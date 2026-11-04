@@ -87,7 +87,7 @@ export const messages = defineMessages("marketplace", {
   "marketplace.agent.update": "Update",
   "marketplace.agent.openChat": "Open chat",
 
-  // The question before an agent update that meets skills with local changes. {names} is a list of skill names.
+  // The question before an agent update that meets skills with local changes.
   "marketplace.agentUpdate.title": "Update {name}?",
   "marketplace.agentUpdate.body": {
     one: "{count} skill has local changes. It stays as it is unless you choose Replace.",
