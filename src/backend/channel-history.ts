@@ -442,12 +442,27 @@ export class ChannelHistory {
       const characterBudget = Math.min(CONTEXT_CHARACTERS, requestedBudget);
       const channel = yield* channelSync(() => dependencies.store.get(task.channelId));
       // The member's own model can summarize when the lead's model is not available, and in a
-      // channel with no lead.
+      // channel with no lead. A summary is context, not a condition of the turn: when its model
+      // fails, the packet gives the stored summary and the newest messages that fit, and the next
+      // turn tries again. A lead model that timed out on each summary stopped every member (#4961).
       const summarized = yield* summarize(
         channel.id,
         lead ?? agent,
         lead && agent.id !== lead.id ? [agent] : [],
         characterBudget,
+      ).pipe(
+        Effect.catch((failure) =>
+          Effect.gen(function* () {
+            logger.warn("A channel summary failed. The packet gives the newest messages that fit.", {
+              channelId: channel.id,
+              reason: failure.cause instanceof Error ? failure.cause.message : String(failure.cause),
+            });
+            const messages = conversation(yield* channelSync(() => dependencies.store.messages(channel.id)));
+            const summary = yield* channelSync(() => dependencies.store.summary(channel.id));
+            const recent = messages.filter((message) => message.sequence > summary.throughSequence);
+            return { messages, summary, recent, summaryPasses: 0 };
+          }),
+        ),
       );
       const { messages, summary, summaryPasses } = summarized;
       let { recent } = summarized;
@@ -566,7 +581,8 @@ export class ChannelHistory {
       // Each packet stays in the provider session, and a provider keeps recent user messages
       // through a compaction, so a large packet raises what is left after each one (#3905). The
       // summary keeps the history under the transcript part, so the newest-first cut drops a message
-      // only when the summary could not run before it, such as at a message that still streams.
+      // only when the summary could not run before it, such as at a message that still streams or
+      // when the summary model failed.
       const transcriptCharacters = Math.floor(characterBudget * TRANSCRIPT_SHARE);
       const channelBlock = {
         id: channel.id,
