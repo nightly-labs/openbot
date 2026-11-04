@@ -36,10 +36,18 @@ speech, including user turns whose exact transcript is unavailable. After the he
 for new speech. Desktop and mobile wait for the provider's session-ready event before reporting a
 subscription call as connected.
 Exact words are not assumed. Ending, losing or expiring a call saves a labelled context note in the
-agent's existing SQLite chat. This internal note is hidden from the chat timeline. The next provider
+agent's existing SQLite chat. The host leaves this internal note out of client history, live events,
+reply references, message search and unread counts, including responses to released clients that do
+not recognize voice context. Desktop and web also omit cached notes by their item type. Ordinary
+typed quotations remain visible; their text is not used to identify internal notes. The next provider
 turn receives the recent saved handoff, including when that provider session was already loaded.
 Saving context does not enqueue another task or promote voice-model statements to durable facts. Empty context is marked as unavailable so the
 agent asks rather than inventing it.
+
+Live-call controls and voice settings are implemented in the desktop and custom native mobile
+clients. The browser workspace does not provide live calls or a voice picker. Its chat still gets
+the same filtered history. A host update can hide internal context from an older released desktop
+client without adding live-call controls to that client.
 
 This mode does not keep call recordings or a second browser transcript database. Generated audio
 is not proof of the exact words the user heard after an interruption.

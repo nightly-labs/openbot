@@ -11,6 +11,7 @@ import {
   CONTEXT_RESET_ITEM_TYPE,
   CONVERSATION_MEMORY_CHANGES_ITEM_TYPE,
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
+  CONVERSATION_VOICE_CONTEXT_ITEM_TYPE,
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
   MODEL_SWITCH_ITEM_TYPE_PREFIX,
@@ -72,6 +73,7 @@ function isIncoming(message: { itemType?: string | undefined }, fromUser: boolea
     message.itemType !== PLAN_CONTINUATION_ITEM_TYPE &&
     message.itemType !== AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE &&
     message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE &&
+    message.itemType !== CONVERSATION_VOICE_CONTEXT_ITEM_TYPE &&
     !isRoutineEventItem(message)
   );
 }

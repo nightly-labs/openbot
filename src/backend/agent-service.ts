@@ -116,6 +116,7 @@ import {
   agentTaskLimit,
   type BusyMessageMode,
   CONTEXT_RESET_ITEM_TYPE,
+  CONVERSATION_VOICE_CONTEXT_ITEM_TYPE,
   DEFAULT_BUSY_MESSAGE_MODE,
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   DEFAULT_PROVIDER_ACCOUNT_ID,
@@ -1071,7 +1072,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const agent = this.#store.list().find((candidate) => candidate.id === agentId);
         if (!agent?.threadId) return null;
         const page = this.#store.database.readConversationPage(agentId, agent.threadId, { type: "latest" }, 100);
-        return page.messages.findLast((message) => message.itemType === "voice-context")?.text ?? null;
+        return (
+          page.messages.findLast((message) => message.itemType === CONVERSATION_VOICE_CONTEXT_ITEM_TYPE)?.text ?? null
+        );
       },
       store,
       mailbox,
@@ -3941,14 +3944,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#providers.withCodexVoiceAuth(accountId, use);
   }
 
-  voiceSessionContext(agentId: string, memberId: string) {
-    return this.readConversationFor(agentId, memberId).pipe(
+  voiceSessionContext(agentId: string, _memberId: string) {
+    // The voice boundary checks the caller's agent access. This host-only read also needs the
+    // saved context that public conversation reads deliberately omit.
+    return this.readConversation(agentId).pipe(
       Effect.map((snapshot) => {
         const agent = this.#store.list().find((candidate) => candidate.id === agentId);
         const recent = snapshot.messages
           .filter(
             (message) =>
-              message.author === "user" || message.author === "assistant" || message.itemType === "voice-context",
+              message.author === "user" ||
+              message.author === "assistant" ||
+              message.itemType === CONVERSATION_VOICE_CONTEXT_ITEM_TYPE,
           )
           .slice(-8);
         return redactText(
@@ -3988,7 +3995,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         text: voiceContextHandoff(entries),
         createdAt: new Date().toISOString(),
         status: "completed",
-        itemType: "voice-context",
+        itemType: CONVERSATION_VOICE_CONTEXT_ITEM_TYPE,
       },
       "thread.voice-context",
     );
@@ -4459,7 +4466,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /** The conversation of one task, for its panel. */
   readTask(agentId: string, taskId: string): ConversationSnapshot {
-    return structuredClone(this.#tasks.read(agentId, taskId));
+    const snapshot = this.#tasks.read(agentId, taskId);
+    return structuredClone({
+      ...snapshot,
+      messages: snapshot.messages.filter((message) => message.itemType !== CONVERSATION_VOICE_CONTEXT_ITEM_TYPE),
+    });
   }
 
   /** Starts a task of the agent with its first message. The task runs beside the agent's own chat. */

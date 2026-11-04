@@ -1,12 +1,18 @@
-// Exercises persisted call provenance and real mobile chat projection without native rendering.
+// Exercises persisted call provenance and desktop/web/mobile chat projections without native rendering.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { ConversationMessage } from "@openbot/contracts/ipc";
-import type { ChatMessage } from "../apps/mobile/src/features/chat/model/chat-messages";
+import { type ChatMessage, projectChatMessages } from "../apps/mobile/src/features/chat/model/chat-messages";
 import { createVoiceCallHistory } from "../apps/mobile/src/features/chat/model/voice-call-history";
 import { presentVoiceCalls } from "../apps/mobile/src/features/chat/model/voice-call-presentation";
+
+// Load the actual renderer projection in Bun; its Solid TSX imports do not belong to this script's
+// Node type-check project. The separate renderer project checks that module.
+const toAgentMessages: (messages: ConversationMessage[]) => { id: string }[] = (
+  await import(new URL("../src/renderer/src/app-message-projection.ts", import.meta.url).href)
+).toAgentMessages;
 
 const root = await mkdtemp(join(tmpdir(), "openbot-voice-history-"));
 const file = join(root, "history.json");
@@ -25,6 +31,33 @@ const message = (id: string, author: "user" | "assistant", turnId: string): Conv
   createdAt: "2026-11-04T00:00:00.000Z",
 });
 try {
+  const cached: ConversationMessage[] = [
+    {
+      ...message("typed-quotation", "user", "typed-turn"),
+      text: "Voice conversation context. A typed quotation stays visible.",
+    },
+    {
+      id: "hidden-context",
+      author: "system",
+      source: "system",
+      itemType: "voice-context",
+      text: "Internal voice transcript canary",
+      status: "completed",
+      createdAt: "2026-11-04T00:00:01.000Z",
+    },
+    message("normal-answer", "assistant", "typed-turn"),
+  ];
+  const expected = ["typed-quotation", "normal-answer"];
+  assert.deepEqual(
+    toAgentMessages(cached).map((row) => row.id),
+    expected,
+    "Desktop and web exposed cached voice context, or hid a real typed quotation.",
+  );
+  assert.deepEqual(
+    projectChatMessages(cached).map((row) => row.id),
+    expected,
+    "Mobile exposed cached voice context, or hid an ordinary message.",
+  );
   const history = createVoiceCallHistory(port);
   await history.selectOwner("account-one");
   history.begin(target, "call-one");
@@ -114,6 +147,7 @@ try {
     expansionAndSearchRetainDetails: true,
     failuresAndMixedTypedTurnStayVisible: true,
     accountAndSignOutIsolation: true,
+    desktopWebAndMobileHideCachedContext: true,
   };
   await writeFile(join(output, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   process.stdout.write(`${JSON.stringify(report)}\n`);

@@ -12,6 +12,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentAccessLevel,
   agentAccessRank,
+  CONVERSATION_VOICE_CONTEXT_ITEM_TYPE,
   type ConversationMessageSender,
   type ConversationPageAnchor,
   type ConversationSnapshot,
@@ -122,12 +123,14 @@ export function markerExclusionsForCapabilities(capabilities: ReadonlySet<string
   excludeRoutineRunEvents: boolean;
   excludeHostedSiteEvents: boolean;
   excludeRoutineQuietAnswers: boolean;
+  excludeVoiceContext?: boolean;
 } {
   return {
     excludeRoutineEvents: !capabilities.has("routine-event-markers"),
     excludeRoutineRunEvents: !capabilities.has("routine-run-event-markers"),
     excludeHostedSiteEvents: !capabilities.has("hosted-site-event-markers"),
     excludeRoutineQuietAnswers: true,
+    excludeVoiceContext: true,
   };
 }
 
@@ -137,6 +140,7 @@ export function markerExclusionsForCapabilities(capabilities: ReadonlySet<string
  */
 function markerSupported(itemType: string | undefined, capabilities: ReadonlySet<string>): boolean {
   if (itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE) return false;
+  if (itemType === CONVERSATION_VOICE_CONTEXT_ITEM_TYPE) return false;
   if (itemType?.startsWith(ROUTINE_EVENT_ITEM_TYPE_PREFIX)) return capabilities.has("routine-event-markers");
   // Paged history drops suggestions with routine events, so live events drop them the same way.
   if (itemType?.startsWith(MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX)) return capabilities.has("routine-event-markers");

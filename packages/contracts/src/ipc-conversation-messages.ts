@@ -18,6 +18,9 @@ import { type ConversationUiBlock, isConversationUiBlock } from "./ui-blocks";
 
 export type ConversationMessageAuthor = "user" | "assistant" | "agent" | "system";
 
+/** Durable provider context, never a message for a person to read or act on. */
+export const CONVERSATION_VOICE_CONTEXT_ITEM_TYPE = "voice-context";
+
 export const IMAGE_GENERATION_ASPECT_RATIOS = ["square", "portrait", "landscape"] as const;
 export type ImageGenerationAspectRatio = (typeof IMAGE_GENERATION_ASPECT_RATIOS)[number];
 

@@ -4,6 +4,7 @@ import {
   type AgentEvent,
   type AgentSummary,
   CONVERSATION_SNAPSHOT_MESSAGE_LIMIT,
+  CONVERSATION_VOICE_CONTEXT_ITEM_TYPE,
   type ConversationMessage,
   type ConversationSnapshot,
   type QueueDeliveryStatus,
@@ -767,7 +768,13 @@ export class ConversationRuntime {
     if (this.#dropDeletedMessages(snapshot) || signature === undefined)
       signature = conversationContentSignature(snapshot);
     this.#conversationSignatures.set(snapshot.threadId ?? snapshot.agentId, signature);
-    this.#emit({ type: "conversation", snapshot: structuredClone(snapshot) });
+    this.#emit({
+      type: "conversation",
+      snapshot: structuredClone({
+        ...snapshot,
+        messages: snapshot.messages.filter((message) => message.itemType !== CONVERSATION_VOICE_CONTEXT_ITEM_TYPE),
+      }),
+    });
   }
 
   rememberConversationSignature(snapshot: ConversationSnapshot): void {

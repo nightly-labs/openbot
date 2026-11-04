@@ -8,6 +8,7 @@ import {
   CONVERSATION_MEMORY_CHANGES_ITEM_TYPE,
   CONVERSATION_PLAN_ITEM_TYPE,
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
+  CONVERSATION_VOICE_CONTEXT_ITEM_TYPE,
   type ConversationReadState,
   type ConversationSnapshot,
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
@@ -174,7 +175,7 @@ export class ConversationReadStore {
     if (fromMessageId && !fromKey) throw new Error(sourceText("error.backend.readBoundaryUnavailable"));
     const throughMessageId = fromKey ? this.#messageBefore(threadId, fromKey) : null;
     this.#saveCursor(threadId, memberId, throughMessageId, "marked");
-    return this.#stateFromDatabase(threadId, throughMessageId);
+    return this.#withSupportedCursor(threadId, this.#stateFromDatabase(threadId, throughMessageId), {});
   }
 
   #withSupportedCursor(
@@ -184,7 +185,10 @@ export class ConversationReadStore {
   ): ConversationReadState {
     return {
       ...state,
-      throughMessageId: this.database.supportedConversationCursor(threadId, state.throughMessageId, options),
+      throughMessageId: this.database.supportedConversationCursor(threadId, state.throughMessageId, {
+        ...options,
+        excludeVoiceContext: true,
+      }),
     };
   }
 
@@ -294,6 +298,7 @@ export class ConversationReadStore {
       AND COALESCE(item_type, '') != '${PLAN_CONTINUATION_ITEM_TYPE}'
       AND COALESCE(item_type, '') != '${AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE}'
       AND COALESCE(item_type, '') != '${ROUTINE_QUIET_ANSWER_ITEM_TYPE}'
+      AND COALESCE(item_type, '') != '${CONVERSATION_VOICE_CONTEXT_ITEM_TYPE}'
       AND COALESCE(item_type, '') != 'agent_attachment'
       AND COALESCE(item_type, '') NOT LIKE '${CHAT_VISUAL_ITEM_TYPE_PREFIX}%'
       AND COALESCE(item_type, '') != '${AGENT_EXCHANGE_ITEM_TYPE}'
@@ -401,6 +406,7 @@ function stateFromSnapshot(snapshot: ConversationSnapshot, throughMessageId: str
         message.itemType !== PLAN_CONTINUATION_ITEM_TYPE &&
         message.itemType !== AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE &&
         message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE &&
+        message.itemType !== CONVERSATION_VOICE_CONTEXT_ITEM_TYPE &&
         message.itemType !== "agent_attachment" &&
         !message.itemType?.startsWith(CHAT_VISUAL_ITEM_TYPE_PREFIX) &&
         message.itemType !== AGENT_EXCHANGE_ITEM_TYPE &&

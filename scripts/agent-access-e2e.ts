@@ -46,6 +46,7 @@ import {
   agentAccessEvent,
 } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_MEMORY_INCLUSION_ROUTE } from "@openbot/contracts/team-protocol/agent-memories-v1";
+import { BROWSER_USER_CONTROL_CAPABILITY } from "@openbot/contracts/team-protocol/browser-user-control-v1";
 import { teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
 import {
   SERVER_AUDIT_CAPABILITY,
@@ -900,7 +901,7 @@ try {
     };
   });
 
-  await step("voice context: an incomplete handoff persists once across host restart", async () => {
+  await step("voice context: durable agent context stays out of client history, search and unread state", async () => {
     const agent = await runCauseEffect(
       current().agents.createAgentProfile({
         name: "Voice context",
@@ -912,8 +913,17 @@ try {
     const entries = [
       { role: "user", kind: "delegation-context", text: "A contextual summary, not exact spoken words." },
     ] satisfies import("../src/backend/agent/voice-context").VoiceContextEntry[];
+    const published: import("@openbot/contracts/ipc").ConversationSnapshot[] = [];
+    current().agents.on("event", (event: import("@openbot/contracts/ipc").AgentEvent) => {
+      if (event.type === "conversation" && event.snapshot.agentId === agent.id) published.push(event.snapshot);
+    });
     current().agents.recordVoiceContext(agent.id, "handoff-retry", entries);
     current().agents.recordVoiceContext(agent.id, "handoff-retry", entries);
+    assert.ok(published.length > 0, "The context save must publish a conversation revision.");
+    assert.ok(
+      published.every((snapshot) => snapshot.messages.every((message) => message.itemType !== "voice-context")),
+      "A live client event exposed internal voice context.",
+    );
     await stopHost();
     host = await startHost();
     const ownerId = current()
@@ -921,13 +931,134 @@ try {
       .find((member) => member.role === "owner")?.id;
     assert.ok(ownerId);
     const conversation = await runCauseEffect(current().agents.readConversationFor(agent.id, ownerId));
-    const notes = conversation.messages.filter((message) => message.itemType === "voice-context");
+    assert.equal(
+      conversation.messages.some((message) => message.itemType === "voice-context"),
+      false,
+    );
+    assert.equal(conversation.readState?.unreadCount, 0, "Saving internal context must not create an unread reply.");
+    assert.equal(conversation.readState?.throughMessageId, null, "A read cursor must not point at hidden context.");
+    const stored = await runCauseEffect(current().agents.readConversation(agent.id));
+    const notes = stored.messages.filter((message) => message.itemType === "voice-context");
     assert.equal(notes.length, 1);
     assert.ok(notes[0]?.text.includes("not exact spoken words"));
+    assert.ok(stored.threadId);
+    const note = notes[0];
+    assert.ok(note);
+    current().database.persistConversationChanges({
+      agentId: agent.id,
+      threadId: stored.threadId,
+      activeTurnId: null,
+      changedMessages: [
+        {
+          id: "voice-typed-quotation",
+          author: "user",
+          text: "Voice conversation context. Keep this typed quotation visible.",
+          createdAt: new Date(Date.parse(note.createdAt) - 2_000).toISOString(),
+          status: "completed",
+        },
+        {
+          id: "voice-visible-answer",
+          author: "assistant",
+          text: "A normal answer remains visible.",
+          replyToMessageId: note.id,
+          createdAt: new Date(Date.parse(note.createdAt) - 1_000).toISOString(),
+          status: "completed",
+        },
+      ],
+      removedMessageIds: [],
+      eventType: "voice-context-display-fixture",
+      detail: null,
+    });
+    for (const protocol of [TEAM_PROTOCOL_V7, TEAM_PROTOCOL_V9]) {
+      const history = await call("GET", TEAM_API_ROUTES.agent.conversation(agent.id), { token: ownerToken, protocol });
+      assert.equal(history.status, 200);
+      assert.equal(
+        JSON.stringify(history.body).includes("not exact spoken words"),
+        false,
+        "Released-client history exposed context.",
+      );
+      assert.ok(
+        JSON.stringify(history.body).includes("Keep this typed quotation visible"),
+        "Typed quotations must remain visible.",
+      );
+      const page = await call("GET", `${TEAM_API_ROUTES.agent.conversationPage(agent.id)}?limit=1`, {
+        token: ownerToken,
+        protocol,
+      });
+      assert.equal(page.status, 200);
+      assert.equal(
+        JSON.stringify(page.body).includes("not exact spoken words"),
+        false,
+        "Paged client history exposed context.",
+      );
+      const first = record(page.body, "page");
+      assert.deepEqual(record(first.references, "references"), {}, "A reply reference exposed hidden context.");
+      const info = record(first.pageInfo, "page info");
+      assert.equal(info.olderCount, 1, "Hidden context must not occupy a page or inflate older history.");
+      const older: import("@openbot/contracts/ipc").ConversationPage = await runCauseEffect(
+        current().agents.readConversationPageFor(
+          agent.id,
+          ownerId,
+          { type: "before", cursor: text(info.olderCursor, "older cursor") },
+          1,
+        ),
+      );
+      assert.deepEqual(
+        older.messages.map((message) => message.id),
+        ["voice-typed-quotation"],
+      );
+      assert.equal(older.pageInfo.hasOlder, false);
+    }
+    const search = current().agents.searchConversationMessages("not exact spoken words", agent.id);
+    assert.equal(search.total, 0, "Internal context must not appear in message search or its count.");
+    const searchResponse = await call("GET", `${TEAM_API_ROUTES.messages.search}?q=not%20exact%20spoken%20words`, {
+      token: ownerToken,
+    });
+    assert.equal(record(searchResponse.body, "search").total, 0);
+    assert.equal(current().agents.searchConversationMessages("typed quotation", agent.id).total, 1);
+    const read = await runCauseEffect(current().agents.markConversationRead(agent.id, ownerId, note.id));
+    assert.equal(
+      read.throughMessageId,
+      "voice-visible-answer",
+      "A hidden read boundary did not fall back to its visible predecessor.",
+    );
+    const unread = await runCauseEffect(current().agents.markConversationUnread(agent.id, ownerId));
+    assert.equal(unread.unreadCount, 1, "Mark unread counted internal context as another reply.");
+    assert.equal(unread.firstUnreadMessageId, "voice-visible-answer");
+    const socket = await openEvents(ownerToken);
+    // This capability's first event is a barrier: the server has accepted the new scope without
+    // runtime snapshots, so conversation events now take the released full-history path.
+    const scoped = nextMessage(socket, (value) =>
+      isRecord(value) && value.type === "browser-user-control-changed" ? value : null,
+    );
+    socket.send(
+      JSON.stringify({
+        type: "agent-event-scope",
+        includeConversations: true,
+        capabilities: [BROWSER_USER_CONTROL_CAPABILITY],
+      }),
+    );
+    await scoped;
+    const nextConversation = nextMessage(socket, (value) => {
+      if (!isRecord(value) || value.type !== "conversation") return null;
+      const snapshot = record(value.snapshot, "live conversation");
+      return snapshot.botId === agent.id ? snapshot : null;
+    });
+    current().agents.recordVoiceContext(agent.id, "legacy-live-wire", entries);
+    assert.equal(
+      JSON.stringify(await nextConversation).includes("not exact spoken words"),
+      false,
+      "The legacy full-history event materializer reintroduced context from SQLite.",
+    );
     const startup = await runCauseEffect(current().agents.voiceSessionContext(agent.id, ownerId));
     assert.ok(startup.includes('"name":"Voice context"'));
     assert.ok(startup.includes("not exact spoken words"));
-    return { persistedOnce: true, labelledContext: true };
+    return {
+      persistedOnce: true,
+      labelledContext: true,
+      liveAndReleasedHistoryHidden: true,
+      searchAndUnreadHidden: true,
+    };
   });
 
   report.passed = true;

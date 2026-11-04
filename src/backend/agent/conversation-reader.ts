@@ -6,6 +6,7 @@ import type {
   ConversationReadState,
   ConversationSearchPage,
 } from "@openbot/contracts/ipc";
+import { CONVERSATION_VOICE_CONTEXT_ITEM_TYPE } from "@openbot/contracts/ipc";
 import { Effect, Schema } from "effect";
 import type { AgentStore } from "../agent-store";
 import { type ConversationMarkerExclusions, ConversationReadStore } from "../conversation-read-store";
@@ -71,6 +72,7 @@ export class ConversationReader {
     return yield* readerStep(() => {
       return {
         ...snapshot,
+        messages: snapshot.messages.filter((message) => message.itemType !== CONVERSATION_VOICE_CONTEXT_ITEM_TYPE),
         readState: this.#reads.readState(memberId, snapshot),
       };
     });
@@ -87,7 +89,10 @@ export class ConversationReader {
     const agent = yield* this.#store.existing(agentId).pipe(toConversationReadFailed);
     return yield* readerStep(() => {
       this.#mailboxSync.reconcilePersistedMailboxMessages(agent);
-      const page = this.#store.database.readConversationPage(agentId, agent.threadId, anchor, limit, options);
+      const page = this.#store.database.readConversationPage(agentId, agent.threadId, anchor, limit, {
+        ...options,
+        excludeVoiceContext: true,
+      });
       return {
         ...page,
         readState: this.#reads.readStateForThread(memberId, agent.threadId, options),

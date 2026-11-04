@@ -4,6 +4,7 @@ import {
   CONVERSATION_MEMORY_CHANGES_ITEM_TYPE,
   CONVERSATION_PLAN_ITEM_TYPE,
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
+  CONVERSATION_VOICE_CONTEXT_ITEM_TYPE,
   hostedSiteConversationEvent,
   isChannelChangeMarker,
   isContextResetMarker,
@@ -180,6 +181,7 @@ export function toAgentMessages(
   const result: AgentMessage[] = [];
   const thinkingByTurn = new Map<string, AgentMessage>();
   for (const [index, message] of messages.entries()) {
+    if (message.itemType === CONVERSATION_VOICE_CONTEXT_ITEM_TYPE) continue;
     if ((message.delivery?.status === "queued" || message.delivery?.status === "cancelled") && !message.routine) {
       continue;
     }

@@ -10,6 +10,7 @@ import type {
   ConversationSnapshot,
 } from "@openbot/contracts/ipc";
 import {
+  CONVERSATION_VOICE_CONTEXT_ITEM_TYPE,
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   isAttachmentSummary,
   MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
@@ -36,6 +37,7 @@ export interface ConversationQueriesOptions {
 
 /** The message kinds that a Team API client cannot show, left out of its pages and read state. */
 export interface ConversationMarkerExclusions {
+  excludeVoiceContext?: boolean;
   excludeRoutineEvents?: boolean;
   excludeRoutineRunEvents?: boolean;
   excludeHostedSiteEvents?: boolean;
@@ -395,7 +397,7 @@ export class ConversationQueries {
              JOIN projection_threads thread ON thread.thread_id = message.thread_id
              WHERE ${textFilter}
                AND COALESCE(json_extract(message.message_json, '$.delivery.status'), '') NOT IN ('queued', 'cancelled')
-               AND COALESCE(message.item_type, '') NOT IN ('commentary', '${ROUTINE_QUIET_ANSWER_ITEM_TYPE}')
+               AND COALESCE(message.item_type, '') NOT IN ('commentary', '${ROUTINE_QUIET_ANSWER_ITEM_TYPE}', '${CONVERSATION_VOICE_CONTEXT_ITEM_TYPE}')
                AND COALESCE(message.item_type, '') NOT LIKE '${SKILL_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%'
                AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX}%'
                AND COALESCE(message.item_type, '') NOT LIKE '${HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX}%'
@@ -732,6 +734,7 @@ function pageKeyValues(cursor: ConversationPageCursor): [string, number, string,
 
 function conversationMarkerSqlFilter(exclusions: ConversationMarkerExclusions): string {
   return [
+    exclusions.excludeVoiceContext ? `AND COALESCE(item_type, '') != '${CONVERSATION_VOICE_CONTEXT_ITEM_TYPE}'` : "",
     exclusions.excludeRoutineEvents
       ? `AND COALESCE(item_type, '') NOT LIKE '${SKILL_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(item_type, '') NOT LIKE '${MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX}%'`
       : "",
