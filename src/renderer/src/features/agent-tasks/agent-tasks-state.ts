@@ -166,15 +166,20 @@ export function createAgentTasks(options: AgentTasksOptions) {
    * does not have, the list is read again: the new task can be a branch from another device.
    */
   function applyTasksChanged(snapshot: AgentTasksSnapshot): void {
-    const known = untrack(() => {
-      const stored = state.snapshots[snapshot.agentId];
-      return stored && branchable() ? new Set(stored.tasks.map((task) => task.id)) : undefined;
-    });
+    const stored = untrack(() => state.snapshots[snapshot.agentId]);
+    const known = stored && untrack(branchable) ? new Set(stored.tasks.map((task) => task.id)) : undefined;
+    // Each progress line sends a list too. Only a saved message or an end of a turn changes a count.
+    const before = stored ? untrack(() => unreadKey(stored)) : undefined;
     applySnapshot(snapshot);
     if (known && snapshot.tasks.some((task) => task.branch === undefined && !known.has(task.id)))
       void loadTasks(snapshot.agentId);
     // The host sends no event when a read mark moves, so a changed list reads the marks again.
-    else loadUnread(snapshot.agentId);
+    else if (unreadKey(snapshot) !== before) loadUnread(snapshot.agentId);
+  }
+
+  /** What a thread's unread count can follow: the threads, their states and their last changes. */
+  function unreadKey(snapshot: AgentTasksSnapshot): string {
+    return snapshot.tasks.map((task) => `${task.id}:${task.state}:${task.outcome}:${task.updatedAt}`).join("|");
   }
 
   function applyEvent(event: AgentTaskEvent): void {
