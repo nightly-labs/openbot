@@ -329,14 +329,20 @@ async function main(): Promise<void> {
     check(makeCached, makeCached.signedIn, "no token is stored after the sign-in");
     report.cases.push(makeCached);
 
-    // RevenueCat refuses the registration with 400 `invalid_client`. The SDK registers once more
-    // after it drops the credentials; then the test says that the server does not accept OpenBot.
+    // RevenueCat refuses the registration with 400 `invalid_client`. In each attempt, the SDK
+    // registers once more after it drops the credentials, both times as a public client. Then the
+    // probe says that the server does not accept OpenBot.
     const revenueCat = await runCase("registration-refused-invalid-client", ["client_secret_basic", "none"], 2, {
       registrationRefused: true,
     });
     const registrationRefused = sourceText("error.backend.mcpRegistrationRefused");
     for (const [index, attempt] of revenueCat.attempts.entries())
       check(revenueCat, attempt.error === registrationRefused, `attempt ${index + 1} reported: ${attempt.error}`);
+    check(
+      revenueCat,
+      revenueCat.registrations.join() === "none,none,none,none",
+      `the registrations were ${revenueCat.registrations.join()}`,
+    );
     check(revenueCat, revenueCat.pagesOpened === 0, "a sign-in page opened with no registered client");
     check(revenueCat, !revenueCat.storedClient, "a client is stored after a refused registration");
     check(revenueCat, !revenueCat.signedIn, "a token is stored after a refused registration");

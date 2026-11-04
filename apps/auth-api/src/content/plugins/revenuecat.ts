@@ -30,7 +30,7 @@ export const REVENUECAT_PLUGIN_GUIDE: PluginGuide = {
     {
       question: "Which key does the RevenueCat plugin need?",
       answer:
-        "A secret API key for the REST API v2. The key starts with sk_ and reaches one project. Project Admins create secret keys under API keys in the RevenueCat dashboard. OpenBot keeps the key in encrypted storage and sends it in the Authorization header. The plugin catalog holds no secret.",
+        "A secret API key for the REST API v2. The key starts with sk_ and reaches one project. Project Admins create secret keys under API keys in the RevenueCat dashboard. Type the key in the connect dialog in OpenBot. OpenBot sends it as a bearer token in the Authorization header. The plugin catalog holds no secret.",
     },
     {
       question: "What can the agent see and change in RevenueCat?",
@@ -40,7 +40,7 @@ export const REVENUECAT_PLUGIN_GUIDE: PluginGuide = {
     {
       question: "Why does OpenBot not sign in to RevenueCat in the browser?",
       answer:
-        "RevenueCat supports OAuth for its MCP server, but it does not let clients register themselves. Each OAuth client must be added to an allowlist by RevenueCat support. Until RevenueCat adds OpenBot, OpenBot shows that the sign-in server does not accept it, and the API key is the way to connect.",
+        "RevenueCat supports OAuth for its MCP server, but it does not let clients register themselves. Each OAuth client must be added to an allowlist by RevenueCat support. Until RevenueCat adds OpenBot, a browser sign-in stops with a message that the sign-in server does not accept OpenBot. Connect with a secret API key instead.",
     },
   ],
   sources: [
