@@ -202,7 +202,7 @@ export function parseProviderApiKeyInput(value: unknown): SetProviderApiKeyInput
   return { provider, key: value.key.trim() };
 }
 
-export function parseManagedProviderId(value: unknown): ManagedProviderId {
+function parseManagedProviderId(value: unknown): ManagedProviderId {
   const provider = parseProviderId(value);
   if (!isManagedRuntimeProvider(provider)) throw new Error("OpenBot does not manage this provider's CLI.");
   return provider;

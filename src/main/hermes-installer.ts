@@ -23,7 +23,7 @@ const logger = createOpenBotLogger("hermes-installer");
  * (`~/.hermes`, `~/.local/bin/hermes`), so `hermes update` keeps working and OpenBot finds it as
  * the user's own CLI.
  */
-export const HERMES_INSTALLER = {
+const HERMES_INSTALLER = {
   version: "0.22.7",
   commit: "b200f5bc60e31588ba2cb60e288029c4a54ba5fa",
   url: "https://raw.githubusercontent.com/NousResearch/hermes-agent/b200f5bc60e31588ba2cb60e288029c4a54ba5fa/scripts/install.sh",
