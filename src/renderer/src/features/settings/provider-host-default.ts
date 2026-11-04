@@ -2,7 +2,7 @@ import type { AgentModelId, AgentProviderId, HostDefaultProvider, OpenBotDesktop
 import { createEffect, createSignal, untrack } from "solid-js";
 
 /** The default provider calls of a joined server's host. The desktop reaches them through main. */
-export type HostDefaultProviderCalls = Pick<
+type HostDefaultProviderCalls = Pick<
   OpenBotDesktopApi["providerAdmin"],
   "hostDefaultProvider" | "setHostDefaultProvider"
 >;
