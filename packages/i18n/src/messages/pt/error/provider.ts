@@ -295,6 +295,7 @@ export const messages = {
   "error.provider.acpSignInFailed": "O login não foi concluído.",
   "error.provider.acpSignInFailedReason": "O login não foi concluído: {reason}",
   "error.provider.acpSignOutFailed": "O logout não foi concluído.",
+  "error.provider.acpSignOutFailedReason": "O logout não foi concluído: {reason}",
   "error.provider.acpSignInMethodMissing":
     "Este provedor não oferece esta forma de login neste computador. Atualize o provedor e tente novamente.",
   "error.provider.httpsSignInLinkOnly": "Somente links de login HTTPS podem abrir no navegador.",

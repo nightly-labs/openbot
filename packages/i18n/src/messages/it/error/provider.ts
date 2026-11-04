@@ -295,6 +295,7 @@ export const messages = {
   "error.provider.acpSignInFailed": "L'accesso non è stato completato.",
   "error.provider.acpSignInFailedReason": "L'accesso non è stato completato: {reason}",
   "error.provider.acpSignOutFailed": "La disconnessione non è stata completata.",
+  "error.provider.acpSignOutFailedReason": "La disconnessione non è stata completata: {reason}",
   "error.provider.acpSignInMethodMissing":
     "Questo provider non offre questo metodo di accesso su questo computer. Aggiorna il provider, poi riprova.",
   "error.provider.httpsSignInLinkOnly": "Solo i link di accesso HTTPS possono aprirsi nel browser.",

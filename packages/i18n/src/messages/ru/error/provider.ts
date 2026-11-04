@@ -286,6 +286,7 @@ export const messages = {
   "error.provider.acpSignInFailed": "Вход не завершён.",
   "error.provider.acpSignInFailedReason": "Вход не завершён: {reason}",
   "error.provider.acpSignOutFailed": "Выход не завершён.",
+  "error.provider.acpSignOutFailedReason": "Выход не завершён: {reason}",
   "error.provider.acpSignInMethodMissing":
     "Этот провайдер не предлагает такой вход на этом компьютере. Обновите провайдера и повторите попытку.",
   "error.provider.httpsSignInLinkOnly": "В браузере можно открыть только ссылки для входа по HTTPS.",

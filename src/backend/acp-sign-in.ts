@@ -180,6 +180,11 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
         }
         if (message.error !== undefined && (message.id === 1 || message.id === 2 || message.id === 3)) {
           const reason = serverReason(message.error);
+          // A refused sign-out keeps the server's reason, such as a token that the CLI did not save.
+          if (options.logoutOnly && reason)
+            return fail(
+              new ProviderSignInError({ message: sourceText("error.provider.acpSignOutFailedReason", { reason }) }),
+            );
           signInFailed(
             reason
               ? sourceText("error.provider.acpSignInFailedReason", { reason })

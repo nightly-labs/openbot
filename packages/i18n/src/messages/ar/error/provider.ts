@@ -275,6 +275,7 @@ export const messages = {
   "error.provider.acpSignInFailed": "لم يكتمل تسجيل الدخول.",
   "error.provider.acpSignInFailedReason": "لم يكتمل تسجيل الدخول: {reason}",
   "error.provider.acpSignOutFailed": "لم يكتمل تسجيل الخروج.",
+  "error.provider.acpSignOutFailedReason": "لم يكتمل تسجيل الخروج: {reason}",
   "error.provider.acpSignInMethodMissing":
     "لا يوفر هذا المزوّد طريقة تسجيل الدخول هذه على هذا الحاسوب. حدّث المزوّد، ثم أعد المحاولة.",
   "error.provider.httpsSignInLinkOnly": "لا يمكن فتح سوى روابط تسجيل الدخول HTTPS في المتصفح.",

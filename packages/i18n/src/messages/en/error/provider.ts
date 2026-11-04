@@ -282,6 +282,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.acpSignInFailed": "The sign-in did not complete.",
   "error.provider.acpSignInFailedReason": "The sign-in did not complete: {reason}",
   "error.provider.acpSignOutFailed": "The sign-out did not complete.",
+  "error.provider.acpSignOutFailedReason": "The sign-out did not complete: {reason}",
   "error.provider.acpSignInMethodMissing":
     "This provider does not offer this sign-in on this computer. Update the provider, then try again.",
   "error.provider.httpsSignInLinkOnly": "Only HTTPS sign-in links can open in the browser.",

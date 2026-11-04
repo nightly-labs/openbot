@@ -68,68 +68,61 @@ const ACP_REGISTRY_TARGETS: Record<RuntimeTarget, string> = {
   "win32-x64": "windows-x86_64",
 };
 
+/**
+ * The spec of the asset `assetName` in the latest release of the GitHub repository `repo`, with the
+ * asset's `digest` and size. The tag is `v` and the version.
+ */
+const latestGitHubAsset = Effect.fn("ProviderRelease.github")(function* (
+  fetch: Fetch,
+  repo: string,
+  assetName: string,
+  pinned: RuntimeSpec,
+) {
+  const release = yield* fetchJsonEffect(fetch, `https://api.github.com/repos/${repo}/releases/latest`, {
+    Accept: "application/vnd.github+json",
+  });
+  const version = isString(release.tag_name) ? versionFromTag(release.tag_name, "v") : null;
+  const asset = Array.isArray(release.assets)
+    ? release.assets.find((entry: unknown) => isDynamicRecord(entry) && entry.name === assetName)
+    : null;
+  if (
+    !version ||
+    !isDynamicRecord(asset) ||
+    !isString(asset.digest) ||
+    !/^sha256:[a-f0-9]{64}$/u.test(asset.digest) ||
+    !isNumber(asset.size) ||
+    asset.size <= 0
+  )
+    return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.nativeArchiveInvalid")) });
+  return {
+    ...pinned,
+    source: "latest" as const,
+    version,
+    packageVersion: version,
+    url: `https://github.com/${repo}/releases/download/v${version}/${assetName}`,
+    archiveDigest: { algorithm: "sha256" as const, hex: asset.digest.slice(7) },
+    downloadBytes: asset.size,
+  };
+});
+
 const LATEST_RELEASES: Record<
   ManagedProviderId,
   (context: LatestReleaseContext) => Effect.Effect<RuntimeSpec, ProviderRuntimeFailure>
 > = {
-  pi: Effect.fn("ProviderRelease.pi")(function* ({ target, lock, fetch }: LatestReleaseContext) {
-    const pinned = providerRuntimeDescriptor("pi").spec(target, lock);
-    const release = yield* fetchJsonEffect(fetch, "https://api.github.com/repos/earendil-works/pi/releases/latest", {
-      Accept: "application/vnd.github+json",
-    });
-    const version = isString(release.tag_name) ? versionFromTag(release.tag_name, "v") : null;
-    const assetName = `pi-${target.replace("win32", "windows")}.${target === "win32-x64" ? "zip" : "tar.gz"}`;
-    const asset = Array.isArray(release.assets)
-      ? release.assets.find((entry: unknown) => isDynamicRecord(entry) && entry.name === assetName)
-      : null;
-    if (
-      !version ||
-      !isDynamicRecord(asset) ||
-      !isString(asset.digest) ||
-      !/^sha256:[a-f0-9]{64}$/u.test(asset.digest) ||
-      !isNumber(asset.size) ||
-      asset.size <= 0
-    )
-      return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.nativeArchiveInvalid")) });
-    return {
-      ...pinned,
-      source: "latest" as const,
-      version,
-      packageVersion: version,
-      url: `https://github.com/earendil-works/pi/releases/download/v${version}/${assetName}`,
-      archiveDigest: { algorithm: "sha256" as const, hex: asset.digest.slice(7) },
-      downloadBytes: asset.size,
-    };
-  }),
-  copilot: Effect.fn("ProviderRelease.copilot")(function* ({ target, lock, fetch }: LatestReleaseContext) {
-    const pinned = providerRuntimeDescriptor("copilot").spec(target, lock);
-    const release = yield* fetchJsonEffect(fetch, "https://api.github.com/repos/github/copilot-cli/releases/latest", {
-      Accept: "application/vnd.github+json",
-    });
-    const version = isString(release.tag_name) ? versionFromTag(release.tag_name, "v") : null;
-    const assetName = `copilot-${target}.${target === "win32-x64" ? "zip" : "tar.gz"}`;
-    const asset = Array.isArray(release.assets)
-      ? release.assets.find((entry: unknown) => isDynamicRecord(entry) && entry.name === assetName)
-      : null;
-    if (
-      !version ||
-      !isDynamicRecord(asset) ||
-      !isString(asset.digest) ||
-      !/^sha256:[a-f0-9]{64}$/u.test(asset.digest) ||
-      !isNumber(asset.size) ||
-      asset.size <= 0
-    )
-      return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.nativeArchiveInvalid")) });
-    return {
-      ...pinned,
-      source: "latest" as const,
-      version,
-      packageVersion: version,
-      url: `https://github.com/github/copilot-cli/releases/download/v${version}/${assetName}`,
-      archiveDigest: { algorithm: "sha256" as const, hex: asset.digest.slice(7) },
-      downloadBytes: asset.size,
-    };
-  }),
+  pi: ({ target, lock, fetch }) =>
+    latestGitHubAsset(
+      fetch,
+      "earendil-works/pi",
+      `pi-${target.replace("win32", "windows")}.${target === "win32-x64" ? "zip" : "tar.gz"}`,
+      providerRuntimeDescriptor("pi").spec(target, lock),
+    ),
+  copilot: ({ target, lock, fetch }) =>
+    latestGitHubAsset(
+      fetch,
+      "github/copilot-cli",
+      `copilot-${target}.${target === "win32-x64" ? "zip" : "tar.gz"}`,
+      providerRuntimeDescriptor("copilot").spec(target, lock),
+    ),
   muse: Effect.fn("ProviderRelease.muse")(function* ({ target, lock, fetch }: LatestReleaseContext) {
     const pinned = providerRuntimeDescriptor("muse").spec(target, lock);
     const channel = yield* fetchJsonEffect(fetch, "https://api.meta.ai/muse-code/channels/muse-stable");

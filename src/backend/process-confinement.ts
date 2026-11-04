@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, realpathSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { sourceText } from "@openbot/i18n/source";
@@ -404,7 +404,7 @@ export function museStatePaths(env: NodeJS.ProcessEnv = process.env, home = home
 }
 
 /** The home folder of the GitHub Copilot CLI: `$COPILOT_HOME`, or `~/.copilot`. */
-function copilotHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+export function copilotHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
   return env.COPILOT_HOME?.trim() || join(home, ".copilot");
 }
 
@@ -418,6 +418,7 @@ function copilotHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homed
  */
 export function copilotStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
   const copilotHome = copilotHomeDirectory(env, home);
+  makeCopilotConfig(copilotHome);
   return {
     writable: [copilotHome, COPILOT_CONFINED_CACHE],
     writableContents: keychainLockFiles(),
@@ -441,6 +442,24 @@ export function copilotStatePaths(env: NodeJS.ProcessEnv = process.env, home = h
       "pkg",
     ].map((name) => join(copilotHome, name)),
   };
+}
+
+/**
+ * At its first start, GitHub Copilot CLI 1.0.105 writes `firstLaunchAt` in `config.json`. When it
+ * cannot, it stops with no message, and a confined process cannot write that file. Thus OpenBot makes
+ * the file when it is missing, with the same value. The CLI keeps the other values in it.
+ */
+function makeCopilotConfig(copilotHome: string): void {
+  mkdirSync(copilotHome, { recursive: true, mode: 0o700 });
+  try {
+    writeFileSync(
+      join(copilotHome, "config.json"),
+      `${JSON.stringify({ firstLaunchAt: new Date().toISOString() }, null, 2)}\n`,
+      { flag: "wx", mode: 0o600 },
+    );
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) throw error;
+  }
 }
 
 const COPILOT_CONFINED_CACHE = join(tmpdir(), "openbot-confined-copilot-cache");
@@ -494,7 +513,7 @@ const PROJECT_SETTINGS = [
   "_agent",
   // GitHub Copilot reads MCP servers from `.mcp.json` and `.github/mcp.json`, and its project
   // settings, hooks, skills and agents from `.github`. The rest of `.github`, such as the workflows,
-  // stays writable, so `.github` itself cannot be removed or renamed (`seatbeltProfile`).
+  // stays writable, so `.github` itself cannot be removed, renamed or made (`seatbeltProfile`).
   ".mcp.json",
   ".github/mcp.json",
   ".github/copilot",
@@ -562,7 +581,8 @@ function unavailable(tool: string): string {
  * existing file, not its removal, a rename or a link in its place. A lock folder allows every write
  * on the folder itself, but a create there only of a folder. A folder that holds an excluded folder
  * or a protected project path cannot be removed or renamed, because that path would move with it
- * out of its rule.
+ * out of its rule. When that folder does not exist, it cannot be made: a folder renamed or linked
+ * into its place would bring a protected path with no write on that path, such as `.github/mcp.json`.
  * Everything else stays open, as the Access setting says: reads, the network and process starts.
  */
 function seatbeltProfile(
@@ -607,7 +627,7 @@ function seatbeltProfile(
       : []),
     '(allow file-write* (literal "/dev/null") (literal "/dev/zero") (literal "/dev/tty") (literal "/dev/ptmx") (literal "/dev/dtracehelper") (regex #"^/dev/ttys[0-9]+$") (regex #"^/dev/fd/"))',
     ...(denied.length > 0 ? [`(deny file-write* ${denied.join(" ")})`] : []),
-    ...(holders.length > 0 ? [`(deny file-write-unlink ${holders.join(" ")})`] : []),
+    ...(holders.length > 0 ? [`(deny file-write-unlink file-write-create ${holders.join(" ")})`] : []),
     "",
   ].join("\n");
 }

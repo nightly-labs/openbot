@@ -81,6 +81,7 @@ import {
   COPILOT_CONFINED_ENV,
   clineStatePaths,
   confineSpawnTarget,
+  copilotHomeDirectory,
   copilotStatePaths,
   cursorConfinedEnv,
   cursorStatePaths,
@@ -1258,6 +1259,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     },
     // The CLI has no `logout` command; its ACP server has a `logout` method.
     signOut: { argv: COPILOT_ARGV, env: () => ({ ...COPILOT_ENV }), timeoutMs: 30_000, acpLogout: true },
+    // A sign-in writes `loggedInUsers` and `lastLoggedInUser` in `config.json`, and the token in the
+    // keychain.
+    signInFiles: () => [join(copilotHomeDirectory(), "config.json")],
     resolveCli: resolveCopilotCli,
     createClient: (cli, timeout, context, confinement) =>
       new AcpAgentClient(cli, timeout, {

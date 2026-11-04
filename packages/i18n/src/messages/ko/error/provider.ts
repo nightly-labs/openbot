@@ -289,6 +289,7 @@ export const messages = {
   "error.provider.acpSignInFailed": "로그인이 완료되지 않았어요.",
   "error.provider.acpSignInFailedReason": "로그인이 완료되지 않았어요: {reason}",
   "error.provider.acpSignOutFailed": "로그아웃이 완료되지 않았어요.",
+  "error.provider.acpSignOutFailedReason": "로그아웃이 완료되지 않았어요: {reason}",
   "error.provider.acpSignInMethodMissing":
     "이 제공자는 이 컴퓨터에서 이 로그인 방식을 제공하지 않아요. 제공자를 업데이트한 후 다시 시도해 주세요.",
   "error.provider.httpsSignInLinkOnly": "브라우저에서는 HTTPS 로그인 링크만 열 수 있어요.",
