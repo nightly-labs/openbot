@@ -36,6 +36,7 @@ import type { WorkflowRunEnd } from "../backend/workflows/workflows";
 import { type AnalyticsOperationFailure, analyticsIO, analyticsSync } from "./analytics-effects";
 import { PROVIDER_AUTH_KINDS, type ProviderAuthKind } from "./analytics-provider-auth";
 import { localDay, RESOURCE_ENUMS, RESOURCE_PROPERTY_NAMES, type ResourceProperties } from "./resource-summary";
+import { UNCLEAN_EXIT_ENUMS, type UncleanExitProperties } from "./run-marker";
 import { SERVICE_STEPS, START_KINDS, type StartupProperties } from "./startup-timing";
 
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
@@ -102,6 +103,8 @@ const MAX_INVENTORY_ITEMS = 32;
 const ANALYTICS_SCHEMA_VERSION = ANALYTICS_GENERATIONS.desktop_host;
 const CURATED_AGENT_PREFIX = "openbot-curated-agent-";
 const LISTING_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u;
+/** An OpenBot version, such as `0.52.1` or `0.53.0-beta.2`. */
+const APP_VERSION_PATTERN = /^\d{1,4}\.\d{1,4}\.\d{1,6}(?:-[0-9A-Za-z.]{1,24})?$/u;
 const TOOL_NAME_PATTERN = /^[A-Za-z0-9_.-]{1,64}$/u;
 const TOOL_KINDS = [
   "command",
@@ -159,6 +162,7 @@ type HostEventName =
   | "system_inventory"
   | "system_resources"
   | "system_startup"
+  | "system_unclean_exit"
   | "hosted_site_action";
 /**
  * Events that go only when the user links analytics to their account: the sites they visit, the
@@ -209,6 +213,8 @@ export interface HostAnalyticsOptions {
   resolveInventory?: () => Effect.Effect<AnalyticsInventory, AnalyticsOperationFailure>;
   inventoryDay?: AnalyticsInventoryDayStore;
   resources?: AnalyticsResourceSource;
+  /** How the previous run ended when it did not quit cleanly. Sent once, never saved for a later run. */
+  uncleanExit?: UncleanExitProperties | null;
 }
 
 /** The resource summary of the last closed local day, which the resource monitor keeps. */
@@ -322,6 +328,16 @@ const HOST_ALLOWLIST = {
   ],
   system_resources: RESOURCE_PROPERTY_NAMES,
   system_startup: STARTUP_PROPERTY_NAMES,
+  system_unclean_exit: [
+    "phase",
+    "previous_app_version",
+    "uptime_class",
+    "crash_dump_count",
+    "slept",
+    "ended_asleep",
+    "os_restarted",
+    "host_kind",
+  ],
   hosted_site_action: ["action", "entry_point", "result", "failure_code"],
 } as const satisfies Record<HostEventName, readonly string[]>;
 
@@ -356,6 +372,7 @@ export class HostAnalytics {
   readonly #resolveInventory: HostAnalyticsOptions["resolveInventory"];
   readonly #inventoryDayStore: HostAnalyticsOptions["inventoryDay"];
   readonly #resources: HostAnalyticsOptions["resources"];
+  #uncleanExit: UncleanExitProperties | null;
   readonly #client: HostOpenPanelClient | null;
   #identifiedOwner: AnalyticsIdentity | null = null;
   #trackingEnabled: boolean;
@@ -390,6 +407,7 @@ export class HostAnalytics {
     this.#resolveInventory = options.resolveInventory;
     this.#inventoryDayStore = options.inventoryDay;
     this.#resources = options.resources;
+    this.#uncleanExit = options.uncleanExit ?? null;
     this.#trackingEnabled = options.trackingEnabled ?? true;
     this.#install = options.installId ? { id: options.installId, email: null } : null;
     if (!options.enabled) {
@@ -673,6 +691,7 @@ export class HostAnalytics {
     }
     this.#checkInventory();
     this.checkResources();
+    this.#checkUncleanExit();
   }
 
   /** The account signed out. Later events go with the install ID only when the user does not share analytics. */
@@ -920,6 +939,23 @@ export class HostAnalytics {
   }
 
   /**
+   * Sends how the previous run ended, once. It stays in memory only: a user who shares analytics and
+   * is signed out sends it at sign-in in this run, or never. With analytics disabled, or with no
+   * install ID while the user does not share analytics, it is dropped.
+   */
+  #checkUncleanExit(): void {
+    const properties = this.#uncleanExit;
+    if (this.#closed || !properties) return;
+    const owner = this.#client ? this.#currentSubject() : null;
+    if (!owner) {
+      if (!this.#client || !this.#trackingEnabled) this.#uncleanExit = null;
+      return;
+    }
+    this.#uncleanExit = null;
+    this.#trackForOwner("system_unclean_exit", { ...properties }, owner);
+  }
+
+  /**
    * The subject of a new event: the account when the user shares analytics, else the install ID.
    * Null while a user who shares analytics is signed out, so the install ID never shows next to an
    * account, and when there is no install ID.
@@ -1155,6 +1191,15 @@ function sanitizeHostProperty(name: HostEventName, key: string, value: unknown):
       return isBoolean(value) ? value : undefined;
     }
     return boundedCount(value, 10_000_000);
+  }
+  if (name === "system_unclean_exit") {
+    if (key === "phase" || key === "uptime_class" || key === "host_kind") {
+      const allowed: readonly string[] = UNCLEAN_EXIT_ENUMS[key];
+      return isString(value) && allowed.includes(value) ? value : undefined;
+    }
+    if (key === "previous_app_version") return isString(value) && APP_VERSION_PATTERN.test(value) ? value : undefined;
+    if (key === "crash_dump_count") return boundedCount(value, 10);
+    return isBoolean(value) ? value : undefined;
   }
   if (key === "cause_code" || key === "severity" || key === "operation") {
     const safe = safeProperties({
