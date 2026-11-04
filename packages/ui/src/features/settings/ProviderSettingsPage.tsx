@@ -1753,9 +1753,16 @@ function DeleteSection(props: SectionProps) {
   const usedBy = () => props.option.usedBy ?? [];
   const offered = () =>
     Boolean(props.onSetProviderOn && props.onRemoveProviderDownload) && isManagedRuntimeProvider(props.option.id);
-  /** A provider that is on runs a CLI. Only one that OpenBot downloaded has a download to delete. */
+  /**
+   * A provider that is on runs a CLI. Only one that OpenBot downloaded has a download to delete. Pi
+   * also runs the key-only providers, so the host can keep its CLI after Pi turns off; Pi offers
+   * Delete only when it is off and the host measured a download.
+   */
   const onWithDownload = () =>
-    !props.row.off() && props.option.runtimeStatus?.phase === "ready" && props.option.cliSource !== "system";
+    props.option.id !== "pi" &&
+    !props.row.off() &&
+    props.option.runtimeStatus?.phase === "ready" &&
+    props.option.cliSource !== "system";
   let reads = 0;
   /** What a deletion frees. The host measures nothing while the provider is on. */
   async function measure(provider: AgentProviderId, read = props.onMeasureProviderDownload): Promise<number> {
