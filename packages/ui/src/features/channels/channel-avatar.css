@@ -88,10 +88,10 @@
   height: var(--channel-avatar-face);
 }
 /* The count of the members the cluster does not show: the felt pill of the sidebar unread count,
-   with its cream yarn digits (`sidebar-felt-badges.css`). The count is a bare text node, so it takes
-   the digit styles itself. It paints its own felt colour under the pill. */
+   with its cream yarn digits. The count is a bare text node, so it takes the digit styles itself. It
+   paints its own felt colour under the pill. */
 .channel-avatar-count {
-  --channel-avatar-felt-box: calc(var(--channel-avatar-size) * 0.46);
+  --felt-box: calc(var(--channel-avatar-size) * 0.46);
 
   /* The optical lift translates the face's drawing, which paints it like a positioned box. The
      count is positioned too, so it paints over the face before it. */
@@ -101,8 +101,8 @@
      ends past the faces and pulls the cluster off centre. 0.46 matches the faces. Two digits do
      not fit the disc, so the disc grows into a pill, centred on the bottom row. */
   box-sizing: border-box;
-  min-width: var(--channel-avatar-felt-box);
-  height: var(--channel-avatar-felt-box);
+  min-width: var(--felt-box);
+  height: var(--felt-box);
   isolation: isolate;
   padding-inline: 4px;
   place-items: center;
@@ -115,25 +115,33 @@
      the smallest step that stays legible on the disc at both cluster sizes. */
   font-size: var(--openbot-text-sm);
   line-height: 1;
-  font-weight: 800;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
+}
+/* The cream yarn digits of the "+N" count and of the sidebar unread count. The stroke makes the
+   digits fat. */
+:is(.channel-avatar-count, .agent-row-unread-count) {
+  font-weight: 800;
   paint-order: stroke fill;
   -webkit-text-stroke: 0.7px var(--openbot-felt-cream-stroke);
 }
-/* The 9-slice felt pill of the unread count, at the height of the count. */
-.channel-avatar-count::before {
-  --channel-avatar-felt-slice: calc(var(--channel-avatar-felt-box) / 1.62);
-  --channel-avatar-felt-edge: calc(var(--channel-avatar-felt-slice) * 0.19);
+/* The felt pill of the "+N" count and of the sidebar unread count (`sidebar-felt-badges.css`): a
+   9-slice of the round lilac ball, so its ends stay round at any width. Each badge sets `--felt-box`,
+   the height of its felt. The art is the left half of the ball and its mirror image, so both ends are
+   the same. The felt is opaque from 0.19 of the slice on all four sides. It goes out by that much past
+   the felt box, and the clip cuts it 0.25px inside the box, on the felt fill. The slice is half of the
+   felt height, so the ends stay round: 2 × slice = box + 2 × 0.19 × slice, thus slice = box / 1.62.
+   The filter darkens the lilac to plum. */
+:is(.channel-avatar-count, .agent-row-agent-status-unread)::before {
+  --felt-slice: calc(var(--felt-box) / 1.62);
+  --felt-edge: calc(var(--felt-slice) * 0.19);
 
   position: absolute;
   z-index: -1;
-  inset: calc(-1 * var(--channel-avatar-felt-edge));
-  border: var(--channel-avatar-felt-slice) solid transparent;
-  border-image: url("../../assets/plush/felt-pill-lilac.webp") 49% fill / var(--channel-avatar-felt-slice) stretch;
-  clip-path: inset(
-    calc(var(--channel-avatar-felt-edge) + 0.25px) round calc(var(--channel-avatar-felt-box) / 2 - 0.25px)
-  );
+  inset: calc(-1 * var(--felt-edge));
+  border: var(--felt-slice) solid transparent;
+  border-image: url("../../assets/plush/felt-pill-lilac.webp") 49% fill / var(--felt-slice) stretch;
+  clip-path: inset(calc(var(--felt-edge) + 0.25px) round calc(var(--felt-box) / 2 - 0.25px));
   filter: brightness(0.52) saturate(1.35) contrast(1.1);
   content: "";
 }

@@ -33,6 +33,7 @@
 
 .agent-row-agent-status-unread {
   --sidebar-felt-under: linear-gradient(to bottom, var(--openbot-felt-plum-top), var(--openbot-felt-plum-bottom));
+  --felt-box: var(--sidebar-felt-box);
 
   /* The digits roll in and out inside the felt, as on a counter. The clip is the rounded padding box,
      so it cuts no part of the ring or the felt. */
@@ -40,40 +41,20 @@
   padding: 0 3px;
   color: var(--openbot-felt-cream);
   font-size: var(--openbot-text-lg);
-  font-weight: 800;
   line-height: 16px;
 }
 
-/* The felt pill: a 9-slice of the round lilac ball, so its ends stay round at any width. The art is
-   the left half of the ball and its mirror image, so both ends are the same. The felt is opaque from
-   0.19 of the slice on all four sides. It goes out by that much past the felt box, and the clip cuts
-   it 0.25px inside the box, on the felt fill. The slice is half of the felt height, so the ends stay
-   round: 2 × slice = box + 2 × 0.19 × slice, thus slice = box / 1.62. The filter darkens the lilac
-   to plum. The "+N" count of a channel cluster is the same pill (`channel-avatar.css`). */
-.agent-row-agent-status-unread::before {
-  --sidebar-felt-slice: calc(var(--sidebar-felt-box) / 1.62);
-  --sidebar-felt-edge: calc(var(--sidebar-felt-slice) * 0.19);
-
-  position: absolute;
-  z-index: -1;
-  inset: calc(-1 * var(--sidebar-felt-edge));
-  border: var(--sidebar-felt-slice) solid transparent;
-  border-image: url("../../assets/plush/felt-pill-lilac.webp") 49% fill / var(--sidebar-felt-slice) stretch;
-  clip-path: inset(calc(var(--sidebar-felt-edge) + 0.25px) round calc(var(--sidebar-felt-box) / 2 - 0.25px));
-  filter: brightness(0.52) saturate(1.35) contrast(1.1);
-  content: "";
-}
+/* The felt pill and the cream digit stroke are the same as on the "+N" count of a channel cluster,
+   so `channel-avatar.css` holds them for both badges. */
 
 /* The letter spacing also adds space after the last digit. The negative end margin removes it, so
    the digits are on the centre of the pill. The yarn look is CSS only, so Chrome and Firefox draw
    the same digits: an SVG filter is not safe at this size, because Firefox rounds a 0.35px dilate up
-   to 1px and the digits fuse. The stroke makes the digits fat. */
+   to 1px and the digits fuse. */
 .agent-row-unread-count {
   position: relative;
   margin-inline-end: -0.06em;
   letter-spacing: 0.06em;
-  paint-order: stroke fill;
-  -webkit-text-stroke: 0.7px var(--openbot-felt-cream-stroke);
 }
 
 /* The failed mark: a raspberry felt ball with two cream felt pills crossed on it. The ball is opaque
