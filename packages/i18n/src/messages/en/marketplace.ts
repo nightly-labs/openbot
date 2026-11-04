@@ -87,6 +87,24 @@ export const messages = defineMessages("marketplace", {
   "marketplace.agent.update": "Update",
   "marketplace.agent.openChat": "Open chat",
 
+  // The question before an agent update that meets skills with local changes.
+  "marketplace.agentUpdate.title": "Update {name}?",
+  "marketplace.agentUpdate.body": {
+    one: "{count} skill has local changes. It stays as it is unless you choose Replace.",
+    other: "{count} skills have local changes. They stay as they are unless you choose Replace.",
+  },
+  "marketplace.agentUpdate.listLabel": "Skills with local changes",
+  "marketplace.agentUpdate.keep": "Your changes stay",
+  "marketplace.agentUpdate.lost": "Your changes will be lost",
+  "marketplace.agentUpdate.choiceLabel": "Keep or replace {name}",
+  "marketplace.agentUpdate.keepOption": "Keep",
+  "marketplace.agentUpdate.replace": "Replace",
+  "marketplace.agentUpdate.others": {
+    one: "{count} other skill also updates.",
+    other: "{count} other skills also update.",
+  },
+  "marketplace.agentUpdate.confirm": "Update agent",
+
   // Apps.
   "marketplace.app.connect": "Connect",
   "marketplace.app.reconnect": "Reconnect",
