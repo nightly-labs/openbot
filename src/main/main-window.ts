@@ -13,6 +13,7 @@ import { Effect } from "effect";
 import { join } from "node:path";
 import {
   type AppVariant,
+  type CentralAuthState,
   type ChatWindowTarget,
   type ComputerUseHighlightPlacement,
   IPC_ENDPOINTS,
@@ -91,6 +92,7 @@ const RELOADABLE_RENDERER_EXITS: ReadonlySet<RenderProcessGoneDetails["reason"]>
  */
 interface MainWindowApplicationServices {
   browser: BrowserHost;
+  centralAuth: { getState(): CentralAuthState };
   remoteServers: RemoteServerManager;
   interfaceSize: InterfaceSizeService;
 }
@@ -331,6 +333,13 @@ export function createMainWindowController({
       if (services) {
         Effect.runFork(services.remoteServers.refreshRuntimeSnapshots());
       }
+    });
+    // `sendToRenderer` drops an event while the page loads, and the page still counts as loading in
+    // `did-finish-load`. A page that read `loading` and then missed the settled account would show
+    // the connecting screen until a restart.
+    window.webContents.on("did-stop-loading", () => {
+      const services = getServices();
+      if (services) sendToRenderer(window, IPC_ENDPOINTS.auth.event, services.centralAuth.getState());
     });
 
     return window;
