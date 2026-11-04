@@ -406,6 +406,15 @@ tickets in D1. It returns a new plaintext secret only to the client that request
 app encrypts its account session token with the operating-system storage protection before it writes
 the token to disk.
 
+On Linux, that protection is the system keyring (Secret Service or KWallet). When the keyring has no
+key, or gives a key that does not open a saved secret (for example a locked keyring, or one that
+keeps its items only in memory), OpenBot makes its own random key in
+`~/.config/OpenBot/secret-storage.key`, which only your user can read (mode `0600`). From then on,
+OpenBot encrypts new secrets on this computer with that key (AES-256-GCM), as on a self-hosted
+server. The key never leaves this computer. Anyone who can read your files can read the key, so
+protect this computer as you protect your home folder. Delete the file to go back to the keyring;
+then sign in again and save the secrets again.
+
 The desktop app also keeps, for each joined server, the ID of its logical remote session and the
 Signal address, so that the next start asks only for a new ticket. The file
 (`openbot-remote-sessions-v1.bin`) is encrypted with the same storage protection and is not written
@@ -781,8 +790,9 @@ server can change it.
 - The Vault (Server settings › Vault) is kept in
   `~/Library/Application Support/OpenBot/openbot-vault-v1.json`, encrypted by the operating system's
   secret storage. It holds the logins, payment cards (number, expiry, security code, name), contact
-  info and API keys (variable name, key, notes) that the user saves. On a computer with no secret storage, such as Linux with no
-  keyring, the Vault saves nothing. The file never leaves this computer. An owner or admin of a joined
+  info and API keys (variable name, key, notes) that the user saves. On Linux with no keyring, OpenBot
+  encrypts it with its own key file, as [Data stored by the central account service](#data-stored-by-the-central-account-service)
+  tells. The file never leaves this computer. An owner or admin of a joined
   server can open that server's Vault in Server settings, from the desktop app or the web app: the
   list goes over the encrypted connection with no password, card number, security code or API key, and one of
   those goes to them only when they show or copy it. The iPhone app shows the same list and never

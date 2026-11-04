@@ -161,6 +161,11 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     { appearance: "dark", transparentWindow: false, palette: "omarchy", palettes: [omarchyPalette] },
   ],
   ["signed out", decodeCentralAuthState, { status: "signed_out" } satisfies CentralAuthState],
+  [
+    "signed out after a keyring change",
+    decodeCentralAuthState,
+    { status: "signed_out", reason: "keyring_changed" } satisfies CentralAuthState,
+  ],
   ["code sent", decodeCentralAuthState, codeSent],
   [
     "code sent with every option",
@@ -333,6 +338,7 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
     },
   ],
   ["an unknown account status", decodeCentralAuthState, { status: "banned" }],
+  ["signed out with an unknown reason", decodeCentralAuthState, { status: "signed_out", reason: "expired" }],
   ["signed in without a user", decodeCentralAuthState, { status: "signed_in" }],
   ["code sent with a text expiry", decodeCentralAuthState, { ...codeSent, expiresAt: "soon" }],
   ["Mobile Connect ticket without data", decodeMobileConnectTicket, { expiresAt: 1 }],

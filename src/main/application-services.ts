@@ -108,7 +108,6 @@ import {
   Notification,
   nativeImage,
   powerMonitor,
-  safeStorage,
   screen,
   shell,
   systemPreferences,
@@ -315,6 +314,12 @@ import { StatementTimings } from "./resource-summary";
 import { RoutineFeedServer } from "./routine-feed-server";
 import { clearRoutineHold, ROUTINE_HOLD_FILE, takeRoutineHold, writeRoutineHold } from "./routine-hold-file";
 import { ScreenCapturer } from "./screen-capture";
+import {
+  createSecretStorage,
+  SECRET_STORAGE_KEY_FILE,
+  type SecretStorage,
+  type SecretStorageCipher,
+} from "./secret-storage-cipher";
 import { SERVER_AUDIT_FILE, ServerAuditStore, serverAuditNames } from "./server-audit-store";
 import { AGENT_PROCESS_VARIABLE, agentProcessEnvironment, ServerMemory } from "./server-memory";
 import { ServerMode, type ServerModeEnvironment } from "./server-mode";
@@ -691,18 +696,21 @@ export interface ApplicationServices {
 }
 
 /** How the driver's own state reads as the capability the Team API projects. */
-/** The Electron secret storage cipher that every encrypted file in userData uses. */
+let userDataSecretStorage: SecretStorage | null = null;
+
+/** The secret storage of userData. Made at first use, when userData has its final path. */
+function secretStorage(): SecretStorage {
+  userDataSecretStorage ??= createSecretStorage({
+    keyPath: join(app.getPath("userData"), SECRET_STORAGE_KEY_FILE),
+  });
+  return userDataSecretStorage;
+}
+
+/** The cipher that every encrypted file in userData uses: `safeStorage`, or the Linux key file. */
 function safeStorageCipher(
   unavailableKey: "error.app.secretStorageUnavailable" | "error.app.macSecureStorageUnavailable",
-) {
-  return {
-    canPersist: () => safeStorage.isEncryptionAvailable(),
-    encrypt: (value: string) => {
-      if (!safeStorage.isEncryptionAvailable()) throw new Error(sourceText(unavailableKey));
-      return safeStorage.encryptString(value);
-    },
-    decrypt: (value: Buffer) => safeStorage.decryptString(value),
-  };
+): SecretStorageCipher {
+  return secretStorage().cipher(() => sourceText(unavailableKey));
 }
 
 function computerUseCapability(state: ComputerUseState): CapabilityState {
@@ -720,7 +728,7 @@ function electronUpdaterCacheRoot(): string {
 
 interface MessagingServicesContext {
   teardown: TeardownRegistry;
-  secretCipher: ReturnType<typeof safeStorageCipher>;
+  secretCipher: SecretStorageCipher;
   centralAuth: CentralAuthManager;
   service: AgentService;
   sidebarLayout: SidebarLayoutStore;
@@ -1023,6 +1031,7 @@ export async function createApplicationServices({
     mobileConnectApiUrl: readMobileConnectApiUrl(process.env.OPENBOT_MOBILE_AUTH_API_URL, centralAuthApiUrl),
     storagePath: join(app.getPath("userData"), CENTRAL_AUTH_FILE),
     ...safeStorageCipher("error.app.macSecureStorageUnavailable"),
+    usesKeyFile: () => secretStorage().usesKeyFile(),
     // The system browser, where the user is signed in to the company. The language loads below.
     companySignInBrowser: { open: (url) => shell.openExternal(url), language: () => language },
   });
@@ -2796,7 +2805,7 @@ export async function createApplicationServices({
     remoteDesktopStateDirectory: join(app.getPath("userData"), "remote-desktop-runtime"),
     getRemoteDesktopRuntimeCredentials: () =>
       Effect.suspend(() => {
-        if (!safeStorage.isEncryptionAvailable())
+        if (!secretCipher.canPersist())
           return Effect.fail(
             new RemoteWorkflowError({ cause: new Error(sourceText("error.app.secretStorageUnavailable")) }),
           );

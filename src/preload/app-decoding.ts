@@ -256,9 +256,12 @@ export function decodeCentralAuthState(value: unknown): CentralAuthState {
   const state = decodeRecord(value, "account state");
   switch (state.status) {
     case "loading":
-    case "signed_out":
     case "signing_in":
       return { status: state.status };
+    case "signed_out":
+      if (state.reason === undefined) return { status: "signed_out" };
+      if (state.reason !== "keyring_changed") throw new Error("Invalid signed-out reason.");
+      return { status: "signed_out", reason: state.reason };
     case "code_sent": {
       const { developmentCode, issue } = state;
       if (developmentCode !== undefined && !isString(developmentCode)) throw new Error("Invalid developmentCode.");
