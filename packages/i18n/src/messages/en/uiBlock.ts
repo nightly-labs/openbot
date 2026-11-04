@@ -3,8 +3,6 @@ import { defineMessages } from "../../message";
 export const messages = defineMessages("uiBlock", {
   "uiBlock.status.pending": "Needs your answer",
   "uiBlock.status.answered": "Answered",
-  "uiBlock.status.expired": "Expired",
-  "uiBlock.status.closed": "Closed",
   "uiBlock.outcome.expired": "No answer was given in time",
   "uiBlock.outcome.closed": "Closed without an answer",
   "uiBlock.outcome.autoAnswered": "{outcome} (nobody answered in time)",
