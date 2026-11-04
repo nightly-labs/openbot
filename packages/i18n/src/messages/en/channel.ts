@@ -76,6 +76,8 @@ export const messages = defineMessages("channel", {
   "channel.picture.icon.card": "Card",
   "channel.error.load": "Could not load channels.",
   "channel.error.action": "The channel action failed.",
+  "channel.error.skillAddress": "Address this skill message to one agent in the channel.",
+  "channel.error.skillUnavailable": "The selected skill is no longer available to that agent.",
   "channel.error.update": "The channel could not be updated.",
   "channel.error.loadOlder": "Could not load earlier messages.",
   "channel.error.delete": "Could not delete this channel.",

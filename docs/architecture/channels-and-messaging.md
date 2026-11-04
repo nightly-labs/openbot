@@ -215,6 +215,15 @@ replies to that task, because a new child task has the request of its parent. A 
 them. A lead change does not move a task that already has an owner. The member packet names the lead
 (`leadAgentId`).
 
+The channel composer offers each member's installed skills through `$`. With one member it shows
+that member's skills; with several, the picker first selects a member. Selecting a skill inserts
+both a leading agent mention and a skill tag, using the existing message format and routing rule.
+An existing leading mention chooses that member directly. A skill message must address exactly one
+member. The host rejects `@everyone`, several leading mentions, or an unavailable skill before it
+stores a skill message or creates work, for every client including mobile. Desktop and web also
+check before sending so that the composer gives immediate feedback. MCP servers remain available
+through `$`, and an ordinary message keeps the channel's existing routing behavior.
+
 Channel tools retrieve history, assign a child task, transfer ownership, and report results. The
 runtime supplies channel and caller identity. A child keeps its parent owner; a transfer changes it.
 Only assignments and awaited results start turns. Completed child results are combined before the

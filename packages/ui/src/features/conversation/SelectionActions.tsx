@@ -175,7 +175,8 @@ export function MessageSelectionActions(props: {
     };
     const onKeyUp = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        dismiss();
+        // The composer's caret is also a document selection; dismiss only our message selection.
+        if (selection()) dismiss();
         return;
       }
       if (event.target instanceof Element && event.target.closest(".selection-actions-layer")) return;

@@ -1,4 +1,5 @@
 import { CHANNEL_CHATS_CAPABILITY } from "@openbot/contracts/ipc";
+import { TEAM_SEMANTIC_TAGS_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import type { WebRuntimeFactory } from "../features/web-client/web-client-context";
@@ -59,6 +60,7 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
         "agent-duplication",
         "sidebar-layout",
         CHANNEL_CHATS_CAPABILITY,
+        TEAM_SEMANTIC_TAGS_CAPABILITY,
         ROUTINE_FLOWS_CAPABILITY,
         MESSAGE_DELETE_CAPABILITY,
       ];
@@ -67,6 +69,7 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
       events.connection({ hostId: host.hostId, state: "offline", message: null });
     },
     listAgents: () => agent.listAgents(),
+    listInstalledSkills: (agentId) => agent.listInstalledSkills(agentId),
     conversation: (agentId, before) =>
       agent.readConversationPage({
         agentId,

@@ -18,6 +18,8 @@ import type { EventRoutinesApi } from "./routine-webhooks-api";
 import type { AgentRoutinesApi } from "./routines-port";
 
 export interface ConversationRuntime {
+  /** Reports skill changes for any channel member, including on a read-only web client. */
+  onSkillsChanged?: (listener: (agentId: string) => void) => () => void;
   agent: Pick<
     OpenBotDesktopApi["agent"],
     | "discardDraftAttachment"

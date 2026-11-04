@@ -1,4 +1,4 @@
-import type { AttachmentSummary, FilePreview, OpenBotDesktopApi } from "@openbot/contracts/ipc";
+import type { AttachmentSummary, FilePreview, InstalledSkill, OpenBotDesktopApi } from "@openbot/contracts/ipc";
 import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
 import type { ChannelMemoriesApi } from "../conversation/memories-port";
 import type { EventRoutinesApi } from "../conversation/routine-webhooks-api";
@@ -60,4 +60,8 @@ export function channelsPort(): ChannelsPort {
     fileActions: "native",
     onAttachmentImport: (listener) => api.agent.onAttachmentImport(listener),
   };
+}
+
+export function listInstalledChannelSkills(agentId: string): Promise<InstalledSkill[]> {
+  return window.openbot.agent.listInstalledSkills(agentId);
 }

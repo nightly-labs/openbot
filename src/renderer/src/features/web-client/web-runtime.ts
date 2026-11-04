@@ -28,6 +28,7 @@ import type {
   DuplicateAgentResult,
   EditQueuedMessageInput,
   HiddenAgentsSnapshot,
+  InstalledSkill,
   InvitePreview,
   LocalBrowserSecretResponse,
   QueueSnapshot,
@@ -157,6 +158,7 @@ import {
   deleteAgent,
   discardAttachmentDraft,
   interruptAgentTurn,
+  listInstalledSkills,
   reorderQueue,
   respondToBrowserSecret,
   respondToBrowserTakeover,
@@ -261,6 +263,7 @@ export interface WebWorkspaceRuntime {
   connect(host: RemoteTeamHost, options?: WebConnectOptions): Promise<string[]>;
   disconnect(): Promise<void>;
   listAgents(): Promise<ClientAgentSummary[]>;
+  listInstalledSkills(agentId: string): Promise<InstalledSkill[]>;
   conversation(agentId: string, before?: string): Promise<ConversationPage>;
   /** The page of an agent's conversation around one message, or the newest page from an older host. */
   conversationAround?: (agentId: string, messageId: string) => Promise<ConversationPage>;
@@ -1271,6 +1274,8 @@ export function createWebWorkspaceRuntime(
     routineFlows,
     updateRoutine: agentRoutines.updateRoutine,
     testRoutine: agentRoutines.testRoutine,
+    listInstalledSkills: (agentId) =>
+      runTeamEffect(listInstalledSkills(teamApi, agentId).pipe(Effect.mapError((error) => error.cause))),
     listHiddenAgents: () => runTeamEffect(listHiddenAgents(teamApi).pipe(Effect.mapError((error) => error.cause))),
     setAgentHidden: (input) =>
       runTeamEffect(setAgentHidden(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
