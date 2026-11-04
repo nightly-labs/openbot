@@ -23,6 +23,8 @@
 //   9. A session at 60% of its window compacts before a turn whose input fills it over 80% (#4374).
 //  10. In an isolated channel, openbot.remember saves a channel memory and the agent keeps none of
 //      it. The packet says when isolation is on and when it is off (#4332).
+//  11. A reply that quotes a member's message and only mentions another member gives the quote in
+//      the assignment. The quote continues its task, and the packet does not show it superseded (#4841).
 // `bun scripts/channel-context-e2e.ts`. Writes .openbot-build/channel-context-e2e/report.json.
 // `CHANNEL_CONTEXT_MEASURE=<label> bun scripts/channel-context-e2e.ts` runs no checks. It sends
 // MEASURE_TURNS requests to three members in turn, with long replies, and writes the size of each
@@ -578,6 +580,11 @@ try {
       rows(referenced(reply)).some((row) => row.id === request.id),
       referenced(reply),
     );
+    pass(
+      "A reply to the request that made the task does not quote it again",
+      !reply.includes("The request replies to message"),
+      blocks(reply).slice(1, 3).join("\n\n"),
+    );
     pass("The delta does not give the channel rules again", !reply.includes(CHANNEL_RULE));
     pass(
       "The delta has no channel facts while the channel is the same",
@@ -902,6 +909,27 @@ try {
       facts(sharedPacket).channel?.isolated === undefined &&
         sharedPacket.includes("no longer isolated") &&
         !sharedPacket.includes("openbot.remember saves a channel memory here"),
+    );
+
+    // 11. The person quotes the Tester's answer and only mentions the Lead.
+    const answer = messages(channelId)
+      .filter((message) => message.author.id === tester.id && message.message.text === "Done.")
+      .at(-1);
+    assert.ok(answer, "The Tester's answer is not stored.");
+    const quoted = await send(channelId, lead.id, `@[Lead](agent:${lead.id}) `, answer.id);
+    record("Lead", quoted);
+    pass(
+      "The assignment gives the quoted message",
+      quoted.includes(`The request replies to message ${answer.id} from Tester:\nDone.`),
+      blocks(quoted).slice(1, 3).join("\n\n"),
+    );
+    const quotedLine = quoted.split("\n").find((line) => line.startsWith(`{"id":${JSON.stringify(answer.id)},`));
+    const quotedRow: { superseded?: boolean } | undefined = quotedLine ? JSON.parse(quotedLine) : undefined;
+    pass(
+      "The packet does not show the quoted message superseded",
+      quotedRow?.superseded === false &&
+        messages(channelId).find((message) => message.id === answer.id)?.superseded === true,
+      JSON.stringify(quotedRow),
     );
   }
   report.passed = true;
