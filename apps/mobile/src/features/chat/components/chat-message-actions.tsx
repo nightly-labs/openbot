@@ -23,7 +23,7 @@ export interface MessageActionsInput {
   /** Unset where the message has no branch: it is not the last answer of a finished turn. */
   onBranch?: () => void;
   onSelectText?: () => void;
-  /** The message that Read aloud reads. Unset where the app cannot read aloud. */
+  /** The message that Read aloud reads. Unset where the message is not a reply. */
   readAloudId?: string;
   /** The open channels that the message text can go to. Unset where the message cannot go to one. */
   sendToChannel?: MessageChannelTargets;

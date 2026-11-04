@@ -15,7 +15,7 @@ import { useEffect, useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
-import { toggleReadAloud, useReadingAloud } from "@/features/voice/model/message-reading";
+import { canReadAloud, toggleReadAloud, useReadingAloud } from "@/features/voice/model/message-reading";
 import { canChangeReplySpeed } from "@/features/voice/model/reply-voice";
 import { saveVoiceSettings, useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { CoveringMenuView } from "@/shared/components/covering-menu-view";
@@ -78,7 +78,8 @@ export function MessageActionsScreen() {
   };
   const icon = String(foreground);
   const readAloudId = request.copyText ? request.readAloudId : undefined;
-  const showSpeed = canChangeReplySpeed && speedReady;
+  /** A build without the native speed, such as Expo Go, shows the speed button disabled. */
+  const canChangeSpeed = canChangeReplySpeed && speedReady;
   const speedLabel = t("mobile.chat.message.readAloudSpeed", { speed: format.number(speed) });
   const changeSpeed = () => {
     void haptics.selection();
@@ -195,22 +196,26 @@ export function MessageActionsScreen() {
             <SettingsRow
               leading={reading ? <Square size={ICON_SIZE} color={icon} /> : <Volume2 size={ICON_SIZE} color={icon} />}
               disclosure={false}
+              disabled={!canReadAloud}
               onPress={() => run(() => toggleReadAloud(readAloudId, request.copyText))}
               trailing={
-                showSpeed ? (
+                speedReady ? (
                   // Changes the speed and keeps the sheet open, so the user can press again.
                   <Button
                     size="sm"
                     variant="secondary"
-                    className="rounded-full"
+                    className="rounded-xl"
+                    isDisabled={!canChangeSpeed}
                     accessibilityLabel={speedLabel}
                     onPress={changeSpeed}
                   >
-                    {t("mobile.chat.message.readAloudSpeedValue", { speed: format.number(speed) })}
+                    <Button.Label className="text-foreground">
+                      {t("mobile.chat.message.readAloudSpeedValue", { speed: format.number(speed) })}
+                    </Button.Label>
                   </Button>
                 ) : undefined
               }
-              accessibilityActions={showSpeed ? [{ name: SPEED_ACTION, label: speedLabel }] : undefined}
+              accessibilityActions={canChangeSpeed ? [{ name: SPEED_ACTION, label: speedLabel }] : undefined}
               onAccessibilityAction={(event) => {
                 if (event.nativeEvent.actionName === SPEED_ACTION) changeSpeed();
               }}

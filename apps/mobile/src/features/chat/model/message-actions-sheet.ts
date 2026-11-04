@@ -13,7 +13,10 @@ export interface MessageActionsRequest {
   createdAt?: string;
   /** The reader's reaction on the message. */
   ownReaction: string | null;
-  /** The message that Read aloud reads. Unset where the app cannot read aloud. */
+  /**
+   * The message that Read aloud reads. Unset where the message is not a reply. A build without the
+   * speech module, such as Expo Go, shows the row disabled.
+   */
   readAloudId?: string;
   /** Unset where a reaction cannot be saved. `null` removes the reader's reaction. */
   onReact?: (emoji: string | null) => void;
