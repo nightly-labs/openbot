@@ -181,9 +181,10 @@ export interface ProviderRuntimeSnapshot {
 }
 
 /**
- * The status of a provider that OpenBot installs with the provider's own installer. Absent where
- * this computer cannot run the installer, where the provider's CLI is already found, and on a host
- * before the installer: the row then shows the install guide, not Download.
+ * The status of a provider that OpenBot installs with the provider's own installer: `ready` where
+ * its CLI is found, so that a server's row offers Connect. Absent where the CLI is missing and this
+ * computer cannot run the installer, and on a host before the installer: the row then shows the
+ * install guide, not Download.
  */
 export type InstallerRuntimeStatuses = { [Provider in InstallerProviderId]?: ProviderRuntimeStatus };
 

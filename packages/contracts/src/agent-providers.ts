@@ -774,8 +774,8 @@ export function customAgentIdOfModel(model: string): string | null {
 
 /**
  * The providers that publish no release archive, so OpenBot installs each with the provider's own
- * pinned installer. The runtime snapshot gives one a status only where this computer can run that
- * installer and no CLI of the provider is found, so a reader that finds no status shows the install
+ * pinned installer. The runtime snapshot gives one a status where its CLI is found (`ready`) or
+ * where this computer can run that installer, so a reader that finds no status shows the install
  * guide instead. Not in `MANAGED_RUNTIME_PROVIDERS`: OpenBot does not pin, verify, update or remove
  * the installed files, and the user's own CLI is the one that runs.
  */

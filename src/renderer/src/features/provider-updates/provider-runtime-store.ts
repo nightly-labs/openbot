@@ -2,7 +2,6 @@ import {
   type AgentProviderId,
   agentProviderName,
   INSTALLER_PROVIDERS,
-  type InstallerProviderId,
   isInstallerProvider,
   isManagedRuntimeProvider,
   MANAGED_RUNTIME_PROVIDERS,
@@ -223,11 +222,13 @@ export function createProviderRuntimeStore(
       const previousPhase = current.providers[provider]?.phase;
       if (previousPhase !== "downloading" && previousPhase !== "finishing") continue;
       const next = snapshot.providers[provider];
-      if (next?.phase === "downloading" || next?.phase === "finishing" || next?.phase === "not-downloaded") continue;
+      // No status: the host no longer offers the install, which is not its end.
+      if (!next || next.phase === "downloading" || next.phase === "finishing" || next.phase === "not-downloaded")
+        continue;
       desktopAnalytics.scope().track("provider_action", {
         provider,
         action: "download_completed",
-        ...(next?.phase === "download-error"
+        ...(next.phase === "download-error"
           ? { result: "failed", failure_code: downloadFailureCode(next.message) }
           : { result: "succeeded" }),
       });
@@ -274,14 +275,15 @@ export function createProviderRuntimeStore(
   }
 
   async function downloadProviderRuntime(provider: AgentProviderId): Promise<void> {
-    if (isInstallerProvider(provider)) return installProvider(provider);
     // A custom agent is the user's own command: OpenBot downloads nothing for it.
-    if (!isManagedRuntimeProvider(provider)) return;
+    if (!isManagedRuntimeProvider(provider) && !isInstallerProvider(provider)) return;
     const source = api();
     if (!source) throw new Error(currentText().t("update.provider.downloadsUnavailable"));
-    const update = providerUpdate(provider);
-    const isUpdate = update.availableVersion !== null;
-    if (isUpdate) {
+    // A provider that its own installer installs has no version and no update, so it shows its
+    // progress and error on its row only.
+    const update = isManagedRuntimeProvider(provider) ? providerUpdate(provider) : null;
+    const isUpdate = update !== null && update.availableVersion !== null;
+    if (update && isUpdate) {
       updating.add(provider);
       failed.delete(provider);
       showProviderUpdateToast(
@@ -300,7 +302,7 @@ export function createProviderRuntimeStore(
         result: "failed",
         failure_code: "download_failed",
       });
-      if (isUpdate) {
+      if (update && isUpdate) {
         updating.delete(provider);
         if (!disposed)
           reportProviderUpdateToast(
@@ -317,28 +319,6 @@ export function createProviderRuntimeStore(
         failed.add(provider);
         return;
       }
-      throw error;
-    }
-  }
-
-  /**
-   * The Download of a provider that its own installer installs. It has no version and no update, so
-   * it shows its progress and error on its row only.
-   */
-  async function installProvider(provider: InstallerProviderId): Promise<void> {
-    const source = api();
-    if (!source) throw new Error(currentText().t("update.provider.downloadsUnavailable"));
-    const analytics = desktopAnalytics.scope();
-    analytics.track("provider_action", { provider, action: "download_started", result: "succeeded" });
-    try {
-      applyFrom(source, await source.download(provider));
-    } catch (error) {
-      analytics.track("provider_action", {
-        provider,
-        action: "download_completed",
-        result: "failed",
-        failure_code: "download_failed",
-      });
       throw error;
     }
   }

@@ -9,7 +9,7 @@ import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
-import { configuredCliPath } from "../backend/cli";
+import { configuredCliPath, resolveHermesCli } from "../backend/cli";
 import { ProviderRuntimeFailure, runtimeIO, runtimeSync } from "./provider-runtime-effects";
 import { readLimitedBody } from "./provider-runtime-releases";
 
@@ -52,6 +52,8 @@ const STAGE_TIMEOUT_MS = 20 * 60_000;
 /** How much of each output stream a stage keeps: the frame is the last stdout line. */
 const OUTPUT_LIMIT = 64 * 1024;
 const LOGGED_OUTPUT = 2_000;
+/** How long a stage that has exited waits for the end of its output. */
+const EXIT_PIPE_WAIT_MS = 2_000;
 
 type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -139,6 +141,8 @@ export class HermesInstaller extends EventEmitter<{ status: [] }> {
       if (configuredCliPath("hermes"))
         return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.cliOverride")) });
       if (this.#task) return;
+      // An installed Hermes updates with `hermes update`. The pinned installer would move it back.
+      if (this.#provider && this.#provider.state !== "not-installed") return;
       this.#set({ phase: "downloading", progress: 0, message: null, version: null });
       // No await between the guard and the record, so a second request finds this task.
       this.#task = yield* Effect.forkIn(this.#installAndCheck(), this.#scope);
@@ -178,24 +182,24 @@ export class HermesInstaller extends EventEmitter<{ status: [] }> {
           ),
         ),
       ),
-      // The check found no Hermes: the installer ended without the command that OpenBot runs.
-      Effect.andThen(
+      // No Hermes command found: the installer ended without the command that OpenBot runs. The
+      // refresh above can do nothing (an off provider, a check that fails), so this looks again.
+      Effect.andThen(Effect.exit(resolveHermesCli())),
+      Effect.andThen((found) =>
         Effect.sync(() =>
-          this.#set(
-            this.#provider?.state === "not-installed"
-              ? failedStatus(sourceText("error.provider.hermesInstallFailed"))
-              : null,
-          ),
+          this.#set(Exit.isSuccess(found) ? null : failedStatus(sourceText("error.provider.hermesInstallFailed"))),
         ),
       ),
+      // The row shows catalog text only: a system error names private paths.
       Effect.catch((error) =>
-        Effect.sync(() =>
-          this.#set(
-            failedStatus(
-              error.cause instanceof Error ? error.cause.message : sourceText("error.provider.hermesInstallFailed"),
-            ),
-          ),
-        ),
+        Effect.sync(() => {
+          const message = error.cause instanceof Error ? error.cause.message : null;
+          const known =
+            message === sourceText("error.provider.hermesNeedsGitCurl") ||
+            message === sourceText("error.provider.hermesInstallFailed");
+          if (!known) logger.warn("The Hermes install failed.", toLogValue(error.cause));
+          this.#set(failedStatus(known && message ? message : sourceText("error.provider.hermesInstallFailed")));
+        }),
       ),
       Effect.onInterrupt(() => Effect.sync(() => this.#set(null))),
       Effect.ensuring(
@@ -316,6 +320,11 @@ const runStage = Effect.fn("HermesInstaller.runStage")(function* (script: string
         Deferred.doneUnsafe(closed, Effect.succeed(null));
       });
       child.once("close", (exitCode) => Deferred.doneUnsafe(closed, Effect.succeed(exitCode)));
+      // A process that the stage started outside its group can keep the pipes open, so "close"
+      // never comes. The exit of the stage itself then ends the wait.
+      child.once("exit", (exitCode) => {
+        setTimeout(() => Deferred.doneUnsafe(closed, Effect.succeed(exitCode)), EXIT_PIPE_WAIT_MS).unref();
+      });
       return child;
     }),
     () =>
