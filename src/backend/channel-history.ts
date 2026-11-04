@@ -215,6 +215,15 @@ function cutInstruction(instruction: string, holder: ChannelMessage): string {
   return `${instruction.slice(0, head)}\n[${instruction.length - head - tail} characters left out. Call channel_history with messageId "${holder.id}" and offset ${offset} to read them.]\n${instruction.slice(-tail)}`;
 }
 
+/** A long quote in the assignment, cut as a long instruction is. */
+function cutQuote(quote: string, message: ChannelMessage): string {
+  if (quote.length <= REPEATED_ASSIGNMENT_CHARACTERS) return quote;
+  const head = Math.floor(REPEATED_ASSIGNMENT_CHARACTERS * HISTORY_HEAD_SHARE);
+  const tail = REPEATED_ASSIGNMENT_CHARACTERS - head;
+  const offset = message.message.text.indexOf(quote) + head;
+  return `${quote.slice(0, head)}\n[${quote.length - head - tail} characters left out. Call channel_history with messageId "${message.id}" and offset ${offset} to read them.]\n${quote.slice(-tail)}`;
+}
+
 /** One part of a long channel message, from `offset`, for a `channel_history` read by message ID. */
 export function historyMessagePart(message: ChannelMessage, offset: number) {
   const text = message.message.text;
@@ -529,21 +538,35 @@ export class ChannelHistory {
         holder?.author.kind === "agent" && task.instruction.length > HANDOFF_INSTRUCTION_CHARACTERS
           ? cutInstruction(task.instruction, holder)
           : task.instruction;
-      const assignment = `${assignmentText({ ...task, instruction }, request, origin)}\nExpected result: ${task.expectedResult}`;
+      // The message that the request replies to. A reply can be only a mention, and only its
+      // `replyToMessageId` joined it to the quote, so the member answered about other messages (#4841).
+      const replyToMessageId = request?.message.replyToMessageId;
+      const replyTarget = replyToMessageId ? messages.find((message) => message.id === replyToMessageId) : undefined;
+      const requested = assignmentText({ ...task, instruction }, request, origin);
+      const quote = replyTarget?.message.text.trim();
+      const assignment = [
+        requested,
+        // A follow-up to the request that it continues has the quote in the assignment already.
+        replyTarget && quote && !requested.includes(quote)
+          ? `\nThe request replies to message ${replyTarget.id} from ${replyTarget.author.name}:\n${cutQuote(quote, replyTarget)}`
+          : null,
+        `Expected result: ${task.expectedResult}`,
+      ]
+        .filter((line) => line !== null)
+        .join("\n");
       const withoutAssignment = (list: ChannelMessage[]) =>
-        holder
-          ? list.map((message) =>
-              message.id === holder.id
-                ? {
-                    ...message,
-                    message: {
-                      ...message.message,
-                      text: message.message.text.replace(task.instruction, ASSIGNMENT_REFERENCE),
-                    },
-                  }
-                : message,
-            )
-          : list;
+        list.map((message) => {
+          let shown = message;
+          if (message.id === holder?.id)
+            shown = {
+              ...shown,
+              message: { ...shown.message, text: shown.message.text.replace(task.instruction, ASSIGNMENT_REFERENCE) },
+            };
+          // A reply continues the task of the message it quotes, and that marks the quote superseded.
+          // The person asks about it now, so the member reads it as current.
+          if (message.id === replyTarget?.id && message.superseded) shown = { ...shown, superseded: false };
+          return shown;
+        });
       const { instruction: _instruction, expectedResult: _expectedResult, ...taskFacts } = task;
       // Each packet stays in the provider session, and a provider keeps recent user messages
       // through a compaction, so a large packet raises what is left after each one (#3905). The
