@@ -107,30 +107,40 @@ function HiddenCount({ count, size, cell }: { count: number; size: number; cell:
   const { t, format } = useText();
   const disc = Math.round(size * COUNT);
   const [x, y] = cell;
+  // The type follows the disc, so the count fits the small header avatar as well as a list row.
+  const fontSize = Math.max(8, Math.round(disc * 0.55));
   return (
+    // A box of the cell's width centres the disc on its cell, also when a wide count grows it into a
+    // pill. A count of two digits is centred on the bottom row.
     <View
-      className="bg-default"
       style={{
         position: "absolute",
-        // A pill of two digits is centred on the bottom row; a disc on its cell.
-        left: count >= 10 ? undefined : size / 2 + x * size - disc / 2,
+        left: count >= 10 ? 0 : size / 2 + x * size - disc / 2,
+        width: count >= 10 ? size : disc,
         top: size / 2 + y * size - disc / 2,
-        minWidth: disc,
-        height: disc,
-        paddingHorizontal: 1,
-        borderRadius: disc / 2,
         alignItems: "center",
-        justifyContent: "center",
       }}
     >
-      <Typography
-        type="body-xs"
-        className="font-semibold text-text-secondary"
-        style={{ fontVariant: ["tabular-nums"], letterSpacing: -0.4 }}
-        numberOfLines={1}
+      <View
+        className="bg-default"
+        style={{
+          minWidth: disc,
+          height: disc,
+          paddingHorizontal: 1,
+          borderRadius: disc / 2,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
       >
-        {t("mobile.channel.avatar.more", { count: format.number(count) })}
-      </Typography>
+        <Typography
+          type="body-xs"
+          className="font-semibold text-text-secondary"
+          style={{ fontSize, lineHeight: fontSize * 1.2, fontVariant: ["tabular-nums"], letterSpacing: -0.4 }}
+          numberOfLines={1}
+        >
+          {t("mobile.channel.avatar.more", { count: format.number(count) })}
+        </Typography>
+      </View>
     </View>
   );
 }
