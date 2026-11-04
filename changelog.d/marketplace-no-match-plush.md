@@ -1,3 +1,3 @@
 ### Changed
 
-- When the Marketplace has nothing to show, a felt plush sits above the text and fishes. With reduced motion, it is a still image.
+- When a Marketplace search or filter finds nothing, or a tab is empty, a felt plush sits above the text and fishes. With reduced motion, it is a still image.
