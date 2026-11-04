@@ -160,8 +160,8 @@ export class MobileChannelStore {
       supported,
       canDelete: capabilities.includes(CHANNEL_DELETE_CAPABILITY),
       canCancelTasks: capabilities.includes(CHANNEL_TASK_CANCEL_CAPABILITY),
-      // A host without channels has its whole list already: none.
-      ...(supported ? {} : { listed: true }),
+      // A host without channels has its whole list already: none. A kept copy goes.
+      ...(supported ? {} : { listed: true, channels: [], pages: new Map() }),
     });
   }
   /**
