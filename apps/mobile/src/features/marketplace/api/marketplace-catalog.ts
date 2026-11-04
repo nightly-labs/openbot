@@ -65,7 +65,7 @@ export function pluginIconUrl(apiUrl: string, slug: string, appId: string): stri
   return url.toString();
 }
 
-export function listMarketplaceAgents(
+function listMarketplaceAgents(
   apiUrl: string,
   query: MarketplaceAgentQuery,
   signal?: AbortSignal,
@@ -73,7 +73,7 @@ export function listMarketplaceAgents(
   return runTeamEffect(catalogFor(apiUrl).agents.list(query), signal);
 }
 
-export function listMarketplaceSkills(
+function listMarketplaceSkills(
   apiUrl: string,
   query: MarketplaceSkillQuery,
   signal?: AbortSignal,
