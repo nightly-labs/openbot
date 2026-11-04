@@ -291,10 +291,18 @@ function createRemoteSearch<T>(
   request: () => { search: PagedSearch<T>; query: string } | null,
   key: (item: T) => string,
 ): RemoteSearch<T> {
+  type Request = ReturnType<typeof request>;
   type Loaded = { items: T[]; total?: number | undefined; cursor: string | null };
   const empty: Loaded = { items: [], cursor: null };
+  const requested = createMemo(request);
+  // The request that the first page answered. The search is pending until it is the current request,
+  // in the same update as the query: an effect would report it one update late.
+  const [answered, setAnswered] = createSignal<Request>(null);
+  const pending = () => {
+    const current = requested();
+    return current !== null && answered() !== current;
+  };
   const [loaded, setLoaded] = createSignal<Loaded>(empty);
-  const [pending, setPending] = createSignal(false);
   const [failed, setFailed] = createSignal(false);
   let timer: ReturnType<typeof setTimeout> | undefined;
   let latest = 0;
@@ -308,25 +316,26 @@ function createRemoteSearch<T>(
     cursor = next.cursor;
     loading = false;
     setLoaded(next);
-    setPending(false);
   };
   function loadFirst(next: { search: PagedSearch<T>; query: string }): void {
     const current = latest;
     loading = true;
-    setPending(true);
     next.search(next.query).then(
       (page) => {
-        if (current === latest) show({ items: page.results, total: page.total, cursor: page.nextCursor });
+        if (current !== latest) return;
+        show({ items: page.results, total: page.total, cursor: page.nextCursor });
+        setAnswered(next);
       },
       () => {
         if (current !== latest) return;
         show(empty);
+        setAnswered(next);
         failedCursor = null;
         setFailed(true);
       },
     );
   }
-  createEffect(request, (next) => {
+  createEffect(requested, (next) => {
     if (timer) clearTimeout(timer);
     ++latest;
     active = next;
@@ -337,7 +346,6 @@ function createRemoteSearch<T>(
       return;
     }
     loading = true;
-    setPending(true);
     timer = setTimeout(() => loadFirst(next), SEARCH_DEBOUNCE_MS);
   });
   onCleanup(() => {
@@ -380,6 +388,7 @@ function createRemoteSearch<T>(
     setFailed(false);
     if (failedCursor === null) {
       ++latest;
+      setAnswered(null);
       loadFirst(active);
       return;
     }
