@@ -107,12 +107,12 @@ export function ImageGallery(props: {
       <For each={props.images} keyed={false}>
         {(image, index) => {
           const box = () => layout().boxes[index];
-          // Keyed by URL: a new URL for the same attachment gets a new try.
-          const key = () => image().previewUrl ?? image().id;
-          const isMissing = () => missing[key()] === true;
           // Once the tile draws an image, a new URL draws over it when it loads, with no spinner.
           const [loaded, setLoaded] = createSignal(false);
           const url = createSteadyImageUrl(() => image().previewUrl);
+          // Keyed by the drawn URL: a new URL for the same attachment gets a new try.
+          const key = () => url() ?? image().id;
+          const isMissing = () => missing[key()] === true;
           let element: HTMLImageElement | undefined;
           const measure = ({ naturalHeight, naturalWidth }: HTMLImageElement) => {
             setLoaded(true);

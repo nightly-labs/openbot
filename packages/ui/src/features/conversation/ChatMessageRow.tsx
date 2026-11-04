@@ -364,7 +364,10 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
         aria-label={t("chat.row.label", { name: props.author.name })}
         data-author={person() ? "user" : "assistant"}
         data-chat-search-message={props["data-chat-search-message"]}
-        style={authorStyle() ?? ""}
+        // The trigger turns off the long-press callout. A row with no menu keeps it, as before.
+        style={[authorStyle(), props.menu ? undefined : "-webkit-touch-callout: default"]
+          .filter((style) => style !== undefined)
+          .join("; ")}
         class={["ui-message", ...rowClass()]}
       >
         {body()}

@@ -32,8 +32,9 @@ export function ImageGeneration(props: ImageGenerationProps) {
     const { naturalHeight, naturalWidth } = element;
     if (naturalWidth > 0 && naturalHeight > 0) setImageRatio(`${naturalWidth} / ${naturalHeight}`);
   };
+  // Keyed by the drawn URL: a URL that failed is not tried again while the new one loads.
   createEffect(
-    () => `${props.attachment?.id ?? ""}:${props.attachment?.previewUrl ?? ""}:${imageUrl() ?? ""}`,
+    () => imageUrl(),
     () => {
       setPreviewError(false);
       // An image in the memory cache, such as one the composer showed, is complete at once. A lazy
