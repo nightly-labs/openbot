@@ -187,6 +187,18 @@
       "version": "1.0.0",
       "featured": false,
       "detailSha256": "5014d267e7627c50d84ea1823d04e4d6c6f18e7096319f3e1351972e656c4449"
+    },
+    {
+      "slug": "coinbase",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "acd33c814b13821ce8a0529dad8699f262529f978fe0d7865f200bfa7ac736d5"
+    },
+    {
+      "slug": "robinhood",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "de85730802e38802ee01f6695c0c4d3adba9381cf4b1665a52a228df00f01939"
     }
   ]
 }

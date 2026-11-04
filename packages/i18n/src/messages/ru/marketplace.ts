@@ -426,6 +426,25 @@ export const messages = {
   "marketplace.plugin.clickup.prompt.createTask": "Создай задачу в ClickUp из этих пунктов и назначь её мне.",
   "marketplace.plugin.clickup.prompt.summarizeDoc":
     "Найди последнее обновление проекта в ClickUp и кратко перечисли открытые вопросы.",
+  "marketplace.plugin.coinbase.tagline": "Курсы криптовалют, портфели и торговля",
+  "marketplace.plugin.coinbase.description":
+    "Coinbase позволяет агентам читать курсы, балансы, портфели, ордера и комиссии в Coinbase Advanced Trade, просматривать и размещать ордера, обменивать активы и переводить средства между портфелями. Каждый пользователь входит в свой аккаунт Coinbase через браузер. У агентов те же права, что и у пользователя. Ордера и обмены используют реальные средства, а агенты могут оплачивать запросы x402 с баланса USDC.",
+  "marketplace.plugin.coinbase.app":
+    "Курсы, балансы, портфели, ордера и обмены через MCP-сервер Coinbase со входом в браузере.",
+  "marketplace.plugin.coinbase.prompt.balances": "Какие у меня балансы на Coinbase в каждом портфеле?",
+  "marketplace.plugin.coinbase.prompt.price": "Покажи курс BTC-USD на Coinbase и как он менялся на этой неделе.",
+  "marketplace.plugin.coinbase.prompt.previewOrder":
+    "Покажи предварительный просмотр рыночной покупки ETH на 50 USD на Coinbase. Не размещай ордер.",
+  "marketplace.plugin.robinhood.tagline": "Брокерские счета и торговля через агентов",
+  "marketplace.plugin.robinhood.description":
+    "Robinhood позволяет агентам читать счета, позиции, балансы, историю операций и списки наблюдения клиента Robinhood, читать рыночные данные и размещать ордера на акции, опционы и криптовалюту. Каждый пользователь входит в свой аккаунт Robinhood через браузер. При первом входе Robinhood просит пользователя открыть отдельный счёт Agentic. Агенты могут торговать только на этом счёте и по умолчанию размещают ордера, не запрашивая у пользователя подтверждения каждого.",
+  "marketplace.plugin.robinhood.app":
+    "Счета, позиции, рыночные данные и сделки через MCP-сервер Robinhood со входом в браузере.",
+  "marketplace.plugin.robinhood.prompt.positions":
+    "Подведи итог моим позициям в Robinhood и тому, как они изменились сегодня.",
+  "marketplace.plugin.robinhood.prompt.watchlist":
+    "Как на этой неделе изменилась каждая акция из моего списка наблюдения в Robinhood?",
+  "marketplace.plugin.robinhood.prompt.agenticCash": "Сколько наличных на моём счёте Agentic в Robinhood?",
   "marketplace.plugin.huggingface.tagline": "Модели, датасеты и статьи на Hub",
   "marketplace.plugin.huggingface.description":
     "Hugging Face позволяет агентам искать модели, датасеты, Spaces, коллекции и статьи на Hugging Face Hub, читать карточки моделей и файлы репозиториев, просматривать датасеты и искать по документации Hugging Face. Он использует публичные данные Hub и не требует аккаунта и ключа. Инструменты только читают данные: агенты не могут создавать репозитории или запускать задачи.",

@@ -33,7 +33,9 @@
     "brave-search",
     "resend",
     "composio",
-    "clickup"
+    "clickup",
+    "coinbase",
+    "robinhood"
   ],
   "featured": ["aave", "canva", "notion", "figma"]
 }
