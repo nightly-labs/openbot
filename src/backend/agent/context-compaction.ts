@@ -22,8 +22,11 @@ interface ThreadContextBudget {
   lastCompactedTokens: number | null;
   /** Compactions in a row after which the session still filled `INEFFECTIVE_COMPACTION_SHARE` of its window. */
   ineffectiveCompactions: number;
-  /** A rotation made this session, so its first usage tells whether the rotation helped. */
-  rotated: boolean;
+  /**
+   * A compaction or a rotation ended and no usage came since, so the next usage tells whether it
+   * helped. A new turn does not end the wait: a turn that fails after retries reports no usage (#4819).
+   */
+  compacted: boolean;
 }
 
 const logger = createOpenBotLogger("context-compaction");
@@ -293,14 +296,14 @@ export class ContextCompaction {
       compactionTurnId: null,
       lastCompactedTokens: null,
       ineffectiveCompactions: 0,
-      rotated: false,
+      compacted: false,
     };
     budget.usedTokens = usedTokens;
     budget.contextWindow = contextWindow;
     this.#budgets.set(threadId, budget);
-    // `observeUsage` runs next and takes the mark, so the first usage after a compaction is read here.
-    const afterCompaction = budget.rotated || this.#awaitingPostCompaction.has(threadId);
-    budget.rotated = false;
+    // The display mark also covers a compaction that ended before the session had a budget.
+    const afterCompaction = budget.compacted || this.#awaitingPostCompaction.has(threadId);
+    budget.compacted = false;
     if (afterCompaction) this.#checkCompaction(budget, agentId);
 
     const pressured = usedTokens / contextWindow >= CONTEXT_COMPACTION_THRESHOLD;
@@ -334,7 +337,9 @@ export class ContextCompaction {
       !budget ||
       budget.contextWindow <= 1 ||
       budget.usedTokens / budget.contextWindow < RETRY_COMPACTION_SHARE ||
-      budget.ineffectiveCompactions >= INEFFECTIVE_COMPACTION_LIMIT
+      budget.ineffectiveCompactions >= INEFFECTIVE_COMPACTION_LIMIT ||
+      // Nothing tells yet whether the last compaction helped. Each turn compacted again (#4819).
+      budget.compacted
     )
       return false;
     if (budget.phase === "idle") budget.pending = true;
@@ -509,6 +514,7 @@ export class ContextCompaction {
     if (!budget) return;
     budget.pending = false;
     budget.lastCompactedTokens = budget.usedTokens;
+    budget.compacted = true;
   }
 
   finish(agentId: string, threadId: string, status: string): void {
@@ -661,7 +667,7 @@ export class ContextCompaction {
         compactionTurnId: null,
         lastCompactedTokens: compactedTokens,
         ineffectiveCompactions: this.#budgets.get(threadId)?.ineffectiveCompactions ?? 0,
-        rotated: true,
+        compacted: true,
       });
     // A session that was not replaced keeps its budget; the growth rule stops an immediate retry.
     const budget = this.#budgets.get(threadId);
