@@ -33,4 +33,5 @@ export const messages = {
   "error.voice.live.failed": "Canlı ses durdu: {reason}",
   "error.voice.live.disconnected": "Canlı ses bağlantısı kesildi.",
   "error.voice.live.signIn": "Canlı sesi kullanmak için ChatGPT hesabınızla Codex'e giriş yapın.",
+  "error.voice.live.off": "Codex canlı ses kapalı. Ayarlar → Ses bölümünden açın.",
 } as const satisfies PartialTranslation<typeof source>;

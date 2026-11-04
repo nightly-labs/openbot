@@ -32,4 +32,5 @@ export const messages = {
   "error.voice.live.failed": "ライブ音声が停止しました: {reason}",
   "error.voice.live.disconnected": "ライブ音声の接続が切れました。",
   "error.voice.live.signIn": "ライブ音声を使うには、ChatGPT アカウントで Codex にサインインしてください。",
+  "error.voice.live.off": "Codex ライブ音声はオフです。設定 → 音声 でオンにしてください。",
 } as const satisfies PartialTranslation<typeof source>;

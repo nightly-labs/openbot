@@ -159,7 +159,10 @@ export function voiceIpcHandlers({
       // Codex live voice: Codex App Server answers the renderer's WebRTC offer with the user's own
       // Codex sign-in. Main never sees the audio or the credentials.
       startLive: eventPayloadHandler(parseVoiceLiveStart, async (event, input): Promise<VoiceLiveSession> => {
-        const session = await runCauseEffect(service.startLiveVoice(input, speech.getSettings().codexLiveVoice));
+        // The opt-in is checked here, because the voice goes to OpenAI only while it is on.
+        const { codexLive, codexLiveVoice } = speech.getSettings();
+        if (!codexLive) throw new Error(sourceText("error.voice.live.off"));
+        const session = await runCauseEffect(service.startLiveVoice(input, codexLiveVoice));
         if (event.sender.isDestroyed()) {
           await runCauseEffect(service.stopLiveVoice(session.sessionId));
           throw new Error(sourceText("error.voice.live.disconnected"));

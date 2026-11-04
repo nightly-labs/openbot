@@ -30,6 +30,7 @@ export const messages = {
   "error.voice.live.failed": "توقف الصوت المباشر: {reason}",
   "error.voice.live.disconnected": "انقطع اتصال الصوت المباشر.",
   "error.voice.live.signIn": "سجّل الدخول إلى Codex بحساب ChatGPT لاستخدام الصوت المباشر.",
+  "error.voice.live.off": "صوت Codex المباشر متوقف. شغّله من الإعدادات ← الصوت.",
   "error.voice.server.routeOff": "خادم الصوت غير مُعدّ لهذا. تحقّق من الإعدادات → الصوت.",
   "error.voice.server.keyRefused": "رفض {host} مفتاح API.",
   "error.voice.server.invalidAnswer": "لم يرسل {host} ردًا متوافقًا مع OpenAI.",

@@ -31,4 +31,5 @@ export const messages = {
   "error.voice.live.failed": "A voz ao vivo parou: {reason}",
   "error.voice.live.disconnected": "A voz ao vivo foi desligada.",
   "error.voice.live.signIn": "Inicie sessão no Codex com a sua conta ChatGPT para usar a voz ao vivo.",
+  "error.voice.live.off": "A voz ao vivo do Codex está desativada. Ative-a em Definições → Voz.",
 } as const satisfies PartialTranslation<typeof source>;

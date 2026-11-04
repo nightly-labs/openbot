@@ -33,4 +33,5 @@ export const messages = {
   "error.voice.live.failed": "Live spraak is gestopt: {reason}",
   "error.voice.live.disconnected": "Live spraak is verbroken.",
   "error.voice.live.signIn": "Meld je met je ChatGPT-account aan bij Codex om live spraak te gebruiken.",
+  "error.voice.live.off": "Codex live spraak staat uit. Zet het aan in Instellingen → Spraak.",
 } as const satisfies PartialTranslation<typeof source>;

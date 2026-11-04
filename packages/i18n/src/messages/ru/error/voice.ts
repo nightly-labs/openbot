@@ -31,4 +31,5 @@ export const messages = {
   "error.voice.live.failed": "Живой голос остановлен: {reason}",
   "error.voice.live.disconnected": "Живой голос отключён.",
   "error.voice.live.signIn": "Войдите в Codex с аккаунтом ChatGPT, чтобы использовать живой голос.",
+  "error.voice.live.off": "Живой голос Codex выключен. Включите его в Настройки → Голос.",
 } as const satisfies PartialTranslation<typeof source>;

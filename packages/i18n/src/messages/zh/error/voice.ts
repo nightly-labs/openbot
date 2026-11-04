@@ -31,4 +31,5 @@ export const messages = {
   "error.voice.live.failed": "实时语音已停止：{reason}",
   "error.voice.live.disconnected": "实时语音已断开。",
   "error.voice.live.signIn": "请用 ChatGPT 账号登录 Codex 以使用实时语音。",
+  "error.voice.live.off": "Codex 实时语音已关闭。请在 设置 → 语音 中打开。",
 } as const satisfies PartialTranslation<typeof source>;
