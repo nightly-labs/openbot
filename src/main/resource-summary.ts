@@ -265,7 +265,7 @@ const ResourceDaySchema = Schema.Struct({
    * The minute of the longest main-loop delay. Missing in a file from an older version. The phase is
    * any string here, so a value from a newer version does not reject the file; the event checks it.
    */
-  mainLoopPeak: Schema.optional(Schema.Struct({ phase: Schema.String, turnActive: Schema.Boolean })),
+  mainLoopPeak: Schema.optionalKey(Schema.Struct({ phase: Schema.String, turnActive: Schema.Boolean })),
 });
 /** The day that the monitor changes in place. The decoded file has the same shape, read-only. */
 export interface ResourceDay {
