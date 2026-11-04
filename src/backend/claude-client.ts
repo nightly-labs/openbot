@@ -2,6 +2,7 @@ import { execFile, spawn } from "node:child_process";
 import { randomUUID, type UUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { existsSync, readFileSync } from "node:fs";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
@@ -91,6 +92,7 @@ import { runCauseEffect } from "./effect-boundary";
 import { IdleThreadPool } from "./idle-thread-pool";
 import {
   agentMcpServers,
+  type ClaudeMcpServer,
   claudeMcpServers,
   computerUseParam,
   type McpDropReporter,
@@ -257,6 +259,8 @@ interface ThreadRuntime {
   nextTurnId: string | null;
   /** The message the stream sends now, and the thinking block key of each of its content indexes. */
   streamMessage: { id: string | null; thinkingBlocks: Map<number, string> };
+  /** The `--mcp-config` file of this query until the CLI has read it. See `writeClaudeMcpConfig`. */
+  mcpConfigFile: string | null;
 }
 
 /**
@@ -313,6 +317,7 @@ interface ClaudeQuery extends AsyncIterable<ClaudeStreamMessage> {
   interrupt(): Promise<unknown>;
   supportedModels(): Promise<ModelInfo[]>;
   getContextUsage?(options: { detail: "summary" }): Promise<unknown>;
+  initializationResult?(): Promise<unknown>;
   setModel(model?: string): Promise<void>;
   applyFlagSettings(settings: { effortLevel?: ClaudeEffort | null }): Promise<void>;
   usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET?(options?: { skipBehaviors?: boolean }): Promise<unknown>;
@@ -453,6 +458,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       runtime.input.close();
       runtime.query.close();
     }
+    yield* Effect.forEach(runtimes, (runtime) => removeClaudeMcpConfig(runtime.mcpConfigFile), { discard: true });
     yield* Effect.forEach(
       runtimes,
       (runtime) => (runtime.consume ? Fiber.join(runtime.consume).pipe(Effect.ignore) : Effect.void),
@@ -495,6 +501,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     runtime.input.close();
     runtime.query.close();
+    yield* removeClaudeMcpConfig(runtime.mcpConfigFile);
     // A background subagent ends with the process (#1870).
     for (const change of stopClaudeSubagents(runtime.subagents, new Date().toISOString()))
       this.#emitSubagents(runtime, change);
@@ -921,11 +928,37 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         : null;
     const plugins = [skillPlugin, homeSkillPlugin].filter((plugin) => plugin !== null);
     const launchPath = yield* cliLaunchPath(this.#cli.executable, this.#cli.source);
-    // `stop()` may have run during the await: a query created now would outlive the client.
-    if (!this.#running) return yield* providerFailure(new Error("Claude Agent SDK is not running."));
-    if (handoff) this.#reportMcpDrops?.(this.provider, handoff.dropped);
-    const mcpServers = handoff ? { ...handoff.servers, ...this.#createOpenBotServers(threadId) } : {};
+    const openBotServers = handoff ? this.#createOpenBotServers(threadId) : {};
     const nodeOptions = this.#agentEnvironment?.().NODE_OPTIONS;
+    const mcpConfigFile =
+      handoff && stateDirectory && Object.keys(handoff.servers).length > 0
+        ? yield* writeClaudeMcpConfig(stateDirectory, threadId, handoff.servers).pipe(
+            // The file is for a long command line: a state folder that cannot hold it must not stop the session.
+            Effect.catch((error) =>
+              Effect.sync(() => {
+                queryLogger.warn("Claude gets its MCP servers on the command line.", { error: error.cause });
+                return null;
+              }),
+            ),
+          )
+        : null;
+    // `stop()` may have run during the awaits: a query created now would outlive the client.
+    if (!this.#running) {
+      yield* removeClaudeMcpConfig(mcpConfigFile);
+      return yield* providerFailure(new Error("Claude Agent SDK is not running."));
+    }
+    if (handoff) this.#reportMcpDrops?.(this.provider, handoff.dropped);
+    const mcpServers = handoff ? { ...(mcpConfigFile ? {} : handoff.servers), ...openBotServers } : {};
+    const extraArgs: Record<string, string | null> = {
+      // The developer instructions carry the profile and the memories, and `thread/resume` above
+      // restarts the query when they change. A recorded prompt would be sent instead of them on
+      // every later request and resume, so the agent kept an edited profile's old text. The CLI
+      // flag, not the SDK's `systemPromptSnapshot` option: the CLI records by default and ignores
+      // that option.
+      ...(claudeTakesPromptSnapshotFlag(this.#cli.version) ? { "system-prompt-snapshot": "off" } : {}),
+      // The CLI loads this file and the SDK's own `--mcp-config` value together.
+      ...(mcpConfigFile ? { "mcp-config": mcpConfigFile } : {}),
+    };
     const claudeQuery = yield* providerSync(() =>
       this.#createQuery({
         prompt: input,
@@ -940,14 +973,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             preset: "claude_code",
             append: config.developerInstructions,
           },
-          // The developer instructions carry the profile and the memories, and `thread/resume` above
-          // restarts the query when they change. A recorded prompt would be sent instead of them on
-          // every later request and resume, so the agent kept an edited profile's old text. The CLI
-          // flag, not the SDK's `systemPromptSnapshot` option: the CLI records by default and ignores
-          // that option.
-          ...(claudeTakesPromptSnapshotFlag(this.#cli.version)
-            ? { extraArgs: { "system-prompt-snapshot": "off" } }
-            : {}),
+          ...(Object.keys(extraArgs).length ? { extraArgs } : {}),
           ...(config.profileGeneration
             ? { tools: [] }
             : { disallowedTools: [...CLAUDE_NATIVE_SCHEDULING, ...CLAUDE_DUPLICATE_TOOLS] }),
@@ -998,7 +1024,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           },
         },
       }),
-    );
+    ).pipe(Effect.onError(() => removeClaudeMcpConfig(mcpConfigFile)));
     const runtime: ThreadRuntime = {
       id: threadId,
       usageCounterId: randomUUID(),
@@ -1020,8 +1046,16 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       backgroundTasks: 0,
       nextTurnId: null,
       streamMessage: { id: null, thinkingBlocks: new Map<number, string>() },
+      mcpConfigFile,
     };
     runtime.consume = yield* Effect.forkIn(this.#consume(runtime), this.#scope, { startImmediately: true });
+    // The CLI reads the file once at its start and keeps the servers in memory, also to reconnect one.
+    const initialization = mcpConfigFile ? claudeQuery.initializationResult?.() : undefined;
+    if (initialization)
+      yield* Effect.forkIn(
+        providerCall(() => initialization).pipe(Effect.ignore, Effect.andThen(removeClaudeMcpConfig(mcpConfigFile))),
+        this.#scope,
+      );
     this.#threads.add(runtime);
   });
 
@@ -2129,6 +2163,32 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
 }
 
 type ClaudeSdkLaunch = Pick<Options, "pathToClaudeCodeExecutable" | "spawnClaudeCodeProcess">;
+
+/**
+ * Writes the MCP servers that the CLI starts itself to a file for `--mcp-config`. As an argument,
+ * the record put a copy of `PATH` on the command line for each stdio server, and Windows refuses a
+ * command line longer than 32,767 characters with `spawn ENAMETOOLONG` (#4853). The file holds the
+ * environment and the headers of the servers, so only this user can read it, and it is deleted when
+ * the CLI has started, or when the query closes or cannot start. Each query has its own file: a
+ * released query can close while the same thread opens again. OpenBot's own servers stay in `mcpServers`: the SDK must hold them to answer their
+ * tool calls.
+ */
+const writeClaudeMcpConfig = Effect.fn("ClaudeAgentClient.writeMcpConfig")(function* (
+  stateDirectory: string,
+  threadId: string,
+  servers: Record<string, ClaudeMcpServer>,
+) {
+  const directory = join(stateDirectory, "claude-mcp");
+  const file = join(directory, `${threadId}-${randomUUID()}.json`);
+  yield* providerCall(() => mkdir(directory, { recursive: true, mode: 0o700 }));
+  yield* providerCall(() => writeFile(file, JSON.stringify({ mcpServers: servers }), { mode: 0o600 }));
+  return file;
+});
+
+/** A file that cannot be deleted must not stop the close. */
+function removeClaudeMcpConfig(file: string | null): Effect.Effect<void> {
+  return file ? providerCall(() => rm(file, { force: true })).pipe(Effect.ignore) : Effect.void;
+}
 
 /**
  * The error of a Workspace only query when the CLI cannot make its sandbox (`failIfUnavailable`).
