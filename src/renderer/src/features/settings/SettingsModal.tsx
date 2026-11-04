@@ -42,6 +42,7 @@ import { createSettingsUpdatesStore } from "@openbot/ui/features/settings/stores
 import { createEffect, createSignal, Show, untrack } from "solid-js";
 import { useI18n } from "../../i18n-context";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
+import type { CodexLiveAccess } from "../speech/codex-live-access";
 import { licenseContactUs, trackLicenseEvent } from "./license-analytics";
 import { createNotificationLevelsStore } from "./notification-levels-store";
 import { createProfileActivityStore } from "./profile-activity-store";
@@ -50,7 +51,7 @@ import { createSettingsAgentsSection } from "./SettingsAgentsSection";
 import { SettingsDynamicIslandTab } from "./SettingsDynamicIslandTab";
 import { SettingsGeneralTab } from "./SettingsGeneralTab";
 import { SettingsNotificationsTab } from "./SettingsNotificationsTab";
-import { type CodexLiveAccess, SettingsVoiceTab } from "./SettingsVoiceTab";
+import { SettingsVoiceTab } from "./SettingsVoiceTab";
 import { dynamicIslandSettingsShown, navItem, navItems, type SettingsTab, settingsTabShown } from "./settings-tabs";
 import { createSettingsVoiceStore } from "./settings-voice-store";
 

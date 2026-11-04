@@ -49,10 +49,10 @@ import { useServerSettings } from "./features/servers/server-settings";
 import { useServerSwitch } from "./features/servers/server-switch";
 import { useServers } from "./features/servers/servers-context";
 import type { HostProviderSettings } from "./features/settings/ProviderSettingsSection";
-import type { CodexLiveAccess } from "./features/settings/SettingsVoiceTab";
 import { useSettings } from "./features/settings/settings-context";
 import { settingsPort } from "./features/settings/settings-port";
 import { useSidebar } from "./features/sidebar/sidebar-context";
+import { codexLiveAccess as codexLiveAccessOf } from "./features/speech/codex-live-access";
 import { useUpdates } from "./features/updates/updates-context";
 import { useWhatsNew } from "./features/updates/whats-new-context";
 import { usePlanLimitRows } from "./features/usage/plan-limit-rows";
@@ -876,12 +876,8 @@ function AppSettings(props: AccountProps) {
   const { agentStatus } = useAgents();
   const { openServerSettings } = useServerSettings();
   /** Live voice runs on this computer's Codex, whose status shows only while this computer is active. */
-  const codexLiveAccess = (): CodexLiveAccess | undefined => {
-    if (activeServer()?.kind !== "local") return undefined;
-    const codex = agentStatus().providers?.find((provider) => provider.id === "codex");
-    if (!codex || codex.connectionState === "connecting") return undefined;
-    return codex.state === "available" && !codex.apiKeyInUse ? "ready" : "signIn";
-  };
+  const codexLiveAccess = () =>
+    activeServer()?.kind === "local" ? codexLiveAccessOf(agentStatus().providers) : undefined;
   const {
     appSettingsOpen,
     notificationFocusRequest,

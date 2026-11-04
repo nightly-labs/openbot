@@ -42,6 +42,7 @@ import {
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, createStore, For, Show } from "solid-js";
+import type { CodexLiveAccess } from "../speech/codex-live-access";
 import type { SettingsVoiceStore } from "./settings-voice-store";
 import { shortModel, VoiceServerDialog, voiceServerHost } from "./VoiceServerDialog";
 
@@ -148,12 +149,6 @@ function flagFor(language: VoiceLanguage): string {
   }
   return "🌐";
 }
-
-/**
- * Whether Codex on this computer can open live voice: `ready` with a ChatGPT sign-in, `signIn` with
- * an API key, no sign-in, or no Codex. Undefined while it is not known.
- */
-export type CodexLiveAccess = "ready" | "signIn";
 
 /** `automatic` lets OpenAI choose the voice of live voice. */
 type LiveVoiceChoice = CodexLiveVoice | "automatic";

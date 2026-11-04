@@ -62,7 +62,11 @@ export function createCodexLiveConversation(deps: { agentId: string; port?: Code
     levels: quietLevels(),
   });
   let disposed = false;
+  let failed = false;
   let sessionId: string | null = null;
+  // Sessions that ended before `startLive` returned their id: the end event can arrive first.
+  let starting = false;
+  const endedEarly = new Map<string, string | null>();
   let peer: RTCPeerConnection | undefined;
   let channel: RTCDataChannel | undefined;
   let microphone: MediaStream | undefined;
@@ -88,6 +92,7 @@ export function createCodexLiveConversation(deps: { agentId: string; port?: Code
   }
 
   function fail(message: string): void {
+    failed = true;
     release();
     setStep("listening");
     muted = true;
@@ -98,16 +103,22 @@ export function createCodexLiveConversation(deps: { agentId: string; port?: Code
     });
   }
 
+  function failEnded(error: string | null): void {
+    const { t, errorMessage } = currentText();
+    fail(
+      error ? errorMessage(new Error(error), t("error.voice.live.disconnected")) : t("error.voice.live.disconnected"),
+    );
+  }
+
   const stopEvents = port.onLiveEvent((event: VoiceLiveEvent) => {
-    if (disposed || event.sessionId !== sessionId) return;
+    if (disposed) return;
+    if (event.sessionId !== sessionId) {
+      if (event.type === "ended" && starting) endedEarly.set(event.sessionId, event.error);
+      return;
+    }
     if (event.type === "ended") {
       sessionId = null;
-      const { t, errorMessage } = currentText();
-      fail(
-        event.error
-          ? errorMessage(new Error(event.error), t("error.voice.live.disconnected"))
-          : t("error.voice.live.disconnected"),
-      );
+      failEnded(event.error);
       return;
     }
     setState((draft) => {
@@ -129,6 +140,9 @@ export function createCodexLiveConversation(deps: { agentId: string; port?: Code
     const turn = event.turn;
     if (typeof turn !== "object" || turn === null || !("id" in turn) || !("role" in turn)) return;
     if (event.type === "turn.created" && turn.role === "user") {
+      // The next reply answers this turn, so an interrupt of the reply before it does not silence it.
+      silenceNextReply = false;
+      if (silencedTurn === null) reply.muted = false;
       setStep("listening");
       setState((draft) => {
         draft.heard = "";
@@ -176,6 +190,11 @@ export function createCodexLiveConversation(deps: { agentId: string; port?: Code
   }
 
   async function start(): Promise<void> {
+    failed = false;
+    currentReply = null;
+    silencedTurn = null;
+    silenceNextReply = false;
+    reply.muted = false;
     try {
       microphone = await navigator.mediaDevices.getUserMedia({
         // The reply plays while the microphone listens: the echo canceller removes it.
@@ -190,6 +209,8 @@ export function createCodexLiveConversation(deps: { agentId: string; port?: Code
       release();
       return;
     }
+    // The user can mute while the microphone opens.
+    for (const track of microphone.getAudioTracks()) track.enabled = !muted;
     try {
       context = new AudioContext();
       microphoneMeter = meter(microphone);
@@ -206,11 +227,21 @@ export function createCodexLiveConversation(deps: { agentId: string; port?: Code
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
       if (!offer.sdp) throw new Error(currentText().t("conversation.voice.error"));
-      const session = await port.startLive({ agentId: deps.agentId, sdp: offer.sdp });
+      starting = true;
+      endedEarly.clear();
+      const session = await port.startLive({ agentId: deps.agentId, sdp: offer.sdp }).finally(() => {
+        starting = false;
+      });
       if (disposed) {
         void port.stopLive({ sessionId: session.sessionId }).catch(() => undefined);
         return;
       }
+      if (endedEarly.has(session.sessionId)) {
+        failEnded(endedEarly.get(session.sessionId) ?? null);
+        endedEarly.clear();
+        return;
+      }
+      endedEarly.clear();
       sessionId = session.sessionId;
       await peer.setRemoteDescription({ type: "answer", sdp: session.sdp });
       startMeter();
@@ -248,8 +279,9 @@ export function createCodexLiveConversation(deps: { agentId: string; port?: Code
     setState((draft) => {
       draft.muted = muted;
     });
-    // A call that failed starts again on unmute.
-    if (!muted && !peer && !disposed) {
+    // A call that failed starts again on unmute. A call that still starts keeps its start.
+    if (!muted && failed && !disposed) {
+      failed = false;
       setState((draft) => {
         draft.error = null;
       });

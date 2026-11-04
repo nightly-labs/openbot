@@ -16,12 +16,13 @@ import type {
   VoiceTranscriptionResult,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import type { WebContents } from "electron";
 import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { VoiceServerService } from "../voice-server-service";
 import type { VoiceSpeechService } from "../voice-speech-service";
 import type { VoiceTranscriptionService } from "../voice-transcription-service";
-import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
+import { eventPayloadHandler, handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import {
   parseSpeechInput,
   parseSpeechSettings,
@@ -53,6 +54,27 @@ export function voiceIpcHandlers({
   server,
   service,
 }: VoiceIpcDependencies): Pick<IpcGroupHandlers, "voice"> {
+  // A window that closes, reloads or crashes cannot stop its live voice any more, so main stops it.
+  const liveSessions = new WeakMap<WebContents, Set<string>>();
+  const stopLiveSessions = (owner: WebContents) => {
+    const sessions = liveSessions.get(owner);
+    if (!sessions) return;
+    for (const sessionId of sessions) void runCauseEffect(service.stopLiveVoice(sessionId)).catch(() => undefined);
+    sessions.clear();
+  };
+  const watchLiveOwner = (owner: WebContents, sessionId: string) => {
+    const sessions = liveSessions.get(owner);
+    if (sessions) {
+      sessions.add(sessionId);
+      return;
+    }
+    liveSessions.set(owner, new Set([sessionId]));
+    owner.once("destroyed", () => stopLiveSessions(owner));
+    owner.on("render-process-gone", () => stopLiveSessions(owner));
+    owner.on("did-start-navigation", (details) => {
+      if (details.isMainFrame && !details.isSameDocument) stopLiveSessions(owner);
+    });
+  };
   return {
     voice: {
       getModelStatus: handler((): Promise<VoiceModelStatus> => runCauseEffect(voice.getModelStatus())),
@@ -136,15 +158,19 @@ export function voiceIpcHandlers({
       ),
       // Codex live voice: Codex App Server answers the renderer's WebRTC offer with the user's own
       // Codex sign-in. Main never sees the audio or the credentials.
-      startLive: payloadHandler(
-        parseVoiceLiveStart,
-        (input): Promise<VoiceLiveSession> =>
-          runCauseEffect(service.startLiveVoice(input, speech.getSettings().codexLiveVoice)),
-      ),
-      stopLive: payloadHandler(
-        parseVoiceLiveStop,
-        ({ sessionId }): Promise<void> => runCauseEffect(service.stopLiveVoice(sessionId)),
-      ),
+      startLive: eventPayloadHandler(parseVoiceLiveStart, async (event, input): Promise<VoiceLiveSession> => {
+        const session = await runCauseEffect(service.startLiveVoice(input, speech.getSettings().codexLiveVoice));
+        if (event.sender.isDestroyed()) {
+          await runCauseEffect(service.stopLiveVoice(session.sessionId));
+          throw new Error(sourceText("error.voice.live.disconnected"));
+        }
+        watchLiveOwner(event.sender, session.sessionId);
+        return session;
+      }),
+      stopLive: eventPayloadHandler(parseVoiceLiveStop, ({ sender }, { sessionId }): Promise<void> => {
+        liveSessions.get(sender)?.delete(sessionId);
+        return runCauseEffect(service.stopLiveVoice(sessionId));
+      }),
     },
   };
 }

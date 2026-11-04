@@ -412,7 +412,9 @@ try {
   );
 
   // Use: needs a local model that is ready. A fresh dev profile has none, so the step is then skipped.
-  const use = page.locator('[data-settings-row="settings.voice.models.title"]').getByRole("button", { name: useLabel });
+  const use = page
+    .locator('[data-settings-row="settings.voice.dictation.section"]')
+    .getByRole("button", { name: useLabel });
   if (afterEdit && (await use.count()) > 0) {
     // Server dictation on again, so that Use has something to turn off.
     await page.evaluate((current) => window.openbot.voice.setServer({ server: { ...current, apiKey: null } }), {

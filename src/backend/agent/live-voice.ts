@@ -14,7 +14,7 @@ import { type AppServerNotification, decodeRecordResponse, getString } from "../
 /** How long Codex has to answer the WebRTC offer of a live voice session. */
 const ANSWER_TIMEOUT_MS = 20_000;
 /** How Codex reports that OpenAI refused the call: `unexpected status 401 Unauthorized: …`. */
-const UNAUTHORIZED = /\b401\b/;
+const UNAUTHORIZED = /\bstatus 401\b|\b401 Unauthorized\b/;
 
 export class LiveVoiceFailed extends Schema.TaggedError<LiveVoiceFailed>()("LiveVoiceFailed", {
   cause: Schema.Defect(),
@@ -61,6 +61,8 @@ interface LiveSession {
 export class LiveVoice {
   readonly #hooks: LiveVoiceHooks;
   readonly #sessions = new Map<string, LiveSession>();
+  /** Counts the starts, so that a start that a newer one replaced does not register its session. */
+  #starts = 0;
 
   constructor(hooks: LiveVoiceHooks) {
     this.#hooks = hooks;
@@ -80,6 +82,7 @@ export class LiveVoice {
     const agent = yield* liveStep(() => this.#hooks.agent(input.agentId));
     if (agent.provider !== "codex") return yield* liveFailure(sourceText("error.voice.live.codexOnly"));
     for (const session of [...this.#sessions.values()]) yield* this.#stopSession(session);
+    const start = ++this.#starts;
     const release = this.#hooks.holdDrain(agent.id);
     const started = yield* Effect.gen({ self: this }, function* () {
       yield* this.#hooks.awaitDrain(agent.id);
@@ -89,6 +92,7 @@ export class LiveVoice {
       const threadId = yield* this.#hooks
         .ensureThread(agent, client)
         .pipe(Effect.mapError((cause) => new LiveVoiceFailed({ cause })));
+      if (start !== this.#starts) return yield* liveFailure(sourceText("error.voice.live.disconnected"));
       return { client, threadId };
     }).pipe(Effect.onError(() => Effect.sync(release)));
 

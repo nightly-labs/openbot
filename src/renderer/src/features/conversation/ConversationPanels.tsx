@@ -17,6 +17,7 @@ import { desktopBrowserProfileCalls } from "../browser/browser-profiles-port";
 import type { AgentFilesOptions } from "../files/AgentFilesSettings";
 import { canManageStorage, serverHasStorage } from "../files/storage-usage";
 import { serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
+import { codexLiveAccess } from "../speech/codex-live-access";
 import { speechPort } from "../speech/speech-port";
 import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
 import { ConversationSideThread } from "./ConversationSideThread";
@@ -58,7 +59,13 @@ function VoiceConversationPane() {
   const { props } = useConversationViewScope();
   const running = untrack(() => (props.agent ? controller.voiceSessions.running(props.agent.id) : null));
   // Live voice runs in this computer's Codex App Server, so an agent on a remote server transcribes.
-  const codex = untrack(() => props.agent?.provider === "codex" && props.server?.kind !== "remote");
+  // Settings hides the switch when Codex has no ChatGPT sign-in, so the saved choice does not count then.
+  const codex = untrack(
+    () =>
+      props.agent?.provider === "codex" &&
+      props.server?.kind !== "remote" &&
+      codexLiveAccess(props.agentStatus.providers) !== "signIn",
+  );
   const [kind, setKind] = createSignal<VoiceConversationKind | null>(running ?? (codex ? null : "transcribed"));
   if (!running && codex)
     void speechPort()
