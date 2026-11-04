@@ -17,6 +17,7 @@ import {
   agentComputerUseEnabled,
   agentNewChatAllowed,
   agentQuickAcknowledgementEnabled,
+  COMPUTER_USE_MCP_SERVER_ID,
   isMessageReaction,
   marketplaceSuggestionItemType,
   mcpSignInItemType,
@@ -130,7 +131,13 @@ import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
 import { isDynamicToolCall } from "./thread-items";
 import { toolCallIdempotencyKey } from "./tool-call-idempotency";
-import { DEFERRED_MCP_NOTE, discoverTools, namesInSearch, resolveDeferredTool } from "./tool-catalog";
+import {
+  CODEX_DEFERRED_MCP_NOTE,
+  DEFERRED_MCP_NOTE,
+  discoverTools,
+  namesInSearch,
+  resolveDeferredTool,
+} from "./tool-catalog";
 import { ToolOperationFailed, toolStep, toToolOperationFailed } from "./tool-operation";
 import type { AgentBrowserHost } from "./turn-lifecycle";
 import { handleUpdateAgentsTool } from "./update-agents-tool";
@@ -360,9 +367,9 @@ export class OpenBotToolRouter {
           if (!isDynamicToolCall(request.params)) throw new Error("Invalid dynamic tool request.");
           let params = request.params;
           if (params.namespace === "openbot") {
-            const deferredMcp = client.deferredMcpTools?.(params.threadId) ?? false;
+            const deferredMcp = this.#deferredMcpNote(client, params.threadId);
             const invalid = deferredMcp
-              ? `${sourceText("error.agent.toolRequestInvalid")} ${DEFERRED_MCP_NOTE}`
+              ? `${sourceText("error.agent.toolRequestInvalid")} ${deferredMcp}`
               : sourceText("error.agent.toolRequestInvalid");
             if (params.tool === "tool_search" || params.tool === "tool_describe") {
               const agentId = this.#conversation.agentForThread(params.threadId);
@@ -378,7 +385,7 @@ export class OpenBotToolRouter {
               const signIns = yield* this.#searchSignIns(agentId, params);
               if (request.signal?.aborted || !client.running) return;
               const found =
-                deferredMcp && params.tool === "tool_search" ? { ...result, mcpTools: DEFERRED_MCP_NOTE } : result;
+                deferredMcp && params.tool === "tool_search" ? { ...result, mcpTools: deferredMcp } : result;
               client.respond(
                 request.id,
                 openBotToolResult(signIns.length > 0 ? { ...found, mcpServers: signIns } : found),
@@ -589,6 +596,20 @@ export class OpenBotToolRouter {
    * Checks an `ask_ui` call and shows its block. Like `ask_user`, it answers the call only when the
    * person answers or the turn ends. The agent can correct a refused block, so it gets the reason.
    */
+  /**
+   * The note that sends a model from OpenBot's catalog to its provider's own MCP tools, or null when
+   * the provider declares them. Pi tells this for each thread. Codex defers each MCP server except
+   * Computer Use (#4468), so one saved server that is on is enough.
+   */
+  #deferredMcpNote(client: AgentClient, threadId: string): string | null {
+    if (client.deferredMcpTools?.(threadId)) return DEFERRED_MCP_NOTE;
+    if (client.provider !== "codex") return null;
+    const servers = this.#mcpServers?.list() ?? [];
+    return servers.some((config) => config.enabled && config.id !== COMPUTER_USE_MCP_SERVER_ID)
+      ? CODEX_DEFERRED_MCP_NOTE
+      : null;
+  }
+
   #askUi(client: AgentClient, request: AppServerRequest, params: DynamicToolCallParams): void {
     const refuse = (message: string) => client.respond(request.id, openBotToolFailure(message));
     const parsed = askUiToolSchema.safeParse(params.arguments);
