@@ -205,13 +205,12 @@ export function boundedHistoryPage(page: ChannelHistoryPage): ChannelHistoryPage
 }
 
 /**
- * A long instruction that an agent wrote, or a long quote, cut as a long history message is. The
- * note gives the offset in the message that holds it, so channel_history reads the part that is
- * left out.
+ * A long instruction that an agent wrote, cut as a long history message is. The note gives the
+ * offset in the message that holds it, so channel_history reads the part that is left out.
  */
-function cutInstruction(instruction: string, holder: ChannelMessage, limit = HANDOFF_INSTRUCTION_CHARACTERS): string {
-  const head = Math.floor(limit * HISTORY_HEAD_SHARE);
-  const tail = limit - head;
+function cutInstruction(instruction: string, holder: ChannelMessage): string {
+  const head = Math.floor(HANDOFF_INSTRUCTION_CHARACTERS * HISTORY_HEAD_SHARE);
+  const tail = HANDOFF_INSTRUCTION_CHARACTERS - head;
   const offset = holder.message.text.indexOf(instruction) + head;
   return `${instruction.slice(0, head)}\n[${instruction.length - head - tail} characters left out. Call channel_history with messageId "${holder.id}" and offset ${offset} to read them.]\n${instruction.slice(-tail)}`;
 }
@@ -536,14 +535,15 @@ export class ChannelHistory {
       const replyTarget = replyToMessageId ? messages.find((message) => message.id === replyToMessageId) : undefined;
       const requested = `${assignmentText({ ...task, instruction }, request, origin)}\nExpected result: ${task.expectedResult}`;
       const quote = replyTarget?.message.text.trim() ?? "";
-      // A reply to the message that made the task has the quote in the assignment already.
+      // A reply to the message that made the task has the quote in the assignment already. The row of
+      // the quote is a task source, so a long quote or its attachments are read there, not given twice.
       const assignment =
         replyTarget && quote !== task.instruction.trim()
           ? `${requested}\n\nThe request replies to message ${replyTarget.id} from ${replyTarget.author.name}:\n${
               !quote
                 ? "(The message has no text. Its row in this packet gives its attachments.)"
                 : quote.length > REPEATED_ASSIGNMENT_CHARACTERS
-                  ? cutInstruction(quote, replyTarget, REPEATED_ASSIGNMENT_CHARACTERS)
+                  ? "(The message is long. Its row in this packet gives the full text.)"
                   : quote
             }`
           : requested;
