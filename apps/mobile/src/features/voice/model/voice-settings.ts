@@ -1,4 +1,4 @@
-import { isSpeechVoice, type SpeechVoice } from "@openbot/contracts/ipc";
+import { isSpeechSpeed, isSpeechVoice, type SpeechSpeed, type SpeechVoice } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
@@ -30,6 +30,8 @@ interface VoiceSettings {
   recognition: RecognitionEngine;
   supertonicVoice: SpeechVoice;
   elevenLabsVoice: ElevenLabsVoice | null;
+  /** The speed of each reply that is read aloud, as on desktop. The pitch stays the same. */
+  speed: SpeechSpeed;
 }
 
 const DEFAULT_SETTINGS: VoiceSettings = {
@@ -37,6 +39,7 @@ const DEFAULT_SETTINGS: VoiceSettings = {
   recognition: "system",
   supertonicVoice: "F1",
   elevenLabsVoice: null,
+  speed: 1,
 };
 
 const SETTINGS_KEY = "openbot.mobile.voice-settings.v1";
@@ -66,6 +69,7 @@ function decodeSettings(raw: string | null): VoiceSettings {
     supertonicVoice: isSpeechVoice(value.supertonicVoice) ? value.supertonicVoice : DEFAULT_SETTINGS.supertonicVoice,
     elevenLabsVoice:
       isDynamicRecord(voice) && isString(voice.id) && isString(voice.name) ? { id: voice.id, name: voice.name } : null,
+    speed: isSpeechSpeed(value.speed) ? value.speed : DEFAULT_SETTINGS.speed,
   };
 }
 
@@ -86,11 +90,14 @@ export async function loadVoiceSettings(): Promise<void> {
 
 /** Applies at once, also when storage fails; the caller reports the failure. */
 export async function saveVoiceSettings(change: Partial<VoiceSettings>): Promise<void> {
-  const { engine, recognition, supertonicVoice, elevenLabsVoice } = { ...useVoiceSettings.getState(), ...change };
-  useVoiceSettings.setState({ engine, recognition, supertonicVoice, elevenLabsVoice });
+  const { engine, recognition, supertonicVoice, elevenLabsVoice, speed } = {
+    ...useVoiceSettings.getState(),
+    ...change,
+  };
+  useVoiceSettings.setState({ engine, recognition, supertonicVoice, elevenLabsVoice, speed });
   await SecureStore.setItemAsync(
     SETTINGS_KEY,
-    JSON.stringify({ engine, recognition, supertonicVoice, elevenLabsVoice }),
+    JSON.stringify({ engine, recognition, supertonicVoice, elevenLabsVoice, speed }),
   );
 }
 

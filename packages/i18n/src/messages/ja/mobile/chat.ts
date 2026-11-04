@@ -212,6 +212,8 @@ export const messages = {
   "mobile.chat.message.copy": "メッセージをコピー",
   "mobile.chat.message.readAloud": "読み上げ",
   "mobile.chat.message.stopReading": "読み上げを停止",
+  "mobile.chat.message.readAloudSpeed": "再生速度：{speed}×",
+  "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "メッセージを読み上げられませんでした",
   "mobile.chat.message.selectText": "テキストを選択",
   "mobile.chat.message.text": "メッセージのテキスト",
