@@ -314,6 +314,7 @@ import { ResourceMonitor } from "./resource-monitor";
 import { StatementTimings } from "./resource-summary";
 import { RoutineFeedServer } from "./routine-feed-server";
 import { clearRoutineHold, ROUTINE_HOLD_FILE, takeRoutineHold, writeRoutineHold } from "./routine-hold-file";
+import type { UncleanExitProperties } from "./run-marker";
 import { ScreenCapturer } from "./screen-capture";
 import {
   createSecretStorage,
@@ -554,6 +555,8 @@ export interface ApplicationServiceContext {
   localServerChild: LocalServerChildEnvironment | null;
   /** The control pipe of a local server: the commands of the desktop app. */
   localServerControl: Readable | null;
+  /** How the previous run ended when it did not quit cleanly (`run-marker.ts`). */
+  previousUncleanExit: UncleanExitProperties | null;
   macHapticFeedback: MacHapticFeedback;
   teardown: TeardownRegistry;
   forwardCentralAuth: (state: CentralAuthState) => void;
@@ -953,6 +956,7 @@ export async function createApplicationServices({
   hostingDeveloperKey,
   localServerChild,
   localServerControl,
+  previousUncleanExit,
   macHapticFeedback,
   teardown,
   forwardCentralAuth,
@@ -2986,6 +2990,7 @@ export async function createApplicationServices({
       }),
     inventoryDay: analyticsInventoryDayStore(join(app.getPath("userData"), ANALYTICS_INVENTORY_FILE)),
     resources: resourceMonitor,
+    uncleanExit: previousUncleanExit,
   });
   teardown.push(TEARDOWN_ORDER.analytics, "host analytics", () => Effect.runPromise(analytics.close()));
   const analyticsPreferences = new AnalyticsPreferenceService({

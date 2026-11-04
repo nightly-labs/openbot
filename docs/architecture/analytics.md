@@ -99,6 +99,20 @@ main log holds every line of the `main` logger, redacted, in two files of 1 MB. 
 keeps local crash dumps in `app.getPath("crashDumps")` and never uploads them. A process that ends
 with no `exit` span and no dump was stopped from outside OpenBot (#2675).
 
+`run-marker.ts` keeps `openbot-run-marker-v1.json` in the user data folder of the process that holds
+the single-instance lock. It writes `running` at the start, the time of the last sign of life once a
+minute and at sleep and wake, `quitting` with the reason in `recordExit`, `quit_timeout` before the
+shutdown deadline exit, and `clean` after `teardown.runAll()`. It adds no teardown step, so the
+ordinals do not change. The writes are synchronous, so a late write cannot replace a later state. At
+the next start, `RunMarker.start` reads the file before it writes the new one. A `running`,
+`quitting` or `quit_timeout` file is an unclean exit, except a quit for `update` or `session_end`
+and a run that saw the `powerMonitor` `shutdown` event. It counts the `.dmp` files in
+`crashDumps` with a time after that run's last sign of life, by name and time only, and compares
+that time with the boot time. `HostAnalytics` sends the result once as `system_unclean_exit` and
+keeps it in memory only. `scripts/unclean-exit-e2e.ts` kills the dev app's main process, quits
+it with SIGTERM, and checks the event and the marker on each start. `bun run dev:stop` sends SIGKILL
+to the process group after 3 s, so a dev stop can count as `quitting`.
+
 The pure part (`resource-summary.ts`) keeps each day as sparse histograms with two significant digits,
 peaks and counters, so p95 stays exact enough without a sample list. The summary file holds the
 current day and the last closed day; it is written at most every 15 minutes, at a day change and at

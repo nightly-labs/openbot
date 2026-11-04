@@ -857,7 +857,14 @@ server can change it.
   (`%APPDATA%\OpenBot\Crashpad` on Windows). A dump holds part of the memory of the process that
   crashed, which can include conversation text, tokens or other secrets, and cannot be redacted.
   Dumps are never uploaded or added to a diagnostics export. Crashpad deletes old dumps by itself.
-  Do not attach a dump to a public issue.
+  Do not attach a dump to a public issue. At the next start, OpenBot counts the dumps that a run
+  left after its last sign of life, by file name and time only, and the analytics event below sends
+  that count, never a dump, a name or a path.
+- `~/Library/Application Support/OpenBot/openbot-run-marker-v1.json` holds the app version, the
+  start time and the last sign of life of the current run, written once a minute, whether the
+  computer slept, and whether a quit started or ended. At the next start, a run that did not quit
+  cleanly sends one product analytics event: the phase, the previous app version, a coarse uptime
+  class, the dump count, whether the computer slept or started again, and whether it is a server.
 - `~/Library/Application Support/OpenBot/logs/resources.ndjson` holds one line a minute: the memory
   and CPU use of each OpenBot process group and provider id, the main process delay and its phase, the number of
   agent database statements, active turns and browser tabs. It holds no process IDs, program names,
