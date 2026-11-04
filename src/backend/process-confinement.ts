@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, realpathSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { sourceText } from "@openbot/i18n/source";
@@ -403,6 +403,77 @@ export function museStatePaths(env: NodeJS.ProcessEnv = process.env, home = home
   };
 }
 
+/** The home folder of the GitHub Copilot CLI: `$COPILOT_HOME`, or `~/.copilot`. */
+export function copilotHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.COPILOT_HOME?.trim() || join(home, ".copilot");
+}
+
+/**
+ * GitHub Copilot CLI 1.0.105 writes its sessions, session database, command history and logs in its
+ * home folder. Its settings, trusted folders, MCP servers, hooks, skills, agents, plugins and
+ * instructions are in that folder too, and every other Copilot process loads them, so they stay
+ * read-only. On macOS the CLI reads its sign-in from the login Keychain with `security`
+ * (`keychainLockFiles`). The CLI runs JavaScript that it unpacks into a cache folder, so a confined
+ * process gets a cache of its own: `COPILOT_CONFINED_ENV`.
+ */
+export function copilotStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const copilotHome = copilotHomeDirectory(env, home);
+  makeCopilotConfig(copilotHome);
+  return {
+    writable: [copilotHome, COPILOT_CONFINED_CACHE],
+    writableContents: keychainLockFiles(),
+    protected: [
+      "config.json",
+      "config",
+      "settings.json",
+      "mcp-config.json",
+      "lsp-config.json",
+      "permissions-config.json",
+      "mcp-oauth-config",
+      "mcp-oauth-config.json",
+      "copilot-instructions.md",
+      "instructions",
+      "hooks",
+      "skills",
+      "agents",
+      "plugins",
+      "installed-plugins",
+      "extensions",
+      "pkg",
+    ].map((name) => join(copilotHome, name)),
+  };
+}
+
+/**
+ * At its first start, GitHub Copilot CLI 1.0.105 writes `firstLaunchAt` in `config.json`. When it
+ * cannot, it stops with no message, and a confined process cannot write that file. Thus OpenBot makes
+ * the file when it is missing, with the same value. The CLI keeps the other values in it.
+ */
+function makeCopilotConfig(copilotHome: string): void {
+  mkdirSync(copilotHome, { recursive: true, mode: 0o700 });
+  try {
+    writeFileSync(
+      join(copilotHome, "config.json"),
+      `${JSON.stringify({ firstLaunchAt: new Date().toISOString() }, null, 2)}\n`,
+      { flag: "wx", mode: 0o600 },
+    );
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) throw error;
+  }
+}
+
+const COPILOT_CONFINED_CACHE = join(tmpdir(), "openbot-confined-copilot-cache");
+
+/**
+ * The environment of a confined Copilot process: its own cache, apart from the one outside. Both
+ * variables are set, because the package cache variable comes first when the user's own environment
+ * sets it.
+ */
+export const COPILOT_CONFINED_ENV: Readonly<Record<string, string>> = {
+  COPILOT_CACHE_HOME: COPILOT_CONFINED_CACHE,
+  COPILOT_PKG_CACHE_HOME: join(COPILOT_CONFINED_CACHE, "pkg"),
+};
+
 /** The environment of a confined OpenCode process: its own cache, apart from the one outside. */
 export const OPENCODE_CONFINED_ENV: Readonly<Record<string, string>> = { XDG_CACHE_HOME: OPENCODE_CONFINED_CACHE };
 
@@ -440,6 +511,15 @@ const PROJECT_SETTINGS = [
   ".agent",
   "_agents",
   "_agent",
+  // GitHub Copilot reads MCP servers from `.mcp.json` and `.github/mcp.json`, and its project
+  // settings, hooks, skills and agents from `.github`. The rest of `.github`, such as the workflows,
+  // stays writable, so `.github` itself cannot be removed, renamed or made (`seatbeltProfile`).
+  ".mcp.json",
+  ".github/mcp.json",
+  ".github/copilot",
+  ".github/hooks",
+  ".github/skills",
+  ".github/agents",
 ];
 
 /**
@@ -459,6 +539,13 @@ export function confineSpawnTarget(
     ...excluded,
     ...confinement.writableRoots.flatMap((root) => PROJECT_SETTINGS.map((name) => join(root, name))),
   ];
+  // A protected path in a writable folder must not move out of its rule with that folder.
+  const held = [
+    ...excluded,
+    ...confinement.writableRoots.flatMap((root) =>
+      PROJECT_SETTINGS.filter((name) => name.includes("/")).map((name) => join(root, name)),
+    ),
+  ];
   if (platform === "darwin") {
     if (!existsSync(SANDBOX_EXEC)) throw new ProcessConfinementUnavailableError(unavailable("macOS sandbox-exec"));
     return {
@@ -471,7 +558,7 @@ export function confineSpawnTarget(
           state.protectedInProjects,
           state.writableContents ?? [],
           state.lockFolders ?? [],
-          excluded,
+          held,
         ),
         target.command,
         ...target.args,
@@ -493,7 +580,9 @@ function unavailable(tool: string): string {
  * in a Seatbelt profile the last rule that matches wins. `file-write-data` allows writes in an
  * existing file, not its removal, a rename or a link in its place. A lock folder allows every write
  * on the folder itself, but a create there only of a folder. A folder that holds an excluded folder
- * cannot be removed or renamed, because the excluded folder would move with it out of its rule.
+ * or a protected project path cannot be removed or renamed, because that path would move with it
+ * out of its rule. When that folder does not exist, it cannot be made: a folder renamed or linked
+ * into its place would bring a protected path with no write on that path, such as `.github/mcp.json`.
  * Everything else stays open, as the Access setting says: reads, the network and process starts.
  */
 function seatbeltProfile(
@@ -502,12 +591,12 @@ function seatbeltProfile(
   inProjects: ProviderStatePaths["protectedInProjects"],
   contents: readonly string[],
   lockFolders: readonly string[],
-  excluded: readonly string[],
+  held: readonly string[],
 ): string {
   const writableReal = unique(writable.flatMap(realPaths));
   const allowed = writableReal.map((path) => `(subpath ${sbplString(path)})`);
   const holders = unique(
-    excluded.flatMap(realPaths).flatMap((folder) => writableReal.flatMap((root) => holderFolders(root, folder))),
+    held.flatMap(realPaths).flatMap((folder) => writableReal.flatMap((root) => holderFolders(root, folder))),
   ).map((path) => `(literal ${sbplString(path)})`);
   const files = unique(contents.flatMap(realPaths)).map((path) => `(literal ${sbplString(path)})`);
   // `utimes`, which refreshes a lock, has no file-write operation of its own, so the folder gets
@@ -538,7 +627,7 @@ function seatbeltProfile(
       : []),
     '(allow file-write* (literal "/dev/null") (literal "/dev/zero") (literal "/dev/tty") (literal "/dev/ptmx") (literal "/dev/dtracehelper") (regex #"^/dev/ttys[0-9]+$") (regex #"^/dev/fd/"))',
     ...(denied.length > 0 ? [`(deny file-write* ${denied.join(" ")})`] : []),
-    ...(holders.length > 0 ? [`(deny file-write-unlink ${holders.join(" ")})`] : []),
+    ...(holders.length > 0 ? [`(deny file-write-unlink file-write-create ${holders.join(" ")})`] : []),
     "",
   ].join("\n");
 }
