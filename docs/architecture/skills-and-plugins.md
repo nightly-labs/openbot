@@ -98,8 +98,10 @@ secure card, with no card. While agent code from `evaluate` can still run in the
 the filled fields. The mark is per document: a scripted page, and a same-origin page of a connected
 popup or opener that it could reach, keep it until a main-frame navigation or a close. A script can
 also write Cache Storage that a service worker later serves as page code, so the origin stays tainted
-in that session. Before the next fill, OpenBot clears the origin's Cache Storage and service workers;
-a page that a service worker controls must reload once. The same rules apply to `fill_card`. A login matches by 1Password's autofill rule, on the registrable domain
+in that session. When a scripted page ends, and before the next fill, OpenBot clears the origin's
+Cache Storage and service workers. A page whose navigation a service worker handled must reload once;
+a worker that the page registers and claims later served nothing to it. The same rules apply to
+`fill_card`. A login matches by 1Password's autofill rule, on the registrable domain
 with private suffixes such as `github.io` counted. Agents and providers never receive the token, a
 password or a code.
 

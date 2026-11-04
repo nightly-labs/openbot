@@ -317,8 +317,11 @@ export class BrowserCdpEngine {
        * `enter` keeps this true until the fill.
        */
       fields: { password: boolean; oneTimeCode: boolean };
-      /** A service worker controls the page, so its code could come from Cache Storage. Read in the automation world. */
-      controlled: boolean;
+      /**
+       * A service worker handled the page's navigation, so its code could come from Cache Storage. Read
+       * in the automation world. A worker that the page registers and claims later serves no navigation.
+       */
+      servedByWorker: boolean;
     },
     BrowserOperationError
   > {
@@ -385,21 +388,21 @@ export class BrowserCdpEngine {
         // The form method does not count: many sign-in forms have no method and send with their own
         // script. The host blocks a navigation that would carry a vault value in its URL.
         const fields = { password: inputs.length > 0, oneTimeCode: inputs.length > 0 };
-        let controlled = false;
+        let servedByWorker = false;
         for (const node of inputs) {
           const kind = yield* this.#callOnNode(
             send,
             node.backendNodeId,
             `function() {
-              return { password: this.type === 'password', oneTimeCode: (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code'), uncontrolled: navigator.serviceWorker?.controller === null };
+              return { password: this.type === 'password', oneTimeCode: (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code'), network: performance.getEntriesByType('navigation')[0]?.workerStart === 0 };
             }`,
             [],
           );
           fields.password &&= isDynamicRecord(kind) && kind.password === true;
           fields.oneTimeCode &&= isDynamicRecord(kind) && kind.oneTimeCode === true;
-          controlled ||= !isDynamicRecord(kind) || kind.uncontrolled !== true;
+          servedByWorker ||= !isDynamicRecord(kind) || kind.network !== true;
         }
-        return { inputs, button, fingerprints, fields, controlled };
+        return { inputs, button, fingerprints, fields, servedByWorker };
       }),
     );
     if (generation !== this.#navigationGeneration)
@@ -516,7 +519,7 @@ export class BrowserCdpEngine {
           return !recordValue(scan.exceptionDetails) && recordValue(scan.result)?.value === false;
         }),
       ).pipe(Effect.catch(() => Effect.succeed(false)));
-    return { enter, clear, fields: nodes.fields, controlled: nodes.controlled };
+    return { enter, clear, fields: nodes.fields, servedByWorker: nodes.servedByWorker };
   });
 
   /**
@@ -533,8 +536,8 @@ export class BrowserCdpEngine {
     targets: BrowserCardTargets,
     card: VaultCardSecret,
     policy: {
-      /** `controlled`: a service worker controls the field's frame. */
-      checkOrigin: (origin: string, controlled: boolean) => void;
+      /** `servedByWorker`: a service worker handled the navigation of the field's frame. */
+      checkOrigin: (origin: string, servedByWorker: boolean) => void;
       allowFill: () => Effect.Effect<boolean, BrowserOperationError>;
       onFill: () => void;
     },
@@ -567,7 +570,7 @@ export class BrowserCdpEngine {
           if (!description?.connected)
             return yield* unavailable(field, "is unavailable here. Take a fresh snapshot, or use request_takeover.");
           if (!description.secure) return yield* unavailable(field, "is not in an HTTPS page. Use request_takeover.");
-          yield* browserSync(() => policy.checkOrigin(description.origin, !description.uncontrolled));
+          yield* browserSync(() => policy.checkOrigin(description.origin, !description.network));
           if (description.disabled || !cardFieldAccepts(field, description))
             return yield* unavailable(field, "is not an enabled field that takes this value.");
           if (description.sendsGet && (field === "number" || field === "securityCode"))

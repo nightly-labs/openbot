@@ -42,7 +42,7 @@ export interface BrowserHostTab {
   filledCard?: boolean;
   /**
    * The origins whose agent code can run in the current document: the agent ran `evaluate` in it,
-   * a scripted page of a connected tab could reach it, or it loaded under a service worker after a
+   * a scripted page of a connected tab could reach it, or a service worker served it after a
    * script. A main-frame navigation replaces the document and clears this.
    */
   scriptedOrigins?: Set<string>;
