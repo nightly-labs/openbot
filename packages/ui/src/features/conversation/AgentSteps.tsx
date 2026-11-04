@@ -212,10 +212,10 @@ export function AgentStepsDisclosure(props: {
   const isStep = (id: string) => props.steps.some((step) => step.id === id);
   const canSelectSpan = (id: string) =>
     (props.list !== false && isStep(id)) || (props.trace?.canSelectSpan?.(id) ?? false);
-  /** Closes the trace and shows the step in the list, or lets the chat show it. */
+  /** Closes the trace and shows the step in the list, or lets the chat show it. A row with no list lets the chat show each step. */
   const selectSpan = (id: string) => {
     setTraceOpenedAt(null);
-    if (!isStep(id)) {
+    if (props.list === false || !isStep(id)) {
       props.trace?.onSelectSpan?.(id);
       return;
     }

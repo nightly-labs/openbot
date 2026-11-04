@@ -204,7 +204,8 @@
 }
 
 /* The face stays at the end of the bubble when the actions go under it. */
-@supports (position-anchor: --message-bubble) {
+/* Each row scopes its anchor name, so an engine with no anchor-scope keeps the face in the flow. */
+@supports (position-anchor: --message-bubble) and (anchor-scope: --message-bubble) {
   .message-entry-actions-beside {
     anchor-scope: --message-bubble;
   }

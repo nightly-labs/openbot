@@ -554,7 +554,7 @@ export function ConversationTimeline() {
   });
   const showAgentSteps = useShowAgentSteps();
   const traceKeyboard = currentDevicePlatform() === "darwin" ? "mac" : "pc";
-  /** The trace that the steps row above an answer opens. A channel names the agent that answered. */
+  /** The trace that the steps row of an answer opens. A channel names the agent that answered. */
   const traceAbove = (messageId: string | undefined, agentName?: string): AgentStepsTrace => ({
     spans: () =>
       turnSteps.traceAbove(messageId, {
@@ -1234,7 +1234,10 @@ export function ConversationTimeline() {
                         steps={steps()}
                         defaultOpen={showAgentSteps()}
                         list={!stepsInRow()}
-                        trace={traceAbove(message()?.id, stepsInRow() ? author().name : undefined)}
+                        trace={traceAbove(
+                          message()?.id,
+                          channel && author().kind === "agent" ? author().name : undefined,
+                        )}
                         facts={turnSteps.factsAbove(message()?.id)}
                       />
                     )}
