@@ -37,7 +37,11 @@ class FailingDatabase implements D1Database {
   prepare(): D1PreparedStatement {
     return this.statement;
   }
-  batch(): Promise<never> {
+  // Like workerd, `batch` refuses a statement that this database did not make.
+  batch(statements: D1PreparedStatement[]): Promise<never> {
+    if (statements.some((statement) => statement !== this.statement)) {
+      return Promise.reject(new TypeError("Statement is not from this database."));
+    }
     return Promise.reject(new Error(this.statement.message));
   }
   exec(): Promise<never> {

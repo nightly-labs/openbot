@@ -11,7 +11,7 @@
  */
 
 /** The only values a failed D1 call writes to the log. */
-export type D1FailureClass = "overloaded" | "constraint" | "network" | "other";
+type D1FailureClass = "overloaded" | "constraint" | "network" | "other";
 
 /** What the one retry of an overloaded read did. `none`: the call did not run again. */
 type D1RetryOutcome = "none" | "succeeded" | "failed";
@@ -24,7 +24,7 @@ const WRITE_KEYWORD = /\b(INSERT|UPDATE|DELETE|REPLACE|UPSERT)\b/i;
 
 const observedDatabases = new WeakMap<D1Database, D1Database>();
 
-export function d1FailureClass(error: unknown): D1FailureClass {
+function d1FailureClass(error: unknown): D1FailureClass {
   const message = error instanceof Error ? error.message : String(error);
   if (/overloaded/i.test(message)) return "overloaded";
   if (/constraint failed/i.test(message)) return "constraint";
