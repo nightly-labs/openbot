@@ -231,9 +231,16 @@ export function Cla() {
         concerning the authority of individuals submitting Contributions on Your behalf.
       </p>
       <p>
-        This is a legal contract containing Personally Identifiable Information. Please refer to the{" "}
-        <Link to="/privacy-policy">OpenBot Privacy Policy</Link> for the policy governing how this information is used
-        and shared.
+        <strong>Please sign:</strong>
+      </p>
+      <ul>
+        <li>Signature</li>
+        <li>Date</li>
+      </ul>
+      <p>
+        This is a legal contract containing Personally Identifiable Information. Please refer to{" "}
+        <Link to="/privacy">https://openbot.run/privacy</Link> for the policy governing how this information is used and
+        shared.
       </p>
     </>
   );
