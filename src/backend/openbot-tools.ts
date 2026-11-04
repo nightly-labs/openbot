@@ -707,9 +707,9 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     name: "save_api_key",
     description: [
       "Save an API key, token or password that you already have, such as one that the user pasted in the chat, in the OpenBot Vault.",
-      "Every agent can then use it: list_api_keys gives its file path. A Vault key with the same name gets the new value, and your own key with this name from request_api_key is deleted.",
+      "Agents then use it: list_api_keys gives its file path. A Vault key with the same name gets the new value, and your own key with this name from request_api_key is deleted; another agent's own key with this name still wins for that agent.",
       'The result is JSON: {"status":"added"|"updated","name","path"}. It never holds the key.',
-      "Do not repeat the key in your answer or in another tool argument. It does not work in an external chat.",
+      "Do not repeat the key in your answer or in another tool argument. It works only when a person asked in your OpenBot chat, not in an external chat.",
     ].join(" "),
     shape: saveApiKeyToolSchema.shape,
   },

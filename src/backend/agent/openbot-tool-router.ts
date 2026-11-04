@@ -142,6 +142,9 @@ const logger = createOpenBotLogger("openbot-tool-router");
 /** How long the plan card of `acknowledge_request` waits before the host presses its start button. */
 const ACKNOWLEDGE_START_MS = 10_000;
 
+/** The key of a `save_api_key` call whose other arguments can be wrong. */
+const secretKeyArgument = z.object({ key: z.string() });
+
 /** The tools that `#apiKeyTool` answers. */
 const API_KEY_TOOLS: ReadonlySet<string> = new Set([
   "request_api_key",
@@ -474,7 +477,9 @@ export class OpenBotToolRouter {
                 case "list_vault_items":
                   return yield* this.#attention.listVaultItems(params);
                 case "save_vault_item":
-                  return yield* this.#attention.saveVaultItem(params);
+                  return yield* this.#attention.saveVaultItem(params, () =>
+                    this.#requestedByPerson(agentId, params.turnId, params.threadId),
+                  );
                 case "delete_vault_item":
                   return yield* this.#attention.deleteVaultItem(params);
                 case "request_link_payment":
@@ -685,16 +690,23 @@ export class OpenBotToolRouter {
     agentId: string,
     params: DynamicToolCallParams,
   ) {
+    // The key is redacted from the logs before anything can fail, also when the call is refused.
+    const raw = secretKeyArgument.safeParse(params.arguments);
+    if (raw.success) registerSecretValue(raw.data.key, { allowShort: true });
     const parsed = saveApiKeyToolSchema.safeParse(params.arguments);
     if (!parsed.success)
       return openBotToolFailure(`${z.prettifyError(parsed.error)}\nCorrect the arguments and retry.`);
     const { name, key, notes } = parsed.data;
-    registerSecretValue(key);
     const threadId = this.#conversation.publicThreadId(agentId, params.threadId);
     // A person in an external chat is not an OpenBot user, and every agent reads a Vault key.
     if (this.#messaging.store.linkForThread(threadId))
       return openBotToolFailure(
         "save_api_key does not work in an external chat. Ask the user to add the key in Server settings > Vault.",
+      );
+    // A team member, a routine, another agent or a web page must not replace the key of every agent.
+    if (!this.#requestedByPerson(agentId, params.turnId, threadId))
+      return openBotToolFailure(
+        "Only a person's message, in your OpenBot chat or a thread they opened, can save a key to the Vault. Ask the user to add it in Server settings > Vault.",
       );
     const vault = this.#vaultItems;
     if (!vault?.ready()) return openBotToolFailure("No Vault is available on this computer. Ask the user.");
@@ -708,8 +720,6 @@ export class OpenBotToolRouter {
         cause instanceof Error && !("code" in cause) ? cause.message : sourceText("error.backend.apiKeySaveFailed"),
       );
     }
-    // The agent's own key of this name wins over the Vault key, so the older value goes.
-    yield* apiKeys.remove(agentId, name).pipe(Effect.ignore);
     this.postVaultNote(
       agentId,
       threadId,
@@ -718,6 +728,16 @@ export class OpenBotToolRouter {
         name: saved.success.name,
       }),
     );
+    // The agent's own key of this name wins over the Vault key, so the older value goes.
+    const removed = yield* Effect.result(apiKeys.remove(agentId, name));
+    if (Result.isFailure(removed)) {
+      logger.warn("Unable to delete an agent's own API key after a Vault save", {
+        error: toLogValue(removed.failure.cause),
+      });
+      return openBotToolFailure(
+        `The Vault has ${name} now, but OpenBot could not delete your own key with this name, which you still read first. Call remove_api_key name=${name}.`,
+      );
+    }
     const keys = yield* apiKeys.list(agentId).pipe(Effect.catch(() => Effect.succeed<SavedApiKey[]>([])));
     const path = keys.find((entry) => entry.name === name)?.path ?? null;
     return openBotToolResult({ status: saved.success.created ? "added" : "updated", name, path });

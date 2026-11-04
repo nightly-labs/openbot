@@ -39,7 +39,7 @@ import {
 } from "@openbot/contracts/ui-blocks";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
-import { Deferred, Effect, Result, Schema } from "effect";
+import { Deferred, Effect, Option, Result, Schema } from "effect";
 import { getDomain } from "tldts";
 import type { AgentApiKeys } from "../agent-api-keys";
 import type { AgentClient } from "../agent-client";
@@ -177,6 +177,10 @@ const VAULT_LOGIN_ADD_FIELDS =
   "A new login needs website and password. When you do not have the password, call request_vault_item kind=login.";
 const VAULT_PASSWORD_EXTERNAL_REFUSED =
   "You cannot save a password in an external chat. Ask the user to add it in Server settings > Vault.";
+const VAULT_PASSWORD_PERSON_ONLY =
+  "Only a person's message, in your OpenBot chat or a thread they opened, can save a password. Ask the user to add it in Server settings > Vault.";
+/** The password of a `save_vault_item` call whose other arguments can be wrong. */
+const decodePasswordArgument = Schema.decodeUnknownOption(Schema.Struct({ password: Schema.String }));
 const VAULT_CARD_ADD_REFUSED =
   "You cannot add a card: its number comes only from the user. Call request_vault_item kind=card. In a Slack, Discord or Telegram chat, ask the user to add it in Server settings > Vault.";
 const VAULT_FIELDS: Record<BrowserToolArguments<"save_vault_item">["kind"], readonly string[]> = {
@@ -1336,14 +1340,18 @@ export class AttentionRegistry {
   readonly saveVaultItem = Effect.fn("AttentionRegistry.saveVaultItem")(function* (
     this: AttentionRegistry,
     params: DynamicToolCallParams,
+    requestedByPerson: () => boolean,
   ) {
+    // The password is redacted from the logs before anything can fail, also when the call is refused.
+    const raw = decodePasswordArgument(params.arguments);
+    if (Option.isSome(raw)) registerSecretValue(raw.value.password, { allowShort: true });
     const call = yield* attentionStep(() => parseBrowserToolCall("save_vault_item", params.arguments));
     if (call.tool !== "save_vault_item")
       return yield* new AttentionOperationFailed({ cause: new Error("Invalid Vault save request.") });
-    // The password is redacted from the logs before anything can fail.
     if (call.args.password !== undefined) {
-      registerSecretValue(call.args.password);
       if (this.#messagingThread(params.threadId)) return browserTakeoverError(VAULT_PASSWORD_EXTERNAL_REFUSED);
+      // A team member, a routine, another agent or a web page must not set a saved password.
+      if (!requestedByPerson()) return browserTakeoverError(VAULT_PASSWORD_PERSON_ONLY);
     }
     const vault = this.#vaultItems;
     const agentId = params.ownerAgentId;
@@ -1357,6 +1365,8 @@ export class AttentionRegistry {
     if (Result.isFailure(saved)) return vaultFailure("save", saved.failure);
     const { created, id, kind, name } = saved.success;
     const item = { id, kind, name };
+    // A saved login for the same site and username that had this password stays as it was.
+    if ("changed" in saved.success && !saved.success.changed) return vaultResult({ status: "unchanged", ...item });
     this.#noteVaultChange(
       agentId,
       params.threadId,
