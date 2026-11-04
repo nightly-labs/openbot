@@ -85,7 +85,9 @@ export function createScrollStore(deps: ScrollStoreDeps) {
         !(message.kind === "memory-changes" && answeredTurns().has(message.turnId)) &&
         !silentAgentAnswer(message),
     );
-    return summarizeHostedSiteMessages(withQuestionContext(shown, deps.props.messages, deps.props.prompt?.turnId));
+    // A channel row has the id of its channel entry and an author of its own, so this is for an agent's chat.
+    const questionTurnId = deps.props.channel ? undefined : deps.props.prompt?.turnId;
+    return summarizeHostedSiteMessages(withQuestionContext(shown, deps.props.messages, questionTurnId));
   });
   const routineRunTurns = createMemo(() => routineRunTurnMessages(deps.props.messages, shownMessages()));
   /* The messages of a routine run follow its row and open and close with it. */
