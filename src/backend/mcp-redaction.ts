@@ -87,7 +87,7 @@ export function mcpSecretValues(configs: readonly McpServerConfig[]): string[] {
   const values = new Set<string>();
   for (const config of configs) {
     for (const [name, value] of Object.entries(mcpEnvironment(config))) {
-      if (!isUserProfileVariable(name)) values.add(value);
+      if (!isInheritedProfileValue(name, value)) values.add(value);
     }
     for (const pair of config.headers) values.add(pair.value);
     for (const value of urlQueryValues(config.url)) values.add(value);
@@ -98,9 +98,9 @@ export function mcpSecretValues(configs: readonly McpServerConfig[]): string[] {
 
 /**
  * The variables that name this computer's user, its folders, and its search path. The Computer Use
- * server inherits `HOME`, `USER` and `TMPDIR` (#4863). None of them is a credential, and masking
- * `HOME` changes each path an agent writes, so a Shared file link no longer opens. The list is
- * exact: a credential under another name stays masked. Windows names are not case-sensitive.
+ * server inherits `HOME`, `USER` and `TMPDIR` (#4863). This computer's own value of one of them is
+ * not a credential, and masking `HOME` changes each path an agent writes, so a Shared file link no
+ * longer opens. A value that the user typed under one of these names stays masked.
  */
 const USER_PROFILE_VARIABLES = new Set([
   "HOME",
@@ -119,8 +119,13 @@ const USER_PROFILE_VARIABLES = new Set([
   "WINDIR",
 ]);
 
-export function isUserProfileVariable(name: string): boolean {
-  return USER_PROFILE_VARIABLES.has(name.toUpperCase());
+/**
+ * Whether an MCP environment entry holds this computer's own value of a profile variable. The name
+ * is upper-cased for Windows; `process.env` is case-sensitive on macOS and Linux, so `user` there is
+ * a different variable and stays masked.
+ */
+export function isInheritedProfileValue(name: string, value: string): boolean {
+  return USER_PROFILE_VARIABLES.has(name.toUpperCase()) && process.env[name] === value;
 }
 
 /**

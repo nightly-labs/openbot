@@ -6,7 +6,7 @@ import { join } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { registerSecretValue } from "@openbot/logging";
 import { Effect } from "effect";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mcpSecretValues, redactMcpRecord } from "./mcp-redaction";
 import { createPiMcpExtension } from "./pi-mcp";
 
@@ -39,9 +39,19 @@ describe("redactMcpRecord", () => {
 });
 
 // The Computer Use server inherits HOME, USER and TMPDIR. Masking HOME broke each Shared file link
-// in a Pi or Muse transcript (#4863). A credential beside them must stay masked.
+// in a Pi or Muse transcript (#4863). A credential beside them, or a value typed under a profile
+// name, must stay masked.
 describe("mcpSecretValues", () => {
-  const home = process.env.HOME ?? "/Users/someone";
+  const home = "/Users/smoke-home";
+  const originalHome = process.env.HOME;
+  beforeEach(() => {
+    process.env.HOME = home;
+  });
+  afterEach(() => {
+    if (originalHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalHome;
+  });
+
   const server: McpServerConfig = {
     id: "computer-use",
     name: "computer-use",
@@ -51,19 +61,25 @@ describe("mcpSecretValues", () => {
     args: [],
     env: [
       { key: "API_TOKEN", value: "tok_9f8e7d6c5b4a" },
-      { key: "Path", value: "/opt/tools/bin" },
+      { key: "USERNAME", value: "svc-login-7f3k" },
+      { key: "home", value: home },
     ],
     envPassthrough: ["HOME"],
     workingDirectory: "",
     url: "",
-    headers: [{ key: "User", value: "header-value" }],
+    headers: [{ key: "X-Api-Key", value: "header-value" }],
   };
 
-  it("leaves the user's folders and search path unmasked", () => {
+  it("leaves this computer's home folder unmasked", () => {
     const values = mcpSecretValues([server]);
-    expect(values).toEqual(["tok_9f8e7d6c5b4a", "header-value"]);
+    expect(values).toEqual([
+      "tok_9f8e7d6c5b4a",
+      "svc-login-7f3k",
+      ...(process.platform === "win32" ? [] : [home]),
+      "header-value",
+    ]);
     const text = `Wrote ${home}/OpenBot/Shared/demo/report.md with tok_9f8e7d6c5b4a`;
-    expect(redactMcpRecord({ text }, values)).toEqual({
+    expect(redactMcpRecord({ text }, mcpSecretValues([{ ...server, env: server.env.slice(0, 1) }]))).toEqual({
       text: `Wrote ${home}/OpenBot/Shared/demo/report.md with •••`,
     });
   });
@@ -79,19 +95,17 @@ describe("mcpSecretValues", () => {
               type: "stdio",
               command: "cua-driver",
               args: [],
-              env: { HOME: home, API_TOKEN: "tok_9f8e7d6c5b4a" },
+              env: { HOME: home, USERNAME: "svc-login-7f3k" },
             },
-            remote: { type: "http", url: "https://mcp.example.test", headers: { User: "header-value" } },
           },
           local,
           directory,
         ),
       );
-      expect(extension.secrets).toEqual(["tok_9f8e7d6c5b4a", "header-value"]);
+      expect(extension.secrets).toEqual(["svc-login-7f3k"]);
       expect(extension.environment).toMatchObject({
         OPENBOT_PI_MCP_VALUE_0: home,
-        OPENBOT_PI_MCP_VALUE_1: "tok_9f8e7d6c5b4a",
-        OPENBOT_PI_MCP_VALUE_2: "header-value",
+        OPENBOT_PI_MCP_VALUE_1: "svc-login-7f3k",
       });
       await Effect.runPromise(extension.close());
     } finally {

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { Effect } from "effect";
 import type { LocalMcpSession } from "./local-mcp-bridge";
 import type { ClaudeMcpServer } from "./mcp-provider-shapes";
-import { isUserProfileVariable } from "./mcp-redaction";
+import { isInheritedProfileValue } from "./mcp-redaction";
 import { providerCall } from "./provider-client-effects";
 
 // Pi owns MCP framing, reconnection, cancellation and tool registration. This extension only
@@ -46,13 +46,13 @@ export const createPiMcpExtension = Effect.fn("PiMcp.createExtension")(function*
   // find tools such as tool_search by name. Eight hex characters keep the names short.
   const serverName = (kind: "external" | "local", name: string) =>
     `openbot_${createHash("sha256").update(`${kind}:${name}`).digest("hex").slice(0, 8)}`;
-  const values = (pairs: Record<string, string>, environmentPairs = false) =>
+  const values = (pairs: Record<string, string>) =>
     Object.fromEntries(
       Object.entries(pairs).map(([key, value]) => {
         if (value === "") return [key, ""];
         const variable = `OPENBOT_PI_MCP_VALUE_${count++}`;
         // A stdio server can inherit `HOME`, which is not a credential (#4863).
-        if (!(environmentPairs && isUserProfileVariable(key))) secrets.push(value);
+        if (!isInheritedProfileValue(key, value)) secrets.push(value);
         environment[variable] = value;
         // Pi expands one environment reference. A literal beginning with ! must never become a
         // configuration shell command, and literal ${...} must not read another environment value.
@@ -70,7 +70,7 @@ export const createPiMcpExtension = Effect.fn("PiMcp.createExtension")(function*
     config:
       server.type === "http"
         ? { ...server, headers: values(server.headers), exposure: "deferred", description: name }
-        : { ...server, env: values(server.env, true), exposure: "deferred", description: name },
+        : { ...server, env: values(server.env), exposure: "deferred", description: name },
   }));
   const bridge = local.servers.map((server) => ({
     name: serverName("local", server.name),
