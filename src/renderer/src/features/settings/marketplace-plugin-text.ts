@@ -285,6 +285,19 @@ const PLUGIN_TEXT = {
       "prompt-template": "marketplace.plugin.resend.prompt.template",
     },
   },
+  email: {
+    tagline: "marketplace.plugin.email.tagline",
+    description: "marketplace.plugin.email.description",
+    apps: {
+      "app-email-mcp": "marketplace.plugin.email.app",
+    },
+    prompts: {
+      "prompt-unread": "marketplace.plugin.email.prompt.unread",
+      "prompt-reply": "marketplace.plugin.email.prompt.reply",
+      "prompt-search": "marketplace.plugin.email.prompt.search",
+      "prompt-tidy": "marketplace.plugin.email.prompt.tidy",
+    },
+  },
   composio: {
     tagline: "marketplace.plugin.composio.tagline",
     description: "marketplace.plugin.composio.description",

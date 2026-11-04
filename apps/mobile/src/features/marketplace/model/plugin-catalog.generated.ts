@@ -1241,6 +1241,58 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "email",
+    name: "Email (IMAP/SMTP)",
+    tagline: "Read, search and send your email",
+    description:
+      "Email lets agents read, search, send, reply to and organize mail in any IMAP and SMTP mailbox: Gmail, Google Workspace, Yahoo, iCloud, Zoho, Fastmail, GMX, AOL and most custom domains. The local server finds the mail servers from the address, so the connection needs only the address and a password. Use an app password where the provider offers one. The password goes only to your mail provider. Outlook and Hotmail are not supported yet.",
+    category: "productivity",
+    creatorName: "sarequl",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-unread", text: "Summarize my unread email from today." },
+      { id: "prompt-reply", text: "Draft a reply to the latest email from my client and save it as a draft." },
+      { id: "prompt-search", text: "Find the invoice emails from last month and download their attachments." },
+      { id: "prompt-tidy", text: "Archive every newsletter in my inbox that is older than a week." },
+    ],
+    websiteUrl: "https://github.com/sarequl/email-mcp",
+    privacyPolicyUrl: null,
+    termsUrl: null,
+    featured: false,
+    apps: [
+      {
+        id: "app-email-mcp",
+        name: "Email",
+        description:
+          "Mail reading, search, sending, drafts, folders, templates and scheduled send, over a local MCP server that connects to the mailbox with IMAP and SMTP.",
+        server: {
+          name: "email",
+          transport: "stdio",
+          command: "npx",
+          args: ["-y", "@sarequl/email-mcp@0.1.0"],
+          auth: [
+            {
+              id: "email-password",
+              kind: "key",
+              label: "Address and app password",
+              fields: [
+                { id: "address", label: "Email address", env: "EMAIL_ADDRESS", placeholder: "you@gmail.com" },
+                {
+                  id: "password",
+                  label: "App password",
+                  env: "EMAIL_PASSWORD",
+                  hint: "Gmail: turn on 2-Step Verification, then create one at myaccount.google.com/apppasswords. Use your normal password only if the provider has no app passwords.",
+                },
+              ],
+              docsUrl: "https://github.com/sarequl/email-mcp#setting-up-your-provider",
+              docsLabel: "Set up your provider",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
     slug: "composio",
     name: "Composio",
     tagline: "Many apps through your own Composio link",

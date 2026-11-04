@@ -336,6 +336,16 @@ export const messages = {
   "marketplace.plugin.resend.prompt.status": "Is de factuurmail bij de klant aangekomen?",
   "marketplace.plugin.resend.prompt.template":
     "Stel een e-mail op voor het opnieuw instellen van een wachtwoord in de nieuwe flow.",
+  "marketplace.plugin.email.tagline": "Lees, zoek en verstuur je e-mail",
+  "marketplace.plugin.email.description":
+    "Email laat agents e-mail lezen, zoeken, versturen, beantwoorden en ordenen in elke IMAP- en SMTP-mailbox: Gmail, Google Workspace, Yahoo, iCloud, Zoho, Fastmail, GMX, AOL en de meeste eigen domeinen. De lokale server vindt de mailservers aan de hand van het adres, dus de verbinding heeft alleen het adres en een wachtwoord nodig. Gebruik een app-wachtwoord als je provider dat aanbiedt. Het wachtwoord gaat alleen naar je mailprovider. Outlook en Hotmail worden nog niet ondersteund.",
+  "marketplace.plugin.email.app":
+    "E-mail lezen, zoeken en versturen, concepten, mappen, sjablonen en gepland verzenden, via een lokale MCP-server die met IMAP en SMTP verbinding maakt met de mailbox.",
+  "marketplace.plugin.email.prompt.unread": "Vat mijn ongelezen e-mail van vandaag samen.",
+  "marketplace.plugin.email.prompt.reply":
+    "Schrijf een antwoord op de laatste e-mail van mijn klant en sla het op als concept.",
+  "marketplace.plugin.email.prompt.search": "Zoek de factuurmails van vorige maand en download hun bijlagen.",
+  "marketplace.plugin.email.prompt.tidy": "Archiveer alle nieuwsbrieven in mijn inbox die ouder zijn dan een week.",
   "marketplace.plugin.composio.tagline": "Veel apps via je eigen Composio-link",
   "marketplace.plugin.composio.description":
     "Composio koppelt agents met Gmail, Slack, GitHub en honderden andere apps via één MCP-server. Koppel de apps die je wilt in je Composio-account en plak hier de MCP-URL en API-sleutel ervan.",

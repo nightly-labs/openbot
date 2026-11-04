@@ -355,6 +355,18 @@ export const messages = {
   "marketplace.plugin.resend.prompt.status": "L’e-mail de facture est-il arrivé chez le client ?",
   "marketplace.plugin.resend.prompt.template":
     "Rédigez un e-mail de réinitialisation du mot de passe pour le nouveau parcours.",
+  "marketplace.plugin.email.tagline": "Lisez, cherchez et envoyez vos e-mails",
+  "marketplace.plugin.email.description":
+    "Email permet aux agents de lire, rechercher, envoyer, répondre et ranger les e-mails de toute boîte IMAP et SMTP : Gmail, Google Workspace, Yahoo, iCloud, Zoho, Fastmail, GMX, AOL et la plupart des domaines personnalisés. Le serveur local trouve les serveurs de messagerie à partir de l'adresse, la connexion ne demande donc que l'adresse et un mot de passe. Utilisez un mot de passe d'application si votre fournisseur en propose. Le mot de passe n'est envoyé qu'à votre fournisseur de messagerie. Outlook et Hotmail ne sont pas encore pris en charge.",
+  "marketplace.plugin.email.app":
+    "Lecture, recherche et envoi d'e-mails, brouillons, dossiers, modèles et envoi programmé, via un serveur MCP local qui se connecte à la boîte aux lettres en IMAP et SMTP.",
+  "marketplace.plugin.email.prompt.unread": "Résume mes e-mails non lus d'aujourd'hui.",
+  "marketplace.plugin.email.prompt.reply":
+    "Rédige une réponse au dernier e-mail de mon client et enregistre-la comme brouillon.",
+  "marketplace.plugin.email.prompt.search":
+    "Trouve les e-mails de factures du mois dernier et télécharge leurs pièces jointes.",
+  "marketplace.plugin.email.prompt.tidy":
+    "Archive toutes les newsletters de ma boîte de réception datant de plus d'une semaine.",
   "marketplace.plugin.composio.tagline": "De nombreuses apps via votre propre lien Composio",
   "marketplace.plugin.composio.description":
     "Composio connecte les agents à Gmail, Slack, GitHub et des centaines d’autres apps via un seul serveur MCP. Connectez les apps que vous voulez dans votre compte Composio, puis collez ici son URL MCP et sa clé API.",

@@ -352,6 +352,15 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "أرسل مسودة إعلان الإطلاق إلى قائمة الإصدار التجريبي.",
   "marketplace.plugin.resend.prompt.status": "هل وصل بريد الفاتورة إلى العميل؟",
   "marketplace.plugin.resend.prompt.template": "صُغ رسالة بريد لإعادة تعيين كلمة المرور للمسار الجديد.",
+  "marketplace.plugin.email.tagline": "اقرأ بريدك وابحث فيه وأرسله",
+  "marketplace.plugin.email.description":
+    "يتيح Email للوكلاء قراءة البريد والبحث فيه وإرساله والرد عليه وتنظيمه في أي صندوق بريد يدعم IMAP وSMTP: Gmail وGoogle Workspace وYahoo وiCloud وZoho وFastmail وGMX وAOL ومعظم النطاقات الخاصة. يجد الخادم المحلي خوادم البريد من العنوان، لذلك يحتاج الاتصال إلى العنوان وكلمة مرور فقط. استخدم كلمة مرور التطبيق إذا كان مزود الخدمة يوفرها. تُرسل كلمة المرور إلى مزود البريد فقط. لا يدعم Outlook وHotmail بعد.",
+  "marketplace.plugin.email.app":
+    "قراءة البريد والبحث فيه وإرساله، والمسودات والمجلدات والقوالب والإرسال المجدول، عبر خادم MCP محلي يتصل بصندوق البريد باستخدام IMAP وSMTP.",
+  "marketplace.plugin.email.prompt.unread": "لخّص رسائلي غير المقروءة من اليوم.",
+  "marketplace.plugin.email.prompt.reply": "اكتب ردًا على آخر رسالة من عميلي واحفظه كمسودة.",
+  "marketplace.plugin.email.prompt.search": "ابحث عن رسائل الفواتير من الشهر الماضي ونزّل مرفقاتها.",
+  "marketplace.plugin.email.prompt.tidy": "أرشف كل النشرات البريدية في صندوق الوارد التي مضى عليها أكثر من أسبوع.",
   "marketplace.plugin.composio.tagline": "تطبيقات كثيرة عبر رابط Composio الخاص بك",
   "marketplace.plugin.composio.description":
     "يربط Composio الوكلاء بـ Gmail وSlack وGitHub ومئات التطبيقات الأخرى عبر خادم MCP واحد. اربط التطبيقات التي تريدها في حساب Composio، ثم الصق عنوان MCP URL ومفتاح API هنا.",

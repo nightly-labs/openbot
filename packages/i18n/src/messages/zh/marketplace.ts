@@ -314,6 +314,15 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "把发布公告草稿发送到内测名单。",
   "marketplace.plugin.resend.prompt.status": "发票邮件送达客户了吗？",
   "marketplace.plugin.resend.prompt.template": "为新流程起草一封密码重置邮件。",
+  "marketplace.plugin.email.tagline": "阅读、搜索和发送邮件",
+  "marketplace.plugin.email.description":
+    "Email 让助手在任何支持 IMAP 和 SMTP 的邮箱中阅读、搜索、发送、回复和整理邮件：Gmail、Google Workspace、Yahoo、iCloud、Zoho、Fastmail、GMX、AOL 以及大多数自定义域名。本地服务器会根据地址找到邮件服务器，因此连接只需要地址和密码。如果服务商提供应用专用密码，请使用它。密码只会发送给你的邮件服务商。暂不支持 Outlook 和 Hotmail。",
+  "marketplace.plugin.email.app":
+    "通过使用 IMAP 和 SMTP 连接邮箱的本地 MCP 服务器，提供邮件阅读、搜索、发送、草稿、文件夹、模板和定时发送。",
+  "marketplace.plugin.email.prompt.unread": "总结我今天的未读邮件。",
+  "marketplace.plugin.email.prompt.reply": "给我客户最新的一封邮件起草回复，并保存为草稿。",
+  "marketplace.plugin.email.prompt.search": "找到上个月的发票邮件并下载其附件。",
+  "marketplace.plugin.email.prompt.tidy": "将收件箱中超过一周的所有新闻通讯归档。",
   "marketplace.plugin.composio.tagline": "通过你自己的 Composio 链接连接大量应用",
   "marketplace.plugin.composio.description":
     "Composio 通过一个 MCP 服务器把助手连接到 Gmail、Slack、GitHub 以及数百个其他应用。在你的 Composio 账号中连接想要的应用，然后把它的 MCP URL 和 API 密钥粘贴到这里。",

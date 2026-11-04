@@ -8,6 +8,7 @@ import { COBRAIN_PLUGIN_GUIDE } from "./cobrain";
 import { COINBASE_PLUGIN_GUIDE } from "./coinbase";
 import { COMPOSIO_PLUGIN_GUIDE } from "./composio";
 import { CONTEXT7_PLUGIN_GUIDE } from "./context7";
+import { EMAIL_PLUGIN_GUIDE } from "./email";
 import { FIGMA_PLUGIN_GUIDE } from "./figma";
 import { FIRECRAWL_PLUGIN_GUIDE } from "./firecrawl";
 import { HIGGSFIELD_PLUGIN_GUIDE } from "./higgsfield";
@@ -51,6 +52,7 @@ const PLUGIN_GUIDES: Readonly<Record<string, PluginGuide>> = {
   higgsfield: HIGGSFIELD_PLUGIN_GUIDE,
   posthog: POSTHOG_PLUGIN_GUIDE,
   resend: RESEND_PLUGIN_GUIDE,
+  email: EMAIL_PLUGIN_GUIDE,
   sentry: SENTRY_PLUGIN_GUIDE,
   stripe: STRIPE_PLUGIN_GUIDE,
   revenuecat: REVENUECAT_PLUGIN_GUIDE,

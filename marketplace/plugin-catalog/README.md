@@ -105,3 +105,29 @@ Troubleshooting:
   the prompts again.
 - Mail or Calendar tools time out: AppleScript is slow on large mailboxes and
   on many subscribed calendars. Ask for one folder and a smaller count.
+
+## Email
+
+The listing runs `npx -y @sarequl/email-mcp@0.1.0`
+(<https://github.com/sarequl/email-mcp>), an MIT-licensed IMAP and SMTP server. A
+third party publishes this package and it gets access to the whole mailbox, so the
+listing names one version. Move it only in a reviewed commit, after you check that the
+release keeps `EMAIL_ADDRESS` and `EMAIL_PASSWORD` and still moves deleted mail to Trash
+instead of expunging it.
+
+The server finds the IMAP and SMTP hosts from the address: a built-in table for Gmail,
+Google Workspace, Yahoo, iCloud, Zoho, Fastmail, GMX and AOL, then the domain's DNS SRV
+records, then common host names. The user types the address and an app password in the
+connect dialog. OpenBot gives them to the server as `EMAIL_ADDRESS` and `EMAIL_PASSWORD`.
+
+Troubleshooting:
+
+- Gmail refuses the login: the password is the account password. Turn on 2-Step
+  Verification and make an app password at <https://myaccount.google.com/apppasswords>.
+- A Google Workspace login fails with an app password: the administrator has turned off
+  app passwords or IMAP for the organization.
+- "Could not detect mail servers": the domain publishes no SRV records and uses other host
+  names. The listing cannot set the host variables; add the server by hand in the MCP form
+  with `EMAIL_IMAP_HOST` and `EMAIL_SMTP_HOST`.
+- Outlook and Hotmail refuse the login: Microsoft is removing password sign-in for IMAP.
+  The server does not support Microsoft sign-in yet.

@@ -314,6 +314,15 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "출시 공지 초안을 베타 목록에 보내 줘.",
   "marketplace.plugin.resend.prompt.status": "청구서 이메일이 고객에게 도착했어?",
   "marketplace.plugin.resend.prompt.template": "새 플로우에 맞는 비밀번호 재설정 이메일 초안을 작성해 줘.",
+  "marketplace.plugin.email.tagline": "이메일 읽기, 검색, 보내기",
+  "marketplace.plugin.email.description":
+    "Email을 사용하면 에이전트가 IMAP과 SMTP를 지원하는 모든 메일함의 메일을 읽고, 검색하고, 보내고, 답장하고, 정리할 수 있습니다. Gmail, Google Workspace, Yahoo, iCloud, Zoho, Fastmail, GMX, AOL과 대부분의 사용자 도메인을 지원합니다. 로컬 서버가 주소로 메일 서버를 찾으므로 연결에는 주소와 비밀번호만 필요합니다. 제공업체가 앱 비밀번호를 제공하면 앱 비밀번호를 사용하세요. 비밀번호는 메일 제공업체에만 전송됩니다. Outlook과 Hotmail은 아직 지원하지 않습니다.",
+  "marketplace.plugin.email.app":
+    "메일 읽기, 검색, 보내기, 임시 보관함, 폴더, 템플릿, 예약 전송을 IMAP과 SMTP로 메일함에 연결하는 로컬 MCP 서버로 제공합니다.",
+  "marketplace.plugin.email.prompt.unread": "오늘 읽지 않은 메일을 요약해 줘.",
+  "marketplace.plugin.email.prompt.reply": "고객이 보낸 최신 메일에 대한 답장을 작성해서 임시 보관함에 저장해 줘.",
+  "marketplace.plugin.email.prompt.search": "지난달 청구서 메일을 찾아서 첨부 파일을 다운로드해 줘.",
+  "marketplace.plugin.email.prompt.tidy": "받은편지함에서 일주일이 지난 뉴스레터를 모두 보관해 줘.",
   "marketplace.plugin.composio.tagline": "내 Composio 링크로 연결하는 다양한 앱",
   "marketplace.plugin.composio.description":
     "Composio는 MCP 서버 하나로 에이전트를 Gmail, Slack, GitHub 등 수백 개의 앱에 연결해요. Composio 계정에서 원하는 앱을 연결한 다음, 해당 MCP URL과 API 키를 여기에 붙여넣어 주세요.",
