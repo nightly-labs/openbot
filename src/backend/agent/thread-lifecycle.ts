@@ -28,6 +28,7 @@ import {
   type CodexMcpServer,
   type CodexOwnServers,
   type CodexOwnTransports,
+  codexDeferredMcpServers,
   codexDirectMcpNamespaces,
   codexDisabledServers,
   codexMcpServerKey,
@@ -95,8 +96,9 @@ const logger = createOpenBotLogger("thread-lifecycle");
  * server names in the form Codex accepts. Version 7 keeps approvals for custom MCP servers. Version 8
  * is the MCP namespaces in `features.code_mode.direct_only_tool_namespaces`: Codex 0.164 does not
  * add them on resume to a thread started without them, so a code-mode-only model saw no MCP tools.
- * Since #4468 only Computer Use stays in that list. No new version: a resume with the shorter list
- * defers the MCP tools of a normal model, and a code-mode-only session keeps working with them direct.
+ * Since #4468 only Computer Use stays in that list. No new version: a session started before keeps
+ * its MCP namespaces direct on resume and keeps working, and a new version would replace each Codex
+ * session with a handoff. Such a session defers the tools from its next new session.
  * Version 9 adds `image_gen` to those namespaces. Version 10 gives a stdio server its working
  * directory as `cwd`; before, Codex did not get such a server.
  */
@@ -1198,11 +1200,7 @@ export class ThreadLifecycle {
       homeSkills,
       httpMcpServers: mcpServers.some((config) => config.transport === "http"),
       deferredMcpServers:
-        client.provider === "codex"
-          ? mcpServers
-              .filter((config) => config.enabled && config.id !== COMPUTER_USE_MCP_SERVER_ID)
-              .map((config) => config.name)
-          : [],
+        client.provider === "codex" ? codexDeferredMcpServers(mcpServers).map((config) => config.name) : [],
       instructionsFileName: instructionsFile.fileName,
       instructionsFile: instructionsFile.file,
     };

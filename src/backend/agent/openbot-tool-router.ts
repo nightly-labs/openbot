@@ -17,7 +17,6 @@ import {
   agentComputerUseEnabled,
   agentNewChatAllowed,
   agentQuickAcknowledgementEnabled,
-  COMPUTER_USE_MCP_SERVER_ID,
   isMessageReaction,
   marketplaceSuggestionItemType,
   mcpSignInItemType,
@@ -41,7 +40,7 @@ import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import type { ChannelService } from "../channel-service";
 import type { ProviderSession } from "../database/provider-sessions";
 import type { MailboxStore } from "../mailbox-store";
-import { agentMcpServers } from "../mcp-provider-shapes";
+import { agentMcpServers, codexDeferredMcpServers } from "../mcp-provider-shapes";
 import type { MessagingThreads } from "../messaging/messaging-threads";
 import { MESSAGING_OUTBOUND_TOOLS } from "../messaging/messaging-tools";
 import {
@@ -593,10 +592,6 @@ export class OpenBotToolRouter {
   }).bind(this);
 
   /**
-   * Checks an `ask_ui` call and shows its block. Like `ask_user`, it answers the call only when the
-   * person answers or the turn ends. The agent can correct a refused block, so it gets the reason.
-   */
-  /**
    * The note that sends a model from OpenBot's catalog to its provider's own MCP tools, or null when
    * the provider declares them. Pi tells this for each thread. Codex defers each MCP server except
    * Computer Use (#4468), so one saved server that is on is enough.
@@ -604,12 +599,13 @@ export class OpenBotToolRouter {
   #deferredMcpNote(client: AgentClient, threadId: string): string | null {
     if (client.deferredMcpTools?.(threadId)) return DEFERRED_MCP_NOTE;
     if (client.provider !== "codex") return null;
-    const servers = this.#mcpServers?.list() ?? [];
-    return servers.some((config) => config.enabled && config.id !== COMPUTER_USE_MCP_SERVER_ID)
-      ? CODEX_DEFERRED_MCP_NOTE
-      : null;
+    return codexDeferredMcpServers(this.#mcpServers?.list() ?? []).length > 0 ? CODEX_DEFERRED_MCP_NOTE : null;
   }
 
+  /**
+   * Checks an `ask_ui` call and shows its block. Like `ask_user`, it answers the call only when the
+   * person answers or the turn ends. The agent can correct a refused block, so it gets the reason.
+   */
   #askUi(client: AgentClient, request: AppServerRequest, params: DynamicToolCallParams): void {
     const refuse = (message: string) => client.respond(request.id, openBotToolFailure(message));
     const parsed = askUiToolSchema.safeParse(params.arguments);

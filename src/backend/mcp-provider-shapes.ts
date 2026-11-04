@@ -727,6 +727,11 @@ export function codexDirectMcpNamespaces(servers: Readonly<Record<string, CodexM
   return Object.hasOwn(servers, COMPUTER_USE_MCP_SERVER_NAME) ? [`mcp__${COMPUTER_USE_MCP_SERVER_NAME}`] : [];
 }
 
+/** The servers that are on and whose tools Codex defers: all except Computer Use, see `codexDirectMcpNamespaces`. */
+export function codexDeferredMcpServers(configs: readonly McpServerConfig[]): McpServerConfig[] {
+  return configs.filter((config) => config.enabled && config.id !== COMPUTER_USE_MCP_SERVER_ID);
+}
+
 export function codexMcpServers(
   servers: readonly UsableMcpServer[],
   own: CodexOwnTransports = {},
