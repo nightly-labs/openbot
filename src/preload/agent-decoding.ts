@@ -27,11 +27,13 @@ import {
   decodeOptionalHostAnalytics,
   decodeProviderUsageResetOutcome,
   decodeProviderUsageResets,
+  type HostDefaultProvider,
   type HostProviderAccounts,
   isAccountUsage,
   isAgentHostSettings,
   isAgentMemory,
   isAgentMemorySelectionState,
+  isAgentModel,
   isAgentProvider,
   isAgentRuntimeSnapshot,
   isAgentStatus,
@@ -135,6 +137,14 @@ export function decodeProviderUsageResetsFromMain(value: unknown): ProviderUsage
 
 export function decodeProviderUsageResetOutcomeFromMain(value: unknown): ProviderUsageResetOutcome {
   return decodeProviderUsageResetOutcome(value);
+}
+
+/** Main has already read a provider that this build does not know as none. */
+export function decodeHostDefaultProviderFromMain(value: unknown): HostDefaultProvider {
+  const { preferredProvider, preferredModel } = decodeRecord(value, "default provider");
+  if (preferredProvider !== null && !isAgentProvider(preferredProvider)) throw new Error("Invalid default provider.");
+  if (preferredModel !== null && !isAgentModel(preferredModel)) throw new Error("Invalid default model.");
+  return { preferredProvider, preferredModel };
 }
 
 /** Main has already left out the providers that this build does not know, so each one must be known. */
