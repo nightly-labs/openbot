@@ -1,8 +1,9 @@
 // The Vault of this computer: logins, payment cards, contact info and API keys that the user saves in
 // Server settings. Agents fill logins through the `PasswordVault` port (`openbot:` IDs) and cards and
 // contact info through `VaultItems`; neither port gives an agent a password, a card number or a security
-// code. Agents can also add and change items through `VaultItems`, but cannot set a secret. API keys
-// reach an agent only as files that `AgentApiKeys` writes; agents cannot see or change them as items.
+// code. Agents can also add and change items through `VaultItems`, and save a password or an API key
+// that they have, but never read one back or set a card number. API keys reach an agent only as files
+// that `AgentApiKeys` writes.
 
 import { randomUUID } from "node:crypto";
 import {

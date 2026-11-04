@@ -286,14 +286,12 @@ export const removeApiKeyToolSchema = z.strictObject({ name: apiKeyNameSchema })
 
 export const saveApiKeyToolSchema = z.strictObject({
   name: apiKeyNameSchema,
-  key: z.string().trim().min(1).max(VAULT_API_KEY_LIMIT).describe("The key, token or password, exactly as you got it."),
+  key: z.string().trim().min(1).max(VAULT_API_KEY_LIMIT).describe("The value, as you got it."),
   notes: z
     .string()
     .max(VAULT_NOTES_LIMIT)
     .optional()
-    .describe(
-      "What the key is for, such as the account or the project. Never a secret. Omit it to keep the saved notes.",
-    ),
+    .describe("What the key is for. Never a secret. Omit it to keep the saved notes."),
 });
 
 export const sendToChannelToolSchema = z.strictObject({
@@ -706,10 +704,9 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "save_api_key",
     description: [
-      "Save an API key, token or password that you already have, such as one that the user pasted in the chat, in the OpenBot Vault.",
-      "Agents then use it: list_api_keys gives its file path. A Vault key with the same name gets the new value, and your own key with this name from request_api_key is deleted; another agent's own key with this name still wins for that agent.",
-      'The result is JSON: {"status":"added"|"updated","name","path"}. It never holds the key.',
-      "Do not repeat the key in your answer or in another tool argument. It works only when a person asked in your OpenBot chat, not in an external chat.",
+      "Save a key, token or password that you have, such as one the user pasted, in the OpenBot Vault for every agent; list_api_keys gives its path.",
+      "It replaces a Vault key with this name and deletes your own key with this name.",
+      'Returns {"status":"added"|"updated","name","path"}, never the key. Do not repeat the key. Only for a request of a person in your OpenBot chat.',
     ].join(" "),
     shape: saveApiKeyToolSchema.shape,
   },
