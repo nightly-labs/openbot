@@ -574,6 +574,7 @@ export const messages = {
   "settings.voice.speech.model.description": "يقرأ الردود بصوت عالٍ على هذا الحاسوب، في 31 لغة.",
   "settings.voice.speech.readReplies.title": "قراءة الردود بصوت عالٍ",
   "settings.voice.speech.readReplies.description": "عندما تُملي رسالة، يُقرأ الرد بصوت عالٍ. أَمْلِ مرة أخرى لإيقافه.",
+  "settings.voice.speech.speed.title": "السرعة",
   "settings.voice.speech.voice.title": "الصوت",
   "settings.voice.speech.voice.female": "صوت أنثوي {number}",
   "settings.voice.speech.voice.male": "صوت ذكوري {number}",
