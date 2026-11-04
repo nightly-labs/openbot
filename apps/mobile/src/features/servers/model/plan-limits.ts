@@ -115,7 +115,13 @@ export function usePlanLimits(serverId: string) {
     if (account && reading) saveReading(account, serverId, reading);
   }, [account, serverId, reading]);
   const rows = useMemo(() => planLimitRows(limits.data?.usage), [limits.data]);
-  return { rows, accounts: limits.data?.accounts ?? null, online, loading: online && limits.isPending };
+  return {
+    rows,
+    usage: limits.data?.usage ?? null,
+    accounts: limits.data?.accounts ?? null,
+    online,
+    loading: online && limits.isPending,
+  };
 }
 
 /** The provider, and the account when the provider has more than one. */
