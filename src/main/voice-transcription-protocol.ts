@@ -16,6 +16,10 @@ export interface VoiceTranscriptionRequest {
   language: string;
   /** The number of silent samples the host puts before the audio. */
   leadingSilenceSamples: number;
+  /** ONNX Runtime threads. */
+  numThreads: number;
+  /** A file of ONNX Runtime session settings in the runtime directory, or empty for the defaults. */
+  sessionConfig: string;
   /** Little-endian 16-bit mono PCM at 16 kHz: the data chunk of the validated WAV file. */
   pcm: Uint8Array;
 }

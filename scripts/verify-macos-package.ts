@@ -48,7 +48,13 @@ const packagedIconCatalogPath = resolve(resourcesPath, "Assets.car");
 const sourceIconCatalogPath = resolve("build/macos/Assets.car");
 const plistPath = resolve(contentsPath, "Info.plist");
 const voiceRuntimePath = resolve(resourcesPath, "voice/runtime");
-const voiceRuntimeFiles = ["sherpa-onnx.node", "libsherpa-onnx-c-api.dylib", "libonnxruntime.dylib"];
+const voiceRuntimeFiles = [
+  "sherpa-onnx.node",
+  "libsherpa-onnx-c-api.dylib",
+  "libonnxruntime.dylib",
+  // ONNX Runtime session settings that the voice hosts read.
+  "no-arena.cfg",
+];
 const remoteRuntimePath = resolve(resourcesPath, "remote-desktop-runtime/darwin", architecture);
 const cuaDriverPath = resolve(resourcesPath, "cua-driver/darwin", architecture);
 // The database host is spawned by path as its own process, so it has to survive the asar unchanged.

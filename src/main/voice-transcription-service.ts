@@ -29,7 +29,13 @@ import {
   scribeRealtimeUrl,
   VoiceStreamFailure,
 } from "./voice-cloud-stream";
-import { VOICE_RUNTIME_ADDON, VoiceModelService, VoiceOperationError } from "./voice-model-service";
+import {
+  TRANSCRIPTION_SESSION_CONFIGS,
+  transcriptionHostThreads,
+  VOICE_RUNTIME_ADDON,
+  VoiceModelService,
+  VoiceOperationError,
+} from "./voice-model-service";
 import type { VoicePreferenceStore } from "./voice-preference-store";
 import type {
   VoiceTranscriptionEngine,
@@ -58,6 +64,8 @@ const LEADING_SILENCE_SAMPLES: Record<LocalVoiceModelId, number> = {
  * the user speaks, the renderer asks about once per second, so the host stays loaded until then.
  */
 const HOST_IDLE_MS = 60_000;
+/** A loaded model keeps its thread count, so the count is read once. */
+const HOST_THREADS = transcriptionHostThreads();
 /** `parseVoiceTranscription` accepts only the canonical 44-byte header before the PCM data. */
 const WAV_HEADER_BYTES = 44;
 const BYTES_PER_SECOND = 32_000;
@@ -406,6 +414,8 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
         engine,
         language: engine === "whisper" && language !== AUTOMATIC_VOICE_LANGUAGE ? language : "",
         leadingSilenceSamples: LEADING_SILENCE_SAMPLES[modelId],
+        numThreads: HOST_THREADS,
+        sessionConfig: TRANSCRIPTION_SESSION_CONFIGS[modelId],
         pcm,
       });
       return Effect.sync(() => {

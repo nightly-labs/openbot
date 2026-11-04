@@ -63,7 +63,13 @@ const executablePath = resolve(appPath, "openbot");
 const resourcesPath = resolve(appPath, "resources");
 const asarPath = resolve(resourcesPath, "app.asar");
 const voiceRuntimePath = resolve(resourcesPath, "voice/runtime");
-const voiceRuntimeFiles = ["sherpa-onnx.node", "libsherpa-onnx-c-api.so", "libonnxruntime.so"];
+const voiceRuntimeFiles = [
+  "sherpa-onnx.node",
+  "libsherpa-onnx-c-api.so",
+  "libonnxruntime.so",
+  // ONNX Runtime session settings that the voice hosts read.
+  "no-arena.cfg",
+];
 const voiceHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-transcription-host.js");
 const speechHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-speech-host.js");
 

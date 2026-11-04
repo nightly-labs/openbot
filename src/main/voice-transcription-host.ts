@@ -9,7 +9,8 @@
 // the path in the request, and the protocol is type-only, so this process cannot load Electron,
 // the application database, or any module of the main bundle.
 
-import { join } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
 import type {
   VoiceTranscriptionEngine,
   VoiceTranscriptionFailure,
@@ -28,6 +29,10 @@ const WHISPER_SPLIT_SEARCH_SAMPLES = 4 * SAMPLE_RATE;
 const SPLIT_WINDOW_SAMPLES = SAMPLE_RATE / 50;
 /** The most leading silence a request can ask for. */
 const MAXIMUM_LEADING_SILENCE_SAMPLES = SAMPLE_RATE;
+/** The most ONNX Runtime threads a request can ask for. */
+const MAXIMUM_THREADS = 64;
+/** A settings file is a plain name in the runtime directory; empty is the default settings. */
+const SESSION_CONFIG_PATTERN = /^(?:[a-z0-9-]+\.cfg)?$/u;
 
 /** The part of the sherpa-onnx offline recognizer configuration that OpenBot sets. */
 interface RecognizerConfig {
@@ -46,7 +51,8 @@ interface RecognizerConfig {
     };
     tokens: string;
     numThreads: number;
-    provider: "cpu";
+    /** `cpu`, or `cpu:<file>` with ONNX Runtime session settings. */
+    provider: string;
     debug: number;
     modelType?: "nemo_transducer";
   };
@@ -71,6 +77,8 @@ interface LoadedRecognizer {
   modelDirectory: string;
   /** The Whisper language the recognizer uses now. */
   language: string;
+  numThreads: number;
+  provider: string;
 }
 
 class HostFailure extends Error {
@@ -116,13 +124,31 @@ function loadAddon(path: string): SherpaOnnxAddon {
   return module.exports;
 }
 
+/**
+ * The provider string. sherpa-onnx opens a settings file with a narrow path and ends the process
+ * when the file is missing, so the path is relative to the runtime directory, and a missing file
+ * gives the default settings.
+ */
+function providerFor(addonPath: string, sessionConfig: string): string {
+  if (sessionConfig === "") return "cpu";
+  const directory = dirname(addonPath);
+  if (!existsSync(join(directory, sessionConfig))) return "cpu";
+  try {
+    process.chdir(directory);
+  } catch {
+    return "cpu";
+  }
+  return `cpu:${sessionConfig}`;
+}
+
 function recognizerConfig(
   engine: VoiceTranscriptionEngine,
   modelDirectory: string,
   language: string,
+  session: { numThreads: number; provider: string },
 ): RecognizerConfig {
   const file = (name: string) => join(modelDirectory, name);
-  const common = { numThreads: 4, provider: "cpu", debug: 0 } as const;
+  const common = { numThreads: session.numThreads, provider: session.provider, debug: 0 };
   if (engine === "whisper") {
     return {
       featConfig: { sampleRate: SAMPLE_RATE, featureDim: 80 },
@@ -157,14 +183,17 @@ function recognizerConfig(
 }
 
 function recognizerKey(request: VoiceTranscriptionRequest): string {
-  return `${request.addonPath}\n${request.modelDirectory}\n${request.engine}`;
+  return [request.addonPath, request.modelDirectory, request.engine, request.numThreads, request.sessionConfig].join(
+    "\n",
+  );
 }
 
 async function createRecognizer(request: VoiceTranscriptionRequest): Promise<LoadedRecognizer> {
   const addon = loadAddon(request.addonPath);
+  const session = { numThreads: request.numThreads, provider: providerFor(request.addonPath, request.sessionConfig) };
   try {
     const recognizer = await addon.createOfflineRecognizerAsync(
-      recognizerConfig(request.engine, request.modelDirectory, request.language),
+      recognizerConfig(request.engine, request.modelDirectory, request.language, session),
     );
     return {
       key: recognizerKey(request),
@@ -173,6 +202,7 @@ async function createRecognizer(request: VoiceTranscriptionRequest): Promise<Loa
       engine: request.engine,
       modelDirectory: request.modelDirectory,
       language: request.language,
+      ...session,
     };
   } catch {
     throw new HostFailure("model-load-failed");
@@ -200,7 +230,7 @@ function useLanguage(loaded: LoadedRecognizer, language: string): void {
   try {
     loaded.addon.offlineRecognizerSetConfig(
       loaded.recognizer,
-      recognizerConfig(loaded.engine, loaded.modelDirectory, language),
+      recognizerConfig(loaded.engine, loaded.modelDirectory, language, loaded),
     );
   } catch {
     throw new HostFailure("model-load-failed");
@@ -307,6 +337,14 @@ function isRequest(value: unknown): value is VoiceTranscriptionRequest {
     Number.isInteger(value.leadingSilenceSamples) &&
     value.leadingSilenceSamples >= 0 &&
     value.leadingSilenceSamples <= MAXIMUM_LEADING_SILENCE_SAMPLES &&
+    "numThreads" in value &&
+    typeof value.numThreads === "number" &&
+    Number.isInteger(value.numThreads) &&
+    value.numThreads >= 1 &&
+    value.numThreads <= MAXIMUM_THREADS &&
+    "sessionConfig" in value &&
+    typeof value.sessionConfig === "string" &&
+    SESSION_CONFIG_PATTERN.test(value.sessionConfig) &&
     "pcm" in value &&
     value.pcm instanceof Uint8Array
   );

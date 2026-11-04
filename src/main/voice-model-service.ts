@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { createReadStream, existsSync } from "node:fs";
 import { mkdir, open, rename, rm, stat } from "node:fs/promises";
+import { availableParallelism } from "node:os";
 import { join } from "node:path";
 import type { LocalVoiceModelId, SpeechModelId, VoiceModelStatus } from "@openbot/contracts/ipc";
 import { PARAKEET_MODEL_FILES, SUPERTONIC_MODEL_FILES } from "@openbot/contracts/speech-models";
@@ -11,6 +12,44 @@ import { causeHelpers } from "../backend/effect-boundary";
 
 /** The N-API addon of sherpa-onnx. Its libraries are in the same directory. */
 export const VOICE_RUNTIME_ADDON = "sherpa-onnx.node";
+
+/**
+ * ONNX Runtime session settings, as files that `scripts/prepare-voice.ts` writes to the voice
+ * runtime directory. A host gives sherpa-onnx `cpu:<file>`. `scripts/voice-host-bench.ts` measures
+ * each file with each model.
+ */
+export const VOICE_SESSION_CONFIGS = {
+  /**
+   * Without the CPU memory arena, a host gives back the memory of each decode. Prepacking stays on:
+   * without it Parakeet holds about 750 MB less, but decodes 20-60% slower, and Bark many times slower.
+   */
+  "no-arena.cfg": "EnableCpuMemArena=0\n",
+} as const;
+/** A settings file, or empty for the ONNX Runtime defaults. */
+export type VoiceSessionConfig = keyof typeof VOICE_SESSION_CONFIGS | "";
+
+/**
+ * Without the arena, Parakeet and Bark hold about 230 MB less at about the same speed. Whisper
+ * holds about 880 MB less, but decodes 15-30% slower, so it keeps the defaults.
+ */
+export const TRANSCRIPTION_SESSION_CONFIGS: Readonly<Record<LocalVoiceModelId, VoiceSessionConfig>> = {
+  "parakeet-tdt-0.6b-v3": "no-arena.cfg",
+  "bark-3.0-plus": "no-arena.cfg",
+  "whisper-turbo": "",
+};
+/** Without the CPU memory arena, Supertonic holds about 110 MB less at about the same speed. */
+export const SPEECH_SESSION_CONFIG: VoiceSessionConfig = "no-arena.cfg";
+
+/** Supertonic is not faster with more than 4 threads. */
+export const SPEECH_HOST_THREADS = 4;
+
+/**
+ * Half the logical processors, from 4 to 6; half leaves out SMT siblings. On a 12-processor M4 Pro,
+ * 6 threads decode Parakeet and Whisper 10-25% faster than 4, and 8 are not faster than 6.
+ */
+export function transcriptionHostThreads(processors = availableParallelism()): number {
+  return Math.min(6, Math.max(4, Math.floor(processors / 2)));
+}
 
 export interface VoiceModelFile {
   name: string;
