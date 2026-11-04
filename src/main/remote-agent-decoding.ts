@@ -204,10 +204,9 @@ export function decodeHostProviderAccountsFromHost(value: unknown): HostProvider
 export function decodeHostDefaultProviderFromHost(value: unknown): HostDefaultProvider {
   const { provider, model } = decodeRecord(value, "default provider");
   if (provider !== null && !isString(provider)) throw new Error("Invalid default provider.");
+  if (!isAgentProvider(provider)) return { preferredProvider: null, preferredModel: null };
   if (model !== null && !isAgentModel(model)) throw new Error("Invalid default model.");
-  return isAgentProvider(provider)
-    ? { preferredProvider: provider, preferredModel: model }
-    : { preferredProvider: null, preferredModel: null };
+  return { preferredProvider: provider, preferredModel: model };
 }
 
 /** The `provider-usage-reset-v1` list: an unknown provider is left out. */
