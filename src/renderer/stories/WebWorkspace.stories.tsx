@@ -119,7 +119,7 @@ const savedFrameSlowRuntime: WebRuntimeFactory = (accountId, events) => {
   };
 };
 
-/** A new page with a saved frame: the full-window loading screen covers the frame until the host answers. */
+/** A new page with a saved frame: the chat shows the loader of its history until the host answers. */
 export const SavedFrameSlowConnect: Story = {
   args: { createRuntime: savedFrameSlowRuntime },
 };
