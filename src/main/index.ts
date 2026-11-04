@@ -1534,6 +1534,8 @@ if (!hasSingleInstanceLock) {
       reconcileDynamicIsland();
       await windows.loadRenderer(mainWindow);
       performance.mark("openbot:renderer-loaded");
+      // After the first window, so the new process does not compete with the start for the CPU.
+      Effect.runFork(built.prewarmAgentDatabase);
       // After the load: `sendToRenderer` drops events aimed at a window that is still loading.
       await Effect.runPromise(remoteServers.startEventConnections());
       screen.on("display-added", reconcileDynamicIsland);
