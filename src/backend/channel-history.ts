@@ -581,7 +581,8 @@ export class ChannelHistory {
       // Each packet stays in the provider session, and a provider keeps recent user messages
       // through a compaction, so a large packet raises what is left after each one (#3905). The
       // summary keeps the history under the transcript part, so the newest-first cut drops a message
-      // only when the summary could not run before it, such as at a message that still streams.
+      // only when the summary could not run before it, such as at a message that still streams or
+      // when the summary model failed.
       const transcriptCharacters = Math.floor(characterBudget * TRANSCRIPT_SHARE);
       const channelBlock = {
         id: channel.id,
