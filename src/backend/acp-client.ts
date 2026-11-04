@@ -129,6 +129,17 @@ const ACP_FIRST_UPDATE_MS = 3 * 60_000;
 /** The result of a prompt that got no update within `ACP_FIRST_UPDATE_MS`. */
 const SILENT_PROMPT = Symbol("silent prompt");
 
+/**
+ * Updates about the session, not about the prompt. An agent can send them at any time after a session
+ * opens or resumes, so they do not show that the prompt arrived.
+ */
+const SESSION_STATE_UPDATES: ReadonlySet<SessionUpdate["sessionUpdate"]> = new Set([
+  "available_commands_update",
+  "current_mode_update",
+  "session_info_update",
+  "user_message_chunk",
+]);
+
 /** How long a stopped turn may take to end before OpenBot ends it itself. */
 const ACP_STOP_GRACE_MS = 10_000;
 
@@ -2272,6 +2283,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (thread.activeTurn !== turn || turn.completing || turn.stopped)
         return Result.succeed({ stopReason: "cancelled" } satisfies PromptResponse);
       if (Result.isFailure(resumed)) {
+        // As after any request that timed out, a process that does not answer a probe is ended.
+        if (resumed.failure.cause instanceof TimeoutError)
+          yield* Effect.forkIn(this.#endIfUnresponsive(thread), this.#scope);
         logger.warn("OpenBot ended a turn whose prompt got no update.", {
           provider: this.provider,
           reason: this.#redact(failureText(resumed.failure.cause)),
@@ -2440,7 +2454,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   /** Applies one output update of the agent to a turn: a live one, or one that a background replay found. */
   #applyTurnUpdate(thread: AcpThread, turn: AcpTurn, update: SessionUpdate): void {
-    turn.answered = true;
+    if (!SESSION_STATE_UPDATES.has(update.sessionUpdate)) turn.answered = true;
     if (this.#flavor.unsentBackgroundTurns) {
       const id = shownEntryId(update);
       if (id) thread.shownIds.add(id);

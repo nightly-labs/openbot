@@ -3,7 +3,8 @@
 // - `tool` keeps one tool call open for `FAKE_TOOL_MS`, then answers.
 // - `stream` sends its answer in two chunks `FAKE_CHUNK_GAP_MS` apart, then answers.
 // - `hang-once` never answers until a `session/resume` of its session, as an Antigravity prompt that
-//   its harness lost (#4846). After the resume it answers at once.
+//   its harness lost (#4846). It sends only an `available_commands_update`. After the resume it
+//   answers at once.
 // - `quiet` sends one line, stays silent for `FAKE_QUIET_MS`, then answers, as a background task.
 // Each other prompt answers at once. `FAKE_NO_LOAD=1` offers no `session/load`, as some custom agents.
 // `FAKE_RESUME=1` offers `session/resume`, as Antigravity.
@@ -71,7 +72,11 @@ serveFakeAcpAgent(
       const text = promptText(request.params).trim();
       logEntry({ event: "prompt", sessionId, text });
       if (text === "hang") return;
-      if (text === "hang-once" && !resumed.has(sessionId)) return;
+      if (text === "hang-once" && !resumed.has(sessionId)) {
+        // An update about the session, not about the prompt: the prompt is still lost.
+        peer.update(sessionId, { sessionUpdate: "available_commands_update", availableCommands: [] });
+        return;
+      }
       if (text === "quiet") {
         peer.say(sessionId, "working");
         setTimeout(() => {
