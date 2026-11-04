@@ -312,6 +312,8 @@ export function MessageBody(props: {
   onOpenWorkspaceFile?: ((path: string) => void) | undefined;
   /** Opens the passage that a quote in the message points to. */
   onOpenQuote?: ((messageId: string, text: string) => void) | undefined;
+  /** Shows the browser tab or opens the thread that a tag in the message names. */
+  onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
   mediaSource?: AttachmentMediaSource | undefined;
   /** The download state of attachments from a joined server. */
@@ -557,6 +559,7 @@ export function MessageBody(props: {
       onOpenSharedFile={props.onOpenSharedFile}
       onOpenWorkspaceFile={props.onOpenWorkspaceFile}
       onOpenQuote={props.onOpenQuote}
+      onOpenTag={props.onOpenTag}
     />
   );
 
@@ -724,6 +727,7 @@ export function MessageBody(props: {
                             onOpenSharedFile={props.onOpenSharedFile}
                             onOpenWorkspaceFile={props.onOpenWorkspaceFile}
                             onOpenQuote={props.onOpenQuote}
+                            onOpenTag={props.onOpenTag}
                             showCitationFooter={index === lastTextBlockIndex()}
                             streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
                             streamingTailAfter={textTailAfter()[index]}

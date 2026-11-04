@@ -16,7 +16,7 @@ import type { MailboxStore } from "../mailbox-store";
 import { decodeRecordResponse } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { CustomEndpoints } from "./custom-endpoints";
-import { agentNamesById, deliveryPromptInput } from "./delivery-content";
+import { agentNamesById, deliveryPromptInput, type TagReferenceSource } from "./delivery-content";
 import { type DrainScheduler, REMOVED_ENDPOINT_MESSAGE } from "./drain-scheduler";
 import type { MailboxSync } from "./mailbox-sync";
 import type { ProviderRuntime } from "./provider-runtime";
@@ -31,6 +31,9 @@ export interface QueueControlsHooks {
    * deleted task.
    */
   taskThreadId(deliveryId: string): string | null;
+  /** The tabs and threads of this agent, as the tags of a steered message name them. */
+  /** `threadId` is the public thread that gets the prompt. */
+  tagReferences(agentId: string, threadId: string | null): TagReferenceSource;
 }
 
 export interface QueueControlsOptions {
@@ -219,7 +222,7 @@ export class QueueControls {
 
   readonly steer = Effect.fn("QueueControls.steer")(function* (this: QueueControls, input: SteerQueuedMessageInput) {
     const agent = yield* this.#store.existing(input.agentId).pipe(toQueueOperationFailed);
-    const { client, session, snapshot, context, turnId, routineSession } = yield* queueStep(() => {
+    const { client, session, snapshot, context, turnId, routineSession, publicThreadId } = yield* queueStep(() => {
       const client = this.#providers.requireReadyClientForAgent(agent);
       // A task message steers the task's turn, in the task's own provider session.
       const taskThreadId = this.#hooks.taskThreadId(input.deliveryId);
@@ -242,7 +245,7 @@ export class QueueControls {
       // Steering uses the running turn's endpoint even when the saved model has changed.
       if (!this.#endpoints.serves(this.#drain.modelForTurn(agent.id, turnId) ?? agent.model, client.provider))
         throw new Error(REMOVED_ENDPOINT_MESSAGE);
-      return { client, session, snapshot, context, turnId, routineSession };
+      return { client, session, snapshot, context, turnId, routineSession, publicThreadId };
     });
     // A routine run has its own session, which ends with the run. A message steered into it would not
     // stay in the session of its thread, so it waits for the next turn.
@@ -273,6 +276,7 @@ export class QueueControls {
             routineRun:
               context.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(input.deliveryId) : null,
             wokenWaits: context.delivery.sender.kind === "routine" ? this.#routines.wokenWaits(input.deliveryId) : [],
+            tags: this.#hooks.tagReferences(agent.id, publicThreadId),
           }),
         },
         decodeRecordResponse,

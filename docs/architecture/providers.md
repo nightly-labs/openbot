@@ -287,8 +287,10 @@ binary, never stops startup.
 
 A provider that is off in this profile runs no CLI, so the manager does not stamp its versions. Pi
 counts as in use while a key-only provider that runs on it is on. Its
-provider page in Settings offers Remove download (#3321), which removes every version of that CLI and
-this profile's partial downloads of it, and leaves accounts and sign-ins alone. It is refused while
+provider page in Settings offers Delete (#3321), which removes every version of that CLI and
+this profile's partial downloads of it, and leaves accounts and sign-ins alone. On a provider that
+is on and runs the CLI that OpenBot downloaded, Delete first turns the provider off. An agent that
+uses the provider stops it, as it stops the switch. It is refused while
 the provider is on, while its download runs, and for a provider with an explicit CLI path. The same
 age rule keeps a version another instance stamped, with one change: the manager remembers its own
 last stamp of each directory, and a directory whose mtime is not later than that stamp counts as

@@ -266,24 +266,9 @@ export const messages = {
   "provider.settings.modelShow": "Pokaż {name} ({id}) w wyborze modelu",
   "provider.settings.modelsNoMatch": "Żaden model nie pasuje do wyszukiwania.",
   "provider.settings.modelsLoadFailed": "Nie udało się wczytać modeli tego serwera.",
-  "provider.settings.download": "Pobrane",
-  "provider.settings.downloadedCli": "CLI {name}",
-  "provider.settings.downloadDetail": {
-    one: "{version} · 1 wersja · {size}",
-    few: "{version} · {count} wersje · {size}",
-    many: "{version} · {count} wersji · {size}",
-    other: "{version} · {count} wersji · {size}",
-  },
-  "provider.settings.downloadVersions": {
-    one: "1 wersja · {size}",
-    few: "{count} wersje · {size}",
-    many: "{count} wersji · {size}",
-    other: "{count} wersji · {size}",
-  },
-  "provider.settings.downloadAgain": "Gdy włączysz {name}, OpenBot pobierze CLI ponownie.",
-  "provider.settings.removeDownloadConfirm": "Usunąć {size}?",
-  "provider.settings.removeDownloadKeeps": "Konta, logowania i agenci zostają.",
-  "provider.settings.removeDownload": "Usuń pobrane",
-  "provider.settings.removingDownload": "Usuwanie…",
+  "provider.settings.deleteTitle": "Usuń {name}",
+  "provider.settings.deleteOn": "Wyłącza {name} i usuwa CLI pobrane przez OpenBot. Konta, logowania i agenci zostają.",
+  "provider.settings.deleteOff":
+    "Usuwa CLI pobrane przez OpenBot dla {name} ({size}). Konta, logowania i agenci zostają.",
   "provider.settings.removeDownloadFailed": "Nie udało się usunąć pobranych plików.",
 } as const satisfies PartialTranslation<typeof source>;

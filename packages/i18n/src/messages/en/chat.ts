@@ -420,4 +420,8 @@ export const messages = defineMessages("chat", {
   "chat.compaction.failed": "Could not compact context",
   "chat.compaction.tokens": "{before} → {after} tokens",
   "chat.compaction.continues": "Queued messages continue.",
+  "chat.reference.kind.tab": "Browser tab",
+  "chat.reference.kind.thread": "Thread",
+  "chat.reference.open.tab": "Show browser tab {name}",
+  "chat.reference.open.thread": "Open thread {name}",
 });

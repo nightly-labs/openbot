@@ -421,4 +421,8 @@ export const messages = {
   "chat.compaction.failed": "无法压缩上下文",
   "chat.compaction.tokens": "{before} → {after} 个 token",
   "chat.compaction.continues": "排队中的消息会继续执行。",
+  "chat.reference.kind.tab": "浏览器标签页",
+  "chat.reference.kind.thread": "话题",
+  "chat.reference.open.tab": "显示浏览器标签页 {name}",
+  "chat.reference.open.thread": "打开话题 {name}",
 } as const satisfies PartialTranslation<typeof source>;

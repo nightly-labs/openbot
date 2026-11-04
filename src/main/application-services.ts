@@ -685,6 +685,8 @@ export interface ApplicationServices {
   computerUseHighlight: ComputerUseHighlightController;
   computerUsePermissionHelp: ComputerUsePermissionHelpWindowController;
   analytics: HostAnalytics;
+  /** Starts the shared agent database host early. The entry point runs it after the first window loads. */
+  prewarmAgentDatabase: Effect.Effect<void>;
   trace: TraceFile;
   resourceMonitor: ResourceMonitor;
   /** Null for a local server child: its parent desktop reports the start. */
@@ -3693,6 +3695,7 @@ export async function createApplicationServices({
     computerUseHighlight,
     computerUsePermissionHelp,
     analytics,
+    prewarmAgentDatabase: tables.prewarm(),
     trace,
     resourceMonitor,
     startup,

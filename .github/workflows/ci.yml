@@ -657,6 +657,7 @@ jobs:
     # Runs the real ACP provider drivers (custom agents, OpenCode, Cline) over fake agents from
     # `scripts/provider-fakes/`. The fakes speak ACP on stdio as the released CLIs do, or replay a
     # recorded transcript of a released CLI, so the job needs no provider account, network or display.
+    # It also runs the agent database host start test, which starts the real host with Node.
     name: Provider fakes E2E
     needs: detect
     if: needs.detect.outputs.desktop == 'true'
@@ -714,6 +715,10 @@ jobs:
       - name: Run the ACP turn stall E2E test
         if: ${{ !cancelled() }}
         run: bun run test:acp-turn-stall
+
+      - name: Run the agent database host start E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:agent-database-host-start
 
       - name: Run the ACP instructions once E2E test
         if: ${{ !cancelled() }}
@@ -792,6 +797,7 @@ jobs:
             .openbot-build/acp-flavor-e2e/
             .openbot-build/acp-mcp-server-names-e2e/
             .openbot-build/acp-turn-stall-e2e/
+            .openbot-build/agent-database-host-start-e2e/
             .openbot-build/acp-instructions-once-e2e/
             .openbot-build/acp-audio-input-e2e/
             .openbot-build/grok-steer-e2e/

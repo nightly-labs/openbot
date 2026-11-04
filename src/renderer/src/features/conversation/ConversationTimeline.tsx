@@ -159,6 +159,7 @@ export function ConversationTimeline() {
     openSharedFile,
     openWorkspaceFile,
     openQuote,
+    openTaggedReference,
     pendingSendFor,
     presentedQueueDeliveries,
     providerUpdateRequired,
@@ -419,6 +420,7 @@ export function ConversationTimeline() {
             // A workspace path is in the workspace of the agent that wrote it, as in a channel.
             onOpenWorkspaceFile={(path) => openWorkspaceFile(path, undefined, current().exchange?.senderAgentId)}
             onOpenQuote={openQuote}
+            onOpenTag={openTaggedReference}
             macWindowControls={props.platform === "darwin"}
           />
         )}
@@ -1322,6 +1324,7 @@ export function ConversationTimeline() {
                                 : undefined
                             }
                             onOpenQuote={openQuote}
+                            onOpenTag={openTaggedReference}
                             onDownload={(attachment) => attachmentAction(attachment, "download")}
                             mediaSource={runtime.attachmentMedia}
                             downloads={attachmentDownloads}

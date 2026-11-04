@@ -1541,9 +1541,8 @@ if (!hasSingleInstanceLock) {
       await windows.loadRenderer(mainWindow);
       performance.mark("openbot:renderer-loaded");
       built.startup?.rendererLoaded();
-      // `sendToRenderer` dropped the server changes made while the window loaded: the host list and
-      // the connection of the selected server. The renderer can have read the list before them.
-      forwardServers(remoteServers.list());
+      // After the first window, so the new process does not compete with the start for the CPU.
+      Effect.runFork(built.prewarmAgentDatabase);
       // After the load: `sendToRenderer` drops events aimed at a window that is still loading.
       await Effect.runPromise(remoteServers.startEventConnections());
       screen.on("display-added", reconcileDynamicIsland);
