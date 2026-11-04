@@ -409,6 +409,14 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "ما مهام Todoist المستحقة اليوم؟",
   "marketplace.plugin.todoist.prompt.capture": "أضف بنود العمل هذه إلى Inbox في Todoist.",
   "marketplace.plugin.todoist.prompt.overdue": "انقل مهامي المتأخرة في Todoist إلى الغد.",
+  "marketplace.plugin.ticktick.tagline": "المهام والقوائم والعادات والتركيز",
+  "marketplace.plugin.ticktick.description":
+    "يتيح TickTick للوكلاء البحث عن المهام وتصفيتها، وإضافة المهام وتعديلها، وإدارة القوائم والأقسام والمجلدات والوسوم والتعليقات. ويمكن للوكلاء أيضًا قراءة العادات وسجلات التركيز وتعديلها، وقراءة الأحداث من التقويمات المتصلة بـ TickTick. يسجّل كل مستخدم الدخول إلى حسابه في TickTick من المتصفح. يحصل الوكلاء على صلاحية القراءة والكتابة: يمكنهم إكمال المهام ونقلها وحذفها، وحذف الوسوم وسجلات التركيز.",
+  "marketplace.plugin.ticktick.app":
+    "المهام والقوائم والعادات وسجلات التركيز، عبر خادم MCP من TickTick مع تسجيل الدخول في المتصفح.",
+  "marketplace.plugin.ticktick.prompt.today": "ما مهام TickTick المستحقة اليوم؟",
+  "marketplace.plugin.ticktick.prompt.capture": "أضف بنود العمل هذه إلى صندوق الوارد في TickTick.",
+  "marketplace.plugin.ticktick.prompt.week": "ما مهام TickTick التي أكملتها الأسبوع الماضي؟",
   "marketplace.plugin.trello.tagline": "اللوحات والقوائم والبطاقات",
   "marketplace.plugin.trello.description":
     "يتيح Trello للوكلاء البحث في اللوحات والقوائم والبطاقات وقوائم التحقق والتعليقات وقراءتها، وإنشاء اللوحات والبطاقات، ونقل القوائم والبطاقات، ووضع علامة «منجز» على البطاقات، وإضافة قوائم التحقق والتعليقات والتصنيفات. ويمكن للوكلاء أيضًا قراءة البطاقات وإضافتها في Inbox الخاص بالمستخدم في Trello، وقراءة أحداث Planner، التي قد تأتي من تقويم Google أو Outlook مرتبط. يسجّل كل مستخدم الدخول إلى حساب Trello الخاص به عبر المتصفح ويختار مساحات العمل في شاشة الموافقة. يحصل الوكلاء على أذونات المستخدم نفسها في مساحات العمل تلك. يمكنهم أرشفة البطاقات والقوائم، لكن الخادم لا يستطيع حذف أي شيء نهائيًا.",

@@ -420,6 +420,14 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "Quelles tâches Todoist sont à faire aujourd’hui ?",
   "marketplace.plugin.todoist.prompt.capture": "Ajoute ces actions à ma boîte de réception Todoist.",
   "marketplace.plugin.todoist.prompt.overdue": "Reporte mes tâches Todoist en retard à demain.",
+  "marketplace.plugin.ticktick.tagline": "Tâches, listes, habitudes et concentration",
+  "marketplace.plugin.ticktick.description":
+    "TickTick permet aux agents de rechercher et filtrer des tâches, d'ajouter et modifier des tâches, et de gérer les listes, sections, dossiers, étiquettes et commentaires. Les agents peuvent aussi lire et modifier les habitudes et les sessions de concentration, et lire les événements des calendriers connectés à TickTick. Chaque utilisateur se connecte à son propre compte TickTick dans le navigateur. Les agents ont un accès en lecture et en écriture : ils peuvent terminer, déplacer et supprimer des tâches, et supprimer des étiquettes et des sessions de concentration.",
+  "marketplace.plugin.ticktick.app":
+    "Tâches, listes, habitudes et sessions de concentration, via le serveur MCP de TickTick avec connexion dans le navigateur.",
+  "marketplace.plugin.ticktick.prompt.today": "Quelles tâches TickTick sont à faire aujourd'hui ?",
+  "marketplace.plugin.ticktick.prompt.capture": "Ajoute ces actions à ma boîte de réception TickTick.",
+  "marketplace.plugin.ticktick.prompt.week": "Quelles tâches TickTick ai-je terminées la semaine dernière ?",
   "marketplace.plugin.trello.tagline": "Tableaux, listes et cartes",
   "marketplace.plugin.trello.description":
     "Trello permet aux agents de rechercher et lire les tableaux, listes, cartes, checklists et commentaires, de créer des tableaux et des cartes, de déplacer les listes et les cartes, de marquer des cartes comme terminées, et d’ajouter des checklists, des commentaires et des étiquettes. Les agents peuvent aussi lire et ajouter des cartes dans la boîte de réception Trello de l’utilisateur, et lire les événements du Planner, qui peuvent venir d’un agenda Google ou Outlook connecté. Chaque utilisateur se connecte à son propre compte Trello dans le navigateur et choisit les espaces de travail sur un écran de consentement. Les agents ont les mêmes droits que l’utilisateur dans ces espaces de travail. Ils peuvent archiver des cartes et des listes, mais le serveur ne peut rien supprimer définitivement.",

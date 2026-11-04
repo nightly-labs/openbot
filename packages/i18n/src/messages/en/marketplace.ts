@@ -421,6 +421,14 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.todoist.prompt.today": "Which Todoist tasks are due today?",
   "marketplace.plugin.todoist.prompt.capture": "Add these action items to my Todoist Inbox.",
   "marketplace.plugin.todoist.prompt.overdue": "Move my overdue Todoist tasks to tomorrow.",
+  "marketplace.plugin.ticktick.tagline": "Tasks, lists, habits and focus",
+  "marketplace.plugin.ticktick.description":
+    "TickTick lets agents search and filter tasks, add and update tasks, and manage lists, sections, folders, tags and comments. Agents can also read and change habits and focus records, and read events from the calendars connected to TickTick. Each user signs in to their own TickTick account through the browser. Agents get read and write access: they can complete, move and delete tasks, and delete tags and focus records.",
+  "marketplace.plugin.ticktick.app":
+    "Tasks, lists, habits and focus records, over TickTick's MCP server with browser sign-in.",
+  "marketplace.plugin.ticktick.prompt.today": "Which TickTick tasks are due today?",
+  "marketplace.plugin.ticktick.prompt.capture": "Add these action items to my TickTick Inbox.",
+  "marketplace.plugin.ticktick.prompt.week": "Which TickTick tasks did I complete last week?",
   "marketplace.plugin.trello.tagline": "Boards, lists and cards",
   "marketplace.plugin.trello.description":
     "Trello lets agents search and read boards, lists, cards, checklists and comments, create boards and cards, move lists and cards, mark cards done, and add checklists, comments and labels. Agents can also read and add cards in the user's Trello Inbox, and read Planner events, which can come from a connected Google or Outlook calendar. Each user signs in to their own Trello account through the browser and chooses the workspaces on a consent screen. Agents get the same permissions as the user in those workspaces. They can archive cards and lists, but the server cannot delete anything permanently.",

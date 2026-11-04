@@ -26,6 +26,7 @@ import { REVENUECAT_PLUGIN_GUIDE } from "./revenuecat";
 import { ROBINHOOD_PLUGIN_GUIDE } from "./robinhood";
 import { SENTRY_PLUGIN_GUIDE } from "./sentry";
 import { STRIPE_PLUGIN_GUIDE } from "./stripe";
+import { TICKTICK_PLUGIN_GUIDE } from "./ticktick";
 import { TODOIST_PLUGIN_GUIDE } from "./todoist";
 import { TRELLO_PLUGIN_GUIDE } from "./trello";
 import { VERCEL_PLUGIN_GUIDE } from "./vercel";
@@ -53,6 +54,7 @@ const PLUGIN_GUIDES: Readonly<Record<string, PluginGuide>> = {
   revenuecat: REVENUECAT_PLUGIN_GUIDE,
   vercel: VERCEL_PLUGIN_GUIDE,
   todoist: TODOIST_PLUGIN_GUIDE,
+  ticktick: TICKTICK_PLUGIN_GUIDE,
   trello: TRELLO_PLUGIN_GUIDE,
   clickup: CLICKUP_PLUGIN_GUIDE,
   coinbase: COINBASE_PLUGIN_GUIDE,

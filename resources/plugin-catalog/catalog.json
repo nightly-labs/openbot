@@ -45,6 +45,12 @@
       "detailSha256": "5ead5bab31fb150bf62410b0f4f59106c1e0aa6b00c8449bd8a0d0557cfd48c5"
     },
     {
+      "slug": "ticktick",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "d78a41e454da4e0134d57a11d7da29b5b8c38accf4f5d4dfde2e28bf38601a93"
+    },
+    {
       "slug": "trello",
       "version": "1.0.0",
       "featured": false,

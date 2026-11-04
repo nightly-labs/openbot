@@ -393,6 +393,14 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "Quais tarefas do Todoist vencem hoje?",
   "marketplace.plugin.todoist.prompt.capture": "Adicione estes itens de ação à minha Caixa de Entrada do Todoist.",
   "marketplace.plugin.todoist.prompt.overdue": "Mova minhas tarefas atrasadas do Todoist para amanhã.",
+  "marketplace.plugin.ticktick.tagline": "Tarefas, listas, hábitos e foco",
+  "marketplace.plugin.ticktick.description":
+    "O TickTick permite que agentes pesquisem e filtrem tarefas, adicionem e alterem tarefas, e gerenciem listas, seções, pastas, etiquetas e comentários. Os agentes também podem ler e alterar hábitos e registros de foco, e ler eventos dos calendários conectados ao TickTick. Cada usuário entra na própria conta do TickTick pelo navegador. Os agentes recebem acesso de leitura e escrita: podem concluir, mover e excluir tarefas, e excluir etiquetas e registros de foco.",
+  "marketplace.plugin.ticktick.app":
+    "Tarefas, listas, hábitos e registros de foco, pelo servidor MCP do TickTick com login no navegador.",
+  "marketplace.plugin.ticktick.prompt.today": "Quais tarefas do TickTick vencem hoje?",
+  "marketplace.plugin.ticktick.prompt.capture": "Adicione estes itens de ação à minha Caixa de entrada do TickTick.",
+  "marketplace.plugin.ticktick.prompt.week": "Quais tarefas do TickTick eu concluí na semana passada?",
   "marketplace.plugin.trello.tagline": "Quadros, listas e cartões",
   "marketplace.plugin.trello.description":
     "O Trello permite que os agentes pesquisem e leiam quadros, listas, cartões, checklists e comentários, criem quadros e cartões, movam listas e cartões, marquem cartões como concluídos e adicionem checklists, comentários e etiquetas. Os agentes também podem ler e adicionar cartões na Caixa de Entrada do Trello do usuário e ler eventos do Planner, que podem vir de um calendário Google ou Outlook conectado. Cada usuário entra na própria conta do Trello pelo navegador e escolhe as áreas de trabalho em uma tela de consentimento. Os agentes têm as mesmas permissões que o usuário nessas áreas de trabalho. Eles podem arquivar cartões e listas, mas o servidor não pode excluir nada de forma permanente.",
