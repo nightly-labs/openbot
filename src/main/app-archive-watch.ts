@@ -15,7 +15,7 @@ import { Option, Schema } from "effect";
 import { dialog, shell } from "electron";
 
 const logger = createOpenBotLogger("app-archive");
-const DOWNLOAD_URL = "https://openbot.run/download";
+export const DOWNLOAD_URL = "https://openbot.run/download";
 // A copy of the archive writes for some seconds. Check once the writes stop.
 const SETTLE_MS = 2_000;
 
