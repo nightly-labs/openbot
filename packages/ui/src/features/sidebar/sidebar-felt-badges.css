@@ -130,7 +130,7 @@
     .agent-row-agent-status-unread,
     .agent-row-agent-status-routine-failed
   ).agent-row-agent-status-entering {
-    animation: sidebar-felt-in 200ms cubic-bezier(0.2, 0, 0, 1) both;
+    animation: sidebar-felt-in var(--openbot-duration-slow) cubic-bezier(0.2, 0, 0, 1) both;
   }
 
   .agent-row-agent-status-unread.agent-row-agent-status-bumping {
@@ -145,7 +145,7 @@
     .agent-row-agent-status-unread,
     .agent-row-agent-status-routine-failed
   ).agent-row-agent-status-leaving {
-    animation: sidebar-felt-out 240ms cubic-bezier(0.5, 0, 0.75, 0) both;
+    animation: sidebar-felt-out var(--openbot-duration-overlay) cubic-bezier(0.5, 0, 0.75, 0) both;
   }
 
   .agent-row-unread-count.agent-row-unread-count-roll-in {

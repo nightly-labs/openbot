@@ -150,9 +150,13 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
     },
   );
 
-  /* The animation of the badge itself has ended: the digits animate too, and their events bubble. */
+  /* The animation of the badge itself has ended: the digits animate too, and their events bubble.
+     A bump or an entrance can end in the same frame that the badge starts to shrink; only the end of
+     the shrink removes the badge. */
   const animationEnded = (event: AnimationEvent) => {
-    if (event.target === event.currentTarget) stop();
+    if (event.target !== event.currentTarget) return;
+    if (untrack(phase) === "out" && event.animationName !== "sidebar-felt-out") return;
+    stop();
   };
   /* A class change that starts the next animation cancels the one before; only a badge with no
      animation left, such as one in a collapsed section, settles. */

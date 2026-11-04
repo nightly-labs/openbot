@@ -57,12 +57,21 @@
 }
 
 /* The ring filter of the sidebar faces floods the sidebar colour, which would be a halo on the clear
- * sidebar. A row with its own hover or selected fill keeps the filter of that fill. */
+ * sidebar. A row with its own hover or selected fill keeps the filter of that fill; a row under a drag
+ * has no hover fill. */
 :root[data-openbot-window-glass]
   .app-window
   > .app-frame-edge
   > .sidebar
   .agent-row:not(:hover, .agent-row-active)
+  .channel-avatar-cluster
+  .agent-avatar:has(> .bloub-avatar-svg image),
+:root[data-openbot-window-glass]
+  .app-window
+  > .app-frame-edge
+  > .sidebar
+  .agent-list[data-sidebar-dragging]
+  .agent-row:hover:not(.agent-row-active)
   .channel-avatar-cluster
   .agent-avatar:has(> .bloub-avatar-svg image) {
   filter: none;

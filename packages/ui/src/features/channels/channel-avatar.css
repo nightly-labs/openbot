@@ -104,9 +104,6 @@
   min-width: var(--channel-avatar-felt-box);
   height: var(--channel-avatar-felt-box);
   isolation: isolate;
-  /* The count sits 1.5px lower than the cell centre, so its ring meets the faces above it at the
-     same gap as the ring between the faces. */
-  translate: 0 1.5px;
   padding-inline: 4px;
   place-items: center;
   border-radius: var(--openbot-radius-pill);
@@ -139,6 +136,11 @@
   );
   filter: brightness(0.52) saturate(1.35) contrast(1.1);
   content: "";
+}
+/* With the 3.5px ring, the count sits 1.5px lower than the cell centre, so its ring meets the faces
+   above it at the same gap as the ring between the faces. */
+.sidebar .channel-avatar-cluster .channel-avatar-count {
+  translate: 0 1.5px;
 }
 /*
  * The plush faces of a sidebar cluster get the ring of the "+N" count. The ring of the drop shadows
