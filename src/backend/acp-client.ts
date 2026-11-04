@@ -2340,7 +2340,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         });
         // The lost prompt can still run in the harness. The next prompt opens the session again.
         thread.needsResume = true;
-        turn.failureCause = "timeout";
+        // Not `timeout`: a backup model must not start while the prompt can still run here.
+        turn.failureCause = "stalled";
         // A plain message, as `#watchStall` gives: the user reads it as it is.
         return Result.fail(
           providerFailure(
@@ -2738,7 +2739,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       }
       this.emit("diagnostic", `${this.#label} sent nothing for ${silentFor} ms; ending turn ${turn.id}.`);
       yield* providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id })).pipe(Effect.ignore);
-      turn.failureCause = "timeout";
+      // The agent can ignore the cancel, so a backup model must not start on this stall.
+      turn.failureCause = "stalled";
       yield* this.#abandonTurn(
         thread,
         turn,
@@ -2788,6 +2790,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       const turn = thread.activeTurn;
       const message = sourceText("error.provider.acpUnresponsive", { provider: this.#label });
       if (turn) {
+        // The transport stops below, so the prompt cannot still run and a backup model can start.
         turn.failureCause = "timeout";
         yield* this.#abandonTurn(thread, turn, "failed", message);
       }

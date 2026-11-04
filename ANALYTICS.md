@@ -28,7 +28,7 @@ Every event has these low-cardinality properties:
 Each surface counts its own generations, so a report filters by `surface` and that surface's current
 generation. Host generation 13 adds `failure_code` and `cause_code` on a failed `system_turn_completed`,
 and the cause codes `context_too_long`, `model_not_found`, `invalid_request`, `content_blocked`,
-`turn_limit`, `empty_answer`, `provider_internal_error` and `provider_exited`. Host generation 12 adds the main-loop stall attribution (`main_loop_delay_max_phase`,
+`turn_limit`, `empty_answer`, `provider_internal_error`, `provider_exited` and `stalled`. Host generation 12 adds the main-loop stall attribution (`main_loop_delay_max_phase`,
 `main_loop_delay_max_turn_active`, `main_loop_stall_count`), `child_gone_<type>_count`,
 `renderer_long_task_count` and `renderer_input_delay_ms_p95` on `system_resources`, the
 `system_startup` event, and `queue_wait_ms`, `start_ms`, `provider_start_ms` and `first_output_ms` on
@@ -400,7 +400,8 @@ fallback for errors that have no structured field. A refusal cause from an HTTP 
 | `usage_limit` | A plan or free quota is used up |
 | `billing` | Payment is required or the credits are used up |
 | `network` | The provider cannot be reached |
-| `timeout` | No answer in time, or the turn stalled |
+| `timeout` | No answer in time |
+| `stalled` | OpenBot ended a turn that sent no update for the stall time. A backup model does not start, because the prompt can still run |
 | `storage` | A local disk failure |
 | `not_found` | A resource that is not a model is missing |
 | `conflict` | A state conflict (HTTP 409) |
@@ -417,7 +418,7 @@ fallback for errors that have no structured field. A refusal cause from an HTTP 
 | `cancelled` | The turn or request was cancelled |
 | `unknown` | No rule matched |
 
-Codes from `context_too_long` to `provider_exited` start at host generation 13. The message rules
+Codes from `context_too_long` to `provider_exited`, and `stalled`, start at host generation 13. The message rules
 are shared, so desktop, web and mobile reports at earlier generations can also contain them.
 `rate_limit`, `usage_limit`, `billing`, `authentication`, `network`, `timeout` and
 `provider_unavailable` are user or provider limits; other codes are more likely OpenBot failures.

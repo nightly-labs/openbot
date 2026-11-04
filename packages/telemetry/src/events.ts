@@ -11,6 +11,7 @@ export const CauseCode = Schema.Literals([
   "billing",
   "network",
   "timeout",
+  "stalled",
   "storage",
   "not_found",
   "conflict",

@@ -712,7 +712,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       // `abort` when it is idle, after `agent_settled`, which then ends the turn as failed.
       yield* thread.rpc.request({ type: "clear_queue" }).pipe(Effect.ignore);
       yield* thread.rpc.request({ type: "abort" }).pipe(Effect.ignore);
-      yield* this.#finish(thread, "failed", failure, "timeout");
+      yield* this.#finish(thread, "failed", failure, "stalled");
     }
   });
 
@@ -812,7 +812,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
           thread,
           turn.stalled || (!turn.stopped && failure) ? "failed" : turn.stopped ? "interrupted" : "completed",
           failure ?? undefined,
-          turn.stalled ? "timeout" : (turn.failureCause ?? undefined),
+          turn.stalled ? "stalled" : (turn.failureCause ?? undefined),
         ),
       );
     } else if (record.type === "compaction_start" || record.type === "compaction_end") {
