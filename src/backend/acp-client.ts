@@ -28,7 +28,7 @@ import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runt
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { classifyUserError } from "@openbot/user-errors";
-import { Deferred, Effect, Exit, Fiber, Scope, Semaphore } from "effect";
+import { Deferred, Effect, Exit, Fiber, Result, Scope, Semaphore } from "effect";
 import {
   AcpConfiguration,
   type AcpModel,
@@ -117,6 +117,18 @@ const ACP_PROMPT_AUDIO_BASE64_BYTES = 19 * 1024 * 1024;
  */
 const ACP_TURN_STALL_MS = 5 * 60_000;
 
+/**
+ * How long an agent that keeps a silent prompt open for background tasks
+ * (`AcpFlavor.promptOpenForBackgroundTasks`) may send nothing at all for a prompt. Its turn is not
+ * ended as stalled, so a prompt that Antigravity lost showed as thinking until the user stopped it
+ * and sent it again (#4846). Gemini CLI's own deadline for a model response is 60 s, and it retries
+ * after that, so this leaves room for a retry of its own.
+ */
+const ACP_FIRST_UPDATE_MS = 3 * 60_000;
+
+/** The result of a prompt that got no update within `ACP_FIRST_UPDATE_MS`. */
+const SILENT_PROMPT = Symbol("silent prompt");
+
 /** How long a stopped turn may take to end before OpenBot ends it itself. */
 const ACP_STOP_GRACE_MS = 10_000;
 
@@ -187,6 +199,8 @@ interface AcpTurn {
   task: Fiber.Fiber<void, ProviderClientOperationError> | null;
   /** When the agent last sent an update for this turn, or the user last answered it. */
   lastActivityAt: number;
+  /** The agent sent an update, a question or a tool call for the prompt that it has now. */
+  answered: boolean;
   /** Questions and approvals that wait for the user. The turn is not stalled while one is open. */
   waitingOnUser: number;
   /** OpenBot ended the turn because the agent did not. Its open tool calls get no more updates. */
@@ -393,6 +407,8 @@ export interface AcpProviderOptions {
   mcpServers?: McpServerSource | undefined;
   /** How long a turn may send nothing before it fails (`ACP_TURN_STALL_MS` when absent). */
   turnStallMs?: number;
+  /** How long a prompt may get no update before it is sent again (`ACP_FIRST_UPDATE_MS` when absent). */
+  firstUpdateMs?: number;
   /** What this provider could not be given. Reported once per spawn, by `AgentService`. */
   reportMcpDrops?: McpDropReporter | undefined;
   mcpToolRuntimes?: McpToolRuntimeSource | undefined;
@@ -2120,6 +2136,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       completing: false,
       task: null,
       lastActivityAt: Date.now(),
+      answered: false,
       waitingOnUser: 0,
       abandoned: false,
       reportedCost: null,
@@ -2158,10 +2175,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     params: unknown,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     try {
-      const send = () =>
-        providerCall(() => this.#sessionConnection(thread).prompt({ sessionId: thread.id, prompt })).pipe(
-          Effect.result,
-        );
+      const send = () => this.#sendPrompt(thread, turn, prompt, params);
       let response = providerResult(yield* send());
       while (providerResult(yield* Effect.result(this.#leaveOutFailedMcpServer(thread, turn, response, params))))
         response = providerResult(yield* send());
@@ -2219,6 +2233,81 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       const failure = transport && !turn.stopped ? (yield* this.#explainSessionEnd(transport, error)).cause : error;
       yield* this.#completeTurn(thread, turn, turn.stopped ? "interrupted" : "failed", turn.stopped ? null : failure);
     }
+  });
+
+  /**
+   * Sends a prompt. An agent that keeps a silent prompt open for background tasks gets it once more
+   * when it sends nothing at all for it within `ACP_FIRST_UPDATE_MS`: such a turn is never ended as
+   * stalled, so a prompt that Antigravity lost showed as thinking until the user stopped it and sent
+   * it again (#4846). This does the same. The prompt is cancelled, `session/resume` rebuilds the
+   * session's harness, as it does after a stop, and the prompt goes again. The user saw nothing and no
+   * tool ran, so nothing is done twice. A second silent prompt fails the turn, and the next prompt
+   * opens the session again, on a new process when the session has one of its own.
+   */
+  readonly #sendPrompt = Effect.fn("AcpAgentClient.sendPrompt")(function* (
+    this: AcpAgentClient,
+    thread: AcpThread,
+    turn: AcpTurn,
+    prompt: ContentBlock[],
+    params: unknown,
+  ): Effect.fn.Return<Result.Result<PromptResponse, ProviderClientOperationError>> {
+    const send = providerCall(() => this.#sessionConnection(thread).prompt({ sessionId: thread.id, prompt })).pipe(
+      Effect.result,
+    );
+    if (!this.#flavor.promptOpenForBackgroundTasks || !this.#supportsSessionResume) return yield* send;
+    const limit = this.options.firstUpdateMs ?? ACP_FIRST_UPDATE_MS;
+    const silent = Effect.sleep(limit).pipe(
+      Effect.flatMap(() => (turn.answered || turn.stopped ? Effect.never : Effect.succeed(SILENT_PROMPT))),
+    );
+    for (let attempt = 1; ; attempt += 1) {
+      turn.answered = false;
+      const outcome = yield* Effect.raceFirst(send, silent);
+      if (outcome !== SILENT_PROMPT) return outcome;
+      logger.warn("An ACP agent sent nothing for a prompt.", { provider: this.provider, attempt, silentMs: limit });
+      yield* providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id })).pipe(Effect.ignore);
+      const resumed =
+        attempt === 1
+          ? yield* Effect.result(this.#resendPreparation(thread, params))
+          : Result.fail(providerFailure(new Error("The prompt got no update after it was sent again.")));
+      if (thread.activeTurn !== turn || turn.completing || turn.stopped)
+        return Result.succeed({ stopReason: "cancelled" } satisfies PromptResponse);
+      if (Result.isFailure(resumed)) {
+        logger.warn("OpenBot ended a turn whose prompt got no update.", {
+          provider: this.provider,
+          reason: this.#redact(failureText(resumed.failure.cause)),
+        });
+        // The lost prompt can still run in the harness. The next prompt opens the session again.
+        thread.needsResume = true;
+        // A plain message, as `#watchStall` gives: the user reads it as it is.
+        return Result.fail(
+          providerFailure(
+            sourceText("error.agent.turnStalled", {
+              provider: this.options.customEndpoint?.(thread.currentModelId)?.name ?? this.#label,
+            }),
+          ),
+        );
+      }
+      turn.lastActivityAt = Date.now();
+    }
+  });
+
+  /** Rebuilds a session's harness with `session/resume`, with the model and settings of the turn. */
+  readonly #resendPreparation = Effect.fn("AcpAgentClient.resendPreparation")(function* (
+    this: AcpAgentClient,
+    thread: AcpThread,
+    params: unknown,
+  ): Effect.fn.Return<void, ProviderClientOperationError> {
+    const model = thread.currentModelId;
+    const restored = yield* this.#restoreSessionEffect(
+      () => this.#sessionConnection(thread),
+      { sessionId: thread.id, ...thread.restore },
+      "resume",
+    ).pipe(this.#backgroundTimeout("session/resume"));
+    thread.configOptions = restored.configOptions ?? thread.configOptions;
+    thread.currentModelId = currentModelFromSessionSetup(restored) ?? thread.currentModelId;
+    yield* this.#configuration.applyConfig(thread, model, null, this.#models);
+    yield* this.#applyTurnSettings(thread, params);
+    this.#publishSessionSettings(thread);
   });
 
   /**
@@ -2351,6 +2440,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   /** Applies one output update of the agent to a turn: a live one, or one that a background replay found. */
   #applyTurnUpdate(thread: AcpThread, turn: AcpTurn, update: SessionUpdate): void {
+    turn.answered = true;
     if (this.#flavor.unsentBackgroundTurns) {
       const id = shownEntryId(update);
       if (id) thread.shownIds.add(id);
@@ -2560,7 +2650,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    * Fails a turn that sends nothing while no tool call runs and no question waits for the user.
    *
    * A silent prompt of an agent that keeps it open for background tasks can still be working, so its
-   * turn goes on, and `#endIfUnresponsive` checks the process instead.
+   * turn goes on, and `#endIfUnresponsive` checks the process instead. Only a prompt that got no
+   * update at all ends, in `#sendPrompt`.
    */
   readonly #watchStall = Effect.fn("AcpAgentClient.watchStall")(function* (
     this: AcpAgentClient,
@@ -2825,6 +2916,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #waitForUser<A, E>(turn: AcpTurn | null | undefined, request: Effect.Effect<A, E>): Effect.Effect<A, E> {
     if (!turn) return request;
     return Effect.suspend(() => {
+      turn.answered = true;
       turn.waitingOnUser += 1;
       return request;
     }).pipe(
@@ -3048,6 +3140,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (this.#historyReplays.has(params.threadId)) {
       return { success: false, contentItems: [{ type: "inputText", text: "History replay cannot execute tools." }] };
     }
+    const turn = this.#threads.get(params.threadId)?.activeTurn;
+    if (turn) turn.answered = true;
     const result = yield* this.#serverRequests
       .call("item/tool/call", params, signal)
       .pipe(toProviderClientOperationError);
