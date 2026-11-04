@@ -858,16 +858,17 @@ export function ChatView({
   }
 
   // The messages whose text and files are in the composer. The outbox keeps them until it sends,
-  // and they come back stopped when the chat closes. Their text then leaves the draft with what was
-  // typed after it, so that it does not show both in the queue and in the composer.
+  // and they come back stopped when the chat closes. The chat then keeps the draft from before the
+  // first Edit, so that their text does not show both in the queue and in the composer.
   const editedMessages = useRef(new Set<string>());
+  const draftBeforeEdit = useRef("");
   const mounted = useRef(false);
   useEffect(() => {
     mounted.current = true;
     const edited = editedMessages.current;
     return () => {
       mounted.current = false;
-      if (edited.size) setDraft("");
+      if (edited.size) setDraft(draftBeforeEdit.current);
       outbox.stopEditing(edited);
       edited.clear();
     };
@@ -897,9 +898,13 @@ export function ChatView({
       outbox.stopEditing([clientMessageId]);
       return;
     }
+    const firstEdit = editedMessages.current.size === 0;
     editedMessages.current.add(clientMessageId);
     const { text: body, replyToMessageId, files } = restored;
-    if (body) setDraft((current) => (current ? `${body}\n${current}` : body));
+    setDraft((current) => {
+      if (firstEdit) draftBeforeEdit.current = current;
+      return body ? (current ? `${body}\n${current}` : body) : current;
+    });
     const reply = projectedMessages.find(
       (message): message is ChatBubbleMessage => message.kind === "message" && message.id === replyToMessageId,
     );
@@ -913,12 +918,15 @@ export function ChatView({
   });
   // A stopped upload is the person's own choice: the text and files go back to the composer, and no
   // error is needed to explain it.
+  // Only the chat in front takes them: a screen of the same chat under it shares the draft, and must
+  // not hold the edit that the front composer sends.
   useEffect(() => {
+    if (!isFocused) return;
     const returned = outboxMessages.filter((message) => message.returned);
     if (!returned.length) return;
     cancelSend.current();
     for (const message of returned) void editOutboxMessage.current(message.clientMessageId);
-  }, [outboxMessages]);
+  }, [outboxMessages, isFocused]);
   const outboxStatuses = useMemo(() => {
     const statuses = new Map<string, OutboxRowStatus>();
     // The waiting messages share one status line, under the last of them.
