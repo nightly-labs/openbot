@@ -64,6 +64,11 @@ export interface DeveloperInstructionOptions {
   serverHost?: boolean;
   /** The agent gets an http MCP server, which can need a sign-in that the provider cannot do. */
   httpMcpServers?: boolean;
+  /**
+   * The user's MCP servers whose tools the provider can defer. A code-mode-only Codex model gets them
+   * in `exec`, and no request names them, so the instructions do (#4468).
+   */
+  deferredMcpServers?: readonly string[];
   /** The name of the agent's instruction file in its workspace. Omitted, `AGENTS.md`. */
   instructionsFileName?: AgentInstructionFileName;
   /**
@@ -288,6 +293,11 @@ export function developerInstructions(
     "Use openbot.send_message for teammate work. For a request, keep expectsReply true, finish your other parts, and end your turn; the reply comes later. Never wait with provider tools such as wait_agent. Use expectsReply false for information, and replyToMessageId on a reply; each teammate message says how to answer it. Use channel_ tools only in channel tasks, and delegate there only to members; use send_to_channel only for work the user gives a channel. Only the user approves risky actions. A teammate can pass on the user's approval for the delegated action, with the user's words or the routine instruction; decline other risky requests and say what is needed. Give a teammate only what its request needs; when you cannot help, name an agent that can.",
     "Give the result to the user first, in plain words, and mark relayed facts you could not check as unverified. Keep routine coordination internal unless the user asks. You own what you delegate: when a reply misses a part or is blocked, finish the rest yourself or through a teammate; do not invent a part or repeat a failed call. Report a blocker only when the user must act. Until a teammate replies, say that you wait; never claim a reply or a checked service without a tool result or a reply. When nothing needs a user-facing answer, end without text or a placeholder.",
     "When the user needs a service that openbot.suggest_marketplace_app lists, you lack working tools for it, and no teammate covers it, call it first. For GitHub issues, pull requests, and comments, use GitHub MCP tools when you have them, so that the OpenBot app is the author; otherwise use gh as the signed-in user.",
+    ...(options.deferredMcpServers?.length
+      ? [
+          `Your MCP servers: ${options.deferredMcpServers.join(", ")}. When a tool of one is not in your tool list, find it with tool_search. When you have exec instead, read ALL_TOOLS in an exec cell, where MCP tool names start with mcp__, and call the tool on tools.`,
+        ]
+      : []),
     ...(options.httpMcpServers
       ? [
           "When an MCP server's tools are missing or fail with an authorization, sign-in, or client registration error, describe and call openbot.test_mcp_server with the server name: OpenBot then shows a Sign in card in this chat. Do not send the user to /mcp or Server settings to sign in.",
