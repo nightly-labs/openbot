@@ -10,4 +10,13 @@ export const messages = {
   "startup.archiveChangedBody":
     "Un autre programme a modifié le fichier app.asar d’OpenBot. OpenBot fonctionne maintenant, mais il ne s’ouvrira plus après sa fermeture.\n\nPour le réparer, réinstallez OpenBot. Vos données locales sont conservées.",
   "startup.archiveChangedDownload": "Télécharger OpenBot",
+  "startup.newerDataUpdatingTitle": "Mise à jour d’OpenBot",
+  "startup.newerDataUpdatingBody":
+    "Une version plus récente d’OpenBot a enregistré vos données. OpenBot installe la dernière version, puis se rouvre.\n\nVos données locales n’ont pas été réinitialisées ni écrasées.",
+  "startup.newerDataTitle": "Installez la dernière version d’OpenBot",
+  "startup.newerDataBody":
+    "Une version plus récente d’OpenBot a enregistré vos données, et cette version ({version}) ne peut pas les ouvrir. Installez la dernière version pour ouvrir vos données.\n\nVos données locales n’ont pas été réinitialisées ni écrasées.",
+  "startup.newerDataDownload": "Télécharger OpenBot",
+  "startup.newerDataGuide": "Ouvrir le guide",
+  "startup.newerDataQuit": "Quitter",
 } as const satisfies PartialTranslation<typeof source>;

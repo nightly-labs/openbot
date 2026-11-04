@@ -367,11 +367,28 @@ export function MessageBody(props: {
   /* The web client gets no `previewUrl`. An image that the host sent shows full size, as on desktop.
      Each loaded image keeps one object, so a load elsewhere does not draw it again. */
   const mediaImages = new Map<string, AttachmentSummary>();
-  const shownAttachments = createMemo(() =>
-    (props.message.attachments ?? []).map((attachment) => {
+  /* A sent image shows its local copy. The stored copy gets a new id and no `previewUrl`, so the
+     image keeps the local copy and does not become a file card. */
+  const sentImages = new Map<string, AttachmentSummary>();
+  const shownAttachments = createMemo<AttachmentSummary[]>((previous = []) =>
+    (props.message.attachments ?? []).map((attachment, index) => {
       if (attachment.previewUrl || attachment.previewKind !== "image") return attachment;
       const url = props.mediaSource?.url(attachment.id);
-      if (!url) return attachment;
+      if (!url) {
+        const sent = sentImages.get(attachment.id);
+        if (sent) return sent;
+        const before = previous[index];
+        if (
+          !before?.previewUrl ||
+          before.id === attachment.id ||
+          before.name !== attachment.name ||
+          before.size !== attachment.size
+        )
+          return attachment;
+        const shown = { ...attachment, previewUrl: before.previewUrl };
+        sentImages.set(attachment.id, shown);
+        return shown;
+      }
       const key = `${attachment.id}\0${url}`;
       const known = mediaImages.get(key);
       if (known) return known;
@@ -553,14 +570,15 @@ export function MessageBody(props: {
       </Match>
       <Match when={standaloneImageAttachments().length === 1}>
         <div class="message-image-attachments">
-          <For each={standaloneImageAttachments()}>
+          {/* Unkeyed: a sent image gets a new id and URL when the host stores it, and keeps its pixels. */}
+          <For each={standaloneImageAttachments()} keyed={false}>
             {(attachment) => (
               <ImageGeneration
                 presentation="attachment"
                 status="completed"
-                prompt={attachment.name}
+                prompt={attachment().name}
                 aspectRatio="square"
-                attachment={attachment}
+                attachment={attachment()}
                 onPreview={openAttachment}
                 onDownload={props.onDownload}
               />

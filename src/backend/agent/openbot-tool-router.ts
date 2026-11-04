@@ -27,7 +27,7 @@ import {
 import { isString } from "@openbot/contracts/runtime-values";
 import { isUiBlockId, normalizeUiBlockSpec } from "@openbot/contracts/ui-blocks";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger, redactText } from "@openbot/logging";
+import { createOpenBotLogger, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
 import { Effect, Result } from "effect";
 import { z } from "zod";
 import type { AgentApiKeys, SavedApiKey } from "../agent-api-keys";
@@ -40,7 +40,7 @@ import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import type { ChannelService } from "../channel-service";
 import type { ProviderSession } from "../database/provider-sessions";
 import type { MailboxStore } from "../mailbox-store";
-import { agentMcpServers } from "../mcp-provider-shapes";
+import { agentMcpServers, codexDeferredMcpServers } from "../mcp-provider-shapes";
 import type { MessagingThreads } from "../messaging/messaging-threads";
 import { MESSAGING_OUTBOUND_TOOLS } from "../messaging/messaging-tools";
 import {
@@ -54,11 +54,13 @@ import {
   removeApiKeyToolSchema,
   requestApiKeyToolSchema,
   routineReportFailureToolSchema,
+  saveApiKeyToolSchema,
   sendToChannelToolSchema,
 } from "../openbot-tools";
 import { type AppServerRequest, type DynamicToolCallParams, type DynamicToolResult, isRecord } from "../protocol";
 import { handleRoutineFlowTool, type RoutineFlowTools } from "../routine-flows/routine-flow-tools";
 import type { StoredStateFailure } from "../stored-state-effects";
+import type { VaultItems } from "../vault-items";
 import {
   handleWorkflowTool,
   WORKFLOW_CHANGE_TOOL_NAMES,
@@ -130,7 +132,13 @@ import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
 import { isDynamicToolCall } from "./thread-items";
 import { toolCallIdempotencyKey } from "./tool-call-idempotency";
-import { DEFERRED_MCP_NOTE, discoverTools, namesInSearch, resolveDeferredTool } from "./tool-catalog";
+import {
+  CODEX_DEFERRED_MCP_NOTE,
+  DEFERRED_MCP_NOTE,
+  discoverTools,
+  namesInSearch,
+  resolveDeferredTool,
+} from "./tool-catalog";
 import { ToolOperationFailed, toolStep, toToolOperationFailed } from "./tool-operation";
 import type { AgentBrowserHost } from "./turn-lifecycle";
 import { handleUpdateAgentsTool } from "./update-agents-tool";
@@ -140,8 +148,16 @@ const logger = createOpenBotLogger("openbot-tool-router");
 /** How long the plan card of `acknowledge_request` waits before the host presses its start button. */
 const ACKNOWLEDGE_START_MS = 10_000;
 
+/** The key of a `save_api_key` call whose other arguments can be wrong. */
+const secretKeyArgument = z.object({ key: z.string() });
+
 /** The tools that `#apiKeyTool` answers. */
-const API_KEY_TOOLS: ReadonlySet<string> = new Set(["request_api_key", "list_api_keys", "remove_api_key"]);
+const API_KEY_TOOLS: ReadonlySet<string> = new Set([
+  "request_api_key",
+  "list_api_keys",
+  "remove_api_key",
+  "save_api_key",
+]);
 
 /** The characters of an agent description that `list_agents` returns. `read_agent` returns all of it. */
 const LISTED_DESCRIPTION_LENGTH = 300;
@@ -231,6 +247,8 @@ export interface OpenBotToolRouterOptions {
   marketplaceAppServer?: ((appId: string) => MarketplaceAppServer | null) | undefined;
   /** The API keys that users saved for agents; null where nothing can save them. */
   apiKeys?: AgentApiKeys | null | undefined;
+  /** The Vault, where `save_api_key` keeps a key for every agent; null where this server has none. */
+  vaultItems?: VaultItems | null | undefined;
   hooks: OpenBotToolRouterHooks;
 }
 
@@ -270,6 +288,7 @@ export class OpenBotToolRouter {
   readonly #mcpServers: AgentMcpServers | null;
   readonly #marketplaceAppServer: (appId: string) => MarketplaceAppServer | null;
   readonly #apiKeys: AgentApiKeys | null;
+  readonly #vaultItems: VaultItems | null;
   readonly #hooks: OpenBotToolRouterHooks;
   readonly #interruptTool: AgentInterruptTool;
 
@@ -306,6 +325,7 @@ export class OpenBotToolRouter {
     this.#mcpServers = options.mcpServers ?? null;
     this.#marketplaceAppServer = options.marketplaceAppServer ?? (() => null);
     this.#apiKeys = options.apiKeys ?? null;
+    this.#vaultItems = options.vaultItems ?? null;
     this.#hooks = options.hooks;
     this.#interruptTool = new AgentInterruptTool({
       store: options.store,
@@ -360,9 +380,9 @@ export class OpenBotToolRouter {
           if (!isDynamicToolCall(request.params)) throw new Error("Invalid dynamic tool request.");
           let params = request.params;
           if (params.namespace === "openbot") {
-            const deferredMcp = client.deferredMcpTools?.(params.threadId) ?? false;
+            const deferredMcp = this.#deferredMcpNote(client, params.threadId);
             const invalid = deferredMcp
-              ? `${sourceText("error.agent.toolRequestInvalid")} ${DEFERRED_MCP_NOTE}`
+              ? `${sourceText("error.agent.toolRequestInvalid")} ${deferredMcp}`
               : sourceText("error.agent.toolRequestInvalid");
             if (params.tool === "tool_search" || params.tool === "tool_describe") {
               const agentId = this.#conversation.agentForThread(params.threadId);
@@ -378,7 +398,7 @@ export class OpenBotToolRouter {
               const signIns = yield* this.#searchSignIns(agentId, params);
               if (request.signal?.aborted || !client.running) return;
               const found =
-                deferredMcp && params.tool === "tool_search" ? { ...result, mcpTools: DEFERRED_MCP_NOTE } : result;
+                deferredMcp && params.tool === "tool_search" ? { ...result, mcpTools: deferredMcp } : result;
               client.respond(
                 request.id,
                 openBotToolResult(signIns.length > 0 ? { ...found, mcpServers: signIns } : found),
@@ -475,7 +495,9 @@ export class OpenBotToolRouter {
                 case "list_vault_items":
                   return yield* this.#attention.listVaultItems(params);
                 case "save_vault_item":
-                  return yield* this.#attention.saveVaultItem(params);
+                  return yield* this.#attention.saveVaultItem(params, () =>
+                    this.#requestedByPerson(agentId, params.turnId, params.threadId),
+                  );
                 case "delete_vault_item":
                   return yield* this.#attention.deleteVaultItem(params);
                 case "request_link_payment":
@@ -598,6 +620,17 @@ export class OpenBotToolRouter {
   }).bind(this);
 
   /**
+   * The note that sends a model from OpenBot's catalog to its provider's own MCP tools, or null when
+   * the provider declares them. Pi tells this for each thread. Codex defers each MCP server except
+   * Computer Use (#4468), so one saved server that is on is enough.
+   */
+  #deferredMcpNote(client: AgentClient, threadId: string): string | null {
+    if (client.deferredMcpTools?.(threadId)) return DEFERRED_MCP_NOTE;
+    if (client.provider !== "codex") return null;
+    return codexDeferredMcpServers(this.#mcpServers?.list() ?? []).length > 0 ? CODEX_DEFERRED_MCP_NOTE : null;
+  }
+
+  /**
    * Checks an `ask_ui` call and shows its block. Like `ask_user`, it answers the call only when the
    * person answers or the turn ends. The agent can correct a refused block, so it gets the reason.
    */
@@ -623,7 +656,8 @@ export class OpenBotToolRouter {
   /**
    * The API key tools. `request_api_key` shows a form with one secret field, and the attention registry
    * answers it with the path of the saved key, so it returns null. The others answer at once. No result
-   * holds a key value.
+   * holds a key value. `save_api_key` gets the value from the agent: the agent already has it, so it
+   * goes in the Vault and is redacted from the logs.
    */
   readonly #apiKeyTool = Effect.fn("OpenBotToolRouter.apiKeyTool")(function* (
     this: OpenBotToolRouter,
@@ -657,6 +691,7 @@ export class OpenBotToolRouter {
         Effect.catch(failed),
       );
     }
+    if (params.tool === "save_api_key") return yield* this.#saveApiKey(apiKeys, agentId, params);
     const parsed = requestApiKeyToolSchema.safeParse(params.arguments);
     if (!parsed.success)
       return openBotToolFailure(`${z.prettifyError(parsed.error)}\nCorrect the arguments and retry.`);
@@ -676,6 +711,66 @@ export class OpenBotToolRouter {
       apiKey: { name: parsed.data.name },
     });
     return null;
+  });
+
+  readonly #saveApiKey = Effect.fn("OpenBotToolRouter.saveApiKey")(function* (
+    this: OpenBotToolRouter,
+    apiKeys: AgentApiKeys,
+    agentId: string,
+    params: DynamicToolCallParams,
+  ) {
+    // The key is redacted from the logs before anything can fail, also when the call is refused. A short
+    // key is redacted only when the Vault saves it: an unsaved short value would hide unrelated text.
+    const raw = secretKeyArgument.safeParse(params.arguments);
+    if (raw.success) registerSecretValue(raw.data.key);
+    const parsed = saveApiKeyToolSchema.safeParse(params.arguments);
+    if (!parsed.success)
+      return openBotToolFailure(`${z.prettifyError(parsed.error)}\nCorrect the arguments and retry.`);
+    const { name, key, notes } = parsed.data;
+    const threadId = this.#conversation.publicThreadId(agentId, params.threadId);
+    // A person in an external chat is not an OpenBot user, and every agent reads a Vault key.
+    if (this.#messaging.store.linkForThread(threadId))
+      return openBotToolFailure(
+        "save_api_key does not work in an external chat. Ask the user to add the key in Server settings > Vault.",
+      );
+    // A team member, a routine, another agent or a web page must not replace the key of every agent.
+    if (!this.#requestedByPerson(agentId, params.turnId, threadId))
+      return openBotToolFailure(
+        "Only a person's message, in your OpenBot chat or a thread they opened, can save a key to the Vault. Ask the user to add it in Server settings > Vault.",
+      );
+    const vault = this.#vaultItems;
+    if (!vault?.ready()) return openBotToolFailure("No Vault is available on this computer. Ask the user.");
+    const agentName = this.#store.list().find((candidate) => candidate.id === agentId)?.name;
+    const saved = yield* Effect.result(vault.saveApiKey({ name, key, notes }, agentName));
+    if (Result.isFailure(saved)) {
+      // The Vault's own errors are user text with no secret in them. A file error gets a fixed text.
+      const { cause } = saved.failure;
+      logger.warn("Unable to save an API key in the Vault for an agent", { error: toLogValue(cause) });
+      return openBotToolFailure(
+        cause instanceof Error && !("code" in cause) ? cause.message : sourceText("error.backend.apiKeySaveFailed"),
+      );
+    }
+    this.postVaultNote(
+      agentId,
+      threadId,
+      params.turnId,
+      sourceText(saved.success.created ? "status.agent.vaultAdded" : "status.agent.vaultUpdated", {
+        name: saved.success.name,
+      }),
+    );
+    // The agent's own key of this name wins over the Vault key, so the older value goes.
+    const removed = yield* Effect.result(apiKeys.remove(agentId, name));
+    if (Result.isFailure(removed)) {
+      logger.warn("Unable to delete an agent's own API key after a Vault save", {
+        error: toLogValue(removed.failure.cause),
+      });
+      return openBotToolFailure(
+        `The Vault has ${name} now, but OpenBot could not delete your own key with this name, which you still read first. Call remove_api_key name=${name}.`,
+      );
+    }
+    const keys = yield* apiKeys.list(agentId).pipe(Effect.catch(() => Effect.succeed<SavedApiKey[]>([])));
+    const path = keys.find((entry) => entry.name === name)?.path ?? null;
+    return openBotToolResult({ status: saved.success.created ? "added" : "updated", name, path });
   });
 
   /**

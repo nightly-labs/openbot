@@ -1,12 +1,13 @@
-// Runs issue #2897 end to end on the real `codex app-server`: a code-mode-only model, as Codex
-// describes GPT-6, and an OpenBot MCP server. Codex defers such a model's MCP tools into its `exec`
-// cell, and the prompt does not name them, so the model does not find them. OpenBot sends their
-// namespaces as direct-only, beside its own. The payload is the one `codexDisabledServers`,
-// `codexMcpServers`, `codexThreadMcpServers` and `codexMcpNamespaces` build for a thread. A local
-// server that speaks the Responses API stands in for the model: it records the top-level namespaces
-// and calls the MCP tool when Codex offers it, so no account or key is used. A thread started with
-// the list keeps it on `thread/resume`. Codex 0.164 does not add the list to a thread started
-// without it, so `CODEX_MCP_ADAPTER_VERSION` 8 replaces those sessions.
+// Runs issues #2897 and #4468 end to end on the real `codex app-server`: a code-mode-only model, as
+// Codex describes GPT-6, and an OpenBot MCP server. Codex defers such a model's MCP tools into its
+// `exec` cell. #2897 made each MCP namespace direct-only, so each request carried the schema of every
+// MCP tool. Since #4468 only Computer Use stays direct; the model finds another server's tools in
+// `ALL_TOOLS` inside `exec`, as the developer instructions tell it. The payload is the one
+// `codexDisabledServers`, `codexMcpServers`, `codexThreadMcpServers` and `codexDirectMcpNamespaces`
+// build for a thread. A local server that speaks the Responses API stands in for the model: it records
+// the top-level namespaces, calls a direct MCP tool when Codex offers it, and otherwise calls the tool
+// from `exec`, so no account or key is used. A thread started with every MCP namespace direct keeps
+// them on `thread/resume`.
 // Issue #3265: a direct call gives the model the result's `structuredContent` alone when the server
 // sends it, and drops each image of `content`. A result without it keeps its images. The image steps
 // record this Codex behavior, so a Codex update that changes it fails here.
@@ -19,7 +20,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { COMPUTER_USE_MCP_SERVER_ID, COMPUTER_USE_MCP_SERVER_NAME, type McpServerConfig } from "@openbot/contracts/ipc";
 import { readCodexMcpConfig } from "../src/backend/agent/codex-mcp-config";
 import { VISIBLE_DYNAMIC_TOOLS } from "../src/backend/agent/tool-catalog";
 import { CodexAppServerClient } from "../src/backend/app-server-client";
@@ -27,8 +28,8 @@ import { resolveCodexCli } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import {
   type CodexOwnTransports,
+  codexDirectMcpNamespaces,
   codexDisabledServers,
-  codexMcpNamespaces,
   codexMcpServers,
   codexThreadMcpServers,
   toMcpShapeFailed,
@@ -40,6 +41,8 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/codex-code-mode-mcp-
 const NL = String.fromCharCode(10);
 const DEADLINE_MS = 60_000;
 const MODEL = "code-mode-model";
+// A model that is not code-mode-only: Codex defers its MCP tools behind `tool_search`.
+const SEARCH_MODEL = "tool-search-model";
 const TOOL = "list_calendars";
 const RESULT = "calendar_fixture_result";
 const STRUCTURED = "calendar_fixture_structured";
@@ -47,33 +50,35 @@ const STRUCTURED = "calendar_fixture_structured";
 const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
 // The fields Codex reads to route tools, as its model cache has them for GPT-6.
+const CODE_MODE_MODEL = {
+  slug: MODEL,
+  display_name: "Code mode model",
+  description: "Local E2E model",
+  default_reasoning_level: "low",
+  supported_reasoning_levels: [{ effort: "low", description: "Local E2E model" }],
+  shell_type: "unified_exec",
+  visibility: "list",
+  supported_in_api: true,
+  priority: 0,
+  support_verbosity: false,
+  truncation_policy: { mode: "tokens", limit: 10000 },
+  context_window: 272000,
+  experimental_supported_tools: [],
+  input_modalities: ["text", "image"],
+  supports_search_tool: true,
+  use_responses_lite: true,
+  tool_mode: "code_mode_only",
+  model_messages: { instructions_template: "Use the available tools." },
+};
+const { tool_mode: _toolMode, use_responses_lite: _lite, ...searchModel } = CODE_MODE_MODEL;
 const MODEL_CATALOG = {
-  models: [
-    {
-      slug: MODEL,
-      display_name: "Code mode model",
-      description: "Local E2E model",
-      default_reasoning_level: "low",
-      supported_reasoning_levels: [{ effort: "low", description: "Local E2E model" }],
-      shell_type: "unified_exec",
-      visibility: "list",
-      supported_in_api: true,
-      priority: 0,
-      support_verbosity: false,
-      truncation_policy: { mode: "tokens", limit: 10000 },
-      context_window: 272000,
-      experimental_supported_tools: [],
-      input_modalities: ["text", "image"],
-      supports_search_tool: true,
-      use_responses_lite: true,
-      tool_mode: "code_mode_only",
-      model_messages: { instructions_template: "Use the available tools." },
-    },
-  ],
+  models: [CODE_MODE_MODEL, { ...searchModel, slug: SEARCH_MODEL, display_name: "Tool search model" }],
 };
 
 interface ModelTool {
+  type?: string;
   name?: string;
+  description?: string;
   tools?: Array<{ name?: string }>;
 }
 
@@ -90,6 +95,7 @@ interface ModelItem {
   name?: string;
   namespace?: string;
   arguments?: string;
+  input?: string;
   content?: Array<{ type: string; text: string }>;
 }
 
@@ -110,6 +116,8 @@ interface Offer {
   names: string[];
   /** Whether the request names the MCP tool anywhere, the `exec` description included. */
   mentionsTool: boolean;
+  /** The description of Codex's `tool_search`, which names the sources of deferred tools. */
+  search: string;
   /** Whether the request carries the MCP tool's result back. */
   hasResult: boolean;
   /** Whether the tool output carries the result's `structuredContent`. */
@@ -118,9 +126,16 @@ interface Offer {
   hasImage: boolean;
 }
 
+// What a model writes in `exec` when the MCP tool is not direct: it finds the tool in `ALL_TOOLS`.
+const EXEC_CALL = [
+  `const tool = ALL_TOOLS.find((t) => t.name.startsWith("mcp__") && t.name.endsWith("__${TOOL}"));`,
+  "const result = await tools[tool.name]({});",
+  "text(JSON.stringify(result));",
+].join(NL);
+
 /**
- * Calls the MCP tool once when a top-level namespace offers it, then answers with a short text.
- * Records what each request offered.
+ * Calls the MCP tool once, directly when a top-level namespace offers it and from `exec` otherwise,
+ * then answers with a short text. Records what each request offered.
  */
 async function startFakeModel() {
   const offers: Offer[] = [];
@@ -134,22 +149,29 @@ async function startFakeModel() {
       const input = parsed.input ?? [];
       // A Responses Lite request sends its tools in an `input` item.
       const tools = parsed.tools ?? input.find((item) => item.tools)?.tools ?? [];
-      const output = JSON.stringify(input.filter((item) => item.type === "function_call_output"));
+      const output = JSON.stringify(
+        input.filter((item) => item.type === "function_call_output" || item.type === "custom_tool_call_output"),
+      );
       offers.push({
         names: tools.flatMap((tool) => (tool.name ? [tool.name] : [])).sort(),
         mentionsTool: body.includes(TOOL),
+        search: tools.find((tool) => tool.type === "tool_search")?.description ?? "",
         hasResult: JSON.stringify(input).includes(RESULT),
         hasStructured: output.includes(STRUCTURED),
         hasImage: output.includes('"input_image"'),
       });
-      const called = input.some((item) => item.type === "function_call");
+      const called = input.some((item) => item.type === "function_call" || item.type === "custom_tool_call");
       const namespace = tools.find(
         (tool) => tool.name?.startsWith("mcp__") && tool.tools?.some((t) => t.name === TOOL),
       );
-      const item: ModelItem =
-        !called && namespace?.name
+      const exec = tools.some((tool) => tool.name === "functions" && tool.tools?.some((t) => t.name === "exec"));
+      const item: ModelItem = called
+        ? { type: "message", role: "assistant", id: "m", content: [{ type: "output_text", text: "done" }] }
+        : namespace?.name
           ? { type: "function_call", id: "c", call_id: "c", name: TOOL, namespace: namespace.name, arguments: "{}" }
-          : { type: "message", role: "assistant", id: "m", content: [{ type: "output_text", text: "done" }] };
+          : exec
+            ? { type: "custom_tool_call", id: "x", call_id: "x", name: "exec", input: EXEC_CALL }
+            : { type: "message", role: "assistant", id: "m", content: [{ type: "output_text", text: "done" }] };
       const send = (event: ModelEvent) =>
         response.write(`event: ${event.type}${NL}data: ${JSON.stringify(event)}${NL}${NL}`);
       response.writeHead(200, { "content-type": "text/event-stream" });
@@ -250,14 +272,19 @@ function row(name: string, fields: Partial<McpServerConfig> = {}): McpServerConf
   };
 }
 
+/** A server under Computer Use's id and name, which stays direct. */
+function computerUse(url = httpUrl): McpServerConfig {
+  return row(COMPUTER_USE_MCP_SERVER_NAME, { id: COMPUTER_USE_MCP_SERVER_ID, url });
+}
+
 interface Case {
   name: string;
   /** The user's own entries, as TOML. */
   user?: string;
   rows: McpServerConfig[];
-  /** True sends the direct-only list as it was before the fix: OpenBot's own namespace alone. */
-  legacy?: boolean;
-  /** True starts the thread with the fix, then resumes it in a new app-server. */
+  /** The model slug; the code-mode-only model when omitted. */
+  model?: string;
+  /** True starts the thread with the list of #2897, every MCP namespace direct, then resumes it in a new app-server. */
   resume?: boolean;
 }
 
@@ -266,6 +293,7 @@ interface Outcome {
   directOnly: string[];
   offered: string[];
   mentionsTool: boolean;
+  search: string;
   calls: string[];
   resultReturned: boolean;
   structuredReturned: boolean;
@@ -318,7 +346,7 @@ async function run(test: Case): Promise<Outcome> {
   await writeFile(
     join(home, "config.toml"),
     [
-      `model = "${MODEL}"`,
+      `model = "${test.model ?? MODEL}"`,
       `model_catalog_json = ${JSON.stringify(catalog)}`,
       'model_provider = "fake"',
       "[model_providers.fake]",
@@ -338,13 +366,18 @@ async function run(test: Case): Promise<Outcome> {
       codexDisabledServers(() => readCodexMcpConfig(session.client, keyed).pipe(toMcpShapeFailed)),
     );
     const servers = keyed(own.transports);
-    const legacy = VISIBLE_DYNAMIC_TOOLS.map((namespace) => namespace.name);
-    const fixed = [...legacy, ...codexMcpNamespaces(servers)];
+    const openbot = VISIBLE_DYNAMIC_TOOLS.map((namespace) => namespace.name);
+    const current = [...openbot, ...codexDirectMcpNamespaces(servers)];
+    // The list from #2897 to #4468: Codex's name for each server key.
+    const everyServer = [
+      ...openbot,
+      ...Object.keys(servers).map((key) => `mcp__${key.replace(/[^A-Za-z0-9_]/gu, "_")}`),
+    ];
     const params = (directOnly: string[]) => ({
       cwd: home,
       approvalPolicy: "never",
       sandbox: "danger-full-access",
-      model: MODEL,
+      model: test.model ?? MODEL,
       config: {
         mcp_servers: codexThreadMcpServers(own.disabled, servers),
         "features.code_mode.direct_only_tool_namespaces": directOnly,
@@ -352,7 +385,7 @@ async function run(test: Case): Promise<Outcome> {
       dynamicTools: VISIBLE_DYNAMIC_TOOLS,
     });
     const started = await runCauseEffect(
-      session.client.request("thread/start", params(test.legacy ? legacy : fixed), decodeRecordResponse),
+      session.client.request("thread/start", params(test.resume ? everyServer : current), decodeRecordResponse),
     );
     const threadId = getString(getRecord(started, "thread"), "id");
     assert(threadId, "thread/start returned no thread id");
@@ -361,7 +394,7 @@ async function run(test: Case): Promise<Outcome> {
       await runCauseEffect(session.client.stop());
       session = await open(home);
       await runCauseEffect(
-        session.client.request("thread/resume", { threadId, ...params(fixed) }, decodeRecordResponse),
+        session.client.request("thread/resume", { threadId, ...params(current) }, decodeRecordResponse),
       );
     }
     const firstOffer = model.offers.length;
@@ -370,9 +403,10 @@ async function run(test: Case): Promise<Outcome> {
     const offers = model.offers.slice(firstOffer);
     return {
       keys: Object.keys(servers).sort(),
-      directOnly: test.legacy ? legacy : fixed,
+      directOnly: current,
       offered: (offers[0]?.names ?? []).filter((name) => name.startsWith("mcp__")),
       mentionsTool: offers[0]?.mentionsTool ?? false,
+      search: offers[0]?.search ?? "",
       calls: http.calls.slice(firstCall),
       resultReturned: offers.some((offer) => offer.hasResult),
       structuredReturned: offers.some((offer) => offer.hasStructured),
@@ -412,33 +446,34 @@ const httpUrl = `${httpOrigin}/mcp`;
 
 try {
   await step(
-    "before the fix: the prompt does not name the deferred MCP tool, and the model makes no call",
-    { name: "legacy", rows: [row("composio")], legacy: true },
+    "issue #4468: the request declares no MCP schema, and exec finds the tool in ALL_TOOLS and calls it",
+    { name: "deferred", rows: [row("composio")] },
     (o) => {
       assert.deepEqual(o.keys, ["composio"]);
+      assert.ok(!o.directOnly.includes("mcp__composio"), `direct-only ${o.directOnly.join(", ")}`);
       assert.deepEqual(o.offered, []);
       assert.equal(o.mentionsTool, false, "the request named the MCP tool");
-      assert.deepEqual(o.calls, []);
-    },
-  );
-  await step(
-    "the MCP namespace is direct-only: the model sees it and its call returns the result",
-    { name: "fixed", rows: [row("composio")] },
-    (o) => {
-      assert.ok(o.directOnly.includes("mcp__composio"), `direct-only ${o.directOnly.join(", ")}`);
-      assert.deepEqual(o.offered, ["mcp__composio"]);
       assert.deepEqual(o.calls, [TOOL]);
       assert.equal(o.resultReturned, true, "the model did not get the MCP result");
     },
   );
   await step(
-    "a thread started with the fix keeps the namespace when it resumes",
+    "issue #4468: for a model that is not code-mode-only, Codex's tool_search names the deferred server",
+    { name: "tool-search", rows: [row("composio")], model: SEARCH_MODEL },
+    (o) => {
+      assert.deepEqual(o.offered, []);
+      assert.equal(o.mentionsTool, false, "the request named the MCP tool");
+      assert.ok(o.search.includes("composio"), `tool_search description: ${o.search}`);
+    },
+  );
+  await step(
+    "a thread started with every MCP namespace direct keeps them on resume",
     { name: "resumed", rows: [row("composio")], resume: true },
     // The call is in the first turn; the history holds it, so the fake model does not call again.
     (o) => assert.deepEqual(o.offered, ["mcp__composio"]),
   );
   await step(
-    "a user stdio composio renames the row: the renamed namespace is direct-only",
+    "a user stdio composio renames the row: exec reaches the renamed tool",
     {
       name: "renamed",
       user: `[mcp_servers.composio]${NL}command = "node"${NL}enabled = true${NL}`,
@@ -446,27 +481,21 @@ try {
     },
     (o) => {
       assert.deepEqual(o.keys, ["openbot_composio"]);
-      assert.deepEqual(o.offered, ["mcp__openbot_composio"]);
-      assert.ok(!o.directOnly.includes("mcp__composio"), "the user's turned-off server is direct-only");
+      assert.deepEqual(o.offered, []);
       assert.deepEqual(o.calls, [TOOL]);
     },
   );
   await step(
-    "a key that starts with mcp__ keeps one prefix",
-    { name: "prefixed", rows: [row("mcp__calendar")] },
+    "Computer Use stays direct: the model sees its namespace and calls it",
+    { name: "computer-use", rows: [computerUse()] },
     (o) => {
-      assert.deepEqual(o.offered, ["mcp__calendar"]);
+      assert.ok(
+        o.directOnly.includes(`mcp__${COMPUTER_USE_MCP_SERVER_NAME}`),
+        `direct-only ${o.directOnly.join(", ")}`,
+      );
+      assert.deepEqual(o.offered, [`mcp__${COMPUTER_USE_MCP_SERVER_NAME}`]);
       assert.deepEqual(o.calls, [TOOL]);
-    },
-  );
-  await step(
-    "a hyphen in the key becomes an underscore, as Codex names the namespace",
-    { name: "hyphen", rows: [row("google-calendar")] },
-    (o) => {
-      assert.deepEqual(o.keys, ["google-calendar"]);
-      assert.deepEqual(o.offered, ["mcp__google_calendar"]);
-      assert.ok(o.directOnly.includes("mcp__google_calendar"), `direct-only ${o.directOnly.join(", ")}`);
-      assert.deepEqual(o.calls, [TOOL]);
+      assert.equal(o.resultReturned, true, "the model did not get the MCP result");
     },
   );
   await step(
@@ -480,8 +509,8 @@ try {
     },
   );
   await step(
-    "an MCP image without structuredContent reaches the model with the text",
-    { name: "image", rows: [row("gallery", { url: `${httpOrigin}/image` })] },
+    "a direct MCP image without structuredContent reaches the model with the text",
+    { name: "image", rows: [computerUse(`${httpOrigin}/image`)] },
     (o) => {
       assert.deepEqual(o.calls, [TOOL]);
       assert.equal(o.resultReturned, true, "the model did not get the text");
@@ -489,8 +518,8 @@ try {
     },
   );
   await step(
-    "issue #3265: beside structuredContent, Codex gives the model the structured JSON alone",
-    { name: "structured-image", rows: [row("gallery", { url: `${httpOrigin}/structured-image` })] },
+    "issue #3265: beside structuredContent, a direct call gives the model the structured JSON alone",
+    { name: "structured-image", rows: [computerUse(`${httpOrigin}/structured-image`)] },
     (o) => {
       assert.deepEqual(o.calls, [TOOL]);
       assert.equal(o.structuredReturned, true, "the model did not get structuredContent");

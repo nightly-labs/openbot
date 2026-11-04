@@ -10,4 +10,14 @@ export const messages = defineMessages("startup", {
   "startup.archiveChangedBody":
     "Another program changed the OpenBot file app.asar. OpenBot runs now, but it will not open after you quit it.\n\nTo repair OpenBot, install it again. Your local data stays.",
   "startup.archiveChangedDownload": "Download OpenBot",
+  // An older OpenBot started over data that a newer one migrated: it installs the latest release.
+  "startup.newerDataUpdatingTitle": "Updating OpenBot",
+  "startup.newerDataUpdatingBody":
+    "A newer version of OpenBot saved your data. OpenBot installs the latest version and then opens again.\n\nYour local data was not reset or overwritten.",
+  "startup.newerDataTitle": "Install the latest OpenBot",
+  "startup.newerDataBody":
+    "A newer version of OpenBot saved your data, and this version ({version}) cannot open it. Install the latest version to open your data.\n\nYour local data was not reset or overwritten.",
+  "startup.newerDataDownload": "Download OpenBot",
+  "startup.newerDataGuide": "Open guide",
+  "startup.newerDataQuit": "Quit",
 });

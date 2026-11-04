@@ -86,7 +86,11 @@ import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/what
 // them through their own transport, so the path, body and decoding of each request are here once.
 // The host answers only an owner or admin; a member gets a refusal, which the transport rejects.
 
-import { type AgentProviderRef, isAgentProviderRef, type ManagedProviderId } from "@openbot/contracts/agent-providers";
+import {
+  type AgentProviderRef,
+  type DownloadableProviderId,
+  isAgentProviderRef,
+} from "@openbot/contracts/agent-providers";
 import { parseHostedSiteList } from "@openbot/contracts/hosted-sites";
 import {
   type AccountUsage,
@@ -1283,7 +1287,7 @@ export function getProviderRuntimes(
 
 export function downloadProviderRuntime(
   request: TeamApiRequest,
-  provider: ManagedProviderId,
+  provider: DownloadableProviderId,
   routes: ProviderRuntimeRoutes = PROVIDERS_ADMIN_ROUTES,
 ): Effect.Effect<ProviderRuntimeSnapshot, TeamAdminRequestError> {
   return adminCall(() => request("POST", routes.runtimesDownload, runtimeDecoder(routes), { provider }));
@@ -1291,7 +1295,7 @@ export function downloadProviderRuntime(
 
 export function cancelProviderRuntime(
   request: TeamApiRequest,
-  provider: ManagedProviderId,
+  provider: DownloadableProviderId,
   routes: ProviderRuntimeRoutes = PROVIDERS_ADMIN_ROUTES,
 ): Effect.Effect<ProviderRuntimeSnapshot, TeamAdminRequestError> {
   return adminCall(() => request("POST", routes.runtimesCancel, runtimeDecoder(routes), { provider }));

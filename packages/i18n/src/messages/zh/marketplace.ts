@@ -251,6 +251,16 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "查询这笔支付并解释它为什么失败。",
   "marketplace.plugin.stripe.prompt.customer": "总结该客户的发票和未结余额。",
   "marketplace.plugin.stripe.prompt.link": "为每月 49 的专业版套餐起草一个支付链接。",
+  "marketplace.plugin.revenuecat.tagline": "订阅、产品和付费墙",
+  "marketplace.plugin.revenuecat.description":
+    "RevenueCat 让智能体读取和更改应用内订阅的设置：应用、产品、权益、Offering、套餐、付费墙和实验。智能体还可以查找客户及其购买记录，并读取图表和指标。RevenueCat 密钥 API 密钥放在一个 Authorization 请求头中。该密钥可访问一个项目。使用只读密钥时，智能体只能读取。使用写入密钥时，智能体可以将产品提交到 App Store 审核、向客户授予权益，并删除套餐、定向规则和 Webhook。",
+  "marketplace.plugin.revenuecat.app":
+    "通过 RevenueCat 的 MCP 服务器和密钥 API 密钥使用产品、权益、Offering、付费墙和指标。",
+  "marketplace.plugin.revenuecat.prompt.offerings": "我的 RevenueCat 项目有哪些 Offering 和套餐？",
+  "marketplace.plugin.revenuecat.prompt.revenue": "本月我在 RevenueCat 的收入和活跃订阅有什么变化？",
+  "marketplace.plugin.revenuecat.prompt.customer": "这位 RevenueCat 客户有哪些权益，什么时候到期？",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "在 RevenueCat 控制台中，打开项目的 API keys，并创建一个密钥 API 密钥。只读密钥就足以查看数据。",
   "marketplace.plugin.posthog.tagline": "产品分析与功能开关",
   "marketplace.plugin.posthog.description":
     "PostHog 让助手查询事件和漏斗、检查功能开关，并总结发布后的变化。把项目设置中的个人 API 密钥填入一个 Authorization 请求头即可。",
@@ -355,6 +365,13 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "今天到期的 Todoist 任务有哪些？",
   "marketplace.plugin.todoist.prompt.capture": "把这些待办事项添加到我的 Todoist 收件箱。",
   "marketplace.plugin.todoist.prompt.overdue": "把我逾期的 Todoist 任务改到明天。",
+  "marketplace.plugin.ticktick.tagline": "任务、清单、习惯和专注",
+  "marketplace.plugin.ticktick.description":
+    "TickTick 让助手搜索和筛选任务，添加和修改任务，并管理清单、分组、文件夹、标签和评论。助手还可以读取和修改习惯与专注记录，并读取与 TickTick 关联的日历中的日程。每位用户在浏览器中登录自己的 TickTick 账号。助手获得读写权限：可以完成、移动和删除任务，以及删除标签和专注记录。",
+  "marketplace.plugin.ticktick.app": "通过 TickTick 的 MCP 服务器以浏览器登录处理任务、清单、习惯和专注记录。",
+  "marketplace.plugin.ticktick.prompt.today": "今天有哪些 TickTick 任务到期？",
+  "marketplace.plugin.ticktick.prompt.capture": "把这些待办事项添加到我的 TickTick 收集箱。",
+  "marketplace.plugin.ticktick.prompt.week": "我上周完成了哪些 TickTick 任务？",
   "marketplace.plugin.trello.tagline": "看板、列表和卡片",
   "marketplace.plugin.trello.description":
     "Trello 让助手搜索和读取看板、列表、卡片、清单和评论，创建看板和卡片，移动列表和卡片，将卡片标记为完成，并添加清单、评论和标签。助手还可以读取和添加用户 Trello 收件箱中的卡片，并读取 Planner 中的日程，这些日程可能来自已连接的 Google 或 Outlook 日历。每位用户通过浏览器登录自己的 Trello 账号，并在授权页面上选择工作区。助手在这些工作区中拥有与用户相同的权限。助手可以归档卡片和列表，但服务器无法永久删除任何内容。",
@@ -369,6 +386,20 @@ export const messages = {
   "marketplace.plugin.clickup.prompt.findTasks": "找出我本周到期且未完成的 ClickUp 任务。",
   "marketplace.plugin.clickup.prompt.createTask": "用这些待办事项创建一个 ClickUp 任务，并分配给我。",
   "marketplace.plugin.clickup.prompt.summarizeDoc": "在 ClickUp 中找到最新的项目进展，并总结未解决的问题。",
+  "marketplace.plugin.coinbase.tagline": "加密货币价格、投资组合和交易",
+  "marketplace.plugin.coinbase.description":
+    "Coinbase 让智能体读取 Coinbase Advanced Trade 中的价格、余额、投资组合、订单和费用，预览并下单，在资产之间兑换，并在投资组合之间转移资金。每个用户在浏览器中登录自己的 Coinbase 账户。智能体拥有与用户相同的权限。订单和兑换使用真实资金，智能体还可以用 USDC 余额支付 x402 请求。",
+  "marketplace.plugin.coinbase.app": "价格、余额、投资组合、订单和兑换，通过 Coinbase 的 MCP 服务器并在浏览器中登录。",
+  "marketplace.plugin.coinbase.prompt.balances": "我在 Coinbase 每个投资组合中的余额是多少？",
+  "marketplace.plugin.coinbase.prompt.price": "显示 Coinbase 上的 BTC-USD 价格以及本周的走势。",
+  "marketplace.plugin.coinbase.prompt.previewOrder": "在 Coinbase 上预览一笔 50 USD 的 ETH 市价买入。不要下单。",
+  "marketplace.plugin.robinhood.tagline": "证券账户和智能体交易",
+  "marketplace.plugin.robinhood.description":
+    "Robinhood 让智能体读取 Robinhood 客户的账户、持仓、余额、交易记录、自选列表和市场数据，并下达股票、期权和加密货币订单。每个用户在浏览器中登录自己的 Robinhood 账户。首次登录时，Robinhood 会要求用户开设一个单独的 Agentic 账户。智能体只能在该账户中交易，并且默认下单时不会逐笔请求用户批准。",
+  "marketplace.plugin.robinhood.app": "账户、持仓、市场数据和交易，通过 Robinhood 的 MCP 服务器并在浏览器中登录。",
+  "marketplace.plugin.robinhood.prompt.positions": "总结我在 Robinhood 的持仓以及今天的变动。",
+  "marketplace.plugin.robinhood.prompt.watchlist": "我在 Robinhood 自选列表中的每只股票本周走势如何？",
+  "marketplace.plugin.robinhood.prompt.agenticCash": "我的 Robinhood Agentic 账户里有多少现金？",
   "marketplace.plugin.huggingface.tagline": "Hub 上的模型、数据集和论文",
   "marketplace.plugin.huggingface.description":
     "Hugging Face 让助手在 Hugging Face Hub 上搜索模型、数据集、Spaces、合集和论文，读取模型卡片和仓库文件，预览数据集，并搜索 Hugging Face 文档。它使用 Hub 的公开数据，无需账号和密钥。这些工具只读取数据：助手不能创建仓库，也不能运行任务。",

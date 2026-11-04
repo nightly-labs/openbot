@@ -1,4 +1,4 @@
-import { isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
+import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
 import { ANALYTICS_GENERATIONS, openPanelTransport, ReportQueue } from "@openbot/telemetry";
 import { fileReportStorage } from "@openbot/telemetry/node";
 import { makeWASocket } from "@openbot/whatsapp/baileys";
@@ -214,6 +214,7 @@ import { GitHubConnectorStore } from "./github-connector-store";
 import { GitHubRelay, receiveGitHubDelivery } from "./github-relay";
 import { createGitHubRest, type WorkflowGitHubDirectory, workflowGitHubDirectory } from "./github-rest";
 import { HermesImportService } from "./hermes-import-service";
+import { HermesInstaller } from "./hermes-installer";
 import { HostEventsRuntime } from "./host-events-runtime";
 import { agentWebhookRoutineWriter, HostEventsService } from "./host-events-service";
 import { HostService } from "./host-service";
@@ -343,12 +344,14 @@ import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
 import type { TeardownRegistry } from "./teardown-registry";
 import { THEME_PALETTE_DIRECTORY } from "./theme-palette-files";
 import { TraceFile } from "./trace-file";
-import { readUpdatePreference, writeUpdatePreference } from "./update-preference-store";
+import { readUpdatePreference, UPDATE_PREFERENCE_FILE, writeUpdatePreference } from "./update-preference-store";
 import { checkRestartReadiness, type RestartReadiness } from "./update-readiness";
 import {
   createDisabledUpdateAdapter,
+  electronUpdaterCacheDirectory,
   isNixStoreInstall,
   isValidSemver,
+  loadElectronUpdater,
   supportsInstalledUpdates,
   type UpdateAdapter,
   UpdateService,
@@ -386,7 +389,6 @@ const LANGUAGE_PREFERENCE_FILE = "openbot-language-preference-v1.json";
 const LOGO_COLOR_PREFERENCE_FILE = "openbot-logo-color-preference-v1.json";
 const APPEARANCE_PREFERENCE_FILE = "openbot-appearance-preference-v1.json";
 const INTERFACE_SIZE_PREFERENCE_FILE = "openbot-interface-size-preference-v1.json";
-const UPDATE_PREFERENCE_FILE = "openbot-update-preference-v1.json";
 const NOTIFICATION_PREFERENCE_FILE = "openbot-notification-preference-v1.json";
 const PUSH_NOTIFICATION_FILE = "openbot-push-notifications-v1.json";
 const BUSY_MESSAGE_MODE_PREFERENCE_FILE = "openbot-busy-message-mode-v1.json";
@@ -717,13 +719,6 @@ function computerUseCapability(state: ComputerUseState): CapabilityState {
   if (state.status === "ready") return "ready";
   if (state.status === "permissions-required") return "setup-required";
   return "unavailable";
-}
-
-/** The base cache path of electron-updater 6.8.9 (`getAppCacheDir`), which differs from Electron's. */
-function electronUpdaterCacheRoot(): string {
-  if (process.platform === "win32") return process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local");
-  if (process.platform === "darwin") return join(homedir(), "Library", "Caches");
-  return process.env.XDG_CACHE_HOME || join(homedir(), ".cache");
 }
 
 interface MessagingServicesContext {
@@ -1379,10 +1374,17 @@ export async function createApplicationServices({
       appData: app.getPath("appData"),
       userDataOverride: app.commandLine.getSwitchValue("user-data-dir"),
     });
+  const providerDownloads = join(app.getPath("userData"), "provider-runtimes", ".downloads");
+  const hermesInstaller = new HermesInstaller({
+    downloadRoot: providerDownloads,
+    // `service` exists before the first install can end: the row offers Download from its status.
+    refreshProvider: () => service.refreshProvider("hermes"),
+  });
   const providerRuntimes = new ProviderRuntimeManager({
     isProviderOn: (provider) => !providerUse.off().includes(provider),
     root: providerRuntimesRoot,
-    downloadRoot: join(app.getPath("userData"), "provider-runtimes", ".downloads"),
+    downloadRoot: providerDownloads,
+    hermesInstaller,
     updateRuntime: (runtime, install, signal, onWait) => {
       if (isManagedToolRuntime(runtime)) return install().pipe(Effect.asVoid);
       return service
@@ -2201,15 +2203,34 @@ export async function createApplicationServices({
    * latest upstream release. It knows the copies it downloaded itself; a CLI the user installed is
    * only ever reported in the agent status, so it is passed on from here. Its update offer installs
    * a managed copy and leaves the system installation untouched.
+   *
+   * A hosted server's image installs its own Claude and Codex CLIs, and updates them at boot. That
+   * update can fail with no error, and the user cannot install a CLI on the server. When the CLI is
+   * too old, the server downloads the managed copy itself, once per start: the provider showed as too
+   * old, which the user read as uninstalled (#4995). A too-old row has no `cliSource`, as the
+   * resolution failed; the download does nothing when the copy in the store is already the newest.
+   * A failed download shows its error, and the user can retry it.
    */
+  const replacedOutdatedSystemClis = new Set<ManagedProviderId>();
   const trackSystemCliVersions = (status: AgentStatus): void => {
     let copyInUse = false;
     for (const provider of status.providers ?? []) {
+      if (!isManagedRuntimeProvider(provider.id)) continue;
       const version = provider.cliSource === "system" ? (provider.version ?? null) : null;
-      if (isManagedRuntimeProvider(provider.id) && providerRuntimes.setSystemVersion(provider.id, version))
-        copyInUse = true;
+      if (providerRuntimes.setSystemVersion(provider.id, version)) copyInUse = true;
+      if (
+        hostedServer !== null &&
+        provider.state === "outdated" &&
+        !replacedOutdatedSystemClis.has(provider.id) &&
+        !providerUse.off().includes(provider.id)
+      ) {
+        replacedOutdatedSystemClis.add(provider.id);
+        Effect.runFork(providerRuntimes.download(provider.id).pipe(Effect.ignore));
+      }
     }
     if (copyInUse) Effect.runFork(providerRuntimes.providerUseChanged());
+    // Hermes has a Download only while the agent status finds no Hermes.
+    hermesInstaller.setProvider(status.providers?.find((provider) => provider.id === "hermes"));
   };
   trackSystemCliVersions(service.getStatus());
   service.on("event", (event) => {
@@ -3305,19 +3326,12 @@ export async function createApplicationServices({
       ...(containerInstaller ? { paths: CONTAINER_UPDATE_PATHS } : {}),
     });
   } else if (updatesEnabled) {
-    try {
-      const updaterModule = await import("electron-updater");
-      const realAdapter = updaterModule.autoUpdater ?? updaterModule.default?.autoUpdater ?? updaterModule.default;
-      if (realAdapter) {
-        updateAdapter = realAdapter;
-        updaterCacheDirectory = join(electronUpdaterCacheRoot(), "openbot-updater");
-      } else {
-        updaterEnabled = false;
-        logger.warn("OpenBot updates are disabled: electron-updater did not export autoUpdater");
-      }
-    } catch {
+    const realAdapter = await loadElectronUpdater();
+    if (realAdapter) {
+      updateAdapter = realAdapter;
+      updaterCacheDirectory = electronUpdaterCacheDirectory();
+    } else {
       updaterEnabled = false;
-      logger.warn("OpenBot updates are disabled: electron-updater failed to load");
     }
   }
   const updater = new UpdateService(updateAdapter, {

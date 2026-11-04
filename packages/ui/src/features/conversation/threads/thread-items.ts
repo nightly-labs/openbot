@@ -24,6 +24,8 @@ export interface ThreadListsInput {
   hidden: ReadonlySet<string>;
   /** What the running turn of a side thread waits for the user to do, if anything. */
   waitsFor: (task: AgentTask) => SidebarWaitReason | undefined;
+  /** The agent messages of an open side thread that the user has not read. */
+  unread?: ((task: AgentTask) => number) | undefined;
 }
 
 export interface ThreadLists {
@@ -50,6 +52,7 @@ export function threadLists(input: ThreadListsInput): ThreadLists {
       updatedAt: task.updatedAt,
       status: agentTaskThreadStatus(task, input.waitsFor(task)),
     };
+    if (input.unread) item.unread = input.unread(task);
     if (task.state === "closed") archived.push(item);
     else {
       items.set(task.id, item);

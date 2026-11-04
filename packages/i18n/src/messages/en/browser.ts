@@ -68,7 +68,6 @@ export const messages = defineMessages("browser", {
   "browser.liveView.copyFailed": "Could not copy the text. Click the page and try again.",
   "browser.previews.label": "Browser previews",
   "browser.previews.resize": "Resize right panel",
-  "browser.previews.collapse": "Collapse browser previews",
   "browser.previews.empty": "No browser tabs",
   "browser.previews.openPage": "Open a page",
   "browser.preview.pageFallback": "Browser page",

@@ -206,6 +206,13 @@ export function decodeAgentTaskReadState(value: unknown): AgentTaskReadState {
   return value;
 }
 
+export function decodeAgentTaskReadStates(value: unknown): AgentTaskReadState[] {
+  if (!Array.isArray(value) || !value.every(isAgentTaskReadState)) {
+    throw new Error("Invalid thread read states.");
+  }
+  return value;
+}
+
 export function decodeAgentTasks(value: unknown): AgentTasksSnapshot {
   if (!isAgentTasksSnapshot(value)) {
     throw new Error("Invalid task list response.");

@@ -1765,64 +1765,28 @@ try {
     // Each frozen list is the released vocabulary of its protocol. Protocol 8 and later hide none.
     const hiddenBy = (protocol: number) =>
       AGENT_PROVIDERS.filter((provider) => isPeerHiddenProvider(provider, protocol));
-    const expectedHidden: Record<number, readonly string[]> = {
-      1: [
-        "opencode",
-        "antigravity",
-        "acp",
-        "cursor",
-        "cline",
-        "pi",
-        "muse",
-        "inception",
-        "deepseek",
-        "openrouter",
-        "kimi",
-        "devin",
-        "copilot",
-        "hermes",
-      ],
-      3: [
-        "opencode",
-        "antigravity",
-        "acp",
-        "cursor",
-        "cline",
-        "pi",
-        "muse",
-        "inception",
-        "deepseek",
-        "openrouter",
-        "kimi",
-        "devin",
-        "copilot",
-        "hermes",
-      ],
-      4: [
-        "antigravity",
-        "acp",
-        "cursor",
-        "cline",
-        "pi",
-        "muse",
-        "inception",
-        "deepseek",
-        "openrouter",
-        "kimi",
-        "devin",
-        "copilot",
-        "hermes",
-      ],
-      5: ["cursor", "cline", "pi", "muse", "inception", "deepseek", "openrouter", "kimi", "devin", "copilot", "hermes"],
-      6: ["pi", "muse", "inception", "deepseek", "openrouter", "kimi", "devin", "copilot", "hermes"],
-      7: ["inception", "deepseek", "openrouter", "kimi", "devin", "copilot", "hermes"],
-      8: [],
-      9: [],
+    // The released vocabulary of each protocol, written out again here so that a change to the host
+    // copy fails this check. A provider added later is hidden below protocol 8 with no edit here.
+    const known1 = ["codex", "claude", "grok"];
+    const known4 = [...known1, "opencode"];
+    const known5 = [...known4, "antigravity", "acp"];
+    const known6 = [...known5, "cursor", "cline"];
+    const known7 = [...known6, "pi", "muse"];
+    const known: Record<number, readonly string[] | null> = {
+      1: known1,
+      2: known1,
+      3: known1,
+      4: known4,
+      5: known5,
+      6: known6,
+      7: known7,
+      8: null,
+      9: null,
     };
-    const hiddenRows = Object.entries(expectedHidden).map(([protocol, expected]) => ({
+    const hiddenRows = Object.entries(known).map(([protocol, names]) => ({
       protocol: Number(protocol),
       hidden: hiddenBy(Number(protocol)),
-      expected: AGENT_PROVIDERS.filter((provider) => expected.includes(provider)),
+      expected: names === null ? [] : AGENT_PROVIDERS.filter((provider) => !names.includes(provider)),
     }));
     check(
       "the frozen provider lists hide each provider that a protocol below 8 does not know, and protocol 8 hides none",

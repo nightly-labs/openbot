@@ -654,6 +654,16 @@ export function createConversationViewScope(props: ConversationProps) {
     messageId?.startsWith(PENDING_SEND_ID_PREFIX)
       ? currentPendingSends().find((send) => `${PENDING_SEND_ID_PREFIX}${send.clientMessageId}` === messageId)
       : undefined;
+  // The host id of each sent message, to the key of the row its pending copy drew. The row keeps
+  // that key after the send settles, so it stays mounted while the host's message replaces it.
+  const handedOverRowKeys = createMemo<ReadonlyMap<string, string>>((previous = new Map()) => {
+    const sent = currentPendingSends().flatMap((send) =>
+      send.messageId && !previous.has(send.messageId)
+        ? [[send.messageId, `${PENDING_SEND_ID_PREFIX}${send.clientMessageId}`] as const]
+        : [],
+    );
+    return sent.length ? new Map([...previous, ...sent]) : previous;
+  });
   createEffect(
     () => ({
       target: currentTarget(),
@@ -670,6 +680,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setMarkingRead,
     setComposerError: setScopedComposerError,
     pendingMessages,
+    handedOverRowKeys,
     elements: {
       scrollElement: () => scrollElement,
       virtualRoot: () => virtualRoot,
