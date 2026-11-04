@@ -533,21 +533,7 @@ export class ChannelService {
   ): Effect.fn.Return<Channel, ChannelOperationError> {
     const operationId = `${actor.id}:${command.operationId}`;
     const receipt = yield* channelSync(() => this.store.database.commandResult(`channels:${operationId}`));
-    if (receipt !== undefined) {
-      const channel = yield* channelSync(() => this.store.get(command.channelId));
-      const assignments = (yield* channelSync(() => this.store.assignments(channel.id))).filter(activeAssignment);
-      const superseded = (yield* channelSync(() => this.store.tasks(channel.id))).filter((task) =>
-        assignments.some(
-          (assignment) =>
-            assignment.taskId === task.id &&
-            assignment.taskRevision !== task.revision &&
-            assignment.pendingRevision !== task.revision,
-        ),
-      );
-      yield* this.interruptTasks(channel.id, superseded);
-      yield* this.wake(channel.id);
-      return channel;
-    }
+    if (receipt !== undefined) return yield* this.#finishCommitted(command.channelId);
     const known = this.hooks.agents();
     if (command.type === "save") {
       const existing = (yield* channelSync(() => this.store.exists(command.channelId)))
@@ -886,22 +872,7 @@ export class ChannelService {
       // Cancel is the way out of a stopped run; Stop is the one for active work.
       if (selected.state !== "paused" && selected.state !== "failed")
         return yield* channelFailure(new Error(sourceText("error.backend.channelTaskNotStopped")));
-      const cancelled = descendants(tasks, selected.rootTaskId);
-      const result = yield* channelSync(() =>
-        this.store.update(
-          channel,
-          {
-            tasks: cancelled.map(
-              (task): ChannelTask => ({ ...task, state: "cancelled", error: null, revision: task.revision + 1 }),
-            ),
-          },
-          operationId,
-        ),
-      );
-      this.publish(channel.id);
-      yield* this.interruptTasks(channel.id, cancelled);
-      yield* this.wake(channel.id);
-      return result;
+      return yield* this.#cancelTasks(channel, descendants(tasks, selected.rootTaskId), operationId);
     }
     if (command.type === "reassign") {
       if (!command.recipientAgentId)
@@ -2799,6 +2770,56 @@ export class ChannelService {
   });
 
   /**
+   * A command that was saved before: its change is in the database, but the turns that it stopped
+   * can still run if the first call ended before it interrupted them. Stop those turns and wake the
+   * channel again, then give the channel as it is.
+   */
+  readonly #finishCommitted = Effect.fn("ChannelService.finishCommitted")(function* (
+    this: ChannelService,
+    channelId: string,
+  ) {
+    const channel = yield* channelSync(() => this.store.get(channelId));
+    const assignments = (yield* channelSync(() => this.store.assignments(channel.id))).filter(activeAssignment);
+    const superseded = (yield* channelSync(() => this.store.tasks(channel.id))).filter((task) =>
+      assignments.some(
+        (assignment) =>
+          assignment.taskId === task.id &&
+          assignment.taskRevision !== task.revision &&
+          assignment.pendingRevision !== task.revision,
+      ),
+    );
+    yield* this.interruptTasks(channel.id, superseded);
+    yield* this.wake(channel.id);
+    return channel;
+  });
+
+  /** Cancels the tasks in one saved change, with the notes, then stops their turns. */
+  readonly #cancelTasks = Effect.fn("ChannelService.cancelTasks")(function* (
+    this: ChannelService,
+    channel: Channel,
+    cancelled: ChannelTask[],
+    operationId: string,
+    messages: ChannelMessage[] = [],
+  ) {
+    const result = yield* channelSync(() =>
+      this.store.update(
+        channel,
+        {
+          tasks: cancelled.map(
+            (task): ChannelTask => ({ ...task, state: "cancelled", error: null, revision: task.revision + 1 }),
+          ),
+          ...(messages.length ? { messages } : {}),
+        },
+        operationId,
+      ),
+    );
+    this.publish(channel.id);
+    yield* this.interruptTasks(channel.id, cancelled);
+    yield* this.wake(channel.id);
+    return result;
+  });
+
+  /**
    * `channel_cancel`: a member ends a whole run that it owns, at a person's request, as Cancel does
    * for a stopped run. Active work ends too: the turns stop and queued deliveries are cancelled. The
    * run of the caller's own task is refused, because the cancel would interrupt the turn that makes
@@ -2822,12 +2843,17 @@ export class ChannelService {
     if (!isString(args.taskId) || !args.taskId) return refuse("Provide the taskId of the run to cancel.", "no task id");
     const taskId = args.taskId;
     const receipt = `${agentId}:${operationId}`;
-    if ((yield* channelSync(() => this.store.database.commandResult(`channels:${receipt}`))) !== undefined)
-      return { accepted: true };
     let result: unknown;
     yield* this.#serialize(
       channelId,
       Effect.gen({ self: this }, function* () {
+        // A retried call finds its receipt here, in the queue, so a copy that waited behind the first
+        // is not refused for the run that the first ended. The turns that it did not stop stop now.
+        if ((yield* channelSync(() => this.store.database.commandResult(`channels:${receipt}`))) !== undefined) {
+          yield* this.#finishCommitted(channelId);
+          result = { accepted: true };
+          return;
+        }
         // Archive does not wait in the queue, so the channel is read again at this change's turn.
         const channel = yield* channelSync(() => this.store.get(channelId));
         if (channel.archived) return yield* channelFailure(new Error(sourceText("error.backend.channelArchived")));
@@ -2874,7 +2900,8 @@ export class ChannelService {
           return;
         }
         const agent = { id: agentId, name: this.memberName(agentId) };
-        const request = root.instruction.split("\n", 1)[0]?.trim() ?? "";
+        // The first line with text, cut by characters, so that an emoji is not split.
+        const request = [...(root.instruction.trim().split("\n", 1)[0]?.trim() ?? "")];
         const note = this.message(
           channelId,
           callerTask.id,
@@ -2882,26 +2909,14 @@ export class ChannelService {
           sourceText("status.agent.channelTaskCancelled", {
             agent: agent.name,
             person: person.name,
-            task: request.length > 80 ? `${request.slice(0, 79)}…` : request,
+            task: request.length > 80 ? `${request.slice(0, 79).join("")}…` : request.join(""),
           }),
           undefined,
           CHANNEL_CHANGE_ITEM_TYPE,
         );
-        yield* channelSync(() =>
-          this.store.update(
-            channel,
-            {
-              tasks: cancelled.map(
-                (item): ChannelTask => ({ ...item, state: "cancelled", error: null, revision: item.revision + 1 }),
-              ),
-              messages: [{ ...note, message: { ...note.message, source: "system" } }],
-            },
-            receipt,
-          ),
-        );
-        this.publish(channelId);
-        yield* this.interruptTasks(channelId, cancelled);
-        yield* this.wake(channelId);
+        yield* this.#cancelTasks(channel, cancelled, receipt, [
+          { ...note, message: { ...note.message, source: "system" } },
+        ]);
         result = {
           accepted: true,
           cancelledTaskIds: [...ids],

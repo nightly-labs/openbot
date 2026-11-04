@@ -519,12 +519,16 @@ export class ChannelHistory {
       // The channel controls stop and cancel a run with no message that a model reads, so the member
       // that owns the run, or work above it, said that it still waited for the result (#4937). Only
       // the runs of the recent messages are given; older ones are in the summary.
-      const recentTaskIds = new Set(recent.flatMap((message) => (message.taskId ? [message.taskId] : [])));
+      // A message of a sub-task names that sub-task, so each message gives the root of its run.
+      const rootOf = new Map(tasks.map((item) => [item.id, item.rootTaskId]));
+      const recentRoots = new Set(
+        recent.flatMap((message) => (message.taskId ? [rootOf.get(message.taskId) ?? message.taskId] : [])),
+      );
       const stoppedTasks = tasks
         .filter(
           (item) =>
             (item.state === "paused" || item.state === "cancelled") &&
-            (recentTaskIds.has(item.id) || recentTaskIds.has(item.rootTaskId)) &&
+            recentRoots.has(item.rootTaskId) &&
             channelWorkOwners(item, tasks).has(agent.id),
         )
         .map(brief);

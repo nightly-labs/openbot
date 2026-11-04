@@ -201,6 +201,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
    * One stop at a time, and none after the first that fails: the controller keeps one failed command
    * for its retry, and a later stop that succeeds would clear the error of the one that failed.
    */
+  let rowStopping = false;
   async function stopWork() {
     if (!env.connectionReady()) return;
     for (const taskId of activeRuns()) {
@@ -250,15 +251,16 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     },
     // The existing Stop of a task. The stopped-task card above the composer then offers Continue,
     // Reassign and Cancel for it.
+    // One stop at a time, as in stopWork: a second click while a stop runs does nothing, so that a
+    // stop that succeeds does not clear the error of one that failed.
     stopAwaitingReply: (taskId) => {
-      if (!env.connectionReady() || readOnly()) return;
-      void channels.command({
-        type: "stop",
-        operationId: crypto.randomUUID(),
-        channelId,
-        taskId,
-        recipientAgentId: null,
-      });
+      if (rowStopping || !env.connectionReady() || readOnly()) return;
+      rowStopping = true;
+      void channels
+        .command({ type: "stop", operationId: crypto.randomUUID(), channelId, taskId, recipientAgentId: null })
+        .finally(() => {
+          rowStopping = false;
+        });
     },
     HeaderTitle: (props) => <ChannelHeaderTitle channelId={channelId} onOpenSettings={props.onOpenSettings} />,
     SettingsPane: (props) => (

@@ -779,6 +779,67 @@ try {
       stoppedState(runX.id) === undefined,
     JSON.stringify(stopped),
   );
+  // A provider can send one tool call again. Two copies of one call wait in the queue together: the
+  // second finds the receipt of the first, so both are accepted and the run has one note.
+  const fourth = await callLead("assign a subtask for a retried cancel", workId, lead.id, "channel_assign", {
+    recipientAgentId: writer.id,
+    task: `Check the summary. ${HOLD_MARK}`,
+    expectedResult: "The check.",
+    sourceMessageIds: [plan.id],
+  });
+  pass("The lead assigns a subtask for a retried cancel", fourth.success, fourth.text);
+  const s4 = await waitFor("the subtask of Writer for the retried cancel to run", () =>
+    tasksOf(workId).find((task) => task.ownerAgentId === writer.id && task.state === "running"),
+  );
+  await runCauseEffect(
+    channels().command(
+      {
+        type: "send",
+        operationId: randomUUID(),
+        channelId: workId,
+        text: `Wait. ${HOLD_MARK}`,
+        recipientAgentId: lead.id,
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      PERSON,
+    ),
+  );
+  const held = await waitFor("the held turn of the lead", () =>
+    channels()
+      .store.assignments(workId)
+      .find((item) => item.agentId === lead.id && item.state === "running" && item.turnId),
+  );
+  const notesBeforeRetry = notes(workId).length;
+  const retried = await Promise.all(
+    [0, 1].map(() =>
+      runCauseEffect(
+        channels().tool(workId, lead.id, held.turnId ?? "", "call-retry", "channel_cancel", { taskId: s4.id }),
+      ),
+    ),
+  );
+  await waitFor("the Writer turn of the retried cancel to stop", () =>
+    channels()
+      .store.assignments(workId)
+      .every((item) => item.taskId !== s4.id || !["starting", "running", "queued"].includes(item.state))
+      ? true
+      : undefined,
+  );
+  pass(
+    "A retried cancel is accepted twice, cancels the run once, and stops its turn",
+    retried.every((result) => JSON.stringify(result).includes('"accepted":true')) &&
+      taskState(workId, s4.id) === "cancelled" &&
+      notes(workId).length === notesBeforeRetry + 1,
+    JSON.stringify(retried),
+  );
+  for (const type of ["stop", "cancel"] as const)
+    await runCauseEffect(
+      channels().command(
+        { type, operationId: randomUUID(), channelId: workId, taskId: held.taskId, recipientAgentId: null },
+        PERSON,
+      ),
+    );
+  await settled(workId);
 
   // 10. A routine run cannot cancel a run.
   const canceller = agents.createChannelRoutine({
