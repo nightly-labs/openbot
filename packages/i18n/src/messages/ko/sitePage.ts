@@ -78,6 +78,9 @@ export const messages = {
   "sitePage.pricing.title": "OpenBot 요금",
   "sitePage.pricing.description": "호스팅 서버와 팀용 라이선스. 내 컴퓨터에서 개인용으로 사용하면 OpenBot은 무료예요.",
   "sitePage.pricing.heading": "요금",
+  "sitePage.pricing.personal.title": "개인 사용은 무료예요",
+  "sitePage.pricing.personal.body":
+    "모든 기능을 내 컴퓨터에서, 이미 결제 중인 AI 요금제로 사용할 수 있어요. 서버도 라이선스도 필요 없어요.",
   "sitePage.pricing.enterprise.title": "Enterprise",
   "sitePage.pricing.enterprise.body":
     "더 큰 서버, {count}명이 넘는 멤버 등 필요한 것은 무엇이든 제공해요. 엔터프라이즈 지원도 포함돼요.",

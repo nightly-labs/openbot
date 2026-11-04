@@ -85,6 +85,7 @@ import {
 } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
 import { AGENT_THREAD_FILES_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { AGENT_THREAD_READS_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
+import { AGENT_THREAD_REPLIES_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
 import { AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { BROWSER_SECRET_VAULT_ROUTES } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
@@ -238,7 +239,10 @@ export const startAgentTask = Effect.fn("TeamClient.startAgentTask")(function* (
   );
 });
 
-/** Sends to a task. With files it uses `agent-thread-files-v1`, as `startAgentTask` does. */
+/**
+ * Sends to a task. With files it uses `agent-thread-files-v1`, as `startAgentTask` does. A reply uses
+ * `agent-thread-replies-v1`, so send a reply only to a host that serves it.
+ */
 export const sendAgentTaskMessage = Effect.fn("TeamClient.sendAgentTaskMessage")(function* (
   request: TeamApiRequest,
   {
@@ -246,24 +250,39 @@ export const sendAgentTaskMessage = Effect.fn("TeamClient.sendAgentTaskMessage")
     taskId,
     text,
     attachmentDraftIds,
+    replyToMessageId,
     clientMessageId,
-  }: AgentTaskInput & { text: string; attachmentDraftIds?: string[]; clientMessageId?: string },
+  }: AgentTaskInput & {
+    text: string;
+    attachmentDraftIds?: string[];
+    replyToMessageId?: string;
+    clientMessageId?: string;
+  },
 ): Effect.fn.Return<QueuedMessageReceipt, TeamRequestError> {
   return yield* teamCall(() =>
-    attachmentDraftIds?.length
-      ? request("POST", AGENT_THREAD_FILES_ROUTES.send, decodeTaskReceipt, {
+    replyToMessageId
+      ? request("POST", AGENT_THREAD_REPLIES_ROUTES.send, decodeTaskReceipt, {
           agentId,
           taskId,
           text,
-          attachmentDraftIds,
+          attachmentDraftIds: attachmentDraftIds ?? [],
+          replyToMessageId,
           ...(clientMessageId === undefined ? {} : { clientMessageId }),
         })
-      : request("POST", AGENT_TASKS_ROUTES.send, decodeTaskReceipt, {
-          agentId,
-          taskId,
-          text,
-          ...(clientMessageId === undefined ? {} : { clientMessageId }),
-        }),
+      : attachmentDraftIds?.length
+        ? request("POST", AGENT_THREAD_FILES_ROUTES.send, decodeTaskReceipt, {
+            agentId,
+            taskId,
+            text,
+            attachmentDraftIds,
+            ...(clientMessageId === undefined ? {} : { clientMessageId }),
+          })
+        : request("POST", AGENT_TASKS_ROUTES.send, decodeTaskReceipt, {
+            agentId,
+            taskId,
+            text,
+            ...(clientMessageId === undefined ? {} : { clientMessageId }),
+          }),
   );
 });
 

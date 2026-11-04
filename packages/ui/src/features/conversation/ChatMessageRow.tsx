@@ -1,4 +1,4 @@
-import type { AttachmentSummary, ConversationReaction, InstalledSkill } from "@openbot/contracts/ipc";
+import type { AttachmentSummary, AvatarColor, ConversationReaction, InstalledSkill } from "@openbot/contracts/ipc";
 import {
   Bubble,
   BubbleContent,
@@ -16,7 +16,7 @@ import { avatarHeadColor } from "../../bloub-avatar";
 import type { AgentMessage, AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
-import type { AttachmentMediaSource } from "./AttachmentCards";
+import type { AttachmentDownloads, AttachmentMediaSource } from "./AttachmentCards";
 import type { MessageImageFile } from "./MarkdownMessageText";
 import { conversationBubbleVariant, MessageBody } from "./MessageRendering";
 
@@ -35,6 +35,11 @@ export interface ChatMessageAuthor {
   agent?: AgentProfile | undefined;
   /** The face to draw when the profile is gone: the author id keeps deleted agents apart. */
   avatarSeed?: string | undefined;
+  /**
+   * The tint of the bubble, for a person. An agent's tint comes from its profile. Without a tint, the
+   * reader's and an agent's bubbles stay grey, and another person's bubble takes their name colour.
+   */
+  chatColor?: AvatarColor | undefined;
 }
 
 export interface ChatMessageRowProps {
@@ -66,6 +71,13 @@ export interface ChatMessageRowProps {
   menu?: (() => JSX.Element) | undefined;
   /** Extra content inside the bubble, under the body: a question prompt, a note about the message. */
   children?: JSX.Element;
+  /**
+   * The steps of the turn that wrote the message. They stand at the end of the action row and show
+   * with the actions, so a channel reads name, answer.
+   */
+  steps?: JSX.Element;
+  /** True when the actions and steps stand beside the bubble, as a channel shows an agent's answer. They go under it when the line has no room. */
+  actionsBeside?: boolean | undefined;
   class?: string | undefined;
   "data-chat-search-message"?: string | undefined;
   onSelectAgent: (agentId: string) => void;
@@ -78,6 +90,8 @@ export interface ChatMessageRowProps {
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
   /** Loads the images and media of a client that gets no `previewUrl`. */
   mediaSource?: AttachmentMediaSource | undefined;
+  /** The download state of attachments from a joined server. */
+  downloads?: AttachmentDownloads | undefined;
   /** Reads an image file that an agent message names, for a preview under the text. */
   loadImageFile?: ((file: MessageImageFile) => Promise<string | null>) | undefined;
   onDownloadImageFile?: ((file: MessageImageFile) => void) | undefined;
@@ -106,11 +120,22 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
   // A colour literal in an inline style is refused by `check:ui`, and rightly: this is the agent's
   // own head colour, read through the same helper the action markers use, so a name matches the
   // face beside it.
+  const chatColor = () => props.author.chatColor ?? props.author.agent?.chatColor;
   const authorStyle = () => {
     const currentSeed = seed();
-    if (own() || currentSeed === undefined) return undefined;
-    return `--message-author-color: ${avatarHeadColor(currentSeed, props.author.agent?.avatarHue ?? null)}`;
+    const tint = chatColor();
+    const styles = [
+      own() || currentSeed === undefined
+        ? undefined
+        : `--message-author-color: ${avatarHeadColor(currentSeed, props.author.agent?.avatarHue ?? null, props.author.agent?.avatarColor ?? null)}`,
+      tint === undefined ? undefined : `--message-chat-color: ${tint}`,
+    ].filter((style) => style !== undefined);
+    return styles.length > 0 ? styles.join("; ") : undefined;
   };
+  const bubbleClass = () => ({
+    "message-bubble-member": member(),
+    "message-bubble-colored": chatColor() !== undefined,
+  });
   const rowClass = () => [
     "message-entry",
     {
@@ -118,6 +143,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
       "message-entry-user": person(),
       "message-entry-agent": !person(),
       "message-entry-with-author": props.showAuthor === true && !person(),
+      "message-entry-actions-beside": beside(),
     },
     props.class,
   ];
@@ -164,6 +190,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
   };
   // Read once: a person's row shows its bubble only when the bubble holds something, such as a voice player.
   const extra = children(() => props.children);
+  const steps = children(() => props.steps);
   const messageBody = (frame?: (content: JSX.Element, imagesOnly: () => boolean) => JSX.Element) => (
     <MessageBody
       frame={frame}
@@ -184,6 +211,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
       onOpenQuote={props.onOpenQuote}
       onDownload={props.onDownload}
       mediaSource={props.mediaSource}
+      downloads={props.downloads}
       loadImageFile={props.loadImageFile}
       onDownloadImageFile={props.onDownloadImageFile}
       macWindowControls={props.macWindowControls}
@@ -191,7 +219,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
   );
   const bubble = (content: JSX.Element): JSX.Element => (
     <Bubble
-      class={member() ? "message-bubble-member" : undefined}
+      class={bubbleClass()}
       align={person() ? "end" : "start"}
       variant={variant()}
       data-author={person() ? "user" : "assistant"}
@@ -247,6 +275,22 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
       </Show>
     </Bubble>
   );
+  // The actions, the time and the steps stand under the bubble. A named author shows the time beside
+  // the name. A row beside the bubble goes under it only when the line has no room.
+  const beside = () => props.actionsBeside === true && !person();
+  const actionRow = (): JSX.Element => (
+    <div class="message-action-row">
+      {props.actions}
+      <Show when={!props.showAuthor || own()}>
+        <time class="message-time" datetime={props.message.createdAt}>
+          {props.message.time}
+        </time>
+      </Show>
+      <Show when={steps.toArray().length > 0}>
+        <div class="message-steps">{steps()}</div>
+      </Show>
+    </div>
+  );
   const body = (): JSX.Element => (
     <>
       <Show when={props.showAuthor && !person()}>
@@ -301,16 +345,9 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
               ))}
             </div>
           </Show>
+          <Show when={beside()}>{actionRow()}</Show>
         </div>
-        {/* The actions and the time stand under the bubble. A named author shows the time beside the name. */}
-        <div class="message-action-row">
-          {props.actions}
-          <Show when={!props.showAuthor || own()}>
-            <time class="message-time" datetime={props.message.createdAt}>
-              {props.message.time}
-            </time>
-          </Show>
-        </div>
+        <Show when={!beside()}>{actionRow()}</Show>
       </MessageContent>
     </>
   );

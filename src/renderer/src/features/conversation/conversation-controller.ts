@@ -13,7 +13,7 @@ import type { UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createSignal, createStore, onCleanup } from "solid-js";
 import type { ChatSearchMatch } from "./chat-search";
 import {
-  appendPluginPrompt,
+  appendDraftText,
   appendSkillCreationRequest,
   appendSkillExample,
   EMPTY_DRAFT,
@@ -33,10 +33,12 @@ import type {
   VoiceLiveTranscript,
 } from "./conversation-types";
 import type { TurnRuntime } from "./stores/activity-store";
+import { createAttachmentUploadStore } from "./stores/attachment-upload-store";
 import type { PastePreview } from "./stores/composer-actions";
 import type { SidePanelsState } from "./stores/panels-store";
 import { createPendingSendStore } from "./stores/pending-send-store";
 import type { SideQuestionState } from "./stores/side-question-store";
+import { createVoiceSessions } from "./stores/voice-session-store";
 import type { VoiceCloudStream } from "./stores/voice-store";
 
 const BROWSER_PANEL_DEFAULT = 380;
@@ -150,6 +152,8 @@ export function createStableConversationState(
   const [composerFocusRequest, setComposerFocusRequest] = createSignal(0);
   // A send in flight belongs to the server it was sent to, so it outlives a server switch.
   const pendingSends = createPendingSendStore();
+  // A file import belongs to the chat it was started in, so it outlives a server switch, as a send does.
+  const attachmentUploads = createAttachmentUploadStore();
   const [conversationErrors, setConversationErrors] = createSignal<Record<string, string>>({});
   /** The provider and model of the run behind each conversation error, keyed like `conversationErrors`. */
   const [conversationErrorRuns, setConversationErrorRuns] = createSignal<
@@ -308,7 +312,13 @@ export function createStableConversationState(
     },
     appendPluginPrompt(target: { serverId: string; agentId: string }, prompt: string) {
       const key = composerDraftKey(target);
-      setDrafts((current) => ({ ...current, [key]: appendPluginPrompt(current[key] ?? EMPTY_DRAFT, prompt) }));
+      setDrafts((current) => ({ ...current, [key]: appendDraftText(current[key] ?? EMPTY_DRAFT, prompt) }));
+      setComposerFocusRequest((value) => value + 1);
+    },
+    /** Puts a message from another chat into a channel's composer. The user reads it and sends it. */
+    appendChannelText(target: { serverId: string; channelId: string }, text: string) {
+      const key = composerDraftKey({ serverId: target.serverId, agentId: target.channelId });
+      setChannelDrafts((current) => ({ ...current, [key]: appendDraftText(current[key] ?? EMPTY_DRAFT, text) }));
       setComposerFocusRequest((value) => value + 1);
     },
     stopComposerTyping,
@@ -336,6 +346,7 @@ export function createStableConversationState(
     composerFocusRequest,
     setComposerFocusRequest,
     pendingSends,
+    attachmentUploads,
     conversationErrors,
     setConversationErrors,
     conversationErrorRuns,
@@ -428,6 +439,8 @@ export function createServerConversationState() {
   const [hiddenAwaitingReplyIds, setHiddenAwaitingReplyIds] = createSignal<ReadonlySet<string>>(new Set());
   // Keyed by agent id, as `rightPanels` is: a side question lives as long as its pane, not its view.
   const [sideQuestions, setSideQuestions] = createStore<Record<string, SideQuestionState>>({});
+  // A voice conversation lives as long as its Voice tab, not its view.
+  const voiceSessions = createVoiceSessions(sidePanels);
 
   return {
     showComposerActions,
@@ -478,6 +491,7 @@ export function createServerConversationState() {
     setHiddenAwaitingReplyIds,
     sideQuestions,
     setSideQuestions,
+    voiceSessions,
   };
 }
 

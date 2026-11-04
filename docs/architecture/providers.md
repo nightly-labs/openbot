@@ -21,12 +21,17 @@ such as "read", does not make a result strong. The other results have a short de
 strong result is an `openbot_browser` tool, the results also include `openbot_browser.run_script` with its
 schema. Agents search for the single actions that they know, such as click, and otherwise do not find the
 multi-step tool (see [Browser](browser.md)). The instructions
-tell the agent to describe a tool only when no search result gave its schema. `tool_describe` accepts `names`, or
+tell the agent to describe a tool only when no search result gave its schema. A search with ready schemas, and each
+`tool_describe` result, starts with a `call` note: the tools are not direct tools, so run them with `tool_call`.
+Claude loads its own deferred tools with a search and then calls them directly, and it called a found
+`openbot.list_workflows` as `mcp__openbot__list_workflows`. A search that names a workflow does not get the
+browser note. `tool_describe` accepts `names`, or
 one `name` string, and returns the original schemas for up to ten qualified names, plus guidance from
 `agent/tool-guidance.ts`. Identical guidance appears once per response. The initial catalog lists
 names without schemas.
 
-`tool_call` accepts `{ name: "namespace.tool", arguments: { ... } }`. The router resolves only
+`tool_call` accepts `{ name: "namespace.tool", arguments: { ... } }`, and `tool` as an alias of `name`, because
+a refused call costs a model step. The router resolves only
 original built-in names. It preserves the request, thread, turn, and call identifiers and the abort
 signal, then enters the same dispatch as a direct call. Existing decoders, secure browser input,
 approval cards, image results, cancellation, and message idempotency remain at their existing owners.
@@ -170,12 +175,12 @@ adds its rule there, not in the catalog.
 
 The runtime manager offers the latest upstream release of each provider CLI. It checks at startup,
 every hour, and when the user selects `Check for updates` (`provider-runtime-releases.ts`): GitHub
-`releases/latest` for Codex, Pi and Kimi, the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
-for Grok, the `muse-stable` channel for Muse, and the ACP registry entries `antigravity-acp` for Gemini and `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
+`releases/latest` for Codex, Pi, Kimi and GitHub Copilot, the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
+for Grok, the `muse-stable` channel for Muse, Cognition's `cli/current` manifest for Devin, and the ACP registry entries `antigravity-acp` for Gemini and `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
 answered, and Bun, which is a tool runtime and not a provider, stays on it.
 
 Every upstream download is checked against its source's own hash: the GitHub asset `digest` for
-Codex, Pi and Kimi, the manifest `checksum` for Muse, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
+Codex, Pi, Kimi and GitHub Copilot, the manifest `checksum` for Muse, the manifest `sha256` for Devin, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
 so a Grok, Gemini or Cursor release is trusted on TLS alone. A Gemini release must stay on
 `dl.google.com/agy-extensions/releases` and keep the pinned command name. A Cursor release must use
 the pinned `downloads.cursor.com/lab` path for its target, with a build that starts with the
@@ -731,6 +736,69 @@ adds `cline` to `projection_provider_sessions`.
 Team API v1–v5 do not know `cline`. The host hides Cline agents, models, status, and sign-in state
 from peers on those versions, as for Cursor. Team API v6 and `providers-v4` carry it, as for Cursor.
 
+### Devin
+
+The Devin provider (id `devin`) starts Cognition's Devin CLI with `devin acp`. The runtime manager
+reads `static.devin.ai/cli/current/manifest.json` and downloads
+`devin-<version>-<triple>.tar.gz` (`.zip` on Windows) from `static.devin.ai/cli/<version>/`. The
+archives hold only `bin/` and `share/`. Staging keeps both, because Devin CLI 3000.11.234 has a
+skill that reads its documentation in `share/devin/docs`, and refuses links and other special files.
+The manifest gives a SHA-256 for each target and no size, so a `GET` with `Range: bytes=0-0` gives
+the download size. `OPENBOT_DEVIN_PATH` selects another executable.
+
+Sign in calls the ACP `authenticate` method `devin-browser`, which opens Devin's page in the system
+browser. Devin CLI 3000.11.234 keeps the sign-in in `credentials.toml` of its XDG data folder
+(`~/.local/share/devin`). It has no device-code sign-in, so a joined computer cannot sign in Devin on
+the host. Sign out runs `devin auth logout`. A signed-out Devin process answers `session/new` with an
+empty model list and no error. `noModelsWhenSignedOut` reads that list as "sign-in required".
+
+`devinStatePaths` lets a confined process write `devin/cli` and `devin/mcp` in the XDG data folder,
+`devin` in the XDG cache folder and `~/.devin/plans`. Its config folder, `credentials.toml` and
+`devin/cli/plugins` stay read-only, because every other Devin process loads them. `.devin` and
+`.windsurf` in a workspace are project settings, so a confined process cannot write them. A model
+change with `session/set_model` does not write a file. Devin answers a lost session with `-32016`
+and `{ "cognition.ai/errorKind": "session_not_found" }`, which `DEVIN_ACP_FLAVOR` reads as a missing
+session.
+
+No frozen Team API protocol knows `devin`. The host hides Devin agents, models, status, and sign-in
+state from peers below protocol 8, and `providers-v8` carries it.
+
+### GitHub Copilot
+
+The GitHub Copilot provider (id `copilot`, issue #4637) starts GitHub's Copilot CLI with
+`copilot --acp --no-auto-update`. The runtime manager reads `releases/latest` of
+`github/copilot-cli` and downloads `copilot-<target>.tar.gz` (`.zip` on Windows). Each archive holds
+only `copilot` (`copilot.exe`). The licence lets an app include the CLI only unchanged, so OpenBot
+downloads it and does not ship it. `OPENBOT_COPILOT_PATH` selects another executable. Every Copilot
+process gets `COPILOT_AUTO_UPDATE=false`, because `copilot login` refuses `--no-auto-update`.
+
+The executable unpacks its JavaScript package into `pkg/<platform>/<version>` of its cache folder
+when that folder is missing. A confined process gets `COPILOT_CACHE_HOME` and
+`COPILOT_PKG_CACHE_HOME` in its own temporary folder (`COPILOT_CONFINED_ENV`), so it never writes a
+package that an unconfined process runs.
+
+Sign in runs `copilot login`, which opens GitHub's page in the system browser and takes the result
+on a `127.0.0.1` callback. A joined computer signs in the host with `copilot login --device-code`,
+which prints "visit PAGE and enter code CODE". Copilot CLI 1.0.105 keeps the token in the system
+keychain. It prefers `COPILOT_GITHUB_TOKEN`, `GH_TOKEN` and `GITHUB_TOKEN`, in that order, to the
+keychain sign-in, so one of them in OpenBot's environment selects the account. The CLI has no
+sign-out command: Sign out starts its ACP server and calls the ACP `logout` method
+(`acpLogout`). It cannot sign out a token from the environment. A signed-out process answers
+`session/new` with `-32000`. Not confirmed: a Linux server with no keychain service, and the form
+of Copilot's error for a lost session, which `DEFAULT_ACP_FLAVOR` reads with the `-32002` rule.
+
+`copilotStatePaths` lets a confined process write `~/.copilot` (or `$COPILOT_HOME`), with its
+settings, instructions, hooks, skills, agents, plugins, MCP configuration and `pkg` read-only,
+because every other Copilot process loads them. In a workspace, `.mcp.json`, `.github/mcp.json`,
+`.github/copilot`, `.github/hooks`, `.github/skills` and `.github/agents` are project settings, so a
+confined process cannot write them. Their parent folders, `.github` and the workspace, cannot be
+renamed or removed, so the rules stay on those paths. The CLI reads `.github/instructions` and
+`.github/copilot-instructions.md` as well; a confined process can write them, as it can write
+`AGENTS.md`.
+
+No frozen Team API protocol knows `copilot`. The host hides Copilot agents, models, status, and
+sign-in state from peers below protocol 8, as for Devin.
+
 ### Kimi
 
 The Kimi provider (id `kimi`) starts the Kimi Code CLI with `kimi acp`. The runtime manager
@@ -759,6 +827,21 @@ Kimi CLI 1.52.0 has no ACP configuration options, so OpenBot changes the model w
 and the path in `data.details`. `AcpFlavor.modelSetUnsaved` reads that failure as a model change
 that applied. A Full access Kimi agent saves the model, so it becomes the default model of each new
 Kimi session, also in a terminal.
+
+The CLI reports no usage over ACP. The driver's `readRateLimits` (`src/backend/kimi-usage.ts`)
+sends the request of the CLI's `/usage` command, `GET <base_url>/usages`, with the CLI's access
+token. The CLI's version selects the folder: `KIMI_SHARE_DIR` or `~/.kimi` for the Python CLI 1.x,
+`KIMI_CODE_HOME` or `~/.kimi-code` for Kimi Code 2.x. Both write `base_url` and the token key into
+`[providers."managed:kimi-code"]` of `config.toml`, and the token into `credentials/<key without
+"oauth/">.json`. `KIMI_CODE_BASE_URL` comes first, then `base_url`, then `https://api.kimi.com/coding/v1`.
+The reader accepts only an `https` address. The rolling 5-hour window (the shortest window of
+`limits[]`, else `usages.limit_5h`) fills the primary window, and the weekly quota (`usage`, else
+`usages.limit_7d`) the secondary one. No sign-in, a 401, 403 or 404, or an answer with no quota
+gives no reading. The token lasts 15 minutes, and the CLI refreshes it only during a turn, so an
+expired token fails the read and the dock keeps the last reading. An account with no Kimi Code plan
+has no reading, so a Kimi limit failure stays a turn error. The dock poll calls `readKimiUsage`
+directly, with the CLI that the last Kimi client ran on, so it does not start or wake the CLI for a
+reading. Before a Kimi client runs, the poll has no reading.
 
 No frozen Team API protocol knows `kimi`. The host hides Kimi agents, models, status, and sign-in
 state from peers below protocol 8, and `providers-v8` carries it.
@@ -986,9 +1069,10 @@ uses the optional `provider-usage-reset-v1` routes (see [Admin capabilities](ser
 ### Disconnect the own sign-in
 
 Settings > Providers shows **Disconnect** in the ⋯ menu of the connected own sign-in of Claude,
-Codex, Grok, Muse and Cursor (issue #3487). Claude and Codex have an `accounts.signOut` command
+Codex, Grok, Muse, Cursor, Devin and GitHub Copilot (issue #3487). Claude and Codex have an `accounts.signOut` command
 (`claude auth logout`, `codex logout`), which also signs out an account folder before its removal.
-Grok, Muse and Cursor have a driver `signOut` (`grok logout`, `muse logout`, `cursor-agent logout`)
+Grok, Muse, Cursor, Devin and GitHub Copilot have a driver `signOut` (`grok logout`, `muse logout`,
+`cursor-agent logout`, `devin auth logout`, and the ACP `logout` method of `copilot --acp`)
 for the own sign-in only. Muse offers it only on this computer with no OpenBot key saved
 (`apiKeyInUse`): the key keeps Muse connected, and the key dialog removes it. Cline, Gemini and Pi have no sign-out command.
 `ProviderRuntime.signOutProvider` refuses while the provider runs a turn, cancels a

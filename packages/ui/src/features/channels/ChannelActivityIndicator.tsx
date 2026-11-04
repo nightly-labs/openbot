@@ -58,7 +58,11 @@ function channelWorkerNameParts(workers: ChannelWorker[], list: AppFormat["list"
 
 /** The colour of the worker's name on its messages, so the name here matches its face and its replies. */
 function workerNameStyle(worker: ChannelWorker) {
-  return `--channel-activity-name-color: ${avatarHeadColor(worker.agent?.avatarSeed ?? worker.id, worker.agent?.avatarHue ?? null)}`;
+  return `--channel-activity-name-color: ${avatarHeadColor(
+    worker.agent?.avatarSeed ?? worker.id,
+    worker.agent?.avatarHue ?? null,
+    worker.agent?.avatarColor ?? null,
+  )}`;
 }
 
 /**

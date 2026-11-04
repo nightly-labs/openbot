@@ -5,6 +5,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.databaseIntegrity": "OpenBot database failed its integrity check.",
   "error.backend.webhookRouteLimit": "A host can have at most {limit} webhook routines.",
   "error.backend.webhookSettingsInvalid": "Check the webhook settings and try again.",
+  "error.backend.webhookSenderSecretInvalid":
+    "Paste the complete signing secret from the sender. It has 16 to 1024 characters and no spaces.",
   "error.backend.webhookRouteUnavailable":
     "The public webhook route is not ready. Check the host connection and try again.",
   "error.backend.webhookTestUnavailable":
@@ -55,6 +57,12 @@ export const messages = defineMessages("error.backend", {
   "error.backend.sunshineNotReady": "Sunshine did not become ready.",
   "error.backend.sunshineNotReadyReason": "Sunshine did not become ready. {reason}",
   "error.backend.channelLeadModelUnavailable": "The channel lead model is unavailable.",
+  "error.backend.contextCompactionIneffective":
+    "Compaction does not make this chat smaller: after two compactions it still uses {percent}% of the model's context window, so OpenBot stops compacting it. Tools and instructions use most of the window. Turn off the MCP servers or computer use that this agent does not need, or select a model with a larger window. Then start a new chat.",
+  "error.backend.providerRetrying":
+    "The provider failed this request {attempts} times and tries again. If the agent does not continue, stop the turn.",
+  "error.backend.providerRetryingLargeContext":
+    "The provider failed this request {attempts} times and tries again. This chat uses {percent}% of the model's context window. If the agent does not continue, stop the turn: OpenBot then compacts the chat before the next message.",
   "error.backend.sharedDataUnavailable": "Shared data is unavailable.",
   "error.backend.shuttingDown": "OpenBot is shutting down.",
   "error.backend.channelUnconfirmedStart":
@@ -103,8 +111,8 @@ export const messages = defineMessages("error.backend", {
     "You have {saved} of {limit} memories. To make room, update one memory by memoryId with the combined text of two related memories, then forget the other one, or forget a memory that is no longer true. Then try again.",
   "error.backend.agentMemoryLimitExceeded":
     "You have {saved} memories, and the limit is {limit}. The user set the limit below the number of saved memories. Do not forget memories to make room. Tell the user that this memory was not saved.",
-  "error.backend.channelHistoryLeadRequired": "Choose a channel lead to prepare the shared history.",
   "error.backend.channelHistoryArriving": "A shared message is still arriving. Resume when it is complete.",
+  "error.backend.channelHistoryLeadRequired": "Choose a channel lead to prepare the shared history.",
   "error.backend.channelHistoryInvalid": "The history summary is invalid. Resume to try again.",
   "error.backend.channelContextTooLong":
     "This assignment exceeds the shared context limit. Send a shorter request or reassign it.",
@@ -188,6 +196,10 @@ export const messages = defineMessages("error.backend", {
   "error.backend.agentWaitRemoteUnsupported": "Open waits are only available for agents on this computer.",
   "error.backend.markUnreadRemoteUnsupported":
     "Marking a message unread is only available for agents on this computer.",
+  "error.backend.messageDeleteUnsupported": "Deleting messages is not supported by this server.",
+  "error.backend.messageDeleteNotFound": "This message is not in the chat.",
+  "error.backend.messageDeleteBusy": "This message is part of a running turn. Delete it when the turn ends.",
+  "error.backend.messageDeleteForbidden": "You can delete only the messages that you sent.",
   "error.backend.routineFlowHandoffFailed": "The routine could not pass the work on to this agent.",
   "error.backend.mcpServerLimit": "OpenBot keeps up to {limit} MCP servers.",
   "error.backend.mcpServerNameTaken": "An MCP server named {name} already exists.",
@@ -346,8 +358,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.taskToolInvalid": "Give the task a title of at most 120 characters and a brief that says what to do.",
   "error.backend.taskOwnChatOnly":
     "Start a task only from your own chat. A channel, a messaging conversation or another task cannot start one.",
-  "error.backend.taskOpenLimit":
-    "This agent already has {count} open tasks. Wait until the user closes one before you start another task.",
+  "error.backend.taskUnfinishedLimit":
+    "This agent already has {count} unfinished tasks. Start another task when one of them ends.",
   "error.backend.taskOpenLimitReached":
     "This agent has {count} open tasks. Close a task, then start or open another one.",
   "error.backend.taskRemoteUnsupported": "Tasks are only available for agents on this computer.",

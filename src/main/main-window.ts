@@ -19,7 +19,7 @@ import {
   LOCAL_SERVER_ID,
   type MacPermissionId,
 } from "@openbot/contracts/ipc";
-import type { AppTextKey, AppTranslate } from "@openbot/i18n";
+import type { AppTextKey, AppTranslate, LayoutDirection } from "@openbot/i18n";
 import {
   app,
   BrowserWindow,
@@ -31,6 +31,7 @@ import {
   type MenuItemConstructorOptions,
   type Point,
   type Rectangle,
+  type RenderProcessGoneDetails,
   screen,
   session,
   type WebContents,
@@ -49,7 +50,6 @@ import type { HighlightDisplay } from "./computer-use-highlight-window";
 import { shouldShowDevelopmentWindow } from "./development-profile";
 import { dynamicIslandNotchSizeForDisplay } from "./dynamic-island-window";
 import { type InterfaceSizeService, type InterfaceSizeStep, interfaceSizeShortcut } from "./interface-size-service";
-import { hideMacDockWhenNoWindowShows, showMacDock } from "./mac-dock";
 import { preventPanelActivation } from "./mac-panel-activation";
 import {
   createMainWindowBoundsRecorder,
@@ -65,9 +65,24 @@ import { sendToRenderer } from "./renderer-ipc";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 import type { UpdateService } from "./update-service";
 import { followAppearance, followWindowGlass, windowBackgroundColor } from "./window-appearance";
+import { followWindowButtonSide, WINDOW_BUTTON_INSET } from "./window-buttons";
 
 /** The dark background of the main and setup windows, under the page's own canvas. */
 const MAIN_WINDOW_DARK_BACKGROUND = "#0b0d0e";
+
+/**
+ * The main window loads its page again when the renderer stops, as many times as this in
+ * `RENDERER_RELOAD_WINDOW_MS`. A page that stops each time it loads then ends as it did before.
+ */
+const RENDERER_RELOAD_MAX = 3;
+const RENDERER_RELOAD_WINDOW_MS = 60_000;
+/** A clean exit or a launch failure is not a page that stopped while in use. */
+const RELOADABLE_RENDERER_EXITS: ReadonlySet<RenderProcessGoneDetails["reason"]> = new Set([
+  "crashed",
+  "oom",
+  "killed",
+  "abnormal-exit",
+]);
 
 /**
  * What the window surface reads off the running application. Deliberately narrower than
@@ -132,6 +147,8 @@ export interface MainWindowContext {
   getServices: () => MainWindowApplicationServices | null;
   /** A function, not a value: the saved language is read after the first window opens. */
   getTranslate: () => AppTranslate;
+  /** A function, not a value: the user can change the language while the window is open. */
+  getLayoutDirection: () => LayoutDirection;
   /** A renderer load or committed document navigation resets delivery of queued links. */
   onRendererLoadStarted: () => void;
   /** Main must release resources when a renderer can no longer run its own cleanup. */
@@ -173,6 +190,7 @@ export function createMainWindowController({
   keepRunningInBackground,
   getServices,
   getTranslate,
+  getLayoutDirection,
   onRendererLoadStarted,
   onRendererGone,
   onMainWindowCreated,
@@ -194,6 +212,7 @@ export function createMainWindowController({
       writeBounds: (bounds) => writeMainWindowBounds(statePath, bounds),
       reportError,
     });
+  let rendererReloadTimes: number[] = [];
 
   function createWindow(): BrowserWindow {
     const cursor = screen.getCursorScreenPoint();
@@ -219,9 +238,10 @@ export function createMainWindowController({
       // detail. macOS spaces the three 13px dots 23px apart, so the group is 59px wide: x 12 leaves
       // it 11px clear of the 82px where the top row's first control starts, in the app frame and in
       // the full-bleed browser header alike, and y 13 puts its centre line within half a pixel of
-      // both of those rows. The setup window below uses the same offsets.
+      // both of those rows. The setup window below uses the same offsets. In a right-to-left language
+      // the group is at the top right with the same offsets (`window-buttons.ts`).
       ...(process.platform === "darwin"
-        ? { titleBarStyle: "hidden" as const, trafficLightPosition: { x: 12, y: 13 } }
+        ? { titleBarStyle: "hidden" as const, trafficLightPosition: WINDOW_BUTTON_INSET }
         : {}),
       webPreferences: {
         preload: join(__dirname, "../preload/index.cjs"),
@@ -253,11 +273,11 @@ export function createMainWindowController({
       getServices()?.browser.releaseUserControlHeldBy({ kind: "local" });
       // The hidden renderer owns the cross-host Dynamic Island coordinator and must outlive its visible
       // window. On Windows and Linux the user chooses it, and the tray icon is the way back. On macOS
-      // the Dock icon is the way back, or the menu bar icon when the user chooses it.
+      // the Dock icon is the way back, and the menu bar icon too when the user chooses it. The Dock
+      // icon stays, so its dot shows that OpenBot still runs.
       if ((process.platform === "darwin" || keepRunningInBackground()) && !isQuitting()) {
         event.preventDefault();
         window.hide();
-        if (process.platform === "darwin" && keepRunningInBackground()) hideMacDockWhenNoWindowShows();
       }
     });
     onMainWindowCreated(window);
@@ -280,7 +300,29 @@ export function createMainWindowController({
     });
     window.webContents.on("render-process-gone", onRendererGone);
     window.webContents.once("destroyed", onRendererGone);
+    // A dead page gets no keys, so Ctrl+R cannot reach the Reload item on Windows and Linux, and the
+    // window stayed white until a restart (#4696). The agents keep running in main.
+    window.webContents.on("render-process-gone", (_event, details) => {
+      const now = Date.now();
+      rendererReloadTimes = rendererReloadTimes.filter((time) => now - time < RENDERER_RELOAD_WINDOW_MS);
+      if (
+        isQuitting() ||
+        window.isDestroyed() ||
+        !RELOADABLE_RENDERER_EXITS.has(details.reason) ||
+        rendererReloadTimes.length >= RENDERER_RELOAD_MAX
+      ) {
+        return;
+      }
+      rendererReloadTimes.push(now);
+      setImmediate(() => {
+        if (window.isDestroyed()) return;
+        loadRenderer(window).catch((error: unknown) =>
+          reportError("Could not reload the main window after its renderer stopped", error),
+        );
+      });
+    });
     attachAppInput(window, getServices, getTranslate, { closesBrowserTabs: true, quitShortcut });
+    followWindowButtonSide(window, getLayoutDirection);
     window.webContents.on("will-navigate", (event, targetUrl) => {
       if (!isTrustedRendererUrl(targetUrl)) event.preventDefault();
     });
@@ -327,7 +369,7 @@ export function createMainWindowController({
       title: getTranslate()("window.localHostTitle"),
       icon: appIconPath,
       ...(process.platform === "darwin"
-        ? { titleBarStyle: "hidden" as const, trafficLightPosition: { x: 12, y: 13 } }
+        ? { titleBarStyle: "hidden" as const, trafficLightPosition: WINDOW_BUTTON_INSET }
         : {}),
       webPreferences: {
         preload: join(__dirname, "../preload/index.cjs"),
@@ -359,6 +401,7 @@ export function createMainWindowController({
       if (interfaceSize) window.webContents.setZoomFactor(interfaceSize.zoomFactor);
     });
     attachAppInput(window, getServices, getTranslate, { closesBrowserTabs: false, quitShortcut });
+    followWindowButtonSide(window, getLayoutDirection);
     announceChatWindows();
     const url = appRendererUrl(process.env.ELECTRON_RENDERER_URL);
     url.searchParams.set("window", "chat");
@@ -664,7 +707,10 @@ export function createComputerUseHighlightWindow(bounds: Rectangle): BrowserWind
  * sandboxed, context-isolated, no window may be opened from it, and no navigation away from the
  * renderer's own origin.
  */
-export function createComputerUsePermissionHelpWindow(translate: AppTranslate): BrowserWindow {
+export function createComputerUsePermissionHelpWindow(
+  translate: AppTranslate,
+  getLayoutDirection: () => LayoutDirection,
+): BrowserWindow {
   const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   const width = 340;
   // The card the user drags out of it, the two steps, and nothing else: a window taller than its
@@ -685,7 +731,7 @@ export function createComputerUsePermissionHelpWindow(translate: AppTranslate): 
     backgroundColor: windowBackgroundColor(MAIN_WINDOW_DARK_BACKGROUND),
     title: translate("window.computerUsePermissionTitle"),
     ...(process.platform === "darwin"
-      ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 12, y: 13 } }
+      ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: WINDOW_BUTTON_INSET }
       : {}),
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
@@ -700,6 +746,7 @@ export function createComputerUsePermissionHelpWindow(translate: AppTranslate): 
   // the steps to nobody.
   window.setAlwaysOnTop(true, "floating");
   followAppearance(window, MAIN_WINDOW_DARK_BACKGROUND);
+  followWindowButtonSide(window, getLayoutDirection);
   // The fixed height fits the contents only at 100%; the main window zoom would clip the steps.
   window.webContents.setZoomMode("isolated");
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
@@ -810,6 +857,7 @@ let windowsKeptHidden = false;
  * A server (`OPENBOT_SERVER=1` or a hosted server) shows no window. Its windows are on a virtual
  * display that has no viewer and no GPU, so a shown window drew each frame in software for nobody
  * (#4482). A hidden window draws nothing, and its renderer runs as in the background on a desktop.
+ * A local server on this computer also shows no window: its main window never loads.
  */
 export function keepWindowsHidden(): void {
   windowsKeptHidden = true;
@@ -827,18 +875,7 @@ export function hideWindowsForQuit(): void {
 
 export function showMainWindow(window: BrowserWindow): void {
   if (windowsKeptHidden) return;
-  if (process.platform !== "darwin" || app.dock?.isVisible() !== false) {
-    presentMainWindow(window, process.platform, () => app.show());
-    return;
-  }
-  // Menu bar mode hid the Dock icon. It comes back before the window takes focus.
-  void showMacDock().then(() => {
-    if (windowsKeptHidden || window.isDestroyed()) return;
-    presentMainWindow(window, process.platform, () => app.show());
-    // An app with no Dock icon is not active, and a click on its menu bar icon does not make it
-    // active. Without this, the window opens behind the app in front.
-    app.focus({ steal: true });
-  });
+  presentMainWindow(window, process.platform, () => app.show());
 }
 
 export function loadDynamicIslandRenderer(window: BrowserWindow, display: Display, variant: AppVariant): Promise<void> {

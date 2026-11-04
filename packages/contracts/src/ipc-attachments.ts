@@ -59,12 +59,33 @@ export interface AttachmentDataInput {
 export interface ImportAttachmentsInput {
   paths: string[];
   data: AttachmentDataInput[];
+  /** The import that main names in its `importProgress` events. */
+  requestId?: string;
 }
 
+/** A file of an import. The composer shows it before the file reaches the server. */
+export interface AttachmentImportFile {
+  name: string;
+  size: number;
+}
+
+/**
+ * The life of one import. A retry of a failed import starts again with the same `requestId`.
+ * `progress` comes only from an upload to a joined server that reports its bytes.
+ */
 export type AttachmentImportEvent =
-  | { type: "started"; requestId: string; serverId: string }
+  | { type: "started"; requestId: string; serverId: string; files: AttachmentImportFile[] }
+  | { type: "progress"; requestId: string; serverId: string; sent: number; total: number }
   | { type: "completed"; requestId: string; serverId: string; attachments: DraftAttachment[] }
   | { type: "error"; requestId: string; serverId: string; message: string };
+
+/** The bytes of an import that main sends to a joined server, as the host confirms them. */
+export interface AttachmentImportProgress {
+  serverId: string;
+  requestId: string;
+  sent: number;
+  total: number;
+}
 
 export interface DownloadAttachmentsInput {
   attachments: { id: string; name: string }[];
@@ -73,6 +94,16 @@ export interface DownloadAttachmentsInput {
 export interface OpenAttachmentInput {
   attachmentId: string;
   action: "open" | "reveal" | "download";
+  /** The size that the message names. With it, a download from a joined server reports its bytes. */
+  size?: number;
+}
+
+/** The bytes of an attachment that main downloads from a joined server for an open or a save. */
+export interface AttachmentDownloadProgress {
+  serverId: string;
+  attachmentId: string;
+  received: number;
+  total: number;
 }
 
 /** What the file view does with a shared or workspace file. Absent means `open`. */

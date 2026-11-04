@@ -61,7 +61,7 @@
 .computer-use-compact {
   width: min(100%, 520px);
   margin-top: var(--openbot-space-4);
-  text-align: left;
+  text-align: start;
 }
 
 .computer-use-compact-header {
@@ -256,7 +256,7 @@ body:has(.computer-use-highlight-surface),
   /* Clear of the traffic lights, which sit over this surface on macOS. */
   padding: 44px var(--openbot-space-4) var(--openbot-space-4);
   background: var(--openbot-bg-canvas);
-  text-align: left;
+  text-align: start;
 }
 
 .computer-use-help-header {
@@ -302,7 +302,7 @@ body:has(.computer-use-highlight-surface),
   flex-direction: column;
   gap: var(--openbot-space-2);
   margin: 0;
-  padding-left: var(--openbot-space-4);
+  padding-inline-start: var(--openbot-space-4);
   /* The order of the two steps is the whole of the instruction, so the numbers have to be drawn. */
   list-style: decimal;
   color: var(--openbot-text-secondary);
@@ -367,7 +367,7 @@ body:has(.computer-use-highlight-surface),
 .computer-use-drag-handle {
   position: absolute;
   top: var(--openbot-space-2);
-  right: var(--openbot-space-2);
+  inset-inline-end: var(--openbot-space-2);
   color: var(--openbot-text-dim);
 }
 

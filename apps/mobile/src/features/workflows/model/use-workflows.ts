@@ -84,6 +84,83 @@ export function useWorkflowRunHistory(serverId: string, workflowId: string) {
   });
 }
 
+/** The saved versions of a workflow, newest first. */
+export function useWorkflowVersions(serverId: string, workflowId: string) {
+  const queryScope = useQueryScope();
+  const { loadWorkflowVersions } = useMobileWorkspaceActions();
+  const { ready } = useWorkflowsAvailable(serverId);
+  return useQuery({
+    queryKey: queryKeys.workflow(queryScope, serverId, workflowId, "versions"),
+    enabled: ready && Boolean(workflowId),
+    retry: false,
+    queryFn: () => loadWorkflowVersions(workflowId, serverId),
+  });
+}
+
+/** The graph of one saved version. A version does not change, so the read stays. */
+export function useWorkflowVersionGraph(serverId: string, workflowId: string, versionId: string) {
+  const queryScope = useQueryScope();
+  const { loadWorkflowVersionGraph } = useMobileWorkspaceActions();
+  const { ready } = useWorkflowsAvailable(serverId);
+  return useQuery({
+    queryKey: queryKeys.workflowVersionGraph(queryScope, serverId, workflowId, versionId),
+    enabled: ready && Boolean(workflowId) && Boolean(versionId),
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+    queryFn: () => loadWorkflowVersionGraph({ workflowId, versionId }, serverId),
+  });
+}
+
+/** The host runs GitHub triggers and outputs (`workflows-github-v1`). */
+export function useWorkflowGitHubSupported(serverId: string) {
+  return useMobileWorkspaceSelector((current) => current.canUseWorkflowGitHub(serverId));
+}
+
+/**
+ * The events of the GitHub triggers of a workflow, newest first, and the items of their runs. Each
+ * `workflows-changed` reads them again, as a new event changes the workflow.
+ */
+export function useWorkflowGitHubHistory(serverId: string, workflowId: string, enabled = true) {
+  const queryScope = useQueryScope();
+  const { loadWorkflowGitHubHistory } = useMobileWorkspaceActions();
+  const { ready } = useWorkflowsAvailable(serverId);
+  const supported = useWorkflowGitHubSupported(serverId);
+  return useQuery({
+    queryKey: queryKeys.workflow(queryScope, serverId, workflowId, "github-history"),
+    enabled: enabled && ready && supported && Boolean(workflowId),
+    retry: false,
+    queryFn: () => loadWorkflowGitHubHistory(workflowId, serverId),
+  });
+}
+
+/** The repositories of the host's GitHub connection. The host gives them only to an owner or admin. */
+export function useWorkflowGitHubCatalog(serverId: string, enabled: boolean) {
+  const queryScope = useQueryScope();
+  const { loadWorkflowGitHubCatalog } = useMobileWorkspaceActions();
+  const { ready } = useWorkflowsAvailable(serverId);
+  const supported = useWorkflowGitHubSupported(serverId);
+  return useQuery({
+    queryKey: queryKeys.workflowGitHubCatalog(queryScope, serverId),
+    enabled: enabled && ready && supported,
+    retry: false,
+    queryFn: () => loadWorkflowGitHubCatalog(serverId),
+  });
+}
+
+/** The labels and people of one repository, for an owner or admin. */
+export function useWorkflowGitHubOptions(serverId: string, repository: string, enabled: boolean) {
+  const queryScope = useQueryScope();
+  const { loadWorkflowGitHubOptions } = useMobileWorkspaceActions();
+  const { ready } = useWorkflowsAvailable(serverId);
+  const supported = useWorkflowGitHubSupported(serverId);
+  return useQuery({
+    queryKey: queryKeys.workflowGitHubOptions(queryScope, serverId, repository),
+    enabled: enabled && ready && supported && Boolean(repository),
+    retry: false,
+    queryFn: () => loadWorkflowGitHubOptions(repository, serverId),
+  });
+}
+
 /**
  * One run: from the newest runs when it is there, else its own read. Without `runId`, the newest run,
  * as the drawer opens it from a workflow whose last run needs the person.

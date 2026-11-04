@@ -21,6 +21,10 @@ import {
   type TelegramCallParams,
   type TelegramCallResult,
 } from "@openbot/contracts/signal-protocol/telegram-route";
+import {
+  STANDARD_WEBHOOKS_FORMAT,
+  type WebhookSignatureFormat,
+} from "@openbot/contracts/signal-protocol/webhook-route";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Context, Deferred, Effect, Exit, Layer, ManagedRuntime, Option, Result, Scope, Semaphore } from "effect";
 import WebSocket from "ws";
@@ -141,6 +145,8 @@ export interface WebhookIngressDelivery {
   timestamp: string;
   signature: string;
   body: Uint8Array;
+  /** Absent for an `X-OpenBot-Signature` request. */
+  format?: WebhookSignatureFormat;
 }
 
 interface WebhookIngressAnswer {
@@ -542,6 +548,7 @@ export class SignalIngress implements MessagingIngress {
         token: bootstrap.ticket,
         ...routes,
         ...(queueKey ? { queueKey: queueKey.publicKey } : {}),
+        webhookFormats: [STANDARD_WEBHOOKS_FORMAT],
       };
       socket.send(JSON.stringify(hello));
     });
@@ -725,6 +732,7 @@ export class SignalIngress implements MessagingIngress {
             timestamp: message.timestamp,
             signature: message.signature,
             body: Buffer.from(message.bodyBase64, "base64"),
+            ...(message.format ? { format: message.format } : {}),
           }).pipe(Effect.catch(() => Effect.succeed<WebhookIngressAnswer>({ status: 503 })))
         : { status: 503 as const };
       if (socket.readyState !== WebSocket.OPEN) return;

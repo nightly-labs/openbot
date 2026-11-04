@@ -209,6 +209,16 @@ export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSn
         providers.kimi === undefined
           ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
           : decodeProviderRuntimeStatus(providers.kimi),
+      // A host before Devin sends no Devin row; this client cannot download Devin there.
+      devin:
+        providers.devin === undefined
+          ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
+          : decodeProviderRuntimeStatus(providers.devin),
+      // A host before GitHub Copilot sends no Copilot row; this client cannot download Copilot there.
+      copilot:
+        providers.copilot === undefined
+          ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
+          : decodeProviderRuntimeStatus(providers.copilot),
     },
     toolRuntimes: { bun: decodeProviderRuntimeStatus(toolRuntimes.bun) },
   };

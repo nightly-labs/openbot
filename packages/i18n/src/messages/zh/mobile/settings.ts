@@ -7,6 +7,11 @@ export const messages = {
   "mobile.settings.language.row": "应用语言",
   "mobile.settings.language.system": "跟随系统",
   "mobile.settings.language.footer": "“跟随系统”会使用手机设置中的首选语言。尚未翻译的文案将以英文显示。",
+  "mobile.settings.language.restartTitle": "重启 OpenBot？",
+  "mobile.settings.language.restartBody":
+    "该语言的阅读方向相反。OpenBot 下次启动时，界面会切换方向。如果重启后界面仍不正常，请在应用切换器中关闭 OpenBot，然后重新打开。",
+  "mobile.settings.language.restartNow": "立即重启",
+  "mobile.settings.language.restartFailed": "无法重启 OpenBot。下次打开 OpenBot 时，界面会切换方向。",
   "mobile.settings.dictation.language": "听写语言",
   "mobile.settings.about.development": "开发",
   "mobile.settings.about.openFailed": "无法打开该链接，请重试。",
@@ -67,7 +72,8 @@ export const messages = {
     "关闭“动画”可减少整个应用的动态效果。当手机设置中开启“减弱动态效果”时，应用也会减少动效，下面的动画选项将保持关闭。",
   "mobile.settings.animations.all": "动画",
   "mobile.settings.animations.agentFaces": "助手表情动画",
-  "mobile.settings.animations.agentFacesFooter": "助手工作时和休息时，头像上的表情会动。关闭该选项后表情保持静止。",
+  "mobile.settings.animations.agentFacesFooter":
+    "助手工作时和休息时，头像上的表情会动。关闭该选项后表情保持静止，欢迎页和空白主页上的角色也不再漂浮。",
   "mobile.settings.animations.composerResize": "紧凑输入框",
   "mobile.settings.animations.composerResizeFooter":
     "键盘收起时输入框变成一条小工具栏。关闭该选项后输入框保持完整高度。",

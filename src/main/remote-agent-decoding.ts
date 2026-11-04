@@ -6,6 +6,7 @@ import {
   decodeInstalledSkills,
   decodeProviderUsageResetOutcome,
   decodeProviderUsageResets,
+  type HostDefaultProvider,
   type HostProviderAccounts,
   isAgentHostSettings,
   isAgentNotificationLevelsSnapshot,
@@ -42,14 +43,18 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   isAccountUsage,
+  isAgentColors,
   isAgentExclusionChange,
   isAgentFolderBrowse,
   isAgentFolderChange,
   isAgentFolderList,
   isAgentInstructionsFile,
   isAgentMemory,
+  isAgentModel,
+  isAgentProvider,
   isAgentStatus,
   isAttachmentSummary,
+  isChatColors,
   isClientAgentModelOption,
   isClientAgentSummary,
   isQueuedMessageReceipt,
@@ -65,6 +70,8 @@ import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contrac
 import { isAgentThreadBranchLinks } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
 
 export const decodeAgentHostSettingsFromHost = guardedDecoder(isAgentHostSettings, "agent host settings response");
+export const decodeRemoteAgentColors = guardedDecoder(isAgentColors, "agent colors response");
+export const decodeRemoteChatColors = guardedDecoder(isChatColors, "chat colors response");
 export const decodeHiddenAgentsFromHost = guardedDecoder(isHiddenAgentsSnapshot, "hidden agents response");
 export const decodeSidebarPinsFromHost = guardedDecoder(isSidebarPinsSnapshot, "pinned chats response");
 export const decodeAgentNotificationLevelsFromHost = guardedDecoder(
@@ -190,6 +197,18 @@ export function decodeAgentStatusFromHost(value: unknown): AgentStatus {
 /** The `provider-accounts-v1` list, as the web client also reads it: an unknown provider is left out. */
 export function decodeHostProviderAccountsFromHost(value: unknown): HostProviderAccounts {
   return decodeHostProviderAccounts(value);
+}
+
+/**
+ * The `provider-default-v1` snapshot. A newer host can name a provider that this build does not know,
+ * which reads as none, and its model with it.
+ */
+export function decodeHostDefaultProviderFromHost(value: unknown): HostDefaultProvider {
+  const { provider, model } = decodeRecord(value, "default provider");
+  if (provider !== null && !isString(provider)) throw new Error("Invalid default provider.");
+  if (!isAgentProvider(provider)) return { preferredProvider: null, preferredModel: null };
+  if (model !== null && !isAgentModel(model)) throw new Error("Invalid default model.");
+  return { preferredProvider: provider, preferredModel: model };
 }
 
 /** The `provider-usage-reset-v1` list: an unknown provider is left out. */

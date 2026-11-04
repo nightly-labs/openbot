@@ -55,6 +55,29 @@ const geminiSignedInAgentStatus: AgentStatus = {
   ),
 };
 
+/** Every plan provider's CLI is on the computer, and the user signed in to each one. */
+const everyProviderSignedInAgentStatus: AgentStatus = {
+  ...noProvidersConnectedAgentStatus,
+  providers: (
+    [
+      "codex",
+      "claude",
+      "grok",
+      "antigravity",
+      "cursor",
+      "cline",
+      "kimi",
+      "pi",
+      "muse",
+      "inception",
+      "deepseek",
+      "openrouter",
+      "hermes",
+      "opencode",
+    ] as const
+  ).map((id) => ({ id, state: "available" as const, version: "1.0.0", email: "ada@example.com", message: null })),
+};
+
 /**
  * The plan step as first run shows it after "Use your … plan". The flow itself opens on the first
  * question, so these stories show the step alone.
@@ -334,7 +357,7 @@ export const LazyProviderDownloads: Story = {
 };
 
 /**
- * A new computer with no saved endpoint. The list shows ChatGPT, Claude and Grok. Gemini, OpenCode
+ * A new computer with no saved endpoint. The list shows ChatGPT, Claude and Gemini. Grok, OpenCode
  * and the custom provider are in "More providers".
  */
 export const NewComputer: Story = {
@@ -361,4 +384,22 @@ export const LazyProviderDownloadsWithFailure: Story = {
     agentStatus: lazyProviderAgentStatus,
   },
   render: (storyArgs) => <LazyProviderDownloadsPlanStep args={storyArgs} failGrokOnce />,
+};
+
+/**
+ * The user signed in to every provider. The list still has three plan rows, ChatGPT, Claude and Gemini,
+ * and the free row. The other providers are in "More providers".
+ */
+export const EveryProviderSignedIn: Story = {
+  render: () => (
+    <MockedPlanStep
+      args={{
+        ...args,
+        agentStatus: everyProviderSignedInAgentStatus,
+        customProviders: [],
+        connection: createFakeConnection({ browser: fn(), alternative: [] }),
+        onRefreshProviders: fn(),
+      }}
+    />
+  ),
 };

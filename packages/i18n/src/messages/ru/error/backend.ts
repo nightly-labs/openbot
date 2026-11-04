@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "База данных OpenBot не прошла проверку целостности.",
   "error.backend.webhookRouteLimit": "На хосте может быть не более {limit} регулярных задач с вебхуком.",
   "error.backend.webhookSettingsInvalid": "Проверьте настройки вебхука и повторите попытку.",
+  "error.backend.webhookSenderSecretInvalid":
+    "Вставьте полный секрет подписи отправителя. В нём от 16 до 1024 символов и нет пробелов.",
   "error.backend.webhookRouteUnavailable":
     "Публичный маршрут вебхука не готов. Проверьте подключение хоста и повторите попытку.",
   "error.backend.browserViewRemoteOnly": "Просмотр браузера в реальном времени доступен только для удалённого хоста.",
@@ -55,6 +57,12 @@ export const messages = {
   "error.backend.sunshineNotReady": "Sunshine не стал готов.",
   "error.backend.sunshineNotReadyReason": "Sunshine не стал готов. {reason}",
   "error.backend.channelLeadModelUnavailable": "Модель ведущего канала недоступна.",
+  "error.backend.contextCompactionIneffective":
+    "Сжатие не уменьшает этот чат: после двух сжатий он всё ещё занимает {percent}% окна контекста модели, поэтому OpenBot перестаёт его сжимать. Большую часть окна занимают инструменты и инструкции. Отключите MCP-серверы или управление компьютером, которые не нужны этому агенту, или выберите модель с большим окном. Затем начните новый чат.",
+  "error.backend.providerRetrying":
+    "Провайдер не выполнил этот запрос {attempts} раза и пробует снова. Если агент не продолжит, остановите ход.",
+  "error.backend.providerRetryingLargeContext":
+    "Провайдер не выполнил этот запрос {attempts} раза и пробует снова. Этот чат занимает {percent}% окна контекста модели. Если агент не продолжит, остановите ход: тогда OpenBot сожмёт чат перед следующим сообщением.",
   "error.backend.sharedDataUnavailable": "Общие данные недоступны.",
   "error.backend.shuttingDown": "OpenBot завершает работу.",
   "error.backend.channelUnconfirmedStart":
@@ -105,8 +113,8 @@ export const messages = {
     "У вас {saved} из {limit} записей памяти. Чтобы освободить место, обновите одну запись по её memoryId объединённым текстом двух связанных записей и забудьте другую или забудьте запись, которая больше не верна. Затем повторите попытку.",
   "error.backend.agentMemoryLimitExceeded":
     "У вас {saved} записей памяти, а лимит — {limit}. Пользователь установил лимит ниже числа сохранённых записей. Не забывайте записи, чтобы освободить место. Сообщите пользователю, что эта запись не сохранена.",
-  "error.backend.channelHistoryLeadRequired": "Выберите ведущего канала, чтобы подготовить общую историю.",
   "error.backend.channelHistoryArriving": "Общее сообщение ещё приходит. Продолжите, когда оно придёт полностью.",
+  "error.backend.channelHistoryLeadRequired": "Выберите ведущего канала, чтобы подготовить общую историю.",
   "error.backend.channelHistoryInvalid": "Сводка истории некорректна. Продолжите, чтобы повторить попытку.",
   "error.backend.channelContextTooLong":
     "Это назначение превышает лимит общего контекста. Отправьте запрос короче или назначьте его заново.",
@@ -194,6 +202,10 @@ export const messages = {
   "error.backend.agentWaitRemoteUnsupported": "Открытые ожидания доступны только для агентов на этом компьютере.",
   "error.backend.markUnreadRemoteUnsupported":
     "Отметить сообщение непрочитанным можно только для агентов на этом компьютере.",
+  "error.backend.messageDeleteUnsupported": "Этот сервер не поддерживает удаление сообщений.",
+  "error.backend.messageDeleteNotFound": "Этого сообщения нет в чате.",
+  "error.backend.messageDeleteBusy": "Это сообщение входит в выполняемый ход. Удалите его, когда ход закончится.",
+  "error.backend.messageDeleteForbidden": "Вы можете удалять только отправленные вами сообщения.",
   "error.backend.routineFlowHandoffFailed": "Регулярной задаче не удалось передать работу этому агенту.",
   "error.backend.mcpServerLimit": "OpenBot хранит не более {limit} серверов MCP.",
   "error.backend.mcpServerNameTaken": "Сервер MCP с именем {name} уже существует.",
@@ -346,8 +358,8 @@ export const messages = {
   "error.backend.taskToolInvalid": "Дайте задаче название не длиннее 120 символов и описание того, что нужно сделать.",
   "error.backend.taskOwnChatOnly":
     "Задачу можно начать только из своего чата. Канал, диалог в мессенджере или другая задача не может её начать.",
-  "error.backend.taskOpenLimit":
-    "У этого агента уже открыто задач: {count}. Дождитесь, пока пользователь закроет одну из них, прежде чем начинать новую.",
+  "error.backend.taskUnfinishedLimit":
+    "У этого агента уже есть незавершённые задачи: {count}. Начните новую задачу, когда одна из них завершится.",
   "error.backend.taskOpenLimitReached":
     "У этого агента открыто задач: {count}. Закройте задачу, затем начните или откройте другую.",
   "error.backend.taskRemoteUnsupported": "Задачи доступны только для агентов на этом компьютере.",

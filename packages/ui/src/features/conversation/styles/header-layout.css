@@ -5,7 +5,8 @@
   align-items: center;
   justify-content: space-between;
   border-bottom: 0;
-  padding: 0 12px 0 8px;
+  padding-block: 0;
+  padding-inline: 8px 12px;
   background: transparent;
 }
 
@@ -20,7 +21,7 @@
   position: absolute;
   z-index: 13;
   top: 19px;
-  right: 16px;
+  inset-inline-end: 16px;
   display: flex;
   width: min(308px, calc(100% - 32px));
   height: 34px;
@@ -36,7 +37,7 @@
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
   flex: 0 0 auto;
-  margin-left: 11px;
+  margin-inline-start: 11px;
   stroke-width: var(--openbot-icon-stroke);
 }
 
@@ -93,7 +94,7 @@
 }
 
 .chat-search .chat-search-close {
-  margin-right: 3px;
+  margin-inline-end: 3px;
 }
 
 ::highlight(openbot-chat-search-results) {
@@ -113,12 +114,12 @@
   position: absolute;
   z-index: 14;
   top: 0;
-  right: 0;
+  inset-inline-end: 0;
   bottom: 0;
   display: flex;
   width: var(--browser-panel-width, 380px);
   flex-direction: column;
-  border-left: 1px solid var(--openbot-border);
+  border-inline-start: 1px solid var(--openbot-border);
   background: var(--openbot-bg-canvas);
   color: var(--openbot-text-primary);
   transition:

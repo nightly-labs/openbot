@@ -23,7 +23,9 @@ export function ThreadTabGhost(props: { from: ThreadTabRow }) {
                 <ThreadTabIcon status={carry().thread.status} />
               </span>
             </span>
-            <span class="side-panel-tab-label">{carry().thread.title}</span>
+            <span class="side-panel-tab-label" dir="auto">
+              {carry().thread.title}
+            </span>
           </div>
         </Portal>
       )}

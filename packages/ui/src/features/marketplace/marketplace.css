@@ -32,7 +32,8 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
   gap: var(--openbot-space-3);
   grid-column: 1 / -1;
   min-height: 48px;
-  padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-2) var(--marketplace-inset);
+  padding-block: var(--openbot-space-2);
+  padding-inline: var(--marketplace-inset) var(--openbot-space-2);
   border-bottom: 1px solid var(--openbot-border);
 }
 
@@ -49,7 +50,7 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
   gap: var(--openbot-space-1);
   overflow-y: auto;
   padding: var(--openbot-space-4) var(--openbot-space-3) var(--openbot-space-3);
-  border-right: 1px solid var(--openbot-border);
+  border-inline-end: 1px solid var(--openbot-border);
 }
 
 .marketplace-nav-title {
@@ -168,7 +169,8 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
   width: fit-content;
   max-width: calc(100% - 32px);
   margin: 0 auto var(--openbot-space-4);
-  padding: var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-3);
+  padding-block: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-3) var(--openbot-space-1);
   border: 1px solid var(--openbot-danger);
   border-radius: var(--openbot-radius-md);
   background: var(--openbot-bg-control);
@@ -245,6 +247,12 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
   color: var(--openbot-text-muted);
+}
+
+/* Right to left, the arrow points the other way. */
+.marketplace-crumb-separator:dir(rtl),
+.marketplace-skill-group-head .ui-button > svg[class~="lucide-chevron-right"]:dir(rtl) {
+  transform: scaleX(-1);
 }
 
 /* A title takes focus when its view opens. The focus is for screen readers, not a control. */
@@ -1197,6 +1205,23 @@ html:active-view-transition-type(marketplace-back)::view-transition-new(marketpl
   animation: marketplace-skill-page-in var(--openbot-duration-overlay) var(--openbot-ease-out) both;
 }
 
+/* A right-to-left page steps the other way. */
+html:dir(rtl):active-view-transition-type(marketplace-forward)::view-transition-old(marketplace-page) {
+  --marketplace-skill-to: var(--openbot-space-2);
+}
+
+html:dir(rtl):active-view-transition-type(marketplace-forward)::view-transition-new(marketplace-page) {
+  --marketplace-skill-from: calc(var(--openbot-space-2) * -1);
+}
+
+html:dir(rtl):active-view-transition-type(marketplace-back)::view-transition-old(marketplace-page) {
+  --marketplace-skill-to: calc(var(--openbot-space-2) * -1);
+}
+
+html:dir(rtl):active-view-transition-type(marketplace-back)::view-transition-new(marketplace-page) {
+  --marketplace-skill-from: var(--openbot-space-2);
+}
+
 /* Another kind in the side panel is a new list, not a step: it rises a little into place. */
 html:active-view-transition-type(marketplace-tab)::view-transition-old(marketplace-page) {
   animation: marketplace-skill-blur-out var(--openbot-duration-normal) var(--openbot-ease-out) both;
@@ -1293,7 +1318,7 @@ html:active-view-transition-type(marketplace-swap)::view-transition-new(marketpl
     grid-row: 2;
     overflow-x: auto;
     padding: var(--openbot-space-2) var(--openbot-space-3);
-    border-right: 0;
+    border-inline-end: 0;
     border-bottom: 1px solid var(--openbot-border);
   }
 
@@ -1346,4 +1371,139 @@ html:active-view-transition-type(marketplace-swap)::view-transition-new(marketpl
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
   flex: none;
+}
+
+/* The agent update dialog: the skills with local changes, each with a Replace box. */
+.marketplace-agent-update-frame {
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-control);
+  overflow: hidden;
+}
+
+.ui-confirm-dialog-body .marketplace-agent-update-list {
+  --marketplace-agent-update-fade-top: 0px;
+  --marketplace-agent-update-fade-bottom: 0px;
+  display: flex;
+  max-height: calc(var(--openbot-space-8) * 7);
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  flex-direction: column;
+  list-style: none;
+  scrollbar-width: none;
+  mask-image: linear-gradient(
+    to bottom,
+    var(--openbot-transparent),
+    var(--openbot-text-primary) var(--marketplace-agent-update-fade-top),
+    var(--openbot-text-primary) calc(100% - var(--marketplace-agent-update-fade-bottom)),
+    var(--openbot-transparent)
+  );
+}
+
+/* No scroll bar: the fades show that more rows are above or below. */
+.marketplace-agent-update-list::-webkit-scrollbar {
+  display: none;
+}
+
+.marketplace-agent-update-list.scroll-fade-top {
+  --marketplace-agent-update-fade-top: calc(var(--openbot-space-1) * 6);
+}
+
+.marketplace-agent-update-list.scroll-fade-bottom {
+  --marketplace-agent-update-fade-bottom: calc(var(--openbot-space-1) * 6);
+}
+
+.marketplace-agent-update-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+}
+
+.marketplace-agent-update-row + .marketplace-agent-update-row {
+  border-top: 1px solid var(--openbot-border);
+}
+
+.marketplace-agent-update-text {
+  display: grid;
+  min-width: 0;
+}
+
+.marketplace-agent-update-name {
+  overflow: hidden;
+  color: var(--openbot-text-secondary);
+  font-weight: var(--openbot-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marketplace-agent-update-state {
+  color: var(--openbot-text-dim);
+  font-size: var(--openbot-text-sm);
+}
+
+.marketplace-agent-update-row[data-replace] .marketplace-agent-update-state {
+  color: var(--openbot-warning-text);
+}
+
+/* Keep or Replace for one skill: the look of the window's sliding tabs, as a radio group. */
+.marketplace-agent-update-choice {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 3px;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-tabs-bar-bg);
+  box-shadow: inset 0 0 0 1px var(--openbot-border);
+  padding: 3px;
+}
+
+.marketplace-agent-update-option {
+  display: grid;
+}
+
+.marketplace-agent-update-option-label {
+  display: inline-flex;
+  height: var(--openbot-control-sm);
+  align-items: center;
+  border-radius: var(--openbot-radius-sm);
+  padding: 0 var(--openbot-space-3);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--openbot-duration-fast) ease,
+    color var(--openbot-duration-fast) ease;
+}
+
+.marketplace-agent-update-option-label:hover,
+.marketplace-agent-update-option[data-checked] .marketplace-agent-update-option-label {
+  color: var(--openbot-text-primary);
+}
+
+.marketplace-agent-update-option[data-checked] .marketplace-agent-update-option-label {
+  background: var(--openbot-tabs-pill-bg);
+}
+
+.marketplace-agent-update-option:has(input:focus-visible) .marketplace-agent-update-option-label {
+  box-shadow: var(--openbot-focus-ring);
+}
+
+/* Replace loses the user's files, so the chosen Replace wears the warning color. */
+.marketplace-agent-update-option[data-choice="replace"][data-checked] .marketplace-agent-update-option-label {
+  color: var(--openbot-warning-text);
+}
+
+.marketplace-agent-update-others {
+  margin: var(--openbot-space-2) 0 0;
+  color: var(--openbot-text-dim);
+  font-size: var(--openbot-text-sm);
 }

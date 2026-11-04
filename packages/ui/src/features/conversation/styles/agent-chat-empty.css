@@ -53,7 +53,7 @@
   text-wrap: balance;
 }
 
-/* The one handwritten word. It writes itself once, from left to right. The brand has no hand
+/* The one handwritten word. It writes itself once, from the start side. The brand has no hand
    font, so the system ones stand in. */
 .agent-chat-empty-hand {
   display: inline-block;
@@ -71,6 +71,11 @@
   to {
     clip-path: inset(-0.4em -0.2em -0.4em -0.2em);
   }
+}
+
+/* In right-to-left text, the word writes itself from right to left. */
+:dir(rtl) .agent-chat-empty-hand {
+  clip-path: inset(-0.4em -0.2em -0.4em 100%);
 }
 
 /* The faint turn, in a column of chat width. Its rows are the chat's own. */

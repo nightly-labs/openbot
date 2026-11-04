@@ -28,6 +28,8 @@ export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSn
       kimi: decodeProviderRuntimeStatus(providers.kimi),
       pi: decodeProviderRuntimeStatus(providers.pi),
       muse: decodeProviderRuntimeStatus(providers.muse),
+      devin: decodeProviderRuntimeStatus(providers.devin),
+      copilot: decodeProviderRuntimeStatus(providers.copilot),
     },
     toolRuntimes: { bun: decodeProviderRuntimeStatus(toolRuntimes.bun) },
   };

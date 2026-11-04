@@ -26,4 +26,10 @@ export const messages = {
   "error.voice.speech.timedOut": "朗读回复超时。",
   "error.voice.speech.failed": "OpenBot 无法朗读该回复。",
   "error.voice.recordingNotKept": "OpenBot 无法保留该录音。",
+  "error.voice.live.codexOnly": "实时语音仅适用于 Codex 智能体。",
+  "error.voice.live.timedOut": "Codex 实时语音未能及时启动。请重试。",
+  "error.voice.live.failed": "实时语音已停止：{reason}",
+  "error.voice.live.disconnected": "实时语音已断开。",
+  "error.voice.live.signIn": "请用 ChatGPT 账号登录 Codex 以使用实时语音。",
+  "error.voice.live.off": "Codex 实时语音已关闭。请在 设置 → 语音 中打开。",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1,5 +1,5 @@
+import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { AvatarHue } from "@openbot/contracts/ipc";
 import * as Crypto from "expo-crypto";
 import { router } from "expo-router";
 import type { NativeStackNavigationProp } from "expo-router/native-stack";
@@ -12,11 +12,10 @@ import { KeyboardAvoidingView, KeyboardController } from "react-native-keyboard-
 import Animated, { useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCSSVariable } from "uniwind";
-
+import type { AgentColorValue } from "@/features/agents/components/agent-appearance-picker";
 import type { WelcomeHandOff } from "@/features/agents/components/empty-agents-scene";
 import { InstructionsLimit, instructionsTooLong } from "@/features/agents/components/instructions-limit";
 import { agentInitialMessage } from "@/features/agents/model/agent-initial-message";
-import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { AgentStep } from "@/features/onboarding/components/agent-step";
@@ -204,7 +203,7 @@ export function OnboardingFlow({
   const [task, setTask] = useState("");
   // An agent from scratch starts with a new look and the automatic colour, as in the add-agent sheet.
   const [customSeed, setCustomSeed] = useState(() => `mobile:${Crypto.randomUUID().replaceAll("-", "")}`);
-  const [customHue, setCustomHue] = useState<AvatarHue | null>(null);
+  const [customColor, setCustomColor] = useState<AgentColorValue>({ hue: null, color: null });
   const [customDescription, setCustomDescription] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -257,12 +256,20 @@ export function OnboardingFlow({
     ? {
         seed: role.avatarSeed,
         hue: role.avatarHue,
+        color: null,
         description: t(role.description),
         roleTitle: t(role.title),
         ideas: role.ideas,
       }
-    : { seed: customSeed, hue: customHue, description: customDescription, roleTitle: null, ideas: CUSTOM_AGENT_IDEAS };
-  const draftColor = getBloubAvatarColor(draft.seed, draft.hue);
+    : {
+        seed: customSeed,
+        hue: customColor.hue,
+        color: customColor.color,
+        description: customDescription,
+        roleTitle: null,
+        ideas: CUSTOM_AGENT_IDEAS,
+      };
+  const draftColor = avatarHeadColor(draft.seed, draft.hue, draft.color);
   // Before there is an agent colour, and for an agent made from scratch in the picker, the theme's
   // action colour (white in dark mode, black in light mode) stands in for it.
   const action = String(useCSSVariable("--openbot-action") ?? "#f0f0f0");
@@ -422,6 +429,7 @@ export function OnboardingFlow({
         initialMessage: agentInitialMessage(draft.description, firstTask),
         avatarSeed: draft.seed,
         avatarHue: draft.hue,
+        avatarColor: draft.color,
       });
       setCreated({ agentId, withTask: firstTask.trim().length > 0 });
       go("ready", 1);
@@ -519,10 +527,11 @@ export function OnboardingFlow({
       <LookStep
         motion={motion}
         seed={customSeed}
-        hue={customHue}
+        hue={customColor.hue}
+        color={customColor.color}
         drag={heroDrag}
         onSeedChange={setCustomSeed}
-        onHueChange={setCustomHue}
+        onColorChange={setCustomColor}
         onPulse={() => setPulse((value) => value + 1)}
       />
     ) : step === "name" ? (
@@ -662,6 +671,7 @@ export function OnboardingFlow({
           <OnboardingHero
             seed={draft.seed}
             hue={draft.hue}
+            color={draft.color}
             mood={heroMood}
             slot={heroSlot}
             origin={heroOrigin}

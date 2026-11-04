@@ -15,6 +15,10 @@ import {
   Workflow,
   X,
 } from "@openbot/ui";
+import {
+  AttachmentReferenceVisual,
+  attachmentReferenceTone,
+} from "@openbot/ui/features/conversation/AttachmentReference";
 import { ComputerIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import type { ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
 import { useText } from "@openbot/ui/text";
@@ -28,6 +32,16 @@ import { carriedThreadTab, setCarriedThreadTab, swallowNextClick } from "./threa
 const DRAG_START = 4;
 /** The prefix of a thread tab's value, so a thread id cannot be taken for a pane. */
 const THREAD_VALUE = "thread:";
+/** The prefix of a file tab's value. */
+const FILE_VALUE = "file:";
+
+/**
+ * The value of a file tab. Kobalte finds the selected tab with an unescaped `[data-key="…"]`
+ * selector, and a path can hold a quote, so the key is encoded.
+ */
+function fileValue(key: string): string {
+  return `${FILE_VALUE}${encodeURIComponent(key)}`;
+}
 
 /**
  * A pane of the side panel. Each open pane has a tab at the top of the panel. A side question opens
@@ -115,6 +129,26 @@ export interface SidePanelHeaderProps {
   onCollapse: () => void;
   /** The threads of the agent that show beside the chat. Missing when the chat has no threads. */
   threads?: SidePanelThreads | undefined;
+  /** The open files. Missing when the chat cannot open files. */
+  files?: SidePanelFiles | undefined;
+}
+
+/** A file or folder with a tab in the side panel. */
+export interface SidePanelFileTab {
+  key: string;
+  name: string;
+  folder: boolean;
+}
+
+/** The file tabs of the side panel. They come after the thread tabs. */
+export interface SidePanelFiles {
+  items: readonly SidePanelFileTab[];
+  /** The file that the panel shows, or null while a pane or thread shows. */
+  selectedKey: string | null;
+  onSelect: (key: string) => void;
+  onClose: (key: string) => void;
+  /** Puts the file at `index` of the file tabs. */
+  onMove: (key: string, index: number) => void;
 }
 
 /** The thread tabs of the side panel. They come after the pane tabs. */
@@ -130,23 +164,44 @@ export interface SidePanelThreads {
   onToChat: (id: string) => void;
 }
 
-/** A thread tab that the pointer holds. */
-interface ThreadHold {
-  thread: ThreadItem;
+/**
+ * A thread or file tab that the pointer holds. A tab moves only among the tabs of its own kind. Only a
+ * thread tab has a place to go outside the panel, so `thread` is null for a file tab.
+ */
+interface TabHold {
+  group: TabGroup;
+  id: string;
+  thread: ThreadItem | null;
   pointerId: number;
   startX: number;
   startY: number;
   /** False until the pointer moves past `DRAG_START`. */
   moving: boolean;
-  /** The pointer is over the chat, so a drop moves the thread to the chat header. */
+  /**
+   * The pointer is over the chat. A drop there moves a thread to the chat header and leaves a file tab
+   * in its place.
+   */
   away: boolean;
-  /** The place of the tab in the thread tabs when the pointer lets it go. */
+  /** The place of the tab among the tabs of its kind when the pointer lets it go. */
   target: number;
+  /**
+   * The page reads right to left, so the chat is right of the panel. Read once, when the hold starts,
+   * from the header: the tab strip keeps the left-to-right order in every language.
+   */
+  rightToLeft: boolean;
 }
 
+/** The kinds of tab that drag, with the class and the data attribute that find them. */
+const TAB_GROUPS = {
+  thread: { selector: ":scope > .side-panel-thread-tab", id: (tab: HTMLElement) => tab.dataset.threadId },
+  file: { selector: ":scope > .side-panel-file-tab", id: (tab: HTMLElement) => tab.dataset.fileKey },
+} as const;
+type TabGroup = keyof typeof TAB_GROUPS;
+
 /**
- * The top row of the side panel: a tab for each open pane and each thread that shows beside the chat,
- * then Add and Maximize. The tab icon is also the close button of the tab; hover or focus shows its X.
+ * The top row of the side panel: a tab for each open pane, each thread that shows beside the chat and
+ * each open file, then Add and Maximize. A file tab shows the file-type badge of a file link. The tab
+ * icon is also the close button of the tab; hover or focus shows its X.
  * Add lists only the panes that are not open, and goes away when all of them are.
  *
  * The tabs are one tab stop. The arrow keys, Home and End select a tab; Delete closes it. The close
@@ -155,7 +210,7 @@ interface ThreadHold {
  *
  * A thread tab drags to a new place among the thread tabs, and to the chat, which opens the thread in
  * the chat header. While the pointer takes a thread tab of the chat header over the panel, the panel
- * shows where the drop puts it.
+ * shows where the drop puts it. A file tab drags to a new place among the file tabs.
  */
 export function SidePanelHeader(props: SidePanelHeaderProps) {
   const { t } = useText();
@@ -163,16 +218,23 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
   let tabList: HTMLDivElement | undefined;
   const closedPanes = () => props.available.filter((pane) => !props.panes.includes(pane));
   const threads = () => props.threads?.items ?? [];
-  const hasTabs = () => props.panes.length + threads().length > 0;
+  const files = () => props.files?.items ?? [];
+  const hasTabs = () => props.panes.length + threads().length + files().length > 0;
   const paneLabel = (pane: SidePanelPane) =>
     pane === "settings" && props.settingsLabel !== undefined ? props.settingsLabel : t(PANE_LABELS[pane]);
   const selectedValue = () => {
     const thread = props.threads?.selectedId;
     if (thread) return `${THREAD_VALUE}${thread}`;
+    const file = props.files?.selectedKey;
+    if (file) return fileValue(file);
     return props.selected ?? "__none";
   };
   /** The value of each tab, in tab order. */
-  const tabValues = () => [...props.panes, ...threads().map((thread) => `${THREAD_VALUE}${thread.id}`)];
+  const tabValues = () => [
+    ...props.panes,
+    ...threads().map((thread) => `${THREAD_VALUE}${thread.id}`),
+    ...files().map((file) => fileValue(file.key)),
+  ];
   /** Delete closes the tab. The closed tab leaves the list, so focus moves to the tab that takes its place. */
   const onTabKeyDown = (event: KeyboardEvent, value: string, close: () => void) => {
     if (event.key !== "Delete" && event.key !== "Backspace") return;
@@ -184,25 +246,43 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
     if (next) tabList?.querySelector<HTMLElement>(`[data-key="${CSS.escape(next)}"]`)?.focus();
   };
   const carriedHere = () => carriedThreadTab()?.from === "chat";
+  /**
+   * Focus from the arrow keys selects the tab. Focus from a pointer waits for the click, so a drag does
+   * not select the tab. Focus that comes back from another window has no related target and keeps the
+   * selected tab.
+   */
+  const keyboardFocus = (event: FocusEvent) =>
+    event.relatedTarget !== null &&
+    event.currentTarget instanceof Element &&
+    event.currentTarget.matches(":focus-visible");
 
   onSettled(() => {
     const element = tabList;
     if (!element) return;
-    let hold: ThreadHold | null = null;
-    const threadTabs = () => [...element.querySelectorAll<HTMLElement>(":scope > .side-panel-thread-tab")];
-    const tabOf = (id: string) => threadTabs().find((tab) => tab.dataset.threadId === id);
-    const clearShifts = () => {
-      for (const tab of threadTabs()) tab.style.transform = "";
+    let hold: TabHold | null = null;
+    const groupTabs = (group: TabGroup) => [...element.querySelectorAll<HTMLElement>(TAB_GROUPS[group].selector)];
+    const tabOf = (current: TabHold) =>
+      groupTabs(current.group).find((tab) => TAB_GROUPS[current.group].id(tab) === current.id);
+    const clearShifts = (group: TabGroup) => {
+      for (const tab of groupTabs(group)) tab.style.transform = "";
     };
-    /** The chat is left of the panel. A maximized panel covers the chat, so it has no chat to drop on. */
-    const overChat = (x: number) => !props.maximized && root !== undefined && x < root.getBoundingClientRect().left;
     /**
-     * Moves the held tab with the pointer, and the other thread tabs make room. A tab can be much
+     * The chat is at the inline start of the panel: left of it, or right of it right to left. A
+     * maximized panel covers the chat, so it has no chat to drop on.
+     */
+    const overChat = (x: number, rightToLeft: boolean) => {
+      if (props.maximized || root === undefined) return false;
+      const bounds = root.getBoundingClientRect();
+      return rightToLeft ? x > bounds.right : x < bounds.left;
+    };
+    /**
+     * Moves the held tab with the pointer, and the other tabs of its kind make room. A tab can be much
      * narrower than the held one, so the leading edge of the held tab, not its center, finds its place.
      */
-    const follow = (current: ThreadHold, x: number) => {
-      const items = threadTabs().map((tab) => ({ tab, left: tab.offsetLeft, width: tab.offsetWidth }));
-      const index = items.findIndex((item) => item.tab.dataset.threadId === current.thread.id);
+    const follow = (current: TabHold, x: number) => {
+      const tabId = TAB_GROUPS[current.group].id;
+      const items = groupTabs(current.group).map((tab) => ({ tab, left: tab.offsetLeft, width: tab.offsetWidth }));
+      const index = items.findIndex((item) => tabId(item.tab) === current.id);
       const self = items[index];
       const first = items[0];
       const last = items.at(-1);
@@ -223,15 +303,21 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
         item.tab.style.transform = shift === 0 ? "" : `translateX(${shift}px)`;
       });
     };
-    /** Puts the held tab in its new place. Each thread tab slides from where it shows now. */
-    const reorder = (current: ThreadHold, index: number) => {
-      const before = new Map(threadTabs().map((tab) => [tab, tab.getBoundingClientRect().left]));
+    /**
+     * Puts the held tab in its new place. Each tab of its kind slides from where it shows now. The move
+     * takes the focused tab out of the document for a moment, so the focus goes back to it.
+     */
+    const reorder = (current: TabHold, index: number) => {
+      const focused = element.contains(document.activeElement) ? document.activeElement : null;
+      const before = new Map(groupTabs(current.group).map((tab) => [tab, tab.getBoundingClientRect().left]));
       for (const tab of before.keys()) {
         tab.style.transition = "none";
         tab.style.transform = "";
       }
-      props.threads?.onMove(current.thread.id, index);
+      if (current.group === "thread") props.threads?.onMove(current.id, index);
+      else props.files?.onMove(current.id, index);
       flush();
+      if (focused instanceof HTMLElement && focused !== document.activeElement) focused.focus({ preventScroll: true });
       for (const [tab, left] of before) {
         const offset = left - tab.getBoundingClientRect().left;
         if (Math.abs(offset) > 0.5) tab.style.transform = `translateX(${offset}px)`;
@@ -251,14 +337,16 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
         current.moving = true;
         element.setAttribute("data-dragging", "");
       }
-      current.away = overChat(event.clientX);
-      // Over the chat, the tab goes back to its place, faded, and a copy follows the pointer.
-      tabOf(current.thread.id)?.setAttribute("data-dragged", current.away ? "away" : "");
+      current.away = overChat(event.clientX, current.rightToLeft);
+      // Over the chat, the tab goes back to its place. A thread tab fades, and a copy follows the pointer.
+      tabOf(current)?.setAttribute("data-dragged", current.away ? "away" : "");
       if (current.away) {
-        clearShifts();
-        setCarriedThreadTab({ thread: current.thread, from: "side", x: event.clientX, y: event.clientY });
+        clearShifts(current.group);
+        if (current.thread) {
+          setCarriedThreadTab({ thread: current.thread, from: "side", x: event.clientX, y: event.clientY });
+        }
       } else {
-        setCarriedThreadTab(null);
+        if (current.thread) setCarriedThreadTab(null);
         follow(current, event.clientX);
       }
     };
@@ -274,14 +362,14 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
       stop();
       if (!current.moving) return;
       element.removeAttribute("data-dragging");
-      tabOf(current.thread.id)?.removeAttribute("data-dragged");
-      setCarriedThreadTab(null);
+      tabOf(current)?.removeAttribute("data-dragged");
+      if (current.thread) setCarriedThreadTab(null);
       swallowNextClick();
       if (event.type === "pointercancel") {
-        clearShifts();
+        clearShifts(current.group);
       } else if (current.away) {
-        clearShifts();
-        props.threads?.onToChat(current.thread.id);
+        clearShifts(current.group);
+        if (current.thread) props.threads?.onToChat(current.id);
       } else {
         reorder(current, current.target);
       }
@@ -290,17 +378,25 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
       if (event.button !== 0 || !event.isPrimary || hold || !(event.target instanceof Element)) return;
       // The icon slot is the close button.
       if (event.target.closest(".side-panel-tab-close")) return;
-      const id = event.target.closest<HTMLElement>(".side-panel-thread-tab")?.dataset.threadId;
-      const thread = threads().find((item) => item.id === id);
-      if (!thread) return;
+      const threadId = event.target.closest<HTMLElement>(".side-panel-thread-tab")?.dataset.threadId;
+      const fileKey = event.target.closest<HTMLElement>(".side-panel-file-tab")?.dataset.fileKey;
+      const thread = threads().find((item) => item.id === threadId);
+      const file = files().find((item) => item.key === fileKey);
+      const held = thread
+        ? { group: "thread" as const, id: thread.id, thread }
+        : file
+          ? { group: "file" as const, id: file.key, thread: null }
+          : null;
+      if (!held) return;
       hold = {
-        thread,
+        ...held,
         pointerId: event.pointerId,
         startX: event.clientX,
         startY: event.clientY,
         moving: false,
         away: false,
         target: 0,
+        rightToLeft: root !== undefined && getComputedStyle(root).direction === "rtl",
       };
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", onEnd);
@@ -310,7 +406,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
     return () => {
       element.removeEventListener("pointerdown", onStart);
       stop();
-      if (hold?.moving) setCarriedThreadTab(null);
+      if (hold?.moving && hold.thread) setCarriedThreadTab(null);
     };
   });
 
@@ -321,7 +417,8 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
           <For each={props.panes}>
             {(pane) => {
               const label = () => paneLabel(pane);
-              const selected = () => props.threads?.selectedId == null && props.selected === pane;
+              const selected = () =>
+                props.threads?.selectedId == null && props.files?.selectedKey == null && props.selected === pane;
               return (
                 <div role="presentation" class="side-panel-tab no-drag" data-selected={selected() ? "true" : undefined}>
                   <Button
@@ -348,9 +445,8 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
                     // As in the browser panel, only the user selects a pane: while the tabs register,
                     // the controlled selection can be absent and suggest the first tab.
                     onClick={() => props.onSelect(pane)}
-                    // The arrow keys, Home and End move the focus. Focus that comes back from another
-                    // window has no related target and keeps the selected pane.
-                    onFocus={(event) => event.relatedTarget !== null && !selected() && props.onSelect(pane)}
+                    // The arrow keys, Home and End move the focus and select the pane.
+                    onFocus={(event) => keyboardFocus(event) && !selected() && props.onSelect(pane)}
                     onKeyDown={(event) => onTabKeyDown(event, pane, () => props.onClose(pane))}
                   >
                     <span class="side-panel-tab-label">{label()}</span>
@@ -399,11 +495,67 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
                     onAuxClick={(event: MouseEvent) => {
                       if (event.button === 1) close();
                     }}
-                    onFocus={(event) => event.relatedTarget !== null && !selected() && select()}
+                    onFocus={(event) => keyboardFocus(event) && !selected() && select()}
                     onKeyDown={(event) => onTabKeyDown(event, value(), close)}
                   >
                     <span class="side-panel-tab-label">{thread().title}</span>
                     <ThreadStatusText status={thread().status} />
+                  </Tabs.Trigger>
+                </div>
+              );
+            }}
+          </For>
+          <For each={files()} keyed={(file) => file.key}>
+            {(file) => {
+              const value = () => fileValue(file().key);
+              const selected = () => props.files?.selectedKey === file().key;
+              const select = () => props.files?.onSelect(file().key);
+              const close = () => props.files?.onClose(file().key);
+              return (
+                <div
+                  role="presentation"
+                  class="side-panel-tab side-panel-file-tab no-drag"
+                  data-file-key={file().key}
+                  data-selected={selected() ? "true" : undefined}
+                >
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    class="side-panel-tab-close"
+                    tabindex={-1}
+                    aria-hidden="true"
+                    title={t("conversation.sidePanel.closePane", { name: file().name })}
+                    onClick={close}
+                  >
+                    <span class="side-panel-tab-icon">
+                      <Show
+                        when={file().folder}
+                        fallback={
+                          <span class="side-panel-file-badge" data-file-tone={attachmentReferenceTone(file().name)}>
+                            <AttachmentReferenceVisual name={file().name} />
+                          </span>
+                        }
+                      >
+                        <Folder aria-hidden="true" />
+                      </Show>
+                    </span>
+                    <X class="side-panel-tab-x" aria-hidden="true" />
+                  </Button>
+                  <Tabs.Trigger
+                    as="button"
+                    type="button"
+                    value={value()}
+                    class={buttonVariants({ variant: "ghost", class: "side-panel-tab-select" })}
+                    aria-keyshortcuts="Delete"
+                    title={file().name}
+                    onClick={select}
+                    onAuxClick={(event: MouseEvent) => {
+                      if (event.button === 1) close();
+                    }}
+                    onFocus={(event) => keyboardFocus(event) && !selected() && select()}
+                    onKeyDown={(event) => onTabKeyDown(event, value(), close)}
+                  >
+                    <span class="side-panel-tab-label">{file().name}</span>
                   </Tabs.Trigger>
                 </div>
               );

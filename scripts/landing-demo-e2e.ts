@@ -2,6 +2,7 @@
 //   bun scripts/landing-demo-e2e.ts [--origin=http://127.0.0.1:3100] [--browser-executable=<path>]
 // 1. Starts the site's development server on a free port, or uses `--origin`.
 // 2. Opens `/` in Chrome in the Europe/Warsaw time zone and checks, in the iframe:
+//    - each view: no startup splash or loading screen shows when the demo appears.
 //    - desktop 1440 px: exactly the four agents, no foreign helper agent, no update card and no time
 //      zone toast; the visitor answers the channel question and the launch plan uses that answer;
 //      reactions, unread replies and a fuller context meter at the end; a click on each teammate
@@ -105,7 +106,10 @@ async function openDemo(
   await page.goto(`${origin}/`);
   await page.locator(".landing-app-preview").scrollIntoViewIfNeeded();
   await page.locator('.landing-app-preview[data-preview-state="shown"]').waitFor({ timeout: SCENE_TIMEOUT_MS });
-  return { page, app: page.frameLocator(IFRAME), errors };
+  const app = page.frameLocator(IFRAME);
+  // The demo opens on the workspace: no startup splash or loading screen covers it.
+  assert.equal(await app.locator(".app-loading").count(), 0, "A loading screen covers the shown demo.");
+  return { page, app, errors };
 }
 
 const contextMeter = (app: FrameLocator) => app.locator('[aria-label^="Context "]').first();

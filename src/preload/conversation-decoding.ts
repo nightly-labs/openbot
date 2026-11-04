@@ -9,6 +9,8 @@ import {
   type AgentTaskReadState,
   type AgentTasksSnapshot,
   type AgentWaitsSnapshot,
+  type AttachmentDownloadProgress,
+  type AttachmentImportProgress,
   type ConversationFileSearchPage,
   type ConversationMessage,
   type ConversationPage,
@@ -44,6 +46,26 @@ import {
   requiredString,
 } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+
+export function decodeAttachmentDownloadProgress(value: unknown): AttachmentDownloadProgress {
+  const progress = decodeRecord(value, "attachment download progress");
+  return {
+    serverId: requiredString(progress, "serverId"),
+    attachmentId: requiredString(progress, "attachmentId"),
+    received: requiredNumber(progress, "received"),
+    total: requiredNumber(progress, "total"),
+  };
+}
+
+export function decodeAttachmentImportProgress(value: unknown): AttachmentImportProgress {
+  const progress = decodeRecord(value, "attachment import progress");
+  return {
+    serverId: requiredString(progress, "serverId"),
+    requestId: requiredString(progress, "requestId"),
+    sent: requiredNumber(progress, "sent"),
+    total: requiredNumber(progress, "total"),
+  };
+}
 
 export function decodeFilePreview(value: unknown): FilePreview {
   const preview = decodeRecord(value, "file preview");

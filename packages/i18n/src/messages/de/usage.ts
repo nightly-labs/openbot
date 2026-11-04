@@ -76,4 +76,6 @@ export const messages = {
     "Dieser Host unterstützt keine Agentenstatistiken. Aktualisiere den Host, um diese Ansicht zu nutzen.",
   "usage.panel.loadFailed":
     "Die Nutzungsdaten konnten nicht geladen werden. Prüfe die Verbindung und den Datumsbereich.",
+  "usage.machine.label": "Maschinenauslastung. CPU: {cpu}, Arbeitsspeicher: {memory}",
+  "usage.machine.openStorage": "Speicher öffnen. Datenträger: {percent}, {detail}",
 } as const satisfies PartialTranslation<typeof source>;

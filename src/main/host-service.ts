@@ -42,6 +42,7 @@ import type {
 import {
   type AgentAccessLevel,
   conversationMessageSender,
+  isAvatarColor,
   type ServerAuditName,
   SIGNED_OUT_CHANNEL_MEMBER_ID,
 } from "@openbot/contracts/ipc";
@@ -137,7 +138,8 @@ interface HostServiceOptions {
   focusUse?: ForwardedApiOptions["focusUse"];
   appVersion: string;
   store: TeamStore;
-  agents: ForwardedApiOptions["agents"] & Pick<AgentService, "adoptConversationReads" | "branchTask" | "markTaskRead">;
+  agents: ForwardedApiOptions["agents"] &
+    Pick<AgentService, "adoptConversationReads" | "branchTask" | "markTaskRead" | "readTask">;
   agentsReady: NonNullable<ForwardedApiOptions["agentsReady"]>;
   skills: NonNullable<ForwardedApiOptions["skills"]>;
   sidebarLayout: NonNullable<ForwardedApiOptions["sidebarLayout"]>;
@@ -149,6 +151,11 @@ interface HostServiceOptions {
    * or writes them in the account directory.
    */
   localDevelopmentHost?: boolean;
+  /**
+   * A server on this computer: its owner is a password member that the desktop app logs in as, so a
+   * directory sync keeps the owner's row.
+   */
+  passwordOwner?: boolean;
   logDirectory?: string;
   removeLegacyRemoteDesktopCredential?: () => Effect.Effect<void, RemoteWorkflowError>;
   getSignedInUser: () => CentralAuthUser;
@@ -169,6 +176,7 @@ interface HostServiceOptions {
   createRemoteDesktopRuntime?: RemoteScreenGatewayCreateRuntime;
   getRemoteDesktopRuntimeCredentials?: () => Effect.Effect<{ username: string; password: string }, RemoteWorkflowError>;
   getRemoteDesktopDisplays?: () => RemoteDesktopDisplay[];
+  getRemoteDesktopDisplayScreenOrigin?: (displayId: string) => { x: number; y: number } | undefined;
   getRemoteDesktopIceServers?: () => Effect.Effect<RemoteDesktopIceServer[], RemoteWorkflowError>;
   /** Puts a remote desktop member's pasted text on this computer's clipboard. */
   writeRemoteDesktopClipboard?: (text: string) => void;
@@ -212,6 +220,8 @@ interface HostServiceOptions {
   pushNotificationStore?: PushNotificationStore;
   /** Whether the owner uses the desktop app on this computer now and sees the event there, so the owner's phone stays quiet. */
   hostComputerInUse?: (event: AgentEvent) => boolean;
+  /** How long after the member's last use of another app or computer a phone notifies. `DESKTOP_USE_MS` when not set. */
+  awayAfterMs?: number;
   verifyRemoteSessionTicket?: (ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>;
   endRemoteSession?: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
   remoteControlPlaneUrl?: string;
@@ -282,6 +292,8 @@ export class HostService extends EventEmitter<HostEvents> {
    * changes at the same time would compare the same `before` list.
    */
   readonly #memberWrites = Semaphore.makeUnsafe(1);
+  /** A server on this computer: one publish or unpublish at a time, in the order the desktop app asked. */
+  readonly #localPublish = Semaphore.makeUnsafe(1);
   #webRtcOnline = false;
   /**
    * The home Signal of the last start that got a ticket but did not reach Signal. The next start names
@@ -309,6 +321,7 @@ export class HostService extends EventEmitter<HostEvents> {
         options.getRemoteDesktopRuntimeCredentials ??
         (() => Effect.succeed({ username: "openbot", password: "development-runtime-not-for-release" })),
       ...(options.getRemoteDesktopDisplays ? { getDisplays: options.getRemoteDesktopDisplays } : {}),
+      getDisplayScreenOrigin: options.getRemoteDesktopDisplayScreenOrigin,
       getIceServers:
         options.getRemoteDesktopIceServers ??
         (() => Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.host.iceServersMissing")) }))),
@@ -406,6 +419,7 @@ export class HostService extends EventEmitter<HostEvents> {
               return member !== null && !member.disabled;
             },
             lastUseElsewhere: (memberId, sessionId) => this.#api.lastMemberUseElsewhere(memberId, sessionId),
+            ...(options.awayAfterMs === undefined ? {} : { awayAfterMs: options.awayAfterMs }),
             // The desktop app of this computer runs as the owner.
             atHostComputer: (memberId, event) =>
               memberId === options.store.getOwnerMemberId() && (options.hostComputerInUse?.(event) ?? false),
@@ -540,6 +554,7 @@ export class HostService extends EventEmitter<HostEvents> {
               this.#pushNotifications?.reconnected(sessionId);
             }
           },
+          unknownMemberConnected: (membershipId) => this.#dispatch(this.#learnConnectedMember(membershipId)),
           ...(options.verifyRemoteSessionTicket ? { verifyClientTicket: options.verifyRemoteSessionTicket } : {}),
           ...(options.privateNetwork ? { privateNetwork: options.privateNetwork } : {}),
         })
@@ -1051,6 +1066,59 @@ export class HostService extends EventEmitter<HostEvents> {
     (operation) => this.#provide(operation),
   ).bind(this);
 
+  /**
+   * A server on this computer, after the desktop app registered it for its account: devices meet it
+   * on Signal too. The Team API stays on loopback for the desktop app, and the status does not change,
+   * so the desktop app still reaches it there. The ticket comes with the machine token that the desktop
+   * app gave, so this process needs no account.
+   */
+  readonly publishLocalServer = Effect.fn("HostService.publishLocalServer")(
+    function* (this: HostService): Effect.fn.Return<void, RemoteWorkflowError> {
+      const gateway = this.#webrtcGateway;
+      const issueTicket = this.#options.issueRemoteHostTicket;
+      const identity = this.#options.store.getIdentity();
+      const apiPort = this.#api.port;
+      if (!gateway || !issueTicket || !identity || apiPort === null)
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.webRtcNotConfigured")) });
+      if (this.#webRtcOnline) {
+        // A Signal recovery that failed for good leaves the gateway down; the next publish starts it again.
+        if (this.#status.phase !== "error") return;
+        this.#webRtcOnline = false;
+        yield* gateway.stop();
+      }
+      const failedSignalUrl = this.#unreachedSignalUrl;
+      const bootstrap = yield* issueTicket(identity.serverId, failedSignalUrl === null ? {} : { failedSignalUrl });
+      yield* gateway
+        .start({
+          hostId: identity.serverId,
+          signalUrl: bootstrap.signalUrl,
+          ticket: bootstrap.ticket,
+          localApiPort: apiPort,
+        })
+        .pipe(
+          Effect.tapError(() =>
+            Effect.sync(() => {
+              this.#unreachedSignalUrl = bootstrap.signalUrl;
+            }),
+          ),
+        );
+      this.#unreachedSignalUrl = null;
+      this.#webRtcOnline = true;
+      if (this.#status.phase === "error") this.#setStatus({ phase: "online", apiOnline: true, message: null });
+    },
+    (operation) => this.#localPublish.withPermit(operation),
+  ).bind(this);
+
+  /** The desktop app signed out: devices no longer meet this server. The desktop app still reaches it on loopback. */
+  readonly unpublishLocalServer = Effect.fn("HostService.unpublishLocalServer")(
+    function* (this: HostService): Effect.fn.Return<void, RemoteWorkflowError> {
+      if (!this.#webRtcOnline) return;
+      this.#webRtcOnline = false;
+      yield* this.#webrtcGateway?.stop() ?? Effect.void;
+    },
+    (operation) => this.#localPublish.withPermit(operation),
+  ).bind(this);
+
   // Where this host's Team API listens on this machine, which is not what `#status.apiUrl` reports:
   // that is how a member reaches the host, and for a published one it is the Signal service.
   #localApiUrl(): string | null {
@@ -1158,6 +1226,7 @@ export class HostService extends EventEmitter<HostEvents> {
           email: member.email,
           name: member.name,
           avatarUrl: member.avatarUrl,
+          ...(isAvatarColor(member.chatColor) ? { chatColor: member.chatColor } : {}),
           role: member.role,
           createdAt: new Date(member.createdAt).toISOString(),
           disabled: member.status !== "active",
@@ -1197,6 +1266,11 @@ export class HostService extends EventEmitter<HostEvents> {
     return remoteDecode(() => this.#currentAgentReaderId()).pipe(
       Effect.flatMap((readerId) => this.#options.agents.readConversationFor(agentId, readerId)),
     );
+  }
+
+  /** The conversation of one side thread of a local agent. */
+  readAgentTask(agentId: string, taskId: string) {
+    return this.#options.agents.readTask(agentId, taskId);
   }
 
   readAgentConversationPage(agentId: string, anchor: ConversationPageAnchor = { type: "latest" }, limit = 50) {
@@ -1552,11 +1626,59 @@ export class HostService extends EventEmitter<HostEvents> {
     by?: MemberAuditActor,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
     const before = this.#options.store.listStoredMembers();
-    const closed = yield* this.#options.store.syncRemoteDirectory(hostId, members);
+    const closed = yield* this.#options.store.syncRemoteDirectory(hostId, members, {
+      keepOwner: this.#options.passwordOwner === true,
+    });
     yield* this.#auditMembers(hostId, before, by);
-    if (closed.length === 0) return;
     for (const sessionId of closed) yield* this.#closeLocalSession(sessionId);
-    this.#api.refreshPresence();
+    // The presence change also sends the new member chat colors to each connected peer.
+    if (closed.length > 0 || memberChatColorsChanged(before, this.#options.store.listStoredMembers())) {
+      this.#api.refreshPresence();
+    }
+  });
+
+  /**
+   * A server on this computer: the desktop app read the account directory after it changed a member.
+   * The sync closes the sessions that the directory no longer allows.
+   */
+  readonly applyAccountDirectory = Effect.fn("HostService.applyAccountDirectory")(
+    function* (this: HostService, members: RemoteDirectoryMember[]): Effect.fn.Return<void, RemoteWorkflowError> {
+      const hostId = this.#options.store.getIdentity()?.serverId;
+      if (!hostId) return;
+      yield* this.#syncRemoteDirectory(hostId, members);
+      this.#api.refreshPresence();
+    },
+    (operation) => this.#memberWrites.withPermit(operation),
+  ).bind(this);
+
+  /**
+   * A member who joined after this host read the account directory connects with no name here, so
+   * presence and the messages they write would show their account id. Read the directory once.
+   * A failed read only logs: the member stays connected, as before.
+   */
+  readonly #learnConnectedMember = Effect.fn("HostService.learnConnectedMember")(function* (
+    this: HostService,
+    membershipId: string,
+  ): Effect.fn.Return<void> {
+    const hostId = this.#options.store.getIdentity()?.serverId;
+    const listRemoteMembers = this.#options.listRemoteMembers;
+    if (!hostId || !listRemoteMembers || !this.#usesAccountDirectory()) return;
+    yield* this.#memberWrites
+      .withPermit(
+        Effect.gen({ self: this }, function* () {
+          // Another session of the same member can have read the directory while this one waited.
+          if (this.#options.store.getMember(membershipId)) return;
+          const members = yield* listRemoteMembers(hostId);
+          if (!this.#isActiveHost(hostId)) return;
+          yield* this.#syncRemoteDirectory(hostId, members);
+          this.#api.refreshPresence();
+        }),
+      )
+      .pipe(
+        Effect.catch((error) =>
+          Effect.sync(() => logger.warn("The account directory did not load for a new member.", toLogValue(error))),
+        ),
+      );
   });
 
   /**
@@ -1957,4 +2079,10 @@ function serverLogoUrl(version: string): string {
 function normalizeRemoteDesktopPlatform(platform: NodeJS.Platform): "darwin" | "win32" | "linux" {
   if (platform === "darwin" || platform === "win32") return platform;
   return "linux";
+}
+
+/** True when a directory sync changed the chat color of a member. */
+function memberChatColorsChanged(before: readonly TeamMemberSummary[], after: readonly TeamMemberSummary[]): boolean {
+  const previous = new Map(before.map((member) => [member.id, member.chatColor ?? null]));
+  return after.some((member) => (previous.get(member.id) ?? null) !== (member.chatColor ?? null));
 }

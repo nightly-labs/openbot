@@ -31,6 +31,8 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
     shape: {
       beforeSequence: z.number().int().min(0).optional(),
       attachmentId: z.string().optional(),
+      messageId: z.string().optional(),
+      offset: z.number().int().min(0).optional(),
     },
   },
   {
@@ -50,6 +52,11 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
     description:
       "Publish the requested task result once in the shared chat when answering an assigned or transferred task. End your turn without repeating it.",
     shape: { text: z.string().min(1).max(INPUT_LIMITS.messageText) },
+  },
+  {
+    name: "channel_cancel",
+    description: `Cancel a run that you own when a person asks to drop that work. Give the taskId of its request message or of a subtask: the whole run ends, with its running and queued subtasks. Messages stay. Not for the run of your current task. ${PERSON_ONLY}`,
+    shape: { taskId: z.string().min(1).max(INPUT_LIMITS.identifier) },
   },
   {
     name: "channel_remember",

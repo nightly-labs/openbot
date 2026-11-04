@@ -28,6 +28,8 @@ import {
   type TelegramCallResult,
 } from "./telegram-route";
 import {
+  STANDARD_WEBHOOK_SIGNATURE_PATTERN,
+  STANDARD_WEBHOOKS_FORMAT,
   WEBHOOK_DELIVERY_ID_PATTERN,
   WEBHOOK_ROUTE_ID_PATTERN,
   WEBHOOK_SIGNATURE_PATTERN,
@@ -119,7 +121,10 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
         retryReason: value.retryReason === null ? null : identifier(value.retryReason),
         bodyBase64: deliveryBody(value.bodyBase64, SLACK_DELIVERY_BODY_BYTES_LIMIT),
       };
-    case "webhook-delivery":
+    case "webhook-delivery": {
+      // Signal sends a format only to a host that named it, so an unknown one is a broken frame.
+      if (value.format !== undefined && value.format !== STANDARD_WEBHOOKS_FORMAT) invalid();
+      const standard = value.format === STANDARD_WEBHOOKS_FORMAT;
       return {
         type: kind,
         version,
@@ -127,9 +132,11 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
         routeId: matching(value.routeId, WEBHOOK_ROUTE_ID_PATTERN),
         timestamp: matching(value.timestamp, WEBHOOK_TIMESTAMP_PATTERN),
         deliveryId: matching(value.deliveryId, WEBHOOK_DELIVERY_ID_PATTERN),
-        signature: matching(value.signature, WEBHOOK_SIGNATURE_PATTERN),
+        signature: matching(value.signature, standard ? STANDARD_WEBHOOK_SIGNATURE_PATTERN : WEBHOOK_SIGNATURE_PATTERN),
         bodyBase64: deliveryBody(value.bodyBase64, WEBHOOK_DELIVERY_BODY_BYTES_LIMIT),
+        ...(standard ? { format: STANDARD_WEBHOOKS_FORMAT } : {}),
       };
+    }
     case "discord-session":
       return { type: kind, version, token: identifier(value.token), guilds: guildList(value.guilds) };
     case "webhook-ready":

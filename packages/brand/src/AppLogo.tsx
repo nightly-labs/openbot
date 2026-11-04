@@ -21,10 +21,15 @@ export interface AppLogoProps {
 const EYE_RANGE = { x: 2.4, y: 1.8 };
 /** A larger area gives the eyes more room: the pointer can be far from the logo. */
 const AREA_EYE_RANGE = { x: 9, y: 7 };
+/** The eyes close and open in 192 ms, once every 4.8 s. The first blink comes 44% into the first period. */
+const BLINK_PERIOD = 4_800;
+const BLINK_DURATION = 192;
+const FIRST_BLINK_DELAY = 2_112;
 
 export function AppLogo(props: AppLogoProps) {
   const [clickReaction, setClickReaction] = createSignal(false);
   const [easterEgg, setEasterEgg] = createSignal(false);
+  const [blinking, setBlinking] = createSignal(false);
   const className = () => ["app-logo", props.class].filter(Boolean).join(" ");
   const animation = () => props.animation ?? "none";
   let clickReactionTimer: number | undefined;
@@ -126,6 +131,32 @@ export function AppLogo(props: AppLogoProps) {
     },
   );
 
+  // A timer starts each blink, so the page draws frames only while the eyes move.
+  createEffect(
+    () => animation() === "blink",
+    (blinks) => {
+      if (!blinks) return;
+      let blinkEndTimer: number | undefined;
+      let blinkInterval: number | undefined;
+      const blink = () => {
+        // The reduced-motion setting can change while the logo shows.
+        if (shouldReduceMotion()) return;
+        setBlinking(true);
+        blinkEndTimer = window.setTimeout(() => setBlinking(false), BLINK_DURATION);
+      };
+      const firstBlinkTimer = window.setTimeout(() => {
+        blink();
+        blinkInterval = window.setInterval(blink, BLINK_PERIOD);
+      }, FIRST_BLINK_DELAY);
+      return () => {
+        window.clearTimeout(firstBlinkTimer);
+        window.clearInterval(blinkInterval);
+        window.clearTimeout(blinkEndTimer);
+        setBlinking(false);
+      };
+    },
+  );
+
   onCleanup(() => {
     globalThis.clearTimeout(clickReactionTimer);
     globalThis.clearTimeout(easterEggTimer);
@@ -136,6 +167,7 @@ export function AppLogo(props: AppLogoProps) {
       ref={(element) => (logoElement = element)}
       class={className()}
       data-animation={animation()}
+      data-blink={blinking() ? "" : undefined}
       data-click-reaction={clickReaction() ? "wink" : undefined}
       data-easter-egg={easterEgg() ? "party" : undefined}
       data-interactive={props.interactive ? "true" : undefined}

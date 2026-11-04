@@ -7,7 +7,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createStore, untrack } from "solid-js";
+import { createEffect, createMemo, createStore, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
 import { createScopeGuard } from "../../scope-lifetime";
@@ -53,6 +53,10 @@ export interface AgentTasksOptions {
   branchable: () => boolean;
   /** The server takes files in a side thread: this computer, or the `agent-thread-files-v1` routes. */
   filesAccepted: () => boolean;
+  /** The server takes a reply to a message of a side thread: this computer, or the `agent-thread-replies-v1` route. */
+  repliable: () => boolean;
+  /** The server deletes a message of a side thread: this computer, or the `message-delete-v1` routes. */
+  messageDeletable: () => boolean;
   /**
    * A change of this value reads the lists of the active agent and of each agent with a running thread
    * again, for example when the agent starts again.
@@ -67,7 +71,18 @@ export interface AgentTasksOptions {
  * server: a reply that arrives after that owner ends changes nothing.
  */
 export function createAgentTasks(options: AgentTasksOptions) {
-  const { port, activeAgentId, local, available, editable, readable, branchable, filesAccepted } = options;
+  const {
+    port,
+    activeAgentId,
+    local,
+    available,
+    editable,
+    readable,
+    branchable,
+    filesAccepted,
+    repliable,
+    messageDeletable,
+  } = options;
   const scopeIsCurrent = createScopeGuard();
   const [state, setState] = createStore<AgentTasksState>({ snapshots: {}, conversations: {} });
   const listRequests = new Map<string, number>();
@@ -180,11 +195,15 @@ export function createAgentTasks(options: AgentTasksOptions) {
       });
   }
 
+  // An effect runs again each time its key is computed, so the key is a memo. A reconnect gives the
+  // server's capabilities again, and a list read for that alone repeats the read of the runtime snapshot.
+  const listKey = createMemo(() => ({ agentId: activeAgentId(), reload: options.reloadKey(), shown: available() }), {
+    equals: (before, after) =>
+      before.agentId === after.agentId && before.reload === after.reload && before.shown === after.shown,
+  });
   createEffect(
     () => ({
-      agentId: activeAgentId(),
-      reload: options.reloadKey(),
-      shown: available(),
+      ...listKey(),
       // A running thread can end while the server is away, and the sidebar shows its agent as working.
       running: untrack(() =>
         Object.values(state.snapshots).flatMap((snapshot) =>
@@ -299,6 +318,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
     taskId: string,
     text: string,
     attachmentDraftIds: string[] = [],
+    replyToMessageId: string | null = null,
   ): Promise<boolean> {
     const receipt = await runAction(
       () =>
@@ -307,6 +327,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
           taskId,
           text,
           ...(attachmentDraftIds.length ? { attachmentDraftIds } : {}),
+          ...(replyToMessageId ? { replyToMessageId } : {}),
           clientMessageId: crypto.randomUUID(),
         }),
       "conversation.threads.error.send",
@@ -358,6 +379,24 @@ export function createAgentTasks(options: AgentTasksOptions) {
     return true;
   }
 
+  /** Whether the server deletes a message of a side thread. */
+  const canDeleteMessage = (): boolean => messageDeletable() && port().deleteTaskMessage !== undefined;
+
+  /**
+   * Deletes one message of a thread. The server sends the changed conversation, but the thread also
+   * removes the message at once. A failure throws to the dialog that asked.
+   */
+  async function deleteTaskMessage(agentId: string, taskId: string, messageId: string): Promise<void> {
+    const remove = port().deleteTaskMessage;
+    if (!remove || !messageDeletable()) throw new Error(currentText().t("error.team.messageDeleteUnsupported"));
+    await remove({ agentId, taskId, messageId });
+    if (!scopeIsCurrent()) return;
+    setState((current) => {
+      const conversation = current.conversations[taskId];
+      if (conversation) conversation.messages = conversation.messages.filter((message) => message.id !== messageId);
+    });
+  }
+
   /**
    * Moves the person's read mark of a side thread to the message that they see. The member's other
    * devices read the mark, so the phone no longer shows the thread as unread. A failure keeps the
@@ -374,14 +413,18 @@ export function createAgentTasks(options: AgentTasksOptions) {
   }
 
   /**
-   * Reads the active agent's list and each loaded conversation again, after the server was away. The
-   * lists come first: a thread that another device deleted meanwhile is not read again.
+   * Reads the lists of the active agent, of each agent with a running thread and of each loaded
+   * conversation again, after the server was away. Then it reads each loaded conversation. The lists
+   * come first: a thread that another device deleted meanwhile is not read again.
    */
   function reload(): void {
     if (!available()) return;
     const agentIds = new Set(Object.values(state.conversations).map((conversation) => conversation.agentId));
     const active = activeAgentId();
     if (active) agentIds.add(active);
+    // A running thread can end while the server is away, and the sidebar shows its agent as working.
+    for (const snapshot of Object.values(state.snapshots))
+      if (snapshot.tasks.some((task) => task.state === "running")) agentIds.add(snapshot.agentId);
     for (const agentId of agentIds) {
       void loadTasks(agentId).then((loaded) => {
         if (!loaded) return;
@@ -397,6 +440,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
     editable,
     local,
     filesAccepted,
+    repliable,
     snapshot: (agentId: string): AgentTasksSnapshot | undefined => state.snapshots[agentId],
     conversation: (taskId: string): ConversationSnapshot | undefined => state.conversations[taskId],
     applyEvent,
@@ -413,6 +457,8 @@ export function createAgentTasks(options: AgentTasksOptions) {
     reopenTask,
     renameTask,
     deleteTask,
+    canDeleteMessage,
+    deleteTaskMessage,
     markTaskRead,
   };
 }

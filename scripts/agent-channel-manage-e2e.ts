@@ -6,6 +6,11 @@
 // The check asserts the stored channel and routines after each call, one change note per change
 // that names the agent and the person, and the refusals: the caller removing itself, a person who
 // cannot chat with the agent they ask to add, and a routine run, which is not a person's request.
+// It also checks `channel_cancel`: the lead cancels a run that it owns, from a subtask id or the root
+// id, with a running and a queued subtask, and gets a refusal for a run that another run depends on,
+// a run of another member, the run of its current task, a run that ended, and a routine run. After
+// a person cancels a run of the lead with the channel controls, the next packet of the lead names
+// that run and its subtask as cancelled, and not the run of another member.
 // `bun scripts/agent-channel-manage-e2e.ts`. Writes .openbot-build/agent-channel-manage-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -23,6 +28,7 @@ const userData = join(root, "user-data");
 const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
+const inputLog = join(root, "inputs.jsonl");
 
 // Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
@@ -37,6 +43,10 @@ const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
 const CALL_MARK = "CHANNEL-CALL";
+// A turn whose current assignment has this text (with a real line break) runs until it is interrupted.
+// Each packet gives earlier messages as JSON, where the line break is escaped, so only the plain
+// assignment text matches.
+const HOLD_MARK = "HOLD-TURN\nNOW";
 const PERSON = { id: "local", name: "Alex" };
 // A team member whose roles do not let them chat with the agents they ask to add.
 const LIMITED = { id: "member-limited", name: "Rui" };
@@ -46,7 +56,9 @@ let limitedVisibleAgentId = "";
  * A Codex app-server with the methods that the service calls. A turn whose input has
  * `CHANNEL-CALL <<ARGS{"__tool":"…",…}ARGS>>` calls `openbot.<__tool>` with the rest of that JSON
  * through `tool_call`, logs the result, and ends. A channel packet also repeats earlier requests, so
- * the last call in the input is the current assignment. Other turns answer "Done.".
+ * the last call in the input is the current assignment. A `taskId` of `$CURRENT_TASK` becomes the id
+ * of the task in the packet. A turn with `HOLD_MARK` runs until it is interrupted. Other turns answer
+ * "Done.".
  */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync } = require("node:fs");
@@ -55,6 +67,7 @@ if (process.argv.includes("--version")) {
   process.exit(0);
 }
 const LOG = ${JSON.stringify(fakeLog)};
+const INPUTS = ${JSON.stringify(inputLog)};
 const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", file: "/fake/.codex/config.toml", profile: null }, version: "1", config: { mcp_servers: {} } }] };
 let buffer = "";
 let threads = 0;
@@ -91,8 +104,10 @@ const answer = (message) => {
     case "turn/start": {
       const turnId = "turn-" + (++turns);
       const text = (params.input || []).map((item) => item.text || "").join("\\n");
+      appendFileSync(INPUTS, JSON.stringify({ text }) + "\\n");
       write({ id: message.id, result: { turn: { id: turnId, status: "inProgress", items: [] } } });
       write({ method: "turn/started", params: { threadId: params.threadId, turn: { id: turnId } } });
+      if (text.includes(${JSON.stringify(HOLD_MARK)})) return;
       const calls = text.includes(${JSON.stringify(CALL_MARK)}) ? [...text.matchAll(/<<ARGS([\\s\\S]*?)ARGS>>/g)] : [];
       const match = calls.at(-1);
       if (!match) return setTimeout(() => finish(params.threadId, turnId), 20);
@@ -100,6 +115,7 @@ const answer = (message) => {
       waiting.set(id, { threadId: params.threadId, turnId });
       // The packet carries the request as JSON text, so its quotes arrive escaped.
       const { __tool, ...args } = JSON.parse(match[1].replace(/\\\\"/g, '"'));
+      if (args.taskId === "$CURRENT_TASK") args.taskId = (text.match(/"task":\\{[^}]*?"id":"([^"]+)"/) || [])[1];
       return write({
         id,
         method: "item/tool/call",
@@ -146,6 +162,12 @@ process.stdin.on("data", (chunk) => {
 /** The arguments the fake passes to the channel tool. */
 interface ChannelToolArgs {
   agentId?: string;
+  taskId?: string;
+  recipientAgentId?: string;
+  task?: string;
+  expectedResult?: string;
+  sourceMessageIds?: string[];
+  dependencies?: string[];
   instructions?: string;
   routineId?: string;
   name?: string;
@@ -197,10 +219,10 @@ async function waitFor<T>(label: string, read: () => T | null | undefined | fals
   }
 }
 
-function toolLogs(): ToolLog[] {
+function jsonLines<T>(path: string): T[] {
   let text = "";
   try {
-    text = readFileSync(fakeLog, "utf8");
+    text = readFileSync(path, "utf8");
   } catch {
     return [];
   }
@@ -209,6 +231,10 @@ function toolLogs(): ToolLog[] {
     .filter(Boolean)
     .map((line) => JSON.parse(line));
 }
+
+const toolLogs = () => jsonLines<ToolLog>(fakeLog);
+/** The input text of each turn that the fake started. */
+const turnInputs = () => jsonLines<{ text: string }>(inputLog).map((entry) => entry.text);
 
 function pass(name: string, condition: boolean, detail?: string) {
   report.checks.push({ name, passed: condition });
@@ -277,6 +303,43 @@ async function callTool(
   );
   const entry = await waitFor(`${name} tool result`, () => toolLogs()[before]);
   await settled(channelId);
+  const text = entry.result?.contentItems.map((item) => item.text).join("\n") ?? JSON.stringify(entry.error);
+  report.calls.push({ name, turnId: entry.turnId, success: entry.result?.success ?? null, text });
+  return { success: entry.result?.success === true, text };
+}
+
+/** The tasks of the channel. */
+const tasksOf = (channelId: string) => channels().store.tasks(channelId);
+const taskState = (channelId: string, taskId: string) => tasksOf(channelId).find((task) => task.id === taskId)?.state;
+
+/**
+ * Sends a person's channel message to the lead that makes the fake call `tool`, and returns the tool
+ * result. Other runs of the channel keep running, so it waits only for the run of the lead to leave
+ * the running state.
+ */
+async function callLead(name: string, channelId: string, leadId: string, tool: string, args: ChannelToolArgs) {
+  const before = toolLogs().length;
+  await runCauseEffect(
+    channels().command(
+      {
+        type: "send",
+        operationId: randomUUID(),
+        channelId,
+        text: `${CALL_MARK} <<ARGS${JSON.stringify({ __tool: tool, ...args })}ARGS>>`,
+        recipientAgentId: leadId,
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      PERSON,
+    ),
+  );
+  const entry = await waitFor(`${name} tool result`, () => toolLogs()[before]);
+  await waitFor(`the ${name} turn to end`, () =>
+    tasksOf(channelId).every(
+      (task) =>
+        task.ownerAgentId !== leadId || task.parentTaskId !== null || !["queued", "running"].includes(task.state),
+    ),
+  );
   const text = entry.result?.contentItems.map((item) => item.text).join("\n") ?? JSON.stringify(entry.error);
   report.calls.push({ name, turnId: entry.turnId, success: entry.result?.success ?? null, text });
   return { success: entry.result?.success === true, text };
@@ -528,6 +591,284 @@ try {
 
   pass("Each change has one note", notes(channelId).length === 7);
   report.notes = notes(channelId).map((entry) => entry.message.text);
+
+  // 9. The lead cancels runs that it owns, at a person's request.
+  const workId = randomUUID();
+  await runCauseEffect(
+    channels().command(
+      {
+        type: "save",
+        operationId: randomUUID(),
+        channelId: workId,
+        draft: {
+          name: "work",
+          title: "",
+          instructions: "",
+          members: [{ agentId: lead.id }, { agentId: tester.id }, { agentId: writer.id }],
+          leadAgentId: lead.id,
+        },
+      },
+      PERSON,
+    ),
+  );
+  const send = (text: string, recipientAgentId: string) =>
+    runCauseEffect(
+      channels().command(
+        {
+          type: "send",
+          operationId: randomUUID(),
+          channelId: workId,
+          text,
+          recipientAgentId,
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        PERSON,
+      ),
+    );
+  await send("Plan the launch.", lead.id);
+  await settled(workId);
+  const plan = channels()
+    .store.messages(workId)
+    .find((entry) => entry.message.text === "Plan the launch.");
+  assert.ok(plan);
+  // Run R1: Writer works on a subtask that keeps running.
+  const assigned = await callLead("assign a running subtask", workId, lead.id, "channel_assign", {
+    recipientAgentId: writer.id,
+    task: `Write the notes. ${HOLD_MARK}`,
+    expectedResult: "The notes.",
+    sourceMessageIds: [plan.id],
+  });
+  pass("The lead assigns a running subtask", assigned.success, assigned.text);
+  const s1 = await waitFor("the subtask of Writer to run", () =>
+    tasksOf(workId).find((task) => task.ownerAgentId === writer.id && task.state === "running"),
+  );
+  const r1 = s1.rootTaskId;
+  // Run R2: a queued subtask of Tester that waits for the subtask of R1.
+  const queued = await callLead("assign a queued subtask", workId, lead.id, "channel_assign", {
+    recipientAgentId: tester.id,
+    task: "Check the notes.",
+    expectedResult: "A short check.",
+    sourceMessageIds: [plan.id],
+    dependencies: [s1.id],
+  });
+  pass("The lead assigns a queued subtask", queued.success, queued.text);
+  const s2 = tasksOf(workId).find((task) => task.ownerAgentId === tester.id && task.parentTaskId !== null);
+  assert.ok(s2);
+  const r2 = s2.rootTaskId;
+  pass("The second subtask is queued", s2.state === "queued", s2.state);
+
+  const blocked = await callLead("cancel a run that another run waits for", workId, lead.id, "channel_cancel", {
+    taskId: s1.id,
+  });
+  pass(
+    "A run that another run depends on is not cancelled",
+    blocked.success &&
+      blocked.text.includes('"accepted":false') &&
+      blocked.text.includes("depends on this run") &&
+      taskState(workId, s1.id) === "running",
+    blocked.text,
+  );
+  const fromSubtask = await callLead("cancel from a subtask id", workId, lead.id, "channel_cancel", { taskId: s2.id });
+  pass(
+    "A subtask id cancels its whole run",
+    fromSubtask.success &&
+      fromSubtask.text.includes('"accepted":true') &&
+      taskState(workId, r2) === "cancelled" &&
+      taskState(workId, s2.id) === "cancelled",
+    fromSubtask.text,
+  );
+  const fromRoot = await callLead("cancel from the root id", workId, lead.id, "channel_cancel", { taskId: r1 });
+  pass(
+    "The root id cancels the run and stops its running subtask",
+    fromRoot.success &&
+      fromRoot.text.includes('"accepted":true') &&
+      fromRoot.text.includes("running turns are stopped") &&
+      taskState(workId, r1) === "cancelled" &&
+      taskState(workId, s1.id) === "cancelled",
+    fromRoot.text,
+  );
+  await waitFor("the turn of Writer to stop", () =>
+    agents
+      .listQueue(writer.id)
+      .deliveries.every((delivery) => !["queued", "starting", "running"].includes(delivery.status)),
+  );
+  // Run X belongs to Tester and keeps running. A channel runs at most two tasks at once, so it starts
+  // only now: the lead needs the other place for its own turns.
+  await send(`Test the build. ${HOLD_MARK}`, tester.id);
+  const runX = await waitFor("the run of Tester to start", () =>
+    tasksOf(workId).find(
+      (task) => task.ownerAgentId === tester.id && task.parentTaskId === null && task.state === "running",
+    ),
+  );
+  const notOwned = await callLead("cancel a run of another member", workId, lead.id, "channel_cancel", {
+    taskId: runX.id,
+  });
+  pass(
+    "The lead cannot cancel a run of another member",
+    notOwned.text.includes('"accepted":false') && notOwned.text.includes("only a run that you own"),
+    notOwned.text,
+  );
+  const own = await callLead("cancel the current run", workId, lead.id, "channel_cancel", { taskId: "$CURRENT_TASK" });
+  pass(
+    "The lead cannot cancel the run of its current task",
+    own.text.includes('"accepted":false') && own.text.includes("your current task"),
+    own.text,
+  );
+  const ended = await callLead("cancel an ended run", workId, lead.id, "channel_cancel", { taskId: r1 });
+  pass(
+    "A run that ended is not cancelled again",
+    ended.text.includes('"accepted":false') && ended.text.includes("already ended"),
+    ended.text,
+  );
+  pass("The run of another member keeps running", taskState(workId, runX.id) === "running");
+  const cancelNotes = notes(workId).map((entry) => entry.message.text);
+  pass(
+    "Each cancel has one note that names the agent, the task and the person",
+    cancelNotes.length === 2 &&
+      cancelNotes.every(
+        (text) =>
+          text.startsWith("Lead cancelled the task “CHANNEL-CALL") &&
+          text.endsWith("and its subtasks. Alex asked for it."),
+      ),
+    JSON.stringify(cancelNotes),
+  );
+  report.notes.push(...cancelNotes);
+  // A person stops and cancels run X with the channel controls.
+  for (const type of ["stop", "cancel"] as const)
+    await runCauseEffect(
+      channels().command(
+        { type, operationId: randomUUID(), channelId: workId, taskId: runX.id, recipientAgentId: null },
+        PERSON,
+      ),
+    );
+  await settled(workId);
+  pass("A person cancels the other run with the channel controls", taskState(workId, runX.id) === "cancelled");
+  // A person stops and cancels a subtask of the lead with the channel controls. That writes no
+  // message that a model reads, so the next packet of the lead must name the cancelled run.
+  const third = await callLead("assign a subtask that a person cancels", workId, lead.id, "channel_assign", {
+    recipientAgentId: writer.id,
+    task: `Draft the summary. ${HOLD_MARK}`,
+    expectedResult: "The summary.",
+    sourceMessageIds: [plan.id],
+  });
+  pass("The lead assigns a subtask that a person cancels", third.success, third.text);
+  const s3 = await waitFor("the new subtask of Writer to run", () =>
+    tasksOf(workId).find((task) => task.ownerAgentId === writer.id && task.state === "running"),
+  );
+  for (const type of ["stop", "cancel"] as const)
+    await runCauseEffect(
+      channels().command(
+        { type, operationId: randomUUID(), channelId: workId, taskId: s3.id, recipientAgentId: null },
+        PERSON,
+      ),
+    );
+  await settled(workId);
+  const inputsBefore = turnInputs().length;
+  await callLead("read the channel after a cancel", workId, lead.id, "channel_history", {});
+  const leadFacts = turnInputs()
+    .slice(inputsBefore)
+    .flatMap((text) => text.split("\n\n"))
+    .find((part) => part.startsWith("{") && part.includes(`"agentId":${JSON.stringify(lead.id)}`));
+  const stopped: { id: string; state: string }[] = leadFacts ? (JSON.parse(leadFacts).stoppedTasks ?? []) : [];
+  const stoppedState = (taskId: string) => stopped.find((item) => item.id === taskId)?.state;
+  pass(
+    "The next packet of the lead names the run that a person cancelled, and not the run of another member",
+    stoppedState(s3.rootTaskId) === "cancelled" &&
+      stoppedState(s3.id) === "cancelled" &&
+      stoppedState(runX.id) === undefined,
+    JSON.stringify(stopped),
+  );
+  // A provider can send one tool call again. Two copies of one call wait in the queue together: the
+  // second finds the receipt of the first, so both are accepted and the run has one note.
+  const fourth = await callLead("assign a subtask for a retried cancel", workId, lead.id, "channel_assign", {
+    recipientAgentId: writer.id,
+    task: `Check the summary. ${HOLD_MARK}`,
+    expectedResult: "The check.",
+    sourceMessageIds: [plan.id],
+  });
+  pass("The lead assigns a subtask for a retried cancel", fourth.success, fourth.text);
+  const s4 = await waitFor("the subtask of Writer for the retried cancel to run", () =>
+    tasksOf(workId).find((task) => task.ownerAgentId === writer.id && task.state === "running"),
+  );
+  await runCauseEffect(
+    channels().command(
+      {
+        type: "send",
+        operationId: randomUUID(),
+        channelId: workId,
+        text: `Wait. ${HOLD_MARK}`,
+        recipientAgentId: lead.id,
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      PERSON,
+    ),
+  );
+  const held = await waitFor("the held turn of the lead", () =>
+    channels()
+      .store.assignments(workId)
+      .find((item) => item.agentId === lead.id && item.state === "running" && item.turnId),
+  );
+  const notesBeforeRetry = notes(workId).length;
+  const retried = await Promise.all(
+    [0, 1].map(() =>
+      runCauseEffect(
+        channels().tool(workId, lead.id, held.turnId ?? "", "call-retry", "channel_cancel", { taskId: s4.id }),
+      ),
+    ),
+  );
+  await waitFor("the Writer turn of the retried cancel to stop", () =>
+    channels()
+      .store.assignments(workId)
+      .every((item) => item.taskId !== s4.id || !["starting", "running", "queued"].includes(item.state))
+      ? true
+      : undefined,
+  );
+  pass(
+    "A retried cancel is accepted twice, cancels the run once, and stops its turn",
+    retried.every((result) => JSON.stringify(result).includes('"accepted":true')) &&
+      taskState(workId, s4.id) === "cancelled" &&
+      notes(workId).length === notesBeforeRetry + 1,
+    JSON.stringify(retried),
+  );
+  for (const type of ["stop", "cancel"] as const)
+    await runCauseEffect(
+      channels().command(
+        { type, operationId: randomUUID(), channelId: workId, taskId: held.taskId, recipientAgentId: null },
+        PERSON,
+      ),
+    );
+  await settled(workId);
+
+  // 10. A routine run cannot cancel a run.
+  const canceller = agents.createChannelRoutine({
+    channelId: soloId,
+    name: "Cancel",
+    instruction: `${CALL_MARK} <<ARGS${JSON.stringify({ __tool: "channel_cancel", taskId: "$CURRENT_TASK" })}ARGS>>`,
+    active: false,
+    timezone: "UTC",
+    schedule: { kind: "daily", time: "10:00" },
+  });
+  const beforeCancel = toolLogs().length;
+  await runCauseEffect(agents.testChannelRoutine({ channelId: soloId, routineId: canceller.id }));
+  const cancelRun = await waitFor("the routine cancel result", () => toolLogs()[beforeCancel]);
+  await settled(soloId);
+  const cancelRunText =
+    cancelRun.result?.contentItems.map((item) => item.text).join("\n") ?? JSON.stringify(cancelRun.error);
+  report.calls.push({
+    name: "routine cancel",
+    turnId: cancelRun.turnId,
+    success: cancelRun.result?.success ?? null,
+    text: cancelRunText,
+  });
+  pass(
+    "A routine run cannot cancel a run",
+    cancelRun.result?.success !== true &&
+      cancelRunText.includes("Only a person's request in this channel can cancel a run") &&
+      notes(soloId).length === 0,
+    cancelRunText,
+  );
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

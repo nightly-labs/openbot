@@ -30,6 +30,17 @@ function serverReason(error: unknown): string | null {
 }
 
 /**
+ * Whether OpenBot, not the Gemini server, opens the Google sign-in page (`openGoogleSignIn`).
+ *
+ * On Windows, the server with `BROWSER=true` never prints the page (#4521), so a sign-in at this
+ * computer lets the server open the page itself. `onHost`: the user is at another device, and the
+ * page must not open here.
+ */
+export function googleSignInByOpenBot(onHost: boolean): boolean {
+  return onHost || process.platform !== "win32";
+}
+
+/**
  * A sign-in that is an ACP `authenticate` call, for a server that has no login command.
  *
  * The call runs in a process of its own, not in the client that serves turns: the server opens the
@@ -38,6 +49,7 @@ function serverReason(error: unknown): string | null {
  *
  * With `logout`, a server that advertises ACP `logout` first removes what it kept. Its `authenticate`
  * then opens the browser, so a Reconnect is a new sign-in, not a check of the saved one.
+ * With `logoutOnly`, the call is a sign-out only.
  *
  * `done` settles when the call answers, and the process is stopped then. It rejects when the call
  * fails, the process ends first, or `timeoutMs` passes.
@@ -46,6 +58,7 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
   executable: string;
   argv: readonly string[];
   env: Record<string, string>;
+  /** The sign-in method. A `logoutOnly` call sends no `authenticate`, and ignores it. */
   methodId: string;
   timeoutMs: number;
   /** Signs the server out before `authenticate`, when it advertises ACP `logout`. */
@@ -53,8 +66,14 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
   /** Called when the server answered `logout`: what it kept is gone, whether the sign-in ends or not. */
   onLoggedOut?: () => void;
   /**
+   * A sign-out, for a CLI that has no sign-out command: `done` settles when the server answers
+   * `logout`, with no `authenticate` after it. It rejects when the server does not advertise `logout`.
+   */
+  logoutOnly?: boolean;
+  /**
    * Gemini prints its Google page instead of opening it, and OpenBot opens it, so a launch that fails
-   * shows an error. When the server opened it itself, a failure showed nothing (#3520).
+   * shows an error. When the server opened it itself, a failure showed nothing (#3520). Without it,
+   * the server opens the page itself (`googleSignInByOpenBot`).
    */
   openGoogleSignIn?: (url: string) => Promise<void>;
   /** A temporary folder of its own for the process (`provider-temp.ts`). */
@@ -98,7 +117,13 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
       const openGoogleSignIn = options.openGoogleSignIn;
       let output = "";
       let opened = false;
-      const signInFailed = (message: string) => fail(new ProviderSignInError({ message }));
+      // A failed sign-out says so, whatever stopped it.
+      const signInFailed = (message: string) =>
+        fail(
+          new ProviderSignInError({
+            message: options.logoutOnly ? sourceText("error.provider.acpSignOutFailed") : message,
+          }),
+        );
       const browserFailed = () =>
         signInFailed(
           sourceText(
@@ -155,6 +180,11 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
         }
         if (message.error !== undefined && (message.id === 1 || message.id === 2 || message.id === 3)) {
           const reason = serverReason(message.error);
+          // A refused sign-out keeps the server's reason, such as a token that the CLI did not save.
+          if (options.logoutOnly && reason)
+            return fail(
+              new ProviderSignInError({ message: sourceText("error.provider.acpSignOutFailedReason", { reason }) }),
+            );
           signInFailed(
             reason
               ? sourceText("error.provider.acpSignInFailedReason", { reason })
@@ -165,6 +195,7 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
           const result = isDynamicRecord(message.result) ? message.result : undefined;
           const methods = result?.authMethods;
           if (
+            !options.logoutOnly &&
             Array.isArray(methods) &&
             !methods.some((method) => isDynamicRecord(method) && method.id === options.methodId)
           )
@@ -172,11 +203,14 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
           // A client must not call `logout` unless the server advertises it.
           const capabilities = isDynamicRecord(result?.agentCapabilities) ? result.agentCapabilities : undefined;
           const auth = isDynamicRecord(capabilities?.auth) ? capabilities.auth : undefined;
-          if (options.logout && isDynamicRecord(auth?.logout)) send({ id: 3, method: "logout", params: {} });
+          const canLogOut = isDynamicRecord(auth?.logout);
+          if (options.logoutOnly && !canLogOut) signInFailed(sourceText("error.provider.acpSignOutFailed"));
+          else if ((options.logout || options.logoutOnly) && canLogOut) send({ id: 3, method: "logout", params: {} });
           else send({ id: 2, method: "authenticate", params: { methodId: options.methodId } });
         } else if (message.id === 3) {
           options.onLoggedOut?.();
-          send({ id: 2, method: "authenticate", params: { methodId: options.methodId } });
+          if (options.logoutOnly) settle(null);
+          else send({ id: 2, method: "authenticate", params: { methodId: options.methodId } });
         } else if (message.id === 2) {
           settle(null);
         }

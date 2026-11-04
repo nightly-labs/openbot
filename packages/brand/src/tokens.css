@@ -83,6 +83,20 @@
   --openbot-bg-notch: #000000;
   --openbot-mask-solid: #000000;
   --openbot-transparent: rgba(0, 0, 0, 0);
+  /* The color picker draws real colors, so these stay the same in both themes: the rim and the
+     ends of the saturation area, and the hue spectrum. */
+  --openbot-color-picker-light: #ffffff;
+  --openbot-color-picker-dark: #000000;
+  --openbot-color-picker-spectrum: linear-gradient(
+    to right,
+    #ff0000,
+    #ffff00,
+    #00ff00,
+    #00ffff,
+    #0000ff,
+    #ff00ff,
+    #ff0000
+  );
   --openbot-drawer-scrim: #000000;
   --openbot-scroll-edge-overlay: rgba(0, 0, 0, 0.72);
   --openbot-queue-surface: var(--openbot-bg-surface);
@@ -280,7 +294,7 @@
    * landing page carry type above 24px; .landing-hero-logo is sized in em off
    * --openbot-text-hero, so that token is layout, not just type. */
   --openbot-text-display: 32px;
-  --openbot-text-usage-total: clamp(2rem, 5cqi, 3.5rem);
+  --openbot-text-usage-total: clamp(2rem, 3.5cqi, 2.75rem);
   --openbot-leading-display: 38px;
   --openbot-text-hero: clamp(3rem, 8vw, 6.5rem);
 
@@ -426,6 +440,14 @@
 }
 
 [data-provider="kimi"] {
+  --openbot-provider-current: var(--openbot-text-primary);
+}
+
+[data-provider="devin"] {
+  --openbot-provider-current: var(--openbot-text-primary);
+}
+
+[data-provider="copilot"] {
   --openbot-provider-current: var(--openbot-text-primary);
 }
 

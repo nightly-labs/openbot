@@ -12,6 +12,7 @@ import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { SettingsModal } from "../src/features/settings/SettingsModal";
 import type { SettingsTab } from "../src/features/settings/settings-tabs";
+import type { CodexLiveAccess } from "../src/features/speech/codex-live-access";
 import { STORY_SERVERS } from "../src/preview/fixtures";
 import { createMockBilling } from "../src/preview/mock-billing";
 import type { MockVoiceOptions } from "../src/preview/mock-voice";
@@ -57,6 +58,8 @@ function SettingsModalStory(props: {
   scheduledRestart?: UpdateStatus["scheduledRestart"];
   /** The downloaded dictation models and the saved voice setting. */
   voice?: MockVoiceOptions;
+  /** Whether Codex can open live voice. */
+  codexLiveAccess?: CodexLiveAccess;
 }) {
   const previousApi = window.openbot;
   const billingApi = createMockBilling();
@@ -163,6 +166,8 @@ function SettingsModalStory(props: {
             page={page()}
             initialTab={props.initialTab}
             openTab={props.openTab}
+            codexLiveAccess={props.codexLiveAccess}
+            onConnectCodex={() => setOpen(false)}
             open={open()}
             value={value()}
             onValueChange={(next) => {
@@ -188,6 +193,9 @@ function SettingsModalStory(props: {
             account={account()}
             onUpdateAccountName={updateAccountName}
             onUpdateAccountAvatar={updateAccountAvatar}
+            onSetChatColor={async (chatColor) => {
+              setAccount((current) => ({ ...current, chatColor }));
+            }}
             onCreateMobileConnect={createMobileConnect}
             onCancelMobileConnect={async () => {
               window.clearTimeout(scanTimer);
@@ -229,6 +237,7 @@ const meta = {
     account: storyAccount,
     onUpdateAccountName: fn(async () => undefined),
     onUpdateAccountAvatar: fn(async () => undefined),
+    onSetChatColor: fn(async () => undefined),
     onCreateMobileConnect: fn(async () => ({
       qrData:
         "openbot://mobile-connect?api=https%3A%2F%2Fapi.openbot.run&ticket=storybook-mobile-ticket_1234567890abcdef",
@@ -303,6 +312,11 @@ export const VoiceModelsDownloaded: Story = {
       voice={{ voiceModelsReady: ["parakeet-tdt-0.6b-v3", "bark-3.0-plus"], speechModelReady: true }}
     />
   ),
+};
+
+/** Codex signs in with an API key or not at all: live voice says why it is off, and Connect opens Providers. */
+export const VoiceCodexSignIn: Story = {
+  render: () => <SettingsModalStory initialOpen initialTab="voice" codexLiveAccess="signIn" />,
 };
 
 /** The install guide for each phone, the sign-in code and the connected phones. */

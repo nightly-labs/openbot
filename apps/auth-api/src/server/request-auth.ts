@@ -10,6 +10,7 @@ import { AgentTemplates } from "./agent-templates";
 import { type FcmRelaySender, sharedFcmSender } from "./android-notification-relay";
 import { AuthOperationError, AuthService, AuthServiceError } from "./auth-service";
 import { BillingError, type BillingService } from "./billing-service";
+import { CompanySignInError, CompanySignInService } from "./company-sign-in";
 import type { ContactMessageServices } from "./contact-message";
 import { D1AuthRepository } from "./d1-auth-repository";
 import { DiscordAppError, DiscordAppService } from "./discord-app";
@@ -69,7 +70,28 @@ export function requestAuthService(): AuthService {
     profileChanged: (userId) => notifyAccountProfileChanged(bindings, userId, schedule),
     analytics,
     attribution: new AccountAttribution({ database: bindings.DB, analytics }),
+    usesCompanySignIn: (email) =>
+      new CompanySignInService(bindings)
+        .usesCompanySignIn(email)
+        .pipe(Effect.mapError(() => new AuthOperationError({ message: "Account operation failed." }))),
   });
+}
+
+export function requestCompanySignIn(): CompanySignInService {
+  const bindings = requireWorkerBindings(env);
+  const remote = new RemoteControlPlane(bindings, { schedule });
+  return new CompanySignInService(bindings, {
+    // The revocation is already written and the cron redelivers it, so the answer does not wait.
+    flushSessionRevocations: () => Effect.sync(() => schedule(deliverPendingRemoteAuthEvents(bindings, Date.now()))),
+    revokeMembership: (actorUserId, hostId, membershipId) =>
+      remote.changeMembership(actorUserId, { hostId, membershipId, revoke: true }).pipe(Effect.asVoid),
+    joinServer: (hostId, userId, options) => remote.joinByCompanySignIn(hostId, userId, options),
+  });
+}
+
+export function companySignInErrorResponse(error: unknown): Response {
+  if (error instanceof CompanySignInError) return apiError(error.status, error.code, error.message);
+  return remoteControlPlaneErrorResponse(error);
 }
 
 export function requestAvatarBucket(): R2Bucket {

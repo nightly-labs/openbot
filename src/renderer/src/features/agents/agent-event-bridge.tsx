@@ -71,6 +71,7 @@ export function AgentEventBridge() {
     agentChatsToRetryRead,
     scheduleConversation,
     isAgentChatReadable,
+    isAgentChatOpen,
     autoMarkAgentMessageRead,
     applyConversationDelta,
     applyConversationPage,
@@ -83,6 +84,7 @@ export function AgentEventBridge() {
     setTurnStepLines,
     setFailedTurns,
     setUsageLimits,
+    setSubagentTurns,
     setUsageLimitedModels,
     setWaitedUsageLimits,
     setContextStates,
@@ -272,6 +274,10 @@ export function AgentEventBridge() {
           if (soundLevel() === "all" && !platform.chatWindow) playCompletionSoundForAgentEvent(event, agentList());
         }
         return;
+      case "routine-thread-turn-completed":
+        // The chat's turn state stays: the run's own `turn-completed` did not leave its thread.
+        if (soundLevel() === "all" && !platform.chatWindow) playCompletionSoundForAgentEvent(event.turn, agentList());
+        return;
       case "prompt":
         setPendingPrompts((current) => ({ ...current, [attentionEventKey(event)]: event }));
         // The agent id keys the answer marks of the agent's own chat. A side thread's question keeps
@@ -311,6 +317,21 @@ export function AgentEventBridge() {
           event.approval,
         ]);
         return;
+      case "subagent-failed": {
+        // The chat shows the failure in the subagent card. The toast tells the user who looks at
+        // another chat; the desktop notification tells the user who is not in the app. A failure does
+        // not need the user, so it shows only at the "all" level, as the completion sound does.
+        const agent = agentList().find((candidate) => candidate.id === event.agentId);
+        if (!agent?.notifications || soundLevel() !== "all" || platform.chatWindow) return;
+        if (!platform.appFocused() || isAgentChatOpen(event.agentId)) return;
+        const { t } = currentText();
+        toast.error(agent.name, {
+          description: event.title
+            ? t("notification.subagentFailedFor", { task: event.title })
+            : t("notification.subagentFailed"),
+        });
+        return;
+      }
       case "runtime-snapshot":
         void channels.refresh();
         applyAgentRuntimeSnapshot(event.snapshot);
@@ -402,6 +423,7 @@ export function AgentEventBridge() {
       Object.fromEntries(Object.entries(current).filter(([agentId]) => agentId in usageLimits)),
     );
     setUsageLimitedModels(snapshot.usageLimitedModels ?? []);
+    setSubagentTurns(Object.fromEntries((snapshot.subagentTurns ?? []).map((turn) => [turn.agentId, turn.turnId])));
     setQueues((current) => reconcileQueuesWithRuntimeWork(current, snapshot.work, runtimeTurns));
     setPendingPrompts((current) => reconcileAttentionPrompts(current, snapshot, submittedPromptRequests()));
     setApprovals((current) => reconcileAttentionApprovals(current, snapshot));

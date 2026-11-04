@@ -57,10 +57,16 @@ import type { MailboxSync } from "./mailbox-sync";
 import { memoryChangesMessage } from "./memory-changes-message";
 import { type PlanContinuation, waitsForUser } from "./plan-continuation";
 import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
-import { isBalanceDiagnostic, isPlanLimitDiagnostic, isUsageLimitDiagnostic } from "./provider-diagnostics";
+import {
+  isBalanceDiagnostic,
+  isPlanLimitDiagnostic,
+  isUsageLimitDiagnostic,
+  providerResetDelayMs,
+} from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
 import { isNoUpdateAnswer, settleQuietRoutineTurn } from "./routine-quiet-runs";
 import {
+  foldCodexChildItem,
   foldCodexSubagentItem,
   SUBAGENTS_UPDATED_METHOD,
   stopRunningSubagents,
@@ -83,6 +89,8 @@ import { collectProviderUsage } from "./usage-collection";
 import { USAGE_LIMIT_METHOD, type UsageLimitGate } from "./usage-limit-gate";
 
 const logger = createOpenBotLogger("turn-lifecycle");
+/** The retry of one turn after which the user gets a notice. A single retry is a normal network error. */
+const RETRY_NOTICE_ATTEMPTS = 3;
 const ENDED_TURN_LIMIT = 256;
 /** How long before a turn's start its usage records can be, as in host analytics. */
 const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
@@ -105,6 +113,8 @@ const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
 interface HeldProviderError {
   message: string;
   context: FailureContext & { causeCode: CauseCode };
+  /** A spent balance or quota: the usage notice explains it, so a turn that does not move shows no banner. */
+  quiet?: boolean;
 }
 
 export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTarget {
@@ -154,6 +164,11 @@ export interface TurnHooks {
   /** Whether a provider error moves this agent to a backup model: it switches without asking and has a ready one. */
   mayFailOver(agentId: string): boolean;
   /**
+   * Whether a ready backup continues work that a usage limit stopped after it started. An agent set
+   * to ask uses its order too: the turn already started, so there is no moment to ask.
+   */
+  mayContinueOnBackup(agentId: string): boolean;
+  /**
    * Gives a channel task back to its channel's queue after a spent plan refused its turn. False
    * when the delivery is not an active channel assignment that can go back.
    */
@@ -165,6 +180,8 @@ export interface TurnHooks {
   quietRoutineDelivery(deliveryId: string): boolean;
   /** The task whose thread this is, or null for any other thread. */
   taskForThread(threadId: string): string | null;
+  /** Whether this public thread is the side thread of a routine, which takes that routine's runs. */
+  isRoutineThread(threadId: string): boolean;
   /** Whether this task's thread exists and is not archived. */
   taskOpen(taskId: string): boolean;
   /** The error of a task turn. It shows in the task's panel, not in the agent's own chat. */
@@ -259,6 +276,8 @@ export class TurnLifecycle {
    * reason once the banner that showed it is gone.
    */
   readonly #turnErrors = new Map<string, string>();
+  /** How many times the provider retried a request of each running turn. */
+  readonly #turnRetries = new Map<string, number>();
   /**
    * The client, provider thread and start time of each running turn, from its `turn/started`.
    * `produced` is set by the first item or delta: a refused turn is run again only without one.
@@ -309,6 +328,16 @@ export class TurnLifecycle {
    * update. It is the only clock that moves while a turn works, and it is lost on restart.
    */
   readonly #lastEventAt = new Map<string, number>();
+  /**
+   * The running Codex subagents, under their own thread id, with the turn whose list shows them.
+   * Codex sends the items of these threads too, and OpenBot knows no agent for them.
+   */
+  readonly #codexChildren = new Map<string, { agentId: string; threadId: string; turnId: string }>();
+  /**
+   * The turns of each agent whose subagents still run. A background subagent keeps its turn here after
+   * the turn ended. Boot recovery stops every subagent, so nothing here outlives the process.
+   */
+  readonly #subagentTurns = new Map<string, Set<string>>();
 
   constructor(options: TurnLifecycleOptions) {
     this.#store = options.store;
@@ -332,10 +361,23 @@ export class TurnLifecycle {
     return this.#failedTurns;
   }
 
+  /** The newest turn with running subagents of each agent in `agentIds`. */
+  subagentTurns(agentIds: ReadonlySet<string>): Array<{ agentId: string; turnId: string }> {
+    const turns: Array<{ agentId: string; turnId: string }> = [];
+    for (const [agentId, turnIds] of this.#subagentTurns) {
+      const turnId = [...turnIds].at(-1);
+      if (turnId && agentIds.has(agentId)) turns.push({ agentId, turnId });
+    }
+    return turns;
+  }
+
   forgetAgent(agentId: string): void {
     this.fileHistory.forgetAgent(agentId);
     this.#failedTurns.delete(agentId);
+    this.#subagentTurns.delete(agentId);
     this.#lastEventAt.delete(agentId);
+    for (const [childId, parent] of this.#codexChildren)
+      if (parent.agentId === agentId) this.#codexChildren.delete(childId);
   }
 
   /** When this running turn sent `turn/started`, in epoch milliseconds. Null for a turn that is not running. */
@@ -375,6 +417,7 @@ export class TurnLifecycle {
     this.#failedTurns.clear();
     this.#turnAssociations.clear();
     this.#turnErrors.clear();
+    this.#turnRetries.clear();
     this.#limitedTurns.clear();
     this.#failoverTurns.clear();
     this.#failoverRetries.clear();
@@ -384,6 +427,7 @@ export class TurnLifecycle {
     this.#endedTurns.clear();
     this.#refusedRetries.clear();
     this.#lastEventAt.clear();
+    this.#codexChildren.clear();
     this.#itemTurns.clear();
     this.#traces.clear();
     this.#observedCompactions.clear();
@@ -496,6 +540,10 @@ export class TurnLifecycle {
 
   /** Shows a provider error that was held for a failover that did not happen, as it shows with no backup. */
   #showFailoverError(agentId: string, threadId: string, failover: HeldProviderError): void {
+    if (failover.quiet) {
+      this.#hooks.emitFailure?.({ code: "agent_error", agentId, ...failover.context });
+      return;
+    }
     const taskId = this.#taskForThread(agentId, threadId);
     if (taskId !== null) {
       this.#hooks.emitFailure?.({ code: "agent_error", agentId, ...failover.context });
@@ -589,6 +637,10 @@ export class TurnLifecycle {
       }
       case "item/started":
       case "item/completed": {
+        if (threadId && !agentId) {
+          this.#applyCodexChildItem(threadId, getRecord(params, "item"));
+          return;
+        }
         if (!threadId || !agentId) return;
         const turnId = getString(params, "turnId");
         const item = getRecord(params, "item");
@@ -733,7 +785,7 @@ export class TurnLifecycle {
       case "thread/tokenUsage/updated": {
         if (!threadId || !agentId) return;
         if (this.#conversation.loadedClientFor(threadId) !== source) return;
-        this.#compaction.updateBudget(threadId, params);
+        this.#compaction.updateBudget(threadId, params, agentId);
         const usage = getRecord(params, "tokenUsage");
         const last = getRecord(usage, "last");
         if (typeof last?.totalTokens === "number" && typeof usage?.modelContextWindow === "number")
@@ -754,6 +806,15 @@ export class TurnLifecycle {
         if (status !== "running" && status !== "completed" && status !== "failed") return;
         // Native Claude compaction does not report comparable full-context counts.
         this.#compaction.observeCompaction(threadId, status, "none");
+        return;
+      }
+      case "openbot/turn-progress": {
+        // A provider's own status for the running turn, such as a retry of a failed API request.
+        const turnId = getString(params, "turnId");
+        const detail = getString(params, "detail");
+        if (!threadId || !agentId || !turnId || !detail || !this.#runningTurns.has(turnId)) return;
+        if (this.#conversation.loadedClientFor(threadId) !== source) return;
+        this.#emitTurnProgress(agentId, this.#conversation.publicThreadId(agentId, threadId), turnId, detail);
         return;
       }
       case "thread/archived": {
@@ -791,7 +852,10 @@ export class TurnLifecycle {
           return;
         }
         // Codex retries on its own and reports the final failure again without `willRetry`.
-        if (isRecord(params) && params.willRetry === true) return;
+        if (isRecord(params) && params.willRetry === true) {
+          this.#providerRetried(agentId, threadId, getString(params, "turnId"), source.provider);
+          return;
+        }
         // A usage limit shows no banner, but the failed delivery still keeps it as the reason.
         const errorTurnId = getString(params, "turnId");
         if (notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
@@ -804,14 +868,16 @@ export class TurnLifecycle {
         // with nothing on screen; Gemini keeps the banner, because an API key sign-in, a runtime
         // before 1.4.1 and a Claude or GPT model have no reading. Cursor keeps it too: an on-demand
         // budget and a team limit are not in its reading. OpenCode keeps it because only a Go key
-        // has a reading, and the free models failed with nothing on screen. A plan window holds the
-        // queue until its reset for every provider.
+        // has a reading, and the free models failed with nothing on screen. Kimi keeps it because an
+        // account with no Kimi Code plan has no reading. A plan window holds the queue until its
+        // reset for every provider.
         if (
           error?.codexErrorInfo === "usageLimitExceeded" ||
           (isUsageLimitDiagnostic(message) &&
             ((source.provider !== "antigravity" &&
               source.provider !== "cursor" &&
               source.provider !== "opencode" &&
+              source.provider !== "kimi" &&
               agentProviderDescriptor(source.provider).reportsUsage) ||
               isPlanLimitDiagnostic(message))) ||
           (errorTurnId !== null && this.#limitedTurns.has(errorTurnId))
@@ -823,16 +889,28 @@ export class TurnLifecycle {
           if (planLimit && notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
             this.#limitedTurns.set(errorTurnId, this.#limitedTurns.get(errorTurnId) ?? null);
           }
-          this.#hooks.emitFailure?.({
-            code: "agent_error",
-            ...(agentId !== undefined ? { agentId } : {}),
+          const context = {
             turnId: errorTurnId,
             provider: source.provider,
             model: agentId && errorTurnId ? this.#hooks.turnModel(agentId, errorTurnId) : null,
             causeCode: classifyFailure(error ?? message),
-            severity: notification.method === "warning" ? "warning" : "error",
-          });
+            severity: notification.method === "warning" ? ("warning" as const) : ("error" as const),
+          };
           yield* this.#providers.refreshUsageAfterLimit(source);
+          // A spent balance or quota that the gate does not hold moves to a backup model as a provider
+          // error does (#4616). The end of the turn reports it.
+          if (
+            notification.method === "error" &&
+            agentId &&
+            errorTurnId !== null &&
+            this.#runningTurns.has(errorTurnId) &&
+            !this.#limitedTurns.has(errorTurnId) &&
+            this.#hooks.mayFailOver(agentId)
+          ) {
+            this.#failoverTurns.set(errorTurnId, { message, context, quiet: true });
+            return;
+          }
+          this.#hooks.emitFailure?.({ code: "agent_error", ...(agentId !== undefined ? { agentId } : {}), ...context });
           return;
         }
         const context = {
@@ -866,6 +944,46 @@ export class TurnLifecycle {
   }).bind(this);
 
   /**
+   * Codex sent a request of a running turn again. A turn that retries again and again looked like
+   * work: Codex sent the same large request for 11 minutes, and the agent showed as working (#4374).
+   * The user gets one notice per turn. A large session also compacts before its next turn.
+   */
+  #providerRetried(
+    agentId: string | null | undefined,
+    threadId: string | null | undefined,
+    turnId: string | null,
+    provider: AgentClient["provider"],
+  ): void {
+    if (!agentId || !threadId || !turnId || !this.#runningTurns.has(turnId)) return;
+    const attempts = (this.#turnRetries.get(turnId) ?? 0) + 1;
+    this.#turnRetries.set(turnId, attempts);
+    logger.info("A provider retries a request.", {
+      provider,
+      attempts,
+      usedPercent: this.#compaction.usedPercent(threadId),
+    });
+    if (attempts !== RETRY_NOTICE_ATTEMPTS) return;
+    const compacts = this.#compaction.retrying(threadId);
+    const percent = this.#compaction.usedPercent(threadId);
+    this.#hooks.emitError(
+      "agent_warning",
+      compacts && percent !== null
+        ? sourceText("error.backend.providerRetryingLargeContext", {
+            attempts: String(attempts),
+            percent: String(percent),
+          })
+        : sourceText("error.backend.providerRetrying", { attempts: String(attempts) }),
+      agentId,
+      {
+        provider,
+        model: this.#hooks.turnModel(agentId, turnId),
+        turnId,
+        severity: "warning",
+      },
+    );
+  }
+
+  /**
    * Records a call to the no-update tool. `quiet` when the turn runs only quiet routine runs, so
    * its completion keeps the text answers as quiet answers; `shown` when a person waits for the answer, as in a Test
    * run; null when no routine run started the turn. The completion decides again, because a message
@@ -877,7 +995,7 @@ export class TurnLifecycle {
     this.#noUpdateTurns.add(turnId);
     // A failed run is never quiet, so its answer must still be written.
     if (this.#reportedFailures.has(turnId)) return "shown";
-    return this.#quietRoutineTurn(threadId, deliveries) ? "quiet" : "shown";
+    return this.#quietRoutineTurn(agentId, threadId, deliveries) ? "quiet" : "shown";
   }
 
   /**
@@ -891,11 +1009,16 @@ export class TurnLifecycle {
     return true;
   }
 
-  /** Only a turn that runs nothing but quiet routine runs, outside a channel or messaging thread. */
-  #quietRoutineTurn(threadId: string | null, deliveries: readonly DeliveryContext[]): boolean {
+  /**
+   * Only a turn that runs nothing but quiet routine runs, in the agent's own chat or in a routine's
+   * side thread: not in a channel, a messaging thread or another task.
+   */
+  #quietRoutineTurn(agentId: string, threadId: string | null, deliveries: readonly DeliveryContext[]): boolean {
+    const publicThreadId = threadId === null ? null : this.#conversation.publicThreadId(agentId, threadId);
     return (
       deliveries.length > 0 &&
-      !this.#conversation.isExecutionThread(threadId) &&
+      (!this.#conversation.isExecutionThread(publicThreadId) ||
+        (publicThreadId !== null && this.#hooks.isRoutineThread(publicThreadId))) &&
       deliveries.every(
         ({ delivery }) => delivery.sender.kind === "routine" && this.#hooks.quietRoutineDelivery(delivery.id),
       )
@@ -928,6 +1051,7 @@ export class TurnLifecycle {
       }
       const reportedError = this.#turnErrors.get(turnId);
       this.#turnErrors.delete(turnId);
+      this.#turnRetries.delete(turnId);
       // The error is kept only while the turn runs, so a refused turn always has its entry.
       const refusedFailure =
         running !== undefined && status === "failed" && reportedError !== undefined
@@ -954,7 +1078,11 @@ export class TurnLifecycle {
       const mayRunAgain =
         failover !== undefined && !limited && status === "failed" && running !== undefined && !running.acted;
       const shouldCompact =
-        !refused && !limited && !mayRunAgain && !routineSession && this.#compaction.reserve(agentId, threadId);
+        !refused &&
+        !limited &&
+        !mayRunAgain &&
+        !routineSession &&
+        this.#compaction.reserve(agentId, threadId, false, turnId);
       this.#browser.endControl(this.#conversation.publicThreadId(agentId, threadId), turnId);
       const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
       snapshot.activeTurnId = null;
@@ -973,13 +1101,13 @@ export class TurnLifecycle {
         return;
       }
       const channelTurn = !taskTurn && this.#conversation.isExecutionThread(snapshot.threadId);
-      // After work started, only a ready automatic backup continues it. A turn refused before
+      // After work started, only a ready backup in the agent's order continues it. A turn refused before
       // work still waits for the reset when no backup is ready. A continuation that a backup refused
       // before work keeps the earlier provider's work.
       const carriesWork =
         running !== undefined &&
         (running.acted || deliveries.some((context) => context.resumeAfterUsageLimit !== undefined));
-      let continuing = limited && carriesWork && deliveries.length > 0 && this.#hooks.mayFailOver(agentId);
+      let continuing = limited && carriesWork && deliveries.length > 0 && this.#hooks.mayContinueOnBackup(agentId);
       if (continuing) {
         for (const { delivery, channelId } of deliveries) {
           if (channelId && !(yield* this.#hooks.requeueChannelDelivery(delivery.id, true))) {
@@ -1008,6 +1136,9 @@ export class TurnLifecycle {
       // A foreground subagent ends with its turn. A background one works on and reports later.
       const subagents = snapshot.messages.find((message) => message.id === `${turnId}:subagents`);
       stopRunningSubagents(subagents?.subagents, new Date().toISOString(), { background: false });
+      if (this.#trackSubagents(agentId, turnId, subagents?.subagents)) this.#hooks.emitRuntimeSnapshot();
+      for (const [childId, parent] of this.#codexChildren)
+        if (parent.turnId === turnId) this.#codexChildren.delete(childId);
       for (const message of snapshot.messages) {
         if (this.#itemTurns.get(message.id) !== turnId || message.status !== "streaming") continue;
         message.status = normalizeCompletionStatus(repeatable || failedOver ? "interrupted" : status);
@@ -1069,7 +1200,7 @@ export class TurnLifecycle {
           this.#failoverRetries.set(delivery.id, failed.add(failedKey));
         }
         yield* this.#requeueTurn(agentId, threadId, turnId, snapshot, deliveries);
-        this.#usageLimits.failed(agentId, model);
+        this.#usageLimits.failed(agentId, model, providerResetDelayMs(failover.message));
         this.#hooks.scheduleDrain(agentId);
         return;
       }
@@ -1106,7 +1237,7 @@ export class TurnLifecycle {
       const quiet =
         outcome === "completed" &&
         reportedFailure === undefined &&
-        this.#quietRoutineTurn(snapshot.threadId, deliveries) &&
+        this.#quietRoutineTurn(agentId, snapshot.threadId, deliveries) &&
         settleQuietRoutineTurn(snapshot, turnId, noUpdateCalled);
       const latestAssistant = latestTurnAnswer(snapshot.messages, turnId);
       // A routine run that answered only the no-update marker, also a Test run that shows it in the
@@ -1115,8 +1246,9 @@ export class TurnLifecycle {
         latestAssistant !== undefined &&
         deliveries.some(({ delivery }) => delivery.sender.kind === "routine") &&
         isNoUpdateAnswer(latestAssistant.text);
-      // Before the deliveries end: until then they hold the chat's lane, so no turn of the chat
-      // starts before the digest is in its handoff.
+      // Before the deliveries end: until then they hold their lane, so no later turn of that lane
+      // starts before the digest is in its handoff. A chat turn that starts at the same time keeps
+      // the digest for its next turn (see `ThreadLifecycle.deletePendingHandoff`).
       const routineDelivery = deliveries[0]?.delivery.id;
       if (routineSession && routineDelivery && outcome === "completed" && !quiet && !markerAnswer && latestAssistant)
         yield* this.#hooks.routineAnswered(agentId, routineDelivery, latestAssistant.text);
@@ -1260,11 +1392,15 @@ export class TurnLifecycle {
     (completion, agentId, threadId, turnId, status) =>
       // The turn is already out of `#runningTurns`, so a step above that fails must not leave its
       // deliveries running: nothing else would end them, and the agent's queue would wait (#2214).
+      // Nor a compaction that it reserved and did not ask for: its hold has no deadline (#4960).
       completion.pipe(
         Effect.onError((cause) =>
-          Cause.hasInterruptsOnly(cause)
-            ? Effect.void
-            : this.settleOrphanedTurn(agentId, threadId, turnId, status === "failed" ? "failed" : "interrupted"),
+          Effect.andThen(
+            Effect.sync(() => this.#compaction.dropReservation(agentId, threadId, turnId)),
+            Cause.hasInterruptsOnly(cause)
+              ? Effect.void
+              : this.settleOrphanedTurn(agentId, threadId, turnId, status === "failed" ? "failed" : "interrupted"),
+          ),
         ),
         Effect.ensuring(
           Effect.andThen(
@@ -1328,6 +1464,8 @@ export class TurnLifecycle {
         if (message.turnId !== turnId && this.#itemTurns.get(message.id) !== turnId) continue;
         // As at the normal end, a foreground subagent ends with its turn.
         stopRunningSubagents(message.subagents, now, { background: false });
+        if (message.subagents && this.#trackSubagents(agentId, turnId, message.subagents))
+          this.#hooks.emitRuntimeSnapshot();
         message.status = status;
         markIncompleteImageGeneration(message, status);
         changedIds.add(message.id);
@@ -1603,9 +1741,41 @@ export class TurnLifecycle {
     message.subagents = subagents;
     // A new step replaces the last one in the event log, so a long run does not keep a copy of the
     // list for each step. A new subagent or a new state keeps its own event.
-    if (previous && subagentStates(previous) === subagentStates(subagents))
+    if (previous && subagentStates(previous) === subagentStates(subagents)) {
       this.#conversation.emitReplacedMessage(snapshot, id, "turn.subagents-updated");
-    else this.#conversation.emitConversation(snapshot);
+      return;
+    }
+    this.#conversation.emitConversation(snapshot);
+    if (this.#trackSubagents(agentId, turnId, subagents)) this.#hooks.emitRuntimeSnapshot();
+    const publicThreadId = snapshot.threadId;
+    if (!publicThreadId) return;
+    const failedBefore = new Set(previous?.filter((subagent) => subagent.status === "failed").map(({ id }) => id));
+    for (const subagent of subagents)
+      if (subagent.status === "failed" && !failedBefore.has(subagent.id))
+        this.#hooks.emit({
+          type: "subagent-failed",
+          agentId,
+          threadId: publicThreadId,
+          turnId,
+          subagentId: subagent.id,
+          title: subagent.title,
+        });
+  }
+
+  /**
+   * Notes whether a turn's subagents still run, so that their agent shows as at work. Returns true when
+   * the turns of the agent changed.
+   */
+  #trackSubagents(agentId: string, turnId: string, subagents: readonly ConversationSubagent[] | undefined): boolean {
+    const running = subagents?.some((subagent) => subagent.status === "running") === true;
+    const turns = this.#subagentTurns.get(agentId);
+    if (running === (turns?.has(turnId) === true)) return false;
+    if (running) this.#subagentTurns.set(agentId, (turns ?? new Set()).add(turnId));
+    else if (turns) {
+      turns.delete(turnId);
+      if (turns.size === 0) this.#subagentTurns.delete(agentId);
+    }
+    return true;
   }
 
   /** Codex reports its subagents as tool items of the parent thread. */
@@ -1614,7 +1784,26 @@ export class TurnLifecycle {
     const current = snapshot.messages.find((candidate) => candidate.id === `${turnId}:subagents`)?.subagents ?? [];
     const subagents = foldCodexSubagentItem(current, item, new Date().toISOString());
     const clamped = subagents && clampConversationSubagents(subagents);
-    if (clamped) this.#applySubagents(agentId, threadId, turnId, clamped);
+    if (!clamped) return;
+    for (const subagent of clamped)
+      if (subagent.status === "running") this.#codexChildren.set(subagent.id, { agentId, threadId, turnId });
+      else this.#codexChildren.delete(subagent.id);
+    this.#applySubagents(agentId, threadId, turnId, clamped);
+  }
+
+  /**
+   * An item of a Codex subagent's own thread becomes a step of that subagent. Items that came
+   * before `spawnAgent` named the thread are not shown. The subagent's work keeps its agent active.
+   */
+  #applyCodexChildItem(childThreadId: string, item: DynamicRecord | null): void {
+    const parent = this.#codexChildren.get(childThreadId);
+    if (!parent || !item) return;
+    this.#lastEventAt.set(parent.agentId, Date.now());
+    const snapshot = this.#conversation.ensureSnapshot(parent.agentId, parent.threadId);
+    const current = snapshot.messages.find((candidate) => candidate.id === `${parent.turnId}:subagents`)?.subagents;
+    const subagents = current && foldCodexChildItem(current, childThreadId, item);
+    const clamped = subagents && clampConversationSubagents(subagents);
+    if (clamped) this.#applySubagents(parent.agentId, parent.threadId, parent.turnId, clamped);
   }
 
   #clearPlan(agentId: string, threadId: string, turnId: string): void {

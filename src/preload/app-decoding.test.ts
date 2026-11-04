@@ -1,8 +1,10 @@
 import type {
   AccountSession,
+  AppAppearancePreference,
   AppInfo,
   ApprovalAutomationPreference,
   AppSetupState,
+  AppThemePalette,
   CentralAuthState,
   MobileConnectedDevice,
   NotificationOpenedEvent,
@@ -35,6 +37,26 @@ import {
   decodeVoiceServerProbe,
   decodeVoiceServerSettings,
 } from "./app-decoding";
+
+const omarchyPalette = {
+  id: "omarchy",
+  name: "Omarchy",
+  scheme: "dark",
+  colors: {
+    canvas: "#1a1b26",
+    frame: "#13141c",
+    sidebar: "#13141c",
+    surface: "#24283b",
+    text: "#a9b1d6",
+    textMuted: "#565f89",
+    border: "#414868",
+    accent: "#7aa2f7",
+    accentForeground: "#1a1b26",
+    success: "#9ece6a",
+    warning: "#e0af68",
+    danger: "#f7768e",
+  },
+} satisfies AppThemePalette;
 
 const updateStatus = {
   phase: "downloading",
@@ -114,6 +136,17 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     } satisfies AppInfo,
   ],
   [
+    "app info drawn on the CPU",
+    decodeAppInfo,
+    {
+      name: "OpenBot",
+      version: "1.0.0",
+      platform: "linux",
+      variant: "production",
+      softwareRendering: true,
+    } satisfies AppInfo,
+  ],
+  [
     "setup state",
     decodeAppSetupState,
     { completed: true, preferredProvider: "codex", preferredModel: null } satisfies AppSetupState,
@@ -128,8 +161,22 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     } satisfies ApprovalAutomationPreference,
   ],
   ["language preference", decodeAppLanguagePreference, { language: "fr" }],
-  ["appearance preference", decodeAppAppearancePreference, { appearance: "light", transparentWindow: true }],
+  [
+    "appearance preference",
+    decodeAppAppearancePreference,
+    { appearance: "light", transparentWindow: true, palette: null, palettes: [] } satisfies AppAppearancePreference,
+  ],
+  [
+    "appearance preference with a theme palette",
+    decodeAppAppearancePreference,
+    { appearance: "dark", transparentWindow: false, palette: "omarchy", palettes: [omarchyPalette] },
+  ],
   ["signed out", decodeCentralAuthState, { status: "signed_out" } satisfies CentralAuthState],
+  [
+    "signed out after a keyring change",
+    decodeCentralAuthState,
+    { status: "signed_out", reason: "keyring_changed" } satisfies CentralAuthState,
+  ],
   ["code sent", decodeCentralAuthState, codeSent],
   [
     "code sent with every option",
@@ -154,6 +201,22 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     {
       status: "signed_in",
       user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, analyticsEnabled: true },
+    } satisfies CentralAuthState,
+  ],
+  [
+    "signed in with a chat color",
+    decodeCentralAuthState,
+    {
+      status: "signed_in",
+      user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, chatColor: "#3b82f6" },
+    } satisfies CentralAuthState,
+  ],
+  [
+    "signed in with no chat color",
+    decodeCentralAuthState,
+    {
+      status: "signed_in",
+      user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, chatColor: null },
     } satisfies CentralAuthState,
   ],
   [
@@ -218,6 +281,11 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
     decodeAppInfo,
     { name: "OpenBot", version: "1.0.0", platform: "darwin", variant: "production", analyticsInstallId: 1 },
   ],
+  [
+    "app info with a software rendering flag that is not a boolean",
+    decodeAppInfo,
+    { name: "OpenBot", version: "1.0.0", platform: "linux", variant: "production", softwareRendering: "yes" },
+  ],
   // The key never comes back to the renderer, so a record that carries one fails closed.
   ["a voice server with its key", decodeVoiceServerSettings, { ...voiceServer, apiKey: "sk-secret" }],
   [
@@ -255,7 +323,38 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
     decodeAppAppearancePreference,
     { appearance: "dark", transparentWindow: "true" },
   ],
+  [
+    "appearance preference with no theme palettes",
+    decodeAppAppearancePreference,
+    { appearance: "dark", transparentWindow: false, palette: null },
+  ],
+  [
+    "a theme palette id with a path",
+    decodeAppAppearancePreference,
+    { appearance: "dark", transparentWindow: false, palette: "../omarchy", palettes: [] },
+  ],
+  [
+    "a theme palette color that is not hex",
+    decodeAppAppearancePreference,
+    {
+      appearance: "dark",
+      transparentWindow: false,
+      palette: null,
+      palettes: [{ ...omarchyPalette, colors: { ...omarchyPalette.colors, accent: "red; background: url(x)" } }],
+    },
+  ],
+  [
+    "a theme palette with a missing color",
+    decodeAppAppearancePreference,
+    {
+      appearance: "dark",
+      transparentWindow: false,
+      palette: null,
+      palettes: [{ ...omarchyPalette, colors: { canvas: "#1a1b26" } }],
+    },
+  ],
   ["an unknown account status", decodeCentralAuthState, { status: "banned" }],
+  ["signed out with an unknown reason", decodeCentralAuthState, { status: "signed_out", reason: "expired" }],
   ["signed in without a user", decodeCentralAuthState, { status: "signed_in" }],
   ["code sent with a text expiry", decodeCentralAuthState, { ...codeSent, expiresAt: "soon" }],
   ["Mobile Connect ticket without data", decodeMobileConnectTicket, { expiresAt: 1 }],
@@ -289,6 +388,22 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
     {
       status: "signed_in",
       user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, analyticsEnabled: "yes" },
+    },
+  ],
+  [
+    "an account chat color that is not a lower-case hex color",
+    decodeCentralAuthState,
+    {
+      status: "signed_in",
+      user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, chatColor: "#3B82F6" },
+    },
+  ],
+  [
+    "an account chat color that is a CSS expression",
+    decodeCentralAuthState,
+    {
+      status: "signed_in",
+      user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, chatColor: "red;x:url(a)" },
     },
   ],
   ["a model list with an empty id", decodeDiscoverModelsResult, { models: [{ id: "" }] }],

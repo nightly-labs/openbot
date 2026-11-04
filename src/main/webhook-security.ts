@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { WEBHOOK_DELIVERY_BODY_BYTES_LIMIT } from "@openbot/contracts/signal-protocol/messages";
 import {
+  STANDARD_WEBHOOK_SIGNATURE_PATTERN,
   WEBHOOK_DELIVERY_ID_PATTERN,
   WEBHOOK_MAX_CLOCK_SKEW_SECONDS,
   WEBHOOK_TIMESTAMP_PATTERN,
@@ -15,6 +16,10 @@ const WEBHOOK_MAX_CLOCK_SKEW_MS = WEBHOOK_MAX_CLOCK_SKEW_SECONDS * 1000;
  */
 const WEBHOOK_SIGNATURE_PATTERN = /^sha256=[0-9a-f]{64}$/i;
 const WEBHOOK_SIGNATURE_PREFIX = "sha256=";
+const STANDARD_WEBHOOK_SIGNATURE_VERSION = "v1,";
+const STANDARD_WEBHOOK_SECRET_PREFIX = "whsec_";
+const STANDARD_WEBHOOK_MINIMUM_KEY_BYTES = 16;
+const SHA256_BYTES = 32;
 
 /** Does not retain the input, secret, or native error. It is safe to show and log. */
 class WebhookSecurityError extends Schema.TaggedError<WebhookSecurityError>()("WebhookSecurityError", {
@@ -52,12 +57,8 @@ export function signWebhookBody(secret: string, timestamp: string, deliveryId: s
   return `${WEBHOOK_SIGNATURE_PREFIX}${signatureDigest(secret, timestamp, deliveryId, body).toString("hex")}`;
 }
 
-/**
- * Checks input bounds, timestamp freshness, and the HMAC in constant time.
- *
- * The caller should deduplicate `(routine, deliveryId)` after this check and before a run starts.
- */
-export function verifyWebhookSignature(secret: string, input: WebhookSignatureInput, signature: string): void {
+/** Checks the bounds, the timestamp freshness and the delivery ID that every signature format shares. */
+function verifyWebhookInput(input: WebhookSignatureInput): void {
   if (input.body.byteLength > WEBHOOK_DELIVERY_BODY_BYTES_LIMIT) fail("body_too_large");
   if (!WEBHOOK_TIMESTAMP_PATTERN.test(input.timestamp)) fail("invalid_timestamp");
   if (Math.abs(Number(input.timestamp) * 1000 - (input.nowMs ?? Date.now())) > WEBHOOK_MAX_CLOCK_SKEW_MS)
@@ -65,9 +66,53 @@ export function verifyWebhookSignature(secret: string, input: WebhookSignatureIn
   // The shared patterns are the relay's rules. The timestamp has at most 12 digits, so it is a safe
   // integer, and the delivery ID excludes CR/LF.
   if (!WEBHOOK_DELIVERY_ID_PATTERN.test(input.deliveryId)) fail("invalid_delivery_id");
+}
+
+/**
+ * Checks input bounds, timestamp freshness, and the HMAC in constant time.
+ *
+ * The caller should deduplicate `(routine, deliveryId)` after this check and before a run starts.
+ */
+export function verifyWebhookSignature(secret: string, input: WebhookSignatureInput, signature: string): void {
+  verifyWebhookInput(input);
   if (!WEBHOOK_SIGNATURE_PATTERN.test(signature)) fail("invalid_signature");
   const expected = signatureDigest(secret, input.timestamp, input.deliveryId, input.body);
   const supplied = Buffer.from(signature.slice(WEBHOOK_SIGNATURE_PREFIX.length), "hex");
   // The pattern makes both values 32 bytes, so `timingSafeEqual` does not throw.
   if (!timingSafeEqual(expected, supplied)) fail("invalid_signature");
+}
+
+/**
+ * The HMAC keys of a Standard Webhooks secret. The specification decodes the base64 after `whsec_`;
+ * Composio uses the whole secret as UTF-8. Both keys need the secret, so accepting either is as safe.
+ */
+function standardWebhookKeys(secret: string): Buffer[] {
+  const keys = [Buffer.from(secret, "utf8")];
+  if (secret.startsWith(STANDARD_WEBHOOK_SECRET_PREFIX)) {
+    const encoded = secret.slice(STANDARD_WEBHOOK_SECRET_PREFIX.length);
+    const decoded = Buffer.from(encoded, "base64");
+    // Node skips characters that are not base64, so only an exact round trip is the sender's key.
+    if (decoded.byteLength >= STANDARD_WEBHOOK_MINIMUM_KEY_BYTES && decoded.toString("base64") === encoded)
+      keys.push(decoded);
+  }
+  return keys;
+}
+
+/**
+ * Checks a Standard Webhooks request: the base64 HMAC-SHA256 of `deliveryId.timestamp.body` in one of
+ * the space-separated `v1,<signature>` values, in constant time. Other versions are ignored.
+ */
+export function verifyStandardWebhookSignature(secret: string, input: WebhookSignatureInput, signature: string): void {
+  verifyWebhookInput(input);
+  if (!STANDARD_WEBHOOK_SIGNATURE_PATTERN.test(signature)) fail("invalid_signature");
+  const supplied = signature
+    .split(" ")
+    .filter((entry) => entry.startsWith(STANDARD_WEBHOOK_SIGNATURE_VERSION))
+    .map((entry) => Buffer.from(entry.slice(STANDARD_WEBHOOK_SIGNATURE_VERSION.length), "base64"))
+    .filter((value) => value.byteLength === SHA256_BYTES);
+  const expected = standardWebhookKeys(secret).map((key) =>
+    createHmac("sha256", key).update(`${input.deliveryId}.${input.timestamp}.`).update(input.body).digest(),
+  );
+  // Each value is 32 bytes, so `timingSafeEqual` does not throw.
+  if (!supplied.some((value) => expected.some((digest) => timingSafeEqual(digest, value)))) fail("invalid_signature");
 }

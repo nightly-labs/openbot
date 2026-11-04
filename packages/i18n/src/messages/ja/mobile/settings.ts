@@ -8,6 +8,12 @@ export const messages = {
   "mobile.settings.language.system": "システムの設定",
   "mobile.settings.language.footer":
     "「システムの設定」は、スマートフォンの設定で最初に表示される言語に従います。まだ翻訳されていないテキストは英語で表示されます。",
+  "mobile.settings.language.restartTitle": "OpenBot を再起動しますか？",
+  "mobile.settings.language.restartBody":
+    "この言語は逆方向に読みます。OpenBot を次に起動したときに画面の向きが切り替わります。再起動後も画面がおかしい場合は、App スイッチャーで OpenBot を閉じてから開き直してください。",
+  "mobile.settings.language.restartNow": "今すぐ再起動",
+  "mobile.settings.language.restartFailed":
+    "OpenBot を再起動できませんでした。次に OpenBot を開いたときに画面の向きが切り替わります。",
   "mobile.settings.dictation.language": "音声入力の言語",
   "mobile.settings.about.development": "開発版",
   "mobile.settings.about.openFailed": "リンクを開けませんでした。もう一度お試しください。",
@@ -73,7 +79,7 @@ export const messages = {
   "mobile.settings.animations.all": "アニメーション",
   "mobile.settings.animations.agentFaces": "エージェントの表情アニメーション",
   "mobile.settings.animations.agentFacesFooter":
-    "エージェントが作業中や待機中に、アバターの表情が動きます。オフにすると、表情は動きません。",
+    "エージェントが作業中や待機中に、アバターの表情が動きます。オフにすると、表情は動かず、ようこそ画面と空のホーム画面のキャラクターも浮遊しなくなります。",
   "mobile.settings.animations.composerResize": "コンパクトなメッセージ欄",
   "mobile.settings.animations.composerResizeFooter":
     "キーボードを閉じている間、メッセージ欄は小さなバーになります。オフにすると、メッセージ欄は常に元のサイズのままです。",

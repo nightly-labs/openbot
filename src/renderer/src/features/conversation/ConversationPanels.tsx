@@ -17,6 +17,9 @@ import { desktopBrowserProfileCalls } from "../browser/browser-profiles-port";
 import type { AgentFilesOptions } from "../files/AgentFilesSettings";
 import { canManageStorage, serverHasStorage } from "../files/storage-usage";
 import { serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
+import { codexLiveAccess } from "../speech/codex-live-access";
+import { speechPort } from "../speech/speech-port";
+import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
 import { ConversationSideThread } from "./ConversationSideThread";
 import { htmlAttachmentPageHtml, htmlAttachmentPageUrl } from "./chat-visual-url";
 import { useConversationController } from "./conversation-controller-context";
@@ -24,6 +27,8 @@ import { type AgentNotificationLevelCalls, conversationRuntime } from "./convers
 import { useConversationViewScope } from "./conversation-scope";
 import { agentSkillsMode } from "./installed-skills-source";
 import { desktopChatEventRoutinesApi } from "./routine-webhooks-api";
+import { createCodexLiveConversation } from "./stores/codex-live-conversation-store";
+import type { VoiceConversationKind } from "./stores/voice-session-store";
 
 const BROWSER_PANEL_DEFAULT_RATIO = 0.5;
 const BROWSER_PANEL_MIN = 220;
@@ -43,12 +48,53 @@ import {
 } from "./agent-folders-port";
 import { conversationPort } from "./conversation-port";
 
-/** The voice conversation with the agent that is open when the pane opens. */
+/**
+ * The voice conversation with the agent that is open when the pane opens. A Codex agent on this
+ * computer uses Codex live voice when the user turned it on in Settings → Voice; a failed read of that
+ * setting keeps the conversation that transcribes on this computer. A conversation that still runs
+ * from an earlier visit to the pane shows again.
+ */
 function VoiceConversationPane() {
+  const controller = useConversationController();
+  const { props } = useConversationViewScope();
+  const running = untrack(() => (props.agent ? controller.voiceSessions.running(props.agent.id) : null));
+  // Live voice runs in this computer's Codex App Server, so an agent on a remote server transcribes.
+  // Settings hides the switch when Codex has no ChatGPT sign-in, so the saved choice does not count then.
+  const codex = untrack(
+    () =>
+      props.agent?.provider === "codex" &&
+      props.server?.kind !== "remote" &&
+      codexLiveAccess(props.agentStatus.providers) !== "signIn",
+  );
+  const [kind, setKind] = createSignal<VoiceConversationKind | null>(running ?? (codex ? null : "transcribed"));
+  if (!running && codex)
+    void speechPort()
+      .voice.getSpeechSettings()
+      .then(
+        (settings) => setKind(settings.codexLive ? "codex-live" : "transcribed"),
+        () => setKind("transcribed"),
+      );
+  return (
+    <Show when={kind()} keyed>
+      {(next) => <VoiceConversation kind={next} />}
+    </Show>
+  );
+}
+
+function VoiceConversation(paneProps: { kind: VoiceConversationKind }) {
+  const controller = useConversationController();
   const { props, startVoiceConversation, closeSidePanelPane } = useConversationViewScope();
   const agentId = untrack(() => props.agent?.id);
   if (!agentId) return null;
-  const conversation = startVoiceConversation(agentId);
+  const kind = untrack(() => paneProps.kind);
+  // The conversation outlives this pane: another tab or chat keeps it, and closing the Voice tab ends it.
+  const conversation = controller.voiceSessions.open(agentId, kind, () =>
+    kind === "codex-live" ? createCodexLiveConversation({ agentId }) : startVoiceConversation(agentId),
+  );
+  // Codex live voice speaks at the speed of the realtime model, so it has no speed button.
+  const transcribed = kind === "transcribed";
+  const replySpeed = () => (transcribed ? speechSpeed() : undefined);
+  const cycleSpeed = transcribed ? cycleSpeechSpeed : undefined;
   return (
     <Show when={props.agent}>
       {(agent) => (
@@ -63,6 +109,8 @@ function VoiceConversationPane() {
           onToggleMute={conversation.toggleMute}
           onInterrupt={conversation.interrupt}
           onEnd={() => closeSidePanelPane("voice")}
+          speed={replySpeed()}
+          onCycleSpeed={cycleSpeed}
         />
       )}
     </Show>
@@ -81,7 +129,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     browserExpandedOpen,
     hideBrowserPanel,
     browserTabs,
-    closeSidebarFilePreview,
+    closeShownSidePanelFile,
     closeBrowserTab,
     downloadSidebarFile,
     revealSidebarFile,
@@ -126,6 +174,9 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     openSidePanelPane,
     toggleSidePanel,
     closeSidePanelPane,
+    openSidePanelFile,
+    closeSidePanelFile,
+    moveSidePanelFile,
     sideQuestion,
     setSideQuestionDraft,
     askSideQuestion,
@@ -331,6 +382,14 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
   /** With no side thread to show, the side panel lists the panes. */
   const launcherShown = () =>
     activeRightPanel() === "side-panel" || (activeRightPanel() === "thread" && shownPanelThreadId() === null);
+  /** The file that shows, and whose tab is selected. */
+  const shownFile = () => (filePreviewOpen() ? sidePanel().file : null);
+  /** Opens the routine's side thread in the chat, and closes the settings that cover it. */
+  const openRoutineThread = async (routineId: string): Promise<boolean> => {
+    const opened = (await props.threads?.onOpenRoutineThread(routineId)) ?? false;
+    if (opened) setActiveRightPanel("none");
+    return opened;
+  };
   const sideThreadTabs = () => props.threads?.side.tabs ?? [];
   const moveSideThread = (id: string, index: number) => props.threads?.side.onMove(id, index);
   return (
@@ -352,6 +411,13 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
             onClose: closePanelThread,
             onMove: moveSideThread,
             onToChat: movePanelThreadToChat,
+          }}
+          files={{
+            items: sidePanel().files,
+            selectedKey: shownFile(),
+            onSelect: openSidePanelFile,
+            onClose: closeSidePanelFile,
+            onMove: moveSidePanelFile,
           }}
           onToggleMaximized={() => setSidePanelMaximized(!sidePanel().maximized)}
           onCollapse={toggleSidePanel}
@@ -396,7 +462,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 }
                 onWidthChange={setBrowserPanelWidth}
                 onOpenLink={(url) => void openExternalMessageUrl(url)}
-                onOpenSharedFile={openSharedFile}
+                onOpenSharedFile={(path) => openSharedFile(path, "here")}
                 onOpenWorkspaceFile={previewWorkspaceAgentId() ? openWorkspaceFolderEntry : undefined}
                 onOpenWorkspaceFolder={openWorkspaceFolder}
                 onBack={sidebarFileBack() === null ? undefined : openSidebarFileBack}
@@ -409,7 +475,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 onDownload={downloadSidebarFile}
                 /* A browser cannot show a file in the file manager. */
                 onReveal={props.runtime ? undefined : revealSidebarFile}
-                onClose={closeSidebarFilePreview}
+                onClose={closeShownSidePanelFile}
               />
             </Loading>
           );
@@ -457,7 +523,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
         )}
       </Show>
 
-      {/* Keyed, so another agent or server gets its own conversation; closing the pane ends it. */}
+      {/* Keyed, so another agent or server gets its own conversation; closing the Voice tab ends it. */}
       <Show
         when={
           activeRightPanel() === "voice" &&
@@ -640,6 +706,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               }
               onRoutineSelectionRequestHandled={handleRoutineSettingsRequest}
               onOpenRoutineRun={props.onOpenSearchMessage ? openRoutineRunMessage : undefined}
+              onOpenRoutineThread={props.threads ? openRoutineThread : undefined}
               files={agentFiles(props.server, agent().id)}
               eventRoutines={desktopChatEventRoutinesApi(props.server, props.runtime)}
               routines={props.runtime?.routines}

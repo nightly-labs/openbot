@@ -87,6 +87,24 @@ export const messages = defineMessages("marketplace", {
   "marketplace.agent.update": "Update",
   "marketplace.agent.openChat": "Open chat",
 
+  // The question before an agent update that meets skills with local changes.
+  "marketplace.agentUpdate.title": "Update {name}?",
+  "marketplace.agentUpdate.body": {
+    one: "{count} skill has local changes. It stays as it is unless you choose Replace.",
+    other: "{count} skills have local changes. They stay as they are unless you choose Replace.",
+  },
+  "marketplace.agentUpdate.listLabel": "Skills with local changes",
+  "marketplace.agentUpdate.keep": "Your changes stay",
+  "marketplace.agentUpdate.lost": "Your changes will be lost",
+  "marketplace.agentUpdate.choiceLabel": "Keep or replace {name}",
+  "marketplace.agentUpdate.keepOption": "Keep",
+  "marketplace.agentUpdate.replace": "Replace",
+  "marketplace.agentUpdate.others": {
+    one: "{count} other skill also updates.",
+    other: "{count} other skills also update.",
+  },
+  "marketplace.agentUpdate.confirm": "Update agent",
+
   // Apps.
   "marketplace.app.connect": "Connect",
   "marketplace.app.reconnect": "Reconnect",
@@ -104,6 +122,7 @@ export const messages = defineMessages("marketplace", {
   "marketplace.app.slackTagline": "Mentions and direct messages in Slack",
   "marketplace.app.discordTagline": "Mentions and direct messages in Discord",
   "marketplace.app.telegramTagline": "Groups and direct chats in Telegram",
+  "marketplace.app.whatsappTagline": "Your own chat and the people you allow in WhatsApp",
   "marketplace.app.bitwardenTagline": "Sign in to sites with logins from a shared folder",
   // The category row in the information of a password manager page: 1Password and Bitwarden.
   "marketplace.app.onePasswordCategory": "Login and Credential Management",
@@ -406,6 +425,23 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.clickup.prompt.createTask": "Create a ClickUp task for these action items and assign it to me.",
   "marketplace.plugin.clickup.prompt.summarizeDoc":
     "Find the latest project update in ClickUp and summarize the open questions.",
+  "marketplace.plugin.coinbase.tagline": "Crypto prices, portfolios and trading",
+  "marketplace.plugin.coinbase.description":
+    "Coinbase lets agents read prices, balances, portfolios, orders and fees in Coinbase Advanced Trade, preview and place orders, convert between assets, and move funds between portfolios. Each user signs in to their own Coinbase account through the browser. Agents get the same permissions as the user. Orders and conversions use real funds, and agents can pay for x402 requests from the USDC balance.",
+  "marketplace.plugin.coinbase.app":
+    "Prices, balances, portfolios, orders and conversions, over Coinbase's MCP server with browser sign-in.",
+  "marketplace.plugin.coinbase.prompt.balances": "What are my Coinbase balances in each portfolio?",
+  "marketplace.plugin.coinbase.prompt.price": "Show the BTC-USD price on Coinbase and how it moved this week.",
+  "marketplace.plugin.coinbase.prompt.previewOrder":
+    "Preview a 50 USD market buy of ETH on Coinbase. Do not place the order.",
+  "marketplace.plugin.robinhood.tagline": "Brokerage accounts and agentic trading",
+  "marketplace.plugin.robinhood.description":
+    "Robinhood lets agents read the accounts, positions, balances, transaction history and watchlists of a Robinhood customer, read market data, and place stock, options and crypto orders. Each user signs in to their own Robinhood account through the browser. At the first sign-in, Robinhood asks the user to open a separate Agentic account. Agents can trade only in that account, and by default they place orders without asking the user to approve each one.",
+  "marketplace.plugin.robinhood.app":
+    "Accounts, positions, market data and trades, over Robinhood's MCP server with browser sign-in.",
+  "marketplace.plugin.robinhood.prompt.positions": "Summarize my Robinhood positions and how they moved today.",
+  "marketplace.plugin.robinhood.prompt.watchlist": "How did each stock on my Robinhood watchlist move this week?",
+  "marketplace.plugin.robinhood.prompt.agenticCash": "How much cash is in my Robinhood Agentic account?",
   "marketplace.plugin.huggingface.tagline": "Models, datasets and papers on the Hub",
   "marketplace.plugin.huggingface.description":
     "Hugging Face lets agents search models, datasets, Spaces, collections and papers on the Hugging Face Hub, read model cards and repository files, preview datasets, and search the Hugging Face documentation. It uses public Hub data and needs no account and no key. The tools only read: agents cannot create repositories or run jobs.",

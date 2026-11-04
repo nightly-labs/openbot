@@ -8,6 +8,12 @@ export const messages = {
   "mobile.settings.language.system": "Langue du système",
   "mobile.settings.language.footer":
     "« Langue du système » suit la première langue des réglages du téléphone. Le texte pas encore traduit s’affiche en anglais.",
+  "mobile.settings.language.restartTitle": "Redémarrer OpenBot ?",
+  "mobile.settings.language.restartBody":
+    "Cette langue se lit dans l’autre sens. Les écrans changent de sens au prochain démarrage d’OpenBot. Si les écrans restent incorrects après le redémarrage, fermez OpenBot dans le sélecteur d’apps et rouvrez-le.",
+  "mobile.settings.language.restartNow": "Redémarrer maintenant",
+  "mobile.settings.language.restartFailed":
+    "OpenBot n’a pas pu redémarrer. Les écrans changeront de sens à la prochaine ouverture d’OpenBot.",
   "mobile.settings.dictation.language": "Langue de dictée",
   "mobile.settings.about.development": "Développement",
   "mobile.settings.about.openFailed": "Impossible d’ouvrir le lien. Réessayez.",
@@ -73,7 +79,7 @@ export const messages = {
   "mobile.settings.animations.all": "Animations",
   "mobile.settings.animations.agentFaces": "Visages animés des agents",
   "mobile.settings.animations.agentFacesFooter":
-    "Les avatars des agents bougent leur visage pendant que les agents travaillent et se reposent. Désactivé, les visages restent immobiles.",
+    "Les avatars des agents bougent leur visage pendant que les agents travaillent et se reposent. Désactivé, les visages restent immobiles et les personnages de l’écran d’accueil et de l’accueil vide ne flottent plus.",
   "mobile.settings.animations.composerResize": "Champ de message compact",
   "mobile.settings.animations.composerResizeFooter":
     "Le champ de message devient une petite barre quand le clavier est fermé. Désactivé, le champ garde sa taille complète.",

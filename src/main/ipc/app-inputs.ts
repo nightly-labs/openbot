@@ -4,6 +4,7 @@ import type {
   AgentMemoryLimitPreference,
   AgentProviderId,
   AppBehaviorPreferenceChange,
+  AvatarColor,
   BrowserDockAction,
   BrowserDockFrame,
   BrowserDockPresentation,
@@ -55,6 +56,8 @@ import {
   isAppInterfaceSize,
   isAppLanguage,
   isAppLogoColor,
+  isAppThemePaletteId,
+  isAvatarColor,
   isBrowserDockAction,
   isBrowserDockFrame,
   isBrowserDockPresentation,
@@ -161,14 +164,18 @@ export function parseAppLogoColorPreference(input: unknown): SetAppLogoColorPref
 
 export function parseAppAppearancePreference(input: unknown): SetAppAppearancePreferenceInput {
   if (!isDynamicRecord(input)) throw new Error("Appearance is required.");
-  const { appearance, transparentWindow } = input;
+  const { appearance, transparentWindow, palette } = input;
   if (appearance !== undefined && !isAppAppearance(appearance)) throw new Error("Appearance is invalid.");
   if (transparentWindow !== undefined && typeof transparentWindow !== "boolean")
     throw new Error("Transparent window must be true or false.");
-  if (appearance === undefined && transparentWindow === undefined) throw new Error("Appearance is required.");
+  if (palette !== undefined && palette !== null && !isAppThemePaletteId(palette))
+    throw new Error("Theme palette is invalid.");
+  if (appearance === undefined && transparentWindow === undefined && palette === undefined)
+    throw new Error("Appearance is required.");
   return {
     ...(appearance === undefined ? {} : { appearance }),
     ...(transparentWindow === undefined ? {} : { transparentWindow }),
+    ...(palette === undefined ? {} : { palette }),
   };
 }
 
@@ -315,6 +322,13 @@ export function parseProfileName(input: unknown): string {
     throw new Error(`name must contain ${INPUT_LIMITS.profileNameMin} to ${INPUT_LIMITS.profileName} safe characters.`);
   }
   return validation.name;
+}
+
+/** The chat color of the account: a lower-case `#rrggbb`, or null for no chat color. */
+export function parseChatColor(input: unknown): AvatarColor | null {
+  if (input === null) return null;
+  if (!isAvatarColor(input)) throw new Error("chatColor must be null or a lower-case #rrggbb color.");
+  return input;
 }
 
 // The two marketplaces share query fields and validate their category filters at the boundary.

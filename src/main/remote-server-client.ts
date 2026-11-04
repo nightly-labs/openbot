@@ -50,7 +50,7 @@ import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors"
 import { remoteFetch, requestJson, throwRemoteResponseError, webRtcRequestBody } from "./remote-server-http";
 import type { StoredRemoteServerView } from "./remote-server-store";
 import { addRemotePreviewUrls } from "./remote-server-urls";
-import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
+import { type RemoteFileProgress, RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
 import { decodeIdentityProof } from "./remote-team-decoding";
 import { fingerprint } from "./team-store";
 import { TeamWebRtcRequestError } from "./team-webrtc-client-transport";
@@ -80,6 +80,8 @@ export interface RemoteHostRequestTransport {
       contentType?: string | undefined;
       preserveSemanticTags?: boolean | undefined;
       timeoutMs?: number | undefined;
+      fileProgress?: RemoteFileProgress | undefined;
+      uploadProgress?: ((sent: number, total: number) => void) | undefined;
     },
   ) => Effect.Effect<
     {
@@ -213,6 +215,10 @@ export class RemoteServerClient {
     init: RequestInit = {},
     affectsConnection = true,
     timeoutMs?: number,
+    // Only the WebRTC arm reports here. An HTTP body arrives in parts, so its reader counts them.
+    fileProgress?: RemoteFileProgress,
+    // Only the WebRTC arm reports here: the host confirms each part of the body. `fetch` does not.
+    uploadProgress?: (sent: number, total: number) => void,
   ): Effect.fn.Return<Response, RemoteWorkflowError> {
     return yield* Effect.gen({ self: this }, function* () {
       if (server.transport === "webrtc-v2") {
@@ -227,6 +233,8 @@ export class RemoteServerClient {
             ...(requestBody === undefined ? {} : { body: requestBody }),
             ...(contentType === undefined ? {} : { contentType }),
             ...(timeoutMs === undefined ? {} : { timeoutMs }),
+            ...(fileProgress === undefined ? {} : { fileProgress }),
+            ...(uploadProgress === undefined ? {} : { uploadProgress }),
             preserveSemanticTags: supportsTeamSemanticTags(compatibility.capabilities),
           });
           const headers = new Headers();
