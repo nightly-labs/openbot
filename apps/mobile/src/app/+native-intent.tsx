@@ -13,7 +13,7 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
   try {
     if (isLiveActivityLink(path)) return liveActivityRoute(path, initial);
     if (isIncomingShareLink(path)) return "/incoming-share";
-    return redirectIncomingLink(path);
+    return redirectIncomingLink(path, initial);
   } catch {
     return "/incoming-link";
   }
