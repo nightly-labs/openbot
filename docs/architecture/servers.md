@@ -1152,6 +1152,15 @@ the server as a joined server with `thisComputer: true`. `kind` stays `"remote"`
   stays on loopback for the desktop app. A device ticket names the child's owner member, so the
   owner's phone acts as the owner. A sign-out or another account sends `unpublish`. A sign-in, and
   each start, registers again. A start on this computer does not wait for the account service.
+- **Members and invitations.** The child has no account session, so the desktop app sends the member
+  and invitation calls of such a server to the account service with its own session
+  (`RemoteTeamDirectory`, `isThisComputer`), as for a WebRTC server. Invited people join over WebRTC.
+  The child reads its members through the desktop app: it writes the line
+  `OPENBOT_LOCAL_SERVER_REQUEST members` to stdout, and the desktop app answers on the control pipe
+  with `members` (the account directory) or `members-unavailable` (not registered, or the read
+  failed). After the desktop app changes or removes a member, it writes `members` without a request,
+  and the child syncs it and closes the sessions that the directory no longer allows. The sync keeps
+  the child's owner row (`passwordOwner`), because the desktop app logs in with its username.
 - **Directory.** The account then lists the server. `reconcileWebRtcHosts` leaves out every server
   that `setThisComputerServers` names, so the desktop app keeps its loopback entry. Other computers
   and phones of the account list it as a WebRTC server.
@@ -1175,10 +1184,8 @@ Limits:
   they type a name.
 - A child server is reached as a joined server. Features behind `kind === "local"`, such as
   Computer Use, voice and the local browser dock, work only as far as the Team API carries them.
-- While the desktop app is signed out, only this computer can connect.
-- Only the owner connects from other devices. The account service accepts invitations for the
-  server, but the child does not sync members from the account directory. Not confirmed: how a
-  member that joins with an invitation is shown.
+- While the desktop app is signed out or closed, only this computer can connect: members reach the
+  server only while the desktop app runs and is signed in.
 - The child has no account session, so an owner that ends a device's session from the child's Server
   settings does not end it on the account service. The account has the name of the child's last start.
 - The provider CLI sign-ins in the home folder (`~/.codex`, `~/.claude`) and `~/.agents/skills` are

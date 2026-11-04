@@ -109,6 +109,7 @@ function servers(
       accountId: () => "account-1",
       register: () => Effect.void,
       credential: () => MACHINE_TOKEN,
+      listMembers: () => Effect.succeed([]),
       remove: () => Effect.void,
     },
     command: { executable: "/Applications/OpenBot.app/Contents/MacOS/OpenBot", args: [] },
