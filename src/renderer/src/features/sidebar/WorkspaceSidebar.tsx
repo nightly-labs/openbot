@@ -1,6 +1,10 @@
 import { type ChatWindowTarget, canAdministerServer } from "@openbot/contracts/ipc";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avatar-mood";
+import {
+  agentNumberFromShortcut,
+  numberedSidebarAgentTarget,
+} from "@openbot/ui/features/sidebar/agent-number-shortcut";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { SidebarCommunityCard } from "@openbot/ui/features/sidebar/SidebarCommunityCard";
 import { SidebarMachineCard } from "@openbot/ui/features/sidebar/SidebarMachineCard";
@@ -71,6 +75,39 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       .then(setChatWindows)
       .catch(() => undefined);
     return unsubscribe;
+  });
+  // ⌘⌥1-9 on macOS and Ctrl+Alt+1-9 elsewhere open the agent with that number in the sidebar row
+  // order: the pinned strip, then each section from top to bottom. Hidden agents have no number, so
+  // hiding one does not move the numbers of the others; a collapsed group still counts, so a number
+  // opens the same agent when it opens. The server rail keeps ⌘1-9 / Ctrl+1-9, which carries no Alt.
+  onSettled(() => {
+    const handleAgentNumberShortcut = (event: KeyboardEvent) => {
+      const appInfo = platform.appInfo();
+      if (
+        platform.landingPreview ||
+        !appInfo ||
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.repeat ||
+        event.getModifierState("AltGraph")
+      ) {
+        return;
+      }
+      const number = agentNumberFromShortcut(event, appInfo.platform);
+      if (number === null) return;
+      const agent = numberedSidebarAgentTarget(
+        agentList(),
+        { layout: sidebarLayout(), pinnedItems: pinnedSidebarItems(), hiddenAgentIds: userHiddenAgentIds() },
+        number,
+        activeAgent()?.id,
+      );
+      if (!agent) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      selectAgent(agent.id);
+    };
+    window.addEventListener("keydown", handleAgentNumberShortcut);
+    return () => window.removeEventListener("keydown", handleAgentNumberShortcut);
   });
   const windowAgentIds = createMemo(
     () => new Set(chatWindows().flatMap((target) => (target.serverId === activeServerId() ? [target.agentId] : []))),
