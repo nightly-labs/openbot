@@ -38,6 +38,10 @@ import {
   PROVIDER_ACCOUNTS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import {
+  PROVIDER_DEFAULT_CAPABILITY,
+  PROVIDER_DEFAULT_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-default-v1";
+import {
   PROVIDER_HOST_SIGN_IN_CAPABILITY,
   PROVIDER_HOST_SIGN_IN_ERROR_LIMIT,
   PROVIDER_HOST_SIGN_IN_ROUTES,
@@ -74,6 +78,7 @@ import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import {
   decodeAgentStatusFromHost,
+  decodeHostDefaultProviderFromHost,
   decodeHostProviderAccountsFromHost,
   decodeProviderUsageResetOutcomeFromHost,
   decodeProviderUsageResetsFromHost,
@@ -81,7 +86,7 @@ import {
 import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import { type SignInRelayClient, signInRelayRemote } from "../sign-in-relay-client";
-import { parseProviderId } from "./app-inputs";
+import { parseProviderId, parseSetup } from "./app-inputs";
 import { parseDeleteCustomProvider, parseSaveCustomProvider } from "./custom-provider-inputs";
 import type { IpcGroupHandlers } from "./define-ipc-group";
 import {
@@ -227,6 +232,18 @@ export function providerAdminIpcHandlers({
     });
 
   /**
+   * The provider that a new agent of a joined server's host starts on, which only a host with
+   * `provider-default-v1` serves. This computer's own is `app.saveSetup`.
+   */
+  function hostDefaultProvider(serverId: string, path: string, body: unknown) {
+    if (!remoteServers.supportsCapability(serverId, PROVIDER_DEFAULT_CAPABILITY))
+      throw new Error(sourceText("error.team.providerDefaultUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, path, decodeHostDefaultProviderFromHost, { method: "POST", body }),
+    );
+  }
+
+  /**
    * The usage reset credits of a joined server's host's accounts, which only a host with
    * `provider-usage-reset-v1` spends. This computer's own go through `providers`.
    */
@@ -357,6 +374,18 @@ export function providerAdminIpcHandlers({
       ),
       renameAccount: accountsRequest(parseRenameProviderAccountInput, PROVIDER_ACCOUNTS_ROUTES.rename, acceptEmpty),
       removeAccount: accountsRequest(parseRemoveProviderAccountInput, PROVIDER_ACCOUNTS_ROUTES.remove, acceptEmpty),
+      hostDefaultProvider: scopedQueryHandler({
+        local: () => Promise.reject(new Error(sourceText("error.team.providerDefaultUnsupported"))),
+        remote: (serverId) => hostDefaultProvider(serverId, PROVIDER_DEFAULT_ROUTES.settings, {}),
+      }),
+      setHostDefaultProvider: scopedHandler(parseSetup, {
+        local: () => Promise.reject(new Error(sourceText("error.team.providerDefaultUnsupported"))),
+        remote: (input, serverId) =>
+          hostDefaultProvider(serverId, PROVIDER_DEFAULT_ROUTES.update, {
+            provider: input.preferredProvider,
+            model: input.preferredModel,
+          }),
+      }),
       usageResets: usageResetRequest(
         parseProviderId,
         PROVIDER_USAGE_RESET_ROUTES.list,

@@ -6,6 +6,7 @@ import {
   decodeInstalledSkills,
   decodeProviderUsageResetOutcome,
   decodeProviderUsageResets,
+  type HostDefaultProvider,
   type HostProviderAccounts,
   isAgentHostSettings,
   isAgentNotificationLevelsSnapshot,
@@ -49,6 +50,8 @@ import {
   isAgentFolderList,
   isAgentInstructionsFile,
   isAgentMemory,
+  isAgentModel,
+  isAgentProvider,
   isAgentStatus,
   isAttachmentSummary,
   isClientAgentModelOption,
@@ -192,6 +195,19 @@ export function decodeAgentStatusFromHost(value: unknown): AgentStatus {
 /** The `provider-accounts-v1` list, as the web client also reads it: an unknown provider is left out. */
 export function decodeHostProviderAccountsFromHost(value: unknown): HostProviderAccounts {
   return decodeHostProviderAccounts(value);
+}
+
+/**
+ * The `provider-default-v1` snapshot. A newer host can name a provider that this build does not know,
+ * which reads as none, and its model with it.
+ */
+export function decodeHostDefaultProviderFromHost(value: unknown): HostDefaultProvider {
+  const { provider, model } = decodeRecord(value, "default provider");
+  if (provider !== null && !isString(provider)) throw new Error("Invalid default provider.");
+  if (model !== null && !isAgentModel(model)) throw new Error("Invalid default model.");
+  return isAgentProvider(provider)
+    ? { preferredProvider: provider, preferredModel: model }
+    : { preferredProvider: null, preferredModel: null };
 }
 
 /** The `provider-usage-reset-v1` list: an unknown provider is left out. */
