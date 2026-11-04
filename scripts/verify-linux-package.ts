@@ -117,8 +117,10 @@ for (const name of voiceRuntimeFiles) {
 await Promise.all(
   [
     "voice/model",
+    "voice/parakeet-unified-en-0.6b-int8",
     "voice/bark-3.0-plus-int8",
     "voice/whisper-turbo-int8",
+    "voice/cohere-transcribe-14-lang-int8",
     "voice/supertonic-3-int8",
     "voice/runtime/encoder.int8.onnx",
     "voice/runtime/turbo-encoder.int8.onnx",

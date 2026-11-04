@@ -554,8 +554,11 @@ export const messages = {
   "settings.hostedServers.plan.pro.summary": "لعدد كبير من الوكلاء وعمل مكثف في المتصفح.",
   "settings.voice.dictation.section": "الإملاء",
   "settings.voice.model.parakeet.description": "سريع. يتعرّف على اللغة المنطوقة بنفسه، في 25 لغة أوروبية.",
+  "settings.voice.model.parakeetUnified.description":
+    "سريع. الإنجليزية فقط. يضع علامات الترقيم، مع أخطاء أقل من Parakeet TDT.",
   "settings.voice.model.bark.description": "سريع. الإنجليزية فقط. يكتب غالبًا بأحرف صغيرة، مع قليل من علامات الترقيم.",
   "settings.voice.model.whisper.description": "أبطأ. نحو 100 لغة، ويمكنك تحديد اللغة المنطوقة.",
+  "settings.voice.model.cohere.description": "أبطأ. 14 لغة. أنت تحدد اللغة المنطوقة. يستخدم نحو 4 غيغابايت من الذاكرة.",
   "settings.voice.model.size": "حجم التنزيل: {size}",
   "settings.voice.model.downloading": "جارٍ التنزيل · {received} من {total}",
   "settings.voice.model.failed": "توقف التنزيل. تحقق من الاتصال وحاول مرة أخرى.",
@@ -569,9 +572,13 @@ export const messages = {
   "settings.voice.model.removeLabel": "إزالة {name} من هذا الحاسوب",
   "settings.voice.language.section": "اللغة",
   "settings.voice.language.description": "اللغة التي تتحدث بها. يتعرّف عليها الخيار «تلقائي» من التسجيل.",
+  "settings.voice.language.modelLanguages":
+    "اللغة التي تتحدث بها. يعرف هذا النموذج هذه اللغات فقط، ولا يكتشف اللغة بنفسه.",
   "settings.voice.language.modelDetects":
     "يتعرّف Parakeet على اللغة المنطوقة بنفسه. لتحديد لغة، استخدم Whisper أو ElevenLabs.",
   "settings.voice.language.englishOnly": "يتعرّف Bark على الإنجليزية فقط. لتحديد لغة، استخدم Whisper أو ElevenLabs.",
+  "settings.voice.language.parakeetUnifiedEnglishOnly":
+    "يتعرّف Parakeet Unified على الإنجليزية فقط. لتحديد لغة، استخدم Whisper أو Cohere أو ElevenLabs.",
   "settings.voice.language.automatic": "تلقائي",
   "settings.voice.loadFailed": "تعذّرت قراءة نماذج الصوت.",
   "settings.voice.saveFailed": "تعذّر حفظ إعداد الصوت. حاول مرة أخرى.",

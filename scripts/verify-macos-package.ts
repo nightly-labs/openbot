@@ -82,8 +82,10 @@ await Promise.all([
   access(resolve(resourcesPath, "licenses/sherpa-onnx-LICENSE")),
   access(resolve(resourcesPath, "licenses/onnxruntime-LICENSE")),
   access(resolve(resourcesPath, "licenses/NVIDIA-Parakeet-TDT-0.6B-v3-LICENSE")),
+  access(resolve(resourcesPath, "licenses/NVIDIA-Parakeet-Unified-EN-0.6B-LICENSE")),
   access(resolve(resourcesPath, "licenses/Underdog-Bark-3.0-Plus-LICENSE")),
   access(resolve(resourcesPath, "licenses/OpenAI-Whisper-LICENSE")),
+  access(resolve(resourcesPath, "licenses/Cohere-Transcribe-LICENSE")),
   access(resolve(resourcesPath, "licenses/Supertone-Supertonic-3-LICENSE")),
   ...voiceRuntimeFiles.map((name) => access(resolve(voiceRuntimePath, name))),
   access(databaseHostPath),
@@ -175,11 +177,16 @@ for (const name of voiceRuntimeFiles) {
     throw new Error(`Expected a ${machOArchitecture} voice runtime library: ${voiceArchitecture}`);
   }
 }
-// The Parakeet, Bark, Whisper and Supertonic models are downloaded on demand.
+// The dictation models and Supertonic are downloaded on demand.
 if (
-  ["voice/model", "voice/bark-3.0-plus-int8", "voice/whisper-turbo-int8", "voice/supertonic-3-int8"].some((path) =>
-    existsSync(resolve(resourcesPath, path)),
-  ) ||
+  [
+    "voice/model",
+    "voice/parakeet-unified-en-0.6b-int8",
+    "voice/bark-3.0-plus-int8",
+    "voice/whisper-turbo-int8",
+    "voice/cohere-transcribe-14-lang-int8",
+    "voice/supertonic-3-int8",
+  ].some((path) => existsSync(resolve(resourcesPath, path))) ||
   ["encoder.int8.onnx", "turbo-encoder.int8.onnx", "vocoder.int8.onnx"].some((name) =>
     existsSync(resolve(voiceRuntimePath, name)),
   )

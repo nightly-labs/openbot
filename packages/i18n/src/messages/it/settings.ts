@@ -525,9 +525,13 @@ export const messages = {
   "settings.hostedServers.plan.pro.summary": "Per molti agenti e un uso intenso del browser.",
   "settings.voice.dictation.section": "Dettatura",
   "settings.voice.model.parakeet.description": "Veloce. Riconosce da solo la lingua parlata, in 25 lingue europee.",
+  "settings.voice.model.parakeetUnified.description":
+    "Veloce. Solo inglese. Mette la punteggiatura, con meno errori di Parakeet TDT.",
   "settings.voice.model.bark.description":
     "Veloce. Solo inglese. Scrive quasi tutto in minuscolo, con poca punteggiatura.",
   "settings.voice.model.whisper.description": "Più lento. Circa 100 lingue, e puoi impostare la lingua parlata.",
+  "settings.voice.model.cohere.description":
+    "Più lento. 14 lingue. Imposti tu la lingua parlata. Usa circa 4 GB di memoria.",
   "settings.voice.model.size": "Dimensione del download: {size}",
   "settings.voice.model.downloading": "Download · {received} di {total}",
   "settings.voice.model.failed": "Il download si è interrotto. Controlla la connessione e riprova.",
@@ -541,10 +545,14 @@ export const messages = {
   "settings.voice.model.removeLabel": "Rimuovi {name} da questo computer",
   "settings.voice.language.section": "Lingua",
   "settings.voice.language.description": "La lingua che parli. «Automatica» la riconosce dalla registrazione.",
+  "settings.voice.language.modelLanguages":
+    "La lingua che parli. Questo modello conosce solo queste lingue e non rileva la lingua da solo.",
   "settings.voice.language.modelDetects":
     "Parakeet riconosce da solo la lingua parlata. Per impostare una lingua, usa Whisper o ElevenLabs.",
   "settings.voice.language.englishOnly":
     "Bark riconosce solo l'inglese. Per impostare una lingua, usa Whisper o ElevenLabs.",
+  "settings.voice.language.parakeetUnifiedEnglishOnly":
+    "Parakeet Unified riconosce solo l'inglese. Per impostare una lingua, usa Whisper, Cohere o ElevenLabs.",
   "settings.voice.language.automatic": "Automatica",
   "settings.voice.loadFailed": "Impossibile leggere i modelli vocali.",
   "settings.voice.saveFailed": "Impossibile salvare l'impostazione vocale. Riprova.",

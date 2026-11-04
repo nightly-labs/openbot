@@ -527,9 +527,13 @@ export const messages = {
   // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Dikte",
   "settings.voice.model.parakeet.description": "Hızlı. Konuşulan dili 25 Avrupa dili arasında kendisi bulur.",
+  "settings.voice.model.parakeetUnified.description":
+    "Hızlı. Yalnızca İngilizce. Noktalama kullanır ve Parakeet TDT'den daha az hata yapar.",
   "settings.voice.model.bark.description":
     "Hızlı. Yalnızca İngilizce. Çoğunlukla küçük harfle ve az noktalamayla yazar.",
   "settings.voice.model.whisper.description": "Daha yavaş. Yaklaşık 100 dil; konuşulan dili belirleyebilirsiniz.",
+  "settings.voice.model.cohere.description":
+    "Daha yavaş. 14 dil; konuşulan dili siz belirlersiniz. Yaklaşık 4 GB bellek kullanır.",
   "settings.voice.model.size": "İndirme boyutu: {size}",
   "settings.voice.model.downloading": "İndiriliyor · {received} / {total}",
   "settings.voice.model.failed": "İndirme durdu. Bağlantıyı kontrol edip tekrar deneyin.",
@@ -543,10 +547,14 @@ export const messages = {
   "settings.voice.model.removeLabel": "{name} modelini bu bilgisayardan kaldır",
   "settings.voice.language.section": "Dil",
   "settings.voice.language.description": "Konuştuğunuz dil. Otomatik, dili kayıttan bulur.",
+  "settings.voice.language.modelLanguages":
+    "Konuştuğunuz dil. Bu model yalnızca bu dilleri bilir ve dili kendisi bulmaz.",
   "settings.voice.language.modelDetects":
     "Parakeet konuşulan dili kendisi bulur. Bir dil belirlemek için Whisper'ı veya ElevenLabs'i kullanın.",
   "settings.voice.language.englishOnly":
     "Bark yalnızca İngilizceyi tanır. Bir dil belirlemek için Whisper'ı veya ElevenLabs'i kullanın.",
+  "settings.voice.language.parakeetUnifiedEnglishOnly":
+    "Parakeet Unified yalnızca İngilizceyi tanır. Bir dil belirlemek için Whisper, Cohere veya ElevenLabs kullanın.",
   "settings.voice.language.automatic": "Otomatik",
   "settings.voice.loadFailed": "Ses modelleri okunamadı.",
   "settings.voice.saveFailed": "Ses ayarı kaydedilemedi. Tekrar deneyin.",

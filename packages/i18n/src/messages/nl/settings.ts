@@ -518,9 +518,13 @@ export const messages = {
   "settings.hostedServers.plan.pro.summary": "Voor veel agents en zwaar browserwerk.",
   "settings.voice.dictation.section": "Dicteren",
   "settings.voice.model.parakeet.description": "Snel. Herkent zelf de gesproken taal, in 25 Europese talen.",
+  "settings.voice.model.parakeetUnified.description":
+    "Snel. Alleen Engels. Zet leestekens, met minder fouten dan Parakeet TDT.",
   "settings.voice.model.bark.description":
     "Snel. Alleen Engels. Schrijft meestal in kleine letters, met weinig leestekens.",
   "settings.voice.model.whisper.description": "Trager. Ongeveer 100 talen, en je kunt de gesproken taal instellen.",
+  "settings.voice.model.cohere.description":
+    "Trager. 14 talen. Je stelt de gesproken taal zelf in. Gebruikt ongeveer 4 GB geheugen.",
   "settings.voice.model.size": "Downloadgrootte: {size}",
   "settings.voice.model.downloading": "Downloaden · {received} van {total}",
   "settings.voice.model.failed": "De download is gestopt. Controleer de verbinding en probeer het opnieuw.",
@@ -534,10 +538,14 @@ export const messages = {
   "settings.voice.model.removeLabel": "Verwijder {name} van deze computer",
   "settings.voice.language.section": "Taal",
   "settings.voice.language.description": "De taal die je spreekt. Automatisch herkent hem uit de opname.",
+  "settings.voice.language.modelLanguages":
+    "De taal die je spreekt. Dit model kent alleen deze talen en herkent de taal niet zelf.",
   "settings.voice.language.modelDetects":
     "Parakeet herkent zelf de gesproken taal. Gebruik Whisper of ElevenLabs om een taal in te stellen.",
   "settings.voice.language.englishOnly":
     "Bark herkent alleen Engels. Gebruik Whisper of ElevenLabs om een taal in te stellen.",
+  "settings.voice.language.parakeetUnifiedEnglishOnly":
+    "Parakeet Unified herkent alleen Engels. Gebruik Whisper, Cohere of ElevenLabs om een taal in te stellen.",
   "settings.voice.language.automatic": "Automatisch",
   "settings.voice.loadFailed": "Kan de spraakmodellen niet lezen.",
   "settings.voice.saveFailed": "Kan de spraakinstelling niet opslaan. Probeer het opnieuw.",

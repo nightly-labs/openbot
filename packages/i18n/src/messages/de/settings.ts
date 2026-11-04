@@ -540,9 +540,13 @@ export const messages = {
   "settings.voice.dictation.section": "Diktieren",
   "settings.voice.model.parakeet.description":
     "Schnell. Erkennt die gesprochene Sprache selbst, in 25 europäischen Sprachen.",
+  "settings.voice.model.parakeetUnified.description":
+    "Schnell. Nur Englisch. Setzt Satzzeichen, mit weniger Fehlern als Parakeet TDT.",
   "settings.voice.model.bark.description": "Schnell. Nur Englisch. Schreibt meist klein, mit wenigen Satzzeichen.",
   "settings.voice.model.whisper.description":
     "Langsamer. Etwa 100 Sprachen, und du kannst die gesprochene Sprache festlegen.",
+  "settings.voice.model.cohere.description":
+    "Langsamer. 14 Sprachen. Du legst die gesprochene Sprache fest. Braucht etwa 4 GB Arbeitsspeicher.",
   "settings.voice.model.size": "Downloadgröße: {size}",
   "settings.voice.model.downloading": "Wird geladen · {received} von {total}",
   "settings.voice.model.failed": "Der Download wurde unterbrochen. Prüfe die Verbindung und versuche es erneut.",
@@ -556,10 +560,14 @@ export const messages = {
   "settings.voice.model.removeLabel": "{name} von diesem Computer entfernen",
   "settings.voice.language.section": "Sprache",
   "settings.voice.language.description": "Die Sprache, die du sprichst. Automatisch erkennt sie aus der Aufnahme.",
+  "settings.voice.language.modelLanguages":
+    "Die Sprache, die du sprichst. Dieses Modell kennt nur diese Sprachen und erkennt die Sprache nicht selbst.",
   "settings.voice.language.modelDetects":
     "Parakeet erkennt die gesprochene Sprache selbst. Um eine Sprache festzulegen, verwende Whisper oder ElevenLabs.",
   "settings.voice.language.englishOnly":
     "Bark erkennt nur Englisch. Um eine Sprache festzulegen, verwende Whisper oder ElevenLabs.",
+  "settings.voice.language.parakeetUnifiedEnglishOnly":
+    "Parakeet Unified erkennt nur Englisch. Um eine Sprache festzulegen, verwende Whisper, Cohere oder ElevenLabs.",
   "settings.voice.language.automatic": "Automatisch",
   "settings.voice.loadFailed": "Die Sprachmodelle konnten nicht gelesen werden.",
   "settings.voice.saveFailed": "Die Spracheinstellung konnte nicht gespeichert werden. Versuche es erneut.",

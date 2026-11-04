@@ -553,9 +553,13 @@ export const messages = {
   // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Dyktowanie",
   "settings.voice.model.parakeet.description": "Szybki. Sam rozpoznaje język mowy, w 25 językach europejskich.",
+  "settings.voice.model.parakeetUnified.description":
+    "Szybki. Tylko angielski. Stawia interpunkcję, z mniejszą liczbą błędów niż Parakeet TDT.",
   "settings.voice.model.bark.description":
     "Szybki. Tylko angielski. Pisze głównie małymi literami, z niewielką interpunkcją.",
   "settings.voice.model.whisper.description": "Wolniejszy. Około 100 języków i możesz ustawić język mowy.",
+  "settings.voice.model.cohere.description":
+    "Wolniejszy. 14 języków. Język mowy ustawiasz sam. Używa około 4 GB pamięci.",
   "settings.voice.model.size": "Rozmiar pobierania: {size}",
   "settings.voice.model.downloading": "Pobieranie · {received} z {total}",
   "settings.voice.model.failed": "Pobieranie zostało przerwane. Sprawdź połączenie i spróbuj ponownie.",
@@ -569,10 +573,14 @@ export const messages = {
   "settings.voice.model.removeLabel": "Usuń model {name} z tego komputera",
   "settings.voice.language.section": "Język",
   "settings.voice.language.description": "Język, w którym mówisz. Automatycznie rozpoznaje go z nagrania.",
+  "settings.voice.language.modelLanguages":
+    "Język, którym mówisz. Ten model zna tylko te języki i nie rozpoznaje języka sam.",
   "settings.voice.language.modelDetects":
     "Parakeet sam rozpoznaje język mowy. Aby ustawić język, użyj Whisper lub ElevenLabs.",
   "settings.voice.language.englishOnly":
     "Bark rozpoznaje tylko angielski. Aby ustawić język, użyj Whisper lub ElevenLabs.",
+  "settings.voice.language.parakeetUnifiedEnglishOnly":
+    "Parakeet Unified rozpoznaje tylko angielski. Aby ustawić język, użyj Whisper, Cohere lub ElevenLabs.",
   "settings.voice.language.automatic": "Automatycznie",
   "settings.voice.loadFailed": "Nie udało się odczytać modeli głosu.",
   "settings.voice.saveFailed": "Nie udało się zapisać ustawienia głosu. Spróbuj ponownie.",

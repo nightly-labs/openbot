@@ -25,6 +25,8 @@ import { VoiceApiKeyStore } from "../src/main/voice-api-key-store";
 import { openScribeSocket } from "../src/main/voice-cloud-stream";
 import {
   BARK_PLUS_MODEL_DIRECTORY,
+  COHERE_TRANSCRIBE_MODEL_DIRECTORY,
+  PARAKEET_UNIFIED_MODEL_DIRECTORY,
   SPEECH_SESSION_CONFIG,
   SUPERTONIC_MODEL_DIRECTORY,
   TRANSCRIPTION_SESSION_CONFIGS,
@@ -57,13 +59,17 @@ const SPEECH_HOST = resolve("src/main/voice-speech-host.ts");
 const ELECTRON = resolve("node_modules/electron/dist/Electron.app/Contents/MacOS/Electron");
 const MODEL_DIRECTORIES: Record<LocalVoiceModelId, string> = {
   "parakeet-tdt-0.6b-v3": join(RESOURCES_ROOT, "model"),
+  "parakeet-unified-en-0.6b": join(RESOURCES_ROOT, PARAKEET_UNIFIED_MODEL_DIRECTORY),
   "bark-3.0-plus": join(RESOURCES_ROOT, BARK_PLUS_MODEL_DIRECTORY),
   "whisper-turbo": join(RESOURCES_ROOT, WHISPER_TURBO_MODEL_DIRECTORY),
+  "cohere-transcribe-03-2026": join(RESOURCES_ROOT, COHERE_TRANSCRIBE_MODEL_DIRECTORY),
 };
 const ENGINES: Record<LocalVoiceModelId, VoiceTranscriptionEngine> = {
   "parakeet-tdt-0.6b-v3": "nemo-transducer",
+  "parakeet-unified-en-0.6b": "nemo-transducer",
   "bark-3.0-plus": "nemo-transducer",
   "whisper-turbo": "whisper",
+  "cohere-transcribe-03-2026": "cohere-transcribe",
 };
 const PCM_FROM_JSON = `data:text/javascript,process.prependListener("message",(m)=>{if(m&&typeof m==="object"&&Array.isArray(m.pcm))m.pcm=Uint8Array.from(m.pcm)});`;
 /** The services stop an idle host after 60 s; the check fails when it waits longer than this. */

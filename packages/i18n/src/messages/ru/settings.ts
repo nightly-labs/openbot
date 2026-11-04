@@ -554,9 +554,13 @@ export const messages = {
   // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Диктовка",
   "settings.voice.model.parakeet.description": "Быстрая. Сама определяет язык речи, 25 европейских языков.",
+  "settings.voice.model.parakeetUnified.description":
+    "Быстрая. Только английский. Ставит знаки препинания, ошибок меньше, чем у Parakeet TDT.",
   "settings.voice.model.bark.description":
     "Быстрая. Только английский. Пишет в основном строчными буквами, почти без знаков препинания.",
   "settings.voice.model.whisper.description": "Медленнее. Около 100 языков, и вы можете задать язык речи.",
+  "settings.voice.model.cohere.description":
+    "Медленнее. 14 языков. Язык речи вы задаёте сами. Использует около 4 ГБ памяти.",
   "settings.voice.model.size": "Размер загрузки: {size}",
   "settings.voice.model.downloading": "Загрузка · {received} из {total}",
   "settings.voice.model.failed": "Загрузка прервана. Проверьте подключение и повторите попытку.",
@@ -570,10 +574,14 @@ export const messages = {
   "settings.voice.model.removeLabel": "Удалить {name} с этого компьютера",
   "settings.voice.language.section": "Язык",
   "settings.voice.language.description": "Язык, на котором вы говорите. «Автоматически» определяет его по записи.",
+  "settings.voice.language.modelLanguages":
+    "Язык, на котором вы говорите. Эта модель знает только эти языки и не определяет язык сама.",
   "settings.voice.language.modelDetects":
     "Parakeet сам определяет язык речи. Чтобы задать язык, используйте Whisper или ElevenLabs.",
   "settings.voice.language.englishOnly":
     "Bark распознаёт только английский. Чтобы задать язык, используйте Whisper или ElevenLabs.",
+  "settings.voice.language.parakeetUnifiedEnglishOnly":
+    "Parakeet Unified распознаёт только английский. Чтобы задать язык, используйте Whisper, Cohere или ElevenLabs.",
   "settings.voice.language.automatic": "Автоматически",
   "settings.voice.loadFailed": "Не удалось прочитать голосовые модели.",
   "settings.voice.saveFailed": "Не удалось сохранить настройку голоса. Повторите попытку.",

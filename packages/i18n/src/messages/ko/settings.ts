@@ -509,8 +509,12 @@ export const messages = {
   "settings.hostedServers.plan.pro.summary": "많은 에이전트와 무거운 브라우저 작업을 위한 요금제예요.",
   "settings.voice.dictation.section": "받아쓰기",
   "settings.voice.model.parakeet.description": "빨라요. 유럽 언어 25개에서 말하는 언어를 스스로 찾아내요.",
+  "settings.voice.model.parakeetUnified.description":
+    "빨라요. 영어만 지원해요. 문장 부호를 쓰고, Parakeet TDT보다 오류가 적어요.",
   "settings.voice.model.bark.description": "빨라요. 영어만 지원해요. 대부분 소문자로, 문장 부호가 거의 없이 써요.",
   "settings.voice.model.whisper.description": "느려요. 약 100개 언어를 지원하고 말하는 언어를 지정할 수 있어요.",
+  "settings.voice.model.cohere.description":
+    "느려요. 14개 언어를 지원하고 말하는 언어를 직접 지정해요. 메모리를 약 4GB 사용해요.",
   "settings.voice.model.size": "다운로드 크기: {size}",
   "settings.voice.model.downloading": "다운로드 중 · {total} 중 {received}",
   "settings.voice.model.failed": "다운로드가 중단되었어요. 연결을 확인하고 다시 시도해 주세요.",
@@ -524,10 +528,13 @@ export const messages = {
   "settings.voice.model.removeLabel": "이 컴퓨터에서 {name} 삭제",
   "settings.voice.language.section": "언어",
   "settings.voice.language.description": "말하는 언어예요. 자동을 선택하면 녹음에서 언어를 찾아내요.",
+  "settings.voice.language.modelLanguages": "말하는 언어예요. 이 모델은 이 언어들만 알고, 언어를 스스로 찾지 않아요.",
   "settings.voice.language.modelDetects":
     "Parakeet는 말하는 언어를 스스로 찾아내요. 언어를 지정하려면 Whisper나 ElevenLabs를 사용해 주세요.",
   "settings.voice.language.englishOnly":
     "Bark는 영어만 인식해요. 언어를 지정하려면 Whisper나 ElevenLabs를 사용해 주세요.",
+  "settings.voice.language.parakeetUnifiedEnglishOnly":
+    "Parakeet Unified는 영어만 인식해요. 언어를 지정하려면 Whisper, Cohere 또는 ElevenLabs를 사용해 주세요.",
   "settings.voice.language.automatic": "자동",
   "settings.voice.loadFailed": "음성 모델을 읽을 수 없어요.",
   "settings.voice.saveFailed": "음성 설정을 저장할 수 없어요. 다시 시도해 주세요.",

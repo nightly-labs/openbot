@@ -309,7 +309,7 @@ export const VoiceModelsDownloaded: Story = {
     <SettingsModalStory
       initialOpen
       initialTab="voice"
-      voice={{ voiceModelsReady: ["parakeet-tdt-0.6b-v3", "bark-3.0-plus"], speechModelReady: true }}
+      voice={{ voiceModelsReady: ["parakeet-tdt-0.6b-v3", "parakeet-unified-en-0.6b"], speechModelReady: true }}
     />
   ),
 };

@@ -1,5 +1,5 @@
-// The process that runs local speech recognition (NVIDIA Parakeet TDT, Underdog Bark or OpenAI
-// Whisper turbo through sherpa-onnx).
+// The process that runs local speech recognition (NVIDIA Parakeet, Underdog Bark, OpenAI Whisper
+// turbo or Cohere Transcribe through sherpa-onnx).
 //
 // It is separate from the main process because the loaded model holds about 2 GB of memory and
 // a decode cannot be interrupted. The main process ends this process when it is idle, when a
@@ -20,12 +20,13 @@ import type {
 
 const SAMPLE_RATE = 16_000;
 /**
- * Whisper reads at most 30 s; sherpa-onnx cuts a longer input to its first 29.5 s. Longer audio is
- * decoded in parts of at most this many samples.
+ * Whisper reads at most 30 s; sherpa-onnx cuts a longer input to its first 29.5 s. Cohere
+ * Transcribe has the same encoder-decoder design. Longer audio is decoded in parts of at most this
+ * many samples.
  */
-const WHISPER_MAXIMUM_SAMPLES = 28 * SAMPLE_RATE;
+const PART_MAXIMUM_SAMPLES = 28 * SAMPLE_RATE;
 /** A part ends at the quietest moment in its last seconds, so a cut seldom splits a word. */
-const WHISPER_SPLIT_SEARCH_SAMPLES = 4 * SAMPLE_RATE;
+const PART_SPLIT_SEARCH_SAMPLES = 4 * SAMPLE_RATE;
 const SPLIT_WINDOW_SAMPLES = SAMPLE_RATE / 50;
 /** The most leading silence a request can ask for. */
 const MAXIMUM_LEADING_SILENCE_SAMPLES = SAMPLE_RATE;
@@ -49,6 +50,14 @@ interface RecognizerConfig {
       enableTokenTimestamps: number;
       enableSegmentTimestamps: number;
     };
+    cohereTranscribe?: {
+      encoder: string;
+      decoder: string;
+      /** The language when a stream sets none. Each stream sets the language of its request. */
+      language: string;
+      usePunct: number;
+      useItn: number;
+    };
     tokens: string;
     numThreads: number;
     /** `cpu`, or `cpu:<file>` with ONNX Runtime session settings. */
@@ -65,6 +74,8 @@ interface SherpaOnnxAddon {
   acceptWaveformOffline(stream: unknown, wave: { samples: Float32Array; sampleRate: number }): void;
   decodeOfflineStreamAsync(recognizer: unknown, stream: unknown): Promise<unknown>;
   getOfflineStreamResultAsJson(stream: unknown): string;
+  /** Sets a decoding option of one stream. Cohere Transcribe reads its language from `language`. */
+  offlineStreamSetOption(stream: unknown, key: string, value: string): void;
   /** Replaces the decoding settings of a loaded recognizer. Whisper reads its language from them. */
   offlineRecognizerSetConfig(recognizer: unknown, config: RecognizerConfig): void;
 }
@@ -75,7 +86,7 @@ interface LoadedRecognizer {
   recognizer: unknown;
   engine: VoiceTranscriptionEngine;
   modelDirectory: string;
-  /** The Whisper language the recognizer uses now. */
+  /** The Whisper language the recognizer uses now, or the Cohere Transcribe language of this request. */
   language: string;
   numThreads: number;
   provider: string;
@@ -108,6 +119,8 @@ function isAddon(value: unknown): value is SherpaOnnxAddon {
     typeof value.decodeOfflineStreamAsync === "function" &&
     "getOfflineStreamResultAsJson" in value &&
     typeof value.getOfflineStreamResultAsJson === "function" &&
+    "offlineStreamSetOption" in value &&
+    typeof value.offlineStreamSetOption === "function" &&
     "offlineRecognizerSetConfig" in value &&
     typeof value.offlineRecognizerSetConfig === "function"
   );
@@ -163,6 +176,23 @@ function recognizerConfig(
           enableSegmentTimestamps: 0,
         },
         tokens: file("turbo-tokens.txt"),
+        ...common,
+      },
+    };
+  }
+  if (engine === "cohere-transcribe") {
+    return {
+      featConfig: { sampleRate: SAMPLE_RATE, featureDim: 128 },
+      modelConfig: {
+        // The encoder reads its weights from `encoder.int8.onnx.data` in the same directory.
+        cohereTranscribe: {
+          encoder: file("encoder.int8.onnx"),
+          decoder: file("decoder.int8.onnx"),
+          language: language || "en",
+          usePunct: 1,
+          useItn: 1,
+        },
+        tokens: file("tokens.txt"),
         ...common,
       },
     };
@@ -224,8 +254,15 @@ function recognizerFor(request: VoiceTranscriptionRequest): Promise<LoadedRecogn
   return promise;
 }
 
-/** A language change reuses the loaded Whisper model: only its decoding settings change. */
+/**
+ * A language change reuses the loaded model. Whisper changes its decoding settings; Cohere
+ * Transcribe sets the language on each stream, because sherpa-onnx cannot change its settings.
+ */
 function useLanguage(loaded: LoadedRecognizer, language: string): void {
+  if (loaded.engine === "cohere-transcribe") {
+    loaded.language = language;
+    return;
+  }
   if (loaded.engine !== "whisper" || loaded.language === language) return;
   try {
     loaded.addon.offlineRecognizerSetConfig(
@@ -252,15 +289,19 @@ async function transcribe(request: VoiceTranscriptionRequest): Promise<string> {
   useLanguage(loaded, request.language);
   if (request.pcm.byteLength < 2) return "";
   const samples = toSamples(request.pcm, request.leadingSilenceSamples);
-  const parts = loaded.engine === "whisper" ? splitForWhisper(samples) : [samples];
+  const parts = loaded.engine === "nemo-transducer" ? [samples] : splitIntoParts(samples);
   let text = "";
   for (const part of parts) text = joinText(text, await decode(loaded, part));
   return text;
 }
 
-async function decode({ addon, recognizer }: LoadedRecognizer, samples: Float32Array): Promise<string> {
+async function decode(
+  { addon, recognizer, engine, language }: LoadedRecognizer,
+  samples: Float32Array,
+): Promise<string> {
   try {
     const stream = addon.createOfflineStream(recognizer);
+    if (engine === "cohere-transcribe") addon.offlineStreamSetOption(stream, "language", language);
     addon.acceptWaveformOffline(stream, { samples, sampleRate: SAMPLE_RATE });
     await addon.decodeOfflineStreamAsync(recognizer, stream);
     return resultText(JSON.parse(addon.getOfflineStreamResultAsJson(stream))).trim();
@@ -270,17 +311,17 @@ async function decode({ addon, recognizer }: LoadedRecognizer, samples: Float32A
   }
 }
 
-/** Splits audio into parts that Whisper reads whole, each cut at the quietest point near its end. */
-function splitForWhisper(samples: Float32Array): Float32Array[] {
+/** Splits audio into parts that the model reads whole, each cut at the quietest point near its end. */
+function splitIntoParts(samples: Float32Array): Float32Array[] {
   const parts: Float32Array[] = [];
   let start = 0;
-  while (samples.length - start > WHISPER_MAXIMUM_SAMPLES) {
-    const limit = start + WHISPER_MAXIMUM_SAMPLES;
+  while (samples.length - start > PART_MAXIMUM_SAMPLES) {
+    const limit = start + PART_MAXIMUM_SAMPLES;
     let end = limit;
     let quietest = Number.POSITIVE_INFINITY;
     for (
       let windowStart = limit - SPLIT_WINDOW_SAMPLES;
-      windowStart >= limit - WHISPER_SPLIT_SEARCH_SAMPLES;
+      windowStart >= limit - PART_SPLIT_SEARCH_SAMPLES;
       windowStart -= SPLIT_WINDOW_SAMPLES
     ) {
       let energy = 0;
@@ -329,7 +370,7 @@ function isRequest(value: unknown): value is VoiceTranscriptionRequest {
     "modelDirectory" in value &&
     typeof value.modelDirectory === "string" &&
     "engine" in value &&
-    (value.engine === "nemo-transducer" || value.engine === "whisper") &&
+    (value.engine === "nemo-transducer" || value.engine === "whisper" || value.engine === "cohere-transcribe") &&
     "language" in value &&
     typeof value.language === "string" &&
     "leadingSilenceSamples" in value &&
