@@ -701,7 +701,12 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
             }),
             Effect.flatMap((response) =>
               customStep(() => {
-                const models = routedModels(config, response.data);
+                const models = routedModels(config, response.data, (model) =>
+                  this.emit(
+                    "diagnostic",
+                    this.#redact(`Custom agent ${config.id} lists a model id that is too long: ${model}`),
+                  ),
+                );
                 this.#lastModels.set(config.id, models);
                 return models;
               }),
@@ -723,27 +728,50 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
 }
 
 /**
- * The agent's models under its id. An id that the contract refuses is dropped alone: the model list
- * decoders fail closed on the whole array. An agent with no list gets the one model `default`.
+ * Marks an agent model value that the model id holds as hex: the ACP spec allows any string (DeepSeek
+ * Harness sends `["deepseek-official","deepseek-v4-flash"]`), and the contract refuses quotes. A
+ * value that starts with the mark is encoded too, so the mark is never ambiguous.
  */
-function routedModels(config: CustomAgentConfig, data: readonly ModelEntry[]): ModelEntry[] {
-  if (data.length === 0) {
-    return [{ model: `${config.id}/${CUSTOM_AGENT_DEFAULT_MODEL}`, displayName: config.name }];
-  }
-  return data.flatMap((item) => {
+const ENCODED_MODEL_PREFIX = "hex:";
+
+/**
+ * The agent's models under its id. A value that the contract refuses is encoded; an id that is then
+ * still refused (too long) is dropped alone: the model list decoders fail closed on the whole array.
+ * An agent with no usable model gets the one model `default`, so it stays selectable.
+ */
+function routedModels(
+  config: CustomAgentConfig,
+  data: readonly ModelEntry[],
+  refused: (model: string) => void,
+): ModelEntry[] {
+  const routed = data.flatMap((item) => {
     const model = item.model?.trim();
     if (!model) return [];
-    const id = `${config.id}/${model}`;
+    const plain = `${config.id}/${model}`;
+    const id =
+      isAgentModel(plain) && !model.startsWith(ENCODED_MODEL_PREFIX)
+        ? plain
+        : `${config.id}/${ENCODED_MODEL_PREFIX}${Buffer.from(model, "utf8").toString("hex")}`;
+    if (!isAgentModel(id)) {
+      refused(model);
+      return [];
+    }
     // `<agent name>/<model name>`, as a custom endpoint's models are named: the picker groups by it.
-    return isAgentModel(id) ? [{ ...item, model: id, displayName: `${config.name}/${item.displayName ?? model}` }] : [];
+    return [{ ...item, model: id, displayName: `${config.name}/${item.displayName ?? model}` }];
   });
+  return routed.length > 0
+    ? routed
+    : [{ model: `${config.id}/${CUSTOM_AGENT_DEFAULT_MODEL}`, displayName: config.name }];
 }
 
 /** The params as the agent's own process takes them: its session id, and its model with no prefix. */
 function forChild(params: unknown, sessionId: string | null): DynamicRecord {
   const record: DynamicRecord = isRecord(params) ? params : {};
   const { model, ...rest } = record;
-  const agentModel = typeof model === "string" ? model.slice(model.indexOf("/") + 1) : "";
+  const routed = typeof model === "string" ? model.slice(model.indexOf("/") + 1) : "";
+  const agentModel = routed.startsWith(ENCODED_MODEL_PREFIX)
+    ? Buffer.from(routed.slice(ENCODED_MODEL_PREFIX.length), "hex").toString("utf8")
+    : routed;
   return {
     ...rest,
     ...(sessionId === null ? {} : { threadId: sessionId }),
