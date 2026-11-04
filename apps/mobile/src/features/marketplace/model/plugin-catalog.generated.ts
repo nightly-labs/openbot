@@ -1212,4 +1212,69 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
       },
     ],
   },
+  {
+    slug: "coinbase",
+    name: "Coinbase",
+    tagline: "Crypto prices, portfolios and trading",
+    description:
+      "Coinbase lets agents read prices, balances, portfolios, orders and fees in Coinbase Advanced Trade, preview and place orders, convert between assets, and move funds between portfolios. Each user signs in to their own Coinbase account through the browser. Agents get the same permissions as the user. Orders and conversions use real funds, and agents can pay for x402 requests from the USDC balance.",
+    category: "data-analytics",
+    creatorName: "Coinbase",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-balances", text: "What are my Coinbase balances in each portfolio?" },
+      { id: "prompt-price", text: "Show the BTC-USD price on Coinbase and how it moved this week." },
+      { id: "prompt-preview-order", text: "Preview a 50 USD market buy of ETH on Coinbase. Do not place the order." },
+    ],
+    websiteUrl: "https://www.coinbase.com",
+    privacyPolicyUrl: "https://www.coinbase.com/legal/privacy",
+    termsUrl: "https://www.coinbase.com/legal/user_agreement",
+    featured: false,
+    apps: [
+      {
+        id: "app-coinbase-mcp",
+        name: "Coinbase",
+        description:
+          "Prices, balances, portfolios, orders and conversions, over Coinbase's MCP server with browser sign-in.",
+        server: {
+          name: "coinbase",
+          transport: "http",
+          url: "https://agents.coinbase.com/mcp",
+          auth: [{ id: "coinbase-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
+    slug: "robinhood",
+    name: "Robinhood",
+    tagline: "Brokerage accounts and agentic trading",
+    description:
+      "Robinhood lets agents read the accounts, positions, balances, transaction history and watchlists of a Robinhood customer, read market data, and place stock, options and crypto orders. Each user signs in to their own Robinhood account through the browser. At the first sign-in, Robinhood asks the user to open a separate Agentic account. Agents can trade only in that account, and by default they place orders without asking the user to approve each one.",
+    category: "data-analytics",
+    creatorName: "Robinhood",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-positions", text: "Summarize my Robinhood positions and how they moved today." },
+      { id: "prompt-watchlist", text: "How did each stock on my Robinhood watchlist move this week?" },
+      { id: "prompt-agentic-cash", text: "How much cash is in my Robinhood Agentic account?" },
+    ],
+    websiteUrl: "https://robinhood.com",
+    privacyPolicyUrl: "https://robinhood.com/us/en/support/articles/privacy-policy/",
+    termsUrl: "https://robinhood.com/us/en/about/legal/",
+    featured: false,
+    apps: [
+      {
+        id: "app-robinhood-mcp",
+        name: "Robinhood",
+        description: "Accounts, positions, market data and trades, over Robinhood's MCP server with browser sign-in.",
+        server: {
+          name: "robinhood",
+          transport: "http",
+          url: "https://agent.robinhood.com/mcp/trading",
+          auth: [{ id: "robinhood-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
 ];

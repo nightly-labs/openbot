@@ -425,6 +425,26 @@ export const messages = {
     "Erstelle aus diesen To-dos eine ClickUp-Aufgabe und weise sie mir zu.",
   "marketplace.plugin.clickup.prompt.summarizeDoc":
     "Finde das neueste Projekt-Update in ClickUp und fasse die offenen Fragen zusammen.",
+  "marketplace.plugin.coinbase.tagline": "Kryptokurse, Portfolios und Handel",
+  "marketplace.plugin.coinbase.description":
+    "Coinbase lässt Agenten Kurse, Guthaben, Portfolios, Orders und Gebühren in Coinbase Advanced Trade lesen, Orders prüfen und aufgeben, zwischen Assets tauschen und Geld zwischen Portfolios verschieben. Jeder Benutzer meldet sich im Browser bei seinem eigenen Coinbase-Konto an. Agenten haben dieselben Berechtigungen wie der Benutzer. Orders und Tauschvorgänge verwenden echtes Geld, und Agenten können x402-Anfragen aus dem USDC-Guthaben bezahlen.",
+  "marketplace.plugin.coinbase.app":
+    "Kurse, Guthaben, Portfolios, Orders und Tauschvorgänge über den MCP-Server von Coinbase mit Anmeldung im Browser.",
+  "marketplace.plugin.coinbase.prompt.balances": "Wie hoch sind meine Coinbase-Guthaben in jedem Portfolio?",
+  "marketplace.plugin.coinbase.prompt.price":
+    "Zeig mir den BTC-USD-Kurs auf Coinbase und wie er sich diese Woche entwickelt hat.",
+  "marketplace.plugin.coinbase.prompt.previewOrder":
+    "Prüfe einen Marktkauf von ETH für 50 USD auf Coinbase. Gib die Order nicht auf.",
+  "marketplace.plugin.robinhood.tagline": "Depotkonten und Handel durch Agenten",
+  "marketplace.plugin.robinhood.description":
+    "Robinhood lässt Agenten die Konten, Positionen, Guthaben, Transaktionen und Watchlists eines Robinhood-Kunden lesen, Marktdaten lesen und Orders für Aktien, Optionen und Krypto aufgeben. Jeder Benutzer meldet sich im Browser bei seinem eigenen Robinhood-Konto an. Bei der ersten Anmeldung bittet Robinhood den Benutzer, ein separates Agentic-Konto zu eröffnen. Agenten können nur in diesem Konto handeln und geben Orders standardmäßig auf, ohne den Benutzer jede einzelne bestätigen zu lassen.",
+  "marketplace.plugin.robinhood.app":
+    "Konten, Positionen, Marktdaten und Trades über den MCP-Server von Robinhood mit Anmeldung im Browser.",
+  "marketplace.plugin.robinhood.prompt.positions":
+    "Fasse meine Robinhood-Positionen zusammen und wie sie sich heute entwickelt haben.",
+  "marketplace.plugin.robinhood.prompt.watchlist":
+    "Wie hat sich jede Aktie auf meiner Robinhood-Watchlist diese Woche entwickelt?",
+  "marketplace.plugin.robinhood.prompt.agenticCash": "Wie viel Bargeld liegt auf meinem Robinhood-Agentic-Konto?",
   "marketplace.plugin.huggingface.tagline": "Modelle, Datensätze und Paper auf dem Hub",
   "marketplace.plugin.huggingface.description":
     "Mit Hugging Face durchsuchen Agenten Modelle, Datensätze, Spaces, Collections und Paper auf dem Hugging Face Hub, lesen Model Cards und Repository-Dateien, zeigen eine Vorschau von Datensätzen und durchsuchen die Hugging-Face-Dokumentation. Es verwendet öffentliche Hub-Daten und braucht kein Konto und keinen Schlüssel. Die Tools lesen nur: Agenten können keine Repositorys anlegen und keine Jobs ausführen.",

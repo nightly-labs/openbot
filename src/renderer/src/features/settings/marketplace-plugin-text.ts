@@ -381,6 +381,30 @@ const PLUGIN_TEXT = {
       "prompt-summarize-doc": "marketplace.plugin.clickup.prompt.summarizeDoc",
     },
   },
+  coinbase: {
+    tagline: "marketplace.plugin.coinbase.tagline",
+    description: "marketplace.plugin.coinbase.description",
+    apps: {
+      "app-coinbase-mcp": "marketplace.plugin.coinbase.app",
+    },
+    prompts: {
+      "prompt-balances": "marketplace.plugin.coinbase.prompt.balances",
+      "prompt-price": "marketplace.plugin.coinbase.prompt.price",
+      "prompt-preview-order": "marketplace.plugin.coinbase.prompt.previewOrder",
+    },
+  },
+  robinhood: {
+    tagline: "marketplace.plugin.robinhood.tagline",
+    description: "marketplace.plugin.robinhood.description",
+    apps: {
+      "app-robinhood-mcp": "marketplace.plugin.robinhood.app",
+    },
+    prompts: {
+      "prompt-positions": "marketplace.plugin.robinhood.prompt.positions",
+      "prompt-watchlist": "marketplace.plugin.robinhood.prompt.watchlist",
+      "prompt-agentic-cash": "marketplace.plugin.robinhood.prompt.agenticCash",
+    },
+  },
   huggingface: {
     tagline: "marketplace.plugin.huggingface.tagline",
     description: "marketplace.plugin.huggingface.description",

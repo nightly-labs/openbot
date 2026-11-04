@@ -240,6 +240,8 @@ export const messages = {
   "error.provider.antigravityMissing":
     "Gemini はダウンロードされていません。続けるには OpenBot でダウンロードしてください。",
   "error.provider.antigravityNotStarted": "Gemini サーバーは見つかりましたが、バージョンを読み取れません。",
+  "error.provider.antigravityOverrideInvalid":
+    "OPENBOT_ANTIGRAVITY_PATH の Gemini サーバーが見つからないか、実行できません。パスを修正するか変数を削除してから、OpenBot を再起動してください。",
   "error.provider.antigravityVersionUnreadable": "Gemini サーバーのバージョンを読み取れません。",
   "error.provider.antigravitySignIn": "Gemini を使うには Google でサインインしてください。",
   "error.provider.antigravityRateLimited":

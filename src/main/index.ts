@@ -28,6 +28,7 @@ import {
   shell,
 } from "electron";
 import { runCauseEffect } from "../backend/effect-boundary";
+import { NewerDatabaseError } from "../backend/openbot-database-schema";
 import { OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
 import { watchAppArchive } from "./app-archive-watch";
 import { readAppVariant, resolveAppIconPath, resolveLogoColorIconPath, resolveMenuBarIconPath } from "./app-icon";
@@ -123,6 +124,7 @@ import {
 } from "./main-window";
 import { ensureMacApplicationPresence, secondLaunchResponse } from "./main-window-state";
 import { MessageLinkRelay, openHttpLink } from "./message-link-relay";
+import { recoverFromNewerDatabase } from "./newer-database-recovery";
 import { startMainLog } from "./provider-log";
 import { watchRemoteHostDirectory } from "./remote-server-host-directory";
 import { createRendererForwarders } from "./renderer-forwarders";
@@ -1662,6 +1664,18 @@ if (!hasSingleInstanceLock) {
         // The services, and with them the saved language, may not exist yet. Then the system language applies.
         const locale = services?.language.locale ?? resolveLocale("system", app.getLocale());
         const translate = services?.language.translate ?? translateFor(locale);
+        // A newer OpenBot migrated the data: install that release instead of a dead-end error (#4969).
+        if (error instanceof NewerDatabaseError) {
+          recoverFromNewerDatabase({
+            window: windowHolder.current,
+            translate,
+            beforeInstall: prepareForUpdateInstall,
+          }).catch((recoveryError) => {
+            logger.error("The update over newer data failed:", toLogValue(recoveryError));
+            app.quit();
+          });
+          return;
+        }
         dialog.showErrorBox(
           translate("startup.failedTitle"),
           translate("startup.failedBody", { message: localizeSourceText(message, locale) }),

@@ -1089,12 +1089,20 @@ function readAppliedVersions(db: DatabaseSync): number[] {
     });
 }
 
+/**
+ * A newer OpenBot migrated the database. This build stops before it writes anything; the start can
+ * recover by installing a release that knows the version (`src/main/newer-database-recovery.ts`).
+ */
+export class NewerDatabaseError extends Error {
+  constructor(databaseVersion: number, supportedVersion: number) {
+    super(`OpenBot database version ${databaseVersion} is newer than this application supports (${supportedVersion}).`);
+  }
+}
+
 function validateAppliedVersions(versions: number[]): void {
   const newestVersion = versions.at(-1) ?? 0;
   if (newestVersion > LATEST_SCHEMA_VERSION) {
-    throw new Error(
-      `OpenBot database version ${newestVersion} is newer than this application supports (${LATEST_SCHEMA_VERSION}).`,
-    );
+    throw new NewerDatabaseError(newestVersion, LATEST_SCHEMA_VERSION);
   }
 
   const baselineAndLater = versions.filter((version) => version >= BASELINE_SCHEMA_VERSION);

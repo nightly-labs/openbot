@@ -428,6 +428,24 @@ export const messages = {
   "marketplace.plugin.clickup.prompt.createTask": "Bu yapılacak maddelerden bir ClickUp görevi oluştur ve bana ata.",
   "marketplace.plugin.clickup.prompt.summarizeDoc":
     "ClickUp'taki en son proje güncellemesini bul ve açık soruları özetle.",
+  "marketplace.plugin.coinbase.tagline": "Kripto fiyatları, portföyler ve alım satım",
+  "marketplace.plugin.coinbase.description":
+    "Coinbase, ajanların Coinbase Advanced Trade'deki fiyatları, bakiyeleri, portföyleri, emirleri ve ücretleri okumasını, emirleri önizleyip vermesini, varlıklar arasında dönüşüm yapmasını ve portföyler arasında fon taşımasını sağlar. Her kullanıcı tarayıcıda kendi Coinbase hesabına giriş yapar. Ajanlar kullanıcıyla aynı izinlere sahiptir. Emirler ve dönüşümler gerçek fon kullanır ve ajanlar x402 isteklerinin ücretini USDC bakiyesinden ödeyebilir.",
+  "marketplace.plugin.coinbase.app":
+    "Fiyatlar, bakiyeler, portföyler, emirler ve dönüşümler; Coinbase'in MCP sunucusu ve tarayıcıda giriş ile.",
+  "marketplace.plugin.coinbase.prompt.balances": "Coinbase'de her portföydeki bakiyelerim nedir?",
+  "marketplace.plugin.coinbase.prompt.price": "Coinbase'de BTC-USD fiyatını ve bu hafta nasıl hareket ettiğini göster.",
+  "marketplace.plugin.coinbase.prompt.previewOrder":
+    "Coinbase'de 50 USD'lik piyasa fiyatından ETH alımını önizle. Emri verme.",
+  "marketplace.plugin.robinhood.tagline": "Aracı kurum hesapları ve ajanlarla alım satım",
+  "marketplace.plugin.robinhood.description":
+    "Robinhood, ajanların bir Robinhood müşterisinin hesaplarını, pozisyonlarını, bakiyelerini, işlem geçmişini ve izleme listelerini ve piyasa verilerini okumasını, hisse senedi, opsiyon ve kripto emirleri vermesini sağlar. Her kullanıcı tarayıcıda kendi Robinhood hesabına giriş yapar. İlk girişte Robinhood, kullanıcıdan ayrı bir Agentic hesabı açmasını ister. Ajanlar yalnızca o hesapta işlem yapabilir ve varsayılan olarak her emir için kullanıcı onayı istemeden emir verir.",
+  "marketplace.plugin.robinhood.app":
+    "Hesaplar, pozisyonlar, piyasa verileri ve işlemler; Robinhood'un MCP sunucusu ve tarayıcıda giriş ile.",
+  "marketplace.plugin.robinhood.prompt.positions":
+    "Robinhood pozisyonlarımı ve bugün nasıl hareket ettiklerini özetle.",
+  "marketplace.plugin.robinhood.prompt.watchlist": "Robinhood izleme listemdeki her hisse bu hafta nasıl hareket etti?",
+  "marketplace.plugin.robinhood.prompt.agenticCash": "Robinhood Agentic hesabımda ne kadar nakit var?",
   "marketplace.plugin.huggingface.tagline": "Hub'daki modeller, veri kümeleri ve makaleler",
   "marketplace.plugin.huggingface.description":
     "Hugging Face, ajanların Hugging Face Hub'da modelleri, veri kümelerini, Spaces'i, koleksiyonları ve makaleleri aramasına, model kartlarını ve depo dosyalarını okumasına, veri kümelerini önizlemesine ve Hugging Face belgelerinde arama yapmasına olanak tanır. Herkese açık Hub verilerini kullanır ve hesap ya da anahtar gerektirmez. Araçlar yalnızca okur: ajanlar depo oluşturamaz ve iş (job) çalıştıramaz.",

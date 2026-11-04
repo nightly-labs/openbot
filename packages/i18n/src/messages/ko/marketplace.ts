@@ -372,6 +372,23 @@ export const messages = {
   "marketplace.plugin.clickup.prompt.createTask": "이 실행 항목들로 ClickUp 작업을 만들고 나에게 할당해 줘.",
   "marketplace.plugin.clickup.prompt.summarizeDoc":
     "ClickUp에서 최신 프로젝트 업데이트를 찾아 미해결 질문을 요약해 줘.",
+  "marketplace.plugin.coinbase.tagline": "암호화폐 시세, 포트폴리오, 거래",
+  "marketplace.plugin.coinbase.description":
+    "Coinbase를 사용하면 에이전트가 Coinbase Advanced Trade의 시세, 잔액, 포트폴리오, 주문, 수수료를 읽고, 주문을 미리 보고 넣고, 자산 간에 전환하고, 포트폴리오 간에 자금을 옮길 수 있습니다. 각 사용자는 브라우저에서 자신의 Coinbase 계정으로 로그인합니다. 에이전트는 사용자와 같은 권한을 가집니다. 주문과 전환에는 실제 자금이 쓰이며, 에이전트는 USDC 잔액으로 x402 요청 비용을 낼 수 있습니다.",
+  "marketplace.plugin.coinbase.app":
+    "시세, 잔액, 포트폴리오, 주문, 전환. Coinbase의 MCP 서버와 브라우저 로그인을 사용합니다.",
+  "marketplace.plugin.coinbase.prompt.balances": "포트폴리오별 내 Coinbase 잔액은 얼마인가요?",
+  "marketplace.plugin.coinbase.prompt.price": "Coinbase의 BTC-USD 시세와 이번 주 움직임을 보여 주세요.",
+  "marketplace.plugin.coinbase.prompt.previewOrder":
+    "Coinbase에서 ETH 50 USD 시장가 매수를 미리 보여 주세요. 주문은 넣지 마세요.",
+  "marketplace.plugin.robinhood.tagline": "증권 계좌와 에이전트 거래",
+  "marketplace.plugin.robinhood.description":
+    "Robinhood를 사용하면 에이전트가 Robinhood 고객의 계좌, 포지션, 잔액, 거래 내역, 관심 종목과 시장 데이터를 읽고 주식, 옵션, 암호화폐 주문을 넣을 수 있습니다. 각 사용자는 브라우저에서 자신의 Robinhood 계정으로 로그인합니다. 처음 로그인할 때 Robinhood는 별도의 Agentic 계좌를 열도록 요청합니다. 에이전트는 그 계좌에서만 거래할 수 있으며, 기본 설정에서는 주문마다 사용자 승인을 받지 않고 주문합니다.",
+  "marketplace.plugin.robinhood.app":
+    "계좌, 포지션, 시장 데이터, 거래. Robinhood의 MCP 서버와 브라우저 로그인을 사용합니다.",
+  "marketplace.plugin.robinhood.prompt.positions": "내 Robinhood 포지션과 오늘의 움직임을 요약해 주세요.",
+  "marketplace.plugin.robinhood.prompt.watchlist": "내 Robinhood 관심 종목은 이번 주에 각각 어떻게 움직였나요?",
+  "marketplace.plugin.robinhood.prompt.agenticCash": "내 Robinhood Agentic 계좌에 현금이 얼마 있나요?",
   "marketplace.plugin.huggingface.tagline": "Hub의 모델, 데이터셋, 논문",
   "marketplace.plugin.huggingface.description":
     "Hugging Face를 사용하면 에이전트가 Hugging Face Hub에서 모델, 데이터셋, Spaces, 컬렉션, 논문을 검색하고, 모델 카드와 저장소 파일을 읽고, 데이터셋을 미리 보고, Hugging Face 문서를 검색할 수 있어요. 공개 Hub 데이터를 사용하므로 계정도 키도 필요 없어요. 도구는 읽기만 해요. 에이전트는 저장소를 만들거나 작업(Jobs)을 실행할 수 없어요.",

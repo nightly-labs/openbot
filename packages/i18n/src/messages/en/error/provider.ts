@@ -225,6 +225,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.antigravityReleaseShape": "The Gemini release has an unexpected shape.",
   "error.provider.antigravityMissing": "Gemini is not downloaded. Download it in OpenBot to continue.",
   "error.provider.antigravityNotStarted": "The Gemini server was found, but its version cannot be read.",
+  "error.provider.antigravityOverrideInvalid":
+    "The Gemini server in OPENBOT_ANTIGRAVITY_PATH is missing or is not executable. Correct the path or remove the variable, then restart OpenBot.",
   "error.provider.antigravityVersionUnreadable": "Unable to read the Gemini server version.",
   "error.provider.antigravitySignIn": "Sign in with Google to use Gemini.",
   "error.provider.antigravityRateLimited":
