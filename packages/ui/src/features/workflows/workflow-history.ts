@@ -205,7 +205,9 @@ export function hostDefaults(
       const agent = catalogs.agents[0];
       return agent ? { agentId: agent.id, model: agent.model, provider: agent.provider } : {};
     }
-    case "llm": {
+    // A condition asks a model too, so a new one saves the model of a new LLM step.
+    case "llm":
+    case "condition": {
       const model = defaultWorkflowModel(catalogs);
       return model
         ? {

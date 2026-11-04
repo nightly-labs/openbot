@@ -98,6 +98,7 @@ export const messages = {
   "workflow.model.providerModels": "{name} 模型",
   "workflow.model.effort": "强度：{name}",
   "workflow.model.effortRange": "{from}–{to}",
+  "workflow.model.auto": "自动",
 
   "workflow.llm.title": "LLM",
   "workflow.llm.name": "LLM 步骤",
