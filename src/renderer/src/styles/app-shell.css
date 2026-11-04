@@ -2240,24 +2240,6 @@ textarea {
   height: 34px;
 }
 
-.person-unread-badge {
-  position: absolute;
-  z-index: 2;
-  inset-inline-end: -4px;
-  bottom: -3px;
-  display: grid;
-  min-width: 17px;
-  height: 17px;
-  place-items: center;
-  border: 2px solid var(--openbot-bg-sidebar);
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-text-primary);
-  padding: 0 3px;
-  color: var(--openbot-bg-sidebar);
-  font-size: var(--openbot-text-sm);
-  font-weight: 680;
-}
-
 .agent-row {
   --agent-row-avatar-size: 46px;
 
@@ -2333,6 +2315,9 @@ textarea {
 
 /* The working badge, with its felt balls, is in `@openbot/ui/features/sidebar/sidebar-working-badge.css`. */
 
+/* The unread count and the failed routine mark are felt too, with their transitions, in
+   `@openbot/ui/features/sidebar/sidebar-felt-badges.css`. */
+
 .agent-row-thinking-dots {
   display: inline-flex;
   align-items: center;
@@ -2374,18 +2359,6 @@ textarea {
   stroke-linejoin: round;
 }
 
-.agent-row-agent-status-unread {
-  min-width: 16px;
-  height: 16px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-text-primary);
-  padding: 0 3px;
-  color: var(--openbot-bg-sidebar);
-  font-size: var(--openbot-text-sm);
-  font-weight: 650;
-  line-height: 12px;
-}
-
 .agent-row-agent-status-routine,
 .agent-row-agent-status-limited {
   width: 16px;
@@ -2399,10 +2372,6 @@ textarea {
 .agent-row-agent-status-limited svg {
   width: 10px;
   height: 10px;
-}
-
-.agent-row-agent-status-routine-failed {
-  color: var(--openbot-danger);
 }
 
 /* An agent that waits for the user: amber, and a little larger than the routine marks, so it is
@@ -3572,6 +3541,14 @@ textarea {
   --agent-avatar-outline: var(--openbot-bg-control);
 
   background: var(--openbot-bg-control);
+}
+
+/* A row is a ghost button. With a fine pointer, the ghost hover fill wins over the row fill
+   (`primitives.css`), so the avatar ring takes that fill too. */
+@media (hover: hover) and (pointer: fine) and (min-width: 601px) {
+  .agent-row:hover {
+    --agent-avatar-outline: var(--openbot-bg-control-hover);
+  }
 }
 
 .agent-list[data-sidebar-dragging] .agent-row:hover {
