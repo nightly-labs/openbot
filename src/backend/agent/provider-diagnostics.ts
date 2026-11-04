@@ -254,7 +254,9 @@ export function isUsageLimitDiagnostic(message: string): boolean {
  * plan's rolling, weekly and monthly windows name no reset: `429: {"type":"GoUsageLimitError",
  * "message":"Go usage limit exceeded"}` (#4256). The z.ai GLM Coding Plan writes "Usage limit reached
  * for 5 hour. Your limit will reset at 2026-11-02 17:37:38" and "Weekly/Monthly Limit Exhausted. Your
- * limit will reset at …" (#4469). Its reset names no zone, so it is not read. A spent credit
+ * limit will reset at …" (#4469). Its reset names no zone, so it is not read. Grok's free tier
+ * writes "subscription:free-usage-exhausted: You've used all the included free usage for model …
+ * Usage resets over a rolling 24-hour window" (#4869). A spent credit
  * balance or quota does not reset, so it is not one: holding work for it would wait forever and hide
  * the provider's reason. A short request-rate throttle says "rate limit".
  */
@@ -266,7 +268,8 @@ export function isPlanLimitDiagnostic(message: string): boolean {
     /\b(?:session|weekly) (?:usage )?limit\b.{0,80}\b(?:reached|resets?)\b/iu.test(message) ||
     /\b(?:GoUsageLimitError|Go usage limit exceeded)\b/u.test(message) ||
     /\busage limit reached for \d+ ?hours?\b/iu.test(message) ||
-    /\b(?:daily|weekly|monthly) limit exhausted\b/iu.test(message)
+    /\b(?:daily|weekly|monthly) limit exhausted\b/iu.test(message) ||
+    /\bsubscription:free-usage-exhausted\b/u.test(message)
   );
 }
 
