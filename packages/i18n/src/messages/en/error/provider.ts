@@ -205,6 +205,8 @@ export const messages = defineMessages("error.provider", {
     "The model provider failed on its side. Your connection is not the cause. Try again later or choose another model.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode could not connect to the model provider. Check the network connection of the computer that runs OpenBot, then try again.\n{detail}",
+  "error.provider.codexStateBusy":
+    "ChatGPT is still preparing its local history after an earlier start. Wait a few minutes, then try again.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode could not open its database because a newer OpenCode version changed it. Update OpenCode to version 2 or later, then try again.",
   "error.provider.opencodeNoAnswer":

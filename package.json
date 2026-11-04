@@ -282,6 +282,7 @@
     "test:provider-runtime-remove": "bun scripts/provider-runtime-remove-e2e.ts",
     "test:provider-exit-session": "bun scripts/provider-exit-session-e2e.ts",
     "test:codex-hung-app-server": "bun scripts/codex-hung-app-server-e2e.ts",
+    "test:codex-state-busy": "bun scripts/codex-state-busy-e2e.ts",
     "test:codex-subagent-steps": "bun scripts/codex-subagent-steps-e2e.ts",
     "test:subagent-status": "bun scripts/subagent-status-e2e.ts",
     "test:codex-missing-rollout": "bun scripts/codex-missing-rollout-e2e.ts",
