@@ -17,6 +17,7 @@ import { desktopBrowserProfileCalls } from "../browser/browser-profiles-port";
 import type { AgentFilesOptions } from "../files/AgentFilesSettings";
 import { canManageStorage, serverHasStorage } from "../files/storage-usage";
 import { serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
+import { speechPort } from "../speech/speech-port";
 import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
 import { ConversationSideThread } from "./ConversationSideThread";
 import { htmlAttachmentPageHtml, htmlAttachmentPageUrl } from "./chat-visual-url";
@@ -25,6 +26,8 @@ import { type AgentNotificationLevelCalls, conversationRuntime } from "./convers
 import { useConversationViewScope } from "./conversation-scope";
 import { agentSkillsMode } from "./installed-skills-source";
 import { desktopChatEventRoutinesApi } from "./routine-webhooks-api";
+import { createCodexLiveConversation } from "./stores/codex-live-conversation-store";
+import type { VoiceConversationKind } from "./stores/voice-session-store";
 
 const BROWSER_PANEL_DEFAULT_RATIO = 0.5;
 const BROWSER_PANEL_MIN = 220;
@@ -44,12 +47,47 @@ import {
 } from "./agent-folders-port";
 import { conversationPort } from "./conversation-port";
 
-/** The voice conversation with the agent that is open when the pane opens. */
+/**
+ * The voice conversation with the agent that is open when the pane opens. A Codex agent on this
+ * computer uses Codex live voice when the user turned it on in Settings → Voice; a failed read of that
+ * setting keeps the conversation that transcribes on this computer. A conversation that still runs
+ * from an earlier visit to the pane shows again.
+ */
 function VoiceConversationPane() {
+  const controller = useConversationController();
+  const { props } = useConversationViewScope();
+  const running = untrack(() => (props.agent ? controller.voiceSessions.running(props.agent.id) : null));
+  // Live voice runs in this computer's Codex App Server, so an agent on a remote server transcribes.
+  const codex = untrack(() => props.agent?.provider === "codex" && props.server?.kind !== "remote");
+  const [kind, setKind] = createSignal<VoiceConversationKind | null>(running ?? (codex ? null : "transcribed"));
+  if (!running && codex)
+    void speechPort()
+      .voice.getSpeechSettings()
+      .then(
+        (settings) => setKind(settings.codexLive ? "codex-live" : "transcribed"),
+        () => setKind("transcribed"),
+      );
+  return (
+    <Show when={kind()} keyed>
+      {(next) => <VoiceConversation kind={next} />}
+    </Show>
+  );
+}
+
+function VoiceConversation(paneProps: { kind: VoiceConversationKind }) {
+  const controller = useConversationController();
   const { props, startVoiceConversation, closeSidePanelPane } = useConversationViewScope();
   const agentId = untrack(() => props.agent?.id);
   if (!agentId) return null;
-  const conversation = startVoiceConversation(agentId);
+  const kind = untrack(() => paneProps.kind);
+  // The conversation outlives this pane: another tab or chat keeps it, and closing the Voice tab ends it.
+  const conversation = controller.voiceSessions.open(agentId, kind, () =>
+    kind === "codex-live" ? createCodexLiveConversation({ agentId }) : startVoiceConversation(agentId),
+  );
+  // Codex live voice speaks at the speed of the realtime model, so it has no speed button.
+  const transcribed = kind === "transcribed";
+  const replySpeed = () => (transcribed ? speechSpeed() : undefined);
+  const cycleSpeed = transcribed ? cycleSpeechSpeed : undefined;
   return (
     <Show when={props.agent}>
       {(agent) => (
@@ -64,8 +102,8 @@ function VoiceConversationPane() {
           onToggleMute={conversation.toggleMute}
           onInterrupt={conversation.interrupt}
           onEnd={() => closeSidePanelPane("voice")}
-          speed={speechSpeed()}
-          onCycleSpeed={cycleSpeechSpeed}
+          speed={replySpeed()}
+          onCycleSpeed={cycleSpeed}
         />
       )}
     </Show>
@@ -478,7 +516,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
         )}
       </Show>
 
-      {/* Keyed, so another agent or server gets its own conversation; closing the pane ends it. */}
+      {/* Keyed, so another agent or server gets its own conversation; closing the Voice tab ends it. */}
       <Show
         when={
           activeRightPanel() === "voice" &&

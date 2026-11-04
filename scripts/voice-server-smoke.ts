@@ -279,8 +279,8 @@ try {
   const badges = await page.getByRole("tabpanel").getByText(t("settings.voice.model.inUse"), { exact: true }).count();
   check("no local dictation model is in use", badges === 0, badges);
   const language = page
-    .locator('[data-settings-row="settings.voice.language.title"]')
-    .getByRole("button", { name: t("settings.voice.language.title") });
+    .locator('[data-settings-row="settings.voice.language.section"]')
+    .getByRole("button", { name: t("settings.voice.language.section") });
   check("the dictation language can be set for the server", await language.isEnabled());
   const voiceRows = await page.locator('[data-settings-row="settings.voice.speech.voice.title"]').count();
   check("the Supertonic voice row is hidden", voiceRows === 0, voiceRows);

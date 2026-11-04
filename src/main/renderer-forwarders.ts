@@ -27,6 +27,7 @@ import {
   latestTurnAnswer,
   type ServerNotificationLevel,
   type SpeechModelStatus,
+  type VoiceLiveEvent,
   type VoiceModelStatus,
   type VoiceServerSettings,
   type VoiceStreamTranscript,
@@ -567,6 +568,10 @@ export function createRendererForwarders({
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.voice.streamTranscript, transcript);
   }
 
+  function forwardVoiceLiveEvent(event: VoiceLiveEvent): void {
+    for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.voice.liveEvent, event);
+  }
+
   function forwardProviderRuntimeStatus(snapshot: import("@openbot/contracts/ipc").ProviderRuntimeSnapshot): void {
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.providerRuntimes.event, snapshot);
   }
@@ -661,6 +666,7 @@ export function createRendererForwarders({
     forwardUpdatePreference,
     forwardVoiceModelStatus,
     forwardVoiceStreamTranscript,
+    forwardVoiceLiveEvent,
     forwardSpeechModelStatus,
     forwardVoiceServerSettings,
     forwardProviderRuntimeStatus,

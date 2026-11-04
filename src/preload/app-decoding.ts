@@ -71,6 +71,7 @@ import {
   isAppThemePalette,
   isAppThemePaletteId,
   isBusyMessageMode,
+  isCodexLiveVoice,
   isCustomAgentCheckResult,
   isCustomAgentResult,
   isCustomAgentSummary,
@@ -113,6 +114,8 @@ import {
   UPDATE_PHASES,
   type UpdatePreference,
   type UpdateStatus,
+  type VoiceLiveEvent,
+  type VoiceLiveSession,
   type VoiceModelStatus,
   type VoiceServerProbe,
   type VoiceServerSettings,
@@ -518,9 +521,37 @@ export function decodeSpeechModelStatus(value: unknown): SpeechModelStatus {
 
 export function decodeSpeechSettings(value: unknown): SpeechSettings {
   const settings = decodeRecord(value, "speech settings");
-  const { voice, speed } = settings;
-  if (!isSpeechVoice(voice) || !isSpeechSpeed(speed)) throw new Error("Invalid speech settings.");
-  return { readReplies: requiredBoolean(settings, "readReplies"), voice, speed };
+  const { voice, speed, codexLiveVoice } = settings;
+  if (!isSpeechVoice(voice) || !isSpeechSpeed(speed) || !(codexLiveVoice === null || isCodexLiveVoice(codexLiveVoice)))
+    throw new Error("Invalid speech settings.");
+  return {
+    readReplies: requiredBoolean(settings, "readReplies"),
+    voice,
+    speed,
+    codexLive: requiredBoolean(settings, "codexLive"),
+    codexLiveVoice,
+  };
+}
+
+export function decodeVoiceLiveSession(value: unknown): VoiceLiveSession {
+  const session = decodeRecord(value, "live voice session");
+  return { sessionId: requiredString(session, "sessionId"), sdp: requiredString(session, "sdp") };
+}
+
+export function decodeVoiceLiveEvent(value: unknown): VoiceLiveEvent {
+  const event = decodeRecord(value, "live voice event");
+  const sessionId = requiredString(event, "sessionId");
+  if (event.type === "ended") return { type: "ended", sessionId, error: nullableString(event, "error") };
+  const { role } = event;
+  if (event.type !== "transcript" || (role !== "user" && role !== "assistant"))
+    throw new Error("Invalid live voice event.");
+  return {
+    type: "transcript",
+    sessionId,
+    role,
+    text: requiredString(event, "text"),
+    final: requiredBoolean(event, "final"),
+  };
 }
 
 export function decodeSpeechAudio(value: unknown): SpeechAudio {

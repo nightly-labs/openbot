@@ -189,6 +189,8 @@ import {
   decodeSpeechSettings,
   decodeUpdatePreference,
   decodeUpdateStatus,
+  decodeVoiceLiveEvent,
+  decodeVoiceLiveSession,
   decodeVoiceModelStatus,
   decodeVoiceModelStatuses,
   decodeVoiceServerProbe,
@@ -886,6 +888,9 @@ const openbotApi: OpenBotDesktopApi = {
     probeServer: decodeVoiceServerProbe,
     setServer: decodeVoiceServerSettings,
     serverSettings: decodeVoiceServerSettings,
+    startLive: decodeVoiceLiveSession,
+    stopLive: decodeVoid,
+    liveEvent: decodeVoiceLiveEvent,
   }),
   auth: bridgeGroup(IPC_ENDPOINTS.auth, {
     getState: decodeCentralAuthState,

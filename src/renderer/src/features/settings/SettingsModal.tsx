@@ -50,7 +50,7 @@ import { createSettingsAgentsSection } from "./SettingsAgentsSection";
 import { SettingsDynamicIslandTab } from "./SettingsDynamicIslandTab";
 import { SettingsGeneralTab } from "./SettingsGeneralTab";
 import { SettingsNotificationsTab } from "./SettingsNotificationsTab";
-import { SettingsVoiceTab } from "./SettingsVoiceTab";
+import { type CodexLiveAccess, SettingsVoiceTab } from "./SettingsVoiceTab";
 import { dynamicIslandSettingsShown, navItem, navItems, type SettingsTab, settingsTabShown } from "./settings-tabs";
 import { createSettingsVoiceStore } from "./settings-voice-store";
 
@@ -106,6 +106,10 @@ export interface SettingsModalProps {
   hostedServersApi?: HostedServersDesktopApi | undefined;
   /** Opens the add server dialog from the Hosted servers tab. */
   onAddHostedServer?: (() => void) | undefined;
+  /** Whether Codex on this computer can open live voice. Undefined while it is not known. */
+  codexLiveAccess?: CodexLiveAccess | undefined;
+  /** Opens the Providers section of this computer, where Codex signs in for live voice. */
+  onConnectCodex?: (() => void) | undefined;
   /** A hosted server that the server menu asked to delete. Each nonce opens its confirmation once. */
   hostedServerDeleteRequest?: { serverId: string; nonce: number } | null;
   onTestNotification?: () => void | Promise<void>;
@@ -315,7 +319,12 @@ export function SettingsModal(props: SettingsModalProps) {
         </Tabs.Content>
 
         <Tabs.Content value="voice" class="settings-modal-tab-panel" data-tab="voice">
-          <SettingsVoiceTab store={voice} selectMount={modalElement} />
+          <SettingsVoiceTab
+            store={voice}
+            selectMount={modalElement}
+            codexLiveAccess={props.codexLiveAccess}
+            onConnectCodex={props.onConnectCodex}
+          />
         </Tabs.Content>
 
         <Show when={dynamicIslandShown()}>

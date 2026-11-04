@@ -957,6 +957,15 @@ Network traffic can also occur when:
   text, as for a typed message, and no recording is kept. Recordings show in the Storage tab of
   **Server Settings**, where the user can delete them, and are part of a data export. A recording is
   deleted with the agent's or channel's data;
+- the user turns on Codex live voice in **Settings → Voice** and opens the Voice pane of a Codex agent
+  on this computer. The app window sends a WebRTC offer to the local Codex App Server, which opens a
+  realtime voice session with OpenAI through the user's own Codex sign-in. The microphone audio then
+  goes from this computer to OpenAI, and the spoken reply comes back, until the pane closes. OpenAI
+  also gets the instructions and the chat context that Codex sends for the agent's thread, as for a
+  typed message. OpenBot never reads the Codex credentials. What the user says is added to the chat
+  as text; no recording is kept. OpenAI handles the audio and the text under its own policy and the
+  user's ChatGPT plan. The setting is saved in `speech-preference.json` in the application data
+  folder. It is off by default;
 - the user connects Bitwarden. OpenBot runs the installed `bw` CLI to sync with the server already
   configured in that CLI, including a self-hosted server. It syncs before listing or filling logins.
   These calls send no OpenBot conversations, files, or agent instructions to Bitwarden. For a

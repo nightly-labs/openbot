@@ -49,6 +49,7 @@ import { useServerSettings } from "./features/servers/server-settings";
 import { useServerSwitch } from "./features/servers/server-switch";
 import { useServers } from "./features/servers/servers-context";
 import type { HostProviderSettings } from "./features/settings/ProviderSettingsSection";
+import type { CodexLiveAccess } from "./features/settings/SettingsVoiceTab";
 import { useSettings } from "./features/settings/settings-context";
 import { settingsPort } from "./features/settings/settings-port";
 import { useSidebar } from "./features/sidebar/sidebar-context";
@@ -871,7 +872,16 @@ function AppSettings(props: AccountProps) {
   const auth = useAuth();
   const updates = useUpdates();
   const whatsNew = useWhatsNew();
-  const { servers, setAddServerOpen, setServerMuted, setServerNotificationLevel } = useServers();
+  const { servers, activeServer, setAddServerOpen, setServerMuted, setServerNotificationLevel } = useServers();
+  const { agentStatus } = useAgents();
+  const { openServerSettings } = useServerSettings();
+  /** Live voice runs on this computer's Codex, whose status shows only while this computer is active. */
+  const codexLiveAccess = (): CodexLiveAccess | undefined => {
+    if (activeServer()?.kind !== "local") return undefined;
+    const codex = agentStatus().providers?.find((provider) => provider.id === "codex");
+    if (!codex || codex.connectionState === "connecting") return undefined;
+    return codex.state === "available" && !codex.apiKeyInUse ? "ready" : "signIn";
+  };
   const {
     appSettingsOpen,
     notificationFocusRequest,
@@ -936,6 +946,11 @@ function AppSettings(props: AccountProps) {
         onAddHostedServer={() => {
           setAppSettingsOpen(false);
           setAddServerOpen(true, "settings_billing");
+        }}
+        codexLiveAccess={codexLiveAccess()}
+        onConnectCodex={() => {
+          setAppSettingsOpen(false);
+          openServerSettings(LOCAL_SERVER_ID, null, "providers");
         }}
         onTestNotification={sendTestNotification}
         onOpenNotificationSettings={openNotificationSettings}

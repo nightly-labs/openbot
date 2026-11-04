@@ -185,6 +185,8 @@ export class DrainScheduler {
    */
   readonly #requeuedAtLimit = new Set<string>();
   readonly #settingsHolds = new Map<string, number>();
+  /** Agents with a live voice session: the voice model starts their turns, so queued messages wait. */
+  readonly #liveVoiceHolds = new Map<string, number>();
   /** The last hold `#reportHold` logged per lane, so a waiting queue logs once per reason. */
   readonly #reportedHolds = new Map<string, string>();
   /**
@@ -298,6 +300,7 @@ export class DrainScheduler {
     const { agentId, taskId } = lane;
     if (this.#hooks.isDeleting(agentId)) return "deleting";
     if (this.#settingsHolds.has(agentId)) return "session-settings";
+    if (this.#liveVoiceHolds.has(agentId)) return "live-voice";
     if (this.#laneTurnActive(lane)) return "active-turn";
     // The provider has one turn of the agent at a time, so each lane waits for the turn of any other.
     if (
@@ -434,11 +437,22 @@ export class DrainScheduler {
   }
 
   holdSessionSettings(agentId: string): () => void {
-    this.#settingsHolds.set(agentId, (this.#settingsHolds.get(agentId) ?? 0) + 1);
+    return this.#hold(this.#settingsHolds, agentId);
+  }
+
+  holdLiveVoice(agentId: string): () => void {
+    return this.#hold(this.#liveVoiceHolds, agentId);
+  }
+
+  #hold(holds: Map<string, number>, agentId: string): () => void {
+    holds.set(agentId, (holds.get(agentId) ?? 0) + 1);
+    let released = false;
     return () => {
-      const remaining = (this.#settingsHolds.get(agentId) ?? 1) - 1;
-      if (remaining > 0) this.#settingsHolds.set(agentId, remaining);
-      else this.#settingsHolds.delete(agentId);
+      if (released) return;
+      released = true;
+      const remaining = (holds.get(agentId) ?? 1) - 1;
+      if (remaining > 0) holds.set(agentId, remaining);
+      else holds.delete(agentId);
       this.scheduleDrain(agentId);
     };
   }

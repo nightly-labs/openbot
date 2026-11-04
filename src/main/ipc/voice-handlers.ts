@@ -7,6 +7,7 @@ import type {
   SpeechAudio,
   SpeechModelStatus,
   SpeechSettings,
+  VoiceLiveSession,
   VoiceModelStatus,
   VoiceServerProbe,
   VoiceServerSettings,
@@ -25,6 +26,8 @@ import {
   parseSpeechInput,
   parseSpeechSettings,
   parseVoiceApiKey,
+  parseVoiceLiveStart,
+  parseVoiceLiveStop,
   parseVoiceModelRequest,
   parseVoiceRecording,
   parseVoiceServerConnection,
@@ -41,7 +44,7 @@ export interface VoiceIpcDependencies {
   /** The user's own server. While one of its routes is on, it replaces the model on this computer. */
   server: VoiceServerService;
   /** Keeps a voice turn's recording as an attachment draft. Voice turns go to this computer's host only. */
-  service: Pick<AgentService, "prepareVoiceRecording">;
+  service: Pick<AgentService, "prepareVoiceRecording" | "startLiveVoice" | "stopLiveVoice">;
 }
 
 export function voiceIpcHandlers({
@@ -130,6 +133,17 @@ export function voiceIpcHandlers({
       setServer: payloadHandler(
         parseVoiceServerSave,
         (save): Promise<VoiceServerSettings | null> => runCauseEffect(server.set(save.server)),
+      ),
+      // Codex live voice: Codex App Server answers the renderer's WebRTC offer with the user's own
+      // Codex sign-in. Main never sees the audio or the credentials.
+      startLive: payloadHandler(
+        parseVoiceLiveStart,
+        (input): Promise<VoiceLiveSession> =>
+          runCauseEffect(service.startLiveVoice(input, speech.getSettings().codexLiveVoice)),
+      ),
+      stopLive: payloadHandler(
+        parseVoiceLiveStop,
+        ({ sessionId }): Promise<void> => runCauseEffect(service.stopLiveVoice(sessionId)),
       ),
     },
   };

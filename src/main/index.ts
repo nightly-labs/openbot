@@ -415,6 +415,7 @@ const {
   forwardUpdatePreference,
   forwardVoiceModelStatus,
   forwardVoiceStreamTranscript,
+  forwardVoiceLiveEvent,
   forwardSpeechModelStatus,
   forwardVoiceServerSettings,
   forwardProviderRuntimeStatus,
@@ -1343,6 +1344,8 @@ if (!hasSingleInstanceLock) {
       // Team API clients never receive them.
       service.on("toolUsage", (usage) => built.analytics.handleToolUsage(usage));
       service.on("workflowRun", (end) => built.analytics.handleWorkflowRun(end));
+      // Codex live voice goes to this computer's windows only, never to Team API clients.
+      service.on("liveVoice", forwardVoiceLiveEvent);
       built.browser.onSiteVisited((visit) => built.analytics.handleSiteVisit(visit));
       sidebarLayout.on("changed", (layout) => forwardAgentEvent("local", { type: "sidebar-layout-changed", layout }));
       // A pin from the owner's phone shows at once in the sidebar of this computer.
