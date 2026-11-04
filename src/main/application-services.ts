@@ -2804,6 +2804,12 @@ export async function createApplicationServices({
         primary: display.id === primaryId,
       }));
     },
+    // Electron bounds are in DIP; Sunshine reports a Windows display's origin in physical pixels.
+    getRemoteDesktopDisplayScreenOrigin: (displayId) => {
+      if (process.platform !== "win32") return undefined;
+      const display = screen.getAllDisplays().find((candidate) => String(candidate.id) === displayId);
+      return display ? screen.dipToScreenPoint({ x: display.bounds.x, y: display.bounds.y }) : undefined;
+    },
     // A member's paste in the remote desktop replaces this computer's clipboard, as a copy they make
     // on it does.
     writeRemoteDesktopClipboard: (text) => clipboard.writeText(text),

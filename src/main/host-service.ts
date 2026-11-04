@@ -170,6 +170,7 @@ interface HostServiceOptions {
   createRemoteDesktopRuntime?: RemoteScreenGatewayCreateRuntime;
   getRemoteDesktopRuntimeCredentials?: () => Effect.Effect<{ username: string; password: string }, RemoteWorkflowError>;
   getRemoteDesktopDisplays?: () => RemoteDesktopDisplay[];
+  getRemoteDesktopDisplayScreenOrigin?: (displayId: string) => { x: number; y: number } | undefined;
   getRemoteDesktopIceServers?: () => Effect.Effect<RemoteDesktopIceServer[], RemoteWorkflowError>;
   /** Puts a remote desktop member's pasted text on this computer's clipboard. */
   writeRemoteDesktopClipboard?: (text: string) => void;
@@ -314,6 +315,7 @@ export class HostService extends EventEmitter<HostEvents> {
         options.getRemoteDesktopRuntimeCredentials ??
         (() => Effect.succeed({ username: "openbot", password: "development-runtime-not-for-release" })),
       ...(options.getRemoteDesktopDisplays ? { getDisplays: options.getRemoteDesktopDisplays } : {}),
+      getDisplayScreenOrigin: options.getRemoteDesktopDisplayScreenOrigin,
       getIceServers:
         options.getRemoteDesktopIceServers ??
         (() => Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.host.iceServersMissing")) }))),
