@@ -54,6 +54,18 @@ const API_KEY_ANSWER = [
   "### Quota Limits",
   "- Not applicable for current authentication method.",
 ].join("\n");
+/** A spent weekly window whose reset Google names as a relative time, not a date. */
+const RELATIVE_ANSWER = [
+  "### Session Usage",
+  "- No token usage recorded yet.",
+  "### Quota Limits",
+  "- **Gemini Models**",
+  "  *(Models within this group: Gemini Flash, Gemini Pro)*",
+  "  - **Weekly Limit Remaining:** 0% remaining (resets in 2 hours, 52 minutes)",
+  "- **Claude and GPT models**",
+  "  *(Models within this group: Claude Opus, Claude Sonnet, GPT-OSS)*",
+  "  - **Weekly Limit Remaining:** 100% remaining",
+].join("\n");
 
 // Logs every request method, and answers a prompt that starts with `/usage` with `FAKE_AGY_ANSWER`
 // in one `agent_message_chunk` before the prompt returns. Any other prompt is a model turn.
@@ -125,6 +137,7 @@ interface Report {
   groups?: AccountUsage;
   apiKeySignIn?: UsageCase;
   olderRuntime?: UsageCase;
+  relativeReset?: UsageCase;
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-antigravity-usage-e2e-"));
@@ -259,6 +272,30 @@ try {
   report.olderRuntime = older;
   assert.deepEqual(older.prompts, [], "1.3.0 is not sent `/usage`");
   assert.equal(older.readings[0]?.rateLimits ?? null, null, "1.3.0 gives no reading");
+
+  // 6. A reset named as a relative time becomes a reset the clock can wait for, so the composer
+  // notice and the usage limit hold end when the window refills instead of waiting for a restart.
+  const relativeStartedAt = Date.now() / 1_000;
+  const relative = await readUsage("1.4.1", RELATIVE_ANSWER, 1, "gemini-3.8-flash-high");
+  report.relativeReset = relative;
+  const relativeFinishedAt = Date.now() / 1_000;
+  const relativeWindow = relative.readings[0]?.rateLimits?.secondary ?? null;
+  assert.deepEqual(
+    relativeWindow && {
+      usedPercent: relativeWindow.usedPercent,
+      windowDurationMins: relativeWindow.windowDurationMins,
+    },
+    { usedPercent: 100, windowDurationMins: 10_080 },
+    "the spent weekly window with a relative reset",
+  );
+  const relativeResetsAt = relative.readings[0]?.rateLimits?.secondary?.resetsAt ?? null;
+  assert.ok(relativeResetsAt !== null, "a relative reset is read, not dropped");
+  const relativeSeconds = 2 * 3_600 + 52 * 60;
+  assert.ok(
+    relativeResetsAt >= Math.floor(relativeStartedAt) + relativeSeconds - 1 &&
+      relativeResetsAt <= Math.ceil(relativeFinishedAt) + relativeSeconds + 1,
+    `the relative reset is about now + ${relativeSeconds}s: ${relativeResetsAt}`,
+  );
 
   report.passed = true;
 } finally {
