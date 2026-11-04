@@ -3,6 +3,7 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, For, Match, Show, Switch } from "solid-js";
 import { AgentLibrary, agentFromSource } from "./MarketplaceAgents";
 import { AppRow } from "./MarketplaceCards";
+import { MarketplaceNoMatchPlush } from "./MarketplaceNoMatchPlush";
 import { MissingNotice } from "./MarketplaceParts";
 import { SkillLibrary } from "./MarketplaceSkills";
 import { CATEGORY_LABELS } from "./marketplace-listing";
@@ -46,6 +47,7 @@ function NoMatch(props: {
   const others = () => MARKETPLACE_TABS.filter((tab) => tab !== props.tab && props.counts()[tab] > 0);
   return (
     <div class="marketplace-empty">
+      <MarketplaceNoMatchPlush />
       <Text as="p" variant="body-sm" tone="muted">
         {props.filtered ? t("marketplace.noMatch.filters") : searching() ? t(NO_MATCH[props.tab]) : t(EMPTY[props.tab])}
       </Text>
