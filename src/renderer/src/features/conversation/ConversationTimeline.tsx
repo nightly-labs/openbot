@@ -769,6 +769,9 @@ export function ConversationTimeline() {
                 // A row the host has not drawn yet has no reactions, replies or menu: its id is not the
                 // host's, even after the host answered.
                 const hostless = createMemo(() => message()?.id.startsWith(PENDING_SEND_ID_PREFIX) === true);
+                // The text before a waiting question is a step of the turn (#4897). A step keeps no
+                // reaction, reply or menu, and the row goes back into the steps after the answer.
+                const turnStep = createMemo(() => message()?.itemType === "commentary");
                 const pendingSend = createMemo(() => {
                   const send = pendingSendFor(message()?.id);
                   return send && send.state !== "sent" ? send : undefined;
@@ -1318,7 +1321,7 @@ export function ConversationTimeline() {
                                     }}
                                   />
                                 </Show>
-                                <Show when={!hostless()}>
+                                <Show when={!hostless() && !turnStep()}>
                                   <MessageActions
                                     message={message() ?? initialMessage}
                                     pickerOpen={openReactionMessageId() === message()?.id}
@@ -1348,7 +1351,7 @@ export function ConversationTimeline() {
                               </>
                             }
                             menu={
-                              hostless()
+                              hostless() || turnStep()
                                 ? undefined
                                 : () => (
                                     <MessageMenu
