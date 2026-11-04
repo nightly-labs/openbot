@@ -308,6 +308,10 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   #keyChangedAt = new Map<string, number>();
   /** The local servers that this app runs as its child processes. See `local-servers/`. */
   #thisComputerServers: ReadonlySet<string> = new Set();
+  /** The servers on this computer that are registered for the signed-in account. */
+  #registeredThisComputerServers: ReadonlySet<string> = new Set();
+  /** Gives a server on this computer its new members after a change here. */
+  #thisComputerMembersChanged: (serverId: string) => void = () => undefined;
   readonly #hostedServers: HostedServerWakeHooks | null;
   /** When each hosted server that starts after a wake request started. */
   readonly #hostedStartAt = new Map<string, number>();
@@ -430,6 +434,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       servers: this.#store,
       request: (serverId, path, decoder, init) => this.#client.request(serverId, path, decoder, init),
       transport: this.#webrtcTransport,
+      isRegisteredThisComputer: (serverId) => this.#registeredThisComputerServers.has(serverId),
+      allowLocalDevelopmentApiUrl: this.#allowLocalDevelopmentInvites,
       sendInviteEmail: (input) => {
         if (!this.#centralAccount.sendTeamInviteEmail)
           throw new Error(sourceText("error.remote.emailDeliveryUnavailable"));
@@ -1146,6 +1152,28 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   }
 
   /**
+   * Before a server is registered, or while the app is signed out, its members and invitations stay
+   * with the server's own Team API, which lists its owner without an account.
+   */
+  setRegisteredThisComputerServers(serverIds: Iterable<string>): void {
+    this.#registeredThisComputerServers = new Set(serverIds);
+  }
+
+  setThisComputerMembersListener(listener: (serverId: string) => void): void {
+    this.#thisComputerMembersChanged = listener;
+  }
+
+  /**
+   * The child cannot read the account directory, so a change made here must reach it. Also after a
+   * failure: the account service can have changed the member before a later step failed.
+   */
+  #membersChanged(serverId: string): Effect.Effect<void> {
+    return Effect.sync(() => {
+      if (this.#thisComputerServers.has(serverId)) this.#thisComputerMembersChanged(serverId);
+    });
+  }
+
+  /**
    * A local server that started: it proves the key pinned when it was made, then this app logs in as
    * its owner. A new session at each start, so no session can expire while the server runs.
    */
@@ -1808,13 +1836,15 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   }
 
   updateMember(serverId: string, input: UpdateTeamMemberInput): Effect.Effect<TeamMemberSummary, RemoteWorkflowError> {
-    return this.#owned(this.#team.updateMember(serverId, input)).pipe(
-      Effect.map((member) => this.#refresh.withMemberChatColors(serverId, [member])[0] ?? member),
-    );
+    return this.#owned(
+      this.#team.updateMember(serverId, input).pipe(Effect.ensuring(this.#membersChanged(serverId))),
+    ).pipe(Effect.map((member) => this.#refresh.withMemberChatColors(serverId, [member])[0] ?? member));
   }
 
   removeMember(serverId: string, memberId: string): Effect.Effect<void, RemoteWorkflowError> {
-    return this.#owned(this.#team.removeMember(serverId, memberId));
+    return this.#owned(
+      this.#team.removeMember(serverId, memberId).pipe(Effect.ensuring(this.#membersChanged(serverId))),
+    );
   }
 
   listInvites(serverId: string): Effect.Effect<TeamInviteSummary[], RemoteWorkflowError> {
