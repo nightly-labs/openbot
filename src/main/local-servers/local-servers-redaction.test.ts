@@ -25,18 +25,19 @@ const MACHINE_TOKEN = "machine-token-of-the-server-on-this-computer";
 
 /** A child that reports ready at once and exits when it is asked to stop. */
 class ReadyChild extends ChildProcess {
-  /** What the parent wrote to standard input. */
+  /** What the parent wrote to the control pipe. */
   readonly input: string[] = [];
+  readonly #stdout = new PassThrough();
+  readonly #stderr = new PassThrough();
+  readonly #control = new PassThrough();
+  override readonly stdio: ChildProcess["stdio"] = [null, this.#stdout, this.#stderr, this.#control, undefined];
 
   constructor() {
     super();
-    const stdin = new PassThrough();
-    stdin.on("data", (chunk: Buffer) => this.input.push(chunk.toString()));
-    this.stdin = stdin;
-    const stdout = new PassThrough();
-    this.stdout = stdout;
-    this.stderr = new PassThrough();
-    setImmediate(() => stdout.write(`${formatLocalServerReady(READY)}\n`));
+    this.#control.on("data", (chunk: Buffer) => this.input.push(chunk.toString()));
+    this.stdout = this.#stdout;
+    this.stderr = this.#stderr;
+    setImmediate(() => this.#stdout.write(`${formatLocalServerReady(READY)}\n`));
   }
 
   override kill(signal?: NodeJS.Signals | number): boolean {
@@ -161,7 +162,7 @@ describe("servers on this computer", () => {
     expect(log).not.toContain(secret);
   });
 
-  it("gives the machine token only to the child's standard input", async () => {
+  it("gives the machine token only to the child's control pipe", async () => {
     const lines: string[] = [];
     const spawned: Spawned[] = [];
     const local = servers(
