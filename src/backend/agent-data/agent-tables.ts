@@ -198,7 +198,8 @@ export class AgentTables {
    */
   prewarm(): Effect.Effect<void> {
     return Effect.tryPromise(() => access(this.#path)).pipe(
-      Effect.andThen(Effect.sync(() => this.#supervisor.prewarm())),
+      // `try`, not `sync`: a start that throws is then a failure that `ignore` drops, not a defect.
+      Effect.andThen(Effect.try(() => this.#supervisor.prewarm())),
       Effect.ignore,
     );
   }

@@ -657,6 +657,7 @@ jobs:
     # Runs the real ACP provider drivers (custom agents, OpenCode, Cline) over fake agents from
     # `scripts/provider-fakes/`. The fakes speak ACP on stdio as the released CLIs do, or replay a
     # recorded transcript of a released CLI, so the job needs no provider account, network or display.
+    # It also runs the agent database host start test, which starts the real host with Node.
     name: Provider fakes E2E
     needs: detect
     if: needs.detect.outputs.desktop == 'true'

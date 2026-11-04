@@ -25,10 +25,11 @@ import {
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/agent-database-host-start-e2e");
 const HOST = resolve(import.meta.dirname, "../src/backend/agent-data/agent-database-host.ts");
-const STATEMENT_DEADLINE_MS = 300;
+/** Wide for a loaded CI runner: the first statement creates the file and the metadata tables. */
+const STATEMENT_DEADLINE_MS = 1_000;
 /** Longer than the statement deadline: before the fix, this start ended the first statement. */
-const READY_DELAY_MS = 1_000;
-const START_DEADLINE_MS = 2_000;
+const READY_DELAY_MS = 2_000;
+const START_DEADLINE_MS = 3_000;
 const NOT_STARTED = "The database process did not start. Nothing was run. Try the call again.";
 
 interface Case {

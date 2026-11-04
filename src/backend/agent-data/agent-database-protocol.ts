@@ -100,8 +100,9 @@ export type AgentDatabaseHostMessage = AgentDatabaseResponse | AgentDatabaseHost
  * arms when it starts a host; every other number bounds a payload that would otherwise be unbounded
  * because a model chose it.
  *
- * The start deadline is shorter than the queue wait, so a request queued behind a slow start can
- * still run once the host is ready. It is long because a slow Windows computer, with a virus scan
+ * The start deadline is shorter than the queue wait, so a request that comes while a host starts can
+ * still run once the host is ready. A request that already waited behind a stopped statement has
+ * less time left. The start deadline is long because a slow Windows computer, with a virus scan
  * of the new process, can take several seconds to load the host.
  */
 export const AGENT_DATABASE_LIMITS = {
