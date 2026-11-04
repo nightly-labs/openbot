@@ -103,6 +103,16 @@ export interface AcpFlavor {
   /** Each answer message has its own `messageId`, so text of a new ID is a new message, not more text. */
   messagePerId?: true;
   /**
+   * OpenCode sends the work of its subagents as `opencode/session/child_update` notifications when
+   * the client asks for them, and they show in the subagent card, not in the parent's steps.
+   */
+  childSessionUpdates?: true;
+  /**
+   * The tools that run a subagent and send no events of it, as the tool name or `<name>: <description>`.
+   * Each call shows as a subagent with its task, state, and report.
+   */
+  subagentTools?: readonly string[];
+  /**
    * The agent keeps one MCP server of each name for a directory, and a session that opens there
    * replaces the server that the others in it use. Their OpenBot servers then share one token.
    */
@@ -133,8 +143,11 @@ export interface AcpFlavor {
   loadInsteadOfResume?: { missing(response: LoadSessionResponse): boolean };
 }
 
-/** The protocol's own behavior: Grok and Cline. */
+/** The protocol's own behavior: Grok. */
 export const DEFAULT_ACP_FLAVOR: AcpFlavor = {};
+
+/** Cline CLI 3.0.68 runs a subagent with its `spawn_agent` tool: `{ systemPrompt, task }`, result `{ text }`. */
+export const CLINE_ACP_FLAVOR: AcpFlavor = { subagentTools: ["spawn_agent"] };
 
 /**
  * Hermes Agent 0.21.5 answers a `session/resume` of a missing session with a new session, and the
@@ -144,6 +157,8 @@ export const DEFAULT_ACP_FLAVOR: AcpFlavor = {};
  */
 export const HERMES_ACP_FLAVOR: AcpFlavor = {
   loadInsteadOfResume: { missing: (response) => response.modes == null },
+  // Its `delegate_task` call is titled `delegate_task: <goal>`, and its subagents send no events.
+  subagentTools: ["delegate_task"],
 };
 
 /**
@@ -186,6 +201,8 @@ export const KIMI_ACP_FLAVOR: AcpFlavor = {
     isRecord(error.data) &&
     typeof error.data.details === "string" &&
     error.data.details.includes("config.toml"),
+  // Its `Agent` call is titled `Agent: <description>`, and its arguments come as content text.
+  subagentTools: ["Agent"],
 };
 
 /**

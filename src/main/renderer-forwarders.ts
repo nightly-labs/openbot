@@ -342,7 +342,7 @@ export function createRendererForwarders({
     const routineTaskId = received.type === "routine-thread-turn-completed" ? received.taskId : null;
     const event = received.type === "routine-thread-turn-completed" ? received.turn : received;
     // Most events stream while an agent works. Only these can notify, so the others skip the server list.
-    if (!agentEventCanNotify(event) && event.type !== "usage-limit-reached") return;
+    if (!agentEventCanNotify(event) && event.type !== "usage-limit-reached" && event.type !== "subagent-failed") return;
     // Like Discord, nothing pops up while the user is looking at the app. The level is read again
     // after the lookup, with the rest, because the user can change it while the lookup runs.
     const notifyLevel = (agentLevels: ReadonlyMap<string, ServerNotificationLevel> | null) => {

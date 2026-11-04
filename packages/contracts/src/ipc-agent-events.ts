@@ -17,9 +17,10 @@ import {
   isAgentApproval,
   isBrowserTakeoverRequest,
 } from "./ipc-approvals";
-import { isIdentifier } from "./ipc-bounded-values";
+import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import type { BrowserControlState, BrowserTab } from "./ipc-browser";
 import { type AgentPromptQuestion, isAgentPromptQuestion, isConversationMessage } from "./ipc-conversation-messages";
+import { CONVERSATION_SUBAGENT_TITLE_LIMIT } from "./ipc-conversation-subagents";
 import {
   type ConversationPage,
   type ConversationSnapshot,
@@ -185,6 +186,19 @@ export type AgentEvent =
       provider: AgentProviderId;
       resetsAt: number | null;
       agentCount: number;
+    }
+  /**
+   * A subagent of a turn failed, once per subagent. `title` is the task the card shows. Local only:
+   * the released Team API event adapters do not carry it, and a remote client reads the failure in the
+   * subagent list of the conversation (`subagents-v1`).
+   */
+  | {
+      type: "subagent-failed";
+      agentId: string;
+      threadId: string;
+      turnId: string;
+      subagentId: string;
+      title: string;
     };
 
 export function isAgentEvent(value: unknown): value is AgentEvent {
@@ -362,6 +376,14 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         isString(value.message) &&
         (value.provider === undefined || isAgentProvider(value.provider)) &&
         (value.model === undefined || isString(value.model))
+      );
+    case "subagent-failed":
+      return (
+        isIdentifier(value.agentId) &&
+        isIdentifier(value.threadId) &&
+        isIdentifier(value.turnId) &&
+        isIdentifier(value.subagentId) &&
+        isBoundedString(value.title, CONVERSATION_SUBAGENT_TITLE_LIMIT)
       );
     case "usage-limit-reached":
       return (

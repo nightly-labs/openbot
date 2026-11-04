@@ -414,6 +414,18 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:provider-exit-session
 
+      - name: Run the ACP subagent card E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:acp-subagents
+
+      - name: Run the Codex subagent steps E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:codex-subagent-steps
+
+      - name: Run the subagent status and failure alert E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:subagent-status
+
       - name: Run the hung Codex app-server E2E test
         if: ${{ !cancelled() }}
         run: bun run test:codex-hung-app-server
@@ -590,6 +602,9 @@ jobs:
             .openbot-build/provider-update-after-app-upgrade-e2e/
             .openbot-build/provider-runtime-remove-e2e/
             .openbot-build/provider-exit-session-e2e/
+            .openbot-build/acp-subagents-e2e/
+            .openbot-build/codex-subagent-steps-e2e/
+            .openbot-build/subagent-status-e2e/
             .openbot-build/codex-hung-app-server-e2e/
             .openbot-build/codex-missing-rollout-e2e/
             .openbot-build/codex-usage-metering-e2e/
