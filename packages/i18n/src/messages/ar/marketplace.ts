@@ -415,6 +415,23 @@ export const messages = {
   "marketplace.plugin.clickup.prompt.findTasks": "ابحث عن مهامي المفتوحة في ClickUp المستحقة هذا الأسبوع.",
   "marketplace.plugin.clickup.prompt.createTask": "أنشئ مهمة في ClickUp لبنود العمل هذه وعيّنها لي.",
   "marketplace.plugin.clickup.prompt.summarizeDoc": "ابحث عن آخر تحديث للمشروع في ClickUp ولخّص الأسئلة المفتوحة.",
+  "marketplace.plugin.coinbase.tagline": "أسعار العملات المشفرة والمحافظ والتداول",
+  "marketplace.plugin.coinbase.description":
+    "يتيح Coinbase للوكلاء قراءة الأسعار والأرصدة والمحافظ والأوامر والرسوم في Coinbase Advanced Trade، ومعاينة الأوامر وتنفيذها، والتحويل بين الأصول، ونقل الأموال بين المحافظ. يسجّل كل مستخدم الدخول إلى حسابه في Coinbase عبر المتصفح. يحصل الوكلاء على صلاحيات المستخدم نفسها. تستخدم الأوامر والتحويلات أموالًا حقيقية، ويمكن للوكلاء دفع طلبات x402 من رصيد USDC.",
+  "marketplace.plugin.coinbase.app":
+    "الأسعار والأرصدة والمحافظ والأوامر والتحويلات، عبر خادم MCP الخاص بـ Coinbase مع تسجيل الدخول في المتصفح.",
+  "marketplace.plugin.coinbase.prompt.balances": "ما أرصدتي في Coinbase في كل محفظة؟",
+  "marketplace.plugin.coinbase.prompt.price": "اعرض سعر BTC-USD على Coinbase وكيف تحرّك هذا الأسبوع.",
+  "marketplace.plugin.coinbase.prompt.previewOrder":
+    "اعرض معاينة لشراء ETH بسعر السوق بقيمة 50 USD على Coinbase. لا تنفّذ الأمر.",
+  "marketplace.plugin.robinhood.tagline": "حسابات الوساطة والتداول عبر الوكلاء",
+  "marketplace.plugin.robinhood.description":
+    "يتيح Robinhood للوكلاء قراءة حسابات عميل Robinhood ومراكزه وأرصدته وسجل معاملاته وقوائم المتابعة، وقراءة بيانات السوق، وتنفيذ أوامر الأسهم والخيارات والعملات المشفرة. يسجّل كل مستخدم الدخول إلى حسابه في Robinhood عبر المتصفح. عند أول تسجيل دخول، يطلب Robinhood من المستخدم فتح حساب Agentic منفصل. لا يمكن للوكلاء التداول إلا في ذلك الحساب، وهم افتراضيًا ينفّذون الأوامر دون طلب موافقة المستخدم على كل أمر.",
+  "marketplace.plugin.robinhood.app":
+    "الحسابات والمراكز وبيانات السوق والصفقات، عبر خادم MCP الخاص بـ Robinhood مع تسجيل الدخول في المتصفح.",
+  "marketplace.plugin.robinhood.prompt.positions": "لخّص مراكزي في Robinhood وكيف تحرّكت اليوم.",
+  "marketplace.plugin.robinhood.prompt.watchlist": "كيف تحرّك كل سهم في قائمة متابعتي في Robinhood هذا الأسبوع؟",
+  "marketplace.plugin.robinhood.prompt.agenticCash": "كم من النقد في حساب Agentic الخاص بي في Robinhood؟",
   "marketplace.plugin.huggingface.tagline": "النماذج ومجموعات البيانات والأوراق البحثية على Hub",
   "marketplace.plugin.huggingface.description":
     "يتيح Hugging Face للوكلاء البحث في النماذج ومجموعات البيانات وSpaces والمجموعات والأوراق البحثية على Hugging Face Hub، وقراءة بطاقات النماذج وملفات المستودعات، ومعاينة مجموعات البيانات، والبحث في وثائق Hugging Face. يستخدم بيانات Hub العامة ولا يحتاج إلى حساب ولا مفتاح. الأدوات للقراءة فقط: لا يمكن للوكلاء إنشاء مستودعات أو تشغيل مهام.",

@@ -402,6 +402,24 @@ export const messages = {
   "marketplace.plugin.clickup.prompt.createTask": "Maak een ClickUp-taak van deze actiepunten en wijs die aan mij toe.",
   "marketplace.plugin.clickup.prompt.summarizeDoc":
     "Zoek de nieuwste projectupdate in ClickUp en vat de open vragen samen.",
+  "marketplace.plugin.coinbase.tagline": "Cryptokoersen, portefeuilles en handel",
+  "marketplace.plugin.coinbase.description":
+    "Met Coinbase lezen agents koersen, saldi, portefeuilles, orders en kosten in Coinbase Advanced Trade, bekijken en plaatsen ze orders, wisselen ze tussen assets en verplaatsen ze geld tussen portefeuilles. Elke gebruiker meldt zich in de browser aan bij een eigen Coinbase-account. Agents hebben dezelfde rechten als de gebruiker. Orders en omwisselingen gebruiken echt geld, en agents kunnen x402-verzoeken betalen met het USDC-saldo.",
+  "marketplace.plugin.coinbase.app":
+    "Koersen, saldi, portefeuilles, orders en omwisselingen, via de MCP-server van Coinbase met aanmelden in de browser.",
+  "marketplace.plugin.coinbase.prompt.balances": "Wat zijn mijn Coinbase-saldi in elke portefeuille?",
+  "marketplace.plugin.coinbase.prompt.price": "Toon de BTC-USD-koers op Coinbase en hoe die deze week bewoog.",
+  "marketplace.plugin.coinbase.prompt.previewOrder":
+    "Bekijk vooraf een marktaankoop van 50 USD aan ETH op Coinbase. Plaats de order niet.",
+  "marketplace.plugin.robinhood.tagline": "Beleggingsrekeningen en handel door agents",
+  "marketplace.plugin.robinhood.description":
+    "Met Robinhood lezen agents de rekeningen, posities, saldi, transactiegeschiedenis en volglijsten van een Robinhood-klant, lezen ze marktgegevens en plaatsen ze orders voor aandelen, opties en crypto. Elke gebruiker meldt zich in de browser aan bij een eigen Robinhood-account. Bij de eerste aanmelding vraagt Robinhood de gebruiker om een aparte Agentic-rekening te openen. Agents kunnen alleen op die rekening handelen en plaatsen standaard orders zonder de gebruiker om goedkeuring per order te vragen.",
+  "marketplace.plugin.robinhood.app":
+    "Rekeningen, posities, marktgegevens en transacties, via de MCP-server van Robinhood met aanmelden in de browser.",
+  "marketplace.plugin.robinhood.prompt.positions": "Vat mijn Robinhood-posities samen en hoe ze vandaag bewogen.",
+  "marketplace.plugin.robinhood.prompt.watchlist": "Hoe bewoog elk aandeel op mijn Robinhood-volglijst deze week?",
+  "marketplace.plugin.robinhood.prompt.agenticCash":
+    "Hoeveel contant geld staat er op mijn Robinhood Agentic-rekening?",
   "marketplace.plugin.huggingface.tagline": "Modellen, datasets en papers op de Hub",
   "marketplace.plugin.huggingface.description":
     "Met Hugging Face kunnen agents modellen, datasets, Spaces, collecties en papers op de Hugging Face Hub zoeken, modelkaarten en repositorybestanden lezen, datasets bekijken en de Hugging Face-documentatie doorzoeken. Het gebruikt openbare Hub-data en heeft geen account en geen sleutel nodig. De tools lezen alleen: agents kunnen geen repository’s maken of jobs uitvoeren.",
