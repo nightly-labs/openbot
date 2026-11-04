@@ -156,9 +156,10 @@ export function startingChoice(
 /**
  * The provider of a workflow step that names no provider and no model, given the starting choice
  * `starting`. A step is one generation and cannot wait for a sign-in. So when the starting choice is
- * the built-in default with no model chosen, and that provider is off, signed out or not installed,
- * the first provider in picker order that can run and lists a model takes its place. Another
- * preferred provider, or a model chosen beside the built-in one, stays, and the step's error names it.
+ * the built-in default with no model chosen, and that provider is off or cannot run (signed out,
+ * missing, outdated or failed), the first provider in picker order that can run and lists a model
+ * takes its place. Another preferred provider, or a model chosen beside the built-in one, stays, and
+ * the step's error names it.
  */
 export function workflowProvider(
   starting: AgentProvider,
@@ -168,7 +169,9 @@ export function workflowProvider(
 ): AgentProvider {
   if (starting !== DEFAULT_AGENT_PROVIDER || !builtInDefault(preference)) return starting;
   const row = providers.find((candidate) => candidate.id === starting);
-  if (!row?.off && row?.state !== "sign-in-required" && row?.state !== "not-installed") return starting;
+  // A provider that starts or runs keeps the step. A missing Codex reports "error", not "not-installed".
+  if (!row || (!row.off && (row.state === "available" || row.state === "checking" || row.state === "not-started")))
+    return starting;
   return (
     PICKER_PROVIDERS.find(
       (provider) =>
