@@ -3,6 +3,7 @@ import type { AppTextKey } from "@openbot/i18n";
 import { Bot, File, Folder, Plug, type Puzzle, ShieldCheck, Store, UsersRound } from "@openbot/ui";
 import type { ComposerAgent, ComposerBrowserTab, ComposerMcpServer, ComposerSkill, ComposerThread } from "../../data";
 import type { TextValue } from "../../text";
+import { browserDisplayUrl } from "../browser/browser-suggestions";
 
 /**
  * Where the picker hangs, and from which element. Like the queue panel, it is a child of
@@ -79,19 +80,14 @@ export function pickerOptionDescription(
   if (option.type === "attachment") return format.fileSize(option.attachment.size);
   if (option.type === "skill") return skillDescription(option.skill);
   if (option.type === "mcp") return mcpServerDescription(option.server);
-  if (option.type === "tab") return shortTabUrl(option.tab.url) || undefined;
+  if (option.type === "tab") return browserDisplayUrl(option.tab.url) || undefined;
   if (option.type === "thread") return threadDetail(option.thread);
   return option.agent.description.trim() || option.agent.title.trim() || undefined;
 }
 
 /** A tab that has no title yet shows its address. */
 export function tabTitle(tab: ComposerBrowserTab): string {
-  return tab.title.trim() || shortTabUrl(tab.url) || tab.url;
-}
-
-/** The page address without the scheme and `www.`, as the second line of a tab row. */
-export function shortTabUrl(url: string): string {
-  return url.replace(/^[a-z][a-z\d+.-]*:\/\/(www\.)?/iu, "").replace(/\/$/u, "");
+  return tab.title.trim() || browserDisplayUrl(tab.url) || tab.url;
 }
 
 /** What a running thread does now, or why the last turn failed. */
@@ -122,7 +118,7 @@ function threadStateLabel(thread: ComposerThread): keyof typeof THREAD_STATE_LAB
  */
 export function referenceMatches(option: { tab: ComposerBrowserTab } | { thread: ComposerThread }, query: string) {
   if (!query) return true;
-  const text = "tab" in option ? `${tabTitle(option.tab)} ${shortTabUrl(option.tab.url)}` : option.thread.title;
+  const text = "tab" in option ? `${tabTitle(option.tab)} ${browserDisplayUrl(option.tab.url)}` : option.thread.title;
   return text.toLocaleLowerCase().includes(query);
 }
 

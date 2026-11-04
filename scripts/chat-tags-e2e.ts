@@ -154,7 +154,7 @@ try {
   // 2. The agent's own chat reads the side thread.
   const threadTag = serializeChatTagReference("thread", task.title, sideTaskId);
   await bridge.send(
-    `${threadTag} What is the thread code word there? Read that thread. Reply with the code word only.`,
+    `${threadTag} Read that thread. Its first message names the thread code word; the thread also holds a tab code word. Reply with the thread code word only.`,
   );
   const mainAfter = await waitFor(
     page,

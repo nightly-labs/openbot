@@ -3004,6 +3004,8 @@ export class BrowserHost {
             tab.privateSession,
             tab.tabSession,
           );
+          // A thread that drives a shared tab also drives its popups, for example a sign-in window.
+          if (tab.sharedThreadIds?.size) popup.sharedThreadIds = new Set(tab.sharedThreadIds);
           // Chromium exposes no opener for noopener/noreferrer requests.
           if (options.webContents?.opener) {
             popup.openerTabId = tab.id;

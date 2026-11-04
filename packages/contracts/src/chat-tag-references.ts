@@ -77,7 +77,8 @@ export function fileQuoteTarget(id: string): FileQuoteTarget | null {
 }
 
 export function serializeChatTagReference(kind: ChatTagKind, name: string, id: string): string {
-  const unsafeName = kind === "quote" ? UNSAFE_QUOTE_NAME : /[\]\r\n]/u;
+  // A quote, a page title and a thread title are any text, so they get the strict rule.
+  const unsafeName = kind === "quote" || kind === "tab" || kind === "thread" ? UNSAFE_QUOTE_NAME : /[\]\r\n]/u;
   if (name && id && !unsafeName.test(name) && !/[)\r\n]/u.test(id)) return `@[${name}](${kind}:${id})`;
   return `@[${encodeChatTagComponent(name)}](${kind}+uri:${encodeChatTagComponent(id)})`;
 }

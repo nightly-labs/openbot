@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { agentProviderDescriptor, customAgentIdOfModel } from "@openbot/contracts/agent-providers";
-import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { developmentStartingModel } from "@openbot/contracts/development-defaults";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -1407,7 +1406,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hooks: {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         redactMcp: (text) => this.#mcp.redact(text),
-        tagReferences: (agentId) => this.#tagReferences(agentId),
+        tagReferences: (agentId, threadId) => this.#tagReferences(agentId, threadId),
         isStopping: () => this.#stopping,
         isDeleting: (agentId) => this.#removal.deleting().has(agentId),
         servesModel: (model, provider) => this.#endpoints.serves(model, provider),
@@ -1509,7 +1508,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           if (this.#tasks.deliveryTaskGone(deliveryId)) throw new Error(sourceText("error.backend.threadNotFound"));
           return this.#tasks.threadForDelivery(deliveryId);
         },
-        tagReferences: (agentId) => this.#tagReferences(agentId),
+        tagReferences: (agentId, threadId) => this.#tagReferences(agentId, threadId),
       },
     });
     this.#turn = new TurnLifecycle({
@@ -4980,13 +4979,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       });
     }
     if (timezone !== undefined) this.#routines.noteDeliveryTimezone(delivery.delivery.id, timezone);
-    // A tagged tab of this agent becomes usable in the thread that gets the message. The browser host
-    // checks the owner, so a tag that names another agent's tab shares nothing.
     const targetThreadId = task?.threadId ?? agent.threadId;
-    for (const reference of chatTagReferences(delivery.delivery.text)) {
-      if (reference.kind === "tab" && targetThreadId)
-        this.#browser.shareTab(reference.id, { agentId: agent.id, threadId: targetThreadId });
-    }
     const snapshot = this.#conversation.ensureSnapshot(agent.id, targetThreadId);
     // A task message shows in the task's row until its turn starts, not in the agent's own chat.
     if (!task) this.#mailboxSync.syncMailboxMessages(snapshot);
@@ -5022,11 +5015,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /**
    * The current state of the tabs and threads that a message to this agent tags. Each is read only
    * when the prompt names it, and only for this agent: a tag of another agent's tab or thread reads
-   * as closed or deleted.
+   * as closed or deleted. A tagged tab becomes usable in `threadId`, the thread that gets the prompt.
+   * The share happens here, not when the message is queued, because a queued message can move to a
+   * new task or be edited before it runs. The browser host checks the owner, so a tag that names
+   * another agent's tab shares nothing.
    */
-  #tagReferences(agentId: string): TagReferenceSource {
+  #tagReferences(agentId: string, threadId: string | null): TagReferenceSource {
     return {
-      tab: (tabId) => this.#browser.agentTab(tabId, agentId),
+      tab: (tabId) => {
+        if (threadId) this.#browser.shareTab(tabId, { agentId, threadId });
+        return this.#browser.agentTab(tabId, agentId);
+      },
       thread: (taskId) => {
         if (!this.#tasks.has(agentId, taskId)) return null;
         const task = this.#tasks.publicTask(this.#tasks.require(agentId, taskId));

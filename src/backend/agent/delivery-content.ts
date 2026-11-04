@@ -246,9 +246,12 @@ function escapeRegExp(value: string): string {
 export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryPromptSources): DeliveryInputItem[] {
   const { delivery, managedAttachments } = context;
   const { agentNames, snapshot } = sources;
+  // A teammate's tags name the sender's tabs and threads, not the recipient's. They keep the name and
+  // id only, so `isTeammatePromptOf` can find the message in the prompt again.
+  const fromTeammate = delivery.sender.kind === "agent" && delivery.sender.agentId !== delivery.recipientAgentId;
   const displayText = displayMessageReferences(delivery.text, delivery.attachments, agentNames, {
     fileHeadings: true,
-    tags: sources.tags,
+    tags: fromTeammate ? undefined : sources.tags,
   });
   let text = sources.executionText ?? (displayText || "The user shared attached local files.");
   if (delivery.sender.kind === "user" && delivery.replyToMessageId) {

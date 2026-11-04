@@ -1381,9 +1381,12 @@ export function createConversationViewScope(props: ConversationProps) {
 
   /*
    * What `@` can tag beside the agents: the agent's own browser tabs and its side threads that are
-   * not closed, newest first. A channel has many agents, so it tags neither.
+   * not closed, newest first. A channel has many agents, so it tags neither. A tab of an old agent run
+   * has only an owner thread, and the host shares only a tab with an owner agent.
    */
-  const taggableBrowserTabs = createMemo(() => (props.channel ? [] : browserTabs()));
+  const taggableBrowserTabs = createMemo(() =>
+    props.channel ? [] : browserTabs().filter((tab) => tab.ownerAgentId === props.agent?.id),
+  );
   const taggableThreads = createMemo(() =>
     props.channel
       ? []

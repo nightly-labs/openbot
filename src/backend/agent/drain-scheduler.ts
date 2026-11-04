@@ -65,7 +65,8 @@ export interface DrainHooks {
    */
   redactMcp(text: string): string;
   /** The tabs and threads of this agent, as the tags of a delivered message name them. */
-  tagReferences(agentId: string): TagReferenceSource;
+  /** `threadId` is the public thread that gets the prompt. */
+  tagReferences(agentId: string, threadId: string | null): TagReferenceSource;
   /**
    * Gives a channel task back to its channel after a spent plan refused it; false when it cannot go
    * back. `continueWork` keeps the assignment for a ready backup instead.
@@ -784,7 +785,8 @@ export class DrainScheduler {
       }
 
       const agentNames = agentNamesById(this.#store.list());
-      const tags = this.#hooks.tagReferences(agent.id);
+      // `threadId` is the provider session; a tab owner is a public thread.
+      const tags = this.#hooks.tagReferences(agent.id, this.#conversation.publicThreadId(agent.id, threadId));
       const requestIds = new Set(
         batch.flatMap(({ delivery: item }) =>
           item.sender.kind === "agent" && item.replyToMessageId ? [item.replyToMessageId] : [],
