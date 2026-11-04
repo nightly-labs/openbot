@@ -65,6 +65,8 @@ export const messages = {
   "error.team.sharedDataUnsupported": "当前连接不支持共享数据。",
   "error.team.agentInstallUnsupported": "当前连接不支持添加助手。",
   "error.team.agentHideUnsupported": "当前连接不支持隐藏助手。",
+  "error.team.agentColorsUnsupported": "当前连接不支持助手颜色。",
+  "error.team.chatColorsUnsupported": "当前连接不支持聊天颜色。",
   "error.team.sidebarFoldersUnsupported": "当前连接不支持文件夹嵌套。",
   "error.team.agentNotificationLevelsUnsupported":
     "此服务器无法为每个助手保存你自己的通知级别。请在运行它的电脑上更新 OpenBot。",
@@ -74,6 +76,7 @@ export const messages = {
   "error.team.agentUpdateUnsupported": "当前连接不支持更新助手。",
   "error.team.contextResetUnsupported": "当前连接不支持开始新对话。",
   "error.team.contextCompactUnsupported": "当前连接不支持压缩上下文。",
+  "error.team.messageDeleteUnsupported": "此连接不支持删除消息。",
   "error.team.workspaceDirectoryUnsupported": "当前连接不支持显示文件夹。",
   "error.team.conversationFileSearchUnsupported": "当前连接不支持搜索文件。",
   "error.team.sideQuestionUnsupported": "当前连接不支持旁问。",

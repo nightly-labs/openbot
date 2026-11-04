@@ -66,6 +66,8 @@ export const messages = {
   "error.team.sharedDataUnsupported": "To połączenie nie obsługuje wspólnych danych.",
   "error.team.agentInstallUnsupported": "To połączenie nie obsługuje dodawania agentów.",
   "error.team.agentHideUnsupported": "To połączenie nie obsługuje ukrywania agentów.",
+  "error.team.agentColorsUnsupported": "To połączenie nie obsługuje kolorów agentów.",
+  "error.team.chatColorsUnsupported": "To połączenie nie obsługuje kolorów czatu.",
   "error.team.sidebarFoldersUnsupported": "To połączenie nie obsługuje folderów w folderach.",
   "error.team.agentNotificationLevelsUnsupported":
     "Ten serwer nie może zapisać Twojego poziomu powiadomień dla każdego agenta. Zaktualizuj OpenBot na komputerze, na którym działa.",
@@ -76,6 +78,7 @@ export const messages = {
   "error.team.agentUpdateUnsupported": "To połączenie nie obsługuje aktualizowania agentów.",
   "error.team.contextResetUnsupported": "To połączenie nie obsługuje rozpoczynania nowego czatu.",
   "error.team.contextCompactUnsupported": "To połączenie nie obsługuje kompaktowania kontekstu.",
+  "error.team.messageDeleteUnsupported": "To połączenie nie obsługuje usuwania wiadomości.",
   "error.team.workspaceDirectoryUnsupported": "To połączenie nie obsługuje pokazywania folderów.",
   "error.team.conversationFileSearchUnsupported": "To połączenie nie obsługuje wyszukiwania plików.",
   "error.team.sideQuestionUnsupported": "To połączenie nie obsługuje pytań pobocznych.",

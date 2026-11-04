@@ -35,6 +35,18 @@ export const DISCORD_QUOTE_TEXT_LIMIT = 4_000;
 /** The longest replied-to text a host accepts: a later Signal can pass more without breaking a host. */
 const QUOTE_DECODE_LIMIT = 8_000;
 
+/** The most embeds Signal passes on with one message. Discord's own limit. */
+export const DISCORD_EMBEDS_LIMIT = 10;
+
+/**
+ * The longest text of all embeds of one message that Signal passes on, links included. Discord's
+ * own limit for the text of all embeds of a message, without links.
+ */
+export const DISCORD_EMBED_TEXT_LIMIT = 6_000;
+
+/** The longest embed text a host accepts: a later Signal can pass more without breaking a host. */
+const EMBED_DECODE_LIMIT = 16_000;
+
 export interface DiscordInboundAttachment {
   id: string;
   filename: string;
@@ -56,6 +68,11 @@ export interface DiscordInboundQuote {
   sentAt: string;
   /** Empty from an older Signal. */
   attachments: DiscordInboundAttachment[];
+  /**
+   * The text of each embed, such as the form of a ticket bot: one part on each line, with the
+   * links of its images. Discord markdown. Empty from an older Signal.
+   */
+  embeds: string[];
   /**
    * A forward: `content` and `attachments` are the forwarded message's, and both are empty when
    * Discord did not give them. False from an older Signal.
@@ -171,6 +188,8 @@ export interface DiscordHistoryMessage {
   /** Empty from an older Signal. */
   attachments: DiscordInboundAttachment[];
   /** As in `DiscordInboundQuote`. */
+  embeds: string[];
+  /** As in `DiscordInboundQuote`. */
   forwarded: boolean;
 }
 
@@ -261,8 +280,20 @@ function quote(value: unknown): DiscordInboundQuote | null {
     content,
     sentAt: text(item.sentAt),
     attachments: attachments(item.attachments),
+    embeds: embeds(item.embeds),
     forwarded: forwarded(item.forwarded),
   };
+}
+
+function embeds(value: unknown): string[] {
+  // An older Signal sends no embeds.
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > DISCORD_EMBEDS_LIMIT) invalid();
+  return value.map((entry) => {
+    const embed = text(entry);
+    if (embed.length > EMBED_DECODE_LIMIT) invalid();
+    return embed;
+  });
 }
 
 function forwarded(value: unknown): boolean {
@@ -358,6 +389,7 @@ export function decodeDiscordHistory(value: unknown): DiscordHistoryMessage[] {
       replyToId: nullableSnowflake(item.replyToId),
       sentAt: text(item.sentAt),
       attachments: attachments(item.attachments),
+      embeds: embeds(item.embeds),
       forwarded: forwarded(item.forwarded),
     };
   });

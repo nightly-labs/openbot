@@ -7,6 +7,7 @@ import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar"
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { useText } from "@/shared/lib/text";
+import { lineDirectionStyle } from "@/shared/lib/text-direction";
 import type { AwaitingReply, AwaitingReplyState } from "../model/awaiting-replies";
 import { ThinkingTextGradient } from "./thinking-text-gradient";
 
@@ -81,6 +82,7 @@ export function AwaitingRepliesSection({
                     agentId={agent.id}
                     serverId={agent.serverId}
                     hue={agent.avatarHue}
+                    color={agent.avatarColor}
                     seed={agent.avatarSeed}
                     size={AVATAR_SIZE}
                   />
@@ -127,7 +129,12 @@ export function AwaitingRepliesSection({
                   {wait.detail}
                 </Typography.Paragraph>
               ) : row.preview ? (
-                <Typography.Paragraph type="body-sm" numberOfLines={2} className="text-grouped-secondary">
+                <Typography.Paragraph
+                  type="body-sm"
+                  numberOfLines={2}
+                  className="text-grouped-secondary"
+                  style={lineDirectionStyle(row.preview)}
+                >
                   {row.preview}
                 </Typography.Paragraph>
               ) : null}

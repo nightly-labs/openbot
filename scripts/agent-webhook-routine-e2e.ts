@@ -6,10 +6,12 @@
 // the chat records the creation for the card, that the routine lists with the webhook routines, that
 // a duplicate name and a bad filter come back as tool failures, and that a request signed with the
 // secret the card makes starts the routine, that test_routine refuses it with a message that names
-// Routines settings, and that delete_routine deletes it.
+// Routines settings, and that delete_routine deletes it. It also checks Standard Webhooks requests, as
+// Composio sends them: the sender's own secret (raw, and `whsec_` base64), the `v1,` signature, and
+// a filter on `/metadata/trigger_slug`, which matches because the whole body is the event data.
 // `bun scripts/agent-webhook-routine-e2e.ts`. Writes .openbot-build/agent-webhook-routine-e2e/report.json.
 import assert from "node:assert/strict";
-import { createHmac, randomUUID } from "node:crypto";
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -17,6 +19,7 @@ import { join, resolve } from "node:path";
 import { AGENT_PROVIDERS, type AgentEvent, routineConversationEvent } from "@openbot/contracts/ipc";
 import type { EventActivity, EventRoutine } from "@openbot/contracts/ipc-events";
 import {
+  STANDARD_WEBHOOKS_FORMAT,
   WEBHOOK_DELIVERY_ID_HEADER,
   WEBHOOK_SIGNATURE_HEADER,
   WEBHOOK_TIMESTAMP_HEADER,
@@ -175,13 +178,18 @@ interface WebhookToolBody {
   url?: string | null;
   urlPending?: string;
   secret?: string;
-  request?: { headers: Record<string, string> };
+  request?: { headers: Record<string, string>; standardWebhooks?: string };
 }
 
 const report: {
   calls: { name: string; turnId: string; success: boolean | null; body: WebhookToolBody | null }[];
   routines: EventRoutine[];
   receive?: { signed: number; wrongSecret: number; activity: EventActivity[] };
+  standard?: {
+    refusals: { shortSecret: string | null; scheduleRoutine: string | null };
+    statuses: Record<string, number>;
+    activity: EventActivity[];
+  };
   checks: { name: string; passed: boolean }[];
   passed: boolean;
   error?: string;
@@ -332,6 +340,11 @@ try {
   );
   pass("The result has no signing secret", !created.text.includes("whsec_"));
   pass("The result sends the user to the chat card", result.secret.includes("card in this chat"));
+  pass(
+    "The result names Standard Webhooks senders and the sender's secret",
+    result.request.standardWebhooks?.includes("Composio") === true &&
+      result.request.standardWebhooks.includes("/metadata/trigger_slug"),
+  );
 
   const listed = await Effect.runPromise(events.listRoutines({ owner }));
   report.routines = listed;
@@ -475,6 +488,86 @@ try {
   pass(
     "The same secret still signs, and a request outside the new filter is ignored",
     outside.status === 202 && latest[0]?.status === "ignored" && latest[0]?.reason === "filter",
+  );
+
+  // 7b. A Standard Webhooks sender, such as Composio, makes its own secret. The person pastes it; the
+  // agent sets a filter on the sender's metadata, which the whole body carries as the event data.
+  const refusal = (secretValue: string, id: string) =>
+    Effect.runPromise(events.setSecret({ owner, id, secret: secretValue })).then(
+      () => null,
+      (error: unknown) => String(error),
+    );
+  const shortSecret = await refusal("too-short", result.routineId);
+  const scheduleRoutine = await refusal(randomBytes(24).toString("hex"), runner.id);
+  pass("A sender's secret that is too short is refused", shortSecret !== null);
+  pass("A schedule routine refuses a sender's secret", scheduleRoutine !== null);
+  const composio = await callTool("composio filter", agent.id, {
+    __tool: "update_webhook_routine",
+    routineId: result.routineId,
+    eventType: "composio.trigger.message",
+    filters: [{ pointer: "/metadata/trigger_slug", value: "GMAIL_NEW_GMAIL_MESSAGE" }],
+  });
+  pass("The agent sets a filter on the sender's metadata", composio.entry.result?.success === true, composio.text);
+  const rawSecret = randomBytes(24).toString("hex");
+  // Spaces from a paste do not become part of the key.
+  await Effect.runPromise(events.setSecret({ owner, id: result.routineId, secret: ` ${rawSecret}\n` }));
+  const standardBody = (slug: string) =>
+    new TextEncoder().encode(
+      JSON.stringify({
+        id: randomUUID(),
+        type: "composio.trigger.message",
+        timestamp: "2026-11-03T10:00:00.000Z",
+        metadata: { trigger_slug: slug, trigger_id: "ti_e2e" },
+        data: { subject: "Invoice" },
+      }),
+    );
+  const deliverStandard = (key: Buffer | string, payload: Uint8Array) => {
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const deliveryId = `msg_${randomUUID().replaceAll("-", "")}`;
+    const digest = createHmac("sha256", key).update(`${deliveryId}.${timestamp}.`).update(payload).digest("base64");
+    // A sender can list several signatures, for example during its own key rotation.
+    const signature = `v1,${randomBytes(32).toString("base64")} v1,${digest}`;
+    return Effect.runPromise(
+      events.receive({ routeId, deliveryId, timestamp, signature, body: payload, format: STANDARD_WEBHOOKS_FORMAT }),
+    );
+  };
+  const statuses: Record<string, number> = {};
+  statuses.rawKey = (await deliverStandard(rawSecret, standardBody("GMAIL_NEW_GMAIL_MESSAGE"))).status;
+  statuses.otherSlug = (await deliverStandard(rawSecret, standardBody("SLACK_RECEIVE_MESSAGE"))).status;
+  statuses.wrongKey = (await deliverStandard("not-the-secret", standardBody("GMAIL_NEW_GMAIL_MESSAGE"))).status;
+  statuses.oldSecret = (await deliver(secret)).status;
+  const encoded = randomBytes(24);
+  await Effect.runPromise(
+    events.setSecret({ owner, id: result.routineId, secret: `whsec_${encoded.toString("base64")}` }),
+  );
+  statuses.whsecKey = (await deliverStandard(encoded, standardBody("GMAIL_NEW_GMAIL_MESSAGE"))).status;
+  // Node skips characters that are not base64: this value decodes to one byte, which is not a key.
+  const malformed = "whsec_!!!!!!!!!!!!!!!!AA==";
+  await Effect.runPromise(events.setSecret({ owner, id: result.routineId, secret: malformed }));
+  statuses.malformedKey = (
+    await deliverStandard(Buffer.from(malformed.slice(6), "base64"), standardBody("GMAIL_NEW_GMAIL_MESSAGE"))
+  ).status;
+  const standardActivity = await Effect.runPromise(events.listActivity({ owner, routineId: result.routineId }));
+  report.standard = { refusals: { shortSecret, scheduleRoutine }, statuses, activity: standardActivity };
+  const [whsecReceipt, slugReceipt, rawReceipt] = standardActivity;
+  pass(
+    "A Standard Webhooks request signed with the raw sender's secret starts the routine",
+    statuses.rawKey === 202 && rawReceipt?.status === "started" && rawReceipt.eventType === "composio.trigger.message",
+  );
+  pass(
+    "A Standard Webhooks request for another trigger slug is ignored by the metadata filter",
+    statuses.otherSlug === 202 && slugReceipt?.status === "ignored" && slugReceipt.reason === "filter",
+  );
+  pass("A Standard Webhooks request with another key is refused", statuses.wrongKey === 401);
+  pass("The secret that the host made stops working", statuses.oldSecret === 401);
+  pass(
+    "A whsec_ sender's secret signs with its base64 key",
+    statuses.whsecKey === 202 && whsecReceipt?.status === "started",
+  );
+  pass("A whsec_ value that is not exact base64 is not a short key", statuses.malformedKey === 401);
+  pass(
+    "The sender's secret is not in the chat",
+    !JSON.stringify((await runCauseEffect(agents.readConversation(agent.id))).messages).includes(rawSecret),
   );
 
   // 8. test_routine does not test a webhook routine and names Routines settings. delete_routine

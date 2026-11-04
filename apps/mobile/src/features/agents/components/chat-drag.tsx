@@ -518,6 +518,7 @@ export function AgentDragPreview({ agent }: { agent: MobileAgent }) {
       agentId={agent.id}
       serverId={agent.serverId}
       hue={agent.avatarHue}
+      color={agent.avatarColor}
       seed={agent.avatarSeed}
       size={DRAG_AVATAR_SIZE}
       animateIdle={false}

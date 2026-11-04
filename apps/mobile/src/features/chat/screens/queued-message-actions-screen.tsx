@@ -18,6 +18,7 @@ import {
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { AttachmentThumbnail, showsAsImage, useAttachmentFile } from "../components/attachment-preview";
 import { useQueuedChat } from "../context/queued-messages-context";
 import { queuedMessageLocks, queuedMessagePreview } from "../model/queued-message-view";
@@ -85,7 +86,7 @@ export function QueuedMessageActionsScreen() {
           </SettingsRow>
         )}
         <SettingsRow
-          leading={<CornerDownRight color={foreground} size={22} />}
+          leading={<CornerDownRight color={foreground} size={22} style={MIRROR_IN_RTL} />}
           disclosure={false}
           disabled={locked || editedElsewhere || !queue.activeTurnId}
           onPress={() => finish(queue.steer(delivery))}

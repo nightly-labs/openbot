@@ -9,6 +9,7 @@ import type {
 } from "@/features/onboarding/components/onboarding-buttons.types";
 import { swapEntering, swapExiting, useOnboardingMotion } from "@/features/onboarding/components/onboarding-motion";
 import { readableOn } from "@/features/onboarding/model/onboarding-colors";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 // Every control beside the main action has its height, so the row reads as one set.
 const LARGE = 52;
@@ -71,7 +72,7 @@ export function OnboardingIconButton({
       accessibilityLabel={label}
       onPress={onPress}
     >
-      <Icon size={Math.round(size * 0.42)} color={foreground} strokeWidth={2} />
+      <Icon size={Math.round(size * 0.42)} color={foreground} strokeWidth={2} style={MIRROR_IN_RTL} />
     </Button>
   );
 }

@@ -114,7 +114,14 @@ export const messages = {
   "provider.picker.noModels": "Nenhum modelo de {name} está disponível.",
   "provider.picker.customEmpty":
     "Adicione um endpoint compatível com OpenAI: um servidor de modelos neste computador ou qualquer serviço com uma URL base e uma chave.",
+  "provider.picker.customPending":
+    "Os modelos dos seus endpoints ainda não foram carregados. O provedor os lê após a tarefa atual parar.",
   "provider.picker.defaultModelLabel": "{name}, padrão",
+  "provider.picker.usageLimit": "Limite de uso atingido",
+  "provider.picker.usageLimitWindow": "Limite ({window})",
+  "provider.picker.usageLimitResets": "{limit} · Renova em {time}",
+  "provider.picker.usageLimitLabel": "{name}, limite de uso atingido",
+  "provider.picker.usageLimitResetsLabel": "{name}, limite de uso atingido, renova em {time}",
   "provider.picker.effort": "Esforço",
   "provider.picker.effortLabel": "Esforço de raciocínio do agente",
   "provider.picker.effortFixed": "{effort}, definido por {provider}",

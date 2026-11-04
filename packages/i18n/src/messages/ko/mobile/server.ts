@@ -371,6 +371,8 @@ export const messages = {
   "mobile.server.settings.aiSection": "AI 및 도구",
   "mobile.server.settings.dataSection": "데이터",
   "mobile.server.settings.maintenanceSection": "유지 관리",
+  "mobile.server.settings.peopleSection": "사용자",
+  "mobile.server.settings.moveSection": "가져오기 및 이전",
   "mobile.server.settings.general": "일반",
   "mobile.server.settings.timezone": "시간대",
   "mobile.server.settings.timezoneAutomatic": "자동",

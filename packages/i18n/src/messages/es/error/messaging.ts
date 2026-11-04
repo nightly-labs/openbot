@@ -18,6 +18,11 @@ export const messages = {
     "OpenBot no puede acceder a Telegram en este equipo. Inicia sesión, ponle un nombre a este equipo e inténtalo de nuevo.",
   "error.messaging.telegramServiceUnavailable":
     "OpenBot no puede conectar Telegram ahora. Inténtalo de nuevo más tarde.",
+  "error.messaging.whatsappNotConnected": "Este número de WhatsApp no está conectado.",
+  "error.messaging.whatsappUnsupported": "Este equipo no puede conectarse a WhatsApp.",
+  "error.messaging.whatsappTooManySenders": "Un número de WhatsApp puede permitir hasta 200 contactos y grupos.",
+  "error.messaging.whatsappRequestEnded":
+    "Esta solicitud terminó. Pide a la persona que vuelva a escribir para obtener un código nuevo.",
   "error.messaging.memoryLimit":
     "Un espacio de trabajo conectado puede tener hasta {limit} recuerdos. Borra uno primero.",
 } as const satisfies PartialTranslation<typeof source>;

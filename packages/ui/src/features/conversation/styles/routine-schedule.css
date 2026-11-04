@@ -202,14 +202,14 @@
 
 .routine-schedule-hint {
   margin: 0;
-  padding-left: var(--openbot-space-2);
+  padding-inline-start: var(--openbot-space-2);
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
 }
 
 .routine-schedule-picker[data-density="card"] .routine-schedule-hint {
-  padding-left: 0;
+  padding-inline-start: 0;
 }
 
 /* Popovers */
@@ -293,7 +293,7 @@
 
 .routine-segmented {
   display: flex;
-  margin-left: var(--openbot-space-1);
+  margin-inline-start: var(--openbot-space-1);
   border-radius: var(--openbot-radius-md);
   background: var(--openbot-bg-control-active);
   padding: var(--openbot-space-0-5);
@@ -344,7 +344,8 @@
   justify-content: space-between;
   gap: var(--openbot-space-2);
   border-top: 1px solid var(--openbot-border);
-  padding: var(--openbot-space-2) var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-3);
+  padding-block: var(--openbot-space-2) var(--openbot-space-1);
+  padding-inline: var(--openbot-space-3) var(--openbot-space-1);
 }
 
 .routine-window-repeat-label {
@@ -568,7 +569,8 @@
   min-width: 0;
   align-items: center;
   gap: var(--openbot-space-2);
-  padding: var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-3);
+  padding-block: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-3) var(--openbot-space-1);
 }
 
 :is(.routine-trigger-card-header, .routine-trigger-menu) .routine-trigger-icon {
@@ -597,10 +599,11 @@
   border-top: 1px solid var(--openbot-border);
   margin: 0;
   background: none;
-  padding: var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-3);
+  padding-block: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-3) var(--openbot-space-1);
   color: inherit;
   font: inherit;
-  text-align: left;
+  text-align: start;
 }
 
 .routine-webhook-label {
@@ -636,9 +639,20 @@ code.routine-webhook-secret {
   justify-self: center;
 }
 
-.routine-webhook-field > .ui-icon-button {
+.routine-webhook-field > .ui-icon-button,
+.routine-webhook-actions > .ui-icon-button {
   width: var(--openbot-control-sm);
   height: var(--openbot-control-sm);
+}
+
+/* The secret row can have two actions. They share the last column, which grows to fit them. */
+.routine-webhook-field:has(> .routine-webhook-actions) {
+  grid-template-columns: minmax(84px, auto) minmax(0, 1fr) minmax(var(--openbot-control-sm), auto);
+}
+
+.routine-webhook-actions {
+  display: flex;
+  align-items: center;
 }
 
 /* The Events row is a ghost Button; two classes keep the row layout over the button styles. */
@@ -704,7 +718,7 @@ code.routine-webhook-secret {
 
 .routine-webhook-card-endpoint > .routine-webhook-field,
 .routine-webhook-card-endpoint > .routine-webhook-note {
-  padding-left: 0;
+  padding-inline-start: 0;
 }
 
 /* The setup steps: a number, or a check when done, beside each step. */
@@ -822,7 +836,7 @@ code.routine-webhook-secret {
 
 .routine-webhook-add-filter {
   justify-self: start;
-  margin-left: calc(var(--openbot-space-2) * -1);
+  margin-inline-start: calc(var(--openbot-space-2) * -1);
   padding-inline: var(--openbot-space-2);
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-md);
@@ -832,7 +846,8 @@ code.routine-webhook-secret {
 /* A quiet link under the rows. Its text starts under the row labels. */
 .routine-webhook-filter-link {
   justify-self: start;
-  margin: 0 0 var(--openbot-space-1) var(--openbot-space-1);
+  margin-block: 0 var(--openbot-space-1);
+  margin-inline: var(--openbot-space-1) 0;
   padding-inline: var(--openbot-space-2);
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
@@ -875,4 +890,11 @@ code.routine-webhook-secret {
 
 .routine-trigger-menu.ui-action-menu .routine-trigger-menu-item > .routine-trigger-menu-check {
   color: var(--openbot-text-primary);
+}
+
+/* The previous and next months, and the closed disclosures, point the other way in RTL. */
+:dir(rtl) .routine-calendar-header :is(svg[class~="lucide-chevron-left"], svg[class~="lucide-chevron-right"]),
+:dir(rtl) .routine-webhook-events-toggle > svg[class~="lucide-chevron-right"],
+:dir(rtl) svg[class~="lucide-chevron-right"].routine-webhook-disclosure-icon {
+  transform: scaleX(-1);
 }

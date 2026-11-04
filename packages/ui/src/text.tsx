@@ -1,3 +1,4 @@
+import { I18nProvider as ControlLocaleProvider } from "@kobalte/core/i18n";
 import {
   type AppFormat,
   type AppTranslate,
@@ -90,7 +91,20 @@ export function TextProvider(props: ParentProps<TextProviderProps>): JSX.Element
       setActiveFormatLocale(format);
     },
   );
-  return <TextContext value={value}>{props.children}</TextContext>;
+  // Kobalte reads its layout direction from this locale, not from `<html dir>`. Without it, menus,
+  // submenus, tabs and sliders keep the direction of `navigator.language` in the Arabic interface.
+  // The format locale gives sliders and progress bars the numbers of `format`, but only when it has
+  // the language of the interface. "System" on a Hebrew computer shows English text with a `he-IL`
+  // format locale, and Kobalte would lay out from right to left in a left-to-right page.
+  const controlLocale = () => {
+    const format = formatLocale();
+    return format.split("-")[0]?.toLowerCase() === props.locale ? format : props.locale;
+  };
+  return (
+    <TextContext value={value}>
+      <ControlLocaleProvider locale={controlLocale()}>{props.children}</ControlLocaleProvider>
+    </TextContext>
+  );
 }
 
 export function useText(): TextValue {

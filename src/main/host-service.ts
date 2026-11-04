@@ -42,6 +42,7 @@ import type {
 import {
   type AgentAccessLevel,
   conversationMessageSender,
+  isAvatarColor,
   type ServerAuditName,
   SIGNED_OUT_CHANNEL_MEMBER_ID,
 } from "@openbot/contracts/ipc";
@@ -137,7 +138,8 @@ interface HostServiceOptions {
   focusUse?: ForwardedApiOptions["focusUse"];
   appVersion: string;
   store: TeamStore;
-  agents: ForwardedApiOptions["agents"] & Pick<AgentService, "adoptConversationReads" | "branchTask" | "markTaskRead">;
+  agents: ForwardedApiOptions["agents"] &
+    Pick<AgentService, "adoptConversationReads" | "branchTask" | "markTaskRead" | "readTask">;
   agentsReady: NonNullable<ForwardedApiOptions["agentsReady"]>;
   skills: NonNullable<ForwardedApiOptions["skills"]>;
   sidebarLayout: NonNullable<ForwardedApiOptions["sidebarLayout"]>;
@@ -545,6 +547,7 @@ export class HostService extends EventEmitter<HostEvents> {
               this.#pushNotifications?.reconnected(sessionId);
             }
           },
+          unknownMemberConnected: (membershipId) => this.#dispatch(this.#learnConnectedMember(membershipId)),
           ...(options.verifyRemoteSessionTicket ? { verifyClientTicket: options.verifyRemoteSessionTicket } : {}),
           ...(options.privateNetwork ? { privateNetwork: options.privateNetwork } : {}),
         })
@@ -1216,6 +1219,7 @@ export class HostService extends EventEmitter<HostEvents> {
           email: member.email,
           name: member.name,
           avatarUrl: member.avatarUrl,
+          ...(isAvatarColor(member.chatColor) ? { chatColor: member.chatColor } : {}),
           role: member.role,
           createdAt: new Date(member.createdAt).toISOString(),
           disabled: member.status !== "active",
@@ -1255,6 +1259,11 @@ export class HostService extends EventEmitter<HostEvents> {
     return remoteDecode(() => this.#currentAgentReaderId()).pipe(
       Effect.flatMap((readerId) => this.#options.agents.readConversationFor(agentId, readerId)),
     );
+  }
+
+  /** The conversation of one side thread of a local agent. */
+  readAgentTask(agentId: string, taskId: string) {
+    return this.#options.agents.readTask(agentId, taskId);
   }
 
   readAgentConversationPage(agentId: string, anchor: ConversationPageAnchor = { type: "latest" }, limit = 50) {
@@ -1612,9 +1621,41 @@ export class HostService extends EventEmitter<HostEvents> {
     const before = this.#options.store.listStoredMembers();
     const closed = yield* this.#options.store.syncRemoteDirectory(hostId, members);
     yield* this.#auditMembers(hostId, before, by);
-    if (closed.length === 0) return;
     for (const sessionId of closed) yield* this.#closeLocalSession(sessionId);
-    this.#api.refreshPresence();
+    // The presence change also sends the new member chat colors to each connected peer.
+    if (closed.length > 0 || memberChatColorsChanged(before, this.#options.store.listStoredMembers())) {
+      this.#api.refreshPresence();
+    }
+  });
+
+  /**
+   * A member who joined after this host read the account directory connects with no name here, so
+   * presence and the messages they write would show their account id. Read the directory once.
+   * A failed read only logs: the member stays connected, as before.
+   */
+  readonly #learnConnectedMember = Effect.fn("HostService.learnConnectedMember")(function* (
+    this: HostService,
+    membershipId: string,
+  ): Effect.fn.Return<void> {
+    const hostId = this.#options.store.getIdentity()?.serverId;
+    const listRemoteMembers = this.#options.listRemoteMembers;
+    if (!hostId || !listRemoteMembers || !this.#usesAccountDirectory()) return;
+    yield* this.#memberWrites
+      .withPermit(
+        Effect.gen({ self: this }, function* () {
+          // Another session of the same member can have read the directory while this one waited.
+          if (this.#options.store.getMember(membershipId)) return;
+          const members = yield* listRemoteMembers(hostId);
+          if (!this.#isActiveHost(hostId)) return;
+          yield* this.#syncRemoteDirectory(hostId, members);
+          this.#api.refreshPresence();
+        }),
+      )
+      .pipe(
+        Effect.catch((error) =>
+          Effect.sync(() => logger.warn("The account directory did not load for a new member.", toLogValue(error))),
+        ),
+      );
   });
 
   /**
@@ -2015,4 +2056,10 @@ function serverLogoUrl(version: string): string {
 function normalizeRemoteDesktopPlatform(platform: NodeJS.Platform): "darwin" | "win32" | "linux" {
   if (platform === "darwin" || platform === "win32") return platform;
   return "linux";
+}
+
+/** True when a directory sync changed the chat color of a member. */
+function memberChatColorsChanged(before: readonly TeamMemberSummary[], after: readonly TeamMemberSummary[]): boolean {
+  const previous = new Map(before.map((member) => [member.id, member.chatColor ?? null]));
+  return after.some((member) => (previous.get(member.id) ?? null) !== (member.chatColor ?? null));
 }

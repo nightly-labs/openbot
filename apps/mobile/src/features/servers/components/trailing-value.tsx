@@ -2,6 +2,7 @@ import { Typography } from "heroui-native";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 /** A value and the disclosure chevron at the end of a navigation row. */
 export function TrailingValue({ value, tone }: { value: string; tone?: "warning" }) {
@@ -14,7 +15,7 @@ export function TrailingValue({ value, tone }: { value: string; tone?: "warning"
       >
         {value}
       </Typography.Paragraph>
-      <ChevronRight size={18} color={muted} strokeWidth={1.5} />
+      <ChevronRight size={18} color={muted} strokeWidth={1.5} style={MIRROR_IN_RTL} />
     </View>
   );
 }

@@ -1,0 +1,43 @@
+diff --git a/dist/chunk-R4JYHVOI.js b/dist/chunk-R4JYHVOI.js
+index 5bb81d62e70431afe1507656fa5b08bbae75a9bb..551bdf0cc6e3363e2e104e22fee69a93a9ec4216 100644
+--- a/dist/chunk-R4JYHVOI.js
++++ b/dist/chunk-R4JYHVOI.js
+@@ -126,7 +126,7 @@ function createDefaultRender(createComponent) {
+ }
+ 
+ // src/renderer/shared/mount.ts
+-function createMount({ storyStore }) {
++function createMount({ storyStore, flush }) {
+   return (context) => {
+     const storyId = getStoryId(context);
+     const { forceRemount } = context;
+@@ -144,6 +144,7 @@ function createMount({ storyStore }) {
+         storyStore.resetStory(storyId);
+       }
+       storyStore.makeContextReactive(context);
++      flush?.();
+       await context.renderToCanvas();
+       return context.canvas;
+     };
+diff --git a/dist/renderer/solid-next.js b/dist/renderer/solid-next.js
+index 6261506b616ffc4ee8056f46cf9296c76c56c68e..04907441d4c3c9f7c2dbf3b931662d4db6986947 100644
+--- a/dist/renderer/solid-next.js
++++ b/dist/renderer/solid-next.js
+@@ -4,7 +4,7 @@ import '../chunk-TVNQ54Y4.js';
+ import '../chunk-PZ5AY32C.js';
+ import { render as render$1 } from '@solidjs/web';
+ import { global } from '@storybook/global';
+-import { createStore, createComponent, onSettled, Errored, createMemo } from 'solid-js';
++import { createStore, createComponent, onSettled, Errored, createMemo, flush } from 'solid-js';
+ import { definePreviewAddon } from 'storybook/internal/csf';
+ 
+ var SOLID_RENDERER_ID = "solid-next";
+@@ -30,7 +30,7 @@ var runtime = {
+   createComponent
+ };
+ var applyDecorators = createApplyDecorators({ storyStore });
+-var mount = createMount(runtime);
++var mount = createMount({ ...runtime, flush });
+ var render = createDefaultRender(runtime.createComponent);
+ var renderToCanvas = createRenderToCanvas({
+   ...runtime,

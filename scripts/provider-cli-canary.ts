@@ -50,6 +50,7 @@ const NOT_COVERED: Readonly<Record<string, string>> = {
   kimi: "Needs a Kimi Code account.",
   pi: "Needs a provider API key.",
   muse: "Needs a Muse account.",
+  devin: "Needs a Devin account.",
 };
 
 interface CanaryResult {

@@ -31,7 +31,7 @@
 }
 
 .awaiting-replies-dismiss {
-  margin-right: var(--openbot-space-2);
+  margin-inline-end: var(--openbot-space-2);
   color: var(--openbot-text-muted);
 }
 

@@ -1,6 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
-  type AvatarHue,
   agentPermissionLevel,
   canAdministerServer,
   DEFAULT_PROVIDER_ACCOUNT_ID,
@@ -20,7 +19,7 @@ import {
   PERMISSION_LABEL,
   useAgentAdminSettings,
 } from "@/features/agents/components/agent-access-fields";
-import { AgentAppearancePicker } from "@/features/agents/components/agent-appearance-picker";
+import { AgentAppearancePicker, type AgentColorValue } from "@/features/agents/components/agent-appearance-picker";
 import {
   AgentBackupModelPicker,
   AgentBackupModelsPage,
@@ -65,7 +64,15 @@ import { useText } from "@/shared/lib/text";
 
 type AgentEdits = Pick<
   UpdateAgentInput,
-  "name" | "title" | "description" | "avatarSeed" | "avatarHue" | "provider" | "model" | "reasoningEffort"
+  | "name"
+  | "title"
+  | "description"
+  | "avatarSeed"
+  | "avatarHue"
+  | "avatarColor"
+  | "provider"
+  | "model"
+  | "reasoningEffort"
 >;
 
 type AgentPage =
@@ -183,6 +190,7 @@ function AgentForm({
   const description = edits.description ?? agent.description;
   const avatarSeed = edits.avatarSeed ?? agent.avatarSeed;
   const avatarHue = edits.avatarHue === undefined ? agent.avatarHue : edits.avatarHue;
+  const avatarColor = edits.avatarColor === undefined ? agent.avatarColor : edits.avatarColor;
   const photoChanged = photo !== undefined && (photo !== null || Boolean(agent.avatarUrl));
   const dirty =
     photoChanged ||
@@ -191,6 +199,7 @@ function AgentForm({
     description.trim() !== agent.description ||
     avatarSeed !== agent.avatarSeed ||
     avatarHue !== agent.avatarHue ||
+    avatarColor !== agent.avatarColor ||
     (edits.provider !== undefined && edits.provider !== agent.provider) ||
     (edits.model !== undefined && edits.model !== agent.model) ||
     (edits.reasoningEffort !== undefined && edits.reasoningEffort !== agent.reasoningEffort) ||
@@ -228,8 +237,8 @@ function AgentForm({
     setEdits((current) => ({ ...current, avatarSeed }));
     setError(null);
   }, []);
-  const changeAvatarHue = useCallback((avatarHue: AvatarHue | null) => {
-    setEdits((current) => ({ ...current, avatarHue }));
+  const changeAvatarColor = useCallback((value: AgentColorValue) => {
+    setEdits((current) => ({ ...current, avatarHue: value.hue, avatarColor: value.color }));
     setError(null);
   }, []);
   const hasPhoto = photo === undefined ? Boolean(agent.avatarUrl) : Boolean(photo);
@@ -267,6 +276,7 @@ function AgentForm({
             ...(edits.description === undefined ? {} : { description: description.trim() }),
             ...(edits.avatarSeed === undefined ? {} : { avatarSeed }),
             ...(edits.avatarHue === undefined ? {} : { avatarHue }),
+            ...(edits.avatarColor === undefined ? {} : { avatarColor }),
             ...(edits.provider === undefined ? {} : { provider: edits.provider }),
             ...(edits.model === undefined ? {} : { model: edits.model }),
             ...(edits.reasoningEffort === undefined ? {} : { reasoningEffort: edits.reasoningEffort }),
@@ -335,6 +345,7 @@ function AgentForm({
                 serverId={agent.serverId}
                 seed={avatarSeed}
                 hue={avatarHue}
+                color={avatarColor}
                 size={112}
               />
               {/* A photo fills the circle; the generated avatar leaves space around its shape. */}
@@ -382,13 +393,14 @@ function AgentForm({
           imageUrl={photo === undefined ? undefined : (photo?.uri ?? null)}
           seed={avatarSeed}
           hue={avatarHue}
+          color={avatarColor}
           name={name}
           nameField={null}
           showFaces={!hasPhoto}
           photoField={photoField}
           disabled={saving || pickingPhoto}
           onSeedChange={changeAvatarSeed}
-          onHueChange={changeAvatarHue}
+          onColorChange={changeAvatarColor}
         />
       ) : null}
       {page === "runtime" ? (

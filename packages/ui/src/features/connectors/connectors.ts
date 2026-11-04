@@ -3,6 +3,7 @@ import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
+import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 
 export { CONNECTOR_IDS, type ConnectorId } from "@openbot/contracts/ipc";
 
@@ -18,6 +19,8 @@ export const CONNECTORS: Readonly<Record<ConnectorId, ConnectorDefinition>> = {
   slack: { server: CONNECTORS_CAPABILITY },
   discord: { server: CONNECTORS_CAPABILITY },
   telegram: { server: CONNECTORS_CAPABILITY },
+  // The host's session gets the link code, and the admin's computer shows it.
+  whatsapp: { server: WHATSAPP_CONNECTOR_CAPABILITY },
   github: { server: CONNECTORS_CAPABILITY },
   onepassword: { server: ONEPASSWORD_CONNECTOR_CAPABILITY },
   bitwarden: { server: BITWARDEN_CONNECTOR_CAPABILITY },

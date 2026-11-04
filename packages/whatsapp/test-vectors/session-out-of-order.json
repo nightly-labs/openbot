@@ -1,0 +1,379 @@
+{
+  "description": "Out-of-order and duplicate delivery across ratchet steps (libsignal@6.0.0). Same key-drawing rules as session-pkmsg.json. Steps run in the listed order; decrypt steps refer to the encrypt step by decryptStep. Steps with expectError must fail and must not change state.",
+  "source": "libsignal@6.0.0",
+  "alice": {
+    "identityPrivateKey": "d3b8f04ba2795598e3b520d09034e30bc80f68a1fc844ea48323f32eaa891453",
+    "identityPublicKey": "05d44a2349f82d55f92d97d65919f6ea9b296f9ea51e74002215a5e9503c2ab15a",
+    "registrationId": 12345,
+    "baseKey": {
+      "priv": "db2dce1b5f04dc53d5bb13a16666b5bb0763121a58a1e68ca643baaf5533e8b2",
+      "pub": "050b32a2c2e679bdf3890f76d8ac98df9d9e2a9f52dfca3f395965d6c9d1c94134"
+    },
+    "ratchetKeysInOrder": [
+      {
+        "priv": "5bd1b8c8f8c23e277a3eec8790ee637961ac322bc73477ae838d72e5c91411ea",
+        "pub": "055a69b9e7ec2f22778f5cbc4af6f2234965d58f02431f3efa2f2799b866525871"
+      },
+      {
+        "priv": "7a98e99d3d584faa90dece7d4b90a2744bc9b5d001a68661ef69348455200447",
+        "pub": "052ac677ba176dc051cd7099872c32480e8eb9a135374e2314bd10750dee7cca33"
+      },
+      {
+        "priv": "c767304628e7b7cd68f51ce64095b62631490d7172531ab41c25fd24a5deb93d",
+        "pub": "0530cf6ec58ae162eb94e065ce6a365f24afad8cf6001bad620b14b0037706a361"
+      }
+    ]
+  },
+  "bob": {
+    "identityPrivateKey": "f1dbf7f1eec3b082bd9d659ae09d145b16ae7884cd2a8b93fbc62fd02766085c",
+    "identityPublicKey": "05377d572e4476194cc722dc652c27171dae64cb1bd8de8ecca646d9ec8bfb5d7a",
+    "registrationId": 6789,
+    "signedPreKey": {
+      "id": 1,
+      "privateKey": "cc4e87dd4e55b2b30eb3aa662ec49804e731b2f4fb519966b6ad456927410f35",
+      "publicKey": "050ca70f620a6ae08a167ea1cc1ca8f7efe55233bd8ca4c36bf98cdf079f0a4f37",
+      "signature": "2104c44ab6ddc4c1858474140cdabf39aea3131c17de2652dc7caa0acadcafed295cf3d7cb592cc3dde994e37074a63b9d958394803046ee0b111f267221ed8c"
+    },
+    "oneTimePreKey": {
+      "id": 42,
+      "privateKey": "2efc1665ba034a866557a486a29acba74d03edd01ebb9c71f3731d4e5faf1493",
+      "publicKey": "056261a60bdeafd3bb03b7c1372cf4e54866e7050f02c0e3f05ac328b7f5ee8443"
+    },
+    "ratchetKeysInOrder": [
+      {
+        "priv": "da5bb33a49e776b31cb8227f4fe23acef3c297bef0b05a8e7a9a29f8691750a5",
+        "pub": "053efdb6c48613cf7cedceca00a3f712e9e0dfaac08b232202541e2735577b080e"
+      },
+      {
+        "priv": "36332b9da766ae5671a189801471c8de84d208a53a7c2130013068ef363e005d",
+        "pub": "0575bfea891ad8093d6ed3eff403580388fc0c6d890f77b281b599cb2b3d565a77"
+      },
+      {
+        "priv": "cbb4361703fff51b45e5b97e3f85da25b56cd6a988777fa7e0f5a0f40e996c4d",
+        "pub": "05b18491b0488900319b3d29f6f7fa9d7180857ecf0dbacdd317dfd83f1957b958"
+      }
+    ]
+  },
+  "bundleSeenByAlice": {
+    "identityKey": "05377d572e4476194cc722dc652c27171dae64cb1bd8de8ecca646d9ec8bfb5d7a",
+    "registrationId": 6789,
+    "signedPreKey": {
+      "id": 1,
+      "publicKey": "050ca70f620a6ae08a167ea1cc1ca8f7efe55233bd8ca4c36bf98cdf079f0a4f37",
+      "signature": "2104c44ab6ddc4c1858474140cdabf39aea3131c17de2652dc7caa0acadcafed295cf3d7cb592cc3dde994e37074a63b9d958394803046ee0b111f267221ed8c"
+    },
+    "preKey": {
+      "id": 42,
+      "publicKey": "056261a60bdeafd3bb03b7c1372cf4e54866e7050f02c0e3f05ac328b7f5ee8443"
+    }
+  },
+  "steps": [
+    {
+      "step": 1,
+      "label": "Alice sends A0 (pkmsg, chain A1, counter 0)",
+      "from": "alice",
+      "type": "pkmsg",
+      "plaintext": "4130",
+      "ciphertext": "33082a1221050b32a2c2e679bdf3890f76d8ac98df9d9e2a9f52dfca3f395965d6c9d1c941341a2105d44a2349f82d55f92d97d65919f6ea9b296f9ea51e74002215a5e9503c2ab15a2242330a21055a69b9e7ec2f22778f5cbc4af6f2234965d58f02431f3efa2f2799b8665258711000180022103997c992e83f60fd43b60b340b3b30acbb81d5cdcc10192e28b9603001",
+      "senderConsumedKeys": [],
+      "pkmsg": {
+        "versionByte": "33",
+        "registrationId": 12345,
+        "preKeyId": 42,
+        "signedPreKeyId": 1,
+        "baseKey": "050b32a2c2e679bdf3890f76d8ac98df9d9e2a9f52dfca3f395965d6c9d1c94134",
+        "identityKey": "05d44a2349f82d55f92d97d65919f6ea9b296f9ea51e74002215a5e9503c2ab15a"
+      },
+      "msg": {
+        "bytes": "330a21055a69b9e7ec2f22778f5cbc4af6f2234965d58f02431f3efa2f2799b8665258711000180022103997c992e83f60fd43b60b340b3b30acbb81d5cdcc10192e",
+        "versionByte": "33",
+        "protobuf": "0a21055a69b9e7ec2f22778f5cbc4af6f2234965d58f02431f3efa2f2799b8665258711000180022103997c992e83f60fd43b60b340b3b30ac",
+        "mac": "bb81d5cdcc10192e",
+        "ratchetKey": "055a69b9e7ec2f22778f5cbc4af6f2234965d58f02431f3efa2f2799b866525871",
+        "counter": 0,
+        "previousCounter": 0,
+        "ciphertext": "3997c992e83f60fd43b60b340b3b30ac"
+      }
+    },
+    {
+      "step": 2,
+      "label": "Bob decrypts A0 (creates session, new ratchet key B1)",
+      "to": "bob",
+      "decryptStep": 1,
+      "expectedPlaintext": "4130",
+      "receiverConsumedKeys": [
+        {
+          "priv": "da5bb33a49e776b31cb8227f4fe23acef3c297bef0b05a8e7a9a29f8691750a5",
+          "pub": "053efdb6c48613cf7cedceca00a3f712e9e0dfaac08b232202541e2735577b080e"
+        }
+      ]
+    },
+    {
+      "step": 3,
+      "label": "Bob sends B0 (chain B1, counter 0)",
+      "from": "bob",
+      "type": "msg",
+      "plaintext": "4230",
+      "ciphertext": "330a21053efdb6c48613cf7cedceca00a3f712e9e0dfaac08b232202541e2735577b080e100018002210117ef4b02b5375196b54c62ca940c0bf413baf022922fa6a",
+      "senderConsumedKeys": [],
+      "msg": {
+        "bytes": "330a21053efdb6c48613cf7cedceca00a3f712e9e0dfaac08b232202541e2735577b080e100018002210117ef4b02b5375196b54c62ca940c0bf413baf022922fa6a",
+        "versionByte": "33",
+        "protobuf": "0a21053efdb6c48613cf7cedceca00a3f712e9e0dfaac08b232202541e2735577b080e100018002210117ef4b02b5375196b54c62ca940c0bf",
+        "mac": "413baf022922fa6a",
+        "ratchetKey": "053efdb6c48613cf7cedceca00a3f712e9e0dfaac08b232202541e2735577b080e",
+        "counter": 0,
+        "previousCounter": 0,
+        "ciphertext": "117ef4b02b5375196b54c62ca940c0bf"
+      }
+    },
+    {
+      "step": 4,
+      "label": "Bob sends B1 (chain B1, counter 1)",
+      "from": "bob",
+      "type": "msg",
+      "plaintext": "4231",
+      "ciphertext": "330a21053efdb6c48613cf7cedceca00a3f712e9e0dfaac08b232202541e2735577b080e10011800221006e89bd9e5bf2385f08571275a0bf84470b3459bd6df737a",
+      "senderConsumedKeys": [],
+      "msg": {
+        "bytes": "330a21053efdb6c48613cf7cedceca00a3f712e9e0dfaac08b232202541e2735577b080e10011800221006e89bd9e5bf2385f08571275a0bf84470b3459bd6df737a",
+        "versionByte": "33",
+        "protobuf": "0a21053efdb6c48613cf7cedceca00a3f712e9e0dfaac08b232202541e2735577b080e10011800221006e89bd9e5bf2385f08571275a0bf844",
+        "mac": "70b3459bd6df737a",
+        "ratchetKey": "053efdb6c48613cf7cedceca00a3f712e9e0dfaac08b232202541e2735577b080e",
+        "counter": 1,
+        "previousCounter": 0,
+        "ciphertext": "06e89bd9e5bf2385f08571275a0bf844"
+      }
+    },
+    {
+      "step": 5,
+      "label": "Bob sends B2 (chain B1, counter 2)",
+      "from": "bob",
+      "type": "msg",
+      "plaintext": "4232",
+      "ciphertext": "330a21053efdb6c48613cf7cedceca00a3f712e9e0dfaac08b232202541e2735577b080e1002180022107a7a06d1bec2594ed0e1d911cb956e91307ca235bec7eba3",
+      "senderConsumedKeys": [],
+      "msg": {
+        "bytes": "330a21053efdb6c48613cf7cedceca00a3f712e9e0dfaac08b232202541e2735577b080e1002180022107a7a06d1bec2594ed0e1d911cb956e91307ca235bec7eba3",
+        "versionByte": "33",
+        "protobuf": "0a21053efdb6c48613cf7cedceca00a3f712e9e0dfaac08b232202541e2735577b080e1002180022107a7a06d1bec2594ed0e1d911cb956e91",
+        "mac": "307ca235bec7eba3",
+        "ratchetKey": "053efdb6c48613cf7cedceca00a3f712e9e0dfaac08b232202541e2735577b080e",
+        "counter": 2,
+        "previousCounter": 0,
+        "ciphertext": "7a7a06d1bec2594ed0e1d911cb956e91"
+      }
+    },
+    {
+      "step": 6,
+      "label": "Alice receives B1 first: skips counter 0 (key kept), steps ratchet",
+      "to": "alice",
+      "decryptStep": 4,
+      "expectedPlaintext": "4231",
+      "receiverConsumedKeys": [
+        {
+          "priv": "7a98e99d3d584faa90dece7d4b90a2744bc9b5d001a68661ef69348455200447",
+          "pub": "052ac677ba176dc051cd7099872c32480e8eb9a135374e2314bd10750dee7cca33"
+        }
+      ]
+    },
+    {
+      "step": 7,
+      "label": "Alice sends A1 (chain A2, counter 0, previousCounter 0)",
+      "from": "alice",
+      "type": "msg",
+      "plaintext": "4131",
+      "ciphertext": "330a21052ac677ba176dc051cd7099872c32480e8eb9a135374e2314bd10750dee7cca33100018002210aa56ad7b45ce14e613313f39b53af72ae88852a7d89db4a5",
+      "senderConsumedKeys": [],
+      "msg": {
+        "bytes": "330a21052ac677ba176dc051cd7099872c32480e8eb9a135374e2314bd10750dee7cca33100018002210aa56ad7b45ce14e613313f39b53af72ae88852a7d89db4a5",
+        "versionByte": "33",
+        "protobuf": "0a21052ac677ba176dc051cd7099872c32480e8eb9a135374e2314bd10750dee7cca33100018002210aa56ad7b45ce14e613313f39b53af72a",
+        "mac": "e88852a7d89db4a5",
+        "ratchetKey": "052ac677ba176dc051cd7099872c32480e8eb9a135374e2314bd10750dee7cca33",
+        "counter": 0,
+        "previousCounter": 0,
+        "ciphertext": "aa56ad7b45ce14e613313f39b53af72a"
+      }
+    },
+    {
+      "step": 8,
+      "label": "Alice sends A2 (chain A2, counter 1)",
+      "from": "alice",
+      "type": "msg",
+      "plaintext": "4132",
+      "ciphertext": "330a21052ac677ba176dc051cd7099872c32480e8eb9a135374e2314bd10750dee7cca331001180022105b7e788d24472c8ebf36420ddf7ff30a0219bbb7ec821527",
+      "senderConsumedKeys": [],
+      "msg": {
+        "bytes": "330a21052ac677ba176dc051cd7099872c32480e8eb9a135374e2314bd10750dee7cca331001180022105b7e788d24472c8ebf36420ddf7ff30a0219bbb7ec821527",
+        "versionByte": "33",
+        "protobuf": "0a21052ac677ba176dc051cd7099872c32480e8eb9a135374e2314bd10750dee7cca331001180022105b7e788d24472c8ebf36420ddf7ff30a",
+        "mac": "0219bbb7ec821527",
+        "ratchetKey": "052ac677ba176dc051cd7099872c32480e8eb9a135374e2314bd10750dee7cca33",
+        "counter": 1,
+        "previousCounter": 0,
+        "ciphertext": "5b7e788d24472c8ebf36420ddf7ff30a"
+      }
+    },
+    {
+      "step": 9,
+      "label": "Bob receives A2 before A1: steps ratchet, skips counter 0",
+      "to": "bob",
+      "decryptStep": 8,
+      "expectedPlaintext": "4132",
+      "receiverConsumedKeys": [
+        {
+          "priv": "36332b9da766ae5671a189801471c8de84d208a53a7c2130013068ef363e005d",
+          "pub": "0575bfea891ad8093d6ed3eff403580388fc0c6d890f77b281b599cb2b3d565a77"
+        }
+      ]
+    },
+    {
+      "step": 10,
+      "label": "Bob sends B3 (chain B2, counter 0, previousCounter 2)",
+      "from": "bob",
+      "type": "msg",
+      "plaintext": "4233",
+      "ciphertext": "330a210575bfea891ad8093d6ed3eff403580388fc0c6d890f77b281b599cb2b3d565a771000180222102317335e4e199f28f5c49fa24909cf8b6c4c64a5be5cc605",
+      "senderConsumedKeys": [],
+      "msg": {
+        "bytes": "330a210575bfea891ad8093d6ed3eff403580388fc0c6d890f77b281b599cb2b3d565a771000180222102317335e4e199f28f5c49fa24909cf8b6c4c64a5be5cc605",
+        "versionByte": "33",
+        "protobuf": "0a210575bfea891ad8093d6ed3eff403580388fc0c6d890f77b281b599cb2b3d565a771000180222102317335e4e199f28f5c49fa24909cf8b",
+        "mac": "6c4c64a5be5cc605",
+        "ratchetKey": "0575bfea891ad8093d6ed3eff403580388fc0c6d890f77b281b599cb2b3d565a77",
+        "counter": 0,
+        "previousCounter": 2,
+        "ciphertext": "2317335e4e199f28f5c49fa24909cf8b"
+      }
+    },
+    {
+      "step": 11,
+      "label": "Alice receives B3: new chain; previous chain B1 is filled up to previousCounter=2 so B2 key is kept",
+      "to": "alice",
+      "decryptStep": 10,
+      "expectedPlaintext": "4233",
+      "receiverConsumedKeys": [
+        {
+          "priv": "c767304628e7b7cd68f51ce64095b62631490d7172531ab41c25fd24a5deb93d",
+          "pub": "0530cf6ec58ae162eb94e065ce6a365f24afad8cf6001bad620b14b0037706a361"
+        }
+      ]
+    },
+    {
+      "step": 12,
+      "label": "Alice receives late B0 (old chain, kept key)",
+      "to": "alice",
+      "decryptStep": 3,
+      "expectedPlaintext": "4230",
+      "receiverConsumedKeys": []
+    },
+    {
+      "step": 13,
+      "label": "Alice receives late B2 (old chain, kept key)",
+      "to": "alice",
+      "decryptStep": 5,
+      "expectedPlaintext": "4232",
+      "receiverConsumedKeys": []
+    },
+    {
+      "step": 14,
+      "label": "Alice receives B0 again: must fail",
+      "to": "alice",
+      "decryptStep": 3,
+      "expectError": true
+    },
+    {
+      "step": 15,
+      "label": "Bob receives late A1 (old counter on current receiving chain, kept key)",
+      "to": "bob",
+      "decryptStep": 7,
+      "expectedPlaintext": "4131",
+      "receiverConsumedKeys": []
+    },
+    {
+      "step": 16,
+      "label": "Alice sends A3 (chain A3, previousCounter 1)",
+      "from": "alice",
+      "type": "msg",
+      "plaintext": "41332061667465722065766572797468696e67",
+      "ciphertext": "330a210530cf6ec58ae162eb94e065ce6a365f24afad8cf6001bad620b14b0037706a361100018012220a8564db50a662759aad9dc9b916373fff0d81f3444aa9999a018ec54eea719124c0bec2e4ea84241",
+      "senderConsumedKeys": [],
+      "msg": {
+        "bytes": "330a210530cf6ec58ae162eb94e065ce6a365f24afad8cf6001bad620b14b0037706a361100018012220a8564db50a662759aad9dc9b916373fff0d81f3444aa9999a018ec54eea719124c0bec2e4ea84241",
+        "versionByte": "33",
+        "protobuf": "0a210530cf6ec58ae162eb94e065ce6a365f24afad8cf6001bad620b14b0037706a361100018012220a8564db50a662759aad9dc9b916373fff0d81f3444aa9999a018ec54eea71912",
+        "mac": "4c0bec2e4ea84241",
+        "ratchetKey": "0530cf6ec58ae162eb94e065ce6a365f24afad8cf6001bad620b14b0037706a361",
+        "counter": 0,
+        "previousCounter": 1,
+        "ciphertext": "a8564db50a662759aad9dc9b916373fff0d81f3444aa9999a018ec54eea71912"
+      }
+    },
+    {
+      "step": 17,
+      "label": "Bob decrypts A3",
+      "to": "bob",
+      "decryptStep": 16,
+      "expectedPlaintext": "41332061667465722065766572797468696e67",
+      "receiverConsumedKeys": [
+        {
+          "priv": "cbb4361703fff51b45e5b97e3f85da25b56cd6a988777fa7e0f5a0f40e996c4d",
+          "pub": "05b18491b0488900319b3d29f6f7fa9d7180857ecf0dbacdd317dfd83f1957b958"
+        }
+      ]
+    }
+  ],
+  "futureLimit": {
+    "description": "Forward-skip limit. Session built like session-pkmsg.json without a one-time prekey. Bob decrypts step m0 (counter 0) first. Then, from that state, the message with counter 2000 must decrypt (2000 ahead) and the message with counter 2001 must be rejected (2001 ahead). Each probe starts from the state after m0. Alice sent counters 1..1999 too but they are not delivered.",
+    "alice": {
+      "identityPrivateKey": "2cf179118bb9db7f175926aa521c4d03c6fce69587ad65107a312d60090c232d",
+      "identityPublicKey": "05f1c0a9b5441eb6cc7026aa5bee33f68f617198718efae997c14c658aee736876",
+      "registrationId": 12345,
+      "baseKey": {
+        "priv": "094a2494e02e6a571a8448fda92f26c11f84fe1d0d13feb126f7db36948ef28e"
+      },
+      "ratchetKeysInOrder": [
+        {
+          "priv": "b75a4c4a3c9614786b473fd1ad7f4e1cf7c87946c978225933592b6a0f29ee63",
+          "pub": "05237f3c2451cfa5bff1ae4028496434d3582d98d8a7c0c6980dd1742a4b6c1139"
+        }
+      ]
+    },
+    "bob": {
+      "identityPrivateKey": "5e4afcc7ace582eaaa6a246684f10a5fac1f6fc9b816b80b701a731568dc3b81",
+      "identityPublicKey": "05e8e5b1f0b1090f8a84152f8b27a1c53d7e69b909dd15e73b19fd65036484e64a",
+      "registrationId": 6789,
+      "signedPreKey": {
+        "id": 1,
+        "privateKey": "996fe0308cb925945c65854859f5ca15c667070ec9751ff3d1b3f9a05f3b2116"
+      },
+      "ratchetKeysInOrder": [
+        {
+          "priv": "b08442f7938def2bcf189322d972be24883866a84705029dc65f71a51b3a1073",
+          "pub": "054c5c889247e0477457a90fba0277ec9dfaf55772d1646f8b69c41bd06b783c3a"
+        }
+      ]
+    },
+    "m0": {
+      "type": "pkmsg",
+      "plaintext": "6d30",
+      "ciphertext": "331221058c8b4bd57ab80ccab37c124251511f7bf1acfda1d488f86322cb65abad9de3221a2105f1c0a9b5441eb6cc7026aa5bee33f68f617198718efae997c14c658aee7368762242330a2105237f3c2451cfa5bff1ae4028496434d3582d98d8a7c0c6980dd1742a4b6c1139100018002210cac012316212c787f0696821654f60b31fe333051616bef028b9603001"
+    },
+    "accept": {
+      "counter": 2000,
+      "plaintext": "6d32303030",
+      "type": "pkmsg",
+      "ciphertext": "331221058c8b4bd57ab80ccab37c124251511f7bf1acfda1d488f86322cb65abad9de3221a2105f1c0a9b5441eb6cc7026aa5bee33f68f617198718efae997c14c658aee7368762243330a2105237f3c2451cfa5bff1ae4028496434d3582d98d8a7c0c6980dd1742a4b6c113910d00f18002210c0db46baee0aa3b173f65ade0998e2b365897967ad34b3f028b9603001",
+      "expect": "decrypts"
+    },
+    "reject": {
+      "counter": 2001,
+      "plaintext": "6d32303031",
+      "type": "pkmsg",
+      "ciphertext": "331221058c8b4bd57ab80ccab37c124251511f7bf1acfda1d488f86322cb65abad9de3221a2105f1c0a9b5441eb6cc7026aa5bee33f68f617198718efae997c14c658aee7368762243330a2105237f3c2451cfa5bff1ae4028496434d3582d98d8a7c0c6980dd1742a4b6c113910d10f180022109c303f69aaf34d4acf9bf4aa84635e754b45092a76928f2728b9603001",
+      "expect": "error"
+    }
+  }
+}

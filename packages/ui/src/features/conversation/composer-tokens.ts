@@ -378,6 +378,6 @@ export function renderEditorValue(
 function scheduleStaticMentionAvatar(avatar: HTMLElement, agent: ComposerAgent): void {
   queueMicrotask(() => {
     if (!avatar.isConnected) return;
-    avatar.replaceChildren(createStaticAvatarSvg(agent.avatarSeed, agent.avatarHue));
+    avatar.replaceChildren(createStaticAvatarSvg(agent.avatarSeed, agent.avatarHue, agent.avatarColor ?? null));
   });
 }

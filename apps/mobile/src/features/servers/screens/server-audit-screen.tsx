@@ -221,6 +221,7 @@ export function ServerAuditScreen() {
                     agentId={change.agent.id}
                     serverId={serverId}
                     hue={profile?.avatarHue ?? null}
+                    color={profile?.avatarColor ?? null}
                     seed={profile?.avatarSeed ?? change.agent.id}
                     size={36}
                     animateIdle={false}

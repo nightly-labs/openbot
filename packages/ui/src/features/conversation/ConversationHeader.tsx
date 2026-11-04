@@ -68,7 +68,7 @@ export function ConversationHeader(props: ConversationHeaderProps) {
               onClick={() => (props.onOpenChat ?? props.onOpenSettings)()}
             >
               <AgentAvatar agent={agent()} />
-              <h1>{agent().name}</h1>
+              <h1 dir="auto">{agent().name}</h1>
             </Button>
           )}
         </Show>

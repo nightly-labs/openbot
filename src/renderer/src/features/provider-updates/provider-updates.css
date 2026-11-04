@@ -25,7 +25,7 @@
    so it keeps the same room clear that the words keep. */
 .ui-toaster.ui-toaster-closeable .provider-update-toast[data-sonner-toast][data-styled="true"] [data-action],
 .ui-toaster .provider-update-toast[data-sonner-toast][data-styled="true"]:has([data-close-button]) [data-action] {
-  margin-right: var(--openbot-space-6);
+  margin-inline-end: var(--openbot-space-6);
 }
 
 /* A state with nothing to offer marks its label instead of losing it, and the button goes out of the
@@ -94,7 +94,7 @@
    right padding. */
 .ui-toaster.ui-toaster-closeable .provider-update-toast .provider-update-toast-progress,
 .ui-toaster .provider-update-toast:has([data-close-button]) .provider-update-toast-progress {
-  margin-right: calc(-1 * var(--openbot-space-6));
+  margin-inline-end: calc(-1 * var(--openbot-space-6));
 }
 
 .provider-update-toast-bar {

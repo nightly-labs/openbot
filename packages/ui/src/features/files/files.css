@@ -95,7 +95,7 @@
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
-  text-align: right;
+  text-align: end;
 }
 
 /* Storage page ------------------------------------------------------------ */
@@ -237,7 +237,7 @@
   gap: var(--openbot-space-3);
   padding: var(--openbot-space-2) var(--openbot-space-4);
   border-radius: 0;
-  text-align: left;
+  text-align: start;
   font-weight: var(--openbot-weight-regular);
 }
 
@@ -315,6 +315,11 @@
   stroke-width: var(--openbot-icon-stroke);
 }
 
+/* Right to left, the arrow points the other way. */
+.storage-row-chevron:dir(rtl) {
+  transform: scaleX(-1);
+}
+
 .storage-cleanup-row {
   display: flex;
   align-items: center;
@@ -374,7 +379,7 @@
 .file-list-search-icon {
   position: absolute;
   top: 50%;
-  left: var(--openbot-space-2);
+  inset-inline-start: var(--openbot-space-2);
   width: 14px;
   height: 14px;
   color: var(--openbot-text-muted);
@@ -385,7 +390,7 @@
 
 .file-list-search .file-list-search-input {
   width: 100%;
-  padding-left: calc(var(--openbot-space-2) + 14px + var(--openbot-space-1-5));
+  padding-inline-start: calc(var(--openbot-space-2) + 14px + var(--openbot-space-1-5));
 }
 
 .file-list-toolbar > .ui-select {
@@ -510,7 +515,7 @@
   display: flex;
   align-items: center;
   gap: var(--openbot-space-1);
-  padding-right: var(--openbot-space-1);
+  padding-inline-end: var(--openbot-space-1);
   border-radius: var(--openbot-radius-md);
 }
 
@@ -528,7 +533,7 @@
   justify-content: flex-start;
   gap: var(--openbot-space-3);
   padding: var(--openbot-space-1-5) var(--openbot-space-2);
-  text-align: left;
+  text-align: start;
   font-weight: var(--openbot-weight-regular);
 }
 

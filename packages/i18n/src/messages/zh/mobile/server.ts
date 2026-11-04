@@ -372,6 +372,8 @@ export const messages = {
   "mobile.server.settings.aiSection": "AI 与工具",
   "mobile.server.settings.dataSection": "数据",
   "mobile.server.settings.maintenanceSection": "维护",
+  "mobile.server.settings.peopleSection": "人员",
+  "mobile.server.settings.moveSection": "导入与迁移",
   "mobile.server.settings.general": "通用",
   "mobile.server.settings.timezone": "时区",
   "mobile.server.settings.timezoneAutomatic": "自动",

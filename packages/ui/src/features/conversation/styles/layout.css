@@ -6,7 +6,8 @@
   min-width: 0;
   flex-direction: column;
   background: var(--openbot-bg-canvas);
-  transition: padding-right var(--panel-resize-duration, var(--openbot-duration-overlay)) cubic-bezier(0.22, 1, 0.36, 1);
+  transition: padding-inline-end var(--panel-resize-duration, var(--openbot-duration-overlay))
+    cubic-bezier(0.22, 1, 0.36, 1);
   --conversation-column-width: clamp(1440px, 65vw, 1920px);
 }
 
@@ -257,7 +258,8 @@
   border: 1px solid var(--openbot-border);
   border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-control);
-  padding: 6px 7px 6px 13px;
+  padding-block: 6px;
+  padding-inline: 13px 7px;
   box-shadow: 0 8px 25px var(--openbot-shadow-popover-ambient);
 }
 

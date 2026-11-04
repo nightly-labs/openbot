@@ -34,6 +34,7 @@ import {
   agentAccessEvent,
 } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_MEMORY_INCLUSION_ROUTE } from "@openbot/contracts/team-protocol/agent-memories-v1";
+import { CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
 import {
   SERVER_AUDIT_CAPABILITY,
@@ -572,13 +573,26 @@ try {
       body: { agentId: legal, changes: [{ memoryId: "memory-e2e", inclusion: "essential", expectedRevision: 0 }] },
     });
     assert.equal(included.status, 403, `A memory inclusion change on a chat agent returned ${included.status}.`);
-    assert.equal(
-      current()
-        .agents.listAgents()
-        .find((agent) => agent.id === legal)?.name,
-      "Legal",
-    );
-    return { viewCancel: refused.status, chatCancel: passed.status, patch: patched.status, inclusion: included.status };
+    // A chat colour needs manage access, as the avatar on the released agent route does.
+    const chatColor = await call("POST", CHAT_COLORS_ROUTES.set, {
+      token: setup.memberToken,
+      body: { agentId: legal, color: "#a1b2c3" },
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    assert.equal(chatColor.status, 403, `A chat colour change on a chat agent returned ${chatColor.status}.`);
+    assert.ok(refusal(chatColor.body).includes(sourceText("error.team.agentManageDenied")), refusal(chatColor.body));
+    const legalAgent = current()
+      .agents.listAgents()
+      .find((agent) => agent.id === legal);
+    assert.equal(legalAgent?.name, "Legal");
+    assert.equal(legalAgent?.chatColor, undefined, "A refused chat colour was saved.");
+    return {
+      viewCancel: refused.status,
+      chatCancel: passed.status,
+      patch: patched.status,
+      inclusion: included.status,
+      chatColor: chatColor.status,
+    };
   });
 
   await step("manage: the member changes an agent that Everyone does not list", async () => {
@@ -587,13 +601,18 @@ try {
       body: { name: "General 2" },
     });
     assert.equal(patched.status, 200, `PATCH on a manage agent returned ${patched.status}.`);
-    assert.equal(
-      current()
-        .agents.listAgents()
-        .find((agent) => agent.id === general)?.name,
-      "General 2",
-    );
-    return { patch: patched.status };
+    const chatColor = await call("POST", CHAT_COLORS_ROUTES.set, {
+      token: setup.memberToken,
+      body: { agentId: general, color: "#a1b2c3" },
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    assert.equal(chatColor.status, 200, `A chat colour change on a manage agent returned ${chatColor.status}.`);
+    const generalAgent = current()
+      .agents.listAgents()
+      .find((agent) => agent.id === general);
+    assert.equal(generalAgent?.name, "General 2");
+    assert.equal(generalAgent?.chatColor, "#a1b2c3", "The agent store did not keep the chat colour.");
+    return { patch: patched.status, chatColor: chatColor.status };
   });
 
   await step("owner: sees and changes every agent, and reads every role", async () => {

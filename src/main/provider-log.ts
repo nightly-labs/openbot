@@ -54,11 +54,13 @@ export function startAgentLog(logsDirectory: string): () => void {
  * line can be written. The update logger goes here too: `update.log` names only the failure code of
  * a check, download or install, and this file keeps the reason (#3724). A failed channel routing turn
  * goes here too, with its redacted cause (#3041). So does a message that did not start, with its redacted
- * reason: a channel shows only "The provider could not start this assignment" (#3957).
+ * reason: a channel shows only "The provider could not start this assignment" (#3957). The Linux GPU
+ * logger goes here too: a GPU crash keeps software rendering on at later starts, and this file keeps
+ * the reason and the exit code of that crash (#4836).
  */
 export function startMainLog(logsDirectory: string): void {
   const directory = join(logsDirectory, "main");
-  teeLogLines(["main", "update", "channel-routing", "drain-scheduler"], (line) => {
+  teeLogLines(["main", "update", "channel-routing", "drain-scheduler", "linux-gpu"], (line) => {
     Effect.runFork(appendRemoteDiagnosticLog(directory, "main", `${line}\n`));
   });
 }

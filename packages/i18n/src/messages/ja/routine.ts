@@ -297,6 +297,13 @@ export const messages = {
     "現在のシークレットはすぐに使えなくなります。送信元が新しいシークレットを使うまで、古いシークレットで署名されたリクエストは拒否されます。",
   "routine.webhook.regenerateConfirm": "再生成",
   "routine.webhook.regenerateFailed": "署名シークレットを再生成できませんでした。",
+  "routine.webhook.useSenderSecret": "送信元のシークレットを使う",
+  "routine.webhook.senderSecretTitle": "送信元の署名シークレットを使いますか？",
+  "routine.webhook.senderSecretDescription":
+    "Composio や Svix など、一部の送信元は独自の署名シークレットを作成します。ここに貼り付けてください。現在のシークレットはすぐに使えなくなります。",
+  "routine.webhook.senderSecretLabel": "送信元のシークレット",
+  "routine.webhook.senderSecretConfirm": "使用",
+  "routine.webhook.senderSecretFailed": "送信元のシークレットを保存できませんでした。",
   "routine.webhook.statusFailed": "ホストがリレーに接続しているか確認できませんでした。",
   "routine.settings.instruction": "指示",
   "routine.settings.instructionPlaceholderAgent": "このエージェントが行うことを説明してください。",

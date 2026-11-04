@@ -1,3 +1,4 @@
+import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
@@ -8,13 +9,13 @@ import { View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { useCSSVariable } from "uniwind";
 import { thumbnailColor } from "@/features/agents/components/bloub-avatar";
-import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { loadServerLogo } from "@/features/servers/model/server-logo";
 import { DISCONNECTED_APPEARANCE } from "@/features/workspace/components/use-connection-appearance";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
+import { END_X } from "@/shared/lib/text-direction";
 
 const INK = "rgba(0, 0, 0, 0.72)";
 /** The squircle's corner radius as a part of its side. */
@@ -24,11 +25,16 @@ const DOT_OVERHANG = 2;
 // The ring cut out of the squircle around the dot, so the dot works on any background.
 const DOT_GAP = 2.5;
 
-/** A square with a circular hole around the dot. The mask keeps only the filled part. */
+/**
+ * A square with a circular hole around the dot. The mask keeps only the filled part. The dot is at
+ * the bottom end corner: `right` puts it on the left in a right-to-left layout, but the drawing
+ * of the mask counts from the left, so the hole moves with it.
+ */
 function cutoutPath(size: number): string {
-  const center = size + DOT_OVERHANG - DOT / 2;
+  const centerY = size + DOT_OVERHANG - DOT / 2;
+  const centerX = END_X === 1 ? centerY : size - centerY;
   const radius = DOT / 2 + DOT_GAP;
-  return `M0 0H${size}V${size}H0Z M${center - radius} ${center}a${radius} ${radius} 0 1 0 ${radius * 2} 0a${radius} ${radius} 0 1 0 ${-radius * 2} 0Z`;
+  return `M0 0H${size}V${size}H0Z M${centerX - radius} ${centerY}a${radius} ${radius} 0 1 0 ${radius * 2} 0a${radius} ${radius} 0 1 0 ${-radius * 2} 0Z`;
 }
 
 function serverInitials(name: string): string {
@@ -90,7 +96,7 @@ export function ServerAvatar({
     <View
       className="items-center justify-center"
       style={{
-        backgroundColor: thumbnailColor(getBloubAvatarColor(server.id, null), muted),
+        backgroundColor: thumbnailColor(avatarHeadColor(server.id, null), muted),
         borderCurve: "continuous",
         borderRadius: size * SERVER_AVATAR_CORNER_RATIO,
         height: size,

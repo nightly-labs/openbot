@@ -6,6 +6,7 @@ import { Button, Checkbox } from "@openbot/ui";
 import { Dynamic } from "@solidjs/web";
 import { Marked, type Token, type Tokens, type TokensList } from "marked";
 import { createMemo, For, Show } from "solid-js";
+import { textDirection } from "../../content-direction";
 import { useText } from "../../text";
 import { AttachmentReferenceVisual, attachmentReferenceTone } from "./AttachmentReference";
 import { CodeBlock } from "./CodeBlock";
@@ -370,7 +371,7 @@ function MarkdownBlock(props: {
       if (!tokenIs(token, "heading")) return token.raw;
       const level = headingLevel(token.depth);
       return (
-        <Dynamic component={`h${level}`} class="message-markdown-heading" data-level={level}>
+        <Dynamic component={`h${level}`} class="message-markdown-heading" data-level={level} dir="auto">
           <MarkdownInline
             tokens={token.tokens}
             content={props.content}
@@ -383,7 +384,7 @@ function MarkdownBlock(props: {
     case "paragraph": {
       if (!tokenIs(token, "paragraph")) return token.raw;
       return (
-        <p>
+        <p dir="auto">
           <MarkdownInline
             tokens={token.tokens}
             content={props.content}
@@ -396,7 +397,7 @@ function MarkdownBlock(props: {
     case "blockquote": {
       if (!tokenIs(token, "blockquote")) return token.raw;
       return (
-        <blockquote>
+        <blockquote dir={tokensDirection(token.tokens)}>
           <MarkdownBlocks
             tokens={token.tokens}
             content={props.content}
@@ -425,7 +426,7 @@ function MarkdownBlock(props: {
       if (!tokenIs(token, "code")) return token.raw;
       if (props.content.excerpt)
         return (
-          <pre class="message-markdown-excerpt-code">
+          <pre class="message-markdown-excerpt-code" dir="ltr">
             <code>{token.text}</code>
           </pre>
         );
@@ -451,7 +452,11 @@ function MarkdownBlock(props: {
     case "hr":
       return <hr />;
     case "html":
-      return <span class="message-markdown-raw-html">{token.raw}</span>;
+      return (
+        <span class="message-markdown-raw-html" dir="ltr">
+          {token.raw}
+        </span>
+      );
     case "text": {
       if (!tokenIs(token, "text")) return token.raw;
       return token.tokens ? (
@@ -502,7 +507,7 @@ function MarkdownList(props: {
   const list = () => (
     <For each={renderedItems()}>
       {(renderedItem, index) => (
-        <li class={renderedItem.item.task ? "message-markdown-task" : undefined}>
+        <li class={renderedItem.item.task ? "message-markdown-task" : undefined} dir="auto">
           <Show when={renderedItem.item.task}>
             <Checkbox
               class="message-markdown-checkbox"
@@ -526,10 +531,14 @@ function MarkdownList(props: {
     </For>
   );
 
+  // The marker side and the indent follow the list's own text, not the interface language.
+  const direction = createMemo(() => tokensDirection(items()));
   return props.token.ordered ? (
-    <ol start={props.token.start === "" ? undefined : props.token.start}>{list()}</ol>
+    <ol start={props.token.start === "" ? undefined : props.token.start} dir={direction()}>
+      {list()}
+    </ol>
   ) : (
-    <ul>{list()}</ul>
+    <ul dir={direction()}>{list()}</ul>
   );
 }
 
@@ -542,7 +551,11 @@ function MarkdownTable(props: { token: Tokens.Table; content: MarkdownContentPro
   const { t } = useText();
   return (
     <section class="message-markdown-table-scroll" aria-label={t("chat.table.data")} tabindex="0">
-      <table class="message-markdown-table" style={`--message-markdown-table-columns: ${headers().length}`}>
+      <table
+        class="message-markdown-table"
+        style={`--message-markdown-table-columns: ${headers().length}`}
+        dir={tokensDirection([...headers(), ...rows().flat()].flatMap((cell) => cell.tokens))}
+      >
         <thead>
           <tr>
             <For each={headers()}>
@@ -655,7 +668,7 @@ function MarkdownInline(props: {
                 onOpen={props.content.onOpenWorkspaceFile}
               />
             ) : (
-              <code>{token.text}</code>
+              <code dir="ltr">{token.text}</code>
             );
           }
           case "br":
@@ -674,6 +687,7 @@ function MarkdownInline(props: {
               <MessageLink
                 url={url}
                 title={token.title || linkTitle(token.text, url)}
+                isolate={linkTitle(token.text, token.href) === undefined}
                 favicon={props.content.linkFavicons !== false}
                 onOpenLink={props.content.onOpenLink}
               >
@@ -785,6 +799,40 @@ function MarkdownInline(props: {
       }}
     </For>
   );
+}
+
+/**
+ * The base direction of a list, a quote or a table, from its first letter, as `dir="auto"` finds
+ * it for a paragraph. `dir="auto"` skips the descendants that set their own direction, and each
+ * block in these containers does, so the container reads its text here. Code, math, raw HTML and
+ * bare URLs are skipped, as they are left to right and isolated. Undefined keeps the inherited
+ * direction.
+ */
+function tokensDirection(tokens: readonly Token[]): "ltr" | "rtl" | undefined {
+  for (const token of tokens) {
+    const direction = tokenDirection(token);
+    if (direction) return direction;
+  }
+  return undefined;
+}
+
+function tokenDirection(token: Token): "ltr" | "rtl" | undefined {
+  switch (token.type) {
+    case "code":
+    case "codespan":
+    case "blockMath":
+    case "inlineMath":
+    case "html":
+    case "image":
+    case "checkbox":
+      return undefined;
+  }
+  if (tokenIs(token, "list")) return tokensDirection(token.items);
+  if (tokenIs(token, "table"))
+    return tokensDirection([...token.header, ...token.rows.flat()].flatMap((cell) => cell.tokens));
+  if (tokenIs(token, "link") && linkTitle(token.text, token.href) === undefined) return undefined;
+  if ("tokens" in token && token.tokens) return tokensDirection(token.tokens);
+  return "text" in token && typeof token.text === "string" ? textDirection(token.text) : undefined;
 }
 
 function textTokenEndsWithTagMarker(token: Token | undefined): boolean {
@@ -1019,7 +1067,9 @@ function LocalFileLink(props: {
       onClick={() => props.onOpen(props.path)}
     >
       <AttachmentReferenceVisual name={name} />
-      <span class="inline-file-reference-name">{props.label || name}</span>
+      <span class="inline-file-reference-name" dir="auto">
+        {props.label || name}
+      </span>
     </Button>
   );
 }

@@ -25,7 +25,7 @@
    that sits in the row's corner. */
 .mcp-local-heading {
   margin: 0;
-  padding-right: var(--openbot-space-6);
+  padding-inline-end: var(--openbot-space-6);
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-semibold);
@@ -37,7 +37,7 @@
   flex-direction: column;
   gap: var(--openbot-space-2);
   margin: var(--openbot-space-2) 0 0;
-  padding-left: var(--openbot-space-4);
+  padding-inline-start: var(--openbot-space-4);
   list-style: decimal;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
@@ -68,7 +68,7 @@
 .mcp-connect-docs {
   position: absolute;
   top: var(--openbot-space-3);
-  right: var(--openbot-space-3);
+  inset-inline-end: var(--openbot-space-3);
   gap: var(--openbot-space-1-5);
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);

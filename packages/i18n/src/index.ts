@@ -5,7 +5,14 @@ import { type AppMessages, en } from "./messages/en/index";
 
 export { APP_LANGUAGES, type AppLanguage, DEFAULT_APP_LANGUAGE } from "@openbot/contracts/app-language";
 export { type AppFormat, createFormat } from "./format";
-export { formatLocale, resolveLocale, TRANSLATED_LOCALES, type TranslatedLocale } from "./locale";
+export {
+  formatLocale,
+  type LayoutDirection,
+  localeDirection,
+  resolveLocale,
+  TRANSLATED_LOCALES,
+  type TranslatedLocale,
+} from "./locale";
 export { loadLocale, localeLoaded } from "./locale-loading";
 export {
   createTranslate,

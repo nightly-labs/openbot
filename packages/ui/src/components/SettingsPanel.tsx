@@ -61,7 +61,11 @@ export function SettingsBackIcon(): JSX.Element {
 
 export function SettingsForwardIcon(): JSX.Element {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 settings-forward-icon fill-none stroke-current">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      class="ui-glyph-20 settings-forward-icon fill-none stroke-current ui-rtl-mirror"
+    >
       <path d="m5.5 4 6 6-6 6m5-12 6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
     </svg>
   );

@@ -83,7 +83,7 @@
   color: var(--openbot-danger);
   font-size: var(--openbot-text-sm);
   line-height: 17px;
-  text-align: left;
+  text-align: start;
 }
 
 .account-login > .account-login-error {
@@ -171,7 +171,7 @@
 /* Inline, so the lock stays beside the first word when the sentence wraps. */
 .account-login-local-data svg {
   display: inline-block;
-  margin-right: 6px;
+  margin-inline-end: 6px;
   vertical-align: -2px;
 }
 
@@ -216,7 +216,7 @@
   color: var(--openbot-danger);
   font-size: var(--openbot-text-sm);
   line-height: 16px;
-  text-align: left;
+  text-align: start;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -267,7 +267,7 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: var(--openbot-text-sm);
   line-height: 16px;
-  text-align: left;
+  text-align: start;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -290,7 +290,7 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  text-align: left;
+  text-align: start;
   -webkit-app-region: no-drag;
 }
 
@@ -335,7 +335,7 @@
 }
 
 .initial-setup-signout {
-  margin-left: 2px;
+  margin-inline-start: 2px;
   padding: 5px 7px;
   font-size: var(--openbot-text-sm);
 }
@@ -350,7 +350,7 @@
   height: 28px;
   display: grid;
   place-items: center;
-  margin-right: 3px;
+  margin-inline-end: 3px;
   border-radius: var(--openbot-radius-pill);
   padding: 0;
 }
@@ -414,7 +414,7 @@
   background: var(--openbot-bg-canvas);
   padding: 15px 17px;
   color: var(--openbot-text-primary);
-  text-align: left;
+  text-align: start;
   transition:
     border-color var(--openbot-duration-hover) ease,
     background-color var(--openbot-duration-hover) ease,
@@ -495,6 +495,11 @@
 
 .setup-route-button:hover .setup-route-arrow {
   transform: translateX(2px);
+}
+
+/* Right to left, the onboarding styles mirror the arrow, so the hover nudge keeps the mirror. */
+.setup-route-button:hover .setup-route-arrow:dir(rtl) {
+  transform: translateX(-2px) scaleX(-1);
 }
 
 .setup-local-content {
@@ -635,7 +640,8 @@
   grid-template-columns: 16px 18px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  padding: 8px 0 8px 12px;
+  padding-block: 8px;
+  padding-inline: 12px 0;
   cursor: pointer;
 }
 
@@ -687,7 +693,7 @@
 .ui-button.provider-picker-install {
   min-width: 58px;
   min-height: 28px;
-  margin-right: 8px;
+  margin-inline-end: 8px;
   border-radius: var(--openbot-radius-md);
   padding-inline: 9px;
 }
@@ -779,7 +785,8 @@
   grid-column: 1 / -1;
   overflow: visible;
   margin-top: -6px;
-  padding: 0 0 8px 66px;
+  padding-block: 0 8px;
+  padding-inline: 66px 0;
   white-space: normal;
 }
 
@@ -800,7 +807,8 @@
   display: grid;
   gap: 4px;
   margin-top: -6px;
-  padding: 0 0 8px 66px;
+  padding-block: 0 8px;
+  padding-inline: 66px 0;
 }
 
 .provider-picker-account-list {
@@ -887,7 +895,7 @@
    and sits with the row's other actions, so it needs their margin and the button's own specificity. */
 .ui-button.provider-picker-custom-count {
   min-height: 28px;
-  margin-right: 8px;
+  margin-inline-end: 8px;
   border-radius: var(--openbot-radius-md);
   padding-inline: 9px;
   color: var(--text-muted);
@@ -1019,7 +1027,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-3);
+  padding-block: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-3) var(--openbot-space-1);
 }
 
 .provider-more-title {
@@ -1057,7 +1066,7 @@
   color: inherit;
   font: inherit;
   line-height: normal;
-  text-align: left;
+  text-align: start;
   white-space: normal;
 }
 
@@ -1194,12 +1203,30 @@
     animation-delay: 18ms;
   }
 
-  .account-login[data-transition="forward"] .account-login-form[data-auth-panel="code"] {
+  .account-login[data-transition="forward"]
+    .account-login-form:is([data-auth-panel="code"], [data-auth-panel="company"]) {
     animation: account-login-panel-forward var(--openbot-duration-overlay) 32ms var(--openbot-ease-out) both;
   }
 
   .account-login[data-transition="back"] .account-login-form[data-auth-panel="email"] {
     animation: account-login-panel-back var(--openbot-duration-overlay) 32ms var(--openbot-ease-out) both;
+  }
+
+  /* A right-to-left page moves forward to the left. */
+  .account-login:dir(rtl)[data-transition="forward"] :is(.account-login-title, .account-login-description) {
+    animation-name: account-login-copy-back;
+  }
+
+  .account-login:dir(rtl)[data-transition="back"] :is(.account-login-title, .account-login-description) {
+    animation-name: account-login-copy-forward;
+  }
+
+  .account-login:dir(rtl)[data-transition="forward"] .account-login-form[data-auth-panel="code"] {
+    animation-name: account-login-panel-back;
+  }
+
+  .account-login:dir(rtl)[data-transition="back"] .account-login-form[data-auth-panel="email"] {
+    animation-name: account-login-panel-forward;
   }
 
   @keyframes setup-enter {
@@ -1482,4 +1509,9 @@ body,
 .provider-picker-status-sign-in-required i,
 .provider-picker-status-outdated i {
   color: var(--openbot-warning);
+}
+
+/* Change email goes back, so its arrow follows the reading direction. */
+.account-login-code-action-change > svg[class~="lucide-arrow-left"]:dir(rtl) {
+  transform: scaleX(-1);
 }

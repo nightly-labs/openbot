@@ -40,6 +40,8 @@ import type {
   SendDirectMessageInput,
   ServerNotificationLevel,
   ServerSummary,
+  SetAgentChatColorInput,
+  SetAgentColorInput,
   SetAgentNotificationLevelInput,
   SetTeamTypingInput,
   TeamInviteSummary,
@@ -60,12 +62,14 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_COLORS_CAPABILITY, AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/agent-import-v1";
 import {
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { decodeBrowserViewSessionResponse } from "@openbot/contracts/team-protocol/browser-view-v1";
+import { CHAT_COLORS_CAPABILITY, CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import {
   COMPUTER_ACTIVITY_CAPABILITY,
   COMPUTER_ACTIVITY_ROUTES,
@@ -97,6 +101,8 @@ import {
   decodeAgentSummary,
   decodeDraftAttachment,
   decodeDuplicateAgentResultFromHost,
+  decodeRemoteAgentColors,
+  decodeRemoteChatColors,
 } from "./remote-agent-decoding";
 import { AttachmentDownloadStopped, type RemoteAttachment, RemoteAttachmentCache } from "./remote-attachment-cache";
 import type { RemoteConnectTrace } from "./remote-connect-trace";
@@ -404,6 +410,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#refresh = new RemoteEventRefresh({
       request: (serverId, path, decoder, init) => this.#client.request(serverId, path, decoder, init),
       hasServer: (serverId) => this.#store.has(serverId),
+      onMemberChatColors: (serverId) => {
+        if (this.#presence.has(serverId)) this.emit("presence", serverId, this.getPresence(serverId));
+      },
       emit: (serverId, event, bufferedLive) => {
         // Another device of the user changed their levels: the server list shows the new server level.
         if (event.type === "agent-notification-levels-changed")
@@ -414,7 +423,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     });
     this.#presence = new RemotePresenceCache({
       fetchSnapshot: (serverId) => this.request(serverId, TEAM_API_ROUTES.team.presence, decodeTeamPresenceSnapshot),
-      onSnapshot: (serverId, snapshot) => this.emit("presence", serverId, snapshot),
+      onSnapshot: (serverId, snapshot) =>
+        this.emit("presence", serverId, this.#withMemberChatColors(serverId, snapshot)),
     });
     this.#team = new RemoteTeamDirectory({
       servers: this.#store,
@@ -726,6 +736,71 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     );
     this.#rememberLevels(serverId, snapshot);
     return snapshot;
+  }).bind(this);
+
+  /**
+   * The agents with the last colours and chat colours of the server. A server without `agent-colors-v1`
+   * or `chat-colors-v1` has none.
+   */
+  withAgentColors(serverId: string, agents: ClientAgentSummary[]): ClientAgentSummary[] {
+    return this.#refresh.withAgentColors(serverId, agents);
+  }
+
+  /** One agent with the last colour and chat colour of the server. */
+  agentWithColor(serverId: string, agent: ClientAgentSummary): ClientAgentSummary {
+    return this.#refresh.agentWithColor(serverId, agent);
+  }
+
+  /** Reads the colours of a server with `agent-colors-v1`. A server without it has none to read. */
+  readonly readAgentColors = Effect.fn("RemoteManager.readAgentColors")(function* (
+    this: RemoteServerManager,
+    serverId: string,
+  ) {
+    if (!this.supportsCapability(serverId, AGENT_COLORS_CAPABILITY)) return;
+    const colors = yield* this.request(serverId, AGENT_COLORS_ROUTES.read, decodeRemoteAgentColors, {
+      method: "POST",
+      body: {},
+    });
+    this.#refresh.rememberAgentColors(serverId, colors);
+  }).bind(this);
+
+  /** Sets or removes the colour of one agent. The caller checks `agent-colors-v1` first. */
+  readonly setAgentColor = Effect.fn("RemoteManager.setAgentColor")(function* (
+    this: RemoteServerManager,
+    serverId: string,
+    input: SetAgentColorInput,
+  ) {
+    const colors = yield* this.request(serverId, AGENT_COLORS_ROUTES.set, decodeRemoteAgentColors, {
+      method: "POST",
+      body: { agentId: input.agentId, color: input.color },
+    });
+    this.#refresh.rememberAgentColors(serverId, colors);
+  }).bind(this);
+
+  /** Reads the chat colours of a server with `chat-colors-v1`. A server without it has none to read. */
+  readonly readChatColors = Effect.fn("RemoteManager.readChatColors")(function* (
+    this: RemoteServerManager,
+    serverId: string,
+  ) {
+    if (!this.supportsCapability(serverId, CHAT_COLORS_CAPABILITY)) return;
+    const colors = yield* this.request(serverId, CHAT_COLORS_ROUTES.read, decodeRemoteChatColors, {
+      method: "POST",
+      body: {},
+    });
+    this.#refresh.rememberChatColors(serverId, colors);
+  }).bind(this);
+
+  /** Sets or removes the chat colour of one agent. The caller checks `chat-colors-v1` first. */
+  readonly setAgentChatColor = Effect.fn("RemoteManager.setAgentChatColor")(function* (
+    this: RemoteServerManager,
+    serverId: string,
+    input: SetAgentChatColorInput,
+  ) {
+    const colors = yield* this.request(serverId, CHAT_COLORS_ROUTES.set, decodeRemoteChatColors, {
+      method: "POST",
+      body: { agentId: input.agentId, color: input.color },
+    });
+    this.#refresh.rememberChatColors(serverId, colors);
   }).bind(this);
 
   #levelsUnsupported() {
@@ -1686,11 +1761,18 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   }
 
   getPresence(serverId = this.#store.activeServerId): TeamPresenceSnapshot {
-    return this.#presence.get(serverId);
+    return this.#withMemberChatColors(serverId, this.#presence.get(serverId));
   }
 
   getPresenceFor(serverId: string): Effect.Effect<TeamPresenceSnapshot, RemoteWorkflowError> {
-    return this.#owned(this.#presence.refresh(serverId));
+    return this.#owned(this.#presence.refresh(serverId)).pipe(
+      Effect.map((snapshot) => this.#withMemberChatColors(serverId, snapshot)),
+    );
+  }
+
+  /** The presence with the last member chat colours of the server. The released presence has none. */
+  #withMemberChatColors(serverId: string, snapshot: TeamPresenceSnapshot): TeamPresenceSnapshot {
+    return { ...snapshot, members: this.#refresh.withMemberChatColors(serverId, snapshot.members) };
   }
 
   readonly refreshIdentity = Effect.fn("RemoteManager.refreshIdentity")(
@@ -1720,11 +1802,15 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   ).bind(this);
 
   listMembers(serverId: string): Effect.Effect<TeamMemberSummary[], RemoteWorkflowError> {
-    return this.#owned(this.#team.listMembers(serverId));
+    return this.#owned(this.#team.listMembers(serverId)).pipe(
+      Effect.map((members) => this.#refresh.withMemberChatColors(serverId, members)),
+    );
   }
 
   updateMember(serverId: string, input: UpdateTeamMemberInput): Effect.Effect<TeamMemberSummary, RemoteWorkflowError> {
-    return this.#owned(this.#team.updateMember(serverId, input));
+    return this.#owned(this.#team.updateMember(serverId, input)).pipe(
+      Effect.map((member) => this.#refresh.withMemberChatColors(serverId, [member])[0] ?? member),
+    );
   }
 
   removeMember(serverId: string, memberId: string): Effect.Effect<void, RemoteWorkflowError> {
@@ -2097,7 +2183,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       const value = yield* remoteDecode(() =>
         decodeTeamProtocolV1CurrentHttpResponse(image ? "PUT" : "DELETE", url.pathname, response.status, json),
       );
-      return addRemotePreviewUrls(yield* remoteDecode(() => decodeAgentSummary(value)), server.id);
+      const agent = addRemotePreviewUrls(yield* remoteDecode(() => decodeAgentSummary(value)), server.id);
+      return this.#refresh.agentWithColor(server.id, agent);
     },
     (operation) => this.#owned(operation),
   ).bind(this);

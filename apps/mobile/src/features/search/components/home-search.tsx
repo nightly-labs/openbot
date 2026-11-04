@@ -1,3 +1,4 @@
+import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import { isAgentTaskOpen, taskNeedsYou } from "@openbot/team-client/agent-tasks";
 import * as Crypto from "expo-crypto";
 import { type Href, router, useFocusEffect } from "expo-router";
@@ -59,7 +60,6 @@ import { scheduleOnRN } from "react-native-worklets";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { openChatFromPane, useChatListPane } from "@/features/agents/components/chat-list-pane-context";
-import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { reportMobileNotification } from "@/features/analytics/failure-reports";
 import { MobileSearchResults, SearchCaption } from "@/features/search/components/mobile-search-results";
 import { setHomeSearchOpener } from "@/features/search/model/home-search-request";
@@ -80,6 +80,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion, useTransitionMode } from "@/shared/lib/motion";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { currentText, useText } from "@/shared/lib/text";
+import { fieldDirectionStyle } from "@/shared/lib/text-direction";
 import { typeScale } from "@/shared/lib/type-scale";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 
@@ -592,6 +593,7 @@ function TaskTargetRow({ agent, onPress }: { agent: MobileAgent; onPress: () => 
         agentId={agent.id}
         serverId={agent.serverId}
         hue={agent.avatarHue}
+        color={agent.avatarColor}
         seed={agent.avatarSeed}
         size={36}
         animateIdle={false}
@@ -650,7 +652,7 @@ export function HomeSearchBar({
   if (search.result && search.result !== shownResult) setShownResult(search.result);
   const showsResult = search.result !== null;
   const resultColor = shownResult?.ok
-    ? getBloubAvatarColor(shownResult.agent.avatarSeed, shownResult.agent.avatarHue)
+    ? avatarHeadColor(shownResult.agent.avatarSeed, shownResult.agent.avatarHue, shownResult.agent.avatarColor)
     : danger;
   // As the prototype: the color at 18% over the field, so the text in the same color stays readable.
   const resultTint = `${resultColor}2e`;
@@ -801,6 +803,7 @@ export function HomeSearchBar({
                   paddingBottom: 0,
                   paddingTop: 0,
                   textAlignVertical: "center",
+                  ...fieldDirectionStyle(search.query),
                 }}
                 value={search.query}
                 onChangeText={search.setQuery}
@@ -923,6 +926,7 @@ function TaskResultContent({
         agentId={agent.id}
         serverId={agent.serverId}
         hue={agent.avatarHue}
+        color={agent.avatarColor}
         seed={agent.avatarSeed}
         size={26}
         animateIdle={false}
@@ -954,7 +958,7 @@ const TARGET_NAME_WIDTH = 80;
  */
 function TargetChip({ agent, onPress }: { agent: MobileAgent; onPress: () => void }) {
   const { t } = useText();
-  const color = getBloubAvatarColor(agent.avatarSeed, agent.avatarHue);
+  const color = avatarHeadColor(agent.avatarSeed, agent.avatarHue, agent.avatarColor);
   return (
     <Pressable
       accessibilityRole="button"
@@ -969,6 +973,7 @@ function TargetChip({ agent, onPress }: { agent: MobileAgent; onPress: () => voi
         agentId={agent.id}
         serverId={agent.serverId}
         hue={agent.avatarHue}
+        color={agent.avatarColor}
         seed={agent.avatarSeed}
         size={28}
         animateIdle={false}
@@ -1148,7 +1153,7 @@ function TaskEditorPage({ agent, search }: { agent: MobileAgent; search: HomeSea
   const { t } = useText();
   const pane = useChatListPane();
   const muted = String(useThemeColor("muted"));
-  const color = getBloubAvatarColor(agent.avatarSeed, agent.avatarHue);
+  const color = avatarHeadColor(agent.avatarSeed, agent.avatarHue, agent.avatarColor);
   const { tasks } = useServerTasks(agent.serverId, { agentId: agent.id });
   const sorted = [...tasks].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
   const ideas = [...new Set(sorted.filter((task) => !isAgentTaskOpen(task)).map((task) => task.title.trim()))]
@@ -1169,6 +1174,7 @@ function TaskEditorPage({ agent, search }: { agent: MobileAgent; search: HomeSea
             agentId={agent.id}
             serverId={agent.serverId}
             hue={agent.avatarHue}
+            color={agent.avatarColor}
             seed={agent.avatarSeed}
             size={40}
             animateIdle={false}
@@ -1334,6 +1340,7 @@ function AgentChip({ agent, onPress }: { agent: MobileAgent; onPress: () => void
             agentId={agent.id}
             serverId={agent.serverId}
             hue={agent.avatarHue}
+            color={agent.avatarColor}
             seed={agent.avatarSeed}
             size={48}
             animateIdle={false}
