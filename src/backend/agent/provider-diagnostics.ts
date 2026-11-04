@@ -226,7 +226,7 @@ export function isGlogBelowErrorDiagnostic(message: string): boolean {
  *
  * ACP gives stderr to the agent for its logs; a failure reaches OpenBot as an answer or as the exit.
  * Devin CLI 3000.11.234 writes its info records to stderr, and a word such as "failed" in one let it
- * through as a "Provider failed" error (#5064). The level of the record decides instead.
+ * through as a provider error (#5064). The level of the record decides instead.
  *
  * Only a record that opens with the level, after an optional timestamp, counts. An `ERROR` record,
  * or text without a level - a Rust panic included - stays visible.
