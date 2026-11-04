@@ -33,7 +33,8 @@
     "brave-search",
     "resend",
     "composio",
-    "clickup"
+    "clickup",
+    "keenable"
   ],
   "featured": ["aave", "canva", "notion", "figma"]
 }

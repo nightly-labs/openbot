@@ -187,6 +187,12 @@
       "version": "1.0.0",
       "featured": false,
       "detailSha256": "5014d267e7627c50d84ea1823d04e4d6c6f18e7096319f3e1351972e656c4449"
+    },
+    {
+      "slug": "keenable",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "51ce40eab16cfe578bb237108638cc746fe7a02e1aefca669c106025be3df672"
     }
   ]
 }

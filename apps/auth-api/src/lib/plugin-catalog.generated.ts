@@ -204,6 +204,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       featured: false,
       detailSha256: "5014d267e7627c50d84ea1823d04e4d6c6f18e7096319f3e1351972e656c4449",
     },
+    {
+      slug: "keenable",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "51ce40eab16cfe578bb237108638cc746fe7a02e1aefca669c106025be3df672",
+    },
   ],
 };
 
@@ -1445,6 +1451,49 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://clickup.com",
     privacyPolicyUrl: "https://clickup.com/terms/privacy",
     termsUrl: "https://clickup.com/terms",
+    skills: [],
+  },
+  keenable: {
+    slug: "keenable",
+    name: "Keenable",
+    tagline: "Web search and page reading",
+    description:
+      "Search the web and read pages as markdown through Keenable. It works without an account or key. Add an X-API-Key header in server settings for higher limits.",
+    category: "research",
+    creatorName: "Keenable",
+    iconUrl: "https://keenable.ai/favicon.ico",
+    version: "1.0.0",
+    prompts: [
+      {
+        id: "prompt-release",
+        text: "Find the latest release of this library and summarize its changes with links to the release notes.",
+      },
+      {
+        id: "prompt-docs",
+        text: "Read this documentation page and list the steps to configure the feature it describes.",
+      },
+      {
+        id: "prompt-compare",
+        text: "Compare the current free plans of these two hosting services and cite the source pages.",
+      },
+    ],
+    apps: [
+      {
+        id: "app-keenable-mcp",
+        name: "Keenable",
+        description:
+          "Search the web and fetch page content using Keenable's hosted MCP server. To raise the limits, add your API key as an X-API-Key header in server settings.",
+        iconUrl: "https://keenable.ai/favicon.ico",
+        server: {
+          name: "keenable",
+          transport: "http",
+          url: "https://api.keenable.ai/mcp-public?keenable_title=openbot",
+        },
+      },
+    ],
+    websiteUrl: "https://keenable.ai",
+    privacyPolicyUrl: "https://keenable.ai/privacy",
+    termsUrl: "https://keenable.ai/terms",
     skills: [],
   },
 };
