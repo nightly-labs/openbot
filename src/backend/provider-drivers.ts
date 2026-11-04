@@ -15,9 +15,9 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { AcpAgentClient, type AcpHistoryPersistence } from "./acp-client";
 import {
+  CLINE_ACP_FLAVOR,
   CURSOR_ACP_FLAVOR,
   customAgentFlavor,
-  DEFAULT_ACP_FLAVOR,
   DEVIN_ACP_FLAVOR,
   HERMES_ACP_FLAVOR,
   KIMI_ACP_FLAVOR,
@@ -1084,7 +1084,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     createClient: (cli, timeout, context, confinement) =>
       new AcpAgentClient(cli, timeout, {
         provider: "cline",
-        flavor: DEFAULT_ACP_FLAVOR,
+        flavor: CLINE_ACP_FLAVOR,
         argv: CLINE_ARGV,
         env: { ...CLINE_ENV },
         ...(confinement ? { confine: (target) => confineClineTarget(target, confinement) } : {}),
@@ -1101,7 +1101,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     createProfileClient: (cli, timeout, context) =>
       new AcpAgentClient(cli, timeout, {
         provider: "cline",
-        flavor: DEFAULT_ACP_FLAVOR,
+        flavor: CLINE_ACP_FLAVOR,
         argv: CLINE_ARGV,
         profileGeneration: true,
         env: { ...CLINE_ENV },

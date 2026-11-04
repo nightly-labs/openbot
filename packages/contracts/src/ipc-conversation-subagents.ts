@@ -2,9 +2,10 @@ import { isBoundedString, isIdentifier, isNullableBoundedString } from "./ipc-bo
 import { isDynamicRecord, isOneOf } from "./runtime-values";
 
 /**
- * The subagents that an agent started in one turn: Claude `Task` and `Agent` calls, and Codex
- * `spawnAgent` calls. The backend maps each provider to this one shape. Each update holds the full
- * list, and it is stored on one message of the turn, as the plan is.
+ * The subagents that an agent started in one turn: Claude `Task` and `Agent` calls, Codex
+ * `spawnAgent` calls, OpenCode child sessions, and the subagent tool calls of Kimi, Cline and Hermes.
+ * The backend maps each provider to this one shape. Each update holds the full list, and it is stored
+ * on one message of the turn, as the plan is.
  */
 export const CONVERSATION_SUBAGENTS_ITEM_TYPE = "subagents";
 
@@ -55,7 +56,7 @@ export interface ConversationSubagent {
 
 export const CONVERSATION_SUBAGENT_LIMIT = 24;
 export const CONVERSATION_SUBAGENT_STEP_LIMIT = 40;
-const TITLE_LIMIT = 300;
+export const CONVERSATION_SUBAGENT_TITLE_LIMIT = 300;
 const AGENT_TYPE_LIMIT = 80;
 const PROMPT_LIMIT = 2_000;
 const STEP_TEXT_LIMIT = 500;
@@ -70,7 +71,7 @@ function isConversationSubagent(value: unknown): value is ConversationSubagent {
   return (
     isDynamicRecord(value) &&
     isIdentifier(value.id) &&
-    isBoundedString(value.title, TITLE_LIMIT) &&
+    isBoundedString(value.title, CONVERSATION_SUBAGENT_TITLE_LIMIT) &&
     isNullableBoundedString(value.agentType, AGENT_TYPE_LIMIT) &&
     isNullableBoundedString(value.prompt, PROMPT_LIMIT) &&
     isOneOf(CONVERSATION_SUBAGENT_STATUSES, value.status) &&
@@ -110,7 +111,7 @@ export function clampConversationSubagents(subagents: readonly ConversationSubag
     });
     result.push({
       id: subagent.id,
-      title: clampText(subagent.title, TITLE_LIMIT),
+      title: clampText(subagent.title, CONVERSATION_SUBAGENT_TITLE_LIMIT),
       agentType: nullableText(subagent.agentType, AGENT_TYPE_LIMIT),
       prompt: nullableText(subagent.prompt, PROMPT_LIMIT, false),
       status: subagent.status,

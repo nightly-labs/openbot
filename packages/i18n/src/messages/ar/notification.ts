@@ -10,6 +10,8 @@ export const messages = {
   "notification.workflowApproval": "تنتظر خطوة موافقتك.",
   "notification.workflowOutput": "يوجد لسير عمل نتيجة جديدة.",
   "notification.failed": "توقف بسبب خطأ.",
+  "notification.subagentFailed": "توقف وكيل فرعي بسبب خطأ.",
+  "notification.subagentFailedFor": "توقف وكيل فرعي بسبب خطأ: {task}",
   "notification.channelTitle": "{agent} في {channel}",
   "notification.channelMessage": "أرسل رسالة.",
   "notification.usageLimit.title": "بلغ حساب {provider} حدّه",

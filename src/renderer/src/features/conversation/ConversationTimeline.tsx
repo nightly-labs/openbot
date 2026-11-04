@@ -22,7 +22,7 @@ import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMes
 import { ReplyReturnButton, ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
 import { DeleteMessageDialog, MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
 import { PendingSendStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
-import { SubagentGroup } from "@openbot/ui/features/conversation/Subagents";
+import { SubagentDock, SubagentGroup } from "@openbot/ui/features/conversation/Subagents";
 import { TaskList } from "@openbot/ui/features/conversation/TaskList";
 import { UnreadMessagesBanner, UnreadMessagesDivider } from "@openbot/ui/features/conversation/UnreadMessages";
 import { VoicePlayer } from "@openbot/ui/features/conversation/VoicePlayer";
@@ -62,6 +62,7 @@ import { RoutineChatCard } from "./RoutineChatCard";
 import { createChatWebhookRoutines, RoutineWebhookChatCard } from "./RoutineWebhookChatCard";
 import { desktopChatEventRoutinesApi } from "./routine-webhooks-api";
 import { PENDING_SEND_ID_PREFIX, pendingSendRetrySafe } from "./stores/pending-send-store";
+import { createSubagentDock } from "./subagent-dock";
 import { createTurnSteps, SUBAGENT_SPAN_PREFIX } from "./turn-steps";
 
 /**
@@ -515,6 +516,25 @@ export function ConversationTimeline() {
       ? mcpServers().find((config) => config.id === marker.mcpServerId && config.transport === "http")
       : undefined;
   const virtualMessageRows = createMemo(() => messageVirtualizer.getVirtualItems());
+  let timelineScrollElement: HTMLDivElement | undefined;
+  const subagentDock = createSubagentDock({
+    rows: timelineMessages,
+    drawnRows: virtualMessageRows,
+    scrollElement: () => timelineScrollElement,
+    hidden: sideThreadOpen,
+  });
+  /**
+   * Scrolls back to the subagent card, with its header in view when the card is taller than the chat.
+   * The bar that had focus goes away, so focus goes to the card header.
+   */
+  const revealSubagents = async () => {
+    const cardId = subagentDock.cardId();
+    if (!cardId) return;
+    const row = await replyJump.reveal(cardId, undefined, props.agent?.id);
+    const header = row?.querySelector<HTMLElement>(".subagents-group-header");
+    header?.scrollIntoView({ block: "nearest" });
+    header?.focus({ preventScroll: true });
+  };
   const rail = createChatScrollRail({
     rows: timelineMessages,
     // A change the person made in the app, such as to a routine, is a marker, not a message they wrote.
@@ -614,10 +634,17 @@ export function ConversationTimeline() {
         />
       </Show>
 
+      <SubagentDock
+        subagents={subagentDock.subagents()}
+        cardHeader={subagentDock.cardHeader}
+        onReveal={() => void revealSubagents()}
+      />
+
       <div
         class={["conversation-scroll", scrollFades.classes(), { "conversation-covered": sideThreadOpen() }]}
         inert={sideThreadOpen()}
         ref={(element) => {
+          timelineScrollElement = element;
           setScrollElement(element);
           rail.ref(element);
         }}
@@ -627,6 +654,7 @@ export function ConversationTimeline() {
           updateScrollFade(element);
           updateUnreadDividerVisibility();
           replyJump.updateReturnVisibility();
+          subagentDock.update();
         }}
       >
         <ChatScrollRail {...rail.props} />

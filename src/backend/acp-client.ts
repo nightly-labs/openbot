@@ -37,8 +37,24 @@ import {
 } from "./acp-configuration";
 import { AcpConnection, type AcpConnectionOptions } from "./acp-connection";
 import type { AcpCustomEndpoint, AcpFlavor } from "./acp-flavor";
+import {
+  foldAcpSubagentTool,
+  foldOpenCodeChildUpdate,
+  markOpenCodeBackground,
+  noteOpenCodeLaunch,
+  OPENCODE_CHILD_SESSION_UPDATES,
+  OPENCODE_CHILD_UPDATE_METHOD,
+  type OpenCodeLaunches,
+} from "./agent/acp-subagent-updates";
 import { acpPlanSteps, PLAN_UPDATED_METHOD } from "./agent/plan-updates";
 import { elicitationOptions, elicitationValue, secretElicitationField } from "./agent/prompts";
+import {
+  endSubagentTurn,
+  newSubagentState,
+  SUBAGENTS_UPDATED_METHOD,
+  type SubagentChange,
+  stopSubagents,
+} from "./agent/subagent-updates";
 import { type AgentProvider, type DiagnosticOrigin, ProviderTurnActiveError } from "./agent-client";
 import type { AgentCliInfo } from "./cli";
 import { runCauseEffect } from "./effect-boundary";
@@ -556,6 +572,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #models: AcpModel[] = [];
   #lastTurnStartedAt = 0;
   #signedIn = false;
+  /** The subagents of turns, from subagent tool calls (`AcpFlavor.subagentTools`) or OpenCode's child sessions. */
+  readonly #subagents = newSubagentState();
+  /** The thread of each turn in `#subagents`. A background subagent reports after its turn and session ended. */
+  readonly #subagentThreads = new Map<string, string>();
+  /** OpenCode subagent calls whose child session did not start yet. */
+  readonly #openCodeLaunches: OpenCodeLaunches = new Map();
   /** Settles when the server asks for an interactive sign-in while `initialize` checks the account. */
   #signInPrompt: Deferred.Deferred<void> | null = null;
 
@@ -567,7 +589,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     super();
     this.#flavor = options.flavor;
     this.#cli = cli;
-    this.#transport = this.#newTransport((error) => this.emit("exit", error));
+    this.#transport = this.#newTransport((error) => {
+      this.#stopSubagents();
+      this.emit("exit", error);
+    });
     this.#requestTimeoutMs = requestTimeoutMs;
     this.#configuration = new AcpConfiguration({
       connection: () => this.#requireConnection(),
@@ -618,6 +643,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         sessionUpdate: (params) => this.#sessionUpdate(params),
         createElicitation: (params) => runCauseEffect(this.#createElicitation(params)),
         extMethod: (method, params) => runCauseEffect(this.#requestUserInput(method, params)),
+        extNotification: (method, params) => this.#extNotification(method, params),
       }),
     });
   }
@@ -796,6 +822,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             { concurrency: "unbounded", discard: true },
           );
           this.#startingThreads.clear();
+          this.#stopSubagents();
           this.#serverRequests.rejectAll("ACP session stopped.");
           yield* this.#bridge.close().pipe(toProviderClientOperationError);
         }),
@@ -1337,7 +1364,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return providerCall(() =>
       connection.initialize({
         protocolVersion: 1,
-        clientCapabilities: OPENBOT_ACP_CLIENT_CAPABILITIES,
+        // OpenCode sends its subagents' work only to a client that asks for it, and else in the parent's stream.
+        clientCapabilities: this.#flavor.childSessionUpdates
+          ? { ...OPENBOT_ACP_CLIENT_CAPABILITIES, _meta: { [OPENCODE_CHILD_SESSION_UPDATES]: true } }
+          : OPENBOT_ACP_CLIENT_CAPABILITIES,
         clientInfo: this.#flavor.clientInfo ?? OPENBOT_ACP_CLIENT_INFO,
       }),
     );
@@ -2559,6 +2589,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         result: update.rawOutput ?? turn.toolItems.get(update.toolCallId)?.result,
       };
       turn.toolItems.set(update.toolCallId, item);
+      this.#foldSubagentTool(thread, turn, update.toolCallId, update.content, item);
       this.emit("notification", {
         method: update.status === "completed" || update.status === "failed" ? "item/completed" : "item/started",
         params: {
@@ -2940,6 +2971,66 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     );
   }
 
+  /** Applies a tool call that runs a subagent. A tool call of the subagent itself comes from OpenCode's child session. */
+  #foldSubagentTool(thread: AcpThread, turn: AcpTurn, toolCallId: string, content: unknown, item: ThreadItem): void {
+    const call = {
+      id: toolCallId,
+      name: isString(item.name) ? item.name : "",
+      status: isString(item.status) ? item.status : undefined,
+      rawInput: item.arguments,
+      rawOutput: item.result,
+      content,
+    };
+    const subagentTools = this.#flavor.subagentTools;
+    if (subagentTools) {
+      this.#subagentThreads.set(turn.id, thread.id);
+      this.#emitSubagents(foldAcpSubagentTool(this.#subagents, turn.id, subagentTools, call, new Date().toISOString()));
+    }
+    if (this.#flavor.childSessionUpdates) {
+      noteOpenCodeLaunch(this.#openCodeLaunches, call);
+      if (call.status === "completed") this.#emitSubagents(markOpenCodeBackground(this.#subagents, call.rawOutput));
+    }
+  }
+
+  /** ACP extension notifications. OpenBot reads only OpenCode's updates of its subagents' sessions. */
+  #extNotification(method: string, params: DynamicRecord): void {
+    if (method.replace(/^_/, "") !== OPENCODE_CHILD_UPDATE_METHOD || !this.#flavor.childSessionUpdates) return;
+    const thread = isString(params.rootSessionId) ? this.#threads.get(params.rootSessionId) : undefined;
+    const turn = thread?.activeTurn ?? null;
+    // A subagent's work keeps its parent's turn alive, as the parent's own updates do.
+    if (thread && turn) {
+      turn.lastActivityAt = Date.now();
+      this.#subagentThreads.set(turn.id, thread.id);
+    }
+    this.#emitSubagents(
+      foldOpenCodeChildUpdate(
+        this.#subagents,
+        this.#openCodeLaunches,
+        turn?.id ?? null,
+        params,
+        new Date().toISOString(),
+      ),
+    );
+  }
+
+  /** Sends a turn's subagents. Not tied to the active turn: a background subagent reports after its turn ended. */
+  #emitSubagents(change: SubagentChange | null): void {
+    if (!change) return;
+    const threadId = this.#subagentThreads.get(change.turnId);
+    if (!this.#subagents.turns.has(change.turnId)) this.#subagentThreads.delete(change.turnId);
+    if (!threadId) return;
+    this.emit("notification", {
+      method: SUBAGENTS_UPDATED_METHOD,
+      params: { threadId, turnId: change.turnId, subagents: change.subagents },
+    });
+  }
+
+  /** The agent's process ended, and its subagents with it. */
+  #stopSubagents(): void {
+    for (const change of stopSubagents(this.#subagents, new Date().toISOString())) this.#emitSubagents(change);
+    this.#openCodeLaunches.clear();
+  }
+
   readonly #completeTurn = Effect.fn("AcpAgentClient.completeTurn")(function* (
     this: AcpAgentClient,
     thread: AcpThread,
@@ -2949,6 +3040,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   ) {
     if (thread.activeTurn !== turn || turn.completing) return;
     turn.completing = true;
+    // The ACP SDK sends an extension notification through more handlers than `session/update`, so
+    // OpenCode's child updates that came before the prompt's result can still be on their way.
+    if (this.#flavor.childSessionUpdates) yield* Effect.promise(() => new Promise<void>((next) => setImmediate(next)));
     // The agent may not have kept a prompt that failed.
     if (status === "failed") thread.instructionsSent = null;
     // The agent can still store the rest of a turn that did not complete. A replay does not show it.
@@ -2972,6 +3066,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         });
     }
     turn.toolItems.clear();
+    this.#emitSubagents(endSubagentTurn(this.#subagents, turn.id, new Date().toISOString()));
+    // A turn that started no subagent sends no change, so its thread entry is removed here.
+    if (!this.#subagents.turns.has(turn.id)) this.#subagentThreads.delete(turn.id);
     this.#completeMessage(thread, turn, "final_answer");
     if (status === "failed" && error) {
       const detail = this.#redact(failureText(error));
