@@ -438,11 +438,28 @@
 .global-search-empty,
 .global-search-results:not(:has(.global-search-result)) .global-search-status {
   /* With no rows, "Searching…" and "No results" have one height, so the dialog does not jump. */
-  min-height: 96px;
+  min-height: 148px;
 }
 
+/* "No results" is under the plush. */
 .global-search-empty {
+  flex-direction: column;
+  padding-block: var(--openbot-space-3);
   animation: global-search-fade-in var(--openbot-duration-normal) var(--openbot-ease-out) both;
+}
+
+/* The plush tilts on its bottom edge. Its eyes follow the caret, -1 to 1 on each axis. */
+.global-search-plush {
+  --ui-plush-size: 56px;
+  display: block;
+  transform-origin: 50% 100%;
+}
+
+.global-search-plush[data-gaze="follow"] .ui-plush-eyes {
+  animation: none;
+  translate: calc(var(--global-search-gaze-x) * var(--ui-plush-size) * 0.07)
+    calc(var(--global-search-gaze-y) * var(--ui-plush-size) * 0.05);
+  transition: translate var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
 @keyframes global-search-fade-in {

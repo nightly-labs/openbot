@@ -35,6 +35,7 @@ import {
   untrack,
 } from "solid-js";
 import { createScrollFades } from "./createScrollFades";
+import { GlobalSearchPlush } from "./GlobalSearchPlush";
 import { playDialogExit, trackResultHighlight, trackResultsHeight } from "./global-search-motion";
 import { matchParts, normalizedSearchText, snippetAround } from "./global-search-text";
 import { VirtualListbox, type VirtualRowProps } from "./VirtualListbox";
@@ -724,6 +725,12 @@ export function GlobalSearch(props: GlobalSearchProps) {
     messageSearch.retry();
     fileSearch.retry();
   };
+  // A search that finds nothing shows "No results". The next search keeps it until it finds a result,
+  // so the state does not mount again for each letter. The first search shows the spinner.
+  const nothingFound = createMemo<boolean>((previous) => {
+    if (flatResults().length > 0 || failed()) return false;
+    return pending() ? previous === true : true;
+  });
   // A source that is still loading and has nothing to show yet gets a spinner under the list.
   const searching = () => {
     const shown = new Set(sections().map((group) => group.key));
@@ -946,7 +953,7 @@ export function GlobalSearch(props: GlobalSearchProps) {
                     />
                   )}
                 </Combobox.Listbox>
-                <Show when={searching()}>
+                <Show when={searching() && !nothingFound()}>
                   <div class="global-search-status">
                     <Spinner size="sm" />
                     <span>{t("conversation.globalSearch.searching")}</span>
@@ -968,8 +975,11 @@ export function GlobalSearch(props: GlobalSearchProps) {
                     </Button>
                   </div>
                 </Show>
-                <Show when={flatResults().length === 0 && !pending() && !failed()}>
-                  <div class="global-search-empty">{t("conversation.globalSearch.empty")}</div>
+                <Show when={nothingFound()}>
+                  <div class="global-search-empty">
+                    <GlobalSearchPlush input={() => input} searching={pending()} />
+                    {t("conversation.globalSearch.empty")}
+                  </div>
                 </Show>
               </ResultsBody>
             </Combobox.Content>
