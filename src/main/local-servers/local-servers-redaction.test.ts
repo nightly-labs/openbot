@@ -19,13 +19,20 @@ const READY = {
   apiUrl: "http://127.0.0.1:45123",
   fingerprint: "fingerprint-1",
   publicKey: "public-key-1",
+  ownerMemberId: "owner-member-1",
 };
+const MACHINE_TOKEN = "machine-token-of-the-server-on-this-computer";
 
 /** A child that reports ready at once and exits when it is asked to stop. */
 class ReadyChild extends ChildProcess {
+  /** What the parent wrote to standard input. */
+  readonly input: string[] = [];
+
   constructor() {
     super();
-    this.stdin = new PassThrough();
+    const stdin = new PassThrough();
+    stdin.on("data", (chunk: Buffer) => this.input.push(chunk.toString()));
+    this.stdin = stdin;
     const stdout = new PassThrough();
     this.stdout = stdout;
     this.stderr = new PassThrough();
@@ -41,6 +48,7 @@ class ReadyChild extends ChildProcess {
 interface Spawned {
   args: readonly string[];
   secret: string | undefined;
+  child: ReadyChild;
 }
 
 function summary(input: LocalServerAttachInput): ServerSummary {
@@ -91,6 +99,12 @@ function servers(
       attachLocalServer: attach,
       detachLocalServer: () => Effect.void,
     },
+    account: {
+      accountId: () => "account-1",
+      register: () => Effect.void,
+      credential: () => MACHINE_TOKEN,
+      remove: () => Effect.void,
+    },
     command: { executable: "/Applications/OpenBot.app/Contents/MacOS/OpenBot", args: [] },
     trash: () => Promise.resolve(),
     log: {
@@ -99,8 +113,9 @@ function servers(
     },
     platform: "darwin",
     spawn: (_command: string, args: readonly string[], options: SpawnOptions) => {
-      spawned.push({ args, secret: options.env?.[LOCAL_SERVER_ENVIRONMENT.secret] });
-      return new ReadyChild();
+      const child = new ReadyChild();
+      spawned.push({ args, secret: options.env?.[LOCAL_SERVER_ENVIRONMENT.secret], child });
+      return child;
     },
   };
   return new LocalServers(options);
@@ -144,5 +159,26 @@ describe("servers on this computer", () => {
     const log = lines.join("\n");
     expect(log).toContain("Login refused for [redacted]");
     expect(log).not.toContain(secret);
+  });
+
+  it("gives the machine token only to the child's standard input", async () => {
+    const lines: string[] = [];
+    const spawned: Spawned[] = [];
+    const local = servers(
+      (input) => Effect.succeed(summary(input)),
+      (line) => lines.push(line),
+      spawned,
+    );
+    await Effect.runPromise(local.load());
+    await Effect.runPromise(local.initialize());
+    // A create from another device answers after the registration.
+    await Effect.runPromise(local.create(READY.serverName, "device"));
+    expect(local.list().servers).toEqual([{ serverId: READY.serverId, name: READY.serverName, published: true }]);
+    await Effect.runPromise(local.stop());
+
+    expect(spawned[0]?.child.input.join("")).toContain(MACHINE_TOKEN);
+    expect(spawned[0]?.args.join(" ")).not.toContain(MACHINE_TOKEN);
+    expect(await readFile(join(root, LOCAL_SERVERS_FILE), "utf8")).not.toContain(MACHINE_TOKEN);
+    expect(lines.join("\n")).not.toContain(MACHINE_TOKEN);
   });
 });

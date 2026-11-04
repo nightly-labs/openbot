@@ -100,3 +100,48 @@ export function AgentNewChatSection({ agent, available }: { agent: MobileAgent; 
     </SettingsSection>
   );
 }
+
+/**
+ * Asks the host to compact the context of the agent's chat now, as "Compact now" on desktop. The
+ * messages stay. The phone does not show the context usage, so it does not show the progress. The
+ * host refuses while the agent works or when its provider cannot compact, and its reason shows in
+ * the alert.
+ */
+export function AgentCompactSection({ agent, available }: { agent: MobileAgent; available: boolean }) {
+  const { t } = useText();
+  const { compactContext } = useMobileWorkspaceActions();
+  const [compacting, setCompacting] = useState(false);
+  // The host starts the compaction and answers; the provider finishes it later.
+  const [started, setStarted] = useState(false);
+
+  function compact(): void {
+    setCompacting(true);
+    setStarted(false);
+    compactContext(agent.id, agent.serverId)
+      .then(() => {
+        setStarted(true);
+        void haptics.notification("success");
+      })
+      .catch((cause: unknown) => {
+        void haptics.notification("error");
+        const text = currentText();
+        showFailureAlert(
+          cause,
+          "agent",
+          text.t("mobile.agent.compact.failed"),
+          text.errorMessage(cause, text.t("mobile.agent.compact.failedBody")),
+        );
+      })
+      .finally(() => setCompacting(false));
+  }
+
+  return (
+    <SettingsSection footer={t(started ? "mobile.agent.compact.started" : "mobile.agent.compact.footer")}>
+      <SettingsRow disabled={!available || compacting} onPress={compact}>
+        <Typography.Paragraph>
+          {t(compacting ? "mobile.agent.compact.compacting" : "mobile.agent.compact.title")}
+        </Typography.Paragraph>
+      </SettingsRow>
+    </SettingsSection>
+  );
+}

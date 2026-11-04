@@ -1,0 +1,30 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/common";
+
+export const messages = {
+  "common.cancel": "إلغاء",
+  "common.save": "حفظ",
+  "common.close": "إغلاق",
+  "common.delete": "حذف",
+  "common.remove": "إزالة",
+  "common.edit": "تعديل",
+  "common.rename": "إعادة التسمية",
+  "common.retry": "إعادة المحاولة",
+  "common.copy": "نسخ",
+  "common.copied": "تم النسخ",
+  "common.done": "تم",
+  "common.back": "رجوع",
+  "common.continue": "متابعة",
+  "common.add": "إضافة",
+  "common.create": "إنشاء",
+  "common.open": "فتح",
+  "common.search": "بحث",
+  "common.noMatches": "لا توجد نتائج مطابقة",
+  "common.loading": "جارٍ التحميل…",
+  "common.saving": "جارٍ الحفظ…",
+  "common.tryAgain": "إعادة المحاولة",
+  "common.connecting": "جارٍ الاتصال…",
+  "common.download": "تنزيل",
+  "common.removing": "جارٍ الإزالة…",
+  "common.sending": "جارٍ الإرسال…",
+} as const satisfies PartialTranslation<typeof source>;

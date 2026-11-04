@@ -36,7 +36,7 @@ export const messages = {
   "settings.keepRunning.title": "OpenBot을 백그라운드에서 계속 실행",
   "settings.keepRunning.description": "창을 닫은 뒤에도 진행 중인 작업을 계속 실행해요.",
   "settings.menuBar.title": "메뉴 막대에 OpenBot 표시",
-  "settings.menuBar.description": "창을 닫으면 Dock 아이콘을 숨겨요. 진행 중인 작업은 계속 실행돼요.",
+  "settings.menuBar.description": "메뉴 막대 아이콘에서 OpenBot을 열거나 종료해요.",
   "settings.keepAwake.title": "이 컴퓨터를 절전 모드로 전환하지 않기",
   "settings.keepAwake.description": "컴퓨터가 전원에 연결되어 있으면 루틴이 제시간에 실행돼요. 화면은 꺼질 수 있어요.",
   "settings.keepAwakeOnBattery.title": "배터리 사용 중에도 적용",
@@ -531,6 +531,7 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "답변 소리 내어 읽기",
   "settings.voice.speech.readReplies.description":
     "음성으로 메시지를 입력하면 답변을 소리 내어 읽어줘요. 다시 음성 입력을 하면 멈춰요.",
+  "settings.voice.speech.speed.title": "속도",
   "settings.voice.speech.voice.title": "음성",
   "settings.voice.speech.voice.female": "여성 음성 {number}",
   "settings.voice.speech.voice.male": "남성 음성 {number}",

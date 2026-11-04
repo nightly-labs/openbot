@@ -26,7 +26,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { initialWindowMetrics, useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN, scheduleOnUI } from "react-native-worklets";
 import { useUniwind } from "uniwind";
 import { haptics } from "@/shared/lib/haptics";
@@ -64,6 +64,19 @@ const PAGE_SPRING = { damping: 36, stiffness: 300, mass: 1, overshootClamping: t
 // The open picture keeps this margin to the screen and the safe area, so the blur shows on every
 // side and the photo reads as held up over the chat, not as a new screen.
 const INSET = 16;
+// The buttons: 48 points high, 8 points under the safe area. The picture stays clear of them.
+const HEADER_OFFSET = 8;
+const HEADER_HEIGHT = 48;
+// The space between the controls and the picture.
+const CHROME_GAP = 12;
+// The strip of small pictures at the bottom, one tile for each page.
+const THUMB_SIZE = 40;
+const THUMB_GAP = 6;
+const THUMB_STEP = THUMB_SIZE + THUMB_GAP;
+const THUMB_RADIUS = 8;
+const STRIP_OFFSET = 8;
+// The tiles this far from the page on screen mount. The strip shows about nine.
+const THUMB_WINDOW = 8;
 // The space between two pictures of the carousel while a swipe moves them.
 const PAGE_GAP = 24;
 // The pictures either side of the one on screen stay mounted, so a quick second swipe finds its
@@ -165,7 +178,8 @@ export function ImageViewer({
   /** The actions of the page on screen. */
   busy: boolean;
   onShare: () => void;
-  onSave: () => Promise<boolean>;
+  /** Absent for a picture that the photo library does not take, such as an SVG. */
+  onSave?: (() => Promise<boolean>) | undefined;
   onIndexChange?: (index: number) => void;
   /** Called once the picture is back in its place. */
   onDismissed: () => void;
@@ -180,9 +194,13 @@ export function ImageViewer({
   // The same glass as the chat header's buttons. Without Liquid Glass, or with Reduce
   // Transparency on, they fall back to the theme's solid control colour.
   const liquidGlassAvailable = isLiquidGlassAvailable() && reduceTransparency === false;
-  const vertical = Math.max(insets.top, insets.bottom) + INSET;
-  const box = { x: INSET, y: vertical, width: Math.max(W - INSET * 2, 1), height: Math.max(H - vertical * 2, 1) };
   const count = pages.length;
+  // The picture never sits under the buttons or the strip. It stays centred on the screen, so a
+  // pinch scales it about the middle of the screen, where the zoom arithmetic puts its centre.
+  const vertical =
+    Math.max(insets.top + HEADER_OFFSET + HEADER_HEIGHT, insets.bottom + (count > 1 ? STRIP_OFFSET + THUMB_SIZE : 0)) +
+    CHROME_GAP;
+  const box = { x: INSET, y: vertical, width: Math.max(W - INSET * 2, 1), height: Math.max(H - vertical * 2, 1) };
   const step = W + PAGE_GAP;
   // A page learns its size when its image loads. Until then the chat's record of it, or a guess.
   const [sizes, setSizes] = useState<Readonly<Record<string, ImageDimensions>>>({});
@@ -218,6 +236,12 @@ export function ImageViewer({
   const gestureMode = useSharedValue(MODE_NONE);
   const chrome = useSharedValue(0);
   const chromeOn = useSharedValue(true);
+  // A finger on the strip: the page it points at, as a fraction, while it moves.
+  const scrub = useSharedValue(0);
+  const scrubStart = useSharedValue(0);
+  const scrubbing = useSharedValue(false);
+  // The page on screen as a fraction: the strip follows a swipe of the pictures, and a scrub of itself.
+  const stripPosition = useDerivedValue(() => (scrubbing.get() ? scrub.get() : index.get() - pageOffset.get() / step));
   // React hears which page is on screen only to mount its neighbours and label the controls.
   const [shown, setShown] = useState(initialIndex);
   const [savedKeys, setSavedKeys] = useState<ReadonlySet<string>>(() => new Set());
@@ -531,6 +555,56 @@ export function ImageViewer({
 
   const gesture = Gesture.Race(Gesture.Simultaneous(pinch, pan), Gesture.Exclusive(doubleTap, singleTap));
 
+  // A drag along the strip scrubs through the pages: the page under the strip's centre is on
+  // screen at once, and the pictures slide with the finger between two pages.
+  const stripPan = Gesture.Pan()
+    .maxPointers(1)
+    .minDistance(4)
+    .onStart(() => {
+      if (phase.get() !== PHASE_OPEN) return;
+      cancelAnimation(pageOffset);
+      scrubStart.set(index.get() - pageOffset.get() / step);
+      scrub.set(scrubStart.get());
+      scrubbing.set(true);
+    })
+    .onUpdate((event) => {
+      if (!scrubbing.get()) return;
+      const position = clamp(scrubStart.get() - event.translationX / THUMB_STEP, 0, count - 1);
+      scrub.set(position);
+      const nearest = Math.round(position);
+      if (nearest !== index.get()) {
+        index.set(nearest);
+        hiddenSource.set(keys[nearest] ?? null);
+        scale.set(1);
+        tx.set(0);
+        ty.set(0);
+        scheduleOnRN(pageChanged, nearest);
+        scheduleOnRN(tick);
+      }
+      pageOffset.set((nearest - position) * step);
+    })
+    .onFinalize(() => {
+      if (!scrubbing.get()) return;
+      scrubbing.set(false);
+      turnTo(index.get(), 0);
+    });
+
+  const stripTap = Gesture.Tap()
+    .maxDistance(10)
+    .onEnd((event, success) => {
+      if (!success || phase.get() !== PHASE_OPEN) return;
+      const target = Math.round(stripPosition.get() + (event.x - W / 2) / THUMB_STEP);
+      if (target < 0 || target >= count || target === index.get()) return;
+      scheduleOnRN(tick);
+      turnTo(target, 0);
+    });
+
+  const stripGesture = Gesture.Race(stripPan, stripTap);
+  const stripStyle = useAnimatedStyle(() => ({ opacity: chrome.get() * clamp(t.get(), 0, 1) * fade.get() }));
+  const stripRowStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: W / 2 - THUMB_SIZE / 2 - stripPosition.get() * THUMB_STEP }],
+  }));
+
   // Glass stops rendering under a parent with zero opacity, so the buttons are never faded from
   // here. The worklets still decide when they show; React hears only when that flips.
   const [chromeVisible, setChromeVisible] = useState(false);
@@ -615,9 +689,21 @@ export function ImageViewer({
             ))}
           </View>
         </GestureDetector>
-        {/* The viewer covers the window, and the chat can be one column of it. This view reads the
-            window's insets, so the buttons keep clear of the rail of iPhone Duo on either side. */}
-        <SafeAreaView edges={["top", "left", "right"]} style={StyleSheet.absoluteFill} pointerEvents="box-none">
+        {/* A native safe area view in a modal reads no inset the first time the modal opens, so the
+            buttons take the insets the picture is placed with. The viewer covers the window, and the
+            chat can be one column of it: the sides also keep the window's insets, so the buttons keep
+            clear of the rail of iPhone Duo on either side. */}
+        <View
+          pointerEvents="box-none"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              paddingTop: insets.top,
+              paddingLeft: Math.max(insets.left, initialWindowMetrics?.insets.left ?? 0),
+              paddingRight: Math.max(insets.right, initialWindowMetrics?.insets.right ?? 0),
+            },
+          ]}
+        >
           <View pointerEvents="box-none" className="flex-row items-center justify-between px-4 pt-2">
             {/* Close at the leading edge, where the platform puts the way out of a full-screen view,
                 and the position beside it on the same glass. */}
@@ -663,34 +749,123 @@ export function ImageViewer({
               >
                 <Share size={20} color={String(foreground)} />
               </ChatGlassIconButton>
-              <ChatGlassIconButton
-                accessibilityLabel={
-                  saved ? text.t("mobile.chat.imageViewer.saved") : text.t("mobile.chat.imageViewer.save", { name })
-                }
-                hidden={!chromeVisible}
-                disabled={busy || saved}
-                fallbackBackground={fallbackBackground}
-                liquidGlassAvailable={liquidGlassAvailable}
-                onPress={() => {
-                  const key = current?.key;
-                  void onSave().then((done) => {
-                    if (!done || key === undefined) return;
-                    void haptics.notification("success");
-                    setSavedKeys((keys) => new Set(keys).add(key));
-                  });
-                }}
-              >
-                {saved ? (
-                  <Check size={21} color={String(foreground)} />
-                ) : (
-                  <Download size={20} color={String(foreground)} />
-                )}
-              </ChatGlassIconButton>
+              {onSave ? (
+                <ChatGlassIconButton
+                  accessibilityLabel={
+                    saved ? text.t("mobile.chat.imageViewer.saved") : text.t("mobile.chat.imageViewer.save", { name })
+                  }
+                  hidden={!chromeVisible}
+                  disabled={busy || saved}
+                  fallbackBackground={fallbackBackground}
+                  liquidGlassAvailable={liquidGlassAvailable}
+                  onPress={() => {
+                    const key = current?.key;
+                    void onSave().then((done) => {
+                      if (!done || key === undefined) return;
+                      void haptics.notification("success");
+                      setSavedKeys((keys) => new Set(keys).add(key));
+                    });
+                  }}
+                >
+                  {saved ? (
+                    <Check size={21} color={String(foreground)} />
+                  ) : (
+                    <Download size={20} color={String(foreground)} />
+                  )}
+                </ChatGlassIconButton>
+              ) : null}
             </View>
           </View>
-        </SafeAreaView>
+        </View>
+        {count > 1 ? (
+          // The container's value and actions already page through the pictures for a screen reader.
+          <GestureDetector gesture={stripGesture}>
+            <Animated.View
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              pointerEvents={chromeVisible ? "auto" : "none"}
+              style={[
+                {
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  bottom: insets.bottom,
+                  height: THUMB_SIZE + STRIP_OFFSET * 2,
+                  paddingVertical: STRIP_OFFSET,
+                },
+                stripStyle,
+              ]}
+            >
+              <Animated.View style={[{ height: THUMB_SIZE, width: count * THUMB_STEP }, stripRowStyle]}>
+                {/* Only the tiles near the page on screen mount, as the pictures do: the strip shows
+                    about nine, and each tile runs a style on the UI thread in every frame. */}
+                {pages.map((page, slot) =>
+                  Math.abs(slot - shown) <= THUMB_WINDOW ? (
+                    <ViewerThumbnail
+                      key={page.key}
+                      serverId={serverId}
+                      attachment={page.attachment}
+                      slot={slot}
+                      position={stripPosition}
+                    />
+                  ) : null,
+                )}
+              </Animated.View>
+            </Animated.View>
+          </GestureDetector>
+        ) : null}
       </GestureHandlerRootView>
     </Modal>
+  );
+}
+
+/**
+ * One tile of the strip. The tile of the page on screen is whole; the others are smaller and dim,
+ * and a tile grows as a swipe brings its page to the screen.
+ */
+function ViewerThumbnail({
+  serverId,
+  attachment,
+  slot,
+  position,
+}: {
+  serverId: string;
+  attachment: AttachmentSummary;
+  slot: number;
+  position: SharedValue<number>;
+}) {
+  const file = useAttachmentFile(serverId, attachment, true);
+  const style = useAnimatedStyle(() => {
+    const closeness = clamp(1 - Math.abs(position.get() - slot), 0, 1);
+    return { opacity: lerp(0.5, 1, closeness), transform: [{ scale: lerp(0.82, 1, closeness) }] };
+  });
+  return (
+    <Animated.View
+      className="bg-control"
+      style={[
+        {
+          position: "absolute",
+          left: slot * THUMB_STEP,
+          top: 0,
+          width: THUMB_SIZE,
+          height: THUMB_SIZE,
+          borderRadius: THUMB_RADIUS,
+          borderCurve: "continuous",
+          overflow: "hidden",
+        },
+        style,
+      ]}
+    >
+      {file.uri ? (
+        <Image
+          source={file.uri}
+          contentFit="cover"
+          transition={120}
+          accessible={false}
+          style={StyleSheet.absoluteFill}
+        />
+      ) : null}
+    </Animated.View>
   );
 }
 

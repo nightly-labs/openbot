@@ -311,13 +311,19 @@ export const SPEECH_LANGUAGES = [
 ] as const;
 export type SpeechLanguage = (typeof SPEECH_LANGUAGES)[number];
 
+/** The speeds of a reply that is read aloud, slowest first. 1 is normal speed. */
+export const SPEECH_SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const;
+export type SpeechSpeed = (typeof SPEECH_SPEEDS)[number];
+
 export interface SpeechSettings {
   /** Read the reply to a dictated message aloud. */
   readReplies: boolean;
   voice: SpeechVoice;
+  /** The speed of each reply that is read aloud. The pitch stays the same. */
+  speed: SpeechSpeed;
 }
 
-export const DEFAULT_SPEECH_SETTINGS: SpeechSettings = { readReplies: false, voice: "F1" };
+export const DEFAULT_SPEECH_SETTINGS: SpeechSettings = { readReplies: false, voice: "F1", speed: 1 };
 
 export interface SpeechModelStatus extends Omit<VoiceModelStatus, "modelId"> {
   modelId: SpeechModelId;
@@ -342,6 +348,10 @@ export interface SpeechAudio {
 
 export function isSpeechVoice(value: unknown): value is SpeechVoice {
   return isOneOf(SPEECH_VOICES, value);
+}
+
+export function isSpeechSpeed(value: unknown): value is SpeechSpeed {
+  return isOneOf(SPEECH_SPEEDS, value);
 }
 
 export function isSpeechLanguage(value: unknown): value is SpeechLanguage {

@@ -19,6 +19,7 @@ import type { HostReleaseService } from "../host-release-service";
 import type { HostService } from "../host-service";
 import type { MachineAlertMonitor } from "../machine-alerts";
 import type { MemoryReviewPreferenceStore } from "../memory-review-preference-store";
+import type { ModelVisibility } from "../model-visibility";
 import type { PreferenceFileFailure } from "../preference-file";
 import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preference-store";
 import type { ProviderCredentialStore } from "../provider-credential-store";
@@ -149,6 +150,7 @@ type TeamApiAgentMethods = Pick<
   | "listQueue"
   | "acknowledgeFailedTurn"
   | "setMessageReaction"
+  | "deleteConversationMessage"
   | "cancelQueuedMessage"
   | "steerQueuedMessage"
   | "updateQueuedMessage"
@@ -185,7 +187,10 @@ export type TeamApiMcpSignIns = Pick<
   "start" | "status" | "cancel" | "signOut" | "list" | "app" | "saveApp" | "removeApp"
 >;
 
-/** `connectors-v1`: the GitHub connection and the messaging connections of this host. */
+/**
+ * `connectors-v1`: the GitHub connection and the messaging connections of this host. The WhatsApp
+ * methods serve `whatsapp-connector-v1`.
+ */
 export interface TeamApiConnectors {
   github: Pick<GitHubConnectorService, "status" | "pages" | "connect" | "cancel" | "disconnect" | "repositories">;
   messaging: Pick<
@@ -208,6 +213,17 @@ export interface TeamApiConnectors {
     | "discordAccess"
     | "listDiscordRoles"
     | "setDiscordAccess"
+    | "whatsappOverview"
+    | "whatsappLinkState"
+    | "startWhatsAppLink"
+    | "cancelWhatsAppLink"
+    | "disconnectWhatsAppNumber"
+    | "addWhatsAppOrchestrator"
+    | "listWhatsAppGroups"
+    | "addWhatsAppSender"
+    | "removeWhatsAppSender"
+    | "answerWhatsAppRequest"
+    | "setWhatsAppOwnNumber"
   >;
 }
 
@@ -376,6 +392,19 @@ export interface ProviderDefaultSetting {
   model: AgentModelId | null;
 }
 
+/** A server on this computer, as `local-servers-v1` sends it. */
+interface TeamApiLocalServer {
+  serverId: string;
+  name: string;
+  /** Registered for the owner's account, so the owner's devices list it. */
+  published: boolean;
+}
+
+interface TeamApiLocalServerList {
+  servers: TeamApiLocalServer[];
+  limit: number;
+}
+
 /**
  * The admin routes, one member per optional capability. A member's presence is what
  * `#protocolSupport` advertises its capability on; every route behind it requires an owner or admin.
@@ -429,12 +458,24 @@ export interface TeamApiAdmin {
   timezone?: Pick<ServerTimezonePreferenceStore, "get" | "set">;
   /** `host-key-rotation-v1`: the owner changes this host's key. Resolves with the new public key. */
   hostKey?: { rotate(): Effect.Effect<{ publicKey: string }, RemoteWorkflowError> };
+  /**
+   * `local-servers-v1`: the servers that the desktop app runs on this computer. Only the desktop app's
+   * own server has it, not a server on this computer, a hosted server or a server mode host.
+   */
+  localServers?: {
+    list(): Effect.Effect<TeamApiLocalServerList, RemoteWorkflowError>;
+    create(name: string): Effect.Effect<TeamApiLocalServer, RemoteWorkflowError>;
+    /** Moves the server's data to the Trash and removes it from the account. */
+    delete(serverId: string): Effect.Effect<void, RemoteWorkflowError>;
+  };
   /** `agent-memory-limit-v1`: how many memories each agent of this computer can keep. */
   memoryLimit?: AgentMemoryLimitSetting;
   /** `memory-review-v1`: how often this computer's agents review their memories in the background. */
   memoryReview?: MemoryReviewPreferenceStore;
   /** `prompt-cache-ttl-v1`: how long the provider keeps the prompt cache of this computer's agents. */
   promptCacheTtl?: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
+  /** `model-visibility-v1`: which models the model picker of this computer shows, for each provider. */
+  modelVisibility?: Pick<ModelVisibility, "settings" | "set" | "picker" | "listings">;
   /** `provider-default-v1`: the provider and model that a new agent of this computer starts on. */
   defaultProvider?: TeamApiDefaultProvider;
   /** `routine-results-v1`: the place where an agent routine sends its answers. */

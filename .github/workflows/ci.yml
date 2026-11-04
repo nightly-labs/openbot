@@ -350,6 +350,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:push-notification-away
 
+      - name: Run the computer activity phone notification E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:computer-activity
+
       - name: Run the notification summary E2E test
         if: ${{ !cancelled() }}
         run: bun run test:notification-summary
@@ -446,6 +450,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:agent-channel-manage
 
+      - name: Run the agent channel creation E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:agent-channel-create
+
       - name: Run the agent profile accounts E2E test
         if: ${{ !cancelled() }}
         run: bun run test:agent-profile-accounts
@@ -518,6 +526,18 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:workflow-discord
 
+      - name: Run the workflow Telegram E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-telegram
+
+      - name: Run the workflow Slack E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-slack
+
+      - name: Run the Discord files to GitHub E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:discord-github-files
+
       - name: Run the OpenCode usage metering E2E test
         if: ${{ !cancelled() }}
         run: bun run test:opencode-usage-metering
@@ -555,6 +575,7 @@ jobs:
             .openbot-build/server-mute-e2e/
             .openbot-build/desktop-notifications-e2e/
             .openbot-build/push-notification-away-e2e/
+            .openbot-build/computer-activity-e2e/
             .openbot-build/notification-summary-e2e/
             .openbot-build/routine-pause-resume-e2e/
             .openbot-build/routine-timezone-move-e2e/
@@ -578,6 +599,7 @@ jobs:
             .openbot-build/routine-report-failure-e2e/
             .openbot-build/agent-webhook-routine-e2e/
             .openbot-build/agent-channel-manage-e2e/
+            .openbot-build/agent-channel-create-e2e/
             .openbot-build/agent-profile-accounts-e2e/
             .openbot-build/browser-profile-agents-e2e/
             .openbot-build/claude-usage-resume-e2e/
@@ -595,6 +617,9 @@ jobs:
             .openbot-build/antigravity-usage-metering-e2e/
             .openbot-build/workflow-model-steps-e2e/
             .openbot-build/workflow-discord-e2e/
+            .openbot-build/workflow-telegram-e2e/
+            .openbot-build/workflow-slack-e2e/
+            .openbot-build/discord-github-files-e2e/
             .openbot-build/opencode-usage-metering-e2e/
             .openbot-build/claude-api-key-e2e/
             .openbot-build/cursor-usage-e2e/
@@ -640,6 +665,10 @@ jobs:
       - name: Run the Antigravity MCP load failure E2E test
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-mcp-load-failure
+
+      - name: Run the Antigravity expired token E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:antigravity-expired-token
 
       - name: Run the Antigravity tool filter E2E test
         if: ${{ !cancelled() }}
@@ -732,6 +761,7 @@ jobs:
             .openbot-build/codex-login-path-e2e/
             .openbot-build/antigravity-login-path-e2e/
             .openbot-build/antigravity-mcp-load-failure-e2e/
+            .openbot-build/antigravity-expired-token-e2e/
             .openbot-build/antigravity-tool-filter-e2e/
             .openbot-build/acp-additional-directories-e2e/
             .openbot-build/acp-flavor-e2e/
@@ -1008,6 +1038,7 @@ jobs:
           APNS_PRIVATE_KEY: ${{ secrets.APNS_PRIVATE_KEY }}
           APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
           FCM_SERVICE_ACCOUNT: ${{ secrets.FCM_SERVICE_ACCOUNT }}
+          COMPANY_SIGN_IN_SECRET: ${{ secrets.COMPANY_SIGN_IN_SECRET }}
         run: |
           secrets_path="$RUNNER_TEMP/openbot-worker-secrets.json"
           umask 077
@@ -1053,6 +1084,14 @@ jobs:
             }
             const githubAppKey = process.env.OPENBOT_GITHUB_APP_PRIVATE_KEY?.trim();
             if (githubAppKey) optional.GITHUB_APP_PRIVATE_KEY = githubAppKey;
+            // Company sign-in stays off until it is set. It encrypts the stored client secrets, so it never changes.
+            const companySignInSecret = process.env.COMPANY_SIGN_IN_SECRET?.trim();
+            if (companySignInSecret) {
+              if (new TextEncoder().encode(companySignInSecret).byteLength < 32) {
+                throw new Error("COMPANY_SIGN_IN_SECRET must have at least 32 bytes.");
+              }
+              optional.COMPANY_SIGN_IN_SECRET = companySignInSecret;
+            }
             // The Android notification relay stays off until the Firebase service account key is set.
             const fcmServiceAccount = process.env.FCM_SERVICE_ACCOUNT?.trim();
             if (fcmServiceAccount) {
@@ -1099,6 +1138,14 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_SITE_ROUTER_DEPLOY_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: ../../node_modules/.bin/wrangler deploy --config wrangler.jsonc --keep-vars
+
+      # The production Worker sends email through this Worker, so it must exist first.
+      - name: Deploy email relay Worker
+        working-directory: apps/auth-api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PRODUCTION_DEPLOY_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: ../../node_modules/.bin/wrangler deploy --config wrangler.email-relay.jsonc
 
       - name: Deploy production Worker
         working-directory: apps/auth-api

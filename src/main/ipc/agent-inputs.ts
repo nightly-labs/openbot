@@ -17,7 +17,9 @@ import {
   type CreateRoutineInput,
   type DeleteAgentMemoryInput,
   type DeleteChannelMemoryInput,
+  type DeleteChannelMessageInput,
   type DeleteChannelRoutineInput,
+  type DeleteConversationMessageInput,
   type DeleteRoutineInput,
   type DownloadAttachmentsInput,
   type EditQueuedMessageInput,
@@ -29,6 +31,7 @@ import {
   isAgentModel,
   isAgentProvider,
   isAgentTaskLimit,
+  isAvatarColor,
   isAvatarHue,
   isAvatarSeed,
   isBusyMessageMode,
@@ -66,6 +69,7 @@ import {
   type SendMessageInput,
   type SetAgentAvatarInput,
   type SetAgentMemoryInclusionInput,
+  type SetChannelImageInput,
   type SetMessageReactionInput,
   type SidebarLayoutAction,
   type StartAgentTaskInput,
@@ -222,11 +226,16 @@ export function parseCreateAgent(value: unknown): CreateAgentInput {
   const avatarHue = value.avatarHue;
   if (!isAvatarSeed(value.avatarSeed)) throw new Error("Invalid avatar seed.");
   if (avatarHue !== null && !isAvatarHue(avatarHue)) throw new Error("Invalid avatar hue.");
+  const avatarColor = value.avatarColor;
+  if (avatarColor !== undefined && avatarColor !== null && !isAvatarColor(avatarColor)) {
+    throw new Error("Invalid avatar color.");
+  }
   const result: CreateAgentInput = {
     name: requireString(value.name, "name", INPUT_LIMITS.agentName),
     description: requireString(value.description, "description", INPUT_LIMITS.agentDescription),
     avatarSeed: value.avatarSeed,
     avatarHue,
+    ...(avatarColor === undefined ? {} : { avatarColor }),
     initialMessage: requireString(value.initialMessage, "initialMessage", INPUT_LIMITS.messageText),
   };
   if (value.provider !== undefined) {
@@ -655,6 +664,23 @@ export function parseMarkConversationUnread(value: unknown): MarkConversationUnr
   };
 }
 
+export function parseDeleteConversationMessage(value: unknown): DeleteConversationMessageInput {
+  if (!isObject(value)) throw new Error("Invalid message delete request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
+    ...(value.taskId === undefined ? {} : { taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier) }),
+  };
+}
+
+export function parseDeleteChannelMessage(value: unknown): DeleteChannelMessageInput {
+  if (!isObject(value)) throw new Error("Invalid message delete request.");
+  return {
+    channelId: requireString(value.channelId, "channelId", INPUT_LIMITS.identifier),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
+  };
+}
+
 export function parseUpdateAgent(value: unknown): UpdateAgentInput {
   if (!isObject(value)) throw new Error("Invalid agent update request.");
   if (value.role !== undefined) throw new Error("Invalid role.");
@@ -759,6 +785,10 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
     }
     result.avatarHue = value.avatarHue;
   }
+  if (value.avatarColor !== undefined) {
+    if (value.avatarColor !== null && !isAvatarColor(value.avatarColor)) throw new Error("Invalid avatar color.");
+    result.avatarColor = value.avatarColor;
+  }
   return result;
 }
 
@@ -766,6 +796,14 @@ export function parseSetAgentAvatar(value: unknown): SetAgentAvatarInput {
   if (!isObject(value)) throw new Error("Invalid agent avatar request.");
   return {
     agentId: requireString(value.agentId, "agentId"),
+    image: parseAvatarImage(value.image),
+  };
+}
+
+export function parseSetChannelImage(value: unknown): SetChannelImageInput {
+  if (!isObject(value)) throw new Error("Invalid channel image request.");
+  return {
+    channelId: requireString(value.channelId, "channelId"),
     image: parseAvatarImage(value.image),
   };
 }
@@ -793,7 +831,13 @@ export function parseImportAttachments(value: unknown): ImportAttachmentsInput {
     }
     return { name: item.name, mimeType: item.mimeType, bytes: item.bytes };
   });
-  return { paths: value.paths, data };
+  return {
+    paths: value.paths,
+    data,
+    ...(value.requestId === undefined
+      ? {}
+      : { requestId: requireString(value.requestId, "requestId", INPUT_LIMITS.identifier) }),
+  };
 }
 
 /** A renderer can provide file bytes, but it cannot ask main to read a disk path. */
@@ -834,9 +878,13 @@ export function parseOpenAttachment(value: unknown): OpenAttachmentInput {
   if (!isObject(value) || (value.action !== "open" && value.action !== "reveal" && value.action !== "download")) {
     throw new Error("Invalid attachment action.");
   }
+  if (value.size !== undefined && (!Number.isSafeInteger(value.size) || Number(value.size) < 0)) {
+    throw new Error("Invalid attachment size.");
+  }
   return {
     attachmentId: requireString(value.attachmentId, "attachmentId"),
     action: value.action,
+    ...(isNumber(value.size) ? { size: value.size } : {}),
   };
 }
 

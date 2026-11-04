@@ -110,6 +110,12 @@
   overflow: hidden;
 }
 
+/* The personal strip is the first block of the hero, so it has the space under it, not above it. */
+.pricing-page .pricing-personal {
+  margin-top: 0;
+  margin-bottom: clamp(32px, 4vw, 48px);
+}
+
 /* The soft band across the face of the strip. */
 .pricing-page .pricing-enterprise::after {
   position: absolute;

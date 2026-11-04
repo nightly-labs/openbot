@@ -1,6 +1,6 @@
 /*
- * Where the reader is in a long chat, on the right edge of the transcript. The public site's reading
- * progress draws the same rail for its articles.
+ * Where the reader is in a long chat, on the end edge of the transcript (right in LTR, left in RTL).
+ * The public site's reading progress draws the same rail for its articles.
  *
  * One segment per message the reader wrote, as long as the message and the replies under it. The
  * part the reader has passed fills in a muted neutral, and the segment they are in glows at the point
@@ -31,7 +31,7 @@
 .chat-scroll-rail-nav {
   position: absolute;
   top: 50%;
-  right: calc(-1 * var(--chat-scroll-rail-inset, 0px));
+  inset-inline-end: calc(-1 * var(--chat-scroll-rail-inset, 0px));
   width: min(260px, 70%);
   height: min(64%, 600px);
   display: flex;
@@ -47,11 +47,12 @@
 
 /* A scrim in the transcript colour that blurs the messages under the titles, with no edge of its own.
    It darkens and blurs only where the titles are, so they stay legible over a wide message. Both
-   masks fade it out: at the top and bottom, and on the left before the titles start. The blur is set
+   masks fade it out: at the top and bottom, and at the start before the titles. The blur is set
    only while the rail is open, so a scroll does not filter the transcript under a hidden scrim. */
 .chat-scroll-rail-surface {
   position: absolute;
-  inset: calc(-1 * var(--openbot-space-8)) 0 calc(-1 * var(--openbot-space-8)) calc(-2 * var(--openbot-space-8));
+  inset-block: calc(-1 * var(--openbot-space-8));
+  inset-inline: calc(-2 * var(--openbot-space-8)) 0;
   background: color-mix(in srgb, var(--openbot-bg-canvas) 80%, transparent);
   mask-image:
     linear-gradient(
@@ -65,6 +66,20 @@
   mask-composite: intersect;
   opacity: 0;
   transition: opacity var(--openbot-duration-slow) ease;
+}
+
+/* In RTL the rail is on the left edge: the scrim fades out on the right, and the titles come in from
+   the left. */
+:dir(rtl) .chat-scroll-rail-surface {
+  mask-image:
+    linear-gradient(
+      to bottom,
+      transparent,
+      var(--openbot-text-primary) var(--openbot-space-8),
+      var(--openbot-text-primary) calc(100% - var(--openbot-space-8)),
+      transparent
+    ),
+    linear-gradient(to left, transparent, var(--openbot-text-primary) calc(2 * var(--openbot-space-8)));
 }
 
 .chat-scroll-rail-eyebrow {
@@ -91,6 +106,9 @@
 
   color: var(--chat-scroll-rail-accent);
   font-variant-numeric: tabular-nums;
+  /* "03 / 12" keeps the position first in a right-to-left page. */
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 /* Each section keeps room for its title. A chat with more sections than the rail holds scrolls the
@@ -128,7 +146,8 @@
   align-items: stretch;
   justify-content: flex-end;
   gap: var(--openbot-space-3);
-  padding: 0 0 0 var(--openbot-space-4);
+  padding-block: 0;
+  padding-inline: var(--openbot-space-4) 0;
   /* The button's border would move the bars out of the side padding. */
   border: 0;
   border-radius: 0;
@@ -156,7 +175,7 @@
   margin-top: -3px;
   font-size: var(--openbot-text-sm);
   line-height: 18px;
-  text-align: right;
+  text-align: end;
   text-overflow: ellipsis;
   white-space: nowrap;
   opacity: 0;
@@ -167,6 +186,10 @@
     opacity var(--openbot-duration-slow) ease,
     filter var(--openbot-duration-slow) ease,
     transform var(--chat-scroll-rail-quick) var(--chat-scroll-rail-ease);
+}
+
+:dir(rtl) .chat-scroll-rail-label {
+  transform: translateX(calc(-1 * var(--openbot-space-2)));
 }
 
 .chat-scroll-rail-link:focus-visible .chat-scroll-rail-label {
@@ -194,13 +217,13 @@
   content: "";
   position: absolute;
   top: 0;
-  right: 5px;
+  inset-inline-end: 5px;
   bottom: var(--openbot-space-1);
   width: 2px;
   border-radius: var(--openbot-radius-pill);
   transition:
     width var(--chat-scroll-rail-quick) var(--chat-scroll-rail-ease),
-    right var(--chat-scroll-rail-quick) var(--chat-scroll-rail-ease),
+    inset-inline-end var(--chat-scroll-rail-quick) var(--chat-scroll-rail-ease),
     background-color var(--chat-scroll-rail-quick) ease;
 }
 
@@ -216,7 +239,7 @@
 
 .chat-scroll-rail-item[data-state="active"] .chat-scroll-rail-bar::before,
 .chat-scroll-rail-item[data-state="active"] .chat-scroll-rail-fill {
-  right: 4.5px;
+  inset-inline-end: 4.5px;
   width: 3px;
 }
 
@@ -229,7 +252,7 @@
 .chat-scroll-rail-head {
   position: absolute;
   top: 0;
-  right: 3px;
+  inset-inline-end: 3px;
   width: 6px;
   height: 6px;
   border-radius: var(--openbot-radius-pill);

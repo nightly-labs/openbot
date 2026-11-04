@@ -1,5 +1,6 @@
-import { createMemo, For, untrack } from "solid-js";
+import { createMemo, untrack } from "solid-js";
 import { createDigitRoll } from "./digit-roll";
+import { DigitRuns } from "./digit-runs";
 import { prefersReducedMotion } from "./utils";
 
 /**
@@ -29,16 +30,17 @@ export function RollingPrice(props: { value: number; format: (value: number) => 
       <span class="sr-only">{props.format(props.value)}</span>
       <span ref={roll.ref} class="t-digit-group" style={{ "--digit-dir-y": direction() }} aria-hidden="true">
         {/* Only the digits roll. The currency sign stays still. */}
-        <For each={characters()} keyed={false}>
-          {(character, index) => (
+        <DigitRuns
+          text={characters().join("")}
+          digit={(character, index) => (
             <span
               class={isDigit(character()) ? "t-digit" : undefined}
-              data-stagger={isDigit(character()) ? stagger(index) : undefined}
+              data-stagger={isDigit(character()) ? stagger(index()) : undefined}
             >
               {character()}
             </span>
           )}
-        </For>
+        />
       </span>
     </span>
   );

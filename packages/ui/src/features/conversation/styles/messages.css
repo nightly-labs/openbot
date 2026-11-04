@@ -384,7 +384,7 @@
 }
 
 .message-reaction-anchor .ui-bubble-reaction-overflow {
-  padding-right: 6px;
+  padding-inline-end: 6px;
 }
 
 .message-reaction-pill:hover {
@@ -410,8 +410,9 @@
   animation: message-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 
+/* The line's padding, the 32px face, and its lower padding. */
 .agent-activity-slot[data-reserved="true"] {
-  min-height: 44px;
+  min-height: 52px;
 }
 
 .agent-activity-entry {
@@ -439,7 +440,10 @@
   gap: 8px;
   overflow: clip;
   overflow-clip-margin: var(--openbot-space-3);
-  padding: 4px 0 8px 8px;
+  /* The working face's felt dots reach about 10px above it. The top padding keeps them in this line,
+     so they do not cover the message above. */
+  padding-block: var(--openbot-space-3) 8px;
+  padding-inline: 8px 0;
   opacity: 1;
   filter: blur(0);
   transform: translateY(0);
@@ -585,6 +589,12 @@
   color: var(--openbot-text-muted);
 }
 
+/* The link to the routine's own thread, where the run's answer and work are. */
+.ui-button.chat-action-routine-thread {
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted);
+}
+
 .chat-action-history-toggle svg {
   transition: transform var(--chat-action-history-close) var(--openbot-ease-out);
 }
@@ -693,7 +703,7 @@
   padding: var(--openbot-space-1-5) var(--openbot-space-2);
   border-inline-start: 1px solid var(--openbot-border-grouped);
   list-style: none;
-  text-align: left;
+  text-align: start;
 }
 
 .chat-action-history-entry {
@@ -802,7 +812,7 @@
   font: inherit;
   line-height: inherit;
   outline: none;
-  text-align: left;
+  text-align: start;
   white-space: nowrap;
   transition:
     background-color var(--openbot-duration-hover) var(--openbot-ease-out),
@@ -936,7 +946,7 @@ button.chat-action-target:active,
 }
 
 .chat-action-avatar-stack .chat-action-agent-avatar + .chat-action-agent-avatar {
-  margin-left: -6px;
+  margin-inline-start: -6px;
 }
 
 /* An open group lists each message as its own marker, centred like the row that holds them. */
@@ -1031,8 +1041,19 @@ button.chat-action-target:active,
   letter-spacing: -0.15px;
 }
 
+/*
+ * Bubbles grow with the chat column, between a minimum and a maximum, so a big screen shows more of a
+ * reply and a narrow pane is not wasted. A percentage refers to the message row. An agent reply, code,
+ * and a table use the wide width; a person's message uses the narrow width, and leaves a gap at the
+ * other side on a narrow pane.
+ */
+:root {
+  --message-wide-bubble-width: min(100%, max(720px, 70%), 1200px);
+  --message-narrow-bubble-width: min(92%, max(420px, 50%), 800px);
+}
+
 .message-entry-agent .ui-bubble {
-  max-width: min(720px, 100%);
+  max-width: var(--message-wide-bubble-width);
 }
 
 .message-entry-agent .ui-bubble:has(.choice-card) {
@@ -1186,7 +1207,7 @@ button.chat-action-target:active,
   position: absolute;
   z-index: 1;
   top: 8px;
-  right: 8px;
+  inset-inline-end: 8px;
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-surface);
   padding: 2px 7px;
@@ -1202,7 +1223,7 @@ button.chat-action-target:active,
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
-  text-align: left;
+  text-align: start;
 }
 
 .image-generation-label {
@@ -1282,7 +1303,7 @@ button.chat-action-target:active,
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  right: 10px;
+  inset-inline-end: 10px;
   bottom: 10px;
   border: 1px solid var(--openbot-border-strong);
   border-radius: var(--openbot-radius-pill);

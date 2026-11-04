@@ -37,8 +37,7 @@ export const messages = {
   "settings.keepRunning.title": "Mantieni OpenBot attivo in background",
   "settings.keepRunning.description": "Le attività in corso continuano anche dopo aver chiuso la finestra.",
   "settings.menuBar.title": "Mostra OpenBot nella barra dei menu",
-  "settings.menuBar.description":
-    "Nasconde l’icona nel Dock dopo la chiusura della finestra. Le attività in corso continuano.",
+  "settings.menuBar.description": "Apri o chiudi OpenBot da un’icona nella barra dei menu.",
   "settings.keepAwake.title": "Mantieni attivo il computer",
   "settings.keepAwake.description":
     "Le routine partono in orario finché il computer è collegato alla corrente. Lo schermo può comunque spegnersi.",
@@ -70,6 +69,23 @@ export const messages = {
   "settings.busyMessage.title": "Indirizza gli agenti mentre lavorano",
   "settings.busyMessage.description":
     "I nuovi messaggi si uniscono al lavoro in corso dell'agente, non alla coda. Funziona con ChatGPT e Claude.",
+  "settings.agentDefaults.title": "Predefiniti",
+  "settings.agentDefaults.description":
+    "Gli agenti seguono queste impostazioni, a meno che tu non le cambi per un agente.",
+  "settings.agentDefaults.value": "Predefinito: {value}",
+  "settings.agentDefaults.on": "Attivato",
+  "settings.agentDefaults.off": "Disattivato",
+  "settings.agentDefaults.followDefault": "Predefinito ({value})",
+  "settings.agentDefaults.count": "Attivo per {on} su {total}",
+  "settings.agentDefaults.open": "Apri {name}",
+  "settings.agentDefaults.agentList": "Attivo per {names}",
+  "settings.agentDefaults.defaultTitle": "Predefinito",
+  "settings.agentDefaults.defaultDescription": "I nuovi agenti lo usano. Gli agenti su Predefinito lo seguono.",
+  "settings.agentDefaults.agents": "Agenti",
+  "settings.agentDefaults.setAll": "Imposta tutti",
+  "settings.agentDefaults.setAllLabel": "Imposta {setting} per tutti gli agenti",
+  "settings.agentDefaults.agentLabel": "{setting} per {agent}",
+  "settings.agentDefaults.loadFailed": "Impossibile leggere gli agenti.",
   "settings.backgroundProcesses.title": "Processi in background",
   "settings.backgroundProcesses.description":
     "Programmi che gli agenti hanno avviato e lasciato in esecuzione, come i server di sviluppo. Restano attivi dopo la fine della chat e dopo la chiusura di OpenBot.",
@@ -154,6 +170,9 @@ export const messages = {
     "Attivo: i metadati di utilizzo e affidabilità vanno alle analisi self-hosted di OpenBot con l'ID del tuo account e l'email. Disattivo: gli stessi metadati vanno solo con un ID di installazione casuale. Chat, file e prompt non vengono mai inviati. Questa impostazione vale per questo browser.",
   "settings.tab.general.title": "Generali",
   "settings.tab.general.description": "Controlla come si comporta OpenBot su questo computer.",
+  "settings.tab.agents.title": "Agenti",
+  "settings.tab.agents.description":
+    "Scegli cosa possono fare gli agenti su questo computer quando non lo imposti per un agente.",
   "settings.tab.notifications.title": "Notifiche",
   "settings.tab.notifications.description": "Scegli come OpenBot ti avvisa.",
   "settings.tab.voice.title": "Voce",
@@ -529,6 +548,7 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "Leggi le risposte ad alta voce",
   "settings.voice.speech.readReplies.description":
     "Quando detti un messaggio, la risposta viene letta ad alta voce. Detta di nuovo per fermarla.",
+  "settings.voice.speech.speed.title": "Velocità",
   "settings.voice.speech.voice.title": "Voce",
   "settings.voice.speech.voice.female": "Voce femminile {number}",
   "settings.voice.speech.voice.male": "Voce maschile {number}",

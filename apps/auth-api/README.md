@@ -165,6 +165,15 @@ make it an alias of the `EMAIL_SMTP_USERNAME` mailbox. An empty value uses `EMAI
 
 `bun run env:set:smtp` encrypts the app password into `.env.production` only.
 
+Production does not open the SMTP socket itself. From some Cloudflare locations, such as FSD, a
+socket to the mail host fails at once (#4578). The production Worker sends each email through the
+`openbot-email-relay` Worker (`wrangler.email-relay.jsonc`) over the `EMAIL_RELAY` service binding.
+Cloudflare places that Worker near the mail host. The relay has no route and keeps no secret: the
+binding request carries the SMTP settings and the message. CI and `bun run api:deploy` deploy the
+relay before the production Worker. When you change `EMAIL_SMTP_HOST` or `EMAIL_SMTP_PORT`, also
+change `placement.host` in `wrangler.email-relay.jsonc`. The test Worker and local `vite dev` send
+from their own socket. To see where the relay runs, read the `colo` of its Workers Logs events.
+
 For a deployed Worker, `bun run api:deploy` decrypts `.env.production`. It sends
 `EMAIL_SMTP_PASSWORD`, `SKILLS_ADMIN_TOKEN`, `REMOTE_TICKET_PRIVATE_JWK`,
 `REMOTE_TICKET_PUBLIC_JWKS`, `REMOTE_AUTH_WEBHOOK_SECRET`, and `SITE_REPORT_HASH_SECRET` to
@@ -188,6 +197,12 @@ variables. The SMTP connection uses TLS from the start and accepts only port 465
 GitHub Actions reads the remote-control secrets, `SKILLS_ADMIN_TOKEN`, `SITE_REPORT_HASH_SECRET`, and the optional
 `SITE_OPERATIONS_ADMIN_TOKEN` and `SERVER_CLAIMS_ADMIN_TOKEN` from the `cloudflare-production` Environment. It includes
 them in Wrangler's temporary runtime secrets file.
+
+`COMPANY_SIGN_IN_SECRET` (at least 32 random bytes) turns on company sign-in (OpenID Connect and
+SCIM). It encrypts each company's client secret in D1, so never change or lose it: with another
+value, each company must enter its client secret again. Without it, company sign-in answers 503 and
+everyone signs in with an email code. GitHub Actions reads it from the `cloudflare-production`
+Environment; a local deployment reads it from the encrypted `.env.production`.
 
 `SERVER_CLAIMS_ADMIN_TOKEN` lets an operator sign a new server in for a user without an email code: see
 [server claims](../../docs/self-hosted-server.md#sign-in-with-a-server-claim). Without it, the endpoint answers 401.

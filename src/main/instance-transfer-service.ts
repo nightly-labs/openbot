@@ -40,6 +40,7 @@ import {
   type InstanceTransferResult,
   type InstanceTransferSummary,
   isAgentImportKey,
+  isAvatarColor,
   isCustomProviderContextWindow,
   isCustomProviderHarness,
   isCustomProviderMaxOutput,
@@ -326,6 +327,7 @@ export class InstanceTransferService {
         description: agent.description,
         avatarSeed: agent.avatarSeed,
         avatarHue: agent.avatarHue,
+        ...(agent.avatarColor ? { avatarColor: agent.avatarColor } : {}),
         avatar,
         provider: agent.provider,
         model: agent.model,
@@ -849,6 +851,7 @@ export class InstanceTransferService {
           description: source.description,
           avatarSeed: AVATAR_SEED_PATTERN.test(source.avatarSeed) ? source.avatarSeed : `${source.key}-${randomUUID()}`,
           avatarHue: source.avatarHue,
+          ...(isAvatarColor(source.avatarColor) ? { avatarColor: source.avatarColor } : {}),
           ...(useModel
             ? { provider: source.provider, model: source.model, reasoningEffort: source.reasoningEffort }
             : {}),

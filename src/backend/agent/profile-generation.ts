@@ -8,6 +8,7 @@ import {
   type SidebarSection,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect, Fiber, Result, Schema } from "effect";
 import type { AgentClient } from "../agent-client";
 import { causeHelpers } from "../effect-boundary";
@@ -22,6 +23,8 @@ import {
 import { extractJsonObject, StructuredOutputError } from "../structured-output";
 import { isBalanceDiagnostic, isPlanLimitDiagnostic } from "./provider-diagnostics";
 import { USAGE_LIMIT_METHOD } from "./usage-limit-gate";
+
+const logger = createOpenBotLogger("profile-generation");
 
 const GENERATION_TIMEOUT_MS = 120_000;
 
@@ -103,9 +106,10 @@ export const generateTextWithoutTools = Effect.fn("Agent.generateTextWithoutTool
       Effect.gen(function* () {
         const stopped = yield* Effect.result(stopToolless(client));
         const removed = yield* Effect.result(removeToollessDirectory(cwd));
-        // The original finally block reported removal failure first, then stop failure.
-        if (Result.isFailure(removed)) cleanupFailure = removed.failure;
-        else if (Result.isFailure(stopped)) cleanupFailure = stopped.failure;
+        // A folder that Windows still holds is left behind: it does not fail a generation (#4829).
+        if (Result.isFailure(removed))
+          logger.warn("A temporary generation folder was not removed.", toLogValue(removed.failure.cause));
+        if (Result.isFailure(stopped)) cleanupFailure = stopped.failure;
       }),
   );
   if (cleanupFailure) return yield* Effect.fail(cleanupFailure);
@@ -116,8 +120,12 @@ export const generateTextWithoutTools = Effect.fn("Agent.generateTextWithoutTool
 /** A temporary directory for a client without tools to run in. */
 export const makeToollessDirectory = () => profileIo(() => mkdtemp(join(tmpdir(), "openbot-profile-")));
 
-/** Removes a directory that `makeToollessDirectory` made. */
-export const removeToollessDirectory = (cwd: string) => profileIo(() => rm(cwd, { recursive: true, force: true }));
+/**
+ * Removes a directory that `makeToollessDirectory` made. Windows answers `EBUSY` for a moment after
+ * the provider process ends, so Node tries again for about 3 seconds.
+ */
+export const removeToollessDirectory = (cwd: string) =>
+  profileIo(() => rm(cwd, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }));
 
 /** Starts the process of a client without tools and greets it. */
 export const startToolless = Effect.fnUntraced(function* (client: AgentClient) {
@@ -277,7 +285,13 @@ const profileCompletion = Effect.fnUntraced(function* (
   observe?: GenerationObserver,
 ) {
   return yield* Effect.callback<string, ProfileGenerationFailed | GenerationUsageLimitError>((resume) => {
-    let text = "";
+    // The streamed text of each answer item. Reasoning comes in commentary message items: their
+    // phase shows on `item/started` (ACP and Claude thoughts), or only on `item/completed` (an ACP
+    // answer that a thought ended, Pi narration). It is not the answer, and it must not count
+    // against the size limit (#4558).
+    const answers = new Map<string, string>();
+    const commentary = new Set<string>();
+    const answer = () => [...answers.values()].join("");
     let limit: { resetsAt: number | null } | null = null;
     const finish = (effect: Effect.Effect<string, ProfileGenerationFailed | GenerationUsageLimitError>) => {
       cleanup();
@@ -309,15 +323,32 @@ const profileCompletion = Effect.fnUntraced(function* (
         )
           limit ??= { resetsAt: null };
       }
-      if (notification.method === "item/agentMessage/delta") text += getString(notification.params, "delta") ?? "";
+      if (notification.method === "item/started") {
+        const item = getRecord(params, "item");
+        const id = getString(item, "id");
+        if (id && getString(item, "phase") === "commentary") commentary.add(id);
+      }
+      if (notification.method === "item/agentMessage/delta") {
+        const id = getString(params, "itemId") ?? "";
+        if (!commentary.has(id)) answers.set(id, (answers.get(id) ?? "") + (getString(params, "delta") ?? ""));
+      }
       if (notification.method === "item/completed") {
-        const item = getRecord(notification.params, "item");
-        if (getString(item, "type") === "agentMessage") text = getString(item, "text") ?? text;
+        const item = getRecord(params, "item");
+        const id = getString(item, "id") ?? "";
+        if (getString(item, "type") === "agentMessage" && getString(item, "phase") === "commentary") {
+          commentary.add(id);
+          answers.delete(id);
+        } else if (getString(item, "type") === "agentMessage") {
+          // A completed answer replaces the text streamed before it.
+          const text = getString(item, "text") ?? answer();
+          answers.clear();
+          answers.set(id, text);
+        }
       }
       if (notification.method === "turn/completed") {
         const turn = getRecord(notification.params, "turn");
         provider.last = getString(getRecord(turn, "error"), "message") ?? provider.last;
-        if (getString(turn, "status") === "completed") finish(Effect.succeed(text));
+        if (getString(turn, "status") === "completed") finish(Effect.succeed(answer()));
         else if (limit)
           finish(
             Effect.fail(
@@ -329,7 +360,7 @@ const profileCompletion = Effect.fnUntraced(function* (
           );
         else reject(sourceText("error.agent.profileFailed"));
       }
-      if (text.length > 32_000) reject(sourceText("error.agent.profileTooLarge"));
+      if (answer().length > 32_000) reject(sourceText("error.agent.profileTooLarge"));
     };
     const cleanup = () => {
       client.off("exit", exit);

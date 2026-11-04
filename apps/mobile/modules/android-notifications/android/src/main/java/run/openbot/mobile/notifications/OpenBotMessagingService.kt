@@ -77,7 +77,7 @@ class OpenBotMessagingService : ExpoFirebaseMessagingService() {
     /** The channel of each sound, which the app creates (`android-notification-channels.ts`). */
     private fun channelId(sound: String?): String = when {
       sound == null -> "openbot.sound.none"
-      SOUND_RESOURCES.containsKey(sound) -> "openbot.sound.$sound"
+      SOUND_RESOURCES.containsKey(sound) -> "openbot.sound.$sound.v2"
       else -> "openbot.sound.default"
     }
   }

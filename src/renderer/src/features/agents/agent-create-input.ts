@@ -3,7 +3,7 @@ import type { FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetu
 import { createAgentInitialMessage } from "./agent-initial-message";
 
 /** A new agent asked for from a short draft, such as the routine canvas's card. */
-export type NewAgentDraft = Pick<FirstAgentDraft, "name" | "purpose" | "avatarSeed" | "avatarHue"> &
+export type NewAgentDraft = Pick<FirstAgentDraft, "name" | "purpose" | "avatarSeed" | "avatarHue" | "avatarColor"> &
   Partial<Pick<FirstAgentDraft, "provider" | "model" | "reasoningEffort">>;
 
 /**
@@ -19,6 +19,7 @@ export function newAgentInput(draft: NewAgentDraft, createModelSupported: boolea
     description: draft.purpose.trim() || "General-purpose assistant",
     avatarSeed: draft.avatarSeed,
     avatarHue: draft.avatarHue,
+    avatarColor: draft.avatarColor ?? null,
     ...(createModelSupported && draft.provider && draft.model
       ? {
           provider: draft.provider,

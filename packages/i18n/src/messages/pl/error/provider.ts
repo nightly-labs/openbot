@@ -8,6 +8,8 @@ export const messages = {
     "Nie udało się zarejestrować Sterowania komputerem w konfiguracji Codex. Sprawdź, czy plik config.toml Codex jest poprawny i zapisywalny, a potem uruchom ponownie OpenBot. Aby kontynuować bez tej funkcji, wyłącz Sterowanie komputerem w ustawieniach członka zespołu.",
   "error.provider.codexUnresponsive": "Codex przestał odpowiadać, więc OpenBot zakończył jego proces.",
   "error.provider.acpUnresponsive": "{provider} nie odpowiedział na czas, więc OpenBot zakończył jego proces.",
+  "error.provider.acpSignInLost":
+    "{provider} utracił logowanie, więc OpenBot zakończył jego proces. Wyślij wiadomość ponownie.",
   "error.provider.acpMcpNotLoaded":
     "{provider} nie załadował narzędzi OpenBot, więc ten agent nie może ich używać ani kontaktować się z członkami zespołu. Zasady zespołu {provider} mogą blokować lokalne serwery MCP. Poproś administratora zespołu o ich dopuszczenie, a potem spróbuj ponownie.",
   "error.provider.endpointsReadOnly":
@@ -174,6 +176,7 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider} nie zwrócił uwierzytelnionego konta.",
   "error.provider.signInExpired": "Logowanie do {provider} wygasło. Zaloguj się ponownie, aby kontynuować.",
   "error.provider.cliActivateFailed": "Nie udało się aktywować zarządzanego CLI.",
+  "error.provider.noMainlandChinaSignIn": "{provider} nie ma logowania dla Chin kontynentalnych.",
   "error.provider.cliNewVersionNotStarted": "Nowa wersja się nie uruchomiła.",
   "error.provider.cliBusyReconnect": "{provider} CLI pracuje nad turą. Zaczekaj, aż skończy, a potem połącz ponownie.",
   "error.provider.cliBusySignOut": "CLI {provider} przetwarza turę. Poczekaj, aż skończy, a potem odłącz.",
@@ -260,6 +263,7 @@ export const messages = {
   "error.provider.kimiNotStarted": "Nie udało się uruchomić Kimi. Uruchom `kimi --version` w terminalu.",
   "error.provider.kimiVersionUnreadable": "Nie można odczytać wersji Kimi CLI.",
   "error.provider.kimiSignIn": "Zaloguj się przez Kimi Code, aby używać Kimi.",
+  "error.provider.devinSignIn": "Zaloguj się do Devin, aby z niego korzystać.",
   "error.provider.hermesMissing": "Hermes Agent nie jest zainstalowany. Zainstaluj go i spróbuj ponownie.",
   "error.provider.hermesNotStarted": "Nie udało się uruchomić Hermes Agent. Uruchom `hermes --version` w terminalu.",
   "error.provider.hermesVersionUnreadable": "Nie można odczytać wersji Hermes Agent.",

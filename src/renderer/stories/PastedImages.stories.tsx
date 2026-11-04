@@ -9,6 +9,7 @@ import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow
 import {
   ComposerAttachmentRow,
   type ComposerPendingImage,
+  type ComposerUploadFile,
 } from "@openbot/ui/features/conversation/ComposerAttachmentRow";
 import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
 import { createSignal } from "solid-js";
@@ -36,6 +37,29 @@ const brief: DraftAttachment = {
 };
 const pendingScreenshot: ComposerPendingImage = { id: "pending", name: "image.png", url: desktopScreenshot };
 
+const MB = 1024 * 1024;
+/** A file that a joined server has confirmed in part, one that has reported no bytes yet, and a failure. */
+const uploadingArchive: ComposerUploadFile = {
+  key: "archive",
+  uploadId: "archive",
+  name: "customer-interviews-transcripts-2026-10.zip",
+  size: 96.2 * MB,
+  sent: 39.4 * MB,
+  error: null,
+};
+const startingPhoto: ComposerUploadFile = {
+  key: "photo",
+  uploadId: "photo",
+  name: "warehouse-floor.jpg",
+  size: 4.1 * MB,
+  sent: null,
+  error: null,
+};
+const failedArchive: ComposerUploadFile = {
+  ...uploadingArchive,
+  error: "The connection to OpenBot team closed.",
+};
+
 /** The text with a file token, as a paste puts it at the cursor. */
 const named = (text: string, file: DraftAttachment) => `${text} ${serializeAttachmentReference(file.name, file.id)}`;
 
@@ -46,22 +70,32 @@ const named = (text: string, file: DraftAttachment) => `${text} ${serializeAttac
 function Composer(props: {
   attachments: DraftAttachment[];
   pending?: ComposerPendingImage[];
+  uploads?: ComposerUploadFile[];
   text: string;
   width: string;
 }) {
   const [attachments, setAttachments] = createSignal(props.attachments);
+  // Retry starts the file again with no bytes reported; remove drops it.
+  const [uploads, setUploads] = createSignal(props.uploads ?? []);
   const [value, setValue] = createSignal(props.text);
   const row = () => {
     const referenced = attachmentReferenceIds(value());
     return attachments().filter((file) => file.kind === "image" || !referenced.has(file.id));
   };
-  const hasRow = () => row().length > 0 || (props.pending?.length ?? 0) > 0;
+  const hasRow = () => row().length > 0 || (props.pending?.length ?? 0) > 0 || uploads().length > 0;
   return (
     <div class="composer-wrap" style={{ width: props.width, "max-width": "calc(100vw - 32px)" }}>
       <div class="composer" data-has-attachments={hasRow() ? "" : undefined}>
         <ComposerAttachmentRow
           attachments={row()}
           pending={props.pending}
+          uploads={uploads()}
+          onRemoveUpload={(uploadId) => setUploads((current) => current.filter((item) => item.uploadId !== uploadId))}
+          onRetryUpload={(uploadId) =>
+            setUploads((current) =>
+              current.map((item) => (item.uploadId === uploadId ? { ...item, sent: null, error: null } : item)),
+            )
+          }
           onRemove={(removed) => {
             setValue((current) => removeAttachmentReferences(current, removed.id));
             setAttachments((current) => current.filter((item) => item.id !== removed.id));
@@ -135,6 +169,19 @@ export const ComposerWhileImageAdds: Story = {
   render: () => (
     <Composer attachments={[pastedLogo]} pending={[pendingScreenshot]} text={named("Okay", pastedLogo)} width="640px" />
   ),
+};
+
+/**
+ * Files picked for a joined server show at once. The ring fills as the host confirms the bytes; a
+ * transport that reports none shows a spinner. Send waits until they land.
+ */
+export const ComposerWhileFilesUpload: Story = {
+  render: () => <Composer attachments={[brief]} uploads={[uploadingArchive, startingPhoto]} text="" width="760px" />,
+};
+
+/** A failed file keeps its chip, with the reason and Retry. Send waits until it is sent again or removed. */
+export const ComposerUploadFailed: Story = {
+  render: () => <Composer attachments={[brief]} uploads={[failedArchive, startingPhoto]} text="" width="760px" />,
 };
 
 export const ComposerNarrow: Story = {

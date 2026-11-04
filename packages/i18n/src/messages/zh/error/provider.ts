@@ -9,6 +9,7 @@ export const messages = {
     "OpenBot 无法在 Codex 配置中注册 Computer Use。请确认 Codex 的 config.toml 有效且可写，然后重启 OpenBot。你可以在助手设置中关闭 Computer Use 以便继续。",
   "error.provider.codexUnresponsive": "Codex 停止响应，OpenBot 已结束其进程。",
   "error.provider.acpUnresponsive": "{provider} 未及时响应，OpenBot 已结束其进程。",
+  "error.provider.acpSignInLost": "{provider} 的登录已失效，OpenBot 已结束其进程。请重新发送消息。",
   "error.provider.acpMcpNotLoaded":
     "{provider} 没有加载 OpenBot 的工具，因此此智能体无法使用这些工具，也无法联系队友。{provider} 的团队策略可能会阻止本地 MCP 服务器。请让团队管理员允许它们，然后重试。",
   "error.provider.endpointsReadOnly":
@@ -156,6 +157,7 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider} 未返回已验证的账号。",
   "error.provider.signInExpired": "你的 {provider} 登录已过期，请重新登录以继续。",
   "error.provider.cliActivateFailed": "OpenBot 无法激活托管的 CLI。",
+  "error.provider.noMainlandChinaSignIn": "{provider} 没有中国大陆的登录方式。",
   "error.provider.cliNewVersionNotStarted": "新版本未能启动。",
   "error.provider.cliBusyReconnect": "{provider} CLI 正在处理对话，请等它结束后再重新连接。",
   "error.provider.cliBusySignOut": "{provider} CLI 正在处理一轮对话。请等待其完成，然后断开连接。",
@@ -238,6 +240,7 @@ export const messages = {
   "error.provider.kimiNotStarted": "Kimi 无法启动。请在终端中运行 `kimi --version`。",
   "error.provider.kimiVersionUnreadable": "无法读取 Kimi CLI 版本。",
   "error.provider.kimiSignIn": "请使用 Kimi Code 登录以使用 Kimi。",
+  "error.provider.devinSignIn": "请使用 Devin 登录以使用 Devin。",
   "error.provider.hermesMissing": "未安装 Hermes Agent。请安装后重试。",
   "error.provider.hermesNotStarted": "无法启动 Hermes Agent。请在终端中运行 `hermes --version`。",
   "error.provider.hermesVersionUnreadable": "无法读取 Hermes Agent 的版本。",

@@ -74,7 +74,8 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
   // workspace does not render the drawer again.
   const activeServerId = useMobileWorkspaceSelector((current) => current.activeServer.id);
   const servers = useMobileWorkspaceSelector((current) => current.servers);
-  const { leaveServer, removeServer, reorderServers, selectServer } = useMobileWorkspaceActions();
+  const localServerKind = useMobileWorkspaceSelector((current) => current.localServerKind);
+  const { leaveServer, removeServer, deleteLocalServer, reorderServers, selectServer } = useMobileWorkspaceActions();
   const [muted] = useThemeColor(["muted"]);
   // The accessibility state of the drawer. It changes when the drawer starts to open and when it has closed.
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -317,6 +318,8 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
                   onNavigate={navigateAfterClosing}
                   onLeave={leaveServer}
                   onRemove={removeServer}
+                  onDelete={deleteLocalServer}
+                  localServerKind={localServerKind}
                   onReorder={reorderServers}
                   onSelectServer={selectServerAndClose}
                 />

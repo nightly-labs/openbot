@@ -130,6 +130,7 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
       agentId={agent.id}
       serverId={agent.serverId}
       hue={agent.avatarHue}
+      color={agent.avatarColor}
       seed={agent.avatarSeed}
       size={54}
       animateIdle={false}

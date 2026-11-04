@@ -2,8 +2,10 @@ import {
   AUTOMATIC_VOICE_LANGUAGE,
   ELEVENLABS_VOICE_MODEL_ID,
   SPEECH_MODEL,
+  SPEECH_SPEEDS,
   SPEECH_VOICES,
   type SpeechModelStatus,
+  type SpeechSpeed,
   type SpeechVoice,
   VOICE_MODELS,
   type VoiceLanguage,
@@ -501,6 +503,36 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
               </ItemActions>
             </Item>
           </Show>
+          <Item data-settings-row="settings.voice.speech.speed.title" class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{t("settings.voice.speech.speed.title")}</ItemTitle>
+            </ItemContent>
+            <ItemActions>
+              <Select<SpeechSpeed>
+                class="settings-modal-select"
+                options={[...SPEECH_SPEEDS]}
+                value={props.store.speechSpeed()}
+                onChange={(next) => next && props.store.setSpeechSpeed(next)}
+                disabled={!speech().settings}
+                placement="bottom-end"
+                itemComponent={(selectProps) => (
+                  <SelectItem item={selectProps.item}>
+                    {t("chat.voice.speedValue", { speed: format.number(selectProps.item.rawValue) })}
+                  </SelectItem>
+                )}
+              >
+                <SelectTrigger size="sm" aria-label={t("settings.voice.speech.speed.title")}>
+                  <SelectValue<SpeechSpeed>>
+                    {(state) => {
+                      const speed = state.selectedOption();
+                      return speed && t("chat.voice.speedValue", { speed: format.number(speed) });
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent mount={props.selectMount} />
+              </Select>
+            </ItemActions>
+          </Item>
         </ItemGroup>
       </SettingsSection>
 

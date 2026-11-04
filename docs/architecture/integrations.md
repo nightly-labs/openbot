@@ -462,6 +462,17 @@ lets everyone. With a list, `MessagingService` ignores a mention from a member w
 roles, before it reacts or posts. Signal passes the author's role IDs with each mention; a mention
 from an older Signal has none, so a server with a list ignores it.
 
+The optional capability `whatsapp-connector-v1`
+([`whatsapp-connector-v1.ts`](../../packages/contracts/src/team-protocol/whatsapp-connector-v1.ts), host
+route [`route-whatsapp-connector.ts`](../../src/main/team-api/route-whatsapp-connector.ts)) carries the
+host's WhatsApp numbers. The host runs the WhatsApp session and keeps its keys. A link answers the QR
+code text or the pairing code that the host's session got, and the client shows it and reads
+`linkState` while it waits. The other routes read the numbers, the allowed contacts and groups, and the
+pairing requests, and set them, and add the WhatsApp Orchestrator on the host's default model. The
+client uses the same WhatsApp page through `hostWhatsAppPort`
+([`whatsapp-connector.ts`](../../src/renderer/src/features/connectors/whatsapp-connector.ts)). No route
+carries a stored key; the QR code text holds the one-use secret of its link.
+
 The optional capability `onepassword-connector-v1`
 ([`onepassword-connector-v1.ts`](../../packages/contracts/src/team-protocol/onepassword-connector-v1.ts),
 host route [`route-onepassword-connector.ts`](../../src/main/team-api/route-onepassword-connector.ts))

@@ -78,7 +78,7 @@ import { PlanLimitsHeaderButton } from "@/features/servers/components/plan-limit
 import { usePlanLimits } from "@/features/servers/model/plan-limits";
 import { ConnectionHeaderStatus } from "@/features/workspace/components/connection-header-status";
 import { useWaitingAgentIds } from "@/features/workspace/components/use-agent-activity";
-import { useUnreadAgentIds } from "@/features/workspace/components/use-live-workspace";
+import { useUnreadAgentIds, useUnreadCounts } from "@/features/workspace/components/use-live-workspace";
 import {
   type MobileAgent,
   type MobileWorkspaceActions,
@@ -122,23 +122,11 @@ interface ChatRowTarget {
   channelAgents?: ReadonlyMap<string, MobileAgent>;
 }
 
-const TransitioningChatRow = memo(function TransitioningChatRow({
-  agent,
-  channel,
-  serverId,
-  channelAgents,
-  index,
-  reveal,
-  collapsed,
-}: ChatRowTarget & {
-  index: number;
-  reveal: AgentListRevealState;
-  collapsed: boolean;
-}) {
-  const { transition } = useAgentPinTransition();
-  const chatId = agent?.id ?? channel?.id;
-  const isTarget = transition !== null && transition.chatId === chatId && transition.target === "row";
-
+/**
+ * A list row that a closed folder folds to no height. The list keeps the cell, and the height changes
+ * on the UI thread.
+ */
+function CollapsingRow({ collapsed, children }: { collapsed: boolean; children: ReactNode }) {
   const [initiallyExpanded] = useState(!collapsed);
   const [contentMounted, setContentMounted] = useState(!collapsed);
   const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
@@ -210,24 +198,47 @@ const TransitioningChatRow = memo(function TransitioningChatRow({
             setMeasuredHeight(nextHeight);
           }}
         >
-          <Animated.View collapsable={false} entering={isTarget ? ROW_ENTER : undefined}>
-            <AgentListRowReveal index={index} reveal={reveal} skip={isTarget}>
-              {agent ? (
-                <AgentListRow agent={agent} leftInset={15} rightInset={24} />
-              ) : channel && serverId && channelAgents ? (
-                <ChannelListRow
-                  channel={channel}
-                  serverId={serverId}
-                  agents={channelAgents}
-                  leftInset={15}
-                  rightInset={24}
-                />
-              ) : null}
-            </AgentListRowReveal>
-          </Animated.View>
+          {children}
         </Animated.View>
       ) : null}
     </Animated.View>
+  );
+}
+
+const TransitioningChatRow = memo(function TransitioningChatRow({
+  agent,
+  channel,
+  serverId,
+  channelAgents,
+  index,
+  reveal,
+  collapsed,
+}: ChatRowTarget & {
+  index: number;
+  reveal: AgentListRevealState;
+  collapsed: boolean;
+}) {
+  const { transition } = useAgentPinTransition();
+  const chatId = agent?.id ?? channel?.id;
+  const isTarget = transition !== null && transition.chatId === chatId && transition.target === "row";
+  return (
+    <CollapsingRow collapsed={collapsed}>
+      <Animated.View collapsable={false} entering={isTarget ? ROW_ENTER : undefined}>
+        <AgentListRowReveal index={index} reveal={reveal} skip={isTarget}>
+          {agent ? (
+            <AgentListRow agent={agent} leftInset={15} rightInset={24} />
+          ) : channel && serverId && channelAgents ? (
+            <ChannelListRow
+              channel={channel}
+              serverId={serverId}
+              agents={channelAgents}
+              leftInset={15}
+              rightInset={24}
+            />
+          ) : null}
+        </AgentListRowReveal>
+      </Animated.View>
+    </CollapsingRow>
   );
 });
 
@@ -550,16 +561,46 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   // Collapse keeps stable list cells and changes their heights on the UI thread.
   // Enable cell reflow again when a host layout update moves agents or sections.
   const [collapseLayout, setCollapseLayout] = useState<SidebarLayoutSnapshot | null>(null);
-  const collapsedChatIds = useMemo(() => {
+  // The rows that a closed folder hides: its chats, and the folders in it with their chats.
+  const collapsedRowIds = useMemo(() => {
     const ids = new Set<string>();
     let sectionCollapsed = false;
     for (const item of items) {
       if (item.kind === "waiting") sectionCollapsed = false;
-      else if (item.kind === "section") sectionCollapsed = collapsedSectionIds?.has(item.id) ?? false;
-      else if (sectionCollapsed) ids.add(item.id);
+      else if (item.kind === "section") {
+        const hidden = item.ancestorIds.some((ancestorId) => collapsedSectionIds?.has(ancestorId));
+        if (hidden) ids.add(item.id);
+        sectionCollapsed = hidden || (collapsedSectionIds?.has(item.id) ?? false);
+      } else if (sectionCollapsed) ids.add(item.id);
     }
     return ids;
   }, [items, collapsedSectionIds]);
+  // As on the desktop, a closed folder counts the unread messages in it and in the folders in it.
+  // The read state changes on each message, so the counts become a string first: the map, and with it
+  // `renderItem`, change only when the count of a closed folder changes.
+  const unreadCounts = useUnreadCounts();
+  const folderUnreadKey = useMemo(() => {
+    if (!collapsedSectionIds?.size) return "[]";
+    const unread = new Set(unreadAgentIds);
+    const counts = new Map<string, number>();
+    let folderIds: readonly string[] = [];
+    for (const item of items) {
+      if (item.kind === "waiting") folderIds = [];
+      else if (item.kind === "section")
+        folderIds = [...item.ancestorIds, item.id].filter((id) => collapsedSectionIds.has(id));
+      else {
+        const count =
+          item.kind === "channel"
+            ? item.channel.unreadCount
+            : unread.has(item.id)
+              ? Math.max(1, unreadCounts[item.id] ?? 1)
+              : 0;
+        if (count > 0) for (const folderId of folderIds) counts.set(folderId, (counts.get(folderId) ?? 0) + count);
+      }
+    }
+    return JSON.stringify([...counts]);
+  }, [items, collapsedSectionIds, unreadAgentIds, unreadCounts]);
+  const folderUnread = useMemo(() => new Map<string, number>(JSON.parse(folderUnreadKey)), [folderUnreadKey]);
   const sidebarLayout = sidebar?.layout ?? null;
   const serverId = activeServer.id;
   const toggleSection = useCallback(
@@ -583,19 +624,25 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
           <AgentWaitingGroupHeader count={item.count} />
         </AgentListRowReveal>
       ) : item.kind === "section" ? (
-        <AgentListRowReveal index={index + rowOffset} reveal={listReveal}>
-          <SectionDropTarget sectionId={item.id}>
-            <SidebarSectionHeader
-              key={`${activeServer.id}:${item.id}`}
-              id={item.id}
-              name={item.name}
-              empty={item.empty}
-              visibleSectionIds={visibleSectionIds}
-              collapsed={collapsedSectionIds?.has(item.id) ?? false}
-              onToggle={toggleSection}
-            />
-          </SectionDropTarget>
-        </AgentListRowReveal>
+        <CollapsingRow collapsed={collapsedRowIds.has(item.id)}>
+          <AgentListRowReveal index={index + rowOffset} reveal={listReveal}>
+            <SectionDropTarget sectionId={item.id}>
+              <SidebarSectionHeader
+                key={`${activeServer.id}:${item.id}`}
+                id={item.id}
+                name={item.name}
+                title={item.title}
+                parentName={item.parentName}
+                custom={item.custom}
+                empty={item.empty}
+                unread={folderUnread.get(item.id) ?? 0}
+                visibleSectionIds={visibleSectionIds}
+                collapsed={collapsedSectionIds?.has(item.id) ?? false}
+                onToggle={toggleSection}
+              />
+            </SectionDropTarget>
+          </AgentListRowReveal>
+        </CollapsingRow>
       ) : item.kind === "channel" ? (
         <TransitioningChatRow
           channel={item.channel}
@@ -603,21 +650,22 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
           channelAgents={channelAgents}
           index={index + rowOffset}
           reveal={listReveal}
-          collapsed={collapsedChatIds.has(item.id)}
+          collapsed={collapsedRowIds.has(item.id)}
         />
       ) : (
         <TransitioningChatRow
           agent={item.agent}
           index={index + rowOffset}
           reveal={listReveal}
-          collapsed={collapsedChatIds.has(item.id)}
+          collapsed={collapsedRowIds.has(item.id)}
         />
       ),
     [
       activeServer.id,
       channelAgents,
-      collapsedChatIds,
+      collapsedRowIds,
       collapsedSectionIds,
+      folderUnread,
       listReveal,
       rowOffset,
       toggleSection,

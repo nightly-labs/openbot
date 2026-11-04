@@ -1,3 +1,4 @@
+import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { ConversationMessage } from "@openbot/contracts/ipc";
 import { markdownPlainText } from "@openbot/contracts/markdown-preview-text";
@@ -18,14 +19,13 @@ import { KeyboardGestureArea } from "react-native-keyboard-controller";
 import Animated, { useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
-import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { MobileConversationAnalytics } from "@/features/analytics/conversation";
 import { reportMobileNotification } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { useBrowserFeature } from "@/features/browser/components/use-browser-feature";
 import { channelRecipient } from "@/features/channels/model/channel-draft";
 import type { ApprovalDecision } from "@/features/chat/components/chat-approval-card";
-import { ChatComposer, type MentionSkill, VOICE_BUTTON_SIZE } from "@/features/chat/components/chat-composer";
+import { ChatComposer, type MentionSkill } from "@/features/chat/components/chat-composer";
 import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
 import { ChatHeader } from "@/features/chat/components/chat-header";
 import { ChatMessageList } from "@/features/chat/components/chat-message-list";
@@ -75,16 +75,20 @@ import { queueReceiptMessages, queueRowsWithHeldEdit } from "../model/queue-edit
 import { retainConfirmedAttachments } from "../model/upload-chat-attachments";
 import { voiceAccent, voicePalette } from "../model/voice-palette";
 import { rememberImageDimensions } from "./attachment-preview";
-import { asksForSecret, BrowserSecretComposer, BrowserTakeoverCard } from "./browser-secret-card";
+import {
+  asksForSecret,
+  BrowserSecretComposer,
+  BrowserTakeoverCard,
+  QuestionSecretComposer,
+} from "./browser-secret-card";
 import { ChatAttachmentPanel } from "./chat-attachment-panel";
 import type { OutboxRowStatus } from "./chat-outbox-status";
 import { ChatQueueButton } from "./chat-queue-button";
 import { ChatSelectionBar } from "./chat-selection-bar";
-import { type ComposerVoice, dictationVoice, liveVoice } from "./composer-voice";
+import { type ComposerVoice, liveVoice } from "./composer-voice";
 import type { ChatQueueController } from "./use-chat-queue";
+import { useComposerDictation } from "./use-composer-dictation";
 import { type LiveChannel, useLiveConversation } from "./use-live-conversation";
-import { useVoiceMode } from "./use-voice-mode";
-import { VoiceOverlay } from "./voice-overlay";
 
 export interface ChatViewProps {
   target: ChatTarget;
@@ -113,6 +117,10 @@ export interface ChatViewProps {
   liveChannel?: LiveChannel | null;
   /** Absent for a chat that cannot stop a turn, such as a channel. */
   stopTurn?: (turnId: string) => Promise<void>;
+  /** The host messages that offer "Branch from here". */
+  branchPoints?: ReadonlySet<string>;
+  /** Copies the chat through a host message into a new thread. Absent for a chat that cannot branch. */
+  onBranch?: (messageId: string) => Promise<void>;
   questionForm?: QuestionPromptController;
   /** Opens the form of an open question, in a channel where several agents can ask. */
   onSelectQuestion?: (messageId: string) => void;
@@ -217,6 +225,8 @@ export function ChatView({
   conversation = null,
   liveChannel = null,
   stopTurn,
+  branchPoints,
+  onBranch,
   questionForm,
   onSelectQuestion,
   needsAction = false,
@@ -570,13 +580,13 @@ export function ChatView({
   const liquidGlassAvailable = isLiquidGlassAvailable() && !reducedTransparency;
   // A quiet return to the app counts as online: the chat keeps its look, and its requests wait.
   const serverOnline = showsOnline(server);
-  // Speech goes to the voice mode's own transcript, and only Send makes it a
-  // message. Leaving the chat or losing the server stops listening and keeps it.
-  const voice = useVoiceMode({
+  // The mic beside the main control dictates into the draft, and only Send makes it a message.
+  // Leaving the chat or losing the server stops listening and keeps the words.
+  const dictation = useComposerDictation({
     enabled: isFocused && serverOnline && canSend && !readOnly && !notice,
     focused: isFocused,
-    sendable: serverOnline && canSend,
-    onSend: sendMessage,
+    draft,
+    onDraft: setDraft,
   });
   const writable = canSend && !readOnly && !notice;
   // Hands-free, as the voice pane on desktop: the agent hears a pause as the end of a turn, and its
@@ -601,34 +611,43 @@ export function ChatView({
   // Not gated on `appActive`. Notification Center and other system overlays make iOS report the app
   // inactive, and a request must stay with its typed value. It goes when the app leaves.
   const showBrowserRequests = serverOnline && foregroundVisit && isFocused && !readOnly;
-  // The mic of the composer: a live conversation in an agent chat, as on desktop. A channel has no
-  // one conversation to follow, so its mic dictates a message for review.
-  // With no voice ready, the mic opens Settings > Voice, where the user downloads Supertonic 3 or adds
+  // The main control of an empty composer: a live conversation in an agent chat, as on desktop. A
+  // channel has no one conversation to follow, so there only the dictation mic beside it listens.
+  // With no voice ready, the tap opens Settings > Voice, where the user downloads Supertonic 3 or adds
   // an ElevenLabs key.
-  const composerVoice: ComposerVoice =
+  const composerVoice: ComposerVoice | undefined =
     live.available || live.open
       ? {
           ...liveVoice(live, voiceAgent?.name ?? target.name, t),
           start: () => (replyVoiceReady() ? live.start() : router.push("/settings/voice")),
         }
-      : dictationVoice(voice, t);
-  const voiceOpen = voice.stage !== "closed" || live.open;
-  // Dictation covers the chat with its overlay. A live conversation keeps the chat in view and turns
-  // the composer into a call bar.
-  const dictating = voice.stage !== "closed";
+      : undefined;
+  // A live conversation keeps the chat in view and turns the composer into a call bar.
+  const voiceOpen = live.open;
+  const dictating = dictation.active;
   // A password or a code is typed where the composer is, so the screen has one field. The voice
-  // mode and the attachment card keep the composer until they close. Other secret requests wait.
+  // mode, dictation and the attachment card keep the composer until they close: replacing it would
+  // end them. Other secret requests wait.
   const secretRequest =
-    showBrowserRequests && !voiceOpen && !attachments.menuOpen ? chatBrowserRequests.find(asksForSecret) : undefined;
+    showBrowserRequests && !voiceOpen && !dictating && !attachments.menuOpen
+      ? chatBrowserRequests.find(asksForSecret)
+      : undefined;
+  // A private answer to a form question is typed there too, never in a second field beside the composer.
+  const secretQuestion =
+    !secretRequest && !voiceOpen && !dictating && !attachments.menuOpen && questionForm?.question?.isSecret
+      ? questionForm
+      : undefined;
   const dark = useColorScheme() === "dark";
   // The glow and the filled voice controls take that agent's colour. A channel with no leader mixes
   // the colours of its first members.
   const voiceColors = useMemo(
     () =>
       voiceAgent
-        ? [getBloubAvatarColor(voiceAgent.avatarSeed, voiceAgent.avatarHue)]
+        ? [avatarHeadColor(voiceAgent.avatarSeed, voiceAgent.avatarHue, voiceAgent.avatarColor)]
         : target.kind === "channel"
-          ? target.members.slice(0, 4).map((member) => getBloubAvatarColor(member.avatarSeed, member.avatarHue))
+          ? target.members
+              .slice(0, 4)
+              .map((member) => avatarHeadColor(member.avatarSeed, member.avatarHue, member.avatarColor))
           : [],
     [voiceAgent, target],
   );
@@ -671,15 +690,15 @@ export function ChatView({
   useEffect(() => {
     menuOpenValue.set(attachments.menuOpen);
   }, [attachments.menuOpen, menuOpenValue]);
-  // The same for the voice mode: the edge swipe stops or cancels it, as the
-  // back button does, instead of leaving the chat with the spoken text.
+  // The same for voice: the edge swipe ends a live conversation, or stops dictation and keeps the
+  // words, as the back button does, instead of leaving the chat.
   const voiceOpenValue = useSharedValue(false);
   useEffect(() => {
-    voiceOpenValue.set(voiceOpen);
-  }, [voiceOpen, voiceOpenValue]);
-  const voiceBack = useRef(voice.back);
+    voiceOpenValue.set(voiceOpen || dictating);
+  }, [voiceOpen, dictating, voiceOpenValue]);
+  const voiceBack = useRef(live.end);
   useEffect(() => {
-    voiceBack.current = live.open ? live.end : voice.back;
+    voiceBack.current = live.open ? live.end : dictation.finish;
   });
   const leaveVoiceMode = useCallback(() => voiceBack.current(), []);
   const edgeBackGesture = useMemo(
@@ -914,6 +933,10 @@ export function ChatView({
   );
   // The reaction route is an agent route. A channel message has no reaction.
   const canReact = target.kind === "agent";
+  const branchMessage = useCallback(
+    (message: ChatBubbleMessage) => void onBranch?.(hostMessageIds.get(message.id) ?? message.id),
+    [onBranch, hostMessageIds],
+  );
   // Select text starts the selection, and a second tap on it ends the selection.
   const selectText = useCallback((message: ChatBubbleMessage) => {
     Keyboard.dismiss();
@@ -922,17 +945,6 @@ export function ChatView({
   const changeSelection = useCallback(
     (selected: string) =>
       setSelection((current) => (current && current.selected !== selected ? { ...current, selected } : current)),
-    [],
-  );
-  const selectNatively = useCallback(
-    (message: ChatBubbleMessage, selected: string) =>
-      setSelection((current) => {
-        if (selected) {
-          return current?.message.id === message.id && current.selected === selected ? current : { message, selected };
-        }
-        // An empty selection ends only the selection of its own message.
-        return current?.message.id === message.id ? null : current;
-      }),
     [],
   );
   const dismissSelection = useCallback(() => setSelection(null), []);
@@ -983,15 +995,11 @@ export function ChatView({
               topInset={insets.top}
               onBack={leaveConversation}
               threadMenu={threadMenu}
-              // The dictation overlay covers the chat. It blocks touches, and this
-              // keeps screen readers on the transcript and the voice controls.
-              accessibilityHidden={dictating}
             />
             <ChatMessageList
               agents={serverAgents}
               rowsShown={rowsShown}
               target={target}
-              accessibilityHidden={dictating}
               motion={motion}
               sending={Boolean(sendingMessage)}
               awaitingTurn={awaitingTurn}
@@ -1034,11 +1042,12 @@ export function ChatView({
               olderError={olderError}
               onLoadOlder={loadOlder}
               onReply={readOnly ? undefined : replyToMessage}
+              onBranch={onBranch && !readOnly ? branchMessage : undefined}
+              branchPoints={branchPoints}
               onReact={canReact && !readOnly ? react : undefined}
               selectingMessageId={selection?.message.id ?? null}
               onSelectText={selectText}
               onSelectionChange={changeSelection}
-              onNativeSelection={selectNatively}
               onDismissSelection={dismissSelection}
               muted={muted}
               raised={raised}
@@ -1054,23 +1063,8 @@ export function ChatView({
               upload={listUpload}
               outboxStatuses={outboxStatuses}
             />
-            {dictating ? (
-              <VoiceOverlay
-                voice={voice}
-                hint={voice.phase === "listening" ? t("mobile.chat.voice.listening") : ""}
-                reply={replyTarget ? mentionDraft(replyTarget.body).text || t("mobile.chat.reply.attachment") : null}
-                muted={muted}
-                topInset={insets.top}
-                controlsHeight={Math.max(insets.bottom, 10) + VOICE_BUTTON_SIZE + 48}
-                reducedTransparency={reducedTransparency}
-              />
-            ) : null}
             <Animated.View
-              style={[
-                // Above the voice overlay, which covers the header, while the voice mode is open.
-                { position: "absolute", left: 0, right: 0, bottom: 0, zIndex: voiceOpen ? 31 : undefined },
-                motion.composerStyle,
-              ]}
+              style={[{ position: "absolute", left: 0, right: 0, bottom: 0 }, motion.composerStyle]}
               pointerEvents="box-none"
               onLayout={motion.onComposerLayout}
             >
@@ -1189,6 +1183,18 @@ export function ChatView({
                   action={action}
                   actionForeground={actionForeground}
                 />
+              ) : secretQuestion ? (
+                <QuestionSecretComposer
+                  key={`${target.serverId}:${secretQuestion.messageId}:${secretQuestion.question?.id}`}
+                  controller={secretQuestion}
+                  bottomInset={insets.bottom}
+                  liquidGlassAvailable={liquidGlassAvailable}
+                  fallbackBackground={fieldBackground}
+                  foreground={foreground}
+                  muted={muted}
+                  action={action}
+                  actionForeground={actionForeground}
+                />
               ) : (
                 <ChatComposer
                   sendRetryVersion={sendRetryVersion}
@@ -1229,6 +1235,7 @@ export function ChatView({
                   menuProgress={menuProgress}
                   stopping={stopping}
                   voice={composerVoice}
+                  dictation={dictation}
                   // An agent's own colour; a channel keeps the default controls.
                   voiceAccent={target.kind === "agent" ? accent : undefined}
                   voicePalette={palette}
@@ -1239,6 +1246,7 @@ export function ChatView({
                         serverId={target.serverId}
                         seed={voiceAgent.avatarSeed}
                         hue={voiceAgent.avatarHue}
+                        color={voiceAgent.avatarColor}
                       />
                     ) : undefined
                   }

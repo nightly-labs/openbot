@@ -1,10 +1,10 @@
 .message-entry-user .ui-bubble {
-  max-width: min(420px, 100%);
+  max-width: var(--message-narrow-bubble-width);
 }
 
 /* A table needs the width of an agent table. The bubble still fits a short table. */
 .message-entry-user .ui-bubble:has(.message-markdown-table-scroll) {
-  max-width: min(720px, 100%);
+  max-width: var(--message-wide-bubble-width);
 }
 
 .message-copy {
@@ -18,6 +18,13 @@
 
 .message-markdown {
   white-space: normal;
+}
+
+/* Each line of a block takes its direction and its start side from its own text, so a Hebrew
+   line after a line break aligns right in an English paragraph. A table cell keeps the table's
+   direction, so its borders stay on the same side in each cell. */
+.message-markdown :is(p, li, h1, h2, h3, h4, h5, h6, th, td) {
+  unicode-bidi: plaintext;
 }
 
 .message-markdown > *,
@@ -60,7 +67,7 @@
 }
 
 .message-markdown :is(ul, ol) {
-  padding-left: var(--openbot-space-6);
+  padding-inline-start: var(--openbot-space-6);
 }
 
 .message-markdown ul {
@@ -93,8 +100,8 @@
 }
 
 .message-markdown blockquote {
-  border-left: var(--openbot-space-0-5) solid var(--openbot-border-strong);
-  padding-left: var(--openbot-space-3);
+  border-inline-start: var(--openbot-space-0-5) solid var(--openbot-border-strong);
+  padding-inline-start: var(--openbot-space-3);
   color: var(--openbot-text-secondary);
 }
 
@@ -172,11 +179,11 @@
 }
 
 .message-markdown-table :is(th, td) {
-  border-right: 1px solid var(--openbot-data-table-border);
+  border-inline-end: 1px solid var(--openbot-data-table-border);
   border-bottom: 1px solid var(--openbot-data-table-border);
   padding: var(--openbot-space-2) var(--openbot-space-3);
   overflow-wrap: break-word;
-  text-align: left;
+  text-align: start;
   vertical-align: top;
 }
 
@@ -187,7 +194,7 @@
 }
 
 .message-markdown-table :is(th, td):last-child {
-  border-right: 0;
+  border-inline-end: 0;
 }
 
 .message-markdown-table tbody tr:last-child td {
@@ -316,7 +323,8 @@
   height: 28px;
   border: 0;
   background: transparent;
-  padding: 0 10px 0 11px;
+  padding-block: 0;
+  padding-inline: 11px 10px;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
   font-weight: 400;
@@ -351,21 +359,26 @@
   transform: translateX(-8px);
 }
 
+/* Hidden parts slide toward the start side. */
+:dir(rtl) :is(.selection-actions-form-shell-hidden, .selection-actions-presets-hidden) {
+  transform: translateX(8px);
+}
+
 .selection-actions-more-presets {
   max-width: 0;
   gap: 2px;
-  margin-left: 0;
+  margin-inline-start: 0;
   overflow: hidden;
   opacity: 0;
   transition:
     max-width var(--openbot-duration-overlay) cubic-bezier(0.23, 1, 0.32, 1),
     opacity var(--openbot-duration-overlay) cubic-bezier(0.23, 1, 0.32, 1),
-    margin-left var(--openbot-duration-overlay) cubic-bezier(0.23, 1, 0.32, 1);
+    margin-inline-start var(--openbot-duration-overlay) cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .selection-actions-presets-expanded .selection-actions-more-presets {
   max-width: 262px;
-  margin-left: 2px;
+  margin-inline-start: 2px;
   opacity: 1;
 }
 
@@ -450,11 +463,17 @@
 }
 
 .selection-actions-more-divider {
-  margin-left: 1px;
+  margin-inline-start: 1px;
 }
 
 .selection-actions-expand svg {
   transition: transform var(--openbot-duration-overlay) cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* The chevron points to the end side, where the extra presets open. `scale` mirrors it and keeps the
+   open state's `transform` rotation. */
+:dir(rtl) .selection-actions-expand svg {
+  scale: -1 1;
 }
 
 .selection-actions-expand[aria-expanded="true"] svg {
@@ -504,8 +523,11 @@
   max-height: 124px;
   overflow: auto;
   margin: 0;
-  border-left: 2px solid var(--openbot-accent);
-  border-radius: 0 var(--openbot-radius-sm) var(--openbot-radius-sm) 0;
+  border-inline-start: 2px solid var(--openbot-accent);
+  border-start-start-radius: 0;
+  border-start-end-radius: var(--openbot-radius-sm);
+  border-end-end-radius: var(--openbot-radius-sm);
+  border-end-start-radius: 0;
   background: var(--openbot-bg-control);
   padding: 6px 8px;
   color: var(--openbot-text-secondary);
@@ -615,8 +637,8 @@
 }
 
 .message-entry-agent .ui-bubble:has(:is(.message-data-table-scroll, .message-code-block)) {
-  width: min(720px, 100%);
-  max-width: min(720px, 100%);
+  width: var(--message-wide-bubble-width);
+  max-width: var(--message-wide-bubble-width);
 }
 
 .message-entry-agent .ui-bubble:has(.message-data-table-scroll) > .ui-bubble-content {
@@ -644,7 +666,8 @@
   gap: var(--openbot-space-2);
   border-bottom: 1px solid var(--openbot-border);
   background: var(--openbot-bg-control);
-  padding: 4px 6px 4px 10px;
+  padding-block: 4px;
+  padding-inline: 10px 6px;
 }
 
 .message-code-heading {
@@ -787,16 +810,16 @@
 .message-code-line-number {
   width: 40px;
   flex: none;
-  padding-right: 8px;
+  padding-inline-end: 8px;
   color: var(--openbot-text-dim);
   font-size: var(--openbot-text-sm);
-  text-align: right;
+  text-align: end;
   user-select: none;
 }
 
 .message-code-line-source {
   min-width: 0;
-  padding-right: 12px;
+  padding-inline-end: 12px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -805,7 +828,7 @@
   width: 2px;
   height: 13px;
   display: inline-block;
-  margin-left: 2px;
+  margin-inline-start: 2px;
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-accent);
   transform: translateY(2px);
@@ -910,8 +933,10 @@
   color: var(--openbot-data-table-text);
   font-weight: inherit;
   overflow-wrap: break-word;
-  text-align: left;
+  text-align: start;
   vertical-align: top;
+  /* A cell's text takes its own direction, and the cell keeps the table's for its borders. */
+  unicode-bidi: plaintext;
 }
 
 .message-data-table thead th {
@@ -923,7 +948,7 @@
 
 .message-data-table th:not(:last-child),
 .message-data-table td:not(:last-child) {
-  border-right: 1px solid var(--openbot-data-table-border);
+  border-inline-end: 1px solid var(--openbot-data-table-border);
 }
 
 /* Links and code can be one long token. Break them inside the column, so they do not make the
@@ -969,7 +994,7 @@
   height: 14px;
   align-items: center;
   justify-content: center;
-  margin-right: 4px;
+  margin-inline-end: 4px;
   color: currentColor;
   vertical-align: -2px;
 }
@@ -1055,7 +1080,7 @@
   line-height: 15px;
   overflow-wrap: anywhere;
   pointer-events: none;
-  text-align: left;
+  text-align: start;
   white-space: normal;
   opacity: 0;
   transform: translateY(4px);
@@ -1133,7 +1158,7 @@
   display: flex;
   width: 14px;
   height: 14px;
-  margin-left: -2px;
+  margin-inline-start: -2px;
   color: var(--openbot-text-dim);
   opacity: 0;
   transform: rotate(45deg) translate(-1px, 1px);
@@ -1200,8 +1225,8 @@
 .message-reply-context {
   max-width: 360px;
   margin: -1px 0 7px;
-  border-left: 2px solid var(--openbot-text-dim);
-  padding-left: 8px;
+  border-inline-start: 2px solid var(--openbot-text-dim);
+  padding-inline-start: 8px;
   color: var(--openbot-text-secondary);
 }
 
@@ -1257,17 +1282,17 @@
 }
 
 [data-slot="bubble"][data-author="user"] .message-reply-context {
-  border-left-color: var(--openbot-border-strong);
+  border-inline-start-color: var(--openbot-border-strong);
   color: var(--openbot-text-readable);
 }
 
-/* A quote that opens its original. The button lies over the whole quote, its left mark included. */
+/* A quote that opens its original. The button lies over the whole quote, its start mark included. */
 .message-reply-context[data-opens] {
   position: relative;
-  transition: border-left-color var(--openbot-duration-hover) var(--openbot-ease-out);
+  transition: border-inline-start-color var(--openbot-duration-hover) var(--openbot-ease-out);
 }
 
-/* The spinner takes the right column; the author and the text flow into the left one. */
+/* The spinner takes the end column; the author and the text flow into the start one. */
 .message-reply-context[data-loading] {
   display: grid;
   align-items: center;
@@ -1276,14 +1301,15 @@
 }
 
 .message-reply-context[data-opens]:hover {
-  border-left-color: var(--openbot-accent);
+  border-inline-start-color: var(--openbot-accent);
 }
 
 .message-reply-context .message-reply-open,
 .message-reply-context .message-reply-open:hover:not(:disabled):not([data-disabled]) {
   position: absolute;
   z-index: 1;
-  inset: 0 0 0 -2px;
+  inset-block: 0;
+  inset-inline: -2px 0;
   width: auto;
   height: auto;
   min-height: 0;
@@ -1307,7 +1333,7 @@
 }
 
 .message-reply-context[data-unavailable] {
-  border-left-style: dashed;
+  border-inline-start-style: dashed;
 }
 
 .message-reply-unavailable {
@@ -1378,7 +1404,8 @@
   border: 0;
   border-radius: var(--openbot-radius-sm);
   background: transparent;
-  padding: 1px 6px 1px 3px;
+  padding-block: 1px;
+  padding-inline: 3px 6px;
   color: var(--file-reference-color);
   font: inherit;
   font-weight: 550;
@@ -1413,7 +1440,8 @@
   .composer-file-reference,
   .attachment-file-visual,
   .files-file-visual,
-  .composer-attachment-preview
+  .composer-attachment-preview,
+  .side-panel-file-badge
 )[data-file-tone="source"] {
   --file-reference-color: var(--openbot-file-blue);
   --file-reference-soft: var(--openbot-file-blue-soft);
@@ -1424,7 +1452,8 @@
   .composer-file-reference,
   .attachment-file-visual,
   .files-file-visual,
-  .composer-attachment-preview
+  .composer-attachment-preview,
+  .side-panel-file-badge
 )[data-file-tone="script"] {
   --file-reference-color: var(--openbot-file-yellow);
   --file-reference-soft: var(--openbot-file-yellow-soft);
@@ -1435,7 +1464,8 @@
   .composer-file-reference,
   .attachment-file-visual,
   .files-file-visual,
-  .composer-attachment-preview
+  .composer-attachment-preview,
+  .side-panel-file-badge
 )[data-file-tone="markup"] {
   --file-reference-color: var(--openbot-file-orange);
   --file-reference-soft: var(--openbot-file-orange-soft);
@@ -1446,7 +1476,8 @@
   .composer-file-reference,
   .attachment-file-visual,
   .files-file-visual,
-  .composer-attachment-preview
+  .composer-attachment-preview,
+  .side-panel-file-badge
 )[data-file-tone="style"] {
   --file-reference-color: var(--openbot-file-teal);
   --file-reference-soft: var(--openbot-file-teal-soft);
@@ -1457,7 +1488,8 @@
   .composer-file-reference,
   .attachment-file-visual,
   .files-file-visual,
-  .composer-attachment-preview
+  .composer-attachment-preview,
+  .side-panel-file-badge
 )[data-file-tone="data"] {
   --file-reference-color: var(--openbot-file-green);
   --file-reference-soft: var(--openbot-file-green-soft);
@@ -1468,7 +1500,8 @@
   .composer-file-reference,
   .attachment-file-visual,
   .files-file-visual,
-  .composer-attachment-preview
+  .composer-attachment-preview,
+  .side-panel-file-badge
 )[data-file-tone="document"] {
   --file-reference-color: var(--openbot-file-red);
   --file-reference-soft: var(--openbot-file-red-soft);
@@ -1479,7 +1512,8 @@
   .composer-file-reference,
   .attachment-file-visual,
   .files-file-visual,
-  .composer-attachment-preview
+  .composer-attachment-preview,
+  .side-panel-file-badge
 )[data-file-tone="media"] {
   --file-reference-color: var(--openbot-file-pink);
   --file-reference-soft: var(--openbot-file-pink-soft);
@@ -1630,7 +1664,7 @@
   padding: var(--openbot-space-2) var(--openbot-space-3);
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-lg);
-  text-align: left;
+  text-align: start;
   overflow-wrap: anywhere;
 }
 
@@ -1683,7 +1717,7 @@
 .reference-chip.message-reference-chip .reference-chip-icon,
 .message-file-reference .attachment-reference-visual {
   display: inline-block;
-  margin-right: var(--openbot-space-1);
+  margin-inline-end: var(--openbot-space-1);
   text-align: center;
   vertical-align: top;
   user-select: none;
@@ -1724,9 +1758,10 @@
   margin-top: var(--openbot-space-0-5);
 }
 
-/* The face is 128% of the avatar. The grid avatar centres it; inline, half the excess goes left and up. */
+/* The face is 128% of the avatar. The grid avatar centres it; inline, half the excess goes to the start and up. */
 .reference-chip.message-reference-chip .agent-avatar > svg {
-  margin: -14% 0 0 -14%;
+  margin-block: -14% 0;
+  margin-inline: -14% 0;
 }
 
 .reference-chip.message-reference-chip .reference-chip-name,

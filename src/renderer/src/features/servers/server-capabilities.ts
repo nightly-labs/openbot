@@ -42,6 +42,7 @@ export function serverSupportsCapability(
       capability === "connectors-v1" ||
       capability === "onepassword-connector-v1" ||
       capability === "bitwarden-connector-v1" ||
+      capability === "whatsapp-connector-v1" ||
       capability === "vault-v1" ||
       capability === "vault-v2" ||
       capability === "browser-secret-vault-v1" ||
@@ -77,6 +78,7 @@ export function serverSupportsCapability(
       capability === "agent-memory-limit-v1" ||
       capability === "memory-review-v1" ||
       capability === "prompt-cache-ttl-v1" ||
+      capability === "model-visibility-v1" ||
       capability === "claude-api-key-v1" ||
       capability === "agent-access-v1" ||
       capability === "sidebar-folders-v1" ||
@@ -87,6 +89,7 @@ export function serverSupportsCapability(
       capability === "routine-flows-v1" ||
       capability === "routine-recovery-v1" ||
       capability === "webhook-tests-v1" ||
+      capability === "webhook-sender-secret-v1" ||
       capability === "agent-import-v1" ||
       capability === "instance-transfer-v1" ||
       capability === "agent-hidden-v1" ||
@@ -94,6 +97,7 @@ export function serverSupportsCapability(
       capability === "agent-threads-v1" ||
       capability === "agent-thread-reads-v1" ||
       capability === "agent-thread-branches-v1" ||
+      capability === "agent-thread-replies-v1" ||
       capability === "channel-task-cancel-v1" ||
       capability === "side-question-v1" ||
       capability === "workflows-github-v1" ||
@@ -103,7 +107,8 @@ export function serverSupportsCapability(
       capability === "agent-folders-v1" ||
       capability === "agent-fast-mode-v1" ||
       capability === "context-compact-v1" ||
-      capability === "agent-instructions-v1") &&
+      capability === "agent-instructions-v1" ||
+      capability === "message-delete-v1") &&
     server?.kind === "remote"
   ) {
     return server.compatibility?.capabilities.includes(capability) === true;
@@ -122,6 +127,11 @@ export function remoteRoutineRecovery(server: ServerSummary | undefined): boolea
 /** Whether the routine editor can ask the host for a test event: this computer, or a joined server with `webhook-tests-v1`. */
 export function serverSendsWebhookTests(server: ServerSummary | undefined): boolean {
   return serverCanAdminister(server, "webhook-tests-v1");
+}
+
+/** Whether a webhook routine can use a secret that the sender made: this computer, or a joined server with `webhook-sender-secret-v1`. */
+export function serverSetsWebhookSenderSecret(server: ServerSummary | undefined): boolean {
+  return serverCanAdminister(server, "webhook-sender-secret-v1");
 }
 
 /**

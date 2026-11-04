@@ -3,6 +3,7 @@ import {
   type AppTranslate,
   formatLocale,
   loadLocale,
+  localeDirection,
   localeLoaded,
   resolveLocale,
   type TranslatedLocale,
@@ -73,11 +74,12 @@ function createI18nValue(): I18nValue {
 
   // `index.html` declares one language, so the document would keep saying English through every
   // change. A screen reader takes the voice for a control from the nearest `lang`, and reads
-  // Japanese text with an English voice when the two disagree.
+  // Japanese text with an English voice when the two disagree. `dir` mirrors the layout for Arabic.
   createEffect(
     () => locale(),
     (value) => {
       document.documentElement.lang = value;
+      document.documentElement.dir = localeDirection(value);
     },
   );
 
@@ -179,9 +181,12 @@ export function StaticI18nProvider(
   // English site), so the previous language comes back when it unmounts.
   createEffect(locale, (shown) => {
     const previous = document.documentElement.lang;
+    const previousDirection = document.documentElement.dir;
     document.documentElement.lang = shown;
+    document.documentElement.dir = localeDirection(shown);
     return () => {
       document.documentElement.lang = previous;
+      document.documentElement.dir = previousDirection;
     };
   });
   return (

@@ -19,15 +19,31 @@
   position: absolute;
   z-index: 15;
   top: 0;
-  right: 0;
+  inset-inline-end: 0;
   bottom: 0;
   display: flex;
   width: var(--settings-panel-width, 360px);
   flex-direction: column;
-  border-left: 1px solid var(--openbot-border);
+  border-inline-start: 1px solid var(--openbot-border);
   background: var(--openbot-bg-canvas);
   color: var(--openbot-text-primary);
   animation: settings-panel-in var(--openbot-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* The panel sits at the inline end, so in right-to-left text it slides in from the left. */
+.settings-panel:dir(rtl) {
+  animation-name: settings-panel-in-rtl;
+}
+
+@keyframes settings-panel-in-rtl {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .settings-panel-header {
@@ -92,6 +108,16 @@
   transform: translateX(-0.5px);
 }
 
+/* Back and forward follow the reading direction. The mirrored back chevron keeps its nudge. */
+.settings-back-icon:dir(rtl) {
+  transform: scaleX(-1) translateX(-0.5px);
+}
+
+.settings-forward-icon:dir(rtl),
+.settings-link-value > svg[class~="lucide-chevron-right"]:dir(rtl) {
+  transform: scaleX(-1);
+}
+
 .settings-panel-content {
   min-height: 0;
   overflow-y: auto;
@@ -105,7 +131,8 @@
 
 .settings-field > span {
   display: block;
-  margin: 0 0 6px 8px;
+  margin-block: 0 6px;
+  margin-inline: 8px 0;
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-md);
   line-height: 18px;
@@ -114,7 +141,8 @@
 /* The count and error under a field, after its control rather than above it like the label. */
 .settings-field > .ui-field-limit {
   display: grid;
-  margin: var(--openbot-space-1-5) 0 0 var(--openbot-space-2);
+  margin-block: var(--openbot-space-1-5) 0;
+  margin-inline: var(--openbot-space-2) 0;
 }
 
 .settings-field input,
@@ -250,7 +278,7 @@
 
 .agent-instructions-text :is(ul, ol) {
   margin: 0;
-  padding-left: var(--openbot-space-4);
+  padding-inline-start: var(--openbot-space-4);
 }
 
 .agent-instructions-text li + li {
@@ -304,14 +332,16 @@
   width: 100%;
   min-height: 42px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  /* Both sides can shrink, so a long value shares the row with the label and never covers it. */
+  grid-template-columns: minmax(0, auto) minmax(0, max-content);
+  justify-content: space-between;
   align-items: center;
   gap: var(--openbot-space-3);
   border: 0;
   border-radius: 0;
   background: transparent;
   padding: 0 var(--openbot-space-1);
-  text-align: left;
+  text-align: start;
   transition: none;
 }
 
@@ -347,11 +377,17 @@
 
 .settings-link-value {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: var(--openbot-space-2);
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
+}
+
+/* Truncated text clips at its line box; this line height keeps descenders inside it. */
+.settings-link-text {
+  line-height: var(--openbot-leading-md);
 }
 
 .settings-link-value svg {
@@ -378,7 +414,8 @@
 }
 
 .settings-link-section-title {
-  margin: 0 0 0 var(--openbot-space-1);
+  margin-block: 0;
+  margin-inline: var(--openbot-space-1) 0;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-medium);

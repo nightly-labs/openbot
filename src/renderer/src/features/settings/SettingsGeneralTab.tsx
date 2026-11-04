@@ -65,8 +65,9 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
             </ItemContent>
             <ItemActions>
               <AppearanceSelect
-                value={appearance.appearance()}
-                onChange={appearance.changeAppearance}
+                value={appearance.theme()}
+                onChange={appearance.changeTheme}
+                palettes={appearance.palettes()}
                 mount={props.selectMount}
               />
             </ItemActions>

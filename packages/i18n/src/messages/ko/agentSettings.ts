@@ -91,7 +91,7 @@ export const messages = {
   "agentSettings.backupModels.unavailable": "지금 사용할 수 없음 · 건너뜀",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.note":
-    "{name}은(는) 글을 쓰기 시작한 뒤에는 전환하지 않아요. 한도가 끝나거나 제공자 오류 후 10분이 지나면 {model}(으)로 돌아가요.",
+    "작업을 시작한 뒤 사용 한도로 {name}이(가) 멈추면, 순서에서 처음으로 사용 가능한 모델로 같은 작업을 이어가요. 한도가 끝나거나 제공자 오류 후 10분이 지나면 {model}(으)로 돌아가요.",
   "agentSettings.groups.brain": "두뇌",
   "agentSettings.groups.knows": "아는 것",
   "agentSettings.groups.does": "하는 일",
@@ -122,6 +122,9 @@ export const messages = {
   "agentSettings.avatar.resetToId": "ID로 재설정",
   "agentSettings.avatar.shape": "모양",
   "agentSettings.avatar.shuffle": "무작위 얼굴",
+  "agentSettings.avatar.style": "아바타 스타일",
+  "agentSettings.avatar.stylePlush": "봉제 인형",
+  "agentSettings.avatar.styleFlat": "플랫",
   "agentSettings.avatar.shapes": "아바타 모양",
   "agentSettings.avatar.shapeOption": "모양 {number}",
   "agentSettings.avatar.eyes": "눈",

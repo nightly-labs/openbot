@@ -148,6 +148,7 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
           agentId={agent.id}
           serverId={agent.serverId}
           hue={agent.avatarHue}
+          color={agent.avatarColor}
           seed={agent.avatarSeed}
           size={64}
           animateIdle={false}

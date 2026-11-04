@@ -18,6 +18,8 @@ interface AccountLoginProps {
   onRequestEmailCode: (email: string) => Promise<void>;
   onVerifyEmailCode: (challengeId: string, code: string) => Promise<void>;
   onReset: () => Promise<void>;
+  /** Opens the company sign-in page again: in the browser on desktop, in this tab on the web. */
+  onOpenCompanySignIn?: () => Promise<void>;
   /** A choice under the send button, such as the analytics box of the web app. */
   consent?: JSX.Element;
   /** Fine print under the lock line, such as the Terms of Service notice of the web app. */
@@ -28,8 +30,8 @@ interface AccountLoginProps {
   onChangeLanguage?: () => void;
 }
 
-type PendingAction = "retry" | "send" | "check" | "verify" | "resend" | "reset";
-type LoginStep = "email" | "code";
+type PendingAction = "retry" | "send" | "check" | "verify" | "resend" | "reset" | "company";
+type LoginStep = "email" | "code" | "company";
 type LoginTransition = "none" | "forward" | "back";
 
 const FIELD_ISSUES = new Set([
@@ -96,12 +98,15 @@ export function AccountLogin(props: AccountLoginProps) {
 
   const codeSent = () => props.state.status === "code_sent";
   const verified = () => props.state.status === "signed_in";
-  const loginStep = (): LoginStep => (codeSent() || verified() ? "code" : "email");
+  const companySignIn = () => (props.state.status === "company_sign_in" ? props.state : undefined);
+  const loginStep = (): LoginStep => (companySignIn() ? "company" : codeSent() || verified() ? "code" : "email");
   const challenge = () => (props.state.status === "code_sent" ? props.state : undefined);
   const connecting = () => props.state.status === "loading";
   const currentIssue = (): CentralAuthIssue | undefined => {
     if (props.state.status === "error") return props.state.issue;
-    return props.state.status === "code_sent" ? props.state.issue : undefined;
+    return props.state.status === "code_sent" || props.state.status === "company_sign_in"
+      ? props.state.issue
+      : undefined;
   };
   const displayedIssue = () => (issueVisible() ? currentIssue() : undefined);
   const unavailable = () => props.state.status === "error" && props.state.issue.code === "auth_api_unavailable";
@@ -146,6 +151,12 @@ export function AccountLogin(props: AccountLoginProps) {
     if (visibleIssue?.code === "invalid_sign_in_code") return sourceText(visibleIssue.message);
     return issue && NEW_CODE_ISSUES.has(issue.code) ? sourceText(issue.message) : null;
   };
+  const companyDescriptionParts = () => {
+    const [before = "", after = ""] = t("account.login.companyDescription", { email: EMAIL_MARKER }).split(
+      EMAIL_MARKER,
+    );
+    return [before, after] as const;
+  };
   const codeSentParts = () => {
     const [before = "", after = ""] = t("account.login.codeSent", { email: EMAIL_MARKER }).split(EMAIL_MARKER);
     return [before, after] as const;
@@ -164,7 +175,7 @@ export function AccountLogin(props: AccountLoginProps) {
     () => loginStep(),
     (step, previousStep) => {
       if (!previousStep || step === previousStep) return;
-      setLoginTransition(step === "code" ? "forward" : "back");
+      setLoginTransition(step === "email" ? "back" : "forward");
     },
   );
 
@@ -353,6 +364,20 @@ export function AccountLogin(props: AccountLoginProps) {
     }
   }
 
+  async function openCompanySignIn(): Promise<void> {
+    if (pendingAction() || !props.onOpenCompanySignIn) return;
+    setPendingAction("company");
+    setIssueVisible(false);
+    setLocalError(null);
+    try {
+      await props.onOpenCompanySignIn();
+    } catch (error) {
+      showActionError(error, t("account.login.companyOpenFailed"), false);
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
   async function resetEmail(): Promise<void> {
     if (pendingAction()) return;
     setPendingAction("reset");
@@ -391,30 +416,43 @@ export function AccountLogin(props: AccountLoginProps) {
                 ? t("account.login.unavailableTitle")
                 : verified()
                   ? t("account.login.signedInTitle")
-                  : codeSent()
-                    ? t("account.login.checkInboxTitle")
-                    : t("account.login.signInTitle")}
+                  : companySignIn()
+                    ? t("account.login.companyTitle")
+                    : codeSent()
+                      ? t("account.login.checkInboxTitle")
+                      : t("account.login.signInTitle")}
           </h1>
           <p id="account-login-description" class="account-login-description">
             <Show
-              when={challenge() || verified()}
+              when={!companySignIn()}
               fallback={
-                connecting()
-                  ? t("account.login.connectingDescription")
-                  : unavailable()
-                    ? sourceText(currentIssue()?.message ?? t("account.login.unavailableDescription"))
-                    : t("account.login.signInDescription")
+                <>
+                  {companyDescriptionParts()[0]}
+                  <strong>{companySignIn()?.email}</strong>
+                  {companyDescriptionParts()[1]}
+                </>
               }
             >
-              {verified() ? (
-                t("account.login.codeAccepted")
-              ) : (
-                <>
-                  {codeSentParts()[0]}
-                  <strong>{challenge()?.email}</strong>
-                  {codeSentParts()[1]}
-                </>
-              )}
+              <Show
+                when={challenge() || verified()}
+                fallback={
+                  connecting()
+                    ? t("account.login.connectingDescription")
+                    : unavailable()
+                      ? sourceText(currentIssue()?.message ?? t("account.login.unavailableDescription"))
+                      : t("account.login.signInDescription")
+                }
+              >
+                {verified() ? (
+                  t("account.login.codeAccepted")
+                ) : (
+                  <>
+                    {codeSentParts()[0]}
+                    <strong>{challenge()?.email}</strong>
+                    {codeSentParts()[1]}
+                  </>
+                )}
+              </Show>
             </Show>
           </p>
 
@@ -453,7 +491,64 @@ export function AccountLogin(props: AccountLoginProps) {
             )}
           </Show>
 
-          <Show when={!connecting() && !unavailable()}>
+          <Show when={companySignIn()}>
+            <div class="account-login-form" data-auth-panel="company" aria-busy={pendingAction() ? "true" : "false"}>
+              <Show
+                when={formIssue()}
+                fallback={
+                  <div class="account-login-loader" role="status" aria-live="polite">
+                    <span class="account-login-spinner" aria-hidden="true" />
+                    <span>{t("account.login.companyWaiting")}</span>
+                  </div>
+                }
+              >
+                {(issue) => (
+                  <p class="account-login-error" role="alert">
+                    {sourceText(issue().message)}
+                    <ErrorReference reference={issue().reference} />
+                  </p>
+                )}
+              </Show>
+              <Show when={localError()}>
+                {(failure) => (
+                  <p class="account-login-error" role="alert">
+                    {failure().message}
+                    <ErrorReference reference={failure().reference} />
+                  </p>
+                )}
+              </Show>
+              <Show when={props.onOpenCompanySignIn}>
+                <Button
+                  variant="default"
+                  type="button"
+                  class="account-login-primary"
+                  disabled={pendingAction() !== null}
+                  onClick={() => void openCompanySignIn()}
+                >
+                  <Show when={pendingAction() === "company"} fallback={t("account.login.companyOpenAgain")}>
+                    <span class="account-login-button-spinner" aria-hidden="true" />
+                    {t("account.login.companyOpening")}
+                  </Show>
+                </Button>
+              </Show>
+              <div class="account-login-code-actions">
+                <Button
+                  type="button"
+                  class="account-login-code-action account-login-code-action-change"
+                  variant="ghost"
+                  size="sm"
+                  disabled={pendingAction() !== null}
+                  data-cuelume-tap="navigate"
+                  onClick={() => void resetEmail()}
+                >
+                  <ArrowLeft size={14} aria-hidden="true" />
+                  {t("account.login.companyUseAnotherEmail")}
+                </Button>
+              </div>
+            </div>
+          </Show>
+
+          <Show when={!connecting() && !unavailable() && !companySignIn()}>
             <Show
               when={challenge() || verified()}
               fallback={

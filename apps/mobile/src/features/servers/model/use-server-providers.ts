@@ -123,7 +123,6 @@ export function useServerCustomProviders(serverId: string, admin: ProviderAdmin 
 /** The accounts of a host's providers, as the provider page and the account page show them. */
 export function useServerProviderAccounts(serverId: string, admin: ProviderAdmin | null) {
   const queryScope = useQueryScope();
-  const queryClient = useQueryClient();
   const accounts = admin?.accounts;
   const list = useQuery({
     queryKey: queryKeys.providerAccounts(queryScope, serverId),
@@ -131,15 +130,23 @@ export function useServerProviderAccounts(serverId: string, admin: ProviderAdmin
     staleTime: 0,
     queryFn: accounts ? () => accounts.list() : skipToken,
   });
-  // An agent page reads the same accounts under its own key, so a change reads them all again.
-  const refresh = useCallback(
+  const refresh = useRefreshProviderAccounts(serverId);
+  return { list, refresh };
+}
+
+/**
+ * Reads the accounts of a host's providers again, for a page that changes them but does not show
+ * them. An agent page reads the same accounts under its own key, so a change reads them all again.
+ */
+export function useRefreshProviderAccounts(serverId: string) {
+  const queryClient = useQueryClient();
+  return useCallback(
     () =>
       queryClient.invalidateQueries({
         predicate: (query) => query.queryKey.includes("provider-accounts") && query.queryKey.includes(serverId),
       }),
     [queryClient, serverId],
   );
-  return { list, refresh };
 }
 
 /** The custom ACP agents of a host, as the Providers page and the custom agent page show them. */

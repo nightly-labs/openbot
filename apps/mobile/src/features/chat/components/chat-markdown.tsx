@@ -15,7 +15,7 @@ import Blocks from "lucide-react-native/icons/blocks";
 import FileText from "lucide-react-native/icons/file-text";
 import Sparkles from "lucide-react-native/icons/sparkles";
 import type { Token, Tokens } from "marked";
-import { Fragment, memo, type ReactNode, useEffect, useId, useMemo, useRef } from "react";
+import { Fragment, memo, type ReactNode, useMemo } from "react";
 import {
   type ColorValue,
   Platform,
@@ -26,7 +26,6 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
-import { UITextView } from "react-native-uitextview";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
@@ -78,26 +77,13 @@ interface MathToken extends Tokens.Generic {
 // Marked's public Token union includes extension tokens; narrow its built-in tokens here.
 // Keeps the link icon on the same line as the first word of the link.
 const NO_BREAK_SPACE = "\u00a0";
-/** A selection that the handles still change reaches the chat after this pause. */
-const SELECTION_REPORT_DELAY_MS = 80;
 
 function tokenIs<K extends keyof MarkdownTokenByType>(token: Token, type: K): token is MarkdownTokenByType[K] {
   return token.type === type;
 }
 
-/**
- * Where a native selectable paragraph reports the text the reader selected in it. Unset where the
- * text is not a native text view: while a reply streams or reveals, in Expo Go and on Android.
- */
-interface NativeSelectionTarget {
-  /** Changes when the selection ends outside the paragraph, which then draws again without it. */
-  generation: number;
-  report: (paragraph: string, selected: string) => void;
-}
-
 interface TextPresentation {
   selectable: boolean;
-  nativeSelection?: NativeSelectionTarget;
   type: ChatTextType;
   style: TextStyle;
   codeColor: ColorValue;
@@ -348,6 +334,7 @@ function AgentMention({ agent, presentation }: { agent: MobileAgent; presentatio
         agentId={agent.id}
         serverId={agent.serverId}
         hue={agent.avatarHue}
+        color={agent.avatarColor}
         seed={agent.avatarSeed}
         size={chip.mark}
       />
@@ -509,212 +496,6 @@ function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNod
   });
 }
 
-/**
- * A part of a native paragraph, in the order the text view draws it. An inline view, such as a
- * mention or a code chip, takes one character in the text view and gives its own text to a quote.
- */
-interface SelectableSegment {
-  length: number;
-  text: string;
-}
-
-function selectedSegmentsText(segments: readonly SelectableSegment[], start: number, end: number): string {
-  let offset = 0;
-  let selected = "";
-  for (const segment of segments) {
-    const from = Math.max(start, offset);
-    const to = Math.min(end, offset + segment.length);
-    if (from < to) {
-      selected +=
-        segment.length === segment.text.length ? segment.text.slice(from - offset, to - offset) : segment.text;
-    }
-    offset += segment.length;
-  }
-  return selected;
-}
-
-/**
- * The inline tokens as children of a native text view, with the same look as `inline`. Strings and
- * nested `UITextView`s are text; any other view is an inline view. The text view cannot hold a
- * fragment, so this returns a flat list, and it records each part in `segments` in drawing order.
- */
-function selectableInline(tokens: Token[], presentation: TextPresentation, segments: SelectableSegment[]): ReactNode[] {
-  const nodes: ReactNode[] = [];
-  const text = (value: string) => {
-    if (!value) return;
-    segments.push({ length: value.length, text: value });
-    nodes.push(value);
-  };
-  // The native text view takes the line height of a line from its first character, and an inline view
-  // has no line height. A line that starts with one became taller than the view measured it, and its
-  // end was cut with an ellipsis. A word joiner before the view gives the line the text's line height.
-  const startLine = (target: ReactNode[] = nodes) => {
-    const last = segments.at(-1);
-    if (last && !(last.length === last.text.length && last.text.endsWith("\n"))) return;
-    segments.push({ length: 1, text: "" });
-    target.push(WORD_JOINER);
-  };
-  const inlineView = (node: ReactNode, quote: string) => {
-    startLine();
-    segments.push({ length: 1, text: quote });
-    nodes.push(node);
-  };
-  for (const { value: token, offset } of sourceEntries(tokens, (entry) => entry.raw)) {
-    if (token.type === "agentMention") {
-      const reference = chatTagReferences(token.raw)[0];
-      const agent = presentation.agents.find((candidate) => candidate.id === reference?.id);
-      if (agent) inlineView(<AgentMention key={offset} agent={agent} presentation={presentation} />, `@${agent.name}`);
-      else text(`@${reference?.name ?? "Agent"}`);
-    } else if (token.type === "skillMention") {
-      const reference = chatTagReferences(token.raw)[0];
-      const name = reference?.name ?? "";
-      inlineView(
-        <SkillMention key={offset} name={name} app={reference?.kind === "mcp"} presentation={presentation} />,
-        `@${name}`,
-      );
-    } else if (token.type === "br") {
-      text("\n");
-    } else if (token.type === "checkbox") {
-      // The list row draws the task mark.
-    } else if (tokenIs(token, "inlineMath")) {
-      // One view, so the formula is one character whether it draws or falls back to code.
-      inlineView(
-        <View key={offset} collapsable={false} className="flex-row flex-wrap">
-          <ChatMath
-            tex={token.text}
-            display={token.display}
-            block={false}
-            textSize={textSize(presentation)}
-            color={presentation.style.color}
-            fallback={<CodeSpan text={token.raw} presentation={presentation} />}
-          />
-        </View>,
-        token.raw,
-      );
-    } else if (tokenIs(token, "text")) {
-      if (token.tokens) {
-        nodes.push(...selectableInline(token.tokens, presentation, segments));
-      } else {
-        for (const part of plainMentionParts(token.text, presentation.agents)) {
-          if (part.agent) {
-            inlineView(
-              <AgentMention key={`${offset}:${segments.length}`} agent={part.agent} presentation={presentation} />,
-              `@${part.agent.name}`,
-            );
-          } else {
-            text(part.text);
-          }
-        }
-      }
-    } else if (tokenIs(token, "escape")) {
-      text(token.text);
-    } else if (tokenIs(token, "codespan")) {
-      // `CodeSpan` draws one chip per piece, and each chip is one inline view.
-      const pieces = isFileReference(token.text.trim()) ? [token.text.trim()] : codePieces(token.text);
-      startLine();
-      for (const piece of pieces) segments.push({ length: 1, text: piece });
-      nodes.push(<CodeSpan key={offset} text={token.text} presentation={presentation} />);
-    } else if (tokenIs(token, "strong") || tokenIs(token, "em") || tokenIs(token, "del")) {
-      const style: TextStyle = {
-        ...presentation.style,
-        ...(token.type === "strong"
-          ? { fontWeight: "700" }
-          : token.type === "em"
-            ? { fontStyle: "italic" }
-            : { textDecorationLine: "line-through" }),
-      };
-      nodes.push(
-        <UITextView key={offset} style={style}>
-          {selectableInline(token.tokens, { ...presentation, style }, segments)}
-        </UITextView>,
-      );
-    } else if (tokenIs(token, "link") || tokenIs(token, "image")) {
-      const url = webLink(token.href);
-      const icon: ReactNode[] = [];
-      const label: ReactNode[] = [];
-      if (url && tokenIs(token, "link")) {
-        startLine(icon);
-        segments.push({ length: 1, text: "" }, { length: 1, text: NO_BREAK_SPACE });
-        icon.push(
-          <ChatLinkIcon
-            key="icon"
-            url={url}
-            favicon={presentation.linkFavicons}
-            color={presentation.style.color}
-            compact={presentation.type === "body-sm"}
-          />,
-          NO_BREAK_SPACE,
-        );
-      }
-      if (tokenIs(token, "image")) {
-        const name = token.text || presentation.t("mobile.chat.markdown.image");
-        segments.push({ length: name.length, text: name });
-        label.push(name);
-      } else {
-        label.push(...selectableInline(token.tokens, { ...presentation, agents: [] }, segments));
-      }
-      if (!url) {
-        nodes.push(...label);
-      } else {
-        const open = () => openMessageLink(url);
-        nodes.push(
-          <UITextView key={offset} style={presentation.style} onPress={open}>
-            {icon}
-            <UITextView key="label" style={{ ...presentation.style, textDecorationLine: "underline" }} onPress={open}>
-              {label}
-            </UITextView>
-          </UITextView>,
-        );
-      }
-    } else {
-      // HTML remains inert text.
-      text(token.raw);
-    }
-  }
-  return nodes;
-}
-
-/**
- * A paragraph or a heading as a native iOS text view: a touch and hold selects the word under the
- * finger, the handles change the range, and the formatting stays as it is drawn.
- */
-function SelectableParagraph({
-  tokens,
-  presentation,
-  style,
-  heading = false,
-}: {
-  tokens: Token[];
-  presentation: TextPresentation & { nativeSelection: NativeSelectionTarget };
-  style: TextStyle;
-  heading?: boolean;
-}) {
-  const paragraph = useId();
-  const segments: SelectableSegment[] = [];
-  const children = selectableInline(tokens, presentation, segments);
-  const report = presentation.nativeSelection.report;
-  return (
-    <UITextView
-      // A new generation draws the paragraph again, which ends a selection that is still in it.
-      key={presentation.nativeSelection.generation}
-      uiTextView
-      selectable
-      accessibilityRole={heading ? "header" : undefined}
-      style={[CHAT_TEXT_STYLES[presentation.type], style]}
-      onSelectionChange={({ nativeEvent }) =>
-        report(
-          paragraph,
-          nativeEvent.start === nativeEvent.end
-            ? ""
-            : selectedSegmentsText(segments, nativeEvent.start, nativeEvent.end),
-        )
-      }
-    >
-      {children}
-    </UITextView>
-  );
-}
-
 function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation: TextPresentation }) {
   let run: Token[] = [];
   let line: Token[][] = [run];
@@ -814,16 +595,6 @@ const MarkdownBlock = memo(function MarkdownBlock({
     if (inList && Platform.OS !== "android" && token.tokens?.some((child) => tokenIs(child, "codespan"))) {
       return <ListParagraph tokens={token.tokens} presentation={presentation} />;
     }
-    const { nativeSelection } = presentation;
-    if (nativeSelection) {
-      return (
-        <SelectableParagraph
-          tokens={token.tokens ?? [{ type: "text", raw: token.text, text: token.text, escaped: false }]}
-          presentation={{ ...presentation, nativeSelection }}
-          style={textContainerStyle(token.raw, presentation)}
-        />
-      );
-    }
     return (
       <Text
         selectable={presentation.selectable}
@@ -835,17 +606,6 @@ const MarkdownBlock = memo(function MarkdownBlock({
   }
   if (tokenIs(token, "heading")) {
     const heading: TextPresentation = { ...presentation, type: token.depth <= 2 ? "h4" : "h5" };
-    const { nativeSelection } = heading;
-    if (nativeSelection) {
-      return (
-        <SelectableParagraph
-          heading
-          tokens={token.tokens}
-          presentation={{ ...heading, nativeSelection }}
-          style={textContainerStyle(token.raw, presentation)}
-        />
-      );
-    }
     const level = heading.type === "h4" ? "h4" : "h5";
     return (
       <Text
@@ -966,7 +726,6 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   playback,
   selectable = true,
   agents = NO_AGENTS,
-  nativeSelection,
   finished = false,
   linkFavicons = true,
 }: {
@@ -980,11 +739,6 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   playback?: ReplyPlayback;
   selectable?: boolean;
   agents?: readonly MobileAgent[];
-  /**
-   * Draws the text as native selectable text views, and reports the text selected in the message,
-   * or an empty string when the selection ends. A new `generation` ends a selection from outside.
-   */
-  nativeSelection?: { generation: number; onSelect: (selected: string) => void };
   /**
    * False shows only the link symbol, so that no linked site is asked for its favicon. Use it for
    * text that another person wrote, such as the instructions of a marketplace skill.
@@ -1004,38 +758,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   const { tokens: visibleTokens, flushed } = useReplyPlayback(reveal, playback);
   const codeColor = useThemeColor("foreground");
   const { t } = useText();
-  // A reply turns into native text views once it has stopped streaming and its words have all
-  // shown, so the reveal keeps its fading words. The views then hold the same text in place.
-  const revealed =
-    !streaming &&
-    (!playback?.enabled || (playback.complete && (playback.progress.get(playback.id) ?? 0) >= reveal.words.length));
-  const generation = nativeSelection?.generation;
-  const onSelect = nativeSelection?.onSelect;
-  const selectionReport = useRef<{ paragraph: string | null; timer?: ReturnType<typeof setTimeout> }>({
-    paragraph: null,
-  });
-  useEffect(() => () => clearTimeout(selectionReport.current.timer), []);
-  const nativeTarget = useMemo<NativeSelectionTarget | undefined>(() => {
-    if (generation === undefined || !onSelect) return undefined;
-    return {
-      generation,
-      // One paragraph holds the selection at a time. Dragging a handle reports on each step, so
-      // the text reaches the chat after a short pause; the end of a selection reaches it at once.
-      report: (paragraph, selected) => {
-        const state = selectionReport.current;
-        clearTimeout(state.timer);
-        if (selected) {
-          state.paragraph = paragraph;
-          state.timer = setTimeout(() => onSelect(selected), SELECTION_REPORT_DELAY_MS);
-        } else if (state.paragraph === paragraph) {
-          state.paragraph = null;
-          onSelect("");
-        }
-      },
-    };
-  }, [generation, onSelect]);
   const animateTail = (streaming || (Boolean(playback?.enabled) && !flushed)) && animationEnabled && textReveal;
-  const nativeSelectionTarget = revealed ? nativeTarget : undefined;
   // One object while its values stay, so each block keeps its memo when the message renders again.
   const presentation = useMemo<TextPresentation>(
     () => ({
@@ -1050,23 +773,9 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       streaming,
       finished,
       animateTail,
-      nativeSelection: nativeSelectionTarget,
       linkFavicons,
     }),
-    [
-      linkFavicons,
-      selectable,
-      compact,
-      color,
-      codeColor,
-      agents,
-      fontScale,
-      t,
-      streaming,
-      finished,
-      animateTail,
-      nativeSelectionTarget,
-    ],
+    [linkFavicons, selectable, compact, color, codeColor, agents, fontScale, t, streaming, finished, animateTail],
   );
   return (
     <StreamRevealProvider>

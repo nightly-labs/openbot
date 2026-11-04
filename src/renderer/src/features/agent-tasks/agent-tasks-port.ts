@@ -16,12 +16,19 @@ export interface AgentTasksPort
   > {
   /** Steers the thread's running turn, or queues the message in the thread. */
   sendToTask(
-    input: AgentTaskInput & { text: string; attachmentDraftIds?: string[]; clientMessageId: string },
+    input: AgentTaskInput & {
+      text: string;
+      attachmentDraftIds?: string[];
+      replyToMessageId?: string;
+      clientMessageId: string;
+    },
   ): Promise<unknown>;
   /** Missing where the server cannot move a queued message of the agent's own chat to a new thread. */
   runQueuedMessageAsTask?: OpenBotDesktopApi["agent"]["runQueuedMessageAsTask"];
   /** Missing where the server cannot branch a conversation. The branch actions then do not show. */
   branchTask?: OpenBotDesktopApi["agent"]["branchTask"];
+  /** Deletes one message of a thread. Missing where the server cannot delete messages. */
+  deleteTaskMessage?: ((input: { agentId: string; taskId: string; messageId: string }) => Promise<void>) | undefined;
 }
 
 /**
@@ -43,6 +50,7 @@ export function agentTasksPort(): AgentTasksPort {
     reopenTask: (input, serverId) => agent.reopenTask(input, serverId),
     renameTask: (input) => agent.renameTask(input),
     deleteTask: (input, serverId) => agent.deleteTask(input, serverId),
+    deleteTaskMessage: (input) => agent.deleteConversationMessage(input),
     markTaskRead: (input) => agent.markTaskRead(input),
   };
 }

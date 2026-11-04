@@ -16,7 +16,7 @@ import {
   AgentStepsDisclosure,
   type AgentStepsFacts,
 } from "@openbot/ui/features/conversation/AgentSteps";
-import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
+import type { AttachmentDownloads, AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
 import { branchPointIds } from "@openbot/ui/features/conversation/branch-points";
 import { type ChatMessageAuthor, ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ComposerAddMenu } from "@openbot/ui/features/conversation/ComposerAddMenu";
@@ -30,10 +30,11 @@ import {
   type ComposerSelection,
 } from "@openbot/ui/features/conversation/ComposerEditor";
 import { ComposerNotice } from "@openbot/ui/features/conversation/ComposerNotice";
+import { ComposerReplyPreview } from "@openbot/ui/features/conversation/ComposerReplyPreview";
 import { ComposerSendControl } from "@openbot/ui/features/conversation/ComposerSendControl";
 import { ContextUsageMeter, type ContextUsageView } from "@openbot/ui/features/conversation/ContextUsage";
 import { ApprovalCard } from "@openbot/ui/features/conversation/ConversationPrompts";
-import { MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
+import { DeleteMessageDialog, MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
 import type { SendShortcut } from "@openbot/ui/features/conversation/send-shortcut";
 import { ComposerVoiceControls, type VoicePhase } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { type TextValue, useText } from "@openbot/ui/text";
@@ -122,10 +123,16 @@ export interface AgentThreadViewProps {
   onRemoveAttachment?: ((attachment: DraftAttachment) => void) | undefined;
   /** Loads the images of a client that gets no `previewUrl`. */
   mediaSource?: AttachmentMediaSource | undefined;
+  /** The download state of attachments from a joined server. */
+  downloads?: AttachmentDownloads | undefined;
   onDraftChange: (text: string) => void;
-  /** Receives pasted files. Without it, a file paste does nothing here. */
+  /** Receives pasted files and long text pastes, as `ComposerEditor` says. Without it, a file paste does nothing here. */
   onPasteFiles?:
-    | ((files: File[], selection: ComposerSelection) => undefined | Promise<ComposerPasteResult | undefined>)
+    | ((
+        files: File[],
+        selection: ComposerSelection,
+        text?: string,
+      ) => undefined | Promise<ComposerPasteResult | undefined>)
     | undefined;
   onOpenDraftAttachment?: ((attachment: DraftAttachment) => void) | undefined;
   /** Opens the file picker. Without it, the "+" menu has no image or context item. */
@@ -176,8 +183,21 @@ export interface AgentThreadViewProps {
    * offers it. Missing where the host cannot branch.
    */
   onBranch?: ((messageId: string) => void) | undefined;
+  /**
+   * Deletes a message of the thread, after the reader confirms. Missing where the host cannot delete
+   * messages. `canDeleteMessage` says which messages offer it.
+   */
+  onDeleteMessage?: ((messageId: string) => Promise<void>) | undefined;
+  /** Whether the reader can delete a message. Without it, every message that is not streaming can. */
+  canDeleteMessage?: ((message: AgentMessage) => boolean) | undefined;
   /** Where the thread came from, when it is a branch. A line shows after the copied messages. */
   branchSource?: AgentThreadBranchSource | undefined;
+  /** Makes the draft a reply to a message of the thread. Missing where the host cannot take a reply in a thread. */
+  onReply?: ((message: AgentMessage) => void) | undefined;
+  /** The message that the draft replies to. It shows above the message box. */
+  replyTo?: AgentMessage | undefined;
+  /** Removes the reply from the draft. */
+  onCancelReply?: (() => void) | undefined;
   /** A message to scroll to and mark once, when it shows. Each new request has a new nonce. */
   focusMessage?: { messageId: string; nonce: number } | undefined;
 }
@@ -229,32 +249,50 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       fades.stop();
     };
   });
+  /** Scrolls to the row of a message and marks it, as a click on a quote does. False when the row does not show. */
+  function showMessage(messageId: string): boolean {
+    const message = scroller?.querySelector<HTMLElement>(`[data-chat-search-message="${CSS.escape(messageId)}"]`);
+    const row = message?.closest<HTMLElement>(".virtual-chat-row");
+    if (!row) return false;
+    atEnd = false;
+    row.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+    // The row lights up, then fades.
+    delete row.dataset.replyFlash;
+    void row.offsetWidth;
+    row.dataset.replyFlash = "";
+    const end = (event: AnimationEvent) => {
+      if (event.target !== row || event.animationName !== "reply-flash") return;
+      row.removeEventListener("animationend", end);
+      delete row.dataset.replyFlash;
+    };
+    row.addEventListener("animationend", end);
+    return true;
+  }
   let focusedNonce: number | undefined;
   // The thread scrolls to a message once, when its row shows, for example its source after "Branched from".
   createEffect(
     () => ({ focus: props.focusMessage, count: props.messages.length, taskId: props.task?.id }),
     ({ focus }) => {
-      if (!focus || focus.nonce === focusedNonce || !scroller) return;
-      const message = scroller.querySelector<HTMLElement>(
-        `[data-chat-search-message="${CSS.escape(focus.messageId)}"]`,
-      );
-      const row = message?.closest<HTMLElement>(".virtual-chat-row");
-      if (!row) return;
-      focusedNonce = focus.nonce;
-      atEnd = false;
-      row.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
-      // The same mark as a click on a quote: the row lights up, then fades.
-      delete row.dataset.replyFlash;
-      void row.offsetWidth;
-      row.dataset.replyFlash = "";
-      const end = (event: AnimationEvent) => {
-        if (event.target !== row || event.animationName !== "reply-flash") return;
-        row.removeEventListener("animationend", end);
-        delete row.dataset.replyFlash;
-      };
-      row.addEventListener("animationend", end);
+      if (!focus || focus.nonce === focusedNonce) return;
+      if (showMessage(focus.messageId)) focusedNonce = focus.nonce;
     },
   );
+  const messagesById = createMemo(() => new Map(props.messages.map((message) => [message.id, message])));
+  /** The message that a reply quotes, when the thread has it. */
+  const referenced = (message: AgentMessage) => {
+    const id = message.replyToMessageId;
+    return id ? messagesById().get(id) : undefined;
+  };
+  /** Each Reply moves the caret to the message box, as in the agent's own chat. */
+  const [replyFocus, setReplyFocus] = createSignal(0);
+  const replyAction = (message: AgentMessage) => {
+    const onReply = props.onReply;
+    if (!onReply) return undefined;
+    return () => {
+      onReply(message);
+      setReplyFocus((current) => current + 1);
+    };
+  };
   const active = () => (props.task ? isAgentTaskActive(props.task) : false);
   /** The answers that end a finished turn: each offers a branch. */
   const branchPoints = createMemo(() => branchPointIds(props.messages, props.task?.activeTurnId));
@@ -265,6 +303,14 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     if (!onBranch || !branchPoints().has(message.id)) return undefined;
     return () => onBranch(message.id);
   };
+  /** The message that the delete dialog asks about. */
+  const [deleteTargetId, setDeleteTargetId] = createSignal<string | null>(null);
+  const deleteAction = (message: AgentMessage) => {
+    if (!props.onDeleteMessage || message.streaming) return undefined;
+    if (props.canDeleteMessage && !props.canDeleteMessage(message)) return undefined;
+    return () => setDeleteTargetId(message.id);
+  };
+  const deleteMessage = (messageId: string) => props.onDeleteMessage?.(messageId) ?? Promise.resolve();
   const title = () => props.task?.title ?? t("conversation.threads.new");
   const placeholder = () =>
     props.task
@@ -303,7 +349,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       avatarSeed: senderId,
     };
   };
-  /** The action row of a message: Copy, and Branch on the last answer of a finished turn. */
+  /** The action row of a message: Reply, Copy, and Branch on the last answer of a finished turn. */
   function messageActions(message: AgentMessage): JSX.Element | undefined {
     const onCopy = props.onCopyMessage;
     if (!onCopy || message.streaming) return undefined;
@@ -318,6 +364,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         onTogglePicker={() => undefined}
         onExpandEmoji={() => undefined}
         onReact={() => undefined}
+        onReply={replyAction(message)}
         onCopy={() => onCopy(message)}
         onBranch={branchAction(message)}
         branchDisabled={branchBusy()}
@@ -334,16 +381,31 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         authorName={author(message).name}
         reactions={false}
         onReact={() => undefined}
+        onReply={replyAction(message)}
         onCopy={() => onCopy(message)}
         onBranch={branchAction(message)}
         branchDisabled={branchBusy()}
+        onDelete={deleteAction(message)}
       />
     );
   }
-  /** The branch line shows after the last message that the branch copied. */
-  function branchDividerAfter(messageId: string): AgentThreadBranchSource | undefined {
+  /**
+   * The row that the branch line follows: the last message that the branch copied. That message can be
+   * one that the thread does not show as a row, such as a thought in the steps of a turn. Then the line
+   * follows the last shown message from before the branch was made: the copies keep their times.
+   */
+  const branchDividerId = createMemo(() => {
     const source = props.branchSource;
-    return source?.throughMessageId === messageId ? source : undefined;
+    if (!source) return undefined;
+    const shown = props.messages.filter(shownInThread);
+    if (shown.some((message) => message.id === source.throughMessageId)) return source.throughMessageId;
+    const branchedAt = props.task ? Date.parse(props.task.createdAt) : Number.NaN;
+    if (Number.isNaN(branchedAt)) return undefined;
+    return shown.findLast((message) => message.createdAt !== undefined && Date.parse(message.createdAt) < branchedAt)
+      ?.id;
+  });
+  function branchDividerAfter(messageId: string): AgentThreadBranchSource | undefined {
+    return branchDividerId() === messageId ? props.branchSource : undefined;
   }
   const failed = () => (props.task?.state === "idle" && props.task.outcome === "failed" ? props.task : undefined);
   const running = () =>
@@ -405,8 +467,14 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                   onPreview={props.onPreview}
                   onAttachmentAction={props.onAttachmentAction}
                   mediaSource={props.mediaSource}
+                  downloads={props.downloads}
                   onDownload={(attachment) => props.onAttachmentAction(attachment, "download")}
                   macWindowControls={props.macWindowControls}
+                  referencedMessage={referenced(message())}
+                  onOpenReference={() => {
+                    const id = message().replyToMessageId;
+                    if (id) showMessage(id);
+                  }}
                   actions={messageActions(message())}
                   menu={messageMenu(message())}
                   data-chat-search-message={message().id}
@@ -473,6 +541,17 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             />
           )}
         </Show>
+        <Show when={props.replyTo}>
+          {(message) => (
+            <ComposerReplyPreview
+              message={message()}
+              agents={props.agents}
+              skills={props.skills}
+              disabled={sending() || voicePhase() === "transcribing"}
+              onCancel={() => props.onCancelReply?.()}
+            />
+          )}
+        </Show>
         <form
           class="composer agent-thread-composer"
           data-compact={hasRow() ? undefined : "true"}
@@ -501,9 +580,9 @@ export function AgentThreadView(props: AgentThreadViewProps) {
               mcpServers={props.mcpServers}
               attachments={props.draftAttachments}
               value={props.draft}
-              placeholder={placeholder()}
+              placeholder={props.replyTo ? t("composer.placeholder.reply") : placeholder()}
               ariaLabel={placeholder()}
-              focusRequest={props.focusRequest}
+              focusRequest={(props.focusRequest ?? 0) + replyFocus()}
               skillPickerRequest={skillPickerRequest()}
               dictation={{ text: props.voice?.liveText ?? "", final: voicePhase() === "transcribing" }}
               disabled={sending() || voicePhase() === "transcribing"}
@@ -551,6 +630,11 @@ export function AgentThreadView(props: AgentThreadViewProps) {
           </div>
         </form>
       </div>
+      <DeleteMessageDialog
+        messageId={deleteTargetId()}
+        onDelete={deleteMessage}
+        onClose={() => setDeleteTargetId(null)}
+      />
     </>
   );
 }

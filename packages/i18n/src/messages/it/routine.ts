@@ -306,6 +306,13 @@ export const messages = {
     "Il segreto attuale smette subito di funzionare. Le richieste firmate con quel segreto vengono rifiutate finché chi le invia non usa il nuovo segreto.",
   "routine.webhook.regenerateConfirm": "Rigenera",
   "routine.webhook.regenerateFailed": "Impossibile rigenerare il segreto di firma.",
+  "routine.webhook.useSenderSecret": "Usa il segreto del mittente",
+  "routine.webhook.senderSecretTitle": "Usare il segreto di firma del mittente?",
+  "routine.webhook.senderSecretDescription":
+    "Alcuni mittenti, come Composio e Svix, creano un proprio segreto di firma. Incollalo qui. Il segreto attuale smette subito di funzionare.",
+  "routine.webhook.senderSecretLabel": "Segreto del mittente",
+  "routine.webhook.senderSecretConfirm": "Usa segreto",
+  "routine.webhook.senderSecretFailed": "Impossibile salvare il segreto del mittente.",
   "routine.webhook.statusFailed": "Impossibile verificare se l'host è connesso al relay.",
 
   "routine.settings.instruction": "Istruzione",

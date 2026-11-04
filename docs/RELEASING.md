@@ -299,6 +299,16 @@ asset SHA-256 and size, `installedBytes` above the extracted size, and the SHA-2
 paths in `files` are relative to the archive's `kimi/` folder. Do not follow or copy the symbolic
 links in the archive. Set `licenseSha256` to the SHA-256 of `LICENSE` at the version tag.
 
+## Pin the Devin CLI
+
+`native-runtime.lock.json` pins the Devin CLI by hand. Read `version` from
+`https://static.devin.ai/cli/current/manifest.json` and set `version`. For each target, download
+`devin-<version>-<triple>.tar.gz` (`.zip` on Windows) from `https://static.devin.ai/cli/<version>/`,
+and check its SHA-256 against the manifest `sha256`. Set `url`, `assetSha256`, `downloadBytes`,
+`installedBytes` (the size of the extracted `bin/` and `share/` folders), and the SHA-256 of
+`bin/devin` (`bin/devin.exe` on Windows). `share/` holds only documentation, so it is not in
+`files`.
+
 ## Pin the OpenCode CLI
 
 `native-runtime.lock.json` also pins the OpenCode CLI that OpenBot downloads for the OpenCode

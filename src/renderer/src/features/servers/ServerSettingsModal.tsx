@@ -22,7 +22,6 @@ import {
   Blocks,
   Button,
   CalendarClock,
-  ChevronRight,
   Download,
   Globe2,
   HardDrive,
@@ -55,10 +54,12 @@ import { actionToast } from "../../action-toast";
 import { type ServerBrowserProfilesOptions, ServerBrowserProfilesPanel } from "../browser/ServerBrowserProfilesPanel";
 import { type ServerStorageOptions, ServerStoragePanel } from "../files/ServerStoragePanel";
 import { type HostProviderSettings, HostProviderSettingsPanel } from "../settings/ProviderSettingsSection";
+import type { HostModelVisibilityOptions, ProviderModelVisibilitySource } from "../settings/provider-model-visibility";
 import type { HostPromptCacheTtlOptions, ProviderPromptCacheSource } from "../settings/provider-prompt-cache";
 import { type ServerVaultOptions, ServerVaultPanel } from "../vault/ServerVaultPanel";
 import type { McpServerConfig, McpTestResult } from "./mcp-servers";
 import { createServerAuditSection, type ServerAuditOptions } from "./ServerAuditSection";
+import { type CompanySignInCalls, createServerCompanySignInSection } from "./ServerCompanySignInSection";
 import { ServerDesktopPanel } from "./ServerDesktopPanel";
 import { createServerGeneralSection } from "./ServerGeneralSection";
 import { type ServerImportDetail, type ServerImportOptions, ServerImportPanel } from "./ServerImportPanel";
@@ -100,6 +101,8 @@ export interface ServerSettingsModalProps {
    * Members section first asks to add a user to it. Absent on surfaces with no account license.
    */
   license?: Pick<LicenseCalls, "getState" | "setUsers" | "changePlan"> | undefined;
+  /** Company sign-in for the owner of a published server. Absent where the app cannot manage it. */
+  companySignIn?: CompanySignInCalls | undefined;
   /** Opens the contact page when a full license already has the most users that the app sells. */
   onContactUs?: () => void;
   onUpdateMember: (input: UpdateTeamMemberInput) => Promise<void>;
@@ -206,6 +209,11 @@ export interface ServerSettingsModalProps {
    * administers.
    */
   hostPromptCacheTtl?: HostPromptCacheTtlOptions | undefined;
+  /**
+   * Each provider page shows its Models section only when a caller supplies this, and only for the
+   * local server or a remote host with `model-visibility-v1` that this member administers.
+   */
+  hostModelVisibility?: HostModelVisibilityOptions | undefined;
   /**
    * The Roles section appears only when a caller supplies this, and only for the local server or a
    * remote host with `agent-access-v1` that this member administers.
@@ -320,6 +328,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "prompt-cache-ttl-v1")) return undefined;
     return { ...options, serverId: props.server.id };
   }
+  function modelVisibilitySource(): ProviderModelVisibilitySource | undefined {
+    const options = props.hostModelVisibility;
+    if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "model-visibility-v1")) return undefined;
+    return { ...options, serverId: props.server.id };
+  }
   const availableInitialSection = (): Section | null =>
     props.initialSection === "updates" && !props.hostUpdate ? null : (props.initialSection ?? null);
   const published = () => (local() ? props.hostStatus?.phase === "online" : props.server.state === "online");
@@ -369,6 +382,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       saveIdentityDraft: general.saveIdentityDraft,
     },
     roles,
+  );
+  const companySignIn = createServerCompanySignInSection(
+    host,
+    () => props.companySignIn,
+    () => props.open && section() === "members",
   );
   const hostedSites = createSettingsHostedSitesStore(
     {
@@ -425,6 +443,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         setSection(untrack(availableInitialSection) ?? "general");
         general.resetForServer();
         members.resetForServer();
+        companySignIn.resetForServer();
         roles.resetForServer();
         audit.resetForServer();
       }
@@ -516,19 +535,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         class="server-settings-modal-shell"
         page={props.page}
         open={props.open}
-        title={
-          <Show when={crumbDetail()} fallback={t(sections[section()].title)}>
-            {(detail) => (
-              <span class="settings-modal-crumbs">
-                <Button type="button" variant="ghost" class="settings-modal-crumb-parent" onClick={detail().back}>
-                  {t(sections[section()].title)}
-                </Button>
-                <ChevronRight class="settings-modal-crumb-separator" aria-hidden="true" />
-                <span class="settings-modal-crumb-current">{detail().title}</span>
-              </span>
-            )}
-          </Show>
-        }
+        title={t(sections[section()].title)}
+        crumb={crumbDetail()}
         description={t(sections[section()].description)}
         contentKey={`${props.server.id}:${section()}`}
         restoreFocusTarget={props.restoreFocusTarget}
@@ -751,6 +759,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         </Show>
         <Tabs.Content value="members" class="settings-modal-tab-panel server-settings-panel" data-tab="members">
           <members.Panel />
+          <companySignIn.Panel />
         </Tabs.Content>
         <Show when={roles.available()}>
           <Tabs.Content value="roles" class="settings-modal-tab-panel server-settings-panel" data-tab="roles">
@@ -844,6 +853,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                   selectMount={modalElement()}
                   onDetailChange={setProviderDetail}
                   promptCache={promptCacheSource()}
+                  modelVisibility={modelVisibilitySource()}
                 />
               )}
             </Show>

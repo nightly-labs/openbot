@@ -1,4 +1,3 @@
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { ConversationQuestionPrompt } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock, UiConfirmBlock, UiConfirmValueField } from "@openbot/contracts/ui-blocks";
 import { Button, Typography } from "heroui-native";
@@ -7,14 +6,14 @@ import Check from "lucide-react-native/icons/check";
 import ChevronLeft from "lucide-react-native/icons/chevron-left";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import MessageSquareText from "lucide-react-native/icons/message-square-text";
-import Send from "lucide-react-native/icons/send";
 import X from "lucide-react-native/icons/x";
 import { useEffect, useState } from "react";
-import { TextInput, View } from "react-native";
+import { View } from "react-native";
+import { ChatVaultRequest } from "@/features/chat/components/chat-vault-request";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
+import { vaultRequestOf } from "@/features/chat/model/vault-request";
 import { haptics } from "@/shared/lib/haptics";
-import { selectionColorProps } from "@/shared/lib/selection-color";
 import { useText } from "@/shared/lib/text";
 
 type ConfirmPlan = Omit<UiConfirmBlock, "fields"> & { fields: UiConfirmValueField[] };
@@ -114,7 +113,7 @@ function ChatPlanPrompt({
   return (
     <View className="w-full gap-2.5" accessibilityLabel={t("mobile.chat.question.form")}>
       <View
-        className="max-w-[92%] flex-row items-start gap-2 self-start rounded-[30px] bg-control/60 px-4 py-3"
+        className="max-w-[92%] flex-row items-start gap-2 self-start rounded-[20px] bg-control/60 px-4 py-3"
         style={{ borderCurve: "circular" }}
       >
         <View className="min-w-0 flex-1 pt-1">
@@ -177,12 +176,14 @@ function ChatPlanPrompt({
 }
 
 export function ChatQuestionPrompt({
+  serverId,
   prompt,
   uiBlock,
   controller,
   canSend,
   onActivate,
 }: {
+  serverId: string;
   prompt: ConversationQuestionPrompt;
   uiBlock?: ConversationUiBlock | undefined;
   controller?: QuestionPromptController;
@@ -190,11 +191,24 @@ export function ChatQuestionPrompt({
   onActivate?: () => void;
 }) {
   const { t } = useText();
-  const [foreground, muted, accentForeground] = useThemeColor(["foreground", "muted", "accent-foreground"]);
+  const [muted, accentForeground] = useThemeColor(["muted", "accent-foreground"]);
+  const vaultRequest = vaultRequestOf(uiBlock);
+  if (vaultRequest && uiBlock)
+    return (
+      <ChatVaultRequest
+        serverId={serverId}
+        prompt={prompt}
+        uiBlock={uiBlock}
+        request={vaultRequest}
+        controller={controller}
+        canSend={canSend}
+        onActivate={onActivate}
+      />
+    );
   const plan = confirmPlan(prompt, uiBlock);
   if (!prompt.resolution && !controller && onActivate) {
     return (
-      <View className="max-w-[92%] self-start gap-2 rounded-[30px] bg-control/60 px-4 py-3">
+      <View className="max-w-[92%] self-start gap-2 rounded-[20px] bg-control/60 px-4 py-3">
         {plan ? <ConfirmPlanBody plan={plan} compact /> : <Typography>{prompt.questions[0]?.question}</Typography>}
         <Button variant="ghost" onPress={onActivate}>
           <Button.Label>{t("mobile.chat.question.answerForm")}</Button.Label>
@@ -207,7 +221,7 @@ export function ChatQuestionPrompt({
   if (resolution) {
     return (
       <View
-        className="max-w-[92%] self-start gap-2 rounded-[30px] bg-control/60 px-4 py-3"
+        className="max-w-[92%] self-start gap-2 rounded-[20px] bg-control/60 px-4 py-3"
         style={{ borderCurve: "circular" }}
       >
         <View className="flex-row items-center gap-2">
@@ -249,7 +263,7 @@ export function ChatQuestionPrompt({
 
   return (
     <View
-      className="w-full max-w-[92%] self-start gap-1 rounded-[30px] bg-control/60 px-4 py-3"
+      className="w-full max-w-[92%] self-start gap-1 rounded-[20px] bg-control/60 px-4 py-3"
       style={{ borderCurve: "circular" }}
       accessibilityLabel={t("mobile.chat.question.form")}
     >
@@ -359,8 +373,9 @@ export function ChatQuestionPrompt({
       </View>
       <View className="flex-row items-center justify-between gap-2">
         {question.isSecret ? (
+          // The private answer is typed in the masked field that takes the composer's place.
           <Typography type="body-xs" className="flex-1 text-text-secondary">
-            {t("mobile.chat.question.orTypeAnswer")}
+            {t("mobile.chat.question.secretBelow")}
           </Typography>
         ) : (
           <View className="flex-1" />
@@ -379,39 +394,6 @@ export function ChatQuestionPrompt({
           </Typography>
         </Button>
       </View>
-      {/* The composer answers in the chat. Only a private answer keeps its own masked field. */}
-      {question.isSecret ? (
-        <View className="flex-row items-center gap-2 rounded-[18px] bg-default px-3">
-          <TextInput
-            accessibilityLabel={t("mobile.chat.question.customAnswerFor", { question: question.question })}
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!disabled}
-            maxLength={INPUT_LIMITS.promptAnswerText}
-            placeholder={t("mobile.chat.question.privatePlaceholder")}
-            placeholderTextColor={muted}
-            secureTextEntry
-            {...selectionColorProps(foreground)}
-            className="min-h-12 min-w-0 flex-1 font-sans text-foreground"
-            value={controller.draft}
-            onChangeText={controller.setDraft}
-            onSubmitEditing={() => {
-              const answerText = controller.draft.trim();
-              if (answerText) answer([answerText]);
-            }}
-          />
-          <Button
-            variant="ghost"
-            size="sm"
-            isIconOnly
-            accessibilityLabel={t("mobile.chat.question.sendCustomAnswer")}
-            isDisabled={disabled || !controller.draft.trim()}
-            onPress={() => answer([controller.draft.trim()])}
-          >
-            <Send color={String(muted)} size={18} />
-          </Button>
-        </View>
-      ) : null}
       {pending ? (
         <Typography type="body-xs" accessibilityLiveRegion="polite">
           {t("mobile.chat.question.sending")}
