@@ -280,6 +280,18 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "Consultez ce paiement et expliquez pourquoi il a échoué.",
   "marketplace.plugin.stripe.prompt.customer": "Résumez les factures et le solde impayé de ce client.",
   "marketplace.plugin.stripe.prompt.link": "Rédigez un lien de paiement pour le forfait Pro à 49 par mois.",
+  "marketplace.plugin.revenuecat.tagline": "Abonnements, produits et paywalls",
+  "marketplace.plugin.revenuecat.description":
+    "RevenueCat permet aux agents de lire et de modifier la configuration de vos abonnements intégrés : apps, produits, entitlements, offerings, packages, paywalls et expériences. Les agents peuvent aussi consulter les clients et leurs achats, et lire les graphiques et les indicateurs. Une clé API secrète RevenueCat va dans un en-tête Authorization. La clé donne accès à un projet. Avec une clé en lecture seule, les agents peuvent seulement lire. Avec une clé en écriture, les agents peuvent soumettre des produits à la vérification de l'App Store, accorder des entitlements à des clients et supprimer des packages, des règles de ciblage et des webhooks.",
+  "marketplace.plugin.revenuecat.app":
+    "Produits, entitlements, offerings, paywalls et indicateurs, via le serveur MCP de RevenueCat avec une clé API secrète.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "Quels offerings et packages contient mon projet RevenueCat ?",
+  "marketplace.plugin.revenuecat.prompt.revenue":
+    "Comment mes revenus et mes abonnements actifs RevenueCat ont-ils évolué ce mois-ci ?",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "Quels entitlements ce client RevenueCat a-t-il, et quand expirent-ils ?",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "Dans le tableau de bord RevenueCat, ouvrez API keys dans votre projet et créez une clé API secrète. Une clé en lecture seule suffit pour consulter les données.",
   "marketplace.plugin.posthog.tagline": "Analyse produit et feature flags",
   "marketplace.plugin.posthog.description":
     "PostHog permet aux agents d’interroger les événements et les entonnoirs, d’inspecter les feature flags et de résumer ce qui a changé après une version. Une clé API personnelle des réglages du projet va dans un seul en-tête Authorization.",

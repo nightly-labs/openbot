@@ -275,6 +275,18 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "Busca este pago y explica por qué falló.",
   "marketplace.plugin.stripe.prompt.customer": "Resume las facturas de este cliente y su saldo pendiente.",
   "marketplace.plugin.stripe.prompt.link": "Redacta un enlace de pago para el plan Pro a 49 al mes.",
+  "marketplace.plugin.revenuecat.tagline": "Suscripciones, productos y paywalls",
+  "marketplace.plugin.revenuecat.description":
+    "RevenueCat permite a los agentes leer y cambiar la configuración de tus suscripciones dentro de la app: apps, productos, entitlements, offerings, paquetes, paywalls y experimentos. Los agentes también pueden consultar clientes y sus compras, y leer gráficos y métricas. Una clave de API secreta de RevenueCat va en una cabecera Authorization. La clave da acceso a un proyecto. Con una clave de solo lectura, los agentes solo pueden leer. Con una clave de escritura, los agentes pueden enviar productos a revisión en la App Store, conceder entitlements a clientes y eliminar paquetes, reglas de segmentación y webhooks.",
+  "marketplace.plugin.revenuecat.app":
+    "Productos, entitlements, offerings, paywalls y métricas, a través del servidor MCP de RevenueCat con una clave de API secreta.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "¿Qué offerings y paquetes tiene mi proyecto de RevenueCat?",
+  "marketplace.plugin.revenuecat.prompt.revenue":
+    "¿Cómo cambiaron este mes mis ingresos y mis suscripciones activas en RevenueCat?",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "¿Qué entitlements tiene este cliente de RevenueCat y cuándo caducan?",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "En el panel de RevenueCat, abre API keys en tu proyecto y crea una clave de API secreta. Una clave de solo lectura basta para ver datos.",
   "marketplace.plugin.posthog.tagline": "Analítica de producto y flags",
   "marketplace.plugin.posthog.description":
     "PostHog permite a los agentes consultar eventos y embudos, inspeccionar feature flags y resumir qué cambió tras una versión. Una clave de API personal de los ajustes del proyecto va en un único encabezado Authorization.",

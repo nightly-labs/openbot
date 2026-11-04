@@ -163,6 +163,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "1f73a94236d3a0be9a31ee48b56eaa2a2dca91e9e1a5fb476e38aa13f67b5846",
     },
     {
+      slug: "revenuecat",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "3e0e70a7291ef90ef651bb5b88550e9ecd00ccc5090969aa586050aff8cf0f18",
+    },
+    {
       slug: "posthog",
       version: "1.0.0",
       featured: false,
@@ -1116,6 +1122,62 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://stripe.com",
     privacyPolicyUrl: "https://stripe.com/privacy",
     termsUrl: "https://stripe.com/ssa",
+    skills: [],
+  },
+  revenuecat: {
+    slug: "revenuecat",
+    name: "RevenueCat",
+    tagline: "Subscriptions, products and paywalls",
+    description:
+      "RevenueCat lets agents read and change the setup of your in-app subscriptions: apps, products, entitlements, offerings, packages, paywalls and experiments. Agents can also look up customers and their purchases, and read charts and metrics. A RevenueCat secret API key goes into one Authorization header. The key reaches one project. With a read-only key, agents can only read. With a write key, agents can submit products to the App Store for review, grant entitlements to customers, and delete packages, targeting rules and webhooks.",
+    category: "other",
+    creatorName: "RevenueCat",
+    iconUrl: "https://www.revenuecat.com/favicon/favicon-192x192.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-offerings", text: "Which offerings and packages does my RevenueCat project have?" },
+      { id: "prompt-revenue", text: "How did my RevenueCat revenue and active subscriptions change this month?" },
+      {
+        id: "prompt-customer",
+        text: "Which entitlements does this RevenueCat customer have, and when do they expire?",
+      },
+    ],
+    apps: [
+      {
+        id: "app-revenuecat-mcp",
+        name: "RevenueCat",
+        description:
+          "Products, entitlements, offerings, paywalls and metrics, over RevenueCat's MCP server with a secret API key.",
+        iconUrl: "https://www.revenuecat.com/favicon/favicon-192x192.png",
+        server: {
+          name: "revenuecat",
+          transport: "http",
+          url: "https://mcp.revenuecat.ai/mcp",
+          auth: [
+            {
+              id: "revenuecat-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "token",
+                  label: "API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  placeholder: "sk_…",
+                  hint: "In the RevenueCat dashboard, open API keys in your project and create a secret API key. A read-only key is enough to view data.",
+                },
+              ],
+              docsUrl: "https://www.revenuecat.com/docs/projects/authentication#finding-api-keys",
+              docsLabel: "Create a key",
+            },
+          ],
+        },
+      },
+    ],
+    websiteUrl: "https://www.revenuecat.com",
+    privacyPolicyUrl: "https://www.revenuecat.com/privacy",
+    termsUrl: "https://www.revenuecat.com/terms",
     skills: [],
   },
   posthog: {

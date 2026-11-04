@@ -271,6 +271,19 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "この決済を調べて、失敗した理由を説明してください。",
   "marketplace.plugin.stripe.prompt.customer": "この顧客の請求書と未払い残高をまとめてください。",
   "marketplace.plugin.stripe.prompt.link": "Pro プランの月額 49 の支払いリンクの下書きを作成してください。",
+  "marketplace.plugin.revenuecat.tagline": "サブスクリプション、プロダクト、ペイウォール",
+  "marketplace.plugin.revenuecat.description":
+    "RevenueCat を使うと、エージェントはアプリ内サブスクリプションの設定を読み取り、変更できます。対象はアプリ、プロダクト、エンタイトルメント、オファリング、パッケージ、ペイウォール、実験です。エージェントは顧客とその購入を調べ、チャートと指標を読むこともできます。RevenueCat のシークレット API キーは 1 つの Authorization ヘッダーに入ります。キーが使えるのは 1 つのプロジェクトです。読み取り専用キーでは、エージェントは読み取りだけができます。書き込みキーでは、エージェントはプロダクトを App Store の審査に提出し、顧客にエンタイトルメントを付与し、パッケージ、ターゲティングルール、Webhook を削除できます。",
+  "marketplace.plugin.revenuecat.app":
+    "RevenueCat の MCP サーバーとシークレット API キーで使う、プロダクト、エンタイトルメント、オファリング、ペイウォール、指標。",
+  "marketplace.plugin.revenuecat.prompt.offerings":
+    "私の RevenueCat プロジェクトにはどのオファリングとパッケージがありますか？",
+  "marketplace.plugin.revenuecat.prompt.revenue":
+    "今月、RevenueCat の収益とアクティブなサブスクリプションはどう変わりましたか？",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "この RevenueCat の顧客にはどのエンタイトルメントがあり、いつ期限が切れますか？",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "RevenueCat のダッシュボードでプロジェクトの API keys を開き、シークレット API キーを作成します。データを見るだけなら読み取り専用キーで十分です。",
   "marketplace.plugin.posthog.tagline": "プロダクト分析とフラグ",
   "marketplace.plugin.posthog.description":
     "PostHog を使うと、エージェントはイベントとファネルを照会し、フィーチャーフラグを調べ、リリース後に何が変わったかをまとめられます。プロジェクト設定の個人用 API キーを 1 つの Authorization ヘッダーに入れます。",

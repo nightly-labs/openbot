@@ -280,6 +280,18 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "Suche diese Zahlung und erkläre, warum sie fehlgeschlagen ist.",
   "marketplace.plugin.stripe.prompt.customer": "Fasse die Rechnungen und den offenen Saldo dieses Kunden zusammen.",
   "marketplace.plugin.stripe.prompt.link": "Entwirf einen Zahlungslink für den Pro-Tarif zu 49 pro Monat.",
+  "marketplace.plugin.revenuecat.tagline": "Abos, Produkte und Paywalls",
+  "marketplace.plugin.revenuecat.description":
+    "Mit RevenueCat können Agenten die Einrichtung deiner In-App-Abos lesen und ändern: Apps, Produkte, Entitlements, Offerings, Pakete, Paywalls und Experimente. Agenten können auch Kunden und ihre Käufe nachschlagen sowie Diagramme und Kennzahlen lesen. Ein geheimer RevenueCat-API-Schlüssel kommt in einen Authorization-Header. Der Schlüssel gilt für ein Projekt. Mit einem Nur-Lese-Schlüssel können Agenten nur lesen. Mit einem Schreibschlüssel können Agenten Produkte zur Prüfung an den App Store senden, Kunden Entitlements gewähren und Pakete, Targeting-Regeln und Webhooks löschen.",
+  "marketplace.plugin.revenuecat.app":
+    "Produkte, Entitlements, Offerings, Paywalls und Kennzahlen über den MCP-Server von RevenueCat mit einem geheimen API-Schlüssel.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "Welche Offerings und Pakete hat mein RevenueCat-Projekt?",
+  "marketplace.plugin.revenuecat.prompt.revenue":
+    "Wie haben sich mein RevenueCat-Umsatz und meine aktiven Abos diesen Monat verändert?",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "Welche Entitlements hat dieser RevenueCat-Kunde, und wann laufen sie ab?",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "Öffne im RevenueCat-Dashboard die API-Schlüssel deines Projekts und erstelle einen geheimen API-Schlüssel. Ein Nur-Lese-Schlüssel reicht, um Daten anzusehen.",
   "marketplace.plugin.posthog.tagline": "Produktanalysen und Flags",
   "marketplace.plugin.posthog.description":
     "Mit PostHog fragen Agenten Events und Funnels ab, prüfen Feature-Flags und fassen zusammen, was sich nach einem Release geändert hat. Ein persönlicher API-Schlüssel aus den Projekteinstellungen kommt in einen Authorization-Header.",

@@ -251,6 +251,16 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "查询这笔支付并解释它为什么失败。",
   "marketplace.plugin.stripe.prompt.customer": "总结该客户的发票和未结余额。",
   "marketplace.plugin.stripe.prompt.link": "为每月 49 的专业版套餐起草一个支付链接。",
+  "marketplace.plugin.revenuecat.tagline": "订阅、产品和付费墙",
+  "marketplace.plugin.revenuecat.description":
+    "RevenueCat 让智能体读取和更改应用内订阅的设置：应用、产品、权益、Offering、套餐、付费墙和实验。智能体还可以查找客户及其购买记录，并读取图表和指标。RevenueCat 密钥 API 密钥放在一个 Authorization 请求头中。该密钥可访问一个项目。使用只读密钥时，智能体只能读取。使用写入密钥时，智能体可以将产品提交到 App Store 审核、向客户授予权益，并删除套餐、定向规则和 Webhook。",
+  "marketplace.plugin.revenuecat.app":
+    "通过 RevenueCat 的 MCP 服务器和密钥 API 密钥使用产品、权益、Offering、付费墙和指标。",
+  "marketplace.plugin.revenuecat.prompt.offerings": "我的 RevenueCat 项目有哪些 Offering 和套餐？",
+  "marketplace.plugin.revenuecat.prompt.revenue": "本月我在 RevenueCat 的收入和活跃订阅有什么变化？",
+  "marketplace.plugin.revenuecat.prompt.customer": "这位 RevenueCat 客户有哪些权益，什么时候到期？",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "在 RevenueCat 控制台中，打开项目的 API keys，并创建一个密钥 API 密钥。只读密钥就足以查看数据。",
   "marketplace.plugin.posthog.tagline": "产品分析与功能开关",
   "marketplace.plugin.posthog.description":
     "PostHog 让助手查询事件和漏斗、检查功能开关，并总结发布后的变化。把项目设置中的个人 API 密钥填入一个 Authorization 请求头即可。",

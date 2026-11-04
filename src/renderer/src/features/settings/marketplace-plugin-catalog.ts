@@ -1040,6 +1040,65 @@ const STRIPE: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/stripe",
 };
 
+const REVENUECAT: MarketplacePluginDetail = {
+  id: "plugin-revenuecat",
+  slug: "revenuecat",
+  name: "RevenueCat",
+  tagline: "Subscriptions, products and paywalls",
+  description:
+    "RevenueCat lets agents read and change the setup of your in-app subscriptions: apps, products, entitlements, offerings, packages, paywalls and experiments. Agents can also look up customers and their purchases, and read charts and metrics. A RevenueCat secret API key goes into one Authorization header. The key reaches one project. With a read-only key, agents can only read. With a write key, agents can submit products to the App Store for review, grant entitlements to customers, and delete packages, targeting rules and webhooks.",
+  category: "other",
+  creatorName: "RevenueCat",
+  iconUrl: "https://www.revenuecat.com/favicon/favicon-192x192.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-offerings", text: "Which offerings and packages does my RevenueCat project have?" },
+    { id: "prompt-revenue", text: "How did my RevenueCat revenue and active subscriptions change this month?" },
+    { id: "prompt-customer", text: "Which entitlements does this RevenueCat customer have, and when do they expire?" },
+  ],
+  apps: [
+    {
+      id: "app-revenuecat-mcp",
+      name: "RevenueCat",
+      description:
+        "Products, entitlements, offerings, paywalls and metrics, over RevenueCat's MCP server with a secret API key.",
+      iconUrl: "https://www.revenuecat.com/favicon/favicon-192x192.png",
+      server: {
+        name: "revenuecat",
+        transport: "http",
+        url: "https://mcp.revenuecat.ai/mcp",
+        auth: [
+          {
+            id: "revenuecat-key",
+            kind: "key",
+            label: "API key",
+            fields: [
+              {
+                id: "token",
+                label: "API key",
+                header: "Authorization",
+                prefix: "Bearer ",
+                placeholder: "sk_…",
+                hint: "In the RevenueCat dashboard, open API keys in your project and create a secret API key. A read-only key is enough to view data.",
+              },
+            ],
+            docsUrl: "https://www.revenuecat.com/docs/projects/authentication#finding-api-keys",
+            docsLabel: "Create a key",
+          },
+        ],
+      },
+    },
+  ],
+  websiteUrl: "https://www.revenuecat.com",
+  privacyPolicyUrl: "https://www.revenuecat.com/privacy",
+  termsUrl: "https://www.revenuecat.com/terms",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-09-30T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/revenuecat",
+};
+
 const POSTHOG: MarketplacePluginDetail = {
   id: "plugin-posthog",
   slug: "posthog",
@@ -1520,6 +1579,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   CONTEXT7,
   HUGGINGFACE,
   STRIPE,
+  REVENUECAT,
   POSTHOG,
   AIRTABLE,
   FIRECRAWL,

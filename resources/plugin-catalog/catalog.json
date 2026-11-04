@@ -147,6 +147,12 @@
       "detailSha256": "1f73a94236d3a0be9a31ee48b56eaa2a2dca91e9e1a5fb476e38aa13f67b5846"
     },
     {
+      "slug": "revenuecat",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "3e0e70a7291ef90ef651bb5b88550e9ecd00ccc5090969aa586050aff8cf0f18"
+    },
+    {
       "slug": "posthog",
       "version": "1.0.0",
       "featured": false,

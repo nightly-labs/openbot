@@ -272,6 +272,17 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "Cerca questo pagamento e spiega perché è fallito.",
   "marketplace.plugin.stripe.prompt.customer": "Riassumi le fatture di questo cliente e il saldo da pagare.",
   "marketplace.plugin.stripe.prompt.link": "Prepara un link di pagamento per il piano Pro a 49 al mese.",
+  "marketplace.plugin.revenuecat.tagline": "Abbonamenti, prodotti e paywall",
+  "marketplace.plugin.revenuecat.description":
+    "RevenueCat consente agli agenti di leggere e modificare la configurazione dei tuoi abbonamenti in-app: app, prodotti, entitlement, offering, pacchetti, paywall ed esperimenti. Gli agenti possono anche cercare clienti e acquisti, e leggere grafici e metriche. Una chiave API segreta di RevenueCat va in un'intestazione Authorization. La chiave dà accesso a un progetto. Con una chiave di sola lettura, gli agenti possono solo leggere. Con una chiave di scrittura, gli agenti possono inviare prodotti alla revisione dell'App Store, concedere entitlement ai clienti ed eliminare pacchetti, regole di targeting e webhook.",
+  "marketplace.plugin.revenuecat.app":
+    "Prodotti, entitlement, offering, paywall e metriche, tramite il server MCP di RevenueCat con una chiave API segreta.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "Quali offering e pacchetti ha il mio progetto RevenueCat?",
+  "marketplace.plugin.revenuecat.prompt.revenue":
+    "Come sono cambiati questo mese i miei ricavi e gli abbonamenti attivi su RevenueCat?",
+  "marketplace.plugin.revenuecat.prompt.customer": "Quali entitlement ha questo cliente RevenueCat e quando scadono?",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "Nella dashboard di RevenueCat, apri API keys nel tuo progetto e crea una chiave API segreta. Una chiave di sola lettura basta per vedere i dati.",
   "marketplace.plugin.posthog.tagline": "Analisi di prodotto e flag",
   "marketplace.plugin.posthog.description":
     "PostHog permette agli agenti di interrogare eventi e funnel, ispezionare i feature flag e riassumere cosa è cambiato dopo un rilascio. Una chiave API personale, presa dalle impostazioni del progetto, va in un unico header Authorization.",
