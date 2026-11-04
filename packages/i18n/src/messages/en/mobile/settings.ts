@@ -70,7 +70,7 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.animations.all": "Animations",
   "mobile.settings.animations.agentFaces": "Animated agent faces",
   "mobile.settings.animations.agentFacesFooter":
-    "Agent avatars move their faces while the agents work and rest. When this is off, the faces stay still.",
+    "Agent avatars move their faces while the agents work and rest. When this is off, the faces stay still, and the characters on the welcome and empty home screens stop floating.",
   "mobile.settings.animations.composerResize": "Compact message field",
   "mobile.settings.animations.composerResizeFooter":
     "The message field becomes a small bar while the keyboard is closed. When this is off, the field stays full size.",
