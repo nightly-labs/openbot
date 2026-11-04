@@ -57,11 +57,6 @@ const DRAWER_SPRING = {
  * blur filter on each frame of the motion; it draws an elevation shadow on the render thread.
  */
 const DRAWER_SURFACE_ELEVATION = 16;
-/**
- * The drawer is at the start edge: on the left, and on the right in a right-to-left layout. React
- * Native moves the drawer's `left` to the right there, but not a horizontal move or a drag, so
- * each of them is multiplied by this value.
- */
 
 /** Where the drawer is: at its closed place, between its places, or at its open place. */
 type DrawerPhase = "closed" | "moving" | "open";

@@ -106,14 +106,6 @@ export function lineDirectionStyle(text: string): TextStyle {
 }
 
 /**
- * The style of an iOS text field or native text view, where `textAlign` left and right do not change
- * with the layout direction.
- */
-function physicalTextDirectionStyle(direction: TextDirection): TextStyle {
-  return { writingDirection: direction, textAlign: direction === "rtl" ? "right" : "left" };
-}
-
-/**
  * The sign of a horizontal transform that moves toward the end of the layout. React Native mirrors
  * the layout in a right-to-left language, but not `translateX` and not `transformOrigin`, so an
  * offset that a left-to-right layout computes is multiplied by this.
@@ -127,7 +119,9 @@ export const END_X: 1 | -1 = I18nManager.isRTL ? -1 : 1;
  */
 export function fieldDirectionStyle(text: string): TextStyle | undefined {
   if (Platform.OS !== "ios") return undefined;
-  return physicalTextDirectionStyle(textDirection(text, layoutDirection()));
+  // An iOS field does not swap textAlign left and right with the layout direction.
+  const direction = textDirection(text, layoutDirection());
+  return { writingDirection: direction, textAlign: direction === "rtl" ? "right" : "left" };
 }
 
 /** Code is left to right in every language and in every layout. */
