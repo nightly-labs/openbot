@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.61.0",
+    "date": "2026-11-04",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Delete a message in a chat: right-click it and select Delete. This works in agent chats, side tasks and channels.",
+          "Agents can make, change and run workflows, and you see them build each step on the Workflows page.",
+          "Talk to a Codex agent with Codex live voice. Turn it on in Settings → Voice.",
+          "Devin and GitHub Copilot are new providers under More providers.",
+          "Pick a chat color for each agent and for yourself. Agents also have more avatar colors.",
+          "Agents can save an API key or a password that you paste in the chat to the Vault.",
+          "Webhook routines accept Standard Webhooks requests, such as from Composio, Svix, Clerk and Resend.",
+          "Connect Coinbase, Robinhood or RevenueCat from the Apps marketplace."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Each routine of an agent runs in its own thread, so routines and the chat no longer wait for each other.",
+          "Agents finish more of a task before they stop, and ask with a confirm card before a send, a post, a delete or a payment.",
+          "The sidebar badges are felt, and a pinned channel shows its unread count."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "A channel with a long history opens quickly again.",
+          "On Linux, OpenBot no longer asks you to sign in again after each restart when the keyring does not keep its key.",
+          "On Windows, channel leads route messages again, and you can create a server on this computer.",
+          "When an older OpenBot opens data that a newer version saved, it installs the latest version."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.60.0",
     "date": "2026-11-03",
     "notices": [],
