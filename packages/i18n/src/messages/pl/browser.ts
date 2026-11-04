@@ -71,7 +71,6 @@ export const messages = {
   "browser.liveView.copyFailed": "Nie udało się skopiować tekstu. Kliknij stronę i spróbuj ponownie.",
   "browser.previews.label": "Podglądy przeglądarki",
   "browser.previews.resize": "Zmień rozmiar prawego panelu",
-  "browser.previews.collapse": "Zwiń podglądy przeglądarki",
   "browser.previews.empty": "Brak kart przeglądarki",
   "browser.previews.openPage": "Otwórz stronę",
   "browser.preview.pageFallback": "Strona przeglądarki",

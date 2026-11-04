@@ -127,7 +127,6 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     agentActivity,
     browserSidebarOpen,
     browserExpandedOpen,
-    hideBrowserPanel,
     browserTabs,
     closeShownSidePanelFile,
     closeBrowserTab,
@@ -421,7 +420,11 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
           }}
           onToggleMaximized={() => setSidePanelMaximized(!sidePanel().maximized)}
           onCollapse={toggleSidePanel}
-          onNewBrowserTab={() => void openBrowserAddress(BROWSER_NEW_TAB_URL, true)}
+          onNewBrowserTab={() => {
+            // The new tab shows in the Browser pane, so the pane comes to the front first.
+            openSidePanelPane("browser");
+            void openBrowserAddress(BROWSER_NEW_TAB_URL, true);
+          }}
         />
       </Show>
 
@@ -575,7 +578,6 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
           }}
           onCloseTab={(tabId) => void closeBrowserTab(tabId)}
           onNewTab={() => void openBrowserAddress(BROWSER_NEW_TAB_URL, true)}
-          onCollapse={hideBrowserPanel}
         />
       </Show>
 

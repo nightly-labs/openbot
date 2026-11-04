@@ -223,7 +223,8 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
   const threads = () => props.threads?.items ?? [];
   const files = () => props.files?.items ?? [];
   const hasTabs = () => props.panes.length + threads().length + files().length > 0;
-  const newBrowserTab = () => (props.panes.includes("browser") ? props.onNewBrowserTab : undefined);
+  const newBrowserTab = () =>
+    props.panes.includes("browser") && props.available.includes("browser") ? props.onNewBrowserTab : undefined;
   const paneLabel = (pane: SidePanelPane) =>
     pane === "settings" && props.settingsLabel !== undefined ? props.settingsLabel : t(PANE_LABELS[pane]);
   const selectedValue = () => {
