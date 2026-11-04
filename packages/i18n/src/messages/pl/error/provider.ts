@@ -229,6 +229,8 @@ export const messages = {
   "error.provider.antigravityReleaseShape": "Wydanie Gemini ma nieoczekiwaną strukturę.",
   "error.provider.antigravityMissing": "Gemini nie jest pobrany. Pobierz go w OpenBot, aby kontynuować.",
   "error.provider.antigravityNotStarted": "Znaleziono serwer Gemini, ale nie można odczytać jego wersji.",
+  "error.provider.antigravityOverrideInvalid":
+    "Serwer Gemini z OPENBOT_ANTIGRAVITY_PATH nie istnieje lub nie jest wykonywalny. Popraw ścieżkę lub usuń zmienną, a potem uruchom ponownie OpenBot.",
   "error.provider.antigravityVersionUnreadable": "Nie można odczytać wersji serwera Gemini.",
   "error.provider.antigravitySignIn": "Zaloguj się przez Google, aby używać Gemini.",
   "error.provider.antigravityRateLimited":
