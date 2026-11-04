@@ -54,7 +54,7 @@ is not proof of the exact words the user heard after an interruption.
 
 ## Host configuration
 
-Sign into Codex with ChatGPT on the selected OpenBot host. Use **Server settings → General → Live voice calls** to allow calls and select the shared default voice. Only server owners and admins see these host controls. Then each user can enable **Use ChatGPT voice on this device** in **Settings → Voice**. This account-and-device choice starts off and never changes another user or device. The notice states that agent calls send microphone audio and conversation context to OpenAI. Without this choice, the existing voice conversation uses the local recognizer and reply voice, with captions. Channels keep that local path. The telephone button beside dictation appears only after this device opts in and the host allows calls.
+Sign into Codex with ChatGPT on the selected OpenBot host. Use **Server settings → General → Live voice calls** to allow calls and select the shared default voice. Only server owners and admins see these host controls. Then each user can enable **Use ChatGPT voice on this device** in **Settings → Voice**. This account-and-device choice starts off and never changes another user or device. The notice states that agent calls send microphone audio and conversation context to OpenAI. Without this choice, the existing voice conversation uses the local recognizer and reply voice, with captions. Channels keep that local path. On desktop, the telephone button beside dictation appears after device opt-in and host availability. On mobile, the empty composer’s voice control starts the call. Before starting, its visible label identifies ChatGPT voice or the existing device voice settings; ChatGPT calls use a telephone glyph.
 
 These host environment values provide defaults before a preference is saved:
 
@@ -161,7 +161,7 @@ validated separately. Provider availability still depends on the connected accou
 
 ## Agent voices and the server default
 
-Voice settings show only when the selected host reports a connected Codex provider. Reading these
+Voice settings remain visible when the host is not ready. The disabled device switch explains the requirement and links to Codex setup and server availability. The Codex provider page links back to this entry point. Agent settings also link to Voice call setup. Reading these
 settings does not start a sign-in or request a subscription token. The host reports only this
 availability flag, not provider credentials or account details. A connected provider does not
 establish upstream voice entitlement; the existing authenticated call handshake still checks it.
@@ -177,4 +177,29 @@ The additive protocol-9 `realtime-voice-agent-settings-v1` capability carries co
 and selections. Current chat access is required to read an agent choice; manage access is required
 to change it. Connector access restrictions remain part of that check. Only server owners/admins
 can change the default. Older wire routes retain their prior meaning and changing the legacy
-default does not erase agent overrides. Unsupported hosts keep the new settings section hidden.
+default does not erase agent overrides. Unsupported hosts keep the switch disabled and show the update requirement.
+
+## Voice setup entry point
+
+Start at **Settings → Voice → Live voice calls** on desktop or mobile. The device switch stays
+visible when setup is incomplete. Its reason distinguishes an offline or old host, a failed
+availability read, Codex sign-in requirements, and server call availability. Turning the device
+choice off remains possible when the host is unavailable.
+
+Use **Set up Codex** to open the provider page, and **Server availability and default voice**
+to open the host controls. The Codex page reports readiness and the ChatGPT subscription
+requirement and links back to Voice call setup. Agent voice settings also link back here; an
+agent override remains a host setting, while the opt-in remains account-and-device specific.
+
+On the phone, server admins can download or update Codex, turn a disabled Codex provider on,
+and sign in through a device code or the browser relay. The browser flow supports a returned
+loopback address pasted back into the app. Opening setup does not start OAuth. A sign-in starts
+only after the user selects it. Members get the requirement and an instruction to ask an admin.
+The provider enable action is a new protocol-9 `realtime-voice-setup-v1` capability. It requires
+current server admin access, enables only Codex through the existing provider operation, and
+neither selects a chat provider for an agent nor opts any device into cloud audio.
+
+The mobile empty-composer control shows its audio path before starting. **Start ChatGPT voice
+call** uses a telephone glyph; **Start voice conversation with device voice settings** keeps
+the existing audio glyph. Dictation remains a separate microphone control. Desktop retains its
+telephone button beside dictation. Channels retain the existing device voice path.

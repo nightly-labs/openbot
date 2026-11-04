@@ -149,7 +149,10 @@ import {
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v8";
-import { REALTIME_VOICE_CAPABILITY } from "@openbot/contracts/team-protocol/realtime-voice-v1";
+import {
+  REALTIME_VOICE_CAPABILITY,
+  REALTIME_VOICE_SETUP_CAPABILITY,
+} from "@openbot/contracts/team-protocol/realtime-voice-v1";
 import {
   TEAM_REASONING_EFFORTS_CAPABILITY,
   withLegacyReasoningEfforts,
@@ -2279,6 +2282,8 @@ export class TeamApiServer {
           if (capability === PROMPT_CACHE_TTL_CAPABILITY) return this.#options.admin?.promptCacheTtl !== undefined;
           if (capability === MODEL_VISIBILITY_CAPABILITY) return this.#options.admin?.modelVisibility !== undefined;
           if (capability === PROVIDER_DEFAULT_CAPABILITY) return this.#options.admin?.defaultProvider !== undefined;
+          if (capability === REALTIME_VOICE_SETUP_CAPABILITY)
+            return this.#options.realtimeVoice !== undefined && this.#options.agents.setProviderOn !== undefined;
           if (capability === REALTIME_VOICE_CAPABILITY) return this.#options.realtimeVoice !== undefined;
           if (capability === AGENT_ACCESS_CAPABILITY) return this.#options.agentAccess !== undefined;
           if (capability === SERVER_AUDIT_CAPABILITY) return this.#options.serverAudit !== undefined;

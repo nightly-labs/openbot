@@ -239,7 +239,7 @@ export function useLiveConversation(input: LiveConversationInput): LiveConversat
 
   return {
     ...state,
-    realtimeReady,
+    realtimeReady: optedIn && realtimeReady,
     available,
     micOpen: dictation.phase === "listening",
     level: state.phase === "speaking" ? speechLevel : dictation.level,

@@ -10,6 +10,8 @@ import {
   type OptionalRouteCodec,
   string,
 } from "./admin-wire";
+export const REALTIME_VOICE_SETUP_CAPABILITY = "realtime-voice-setup-v1";
+export const REALTIME_VOICE_CODEX_ENABLE_ROUTE = "/v1/realtime-voice/codex/enable";
 export const REALTIME_VOICE_CAPABILITY = "realtime-voice-v1";
 export const REALTIME_VOICE_AGENT_SETTINGS_CAPABILITY = "realtime-voice-agent-settings-v1";
 export const REALTIME_VOICE_CONFIGURATION_ROUTE = "/v1/realtime-voice/configuration";
@@ -33,6 +35,7 @@ const voiceSettings = fields({
   voice: nullable(string(128)),
 });
 export const REALTIME_VOICE_CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
+  [REALTIME_VOICE_CODEX_ENABLE_ROUTE, adminRoute(empty, empty)],
   [REALTIME_VOICE_CONFIGURATION_ROUTE, adminRoute(fields({ agentId: nullable(identifier) }), voiceSettings)],
   [
     REALTIME_VOICE_AGENT_SELECTION_ROUTE,

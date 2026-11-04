@@ -19,3 +19,5 @@ export const createRealtimeVoiceConversation = () => ({
 });
 
 export const skillExamplePrompt = () => "";
+
+export const toast = { error() {} };

@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
-import { createRoot, flush } from "solid-js";
+import { createRoot, createSignal, flush } from "solid-js";
 import { createVoiceConversation } from "../../../src/renderer/src/features/conversation/stores/voice-conversation-store";
+import {
+  createRealtimeVoiceSettingsStore,
+  realtimeVoiceSetupKey,
+} from "../../../src/renderer/src/features/settings/realtime-voice-settings-store";
 import {
   realtimeVoiceOptedIn,
   setRealtimeVoiceOptIn,
@@ -60,6 +64,50 @@ flush(() => setRealtimeVoiceOptIn(owner, false));
 assert.equal(await startCall(), false, "Turning the device choice off did not restore local calls.");
 assert.equal(starts.length, 1, "A cloud call started after consent was removed.");
 assert.equal([...saved.values()].includes("true"), false, "Revocation was not persisted.");
+
+let readSettings;
+window.openbot = {
+  voice: {
+    getRealtimeSettings: () =>
+      new Promise((resolve) => {
+        readSettings = resolve;
+      }),
+  },
+};
+const host = {
+  id: "setup-host",
+  kind: "remote",
+  name: "Fixture host",
+  role: "owner",
+  state: "online",
+  compatibility: { capabilities: ["realtime-voice-agent-settings-v1"] },
+};
+const [selected, select] = createSignal(host);
+let setup;
+let disposeSetup;
+createRoot((cleanup) => {
+  disposeSetup = cleanup;
+  setup = createRealtimeVoiceSettingsStore(() => true, selected);
+});
+flush();
+assert.equal(realtimeVoiceSetupKey(setup.state), "settings.voice.realtime.loading");
+flush(() => select({ ...host, id: "offline-host", state: "offline" }));
+readSettings({ configured: true, canManage: true, enabled: true, model: "gpt-live-1-codex", defaultVoice: "cove" });
+await new Promise((resolve) => setImmediate(resolve));
+flush();
+assert.equal(
+  realtimeVoiceSetupKey(setup.state),
+  "settings.voice.realtime.offline",
+  "A stale host answer replaced the setup reason of a different host.",
+);
+assert.equal(setup.state.configured, false);
+flush(() => select({ ...host, compatibility: { capabilities: [] } }));
+assert.equal(
+  realtimeVoiceSetupKey(setup.state),
+  "settings.voice.realtime.unsupported",
+  "An old host was presented as a missing sign-in.",
+);
+disposeSetup();
 process.stdout.write(
-  `${JSON.stringify({ passed: true, localByDefault: true, cloudOnlyAfterConsent: true, accountIsolation: true, revocationRestoresLocal: true })}\n`,
+  `${JSON.stringify({ passed: true, localByDefault: true, cloudOnlyAfterConsent: true, accountIsolation: true, revocationRestoresLocal: true, readinessScopedToHost: true })}\n`,
 );

@@ -71,6 +71,7 @@ interface DefaultProviderSettings extends Pick<AppSetupState, "preferredProvider
 }
 
 interface ProviderSettingsSectionProps {
+  codexVoiceSetup?: JSX.Element;
   defaultProvider?: DefaultProviderSettings | undefined;
   store: SettingsGeneralStore;
   /** The dialog element the Select popovers portal into, captured when the section was created. */
@@ -247,6 +248,7 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
     // The tab title already names this list, so it has no heading of its own.
     <div class="settings-provider-section">
       <ProviderSettingsPage
+        codexVoiceSetup={props.codexVoiceSetup}
         options={props.store.providerOptions()}
         defaultProvider={
           props.defaultProvider
@@ -532,6 +534,7 @@ export function HostProviderSettingsPanel(
   props: HostProviderSettings & {
     hostName?: string | undefined;
     selectMount: HTMLElement | undefined;
+    codexVoiceSetup?: JSX.Element;
     onDetailChange?: ((detail: ProviderSettingsDetail | null) => void) | undefined;
     /** The Claude page's prompt cache time, for a host with `prompt-cache-ttl-v1` that this account administers. */
     promptCache?: ProviderPromptCacheSource | undefined;
@@ -578,6 +581,7 @@ export function HostProviderSettingsPanel(
   return (
     <>
       <ProviderSettingsSection
+        codexVoiceSetup={props.codexVoiceSetup}
         defaultProvider={props.defaultProvider}
         store={store}
         selectMount={props.selectMount}

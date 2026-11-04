@@ -155,7 +155,6 @@ export const messages = {
   "mobile.chat.composer.cancelDictation": "Отменить диктовку",
   "mobile.chat.voice.listening": "Слушаю…",
   "mobile.chat.voice.continue": "Продолжить диктовку",
-  "mobile.chat.liveVoice.start": "Начать голосовой разговор",
   "mobile.chat.liveVoice.status": "{name} · {phase}",
   "mobile.chat.liveVoice.phase.starting": "Запуск",
   "mobile.chat.liveVoice.phase.listening": "Слушает",

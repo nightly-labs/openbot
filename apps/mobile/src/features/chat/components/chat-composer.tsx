@@ -7,6 +7,7 @@ import AudioLines from "lucide-react-native/icons/audio-lines";
 import Blocks from "lucide-react-native/icons/blocks";
 import Mic from "lucide-react-native/icons/mic";
 import MicOff from "lucide-react-native/icons/mic-off";
+import Phone from "lucide-react-native/icons/phone";
 import Plus from "lucide-react-native/icons/plus";
 import Reply from "lucide-react-native/icons/reply";
 import Sparkles from "lucide-react-native/icons/sparkles";
@@ -890,6 +891,11 @@ export const ChatComposer = memo(function ChatComposer({
 
   return (
     <View>
+      {!voiceOpen && control.mode === "dictate" && voice?.callPath ? (
+        <Typography.Paragraph type="body-xs" className="px-4 text-grouped-secondary">
+          {voice.startLabel}
+        </Typography.Paragraph>
+      ) : null}
       {suggestionsVisible && query ? (
         <GlassView
           glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
@@ -1475,7 +1481,11 @@ export const ChatComposer = memo(function ChatComposer({
                       ) : control.mode === "stop" ? (
                         <Square color={accentGlyph} fill={accentGlyph} size={14} strokeWidth={2} />
                       ) : control.mode === "dictate" ? (
-                        <AudioLines color={accentGlyph} size={20} strokeWidth={2} />
+                        voice?.callPath === "chatgpt" ? (
+                          <Phone color={accentGlyph} size={20} strokeWidth={2} />
+                        ) : (
+                          <AudioLines color={accentGlyph} size={20} strokeWidth={2} />
+                        )
                       ) : (
                         <ArrowUp color={control.primed ? accentGlyph : String(muted)} size={21} strokeWidth={2.2} />
                       )}

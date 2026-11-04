@@ -26,6 +26,7 @@ export interface ComposerVoice {
   start: () => void;
   /** The name of the mic of the composer. */
   startLabel: string;
+  callPath?: "chatgpt" | "local";
   center: { label: string; glyph: VoiceGlyph; pressable: boolean; busy: boolean; onPress: () => void };
   /** Dictation only: the side buttons take presses. */
   sides?: boolean;
@@ -97,7 +98,8 @@ export function liveVoice(live: LiveConversation, name: string, t: MobileTransla
     level: live.level,
     presence: live.presence,
     start: live.start,
-    startLabel: t("mobile.chat.liveVoice.start"),
+    startLabel: t(live.realtimeReady ? "mobile.chat.liveVoice.startChatGPT" : "mobile.chat.liveVoice.startLocal"),
+    callPath: live.realtimeReady ? "chatgpt" : "local",
     center: {
       label: t(live.muted ? "mobile.chat.liveVoice.unmute" : "mobile.chat.liveVoice.mute"),
       glyph: live.muted

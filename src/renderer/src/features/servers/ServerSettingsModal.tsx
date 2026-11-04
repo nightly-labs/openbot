@@ -57,6 +57,7 @@ import { type HostProviderSettings, HostProviderSettingsPanel } from "../setting
 import type { HostModelVisibilityOptions, ProviderModelVisibilitySource } from "../settings/provider-model-visibility";
 import type { HostPromptCacheTtlOptions, ProviderPromptCacheSource } from "../settings/provider-prompt-cache";
 import { type ServerVaultOptions, ServerVaultPanel } from "../vault/ServerVaultPanel";
+import { CodexVoiceSetup } from "./CodexVoiceSetup";
 import type { McpServerConfig, McpTestResult } from "./mcp-servers";
 import { createServerAuditSection, type ServerAuditOptions } from "./ServerAuditSection";
 import { type CompanySignInCalls, createServerCompanySignInSection } from "./ServerCompanySignInSection";
@@ -76,6 +77,7 @@ import { serverCanAdminister, serverRoleCanAdminister } from "./server-capabilit
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
 export interface ServerSettingsModalProps {
+  onOpenVoiceSetup?: (() => void) | undefined;
   open: boolean;
   platform: "darwin" | "win32" | "linux";
   /** False where no remote desktop can start, such as the browser client. The section is then absent. */
@@ -849,6 +851,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               {(providers) => (
                 <HostProviderSettingsPanel
                   {...providers()}
+                  codexVoiceSetup={<CodexVoiceSetup server={props.server} onOpen={props.onOpenVoiceSetup} />}
                   hostName={local() ? undefined : props.server.name}
                   selectMount={modalElement()}
                   onDetailChange={setProviderDetail}

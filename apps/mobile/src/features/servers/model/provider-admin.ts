@@ -66,6 +66,10 @@ import {
   PROVIDERS_V5_RUNTIME_PROVIDERS,
 } from "@openbot/contracts/team-protocol/providers-v5";
 import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
+import {
+  REALTIME_VOICE_CODEX_ENABLE_ROUTE,
+  REALTIME_VOICE_SETUP_CAPABILITY,
+} from "@openbot/contracts/team-protocol/realtime-voice-v1";
 import { SIGN_IN_RELAY_CAPABILITY, SIGN_IN_RELAY_PROVIDERS } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import {
@@ -330,6 +334,9 @@ export function createProviderAdmin(request: TeamApiRequest, capabilities: reado
   const ignore = () => undefined;
   return {
     capabilities,
+    enableCodexVoice: has(REALTIME_VOICE_SETUP_CAPABILITY)
+      ? () => request("POST", REALTIME_VOICE_CODEX_ENABLE_ROUTE, () => undefined, {})
+      : null,
     readStatus: (): Promise<AgentStatus> => request("GET", TEAM_API_ROUTES.agents.status, decodeAgentStatus),
     readRuntimes: (): Promise<ProviderRuntimeSnapshot> => runTeamRequest(getProviderRuntimes(request, runtimeRoutes)),
     download: (provider: ManagedProviderId) =>

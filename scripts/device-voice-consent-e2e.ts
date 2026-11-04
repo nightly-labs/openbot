@@ -22,7 +22,7 @@ await build({
         b.onResolve(
           {
             filter:
-              /(^@openbot\/ui\/text$|^@openbot\/ui\/components\/SkillPreview$|\/analytics$|\/speech-playback$|\/speech-port$|\/speech-replies$|\/realtime-voice-conversation$)/,
+              /(^@openbot\/ui$|^@openbot\/ui\/text$|^@openbot\/ui\/components\/SkillPreview$|\/analytics$|\/speech-playback$|\/speech-port$|\/speech-replies$|\/realtime-voice-conversation$)/,
           },
           () => ({ path: native }),
         );

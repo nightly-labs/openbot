@@ -1,6 +1,8 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("mobile.chat", {
+  "mobile.chat.liveVoice.startLocal": "Start voice conversation with device voice settings",
+  "mobile.chat.liveVoice.startChatGPT": "Start ChatGPT voice call",
   "mobile.chat.voiceCall.title": "Voice call",
   "mobile.chat.voiceCall.showDetails": "View details",
   "mobile.chat.voiceCall.hideDetails": "Hide details",
@@ -152,7 +154,6 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.composer.cancelDictation": "Cancel dictation",
   "mobile.chat.voice.listening": "Listening…",
   "mobile.chat.voice.continue": "Continue dictation",
-  "mobile.chat.liveVoice.start": "Start a voice conversation",
   "mobile.chat.liveVoice.status": "{name} · {phase}",
   "mobile.chat.liveVoice.phase.starting": "Starting",
   "mobile.chat.liveVoice.phase.listening": "Listening",

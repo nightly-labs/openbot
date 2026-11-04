@@ -1,12 +1,14 @@
 import { type RealtimeVoiceSettings, realtimeVoiceChoices } from "@openbot/contracts/ipc";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Text } from "@openbot/ui";
+import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Text } from "@openbot/ui";
 import { SettingsLinkGroup } from "@openbot/ui/components/SettingsPanel";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createStore, Show } from "solid-js";
+import { useSettings } from "../settings/settings-context";
 
 /** The host owns both the default and each agent override. No provider identity changes here. */
 export function AgentVoiceSettings(props: { agentId: string; serverId?: string }) {
   const { t, errorMessage } = useText();
+  const { openAppSettings } = useSettings();
   const [state, setState] = createStore<{
     settings: RealtimeVoiceSettings | null;
     busy: boolean;
@@ -66,30 +68,37 @@ export function AgentVoiceSettings(props: { agentId: string; serverId?: string }
     }
   }
   return (
-    <Show when={state.settings?.configured}>
-      <SettingsLinkGroup inset class="agent-settings-runtime-rows" title={t("settings.voice.realtime.section")}>
-        <div class="agent-session-setting">
-          <Select<string>
-            options={["default", ...realtimeVoiceChoices(state.settings?.model ?? "gpt-live-1-codex")]}
-            value={state.settings?.voice ?? "default"}
-            disabled={state.busy || !state.settings?.canManage}
-            onChange={(value) => {
-              if (value !== null) void save(value);
-            }}
-            itemComponent={(item) => <SelectItem item={item.item}>{label(item.item.rawValue)}</SelectItem>}
-          >
-            <SelectTrigger class="agent-settings-runtime-row" aria-label={t("settings.voice.realtime.agentVoice")}>
-              <span class="agent-settings-runtime-label">{t("settings.voice.realtime.agentVoice")}</span>
-              <SelectValue<string>>{(value) => label(value.selectedOption() ?? "default")}</SelectValue>
-            </SelectTrigger>
-            <SelectContent />
-          </Select>
-        </div>
-        <div class="agent-session-setting-notes">
-          <Text tone="muted">{t("settings.voice.realtime.agentDescription")}</Text>
-        </div>
-        <Show when={state.error}>{(error) => <Text role="alert">{error()}</Text>}</Show>
-      </SettingsLinkGroup>
-    </Show>
+    <SettingsLinkGroup inset class="agent-settings-runtime-rows" title={t("settings.voice.realtime.section")}>
+      <div class="agent-session-setting">
+        <Select<string>
+          options={["default", ...realtimeVoiceChoices(state.settings?.model ?? "gpt-live-1-codex")]}
+          value={state.settings?.voice ?? "default"}
+          disabled={state.busy || !state.settings?.configured || !state.settings?.canManage}
+          onChange={(value) => {
+            if (value !== null) void save(value);
+          }}
+          itemComponent={(item) => <SelectItem item={item.item}>{label(item.item.rawValue)}</SelectItem>}
+        >
+          <SelectTrigger class="agent-settings-runtime-row" aria-label={t("settings.voice.realtime.agentVoice")}>
+            <span class="agent-settings-runtime-label">{t("settings.voice.realtime.agentVoice")}</span>
+            <SelectValue<string>>{(value) => label(value.selectedOption() ?? "default")}</SelectValue>
+          </SelectTrigger>
+          <SelectContent />
+        </Select>
+      </div>
+      <div class="agent-session-setting-notes">
+        <Text tone="muted">
+          {t(
+            state.settings?.configured
+              ? "settings.voice.realtime.agentDescription"
+              : "settings.voice.realtime.subscription",
+          )}
+        </Text>
+        <Button variant="link" onClick={() => openAppSettings(null, "voice")}>
+          {t("settings.voice.realtime.setupLink")}
+        </Button>
+      </div>
+      <Show when={state.error}>{(error) => <Text role="alert">{error()}</Text>}</Show>
+    </SettingsLinkGroup>
   );
 }

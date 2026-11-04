@@ -1,6 +1,21 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("settings", {
+  "settings.voice.realtime.failed": "Could not read voice availability from {server}. Reconnect and try again.",
+  "settings.voice.realtime.unsupported": "Update {server} to use ChatGPT voice setup.",
+  "settings.voice.realtime.offline": "Connect to {server} to check voice availability.",
+  "settings.voice.realtime.loading": "Checking voice availability on {server}\u2026",
+  "settings.voice.realtime.requirements":
+    "Sign in to Codex with ChatGPT on {server}. A ChatGPT subscription is required; an API key does not enable subscription voice.",
+  "settings.voice.realtime.ready": "The server allows ChatGPT calls. Enable the device switch to use them.",
+  "settings.voice.realtime.hostOff": "Ask a server owner or admin to allow ChatGPT calls in Server settings.",
+  "settings.voice.realtime.subscription":
+    "Codex must be installed, turned on and signed in with ChatGPT. Subscription voice access is checked when a call starts.",
+  "settings.voice.realtime.providersLink": "Set up Codex",
+  "settings.voice.realtime.serverLink": "Server availability and default voice",
+  "settings.voice.realtime.setupLink": "Voice call setup",
+  "settings.voice.realtime.agentHelp":
+    "For an agent\u2019s voice, open that agent\u2019s settings and choose Voice or Use server default.",
   "settings.voice.realtime.deviceEnabled": "Use ChatGPT voice on this device",
   "settings.voice.realtime.deviceDescription":
     "Use the server’s ChatGPT subscription for agent calls. Microphone audio and conversation context go to OpenAI. Off by default; applies only to your account on this device.",

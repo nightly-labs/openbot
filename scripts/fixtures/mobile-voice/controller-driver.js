@@ -84,6 +84,16 @@ assert.equal(
   "Call failed",
   "The cloud call bar hid its error.",
 );
+assert.equal(
+  liveVoice({ ...state, realtimeReady: false }, "Fixture", (key) => key).callPath,
+  "local",
+  "The pre-call control identifies the wrong audio path.",
+);
+assert.equal(
+  liveVoice({ ...state, realtimeReady: true }, "Fixture", (key) => key).callPath,
+  "chatgpt",
+  "The cloud call control is not identified before it starts.",
+);
 local.dispose();
 process.stdout.write(
   `${JSON.stringify({

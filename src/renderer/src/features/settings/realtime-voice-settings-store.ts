@@ -11,12 +11,13 @@ export function createRealtimeVoiceSettingsStore(
   selectedServer: () => ServerSummary | undefined,
 ) {
   const [state, setState] = createStore<{
+    phase: "loading" | "offline" | "unsupported" | "failed" | "ready";
     configured: boolean;
     status: RealtimeVoiceStatus | null;
     busy: boolean;
     canManage: boolean;
     hostName: string;
-  }>({ configured: false, status: null, busy: false, canManage: false, hostName: "" });
+  }>({ phase: "loading", configured: false, status: null, busy: false, canManage: false, hostName: "" });
   createEffect(
     () => ({ active: active(), server: selectedServer() }),
     ({ active, server }) => {
@@ -28,6 +29,11 @@ export function createRealtimeVoiceSettingsStore(
         server.compatibility?.capabilities.includes("realtime-voice-agent-settings-v1");
       setState((draft) => {
         Object.assign(draft, {
+          phase: !supported
+            ? "unsupported"
+            : server?.kind === "remote" && server.state !== "online"
+              ? "offline"
+              : "loading",
           configured: false,
           status: null,
           busy: false,
@@ -38,7 +44,7 @@ export function createRealtimeVoiceSettingsStore(
           hostName: server?.name ?? currentText().t("settings.voice.realtime.local"),
         });
       });
-      if (!supported) return;
+      if (!supported || (server?.kind === "remote" && server.state !== "online")) return;
       let alive = true;
       void voicePort()
         .voice.getRealtimeSettings({ agentId: null }, id)
@@ -47,12 +53,18 @@ export function createRealtimeVoiceSettingsStore(
           noteRealtimeVoiceStatus(id, status);
           if (alive)
             setState((draft) => {
+              draft.phase = "ready";
               draft.status = status;
               draft.configured = settings.configured;
               draft.canManage = draft.canManage && settings.canManage;
             });
         })
-        .catch(() => {});
+        .catch(() => {
+          if (alive)
+            setState((draft) => {
+              draft.phase = "failed";
+            });
+        });
       return () => {
         alive = false;
       };
@@ -112,4 +124,18 @@ export function createRealtimeVoiceSettingsStore(
     toast.error(errorMessage(error, t(key)));
   }
   return { state, setRealtimeEnabled, setRealtimeDefaultVoice };
+}
+
+/** One readiness message is shared by the provider notice and the personal setup entry. */
+export function realtimeVoiceSetupKey(state: {
+  phase: "loading" | "offline" | "unsupported" | "failed" | "ready";
+  configured: boolean;
+  status: RealtimeVoiceStatus | null;
+}) {
+  if (state.phase === "loading") return "settings.voice.realtime.loading";
+  if (state.phase === "offline") return "settings.voice.realtime.offline";
+  if (state.phase === "unsupported") return "settings.voice.realtime.unsupported";
+  if (state.phase === "failed") return "settings.voice.realtime.failed";
+  if (!state.configured) return "settings.voice.realtime.requirements";
+  return state.status?.enabled ? "settings.voice.realtime.ready" : "settings.voice.realtime.hostOff";
 }

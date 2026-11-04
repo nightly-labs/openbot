@@ -379,6 +379,7 @@ function RestartServer() {
  * active one - hence the target held by the domain instead of `activeServer()`.
  */
 function ServerSettings() {
+  const { openAppSettings } = useSettings();
   const windowPage = useWindowPage();
   const usageRows = usePlanLimitRows();
   const platform = usePlatform();
@@ -713,6 +714,10 @@ function ServerSettings() {
     <Show when={serverSettingsTarget()}>
       {(server) => (
         <ServerSettingsOverlay
+          onOpenVoiceSetup={() => {
+            setServerSettingsOpen(false);
+            openAppSettings(null, "voice");
+          }}
           // The settings show only as a page of the window, so they wait for the page.
           open={serverSettingsOpen() && windowPage.settingsPlacement("server") !== undefined}
           page={windowPage.settingsPlacement("server")}
@@ -866,6 +871,7 @@ function trackHostedSiteDelete(): (result: HostedSiteDeleteResult) => void {
  * `<Show>`: the settings own their open state and wait for the page placement.
  */
 function AppSettings(props: AccountProps) {
+  const { openServerSettings } = useServerSettings();
   const windowPage = useWindowPage();
   const platform = usePlatform();
   const auth = useAuth();
@@ -890,6 +896,10 @@ function AppSettings(props: AccountProps) {
   return (
     <Loading>
       <SettingsModal
+        onOpenVoiceSetup={(id, section) => {
+          setAppSettingsOpen(false);
+          openServerSettings(id, null, section);
+        }}
         // The settings show only as a page of the window, so they wait for the page.
         open={appSettingsOpen() && windowPage.settingsPlacement("personal") !== undefined}
         page={windowPage.settingsPlacement("personal")}

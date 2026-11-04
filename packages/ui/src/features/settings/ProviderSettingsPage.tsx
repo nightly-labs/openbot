@@ -120,6 +120,7 @@ export interface ProviderModelVisibilityControl {
 }
 
 export interface ProviderSettingsPageProps extends ProviderRowHost {
+  codexVoiceSetup?: JSX.Element;
   options: ProviderPickerOption[];
   /** The default for new agents. A joined server has none: its default is not this computer's. */
   defaultProvider?:
@@ -547,6 +548,7 @@ function ProviderPage(props: PageProps) {
         </Show>
         <Show when={models()}>{(control) => <ModelsSection control={control()} />}</Show>
       </Show>
+      <Show when={props.option.id === "codex"}>{props.codexVoiceSetup}</Show>
       <UseSection {...props} row={row} />
       <DownloadSection {...props} row={row} />
     </>

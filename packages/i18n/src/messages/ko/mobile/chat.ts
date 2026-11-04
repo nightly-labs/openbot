@@ -150,7 +150,6 @@ export const messages = {
   "mobile.chat.composer.cancelDictation": "음성 입력 취소",
   "mobile.chat.voice.listening": "듣는 중…",
   "mobile.chat.voice.continue": "음성 입력 계속",
-  "mobile.chat.liveVoice.start": "음성 대화 시작",
   "mobile.chat.liveVoice.status": "{name} · {phase}",
   "mobile.chat.liveVoice.phase.starting": "시작 중",
   "mobile.chat.liveVoice.phase.listening": "듣는 중",

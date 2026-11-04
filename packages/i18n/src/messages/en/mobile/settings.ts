@@ -1,6 +1,25 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("mobile.settings", {
+  "mobile.settings.voice.live.checking": "Checking voice availability on {server}\u2026",
+  "mobile.settings.voice.live.loadFailed": "Could not read voice availability. Reconnect to the server and try again.",
+  "mobile.settings.voice.live.enableCodex": "Turn on Codex",
+  "mobile.settings.voice.live.requirements":
+    "Sign in to Codex with ChatGPT on {server}. A ChatGPT subscription is required; an API key does not enable subscription voice.",
+  "mobile.settings.voice.live.ready": "The server allows ChatGPT calls. Enable the device switch to use them.",
+  "mobile.settings.voice.live.hostOff": "Ask a server owner or admin to allow ChatGPT calls in Server settings.",
+  "mobile.settings.voice.live.subscription":
+    "Codex must be installed, turned on and signed in with ChatGPT. Subscription voice access is checked when a call starts.",
+  "mobile.settings.voice.live.providersLink": "Set up Codex",
+  "mobile.settings.voice.live.serverLink": "Server availability and default voice",
+  "mobile.settings.voice.live.setupLink": "Voice call setup",
+  "mobile.settings.voice.live.agentHelp":
+    "For an agent\u2019s voice, open that agent\u2019s settings and choose Voice or Use server default.",
+  "mobile.settings.voice.live.noServer": "Choose a server, then set up Codex with ChatGPT.",
+  "mobile.settings.voice.live.unsupported": "Update this server to use ChatGPT live calls.",
+  "mobile.settings.voice.live.nativeMissing": "Update the app to a build with live call support.",
+  "mobile.settings.voice.live.adminHelp": "Ask a server owner or admin to set up Codex and allow ChatGPT calls.",
+  "mobile.settings.voice.live.browserSignIn": "Sign in to ChatGPT in browser",
   "mobile.settings.voice.live.deviceEnabled": "Use ChatGPT voice on this device",
   "mobile.settings.voice.live.deviceDescription":
     "Use the server’s ChatGPT subscription for agent calls. Microphone audio and conversation context go to OpenAI. Off by default; applies only to your account on this device.",

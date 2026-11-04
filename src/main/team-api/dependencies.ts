@@ -169,6 +169,7 @@ type TeamApiAgentMethods = Pick<
 >;
 
 export type TeamApiAgents = TeamApiAgentMethods & {
+  setProviderOn?: AgentService["setProviderOn"];
   on: (event: "event", listener: (event: AgentEvent) => void) => void;
   off: (event: "event", listener: (event: AgentEvent) => void) => void;
 };

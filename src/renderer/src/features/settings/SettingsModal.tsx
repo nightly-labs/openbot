@@ -81,6 +81,7 @@ export interface SettingsModalProps {
   onCancelScheduledRestart?: () => Promise<void>;
   onRestartWhenIdle?: () => Promise<void>;
   onCancelIdleRestart?: () => Promise<void>;
+  onOpenVoiceSetup?: ((serverId: string, section: "general" | "providers") => void) | undefined;
   account: CentralAuthUser;
   onUpdateAccountName: (name: string) => Promise<void>;
   onUpdateAccountAvatar: (image: AvatarImageInput | null) => Promise<void>;
@@ -318,7 +319,17 @@ export function SettingsModal(props: SettingsModalProps) {
         </Tabs.Content>
 
         <Tabs.Content value="voice" class="settings-modal-tab-panel" data-tab="voice">
-          <SettingsVoiceTab accountId={props.account.id} store={voice} selectMount={modalElement} />
+          <SettingsVoiceTab
+            accountId={props.account.id}
+            store={voice}
+            selectMount={modalElement}
+            onOpenVoiceSetup={
+              props.onOpenVoiceSetup
+                ? (section) =>
+                    props.onOpenVoiceSetup?.(props.servers?.find((server) => server.active)?.id ?? "local", section)
+                : undefined
+            }
+          />
         </Tabs.Content>
 
         <Show when={dynamicIslandShown()}>

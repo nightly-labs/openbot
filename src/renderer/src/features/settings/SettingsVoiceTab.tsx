@@ -41,6 +41,7 @@ import {
 import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, createStore, For, Show } from "solid-js";
 import { realtimeVoiceOptedIn, setRealtimeVoiceOptIn } from "../speech/realtime-voice-preference";
+import { realtimeVoiceSetupKey } from "./realtime-voice-settings-store";
 import type { SettingsVoiceStore } from "./settings-voice-store";
 import { shortModel, VoiceServerDialog, voiceServerHost } from "./VoiceServerDialog";
 
@@ -151,6 +152,7 @@ function flagFor(language: VoiceLanguage): string {
 interface SettingsVoiceTabProps {
   store: SettingsVoiceStore;
   accountId: string;
+  onOpenVoiceSetup?: ((section: "general" | "providers") => void) | undefined;
   selectMount: HTMLElement | undefined;
 }
 
@@ -231,18 +233,33 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
 
   return (
     <>
-      <Show when={props.store.realtime.state.configured || realtimeVoiceOptedIn(props.accountId)}>
-        <SettingsSection title={t("settings.voice.realtime.section")}>
-          <ItemGroup class="settings-modal-card">
-            <SwitchField
-              checked={realtimeVoiceOptedIn(props.accountId)}
-              onChange={(enabled) => setRealtimeVoiceOptIn(props.accountId, enabled)}
-              label={t("settings.voice.realtime.deviceEnabled")}
-              description={t("settings.voice.realtime.deviceDescription")}
-            />
-          </ItemGroup>
-        </SettingsSection>
-      </Show>
+      <SettingsSection title={t("settings.voice.realtime.section")}>
+        <ItemGroup class="settings-modal-card">
+          <SwitchField
+            checked={realtimeVoiceOptedIn(props.accountId)}
+            disabled={
+              !realtimeVoiceOptedIn(props.accountId) &&
+              (!props.store.realtime.state.configured || !props.store.realtime.state.status?.enabled)
+            }
+            onChange={(enabled) => setRealtimeVoiceOptIn(props.accountId, enabled)}
+            label={t("settings.voice.realtime.deviceEnabled")}
+            description={t("settings.voice.realtime.deviceDescription")}
+          />
+        </ItemGroup>
+        <ItemDescription>
+          {t(realtimeVoiceSetupKey(props.store.realtime.state), { server: props.store.realtime.state.hostName })}
+        </ItemDescription>
+        <Show when={props.onOpenVoiceSetup && props.store.realtime.state.canManage}>
+          <Button variant="link" onClick={() => props.onOpenVoiceSetup?.("providers")}>
+            {t("settings.voice.realtime.providersLink")}
+          </Button>
+          <Button variant="link" onClick={() => props.onOpenVoiceSetup?.("general")}>
+            {t("settings.voice.realtime.serverLink")}
+          </Button>
+        </Show>
+        <ItemDescription>{t("settings.voice.realtime.agentHelp")}</ItemDescription>
+      </SettingsSection>
+
       <SettingsSection data-settings-row="settings.voice.models.title" title={t("settings.voice.models.title")}>
         <ItemGroup class="settings-modal-card">
           <For each={VOICE_MODELS}>

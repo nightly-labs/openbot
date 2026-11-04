@@ -4,10 +4,12 @@ import {
   REALTIME_VOICE_AGENT_SELECTION_ROUTE,
   REALTIME_VOICE_AGENT_SETTINGS_CAPABILITY,
   REALTIME_VOICE_CAPABILITY,
+  REALTIME_VOICE_CODEX_ENABLE_ROUTE,
   REALTIME_VOICE_CONFIGURATION_ROUTE,
   REALTIME_VOICE_ROUTES,
   REALTIME_VOICE_SELECTION_CAPABILITY,
   REALTIME_VOICE_SELECTION_ROUTE,
+  REALTIME_VOICE_SETUP_CAPABILITY,
 } from "@openbot/contracts/team-protocol/realtime-voice-v1";
 import { RealtimeVoiceService, takeRealtimeVoiceApiKey } from "../src/main/realtime-voice-service";
 // Checks member access to agents through the agent-access-v1 Team API contract. A real
@@ -730,6 +732,36 @@ try {
     assert.equal(stored.roles[0]?.agents[copy], "chat", "The role did not get the copy.");
     assert.ok(!(await listedIds(setup.memberToken)).includes(copy), "The member sees the copy.");
     return { copy: stored.everyone[copy], role: stored.roles[0]?.agents[copy] };
+  });
+
+  await step("voice setup: enabling Codex requires current server admin and the new capability", async () => {
+    const agents = current().agents;
+    const original = agents.setProviderOn;
+    let enabled = 0;
+    agents.setProviderOn = (provider, on) =>
+      Effect.sync(() => {
+        assert.equal(provider, "codex");
+        assert.equal(on, true);
+        enabled += 1;
+        return agents.getStatus();
+      });
+    const enable = (token: string, capabilities = [REALTIME_VOICE_CAPABILITY, REALTIME_VOICE_SETUP_CAPABILITY]) =>
+      call("POST", REALTIME_VOICE_CODEX_ENABLE_ROUTE, { token, protocol: TEAM_PROTOCOL_V9, capabilities, body: {} });
+    try {
+      assert.equal((await enable(setup.memberToken)).status, 403);
+      assert.equal((await enable(ownerToken, [REALTIME_VOICE_CAPABILITY])).status, 400);
+      assert.equal(enabled, 0, "An unauthorized or legacy client changed provider state.");
+      assert.equal((await enable(ownerToken)).status, 200);
+      assert.equal(enabled, 1);
+      const legacy = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V7);
+      assert.equal(
+        legacy.includes(REALTIME_VOICE_SETUP_CAPABILITY),
+        false,
+        "The new operation leaked into a frozen protocol.",
+      );
+    } finally {
+      agents.setProviderOn = original;
+    }
   });
 
   await step("live voice: host key is removed before subprocess launch", async () => {

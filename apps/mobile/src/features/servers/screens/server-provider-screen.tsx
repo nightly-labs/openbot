@@ -27,6 +27,8 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@/features/settings/components/settings-content";
+import { LiveVoiceSettings } from "@/features/voice/components/live-voice-settings";
+import { useMobileWorkspaceSelector } from "@/features/workspace/context/workspace-store";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
@@ -43,6 +45,7 @@ export function ServerProviderScreen() {
   const { t, sourceText, errorMessage } = text;
   const params = useLocalSearchParams<{ serverId: string; provider: string }>();
   const serverId = params.serverId;
+  const server = useMobileWorkspaceSelector((workspace) => workspace.servers.find((server) => server.id === serverId));
   const provider = isAgentProvider(params.provider) ? params.provider : null;
   const providers = useServerProviders(serverId);
   const { available, admin, status, rows, applyStatus, applyRuntimes } = providers;
@@ -120,6 +123,7 @@ export function ServerProviderScreen() {
   return (
     <SettingsContent>
       <Stack.Screen options={{ title: row.name }} />
+      {provider === "codex" && server ? <LiveVoiceSettings host={server} providerNotice /> : null}
       {error ? (
         <Typography.Paragraph accessibilityRole="alert" type="body-xs" className="px-4 text-danger-text">
           {error}
@@ -185,6 +189,28 @@ export function ServerProviderScreen() {
         </SettingsSection>
       ) : connectable && state !== "available" && !(row.apiKey && isKeyOnlyProvider(provider)) ? (
         <SettingsNote>{t("mobile.server.providers.connectOnComputer")}</SettingsNote>
+      ) : null}
+      {provider === "codex" && row.status?.off && admin.enableCodexVoice ? (
+        <SettingsSection>
+          <SettingsRow
+            disabled={busy}
+            onPress={() =>
+              void run("enable-codex", async () => {
+                await admin.enableCodexVoice?.();
+                await providers.refreshStatus();
+              })
+            }
+          >
+            <Typography.Paragraph>{t("mobile.settings.voice.live.enableCodex")}</Typography.Paragraph>
+          </SettingsRow>
+        </SettingsSection>
+      ) : null}
+      {provider === "codex" && connectable && admin.capabilities.includes("sign-in-relay-v1") ? (
+        <SettingsSection footer={t("mobile.settings.voice.live.subscription")}>
+          <SettingsRow disabled={busy} onPress={() => openSignIn("relay")}>
+            <Typography.Paragraph>{t("mobile.settings.voice.live.browserSignIn")}</Typography.Paragraph>
+          </SettingsRow>
+        </SettingsSection>
       ) : null}
       {runtime && runtimeAction ? (
         <SettingsSection
