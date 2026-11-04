@@ -319,9 +319,10 @@ export function AgentEventBridge() {
         return;
       case "subagent-failed": {
         // The chat shows the failure in the subagent card. The toast tells the user who looks at
-        // another chat; the desktop notification tells the user who is not in the app.
+        // another chat; the desktop notification tells the user who is not in the app. A failure does
+        // not need the user, so it shows only at the "all" level, as the completion sound does.
         const agent = agentList().find((candidate) => candidate.id === event.agentId);
-        if (!agent?.notifications || soundLevel() === "nothing" || platform.chatWindow) return;
+        if (!agent?.notifications || soundLevel() !== "all" || platform.chatWindow) return;
         if (!platform.appFocused() || isAgentChatOpen(event.agentId)) return;
         const { t } = currentText();
         toast.error(agent.name, {
