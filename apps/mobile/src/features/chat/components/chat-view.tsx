@@ -64,6 +64,7 @@ import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import { useReducedTransparency } from "@/shared/lib/use-reduced-transparency";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
+import { useComposerDraft } from "../model/composer-drafts";
 import {
   deleteComposerFiles,
   takeComposerFocus,
@@ -320,7 +321,8 @@ export function ChatView({
   const [selection, setSelection] = useState<{ message: ChatBubbleMessage; selected: string } | null>(null);
   const selectionQuote = selection ? selection.selected.trim() || markdownPlainText(selection.message.body) : "";
   const [replyFocusVersion, setReplyFocusVersion] = useState(0);
-  const [draft, setDraft] = useState("");
+  // Each chat keeps its own unsent text, so a look at another chat does not lose it.
+  const [draft, setDraft] = useComposerDraft({ kind: target.kind, serverId: target.serverId, id: target.id });
   const [sendError, setSendError] = useState<{
     agentId: string;
     message: string;
@@ -529,7 +531,7 @@ export function ChatView({
     void composerAttachments
       .addShared(request.text, files, (text) => setDraft((current) => (current ? `${current}\n${text}` : text)))
       .finally(() => deleteComposerFiles(files));
-  }, [isFocused, composerRequest, target.kind, target.serverId, target.id, composerAttachments.addShared]);
+  }, [isFocused, composerRequest, target.kind, target.serverId, target.id, composerAttachments.addShared, setDraft]);
   const composerFocus = useComposerRequest((state) => state.focus);
   const [handoffFocusVersion, setHandoffFocusVersion] = useState(0);
   useEffect(() => {
@@ -855,8 +857,9 @@ export function ChatView({
     deliver(serializeSelectionInstruction(instruction, selectionQuote), hostMessageId(selection.message.id), []);
   }
 
-  // The messages whose text and files are in the composer. The composer draft is not saved, so the
-  // outbox keeps them until it sends, and they come back stopped when the chat closes.
+  // The messages whose text and files are in the composer. The outbox keeps them until it sends,
+  // and they come back stopped when the chat closes. Their text then leaves the draft with what was
+  // typed after it, so that it does not show both in the queue and in the composer.
   const editedMessages = useRef(new Set<string>());
   const mounted = useRef(false);
   useEffect(() => {
@@ -864,9 +867,11 @@ export function ChatView({
     const edited = editedMessages.current;
     return () => {
       mounted.current = false;
+      if (edited.size) setDraft("");
       outbox.stopEditing(edited);
+      edited.clear();
     };
-  }, [outbox]);
+  }, [outbox, setDraft]);
   /**
    * Puts the text, reply and files of an outbox message in the composer. A ref, so that a streamed
    * reply does not draw the pending rows again.
