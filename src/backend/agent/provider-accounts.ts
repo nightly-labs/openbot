@@ -16,7 +16,7 @@ import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/clau
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Cause, Effect, Fiber, Schema, type Scope } from "effect";
-import { startAcpAuthentication } from "./../acp-sign-in";
+import { googleSignInByOpenBot, startAcpAuthentication } from "./../acp-sign-in";
 import type { AgentClient } from "./../agent-client";
 import { type AgentCliInfo, cliPathEnvironment, cliSpawnTarget } from "./../cli";
 import type { AccountReadResult } from "./../protocol";
@@ -28,7 +28,7 @@ import { stopProcessTree } from "../windows-process-tree";
 import { usageWindowResetSince } from "./account-usage";
 import { captureBrowser } from "./browser-capture";
 import type { ProviderAccountStore, StoredProviderAccount } from "./provider-account-store";
-import { waitForSuccessfulProcess } from "./provider-status";
+import { type ProviderProcessFailed, waitForSuccessfulProcess } from "./provider-status";
 import { providerLabel } from "./thread-items";
 import { UsageReadGate } from "./usage-read-gate";
 
@@ -45,9 +45,16 @@ function accountFailure(text: string): ProviderAccountFailed {
   return new ProviderAccountFailed({ cause: new Error(text) });
 }
 
+/** Who a client is signed in as. A team and a personal login can share an email in different organizations. */
+interface AccountLogin {
+  email: string | null;
+  organization: string | null;
+}
+
 interface AccountState {
   state: ProviderAccountState;
   email: string | null;
+  organization: string | null;
   message: string | null;
   checkedAt: number;
 }
@@ -57,7 +64,8 @@ export interface ProviderAccountsHost {
   scope(): Scope.Scope;
   /** The CLI of the provider's own sign-in, or undefined when it is not connected. */
   cli(provider: AgentProviderId): AgentCliInfo | undefined;
-  defaultEmail(provider: AgentProviderId): string | null;
+  /** The login of the provider's own sign-in. */
+  defaultLogin(provider: AgentProviderId): AccountLogin | null;
   /** The provider's saved API key. */
   apiKey(provider: AgentProviderId): string | null;
   /** Whether the provider's own sign-in runs on its saved key, as it does with no account of its own. */
@@ -115,6 +123,11 @@ export class ProviderAccounts {
 
   static support(provider: AgentProviderId): ProviderAccountSupport | undefined {
     return provider === "acp" ? undefined : requireProviderDriver(provider).accounts;
+  }
+
+  /** The command that signs the provider's own sign-in out, or undefined when its CLI has none. */
+  static signOutCommand(provider: AgentProviderId): ProviderAccountSupport["signOut"] {
+    return ProviderAccounts.support(provider)?.signOut ?? requireProviderDriver(provider).signOut;
   }
 
   /** The stored account an agent names, or null for the provider's own sign-in or a removed account. */
@@ -223,7 +236,8 @@ export class ProviderAccounts {
       Effect.gen({ self: this }, function* () {
         if ("kind" in command) {
           // A Reconnect signs the account out first: its saved token would answer with no browser page.
-          // The server prints Google's page, which a host shows and this computer opens itself.
+          // The server prints Google's page, which a host shows and this computer opens itself, except
+          // at a Windows computer, where the server opens it (`googleSignInByOpenBot`).
           const login = yield* startAcpAuthentication({
             executable: cli.executable,
             argv: command.argv,
@@ -232,7 +246,7 @@ export class ProviderAccounts {
             timeoutMs: command.timeoutMs,
             ...(added ? {} : { logout: true }),
             privateTemp: this.#host.signInTemp(provider),
-            openGoogleSignIn: openExternal,
+            ...(googleSignInByOpenBot(onHost) ? { openGoogleSignIn: openExternal } : {}),
           });
           return yield* login.done;
         }
@@ -573,7 +587,8 @@ export class ProviderAccounts {
       ({ client, account: signedIn }) =>
         Effect.gen({ self: this }, function* () {
           const email = signedIn.email ?? null;
-          if (email && this.#emailTaken(provider, account.id, email))
+          const organization = signedIn.organization ?? null;
+          if (email && this.#loginTaken(provider, account.id, { email, organization }))
             return yield* accountFailure(
               sourceText("error.provider.accountAlreadyAdded", { provider: providerLabel(provider) }),
             );
@@ -599,7 +614,7 @@ export class ProviderAccounts {
                     )
                   : reading
               : null;
-          this.#setState(account.id, { state: "connected", email, message: null });
+          this.#setState(account.id, { state: "connected", email, organization, message: null });
           // The rail shows an account only with a reading, and no usage request follows a sign-in.
           if (limit) this.#host.usageChanged(limit);
         }),
@@ -644,6 +659,25 @@ export class ProviderAccounts {
     });
   }
 
+  /**
+   * Signs the provider's own sign-in out: the CLI's sign-out in the user's own home folder, which a
+   * terminal CLI on the same computer shares. The caller stops the client that still runs on it.
+   */
+  readonly signOutDefault = Effect.fn("ProviderAccounts.signOutDefault")(function* (
+    this: ProviderAccounts,
+    provider: AgentProviderId,
+  ) {
+    const command = ProviderAccounts.signOutCommand(provider);
+    const cli = this.#host.cli(provider);
+    if (!command || !cli)
+      return yield* accountFailure(
+        sourceText("error.provider.signOutUnsupported", { provider: providerLabel(provider) }),
+      );
+    yield* this.#runSignOut(cli, command, {}).pipe(
+      Effect.mapError((error) => accountFailure(this.#message(provider, error))),
+    );
+  });
+
   /** Runs the CLI's sign-out in the account's folder, for a CLI that keeps a credential outside it. */
   readonly #signOut = Effect.fn("ProviderAccounts.signOut")(function* (
     this: ProviderAccounts,
@@ -653,25 +687,7 @@ export class ProviderAccounts {
     const cli = this.#host.cli(account.provider);
     // A key account never signed in; the key goes with the stored credential.
     if (!command || !cli || isKeyAccount(account)) return;
-    yield* Effect.scoped(
-      Effect.gen({ self: this }, function* () {
-        const target = cliSpawnTarget(cli.executable, command.argv);
-        const child = yield* Effect.acquireRelease(
-          Effect.sync(() =>
-            spawn(target.command, target.args, {
-              cwd: process.cwd(),
-              env: { ...process.env, ...cliPathEnvironment(cli), ...command.env(cli), ...this.environment(account) },
-              stdio: "ignore",
-              shell: false,
-              windowsHide: process.platform === "win32",
-              windowsVerbatimArguments: target.windowsVerbatimArguments,
-            }),
-          ),
-          (child) => stopProcessTree(child).pipe(Effect.ignore),
-        );
-        yield* waitForSuccessfulProcess(child, command.timeoutMs, "Provider sign-out");
-      }),
-    ).pipe(
+    yield* this.#runSignOut(cli, command, this.environment(account)).pipe(
       // The folder goes in any case; a credential the CLI kept elsewhere is the CLI's to clear.
       Effect.catch((error) =>
         Effect.sync(() =>
@@ -684,12 +700,37 @@ export class ProviderAccounts {
     );
   });
 
-  #emailTaken(provider: AgentProviderId, accountId: string, email: string): boolean {
-    const normalized = email.toLowerCase();
-    if (this.#host.defaultEmail(provider)?.toLowerCase() === normalized) return true;
-    return this.#store
-      .list(provider)
-      .some((other) => other.id !== accountId && this.#states.get(other.id)?.email?.toLowerCase() === normalized);
+  #runSignOut(
+    cli: AgentCliInfo,
+    command: NonNullable<ProviderAccountSupport["signOut"]>,
+    environment: Readonly<Record<string, string>>,
+  ): Effect.Effect<void, ProviderProcessFailed> {
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const target = cliSpawnTarget(cli.executable, command.argv);
+        const child = yield* Effect.acquireRelease(
+          Effect.sync(() =>
+            spawn(target.command, target.args, {
+              cwd: process.cwd(),
+              env: { ...process.env, ...cliPathEnvironment(cli), ...command.env(cli), ...environment },
+              stdio: "ignore",
+              shell: false,
+              windowsHide: process.platform === "win32",
+              windowsVerbatimArguments: target.windowsVerbatimArguments,
+            }),
+          ),
+          (child) => stopProcessTree(child).pipe(Effect.ignore),
+        );
+        yield* waitForSuccessfulProcess(child, command.timeoutMs, "Provider sign-out");
+      }),
+    );
+  }
+
+  #loginTaken(provider: AgentProviderId, accountId: string, login: AccountLogin): boolean {
+    const same = (other: AccountLogin | null | undefined) =>
+      other?.email?.toLowerCase() === login.email?.toLowerCase() && other?.organization === login.organization;
+    if (same(this.#host.defaultLogin(provider))) return true;
+    return this.#store.list(provider).some((other) => other.id !== accountId && same(this.#states.get(other.id)));
   }
 
   #interrupt(accountId: string): Effect.Effect<void> {
@@ -722,6 +763,7 @@ export class ProviderAccounts {
     this.#states.set(accountId, {
       state: patch.state ?? current?.state ?? "checking",
       email: patch.email !== undefined ? patch.email : (current?.email ?? null),
+      organization: patch.organization !== undefined ? patch.organization : (current?.organization ?? null),
       message: patch.message !== undefined ? patch.message : (current?.message ?? null),
       checkedAt: patch.state === "connected" || patch.state === "signed-out" ? Date.now() : (current?.checkedAt ?? 0),
     });

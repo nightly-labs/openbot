@@ -125,6 +125,11 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.6fr) auto;
 }
 
+/* Two token counts next to the ID and the name. Each count keeps room for a value such as 131,072. */
+.custom-provider-row-inputs.custom-provider-row-quad {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(9ch, 0.8fr) minmax(9ch, 0.8fr) auto;
+}
+
 .custom-provider-rows-error,
 .custom-provider-row-error,
 .custom-provider-submit-error {
@@ -275,6 +280,12 @@
   color: var(--openbot-text-muted);
 }
 
+/* Right to left, the arrow points the other way. */
+.custom-provider-preset-chevron:dir(rtl),
+.custom-provider-header .ui-icon-button > svg[class~="lucide-arrow-left"]:dir(rtl) {
+  transform: scaleX(-1);
+}
+
 /* The custom ACP agent form. */
 .custom-acp-presets {
   display: flex;
@@ -380,4 +391,56 @@ input.custom-acp-code {
   flex-shrink: 1;
   flex-wrap: wrap;
   margin-inline-start: auto;
+}
+
+/* "Runs on": the logo and the name of the provider that runs the endpoint. */
+.custom-provider-harness {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+/* A provider to download keeps its action at the end of the row. */
+.custom-provider-harness-item .ui-select-item-label {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--openbot-space-3);
+}
+
+/* With no check mark to make room for, the action reaches the end of the row. */
+.custom-provider-harness-item[data-action]:not([data-selected]) {
+  padding-inline-end: var(--openbot-space-1-5);
+}
+
+.custom-provider-harness-action {
+  margin-inline-start: auto;
+}
+
+.custom-provider-harness-button {
+  gap: var(--openbot-space-1);
+  font-size: inherit;
+  pointer-events: none;
+}
+
+.custom-provider-harness-item .custom-provider-harness-button svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+/* The closed field: the chosen provider, and its download at the end. */
+.custom-provider-harness-value {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--openbot-space-3);
+}
+
+.custom-provider-harness-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  margin-inline-start: auto;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
 }

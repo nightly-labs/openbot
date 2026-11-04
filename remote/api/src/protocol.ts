@@ -56,6 +56,7 @@ const signalMessageTypeSchema = z.enum([
   "disconnect",
   "slack-delivery-result",
   "webhook-delivery-result",
+  "github-delivery-result",
   "telegram-call",
   "queued-delivery-ack",
 ]);
@@ -159,8 +160,12 @@ const signalClientMessageSchema = z.discriminatedUnion("type", [
     slackRoute: z.string().min(1).max(8_192).optional(),
     discordRoute: z.string().min(1).max(8_192).optional(),
     webhookRoute: z.string().min(1).max(8_192).optional(),
+    githubRoute: z.string().min(1).max(16_384).optional(),
     telegramRoute: z.string().min(1).max(16_384).optional(),
     queueKey: z.string().max(128).optional(),
+    // Unknown formats are kept but never used: Signal sends only the formats it knows. A list that a
+    // later host sends in a shape this Signal does not know is dropped, not the whole hello.
+    webhookFormats: z.array(z.string().min(1).max(64)).max(8).optional().catch(undefined),
   }),
   z.object({
     type: z.enum(["offer", "answer"]),
@@ -221,6 +226,12 @@ const signalClientMessageSchema = z.discriminatedUnion("type", [
       z.literal(429),
       z.literal(503),
     ]),
+  }),
+  z.object({
+    type: z.literal("github-delivery-result"),
+    version: z.literal(1),
+    requestId: identifierSchema,
+    status: z.union([z.literal(202), z.literal(400), z.literal(404), z.literal(503)]),
   }),
   telegramCallSchema,
 ]) satisfies z.ZodType<SignalClientMessage>;

@@ -88,6 +88,7 @@ export const messages = {
   "error.remote.fileTransferFailed": "WebRTC 파일 전송에 실패했어요.",
   "error.remote.fileResumeFailed": "WebRTC 파일 전송을 제한 시간 안에 재개할 수 없었어요.",
   "error.remote.fileTransportStopped": "WebRTC 파일 전송이 중지되었어요.",
+  "error.remote.downloadStopped": "다운로드를 중지했어요.",
   "error.remote.fileResumeExpired": "WebRTC 파일 전송 재개 제한 시간이 지났어요.",
   "error.remote.hostRequestFailed": "호스트가 요청을 완료할 수 없었어요.",
   "error.remote.responseTooLarge": "호스트의 응답이 너무 커서 이 기기로 보낼 수 없어요.",
@@ -121,7 +122,6 @@ export const messages = {
   "error.remote.serverDisconnected": "서버 연결이 끊어졌어요.",
   "error.remote.preferencesUnreadable": "저장된 채팅 환경설정을 읽을 수 없어요.",
   "error.remote.accountAuthRequired": "계정 인증이 필요해요.",
-  "error.remote.serverIdentityChanged": "서버 ID가 변경되었어요. 신뢰하는 호스트 키를 교체하지 않아요.",
   "error.remote.pairedIdentityChanged":
     "페어링된 데스크톱 ID가 없거나 변경되었어요. 해당 데스크톱에서 새 코드를 스캔해 주세요.",
   "error.remote.permanentInviteNoEmail": "영구 초대는 이메일로 보낼 수 없어요.",
@@ -194,4 +194,6 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "채널을 삭제하려면 이 데스크톱 서버를 업데이트해 주세요.",
   "error.remote.historyRefreshFailed": "메시지를 보냈지만 채팅 기록을 새로 고칠 수 없었어요.",
   "error.remote.taskHistoryRefreshFailed": "작업을 변경했지만 채팅 기록을 새로 고칠 수 없었어요.",
+  "error.remote.localServerAccountRemovalFailed":
+    "서버는 해당 컴퓨터에서 삭제되었지만 계정에는 아직 표시됩니다. 계정에서 제거하려면 다시 삭제하세요.",
 } as const satisfies PartialTranslation<typeof source>;

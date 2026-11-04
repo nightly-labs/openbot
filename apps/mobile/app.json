@@ -3,7 +3,7 @@
     "name": "OpenBot",
     "slug": "openbot",
     "platforms": ["ios", "android"],
-    "version": "1.4.3",
+    "version": "1.4.6",
     "orientation": "portrait",
     "icon": "./assets/icons/app-icon.png",
     "scheme": "openbot",
@@ -24,6 +24,11 @@
     "android": {
       "package": "run.openbot.mobile",
       "icon": "./assets/icons/app-icon.png",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icons/android-adaptive-eyes.png",
+        "backgroundImage": "./assets/icons/android-adaptive-background.png",
+        "monochromeImage": "./assets/icons/android-adaptive-eyes.png"
+      },
       "predictiveBackGestureEnabled": false,
       "permissions": ["android.permission.CAMERA"],
       "blockedPermissions": [

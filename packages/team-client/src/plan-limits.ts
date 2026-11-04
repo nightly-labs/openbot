@@ -3,10 +3,13 @@ import {
   type AccountUsageLimit,
   type AccountUsageWindow,
   type AgentProviderId,
+  accountUsageCoversModel,
   agentProviderDescriptor,
+  DEFAULT_PROVIDER_ACCOUNT_ID,
   type HostProviderAccounts,
   isAccountUsage,
   isAgentProvider,
+  usageQuotaForModel,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { Effect, Schema } from "effect";
@@ -78,9 +81,11 @@ export function usageTone(remainingPercent: number | null): PlanLimitTone {
 }
 
 /** The windows of a reading, the shortest first. A window with no duration comes last. */
-export function reportedUsageWindows(limit: Pick<AccountUsageLimit, "primary" | "secondary">): AccountUsageWindow[] {
-  return [limit.primary, limit.secondary]
-    .filter((window): window is AccountUsageWindow => window !== null)
+export function reportedUsageWindows(
+  limit: Pick<AccountUsageLimit, "primary" | "secondary" | "tertiary">,
+): AccountUsageWindow[] {
+  return [limit.primary, limit.secondary, limit.tertiary]
+    .filter((window): window is AccountUsageWindow => window != null)
     .sort(
       (left, right) =>
         (left.windowDurationMins ?? Number.POSITIVE_INFINITY) - (right.windowDurationMins ?? Number.POSITIVE_INFINITY),
@@ -132,6 +137,31 @@ export function withSignInUsage(current: AccountUsage | null | undefined, signIn
   };
 }
 
+function usageLimitKey(limit: AccountUsageLimit): string {
+  return JSON.stringify([limit.id, limit.accountId ?? null]);
+}
+
+/**
+ * The reading after a host's `usage-changed` event. The host sends one provider, or the providers it
+ * has read so far, so each limit of the event replaces only its own, as on desktop. A limit with no
+ * window keeps the windows it had, so its ring does not go and come back. An empty event clears the
+ * provider's own sign-ins, as on desktop.
+ */
+export function withUsageEvent(current: AccountUsage | null | undefined, event: AccountUsage): AccountUsage {
+  if (event.limits.length === 0) return withSignInUsage(current, event);
+  const limits = new Map((current?.limits ?? []).map((limit) => [usageLimitKey(limit), limit]));
+  for (const limit of event.limits) {
+    const kept = limits.get(usageLimitKey(limit));
+    limits.set(
+      usageLimitKey(limit),
+      limit.primary || limit.secondary || !kept
+        ? limit
+        : { ...limit, primary: kept.primary, secondary: kept.secondary },
+    );
+  }
+  return { limits: [...limits.values()] };
+}
+
 function decodeAccountUsage(value: unknown): AccountUsage {
   if (!isAccountUsage(value)) throw new Error("The server returned invalid usage limits.");
   return value;
@@ -162,3 +192,47 @@ export const readPlanLimits = Effect.fn("TeamClient.readPlanLimits")(function* (
   );
   return { usage: withSignInUsage(extra?.[0], signInUsage), accounts: extra?.[1].providers ?? null };
 });
+
+/** A plan window that is spent and has not ended yet, as the composer notice and the model picker read it. */
+export interface SpentUsageWindow {
+  slot: "primary" | "secondary";
+  window: AccountUsageWindow;
+  /** False for a provider-level reading that does not limit the model (`accountUsageCoversModel`). */
+  covers: boolean;
+}
+
+/**
+ * The plan window of the account that stops the model now and resets last. Only the account's own reading
+ * counts: another account of the same provider has its own quota. `usedPercent` is what the provider
+ * reports, so it can pass 100 slightly. A window that ended gives the quota back, and its reading
+ * stays as it was until something asks the provider again, so the clock is an input.
+ */
+export function spentUsageWindow(
+  limits: readonly AccountUsageLimit[] | undefined,
+  provider: AgentProviderId,
+  accountId: string,
+  model: string | null | undefined,
+  nowMs: number,
+): SpentUsageWindow | null {
+  for (const limit of limits ?? []) {
+    if (limit.id !== provider || (limit.accountId ?? DEFAULT_PROVIDER_ACCOUNT_ID) !== accountId) continue;
+    // A provider that names quota groups limits each group apart: only the model's group can stop it,
+    // and a model that no group lists has no spent window.
+    const quota = usageQuotaForModel(limit, model);
+    if (!quota) continue;
+    // When two windows are spent, the model can run only after both reset: keep the one that resets
+    // last. A window with no reset time never gives the quota back.
+    let spent: SpentUsageWindow | null = null;
+    for (const slot of ["primary", "secondary"] as const) {
+      const window = quota[slot];
+      if (!window || window.usedPercent < 100) continue;
+      if (window.resetsAt !== null && window.resetsAt * 1_000 <= nowMs) continue;
+      if (spent && (window.resetsAt ?? Number.POSITIVE_INFINITY) <= (spent.window.resetsAt ?? Number.POSITIVE_INFINITY))
+        continue;
+      // A named group is the model's own quota.
+      spent = { slot, window, covers: quota !== limit || accountUsageCoversModel(provider, model) };
+    }
+    if (spent) return spent;
+  }
+  return null;
+}

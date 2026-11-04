@@ -94,6 +94,11 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
     codeFallback.startedWithCode();
     host.connection?.alternative(option().id);
   };
+  /** The mainland China site that the ⋯ menu signs in with, while the row is not signed in. */
+  const mainlandChinaSite = (): string | null =>
+    browserConnect() && !off() && state() !== "available"
+      ? (host.connection?.mainlandChinaSite?.(option().id) ?? null)
+      : null;
   /** A Connect that failed before the sign-in started. The status reports the rest. */
   const [connectError, setConnectError] = createSignal<string | null>(null);
   const connect = () => {
@@ -107,6 +112,13 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
     else codeFallback.startedWithCode();
     setConnectError(null);
     void Promise.resolve(host.connection?.connect(option().id)).catch((error: unknown) =>
+      setConnectError(errorMessage(error, t("app.provider.connectFailedRetry", { name: option().name }))),
+    );
+  };
+  const connectInMainlandChina = () => {
+    codeFallback.startedInBrowser();
+    setConnectError(null);
+    void Promise.resolve(host.connection?.connectInMainlandChina?.(option().id)).catch((error: unknown) =>
       setConnectError(errorMessage(error, t("app.provider.connectFailedRetry", { name: option().name }))),
     );
   };
@@ -207,11 +219,15 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
    * stays reachable in every state, Connected included: a refused key must stay replaceable and
    * removable. A released host stores a Gemini key but never reads it, so only this computer offers it.
    * Claude's key works the same way. Its row has a key status only where the host reads the key.
+   * Codex's key is a login on this computer, so its row has a key status only here.
    */
   const apiKeyOffered = () =>
     Boolean(host.onSignInProvider) &&
     ((option().id === "antigravity" && browserConnect() && runtimeStatus()?.phase === "ready") ||
-      (option().id === "claude" && option().keyStatus !== undefined && runtimeReady() && state() !== "not-installed"));
+      ((option().id === "claude" || option().id === "codex") &&
+        option().keyStatus !== undefined &&
+        runtimeReady() &&
+        state() !== "not-installed"));
   /** OpenCode runs free models while no key is saved. */
   const freeKey = () =>
     option().id === "opencode" && (option().keyStatus === "missing" || option().keyStatus === "unreadable");
@@ -234,6 +250,8 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
     runtimeAction,
     codeFallbackOffered,
     signInAlternative,
+    mainlandChinaSite,
+    connectInMainlandChina,
     connectError,
     connect,
     runAction,

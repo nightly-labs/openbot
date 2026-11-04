@@ -5,6 +5,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.databaseIntegrity": "OpenBot database failed its integrity check.",
   "error.backend.webhookRouteLimit": "A host can have at most {limit} webhook routines.",
   "error.backend.webhookSettingsInvalid": "Check the webhook settings and try again.",
+  "error.backend.webhookSenderSecretInvalid":
+    "Paste the complete signing secret from the sender. It has 16 to 1024 characters and no spaces.",
   "error.backend.webhookRouteUnavailable":
     "The public webhook route is not ready. Check the host connection and try again.",
   "error.backend.webhookTestUnavailable":
@@ -55,6 +57,12 @@ export const messages = defineMessages("error.backend", {
   "error.backend.sunshineNotReady": "Sunshine did not become ready.",
   "error.backend.sunshineNotReadyReason": "Sunshine did not become ready. {reason}",
   "error.backend.channelLeadModelUnavailable": "The channel lead model is unavailable.",
+  "error.backend.contextCompactionIneffective":
+    "Compaction does not make this chat smaller: after two compactions it still uses {percent}% of the model's context window, so OpenBot stops compacting it. Tools and instructions use most of the window. Turn off the MCP servers or computer use that this agent does not need, or select a model with a larger window. Then start a new chat.",
+  "error.backend.providerRetrying":
+    "The provider failed this request {attempts} times and tries again. If the agent does not continue, stop the turn.",
+  "error.backend.providerRetryingLargeContext":
+    "The provider failed this request {attempts} times and tries again. This chat uses {percent}% of the model's context window. If the agent does not continue, stop the turn: OpenBot then compacts the chat before the next message.",
   "error.backend.sharedDataUnavailable": "Shared data is unavailable.",
   "error.backend.shuttingDown": "OpenBot is shutting down.",
   "error.backend.channelUnconfirmedStart":
@@ -65,11 +73,14 @@ export const messages = defineMessages("error.backend", {
   "error.backend.channelReferenceUnavailable": "The referenced channel message is unavailable.",
   "error.backend.channelTaskNotFound": "Channel task not found.",
   "error.backend.channelTaskComplete": "This task is already complete.",
+  "error.backend.channelTaskNotStopped": "Only a stopped or failed task can be cancelled.",
   "error.backend.channelSelectAgent": "Select an agent.",
   "error.backend.channelLeadRequired": "Choose an available channel lead or assign this task to a member.",
   "error.backend.channelRoutingTooLong":
     "This request exceeds the routing context limit. Select a member or send a shorter request.",
   "error.backend.channelTaskMemberRequired": "Choose a member for this task.",
+  "error.backend.channelTaskStopped": "Stopped. Continue or reassign this task.",
+  "error.backend.channelRoutingUnreadable": "The lead could not route this message. Reassign it to a member.",
   "error.backend.channelRoutingFailed": "Routing failed. Choose a member or try again.",
   "error.backend.channelLeadTimedOut": "The channel lead did not answer in time. Choose a member or try again.",
   "error.backend.channelLeadFailed": "The channel lead could not route this message. Choose a member or try again.",
@@ -100,8 +111,8 @@ export const messages = defineMessages("error.backend", {
     "You have {saved} of {limit} memories. To make room, update one memory by memoryId with the combined text of two related memories, then forget the other one, or forget a memory that is no longer true. Then try again.",
   "error.backend.agentMemoryLimitExceeded":
     "You have {saved} memories, and the limit is {limit}. The user set the limit below the number of saved memories. Do not forget memories to make room. Tell the user that this memory was not saved.",
-  "error.backend.channelHistoryLeadRequired": "Choose a channel lead to prepare the shared history.",
   "error.backend.channelHistoryArriving": "A shared message is still arriving. Resume when it is complete.",
+  "error.backend.channelHistoryLeadRequired": "Choose a channel lead to prepare the shared history.",
   "error.backend.channelHistoryInvalid": "The history summary is invalid. Resume to try again.",
   "error.backend.channelContextTooLong":
     "This assignment exceeds the shared context limit. Send a shorter request or reassign it.",
@@ -131,8 +142,6 @@ export const messages = defineMessages("error.backend", {
   "error.backend.recipientHidden": "This agent is hidden. Restore it to send messages.",
   "error.backend.attachBetween": "Attach between 1 and {limit} files.",
   "error.backend.attachmentNotFile": "Attachment is not a file: {path}",
-  "error.backend.attachSvg":
-    "{name} is an SVG file and cannot be attached. Write its absolute path in your answer: the chat shows the image there.",
   "error.backend.generatedImageTooLarge": "Generated image exceeds the 100 MB limit.",
   "error.backend.attachmentNotRegularFile": "Only regular files can be attached: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot could not copy {name}.",
@@ -185,6 +194,12 @@ export const messages = defineMessages("error.backend", {
   "error.backend.agentWaitNoRoutine":
     "Only a run of one of your routines wakes a wait, and you have no routine. Create one with openbot.create_routine, then open the wait.",
   "error.backend.agentWaitRemoteUnsupported": "Open waits are only available for agents on this computer.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Marking a message unread is only available for agents on this computer.",
+  "error.backend.messageDeleteUnsupported": "Deleting messages is not supported by this server.",
+  "error.backend.messageDeleteNotFound": "This message is not in the chat.",
+  "error.backend.messageDeleteBusy": "This message is part of a running turn. Delete it when the turn ends.",
+  "error.backend.messageDeleteForbidden": "You can delete only the messages that you sent.",
   "error.backend.routineFlowHandoffFailed": "The routine could not pass the work on to this agent.",
   "error.backend.mcpServerLimit": "OpenBot keeps up to {limit} MCP servers.",
   "error.backend.mcpServerNameTaken": "An MCP server named {name} already exists.",
@@ -241,6 +256,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.sidebarSectionLimit": "A server can have up to {limit} sidebar sections.",
   "error.backend.sectionNameRequired": "Section name is required.",
   "error.backend.sectionNameTooLong": "Section name is too long.",
+  "error.backend.sidebarFolderTooDeep": "Folders can go only three levels deep.",
+  "error.backend.sidebarFolderMoveInvalid": "This folder cannot move there.",
   "error.backend.sectionNameDuplicate": "Section names must be unique.",
   "error.backend.directMessageRequired": "Write a message first.",
   "error.backend.directMessageTooLong": "A direct message can have up to {limit} characters.",
@@ -277,6 +294,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.apiKeySaveFailed": "OpenBot could not save the API key. Try again.",
   "error.backend.apiKeyNotAllowed": "Only the server owner or an admin can enter an API key.",
   "error.backend.apiKeySaving": "The API key is already being saved.",
+  "error.backend.vaultItemNotAllowed": "Only the server owner or an admin can add an item to the Vault.",
+  "error.backend.vaultItemSaving": "The Vault item is already being saved.",
   "error.backend.authRequestInactive": "This secure authentication request is no longer active.",
   "error.backend.secureAuthUnavailable": "Secure authentication is unavailable.",
   "error.backend.browserUrlRequired": "A browser URL is required.",
@@ -308,6 +327,10 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserViewProtected": "Browser view is protected during authentication.",
   "error.backend.browserPreviewPageChanged": "The browser page changed during the preview. Try again.",
   "error.backend.browserInputProtected": "Browser input is protected during authentication.",
+  "error.backend.browserTypingFocusMoved":
+    "The page moved focus away from the target before typing. Nothing was typed. Take a fresh snapshot.",
+  "error.backend.browserTypingSubmitSkipped":
+    "The text is in the field, but the page moved focus away, so Enter was not sent. Do not type the text again. Take a fresh snapshot.",
   "error.backend.mcpServerHttpCredentials": "The server answered {status}. Check the API key or other credentials.",
   "error.backend.mcpServerHttpUrl":
     "The server answered {status}. Check the URL. The link may be wrong, expired, or deleted.",
@@ -330,13 +353,16 @@ export const messages = defineMessages("error.backend", {
   "error.backend.threadOpenLimitReached":
     "This agent has {count} open threads. Archive a thread, then start or restore another one.",
   "error.backend.threadRemoteUnsupported": "Threads are only available for agents on this computer.",
+  "error.backend.branchSourceBusy": "Stop the current turn before you branch this chat.",
+  "error.backend.branchMessageNotFound": "You can branch only from a finished answer of the agent.",
+  "error.backend.branchRemoteUnsupported": "Branches are only available for agents on this computer.",
   "error.backend.threadMoveRefused": "Only a message that you sent to this agent alone can run in a new thread.",
   "error.backend.taskTitleRequired": "Give the task a short title.",
   "error.backend.taskToolInvalid": "Give the task a title of at most 120 characters and a brief that says what to do.",
   "error.backend.taskOwnChatOnly":
     "Start a task only from your own chat. A channel, a messaging conversation or another task cannot start one.",
-  "error.backend.taskOpenLimit":
-    "This agent already has {count} open tasks. Wait until the user closes one before you start another task.",
+  "error.backend.taskUnfinishedLimit":
+    "This agent already has {count} unfinished tasks. Start another task when one of them ends.",
   "error.backend.taskOpenLimitReached":
     "This agent has {count} open tasks. Close a task, then start or open another one.",
   "error.backend.taskRemoteUnsupported": "Tasks are only available for agents on this computer.",

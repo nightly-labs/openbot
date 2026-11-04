@@ -234,6 +234,7 @@ export function ServerStorageScreen() {
                     agentId={row.agentId}
                     serverId={serverId}
                     hue={agent?.avatarHue ?? null}
+                    color={agent?.avatarColor ?? null}
                     seed={agent?.avatarSeed ?? row.agentId}
                     size={36}
                     animateIdle={false}

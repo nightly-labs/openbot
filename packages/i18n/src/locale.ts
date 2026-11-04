@@ -3,6 +3,7 @@ import type { AppLanguage } from "@openbot/contracts/app-language";
 /** The languages a catalog exists for. `"system"` resolves to one of these; it is never one itself. */
 export const TRANSLATED_LOCALES = [
   "en",
+  "ar",
   "de",
   "es",
   "fr",
@@ -53,4 +54,17 @@ export function formatLocale(language: AppLanguage, systemLocale: string): strin
   } catch {
     return locale;
   }
+}
+
+/** The locales whose script runs from right to left. The interface mirrors for these. */
+const RIGHT_TO_LEFT_LOCALES: ReadonlySet<TranslatedLocale> = new Set(["ar"]);
+
+export type LayoutDirection = "ltr" | "rtl";
+
+/**
+ * The `dir` of the interface for a locale. Only the layout follows it: each paragraph of user
+ * content takes its own direction from its text (`dir="auto"`), whatever the interface language.
+ */
+export function localeDirection(locale: TranslatedLocale): LayoutDirection {
+  return RIGHT_TO_LEFT_LOCALES.has(locale) ? "rtl" : "ltr";
 }

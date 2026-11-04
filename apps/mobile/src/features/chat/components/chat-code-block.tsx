@@ -5,7 +5,7 @@ import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
 import Copy from "lucide-react-native/icons/copy";
 import { memo, useEffect, useRef, useState } from "react";
-import { type ColorValue, ScrollView, useWindowDimensions, View } from "react-native";
+import { type ColorValue, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { haptics } from "@/shared/lib/haptics";
@@ -37,7 +37,6 @@ const CodeBlockBody = memo(function CodeBlockBody({
   finished = false,
   highlight: highlightAllowed,
 }: ChatCodeBlockProps & { highlight: boolean }) {
-  const { fontScale } = useWindowDimensions();
   const { t } = useText();
   const { foreground, muted, colors } = useCodeTokenColors();
   const [highlight, setHighlight] = useState<{ text: string; language?: string; tokens: CodeToken[] } | null>(() => {
@@ -108,12 +107,7 @@ const CodeBlockBody = memo(function CodeBlockBody({
           {copied ? <Check size={14} color={String(muted)} /> : <Copy size={14} color={String(muted)} />}
         </Button>
       </View>
-      <ScrollView
-        horizontal
-        bounces={false}
-        style={{ flexGrow: 0, flexShrink: 0, height: text.split("\n").length * 20 * fontScale + 20, maxWidth: "100%" }}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 6, paddingBottom: 14, alignItems: "flex-start" }}
-      >
+      <View style={{ paddingHorizontal: 12, paddingTop: 6, paddingBottom: 14 }}>
         <Typography.Code
           selectable={selectable}
           className="bg-transparent p-0"
@@ -133,7 +127,7 @@ const CodeBlockBody = memo(function CodeBlockBody({
             </Typography.Code>
           ))}
         </Typography.Code>
-      </ScrollView>
+      </View>
     </View>
   );
 });

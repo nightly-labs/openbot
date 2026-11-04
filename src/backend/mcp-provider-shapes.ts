@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
+import { access } from "node:fs/promises";
 import { homedir } from "node:os";
 import { delimiter, isAbsolute, join } from "node:path";
 import { promisify } from "node:util";
@@ -15,6 +16,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Schema } from "effect";
 import { isWindowsRunnable, runInLoginShell } from "./cli";
 import { causeHelpers } from "./effect-boundary";
+import { isMissingFileError } from "./file-errors";
 import type { McpOperationError } from "./mcp-effects";
 import { getRecord } from "./protocol";
 
@@ -68,8 +70,10 @@ export interface McpEndpointRefusal {
   error: string;
 }
 
+/** `agentId` is the agent whose session connects, or `null` for a session that has none. */
 export type McpEndpointSource = (
   config: McpServerConfig,
+  agentId: string | null,
 ) => Effect.Effect<McpEndpoint | McpEndpointRefusal, McpOperationError>;
 
 /**
@@ -112,7 +116,7 @@ export interface McpHandoff<T> {
   dropped: McpServerDrop[];
 }
 
-/** Said by both providers that cannot carry one, so the user reads the same sentence either way. */
+/** Said by the providers that cannot carry one, so the user reads the same sentence each time. */
 const WORKING_DIRECTORY_UNSUPPORTED = "This provider cannot start a server in a working directory.";
 
 /** Said when two names differ only in characters the provider replaces. */
@@ -180,13 +184,23 @@ export function computerUseParam(params: unknown): boolean {
   return !isDynamicRecord(params) || params.computerUse !== false;
 }
 
+/**
+ * The agent of a `thread/start` or `thread/resume`. `ThreadLifecycle` sends `openbotAgentId` to
+ * Claude and the ACP clients, which read the MCP servers themselves, so that the proxy can name the
+ * agent to a server it signed in to.
+ */
+export function mcpAgentParam(params: unknown): string | null {
+  return isDynamicRecord(params) && typeof params.openbotAgentId === "string" ? params.openbotAgentId : null;
+}
+
 export const usableMcpServers = Effect.fnUntraced(function* (
   configs: readonly McpServerConfig[],
   tools: McpToolRuntimes = NO_MCP_TOOL_RUNTIMES,
   endpoint?: McpEndpointSource,
+  agentId: string | null = null,
 ) {
   const candidates = configs.filter((config) => config.enabled && !isReservedMcpServerName(config.name));
-  return yield* Effect.forEach(candidates, (config) => usableMcpServer(config, tools, endpoint), {
+  return yield* Effect.forEach(candidates, (config) => usableMcpServer(config, tools, endpoint, agentId), {
     concurrency: "unbounded",
   });
 });
@@ -195,12 +209,13 @@ export const usableMcpServer = Effect.fnUntraced(function* (
   config: McpServerConfig,
   tools: McpToolRuntimes = NO_MCP_TOOL_RUNTIMES,
   endpoint?: McpEndpointSource,
+  agentId: string | null = null,
 ): Effect.fn.Return<UsableMcpServer, McpShapeFailed> {
   // An http server starts no process, so it needs neither a command nor a `PATH`. It is the only
   // kind that can carry a sign-in, because a token travels in a header.
   if (config.transport !== "stdio") {
     const resolved = endpoint
-      ? yield* endpoint(config).pipe(Effect.mapError(({ cause }) => new McpShapeFailed({ cause })))
+      ? yield* endpoint(config, agentId).pipe(Effect.mapError(({ cause }) => new McpShapeFailed({ cause })))
       : { url: config.url, authorization: null, proxied: false };
     // Never the raw token instead: a proxy that cannot start is a server this hand-off leaves out.
     if ("error" in resolved) return { config, error: resolved.error, reason: "unusable" };
@@ -285,7 +300,8 @@ function shellWord(value: string): string {
 /**
  * An absolute path for a command name, or `null` when the given `PATH` holds none. A command the
  * user already wrote as a path is taken as written, after `~` is expanded: it is their statement of
- * which build to run.
+ * which build to run. An absolute path that names no file is `null` too: the provider would fail to
+ * start it and say so only in its own log (#4845).
  *
  * `path` is the list to search, which is the list the server will be launched with. Without one the
  * login shell's own is used, because a packaged app starts with a restricted `PATH` - the same
@@ -297,7 +313,8 @@ const resolvedCommands = new Map<string, Deferred.Deferred<string | null, McpSha
 const resolveMcpCommand = Effect.fn("McpShape.resolveCommand")(function* (command: string, path: string | null = null) {
   const trimmed = expandHomePath(command);
   if (!trimmed) return null;
-  if (isAbsolute(trimmed) || trimmed.startsWith(".")) return trimmed;
+  if (isAbsolute(trimmed)) return (yield* isMissingCommandFile(trimmed)) ? null : trimmed;
+  if (trimmed.startsWith(".")) return trimmed;
   const key = `${path ?? ""}\u0000${trimmed}`;
   const cached = resolvedCommands.get(key);
   if (cached) return yield* Deferred.await(cached);
@@ -311,6 +328,31 @@ const resolveMcpCommand = Effect.fn("McpShape.resolveCommand")(function* (comman
     ),
     Effect.onExit((exit) => Deferred.done(pending, exit)),
     Effect.uninterruptible,
+  );
+});
+
+/** How long a hand-off waits for the file check. A slow answer keeps the path as written. */
+const COMMAND_FILE_CHECK_MS = 2_000;
+
+/**
+ * Whether an absolute command path names no file.
+ *
+ * Only a missing file counts. Any other answer, such as a folder this process cannot read, keeps the
+ * path as written, so the provider reports what it can actually start. The check has a deadline,
+ * because a privacy prompt for a protected folder or a dead network volume can hold the call, and the
+ * hand-off must not wait for it. On Windows, process creation adds an extension to a path without
+ * one, so only a path that has a `PATHEXT` extension is checked.
+ */
+const isMissingCommandFile = Effect.fn("McpShape.isMissingCommandFile")(function* (command: string) {
+  if (process.platform === "win32" && !isWindowsRunnable(command, process.env.PATHEXT)) return false;
+  return yield* mcpShapeIo(() => access(command)).pipe(
+    Effect.as(false),
+    Effect.catch(({ cause }) =>
+      Effect.succeed(
+        isMissingFileError(cause) || (cause instanceof Error && "code" in cause && cause.code === "ENOTDIR"),
+      ),
+    ),
+    Effect.timeoutOrElse({ duration: COMMAND_FILE_CHECK_MS, orElse: () => Effect.succeed(false) }),
   );
 });
 
@@ -411,7 +453,7 @@ export const needsManagedRuntime = Effect.fn("McpShape.needsManagedRuntime")(fun
   config: McpServerConfig,
   tools: McpToolRuntimes,
 ) {
-  if (config.transport !== "stdio") return false;
+  if (config.transport !== "stdio" || isAbsolute(expandHomePath(config.command))) return false;
   const resolved = yield* usableMcpServer(config, tools);
   return resolved.error !== undefined && resolved.reason === "command_not_found";
 });
@@ -548,12 +590,9 @@ export function acpMcpServers(servers: readonly UsableMcpServer[]): McpHandoff<A
  * Codex reads `config.mcp_servers`, a record keyed by name, which `profile-generation.ts` already
  * writes to disable the user's own servers.
  *
- * **stdio needs no working directory.** Neither a key for a working directory nor any other guess
- * could be confirmed against the pinned Codex app-server, and a guessed key name would fail
- * silently at the next turn. A server that names a directory is left out of the Codex payload
- * instead: a directory that does not arrive would start the server in the wrong place, which a
- * server told to open `./data.db` answers by creating a second database. Every other capable
- * provider still gets it.
+ * **stdio takes its working directory as `cwd`.** Codex starts the server there; without it, Codex
+ * starts it in its own directory. A server whose start script names a local `.venv` was left out
+ * when OpenBot did not send the key, so a Codex agent had no tools from it (#3869).
  *
  * **http travels as `url` with `http_headers`.** Both were confirmed against the pinned Codex
  * app-server: an entry with an invalid credential is listed as failed with the server's own 401,
@@ -568,7 +607,14 @@ export function acpMcpServers(servers: readonly UsableMcpServer[]): McpHandoff<A
  * `codexMcpServerKey`.
  */
 export type CodexMcpServer =
-  | { command: string; args: string[]; env: Record<string, string>; enabled?: boolean; tools?: DynamicRecord }
+  | {
+      command: string;
+      args: string[];
+      env: Record<string, string>;
+      cwd?: string;
+      enabled?: boolean;
+      tools?: DynamicRecord;
+    }
   | { url: string; http_headers: Record<string, string> };
 
 /**
@@ -700,18 +746,11 @@ export function codexMcpServers(
       continue;
     }
     if (server.config.transport === "stdio") {
-      if (server.config.workingDirectory) {
-        dropped.push({
-          name: server.config.name,
-          reason: "working_directory_unsupported",
-          detail: WORKING_DIRECTORY_UNSUPPORTED,
-        });
-        continue;
-      }
       record[name] = {
         command: server.command,
         args: [...server.config.args],
         env: mcpLaunchEnvironment(server),
+        ...(server.workingDirectory ? { cwd: server.workingDirectory } : {}),
       };
     } else {
       record[name] = {

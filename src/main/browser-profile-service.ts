@@ -28,6 +28,8 @@ export interface BrowserProfileServiceDependencies {
   store: Pick<BrowserProfileStore, "list" | "get" | "create" | "rename" | "setHue" | "delete">;
   agents: Pick<AgentService, "listAgents" | "updateAgent">;
   browser: Pick<BrowserHost, "tabIdsInSession" | "listTabSessions" | "close" | "clearTabSession">;
+  /** Runs after each change that succeeds, so every open profile list reads them again. */
+  onChanged?: () => void;
 }
 
 export interface BrowserProfileService {
@@ -49,6 +51,7 @@ export function createBrowserProfileService({
   store,
   agents,
   browser,
+  onChanged,
 }: BrowserProfileServiceDependencies): BrowserProfileService {
   function requireAgent(agentId: string): AgentSummary {
     const agent = agents.listAgents().find((candidate) => candidate.id === agentId);
@@ -84,7 +87,12 @@ export function createBrowserProfileService({
   // One change at a time, so an agent cannot move into a profile while a delete moves its agents out.
   const changes = Semaphore.makeUnsafe(1);
   const serialized = <A>(change: Effect.Effect<A, BrowserProfileFailure>) =>
-    changes.withPermits(1)(change).pipe(Effect.uninterruptible);
+    changes
+      .withPermits(1)(change)
+      .pipe(
+        Effect.tap(() => Effect.sync(() => onChanged?.())),
+        Effect.uninterruptible,
+      );
   const check = <T>(run: () => T) => Effect.try({ try: run, catch: (cause) => new BrowserProfileFailure({ cause }) });
 
   const closeAndClear = Effect.fn("BrowserProfiles.closeAndClear")(function* (tabSession: BrowserTabSession) {

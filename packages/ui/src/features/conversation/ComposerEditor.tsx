@@ -101,9 +101,17 @@ interface ComposerEditorProps {
    */
   sendShortcut?: SendShortcut | undefined;
   onOpenAttachment?: ((attachment: DraftAttachment) => void) | undefined;
-  /** Receives pasted files. Without it, a file paste does nothing here; the desktop preload imports it. */
+  /**
+   * Receives pasted files. Without it, a file paste does nothing here; the desktop preload imports it.
+   * A text paste longer than `INPUT_LIMITS.pastedText` also comes here as `pasted-text.txt`, with
+   * `text` set: when the file cannot come, the receiver puts that text at the selection.
+   */
   onPasteFiles?:
-    | ((files: File[], selection: ComposerSelection) => undefined | Promise<ComposerPasteResult | undefined>)
+    | ((
+        files: File[],
+        selection: ComposerSelection,
+        text?: string,
+      ) => undefined | Promise<ComposerPasteResult | undefined>)
     | undefined;
   onPasteAttachments?: (
     clipboard: DataTransfer,
@@ -147,6 +155,8 @@ interface MentionContext {
 }
 
 const DICTATION_INTERIM_WORDS = 2;
+/** The name of the file that a long text paste becomes, as on mobile. */
+const PASTED_TEXT_FILE_NAME = "pasted-text.txt";
 
 export function expandComposerMentions(value: string): string {
   return value.replace(MENTION_PATTERN, (match, name: string, target: string) => {
@@ -335,6 +345,9 @@ export function ComposerEditor(props: ComposerEditorProps) {
       quoteRequest,
       disabled,
     }) => {
+      // An owner can set its counter back to 0 after this editor read it, for example when the chat that it
+      // leaves closes after the next one opens. The next request after that must focus this editor.
+      if (focusRequest < lastFocusRequest) lastFocusRequest = focusRequest;
       if (!editor || (isComposing && agentId === lastAgentId)) return;
       const attachmentKey = attachments.map((attachment) => `${attachment.id}:${attachment.name}`).join("|");
       const skillKey = skills
@@ -355,11 +368,16 @@ export function ComposerEditor(props: ComposerEditorProps) {
           (id) => attachments.some((attachment) => attachment.id === id) && !renderedAttachments.has(id),
         );
       const contentChanged = draftChanged || value !== lastEmittedValue || attachmentResolved;
-      const selection =
-        !draftChanged && editor.ownerDocument.activeElement === editor ? readEditorSelection(editor) : null;
-      const scrollTop = draftChanged ? 0 : editor.scrollTop;
       const skillsChanged = skillKey !== lastSkillKey;
       const mcpChanged = mcpKey !== lastMcpKey;
+      const editorChanges = contentChanged || attachmentsChanged || skillsChanged || mcpChanged;
+      // Only a change of the editor's content can move its caret or scroll position. A read of either
+      // lays out the page, and this effect runs for each list that loads while a conversation opens.
+      const selection =
+        editorChanges && !draftChanged && editor.ownerDocument.activeElement === editor
+          ? readEditorSelection(editor)
+          : null;
+      const scrollTop = draftChanged ? 0 : editorChanges ? editor.scrollTop : null;
       const focusRequested = focusRequest > lastFocusRequest;
       if (draftChanged) savedCaret = null;
       if (contentChanged) {
@@ -373,11 +391,11 @@ export function ComposerEditor(props: ComposerEditorProps) {
         if (skillsChanged) syncSkillTokens(editor, skills);
         if (mcpChanged) syncMcpTokens(editor, mcpServers);
       }
-      if (selection && (contentChanged || attachmentsChanged || skillsChanged || mcpChanged)) {
+      if (selection) {
         restoreEditorSelection(editor, selection);
         scheduleCaretScroll();
       }
-      editor.scrollTop = scrollTop;
+      if (scrollTop !== null) editor.scrollTop = scrollTop;
       lastAttachmentKey = attachmentKey;
       lastSkillKey = skillKey;
       lastMcpKey = mcpKey;
@@ -845,8 +863,17 @@ export function ComposerEditor(props: ComposerEditorProps) {
       return;
     }
 
-    const text = clipboard.getData("text/plain").replace(/\r\n?/g, "\n").slice(0, INPUT_LIMITS.messageText);
+    const pastedText = clipboard.getData("text/plain");
+    const normalized = pastedText.replace(/\r\n?/g, "\n");
+    const text = normalized.slice(0, INPUT_LIMITS.messageText);
     if (!text) return;
+    // The file keeps the text as it was copied, with no limit on the message length.
+    if (normalized.length > INPUT_LIMITS.pastedText && props.onPasteFiles) {
+      event.stopPropagation();
+      const file = new File([pastedText], PASTED_TEXT_FILE_NAME, { type: "text/plain" });
+      finishPaste(props.onPasteFiles([file], selection, text));
+      return;
+    }
 
     insertPlainText(editor, text);
     emitValue();
@@ -878,7 +905,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
     const ids = attachmentReferenceIds(text);
     const all = selection.start === 0 && selection.end === value.length;
     const attachments = (props.attachments ?? []).filter((attachment) => all || ids.has(attachment.id));
-    // Without an attachment, the native copy keeps its rich text.
+    // Without an attachment, the copy goes to the next listeners, as any page text does.
     if (!attachments.length) return;
     event.preventDefault();
     let remaining: string | undefined;

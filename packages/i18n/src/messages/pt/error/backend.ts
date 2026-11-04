@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "O banco de dados do OpenBot falhou na verificação de integridade.",
   "error.backend.webhookRouteLimit": "Um computador anfitrião pode ter no máximo {limit} rotinas de webhook.",
   "error.backend.webhookSettingsInvalid": "Verifique as configurações do webhook e tente de novo.",
+  "error.backend.webhookSenderSecretInvalid":
+    "Cole o segredo de assinatura completo do remetente. Ele tem de 16 a 1024 caracteres e nenhum espaço.",
   "error.backend.webhookRouteUnavailable":
     "A rota pública do webhook não está pronta. Verifique a conexão do computador anfitrião e tente de novo.",
   "error.backend.browserViewRemoteOnly":
@@ -61,6 +63,12 @@ export const messages = {
   "error.backend.sunshineNotReady": "O Sunshine não ficou pronto.",
   "error.backend.sunshineNotReadyReason": "O Sunshine não ficou pronto. {reason}",
   "error.backend.channelLeadModelUnavailable": "O modelo do líder do canal está indisponível.",
+  "error.backend.contextCompactionIneffective":
+    "A compactação não reduz este chat: após duas compactações, ele ainda usa {percent}% da janela de contexto do modelo, por isso o OpenBot para de compactá-lo. Ferramentas e instruções usam a maior parte da janela. Desative os servidores MCP ou o uso do computador de que este agente não precisa, ou escolha um modelo com uma janela maior. Depois, inicie um novo chat.",
+  "error.backend.providerRetrying":
+    "O provedor falhou nesta solicitação {attempts} vezes e tenta novamente. Se o agente não continuar, pare o turno.",
+  "error.backend.providerRetryingLargeContext":
+    "O provedor falhou nesta solicitação {attempts} vezes e tenta novamente. Este chat usa {percent}% da janela de contexto do modelo. Se o agente não continuar, pare o turno: o OpenBot compacta o chat antes da próxima mensagem.",
   "error.backend.sharedDataUnavailable": "Os dados compartilhados estão indisponíveis.",
   "error.backend.shuttingDown": "O OpenBot está encerrando.",
   "error.backend.channelUnconfirmedStart":
@@ -71,11 +79,14 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "A mensagem do canal usada como referência está indisponível.",
   "error.backend.channelTaskNotFound": "Tarefa do canal não encontrada.",
   "error.backend.channelTaskComplete": "Esta tarefa já está concluída.",
+  "error.backend.channelTaskNotStopped": "Só é possível cancelar uma tarefa parada ou com falha.",
   "error.backend.channelSelectAgent": "Selecione um agente.",
   "error.backend.channelLeadRequired": "Escolha um líder de canal disponível ou atribua esta tarefa a um membro.",
   "error.backend.channelRoutingTooLong":
     "Esta solicitação excede o limite de contexto de encaminhamento. Selecione um membro ou envie uma solicitação mais curta.",
   "error.backend.channelTaskMemberRequired": "Escolha um membro para esta tarefa.",
+  "error.backend.channelTaskStopped": "Parada. Continue ou reatribua esta tarefa.",
+  "error.backend.channelRoutingUnreadable": "O líder não conseguiu encaminhar esta mensagem. Reatribua-a a um membro.",
   "error.backend.channelRoutingFailed": "O encaminhamento falhou. Escolha um membro ou tente novamente.",
   "error.backend.channelLeadTimedOut": "O líder do canal não respondeu a tempo. Escolha um membro ou tente novamente.",
   "error.backend.channelLeadFailed":
@@ -109,9 +120,9 @@ export const messages = {
     "Você tem {saved} de {limit} memórias. Para abrir espaço, atualize uma memória pelo memoryId com o texto combinado de duas memórias relacionadas e esqueça a outra, ou esqueça uma memória que não é mais verdadeira. Depois tente de novo.",
   "error.backend.agentMemoryLimitExceeded":
     "Você tem {saved} memórias, e o limite é {limit}. O usuário definiu o limite abaixo do número de memórias salvas. Não esqueça memórias para abrir espaço. Diga ao usuário que esta memória não foi salva.",
-  "error.backend.channelHistoryLeadRequired": "Escolha um líder de canal para preparar o histórico compartilhado.",
   "error.backend.channelHistoryArriving":
     "Uma mensagem compartilhada ainda está chegando. Retome quando ela estiver completa.",
+  "error.backend.channelHistoryLeadRequired": "Escolha um líder de canal para preparar o histórico compartilhado.",
   "error.backend.channelHistoryInvalid": "O resumo do histórico é inválido. Retome para tentar novamente.",
   "error.backend.channelContextTooLong":
     "Esta tarefa atribuída excede o limite de contexto compartilhado. Envie uma solicitação mais curta ou atribua a tarefa novamente.",
@@ -197,6 +208,13 @@ export const messages = {
   "error.backend.agentWaitNoRoutine":
     "Somente uma execução de uma das suas rotinas desperta uma espera, e você não tem nenhuma rotina. Crie uma com openbot.create_routine e depois abra a espera.",
   "error.backend.agentWaitRemoteUnsupported": "As esperas abertas só estão disponíveis para agentes neste computador.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Marcar uma mensagem como não lida só está disponível para agentes neste computador.",
+  "error.backend.messageDeleteUnsupported": "Este servidor não permite excluir mensagens.",
+  "error.backend.messageDeleteNotFound": "Esta mensagem não está no chat.",
+  "error.backend.messageDeleteBusy":
+    "Esta mensagem faz parte de um turno em andamento. Exclua-a quando o turno terminar.",
+  "error.backend.messageDeleteForbidden": "Você só pode excluir as mensagens que enviou.",
   "error.backend.routineFlowHandoffFailed": "A rotina não conseguiu passar o trabalho para este agente.",
   "error.backend.mcpServerLimit": "O OpenBot mantém até {limit} servidores MCP.",
   "error.backend.mcpServerNameTaken": "Já existe um servidor MCP chamado {name}.",
@@ -255,6 +273,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "Um servidor pode ter até {limit} seções na barra lateral.",
   "error.backend.sectionNameRequired": "É necessário informar o nome da seção.",
   "error.backend.sectionNameTooLong": "O nome da seção é muito longo.",
+  "error.backend.sidebarFolderTooDeep": "As pastas só podem ter três níveis.",
+  "error.backend.sidebarFolderMoveInvalid": "Esta pasta não pode ser movida para lá.",
   "error.backend.sectionNameDuplicate": "Os nomes das seções devem ser exclusivos.",
   "error.backend.directMessageRequired": "Escreva uma mensagem primeiro.",
   "error.backend.directMessageTooLong": "Uma mensagem direta pode ter até {limit} caracteres.",
@@ -343,6 +363,10 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "Este agente tem {count} tópicos abertos. Arquive um tópico e depois inicie ou restaure outro.",
   "error.backend.threadRemoteUnsupported": "Os tópicos só estão disponíveis para agentes neste computador.",
+  "error.backend.branchSourceBusy": "Interrompa o turno atual antes de criar uma ramificação deste chat.",
+  "error.backend.branchMessageNotFound":
+    "Só é possível criar uma ramificação a partir de uma resposta concluída do agente.",
+  "error.backend.branchRemoteUnsupported": "As ramificações só estão disponíveis para agentes neste computador.",
   "error.backend.threadMoveRefused":
     "Só uma mensagem que você enviou apenas para este agente pode ser executada em um novo tópico.",
   "error.backend.taskTitleRequired": "Dê um título curto à tarefa.",
@@ -350,8 +374,8 @@ export const messages = {
     "Dê à tarefa um título de no máximo 120 caracteres e uma instrução que diga o que fazer.",
   "error.backend.taskOwnChatOnly":
     "Inicie uma tarefa só a partir do seu próprio chat. Um canal, uma conversa de mensagens ou outra tarefa não pode iniciar uma.",
-  "error.backend.taskOpenLimit":
-    "Este agente já tem {count} tarefas abertas. Aguarde até o usuário fechar uma antes de iniciar outra tarefa.",
+  "error.backend.taskUnfinishedLimit":
+    "Este agente já tem {count} tarefas não concluídas. Inicie outra tarefa quando uma delas terminar.",
   "error.backend.taskOpenLimitReached":
     "Este agente tem {count} tarefas abertas. Feche uma tarefa e depois inicie ou abra outra.",
   "error.backend.taskRemoteUnsupported": "As tarefas só estão disponíveis para agentes neste computador.",

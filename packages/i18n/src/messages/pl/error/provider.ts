@@ -8,6 +8,10 @@ export const messages = {
     "Nie udało się zarejestrować Sterowania komputerem w konfiguracji Codex. Sprawdź, czy plik config.toml Codex jest poprawny i zapisywalny, a potem uruchom ponownie OpenBot. Aby kontynuować bez tej funkcji, wyłącz Sterowanie komputerem w ustawieniach członka zespołu.",
   "error.provider.codexUnresponsive": "Codex przestał odpowiadać, więc OpenBot zakończył jego proces.",
   "error.provider.acpUnresponsive": "{provider} nie odpowiedział na czas, więc OpenBot zakończył jego proces.",
+  "error.provider.acpSignInLost":
+    "{provider} utracił logowanie, więc OpenBot zakończył jego proces. Wyślij wiadomość ponownie.",
+  "error.provider.acpMcpNotLoaded":
+    "{provider} nie załadował narzędzi OpenBot, więc ten agent nie może ich używać ani kontaktować się z członkami zespołu. Zasady zespołu {provider} mogą blokować lokalne serwery MCP. Poproś administratora zespołu o ich dopuszczenie, a potem spróbuj ponownie.",
   "error.provider.endpointsReadOnly":
     "Zapisane endpointy zapisała nowsza wersja OpenBot albo nie można odczytać pliku. Zaktualizuj OpenBot, aby je zmienić.",
   "error.provider.endpointNoSecureStorage":
@@ -61,6 +65,7 @@ export const messages = {
   "error.provider.removeWhileOn": "Wyłącz dostawcę, zanim usuniesz jego pobrane pliki.",
   "error.provider.removeWhileDownloading": "Poczekaj na koniec pobierania, a potem je usuń.",
   "error.provider.removeIncomplete": "Program używa plików tego CLI. Zamknij go i spróbuj ponownie.",
+  "error.provider.removeDownloadsFailed": "Nie udało się usunąć pobranych CLI: {providers}.",
   "error.provider.cliOverride": "Usuń jawnie ustawioną ścieżkę CLI, zanim zaktualizujesz CLI w OpenBot.",
   "error.provider.runtimeUpdateIncomplete": "Aktualizacja środowiska uruchomieniowego nie została ukończona.",
   "error.provider.downloadHttp": "Pobieranie środowiska uruchomieniowego nie powiodło się (HTTP {status}).",
@@ -100,6 +105,7 @@ export const messages = {
   "error.provider.modelIdCharacter": "ID modelu zawiera niedozwolony znak.",
   "error.provider.modelIdDuplicate": "Dwa modele mają to samo ID.",
   "error.provider.contextWindowInvalid": "Okno kontekstu modelu musi być liczbą całkowitą tokenów od {min} do {max}.",
+  "error.provider.maxOutputInvalid": "Maksymalne wyjście modelu musi być liczbą całkowitą tokenów od {min} do {max}.",
   "error.provider.headersTooMany": "Jest za dużo nagłówków.",
   "error.provider.headerNameCharacter": "Nazwa nagłówka zawiera znak niedozwolony w HTTP.",
   "error.provider.headerNameTooLong": "Nazwa nagłówka jest za długa.",
@@ -122,19 +128,6 @@ export const messages = {
   "error.provider.codexManagedNotStarted":
     "ChatGPT został pobrany, ale nie udało się go uruchomić. Pobierz go ponownie w OpenBot.",
   "error.provider.codexMissing": "ChatGPT nie jest pobrany. Pobierz go w OpenBot, aby kontynuować.",
-  "error.provider.codexConfigIgnored": {
-    one: "Codex zignorował {count} ustawienie w swojej konfiguracji: {settings}. Popraw je lub usuń albo zaktualizuj Codex.",
-    few: "Codex zignorował {count} ustawienia w swojej konfiguracji: {settings}. Popraw je lub usuń albo zaktualizuj Codex.",
-    many: "Codex zignorował {count} ustawień w swojej konfiguracji: {settings}. Popraw je lub usuń albo zaktualizuj Codex.",
-    other:
-      "Codex zignorował {count} ustawienia w swojej konfiguracji: {settings}. Popraw je lub usuń albo zaktualizuj Codex.",
-  },
-  "error.provider.codexConfigIgnoredUnnamed": {
-    one: "Codex zignorował {count} ustawienie w swojej konfiguracji. Popraw je lub usuń albo zaktualizuj Codex.",
-    few: "Codex zignorował {count} ustawienia w swojej konfiguracji. Popraw je lub usuń albo zaktualizuj Codex.",
-    many: "Codex zignorował {count} ustawień w swojej konfiguracji. Popraw je lub usuń albo zaktualizuj Codex.",
-    other: "Codex zignorował {count} ustawienia w swojej konfiguracji. Popraw je lub usuń albo zaktualizuj Codex.",
-  },
   "error.provider.claudeOutdated": "Claude Code {version} jest za stary. OpenBot wymaga wersji 2.1.232 lub nowszej.",
   "error.provider.claudeNotStarted": "Znaleziono Claude CLI, ale nie udało się go uruchomić.",
   "error.provider.claudeNotStartedHint":
@@ -183,13 +176,20 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider} nie zwrócił uwierzytelnionego konta.",
   "error.provider.signInExpired": "Logowanie do {provider} wygasło. Zaloguj się ponownie, aby kontynuować.",
   "error.provider.cliActivateFailed": "Nie udało się aktywować zarządzanego CLI.",
+  "error.provider.noMainlandChinaSignIn": "{provider} nie ma logowania dla Chin kontynentalnych.",
+  "error.provider.cliNewVersionNotStarted": "Nowa wersja się nie uruchomiła.",
   "error.provider.cliBusyReconnect": "{provider} CLI pracuje nad turą. Zaczekaj, aż skończy, a potem połącz ponownie.",
+  "error.provider.cliBusySignOut": "CLI {provider} przetwarza turę. Poczekaj, aż skończy, a potem odłącz.",
   "error.provider.opencodeCredentialsRejected":
     "Dostawca modelu odrzucił klucz API. Popraw klucz OpenCode w Ustawieniach albo klucz dostawcy poleceniem `opencode auth login`. Potem spróbuj ponownie lub wybierz inny model.\n{detail}",
   "error.provider.opencodeAuthRequired":
     "OpenCode nie jest zalogowany u dostawcy modelu „{provider}”. Wybierz model z etykietą Darmowy albo połącz dostawcę: wklej klucz OpenCode Go w ustawieniach OpenCode albo uruchom `opencode auth login` w terminalu. Potem spróbuj ponownie.",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode nie jest zalogowany u dostawcy tego modelu. Wybierz model z etykietą Darmowy albo połącz dostawcę: wklej klucz OpenCode Go w ustawieniach OpenCode albo uruchom `opencode auth login` w terminalu. Potem spróbuj ponownie.",
+  "error.provider.customEndpointKeyRefused":
+    "Endpoint „{provider}” odrzucił swój klucz API lub nagłówki. Wpisz je ponownie w Ustawieniach serwera → Dostawcy, a potem spróbuj ponownie.",
+  "error.provider.customEndpointKeyMissing":
+    "Endpoint „{provider}” wymaga klucza API. Dodaj klucz w Ustawieniach serwera → Dostawcy, a potem spróbuj ponownie.",
   "error.provider.opencodeKeyExpired":
     "Twój klucz API OpenCode wygasł. Utwórz nowy klucz w OpenCode Console, wklej go w ustawieniach OpenCode, potem spróbuj ponownie.",
   "error.provider.opencodeServiceFailure":
@@ -255,6 +255,20 @@ export const messages = {
   "error.provider.clineNotStarted": "Nie udało się uruchomić Cline. Uruchom `cline --version` w terminalu.",
   "error.provider.clineVersionUnreadable": "Nie można odczytać wersji Cline CLI.",
   "error.provider.clineSignIn": "Zaloguj się przez Cline lub ustaw CLINE_API_KEY, aby używać Cline.",
+  "error.provider.kimiArchivePath": "Archiwum Kimi ma nieoczekiwaną ścieżkę.",
+  "error.provider.kimiChecksum": "Niezgodna suma kontrolna środowiska uruchomieniowego Kimi.",
+  "error.provider.kimiLicenseChecksum": "Niezgodna suma kontrolna licencji Kimi.",
+  "error.provider.kimiMissing": "Kimi nie jest pobrany. Pobierz go w OpenBot, aby kontynuować.",
+  "error.provider.kimiOutdated": "Kimi CLI {version} jest za stary. OpenBot wymaga wersji 1.52.0 lub nowszej.",
+  "error.provider.kimiNotStarted": "Nie udało się uruchomić Kimi. Uruchom `kimi --version` w terminalu.",
+  "error.provider.kimiVersionUnreadable": "Nie można odczytać wersji Kimi CLI.",
+  "error.provider.kimiSignIn": "Zaloguj się przez Kimi Code, aby używać Kimi.",
+  "error.provider.devinSignIn": "Zaloguj się do Devin, aby z niego korzystać.",
+  "error.provider.hermesMissing": "Hermes Agent nie jest zainstalowany. Zainstaluj go i spróbuj ponownie.",
+  "error.provider.hermesNotStarted": "Nie udało się uruchomić Hermes Agent. Uruchom `hermes --version` w terminalu.",
+  "error.provider.hermesVersionUnreadable": "Nie można odczytać wersji Hermes Agent.",
+  "error.provider.hermesSignIn":
+    "Zaloguj się przez Nous Portal lub uruchom `hermes setup` w terminalu, aby używać Hermes.",
   "error.provider.usageLimitReached": "Konto osiągnęło limit użycia.",
   "error.provider.foreignReasoning":
     "Dostawca {provider} nie przyjął wcześniejszego rozumowania z tego czatu, ponieważ otrzymało je inne konto lub inny klucz API. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
@@ -309,6 +323,8 @@ export const messages = {
   "error.provider.customAgentNoSecureStorage":
     "Ten komputer nie ma bezpiecznego magazynu, więc nie można zapisać wartości środowiskowych. Usuń je i spróbuj ponownie.",
   "error.provider.customAgentNotSaved": "Ten własny agent nie jest zapisany. Odśwież listę i spróbuj ponownie.",
+  "error.provider.customAgentWorkspaceOnly":
+    "{reason}. Blokuje to tryb „Tylko obszar roboczy”. Wybierz „Pełny dostęp”.",
   "error.provider.customAgentTooMany": "Możesz zapisać maksymalnie {count} własnych agentów.",
   "error.provider.customAgentEnvValueMissing": "Wpisz wartość dla {name}.",
   "error.provider.off": "Dostawca {provider} jest wyłączony w OpenBot. Najpierw włącz go w ustawieniach dostawców.",
@@ -320,6 +336,7 @@ export const messages = {
   "error.provider.accountsUnsupported": "{provider} obsługuje tylko jedno konto.",
   "error.provider.accountNeedsConnection": "Połącz {provider}, zanim dodasz kolejne konto.",
   "error.provider.usageResetUnsupported": "{provider} nie może resetować limitów użycia.",
+  "error.provider.signOutUnsupported": "OpenBot nie może odłączyć logowania {provider}.",
   "error.provider.usageResetNotConnected":
     "Zaloguj się ponownie do tego konta {provider}, zanim zresetujesz jego użycie.",
   "error.provider.accountLimit": "Maksymalna liczba kont dla {provider} to {limit}.",

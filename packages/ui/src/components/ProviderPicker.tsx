@@ -3,6 +3,7 @@ import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
 import type {
   AgentProviderId,
   AgentProviderState,
+  AgentProviderStatus,
   CustomProviderSummary,
   ProviderApiKeyStatus,
   ProviderRuntimeStatus,
@@ -14,6 +15,7 @@ import {
   Copy,
   DropdownMenu,
   Ellipsis,
+  Globe2,
   Input,
   Link,
   RefreshCw,
@@ -69,6 +71,13 @@ export interface ProviderConnection {
   connect: (provider: AgentProviderId) => void | Promise<void>;
   /** Runs the second way in from the ⋯ menu. */
   alternative: (provider: AgentProviderId) => void;
+  /**
+   * The site of the provider's mainland China accounts that the ⋯ menu signs in with, such as
+   * `kimi.com`, or null when the row offers no such sign-in here. Connect uses the global site.
+   */
+  mainlandChinaSite?: (provider: AgentProviderId) => string | null;
+  /** Signs in with an account of `mainlandChinaSite`. A rejection is shown on the row. */
+  connectInMainlandChina?: (provider: AgentProviderId) => Promise<void>;
 }
 
 export interface ProviderPickerOption {
@@ -85,6 +94,8 @@ export interface ProviderPickerOption {
   /** A restart the user asked for waits for the provider's tasks to stop. */
   restartPending?: boolean | undefined;
   runtimeStatus?: ProviderRuntimeStatus | undefined;
+  /** The CLI that the provider ran last: the one the user installed, or the one OpenBot downloaded. */
+  cliSource?: AgentProviderStatus["cliSource"];
   /**
    * Whether the provider's key is saved: the optional OpenCode key, a Gemini key in use, or a Claude
    * key on a host that reads it. Absent while unknown, so the row shows no badge rather than a
@@ -454,6 +465,8 @@ export function ProviderPicker(props: ProviderPickerProps) {
                 version,
                 visualState,
                 alternative,
+                mainlandChinaSite,
+                connectInMainlandChina,
                 connectOptional,
                 runtimeAction,
                 browserConnect,
@@ -479,7 +492,11 @@ export function ProviderPicker(props: ProviderPickerProps) {
                 freeKey,
               } = createProviderRow(option, props);
               const actionsMenu = () =>
-                alternative() !== null || updateOffered() || restartOffered() || diagnosticsOffered();
+                alternative() !== null ||
+                mainlandChinaSite() !== null ||
+                updateOffered() ||
+                restartOffered() ||
+                diagnosticsOffered();
               const inputId = () => `${pickerId}-${option().id}`;
               /** An off row is not a choice, so it never holds the check. */
               const checked = () => !off() && checkedProvider() === option().id;
@@ -777,6 +794,14 @@ export function ProviderPicker(props: ProviderPickerProps) {
                                         ? "provider.action.pasteAddress"
                                         : "provider.action.signInWithCode",
                                     )}
+                                  </DropdownMenu.Item>
+                                )}
+                              </Show>
+                              <Show when={mainlandChinaSite()}>
+                                {(site) => (
+                                  <DropdownMenu.Item onSelect={connectInMainlandChina}>
+                                    <Globe2 aria-hidden="true" />
+                                    {t("provider.action.signInMainlandChina", { site: site() })}
                                   </DropdownMenu.Item>
                                 )}
                               </Show>

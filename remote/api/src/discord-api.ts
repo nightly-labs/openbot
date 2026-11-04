@@ -215,6 +215,24 @@ const historyAttachmentsSchema = z
     }),
   )
   .optional();
+// Each part is optional: Discord leaves out the parts that an embed does not have. Embeds of an
+// unexpected shape are left out, so that they do not fail the whole page of messages.
+const historyEmbedsSchema = z
+  .array(
+    z.object({
+      title: z.string().optional(),
+      description: z.string().optional(),
+      url: z.string().optional(),
+      author: z.object({ name: z.string().optional(), url: z.string().optional() }).optional(),
+      fields: z.array(z.object({ name: z.string(), value: z.string() })).optional(),
+      footer: z.object({ text: z.string().optional() }).optional(),
+      image: z.object({ url: z.string().optional() }).optional(),
+      thumbnail: z.object({ url: z.string().optional() }).optional(),
+      video: z.object({ url: z.string().optional() }).optional(),
+    }),
+  )
+  .optional()
+  .catch(undefined);
 const historySchema = z
   .array(
     z.object({
@@ -227,10 +245,17 @@ const historySchema = z
         .object({ type: z.number().int().optional(), message_id: snowflakeSchema.optional() })
         .optional(),
       attachments: historyAttachmentsSchema,
+      embeds: historyEmbedsSchema,
       // The forwarded message of a forward.
       message_snapshots: z
         .array(
-          z.object({ message: z.object({ content: z.string().optional(), attachments: historyAttachmentsSchema }) }),
+          z.object({
+            message: z.object({
+              content: z.string().optional(),
+              attachments: historyAttachmentsSchema,
+              embeds: historyEmbedsSchema,
+            }),
+          }),
         )
         .optional(),
     }),
@@ -346,10 +371,11 @@ export function makeDiscordApi(transport: DiscordTransport, state: DiscordState)
           query: new URLSearchParams({ after: request.after, limit: String(request.limit) }),
         }).pipe(Effect.flatMap((value) => decode(historySchema, value)));
         const botUserId = state.botUserId;
+        const botRoleId = state.botRoleId(request.guildId);
         return {
           messages: messages
             .map((message) => {
-              const body = messageBody(message, botUserId);
+              const body = messageBody(message, botUserId, botRoleId);
               return {
                 id: message.id,
                 authorId: message.author.id,

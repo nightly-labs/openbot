@@ -1,6 +1,15 @@
 import { win32 } from "node:path";
-import type { RequestError } from "@agentclientprotocol/sdk";
+import type { LoadSessionResponse, NewSessionRequest, PromptResponse, RequestError } from "@agentclientprotocol/sdk";
+import type { DynamicRecord } from "@openbot/contracts/runtime-values";
+import { enableCursorMcpServers } from "./cursor-mcp-disabled";
 import { isRecord } from "./protocol";
+
+/** The custom endpoint that serves a model, as a turn's error names it. Never a credential itself. */
+export interface AcpCustomEndpoint {
+  readonly name: string;
+  /** Whether the endpoint has a saved API key or header. */
+  readonly hasCredentials: boolean;
+}
 
 /**
  * What one ACP agent does differently from the protocol. `AcpAgentClient` reads each hook at the
@@ -17,7 +26,8 @@ export interface AcpFlavor {
   sessionNotFound?(error: RequestError, sessionId: string): boolean | null;
   /**
    * The message of a failed turn, from the redacted failure text. `redact` masks more text, `log`
-   * writes a diagnostic that it redacts first, and `model` is the session's model.
+   * writes a diagnostic that it redacts first, and `model` is the session's model. `endpoint` is the
+   * custom endpoint that serves that model, or null.
    */
   turnFailure?(
     error: unknown,
@@ -25,6 +35,7 @@ export interface AcpFlavor {
     redact: (text: string) => string,
     log: (text: string) => void,
     model: string | null,
+    endpoint: AcpCustomEndpoint | null,
   ): string;
   /** The message of a turn that ended with no answer text. Absent: such a turn succeeds. */
   emptyAnswerFailure?(reasoned: boolean): string;
@@ -40,6 +51,11 @@ export interface AcpFlavor {
    * to it. A set of the model the process already runs on is not sent again.
    */
   processWideModel?: true;
+  /**
+   * A `session/set_model` failure after which the session already runs on the new model. The agent
+   * changes the session first and then fails to save the model as its default.
+   */
+  modelSetUnsaved?(error: RequestError): boolean;
   /**
    * The agent frees what a session holds only when its process ends, not at `session/close`. Model
    * discovery then resumes one probe session for each process rather than opening another.
@@ -92,14 +108,54 @@ export interface AcpFlavor {
    * replaces the server that the others in it use. Their OpenBot servers then share one token.
    */
   mcpServersPerDirectory?: true;
+  /**
+   * The agent connects to each MCP server of a session before it answers `session/new` or
+   * `session/load`, and leaves out a server that did not load with no error. A session that OpenBot's
+   * servers did not reach then fails, as the agent cannot use OpenBot's tools.
+   */
+  mcpServersLoadWithSession?: true;
+  /** Turns OpenBot's servers back on where the agent's own settings for `cwd` turned them off. */
+  enableMcpServers?(cwd: string, names: readonly string[]): void;
   /** OpenBot compacts by replacing the session, for an agent that reports `usage_update` and has no compact request. */
   contextCompaction?: "handoff";
   /** A whole answer chunk that is the agent's own transport error, not answer text. OpenBot drops it. */
   noiseChunk?: RegExp;
+  /**
+   * A whole answer chunk that tells that the agent's process lost its sign-in. OpenBot fails the
+   * turn and ends the process, so the next turn starts a process that reads the sign-in again.
+   */
+  signInLostChunk?: RegExp;
+  /** The `_meta` of each `session/new`, `session/load` and `session/resume` request. */
+  sessionMeta?: NewSessionRequest["_meta"];
+  /**
+   * OpenBot opens a saved session with `session/load`, also when the agent advertises
+   * `session/resume`, and this tells from a successful load reply that the session is missing.
+   */
+  loadInsteadOfResume?: { missing(response: LoadSessionResponse): boolean };
+  /** The usage of this prompt alone, for an agent that sends it in the `_meta` of the prompt result, not in `usage`. */
+  promptUsage?(response: PromptResponse): DynamicRecord | null;
 }
 
-/** The protocol's own behavior: Grok and Cline. */
+/** The protocol's own behavior: Cline. */
 export const DEFAULT_ACP_FLAVOR: AcpFlavor = {};
+
+/**
+ * Grok CLI 1.0.22 and 1.0.70 send no `usage` in the `session/prompt` result and no `usage_update`.
+ * The result's `_meta.usage` holds the tokens and the cost of this prompt's model calls (#4827).
+ */
+export const GROK_ACP_FLAVOR: AcpFlavor = {
+  promptUsage: (response) => (isRecord(response._meta) && isRecord(response._meta.usage) ? response._meta.usage : null),
+};
+
+/**
+ * Hermes Agent 0.21.5 answers a `session/resume` of a missing session with a new session, and the
+ * reply does not give its id: each later prompt to the saved id then ends as "refusal". Its
+ * `session/load` of a missing session answers null, which the SDK gives as an empty reply. A load of
+ * a session that exists always gives its `modes`.
+ */
+export const HERMES_ACP_FLAVOR: AcpFlavor = {
+  loadInsteadOfResume: { missing: (response) => response.modes == null },
+};
 
 /**
  * Cursor puts the missing session in `data.message` and reports only "Invalid params" in `message`.
@@ -111,9 +167,45 @@ export const CURSOR_ACP_FLAVOR: AcpFlavor = {
   // Cursor 2026.10.22-27dcf5f sends "\n\nError: RetriableError: WritableIterable is closed" as one
   // chunk after a turn that succeeded, and then ends the turn (#3334). Only the full chunk matches.
   noiseChunk: /^\s*Error: (?:[\w$]+: )?WritableIterable is closed\s*$/u,
+  // Cursor 2026.10.22-27dcf5f keeps its access token in memory for the life of the process, and
+  // refreshes it there only with an API key. When its server refuses the token, each turn of each
+  // session sends only one of these chunks until the process ends. A new process reads the Keychain
+  // again (#4614).
+  signInLostChunk:
+    /^\n\n(?:Please sign in to continue|Error: \[unauthenticated\] Backend rejected authentication\.[^\n]*)$/u,
   // Cursor 2026.10.22-27dcf5f asks its server for the model list on each model set, and reports a
   // failed request as "Invalid model value" (#3800). One set per change, not one per turn.
   processWideModel: true,
+  // Cursor 2026.10.22-27dcf5f leaves out a disabled or blocked server, and the agent turn then
+  // finds no OpenBot tools (#3058).
+  mcpServersLoadWithSession: true,
+  enableMcpServers: enableCursorMcpServers,
+};
+
+/**
+ * Kimi CLI 1.52.0 refuses `session/load` and `session/resume` for a session that it does not have
+ * with "Invalid params" and `{ session_id: "Session not found" }`. Only that exact data counts: other
+ * invalid parameters, such as an unknown model, must not cause a provider session to be replaced.
+ */
+export const KIMI_ACP_FLAVOR: AcpFlavor = {
+  sessionNotFound: (error) =>
+    error.code === -32602 ? isRecord(error.data) && error.data.session_id === "Session not found" : null,
+  // Kimi CLI 1.52.0 moves the session to the new model, and then saves it as the default model in
+  // its config.toml. In a confined process that file is protected, and the save fails with -32603.
+  modelSetUnsaved: (error) =>
+    error.code === -32603 &&
+    isRecord(error.data) &&
+    typeof error.data.details === "string" &&
+    error.data.details.includes("config.toml"),
+};
+
+/**
+ * Devin CLI 3000.11.234 refuses `session/load` of a session that it does not have with -32016 and
+ * `{ "cognition.ai/errorKind": "session_not_found" }`. Only that kind counts.
+ */
+export const DEVIN_ACP_FLAVOR: AcpFlavor = {
+  sessionNotFound: (error) =>
+    error.code === -32016 ? isRecord(error.data) && error.data["cognition.ai/errorKind"] === "session_not_found" : null,
 };
 
 /**

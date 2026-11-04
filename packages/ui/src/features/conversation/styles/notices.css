@@ -18,7 +18,8 @@
   display: flex;
   margin: 0 12px calc(-1 * var(--notice-composer-overlap));
   /* The trailing button carries its own side padding, so the end inset is smaller than the start. */
-  padding: var(--notice-inset) var(--notice-inset) calc(var(--notice-inset) + var(--notice-composer-overlap)) 12px;
+  padding-block: var(--notice-inset) calc(var(--notice-inset) + var(--notice-composer-overlap));
+  padding-inline: 12px var(--notice-inset);
   align-items: center;
   gap: 10px;
   border: none;
@@ -47,7 +48,7 @@
 .composer-notice:not(:has(.ui-button)) {
   --notice-inset: 8px;
 
-  padding-right: 12px;
+  padding-inline-end: 12px;
 }
 
 .composer-notice-icon {

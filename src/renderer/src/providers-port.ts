@@ -7,6 +7,7 @@ import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
 export interface ProvidersPort {
   cancelProviderCodeLogin: OpenBotDesktopApi["cancelProviderCodeLogin"];
   connectProvider: OpenBotDesktopApi["connectProvider"];
+  connectProviderInMainlandChina: OpenBotDesktopApi["connectProviderInMainlandChina"];
   cancelProviderSignIn: OpenBotDesktopApi["cancelProviderSignIn"];
   refreshAgentProviders: OpenBotDesktopApi["refreshAgentProviders"];
   setProviderOn: OpenBotDesktopApi["setProviderOn"];
@@ -18,6 +19,7 @@ export interface ProvidersPort {
   cancelProviderAccountSignIn: OpenBotDesktopApi["cancelProviderAccountSignIn"];
   renameProviderAccount: OpenBotDesktopApi["renameProviderAccount"];
   removeProviderAccount: OpenBotDesktopApi["removeProviderAccount"];
+  signOutProvider: OpenBotDesktopApi["signOutProvider"];
   providerUsageResets: OpenBotDesktopApi["providerUsageResets"];
   resetProviderUsage: OpenBotDesktopApi["resetProviderUsage"];
   /** The same, for the host of a joined server the account administers. */

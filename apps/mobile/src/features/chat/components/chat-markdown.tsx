@@ -10,13 +10,12 @@ import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import * as Linking from "expo-linking";
-import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Blocks from "lucide-react-native/icons/blocks";
 import FileText from "lucide-react-native/icons/file-text";
 import Sparkles from "lucide-react-native/icons/sparkles";
 import type { Token, Tokens } from "marked";
-import { Fragment, memo, type ReactNode, useEffect, useId, useMemo, useRef } from "react";
+import { Fragment, memo, type ReactNode, useMemo } from "react";
 import {
   type ColorValue,
   Platform,
@@ -27,7 +26,6 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
-import { UITextView } from "react-native-uitextview";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
@@ -48,6 +46,7 @@ import { createReplyReveal, finishedReplyReveal } from "../model/reply-reveal";
 import { ChatCodeBlock } from "./chat-code-block";
 import { ChatCodePreview } from "./chat-code-preview";
 import { ChatMath } from "./chat-math";
+import { CHAT_CODE_STYLES, CHAT_HEADING_RAMP, CHAT_TEXT_STYLES, type ChatTextType } from "./chat-text-styles";
 import { type ReplyPlayback, useReplyPlayback } from "./use-reply-playback";
 
 interface MarkdownTokenByType {
@@ -78,27 +77,14 @@ interface MathToken extends Tokens.Generic {
 // Marked's public Token union includes extension tokens; narrow its built-in tokens here.
 // Keeps the link icon on the same line as the first word of the link.
 const NO_BREAK_SPACE = "\u00a0";
-/** A selection that the handles still change reaches the chat after this pause. */
-const SELECTION_REPORT_DELAY_MS = 80;
 
 function tokenIs<K extends keyof MarkdownTokenByType>(token: Token, type: K): token is MarkdownTokenByType[K] {
   return token.type === type;
 }
 
-/**
- * Where a native selectable paragraph reports the text the reader selected in it. Unset where the
- * text is not a native text view: while a reply streams or reveals, in Expo Go and on Android.
- */
-interface NativeSelectionTarget {
-  /** Changes when the selection ends outside the paragraph, which then draws again without it. */
-  generation: number;
-  report: (paragraph: string, selected: string) => void;
-}
-
 interface TextPresentation {
   selectable: boolean;
-  nativeSelection?: NativeSelectionTarget;
-  type: "body" | "body-sm" | "h4" | "h5";
+  type: ChatTextType;
   style: TextStyle;
   codeColor: ColorValue;
   animateTail: boolean;
@@ -113,11 +99,9 @@ interface TextPresentation {
   linkFavicons: boolean;
 }
 
-/** The HeroUI font size of each text type, in points, which inline math is sized against. */
-const TEXT_SIZES: Record<TextPresentation["type"], number> = { body: 16, "body-sm": 14, h4: 20, h5: 18 };
-
+/** The font size of a text type, in points, which inline math is sized against. */
 function textSize(presentation: TextPresentation): number {
-  return TEXT_SIZES[presentation.type] * presentation.fontScale;
+  return CHAT_TEXT_STYLES[presentation.type].fontSize * presentation.fontScale;
 }
 
 // The inline badge is shifted to align its label with native text. Reserve the
@@ -129,19 +113,30 @@ function textContainerStyle(source: string, presentation: TextPresentation): Tex
     ) || plainMentionParts(source, presentation.agents).some((part) => part.agent);
   // Inline math is moved down to the math axis in the same way.
   const hasMath = chatMathStart(source) !== undefined;
-  // Android moves code chips down as well; see `inlineChipStyle`.
-  const hasAndroidChip = Platform.OS === "android" && source.includes("`");
-  return hasMention || hasMath || hasAndroidChip
+  // Code chips move down as well; see `inlineChipStyle`.
+  const hasChip = source.includes("`");
+  return hasMention || hasMath || hasChip
     ? { ...presentation.style, paddingBottom: presentation.mentionOffset, overflow: "visible" }
     : presentation.style;
 }
 
+/** The height of an inline code chip: its line and one point above and below. */
+function codeChipHeight(presentation: TextPresentation): number {
+  return CHAT_CODE_STYLES[presentation.type === "body-sm" ? "small" : "body"].lineHeight + 2;
+}
+
 /**
- * Android puts the bottom of a view inside text on the text baseline, so a chip sits too high. It
- * moves down by the descender, as a mention does.
+ * A view inside text sits with its bottom edge on the text baseline, so a chip sits too high. It
+ * moves down until its middle is on the middle of the letters around it, as a mention does. A chip
+ * in a wrapping row is centred by the row and does not move.
  */
-function inlineChipStyle(presentation: TextPresentation): ViewStyle | undefined {
-  return Platform.OS === "android" ? { transform: [{ translateY: presentation.mentionOffset }] } : undefined;
+function inlineChipStyle(presentation: TextPresentation, height: number, inRow: boolean): ViewStyle | undefined {
+  if (inRow) return undefined;
+  return {
+    transform: [
+      { translateY: (height / 2 - CHAT_TEXT_STYLES[presentation.type].fontSize * 0.45) * presentation.fontScale },
+    ],
+  };
 }
 
 /** Joins the type badge of a file to the first characters of its name, so a line never ends between them. */
@@ -182,7 +177,15 @@ const FILE_TONE_COLORS: Record<FileReferenceTone, [string, string]> = {
  * Inline code that names a file, drawn as the desktop file reference: a type badge and the name
  * in the colour of its file family. Mobile cannot open workspace files, so it is not a control.
  */
-function FileReference({ text, presentation }: { text: string; presentation: TextPresentation }) {
+function FileReference({
+  text,
+  presentation,
+  inRow,
+}: {
+  text: string;
+  presentation: TextPresentation;
+  inRow: boolean;
+}) {
   const name = fileReferenceName(text.trim());
   const [color, soft] = useCSSVariable(FILE_TONE_COLORS[fileReferenceTone(name)]);
   const small = presentation.type === "body-sm";
@@ -192,7 +195,11 @@ function FileReference({ text, presentation }: { text: string; presentation: Tex
     // paragraph and wraps as text does.
     return (
       <>
-        <View collapsable={false} className="pl-0.5 pr-1" style={inlineChipStyle(presentation)}>
+        <View
+          collapsable={false}
+          className="pl-0.5 pr-1"
+          style={{ transform: [{ translateY: presentation.mentionOffset }] }}
+        >
           <FileBadge name={name} color={String(color)} soft={String(soft)} />
         </View>
         <Text style={{ color: String(color), fontWeight: "600", ...(small ? { fontSize: 12 } : null) }}>
@@ -202,17 +209,24 @@ function FileReference({ text, presentation }: { text: string; presentation: Tex
     );
   }
   return (
-    <View collapsable={false} className="max-w-full shrink flex-row items-center gap-1 self-start px-0.5">
+    <View
+      collapsable={false}
+      className="max-w-full shrink flex-row items-center gap-1 self-start px-0.5"
+      style={inlineChipStyle(presentation, small ? 16 : CHAT_TEXT_STYLES[presentation.type].lineHeight, inRow)}
+    >
       <FileBadge name={name} color={String(color)} soft={String(soft)} />
-      <Typography
+      <Text
         selectable={presentation.selectable}
         numberOfLines={1}
-        type={small ? "body-xs" : presentation.type}
-        className="shrink"
-        style={{ ...presentation.style, color: String(color), fontWeight: "600" }}
+        style={[
+          CHAT_TEXT_STYLES[presentation.type],
+          small ? { fontSize: 12, lineHeight: 16 } : null,
+          presentation.style,
+          { flexShrink: 1, color: String(color), fontWeight: "600" },
+        ]}
       >
         {text.trim()}
-      </Typography>
+      </Text>
     </View>
   );
 }
@@ -223,7 +237,9 @@ function FileBadge({ name, color, soft }: { name: string; color: string; soft: s
   return (
     <View className="h-4 min-w-4 items-center justify-center rounded px-0.5" style={{ backgroundColor: soft }}>
       {badge ? (
-        <Typography style={{ color, fontSize: 8, lineHeight: 10, fontWeight: "800" }}>{badge}</Typography>
+        <Text style={[CHAT_TEXT_STYLES["body-sm"], { color, fontSize: 8, lineHeight: 10, fontWeight: "800" }]}>
+          {badge}
+        </Text>
       ) : (
         <FileText size={11} color={color} strokeWidth={2} />
       )}
@@ -247,26 +263,38 @@ function codePieces(text: string): string[] {
   });
 }
 
-function CodeSpan({ text, presentation }: { text: string; presentation: TextPresentation }) {
-  if (isFileReference(text.trim())) return <FileReference text={text} presentation={presentation} />;
+function CodeSpan({
+  text,
+  presentation,
+  inRow = false,
+}: {
+  text: string;
+  presentation: TextPresentation;
+  /** The chip is an item of a wrapping row, not a view inside text. */
+  inRow?: boolean;
+}) {
+  if (isFileReference(text.trim())) return <FileReference text={text} presentation={presentation} inRow={inRow} />;
   const pieces = codePieces(text);
-  const chipStyle = inlineChipStyle(presentation);
+  const chipStyle = inlineChipStyle(presentation, codeChipHeight(presentation), inRow);
   return sourceEntries(pieces, (piece) => piece).map(({ value: piece, offset }, index) => (
     // Only the ends of the span are rounded, so touching pieces read as one chip.
     <View
       key={offset}
       collapsable={false}
-      className={`max-w-full self-start bg-control ${index === 0 ? "rounded-l-xl pl-1" : ""} ${index === pieces.length - 1 ? "rounded-r-xl pr-1" : ""} ${presentation.type === "body-sm" ? "py-px" : "py-0.5"}`}
+      className={`max-w-full self-start bg-control py-px ${index === 0 ? "rounded-l-xl pl-1" : ""} ${index === pieces.length - 1 ? "rounded-r-xl pr-1" : ""}`}
       style={chipStyle}
     >
-      <Typography.Code
+      <Text
         selectable={presentation.selectable}
         numberOfLines={1}
-        className={presentation.type === "body-sm" ? "bg-transparent p-0 text-xs leading-4" : "bg-transparent p-0"}
-        style={{ ...presentation.style, color: presentation.codeColor }}
+        style={[
+          presentation.style,
+          CHAT_CODE_STYLES[presentation.type === "body-sm" ? "small" : "body"],
+          { color: presentation.codeColor },
+        ]}
       >
         {piece}
-      </Typography.Code>
+      </Text>
     </View>
   ));
 }
@@ -277,14 +305,14 @@ function CodeSpan({ text, presentation }: { text: string; presentation: TextPres
  * their bottom edge, so the chip moves down until it is centred on the letters around it.
  */
 function mentionChip(presentation: TextPresentation) {
-  const size = TEXT_SIZES[presentation.type] - 1;
+  const size = CHAT_TEXT_STYLES[presentation.type].fontSize - 1;
   const lineHeight = Math.round(size * 1.25);
   const padding = 1;
   // The chip's middle goes on the middle of the letters around it, a little under half the text size
   // above their baseline (set on a device); the chip's bottom edge starts on that baseline.
-  const below = (lineHeight + padding * 2) / 2 - TEXT_SIZES[presentation.type] * 0.45;
+  const below = (lineHeight + padding * 2) / 2 - CHAT_TEXT_STYLES[presentation.type].fontSize * 0.45;
   return {
-    label: { ...presentation.style, fontSize: size, lineHeight },
+    label: [CHAT_TEXT_STYLES[presentation.type], presentation.style, { fontSize: size, lineHeight, flexShrink: 1 }],
     mark: (size + 1) * presentation.fontScale,
     style: {
       paddingVertical: padding * presentation.fontScale,
@@ -306,12 +334,11 @@ function AgentMention({ agent, presentation }: { agent: MobileAgent; presentatio
         agentId={agent.id}
         serverId={agent.serverId}
         hue={agent.avatarHue}
+        color={agent.avatarColor}
         seed={agent.avatarSeed}
         size={chip.mark}
       />
-      <Typography type={presentation.type} style={chip.label} className="shrink">
-        {agent.name}
-      </Typography>
+      <Text style={chip.label}>{agent.name}</Text>
     </View>
   );
 }
@@ -334,9 +361,7 @@ function SkillMention({ name, app, presentation }: { name: string; app: boolean;
         size={chip.mark - 2 * presentation.fontScale}
         strokeWidth={2}
       />
-      <Typography type={presentation.type} style={chip.label} className="shrink">
-        {name}
-      </Typography>
+      <Text style={chip.label}>{name}</Text>
     </View>
   );
 }
@@ -471,220 +496,6 @@ function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNod
   });
 }
 
-/** The HeroUI text types as plain styles: a native text view takes no class names. */
-const NATIVE_TEXT_STYLES: Record<TextPresentation["type"], TextStyle> = {
-  body: { fontSize: 16, lineHeight: 28 },
-  "body-sm": { fontSize: 14, lineHeight: 24 },
-  h4: { fontSize: 20, lineHeight: 28, letterSpacing: -0.5 },
-  h5: { fontSize: 18, lineHeight: 28, letterSpacing: -0.45 },
-};
-
-/**
- * A part of a native paragraph, in the order the text view draws it. An inline view, such as a
- * mention or a code chip, takes one character in the text view and gives its own text to a quote.
- */
-interface SelectableSegment {
-  length: number;
-  text: string;
-}
-
-function selectedSegmentsText(segments: readonly SelectableSegment[], start: number, end: number): string {
-  let offset = 0;
-  let selected = "";
-  for (const segment of segments) {
-    const from = Math.max(start, offset);
-    const to = Math.min(end, offset + segment.length);
-    if (from < to) {
-      selected +=
-        segment.length === segment.text.length ? segment.text.slice(from - offset, to - offset) : segment.text;
-    }
-    offset += segment.length;
-  }
-  return selected;
-}
-
-/**
- * The inline tokens as children of a native text view, with the same look as `inline`. Strings and
- * nested `UITextView`s are text; any other view is an inline view. The text view cannot hold a
- * fragment, so this returns a flat list, and it records each part in `segments` in drawing order.
- */
-function selectableInline(tokens: Token[], presentation: TextPresentation, segments: SelectableSegment[]): ReactNode[] {
-  const nodes: ReactNode[] = [];
-  const text = (value: string) => {
-    if (!value) return;
-    segments.push({ length: value.length, text: value });
-    nodes.push(value);
-  };
-  // The native text view takes the line height of a line from its first character, and an inline view
-  // has no line height. A line that starts with one became taller than the view measured it, and its
-  // end was cut with an ellipsis. A word joiner before the view gives the line the text's line height.
-  const startLine = (target: ReactNode[] = nodes) => {
-    const last = segments.at(-1);
-    if (last && !(last.length === last.text.length && last.text.endsWith("\n"))) return;
-    segments.push({ length: 1, text: "" });
-    target.push(WORD_JOINER);
-  };
-  const inlineView = (node: ReactNode, quote: string) => {
-    startLine();
-    segments.push({ length: 1, text: quote });
-    nodes.push(node);
-  };
-  for (const { value: token, offset } of sourceEntries(tokens, (entry) => entry.raw)) {
-    if (token.type === "agentMention") {
-      const reference = chatTagReferences(token.raw)[0];
-      const agent = presentation.agents.find((candidate) => candidate.id === reference?.id);
-      if (agent) inlineView(<AgentMention key={offset} agent={agent} presentation={presentation} />, `@${agent.name}`);
-      else text(`@${reference?.name ?? "Agent"}`);
-    } else if (token.type === "skillMention") {
-      const reference = chatTagReferences(token.raw)[0];
-      const name = reference?.name ?? "";
-      inlineView(
-        <SkillMention key={offset} name={name} app={reference?.kind === "mcp"} presentation={presentation} />,
-        `@${name}`,
-      );
-    } else if (token.type === "br") {
-      text("\n");
-    } else if (token.type === "checkbox") {
-      // The list row draws the task mark.
-    } else if (tokenIs(token, "inlineMath")) {
-      // One view, so the formula is one character whether it draws or falls back to code.
-      inlineView(
-        <View key={offset} collapsable={false} className="flex-row flex-wrap">
-          <ChatMath
-            tex={token.text}
-            display={token.display}
-            block={false}
-            textSize={textSize(presentation)}
-            color={presentation.style.color}
-            fallback={<CodeSpan text={token.raw} presentation={presentation} />}
-          />
-        </View>,
-        token.raw,
-      );
-    } else if (tokenIs(token, "text")) {
-      if (token.tokens) {
-        nodes.push(...selectableInline(token.tokens, presentation, segments));
-      } else {
-        for (const part of plainMentionParts(token.text, presentation.agents)) {
-          if (part.agent) {
-            inlineView(
-              <AgentMention key={`${offset}:${segments.length}`} agent={part.agent} presentation={presentation} />,
-              `@${part.agent.name}`,
-            );
-          } else {
-            text(part.text);
-          }
-        }
-      }
-    } else if (tokenIs(token, "escape")) {
-      text(token.text);
-    } else if (tokenIs(token, "codespan")) {
-      // `CodeSpan` draws one chip per piece, and each chip is one inline view.
-      const pieces = isFileReference(token.text.trim()) ? [token.text.trim()] : codePieces(token.text);
-      startLine();
-      for (const piece of pieces) segments.push({ length: 1, text: piece });
-      nodes.push(<CodeSpan key={offset} text={token.text} presentation={presentation} />);
-    } else if (tokenIs(token, "strong") || tokenIs(token, "em") || tokenIs(token, "del")) {
-      const style: TextStyle = {
-        ...presentation.style,
-        ...(token.type === "strong"
-          ? { fontWeight: "700" }
-          : token.type === "em"
-            ? { fontStyle: "italic" }
-            : { textDecorationLine: "line-through" }),
-      };
-      nodes.push(
-        <UITextView key={offset} style={style}>
-          {selectableInline(token.tokens, { ...presentation, style }, segments)}
-        </UITextView>,
-      );
-    } else if (tokenIs(token, "link") || tokenIs(token, "image")) {
-      const url = webLink(token.href);
-      const icon: ReactNode[] = [];
-      const label: ReactNode[] = [];
-      if (url && tokenIs(token, "link")) {
-        startLine(icon);
-        segments.push({ length: 1, text: "" }, { length: 1, text: NO_BREAK_SPACE });
-        icon.push(
-          <ChatLinkIcon
-            key="icon"
-            url={url}
-            favicon={presentation.linkFavicons}
-            color={presentation.style.color}
-            compact={presentation.type === "body-sm"}
-          />,
-          NO_BREAK_SPACE,
-        );
-      }
-      if (tokenIs(token, "image")) {
-        const name = token.text || presentation.t("mobile.chat.markdown.image");
-        segments.push({ length: name.length, text: name });
-        label.push(name);
-      } else {
-        label.push(...selectableInline(token.tokens, { ...presentation, agents: [] }, segments));
-      }
-      if (!url) {
-        nodes.push(...label);
-      } else {
-        const open = () => openMessageLink(url);
-        nodes.push(
-          <UITextView key={offset} style={presentation.style} onPress={open}>
-            {icon}
-            <UITextView key="label" style={{ ...presentation.style, textDecorationLine: "underline" }} onPress={open}>
-              {label}
-            </UITextView>
-          </UITextView>,
-        );
-      }
-    } else {
-      // HTML remains inert text.
-      text(token.raw);
-    }
-  }
-  return nodes;
-}
-
-/**
- * A paragraph or a heading as a native iOS text view: a touch and hold selects the word under the
- * finger, the handles change the range, and the formatting stays as it is drawn.
- */
-function SelectableParagraph({
-  tokens,
-  presentation,
-  style,
-  heading = false,
-}: {
-  tokens: Token[];
-  presentation: TextPresentation & { nativeSelection: NativeSelectionTarget };
-  style: TextStyle;
-  heading?: boolean;
-}) {
-  const paragraph = useId();
-  const segments: SelectableSegment[] = [];
-  const children = selectableInline(tokens, presentation, segments);
-  const report = presentation.nativeSelection.report;
-  return (
-    <UITextView
-      // A new generation draws the paragraph again, which ends a selection that is still in it.
-      key={presentation.nativeSelection.generation}
-      uiTextView
-      selectable
-      accessibilityRole={heading ? "header" : undefined}
-      style={[NATIVE_TEXT_STYLES[presentation.type], style]}
-      onSelectionChange={({ nativeEvent }) =>
-        report(
-          paragraph,
-          nativeEvent.start === nativeEvent.end
-            ? ""
-            : selectedSegmentsText(segments, nativeEvent.start, nativeEvent.end),
-        )
-      }
-    >
-      {children}
-    </UITextView>
-  );
-}
-
 function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation: TextPresentation }) {
   let run: Token[] = [];
   let line: Token[][] = [run];
@@ -724,21 +535,23 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
             const [token] = run;
             if (!token) return null;
             if (tokenIs(token, "codespan")) {
-              return <CodeSpan key={offset} text={token.text} presentation={presentation} />;
+              return <CodeSpan key={offset} text={token.text} presentation={presentation} inRow />;
             }
             return (
-              <Typography
+              <Text
                 key={offset}
                 selectable={presentation.selectable}
-                className="max-w-full"
-                type={presentation.type}
-                style={textContainerStyle(source(run), presentation)}
+                style={[
+                  CHAT_TEXT_STYLES[presentation.type],
+                  textContainerStyle(source(run), presentation),
+                  { maxWidth: "100%" },
+                ]}
               >
                 {inline(run, {
                   ...presentation,
                   animateTail: presentation.animateTail,
                 })}
-              </Typography>
+              </Text>
             );
           })}
         </View>
@@ -757,7 +570,7 @@ function MarkdownBlocks({
   inList?: boolean;
 }) {
   return (
-    <View className="min-w-0 gap-3">
+    <View className={inList ? "min-w-0 gap-1.5" : "min-w-0 gap-2.5"}>
       {sourceEntries(tokens, (token) => token.raw).map(({ value: token, offset }) => (
         <MarkdownBlock key={offset} token={token} presentation={presentation} inList={inList} />
       ))}
@@ -782,47 +595,27 @@ const MarkdownBlock = memo(function MarkdownBlock({
     if (inList && Platform.OS !== "android" && token.tokens?.some((child) => tokenIs(child, "codespan"))) {
       return <ListParagraph tokens={token.tokens} presentation={presentation} />;
     }
-    const { nativeSelection } = presentation;
-    if (nativeSelection) {
-      return (
-        <SelectableParagraph
-          tokens={token.tokens ?? [{ type: "text", raw: token.text, text: token.text, escaped: false }]}
-          presentation={{ ...presentation, nativeSelection }}
-          style={textContainerStyle(token.raw, presentation)}
-        />
-      );
-    }
     return (
-      <Typography
+      <Text
         selectable={presentation.selectable}
-        type={presentation.type}
-        style={textContainerStyle(token.raw, presentation)}
+        style={[CHAT_TEXT_STYLES[presentation.type], textContainerStyle(token.raw, presentation)]}
       >
         {token.tokens ? inline(token.tokens, presentation) : token.text}
-      </Typography>
+      </Text>
     );
   }
   if (tokenIs(token, "heading")) {
     const heading: TextPresentation = { ...presentation, type: token.depth <= 2 ? "h4" : "h5" };
-    const { nativeSelection } = heading;
-    if (nativeSelection) {
-      return (
-        <SelectableParagraph
-          heading
-          tokens={token.tokens}
-          presentation={{ ...heading, nativeSelection }}
-          style={textContainerStyle(token.raw, presentation)}
-        />
-      );
-    }
+    const level = heading.type === "h4" ? "h4" : "h5";
     return (
-      <Typography.Heading
+      <Text
         selectable={presentation.selectable}
-        type={heading.type === "h4" ? "h4" : "h5"}
-        style={textContainerStyle(token.raw, presentation)}
+        accessibilityRole="header"
+        dynamicTypeRamp={CHAT_HEADING_RAMP[level]}
+        style={[CHAT_TEXT_STYLES[level], textContainerStyle(token.raw, presentation)]}
       >
         {inline(token.tokens, heading)}
-      </Typography.Heading>
+      </Text>
     );
   }
   if (tokenIs(token, "blockMath") || (tokenIs(token, "code") && token.lang?.trim().toLowerCase() === "math")) {
@@ -872,12 +665,12 @@ const MarkdownBlock = memo(function MarkdownBlock({
   }
   if (tokenIs(token, "list")) {
     return (
-      <View className="gap-2">
+      <View className="gap-1.5">
         {sourceEntries(token.items, (item) => item.raw).map(({ value: item, offset: itemOffset }, itemIndex) => (
           <View key={itemOffset} className="flex-row items-start gap-2">
-            <Typography type={presentation.type} style={presentation.style}>
+            <Text style={[CHAT_TEXT_STYLES[presentation.type], presentation.style]}>
               {item.task ? (item.checked ? "☑" : "☐") : token.ordered ? `${Number(token.start) + itemIndex}.` : "•"}
-            </Typography>
+            </Text>
             <View className="min-w-0 shrink">
               <MarkdownBlocks tokens={item.tokens} inList presentation={presentation} />
             </View>
@@ -895,17 +688,16 @@ const MarkdownBlock = memo(function MarkdownBlock({
               <View key={rowOffset} className="flex-row border-b border-separator">
                 {sourceEntries(row, (cell) => cell.text).map(({ value: cell, offset: cellOffset }) => (
                   <View key={cellOffset} className="w-44 px-2 py-2">
-                    <Typography
+                    <Text
                       selectable={presentation.selectable}
-                      type={presentation.type}
-                      style={{
-                        ...textContainerStyle(cell.text, presentation),
-                        textAlign: cell.align ?? "left",
-                        fontWeight: cell.header ? "600" : "400",
-                      }}
+                      style={[
+                        CHAT_TEXT_STYLES[presentation.type],
+                        textContainerStyle(cell.text, presentation),
+                        { textAlign: cell.align ?? "left", fontWeight: cell.header ? "600" : "400" },
+                      ]}
                     >
                       {inline(cell.tokens, presentation)}
-                    </Typography>
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -917,9 +709,9 @@ const MarkdownBlock = memo(function MarkdownBlock({
   }
   if (token.type === "hr") return <View className="h-px bg-separator" />;
   return (
-    <Typography selectable={presentation.selectable} type={presentation.type} style={presentation.style}>
+    <Text selectable={presentation.selectable} style={[CHAT_TEXT_STYLES[presentation.type], presentation.style]}>
       {token.raw}
-    </Typography>
+    </Text>
   );
 });
 
@@ -934,7 +726,6 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   playback,
   selectable = true,
   agents = NO_AGENTS,
-  nativeSelection,
   finished = false,
   linkFavicons = true,
 }: {
@@ -948,11 +739,6 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   playback?: ReplyPlayback;
   selectable?: boolean;
   agents?: readonly MobileAgent[];
-  /**
-   * Draws the text as native selectable text views, and reports the text selected in the message,
-   * or an empty string when the selection ends. A new `generation` ends a selection from outside.
-   */
-  nativeSelection?: { generation: number; onSelect: (selected: string) => void };
   /**
    * False shows only the link symbol, so that no linked site is asked for its favicon. Use it for
    * text that another person wrote, such as the instructions of a marketplace skill.
@@ -972,38 +758,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   const { tokens: visibleTokens, flushed } = useReplyPlayback(reveal, playback);
   const codeColor = useThemeColor("foreground");
   const { t } = useText();
-  // A reply turns into native text views once it has stopped streaming and its words have all
-  // shown, so the reveal keeps its fading words. The views then hold the same text in place.
-  const revealed =
-    !streaming &&
-    (!playback?.enabled || (playback.complete && (playback.progress.get(playback.id) ?? 0) >= reveal.words.length));
-  const generation = nativeSelection?.generation;
-  const onSelect = nativeSelection?.onSelect;
-  const selectionReport = useRef<{ paragraph: string | null; timer?: ReturnType<typeof setTimeout> }>({
-    paragraph: null,
-  });
-  useEffect(() => () => clearTimeout(selectionReport.current.timer), []);
-  const nativeTarget = useMemo<NativeSelectionTarget | undefined>(() => {
-    if (generation === undefined || !onSelect) return undefined;
-    return {
-      generation,
-      // One paragraph holds the selection at a time. Dragging a handle reports on each step, so
-      // the text reaches the chat after a short pause; the end of a selection reaches it at once.
-      report: (paragraph, selected) => {
-        const state = selectionReport.current;
-        clearTimeout(state.timer);
-        if (selected) {
-          state.paragraph = paragraph;
-          state.timer = setTimeout(() => onSelect(selected), SELECTION_REPORT_DELAY_MS);
-        } else if (state.paragraph === paragraph) {
-          state.paragraph = null;
-          onSelect("");
-        }
-      },
-    };
-  }, [generation, onSelect]);
   const animateTail = (streaming || (Boolean(playback?.enabled) && !flushed)) && animationEnabled && textReveal;
-  const nativeSelectionTarget = revealed ? nativeTarget : undefined;
   // One object while its values stay, so each block keeps its memo when the message renders again.
   const presentation = useMemo<TextPresentation>(
     () => ({
@@ -1018,23 +773,9 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       streaming,
       finished,
       animateTail,
-      nativeSelection: nativeSelectionTarget,
       linkFavicons,
     }),
-    [
-      linkFavicons,
-      selectable,
-      compact,
-      color,
-      codeColor,
-      agents,
-      fontScale,
-      t,
-      streaming,
-      finished,
-      animateTail,
-      nativeSelectionTarget,
-    ],
+    [linkFavicons, selectable, compact, color, codeColor, agents, fontScale, t, streaming, finished, animateTail],
   );
   return (
     <StreamRevealProvider>

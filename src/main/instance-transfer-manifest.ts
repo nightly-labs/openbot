@@ -60,6 +60,12 @@ const Agent = Schema.Struct({
   description: text(INPUT_LIMITS.agentDescription),
   avatarSeed: text(128),
   avatarHue: Schema.NullOr(guarded(isAvatarHue)),
+  /**
+   * Added after version 1 shipped: the exact colour, `#rrggbb`. An older app ignores it and draws
+   * `avatarHue`, which is the nearest hue. The import drops an invalid value, so that a newer colour
+   * format cannot refuse the agent.
+   */
+  avatarColor: Schema.optionalKey(Schema.String),
   /** An archive path inside `agents/<key>/`, checked below. */
   avatar: Schema.NullOr(text(512)),
   provider: Provider,
@@ -96,10 +102,18 @@ const Settings = Schema.Struct({
            * drops a value out of range, so that a newer limit cannot refuse the whole Settings section.
            */
           contextWindow: Schema.optionalKey(Schema.Number),
+          /** Added after `contextWindow`, with the same rules. */
+          maxOutput: Schema.optionalKey(Schema.Number),
         }),
       ).check(Schema.isMaxLength(256)),
       /** The provider had a saved key. The key itself is never in the file. */
       needsApiKey: Schema.Boolean,
+      /**
+       * Added after version 1 shipped, and only for an endpoint that runs on Pi. An older app ignores
+       * it and runs the endpoint on OpenCode. The import drops an unknown value, so that a harness a
+       * newer app adds cannot refuse the whole Settings section.
+       */
+      harness: Schema.optionalKey(Schema.String),
     }),
   ).check(Schema.isMaxLength(32)),
   customAgents: Schema.Array(

@@ -74,9 +74,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "Выключите «Анимации», чтобы убрать движение во всём приложении. Если в настройках телефона включено «Уменьшение движения», приложение тоже уменьшает движение, и анимации ниже остаются выключенными.",
   "mobile.settings.animations.all": "Анимации",
-  "mobile.settings.animations.chatZoom": "Увеличение чатов",
-  "mobile.settings.animations.chatZoomFooter":
-    "Чат открывается из своего аватара в списке и сворачивается обратно в него. Если выключить, чат выезжает сбоку.",
   "mobile.settings.animations.agentFaces": "Живые лица агентов",
   "mobile.settings.animations.agentFacesFooter":
     "Аватары агентов двигаются, пока агенты работают и отдыхают. Если выключить, лица останутся неподвижными.",
@@ -125,7 +122,6 @@ export const messages = {
     "Уведомления и Live Activity воспроизводят этот звук. Live Activity также включает экран. Звук OpenBot — тот же звук, который играет приложение для компьютера, когда задача завершена. Следующие четыре звука — звуки звуковых тем приложения для компьютера.",
   "mobile.settings.notifications.soundFooterAndroid":
     "Уведомления воспроизводят этот звук. Звук OpenBot — тот же звук, который играет приложение для компьютера, когда задача завершена. Следующие четыре звука — звуки звуковых тем приложения для компьютера.",
-  "mobile.settings.notifications.notifyAbout": "Уведомлять о",
   "mobile.settings.notifications.level.all": "Вся активность",
   "mobile.settings.notifications.level.needsMe": "Только когда я нужен",
   "mobile.settings.notifications.level.nothing": "Ничего",
@@ -142,12 +138,29 @@ export const messages = {
     "События этого сервера, о которых уведомляет этот телефон. У приложения для компьютера свои настройки.",
   "mobile.settings.notifications.serverUnsupported":
     "Этот сервер не может отправлять уведомления. Обновите OpenBot на компьютере, где он работает.",
+  "mobile.settings.notifications.thisPhone": "Этот телефон",
+  "mobile.settings.notifications.whatYouHear": "О чём вы узнаёте",
+  "mobile.settings.notifications.wholeServer": "Весь сервер",
+  "mobile.settings.notifications.levelShort.all": "Все",
+  "mobile.settings.notifications.levelShort.needsMe": "Нужен я",
+  "mobile.settings.notifications.levelShort.nothing": "Выкл.",
+  "mobile.settings.notifications.thisPhoneOnly": "Только этот телефон",
+  "mobile.settings.notifications.offForEveryone": "Выключено для всех на этом сервере",
+  "mobile.settings.notifications.turnOn": "Включить",
+  "mobile.settings.notifications.turnOnFor": "Включить уведомления {name} для всех на этом сервере",
+  "mobile.settings.notifications.chooseAgent": "Выбрать для одного агента",
+  "mobile.settings.notifications.chooseAnotherAgent": "Выбрать другого агента",
+  "mobile.settings.notifications.levelsFooter": "Нажмите уровень агента ещё раз, чтобы он следовал настройке сервера.",
+  "mobile.settings.notifications.agentsUnsupported": "Обновите OpenBot на этом сервере, чтобы выбирать агентов.",
+  "mobile.settings.notifications.agentsOffline": "Агенты появятся, когда этот сервер будет в сети.",
+  "mobile.settings.notifications.scopeFooter":
+    "Ваш выбор действует на всех ваших устройствах. Режим без звука действует только на этом телефоне.",
   "mobile.settings.notifications.channel": "Уведомления агентов ({sound})",
   "mobile.settings.notifications.channelSilent": "Уведомления агентов (без звука)",
   "mobile.settings.privacy.title": "Конфиденциальность",
   "mobile.settings.privacy.footer":
-    "Передавать данные об использовании функций и результатах подключения с этого телефона. Содержимое сообщений и файлы не отправляются.",
-  "mobile.settings.privacy.analytics": "Делиться аналитикой продукта",
+    "Данные об использовании функций и результатах подключения с этого телефона всегда отправляются в аналитику OpenBot. Вкл.: вместе с ID аккаунта и почтой. Выкл.: только со случайным ID установки. Содержимое сообщений и файлы не отправляются.",
+  "mobile.settings.privacy.analytics": "Связывать аналитику с моим аккаунтом",
   "mobile.settings.privacy.retry": "Повторить сохранение настройки конфиденциальности",
   "mobile.settings.conversations.title": "Диалоги",
   "mobile.settings.conversations.hiddenChats": "Скрытые чаты",

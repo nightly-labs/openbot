@@ -2,9 +2,11 @@ import type { AgentProviderRef } from "@openbot/contracts/agent-providers";
 import type {
   AgentAccess,
   AgentExchangeSummary,
+  AgentInstructionsChange,
   AgentModelId,
   AgentReasoningEffort,
   AttachmentSummary,
+  AvatarColor,
   AvatarHue,
   ChannelRoutingConversationEvent,
   ClientAgentSummary,
@@ -156,6 +158,17 @@ export type ChatActionMarkerModel =
   | { kind: "vault-change"; text: string; timestamp: string }
   /** The agent continues by itself, because its plan still has open steps. `text` is the host's note. */
   | { kind: "plan-continuation"; text: string; timestamp: string }
+  /**
+   * The agent changed its instruction file in a turn. `text` is the host's note. `change` is absent on a
+   * remote client and for a text longer than the editor saves: then the line has no Undo.
+   */
+  | {
+      kind: "instructions-change";
+      agentId: string | null;
+      change: AgentInstructionsChange | null;
+      text: string;
+      timestamp: string;
+    }
   | {
       kind: "unavailable";
       label: string;
@@ -276,6 +289,8 @@ export interface AgentProfile {
   workspacePath?: string;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
+  /** The exact colour, which wins over `avatarHue`. Absent on a host without `agent-colors-v1`. */
+  avatarColor?: AvatarColor | null;
   avatarUrl: string | null;
   marketplaceSource?: NonNullable<ClientAgentSummary["marketplaceSource"]>;
   updatedAt?: string | null;
@@ -286,7 +301,7 @@ export interface AgentProfile {
 /** The agent fields that the composer, the queue, rich text and the browser dock read. */
 export type ComposerAgent = Pick<
   AgentProfile,
-  "id" | "name" | "title" | "description" | "avatarSeed" | "avatarHue" | "avatarUrl"
+  "id" | "name" | "title" | "description" | "avatarSeed" | "avatarHue" | "avatarColor" | "avatarUrl"
 >;
 
 /** The skill fields that the composer, the queue and rich text read. */

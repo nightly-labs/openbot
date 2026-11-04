@@ -399,6 +399,7 @@ interface ResourceHit {
   path: string;
   authorization: string | undefined;
   rowKey: string | undefined;
+  userAgent: string | undefined;
 }
 
 /**
@@ -412,6 +413,8 @@ async function startResourceServer(authorizationServer: string) {
   const waiters: Array<() => void> = [];
   const valid = new Set(["access-on-file"]);
   const sessions = new Map<string, StreamableHTTPServerTransport>();
+  /** The `clientInfo` of each session, in the order the sessions started. */
+  const clients: Array<ReturnType<Server["getClientVersion"]>> = [];
   const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", base);
     const rowKey = request.headers["x-row-key"];
@@ -420,6 +423,7 @@ async function startResourceServer(authorizationServer: string) {
       path: url.pathname,
       authorization: request.headers.authorization,
       rowKey: typeof rowKey === "string" ? rowKey : undefined,
+      userAgent: request.headers["user-agent"],
     });
     for (const waiter of waiters.splice(0)) waiter();
     const metadata = /^\/\.well-known\/oauth-protected-resource(\/.*)$/u.exec(url.pathname)?.[1];
@@ -450,7 +454,9 @@ async function startResourceServer(authorizationServer: string) {
           sessions.set(id, created);
         },
       });
-      await mcpServer().connect(asTransport(created));
+      const session = mcpServer();
+      session.oninitialized = () => clients.push(session.getClientVersion());
+      await session.connect(asTransport(created));
       transport = created;
     }
     await transport.handleRequest(request, response);
@@ -463,6 +469,7 @@ async function startResourceServer(authorizationServer: string) {
   return {
     base,
     hits,
+    clients,
     valid,
     /** Resolves when the hits satisfy `done`, and fails at the deadline. */
     waitFor: (done: () => boolean, what: string) =>
@@ -632,10 +639,21 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
           saved.value = next;
         }),
     };
+    // Read at each `initialize`, so a rename here shows in the next session.
+    const agents = [
+      { id: "agent-research", name: "Research Bot" },
+      { id: "chief", name: "Ops\u0007\n\u202eBot" },
+    ];
     const startGateway = () => {
       const gateway = new McpGateway({
         servers,
-        credentials: { ...NO_PROVIDER_CREDENTIALS, mcpOAuth: oauth, mcpOAuthProxySettings: settings },
+        credentials: {
+          ...NO_PROVIDER_CREDENTIALS,
+          mcpOAuth: oauth,
+          mcpOAuthProxySettings: settings,
+          appVersion: "9.9.9-e2e",
+        },
+        agents: () => agents,
         computerUseMcpServer: () => null,
         logger: createOpenBotLogger("agent-service", (line) => logLines.push(line)),
         hooks: { emitError: () => undefined, refreshAllAgentRuntimes: () => Effect.void },
@@ -643,8 +661,8 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
       gateways.push(gateway);
       return gateway;
     };
-    const endpointOf = async (gateway: McpGateway, config: McpServerConfig) => {
-      const endpoint = await runCauseEffect(gateway.endpoint(config));
+    const endpointOf = async (gateway: McpGateway, config: McpServerConfig, agentId: string | null = null) => {
+      const endpoint = await runCauseEffect(gateway.endpoint(config, agentId));
       assert.ok(!("error" in endpoint), "The proxy did not start.");
       assert.equal(endpoint.proxied, true);
       assert.ok(endpoint.authorization);
@@ -666,7 +684,12 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
 
     // The payload a provider is spawned with names the proxy only: no token, no header of the row.
     const usable = await runCauseEffect(
-      usableMcpServers(gateway.enabled(), undefined, (config) => gateway.endpoint(config).pipe(toMcpOperationError)),
+      usableMcpServers(
+        gateway.enabled(),
+        undefined,
+        (config, agentId) => gateway.endpoint(config, agentId).pipe(toMcpOperationError),
+        "chief",
+      ),
     );
     const codex = codexMcpServers(usable);
     const claude = claudeMcpServers(usable);
@@ -676,12 +699,15 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
         assert.ok(!payload.includes(secret), "A provider payload held a credential or the server's own address.");
     }
     const directRoute = await endpointOf(gateway, direct);
+    const chiefRoute = await endpointOf(gateway, direct, "chief");
     const port = saved.value?.port;
     assert.ok(port);
+    assert.match(directRoute.url, new RegExp(`^http://127\\.0\\.0\\.1:${port}/mcp/[0-9a-f]{32}$`, "u"));
     const codexDirect = codex.servers.Resource;
     assert.ok(codexDirect && "url" in codexDirect);
-    assert.match(codexDirect.url, new RegExp(`^http://127\\.0\\.0\\.1:${port}/mcp/[0-9a-f]{32}$`, "u"));
-    assert.deepEqual(codexDirect.http_headers, { Authorization: `Bearer ${directRoute.bearer}` });
+    assert.match(codexDirect.url, new RegExp(`^http://127\\.0\\.0\\.1:${port}/mcp/[0-9a-f]{32}/[0-9a-f]{32}$`, "u"));
+    assert.equal(codexDirect.url, chiefRoute.url);
+    assert.deepEqual(codexDirect.http_headers, { Authorization: `Bearer ${chiefRoute.bearer}` });
     const redacted = `bearer ${directRoute.bearer}`;
     assert.ok(!gateway.redact(redacted).includes(directRoute.bearer));
     assert.ok(!redactText(redacted).includes(directRoute.bearer));
@@ -697,6 +723,49 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     assert.ok(upstream.length > 0);
     assert.ok(upstream.every((hit) => hit.authorization === "Bearer access-on-file" && hit.rowKey === "row-secret"));
     const echo = { text: "through", upstreamToken: "access-on-file", rowHeaderUpstream: true };
+
+    // The server sees OpenBot as the client, not the provider, and the agent of the route by name.
+    const openbotClient = (title: string) => ({
+      name: "openbot",
+      title,
+      version: "9.9.9-e2e",
+      websiteUrl: "https://openbot.run",
+    });
+    assert.deepEqual(resource.clients.at(-1), openbotClient("OpenBot"));
+    assert.ok(upstream.every((hit) => hit.userAgent === "OpenBot/9.9.9-e2e"));
+    const titleOf = async (route: { url: string; bearer: string }) => {
+      const before = resource.clients.length;
+      const named = await connect(route.url, route.bearer);
+      assert.equal(textOf(await named.callTool({ name: "echo", arguments: { text: "named" } })), "named");
+      assert.equal(resource.clients.length, before + 1);
+      const info = resource.clients.at(-1);
+      assert.deepEqual(info, openbotClient(info?.title ?? ""));
+      return info?.title;
+    };
+    const researchRoute = await endpointOf(gateway, direct, "agent-research");
+    assert.notEqual(researchRoute.url, directRoute.url);
+    assert.equal(await titleOf(researchRoute), "Research Bot (OpenBot)");
+    assert.equal(await titleOf(chiefRoute), "Ops Bot (OpenBot)");
+    const research = agents[0];
+    assert.ok(research);
+    research.name = "Renamed Bot";
+    assert.equal(await titleOf(researchRoute), "Renamed Bot (OpenBot)");
+    assert.equal(await titleOf(await endpointOf(gateway, direct, "removed-agent")), "OpenBot");
+    // The bearer of a route opens neither the same row for another agent nor the row with no agent.
+    const hitsBeforeCross = resource.hits.length;
+    assert.equal(await rawPost(researchRoute.url, { authorization: `Bearer ${directRoute.bearer}` }), 403);
+    assert.equal(await rawPost(directRoute.url, { authorization: `Bearer ${researchRoute.bearer}` }), 403);
+    assert.equal(await rawPost(chiefRoute.url, { authorization: `Bearer ${researchRoute.bearer}` }), 403);
+    assert.equal(resource.hits.length, hitsBeforeCross, "A request with another route's bearer reached the server.");
+    const clientIdentity = {
+      withoutAgent: "OpenBot",
+      agent: "Research Bot (OpenBot)",
+      controlCharacters: "Ops Bot (OpenBot)",
+      renamed: "Renamed Bot (OpenBot)",
+      unknownAgent: "OpenBot",
+      userAgent: "OpenBot/9.9.9-e2e",
+      crossAgentBearers: 403,
+    };
 
     // The GET stream stays open through the proxy and carries a server notification.
     await resource.waitFor(
@@ -737,6 +806,32 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     assert.equal(resource.hits.at(-1)?.authorization, "Bearer access-rotated");
     const midSessionRefresh = { refreshes: 1, text: "renewed" };
 
+    // An added account on the same address: a refused token refreshes the sign-in of that account,
+    // not the sign-in of the plain row, whose token the server still takes.
+    const account = row("Resource Work", "/mcp#account-e2e-work");
+    const accountRecord = freshRecord(auth.base, account.url);
+    records.set(
+      account.url,
+      mcpOAuthRecordSchema.parse({
+        ...accountRecord,
+        tokens: { ...accountRecord.tokens, access_token: "access-work", refresh_token: "refresh-work" },
+      }),
+    );
+    const accountRoute = await endpointOf(gateway, account);
+    assert.notEqual(accountRoute.url, directRoute.url);
+    auth.reset();
+    const accountClient = await connect(accountRoute.url, accountRoute.bearer);
+    assert.equal(textOf(await accountClient.callTool({ name: "echo", arguments: { text: "work" } })), "work");
+    assert.equal(
+      auth.hits.filter((hit) => hit.path === "/token").length,
+      1,
+      "The account did not refresh its own sign-in.",
+    );
+    assert.equal(records.get(account.url)?.tokens?.access_token, "access-rotated");
+    assert.equal(records.get(direct.url)?.tokens?.access_token, "access-rotated");
+    assert.ok(!resource.hits.some((hit) => hit.path.includes("account")), "The account fragment went upstream.");
+    const accountRefresh = { ownSignInRefreshed: true, fragmentUpstream: false };
+
     // After a sign-out the call gets a JSON-RPC error, never a 401 that would start a sign-in.
     await runCauseEffect(gateway.signOut({ mcpServerId: direct.id }));
     const hitsAtSignOut = resource.hits.length;
@@ -768,10 +863,18 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     const expiredWithoutRefresh = { sameRoute: true, sameFingerprint: true };
 
     for (const line of logLines)
-      for (const secret of ["access-on-file", "access-rotated", "refresh-on-file", "row-secret", directRoute.bearer])
+      for (const secret of [
+        "access-on-file",
+        "access-rotated",
+        "refresh-on-file",
+        "row-secret",
+        directRoute.bearer,
+        researchRoute.bearer,
+      ])
         assert.ok(!line.includes(secret), "A log line quoted a credential.");
 
     // A restart keeps the address and the bearers, so a resumed Codex session still reaches them.
+    const movedResearch = await endpointOf(gateway, moved, "agent-research");
     for (const open of clients.splice(0)) await open.close();
     const fingerprint = await runCauseEffect(gateway.proxyFingerprint(servers.listEnabled()));
     assert.ok(fingerprint);
@@ -779,6 +882,7 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     gateway = startGateway();
     const restarted = await endpointOf(gateway, moved);
     assert.deepEqual(restarted, movedRoute);
+    assert.deepEqual(await endpointOf(gateway, moved, "agent-research"), movedResearch);
     assert.equal(await runCauseEffect(gateway.proxyFingerprint(servers.listEnabled())), fingerprint);
     await runCauseEffect(gateway.close());
 
@@ -797,7 +901,18 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     const restart = { samePortAndBearer: true, sameFingerprint: true, busyPortRotatesSecret: true };
 
     await runCauseEffect(oauth.close());
-    return { handoff, echo, getStream, refused, midSessionRefresh, signedOut, expiredWithoutRefresh, restart };
+    return {
+      handoff,
+      echo,
+      getStream,
+      clientIdentity,
+      refused,
+      midSessionRefresh,
+      accountRefresh,
+      signedOut,
+      expiredWithoutRefresh,
+      restart,
+    };
   } finally {
     for (const open of clients) await open.close();
     for (const open of gateways) await runCauseEffect(open.close());

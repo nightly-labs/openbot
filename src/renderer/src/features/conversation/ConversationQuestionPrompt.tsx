@@ -51,6 +51,7 @@ export function ConversationQuestionPrompt(props: {
                   sendShortcut={deviceSendShortcut(view.platform)}
                   onSubmit={answer}
                   onResolutionPresented={presentResolution}
+                  onOpenLink={(url) => void openExternalMessageUrl(url)}
                 />
               }
             >
@@ -58,6 +59,7 @@ export function ConversationQuestionPrompt(props: {
                 <UiBlockPrompt
                   block={block()}
                   agents={view.agents}
+                  agentId={entry.prompt.agentId}
                   onSelectAgent={view.onSelectAgent}
                   onOpenLink={(url) => void openExternalMessageUrl(url)}
                   elementRef={(element) => props.elementRef?.(element)}

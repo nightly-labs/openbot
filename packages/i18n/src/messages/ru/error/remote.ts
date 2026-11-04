@@ -90,6 +90,7 @@ export const messages = {
   "error.remote.fileTransferFailed": "Передача файла по WebRTC не удалась.",
   "error.remote.fileResumeFailed": "Не удалось возобновить передачу файла по WebRTC до истечения срока.",
   "error.remote.fileTransportStopped": "Файловый транспорт WebRTC остановился.",
+  "error.remote.downloadStopped": "Загрузка остановлена.",
   "error.remote.fileResumeExpired": "Срок возобновления передачи файла по WebRTC истёк.",
   "error.remote.hostRequestFailed": "Хост не смог выполнить запрос.",
   "error.remote.responseTooLarge": "Ответ хоста слишком велик для отправки на это устройство.",
@@ -123,7 +124,6 @@ export const messages = {
   "error.remote.serverDisconnected": "Сервер отключился.",
   "error.remote.preferencesUnreadable": "Не удалось прочитать сохранённые настройки чата.",
   "error.remote.accountAuthRequired": "Требуется аутентификация аккаунта.",
-  "error.remote.serverIdentityChanged": "Идентификатор сервера изменился. Замена доверенного ключа хоста отклонена.",
   "error.remote.pairedIdentityChanged":
     "Идентификатор сопряжённого компьютера отсутствует или изменился. Отсканируйте новый код с того компьютера.",
   "error.remote.permanentInviteNoEmail": "Постоянные приглашения нельзя отправить по электронной почте.",
@@ -196,4 +196,6 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "Обновите этот сервер на компьютере, чтобы удалять каналы.",
   "error.remote.historyRefreshFailed": "Сообщение отправлено, но историю чата обновить не удалось.",
   "error.remote.taskHistoryRefreshFailed": "Задача изменена, но историю чата обновить не удалось.",
+  "error.remote.localServerAccountRemovalFailed":
+    "Сервер удалён на своём компьютере, но в аккаунте он ещё есть. Удалите его ещё раз, чтобы убрать из аккаунта.",
 } as const satisfies PartialTranslation<typeof source>;

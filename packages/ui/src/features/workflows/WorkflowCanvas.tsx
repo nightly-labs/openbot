@@ -123,6 +123,7 @@ import {
 } from "./workflow-board";
 import { type Camera, type CameraMotion, glideCamera } from "./workflow-camera";
 import { CLIP_TYPE, type Clip, copied, setCopied } from "./workflow-clipboard";
+import type { WorkflowGitHubCanvas } from "./workflow-github";
 import {
   type CanvasItem,
   type CanvasSnapshot,
@@ -160,7 +161,15 @@ import {
   ToolAction,
   translated,
 } from "./workflow-node-parts";
-import { activeRun, indexRunView, type WorkflowRunView } from "./workflow-run-view";
+import {
+  FollowFrame,
+  PeerCursors,
+  PresenceBar,
+  peersOf,
+  type WorkflowPeer,
+  type WorkflowPresence,
+} from "./workflow-presence";
+import { activeRun, indexRunView, isOpenRun, type WorkflowRunView } from "./workflow-run-view";
 import { DrawArt, ShapesArt, StickyArt } from "./workflow-tool-art";
 
 export interface WorkflowCanvasProps {
@@ -175,6 +184,8 @@ export interface WorkflowCanvasProps {
   /** What this host supports. The canvas hides the kinds, triggers and outputs that it does not list. */
   features: WorkflowFeatures;
   catalogs: WorkflowCatalogs;
+  /** What the GitHub trigger and output cards read from the host. Without it, they show no GitHub data. */
+  github?: WorkflowGitHubCanvas | undefined;
   /** The saved versions of this workflow, newest first. */
   versions: readonly WorkflowVersion[];
   /** The version that the canvas shows, read-only, in place of the live canvas. */
@@ -183,6 +194,8 @@ export interface WorkflowCanvasProps {
   library: readonly WorkflowSummary[];
   /** The canvas shows the graph and the runs; nothing on it changes. */
   readOnly?: boolean | undefined;
+  /** The other people on this canvas. It shows only when `features.presence` is on. */
+  presence?: WorkflowPresence | undefined;
   /** In the desktop window, the top bar is the window's top row, and the canvas fills the card below it. */
   frame?: "window" | undefined;
   /**
@@ -295,6 +308,10 @@ const PINCH_ZOOM_RATE = 0.007;
 const WHEEL_ZOOM_RATE = 0.002;
 /** One scroll event zooms no more than one press of the zoom buttons, so a fast wheel does not jump. */
 const WHEEL_ZOOM_MAX = Math.log(ZOOM_STEP);
+/** While you follow a person, the camera moves when their cursor is this share of the view from the centre. */
+const FOLLOW_ZONE = 0.25;
+/** The time constant of the follow camera, in milliseconds: it closes 63% of the gap in this time. */
+const FOLLOW_EASE = 180;
 const FIT_MARGIN = 64;
 /**
  * In screen pixels, as in workflows.css: the gap between a node and its toolbar, and the room that
@@ -536,10 +553,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   );
   const [camera, setCamera] = createStore({ x: 0, y: 0, scale: 1 });
 
-  /** The run state of each node, from the runs of the host. */
-  const runIndex = createMemo(() => indexRunView(props.runs));
-  /** The run that has not ended. */
-  const openRun = createMemo(() => activeRun(props.runs));
   const running = () => openRun() !== undefined;
   const statusOf = (id: string) => runIndex().get(id)?.status;
   /** The id of the newest step of a node, which Retry, Stop and the approval act on. */
@@ -570,6 +583,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
 
   const canvas = createBoard({
     catalogs: () => props.catalogs,
+    github: () => props.github,
     features: () => props.features,
     edges: initial.board.edges,
     locked: initial.board.locked,
@@ -662,6 +676,17 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     },
   });
   const board = canvas.board;
+  /**
+   * The run that has not ended and that the run bar acts on: the open run that the user views, else
+   * the newest open run. GitHub runs on different items can be open at the same time.
+   */
+  const openRun = createMemo(() => {
+    const number = board.viewing();
+    const viewed = props.runs.runs.find((entry) => entry.run.number === number);
+    return viewed && isOpenRun(viewed) ? viewed : activeRun(props.runs);
+  });
+  /** The run state of each node, from the runs of the host. A viewed open run shows its own steps. */
+  const runIndex = createMemo(() => indexRunView(props.runs, openRun()?.run.id));
 
   /* ---------------------------------------------------------- History */
 
@@ -1133,15 +1158,26 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     glide.goal = undefined;
     if (viewport) delete viewport.dataset.cameraMoving;
   };
+  /** The person whose cursor the camera follows. A move of the camera by you stops it. */
+  const [following, setFollowing] = createSignal<string | undefined>();
+  let followFrame = 0;
+  const stopFollow = () => {
+    if (followFrame) cancelAnimationFrame(followFrame);
+    followFrame = 0;
+    setFollowing(undefined);
+  };
+  onCleanup(() => cancelAnimationFrame(followFrame));
   /** The wheel, a pinch, a pan and the automatic fit move the camera at once, as on Higgsfield. */
   const moveCamera = (next: Camera, byUser = true) => {
     stopGlide();
+    if (byUser) stopFollow();
     cameraMoved ||= byUser;
     placeCamera(next);
   };
   /** A button, a key, a menu item or a jump moves the camera over some frames. */
   const glideTo = (next: Camera, motion: CameraMotion) => {
     stopGlide();
+    stopFollow();
     cameraMoved = true;
     const goal = { ...next, scale: clampScale(next.scale) };
     glide.goal = goal;
@@ -1214,9 +1250,23 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
               at: run.startedAt,
               status: run.status,
               seconds: Math.max(0, (Date.parse(run.endedAt) - Date.parse(run.startedAt)) / 1000),
+              item: runItems().get(run.id),
             },
           ],
     );
+  /** The issue or pull request of each GitHub run. */
+  const runItems = createMemo(
+    () => new Map(props.github?.history().runs.map((entry) => [entry.runId, `#${entry.item.number}`]) ?? []),
+  );
+  /** Runs that have not ended, newest first. */
+  const openRuns = (): readonly HudRun[] =>
+    props.runs.runs.flatMap(({ run }) =>
+      run.endedAt === null
+        ? [{ number: run.number, at: run.startedAt, status: run.status, seconds: null, item: runItems().get(run.id) }]
+        : [],
+    );
+  const waitingEvents = () =>
+    props.github?.history().deliveries.filter((delivery) => delivery.outcome === "waiting").length ?? 0;
   /** The steps of the open run that are done, of the steps on the canvas. */
   const progress = () => {
     const total = live().filter((node) => isWorkflowStepKind(node.kind)).length;
@@ -1437,6 +1487,70 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       : undefined;
   };
   const boxesOf = (ids: readonly string[]) => ids.flatMap((id) => boxOf(id) ?? []);
+
+  /* --------------------------------------------------------- Presence */
+
+  const peers = createMemo(() => (props.features.presence && props.presence ? peersOf(props.presence) : []));
+  const self = () =>
+    props.features.presence ? props.presence?.members.find((member) => member.id === props.presence?.self) : undefined;
+  const spots = () => props.presence?.spots ?? {};
+  /** The other person who selected a node, if any. */
+  const peerOn = (id: string) => peers().find((peer) => spots()[peer.member.id]?.selected === id);
+  /** The name of that person under the node, while their cursor, which shows the name, is away. */
+  const peerTag = (id: string) => {
+    const peer = peerOn(id);
+    const at = peer && spots()[peer.member.id]?.at;
+    const box = boxOf(id);
+    if (!peer || !at || !box) return undefined;
+    const near = at.x >= box.x && at.x <= box.x + box.width && at.y >= box.y - 40 && at.y <= box.y + box.height + 40;
+    return near ? undefined : peer;
+  };
+  /** Moves the camera so a person's cursor is in the centre of the view, at the same zoom. */
+  const showPeer = (peer: WorkflowPeer) => {
+    const at = spots()[peer.member.id]?.at;
+    if (!at) return;
+    const { width, height } = view();
+    const scale = target().scale;
+    glideTo({ scale, x: width / 2 - at.x * scale, y: height / 2 - at.y * scale }, "flight");
+  };
+  /**
+   * Flies to a person, then keeps their cursor in the middle half of the view. When the cursor leaves
+   * it, the camera eases until the cursor is in the centre again, so small moves on a node keep the
+   * view still. With reduced motion, the camera jumps.
+   */
+  const follow = (peer: WorkflowPeer) => {
+    stopFollow();
+    showPeer(peer);
+    setFollowing(peer.member.id);
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let centring = false;
+    let last = performance.now();
+    const tick = (now: number) => {
+      // The person left the canvas.
+      if (!followedPeer()) return stopFollow();
+      // The first frame can start before `follow` read the clock.
+      const elapsed = Math.max(0, now - last);
+      last = now;
+      followFrame = requestAnimationFrame(tick);
+      const at = spots()[peer.member.id]?.at;
+      // The flight to the person comes first.
+      if (!at || glide.goal) return;
+      const { width, height } = view();
+      const dx = width / 2 - (at.x * camera.scale + camera.x);
+      const dy = height / 2 - (at.y * camera.scale + camera.y);
+      centring ||= Math.abs(dx) > width * FOLLOW_ZONE || Math.abs(dy) > height * FOLLOW_ZONE;
+      if (!centring) return;
+      if (Math.hypot(dx, dy) < 0.5) {
+        centring = false;
+        return;
+      }
+      const share = still ? 1 : 1 - Math.exp(-elapsed / FOLLOW_EASE);
+      placeCamera({ scale: camera.scale, x: camera.x + dx * share, y: camera.y + dy * share });
+    };
+    followFrame = requestAnimationFrame(tick);
+  };
+  const toggleFollow = (peer: WorkflowPeer) => (following() === peer.member.id ? stopFollow() : follow(peer));
+  const followedPeer = () => peers().find((peer) => peer.member.id === following());
   /**
    * The toolbar of a node goes under the node, and under its results strip, only when above it the
    * toolbar covers another card and under it the toolbar does not. Text and shapes do not count: a
@@ -2432,9 +2546,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       const node = active instanceof HTMLElement ? active.closest<HTMLElement>("[data-node-id]") : null;
       const arrow = ARROWS[event.key];
       const action = (() => {
-        // A version and a read-only canvas take only the camera keys. Escape goes back to the live canvas.
+        // A version and a read-only canvas take only the camera keys. Escape stops a follow, then goes back
+        // to the live canvas.
         if (frozen()) {
           if (inMenu) return undefined;
+          if (event.key === "Escape" && following()) return stopFollow;
           if (event.key === "Escape") return previewing() ? closeVersion : undefined;
           if (event.shiftKey && event.code === "Digit1") return () => fitView(true);
           return mod && event.key !== "Enter" ? withMod[event.key] : undefined;
@@ -2472,6 +2588,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         if (event.shiftKey && event.code === "Digit1") return () => fitView(true);
         if (event.key === "Escape" && ui.search) return closeSearch;
         if (event.key === "Escape" && (ui.tool === "draw" || placing()) && !inMenu) return () => setTool("select");
+        if (event.key === "Escape" && following() && !inMenu) return stopFollow;
         if (event.key === "Escape" && ids.length > 0 && !inMenu && !drop()) return () => canvas.select([]);
         // A menu or a list box takes letters itself, to go to an item.
         return event.shiftKey || inMenu || takesKeys(active) ? undefined : plain[key];
@@ -2593,12 +2710,21 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                         slotResize.observe(element);
                       }}
                       data-kind={node().kind}
+                      data-peer={peerOn(node().id) ? "" : undefined}
                       style={{
                         left: `${positions[node().id]?.x ?? 0}px`,
                         top: `${positions[node().id]?.y ?? 0}px`,
+                        "--wfn-peer": peerOn(node().id)?.color,
                       }}
                     >
                       <CanvasNodeView node={node()} trigger={triggerOf(node().id)} />
+                      <Show when={peerTag(node().id)}>
+                        {(peer) => (
+                          <span class="wfn-peer-tag" aria-hidden="true">
+                            {peer().name}
+                          </span>
+                        )}
+                      </Show>
                     </div>
                   );
                 }}
@@ -2677,6 +2803,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                   </div>
                 )}
               </Show>
+              <PeerCursors peers={peers()} spots={spots()} />
             </div>
             <Show when={marquee()}>
               {(box) => (
@@ -2903,6 +3030,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
             </ContextMenu.Content>
           </ContextMenu.Portal>
         </ContextMenu.Root>
+        <Show when={followedPeer()}>{(peer) => <FollowFrame peer={peer()} />}</Show>
         <Show when={live().length === 0 && !frozen() && allows("trigger")}>
           <div class="wfn-empty">
             <span class="wfn-menu-icon wfn-empty-icon" data-kind="trigger" aria-hidden="true">
@@ -2940,6 +3068,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           viewing={board.viewing()}
           onView={board.view}
           pastRuns={pastRuns()}
+          openRuns={openRuns()}
+          waiting={waitingEvents()}
           olderRuns={props.runs.nextBefore !== null}
           onLoadOlderRuns={props.onLoadOlderRuns}
           step={current()}
@@ -2949,6 +3079,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           progress={progress()}
           onRun={() => props.onRun({})}
           onStop={stopRun}
+          people={
+            <Show when={peers().length > 0}>
+              <PresenceBar self={self()} peers={peers()} following={following()} onFollow={toggleFollow} />
+            </Show>
+          }
         />
 
         <Show when={ui.tool === "draw"}>

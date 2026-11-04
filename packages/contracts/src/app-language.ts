@@ -10,6 +10,7 @@
 export const APP_LANGUAGES = [
   "system",
   "en",
+  "ar",
   "de",
   "es",
   "fr",

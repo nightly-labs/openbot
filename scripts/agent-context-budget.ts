@@ -69,8 +69,7 @@ const bytes = (value: unknown) => Buffer.byteLength(typeof value === "string" ? 
 const sum = (values: readonly unknown[]) => values.reduce<number>((total, value) => total + bytes(value), 0);
 
 function measure(): Map<string, number> {
-  const guidance = new Set(BUILTIN_TOOL_CATALOG.map((entry) => toolGuidance(entry.namespace, entry.tool)));
-  guidance.delete("");
+  const guidance = new Set(BUILTIN_TOOL_CATALOG.flatMap((entry) => toolGuidance(entry.namespace, entry.tool)));
   return new Map([
     ["instructions.claude", bytes(instructions("claude"))],
     ["instructions.codex", bytes(instructions("codex"))],

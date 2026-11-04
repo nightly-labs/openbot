@@ -12,6 +12,12 @@ HeroUI Native is a component source, not a requirement to decorate every screen.
 
 Render product text through HeroUI Native `Typography`, including `Typography.Heading` and `Typography.Paragraph` for semantic roles. Screens and product components must not import React Native `Text` directly unless a third-party integration boundary requires the native primitive and the exception is documented.
 
+Chat message text is a documented exception. A long reply draws hundreds of text views, so the chat
+Markdown renderer draws React Native `Text` with the plain styles in
+`src/features/chat/components/chat-text-styles.ts`, not `Typography` and its class names. Every way
+of drawing a message, and the selection field over it, uses that one table. Body text is 16 points
+on a 22-point line, as in the composer.
+
 Native system chrome is the intentional exception. Navigation and operating-system-owned controls must remain native even when HeroUI can produce a visually similar element. This lets iOS apply Liquid Glass automatically on supported versions and lets Android retain its native Material behavior.
 
 All text uses Inter, the desktop and web font, with the system font as fallback. Native chrome stays native but takes the font: header titles, back titles and toolbar labels read the React Navigation theme fonts (`navigationFonts` in `src/shared/lib/app-font.ts`), and an iOS `@expo/ui` label takes `nativeLabelFont`. System menus, date pickers and Live Activities keep the system font.

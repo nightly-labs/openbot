@@ -1,5 +1,6 @@
 import {
   type AgentSummary,
+  type AvatarColor,
   type ClientAgentSummary,
   type ForeignProviderId,
   foreignProvider,
@@ -30,7 +31,11 @@ export type RemoteAgent = Pick<
     >
   > & { foreignProvider?: ForeignProviderId | undefined };
 
-export function projectAgent(serverId: string, agent: RemoteAgent): MobileAgent {
+/**
+ * The agent as the phone shows it. `avatarColor` comes from the `agent-colors-v1` route, because the
+ * released agent routes do not carry it.
+ */
+export function projectAgent(serverId: string, agent: RemoteAgent, avatarColor: AvatarColor | null): MobileAgent {
   return {
     id: agent.id,
     serverId,
@@ -48,6 +53,7 @@ export function projectAgent(serverId: string, agent: RemoteAgent): MobileAgent 
     avatarUrl: agent.avatarUrl ?? null,
     avatarSeed: agent.avatarSeed,
     avatarHue: agent.avatarHue,
+    avatarColor,
     marketplaceSource: agent.marketplaceSource
       ? { listingId: agent.marketplaceSource.listingId, version: agent.marketplaceSource.version }
       : undefined,
@@ -122,7 +128,7 @@ export function decodeConversationReads(value: unknown): Record<string, { unread
 
 export function ignoreResponse(): void {}
 
-export function updateAgentPayload(input: UpdateAgentInput): TeamProtocolV2Json {
+export function updateAgentPayload(input: UpdateAgentInput): { [key: string]: TeamProtocolV2Json } {
   return {
     agentId: input.agentId,
     ...(input.name === undefined ? {} : { name: input.name }),

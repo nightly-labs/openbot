@@ -1,6 +1,9 @@
 import type { ManagedProviderId, ManagedToolRuntimeId } from "./agent-providers";
 import type { AgentModelId } from "./ipc-agent-identity";
 import type { AgentProviderId } from "./ipc-agent-status";
+import { integerInRange, isFiniteNumber, isIdentifier } from "./ipc-bounded-values";
+import { decodeRecord, nullableNumber, requiredBoolean, requiredNumber, requiredString } from "./ipc-decoding";
+import { isDynamicRecord, isString } from "./runtime-values";
 
 export type DesktopPlatform = "darwin" | "win32" | "linux";
 export type AppVariant = "production" | "dev" | "preview";
@@ -12,6 +15,8 @@ export interface AppInfo {
   variant: AppVariant;
   /** Set only in an unpackaged build that a local analytics capture server reads. */
   analyticsCaptureUrl?: string;
+  /** The random analytics ID of this install, for events that do not go with the account. */
+  analyticsInstallId?: string;
 }
 
 /** The phase list is the source of truth: `UpdatePhase` is derived from it. */
@@ -196,6 +201,8 @@ export interface AnalyticsPreference {
 
 export interface SetAnalyticsPreferenceInput {
   enabled: boolean;
+  /** True when the user chose this value. Only a choice is sent to the account; a default is not. */
+  chosen?: boolean;
 }
 
 export interface CentralAuthUser {
@@ -203,6 +210,11 @@ export interface CentralAuthUser {
   email: string;
   name: string | null;
   avatarUrl: string | null;
+  /**
+   * The latest product analytics answer of the account, from any device. Null or missing: the user
+   * never answered, or the account service is older.
+   */
+  analyticsEnabled?: boolean | null;
 }
 
 export interface CentralAuthIssue {
@@ -226,8 +238,95 @@ export type CentralAuthState =
       developmentCode?: string;
       issue?: CentralAuthIssue | undefined;
     }
+  /** The email signs in with the company's provider. The browser has the sign-in page. */
+  | { status: "company_sign_in"; email: string; issue?: CentralAuthIssue | undefined }
   | { status: "signed_in"; user: CentralAuthUser }
   | { status: "error"; issue: CentralAuthIssue };
+
+/** The company provider (OpenID Connect) that a server owner connected. */
+export interface CompanySignInConnection {
+  issuer: string;
+  clientId: string;
+  domains: string[];
+  /** True: email codes are refused for the domains, and people sign in with the provider. */
+  enabled: boolean;
+  testedAt: number;
+  /** When the SCIM token was made, or null when the server has none. */
+  scimTokenCreatedAt: number | null;
+}
+
+export interface CompanySignInSettings {
+  /** The address to add to the app at the provider. */
+  redirectUri: string;
+  /** The SCIM base address for user sync. */
+  scimUrl: string;
+  /** The DNS TXT record that proves a domain: `<name>.<domain>` holds `value`. */
+  domainRecord: { name: string; value: string };
+  /** False on a development account service, which does not read DNS. */
+  domainCheck: boolean;
+  connection: CompanySignInConnection | null;
+}
+
+/** The values of the setup dialog. An empty client secret keeps the saved one. */
+export interface TestCompanySignInInput {
+  serverId: string;
+  issuer: string;
+  clientId: string;
+  clientSecret: string;
+  domains: string[];
+}
+
+/** A test that passed saved the values. `email` is the account that signed in at the provider. */
+export interface TestCompanySignInResult {
+  email: string;
+}
+
+export interface SetCompanySignInEnabledInput {
+  serverId: string;
+  enabled: boolean;
+}
+
+/** Shown once. The account service keeps only its hash. */
+export interface CompanySignInScimToken {
+  token: string;
+  createdAt: number;
+}
+
+/** Decodes the settings that the account service answers, and that main sends the renderer. */
+export function decodeCompanySignInSettings(value: unknown): CompanySignInSettings {
+  const settings = decodeRecord(value, "company sign-in settings");
+  const record = decodeRecord(settings.domainRecord, "company sign-in domain record");
+  return {
+    redirectUri: requiredString(settings, "redirectUri"),
+    scimUrl: requiredString(settings, "scimUrl"),
+    domainRecord: { name: requiredString(record, "name"), value: requiredString(record, "value") },
+    domainCheck: requiredBoolean(settings, "domainCheck"),
+    connection: settings.connection === null ? null : decodeCompanySignInConnection(settings.connection),
+  };
+}
+
+function decodeCompanySignInConnection(value: unknown): CompanySignInConnection {
+  const connection = decodeRecord(value, "company sign-in connection");
+  const { domains } = connection;
+  if (!Array.isArray(domains) || !domains.every(isString)) throw new Error("Invalid company sign-in domains.");
+  return {
+    issuer: requiredString(connection, "issuer"),
+    clientId: requiredString(connection, "clientId"),
+    domains,
+    enabled: requiredBoolean(connection, "enabled"),
+    testedAt: requiredNumber(connection, "testedAt"),
+    scimTokenCreatedAt: nullableNumber(connection, "scimTokenCreatedAt"),
+  };
+}
+
+export function decodeCompanySignInScimToken(value: unknown): CompanySignInScimToken {
+  const token = decodeRecord(value, "SCIM token");
+  return { token: requiredString(token, "token"), createdAt: requiredNumber(token, "createdAt") };
+}
+
+export function decodeTestCompanySignInResult(value: unknown): TestCompanySignInResult {
+  return { email: requiredString(decodeRecord(value, "company sign-in test"), "email") };
+}
 
 /** The sign-in code the user typed, with the challenge `requestEmailCode` answered. */
 export interface VerifyEmailCodeInput {
@@ -262,6 +361,37 @@ export const MAC_AUTOMATION_STATUSES = ["granted", "denied", "failed"] as const;
 export interface MacAutomationResult {
   target: MacAutomationTarget;
   status: (typeof MAC_AUTOMATION_STATUSES)[number];
+}
+
+/**
+ * A program that an agent started and left running after its tool call, such as a dev server that
+ * `nohup ... &` started. The system adopted it, so no provider process of OpenBot holds it now.
+ */
+export interface BackgroundProcess {
+  /** The pid and the start time: a pid is reused. Stop takes it. */
+  id: string;
+  pid: number;
+  /** The command line with secrets redacted. */
+  command: string;
+  /** Milliseconds since the epoch. */
+  startedAt: number;
+  /** The TCP ports that the process or its children listen on. */
+  ports: number[];
+  /** The agent whose workspace holds the working folder of the process, or null when none does. */
+  agentId: string | null;
+}
+
+export function isBackgroundProcess(value: unknown): value is BackgroundProcess {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.id) &&
+    integerInRange(value.pid, 1, Number.MAX_SAFE_INTEGER) &&
+    isString(value.command) &&
+    isFiniteNumber(value.startedAt) &&
+    Array.isArray(value.ports) &&
+    value.ports.every((port) => integerInRange(port, 1, 65_535)) &&
+    (value.agentId === null || isIdentifier(value.agentId))
+  );
 }
 
 /**
@@ -377,6 +507,7 @@ export type ExternalDestination =
   | "opencode-auth"
   | "agent-setup"
   | "claude-install"
+  | "hermes-install"
   | "feedback"
   | "message"
   // The release notes, the guides and the Discord community of OpenBot, from the Help menu of the window rail.
@@ -384,6 +515,8 @@ export type ExternalDestination =
   | "changelog"
   | "guides"
   | "discord"
+  // The OpenBot repository, from the toast that asks for a GitHub star.
+  | "github"
   // The OpenBot account on X, from the community card of the sidebar.
   | "x"
   // The x.ai marketplace listing of the Grok Bot agent that exports agents for OpenBot.

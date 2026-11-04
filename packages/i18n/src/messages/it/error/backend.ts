@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "Il database di OpenBot non ha superato il controllo di integrità.",
   "error.backend.webhookRouteLimit": "Un host può avere al massimo {limit} routine webhook.",
   "error.backend.webhookSettingsInvalid": "Controlla le impostazioni del webhook e riprova.",
+  "error.backend.webhookSenderSecretInvalid":
+    "Incolla il segreto di firma completo del mittente. Ha da 16 a 1024 caratteri e nessuno spazio.",
   "error.backend.webhookRouteUnavailable":
     "Il percorso pubblico del webhook non è pronto. Controlla la connessione all'host e riprova.",
   "error.backend.browserViewRemoteOnly": "La vista in diretta del browser è disponibile solo per un host remoto.",
@@ -56,6 +58,12 @@ export const messages = {
   "error.backend.sunshineNotReady": "Sunshine non è diventato pronto.",
   "error.backend.sunshineNotReadyReason": "Sunshine non è diventato pronto. {reason}",
   "error.backend.channelLeadModelUnavailable": "Il modello del responsabile del canale non è disponibile.",
+  "error.backend.contextCompactionIneffective":
+    "La compattazione non riduce questa chat: dopo due compattazioni usa ancora il {percent}% della finestra di contesto del modello, quindi OpenBot smette di compattarla. Strumenti e istruzioni usano la maggior parte della finestra. Disattiva i server MCP o l'uso del computer che questo agente non usa, oppure scegli un modello con una finestra più grande. Poi avvia una nuova chat.",
+  "error.backend.providerRetrying":
+    "Il provider non è riuscito a completare questa richiesta {attempts} volte e riprova. Se l'agente non continua, interrompi il turno.",
+  "error.backend.providerRetryingLargeContext":
+    "Il provider non è riuscito a completare questa richiesta {attempts} volte e riprova. Questa chat usa il {percent}% della finestra di contesto del modello. Se l'agente non continua, interrompi il turno: OpenBot compatterà la chat prima del prossimo messaggio.",
   "error.backend.sharedDataUnavailable": "I dati condivisi non sono disponibili.",
   "error.backend.shuttingDown": "OpenBot si sta chiudendo.",
   "error.backend.channelUnconfirmedStart":
@@ -66,12 +74,16 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "Il messaggio del canale a cui si fa riferimento non è disponibile.",
   "error.backend.channelTaskNotFound": "Attività del canale non trovata.",
   "error.backend.channelTaskComplete": "Questa attività è già completata.",
+  "error.backend.channelTaskNotStopped": "Si può annullare solo un'attività interrotta o non riuscita.",
   "error.backend.channelSelectAgent": "Seleziona un agente.",
   "error.backend.channelLeadRequired":
     "Scegli un responsabile del canale disponibile o assegna questa attività a un membro.",
   "error.backend.channelRoutingTooLong":
     "Questa richiesta supera il limite del contesto di instradamento. Seleziona un membro o invia una richiesta più breve.",
   "error.backend.channelTaskMemberRequired": "Scegli un membro per questa attività.",
+  "error.backend.channelTaskStopped": "Interrotta. Continua o riassegna questa attività.",
+  "error.backend.channelRoutingUnreadable":
+    "Il responsabile non ha potuto instradare questo messaggio. Riassegnalo a un membro.",
   "error.backend.channelRoutingFailed": "L'instradamento non è riuscito. Scegli un membro o riprova.",
   "error.backend.channelLeadTimedOut":
     "Il responsabile del canale non ha risposto in tempo. Scegli un membro o riprova.",
@@ -106,9 +118,9 @@ export const messages = {
     "Hai {saved} memorie su {limit}. Per fare spazio, aggiorna una memoria tramite memoryId con il testo combinato di due memorie correlate e poi dimentica l'altra, oppure dimentica una memoria che non è più vera. Poi riprova.",
   "error.backend.agentMemoryLimitExceeded":
     "Hai {saved} memorie e il limite è {limit}. L'utente ha impostato il limite al di sotto del numero di memorie salvate. Non dimenticare memorie per fare spazio. Di' all'utente che questa memoria non è stata salvata.",
+  "error.backend.channelHistoryArriving": "Un messaggio condiviso sta ancora arrivando. Riprendi quando è completo.",
   "error.backend.channelHistoryLeadRequired":
     "Scegli un responsabile del canale per preparare la cronologia condivisa.",
-  "error.backend.channelHistoryArriving": "Un messaggio condiviso sta ancora arrivando. Riprendi quando è completo.",
   "error.backend.channelHistoryInvalid": "Il riepilogo della cronologia non è valido. Riprendi per riprovare.",
   "error.backend.channelContextTooLong":
     "Questa assegnazione supera il limite del contesto condiviso. Invia una richiesta più breve o riassegnala.",
@@ -197,6 +209,13 @@ export const messages = {
     "Solo un'esecuzione di una delle tue routine risveglia un'attesa, e non hai routine. Creane una con openbot.create_routine, poi apri l'attesa.",
   "error.backend.agentWaitRemoteUnsupported":
     "Le attese aperte sono disponibili solo per gli agenti su questo computer.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Segnare un messaggio come non letto è disponibile solo per gli agenti su questo computer.",
+  "error.backend.messageDeleteUnsupported": "Questo server non supporta l’eliminazione dei messaggi.",
+  "error.backend.messageDeleteNotFound": "Questo messaggio non è nella chat.",
+  "error.backend.messageDeleteBusy":
+    "Questo messaggio fa parte di un turno in corso. Eliminalo quando il turno finisce.",
+  "error.backend.messageDeleteForbidden": "Puoi eliminare solo i messaggi che hai inviato.",
   "error.backend.routineFlowHandoffFailed": "La routine non è riuscita a passare il lavoro a questo agente.",
   "error.backend.mcpServerLimit": "OpenBot conserva fino a {limit} server MCP.",
   "error.backend.mcpServerNameTaken": "Esiste già un server MCP chiamato {name}.",
@@ -255,6 +274,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "Un server può avere fino a {limit} sezioni nella barra laterale.",
   "error.backend.sectionNameRequired": "Il nome della sezione è obbligatorio.",
   "error.backend.sectionNameTooLong": "Il nome della sezione è troppo lungo.",
+  "error.backend.sidebarFolderTooDeep": "Le cartelle possono avere solo tre livelli.",
+  "error.backend.sidebarFolderMoveInvalid": "Questa cartella non può essere spostata lì.",
   "error.backend.sectionNameDuplicate": "I nomi delle sezioni devono essere univoci.",
   "error.backend.directMessageRequired": "Scrivi prima un messaggio.",
   "error.backend.directMessageTooLong": "Un messaggio diretto può avere fino a {limit} caratteri.",
@@ -343,6 +364,9 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "Questo agente ha {count} thread aperti. Archivia un thread, poi avviane o ripristinane un altro.",
   "error.backend.threadRemoteUnsupported": "I thread sono disponibili solo per gli agenti su questo computer.",
+  "error.backend.branchSourceBusy": "Interrompi il turno in corso prima di creare un ramo di questa chat.",
+  "error.backend.branchMessageNotFound": "Puoi creare un ramo solo da una risposta completata dell'agente.",
+  "error.backend.branchRemoteUnsupported": "I rami sono disponibili solo per gli agenti su questo computer.",
   "error.backend.threadMoveRefused":
     "Solo un messaggio che hai inviato soltanto a questo agente può essere eseguito in un nuovo thread.",
   "error.backend.taskTitleRequired": "Dai all'attività un titolo breve.",
@@ -350,8 +374,8 @@ export const messages = {
     "Dai all'attività un titolo di al massimo 120 caratteri e una descrizione che dica cosa fare.",
   "error.backend.taskOwnChatOnly":
     "Avvia un'attività solo dalla tua chat. Un canale, una conversazione di messaggistica o un'altra attività non possono avviarne una.",
-  "error.backend.taskOpenLimit":
-    "Questo agente ha già {count} attività aperte. Attendi che l'utente ne chiuda una prima di avviare un'altra attività.",
+  "error.backend.taskUnfinishedLimit":
+    "Questo agente ha già {count} attività non finite. Avvia un'altra attività quando una di esse finisce.",
   "error.backend.taskOpenLimitReached":
     "Questo agente ha {count} attività aperte. Chiudi un'attività, poi avviane o aprine un'altra.",
   "error.backend.taskRemoteUnsupported": "Le attività sono disponibili solo per gli agenti su questo computer.",

@@ -184,7 +184,7 @@
 .browser-takeover-finish {
   display: flex;
   min-width: 0;
-  margin-left: auto;
+  margin-inline-start: auto;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
@@ -366,7 +366,7 @@
 }
 
 .question-prompt-cancel {
-  margin-left: var(--openbot-space-1);
+  margin-inline-start: var(--openbot-space-1);
 }
 
 .question-prompt-stage {
@@ -457,6 +457,11 @@
     transform var(--openbot-duration-hover) var(--openbot-ease-out);
 }
 
+/* The arrow comes in from the start side and points to the end side. */
+:dir(rtl) .question-prompt-choice-arrow {
+  transform: translateX(3px);
+}
+
 .question-prompt-choice-arrow svg {
   width: 100%;
   height: 100%;
@@ -468,6 +473,10 @@
   .question-prompt-choice-arrow {
   opacity: 1;
   transform: translateX(0);
+}
+
+:dir(rtl) .question-prompt-choice-arrow svg[class~="lucide-chevron-right"] {
+  transform: scaleX(-1);
 }
 
 .question-prompt-custom-row {

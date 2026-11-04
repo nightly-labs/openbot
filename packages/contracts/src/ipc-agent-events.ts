@@ -4,6 +4,8 @@
 
 import { type AgentProviderId, isAgentProvider } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
+import { type AgentColorEntry, isAgentColors } from "./ipc-agent-colors";
+import { type AgentNotificationLevelEntry, isAgentNotificationLevelsSnapshot } from "./ipc-agent-notification-levels";
 import { type AgentRuntimeSnapshot, isAgentRuntimeSnapshot } from "./ipc-agent-runtime";
 import type { AccountUsage, AgentStatus } from "./ipc-agent-status";
 import { type AgentTasksSnapshot, isAgentTasksSnapshot } from "./ipc-agent-tasks";
@@ -27,12 +29,36 @@ import {
 import { type HiddenAgent, isHiddenAgentsSnapshot } from "./ipc-hidden-agents";
 import { isQueueSnapshot, type QueueSnapshot } from "./ipc-queue";
 import { isSidebarLayoutSnapshot, type SidebarLayoutSnapshot } from "./ipc-sidebar-layout";
+import { isSidebarPinsSnapshot, type SidebarPin } from "./ipc-sidebar-pins";
+import type { ServerNotificationLevel } from "./ipc-team-host";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
 
 export type AgentTurnOrigin = "user" | "routine" | "agent" | "unknown";
 
 function isAgentTurnOrigin(value: unknown): value is AgentTurnOrigin {
   return value === "user" || value === "routine" || value === "agent" || value === "unknown";
+}
+
+/** The end of a turn. */
+export interface AgentTurnCompletedEvent {
+  type: "turn-completed";
+  agentId: string;
+  threadId: string;
+  turnId: string;
+  status: string;
+  origin?: AgentTurnOrigin;
+  /**
+   * A routine run that had nothing to report and posted no message. It is not news, so it shows
+   * no notification. The Team API carries it through the optional `quiet-turn-v1` capability.
+   * Peers without that capability receive the released completion event.
+   */
+  quiet?: true;
+  /**
+   * The turn ended with open plan steps, and OpenBot continues the request with one more turn.
+   * The request is not done, so this completion shows no notification, plays no sound, and is
+   * not read aloud. Only local listeners receive it; the Team API adapters leave it out.
+   */
+  continues?: true;
 }
 
 export type AgentEvent =
@@ -49,12 +75,30 @@ export type AgentEvent =
   | { type: "workflows-changed"; workflowId: string }
   /** The Vault of this server changed. Server settings of a joined server read it again. */
   | { type: "vault-changed" }
+  /** The named browser profiles of this server, or the profile of one of its agents, changed. */
+  | { type: "browser-profiles-changed" }
   | { type: "agent-session-settings-changed"; agentId: string }
   | { type: "channel-memories-changed"; channelId: string }
   | { type: "channel-routines-changed"; channelId: string }
   | { type: "sidebar-layout-changed"; layout: SidebarLayoutSnapshot }
   /** The whole hidden list, in the `agent-hidden-v1` wire shape, so the Team API sends it as it is. */
   | { type: "hidden-agents-changed"; agents: HiddenAgent[] }
+  /** The whole list of exact agent colours, in the `agent-colors-v1` wire shape. */
+  | { type: "agent-colors-changed"; agents: AgentColorEntry[] }
+  /**
+   * The user's own notification levels on this server changed on one of their devices. Only the
+   * connections of that member get it (`agent-notification-levels-v1`), with all of their levels.
+   */
+  | {
+      type: "agent-notification-levels-changed";
+      server: ServerNotificationLevel | null;
+      agents: AgentNotificationLevelEntry[];
+    }
+  /**
+   * The user's own pinned chats on this server changed on one of their devices. Only the connections
+   * of that member get it (`sidebar-pins-v1`), with the whole list.
+   */
+  | { type: "sidebar-pins-changed"; items: SidebarPin[]; updatedAt: string | null }
   /** The roles changed. A client reads `/v1/agent-access` again for its own levels. */
   | { type: "agent-access-changed"; revision: number }
   | { type: "conversation"; snapshot: ConversationSnapshot }
@@ -91,26 +135,14 @@ export type AgentEvent =
     }
   | { type: "turn-progress"; agentId: string; threadId: string; turnId: string; detail: string }
   | { type: "turn-started"; agentId: string; threadId: string; turnId: string; origin?: AgentTurnOrigin }
-  | {
-      type: "turn-completed";
-      agentId: string;
-      threadId: string;
-      turnId: string;
-      status: string;
-      origin?: AgentTurnOrigin;
-      /**
-       * A routine run that had nothing to report and posted no message. It is not news, so it shows
-       * no notification. The Team API carries it through the optional `quiet-turn-v1` capability.
-       * Peers without that capability receive the released completion event.
-       */
-      quiet?: true;
-      /**
-       * The turn ended with open plan steps, and OpenBot continues the request with one more turn.
-       * The request is not done, so this completion shows no notification, plays no sound, and is
-       * not read aloud. Only local listeners receive it; the Team API adapters leave it out.
-       */
-      continues?: true;
-    }
+  | AgentTurnCompletedEvent
+  /**
+   * A non-quiet turn in a routine thread ended. `AgentTasks` keeps the turn's own `turn-completed`, so
+   * the state of the agent's chat does not change. The desktop notification, the phone notification and
+   * the completion sound read `turn` from this event, and a click opens the routine thread. Local only:
+   * the released Team API event adapters do not carry it.
+   */
+  | { type: "routine-thread-turn-completed"; taskId: string; turn: AgentTurnCompletedEvent }
   | {
       type: "prompt";
       requestId: string | number;
@@ -186,6 +218,7 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
     case "workflows-changed":
       return isIdentifier(value.workflowId);
     case "vault-changed":
+    case "browser-profiles-changed":
       return true;
     case "channel-memories-changed":
     case "channel-routines-changed":
@@ -194,6 +227,12 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
       return isSidebarLayoutSnapshot(value.layout);
     case "hidden-agents-changed":
       return isHiddenAgentsSnapshot({ agents: value.agents });
+    case "agent-colors-changed":
+      return isAgentColors({ agents: value.agents });
+    case "agent-notification-levels-changed":
+      return isAgentNotificationLevelsSnapshot({ server: value.server, agents: value.agents });
+    case "sidebar-pins-changed":
+      return isSidebarPinsSnapshot({ items: value.items, updatedAt: value.updatedAt });
     case "agent-access-changed":
       return isNumber(value.revision) && Number.isSafeInteger(value.revision) && value.revision >= 0;
     case "conversation":
@@ -261,6 +300,13 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         isString(value.detail) &&
         value.detail.length > 0 &&
         value.detail.length <= INPUT_LIMITS.promptQuestion
+      );
+    case "routine-thread-turn-completed":
+      return (
+        isIdentifier(value.taskId) &&
+        isDynamicRecord(value.turn) &&
+        value.turn.type === "turn-completed" &&
+        isAgentEvent(value.turn)
       );
     case "turn-started":
     case "turn-completed":

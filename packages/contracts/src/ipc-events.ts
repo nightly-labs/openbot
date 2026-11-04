@@ -94,6 +94,11 @@ export interface WebhookSecret {
   secret: string;
 }
 
+/** A signing secret that the sender made, such as a Composio or Svix webhook secret. */
+export interface SetWebhookSecretInput extends EventRoutineRef {
+  secret: string;
+}
+
 export interface ListEventRoutinesInput {
   owner: EventRoutineOwner;
 }

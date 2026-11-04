@@ -50,8 +50,10 @@ export const FALLBACK_PROVIDER_RUNTIMES: ProviderRuntimeSnapshot = {
     antigravity: NO_PROVIDER_RUNTIME,
     cursor: NO_PROVIDER_RUNTIME,
     cline: NO_PROVIDER_RUNTIME,
+    kimi: NO_PROVIDER_RUNTIME,
     pi: NO_PROVIDER_RUNTIME,
     muse: NO_PROVIDER_RUNTIME,
+    devin: NO_PROVIDER_RUNTIME,
   },
   toolRuntimes: { bun: NO_PROVIDER_RUNTIME },
 };

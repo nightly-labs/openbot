@@ -106,7 +106,7 @@ type BridgeCommand =
     }
   | { type: "prepare-signal"; peerId: string; signalUrl: string }
   | { type: "set-private-network"; peerId: string; privateNetwork: boolean }
-  | { type: "disconnect" | "disconnect-peer" | "restart-ice" | "close"; peerId: string }
+  | { type: "disconnect" | "disconnect-peer" | "restart-ice" | "renew-host-signal" | "close"; peerId: string }
   | { type: "send"; peerId: string; channel: TeamWebRtcChannel; data: string | ArrayBuffer };
 
 const COMMAND_TIMEOUT_MS = 15_000;
@@ -198,6 +198,15 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
 
   readonly restartIce = Effect.fn("TeamWebRtcBridge.restartIce")(function* (this: TeamWebRtcBridge, peerId: string) {
     yield* this.#command({ type: "restart-ice", peerId });
+  }).bind(this);
+
+  /**
+   * Opens a new Signal socket for each host peer. Signal closes a socket that does not answer its
+   * pings for 120 seconds, so after a sleep the old socket is gone, but its close did not reach this
+   * computer. The host sends nothing on it for 45 minutes, and no device can reach it until then.
+   */
+  readonly renewHostSignal = Effect.fn("TeamWebRtcBridge.renewHostSignal")(function* (this: TeamWebRtcBridge) {
+    if (this.#port) yield* this.#command({ type: "renew-host-signal", peerId: "all" });
   }).bind(this);
 
   getIceServers(peerId: string): RemoteDesktopIceServer[] {

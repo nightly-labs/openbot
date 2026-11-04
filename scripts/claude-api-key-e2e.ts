@@ -46,7 +46,7 @@ if (process.argv.slice(2).join(" ") === "auth status --json") {
     ? { loggedIn: true, authMethod: "api_key", apiProvider: "firstParty", apiKeySource: "ANTHROPIC_API_KEY" }
     : process.env.FAKE_CLAUDE_SIGNED_OUT === "1"
       ? { loggedIn: false, authMethod: "none", apiProvider: "firstParty" }
-      : { loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty", email: "owner@example.invalid", subscriptionType: "max" }));
+      : { loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty", email: "owner@example.invalid", orgId: "org-owner", subscriptionType: "max" }));
   process.exit(0);
 }
 process.exit(2);
@@ -125,7 +125,7 @@ function accountsHost(key: Pick<ProviderAccountsHost, "apiKey" | "defaultUsesApi
     ...key,
     scope: unused("scope"),
     cli: () => ({ executable, version: "2.1.310" }),
-    defaultEmail: () => null,
+    defaultLogin: () => null,
     signInTemp: () => undefined,
     authenticate: unused("authenticate"),
     stopClient: unused("stopClient"),
@@ -155,7 +155,7 @@ try {
   const plan = await runCase("plan-and-key", KEY);
   report.cases.push(plan);
   assert.deepEqual(plan.account, {
-    account: { type: "claude", email: "owner@example.invalid", planType: "max" },
+    account: { type: "claude", email: "owner@example.invalid", planType: "max", organization: "org-owner" },
     requiresOpenaiAuth: false,
   });
   assert.ok(
@@ -166,7 +166,7 @@ try {
   const keyOnly = await runCase("key-only", KEY, { signedOut: true });
   report.cases.push(keyOnly);
   assert.deepEqual(keyOnly.account, {
-    account: { type: CLAUDE_API_KEY_ACCOUNT_TYPE, email: null, planType: null },
+    account: { type: CLAUDE_API_KEY_ACCOUNT_TYPE, email: null, planType: null, organization: null },
     requiresOpenaiAuth: false,
   });
   const keyOnlyStatus = keyOnly.starts.filter((entry) => entry.args[0] === "auth");
@@ -183,7 +183,7 @@ try {
   const none = await runCase("no-key", null);
   report.cases.push(none);
   assert.deepEqual(none.account, {
-    account: { type: "claude", email: "owner@example.invalid", planType: "max" },
+    account: { type: "claude", email: "owner@example.invalid", planType: "max", organization: "org-owner" },
     requiresOpenaiAuth: false,
   });
   assert.ok(

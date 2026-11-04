@@ -2,7 +2,20 @@ import { execFile } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { createReadStream, createWriteStream } from "node:fs";
-import { access, lstat, mkdir, readdir, readFile, rename, rm, stat, statfs, utimes, writeFile } from "node:fs/promises";
+import {
+  access,
+  lstat,
+  mkdir,
+  readdir,
+  readFile,
+  readlink,
+  rename,
+  rm,
+  stat,
+  statfs,
+  utimes,
+  writeFile,
+} from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { finished } from "node:stream/promises";
@@ -10,6 +23,8 @@ import { promisify } from "node:util";
 import {
   type AgentProviderId,
   type AgentProviderRef,
+  agentProviderDescriptor,
+  type CustomProviderHarness,
   isKeyOnlyProvider,
   isManagedToolRuntime,
   KEY_ONLY_PROVIDERS,
@@ -17,10 +32,10 @@ import {
   MANAGED_TOOL_RUNTIMES,
   type ManagedProviderId,
   type ManagedRuntimeId,
-  type OldRuntimeVersions,
   type ProviderRuntimeDownload,
   type ProviderRuntimeSnapshot,
   type ProviderRuntimeStatus,
+  type RemovableRuntimes,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { matchingSourceKeys, sourceText } from "@openbot/i18n/source";
@@ -28,11 +43,20 @@ import { createOpenBotLogger, type LogValue, redactText, toLogValue } from "@ope
 import { Deferred, Effect, Exit, Fiber, Result, Scope, Stream } from "effect";
 import lockValue from "../../native-runtime.lock.json";
 import { type AgentRuntimeLock, parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
-import { type BundledProviderExecutables, configuredCliPath, resolvePiCli } from "../backend/cli";
+import {
+  type BundledProviderExecutables,
+  compareReleases,
+  configuredCliPath,
+  isVersion,
+  olderVersion,
+  resolveOpencodeCli,
+  resolvePiCli,
+} from "../backend/cli";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { sha256File } from "../backend/file-hash";
 import { type McpToolRuntimes, NO_MCP_TOOL_RUNTIMES } from "../backend/mcp-provider-shapes";
 import { measureTree } from "../backend/storage-usage";
+import { isSafeLinkTarget } from "./provider-runtime-archive";
 import {
   type ArchiveDigest,
   bunxExecutableName,
@@ -274,8 +298,10 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       antigravity: emptyStatus(unsupportedMessage),
       cursor: emptyStatus(unsupportedMessage),
       cline: emptyStatus(unsupportedMessage),
+      kimi: emptyStatus(unsupportedMessage),
       pi: emptyStatus(unsupportedMessage),
       muse: emptyStatus(unsupportedMessage),
+      devin: emptyStatus(unsupportedMessage),
       bun: emptyStatus(unsupportedMessage),
     };
   }
@@ -335,22 +361,62 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
 
   /**
-   * The bytes of the old versions that `removeOldVersions` would remove now. The update check
-   * removes the same versions on its own; this lets the Storage page free them at once.
+   * Collects the old versions now, with the window the update check would use. The update check
+   * collects the same versions on its own.
    */
-  oldVersions(): Effect.Effect<OldRuntimeVersions> {
+  removeOldVersions(): Effect.Effect<void> {
+    return this.#target ? this.#collectVersionsEffect(this.#target, this.#removalRetentionMs()) : Effect.void;
+  }
+
+  /**
+   * What the Storage page can free now: the old versions, and the download of each provider that is
+   * off or runs the CLI the user installed. A version that is both is counted once.
+   */
+  removableRuntimes(): Effect.Effect<RemovableRuntimes> {
     return Effect.gen({ self: this }, function* () {
-      if (!this.#target) return { bytes: 0 };
-      const paths = yield* this.#oldVersionPathsEffect(this.#target, Date.now() - this.#removalRetentionMs(), false);
-      return { bytes: yield* measurePaths(paths) };
+      const target = this.#target;
+      if (!target) return { bytes: 0, providers: [] };
+      const old = yield* this.#oldVersionPathsEffect(target, Date.now() - this.#removalRetentionMs(), false);
+      const downloads = yield* this.#removableDownloadsEffect(target);
+      const paths = new Set([...old, ...downloads.flatMap((download) => download.paths)]);
+      return { bytes: yield* measurePaths([...paths]), providers: downloads.map((download) => download.provider) };
     });
   }
 
-  /** Collects now, with the window the update check would use, and answers what is left. */
-  removeOldVersions(): Effect.Effect<OldRuntimeVersions> {
-    return Effect.gen({ self: this }, function* () {
-      if (this.#target) yield* this.#collectVersionsEffect(this.#target, this.#removalRetentionMs());
-      return yield* this.oldVersions();
+  /**
+   * Collects the old versions, then removes each download that `removableRuntimes` names now, with
+   * the rules of `removeDownload`. One that fails does not stop the others; the failure names them.
+   */
+  removeRemovableRuntimes(): Effect.Effect<RemovableRuntimes, ProviderRuntimeFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<RemovableRuntimes, ProviderRuntimeFailure> {
+      const target = this.#target;
+      if (!target) return yield* this.removableRuntimes();
+      yield* this.removeOldVersions();
+      const downloads = yield* this.#removableDownloadsEffect(target);
+      const failed = yield* Effect.forEach(
+        downloads,
+        ({ provider }) =>
+          this.removeDownload(provider).pipe(
+            Effect.as([]),
+            Effect.catch((error) =>
+              Effect.sync(() => {
+                logger.warn("Provider runtime removal failed.", { runtime: provider, cause: logCause(error.cause) });
+                return [provider];
+              }),
+            ),
+          ),
+        { concurrency: "unbounded" },
+      );
+      const providers = failed.flat();
+      if (providers.length > 0)
+        return yield* new ProviderRuntimeFailure({
+          cause: new Error(
+            sourceText("error.provider.removeDownloadsFailed", {
+              providers: providers.map((provider) => agentProviderDescriptor(provider).displayName).join(", "),
+            }),
+          ),
+        });
+      return yield* this.removableRuntimes();
     });
   }
 
@@ -364,6 +430,23 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       const paths = yield* this.#removableVersionPathsEffect(provider, this.#target);
       return { bytes: yield* measurePaths(paths), versions: paths.length };
     });
+  }
+
+  /**
+   * The providers whose download the Storage page removes now, with the version directories of each:
+   * those `removeDownload` takes, and none that downloads at this moment.
+   */
+  #removableDownloadsEffect(target: RuntimeTarget): Effect.Effect<{ provider: ManagedProviderId; paths: string[] }[]> {
+    return Effect.forEach(
+      MANAGED_RUNTIME_PROVIDERS,
+      (provider) =>
+        this.#tasks.has(provider) || this.#cliInUse(provider) || configuredCliPath(provider)
+          ? Effect.succeed([])
+          : this.#removableVersionPathsEffect(provider, target).pipe(
+              Effect.map((paths) => (paths.length > 0 ? [{ provider, paths }] : [])),
+            ),
+      { concurrency: "unbounded" },
+    ).pipe(Effect.map((downloads) => downloads.flat()));
   }
 
   /**
@@ -409,11 +492,13 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
 
   /**
-   * Whether this instance can run a runtime. A provider that is off runs no CLI here, except Pi,
-   * which the key-only providers run on.
+   * Whether this instance can run a runtime from the store. A provider that is off runs no CLI here,
+   * except Pi, which the key-only providers run on. Neither does one that runs the CLI the user
+   * installed: that CLI is as new as the copy, or the agent service would run the copy.
    */
   #cliInUse(runtime: ManagedRuntimeId): boolean {
-    if (isManagedToolRuntime(runtime) || this.#isProviderOn(runtime)) return true;
+    if (isManagedToolRuntime(runtime)) return true;
+    if (this.#isProviderOn(runtime) && !this.#systemVersions.has(runtime)) return true;
     return runtime === "pi" && KEY_ONLY_PROVIDERS.some((provider) => this.#isProviderOn(provider));
   }
 
@@ -533,14 +618,20 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    * The manager does not own that install and never downloads for it. It decides which version is
    * current, though, so the comparison belongs here with the managed one rather than in the
    * renderer, which must not compare versions at all. Pass `null` when the provider went back to the
-   * managed copy or resolved nothing.
+   * managed copy or resolved nothing. While a version is set, the copy in the store runs nothing here,
+   * so `removeDownload` and the Storage page can remove it, and this instance does not stamp it.
+   *
+   * True when the provider runs its copy in the store again. The caller then runs
+   * `providerUseChanged`, which stamps the copy, or reads the store again when a sibling collected it.
    */
-  setSystemVersion(provider: ManagedProviderId, version: string | null): void {
-    if ((this.#systemVersions.get(provider) ?? null) === version) return;
+  setSystemVersion(provider: ManagedProviderId, version: string | null): boolean {
+    const previous = this.#systemVersions.get(provider) ?? null;
+    if (previous === version) return false;
     if (version) this.#systemVersions.set(provider, version);
     else this.#systemVersions.delete(provider);
     this.#revision += 1;
     this.emit("status", this.getStatus());
+    return previous !== null && version === null;
   }
 
   /** Sends the update offers again after the user turns a provider on or off. */
@@ -749,11 +840,35 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    */
   startKeyProviderCli(provider: AgentProviderRef): Effect.Effect<boolean, ProviderRuntimeFailure> {
     if (!isKeyOnlyProvider(provider)) return Effect.succeed(false);
-    return resolvePiCli({ bundledExecutable: this.executablePath("pi") }).pipe(
+    return this.#startMissingCli("pi");
+  }
+  /**
+   * Starts the download of the provider that runs a saved custom endpoint, when that provider is on
+   * and cannot start. The endpoint form saves on OpenCode by default and nothing else downloads it,
+   * so the endpoint stayed out of every model list. Does not wait, also not for the release check
+   * that a download waits for: an endpoint change holds every other one until it ends, and the model
+   * picker shows the download.
+   */
+  startCustomProviderHarness(harness: CustomProviderHarness): Effect.Effect<void> {
+    if (!this.#isProviderOn(harness)) return Effect.void;
+    return this.#startMissingCli(harness).pipe(Effect.ignore, Effect.forkIn(this.#scope), Effect.asVoid);
+  }
+  /**
+   * Starts the download of a CLI that cannot start, and keeps one that can, from OpenBot or from the
+   * user. True while that download runs.
+   */
+  #startMissingCli(provider: CustomProviderHarness): Effect.Effect<boolean, ProviderRuntimeFailure> {
+    const resolveCli = provider === "pi" ? resolvePiCli : resolveOpencodeCli;
+    return Effect.suspend(() => {
+      // A removal of the download that runs now would take away the CLI that this finds.
+      const removal = this.#removals.get(provider);
+      return removal ? Fiber.await(removal) : Effect.void;
+    }).pipe(
+      Effect.andThen(Effect.suspend(() => resolveCli({ bundledExecutable: this.executablePath(provider) }))),
       Effect.as(false),
       Effect.catch(() =>
-        this.download("pi").pipe(
-          Effect.map((snapshot) => ["downloading", "finishing"].includes(snapshot.providers.pi.phase)),
+        this.download(provider).pipe(
+          Effect.map((snapshot) => ["downloading", "finishing"].includes(snapshot.providers[provider].phase)),
         ),
       ),
     );
@@ -1446,10 +1561,13 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       (runtime) =>
         Effect.gen({ self: this }, function* () {
           const spec = runtimeSpec(runtime, target, this.#lock);
-          const version = this.#statuses[runtime].version;
+          const { phase, version } = this.#statuses[runtime];
           const targetRoot = dirname(this.#installRoot(spec));
           if (stamp && version) yield* this.#stampInUseEffect(runtime, join(targetRoot, version));
-          const backup = version ? yield* this.#workingBackupEffect(targetRoot, spec, version) : null;
+          // A verified version needs nothing to fall back on. The one it replaced is not stamped again,
+          // so it stays only for the collection window and then goes, as any other old version does.
+          const backup =
+            version && phase !== "ready" ? yield* this.#workingBackupEffect(targetRoot, spec, version) : null;
           if (stamp && backup) yield* this.#stampInUseEffect(runtime, join(targetRoot, backup));
           return yield* this.#oldVersionsEffect(spec, backup, stale);
         }).pipe(Effect.catch(() => Effect.succeed([]))),
@@ -1460,8 +1578,10 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   /**
    * The versions no one has any use for.
    *
-   * This instance needs the version it runs, any newer one, and one older version that still works,
-   * to fall back on. An older pin is not kept for itself: the store never goes back to it.
+   * This instance needs the version it runs and any newer one. Until the version it runs is verified,
+   * it also needs one older version that still works, to fall back on; after that, the older one is
+   * kept only while a stamp within `stale` says an instance ran it. An older pin is not kept for
+   * itself: the store never goes back to it.
    *
    * Rank alone decided this when the store belonged to one profile. It is now the computer's, and
    * another instance -- the released app beside a development build, or a worktree whose lock pins
@@ -1685,7 +1805,10 @@ function parseVerificationRecord(text: string): { key: string; versionChecked: b
   return { key: value.key, versionChecked: value.versionChecked, files };
 }
 
-/** One line per file under `root`, sorted, or `null` when something there is not a plain file or folder. */
+/**
+ * One line per file and link under `root`, sorted, or `null` when something there is not a plain
+ * file, folder or link. A link is replaced, not changed, so its inode tells a new one apart.
+ */
 const runtimeFingerprint = Effect.fn("ProviderRuntime.runtimeFingerprint")(function* (
   root: string,
   prefix = "",
@@ -1701,6 +1824,10 @@ const runtimeFingerprint = Effect.fn("ProviderRuntime.runtimeFingerprint")(funct
     } else if (entry.isFile()) {
       const info = yield* runtimeIO(() => lstat(join(root, path), { bigint: true }));
       lines.push([path, info.size, info.mtimeNs, info.ctimeNs, info.ino, info.dev].join("\0"));
+    } else if (entry.isSymbolicLink()) {
+      const info = yield* runtimeIO(() => lstat(join(root, path), { bigint: true }));
+      const target = yield* runtimeIO(() => readlink(join(root, path)));
+      lines.push([path, "link", target, info.ctimeNs, info.ino, info.dev].join("\0"));
     } else return null;
   }
   return lines.sort();
@@ -2049,9 +2176,12 @@ const writeInstallRecord = Effect.fn("ProviderRuntime.writeInstallRecord")(funct
 ): Effect.fn.Return<void, ProviderRuntimeFailure> {
   const files: Record<string, string> = {};
   for (const file of yield* installedFiles(root))
-    files[file] = yield* sha256File(join(root, file)).pipe(
-      Effect.mapError(({ cause }) => new ProviderRuntimeFailure({ cause })),
-    );
+    files[file.path] =
+      file.link === null
+        ? yield* sha256File(join(root, file.path)).pipe(
+            Effect.mapError(({ cause }) => new ProviderRuntimeFailure({ cause })),
+          )
+        : `${INSTALL_RECORD_LINK}${file.link}`;
   const record: InstallRecord = {
     layoutVersion: 1,
     runtime: spec.runtime,
@@ -2087,30 +2217,44 @@ const verifyInstallRecord = Effect.fn("ProviderRuntime.verifyInstallRecord")(fun
   if (files.length !== Object.keys(record.files).length)
     return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.runtimeChecksum")) });
   for (const file of files) {
-    const expected = record.files[file];
+    const expected = record.files[file.path];
     if (
       !isString(expected) ||
-      (yield* sha256File(join(root, file)).pipe(
-        Effect.mapError(({ cause }) => new ProviderRuntimeFailure({ cause })),
-      )) !== expected
+      (file.link === null
+        ? yield* sha256File(join(root, file.path)).pipe(
+            Effect.mapError(({ cause }) => new ProviderRuntimeFailure({ cause })),
+          )
+        : `${INSTALL_RECORD_LINK}${file.link}`) !== expected
     ) {
       return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.runtimeChecksum")) });
     }
   }
 });
 
-/** Every file under `root` but the record, as `/`-separated paths. A link or special file fails. */
+/** How the install record keeps a link: this prefix and its target, which no SHA-256 hex starts with. */
+const INSTALL_RECORD_LINK = "link:";
+
+/**
+ * Every file under `root` but the record, as `/`-separated paths, and the target of each link. Only
+ * a link that `isSafeLinkTarget` accepts is kept: Kimi's macOS framework has some. A special file or
+ * another link fails.
+ */
 const installedFiles = Effect.fn("ProviderRuntime.installedFiles")(function* (
   root: string,
   prefix = "",
-): Effect.fn.Return<string[], ProviderRuntimeFailure> {
-  const files: string[] = [];
+): Effect.fn.Return<{ path: string; link: string | null }[], ProviderRuntimeFailure> {
+  const files: { path: string; link: string | null }[] = [];
   for (const entry of yield* runtimeIO(() => readdir(join(root, prefix), { withFileTypes: true }))) {
     const path = prefix ? `${prefix}/${entry.name}` : entry.name;
     if (entry.isDirectory()) files.push(...(yield* installedFiles(root, path)));
-    else if (!entry.isFile())
+    else if (entry.isSymbolicLink()) {
+      const link = yield* runtimeIO(() => readlink(join(root, path)));
+      if (!isSafeLinkTarget(link))
+        return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.runtimeSpecialFile")) });
+      files.push({ path, link });
+    } else if (!entry.isFile())
       return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.runtimeSpecialFile")) });
-    else if (path !== INSTALL_RECORD) files.push(path);
+    else if (path !== INSTALL_RECORD) files.push({ path, link: null });
   }
   return files;
 });
@@ -2134,23 +2278,6 @@ const digestMatches = Effect.fn("ProviderRuntime.digestMatches")(function* (path
   );
   return hash.digest("hex") === digest.hex;
 });
-
-function isVersion(value: string): boolean {
-  return /^\d+\.\d+\.\d+(?:(?:-\d{2}-\d{2}-\d{2})?-[0-9a-f]{7,40})?$/u.test(value);
-}
-
-/**
- * A commit orders nothing, so two Cursor builds of the same date and time, or of the same date with
- * no time, are neither older nor newer.
- */
-export function olderVersion(installed: string, target: string): boolean {
-  return isVersion(installed) && isVersion(target) && compareReleases(installed, target) < 0;
-}
-
-function compareReleases(a: string, b: string): number {
-  const release = (version: string) => version.replace(/-[0-9a-f]{7,40}$/u, "").replaceAll("-", ".");
-  return release(a).localeCompare(release(b), "en", { numeric: true });
-}
 
 /** The total size of some directories. One that cannot be measured counts as empty. */
 const measurePaths = Effect.fn("ProviderRuntime.measurePaths")(function* (paths: readonly string[]) {

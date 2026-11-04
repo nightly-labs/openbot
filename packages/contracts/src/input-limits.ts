@@ -20,6 +20,9 @@ export const INPUT_LIMITS = {
   serviceTier: 64,
   agentTitle: 120,
   agentDescription: 2_000,
+  // The instruction file at the root of an agent's workspace. Local-only, so no Team API bounds it;
+  // Codex reads at most 32 KiB of `AGENTS.md` by default.
+  agentInstructionsFile: 32_000,
   // The smallest choice of the app setting `AGENT_MEMORY_LIMITS`.
   agentMemories: 64,
   agentSkills: 32,
@@ -73,6 +76,8 @@ export const INPUT_LIMITS = {
   routineCalendarDays: 44,
   routineCron: 255,
   messageText: 100_000,
+  // A longer text paste becomes a `pasted-text.txt` attachment, so the message keeps all of it.
+  pastedText: 4_000,
   directMessageText: 20_000,
   // A side question carries its earlier questions and answers, because nothing on the host keeps them.
   sideQuestionTurns: 20,
@@ -91,6 +96,8 @@ export const INPUT_LIMITS = {
   attachments: 10,
   draftAttachments: 50,
   messageRecipients: 32,
+  // A reorder names the whole queue. The Team API allows 100.
+  queueReorder: 100,
   attachmentName: 255,
   mimeType: 255,
   path: 4_096,

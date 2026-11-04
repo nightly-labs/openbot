@@ -3,11 +3,12 @@ import { constants } from "node:fs";
 import { access, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, extname, isAbsolute, join, posix, resolve, win32 } from "node:path";
-import { promisify } from "node:util";
+import { promisify, stripVTControlCharacters } from "node:util";
 import { type AgentProviderId, agentProviderName } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Result } from "effect";
+import type { SignInRegion } from "./kimi-region";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
 
 const execFileAsync = promisify(execFile);
@@ -19,6 +20,8 @@ const MINIMUM_GROK_VERSION = [1, 0, 5] as const;
 // The first Cline CLI that OpenBot was checked with: its sessions run in-process and it answers a lost
 // session with the ACP resource-not-found error.
 const MINIMUM_CLINE_VERSION = [3, 0, 68] as const;
+// The first checked Python Kimi CLI. Login capabilities are probed before code sign-in.
+const MINIMUM_KIMI_VERSION = [1, 52, 0] as const;
 
 /** What every resolved provider CLI carries. */
 interface ResolvedCli {
@@ -59,6 +62,19 @@ export interface ClineCliInfo extends ResolvedCli {
   source?: "system" | "managed";
 }
 
+export interface KimiCliInfo extends ResolvedCli {
+  source?: "system" | "managed";
+}
+
+/**
+ * OpenBot never installs Hermes: the user's own `hermes` runs, with the user's own `~/.hermes`, and
+ * `resolveHermesCli` gives only `system`. The type keeps `managed`, as each other CLI does, so a
+ * `managed` test value does not narrow `AgentCliInfo`.
+ */
+export interface HermesCliInfo extends ResolvedCli {
+  source?: "system" | "managed";
+}
+
 export type AgentCliInfo =
   | CodexCliInfo
   | ClaudeCliInfo
@@ -66,7 +82,9 @@ export type AgentCliInfo =
   | OpencodeCliInfo
   | AntigravityCliInfo
   | CursorCliInfo
-  | ClineCliInfo;
+  | ClineCliInfo
+  | KimiCliInfo
+  | HermesCliInfo;
 
 export class CodexCliError extends Error {
   constructor(
@@ -420,6 +438,56 @@ export const resolveCursorCli: (input?: {
 );
 
 /**
+ * Finds the user's own Hermes Agent. OpenBot has no copy of its own: a newer Hermes moves the
+ * user's `~/.hermes` database and settings forward, and the user's older Hermes then cannot read them.
+ */
+export const resolveHermesCli: (input?: {
+  systemCandidates?: string[];
+}) => Effect.Effect<HermesCliInfo, ProviderClientOperationError> = Effect.fn("Cli.resolveHermesCli")(
+  function* (
+    input: { systemCandidates?: string[] } = {},
+  ): Effect.fn.Return<HermesCliInfo, ProviderClientOperationError> {
+    const candidates = yield* cliCandidates("hermes", input.systemCandidates, null);
+    let found = false;
+    for (const candidate of candidates) {
+      if (!(yield* isExecutable(candidate.executable))) continue;
+      found = true;
+      const attempt = yield* Effect.result(
+        Effect.gen(function* () {
+          const { stdout, launch } = yield* readCliVersion(candidate, "hermes");
+          return {
+            executable: candidate.executable,
+            version: parseHermesVersion(stdout),
+            source: "system" as const,
+            ...launch,
+          };
+        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
+      );
+      if (Result.isSuccess(attempt)) return attempt.success;
+      const error = attempt.failure.cause;
+
+      if (isCliTimeout(error)) throw error;
+      /* Try the remaining installed candidates. */
+    }
+    throw new CodexCliError(
+      found ? sourceText("error.provider.hermesNotStarted") : sourceText("error.provider.hermesMissing"),
+      found ? "invalid" : "missing",
+    );
+  },
+  Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
+);
+
+/**
+ * Hermes prints its release and its build on the first line, such as
+ * `Hermes Agent v0.21.5+5805.g54bc5e5 (2026.9.24) · upstream 54bc5e50`. A line about an update can follow.
+ */
+function parseHermesVersion(output: string): string {
+  const version = output.match(/^Hermes Agent v(\d+\.\d+\.\d+)\b/mu)?.[1];
+  if (!version) throw new CodexCliError(sourceText("error.provider.hermesVersionUnreadable"), "invalid");
+  return version;
+}
+
+/**
  * Cursor prints its build as a date and a commit, such as `2026.09.28-64d2043`. The newer form that
  * its launcher accepts adds the time: `2026.09.28-10-15-00-64d2043`.
  */
@@ -490,6 +558,97 @@ export const resolveClineCli: (input?: {
   },
   Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
 );
+
+/**
+ * The Kimi Code CLI is `kimi` on `PATH`, which `uv tool install kimi-cli` and Kimi's install script
+ * install. A CLI older than `MINIMUM_KIMI_VERSION` is skipped, so a managed one after it is still
+ * used. With no newer CLI, the outdated one is the error the user sees.
+ */
+export const resolveKimiCli: (input?: {
+  systemCandidates?: string[];
+  bundledExecutable?: string | null | undefined;
+}) => Effect.Effect<KimiCliInfo, ProviderClientOperationError> = Effect.fn("Cli.resolveKimiCli")(
+  function* (
+    input: { systemCandidates?: string[]; bundledExecutable?: string | null | undefined } = {},
+  ): Effect.fn.Return<KimiCliInfo, ProviderClientOperationError> {
+    const candidates = yield* cliCandidates("kimi", input.systemCandidates, input.bundledExecutable ?? null);
+    const failures: CodexCliError[] = [];
+    for (const candidate of candidates) {
+      if (!(yield* isExecutable(candidate.executable))) continue;
+      const attempt = yield* Effect.result(
+        Effect.gen(function* () {
+          const { stdout, launch } = yield* readCliVersion(candidate, "kimi");
+          const version = parseKimiVersion(stdout);
+          if (!isMinimumVersion(version, MINIMUM_KIMI_VERSION)) {
+            throw new CodexCliError(sourceText("error.provider.kimiOutdated", { version }), "outdated");
+          }
+          return { executable: candidate.executable, version, source: candidate.source, ...launch };
+        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
+      );
+      if (Result.isSuccess(attempt)) return attempt.success;
+      const error = attempt.failure.cause;
+
+      if (isCliTimeout(error)) throw error;
+      failures.push(
+        error instanceof CodexCliError
+          ? error
+          : new CodexCliError(sourceText("error.provider.kimiNotStarted"), "invalid"),
+      );
+    }
+    throw (
+      failures.find((failure) => failure.code === "outdated") ??
+      failures[0] ??
+      new CodexCliError(sourceText("error.provider.kimiMissing"), "missing")
+    );
+  },
+  Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
+);
+
+/**
+ * The arguments of `kimi login`. The Python CLI supports JSON, and takes its region from the
+ * variables of `kimiPythonLoginEnv`. Kimi Code 2.x prints a device code as text, and takes the
+ * region as an option: without it, a first sign-in goes to kimi.com.
+ */
+export const kimiLoginArgs = Effect.fn("Cli.kimiLoginArgs")(function* (
+  cli: { executable: string; launchPath?: string },
+  env: Readonly<Record<string, string>>,
+  options: { code: boolean; region: SignInRegion },
+): Effect.fn.Return<readonly string[], ProviderClientOperationError> {
+  const target = cliSpawnTarget(cli.executable, ["login", "--help"]);
+  const probe = Effect.tryPromise({
+    try: (signal) =>
+      execFileAsync(target.command, target.args, {
+        signal,
+        timeout: CLI_VERSION_TIMEOUT_MS,
+        maxBuffer: 64 * 1024,
+        windowsHide: process.platform === "win32",
+        windowsVerbatimArguments: target.windowsVerbatimArguments,
+        env: { ...process.env, ...cliPathEnvironment(cli), ...env },
+      }),
+    catch: (cause) => {
+      const timedOut = isDynamicRecord(cause) && cause.killed === true;
+      return providerFailure(
+        new CodexCliError(
+          timedOut
+            ? sourceText("error.provider.cliTimedOutRefresh", { provider: agentProviderName("kimi") })
+            : sourceText("error.provider.noCodeSignIn", { provider: agentProviderName("kimi") }),
+          timedOut ? "timeout" : "invalid",
+        ),
+      );
+    },
+  });
+  // A browser sign-in needs no option, so a probe that fails keeps the plain `kimi login`.
+  const output = options.code ? yield* probe : yield* Effect.orElseSucceed(probe, () => ({ stdout: "", stderr: "" }));
+  const help = stripVTControlCharacters(`${output.stdout}\n${output.stderr}`);
+  if (/\bkimi\b/i.test(help)) {
+    if (/--json(?:\s|[,=]|$)/u.test(help)) return options.code ? ["login", "--json"] : ["login"];
+    if (/--region\b/u.test(help) && /device-code/u.test(help)) return ["login", "--region", options.region];
+  }
+  if (!options.code) return ["login"];
+  return yield* providerFailure(
+    new CodexCliError(sourceText("error.provider.noCodeSignIn", { provider: agentProviderName("kimi") }), "invalid"),
+  );
+});
 
 function bundledOpencodeExecutable(
   platform = process.platform,
@@ -564,6 +723,13 @@ export function parseClineVersion(output: string): string {
   return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`;
 }
 
+/** Kimi prints `kimi, version 1.52.0`. */
+export function parseKimiVersion(output: string): string {
+  const match = output.trim().match(/^(?:kimi,?\s+version\s+)?v?(\d+)\.(\d+)\.(\d+)(?:[-+.][\w.-]+)?$/i);
+  if (!match) throw new CodexCliError(sourceText("error.provider.kimiVersionUnreadable"), "invalid");
+  return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`;
+}
+
 /**
  * Bun prints a bare `1.4.2` and nothing else. It is not a provider CLI, so no discovery step reads
  * this; only `verifyInstalledRuntime` does, to confirm the binary in the store is the pinned one.
@@ -609,9 +775,9 @@ function isMinimumVersion(version: string, minimum: readonly number[]): boolean 
   return true;
 }
 
-/** Resolves native RPC providers through the same explicit/managed/system precedence. */
+/** Resolves the native providers through the same explicit/managed/system precedence. */
 const resolveNativeCli = Effect.fn("Cli.resolveNativeCli")(function* (
-  provider: "pi" | "muse",
+  provider: "pi" | "muse" | "devin",
   input: { systemCandidates?: string[]; bundledExecutable?: string | null | undefined } = {},
 ): Effect.fn.Return<AgentCliInfo, ProviderClientOperationError> {
   const candidates = yield* cliCandidates(provider, input.systemCandidates, input.bundledExecutable ?? null);
@@ -623,7 +789,7 @@ const resolveNativeCli = Effect.fn("Cli.resolveNativeCli")(function* (
     const attempt = yield* Effect.result(
       Effect.gen(function* () {
         const { stdout, launch } = yield* readCliVersion(candidate, provider);
-        const version = provider === "pi" ? parsePiVersion(stdout) : parseMuseVersion(stdout);
+        const version = NATIVE_VERSION_PARSERS[provider](stdout);
         if (provider === "pi" && !isMinimumVersion(version, [1, 1, 0]))
           throw new CodexCliError(sourceText("error.provider.piOutdated", { version }), "outdated");
         return { executable: candidate.executable, version, source: candidate.source, ...launch };
@@ -653,18 +819,85 @@ export const resolveMuseCli = (input?: {
   systemCandidates?: string[];
   bundledExecutable?: string | null | undefined;
 }) => resolveNativeCli("muse", input);
+export const resolveDevinCli = (input?: {
+  systemCandidates?: string[];
+  bundledExecutable?: string | null | undefined;
+}) => resolveNativeCli("devin", input);
 
-export function parsePiVersion(output: string): string {
+function parsePiVersion(output: string): string {
   const match = output.trim().match(/(?:^|\s)v?(\d+\.\d+\.\d+)(?:[-+][\w.-]+)?(?:\s|$)/u);
   if (!match?.[1])
     throw new CodexCliError(sourceText("error.provider.nativeVersionUnreadable", { provider: "Pi" }), "invalid");
   return match[1];
 }
-export function parseMuseVersion(output: string): string {
+function parseMuseVersion(output: string): string {
   const match = output.match(/\b\d+\.\d+\.\d+-R\d+(?:\.\d+)?\b/u) ?? output.match(/\b\d+\.\d+\.\d+\b/u);
   if (!match)
     throw new CodexCliError(sourceText("error.provider.nativeVersionUnreadable", { provider: "Muse" }), "invalid");
   return match[0];
+}
+
+/** Devin CLI 3000.11.234 prints `devin 3000.11.234 (92c83011d113)`. */
+function parseDevinVersion(output: string): string {
+  const match = output.match(/\bdevin[ \t]+v?(\d+\.\d+\.\d+)\b/iu) ?? output.match(/\b\d+\.\d+\.\d+\b/u);
+  if (!match)
+    throw new CodexCliError(sourceText("error.provider.nativeVersionUnreadable", { provider: "Devin" }), "invalid");
+  return match[1] ?? match[0];
+}
+
+/** The version parser of each native provider CLI. */
+export const NATIVE_VERSION_PARSERS: Readonly<Record<"pi" | "muse" | "devin", (output: string) => string>> = {
+  pi: parsePiVersion,
+  muse: parseMuseVersion,
+  devin: parseDevinVersion,
+};
+
+export function isVersion(value: string): boolean {
+  return /^\d+\.\d+\.\d+(?:(?:-\d{2}-\d{2}-\d{2})?-[0-9a-f]{7,40})?$/u.test(value);
+}
+
+/**
+ * A commit orders nothing, so two Cursor builds of the same date and time, or of the same date with
+ * no time, are neither older nor newer.
+ */
+export function olderVersion(installed: string, target: string): boolean {
+  return isVersion(installed) && isVersion(target) && compareReleases(installed, target) < 0;
+}
+
+export function compareReleases(a: string, b: string): number {
+  const release = (version: string) => version.replace(/-[0-9a-f]{7,40}$/u, "").replaceAll("-", ".");
+  return release(a).localeCompare(release(b), "en", { numeric: true });
+}
+
+/**
+ * Resolve a provider's CLI with OpenBot's copy as `bundledExecutable`. The CLI the user installed
+ * wins over the copy when it is as new: the copy then runs nothing, and the Storage page can remove
+ * it. A version that cannot be compared keeps the copy, as before. An update passes
+ * `preferInstalled: false`, because it must start the copy it just downloaded.
+ */
+export function resolveInstalledFirst<Cli extends AgentCliInfo, E>(
+  resolve: (input: { bundledExecutable?: string | null }) => Effect.Effect<Cli, E>,
+  bundledExecutable: string | null | undefined,
+  preferInstalled: boolean,
+): Effect.Effect<Cli, E> {
+  const copy = resolve(bundledExecutable === undefined ? {} : { bundledExecutable });
+  if (!preferInstalled) return copy;
+  const installedCli = resolve({ bundledExecutable: null }).pipe(Effect.orElseSucceed(() => null));
+  const choose = (resolved: Cli, installed: Cli | null): Cli =>
+    resolved.source === "managed" &&
+    installed?.source === "system" &&
+    (installed.version === resolved.version || olderVersion(resolved.version, installed.version))
+      ? installed
+      : resolved;
+  return Effect.gen(function* () {
+    // With a copy, the two probes run at once: the user's CLI adds no wait unless it is the slower one.
+    if (bundledExecutable) {
+      const [resolved, installed] = yield* Effect.all([copy, installedCli], { concurrency: 2 });
+      return choose(resolved, installed);
+    }
+    const resolved = yield* copy;
+    return resolved.source === "managed" ? choose(resolved, yield* installedCli) : resolved;
+  });
 }
 
 /** The command name of a provider's CLI on `PATH`. */

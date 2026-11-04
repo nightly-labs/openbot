@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "De database van OpenBot heeft de integriteitscontrole niet doorstaan.",
   "error.backend.webhookRouteLimit": "Een host kan maximaal {limit} webhookroutines hebben.",
   "error.backend.webhookSettingsInvalid": "Controleer de webhookinstellingen en probeer het opnieuw.",
+  "error.backend.webhookSenderSecretInvalid":
+    "Plak het volledige ondertekeningsgeheim van de afzender. Het heeft 16 tot 1024 tekens en geen spaties.",
   "error.backend.webhookRouteUnavailable":
     "De openbare webhookroute is niet klaar. Controleer de verbinding met de host en probeer het opnieuw.",
   "error.backend.webhookTestUnavailable":
@@ -58,6 +60,12 @@ export const messages = {
   "error.backend.sunshineNotReady": "Sunshine is niet klaar geworden.",
   "error.backend.sunshineNotReadyReason": "Sunshine is niet klaar geworden. {reason}",
   "error.backend.channelLeadModelUnavailable": "Het model van de kanaalleider is niet beschikbaar.",
+  "error.backend.contextCompactionIneffective":
+    "Comprimeren maakt deze chat niet kleiner: na twee keer comprimeren gebruikt hij nog {percent}% van het contextvenster van het model, dus OpenBot stopt met comprimeren. Tools en instructies gebruiken het grootste deel van het venster. Zet de MCP-servers of computerbediening uit die deze agent niet nodig heeft, of kies een model met een groter venster. Start daarna een nieuwe chat.",
+  "error.backend.providerRetrying":
+    "De provider kon dit verzoek {attempts} keer niet uitvoeren en probeert het opnieuw. Als de agent niet verdergaat, stop dan de beurt.",
+  "error.backend.providerRetryingLargeContext":
+    "De provider kon dit verzoek {attempts} keer niet uitvoeren en probeert het opnieuw. Deze chat gebruikt {percent}% van het contextvenster van het model. Als de agent niet verdergaat, stop dan de beurt: OpenBot comprimeert de chat dan voor het volgende bericht.",
   "error.backend.sharedDataUnavailable": "Gedeelde gegevens zijn niet beschikbaar.",
   "error.backend.shuttingDown": "OpenBot wordt afgesloten.",
   "error.backend.channelUnconfirmedStart":
@@ -68,11 +76,14 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "Het genoemde kanaalbericht is niet beschikbaar.",
   "error.backend.channelTaskNotFound": "Kanaaltaak niet gevonden.",
   "error.backend.channelTaskComplete": "Deze taak is al voltooid.",
+  "error.backend.channelTaskNotStopped": "Alleen een gestopte of mislukte taak kan worden geannuleerd.",
   "error.backend.channelSelectAgent": "Kies een agent.",
   "error.backend.channelLeadRequired": "Kies een beschikbare kanaalleider of wijs deze taak toe aan een lid.",
   "error.backend.channelRoutingTooLong":
     "Dit verzoek overschrijdt de contextlimiet voor routering. Kies een lid of stuur een korter verzoek.",
   "error.backend.channelTaskMemberRequired": "Kies een lid voor deze taak.",
+  "error.backend.channelTaskStopped": "Gestopt. Ga verder of wijs deze taak opnieuw toe.",
+  "error.backend.channelRoutingUnreadable": "De leider kon dit bericht niet toewijzen. Wijs het toe aan een lid.",
   "error.backend.channelRoutingFailed": "Routering is mislukt. Kies een lid of probeer het opnieuw.",
   "error.backend.channelLeadTimedOut": "De kanaalleider reageerde niet op tijd. Kies een lid of probeer het opnieuw.",
   "error.backend.channelLeadFailed":
@@ -106,8 +117,8 @@ export const messages = {
     "Je hebt {saved} van {limit} herinneringen. Maak ruimte: werk één herinnering bij via memoryId met de gecombineerde tekst van twee verwante herinneringen en vergeet dan de andere, of vergeet een herinnering die niet meer klopt. Probeer het daarna opnieuw.",
   "error.backend.agentMemoryLimitExceeded":
     "Je hebt {saved} herinneringen en de limiet is {limit}. De gebruiker heeft de limiet lager ingesteld dan het aantal opgeslagen herinneringen. Vergeet geen herinneringen om ruimte te maken. Vertel de gebruiker dat deze herinnering niet is opgeslagen.",
-  "error.backend.channelHistoryLeadRequired": "Kies een kanaalleider om de gedeelde geschiedenis voor te bereiden.",
   "error.backend.channelHistoryArriving": "Er komt nog een gedeeld bericht binnen. Ga verder als het compleet is.",
+  "error.backend.channelHistoryLeadRequired": "Kies een kanaalleider om de gedeelde geschiedenis voor te bereiden.",
   "error.backend.channelHistoryInvalid":
     "De samenvatting van de geschiedenis is ongeldig. Ga verder om het opnieuw te proberen.",
   "error.backend.channelContextTooLong":
@@ -139,8 +150,6 @@ export const messages = {
   "error.backend.recipientHidden": "Deze agent is verborgen. Herstel de agent om berichten te sturen.",
   "error.backend.attachBetween": "Voeg tussen 1 en {limit} bestanden toe.",
   "error.backend.attachmentNotFile": "Bijlage is geen bestand: {path}",
-  "error.backend.attachSvg":
-    "{name} is een SVG-bestand en kan niet worden bijgevoegd. Schrijf het absolute pad in je antwoord: de chat toont de afbeelding daar.",
   "error.backend.generatedImageTooLarge": "De gemaakte afbeelding is groter dan de limiet van 100 MB.",
   "error.backend.attachmentNotRegularFile": "Alleen gewone bestanden kunnen worden bijgevoegd: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot kon {name} niet kopiëren.",
@@ -198,6 +207,12 @@ export const messages = {
   "error.backend.agentWaitNoRoutine":
     "Alleen een run van een van je routines wekt een wachtpunt, en je hebt geen routine. Maak er een met openbot.create_routine en open dan het wachtpunt.",
   "error.backend.agentWaitRemoteUnsupported": "Open wachtpunten zijn alleen beschikbaar voor agents op deze computer.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Een bericht als ongelezen markeren is alleen beschikbaar voor agents op deze computer.",
+  "error.backend.messageDeleteUnsupported": "Deze server ondersteunt het verwijderen van berichten niet.",
+  "error.backend.messageDeleteNotFound": "Dit bericht staat niet in de chat.",
+  "error.backend.messageDeleteBusy": "Dit bericht hoort bij een lopende beurt. Verwijder het als de beurt klaar is.",
+  "error.backend.messageDeleteForbidden": "Je kunt alleen berichten verwijderen die je zelf hebt verzonden.",
   "error.backend.routineFlowHandoffFailed": "De routine kon het werk niet aan deze agent doorgeven.",
   "error.backend.mcpServerLimit": "OpenBot bewaart maximaal {limit} MCP-servers.",
   "error.backend.mcpServerNameTaken": "Er bestaat al een MCP-server met de naam {name}.",
@@ -256,6 +271,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "Een server kan maximaal {limit} zijbalksecties hebben.",
   "error.backend.sectionNameRequired": "Een naam voor de sectie is verplicht.",
   "error.backend.sectionNameTooLong": "De naam van de sectie is te lang.",
+  "error.backend.sidebarFolderTooDeep": "Mappen kunnen maar drie niveaus diep zijn.",
+  "error.backend.sidebarFolderMoveInvalid": "Deze map kan daar niet naartoe worden verplaatst.",
   "error.backend.sectionNameDuplicate": "Namen van secties moeten uniek zijn.",
   "error.backend.directMessageRequired": "Schrijf eerst een bericht.",
   "error.backend.directMessageTooLong": "Een direct bericht kan maximaal {limit} tekens hebben.",
@@ -292,6 +309,9 @@ export const messages = {
   "error.backend.apiKeySaveFailed": "OpenBot kon de API-sleutel niet opslaan. Probeer het opnieuw.",
   "error.backend.apiKeyNotAllowed": "Alleen de eigenaar van de server of een beheerder kan een API-sleutel invoeren.",
   "error.backend.apiKeySaving": "De API-sleutel wordt al opgeslagen.",
+  "error.backend.vaultItemNotAllowed":
+    "Alleen de eigenaar van de server of een beheerder kan een item aan de Kluis toevoegen.",
+  "error.backend.vaultItemSaving": "Het Kluis-item wordt al opgeslagen.",
   "error.backend.authRequestInactive": "Dit beveiligde verificatieverzoek is niet meer actief.",
   "error.backend.secureAuthUnavailable": "Beveiligde verificatie is niet beschikbaar.",
   "error.backend.browserUrlRequired": "Een URL voor de browser is verplicht.",
@@ -348,6 +368,9 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "Deze agent heeft {count} open threads. Archiveer een thread en start of herstel dan een andere.",
   "error.backend.threadRemoteUnsupported": "Threads zijn alleen beschikbaar voor agents op deze computer.",
+  "error.backend.branchSourceBusy": "Stop de huidige beurt voordat je een aftakking van deze chat maakt.",
+  "error.backend.branchMessageNotFound": "Je kunt alleen aftakken vanaf een voltooid antwoord van de agent.",
+  "error.backend.branchRemoteUnsupported": "Aftakkingen zijn alleen beschikbaar voor agents op deze computer.",
   "error.backend.threadMoveRefused":
     "Alleen een bericht dat je alleen naar deze agent hebt gestuurd, kan in een nieuwe thread draaien.",
   "error.backend.taskTitleRequired": "Geef de taak een korte titel.",
@@ -355,8 +378,8 @@ export const messages = {
     "Geef de taak een titel van maximaal 120 tekens en een korte opdracht die zegt wat er moet gebeuren.",
   "error.backend.taskOwnChatOnly":
     "Start een taak alleen vanuit je eigen chat. Een kanaal, een berichtengesprek of een andere taak kan er geen starten.",
-  "error.backend.taskOpenLimit":
-    "Deze agent heeft al {count} open taken. Wacht tot de gebruiker er een sluit voordat je een nieuwe taak start.",
+  "error.backend.taskUnfinishedLimit":
+    "Deze agent heeft al {count} onvoltooide taken. Start een nieuwe taak wanneer er een klaar is.",
   "error.backend.taskOpenLimitReached":
     "Deze agent heeft {count} open taken. Sluit een taak en start of open dan een andere.",
   "error.backend.taskRemoteUnsupported": "Taken zijn alleen beschikbaar voor agents op deze computer.",

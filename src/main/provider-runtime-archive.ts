@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { createReadStream, createWriteStream } from "node:fs";
-import { type FileHandle, mkdir, open, readdir, writeFile } from "node:fs/promises";
+import { type FileHandle, mkdir, open, readdir, readlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -17,10 +17,32 @@ const MAX_ARCHIVE_LIST_BYTES = 16 * 1024 * 1024;
 export function archiveEntryName(name: string): string {
   return name.replace(/^(?:\.\/)+/u, "");
 }
+
+/**
+ * Whether a link in a runtime points inside the folder that holds it. Only a relative target with no
+ * `..` is safe, so a chain of links cannot leave that folder either.
+ */
+export function isSafeLinkTarget(target: string): boolean {
+  return (
+    target !== "" &&
+    !target.includes("\0") &&
+    !target.includes("\\") &&
+    !target.startsWith("/") &&
+    !/^[A-Za-z]:/u.test(target) &&
+    target.split("/").every((part) => part !== "..")
+  );
+}
+
+/**
+ * Refuses an archive with a path outside `allowedRoots`, or with an entry that is not a file or a
+ * folder. With `links`, a symbolic link is allowed when `isSafeLinkTarget` accepts its target: a
+ * macOS framework must keep its links, or its code signature breaks.
+ */
 export const assertSafeArchive = Effect.fn("ProviderArchive.assertSafeArchive")(function* (
   path: string,
   allowedRoots: readonly string[],
   message: string,
+  options: { links?: boolean } = {},
 ): Effect.fn.Return<void, ProviderRuntimeFailure> {
   const [{ stdout: namesValue }, { stdout: detailsValue }] = yield* Effect.all(
     [
@@ -35,7 +57,16 @@ export const assertSafeArchive = Effect.fn("ProviderArchive.assertSafeArchive")(
   );
   const names = namesValue.split(/\r?\n/u).filter(Boolean);
   const details = detailsValue.split(/\r?\n/u).filter(Boolean);
-  if (details.some((line) => !["-", "d"].includes(line.trimStart().charAt(0)))) {
+  // Both listings have one line per entry, in the same order, so a link line holds its own name.
+  const unsafeEntry = (line: string, index: number) => {
+    const type = line.trimStart().charAt(0);
+    if (type === "-" || type === "d") return false;
+    if (type !== "l" || !options.links || details.length !== names.length) return true;
+    const marker = ` ${names[index]} -> `;
+    const at = line.indexOf(marker);
+    return at < 0 || !isSafeLinkTarget(line.slice(at + marker.length));
+  };
+  if (details.some(unsafeEntry)) {
     return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.archiveSpecialFile")) });
   }
   for (const name of names) {
@@ -103,10 +134,11 @@ export const extractZipFiles = Effect.fn("ProviderArchive.extractZipFiles")(func
     (handle) => runtimeIO(() => handle.close()).pipe(Effect.orDie),
   );
 });
+/** Extracts the entries under `root`, or under any of the roots in a list. `""` extracts each entry. */
 export const extractZipTree = Effect.fn("ProviderArchive.extractZipTree")(function* (
   archive: string,
   destination: string,
-  root: string,
+  root: string | readonly string[],
   message: string,
 ): Effect.fn.Return<void, ProviderRuntimeFailure> {
   yield* Effect.acquireUseRelease(
@@ -129,12 +161,13 @@ export const extractZipTree = Effect.fn("ProviderArchive.extractZipTree")(functi
   );
 });
 
-function isZipTreeName(name: string, root: string): boolean {
+function isZipTreeName(name: string, root: string | readonly string[]): boolean {
   if (name.includes("\0") || name.includes("\\")) return false;
   const parts = name.replace(/\/$/u, "").split("/");
+  const roots: readonly string[] = typeof root === "string" ? [root] : root;
   // A `:` names an NTFS stream on Windows, which would write beside the file rather than into it.
   return (
-    (root === "" || parts[0] === root) &&
+    (roots.includes("") || roots.includes(parts[0] ?? "")) &&
     parts.every((part) => part && part !== "." && part !== ".." && !part.includes(":"))
   );
 }
@@ -253,8 +286,13 @@ const readAtEffect = Effect.fn("ProviderArchive.readAt")(function* (
     return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.archiveUnreadable")) });
   return buffer;
 });
+/**
+ * Refuses anything under `root` that is not a file or a folder. With `links`, a symbolic link is
+ * allowed when `isSafeLinkTarget` accepts its target.
+ */
 export const rejectNonRegularFiles = Effect.fn("ProviderArchive.rejectNonRegularFiles")(function* (
   root: string,
+  options: { links?: boolean } = {},
 ): Effect.fn.Return<void, ProviderRuntimeFailure> {
   const entries = yield* runtimeIO(() => readdir(root, { withFileTypes: true }));
   yield* Effect.forEach(
@@ -262,11 +300,13 @@ export const rejectNonRegularFiles = Effect.fn("ProviderArchive.rejectNonRegular
     (entry) =>
       Effect.gen(function* () {
         const path = join(root, entry.name);
-        if (entry.isSymbolicLink() || (!entry.isFile() && !entry.isDirectory()))
+        const safeLink =
+          entry.isSymbolicLink() && options.links && isSafeLinkTarget(yield* runtimeIO(() => readlink(path)));
+        if (!safeLink && (entry.isSymbolicLink() || (!entry.isFile() && !entry.isDirectory())))
           return yield* new ProviderRuntimeFailure({
             cause: new Error(sourceText("error.provider.runtimeSpecialFile")),
           });
-        if (entry.isDirectory()) yield* rejectNonRegularFiles(path);
+        if (entry.isDirectory()) yield* rejectNonRegularFiles(path, options);
       }),
     { concurrency: "unbounded", discard: true },
   );

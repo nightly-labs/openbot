@@ -24,10 +24,12 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       <label>Code<input id="code" inputmode="numeric"></label>
       ${
         url.pathname === "/login"
-          ? `<form method="get" action="/search"><label>Search password<input id="get-password" type="password"></label></form>
-      <form action="/search"><label>Default password<input id="default-password" type="password"></label></form>
-      <form method="post" action="/search"><label>Override password<input id="override-password" type="password"></label><button id="override-submit" formmethod="get">Go</button></form>
-      <form method="post" action="/session"><label>Post password<input id="post-password" type="password"></label></form>`
+          ? `<form method="get" action="/search"><label>Search password<input id="get-password" name="password" type="password"></label></form>
+      <form action="/search"><label>Default password<input id="default-password" name="password" type="password"></label></form>
+      <form method="post" action="/search"><label>Override password<input id="override-password" name="password" type="password"></label><button id="override-submit" formmethod="get">Go</button></form>
+      <form method="post" action="/session"><label>Post password<input id="post-password" type="password"></label></form>
+      <form action="/search" onsubmit="event.preventDefault(); location.href = '/complete'"><label>Script password<input id="script-password" name="password" type="password"></label></form>
+      <form action="/search" onsubmit="event.preventDefault(); setTimeout(() => this.submit())"><label>Checked password<input id="checked-password" name="password" type="password"></label></form>`
           : ""
       }
       <div>${Array.from({ length: 6 }, (_, index) => `<input aria-label="Digit ${index + 1}" id="digit-${index}" maxlength="1">`).join("")}</div>
@@ -94,7 +96,7 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         );
         if (result.success) throw new Error("Authentication evaluation was not blocked.");
         const secret = method === "password" ? "fixture-password-729104" : "729104";
-        if ((await runCauseEffect(handoff.submit(secret))) !== "submitted")
+        if ((await runCauseEffect(handoff.submit(secret, false))) !== "submitted")
           throw new Error(`Secure ${method} submission did not navigate.`);
         const snapshot = await runCauseEffect(browser.snapshot(tab.id));
         if (JSON.stringify(snapshot).includes(secret)) throw new Error("Authentication value reached a snapshot.");
@@ -104,13 +106,18 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       }
     }
     // A field built for something else must not take a vault password: its value can reach a URL.
-    // A password field in a POST form may.
-    for (const [selector, fillable] of [
-      ["#code", false],
-      ["#get-password", false],
-      ["#default-password", false],
-      ["#override-password", false],
-      ["#post-password", true],
+    // A password field may, in any form, but a navigation that carries a vault value is blocked and the
+    // user finishes. A form that the page sends with its own script, as many sign-in forms with no
+    // method do, still signs in.
+    const vaultPassword = "fixture vault+password/518302";
+    for (const [selector, fillable, path, outcome] of [
+      ["#code", false, undefined, undefined],
+      ["#get-password", true, "/login", "takeover"],
+      ["#default-password", true, "/login", "takeover"],
+      ["#override-password", true, "/login", "takeover"],
+      ["#checked-password", true, "/login", "takeover"],
+      ["#post-password", true, "/session", "submitted"],
+      ["#script-password", true, "/complete", "submitted"],
     ] as const) {
       const tab = await runCauseEffect(
         browser.open("https://authentication.openbot.test/login", "secret-thread", "secret-agent"),
@@ -132,9 +139,20 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
             },
           }),
         );
-        handoff.cancel();
-        if (handoff.vaultFillable !== fillable)
+        if (handoff.vaultFillable !== fillable) {
+          handoff.cancel();
           throw new Error(`${selector} was classified wrongly for a vault password.`);
+        }
+        if (!path) {
+          handoff.cancel();
+          continue;
+        }
+        const result = await runCauseEffect(handoff.submit(vaultPassword, true));
+        const snapshot = await runCauseEffect(browser.snapshot(tab.id));
+        if (new URL(snapshot.url).pathname !== path || result !== outcome)
+          throw new Error(
+            `A vault password in ${selector} reached ${snapshot.url} (${result}), not ${path} (${outcome}).`,
+          );
       } finally {
         await runCauseEffect(browser.close(tab.id));
       }
@@ -174,7 +192,7 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         await contents.executeJavaScript(`${change}; true`);
         let rejected = false;
         try {
-          await runCauseEffect(handoff.submit(method === "otp" ? "729104" : "fixture-password-729104"));
+          await runCauseEffect(handoff.submit(method === "otp" ? "729104" : "fixture-password-729104", false));
         } catch {
           rejected = true;
         }

@@ -1,0 +1,40 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/notification";
+
+export const messages = {
+  "notification.needsInput": "يحتاج إلى إدخالك.",
+  "notification.needsApproval": "يحتاج إلى موافقتك.",
+  "notification.needsBrowserStep": "يحتاج إلى أن تُكمل خطوة في المتصفح.",
+  "notification.needsApprovalFor": "يحتاج إلى موافقتك: {action}",
+  "notification.finished": "انتهى من العمل.",
+  "notification.workflowApproval": "تنتظر خطوة موافقتك.",
+  "notification.workflowOutput": "يوجد لسير عمل نتيجة جديدة.",
+  "notification.failed": "توقف بسبب خطأ.",
+  "notification.channelTitle": "{agent} في {channel}",
+  "notification.channelMessage": "أرسل رسالة.",
+  "notification.usageLimit.title": "بلغ حساب {provider} حدّه",
+  "notification.usageLimit.body": {
+    zero: "لا وكلاء في الانتظار. سيعيد OpenBot المحاولة لاحقًا.",
+    one: "وكيل واحد في الانتظار. سيعيد OpenBot المحاولة لاحقًا.",
+    two: "وكيلان في الانتظار. سيعيد OpenBot المحاولة لاحقًا.",
+    few: "{count} وكلاء في الانتظار. سيعيد OpenBot المحاولة لاحقًا.",
+    many: "{count} وكيلًا في الانتظار. سيعيد OpenBot المحاولة لاحقًا.",
+    other: "{count} وكيل في الانتظار. سيعيد OpenBot المحاولة لاحقًا.",
+  },
+  "notification.usageLimit.bodyResets": {
+    zero: "لا وكلاء في الانتظار. يُعاد التعيين {reset}.",
+    one: "وكيل واحد في الانتظار. يُعاد التعيين {reset}.",
+    two: "وكيلان في الانتظار. يُعاد التعيين {reset}.",
+    few: "{count} وكلاء في الانتظار. يُعاد التعيين {reset}.",
+    many: "{count} وكيلًا في الانتظار. يُعاد التعيين {reset}.",
+    other: "{count} وكيل في الانتظار. يُعاد التعيين {reset}.",
+  },
+  "notification.machineAlert.disk": "{server}: القرص ممتلئ بنسبة {percent}",
+  "notification.machineAlert.memory": "{server}: الذاكرة مستخدمة بنسبة {percent}",
+  "notification.machineAlert.cpu": "{server}: المعالج مشغول بنسبة {percent}",
+  "notification.machineAlert.body": "تجاوز مستوى التنبيه البالغ {level}. راجع إعدادات الخادم > التخزين.",
+  "notification.test": "الإشعارات تعمل.",
+  "notification.welcome": "سيخبرك OpenBot هنا عندما يحتاج إليك وكيل.",
+  "notification.toast.region": "الإشعارات",
+  "notification.toast.close": "إغلاق الإشعار",
+} as const satisfies PartialTranslation<typeof source>;

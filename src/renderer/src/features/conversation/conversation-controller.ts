@@ -13,7 +13,7 @@ import type { UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createSignal, createStore, onCleanup } from "solid-js";
 import type { ChatSearchMatch } from "./chat-search";
 import {
-  appendPluginPrompt,
+  appendDraftText,
   appendSkillCreationRequest,
   appendSkillExample,
   EMPTY_DRAFT,
@@ -33,6 +33,8 @@ import type {
   VoiceLiveTranscript,
 } from "./conversation-types";
 import type { TurnRuntime } from "./stores/activity-store";
+import { createAttachmentUploadStore } from "./stores/attachment-upload-store";
+import type { PastePreview } from "./stores/composer-actions";
 import type { SidePanelsState } from "./stores/panels-store";
 import { createPendingSendStore } from "./stores/pending-send-store";
 import type { SideQuestionState } from "./stores/side-question-store";
@@ -149,6 +151,8 @@ export function createStableConversationState(
   const [composerFocusRequest, setComposerFocusRequest] = createSignal(0);
   // A send in flight belongs to the server it was sent to, so it outlives a server switch.
   const pendingSends = createPendingSendStore();
+  // A file import belongs to the chat it was started in, so it outlives a server switch, as a send does.
+  const attachmentUploads = createAttachmentUploadStore();
   const [conversationErrors, setConversationErrors] = createSignal<Record<string, string>>({});
   /** The provider and model of the run behind each conversation error, keyed like `conversationErrors`. */
   const [conversationErrorRuns, setConversationErrorRuns] = createSignal<
@@ -307,7 +311,13 @@ export function createStableConversationState(
     },
     appendPluginPrompt(target: { serverId: string; agentId: string }, prompt: string) {
       const key = composerDraftKey(target);
-      setDrafts((current) => ({ ...current, [key]: appendPluginPrompt(current[key] ?? EMPTY_DRAFT, prompt) }));
+      setDrafts((current) => ({ ...current, [key]: appendDraftText(current[key] ?? EMPTY_DRAFT, prompt) }));
+      setComposerFocusRequest((value) => value + 1);
+    },
+    /** Puts a message from another chat into a channel's composer. The user reads it and sends it. */
+    appendChannelText(target: { serverId: string; channelId: string }, text: string) {
+      const key = composerDraftKey({ serverId: target.serverId, agentId: target.channelId });
+      setChannelDrafts((current) => ({ ...current, [key]: appendDraftText(current[key] ?? EMPTY_DRAFT, text) }));
       setComposerFocusRequest((value) => value + 1);
     },
     stopComposerTyping,
@@ -335,6 +345,7 @@ export function createStableConversationState(
     composerFocusRequest,
     setComposerFocusRequest,
     pendingSends,
+    attachmentUploads,
     conversationErrors,
     setConversationErrors,
     conversationErrorRuns,
@@ -377,11 +388,11 @@ export function createStableConversationState(
  * shared owner would carry "the computer panel is open for chief" from one
  * server to the next and open the wrong panel on arrival.
  *
- * `attachmentBusy` and `submitting` are
- * here for the same reason by a different route: they carry no key at all. Each
- * describes the composer on screen right now - "a send is in flight" - so a
- * shared owner would disable the arriving server's composer for the length of
- * the server it was left on. What has to outlive the conversation goes in
+ * `submitting` is here for the same reason by a different route: it carries no
+ * key at all. It describes the composer on screen right now - "a send is in
+ * flight" - so a shared owner would disable the arriving server's composer for
+ * the length of the server it was left on. `importingDrafts` is keyed by chat,
+ * but it stays with `submitting`, as the busy flag that it replaces did. What has to outlive the conversation goes in
  * `conversationErrors` and `composerErrors` instead, which are keyed by
  * chat/conversation and sit in the stable half so one chat's banner never
  * leaks into another chat on the same server.
@@ -391,7 +402,9 @@ export function createStableConversationState(
  */
 export function createServerConversationState() {
   const [showComposerActions, setShowComposerActions] = createSignal(false);
-  const [attachmentBusy, setAttachmentBusy] = createSignal(false);
+  // The draft keys of the chats that wait for a file import. Other chats send as normal.
+  const [importingDrafts, setImportingDrafts] = createSignal<ReadonlySet<string>>(new Set());
+  const [pastePreviews, setPastePreviews] = createSignal<readonly PastePreview[]>([]);
   const [submitting, setSubmitting] = createSignal(false);
   const [markingRead, setMarkingRead] = createSignal(false);
   const [dropActive, setDropActive] = createSignal(false);
@@ -429,8 +442,10 @@ export function createServerConversationState() {
   return {
     showComposerActions,
     setShowComposerActions,
-    attachmentBusy,
-    setAttachmentBusy,
+    importingDrafts,
+    setImportingDrafts,
+    pastePreviews,
+    setPastePreviews,
     submitting,
     setSubmitting,
     markingRead,

@@ -2,7 +2,7 @@
 
 ## Team API compatibility boundary
 
-Current remote connections use Team API protocol v8 over three ordered WebRTC DataChannels: `rpc`,
+Current remote connections use Team API protocol v9 over three ordered WebRTC DataChannels: `rpc`,
 `events`, and `files`. A sandboxed hidden Chromium page owns each `RTCPeerConnection`. Electron main
 uses a `MessagePort` and transfers binary data as `ArrayBuffer`. Signal carries SDP and ICE only,
 except the Slack requests of an agent's Slack app (see [Messaging connections](channels-and-messaging.md#messaging-connections)).
@@ -272,6 +272,13 @@ new protocol. A client keeps an agent of a provider that it does not know, and s
 with an update prompt. See [Providers](providers.md) for the frozen lists that hide new providers
 from peers below 8.
 
+Protocol 9 is the protocol 8 wire with capability lists of up to 256 names (`v9.ts`). Protocols 7
+and 8 read at most 128 capabilities, and their lists are full. A capability added after them is in
+`TEAM_PROTOCOL_V9_ONLY_CAPABILITIES` (`current.ts`): a host leaves it out of the compatibility list
+of a peer below 9, and a client sends it only to a host that negotiated 9. On WebRTC, where no
+protocol header is sent, the marker `long-capability-lists-v1` says that a peer reads 256. It is in
+the bootstrap list, so the first compatibility read of a protocol 9 host is already complete.
+
 Capabilities describe additive behavior. The client sends its capability list when it sets the event scope. The host sends optional events only when the client declared the related capability. A missing capability disables only that feature. An unknown optional event is ignored. A malformed known event closes the connection as `protocol_error` because the client cannot safely apply it.
 
 The optional `agent-memories-v1` capability adds three POST routes. `/v1/agent-memories/page`
@@ -307,6 +314,20 @@ serializer checks the complete prompt block during migration, mutation, and prom
 Automatic text and selection changes stay pending until the turn completes successfully. Commit
 checks ownership, revisions, user choices, and capacity again. Agent tools cannot change or delete
 a user-controlled selection. The user can release that control without changing its inclusion.
+
+The optional `message-delete-v1` capability (protocol 9 only) adds three POST routes that delete one
+message and return an empty acknowledgement: `/v1/messages/delete` (`agentId`, `messageId`),
+`/v1/messages/delete-task` (`agentId`, `taskId`, `messageId`) and `/v1/channels/messages/delete`
+(`channelId`, `messageId`). The host always advertises it to a protocol 9 peer, because every host
+that has the routes can delete. `src/main/team-api/route-message-delete.ts` owns the authorization.
+In an agent chat, the agent must be visible to the member (else 404), and the member needs `chat` on
+the agent to delete their own messages; `manage` lets them delete any message. In a channel, each
+member deletes their own messages, and owners and admins delete any message. A host without channels
+answers the channel route with 400 `channelsUnsupported`, as it answers each channel route. A refusal
+from the service gets 403 (not the member's message), 404 (no shown message with that ID) or 409 (the
+message is in a running turn), with the host's sentence. A delete removes the message from the host's
+history, search and attachments; the provider session can still remember it. The host sends its
+usual change events (`conversation-invalidated` and `channels-changed`), so other members refresh.
 
 Team API failures use a JSON error envelope with `error` and a stable `code`. Compatibility codes are `client_update_required`, `host_update_required`, and `protocol_error`. Authentication and network failures are projected to `authentication_required` and `network_unavailable` in the desktop connection state. A confirmed compatibility or protocol error stops data-plane requests and automatic reconnect until the user selects `Retry`, restarts, or updates.
 

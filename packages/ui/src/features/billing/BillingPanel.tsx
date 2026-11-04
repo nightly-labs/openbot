@@ -27,6 +27,7 @@ import {
   ItemMedia,
   ItemTitle,
   OctagonX,
+  PlushLoader,
   RotateCcw,
   ServerGradientLogo,
   SlidersHorizontal,
@@ -222,7 +223,7 @@ export function BillingPanel(props: BillingPanelProps): JSX.Element {
         </Match>
         <Match when>
           <div class="billing-loading">
-            <Spinner label={t("billing.loading")} />
+            <PlushLoader size={48} label={t("billing.loading")} />
           </div>
         </Match>
       </Switch>

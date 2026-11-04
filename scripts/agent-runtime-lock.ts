@@ -8,7 +8,7 @@ const nativeProviderArtifactSchema = z.object({
   assetSha256: sha256Schema,
   downloadBytes: z.number().int().positive(),
   installedBytes: z.number().int().positive(),
-  executable: z.enum(["pi", "pi.exe", "muse", "muse.exe"]),
+  executable: z.enum(["pi", "pi.exe", "muse", "muse.exe", "devin", "devin.exe"]),
   files: z.record(z.string().min(1), sha256Schema),
 });
 const nativeProviderLockSchema = z.object({
@@ -140,6 +140,25 @@ const clineArtifactSchema = z.object({
   downloadBytes: z.number().int().positive(),
   installedBytes: z.number().int().positive(),
   executable: z.enum(["cline", "cline.exe"]),
+});
+
+/**
+ * Kimi ships a PyInstaller folder for each target: the launcher, which holds the Kimi code, and the
+ * Python runtime and libraries in `_internal`. `files` hashes the launcher, the Python library and
+ * the standard library, by their paths in that folder. The archive hash covers the other files at
+ * download only, as the Cursor lock does.
+ */
+const kimiArtifactSchema = z.object({
+  asset: z
+    .string()
+    .regex(
+      /^kimi-\d+\.\d+\.\d+-(?:aarch64-apple-darwin|x86_64-apple-darwin|x86_64-unknown-linux-gnu|aarch64-unknown-linux-gnu|x86_64-pc-windows-msvc)-onedir\.(?:tar\.gz|zip)$/u,
+    ),
+  assetSha256: sha256Schema,
+  downloadBytes: z.number().int().positive(),
+  installedBytes: z.number().int().positive(),
+  executable: z.enum(["kimi", "kimi.exe"]),
+  files: z.record(z.string().regex(/^(?:[A-Za-z0-9_][A-Za-z0-9._-]*\/)*[A-Za-z0-9_][A-Za-z0-9._-]*$/u), sha256Schema),
 });
 
 const agentRuntimeLockSchema = z.object({
@@ -281,6 +300,11 @@ const agentRuntimeLockSchema = z.object({
    */
   pi: nativeProviderLockSchema,
   muse: nativeProviderLockSchema,
+  /**
+   * Cognition's Devin CLI, from its own download site. The licence is proprietary, so OpenBot
+   * downloads the CLI on the user's computer and does not ship it in a release.
+   */
+  devin: nativeProviderLockSchema,
   cline: z.object({
     registry: z.literal("https://registry.npmjs.org"),
     repository: z.literal("https://github.com/cline/cline"),
@@ -293,6 +317,21 @@ const agentRuntimeLockSchema = z.object({
       "linux-x64": clineArtifactSchema,
       "linux-arm64": clineArtifactSchema,
       "win32-x64": clineArtifactSchema,
+    }),
+  }),
+  /** The Kimi Code CLI. Its release tag is the bare version, and the licence is read from that tag. */
+  kimi: z.object({
+    repository: z.literal("https://github.com/MoonshotAI/kimi-cli"),
+    version: z.string().regex(/^\d+\.\d+\.\d+$/u),
+    tag: z.string().regex(/^\d+\.\d+\.\d+$/u),
+    license: z.literal("Apache-2.0"),
+    licenseSha256: sha256Schema,
+    artifacts: z.object({
+      "darwin-arm64": kimiArtifactSchema,
+      "darwin-x64": kimiArtifactSchema,
+      "linux-x64": kimiArtifactSchema,
+      "linux-arm64": kimiArtifactSchema,
+      "win32-x64": kimiArtifactSchema,
     }),
   }),
 });

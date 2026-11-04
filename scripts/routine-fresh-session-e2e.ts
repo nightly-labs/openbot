@@ -1,10 +1,13 @@
-// Checks that each routine run of an agent's own chat starts its own provider session, so that it
-// does not send the whole chat context again. Runs the real agent service on a temporary profile with
-// a fake Codex app-server. The fake keeps the context of each session: each request sends all of the
-// session's earlier input again, as a model request does, and reports that size as input tokens.
-// The chat gets about 45,000 tokens of history, then a routine runs twice. The check asserts that
-// each run starts an ephemeral session and closes it, that its request stays small, that its answer
-// shows in the chat, that the chat keeps its session, and that the next chat turn reads the answers.
+// Checks that each routine of an agent runs in its own side thread, and that each run starts its own
+// provider session, so that it does not send the whole chat context again. Runs the real agent
+// service on a temporary profile with a fake Codex app-server. The fake keeps the context of each
+// session: each request sends all of the session's earlier input again, as a model request does, and
+// reports that size as input tokens. The chat gets about 45,000 tokens of history, then a routine
+// runs twice. The check asserts that each run starts an ephemeral session and closes it, that its
+// request stays small, that both runs use one routine thread and their answers show there and not in
+// the chat, that the chat keeps its session, and that the chat turns read the answers. While the
+// second run is held, a chat message and a run of a second routine must finish: the lanes do not wait
+// for each other. The second routine opens a wait, which a routine thread can do as the chat can.
 // It also drives saved password and authenticator fills through the routine tool router, checks
 // the sign-in guidance, and checks that no secret reaches the provider.
 // `bun scripts/routine-fresh-session-e2e.ts`. Writes .openbot-build/routine-fresh-session-e2e/report.json.
@@ -14,7 +17,13 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { AGENT_PROVIDERS, type AgentEvent, type BrowserTab, decodeUsageTokens } from "@openbot/contracts/ipc";
+import {
+  AGENT_PROVIDERS,
+  type AgentEvent,
+  type BrowserTab,
+  decodeUsageTokens,
+  parseRoutineRunConversationEventItemType,
+} from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import { getRecord, getString } from "../src/backend/protocol";
@@ -25,6 +34,8 @@ const userData = join(root, "user-data");
 const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
+/** While this file exists, the fake holds each turn of the first routine before its answer. */
+const fakeHold = join(root, "hold");
 
 // Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
@@ -44,6 +55,7 @@ const BASE_TOKENS = 3_000;
 const HISTORY_CHARACTERS = 45_000;
 const ROUTINE_INPUT_LIMIT = 10_000;
 const ROUTINE_MARK = "ROUTINE-CHECK";
+const SECOND_MARK = "ROUTINE-SECOND";
 const VAULT_ORIGIN = "https://routine.openbot.test";
 const VAULT_LOGIN = "routine-login";
 const PASSWORD = "fixture-routine-password";
@@ -55,12 +67,13 @@ const CODE = "739182";
  * numbered report; other turns answer "Done.".
  */
 const FAKE_CODEX = `#!/usr/bin/env node
-const { appendFileSync } = require("node:fs");
+const { appendFileSync, existsSync } = require("node:fs");
 if (process.argv.includes("--version")) {
   process.stdout.write("codex-cli 0.160.1\\n");
   process.exit(0);
 }
 const LOG = ${JSON.stringify(fakeLog)};
+const HOLD = ${JSON.stringify(fakeHold)};
 const BASE = ${BASE_TOKENS};
 const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", file: "/fake/.codex/config.toml", profile: null }, version: "1", config: { mcp_servers: {} } }] };
 let buffer = "";
@@ -125,8 +138,10 @@ const answer = (message) => {
       write({ method: "turn/started", params: { threadId: params.threadId, turn: { id: turnId } } });
       const tokenUsage = { total: breakdown(state.input, state.cached, state.output), last: breakdown(prompt, cached, 100), modelContextWindow: 1000000 };
       write({ method: "thread/tokenUsage/updated", params: { threadId: params.threadId, turnId, tokenUsage } });
-      const reply = text.includes(${JSON.stringify(ROUTINE_MARK)}) ? "Routine report " + (++reports) + ": the build is green." : "Done.";
-      const finish = () => {
+      const second = text.includes(${JSON.stringify(SECOND_MARK)});
+      const routine = !second && text.includes(${JSON.stringify(ROUTINE_MARK)});
+      const reply = second ? "Second routine report: the docs are current." : routine ? "Routine report " + (++reports) + ": the build is green." : "Done.";
+      const answerTurn = () => {
         const item = { type: "agentMessage", id: "message-" + turnId, text: reply, phase: "final_answer" };
         write({ method: "item/completed", params: { threadId: params.threadId, turnId, item } });
         write({ method: "turn/completed", params: { threadId: params.threadId, turn: { id: turnId, status: "completed" } } });
@@ -137,11 +152,21 @@ const answer = (message) => {
         targets: [{ kind: "css", selector: "#secret" }], submission: "click",
         submitTarget: { kind: "css", selector: "#submit" },
       });
-      const calls = text.includes(${JSON.stringify(ROUTINE_MARK)}) ? [
+      let held = false;
+      const finish = () => {
+        if (!routine || !existsSync(HOLD)) return answerTurn();
+        if (!held) log({ method: "turn/held", threadId: params.threadId, turnId });
+        held = true;
+        setTimeout(finish, 20);
+      };
+      const calls = routine ? [
         { tool: "tool_describe", arguments: { names: ["openbot_browser.list_logins"] } },
         browserCall("open", { url: ${JSON.stringify(VAULT_ORIGIN)} }),
         browserCall("list_logins", { tabId: "routine-tab" }),
         secret("password"), secret("authenticator"),
+      ] : second ? [
+        // A routine thread keeps the tools of the agent's own chat, as a routine run in the chat had.
+        { tool: "await_event", arguments: { note: "Report when the docs change." } },
       ] : [];
       callNext({ threadId: params.threadId, turnId, calls, finish });
       return;
@@ -206,11 +231,24 @@ const report: {
   closedThreads: string[];
   turns: TurnReport[];
   routineAnswersInChat: string[];
+  routineThreads: { routine: string; taskId: string; threadId: string; title: string; answers: string[] }[];
+  whileHeld?: { chatTurn: string; secondRoutineRun: string; heldRunStatus: string };
+  runStatuses?: string[];
+  runMarkersInChat?: string[];
+  waitInRoutineThread?: unknown[];
   digestInNextTurn?: { marker: boolean; answers: string[] };
   checks: { name: string; passed: boolean }[];
   passed: boolean;
   error?: string;
-} = { threadStarts: [], closedThreads: [], turns: [], routineAnswersInChat: [], checks: [], passed: false };
+} = {
+  threadStarts: [],
+  closedThreads: [],
+  turns: [],
+  routineAnswersInChat: [],
+  routineThreads: [],
+  checks: [],
+  passed: false,
+};
 
 const unused = () => Effect.die(new Error("Not used by this check."));
 let tab: BrowserTab | undefined;
@@ -354,19 +392,36 @@ function mainSession(threadId: string): string[] {
     .map((row) => String(row.external_session_id));
 }
 
-async function settled(deliveryId: string, label: string) {
-  const status = await waitFor(label, () => {
-    const value = mailbox.getDelivery(deliveryId)?.delivery.status;
-    return value === "completed" || value === "failed" || value === "interrupted" ? value : null;
-  });
+async function settled(deliveryId: string, label: string, timeoutMs?: number) {
+  const status = await waitFor(
+    label,
+    () => {
+      const value = mailbox.getDelivery(deliveryId)?.delivery.status;
+      return value === "completed" || value === "failed" || value === "interrupted" ? value : null;
+    },
+    timeoutMs,
+  );
   assert.equal(status, "completed", `${label}: ${mailbox.getDelivery(deliveryId)?.delivery.error ?? status}`);
 }
 
-async function send(agentId: string, text: string, label: string) {
+async function send(agentId: string, text: string, label: string, timeoutMs?: number) {
   const receipt = await runCauseEffect(agents.sendMessage({ agentId, text }));
   const deliveryId = receipt.deliveries[0]?.id;
   assert.ok(deliveryId, `${label}: no delivery`);
-  await settled(deliveryId, label);
+  await settled(deliveryId, label, timeoutMs);
+}
+
+/** The side thread of a routine, and the answers that its conversation shows. */
+function routineThread(agentId: string, routineId: string, mark: string) {
+  const tasks = agents.listTasks(agentId).tasks.filter((task) => task.routineId === routineId);
+  assert.equal(tasks.length, 1, `routine ${routineId}: ${tasks.length} threads`);
+  const [task] = tasks;
+  assert.ok(task);
+  const answers = agents
+    .readTask(agentId, task.id)
+    .messages.map((message) => message.text)
+    .filter((text) => text.startsWith(mark));
+  return { routine: routineId, taskId: task.id, threadId: task.threadId, title: task.title, answers };
 }
 
 function turnEntry(name: string, entry: LogEntry): TurnReport {
@@ -426,21 +481,51 @@ try {
     timezone: "UTC",
     schedule: { kind: "daily", time: "09:00" },
   });
+  const secondRoutine = agents.createRoutine({
+    agentId: agent.id,
+    name: "Docs check",
+    instruction: `${SECOND_MARK}: check the docs and report.`,
+    active: false,
+    timezone: "UTC",
+    schedule: { kind: "daily", time: "10:00" },
+  });
+  const buildTurns = () =>
+    fakeEntries().filter(
+      (item) => item.method === "turn/start" && item.text?.includes(ROUTINE_MARK) && !item.text.includes(SECOND_MARK),
+    );
   const routineTurns: TurnReport[] = [];
   for (const run of [1, 2]) {
+    // The second run waits before its answer, until the chat and the second routine have finished.
+    if (run === 2) await writeFile(fakeHold, "");
     const queued = await runCauseEffect(agents.testRoutine({ agentId: agent.id, routineId: routine.id }));
     assert.ok(queued.deliveryId, `routine run ${run}: no delivery`);
-    await settled(queued.deliveryId, `routine run ${run}`);
-    const entry = await waitFor(`routine run ${run} turn`, () =>
-      fakeEntries()
-        .filter((item) => item.method === "turn/start" && item.text?.includes(ROUTINE_MARK))
-        .at(run - 1),
-    );
+    const runDeliveryId = queued.deliveryId;
+    if (run === 2) {
+      await waitFor("the held routine run", () =>
+        fakeEntries().some((item) => item.method === "turn/held" && item.turnId === buildTurns()[1]?.turnId),
+      );
+      await send(agent.id, "Are you there?", "chat turn while a routine runs", 10_000);
+      const other = await runCauseEffect(agents.testRoutine({ agentId: agent.id, routineId: secondRoutine.id }));
+      assert.ok(other.deliveryId, "second routine: no delivery");
+      await settled(other.deliveryId, "second routine run while the first runs", 10_000);
+      report.whileHeld = {
+        chatTurn: "completed",
+        secondRoutineRun: "completed",
+        heldRunStatus: mailbox.getDelivery(runDeliveryId)?.delivery.status ?? "missing",
+      };
+      pass("The held routine run still runs", report.whileHeld.heldRunStatus === "running");
+      await rm(fakeHold);
+    }
+    await settled(runDeliveryId, `routine run ${run}`);
+    const entry = await waitFor(`routine run ${run} turn`, () => buildTurns().at(run - 1));
     await waitFor(`routine run ${run} session to close`, () =>
       fakeEntries().some((item) => item.method === "thread/unsubscribe" && item.threadId === entry.threadId),
     );
     routineTurns.push(turnEntry(`routine run ${run}`, entry));
   }
+  const buildThread = routineThread(agent.id, routine.id, "Routine report");
+  const docsThread = routineThread(agent.id, secondRoutine.id, "Second routine report");
+  report.routineThreads = [buildThread, docsThread];
 
   const entries = fakeEntries();
   report.threadStarts = entries
@@ -450,7 +535,17 @@ try {
     .filter((entry) => entry.method === "thread/unsubscribe")
     .map((entry) => entry.threadId);
   const routineStarts = report.threadStarts.filter((entry) => entry.ephemeral === true);
-  const results = entries.filter((entry) => entry.method === "tool-result");
+  const toolResults = entries.filter((entry) => entry.method === "tool-result");
+  const results = toolResults.filter((entry) => entry.tool !== "await_event");
+  const waitResults = toolResults.filter((entry) => entry.tool === "await_event");
+  report.waitInRoutineThread = waitResults.map((entry) => entry.result ?? entry.error ?? null);
+  pass(
+    "A run in a routine thread can open a wait",
+    waitResults.length === 1 &&
+      waitResults[0]?.result?.success === true &&
+      waitResults[0].turnId ===
+        entries.find((entry) => entry.method === "turn/start" && entry.text?.includes(SECOND_MARK))?.turnId,
+  );
   pass(
     "Routine Vault tool calls succeed",
     results.length === 10 && results.every((entry) => entry.result?.success && !entry.error),
@@ -470,8 +565,8 @@ try {
   );
   pass("Saved logins need no user takeover", takeoverRequests === 0);
   pass(
-    "Routine browser tabs belong to the public chat",
-    tab?.ownerThreadId === chatThread && tab.ownerAgentId === agent.id,
+    "Routine browser tabs belong to the routine thread",
+    tab?.ownerThreadId === buildThread.threadId && tab.ownerAgentId === agent.id,
   );
   pass(
     "Secrets stay outside provider input and tool results",
@@ -494,15 +589,17 @@ try {
       entry.instructions?.includes("do not call request_takeover or submit_secret without loginId"),
     ),
   );
-  pass("Each routine run starts one new session", routineStarts.length === 2);
+  pass("Each routine run starts one new session", routineStarts.length === 3);
   pass(
     "Routine sessions are ephemeral and not saved",
     routineStarts.every((entry) => entry.persistSession === false),
   );
   pass(
     "Each routine turn runs in its own session",
-    routineTurns.map((turn) => turn.threadId).join() === routineStarts.map((entry) => entry.threadId).join() &&
-      routineTurns.every((turn) => turn.threadId !== mainBefore),
+    new Set(routineTurns.map((turn) => turn.threadId)).size === 2 &&
+      routineTurns.every(
+        (turn) => turn.threadId !== mainBefore && routineStarts.some((entry) => entry.threadId === turn.threadId),
+      ),
   );
   pass(
     "Each routine session closes after its run",
@@ -533,17 +630,55 @@ try {
   const conversation = await runCauseEffect(agents.readConversation(agent.id));
   report.routineAnswersInChat = conversation.messages
     .map((message) => message.text)
-    .filter((text) => text.startsWith("Routine report"));
-  pass("The routine answers show in the chat", report.routineAnswersInChat.length === 2);
+    .filter((text) => text.startsWith("Routine report") || text.startsWith("Second routine report"));
+  pass("No routine answer shows in the chat", report.routineAnswersInChat.length === 0);
+  // A run in a routine thread still gets its status, its History row and its marker in the chat.
+  const runStatuses = () =>
+    [routine, secondRoutine].flatMap((item) =>
+      agents.listRoutineRuns({ agentId: agent.id, routineId: item.id }).map((run) => run.status),
+    );
+  report.runStatuses = await waitFor("the routine runs to succeed", () => {
+    const statuses = runStatuses();
+    return statuses.length === 3 && statuses.every((status) => status === "succeeded") ? statuses : null;
+  }).catch(() => runStatuses());
+  pass(
+    "Each routine run in a routine thread succeeds",
+    report.runStatuses.every((status) => status === "succeeded"),
+  );
+  report.runMarkersInChat = (await runCauseEffect(agents.readConversation(agent.id))).messages.flatMap((message) => {
+    const event = parseRoutineRunConversationEventItemType(message.itemType);
+    return event ? [event.status] : [];
+  });
+  pass(
+    "The chat shows each routine run as a marker",
+    report.runMarkersInChat.filter((status) => status === "succeeded").length === 3,
+  );
+  pass(
+    "Both runs of a routine answer in its one thread",
+    buildThread.answers.length === 2 && buildThread.title === "Build check",
+  );
+  pass(
+    "Each routine has its own thread",
+    docsThread.answers.length === 1 &&
+      docsThread.threadId !== buildThread.threadId &&
+      docsThread.title === "Docs check",
+  );
+  const heldChatTurn = fakeEntries().find(
+    (entry) => entry.method === "turn/start" && entry.threadId === mainBefore && entry.text?.includes("Are you there?"),
+  );
+  pass(
+    "The chat turn during a routine run reads the earlier run",
+    heldChatTurn?.text?.includes("Routine report 1") === true,
+  );
 
   await send(agent.id, "What did the routine find?", "chat turn after the routines");
   const next = fakeEntries()
     .filter((entry) => entry.method === "turn/start" && entry.threadId === mainBefore)
     .at(-1);
   assert.ok(next?.text);
-  const answers = ["Routine report 1", "Routine report 2"].filter((answer) => next.text?.includes(answer));
+  const answers = ["Routine report 2", "Second routine report"].filter((answer) => next.text?.includes(answer));
   report.digestInNextTurn = { marker: next.text.includes("routine run in its own session"), answers };
-  pass("The next chat turn reads both routine answers", report.digestInNextTurn.marker && answers.length === 2);
+  pass("The next chat turn reads the later routine answers", report.digestInNextTurn.marker && answers.length === 2);
   pass(
     "The chat did not resume or restart its session",
     !fakeEntries().some((entry) => entry.method === "thread/resume") &&

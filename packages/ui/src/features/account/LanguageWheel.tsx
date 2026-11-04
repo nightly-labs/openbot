@@ -33,6 +33,7 @@ const WHEEL: readonly WheelEntry[] = APP_LANGUAGE_OPTIONS.flatMap((option) => {
 /** The usual country of each catalog. Portuguese is the Brazilian catalog, so it keeps Brazil. */
 const FLAG_REGION: Record<TranslatedLocale, string> = {
   en: "US",
+  ar: "SA",
   de: "DE",
   es: "ES",
   fr: "FR",

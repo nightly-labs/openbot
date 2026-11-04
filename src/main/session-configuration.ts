@@ -151,9 +151,9 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
   session.defaultSession.protocol.handle("openbot-avatar", async (request) => {
     try {
       const url = new URL(request.url);
-      if (url.hostname !== "agent") return new Response("Not found", { status: 404 });
-      const agentId = decodeURIComponent(url.pathname.split("/").filter(Boolean)[0] ?? "");
-      const avatar = agentId ? agents.resolveAvatar(agentId) : null;
+      if (url.hostname !== "agent" && url.hostname !== "channel") return new Response("Not found", { status: 404 });
+      const id = decodeURIComponent(url.pathname.split("/").filter(Boolean)[0] ?? "");
+      const avatar = !id ? null : url.hostname === "agent" ? agents.resolveAvatar(id) : agents.resolveChannelImage(id);
       if (!avatar || avatar.version !== url.searchParams.get("v")) {
         return new Response("Not found", { status: 404 });
       }
@@ -267,6 +267,7 @@ function applicationContentType(
   | "text/css; charset=utf-8"
   | "image/svg+xml"
   | "image/png"
+  | "image/webp"
   | "font/woff2"
   | "application/octet-stream" {
   switch (extname(path).toLowerCase()) {
@@ -280,6 +281,8 @@ function applicationContentType(
       return "image/svg+xml";
     case ".png":
       return "image/png";
+    case ".webp":
+      return "image/webp";
     case ".woff2":
       return "font/woff2";
     default:

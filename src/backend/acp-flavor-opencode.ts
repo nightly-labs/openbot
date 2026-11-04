@@ -1,6 +1,6 @@
 import { RequestError } from "@agentclientprotocol/sdk";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
-import { type AcpFlavor, shownFailureDetail } from "./acp-flavor";
+import { type AcpCustomEndpoint, type AcpFlavor, shownFailureDetail } from "./acp-flavor";
 import { isUsageLimitDiagnostic } from "./agent/provider-diagnostics";
 import { isRecord } from "./protocol";
 
@@ -25,8 +25,9 @@ function isOpenCodeServiceFailure(error: unknown): boolean {
 /**
  * OpenCode 2.1.3's wrapper error for any failure that it has no ACP error for. Its data names only
  * the JavaScript error class, so the user read the generic text with no provider name (#2850).
+ * A start can get it too, when the probe `session/new` fails on a slow computer; a later start works (#4237).
  */
-function isOpenCodeInternalFailure(error: unknown): boolean {
+export function isOpenCodeInternalFailure(error: unknown): boolean {
   return (
     error instanceof RequestError &&
     error.code === -32603 &&
@@ -39,9 +40,18 @@ function isOpenCodeInternalFailure(error: unknown): boolean {
  * `-32000` and "provider authentication required", and no provider ID. A user with no key can pick
  * a paid or third-party model, and met that text with no next step (#2746). The model ID names the
  * provider before its first `/`.
+ *
+ * OpenCode 2.2.5 answers an HTTP 401 from a custom endpoint the same way, whether OpenBot sent no
+ * key or the endpoint refused the key. Its key is in OpenBot's endpoint settings, so the text for an
+ * OpenCode sign-in sent the user to the wrong place.
  */
-function openCodeAuthRequired(error: unknown, model: string | null): string | null {
+function openCodeAuthRequired(error: unknown, model: string | null, endpoint: AcpCustomEndpoint | null): string | null {
   if (!(error instanceof RequestError) || error.code !== -32000) return null;
+  if (endpoint)
+    return sourceText(
+      endpoint.hasCredentials ? "error.provider.customEndpointKeyRefused" : "error.provider.customEndpointKeyMissing",
+      { provider: endpoint.name },
+    );
   const provider = model?.includes("/") ? model.slice(0, model.indexOf("/")) : "";
   return provider
     ? sourceText("error.provider.opencodeAuthRequired", { provider })
@@ -123,8 +133,8 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
         error.data.sessionId === sessionId &&
         error.message === `Invalid params: session not found: ${sessionId}`
       : null,
-  turnFailure: (error, detail, redact, log, model) => {
-    const authRequired = openCodeAuthRequired(error, model);
+  turnFailure: (error, detail, redact, log, model, endpoint) => {
+    const authRequired = openCodeAuthRequired(error, model, endpoint);
     if (authRequired) return authRequired;
     // Google answers "API key not valid" (#1388).
     if (/invalid api key|api key not valid|unauthori[sz]ed|token refresh failed|authentication failed/i.test(detail))

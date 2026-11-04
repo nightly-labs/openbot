@@ -53,14 +53,14 @@
   align-self: flex-start;
   align-items: center;
   gap: var(--openbot-space-2);
-  margin-left: calc(-1 * var(--openbot-space-1-5));
+  margin-inline-start: calc(-1 * var(--openbot-space-1-5));
   border-radius: var(--openbot-radius-sm);
   padding: var(--openbot-space-0-5) var(--openbot-space-1-5);
   color: inherit;
   font-size: var(--openbot-text-md);
   font-weight: var(--openbot-weight-regular);
   line-height: var(--openbot-leading-md);
-  text-align: left;
+  text-align: start;
 }
 
 /* The open list is not a lit toggle, so the header has no fill. */
@@ -122,7 +122,7 @@
 
 .subagents-list {
   display: flex;
-  width: min(100%, 720px);
+  width: var(--message-wide-bubble-width);
   flex-direction: column;
   margin: 0;
   border: 1px solid var(--openbot-border);
@@ -148,7 +148,7 @@
   color: inherit;
   font-weight: var(--openbot-weight-regular);
   line-height: inherit;
-  text-align: left;
+  text-align: start;
   white-space: normal;
   cursor: pointer;
 }
@@ -267,8 +267,8 @@
   flex-direction: column;
   gap: 2px;
   margin: 0;
-  border-left: 2px solid var(--openbot-border-strong);
-  padding-left: var(--openbot-space-2);
+  border-inline-start: 2px solid var(--openbot-border-strong);
+  padding-inline-start: var(--openbot-space-2);
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
@@ -378,4 +378,17 @@
   .subagents-status[data-state="running"] .subagents-status-icon {
     animation: none;
   }
+}
+
+/* In RTL the right chevron points left, so the open group turns it the other way to point down. */
+:dir(rtl) svg[class~="lucide-chevron-right"].subagents-group-chevron {
+  transform: scaleX(-1);
+}
+
+:dir(rtl) .subagents-group-header[aria-expanded="true"] svg[class~="lucide-chevron-right"].subagents-group-chevron {
+  rotate: -90deg;
+}
+
+:dir(rtl) svg[class~="lucide-chevron-right"].subagents-row-chevron {
+  transform: scaleX(-1);
 }

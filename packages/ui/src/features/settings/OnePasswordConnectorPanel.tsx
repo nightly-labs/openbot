@@ -13,9 +13,9 @@ import {
   ItemMedia,
   ItemTitle,
   KeyRound,
+  PlushLoader,
   RefreshCw,
   SettingsSection,
-  Spinner,
   Text,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
@@ -241,7 +241,7 @@ export function OnePasswordConnectorPanel(props: OnePasswordConnectorPanelProps)
                     </Button>
                   }
                 >
-                  <Spinner size="sm" label={t("connector.onePassword.approveInApp")} />
+                  <PlushLoader size={24} label={t("connector.onePassword.approveInApp")} />
                   <Button type="button" size="sm" variant="ghost" onClick={props.onCancel}>
                     {t("connector.onePassword.cancel")}
                   </Button>

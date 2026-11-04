@@ -21,7 +21,7 @@ computer of the user who signs in. A sign-in uses one of these kinds:
 | Kind | Example | On this computer | On a joined server |
 | --- | --- | --- | --- |
 | Loopback callback | URL MCP servers (`McpOAuth`), Codex browser sign-in, a page that an agent's CLI prints | The page sends the browser to `http://127.0.0.1:<port>/...`. The MCP listener uses port 28417 and path `/mcp-auth` ([`mcp-oauth-redirect-server.ts`](../../src/main/mcp-oauth-redirect-server.ts)). | The [callback relay](#remote-sign-in-the-callback-relay) (`sign-in-relay-v1`). MCP on an older host: the host's live view (`mcp-sign-in-v1`). |
-| Device code | Codex (`codex-device`), Grok, Cline, Muse, the GitHub connector | The user types a short code on the provider's page. Nothing comes back to OpenBot. | The host starts it and the client shows the code (`providers-v1` to `providers-v5`). Muse: the relay opens its device page with no callback. GitHub: `connectors-v1`. |
+| Device code | Codex (`codex-device`), Grok, Cline, Kimi, Muse, the GitHub connector | The user types a short code on the provider's page. Nothing comes back to OpenBot. | The host starts it and the client shows the code (`providers-v1` to `providers-v5`; Kimi `providers-v8` only). Muse: the relay opens its device page with no callback. GitHub: `connectors-v1`. |
 | Pasted code | Claude on Linux (`cli` / `paste`), Cursor (`cli` / `link`) | The page shows a code, and the user pastes it into OpenBot. | The host starts it and the client takes the code (`providers-v3` to `providers-v5`). |
 | CLI-owned browser login | Claude (`auth login`), Codex, Gemini (`acp-authenticate`) | The provider's CLI opens the browser and takes its own callback. | The relay (`provider/start`): the host captures the page, and the client sends the callback query to the CLI's listener on the host. Grok, Cursor and Cline: a code kind. |
 | Deep link | Slack, Discord (`openbot://slack-workspace`, `openbot://discord-guild`), MCP fallback (`openbot://mcp-auth`) | A hosted page ends in an `openbot://` link, which reaches only the computer that opened it. | Slack and Discord: `connectors-v1`. The client sends the sealed grant on to the host that started the install. The browser client gets the grant from a return page of its own origin (`web-messaging-install.ts`). |
@@ -65,6 +65,22 @@ the request. A LAN or localhost MCP URL has no such check. The check does not pi
 DNS can change between the check and the connection; this residual risk is accepted.
 Run `bun run test:mcp-oauth` to check the sign-in paths against a local authorization server.
 
+### More than one account of one MCP server
+
+An app on a fixed address that signs in with a browser, such as Notion, can have more than one
+account. Each account is one http row on the same address. The row name is the account name, and a
+message tags the account with `@<row name>`.
+
+| Part | Rule |
+| --- | --- |
+| Address | The first account keeps the listing URL and name, so a released client still finds it. Add account adds `#account-<id>` to the URL ([`mcp-accounts.ts`](../../packages/contracts/src/mcp-accounts.ts)). A row from before accounts has no fragment and keeps its sign-in. |
+| Sign-in | `McpOAuth` keeps one record for each address with its fragment (`mcpOAuthAccountKey`). Discovery, registration, tokens and revocation use the address without the fragment, so the fragment never leaves the computer. |
+| Provider | `McpGateway.endpoint` removes the fragment. The proxy target keeps it, so a token refresh reads the sign-in of that account, and the proxy removes it before each request. The proxy route is a digest of the row id and its URL, so each account has its own route. |
+| Catalog | `isPluginAppConfig` gives each row with an account fragment to the catalog app, whatever its name. A row with no fragment needs the catalog name, so it has no Rename. Disconnect removes all accounts of the app. |
+| Joined server | The client offers Add account only when the host sends `mcp-accounts-v1`. An older host keys sign-ins by the address without the fragment, so two accounts would share one sign-in. |
+
+Run `bun scripts/mcp-oauth-store-e2e.ts` to check that two accounts keep separate sign-ins.
+
 ### How an agent reaches a signed-in MCP server
 
 An agent never gets an OAuth token. `McpGateway.endpoint` gives a provider a route of
@@ -75,8 +91,9 @@ probe are not changed.
 
 | Part | Rule |
 | --- | --- |
-| Address | `http://127.0.0.1:<port>/mcp/<route>`. The route is a digest of the row id and its URL, so a changed URL is a new route. |
-| Bearer | An HMAC of the route with the proxy secret. A bearer opens one route only. It is compared with `timingSafeEqual` and registered for redaction. |
+| Address | `http://127.0.0.1:<port>/mcp/<route>/<agent>`. The route is a digest of the row id and its URL, so a changed URL is a new route. The agent segment is a digest of the agent id (`mcpOAuthProxyAgentKey`). `/mcp/<route>` with no agent segment stays valid: Codex sessions from before the segment hold it. |
+| Bearer | An HMAC of the route and the agent segment with the proxy secret. A bearer opens one route for one agent only. It is compared with `timingSafeEqual` and registered for redaction. |
+| Identity | The `clientInfo` of each `initialize` becomes `{ name: "openbot", title: "<agent name> (OpenBot)", version, websiteUrl }`; the name is read at each `initialize`, so a rename shows in the next session. With no known agent the title is `OpenBot`. `User-Agent` is `OpenBot/<version>` unless the row sets one. A body that is not JSON, is a batch, or is larger than 64 KiB goes through unchanged. |
 | Refused with 403 | A `Host` that is not `127.0.0.1:<port>` or `localhost:<port>`, an unknown path, a wrong bearer. |
 | Upstream | The row's URL and its headers, with the current token. The provider's `Authorization` and cookies are not sent. Only same-origin 307 and 308 redirects are followed, at most 3. |
 | Server answers 401 | One `McpOAuth.refreshAccessToken`, then one retry with the new token. |
@@ -107,7 +124,7 @@ the sign-in and keeps the grant.
 
 The optional Team API capability `sign-in-relay-v1` carries the relay. The frozen contract is
 [`sign-in-relay-v1.ts`](../../packages/contracts/src/team-protocol/sign-in-relay-v1.ts). It has
-three start routes, and `provider-account-relay-v1` adds a fourth. They share `status`, `complete` and `cancel`:
+three start routes, and `provider-account-relay-v1` and `-v2` add one more each. They share `status`, `complete` and `cancel`:
 
 | Start route | What it signs in | How the host delivers the callback |
 | --- | --- | --- |
@@ -115,6 +132,7 @@ three start routes, and `provider-account-relay-v1` adds a fourth. They share `s
 | `provider/start` | The CLI of a provider in `SIGN_IN_RELAY_PROVIDERS`: Codex, Claude, Gemini (`antigravity`) and Muse | It replays the query to the CLI's own loopback listener on the host. A Muse device page has no callback: the client only opens it. |
 | `link/start` | A sign-in page that an agent of the host printed in its conversation | It replays the query to the loopback address of that page. |
 | `provider-account/start` | An account after the first of Codex or Claude (`PROVIDER_ACCOUNT_RELAY_PROVIDERS`), new or signed out. The separate capability `provider-account-relay-v1` adds this route ([`provider-account-relay-v1.ts`](../../packages/contracts/src/team-protocol/provider-account-relay-v1.ts)) | It replays the query to the loopback listener of the account's CLI on the host, as for `provider/start`. |
+| `provider-account/v2/start` | An account after the first of Codex, Claude or Gemini (`PROVIDER_ACCOUNT_RELAY_V2_PROVIDERS`), new or signed out. The separate capability `provider-account-relay-v2` adds this route ([`provider-account-relay-v2.ts`](../../packages/contracts/src/team-protocol/provider-account-relay-v2.ts)). A host advertises it with v1, and a client uses the newest one that the host advertises | As for `provider-account/start`. |
 
 ### Sequence
 
@@ -456,6 +474,17 @@ lets everyone. With a list, `MessagingService` ignores a mention from a member w
 roles, before it reacts or posts. Signal passes the author's role IDs with each mention; a mention
 from an older Signal has none, so a server with a list ignores it.
 
+The optional capability `whatsapp-connector-v1`
+([`whatsapp-connector-v1.ts`](../../packages/contracts/src/team-protocol/whatsapp-connector-v1.ts), host
+route [`route-whatsapp-connector.ts`](../../src/main/team-api/route-whatsapp-connector.ts)) carries the
+host's WhatsApp numbers. The host runs the WhatsApp session and keeps its keys. A link answers the QR
+code text or the pairing code that the host's session got, and the client shows it and reads
+`linkState` while it waits. The other routes read the numbers, the allowed contacts and groups, and the
+pairing requests, and set them, and add the WhatsApp Orchestrator on the host's default model. The
+client uses the same WhatsApp page through `hostWhatsAppPort`
+([`whatsapp-connector.ts`](../../src/renderer/src/features/connectors/whatsapp-connector.ts)). No route
+carries a stored key; the QR code text holds the one-use secret of its link.
+
 The optional capability `onepassword-connector-v1`
 ([`onepassword-connector-v1.ts`](../../packages/contracts/src/team-protocol/onepassword-connector-v1.ts),
 host route [`route-onepassword-connector.ts`](../../src/main/team-api/route-onepassword-connector.ts))
@@ -503,7 +532,9 @@ Team API adapters are permanent (see [Team API compatibility](team-api.md)). Wor
 4. **Capability list.** Add the capability to `TEAM_CURRENT_CAPABILITIES` in
    [`current.ts`](../../packages/contracts/src/team-protocol/current.ts), and exclude it from
    `TEAM_BOOTSTRAP_CAPABILITIES` and `legacyTeamCapabilities`. Older peers read a limited number of
-   bootstrap capabilities, so a new optional one stays out of bootstrap.
+   bootstrap capabilities, so a new optional one stays out of bootstrap. Protocols 7 and 8 read at
+   most 128 capabilities and their lists are full, so add it to `TEAM_PROTOCOL_V9_ONLY_CAPABILITIES`
+   too: only a protocol 9 peer then sends or gets it.
 5. **Host route.** Add `src/main/team-api/route-<name>.ts`. Return `"unmatched"` for other paths,
    refuse with `400` when the capability is off, and call `requireAdmin` for admin routes. Register
    it in `TeamApiServer.#handle` in [`team-api-server.ts`](../../src/main/team-api-server.ts), and

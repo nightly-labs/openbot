@@ -19,15 +19,19 @@ import {
   LOCAL_SERVER_ID,
   type MacPermissionId,
 } from "@openbot/contracts/ipc";
-import type { AppTextKey, AppTranslate } from "@openbot/i18n";
+import type { AppTextKey, AppTranslate, LayoutDirection } from "@openbot/i18n";
 import {
   app,
   BrowserWindow,
   clipboard,
   type Display,
+  dialog,
+  type Input,
   Menu,
+  type MenuItemConstructorOptions,
   type Point,
   type Rectangle,
+  type RenderProcessGoneDetails,
   screen,
   session,
   type WebContents,
@@ -46,6 +50,7 @@ import type { HighlightDisplay } from "./computer-use-highlight-window";
 import { shouldShowDevelopmentWindow } from "./development-profile";
 import { dynamicIslandNotchSizeForDisplay } from "./dynamic-island-window";
 import { type InterfaceSizeService, type InterfaceSizeStep, interfaceSizeShortcut } from "./interface-size-service";
+import { preventPanelActivation } from "./mac-panel-activation";
 import {
   createMainWindowBoundsRecorder,
   presentMainWindow,
@@ -53,15 +58,31 @@ import {
   resolveMainWindowBounds,
   writeMainWindowBounds,
 } from "./main-window-state";
+import { createQuitShortcut, type QuitShortcut } from "./quit-shortcut";
 import type { RemoteServerManager } from "./remote-server-manager";
 import type { RemoteWorkflowError } from "./remote-service-effects";
 import { sendToRenderer } from "./renderer-ipc";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 import type { UpdateService } from "./update-service";
 import { followAppearance, followWindowGlass, windowBackgroundColor } from "./window-appearance";
+import { followWindowButtonSide, WINDOW_BUTTON_INSET } from "./window-buttons";
 
 /** The dark background of the main and setup windows, under the page's own canvas. */
 const MAIN_WINDOW_DARK_BACKGROUND = "#0b0d0e";
+
+/**
+ * The main window loads its page again when the renderer stops, as many times as this in
+ * `RENDERER_RELOAD_WINDOW_MS`. A page that stops each time it loads then ends as it did before.
+ */
+const RENDERER_RELOAD_MAX = 3;
+const RENDERER_RELOAD_WINDOW_MS = 60_000;
+/** A clean exit or a launch failure is not a page that stopped while in use. */
+const RELOADABLE_RENDERER_EXITS: ReadonlySet<RenderProcessGoneDetails["reason"]> = new Set([
+  "crashed",
+  "oom",
+  "killed",
+  "abnormal-exit",
+]);
 
 /**
  * What the window surface reads off the running application. Deliberately narrower than
@@ -126,6 +147,8 @@ export interface MainWindowContext {
   getServices: () => MainWindowApplicationServices | null;
   /** A function, not a value: the saved language is read after the first window opens. */
   getTranslate: () => AppTranslate;
+  /** A function, not a value: the user can change the language while the window is open. */
+  getLayoutDirection: () => LayoutDirection;
   /** A renderer load or committed document navigation resets delivery of queued links. */
   onRendererLoadStarted: () => void;
   /** Main must release resources when a renderer can no longer run its own cleanup. */
@@ -133,6 +156,8 @@ export interface MainWindowContext {
   /** Where the entry point attaches the Windows session-end handlers, which read its own flags. */
   onMainWindowCreated: (window: BrowserWindow) => void;
   reportError: (message: string, error: unknown) => void;
+  /** Quits after `Cmd + Q` was held or pressed twice in a window. See `createQuitShortcut`. */
+  quitFromShortcut: () => void;
 }
 
 export interface MainWindowController {
@@ -147,6 +172,11 @@ export interface MainWindowController {
   loadRenderer: (window: BrowserWindow) => Promise<void>;
   restoreMainWindowBounds: () => Effect.Effect<void>;
   flushMainWindowBounds: () => Effect.Effect<void, RemoteWorkflowError>;
+  /**
+   * For a view in a window, such as the browser dock: true when the key is part of `Cmd + Q`, and
+   * the view must then stop it. See `createQuitShortcut`.
+   */
+  handleQuitShortcut: (window: BrowserWindow, input: Input) => boolean;
 }
 
 export function createMainWindowController({
@@ -160,11 +190,21 @@ export function createMainWindowController({
   keepRunningInBackground,
   getServices,
   getTranslate,
+  getLayoutDirection,
   onRendererLoadStarted,
   onRendererGone,
   onMainWindowCreated,
   reportError,
+  quitFromShortcut,
 }: MainWindowContext): MainWindowController {
+  const quitShortcut =
+    process.platform === "darwin"
+      ? createQuitShortcut({
+          quit: quitFromShortcut,
+          isQuitting,
+          showHint: (window, visible) => sendToRenderer(window, IPC_ENDPOINTS.app.quitShortcutHint, visible),
+        })
+      : null;
   const { restoreMainWindowBounds, currentMainWindowBounds, rememberMainWindowBounds, flushMainWindowBounds } =
     createMainWindowBoundsRecorder({
       getMainWindow: () => holder.current,
@@ -172,6 +212,7 @@ export function createMainWindowController({
       writeBounds: (bounds) => writeMainWindowBounds(statePath, bounds),
       reportError,
     });
+  let rendererReloadTimes: number[] = [];
 
   function createWindow(): BrowserWindow {
     const cursor = screen.getCursorScreenPoint();
@@ -197,9 +238,10 @@ export function createMainWindowController({
       // detail. macOS spaces the three 13px dots 23px apart, so the group is 59px wide: x 12 leaves
       // it 11px clear of the 82px where the top row's first control starts, in the app frame and in
       // the full-bleed browser header alike, and y 13 puts its centre line within half a pixel of
-      // both of those rows. The setup window below uses the same offsets.
+      // both of those rows. The setup window below uses the same offsets. In a right-to-left language
+      // the group is at the top right with the same offsets (`window-buttons.ts`).
       ...(process.platform === "darwin"
-        ? { titleBarStyle: "hidden" as const, trafficLightPosition: { x: 12, y: 13 } }
+        ? { titleBarStyle: "hidden" as const, trafficLightPosition: WINDOW_BUTTON_INSET }
         : {}),
       webPreferences: {
         preload: join(__dirname, "../preload/index.cjs"),
@@ -216,6 +258,7 @@ export function createMainWindowController({
     window.once("ready-to-show", () => {
       performance.mark("openbot:window-ready");
       if (
+        !windowsKeptHidden &&
         shouldShowDevelopmentWindow({
           remoteRole: developmentRemoteRole,
           testClientEnabled: developmentTestClientEnabled,
@@ -229,7 +272,9 @@ export function createMainWindowController({
       // Nobody can use a tab without the window, so the agents waiting on it continue.
       getServices()?.browser.releaseUserControlHeldBy({ kind: "local" });
       // The hidden renderer owns the cross-host Dynamic Island coordinator and must outlive its visible
-      // window. On Windows and Linux the user chooses it, and the tray icon is the way back.
+      // window. On Windows and Linux the user chooses it, and the tray icon is the way back. On macOS
+      // the Dock icon is the way back, and the menu bar icon too when the user chooses it. The Dock
+      // icon stays, so its dot shows that OpenBot still runs.
       if ((process.platform === "darwin" || keepRunningInBackground()) && !isQuitting()) {
         event.preventDefault();
         window.hide();
@@ -255,7 +300,29 @@ export function createMainWindowController({
     });
     window.webContents.on("render-process-gone", onRendererGone);
     window.webContents.once("destroyed", onRendererGone);
-    attachAppInput(window, getServices, getTranslate, { closesBrowserTabs: true });
+    // A dead page gets no keys, so Ctrl+R cannot reach the Reload item on Windows and Linux, and the
+    // window stayed white until a restart (#4696). The agents keep running in main.
+    window.webContents.on("render-process-gone", (_event, details) => {
+      const now = Date.now();
+      rendererReloadTimes = rendererReloadTimes.filter((time) => now - time < RENDERER_RELOAD_WINDOW_MS);
+      if (
+        isQuitting() ||
+        window.isDestroyed() ||
+        !RELOADABLE_RENDERER_EXITS.has(details.reason) ||
+        rendererReloadTimes.length >= RENDERER_RELOAD_MAX
+      ) {
+        return;
+      }
+      rendererReloadTimes.push(now);
+      setImmediate(() => {
+        if (window.isDestroyed()) return;
+        loadRenderer(window).catch((error: unknown) =>
+          reportError("Could not reload the main window after its renderer stopped", error),
+        );
+      });
+    });
+    attachAppInput(window, getServices, getTranslate, { closesBrowserTabs: true, quitShortcut });
+    followWindowButtonSide(window, getLayoutDirection);
     window.webContents.on("will-navigate", (event, targetUrl) => {
       if (!isTrustedRendererUrl(targetUrl)) event.preventDefault();
     });
@@ -302,7 +369,7 @@ export function createMainWindowController({
       title: getTranslate()("window.localHostTitle"),
       icon: appIconPath,
       ...(process.platform === "darwin"
-        ? { titleBarStyle: "hidden" as const, trafficLightPosition: { x: 12, y: 13 } }
+        ? { titleBarStyle: "hidden" as const, trafficLightPosition: WINDOW_BUTTON_INSET }
         : {}),
       webPreferences: {
         preload: join(__dirname, "../preload/index.cjs"),
@@ -333,7 +400,8 @@ export function createMainWindowController({
       const interfaceSize = getServices()?.interfaceSize;
       if (interfaceSize) window.webContents.setZoomFactor(interfaceSize.zoomFactor);
     });
-    attachAppInput(window, getServices, getTranslate, { closesBrowserTabs: false });
+    attachAppInput(window, getServices, getTranslate, { closesBrowserTabs: false, quitShortcut });
+    followWindowButtonSide(window, getLayoutDirection);
     announceChatWindows();
     const url = appRendererUrl(process.env.ELECTRON_RENDERER_URL);
     url.searchParams.set("window", "chat");
@@ -385,21 +453,29 @@ export function createMainWindowController({
     loadRenderer,
     restoreMainWindowBounds,
     flushMainWindowBounds,
+    handleQuitShortcut: (window, input) => quitShortcut?.handleInput(window, input) ?? false,
   };
 }
 
 /**
  * The keys and the right-click menu of a window that loads the app. Only the main window has the
- * browser, so only it closes a browser tab on the close shortcut.
+ * browser, so only it closes a browser tab on the close shortcut. `quitShortcut` is null where the
+ * Quit item keeps its default key.
  */
 function attachAppInput(
   window: BrowserWindow,
   getServices: () => MainWindowApplicationServices | null,
   getTranslate: () => AppTranslate,
-  { closesBrowserTabs }: { closesBrowserTabs: boolean },
+  { closesBrowserTabs, quitShortcut }: { closesBrowserTabs: boolean; quitShortcut: QuitShortcut | null },
 ): void {
   let inspectElementModifierPressed = false;
+  if (quitShortcut) window.on("blur", () => quitShortcut.handleBlur(window));
   window.webContents.on("before-input-event", (event, input) => {
+    if (quitShortcut?.handleInput(window, input)) {
+      // This also stops the Quit item, which has the same key.
+      event.preventDefault();
+      return;
+    }
     if (input.key.toLowerCase() === "shift") {
       inspectElementModifierPressed = input.type === "keyDown";
     }
@@ -408,15 +484,20 @@ function attachAppInput(
       window.webContents.toggleDevTools();
       return;
     }
+    // A focused frame, such as the remote desktop viewer, gets the select-all key and the size keys
+    // that the View menu also has. The viewer sends them to the remote computer and stops the menu
+    // items with the same keys (#3921). No menu item has Shift+= or "+", so these stay here.
+    const frameFocused = Boolean(window.webContents.focusedFrame?.parent);
     const sizeStep = interfaceSizeShortcut(input, process.platform === "darwin");
     const interfaceSize = getServices()?.interfaceSize;
-    if (sizeStep && interfaceSize) {
+    const sizeKeyInMenu = !input.shift && input.key !== "+";
+    if (!(frameFocused && sizeKeyInMenu) && sizeStep && interfaceSize) {
       // This also stops the View menu item with the same key, which would step the size again.
       event.preventDefault();
       Effect.runFork(interfaceSize.step(sizeStep));
       return;
     }
-    if (isSelectAllShortcut(input)) {
+    if (!frameFocused && isSelectAllShortcut(input)) {
       event.preventDefault();
       void window.webContents.executeJavaScript(
         `(() => {
@@ -539,6 +620,9 @@ export function createDynamicIslandWindow(bounds: Rectangle, _display: Display):
       webSecurity: true,
     },
   });
+  // The island is the topmost window on every Space. Without this, macOS can give it activation
+  // when the user switches to an application that has no window there.
+  preventPanelActivation(window);
   // Chromium shares zoom per origin. The main window zoom would shrink this fixed-size window's
   // viewport and move the shared avatar out of the expanded panel.
   window.webContents.setZoomMode("isolated");
@@ -623,7 +707,10 @@ export function createComputerUseHighlightWindow(bounds: Rectangle): BrowserWind
  * sandboxed, context-isolated, no window may be opened from it, and no navigation away from the
  * renderer's own origin.
  */
-export function createComputerUsePermissionHelpWindow(translate: AppTranslate): BrowserWindow {
+export function createComputerUsePermissionHelpWindow(
+  translate: AppTranslate,
+  getLayoutDirection: () => LayoutDirection,
+): BrowserWindow {
   const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   const width = 340;
   // The card the user drags out of it, the two steps, and nothing else: a window taller than its
@@ -644,7 +731,7 @@ export function createComputerUsePermissionHelpWindow(translate: AppTranslate): 
     backgroundColor: windowBackgroundColor(MAIN_WINDOW_DARK_BACKGROUND),
     title: translate("window.computerUsePermissionTitle"),
     ...(process.platform === "darwin"
-      ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 12, y: 13 } }
+      ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: WINDOW_BUTTON_INSET }
       : {}),
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
@@ -659,6 +746,7 @@ export function createComputerUsePermissionHelpWindow(translate: AppTranslate): 
   // the steps to nobody.
   window.setAlwaysOnTop(true, "floating");
   followAppearance(window, MAIN_WINDOW_DARK_BACKGROUND);
+  followWindowButtonSide(window, getLayoutDirection);
   // The fixed height fits the contents only at 100%; the main window zoom would clip the steps.
   window.webContents.setZoomMode("isolated");
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
@@ -762,8 +850,18 @@ export function sendComputerUseHighlightPlacement(
   sendToRenderer(window, IPC_ENDPOINTS.computerUse.highlightPlacement, placement);
 }
 
-/** Set by `hideWindowsForQuit` and never cleared: the process ends after it. */
-let windowsHiddenForQuit = false;
+/** Set by `hideWindowsForQuit` or `keepWindowsHidden` and never cleared. */
+let windowsKeptHidden = false;
+
+/**
+ * A server (`OPENBOT_SERVER=1` or a hosted server) shows no window. Its windows are on a virtual
+ * display that has no viewer and no GPU, so a shown window drew each frame in software for nobody
+ * (#4482). A hidden window draws nothing, and its renderer runs as in the background on a desktop.
+ * A local server on this computer also shows no window: its main window never loads.
+ */
+export function keepWindowsHidden(): void {
+  windowsKeptHidden = true;
+}
 
 /**
  * The renderer keeps reading while the services stop, and a read that the closing services fail
@@ -771,12 +869,12 @@ let windowsHiddenForQuit = false;
  * then does not show the window again.
  */
 export function hideWindowsForQuit(): void {
-  windowsHiddenForQuit = true;
+  windowsKeptHidden = true;
   for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.hide();
 }
 
 export function showMainWindow(window: BrowserWindow): void {
-  if (windowsHiddenForQuit) return;
+  if (windowsKeptHidden) return;
   presentMainWindow(window, process.platform, () => app.show());
 }
 
@@ -819,6 +917,47 @@ function hideMenuBar(window: BrowserWindow): void {
   if (process.platform !== "darwin") window.setMenuBarVisibility(false);
 }
 
+export type MenuQuitSource = "menu" | "shortcut";
+
+let quitConfirmationOpen = false;
+
+/**
+ * `Cmd + Q` is next to `Cmd + W` and `Cmd + A`, and one press stopped OpenBot with its agents and
+ * routines (#4149). In a focused OpenBot page the keys never get here: `createQuitShortcut` quits
+ * when they are held or pressed twice. The item gets the keys only with no OpenBot page focused, such
+ * as with the window closed or a sign-in window focused. No page can show the hint there, so OpenBot
+ * asks. A click on
+ * the item, the Dock, a system logout and an update still quit at once.
+ */
+function macQuitItem(translate: AppTranslate, quit: (source: MenuQuitSource) => void): MenuItemConstructorOptions {
+  return {
+    label: translate("menu.quit"),
+    accelerator: "Command+Q",
+    click: (_item, _window, event) => {
+      if (!event.triggeredByAccelerator) return quit("menu");
+      // A second press while the question is open does not open another one, and a quit that has
+      // started hid every window and needs no question.
+      if (quitConfirmationOpen || windowsKeptHidden) return;
+      quitConfirmationOpen = true;
+      void dialog
+        .showMessageBox({
+          type: "question",
+          message: translate("menu.quitConfirmTitle"),
+          detail: translate("menu.quitConfirmBody"),
+          buttons: [translate("menu.quitConfirm"), translate("common.cancel")],
+          defaultId: 0,
+          cancelId: 1,
+        })
+        .then(({ response }) => {
+          if (response === 0) quit("shortcut");
+        })
+        .finally(() => {
+          quitConfirmationOpen = false;
+        });
+    },
+  };
+}
+
 /**
  * The native application menu.
  *
@@ -830,6 +969,8 @@ function hideMenuBar(window: BrowserWindow): void {
  * must be declared here: without it macOS has no Settings shortcut. The View menu is the default
  * `viewMenu`, but its zoom items change the saved interface size, so Settings and the next start
  * keep the size the user chose. A website in the browser keeps the zoom of the default roles.
+ *
+ * On macOS the Quit item is custom too, so `quit` learns how it was chosen. See `macQuitItem`.
  */
 export function configureApplicationMenu(
   service: AgentService,
@@ -837,6 +978,7 @@ export function configureApplicationMenu(
   interfaceSize: InterfaceSizeService,
   translate: AppTranslate,
   getMainWindow: () => BrowserWindow | null,
+  quit: (source: MenuQuitSource) => void,
 ): void {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
@@ -880,7 +1022,7 @@ export function configureApplicationMenu(
           { role: "hideOthers" },
           { role: "unhide" },
           { type: "separator" },
-          { role: "quit" },
+          process.platform === "darwin" ? macQuitItem(translate, quit) : { role: "quit" },
         ],
       },
       { role: "editMenu" },

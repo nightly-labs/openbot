@@ -100,13 +100,21 @@ export function AgentInformation({
     if (section === "usage") mobileAnalytics.track("usage_viewed", { scope: "agent" });
   }, [section]);
   const { t, format } = useText();
-  const { recordId } = useLocalSearchParams<{ recordId?: string }>();
+  // The server Usage screen passes its range, so the agent's report opens on the same days.
+  const { recordId, startDate, endDate, timeZone } = useLocalSearchParams<{
+    recordId?: string;
+    startDate?: string;
+    endDate?: string;
+    timeZone?: string;
+  }>();
   const workspace = useMobileWorkspaceActions();
   const role = useMobileWorkspaceSelector(
     (current) => current.servers.find((server) => server.id === agent.serverId)?.role,
   );
   const queryScope = useQueryScope();
-  const [range, setRange] = useState(() => analyticsRange(agent.id));
+  const [range, setRange] = useState(() =>
+    startDate && endDate && timeZone ? { agentId: agent.id, startDate, endDate, timeZone } : analyticsRange(agent.id),
+  );
   const options = { enabled: available, retry: false, staleTime: 0, gcTime: 0 };
   const memories = useQuery({
     ...options,

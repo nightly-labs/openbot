@@ -1,5 +1,6 @@
 import type { ClientAgentSummary, ConversationMessage, QueueDeliveryStatus } from "@openbot/contracts/ipc";
 import {
+  AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
   CONVERSATION_MEMORY_CHANGES_ITEM_TYPE,
   CONVERSATION_PLAN_ITEM_TYPE,
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
@@ -60,6 +61,7 @@ export function toAgentProfile(stored: ClientAgentSummary): AgentProfile {
     workspacePath: stored.workspacePath,
     avatarSeed: stored.avatarSeed,
     avatarHue: stored.avatarHue,
+    ...(stored.avatarColor == null ? {} : { avatarColor: stored.avatarColor }),
     avatarUrl: stored.avatarUrl,
     ...(stored.marketplaceSource === undefined ? {} : { marketplaceSource: stored.marketplaceSource }),
     updatedAt: stored.updatedAt,
@@ -249,6 +251,7 @@ export function agentProfilesEqual(left: AgentProfile, right: AgentProfile): boo
     left.threadId === right.threadId &&
     left.avatarSeed === right.avatarSeed &&
     left.avatarHue === right.avatarHue &&
+    (left.avatarColor ?? null) === (right.avatarColor ?? null) &&
     left.avatarUrl === right.avatarUrl &&
     marketplaceSourcesEqual(left.marketplaceSource, right.marketplaceSource) &&
     left.updatedAt === right.updatedAt &&
@@ -342,6 +345,14 @@ function chatActionMarker(
   if (isVaultChangeMarker(message)) return { kind: "vault-change", text: message.text, timestamp: message.createdAt };
   if (isPlanContinuationMarker(message))
     return { kind: "plan-continuation", text: message.text, timestamp: message.createdAt };
+  if (message.author === "system" && message.itemType === AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE)
+    return {
+      kind: "instructions-change",
+      agentId: ownerAgentId ?? null,
+      change: message.instructionsChange ?? null,
+      text: message.text,
+      timestamp: message.createdAt,
+    };
   const skillEvent = skillConversationEvent(message);
   if (skillEvent) return { ...skillEvent, kind: "skill-lifecycle", timestamp: message.createdAt };
   const suggestion = marketplaceSuggestionEvent(message);

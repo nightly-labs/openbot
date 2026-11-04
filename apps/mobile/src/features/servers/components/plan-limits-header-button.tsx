@@ -2,7 +2,7 @@ import type { PlanLimitRow, PlanLimits } from "@openbot/team-client/plan-limits"
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import { Pressable, View, type ViewStyle } from "react-native";
-import { planLimitName, planLimitWindowLabel } from "@/features/servers/model/plan-limits";
+import { lowestPlanLimitsFirst, planLimitName, planLimitWindowLabel } from "@/features/servers/model/plan-limits";
 import { ChromeGlassSheen } from "@/shared/components/chrome-glass-sheen";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
@@ -38,7 +38,7 @@ export function PlanLimitsHeaderButton({
   androidGlass: ViewStyle;
 }) {
   const { t } = useText();
-  const lowest = [...rows].sort((left, right) => left.remainingPercent - right.remainingPercent);
+  const lowest = lowestPlanLimitsFirst(rows);
   const shown = lowest.slice(0, 2);
   const more = lowest.length - shown.length;
   const summary = lowest

@@ -38,7 +38,8 @@
     "firecrawl",
     "brave-search",
     "resend",
-    "composio"
+    "composio",
+    "clickup"
   ],
   "featured": ["aave", "canva", "notion", "figma"]
 }

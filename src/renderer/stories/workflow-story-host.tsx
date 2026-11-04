@@ -22,12 +22,14 @@ import { HelpMenu } from "@openbot/ui/features/updates/HelpMenu";
 import { PageRail, type PageRailPage } from "@openbot/ui/features/window/PageRail";
 import { WorkflowCanvas } from "@openbot/ui/features/workflows/WorkflowCanvas";
 import { WORKFLOW_FEATURES_V1, type WorkflowFeatures } from "@openbot/ui/features/workflows/workflow-model";
+import type { WorkflowPresence } from "@openbot/ui/features/workflows/workflow-presence";
 import type { WorkflowRunView } from "@openbot/ui/features/workflows/workflow-run-view";
 import { createSignal, Show, untrack } from "solid-js";
 import { fn } from "storybook/test";
 import { defaultSidebarLayout } from "../src/features/sidebar/sidebar-sections";
 import { createWorkflowsController } from "../src/features/workflows/workflows-controller";
 import type { WorkflowHost } from "../src/features/workflows/workflows-port";
+import { createMockGitHubConnector } from "../src/preview/mock-github-connector";
 import { mockWorkflows } from "../src/preview/mock-workflows";
 import { STORY_AGENTS } from "./fixtures";
 import { STORY_CATALOGS, type StoryWorkflow } from "./workflow-story-data";
@@ -136,24 +138,49 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
       decide: async (input) => {
         if (!fixtureSteps.has(input.stepId)) await api.decide(input);
       },
+      githubHistory: async (workflowId) => {
+        const live = await api.githubHistory(workflowId);
+        const fixture = fixtures.get(workflowId)?.github;
+        if (!fixture) return live;
+        return { deliveries: [...live.deliveries, ...fixture.deliveries], runs: [...live.runs, ...fixture.runs] };
+      },
     },
     onChanged(changed) {
       listeners.add(changed);
       return () => listeners.delete(changed);
     },
     places: async () => [...STORY_CATALOGS.places],
+    discordServers: async () => [],
+    telegramChats: async () => [],
+    slackWorkspaces: async () => [],
     agentLevels: async () => null,
+    githubSupported: () => true,
+    githubConnector: createMockGitHubConnector(),
+    hostName: () => undefined,
+    // A story opens no browser.
+    openUrl: async () => undefined,
   };
 }
 
 /** A canvas over the preview mock that opens the first of `workflows`. */
-export function WorkflowStory(props: { workflows: readonly StoryWorkflow[]; features?: WorkflowFeatures }) {
+export function WorkflowStory(props: {
+  workflows: readonly StoryWorkflow[];
+  features?: WorkflowFeatures;
+  presence?: WorkflowPresence;
+}) {
   const story = createWorkflowsController(storyWorkflowHost(untrack(() => props.workflows)));
   const features = () => props.features ?? WORKFLOW_FEATURES_V1;
   return (
     <Show when={story.detail()}>
       {(workflow) => (
-        <WorkflowCanvas workflow={workflow()} features={features()} catalogs={STORY_CATALOGS} {...story.props} />
+        <WorkflowCanvas
+          workflow={workflow()}
+          features={features()}
+          catalogs={STORY_CATALOGS}
+          github={story.github}
+          presence={props.presence}
+          {...story.props}
+        />
       )}
     </Show>
   );
@@ -244,6 +271,7 @@ export function WorkflowInAppStory(props: { workflows: readonly StoryWorkflow[];
                 workflow={workflow()}
                 features={features()}
                 catalogs={STORY_CATALOGS}
+                github={story.github}
                 frame="window"
                 {...story.props}
               />

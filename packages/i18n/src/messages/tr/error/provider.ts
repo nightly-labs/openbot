@@ -9,6 +9,10 @@ export const messages = {
   // Provider, provider runtime and custom endpoint errors.
   "error.provider.codexUnresponsive": "Codex yanıt vermeyi bıraktı, bu yüzden OpenBot işlemini sonlandırdı.",
   "error.provider.acpUnresponsive": "{provider} zamanında yanıt vermedi, bu yüzden OpenBot işlemini sonlandırdı.",
+  "error.provider.acpSignInLost":
+    "{provider} oturumunu kaybetti, bu yüzden OpenBot işlemini sonlandırdı. Mesajınızı yeniden gönderin.",
+  "error.provider.acpMcpNotLoaded":
+    "{provider}, OpenBot araçlarını yüklemedi; bu yüzden bu ajan onları kullanamıyor ve takım arkadaşlarına ulaşamıyor. Bir {provider} ekip politikası yerel MCP sunucularını engelleyebilir. Ekip yöneticinizden bunlara izin vermesini isteyin, ardından yeniden deneyin.",
   "error.provider.endpointsReadOnly":
     "Kayıtlı uç noktalar OpenBot'un daha yeni bir sürümü tarafından yazılmış veya dosya okunamıyor. Bunları değiştirmek için OpenBot'u güncelleyin.",
   "error.provider.endpointNoSecureStorage":
@@ -62,6 +66,7 @@ export const messages = {
   "error.provider.removeWhileOn": "İndirmesini kaldırmadan önce sağlayıcıyı kapatın.",
   "error.provider.removeWhileDownloading": "İndirmenin bitmesini bekleyin, sonra kaldırın.",
   "error.provider.removeIncomplete": "Bir program bu CLI'nin dosyalarını kullanıyor. Kapatın ve yeniden deneyin.",
+  "error.provider.removeDownloadsFailed": "Şu sağlayıcıların CLI indirmeleri kaldırılamadı: {providers}.",
   "error.provider.cliOverride": "OpenBot'ta güncelleme yapmadan önce açık CLI yolu geçersiz kılmasını kaldırın.",
   "error.provider.runtimeUpdateIncomplete": "Çalışma zamanı güncellemesi tamamlanmadı.",
   "error.provider.downloadHttp": "Çalışma zamanı indirmesi HTTP {status} ile başarısız oldu.",
@@ -101,6 +106,8 @@ export const messages = {
   "error.provider.modelIdDuplicate": "İki model aynı kimliğe sahip.",
   "error.provider.contextWindowInvalid":
     "Bir modelin bağlam penceresi {min} ile {max} arasında tam sayı bir token sayısı olmalıdır.",
+  "error.provider.maxOutputInvalid":
+    "Bir modelin en fazla çıktısı {min} ile {max} arasında tam sayı bir token sayısı olmalıdır.",
   "error.provider.headersTooMany": "Çok fazla üstbilgi var.",
   "error.provider.headerNameCharacter": "Bir üstbilgi adı HTTP'nin izin vermediği bir karaktere sahip.",
   "error.provider.headerNameTooLong": "Bir üstbilgi adı çok uzun.",
@@ -123,15 +130,6 @@ export const messages = {
     "Codex CLI bulundu ancak başlatılamadı. Yeni bir terminalde `codex --version` komutunu çalıştırın.",
   "error.provider.codexManagedNotStarted": "ChatGPT indirildi ancak başlatılamadı. OpenBot içinde yeniden indirin.",
   "error.provider.codexMissing": "ChatGPT indirilmedi. Devam etmek için OpenBot içinde indirin.",
-  "error.provider.codexConfigIgnored": {
-    one: "Codex yapılandırmasındaki {count} ayarı yok saydı: {settings}. Düzeltin veya kaldırın ya da Codex'i güncelleyin.",
-    other:
-      "Codex yapılandırmasındaki {count} ayarı yok saydı: {settings}. Düzeltin veya kaldırın ya da Codex'i güncelleyin.",
-  },
-  "error.provider.codexConfigIgnoredUnnamed": {
-    one: "Codex yapılandırmasındaki {count} ayarı yok saydı. Düzeltin veya kaldırın ya da Codex'i güncelleyin.",
-    other: "Codex yapılandırmasındaki {count} ayarı yok saydı. Düzeltin veya kaldırın ya da Codex'i güncelleyin.",
-  },
   "error.provider.claudeOutdated": "Claude Code {version} çok eski. OpenBot 2.1.232 veya daha yenisini gerektirir.",
   "error.provider.claudeNotStarted": "Claude CLI bulundu ancak başlatılamadı.",
   "error.provider.claudeNotStartedHint":
@@ -183,14 +181,22 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider} kimliği doğrulanmış bir hesap döndürmedi.",
   "error.provider.signInExpired": "{provider} oturumunuzun süresi doldu. Devam etmek için yeniden oturum açın.",
   "error.provider.cliActivateFailed": "OpenBot yönetilen CLI'yi etkinleştiremedi.",
+  "error.provider.noMainlandChinaSignIn": "{provider} için Çin anakarası oturum açma yok.",
+  "error.provider.cliNewVersionNotStarted": "Yeni sürüm başlamadı.",
   "error.provider.cliBusyReconnect":
     "{provider} CLI bir tur üzerinde çalışıyor. Bitmesini bekleyin, ardından tekrar bağlanın.",
+  "error.provider.cliBusySignOut":
+    "{provider} CLI bir tur üzerinde çalışıyor. Bitmesini bekleyin, sonra bağlantıyı kesin.",
   "error.provider.opencodeCredentialsRejected":
     "Model sağlayıcısı API anahtarını reddetti. Ayarlar'da OpenCode anahtarını veya `opencode auth login` ile sağlayıcının anahtarını düzeltin. Ardından tekrar deneyin ya da başka bir model seçin.\n{detail}",
   "error.provider.opencodeAuthRequired":
     'OpenCode, "{provider}" model sağlayıcısında oturum açmamış. Ücretsiz etiketli bir model seçin veya sağlayıcıyı bağlayın: OpenCode ayarlarına bir OpenCode Go anahtarı yapıştırın ya da bir terminalde `opencode auth login` komutunu çalıştırın. Ardından tekrar deneyin.',
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode, bu modelin sağlayıcısında oturum açmamış. Ücretsiz etiketli bir model seçin veya sağlayıcıyı bağlayın: OpenCode ayarlarına bir OpenCode Go anahtarı yapıştırın ya da bir terminalde `opencode auth login` komutunu çalıştırın. Ardından tekrar deneyin.",
+  "error.provider.customEndpointKeyRefused":
+    '"{provider}" uç noktası API anahtarını veya başlıklarını reddetti. Bunları Sunucu ayarları → Sağlayıcılar bölümünde yeniden girin, ardından tekrar deneyin.',
+  "error.provider.customEndpointKeyMissing":
+    '"{provider}" uç noktası bir API anahtarı gerektiriyor. Anahtarı Sunucu ayarları → Sağlayıcılar bölümünde ekleyin, ardından tekrar deneyin.',
   "error.provider.opencodeKeyExpired":
     "OpenCode API anahtarınızın süresi doldu. OpenCode Console'da yeni bir anahtar oluşturun, OpenCode ayarlarına yapıştırın, ardından tekrar deneyin.",
   "error.provider.opencodeServiceFailure":
@@ -256,6 +262,21 @@ export const messages = {
   "error.provider.clineNotStarted": "Cline başlatılamadı. Bir terminalde `cline --version` komutunu çalıştırın.",
   "error.provider.clineVersionUnreadable": "Cline CLI sürümü okunamıyor.",
   "error.provider.clineSignIn": "Cline'ı kullanmak için Cline ile oturum açın veya CLINE_API_KEY ayarlayın.",
+  "error.provider.kimiArchivePath": "Kimi arşivi beklenmeyen bir yola sahip.",
+  "error.provider.kimiChecksum": "Kimi çalışma zamanı sağlama toplamı (checksum) eşleşmiyor.",
+  "error.provider.kimiLicenseChecksum": "Kimi lisansı sağlama toplamı (checksum) eşleşmiyor.",
+  "error.provider.kimiMissing": "Kimi indirilmedi. Devam etmek için OpenBot içinde indirin.",
+  "error.provider.kimiOutdated": "Kimi CLI {version} çok eski. OpenBot 1.52.0 veya daha yenisini gerektirir.",
+  "error.provider.kimiNotStarted": "Kimi başlatılamadı. Bir terminalde `kimi --version` komutunu çalıştırın.",
+  "error.provider.kimiVersionUnreadable": "Kimi CLI sürümü okunamıyor.",
+  "error.provider.kimiSignIn": "Kimi'yi kullanmak için Kimi Code ile oturum açın.",
+  "error.provider.devinSignIn": "Devin'i kullanmak için Devin ile oturum açın.",
+  "error.provider.hermesMissing": "Hermes Agent yüklü değil. Yükleyin ve yeniden deneyin.",
+  "error.provider.hermesNotStarted":
+    "Hermes Agent başlatılamadı. Bir terminalde `hermes --version` komutunu çalıştırın.",
+  "error.provider.hermesVersionUnreadable": "Hermes Agent sürümü okunamıyor.",
+  "error.provider.hermesSignIn":
+    "Hermes'i kullanmak için Nous Portal ile oturum açın veya bir terminalde `hermes setup` komutunu çalıştırın.",
   "error.provider.usageLimitReached": "Hesap kullanım sınırına ulaştı.",
   "error.provider.foreignReasoning":
     "Farklı bir hesap veya API anahtarı aldığı için {provider} bu sohbetteki önceki akıl yürütmeyi kabul etmedi. OpenBot sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
@@ -308,6 +329,8 @@ export const messages = {
   "error.provider.customAgentNoSecureStorage":
     "Bu bilgisayarda güvenli depolama alanı yok, bu nedenle ortam değerleri kaydedilemez. Bunları kaldırıp tekrar deneyin.",
   "error.provider.customAgentNotSaved": "Bu özel ajan kayıtlı değil. Listeyi yenileyip tekrar deneyin.",
+  "error.provider.customAgentWorkspaceOnly":
+    "{reason}. “Yalnızca çalışma alanı” bunu engelliyor. “Tam erişim”i deneyin.",
   "error.provider.customAgentTooMany": "En fazla {count} özel ajan kaydedebilirsiniz.",
   "error.provider.customAgentEnvValueMissing": "{name} için bir değer girin.",
   "error.provider.off": "{provider}, OpenBot'ta kapalı. Önce sağlayıcı ayarlarından açın.",
@@ -320,6 +343,7 @@ export const messages = {
   "error.provider.accountsUnsupported": "{provider} yalnızca bir hesap destekler.",
   "error.provider.accountNeedsConnection": "Başka bir hesap eklemeden önce {provider} sağlayıcısına bağlanın.",
   "error.provider.usageResetUnsupported": "{provider} kullanım sınırlarını sıfırlayamaz.",
+  "error.provider.signOutUnsupported": "OpenBot {provider} oturumunun bağlantısını kesemiyor.",
   "error.provider.usageResetNotConnected": "Kullanımını sıfırlamadan önce bu {provider} hesabında yeniden oturum açın.",
   "error.provider.accountLimit": "{provider} en fazla {limit} hesap destekler.",
   "error.provider.accountNotFound": "Bu {provider} hesabı bu bilgisayarda yok. Yenileyip tekrar deneyin.",

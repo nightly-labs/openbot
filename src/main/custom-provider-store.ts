@@ -9,6 +9,7 @@
 
 import { readFile } from "node:fs/promises";
 import type {
+  CustomProviderHarness,
   CustomProviderHeader,
   CustomProviderHeaderInput,
   CustomProviderModel,
@@ -16,7 +17,13 @@ import type {
   SaveCustomProviderInput,
   UpdateCustomProviderInput,
 } from "@openbot/contracts/ipc";
-import { isCustomProviderContextWindow, sameCustomProviderOrigin } from "@openbot/contracts/ipc";
+import {
+  CUSTOM_PROVIDER_HARNESSES,
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
+  isCustomProviderContextWindow,
+  isCustomProviderMaxOutput,
+  sameCustomProviderOrigin,
+} from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema, Semaphore } from "effect";
 import { z } from "zod";
@@ -37,13 +44,15 @@ export interface CustomProviderCipher {
 }
 
 /**
- * `contextWindow` was added in a later release: a file without it still reads, and an older build drops it.
- * A value out of range is dropped, not refused, so that it cannot hide every saved endpoint.
+ * `contextWindow` and `maxOutput` were added in later releases: a file without them still reads, and an
+ * older build drops them. A value out of range is dropped, not refused, so that it cannot hide every
+ * saved endpoint.
  */
 const modelSchema = z.object({
   id: z.string(),
   name: z.string(),
   contextWindow: z.number().refine(isCustomProviderContextWindow).optional().catch(undefined),
+  maxOutput: z.number().refine(isCustomProviderMaxOutput).optional().catch(undefined),
 });
 const headerSchema = z.object({ name: z.string(), value: z.string() });
 
@@ -58,6 +67,11 @@ const entrySchema = z.object({
   models: z.array(modelSchema),
   /** One ciphertext for the key and every header value together, or absent for an endpoint with neither. */
   secret: z.string().nullish(),
+  /**
+   * Added in a later release, and written only for an endpoint that does not run on OpenCode. A file
+   * without it, and a value this build does not know, run on OpenCode; an older build drops it.
+   */
+  harness: z.enum(CUSTOM_PROVIDER_HARNESSES).optional().catch(undefined),
 });
 
 const fileSchema = z.object({ version: z.literal(1), providers: z.array(entrySchema) });
@@ -144,6 +158,7 @@ export class CustomProviderStore {
       headerNames: (secret?.headers ?? []).map((header) => header.name),
       // Copied, not shared: the renderer's list must not alias the stored entry.
       models: stored.models.map(copyModel),
+      harness: harnessOf(stored),
     }));
   }
 
@@ -156,6 +171,7 @@ export class CustomProviderStore {
       apiKey: secret?.apiKey ?? null,
       models: stored.models.map(copyModel),
       headers: secret?.headers ?? [],
+      harness: harnessOf(stored),
     }));
   }
 
@@ -181,6 +197,7 @@ export class CustomProviderStore {
             baseUrl: input.baseUrl,
             models: input.models.map(copyModel),
             secret: secret ? this.#cipher.encrypt(JSON.stringify(secret)).toString("base64") : null,
+            ...storedHarness(input.harness),
           },
           secret,
         },
@@ -216,6 +233,7 @@ export class CustomProviderStore {
           baseUrl: input.baseUrl,
           models: input.models.map(copyModel),
           secret: sealed,
+          ...storedHarness(input.harness ?? current.stored.harness),
         },
         secret,
       };
@@ -332,11 +350,23 @@ export class CustomProviderStore {
   });
 }
 
-/** The parse keeps an out-of-range `contextWindow` key as undefined. The copy drops that key. */
+function harnessOf(stored: StoredEntry): CustomProviderHarness {
+  return stored.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS;
+}
+
+/** OpenCode is not written, so a file with OpenCode endpoints only stays as an older build wrote it. */
+function storedHarness(harness: CustomProviderHarness | undefined): { harness?: CustomProviderHarness } {
+  return harness && harness !== DEFAULT_CUSTOM_PROVIDER_HARNESS ? { harness } : {};
+}
+
+/** The parse keeps an out-of-range `contextWindow` or `maxOutput` key as undefined. The copy drops that key. */
 function copyModel(model: z.infer<typeof modelSchema>): CustomProviderModel {
-  return model.contextWindow === undefined
-    ? { id: model.id, name: model.name }
-    : { id: model.id, name: model.name, contextWindow: model.contextWindow };
+  return {
+    id: model.id,
+    name: model.name,
+    ...(model.contextWindow !== undefined ? { contextWindow: model.contextWindow } : {}),
+    ...(model.maxOutput !== undefined ? { maxOutput: model.maxOutput } : {}),
+  };
 }
 
 /** The same names in the same order, each with its saved value. */

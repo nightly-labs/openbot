@@ -1,0 +1,36 @@
+/* Company sign-in in Members: the setup dialog and the one-time SCIM token. */
+
+.custom-provider-dialog.company-sign-in-dialog {
+  width: min(520px, 100%);
+}
+
+.company-sign-in-copy-row {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  margin-top: var(--openbot-space-2);
+}
+
+.company-sign-in-copy-row > .ui-input,
+.company-sign-in-copy-row > input {
+  flex: 1;
+  min-width: 0;
+}
+
+.company-sign-in-passed {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+}
+
+.company-sign-in-passed svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  color: var(--openbot-success);
+}
+
+.company-sign-in-secondary {
+  display: flex;
+  justify-content: center;
+  gap: var(--openbot-space-2);
+}

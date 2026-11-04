@@ -40,7 +40,10 @@ adding a module or moving ownership between workspaces.
 ## Product constraints
 
 - Workspaces, conversations, attachments, browser data, and team data stay on the computer that
-  runs OpenBot. Providers, visited pages, and plugins can use the network.
+  runs OpenBot. Providers, visited pages, and plugins can use the network. Exception: a signed-in
+  phone keeps an encrypted, read-only copy of the agents, sections, recent chats and drawer values of
+  its servers (`apps/mobile/src/features/workspace/model/workspace-cache.ts`). The copy stays on that phone,
+  the host stays the source of truth, and sign-out, session expiry and server removal delete it.
 - Cloudflare holds accounts, avatars, host configuration, memberships, invitations, and logical
   sessions; it does not hold chats, files, or commands.
 - The user's SQLite database is the source of truth, not a remote cache.

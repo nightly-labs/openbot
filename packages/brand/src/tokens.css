@@ -114,17 +114,6 @@
   --openbot-onboarding-desktop-mist: #dbe9ff;
   --openbot-onboarding-desktop-blue: #7eb4f2;
   --openbot-onboarding-desktop-indigo: #6f7de8;
-  /* The dither tiles of the sound theme picker: a back and an ink color for each sound theme. */
-  --openbot-sound-warm-back: #d95926;
-  --openbot-sound-warm-ink: #f2c46b;
-  --openbot-sound-mech-back: #1f1f1f;
-  --openbot-sound-mech-ink: #dbe9ff;
-  --openbot-sound-bubble-back: #5b5fe0;
-  --openbot-sound-bubble-ink: #8bdee8;
-  --openbot-sound-press-back: #ff1e5e;
-  --openbot-sound-press-ink: #ffd8a8;
-  --openbot-sound-off-back: #212121;
-  --openbot-sound-off-ink: #4c4c4c;
   --openbot-onboarding-window: #f3f5f8;
   --openbot-text-secondary: #dcdcdc;
   --openbot-text-muted: #979797;
@@ -216,6 +205,10 @@
      announcement is not an action. */
   --openbot-badge-new: #ff1e5e;
   --openbot-badge-new-soft: rgba(255, 30, 94, 0.16);
+  /* The star of a GitHub star request: a full yellow fill and a darker edge, so the star reads on
+     a white button as well as on a dark surface. Both themes use the same pair. */
+  --openbot-star: #facc15;
+  --openbot-star-edge: #ca8a04;
   /* The moving border of an offer, such as the hosted server offer: teal, blue, then pink. */
   --openbot-beam-teal: var(--openbot-file-teal);
   --openbot-beam-blue: var(--openbot-accent-text);
@@ -429,6 +422,14 @@
 }
 
 [data-provider="cline"] {
+  --openbot-provider-current: var(--openbot-text-primary);
+}
+
+[data-provider="kimi"] {
+  --openbot-provider-current: var(--openbot-text-primary);
+}
+
+[data-provider="devin"] {
   --openbot-provider-current: var(--openbot-text-primary);
 }
 

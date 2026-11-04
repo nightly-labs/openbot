@@ -3,7 +3,8 @@
 // real notification forwarder, with an Electron `Notification` that records what it shows and closes,
 // and through the real phone notification service, with a send that records what it sends. The
 // level and the mute are set on a real `RemoteServerManager` on a temporary profile. Only the local
-// server is used, so no remote host or account is needed.
+// server is used, so no remote host or account is needed. A run in a routine thread notifies on both,
+// and a click on its desktop notification opens the routine thread.
 // Run: `bun scripts/desktop-notifications-e2e.ts`.
 // Writes .openbot-build/desktop-notifications-e2e/report.json.
 
@@ -15,6 +16,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   type AgentEvent,
+  IPC_ENDPOINTS,
   LOCAL_SERVER_ID,
   type ServerNotificationLevel,
   type ServerSummary,
@@ -41,10 +43,13 @@ interface RecordedNotification {
   title: string;
   body: string;
   closed: boolean;
+  click: () => void;
 }
 
 /** The notifications that the forwarder showed, in order. */
 const shown: RecordedNotification[] = [];
+/** The payloads of the "notification opened" events that a click sent to the window. */
+const opened: unknown[] = [];
 
 // The main process imports Electron. No check here opens a window or a real notification.
 plugin({
@@ -55,7 +60,13 @@ plugin({
       readonly #record: RecordedNotification;
       readonly #listeners = new Map<string, (() => void)[]>();
       constructor(options: { title: string; body: string }) {
-        this.#record = { ...options, closed: false };
+        this.#record = {
+          ...options,
+          closed: false,
+          click: () => {
+            for (const listener of this.#listeners.get("click") ?? []) listener();
+          },
+        };
       }
       static isSupported() {
         return true;
@@ -85,7 +96,9 @@ plugin({
             isDestroyed: () => false,
             isLoadingMainFrame: () => false,
             mainFrame: { isDestroyed: () => false, detached: false },
-            send: () => undefined,
+            send: (channel: string, payload: unknown) => {
+              if (channel === IPC_ENDPOINTS.notifications.opened.channel) opened.push(payload);
+            },
           };
           isDestroyed() {
             return false;
@@ -194,6 +207,10 @@ let agents: AgentService | undefined;
 /** The agent events that the phone service reads, as the host's agent service sends them. */
 const hostEvents = new EventEmitter<{ event: [AgentEvent] }>();
 const sent: NotificationRelayRequest[] = [];
+/** The levels that the owner chose for each agent, which the desktop and the owner's phone read. */
+const ownLevels = new Map<string, ServerNotificationLevel>();
+/** The owner's level of the whole server, for all of their devices, or `null` for the level of each device. */
+let ownServerLevel: ServerNotificationLevel | null = null;
 const sentWaiters: (() => void)[] = [];
 const phone = new PushNotificationService({
   agents: {
@@ -201,6 +218,16 @@ const phone = new PushNotificationService({
     off: (_name, listener) => hostEvents.off("event", listener),
     listAgents: () => agents?.listAgents() ?? [],
     readConversationPageFor: unused,
+    readTask: () => {
+      throw new Error("Previews are off in this check.");
+    },
+    // The phone is away from the start, so it keeps no event to read the state for.
+    getRuntimeSnapshot: () => {
+      throw new Error("Not used by this check.");
+    },
+    listConversationReads: () => {
+      throw new Error("Not used by this check.");
+    },
   },
   store: { list: () => [], replace: () => Effect.void },
   send: (request) =>
@@ -213,7 +240,11 @@ const phone = new PushNotificationService({
   memberActive: () => true,
   lastUseElsewhere: () => null,
   // As `hostComputerInUse` decides for the owner with recent input and the window not focused.
-  atHostComputer: (memberId, event) => memberId === OWNER_ID && desktopShowsAgentEvent(event, localServer(), true),
+  atHostComputer: (memberId, event) =>
+    memberId === OWNER_ID && desktopShowsAgentEvent(event, localServer(), true, ownLevels),
+  // The host reads the owner's levels from the same store as the desktop app of its computer.
+  memberLevels: (memberId) =>
+    memberId === OWNER_ID ? { server: ownServerLevel, agents: ownLevels } : { server: null, agents: new Map() },
   liveActivityShows: () => false,
   randomBytes: (size) => crypto.getRandomValues(new Uint8Array(size)),
 });
@@ -286,6 +317,7 @@ try {
     getFormat: () => createFormat("en"),
     desktopNotificationsEnabled: () => true,
     notificationPreviewEnabled: () => false,
+    ownAgentNotificationLevels: () => ownLevels,
   });
   // For the local server the decision and the notification finish before `forwardAgentEvent` returns.
   const desktop = (event: AgentEvent) => forwarders.forwardAgentEvent(LOCAL_SERVER_ID, event);
@@ -303,6 +335,12 @@ try {
   });
   const startFailure: AgentEvent = { type: "error", agentId, code: "delivery_start_failed", message: "Refused." };
   const finished: AgentEvent = { type: "turn-completed", agentId, ...ids, status: "completed" };
+  const routineThreadId = "routine-thread-1";
+  const routineFinished: AgentEvent = {
+    type: "routine-thread-turn-completed",
+    taskId: "routine-task-1",
+    turn: { type: "turn-completed", agentId, threadId: routineThreadId, turnId: "routine-turn-1", status: "completed" },
+  };
 
   await step("A browser step notifies, and its end withdraws the notification", async () => {
     await setLevel("all");
@@ -314,6 +352,21 @@ try {
     desktop({ type: "browser-takeover-resolved", requestId: 1, agentId });
     assert.equal(notification?.closed, true, "The finished browser step left its notification.");
     return { body: notification?.body };
+  });
+
+  await step("A run in a routine thread notifies at the level All only, and a click opens its thread", async () => {
+    await setLevel("all");
+    const from = shown.length;
+    desktop(routineFinished);
+    assert.deepEqual(shownSince(from), [english("notification.finished")]);
+    const opens = opened.length;
+    shown[from]?.click();
+    assert.deepEqual(opened.slice(opens), [{ serverId: LOCAL_SERVER_ID, agentId, threadId: routineThreadId }]);
+    await setLevel("needs-me");
+    desktop(routineFinished);
+    assert.equal(shown.length, from + 1, "The level Only when it needs me showed a routine run.");
+    await setLevel("all");
+    return { shown: shownSince(from), opened: opened.slice(opens) };
   });
 
   await step("A message that did not start notifies at the level All only", async () => {
@@ -384,7 +437,7 @@ try {
 
   await step("The phone stays quiet for the events that the desktop shows", async () => {
     await setLevel("all");
-    assert.equal(await phoneCount([browserStep(7), finished, startFailure]), 0);
+    assert.equal(await phoneCount([browserStep(7), finished, routineFinished, startFailure]), 0);
     await setLevel("needs-me");
     assert.equal(await phoneCount([prompt(8)]), 0);
     return { sent: 0 };
@@ -392,11 +445,69 @@ try {
 
   await step("The phone tells the owner when the desktop does not", async () => {
     await setLevel("all", true);
-    assert.equal(await phoneCount([browserStep(9), finished]), 2, "A muted desktop kept the phone quiet.");
+    assert.equal(
+      await phoneCount([browserStep(9), finished, routineFinished]),
+      3,
+      "A muted desktop kept the phone quiet.",
+    );
     await setLevel("nothing");
     assert.equal(await phoneCount([prompt(10), startFailure]), 2, "The level Nothing kept the phone quiet.");
     await setLevel("needs-me");
     assert.equal(await phoneCount([finished, startFailure]), 2, "Only when it needs me kept a finished turn off both.");
+    return { sent: sent.length };
+  });
+
+  await step("The level of an agent replaces the server level on the desktop", async () => {
+    const from = shown.length;
+    await setLevel("needs-me");
+    ownLevels.set(agentId, "all");
+    desktop(finished);
+    ownLevels.set(agentId, "nothing");
+    desktop(prompt(11));
+    // The server level Nothing keeps every agent quiet, also one with its own level.
+    await setLevel("nothing");
+    ownLevels.set(agentId, "all");
+    desktop(prompt(12));
+    ownLevels.clear();
+    assert.deepEqual(shownSince(from), [english("notification.finished")]);
+    return { shown: shownSince(from) };
+  });
+
+  await step("The owner's phone follows the level of the agent", async () => {
+    // The desktop is muted, so only the level of the agent can keep the phone quiet.
+    await setLevel("all", true);
+    const count = async (level: ServerNotificationLevel, events: AgentEvent[]): Promise<number> => {
+      const from = sent.length;
+      ownLevels.set(agentId, level);
+      for (const event of events) hostEvents.emit("event", event);
+      // The barrier always reaches the phone, so each event before it was decided.
+      ownLevels.clear();
+      await phoneSends(browserStep(98));
+      return sent.length - from - 1;
+    };
+    assert.equal(await count("nothing", [browserStep(13), finished]), 0, "Nothing for the agent reached the phone.");
+    assert.equal(await count("needs-me", [finished, prompt(14)]), 1, "Only when it needs me sent a finished turn.");
+    return { sent: sent.length };
+  });
+
+  await step("The owner's phone follows the server level that the owner chose for all devices", async () => {
+    // The phone registered "All activity". The level for all devices replaces it.
+    await setLevel("all", true);
+    const count = async (level: ServerNotificationLevel, events: AgentEvent[]): Promise<number> => {
+      const from = sent.length;
+      ownServerLevel = level;
+      for (const event of events) hostEvents.emit("event", event);
+      ownServerLevel = null;
+      await phoneSends(browserStep(97));
+      return sent.length - from - 1;
+    };
+    assert.equal(await count("needs-me", [finished, prompt(15)]), 1, "The server level of all devices was not used.");
+    assert.equal(await count("nothing", [prompt(16), browserStep(17)]), 0, "The server level Nothing sent a request.");
+    // The level of an agent still replaces the server level, but not a server level of Nothing.
+    ownLevels.set(agentId, "all");
+    assert.equal(await count("needs-me", [finished]), 1, "The agent level did not replace the server level.");
+    assert.equal(await count("nothing", [finished]), 0, "The agent level opened a server set to Nothing.");
+    ownLevels.clear();
     return { sent: sent.length };
   });
 

@@ -6,11 +6,13 @@ import {
   CHAT_VISUAL_TITLE_LIMIT,
 } from "@openbot/contracts/chat-visual";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { API_KEY_NAME_PATTERN } from "@openbot/contracts/ipc";
+import { API_KEY_NAME_PATTERN, CONNECTOR_IDS } from "@openbot/contracts/ipc";
 import { isUiBlockId, UI_BLOCK_LIMITS } from "@openbot/contracts/ui-blocks";
 import { z } from "zod";
+import pluginCatalog from "../../resources/plugin-catalog/catalog.json";
 import { advertisedJsonSchema } from "./agent/advertised-json-schema";
 import { interruptAgentToolSchema } from "./agent/agent-interrupt-tool";
+import { createChannelToolSchema, listChannelsToolSchema, updateChannelToolSchema } from "./agent/channel-agent-tools";
 import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
 import { HISTORY_TOOL_DEFINITIONS } from "./agent/history-tools";
 import { MCP_SERVER_TOOL_DEFINITIONS } from "./agent/mcp-tools";
@@ -281,6 +283,19 @@ export const requestApiKeyToolSchema = z.strictObject({
 
 export const removeApiKeyToolSchema = z.strictObject({ name: apiKeyNameSchema });
 
+export const sendToChannelToolSchema = z.strictObject({
+  channelId: z.string().min(1).max(INPUT_LIMITS.identifier),
+  text: z.string().trim().min(1).max(INPUT_LIMITS.messageText),
+  recipientAgentIds: z.array(z.string().min(1).max(INPUT_LIMITS.identifier)).max(INPUT_LIMITS.agents).optional(),
+  paths: z.array(z.string().min(1).max(INPUT_LIMITS.path)).max(INPUT_LIMITS.attachments).optional(),
+});
+
+/** The Marketplace apps that the chat draws a card for: the bundled catalog plugins and the connectors. */
+export const MARKETPLACE_APP_IDS: readonly string[] = [
+  ...pluginCatalog.plugins.map((plugin) => plugin.slug),
+  ...CONNECTOR_IDS,
+];
+
 /** Shared declarations for Codex, Grok, and Claude. Service handlers enforce execution rules. */
 export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   ...CHANNEL_TOOL_DEFINITIONS,
@@ -327,7 +342,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "attach_files_to_response",
     description:
-      "Attach existing local files to the current response for the user. Use this after creating screenshots, charts, diagrams, reports, ZIP archives, or other files that the user should receive. OpenBot copies each file and shows image previews in the conversation. SVG files cannot be attached; write their absolute path in the answer, and the chat shows them.",
+      "Attach existing local files to the current response for the user. Use this after creating screenshots, charts, diagrams, reports, ZIP archives, or other files that the user should receive. OpenBot copies each file and shows image previews in the conversation.",
     shape: { paths: z.array(z.string().min(1).max(INPUT_LIMITS.path)).min(1).max(INPUT_LIMITS.attachments) },
   },
   {
@@ -380,6 +395,30 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     shape: assignAgentSectionToolSchema.shape,
   },
   {
+    name: "list_channels",
+    description:
+      "List the open channels with their id, name, lead, and members. A sidebar section (folder) is not a channel.",
+    shape: listChannelsToolSchema.shape,
+  },
+  {
+    name: "send_to_channel",
+    description:
+      "Post a request into a channel when the user gives it work. Members do not see this conversation: write the whole brief. paths attaches local files. recipientAgentIds names members; without it, the lead chooses. No result comes back here. In a channel task, use channel_assign or channel_transfer.",
+    shape: sendToChannelToolSchema.shape,
+  },
+  {
+    name: "create_channel",
+    description:
+      "Create a channel: a shared chat where member agents take requests and work together, with an optional picture. Returns the channel.",
+    shape: createChannelToolSchema.shape,
+  },
+  {
+    name: "update_channel",
+    description:
+      "Change or archive a channel from openbot.list_channels, including its picture. Pass only the values to change. Returns the channel.",
+    shape: updateChannelToolSchema.shape,
+  },
+  {
     name: "list_agents",
     description:
       "List local OpenBot agents: name, title, description (first 300 characters; read_agent has all), progress: status (working, queued or ready), queuedMessages, turnStartedAt while working, lastActivityAt, and openWaits. To find the teammate for work outside your remit, match the work to titles and descriptions. OpenBot does not track which files an agent changed.",
@@ -412,7 +451,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "update_profile",
     description:
-      "Update a local OpenBot agent’s name, title, instructions, avatar, provider, model, reasoning effort, account, backup models, access, Computer Use, or notifications from the user’s request. You can restrict access to workspace and turn Computer Use off; only the user can widen them again. For an uploaded or local image, use avatarPath. Prepare a PNG, JPEG, or WebP copy up to 512 KB with your available tools if needed. Call list_models before you change a model, an account, or the backup models. A new model applies from the agent's next turn. A provider or account change fails while the agent has a turn or queued messages; try again when it is ready. backupModels replaces the whole list. To give several agents the same settings, use update_agents.",
+      "Update a local OpenBot agent’s name, title, description, avatar, provider, model, reasoning effort, account, backup models, access, Computer Use, or notifications from the user’s request. You can restrict access to workspace and turn Computer Use off; only the user can widen them again. For an uploaded or local image, use avatarPath. Prepare a PNG, JPEG, or WebP copy up to 512 KB with your tools if needed. Call list_models before you change a model, an account, or the backup models. A new model applies from the agent's next turn. A provider or account change fails while the agent has a turn or queued messages; try again when it is ready. backupModels replaces the whole list. To give several agents the same settings, use update_agents.",
     shape: updateProfileToolSchema.shape,
   },
   {
@@ -613,7 +652,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       "The card has your start button, an optional alternative and a cancel button. When nobody answers in 10 s, OpenBot presses start.",
       'The result is JSON {"status":"answered","actionId":…}: "start" means do the plan; "alternative" means do only the alternative; "cancel" means do not start and ask in one sentence what the user wants;',
       '"_text" with "text" means follow the user\'s words. {"status":"skipped"} or {"status":"expired"} means do not start; answer briefly.',
-      "Write in the user's language. It works only when the user turned it on in your settings, and not in a Slack, Discord or Telegram chat. In a channel, each member who reads the channel sees it.",
+      "Write in the user's language. It works only when the user turned it on in your settings, and not in an external chat. In a channel, each member who reads the channel sees it.",
     ].join(" "),
     shape: acknowledgeRequestToolSchema.shape,
   },
@@ -636,11 +675,11 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "request_api_key",
     description: [
-      "Ask the user for an API key or token that your task needs, such as for a script or a service, and wait for the answer.",
+      "Ask the user for an API key, token, or password that your task needs, such as for IMAP, and wait for the answer.",
       "The user enters it in a secure form in this conversation. OpenBot saves it in a private file outside your workspace for later turns; you never get the value.",
       'The result is JSON: {"status":"saved","name","path"} when the user saved it; {"status":"skipped"} when the user closed the form; or {"status":"expired"} when the turn ended first.',
       "Use the key only by reading the file in your command, and quote the path, which can hold spaces: OPENAI_API_KEY=\"$(cat '<path>')\" python script.py. Never print, echo, log or copy the value, and never write it into the workspace.",
-      "Call list_api_keys first: do not ask again for a key that is saved. A new answer replaces the saved key. Only the server owner or an admin can answer. It does not work in a Slack, Discord or Telegram chat.",
+      "Call list_api_keys first: do not ask again for a key that is saved. A new answer replaces the saved key. Only the server owner or an admin can answer. It does not work in an external chat.",
     ].join(" "),
     shape: requestApiKeyToolSchema.shape,
   },
@@ -658,16 +697,9 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   },
   {
     name: "suggest_marketplace_app",
-    description:
-      "Show the user a card in this conversation for one Marketplace app that the task needs and that is not in your tools. The user connects it, opens its listing, or dismisses the card; nothing connects without the user. Keep your normal answer. Returns not_found and the known apps, with no card, when no Marketplace app has that slug.",
+    description: `Call this when the user needs a service in this list and you have no working tools for it: ${MARKETPLACE_APP_IDS.join(", ")}. It shows a card in the chat to connect the app; nothing connects without the user. For an installed app, it tests the app and returns the fix, such as a Sign in card or setup steps.`,
     shape: {
-      app: z
-        .string()
-        .min(1)
-        .max(63)
-        .describe(
-          "The plugin slug: its name in lower case with hyphens, such as notion or linear. Use github for GitHub.",
-        ),
+      app: z.string().min(1).max(63).describe("An app from the list, such as notion. Use github for GitHub."),
     },
   },
   {

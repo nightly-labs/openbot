@@ -1,6 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
-  type AvatarHue,
   agentPermissionLevel,
   canAdministerServer,
   DEFAULT_PROVIDER_ACCOUNT_ID,
@@ -8,7 +7,7 @@ import {
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { useQueryClient } from "@tanstack/react-query";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -20,10 +19,28 @@ import {
   PERMISSION_LABEL,
   useAgentAdminSettings,
 } from "@/features/agents/components/agent-access-fields";
-import { AgentAppearancePicker } from "@/features/agents/components/agent-appearance-picker";
-import { AgentNewChatSection, AgentNotificationsRow } from "@/features/agents/components/agent-chat-settings";
-import { AgentBusyMessageField, AgentHostPermissionFields } from "@/features/agents/components/agent-host-fields";
+import { AgentAppearancePicker, type AgentColorValue } from "@/features/agents/components/agent-appearance-picker";
+import {
+  AgentBackupModelPicker,
+  AgentBackupModelsPage,
+  AgentBackupModelsRow,
+} from "@/features/agents/components/agent-backup-models";
+import { AgentBrowserProfileRow } from "@/features/agents/components/agent-browser-profile";
+import {
+  AgentCompactSection,
+  AgentNewChatSection,
+  AgentNotificationLevelRow,
+} from "@/features/agents/components/agent-chat-settings";
+import { AgentFolderBrowser, AgentFolders, AgentFoldersRow } from "@/features/agents/components/agent-folders";
+import {
+  AgentBusyMessageField,
+  AgentHostPermissionFields,
+  AgentNewChatAllowedField,
+  AgentPlanCardField,
+  AgentTaskLimitField,
+} from "@/features/agents/components/agent-host-fields";
 import { AgentInformation } from "@/features/agents/components/agent-information";
+import { AgentInstructionsFileEditor } from "@/features/agents/components/agent-instructions-file";
 import { type AgentPhotoDraft, AgentPhotoPicker } from "@/features/agents/components/agent-photo-picker";
 import { AgentPublish } from "@/features/agents/components/agent-publish";
 import { AgentRuntimeFields, useProviderAccounts } from "@/features/agents/components/agent-runtime-fields";
@@ -47,7 +64,15 @@ import { useText } from "@/shared/lib/text";
 
 type AgentEdits = Pick<
   UpdateAgentInput,
-  "name" | "title" | "description" | "avatarSeed" | "avatarHue" | "provider" | "model" | "reasoningEffort"
+  | "name"
+  | "title"
+  | "description"
+  | "avatarSeed"
+  | "avatarHue"
+  | "avatarColor"
+  | "provider"
+  | "model"
+  | "reasoningEffort"
 >;
 
 type AgentPage =
@@ -57,11 +82,16 @@ type AgentPage =
   | "memories"
   | "skills"
   | "files"
+  | "instructions"
   | "routines"
   | "tables"
   | "publish"
   | "runtime"
+  | "backup-models"
+  | "backup-model-picker"
   | "permissions"
+  | "folders"
+  | "folder-browser"
   | "advanced"
   | "memory"
   | "routine";
@@ -107,17 +137,35 @@ function AgentForm({
     canManageSharedTables,
     canPublishAgent,
     canStartNewChat,
+    canCompactContext,
+    canManageAgentInstructions,
     canManageAgentAccess,
     canManageAgentHostSettings,
+    canManageAgentTaskLimit,
+    canManageAgentNewChat,
+    canManageAgentPlanCard,
+    canManageBrowserProfiles,
+    canManageAgentFolders,
+    canSetAgentNotificationLevel,
     setAgentProviderAccount,
   } = useMobileWorkspace();
   const queryClient = useQueryClient();
   // The Permissions row shows the access, as on desktop. Its page reads the same host answer.
   const { settings: adminSettings } = useAgentAdminSettings(agent, host, available && page === "info");
   const showPermissions = canManageAgentAccess(agent.serverId) || canManageAgentHostSettings(agent.serverId);
-  const showNotifications = agent.notifications !== undefined;
+  const showFolders = canManageAgentFolders(agent.serverId);
+  // The user's own level of the agent, on a host that keeps it for each member. Settings > Notifications
+  // is the one place that changes notifications, so the agent has no switch of its own here.
+  const showNotificationLevel = agent.notifications !== undefined && canSetAgentNotificationLevel(agent.serverId);
   const showAdvanced =
-    Boolean(agent.workspacePath) || canStartNewChat(agent.serverId) || canManageAgentHostSettings(agent.serverId);
+    Boolean(agent.workspacePath) ||
+    canStartNewChat(agent.serverId) ||
+    canCompactContext(agent.serverId) ||
+    canManageAgentHostSettings(agent.serverId) ||
+    canManageAgentTaskLimit(agent.serverId) ||
+    canManageAgentNewChat(agent.serverId) ||
+    canManageAgentPlanCard(agent.serverId) ||
+    canManageBrowserProfiles(agent.serverId);
   const [edits, setEdits] = useState<AgentEdits>({});
   const foreground = useThemeColor("foreground");
   const [photo, setPhoto] = useState<AgentPhotoDraft | null | undefined>();
@@ -142,6 +190,7 @@ function AgentForm({
   const description = edits.description ?? agent.description;
   const avatarSeed = edits.avatarSeed ?? agent.avatarSeed;
   const avatarHue = edits.avatarHue === undefined ? agent.avatarHue : edits.avatarHue;
+  const avatarColor = edits.avatarColor === undefined ? agent.avatarColor : edits.avatarColor;
   const photoChanged = photo !== undefined && (photo !== null || Boolean(agent.avatarUrl));
   const dirty =
     photoChanged ||
@@ -150,6 +199,7 @@ function AgentForm({
     description.trim() !== agent.description ||
     avatarSeed !== agent.avatarSeed ||
     avatarHue !== agent.avatarHue ||
+    avatarColor !== agent.avatarColor ||
     (edits.provider !== undefined && edits.provider !== agent.provider) ||
     (edits.model !== undefined && edits.model !== agent.model) ||
     (edits.reasoningEffort !== undefined && edits.reasoningEffort !== agent.reasoningEffort) ||
@@ -187,8 +237,8 @@ function AgentForm({
     setEdits((current) => ({ ...current, avatarSeed }));
     setError(null);
   }, []);
-  const changeAvatarHue = useCallback((avatarHue: AvatarHue | null) => {
-    setEdits((current) => ({ ...current, avatarHue }));
+  const changeAvatarColor = useCallback((value: AgentColorValue) => {
+    setEdits((current) => ({ ...current, avatarHue: value.hue, avatarColor: value.color }));
     setError(null);
   }, []);
   const hasPhoto = photo === undefined ? Boolean(agent.avatarUrl) : Boolean(photo);
@@ -226,6 +276,7 @@ function AgentForm({
             ...(edits.description === undefined ? {} : { description: description.trim() }),
             ...(edits.avatarSeed === undefined ? {} : { avatarSeed }),
             ...(edits.avatarHue === undefined ? {} : { avatarHue }),
+            ...(edits.avatarColor === undefined ? {} : { avatarColor }),
             ...(edits.provider === undefined ? {} : { provider: edits.provider }),
             ...(edits.model === undefined ? {} : { model: edits.model }),
             ...(edits.reasoningEffort === undefined ? {} : { reasoningEffort: edits.reasoningEffort }),
@@ -270,6 +321,10 @@ function AgentForm({
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
     >
+      {/* The server Usage screen opens this page too, so the title names the agent. */}
+      {page === "usage" ? (
+        <Stack.Screen options={{ title: t("mobile.agent.info.usage.agentTitle", { name: agent.name }) }} />
+      ) : null}
       {page === "info" ? (
         <>
           <View className="gap-6">
@@ -290,6 +345,7 @@ function AgentForm({
                 serverId={agent.serverId}
                 seed={avatarSeed}
                 hue={avatarHue}
+                color={avatarColor}
                 size={112}
               />
               {/* A photo fills the circle; the generated avatar leaves space around its shape. */}
@@ -319,9 +375,9 @@ function AgentForm({
             onChangeText={(value) => change({ title: value })}
           />
           <SheetFormField
-            label={t("mobile.agent.edit.instructions")}
+            label={t("mobile.agent.edit.description")}
             appearance="soft"
-            placeholder={t("mobile.agent.edit.instructionsPlaceholder")}
+            placeholder={t("mobile.agent.edit.descriptionPlaceholder")}
             multiline
             value={description}
             editable={!saving}
@@ -337,13 +393,14 @@ function AgentForm({
           imageUrl={photo === undefined ? undefined : (photo?.uri ?? null)}
           seed={avatarSeed}
           hue={avatarHue}
+          color={avatarColor}
           name={name}
           nameField={null}
           showFaces={!hasPhoto}
           photoField={photoField}
           disabled={saving || pickingPhoto}
           onSeedChange={changeAvatarSeed}
-          onHueChange={changeAvatarHue}
+          onColorChange={changeAvatarColor}
         />
       ) : null}
       {page === "runtime" ? (
@@ -366,7 +423,17 @@ function AgentForm({
             setAccount(value);
             setError(null);
           }}
+          // The switch saves at once, for the saved model. An unsaved model change hides it.
+          fastMode={
+            provider === agent.provider && (edits.model ?? agent.model) === agent.model
+              ? { agent, server: host, available }
+              : undefined
+          }
         />
+      ) : null}
+      {page === "backup-models" ? <AgentBackupModelsPage agent={agent} server={host} available={available} /> : null}
+      {page === "backup-model-picker" ? (
+        <AgentBackupModelPicker agent={agent} server={host} available={available} />
       ) : null}
       {page === "permissions" ? (
         <>
@@ -377,6 +444,9 @@ function AgentForm({
       {page === "advanced" ? (
         <>
           <AgentBusyMessageField agent={agent} server={host} available={available} />
+          <AgentTaskLimitField agent={agent} server={host} available={available} />
+          {/* After the task limit, as in the desktop Advanced group. */}
+          <AgentBrowserProfileRow agent={agent} />
           {agent.workspacePath ? (
             <SettingsSection title={t("mobile.agent.workspace.title")} footer={t("mobile.agent.workspace.footer")}>
               <SettingsRow>
@@ -387,8 +457,15 @@ function AgentForm({
             </SettingsSection>
           ) : null}
           {canStartNewChat(agent.serverId) ? <AgentNewChatSection agent={agent} available={available} /> : null}
+          {canCompactContext(agent.serverId) ? <AgentCompactSection agent={agent} available={available} /> : null}
+          <AgentNewChatAllowedField agent={agent} server={host} available={available} />
+          {/* After the new-chat switch, as in the desktop Advanced group. */}
+          <AgentPlanCardField agent={agent} server={host} available={available} />
         </>
       ) : null}
+      {page === "folders" ? <AgentFolders agent={agent} host={host} available={available} /> : null}
+      {page === "folder-browser" ? <AgentFolderBrowser agent={agent} available={available} /> : null}
+      {page === "instructions" ? <AgentInstructionsFileEditor agent={agent} available={available} /> : null}
       {page === "tables" ? <AgentSharedTables agent={agent} available={available} /> : null}
       {page === "publish" ? <AgentPublish agent={agent} available={available} /> : null}
       {page === "usage" ||
@@ -429,8 +506,22 @@ function AgentForm({
             >
               <Typography.Paragraph>{t("mobile.agent.runtime.model")}</Typography.Paragraph>
             </SettingsRow>
+            <AgentBackupModelsRow agent={agent} server={host} available={available} />
           </SettingsSection>
           <SettingsSection title={t("mobile.agent.groups.knows")}>
+            {/* First, as in the desktop group. */}
+            {canManageAgentInstructions(agent.serverId) ? (
+              <SettingsRow
+                onPress={() =>
+                  router.push({
+                    pathname: "/agent-info/[agentId]/instructions",
+                    params: { agentId: agent.id, serverId: agent.serverId },
+                  })
+                }
+              >
+                <Typography.Paragraph>{t("mobile.agent.instructionsFile.title")}</Typography.Paragraph>
+              </SettingsRow>
+            ) : null}
             <SettingsRow
               onPress={() =>
                 router.push({
@@ -512,10 +603,10 @@ function AgentForm({
           {host && canAdministerServer(host.role) ? (
             <AgentSessionSettingsSection key={`${agent.serverId}:${agent.id}`} agent={agent} available={available} />
           ) : null}
-          {showPermissions || showNotifications || showAdvanced ? (
+          {showPermissions || showFolders || showNotificationLevel || showAdvanced ? (
             <SettingsSection
               title={t("mobile.agent.groups.rules")}
-              footer={showNotifications ? t("mobile.agent.notifications.footer") : undefined}
+              footer={showNotificationLevel ? t("mobile.agent.notificationLevel.footer") : undefined}
             >
               {showPermissions ? (
                 <SettingsRow
@@ -530,7 +621,8 @@ function AgentForm({
                   <Typography.Paragraph>{t("mobile.agent.permissions.title")}</Typography.Paragraph>
                 </SettingsRow>
               ) : null}
-              {showNotifications ? <AgentNotificationsRow agent={agent} available={available} /> : null}
+              {showFolders ? <AgentFoldersRow agent={agent} host={host} available={available} /> : null}
+              {showNotificationLevel ? <AgentNotificationLevelRow agent={agent} /> : null}
               {showAdvanced ? (
                 <SettingsRow
                   onPress={() =>

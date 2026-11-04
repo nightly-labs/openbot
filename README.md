@@ -6,7 +6,8 @@
 OpenBot is a local-first desktop workspace for persistent AI teammates. It supports the local
 [Codex App Server](https://learn.chatgpt.com/docs/app-server) and
 [Claude Code](https://code.claude.com/docs/en/overview), plus [Grok CLI](https://docs.x.ai/build/overview),
-OpenCode, Gemini, [Cursor CLI](https://cursor.com/cli), and [Cline CLI](https://cline.bot/cli) through ACP. It gives every agent its own workspace and
+OpenCode, Gemini, [Cursor CLI](https://cursor.com/cli), [Cline CLI](https://cline.bot/cli), [Kimi Code CLI](https://github.com/MoonshotAI/kimi-cli),
+[Devin CLI](https://cli.devin.ai), and [Hermes Agent](https://hermes-agent.nousresearch.com) through ACP. It gives every agent its own workspace and
 conversation, and provides local queues, file transfers, an embedded browser, and agent-to-agent
 messaging in one desktop app.
 
@@ -19,7 +20,7 @@ messaging in one desktop app.
 ## What works
 
 - Prompt-driven agent creation and editing on desktop and mobile, with editable instructions, avatar, and section review before saving.
-- Persistent agents backed by independent Codex, Claude, Grok, OpenCode, Gemini, Cursor, or Cline sessions and local workspaces.
+- Persistent agents backed by independent Codex, Claude, Grok, OpenCode, Gemini, Cursor, Cline, Kimi, Devin, or Hermes sessions and local workspaces.
 - Custom OpenAI-compatible endpoints and custom ACP agents, with detection of local model servers (Ollama, LM Studio) and installed agents.
 - Per-agent context monitoring with automatic compaction before long threads exhaust the model window.
 - FIFO message queues with pause, resume, cancellation, and crash-safe persistence.
@@ -33,6 +34,7 @@ messaging in one desktop app.
 
 OpenBot is local-first, not offline-only. Codex connects to OpenAI, Claude connects to Anthropic,
 Grok connects to xAI, Gemini connects to Google, Cursor connects to Cursor, Cline connects to Cline,
+Kimi connects to Moonshot AI, Devin connects to Cognition, Hermes connects to Nous Portal and to the providers you set up in Hermes,
 visited pages use the network, and installed plugins may connect to their own services.
 
 ## Install
@@ -73,6 +75,41 @@ path in the profile if you keep the AppImage outside the usual locations. Do not
 On the first start from an AppImage, OpenBot writes `~/.local/share/applications/openbot.desktop`
 and `~/.local/share/icons/openbot.png`, which is what lets an `openbot://` link - an invitation, or
 a plugin listing - open the app and gives the launcher an icon that stays after the app exits. Delete the two files to undo it.
+
+#### Theme palette files
+
+OpenBot reads each `<name>.json` file in the `themes` folder of its data folder
+(`~/.config/OpenBot/themes/` on Linux) and lists it under Settings > General > Theme. Another
+program, such as an Omarchy theme script, can write the file. OpenBot follows each change to the
+file with no restart. Replace the file with a rename, so that OpenBot never reads half of it:
+
+```json
+{
+  "name": "Omarchy",
+  "appearance": "dark",
+  "colors": {
+    "canvas": "#1a1b26",
+    "frame": "#13141c",
+    "sidebar": "#13141c",
+    "surface": "#24283b",
+    "text": "#a9b1d6",
+    "textMuted": "#565f89",
+    "border": "#414868",
+    "accent": "#7aa2f7",
+    "accentForeground": "#1a1b26",
+    "success": "#9ece6a",
+    "warning": "#e0af68",
+    "danger": "#f7768e"
+  }
+}
+```
+
+The file name is the palette id: lowercase letters, digits and `-`. `appearance` is `light` or
+`dark`, and selects the base that the colors go over. In a dark palette, `surface` colors cards and
+controls. A light palette makes them lighter than `canvas`, as the light base does, because a light
+theme's `surface` is usually darker than its background. Each color is `#rrggbb` or `#rrggbbaa`.
+OpenBot ignores a file with a missing or different color, and then shows the saved light, dark or
+system choice. While no theme choice is saved, OpenBot shows the first palette.
 
 Remote desktop works on Linux x64 in an X11 session,
 such as Xorg or Xvfb. It does not work under Wayland, and the arm64 AppImage does not include it.
@@ -178,7 +215,7 @@ OpenBot include it. Sign in opens Google's sign-in page in your browser. OpenBot
 that name. Set `OPENBOT_ANTIGRAVITY_PATH` to select a server executable yourself. Put it in a
 `bin/` folder, and put an `antigravity-package.json` file with its `version` in the folder above
 `bin/`. Keep `localharness_external` beside the server. When that path is set, OpenBot uses
-only it. Connect remains available in the host's local Settings > Providers screen. Remote
+only it. Connect remains available in the host's local Server settings > Providers screen. Remote
 settings cannot perform Google sign-in; use a browser on the host. See
 [Gemini setup and download recovery](docs/architecture/providers.md#gemini) for the required
 layout, the reported IPv6 download failure, and checks that do not change host networking.
@@ -198,6 +235,29 @@ Cline's sign-in page in your browser. You can also set `CLINE_API_KEY` in the en
 launch OpenBot. If you installed `cline` 3.0.68 or newer yourself, OpenBot uses it until a download
 exists. Set `OPENBOT_CLINE_PATH` to select an executable yourself. Cline agents stay on this
 computer: team members do not see them.
+
+Kimi uses a Kimi Code account. OpenBot downloads and pins the Kimi Code CLI (`kimi`) when you select
+Download on the Kimi row in More providers, and starts it with `kimi acp`. Sign in runs `kimi login`,
+which opens Kimi's sign-in page in your browser. If you installed `kimi` 1.52.0 or newer yourself,
+OpenBot uses it until a download exists. Set `OPENBOT_KIMI_PATH` to select an executable yourself.
+When a Full access Kimi agent changes its model, the CLI saves that model as its default in
+`~/.kimi/config.toml`, so a Kimi session that you start in a terminal also uses it. Kimi agents run
+on this computer. Team members see them when their app supports Kimi.
+
+Devin uses a Devin account. OpenBot downloads and pins the Devin CLI (`devin`) when you select
+Download on the Devin row in More providers, and starts it with `devin acp`. Sign in opens Devin's
+sign-in page in your browser. If you installed `devin` yourself, OpenBot uses it until a download
+exists. Set `OPENBOT_DEVIN_PATH` to select an executable yourself. Devin agents run on this computer.
+Team members see them when their app supports Devin.
+
+Hermes uses the Hermes Agent (`hermes`) that you install yourself, with your own `~/.hermes` (or
+`$HERMES_HOME`): its memories, skills, sign-ins and `SOUL.md` apply to OpenBot agents too. OpenBot
+does not download Hermes; when it is missing, the Hermes row opens the installation guide. OpenBot
+starts it with `hermes acp`. Sign in runs `hermes auth add nous` for a Nous Portal plan, or run
+`hermes setup` in a terminal for other providers. The model menu lists the models of each provider
+that Hermes is signed in to. Hermes reads `AGENTS.md` only in a workspace with no `.hermes.md`, and
+`.agents/skills` only in a git project that `skills.trusted_project_dirs` in `config.yaml` names.
+Team members see the host's Hermes agents when their app uses Team API protocol 8 or newer.
 
 On Windows, install the native CLI and make sure `codex`, `claude`, or `grok` is available in PowerShell.
 Claude Code also requires Git for Windows. Then authenticate the installed CLI and restart OpenBot.
@@ -352,6 +412,7 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun run dev:reset` | Delete the local app, test-client, and legacy host development state. It refuses while a dev app has one of these profiles open. |
 | `bun run dev:status` | Print, as JSON, every dev stack and dev app instance live on this machine: services, ports, pids, which of them belong to this worktree, and which are orphaned - a supervisor that is gone with its children still holding the ports. Each recorded process carries the state a stop command acts on: `live`, `gone` with `groupLive` for a survivor of a dead leader, and `unverified` for a pid this machine cannot date. `registryDirectory` is the directory it read: `~/Library/Caches/OpenBot/dev` on macOS, `$XDG_RUNTIME_DIR/openbot-dev` (else `~/.cache/openbot/dev`) on Linux, `%LOCALAPPDATA%\OpenBot\openbot-dev-instances` on Windows, or `OPENBOT_DEV_REGISTRY_DIR` when set. It does not depend on `TMPDIR`. |
 | `bun run dev:verify` | Print a stable JSON verification plan for this worktree: `ready`/`reasons` for safe checks, setup state, changed files and affected surfaces, nearby tests, runtime state, `qa.required`/`qa.ready`/`qa.reasons`, the renderer QA loop, safe `runnableCommands`, and all suggested `commands`. Add `--run` to execute only the safe non-mutating checks in the plan. Renderer QA follows `snapshot → action with --wait-for → snapshot → screenshot` when appearance matters. |
+| `bun run dev:restart-client` | Restart only the test client of this worktree's `dev:test-client` stack. The host and the other services stay live. The supervisor stops its own test-client child by PID and starts it again. Not on Windows. |
 | `bun run dev:stop` | Stop this worktree's dev stack, children included, using the pids in the registry rather than a process-name pattern. It signals only a pid whose start time still matches the record, so a recycled pid is never sent SIGTERM; anything it cannot confirm is reported, left running and kept in the registry, and the command exits non-zero. `--pid=<supervisor pid>` stops one other stack, `--all` stops every stack on the machine. |
 | `bun run dev:forget` | Drop this worktree's stack record without signalling anything, for the one case `dev:stop` refuses to resolve on its own. It is also the only command that reads a dead record: nothing else deletes one, because a reader that removes what it judged can remove a record the supervisor rewrote in between. Takes the same `--pid=` and `--all`. |
 | `bun run storybook` | Start Storybook on a port allocated through the same registry, so two worktrees never announce one port. `OPENBOT_STORYBOOK_PORT` moves where the search starts; `--port` is refused. |
@@ -360,6 +421,7 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun run dev:cpu` | Measure idle CPU on the running dev app, per process kind and per page. `--duration=<ms>` (default 60000), `--interval=<ms>` (default 5000), `--label=<name>`, `--out=<name>.json` (always under `.openbot-build/dev-automation/cpu/`, and refused if it would leave that directory or pass through a symbolic link) and `--compare=<file>` for a before/after delta. Read-only. Take a baseline before a change and a second run after it: only the difference between two runs on the same machine is a result, because a dev build carries the Vite server and the source maps as well. |
 | `bun run dev:memory` | Measure the running dev app's memory once: resident memory per process kind (main, renderer, GPU, provider CLIs and their MCP servers), with the dev tooling kept out of the app total, plus JS heap and DOM counters per page. `--label=<name>`, `--out=<name>.json` (always under `.openbot-build/dev-automation/memory/`) and `--heap-snapshot=<target-id\|url-substring>` to also write a V8 heap snapshot of one page to that directory. Read-only. |
 | `bun run dev:bench` | Run repeatable RAM and CPU scenarios on the built app (`bun run build` first). Each run seeds a bench profile of its own, starts the built app, samples the process tree every second (resident memory, macOS physical footprint and CPU per process kind, provider memory per CLI) with the main-process and page heaps, drives the scenario, and reads a settled state after garbage collection. `--scenario=<id\|prefix\|all>` (required; without it the command lists the scenarios), `--runs=<n>` (default 3; the report shows the median and range), `--label=<name>`, `--compare=<report.json>`, `--cpu-profile` (records the app window's JavaScript for 15 s after the first run settles, as a `.cpuprofile` for DevTools), `--frames` (counts frames slower than 17 ms and 50 ms while the scenario runs; the loop keeps the renderer drawing, so CPU readings rise) and `--call-counts` (V8 call counts per function while the scenario runs, top 25 in a `-call-counts.json` file; slows JavaScript). Every run also reports the startup marks (`startup.*`, ms) and the app window's layout and style recalculation counts, script and task time, and long tasks (`render.*`). Reports go to `.openbot-build/dev-automation/bench/`. Turn scenarios (`s5` to `s9`) use the real claude, opencode and grok CLIs and spend model quota. It never touches a dev instance or your own profile, and `bun run dev:stop` stops an app a failed run left behind. |
+| `bun run perf:remote` | Measure how fast a remote client gets into the workspace, and which host requests it sends before and after that point. Start `OPENBOT_DEV_SYNC_PROFILE=1 bun run dev:test-client` in this worktree first. The web runs sign in to `/app` as the dev host user and open it in a new browser context each time; the desktop run reads the cold start of the test client, and with `--allow-mutations` each further run reloads its window. `--clients=desktop-start` restarts only the test client (with `--allow-mutations`) and measures from its main process start. `--latency=<ms>` delays the web page's requests and data channel; start the stack with `OPENBOT_DEV_RTT_MS=<ms>` for the same delay in the desktop client, and with `OPENBOT_DEV_CLIENT_TRANSPORT=webrtc` to connect the test client over WebRTC as the dev host user. `--runs=<n>` (default 5), `--label=<name>`, `--clients=web,desktop,desktop-start`, `--api=<url>`, `--compare=<report.json>`, `--browser-executable=<path>`. Writes `report.json` and `waterfall.md` to `.openbot-build/remote-sync-perf/<label>/`. See [remote connect measurement](docs/architecture/servers.md#remote-connect-measurement). |
 | `bun run check` | Run Biome, both typechecks, offline tests, the browser smoke test, and the production build. |
 | `bun run typecheck` | Check all 15 projects in parallel with a separate incremental cache for each project in this worktree. |
 | `bun run knip:check` | Find unused files, exports, and types, unused or unlisted dependencies, and unresolved imports in all workspaces. CI runs it. |
@@ -368,7 +430,7 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun run check:doc-links` | Fail when a link in a tracked Markdown file names a Markdown file that does not exist, or an anchor that the file does not have. |
 | `bun run verify:preload` | After `bun run build`, run the built preload with a fake Electron. Fail when it loads a module that a sandboxed preload cannot load, uses `import()`, or exposes a method that `IPC_ENDPOINTS` does not name. |
 | `bun run types:ratchet` | Hold each TypeScript option in `tools/typescript/type-baseline.json` to its error count per file in every project that extends `tsconfig.base.json`. A new error fails. Add `--write` after a fix to lower the baseline, or `--add=<option>` to start an option at its current counts. |
-| `bun run i18n:check` | Check the translation catalogs: key prefixes, placeholders, plural forms, ambiguous source text, and unused keys. `--fix` puts translated keys in the English order. `--json` writes `.openbot-build/i18n-report.json`. See [docs/i18n.md](docs/i18n.md). |
+| `bun run i18n:check` | Check the translation catalogs: key prefixes, placeholders, plural forms, ambiguous source text, unused keys, and new untranslated keys that `packages/i18n/untranslated.json` does not list. `--fix` puts translated keys in the English order and removes translated keys from `untranslated.json`. `--json` writes `.openbot-build/i18n-report.json`. See [docs/i18n.md](docs/i18n.md). |
 | `bun run test:backend` | Run backend tests only. |
 | `bun run test:changed` | Run, on one worker, only the desktop and mobile test files that import a file changed since `origin/main`, including staged, unstaged and untracked files. It stops with an error when `origin/main` is missing. A change to a vitest config, a setup file or `package.json` selects no test. See [docs/development-checks.md](docs/development-checks.md#focused-tests). |
 | `bun run test:related -- <source>...` | Run, on one worker, only the test files that import the named source files. |
@@ -446,6 +508,11 @@ machine running several worktrees those kill the other checkouts' work mid-write
 
 Set `OPENBOT_DEV_ICE_TRANSPORT_POLICY=relay` before this command to force Team API traffic through
 coturn. This test option works only with the development renderer. Production always starts with `all`.
+Set `OPENBOT_DEV_SYNC_PROFILE=1` as well to let `bun run perf:remote` read the host requests of the
+desktop client.
+Set `OPENBOT_DEV_AWAY_SECONDS=<seconds>` to change the time without input on the computer after which
+a phone gets the notifications of a host (30 seconds by default), for example `5` to test it. The host
+and the desktop client of the stack both read it. A packaged app ignores it.
 
 The normal `check` command is offline and uses a fake App Server. Manual smoke scripts may use the
 signed-in subscription and must not run in CI.
@@ -503,7 +570,7 @@ Cloudflare Workers
 - `src/backend` owns provider adapters, persistence, message scheduling, transfers, and the browser host.
 - `src/preload` exposes only the typed `window.openbot` API.
 - `src/renderer` contains the SolidJS interface.
-- `apps/auth-api` contains the TanStack Start account API, one-time email codes, rate limits, and D1 migrations. It also serves the public site: the landing page, `/news`, `/guides`, and the plugin pages at `/plugins` and `/plugins/<slug>`.
+- `apps/auth-api` contains the TanStack Start account API, one-time email codes, rate limits, and D1 migrations. It also serves the public site: the landing page, `/news`, `/guides`, and the Marketplace pages at `/marketplace` (Agents, Skills, and Apps), `/marketplace/agents/<id>`, `/marketplace/skills/<slug>`, and `/plugins/<slug>`. `/plugins` redirects to `/marketplace/apps`.
 - `apps/status` contains the public status page at `status.openbot.run`, the script that the `status-page` workflow runs to check the services, and the script that sends the [status webhooks](docs/status-webhooks.md) of the team. GitHub hosts it, so it stays up when Cloudflare does not.
 - `packages/contracts` contains process-boundary contracts, shared limits, and pure validation.
 - `packages/i18n` contains the interface text in English, French, Japanese, Brazilian Portuguese and Turkish for desktop, web and mobile. See [docs/i18n.md](docs/i18n.md) to add text or a language.
@@ -528,6 +595,10 @@ original file and extracts it with its own tools. An agent sends a ZIP archive b
 `openbot.attach_files_to_response`, and the user downloads it from the chat. Open shows a ZIP
 archive in the file manager instead of opening it. Remote hosts must advertise the `zip-attachments`
 capability.
+
+SVG images use the same limits. The chat shows an SVG as an image, but the agent gets it as a file,
+not as an image: providers take only raster images, so the agent reads the SVG text. Open shows an SVG
+in the file manager. Remote hosts must advertise the `svg-attachments` capability.
 
 ## Local data and network boundaries
 
@@ -554,6 +625,12 @@ capability.
 - `~/.cursor` — login and session history managed exclusively by the Cursor CLI. A confined Cursor
   process keeps its settings in `~/.cursor/openbot-confined`, so it never changes yours.
 - `~/.cline` (or `$CLINE_DIR`) — login and session history managed exclusively by the Cline CLI.
+- `~/.kimi` (or `$KIMI_SHARE_DIR`) — login and session history managed exclusively by the Kimi Code CLI.
+- `~/.local/share/devin`, `~/.config/devin` and `~/.devin` (or the XDG folders) — login, settings and
+  session history managed exclusively by the Devin CLI.
+- `~/.hermes` (or `$HERMES_HOME`) — your own Hermes Agent settings, memories, skills, sign-ins and
+  session history. OpenBot reads only the change time of `auth.json`, `.env` and `config.yaml`, to
+  see a sign-in.
 
 Deleting an agent removes its workspace, owned generated attachments, and deliveries addressed only
 to that agent. A transfer remains when another agent still uses the same message.

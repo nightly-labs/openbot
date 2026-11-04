@@ -72,9 +72,11 @@ export function createDevelopmentDefaults(): Record<string, string> {
     EMAIL_SMTP_PORT: "",
     EMAIL_SMTP_USERNAME: "",
     EMAIL_FROM: "",
+    EMAIL_LICENSE_FROM: "",
     EMAIL_SMTP_PASSWORD: "",
     SKILLS_ADMIN_TOKEN: developmentSecret(),
     SITE_REPORT_HASH_SECRET: developmentSecret(),
+    COMPANY_SIGN_IN_SECRET: developmentSecret(),
     REMOTE_AUTH_WEBHOOK_SECRET: developmentSecret(),
     REMOTE_TICKET_PRIVATE_JWK: tickets.privateJwk,
     REMOTE_TICKET_PUBLIC_JWKS: tickets.publicJwks,
@@ -96,7 +98,7 @@ export function readDevelopmentState(projectRoot: string): DevelopmentState {
   ensurePrivateDirectory(paths.directory);
 
   const current = readStateIfPresent(paths.state);
-  if (current) return current;
+  if (current) return addMissingSecrets(paths, current);
 
   const lock = acquireStateLock(paths.lock);
   try {
@@ -133,6 +135,24 @@ export function setDevelopmentOverrides(
       else overrides[name] = value;
     }
     const next: DevelopmentState = { ...current, overrides };
+    publishState(paths.state, next);
+    return next;
+  } finally {
+    releaseStateLock(paths.lock, lock);
+  }
+}
+
+/** Secrets added after a state was made. An older state gets a generated value on its next read. */
+const ADDED_SECRET_NAMES = ["COMPANY_SIGN_IN_SECRET"] as const;
+
+function addMissingSecrets(paths: DevelopmentStatePaths, state: DevelopmentState): DevelopmentState {
+  if (ADDED_SECRET_NAMES.every((name) => state.defaults[name])) return state;
+  const lock = acquireStateLock(paths.lock);
+  try {
+    const current = readStateIfPresent(paths.state) ?? state;
+    const defaults = { ...current.defaults };
+    for (const name of ADDED_SECRET_NAMES) defaults[name] ||= developmentSecret();
+    const next: DevelopmentState = { ...current, defaults };
     publishState(paths.state, next);
     return next;
   } finally {

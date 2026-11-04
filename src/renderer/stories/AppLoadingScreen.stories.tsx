@@ -1,5 +1,5 @@
-import { APP_LOADING_FPS, APP_LOADING_LOOP_S, AppLoadingScreen } from "@openbot/ui/features/account/AppLoadingScreen";
-import { ServerConnectionNotice } from "@openbot/ui/features/servers/ServerConnectionNotice";
+import { AppLoadingScreen } from "@openbot/ui/features/account/AppLoadingScreen";
+import { ConversationLoadNotice, ServerConnectionNotice } from "@openbot/ui/features/servers/ServerConnectionNotice";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { SplashPlayground } from "./splash-story-support";
 
@@ -28,7 +28,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The crew hops while the app loads, then jumps out of the screen. */
+/** A new crew falls into a pile while the app loads, then hops out of the screen. */
 export const Sequence: Story = {};
 
 /** The app is ready at once, so the screen only fades. */
@@ -39,13 +39,16 @@ export const Loading: Story = {
   render: () => <AppLoadingScreen />,
 };
 
-/** One frame of the loop. The same time always shows the same frame. */
-export const Scrub: StoryObj<{ at: number }> = {
-  args: { at: 1.5 },
-  argTypes: {
-    at: { control: { type: "range", min: 0, max: APP_LOADING_LOOP_S * 3, step: 1 / APP_LOADING_FPS } },
-  },
-  render: (args) => <AppLoadingScreen at={args.at} />,
+/** One crew. The same seed always makes the same pile. */
+export const Seeded: StoryObj<{ seed: number }> = {
+  args: { seed: 7 },
+  argTypes: { seed: { control: { type: "number", min: 0, step: 1 } } },
+  render: (args) => <AppLoadingScreen seed={args.seed} />,
+};
+
+/** The history of an agent loads: the lilac plush watches its balls. */
+export const HistoryLoading: Story = {
+  render: () => <ConversationLoadNotice name="Research agent" loading error={null} onRetry={() => {}} />,
 };
 
 export const StartingServer: Story = {

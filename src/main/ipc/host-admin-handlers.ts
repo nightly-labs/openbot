@@ -5,15 +5,16 @@ import {
 import { HOST_RELEASE_CAPABILITY, HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
 import { Effect, Result } from "effect";
 import type { RemoteWorkflowError } from "../remote-service-effects";
-// The server name, logo, timezone, agent memory limit, memory review, prompt cache time and app
-// update of one server's host. On a joined server the request goes to the host. Identity, timezone,
-// memory limit, memory review, prompt cache time, settings, cancellation, and forced restarts require
-// an owner or admin.
+// The server name, logo, timezone, agent memory limit, memory review, prompt cache time, model list
+// and app update of one server's host. On a joined server the request goes to the host. Identity,
+// timezone, memory limit, memory review, prompt cache time, model list, settings, cancellation, and
+// forced restarts require an owner or admin.
 // Ordinary members can check and request an idle update through host-member-update-v1.
 
 import {
   type AgentAccessChange,
   type AgentAccessSnapshot,
+  type AgentProviderRef,
   decodeAgentAccessSnapshot,
   decodeHostAgentMemoryLimit,
   decodeHostMemoryReview,
@@ -21,6 +22,8 @@ import {
   decodeHostUpdateStatus,
   decodeMachineAlertSettings,
   decodePromptCacheTtlSetting,
+  decodeProviderModelVisibility,
+  decodeServerAuditLog,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
   hostAgentMemoryLimit,
@@ -29,7 +32,12 @@ import {
   LOCAL_SERVER_ID,
   type MachineAlertSettings,
   type PromptCacheTtl,
+  type ProviderModelVisibilityChange,
   parseAgentAccessChange,
+  parseProviderModelVisibilityChange,
+  parseProviderModelVisibilityProvider,
+  type ServerAuditLog,
+  type ServerAuditName,
   type ServerSummary,
   UPDATE_RESTART_MODES,
   type UpdateHostIdentityInput,
@@ -51,9 +59,14 @@ import {
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MEMORY_REVIEW_CAPABILITY, MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import {
+  MODEL_VISIBILITY_CAPABILITY,
+  MODEL_VISIBILITY_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-v1";
+import {
   PROMPT_CACHE_TTL_CAPABILITY,
   PROMPT_CACHE_TTL_ROUTES,
 } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
+import { SERVER_AUDIT_CAPABILITY, SERVER_AUDIT_ROUTES } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { type AgentAccessStore, agentAccessSnapshot } from "../agent-access-store";
@@ -61,9 +74,11 @@ import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-s
 import type { HostService } from "../host-service";
 import type { MachineAlertMonitor } from "../machine-alerts";
 import type { MemoryReviewPreferenceStore } from "../memory-review-preference-store";
+import type { ModelVisibility } from "../model-visibility";
 import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preference-store";
 import { acceptEmpty, decodeHostReleaseStatusFromHost, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
+import type { ServerAuditStore } from "../server-audit-store";
 import { parseServerTimezone, type ServerTimezonePreferenceStore } from "../server-timezone-preference-store";
 import { parseAgentMemoryLimitPreference, parseHostUpdateSettings, parseMemoryReviewPreference } from "./app-inputs";
 import type { IpcGroupHandlers } from "./define-ipc-group";
@@ -91,10 +106,14 @@ interface HostAdminIpcDependencies {
   memoryReview: MemoryReviewPreferenceStore;
   machineAlerts: Pick<MachineAlertMonitor, "alerts" | "setAlerts" | "canBeResponsible">;
   promptCacheTtl: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
+  modelVisibility: Pick<ModelVisibility, "settings" | "set">;
   agentAccess: Pick<AgentAccessStore, "levels" | "set">;
+  serverAudit: Pick<ServerAuditStore, "read">;
   /** The server ID of this computer's host, when it has one. Roles are stored by it. */
   localServerId: () => string | undefined;
   localAgentIds: () => string[];
+  /** The owner member of this computer's host, who makes each local change, for the audit log. */
+  localOwner: () => ServerAuditName | null;
 }
 
 // The user of this computer owns its server, so the roles give them every agent.
@@ -111,9 +130,12 @@ export function hostAdminIpcHandlers({
   memoryReview,
   machineAlerts,
   promptCacheTtl,
+  modelVisibility,
   agentAccess,
+  serverAudit,
   localServerId,
   localAgentIds,
+  localOwner,
 }: HostAdminIpcDependencies): Pick<IpcGroupHandlers, "hostAdmin"> {
   function remoteUpdate(serverId: string, route: string, body: HostUpdateBody): Promise<HostUpdateStatus> {
     const role = remoteServers.list().find((server) => server.id === serverId)?.role;
@@ -152,6 +174,17 @@ export function hostAdminIpcHandlers({
       throw new Error(sourceText("error.team.promptCacheTtlUnsupported"));
     return runCauseEffect(
       remoteServers.request(serverId, route, decodePromptCacheTtlSetting, { method: "POST", body }),
+    );
+  }
+  function remoteModelVisibility(
+    serverId: string,
+    route: string,
+    body: { provider: AgentProviderRef } | ProviderModelVisibilityChange,
+  ) {
+    if (!remoteServers.supportsCapability(serverId, MODEL_VISIBILITY_CAPABILITY))
+      throw new Error(sourceText("error.team.modelVisibilityUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, route, decodeProviderModelVisibility, { method: "POST", body }),
     );
   }
   function localAccessServerId(): string {
@@ -289,6 +322,14 @@ export function hostAdminIpcHandlers({
         local: (ttl) => runCauseEffect(promptCacheTtl.set(ttl)),
         remote: (ttl, serverId) => remotePromptCacheTtl(serverId, PROMPT_CACHE_TTL_ROUTES.update, { ttl }),
       }),
+      getModelVisibility: scopedHandler(parseProviderModelVisibilityProvider, {
+        local: (provider) => runCauseEffect(modelVisibility.settings(provider)),
+        remote: (provider, serverId) => remoteModelVisibility(serverId, MODEL_VISIBILITY_ROUTES.settings, { provider }),
+      }),
+      setModelVisibility: scopedHandler(parseProviderModelVisibilityChange, {
+        local: (change) => runCauseEffect(modelVisibility.set(change)),
+        remote: (change, serverId) => remoteModelVisibility(serverId, MODEL_VISIBILITY_ROUTES.update, change),
+      }),
       getAgentAccess: scopedQueryHandler({
         local: () => {
           const serverId = localAccessServerId();
@@ -301,7 +342,9 @@ export function hostAdminIpcHandlers({
           const serverId = localAccessServerId();
           // The local owner sees every agent of this host.
           const shown = new Set(localAgentIds());
-          const saved = await Effect.runPromise(Effect.result(agentAccess.set(serverId, change, shown, shown)));
+          const saved = await Effect.runPromise(
+            Effect.result(agentAccess.set(serverId, change, shown, shown, localOwner())),
+          );
           if (Result.isFailure(saved)) {
             if (saved.failure._tag === "AgentAccessStale") throw new Error(sourceText("error.team.agentAccessStale"));
             throw saved.failure.cause;
@@ -309,6 +352,23 @@ export function hostAdminIpcHandlers({
           return agentAccessSnapshot(agentAccess.levels(serverId), LOCAL_OWNER, [...shown]);
         },
         remote: (change, serverId) => remoteAccess(serverId, AGENT_ACCESS_ROUTES.set, change),
+      }),
+      getAuditLog: scopedQueryHandler({
+        // A computer that does not host a server has no changes to show.
+        local: (): ServerAuditLog => {
+          const serverId = localServerId();
+          return serverId ? serverAudit.read(serverId) : { entries: [] };
+        },
+        remote: (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, SERVER_AUDIT_CAPABILITY))
+            throw new Error(sourceText("error.team.serverAuditUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, SERVER_AUDIT_ROUTES.read, decodeServerAuditLog, {
+              method: "POST",
+              body: {},
+            }),
+          );
+        },
       }),
     },
   };

@@ -1,3 +1,0 @@
-### Changed
-
-- In a channel, more than one agent can now answer. When you ask for the view of each agent, speak to the whole group, or need the work of several agents, the lead gives the request to each of them, and each one answers in its own reply. A message that starts with more than one mention, such as "@Writer @Editor what do you think?", goes to each mentioned agent, and a message that starts with `@everyone` goes to every agent in the channel. The mention picker shows an "Everyone" option in channels. "continue" after a stop continues the work of each agent that the request went to. Before, only one agent answered.

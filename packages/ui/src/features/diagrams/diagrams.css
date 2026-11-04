@@ -43,6 +43,12 @@
   color: var(--openbot-text-muted);
 }
 
+/* The run panel is at the inline end, so its toggle and Back chevrons follow the reading direction. */
+.diagram-view-actions .header-panel-toggle > svg:dir(rtl),
+.diagram-inspector .header-panel-toggle > svg:dir(rtl) {
+  transform: scaleX(-1);
+}
+
 .diagram-view-icon {
   display: grid;
   width: 18px;
@@ -81,7 +87,7 @@
   display: flex;
   align-items: center;
   gap: var(--openbot-space-1);
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 /* As with the chat's browser sidebar: the routine details panel appears at once at the right edge, and
@@ -93,11 +99,12 @@
   display: flex;
   min-height: 0;
   flex: 1;
-  transition: padding-right var(--panel-resize-duration, var(--openbot-duration-overlay)) cubic-bezier(0.22, 1, 0.36, 1);
+  transition: padding-inline-end var(--panel-resize-duration, var(--openbot-duration-overlay))
+    cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .diagram-view-body[data-inspector="open"] {
-  padding-right: var(--diagram-inspector-width);
+  padding-inline-end: var(--diagram-inspector-width);
 }
 
 /* The board, or the empty canvas, and the chat panel over it. The panel keeps to this box. */
@@ -111,7 +118,7 @@
 .diagram-view-chat {
   position: absolute;
   bottom: var(--openbot-space-4);
-  left: var(--openbot-space-4);
+  inset-inline-start: var(--openbot-space-4);
   z-index: 2;
   width: min(360px, calc(100% - var(--openbot-space-8)));
   /* The folded panel keeps its box, so the canvas under it still takes the pointer. */
@@ -152,6 +159,8 @@
   position: absolute;
   top: 0;
   left: 0;
+  /* The world is a coordinate space, so it stays left to right in right-to-left text. */
+  direction: ltr;
   transform-origin: 0 0;
 }
 
@@ -261,7 +270,7 @@
 /* Zoom in, zoom out and fit, as a column of separate square buttons. */
 .diagram-board-zoom {
   position: absolute;
-  right: var(--openbot-space-4);
+  inset-inline-end: var(--openbot-space-4);
   bottom: var(--openbot-space-4);
   z-index: 2;
   display: flex;
@@ -993,13 +1002,13 @@
 .diagram-inspector {
   position: absolute;
   top: 0;
-  right: 0;
+  inset-inline-end: 0;
   bottom: 0;
   display: flex;
   width: var(--diagram-inspector-width);
   min-height: 0;
   flex-direction: column;
-  border-left: 1px solid var(--openbot-border);
+  border-inline-start: 1px solid var(--openbot-border);
   background: var(--openbot-bg-surface);
 }
 
@@ -1129,7 +1138,7 @@
   justify-content: flex-start;
   gap: var(--openbot-space-2);
   padding: var(--openbot-space-2);
-  text-align: left;
+  text-align: start;
 }
 
 .diagram-inspector-step-number {
@@ -1238,7 +1247,7 @@
   justify-self: start;
   gap: var(--openbot-space-2);
   border-radius: var(--openbot-radius-pill);
-  padding-left: var(--openbot-space-1-5);
+  padding-inline-start: var(--openbot-space-1-5);
   pointer-events: auto;
   transition:
     opacity var(--diagram-chat-open-duration) var(--openbot-ease-out),
@@ -1313,7 +1322,8 @@
   cursor: grab;
   touch-action: none;
   border-bottom: 1px solid var(--openbot-border);
-  padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-3);
+  padding-block: var(--openbot-space-2);
+  padding-inline: var(--openbot-space-3) var(--openbot-space-2);
 }
 
 .diagram-chat-title {

@@ -129,6 +129,13 @@ export const messages = {
     other: "Uma conta pode ter {count} servidores pagos. Para adicionar um servidor, exclua um primeiro.",
   },
   "server.add.limit.manage": "Gerenciar servidores",
+  "server.upgrade.title": "Seus agentes estão ficando sem espaço",
+  "server.upgrade.description":
+    "{server} tem pouco espaço livre. Faça upgrade para que seus agentes continuem trabalhando sem interrupções.",
+  "server.upgrade.used": "{used} de {total} usados",
+  "server.upgrade.current": "{plan} (atual)",
+  "server.upgrade.price": "Preço",
+  "server.upgrade.action": "Fazer upgrade para {plan}",
   "server.hosted.progressTitle": "Configurando {name}",
   "server.hosted.paymentTitle": "Conclua o pagamento no navegador",
   "server.hosted.paymentDescription": "A configuração começa quando a Stripe confirma o pagamento.",
@@ -200,6 +207,8 @@ export const messages = {
   "server.rail.restart": "Reiniciar servidor",
   "server.rail.leave": "Sair do servidor",
   "server.rail.delete": "Excluir servidor",
+  "server.rail.hide": "Ocultar servidor",
+  "server.rail.showLocal": "Mostrar {name}",
   "server.select.failedTitle": "Não foi possível selecionar o servidor",
   "server.select.failedDescription": "Não foi possível trocar de servidor. Tente novamente.",
   "server.select.openAgentFailed": "Não foi possível abrir {name}. Encontre-o na barra lateral.",
@@ -301,13 +310,6 @@ export const messages = {
   "server.settings.setUpDesktopDescription": "Veja e controle este Mac de outro computador.",
   "server.settings.later": "Depois",
   "server.settings.setUp": "Configurar",
-  "server.settings.notifications": "Notificações",
-  "server.settings.muteNotifications": "Silenciar notificações",
-  "server.settings.muteDescription":
-    "Interrompa as notificações da área de trabalho, os sons e as atualizações no recorte da tela do MacBook deste servidor.",
-  "server.settings.mutedUntilDescription": "{until}. Desative para reativar as notificações agora.",
-  "server.settings.notifyAbout": "Notificar sobre",
-  "server.settings.notifyAboutDescription": "Quais eventos dos agentes mostram uma notificação na área de trabalho.",
   "server.settings.agents": "Agentes",
   "server.settings.timezone": "Fuso horário",
   "server.settings.timezoneDescription":
@@ -338,6 +340,8 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "A chave atual e a nova assinam uma transferência. Os apps dos membros mudam para a nova chave na próxima conexão. Faça isso se o arquivo da chave foi copiado ou exposto.",
   "server.settings.hostKeyRotated": "Chave do servidor alterada",
+  "server.settings.hostKeyChanged": "Última alteração",
+  "server.settings.hostKeyChangedDescription": "{date}. A chave anterior e a chave nova assinaram esta alteração.",
   "server.settings.hostKeyLocalOnly": "Aqui só o servidor deste computador pode alterar a chave.",
   "server.settings.removeTitle": "Remover servidor",
   "server.settings.removeDescription":

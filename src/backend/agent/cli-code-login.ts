@@ -2,7 +2,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { pasteCodeSignInSupported } from "@openbot/contracts/agent-providers";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
-import { Effect, Fiber, Schema } from "effect";
+import { Deferred, Effect, Fiber, Option, Schema } from "effect";
 import { shellQuote } from "../automation-command";
 import { cliSpawnTarget } from "../cli";
 import { stopProcessTree } from "../windows-process-tree";
@@ -12,7 +12,7 @@ import { waitForSuccessfulProcess } from "./provider-status";
  * What a provider CLI prints for a sign-in the user finishes on another device.
  *
  * `device` is a device code: the user opens the page, confirms the code, and the CLI sees the
- * approval by itself (Grok, Cline). `paste` is an authorization code the provider's page shows after
+ * approval by itself (Grok, Cline, Kimi). `paste` is an authorization code the provider's page shows after
  * the sign-in, which the user copies back and OpenBot types into the CLI's prompt (Claude). `link` is
  * a page that signs the CLI in by itself, with no code to confirm or copy (Cursor).
  */
@@ -25,8 +25,12 @@ export interface CliCodeLogin {
   child: ChildProcess;
   /** Settles when the CLI exits: resolves on success, rejects on failure or after `timeoutMs`. */
   done: Effect.Effect<void, CliCodeLoginFailed>;
-  /** Resolves when the CLI has printed what the user needs. Rejects when it exits or goes quiet first. */
-  prompt: Effect.Effect<CliCodePrompt, CliCodeLoginFailed>;
+  /**
+   * Resolves when the CLI has printed what the user needs, or with null when it signed in and exited
+   * with success before it printed anything: Hermes imports the Nous sign-in of another Hermes
+   * profile. Rejects when it fails or goes quiet first.
+   */
+  prompt: Effect.Effect<CliCodePrompt | null, CliCodeLoginFailed>;
   /** Types the code into the CLI's prompt. Only a `paste` sign-in reads it. */
   submit(code: string): void;
 }
@@ -54,6 +58,8 @@ export const startCliCodeLogin = Effect.fnUntraced(function* (options: {
   argv: readonly string[];
   env: Record<string, string>;
   timeoutMs: number;
+  /** Closes the CLI's input at once: see `ProviderCliCommand.closeInput`. */
+  closeInput?: boolean;
   platform?: NodeJS.Platform;
 }) {
   const platform = options.platform ?? process.platform;
@@ -82,7 +88,11 @@ export const startCliCodeLogin = Effect.fnUntraced(function* (options: {
     (child) => stopProcessTree(child).pipe(Effect.orDie),
   );
   child.stdin?.on("error", () => undefined);
+  if (options.closeInput && options.flow !== "paste") child.stdin?.end();
   let submitted = false;
+  // Keep the result after the completion task closes the process scope. Joining a prompt fiber
+  // in that scope can otherwise replace an early CLI failure with interruption.
+  const prompt = Deferred.makeUnsafe<CliCodePrompt | null, CliCodeLoginFailed>();
   // After a pasted code, an exit with a failure code is the provider refusing it. A timeout is a
   // signal, so it keeps its own message.
   const done = yield* Effect.forkScoped(
@@ -96,14 +106,18 @@ export const startCliCodeLogin = Effect.fnUntraced(function* (options: {
                 : failure.cause,
           }),
       ),
+      Effect.tapError((failure) => Deferred.fail(prompt, failure)),
+      Effect.tap(() => Deferred.succeed(prompt, null)),
     ),
     { startImmediately: true },
   );
-  const prompt = yield* Effect.forkScoped(readCodePrompt(child, options.flow), { startImmediately: true });
+  yield* Effect.forkScoped(Deferred.complete(prompt, readCodePrompt(child, options.flow)), {
+    startImmediately: true,
+  });
   return {
     child,
     done: Fiber.join(done),
-    prompt: Fiber.join(prompt),
+    prompt: Deferred.await(prompt),
     submit(code) {
       if (options.flow !== "paste") throw new Error(sourceText("error.provider.codeLoginNotWaiting"));
       const value = normalizePastedCode(code);
@@ -122,22 +136,23 @@ export class CliCodeLoginFailed extends Schema.TaggedError<CliCodeLoginFailed>()
 
 // Output contains credentials and must not become a trace payload.
 const readCodePrompt = Effect.fnUntraced(function* (child: ChildProcess, flow: CliCodePrompt["flow"]) {
-  return yield* Effect.callback<CliCodePrompt, CliCodeLoginFailed>((resume) => {
+  return yield* Effect.callback<CliCodePrompt | null, CliCodeLoginFailed>((resume) => {
     let output = "";
     let settled = false;
     const cleanup = () => {
       child.stdout?.off("data", read);
       child.stderr?.off("data", read);
       child.off("error", unavailable);
-      child.off("exit", unavailable);
+      child.off("exit", exited);
     };
-    const settle = (result: CliCodePrompt | Error) => {
+    const settle = (result: CliCodePrompt | Error | null) => {
       if (settled) return;
       settled = true;
       cleanup();
       resume(result instanceof Error ? Effect.fail(new CliCodeLoginFailed({ cause: result })) : Effect.succeed(result));
     };
     const unavailable = () => settle(new Error(sourceText("error.provider.codeLoginNoLink")));
+    const exited = (code: number | null) => (code === 0 ? settle(null) : unavailable());
     const read = (chunk: Buffer) => {
       if (output.length >= MAX_OUTPUT_CHARS) return;
       output += chunk.toString("utf8").slice(0, MAX_OUTPUT_CHARS - output.length);
@@ -147,7 +162,7 @@ const readCodePrompt = Effect.fnUntraced(function* (child: ChildProcess, flow: C
     child.stdout?.on("data", read);
     child.stderr?.on("data", read);
     child.once("error", unavailable);
-    child.once("exit", unavailable);
+    child.once("exit", exited);
     return Effect.sync(cleanup);
   }).pipe(
     Effect.timeoutOrElse({
@@ -190,12 +205,21 @@ function terminalCommand(platform: NodeJS.Platform, argv: readonly string[]): { 
 /**
  * Reads the link, and the code for a device sign-in, from what the CLI has printed so far. Returns
  * null until all of it is there. The shapes are the pinned CLIs' (Grok 1.0.22, Claude 2.1.263,
- * Cursor 2026.10.01, Cline 3.0.68); the tests hold samples of each.
+ * Cursor 2026.10.01, Cline 3.0.68, Kimi 1.52.0); the tests hold samples of each but Kimi's. Hermes
+ * 0.21.5 prints its Nous Portal sign-in in the shape of `_print_device_code_instructions` in
+ * `hermes_cli/auth_device_flow.py`.
  */
 function parseCliCodePrompt(flow: CliCodePrompt["flow"], output: string): CliCodePrompt | null {
   const text = stripTerminalCodes(output);
-  // Only a link that something has ended: a chunk can stop in the middle of one.
-  const url = text.match(/https:\/\/[^\s"'<>]+(?=[\s"'<>])/)?.[0];
+  if (flow === "device") {
+    const event = deviceCodeEvent(text);
+    if (event) return event;
+  }
+  // Only a link that something has ended: a chunk can stop in the middle of one. Hermes prints its
+  // portal's address before the device page, which follows "Open:".
+  const url =
+    (flow === "device" ? text.match(/\bopen:[ \t]*(https:\/\/[^\s"'<>]+)(?=[\s"'<>])/i)?.[1] : undefined) ??
+    text.match(/https:\/\/[^\s"'<>]+(?=[\s"'<>])/)?.[0];
   if (!url) return null;
   let parsed: URL;
   try {
@@ -232,9 +256,42 @@ function codeAfterConfirmLine(text: string): string | null {
   return code && /^[A-Z0-9]{3,12}(?:-[A-Z0-9]{3,12})*$/.test(code) ? code : null;
 }
 
-/** The code at the end of an "Enter this code in your browser: CODE" line that has ended (Cline). */
+const DeviceCodeEvent = Schema.Struct({
+  type: Schema.Literal("verification_url"),
+  data: Schema.Struct({ verification_url: Schema.String, user_code: Schema.String }),
+});
+const decodeDeviceCodeEvent = Schema.decodeUnknownOption(Schema.fromJsonString(DeviceCodeEvent));
+
+/**
+ * The device code from a JSON line that has ended (Kimi's `login --json`):
+ * `{"type": "verification_url", "data": {"verification_url": "<page with the code>", "user_code": "<code>"}}`.
+ */
+function deviceCodeEvent(text: string): CliCodePrompt | null {
+  for (const line of text.split("\n").slice(0, -1)) {
+    const event = decodeDeviceCodeEvent(line.trim());
+    if (Option.isNone(event)) continue;
+    const { verification_url: url, user_code: userCode } = event.value.data;
+    if (!/^[A-Za-z0-9]{3,12}(?:-[A-Za-z0-9]{3,12})*$/.test(userCode) || !URL.canParse(url)) continue;
+    const page = new URL(url);
+    if (page.protocol !== "https:") continue;
+    const base = new URL(page.href);
+    base.search = "";
+    return {
+      flow: "device",
+      userCode,
+      verificationUrl: base.href,
+      verificationUrlComplete: page.search ? page.href : null,
+    };
+  }
+  return null;
+}
+
+/**
+ * The code at the end of an "Enter this code in your browser: CODE" line (Cline) or an "If prompted,
+ * enter code: CODE" line (Hermes) that has ended.
+ */
 function codeOnEnterLine(text: string): string | null {
-  return text.match(/enter this code[^:\n]*:[ \t]*([A-Z0-9]{3,12}(?:-[A-Z0-9]{3,12})*)[ \t]*\n/i)?.[1] ?? null;
+  return text.match(/enter (?:this )?code[^:\n]*:[ \t]*([A-Z0-9]{3,12}(?:-[A-Z0-9]{3,12})*)[ \t]*\n/i)?.[1] ?? null;
 }
 
 const ESC = 0x1b;

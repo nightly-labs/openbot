@@ -16,6 +16,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
+import { WorkflowGitHubStore } from "../src/backend/workflows/workflow-github-store";
 import { WorkflowRunStore } from "../src/backend/workflows/workflow-run-store";
 import { WorkflowStore } from "../src/backend/workflows/workflow-store";
 import { workflowScheduleDueAt } from "../src/backend/workflows/workflow-triggers";
@@ -58,6 +59,8 @@ async function open() {
     createWorkflows({
       store: new WorkflowStore({ database, nextDueAt: workflowScheduleDueAt(() => "UTC") }),
       runs,
+      github: new WorkflowGitHubStore({ database }),
+      githubApp: () => null,
       // Each delivery stays running: only a delete, a stop or a restart ends the step.
       delivery: () => ({ status: "running", turnId: null, error: null }),
       turnAnswer: () => null,

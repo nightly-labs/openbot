@@ -29,4 +29,14 @@ export const messages = {
   "error.site.fileType": "Ce type de fichier n’est pas autorisé : {path}",
   "error.site.fileOutsideRoot": "Les fichiers du site doivent rester dans la racine source : {path}",
   "error.site.fileTooLarge": "Un fichier dépasse la limite de 1 Mo : {path}",
+  "error.site.serverLimit": {
+    one: "Ce serveur a atteint sa limite de {count} site actif. Pour publier un autre site, supprimez un site ou utilisez un serveur cloud avec un forfait qui a plus de sites.",
+    other:
+      "Ce serveur a atteint sa limite de {count} sites actifs. Pour publier un autre site, supprimez un site ou utilisez un serveur cloud avec un forfait qui a plus de sites.",
+  },
+  "error.site.unlinkedLimit": {
+    one: "Cet ordinateur n’est pas un serveur, et son compte a atteint la limite de {count} site actif. Pour publier un autre site, supprimez un site ou utilisez un serveur cloud avec un forfait qui a plus de sites.",
+    other:
+      "Cet ordinateur n’est pas un serveur, et son compte a atteint la limite de {count} sites actifs. Pour publier un autre site, supprimez un site ou utilisez un serveur cloud avec un forfait qui a plus de sites.",
+  },
 } as const satisfies PartialTranslation<typeof source>;

@@ -6,12 +6,14 @@ import {
   type SmtpEmailConfig,
   sendPrivateContactMessage,
   sendPrivateEmailCode,
+  sendPrivateLicenseEmail,
   sendPrivateTeamInvite,
   sendPrivateWelcomeEmail,
 } from "./smtp-email-delivery";
 import type {
   ContactMessageDelivery,
   EmailCodeDelivery,
+  LicenseEmailDelivery,
   TeamInviteEmailDelivery,
   WelcomeEmailDelivery,
   WorkerBindings,
@@ -28,6 +30,8 @@ export type EmailDeliveryBindings = Pick<
   | "EMAIL_SMTP_USERNAME"
   | "EMAIL_SMTP_PASSWORD"
   | "EMAIL_FROM"
+  | "EMAIL_LICENSE_FROM"
+  | "EMAIL_RELAY"
   | "EMAIL_DELIVERY_WEBHOOK_URL"
   | "EMAIL_DELIVERY_WEBHOOK_SECRET"
 >;
@@ -92,6 +96,20 @@ export function createWelcomeEmailDelivery(
 }
 
 /**
+ * License emails go from `EMAIL_LICENSE_FROM` through the same SMTP account, so that account must be
+ * allowed to send as it. An empty value uses `EMAIL_FROM`.
+ */
+export function createLicenseEmailDelivery(
+  bindings: EmailDeliveryBindings,
+  analytics: AccountAnalytics,
+): LicenseEmailDelivery | null {
+  const smtp = readSmtpConfig(bindings);
+  if (!smtp) return null;
+  const config = { ...smtp, from: bindings.EMAIL_LICENSE_FROM?.trim() || smtp.from };
+  return { send: (message) => tracked(analytics, "license", sendPrivateLicenseEmail(config, message)) };
+}
+
+/**
  * Sends one `email_sent` event with the result of an SMTP send, so a dashboard can show the use of the
  * hourly quota of the mailbox. The webhook path does not use the mailbox, so it sends none.
  */
@@ -141,5 +159,6 @@ function readSmtpConfig(bindings: EmailDeliveryBindings): SmtpEmailConfig | null
     username: values.username,
     password: values.password,
     from: values.from,
+    ...(bindings.EMAIL_RELAY ? { relay: bindings.EMAIL_RELAY } : {}),
   };
 }

@@ -84,6 +84,7 @@ export const messages = {
   "error.remote.fileTransferFailed": "WebRTC 文件传输失败。",
   "error.remote.fileResumeFailed": "WebRTC 文件传输未能在截止时间前恢复。",
   "error.remote.fileTransportStopped": "WebRTC 文件传输已停止。",
+  "error.remote.downloadStopped": "下载已停止。",
   "error.remote.fileResumeExpired": "WebRTC 文件续传的截止时间已过。",
   "error.remote.hostRequestFailed": "主机无法完成该请求。",
   "error.remote.responseTooLarge": "主机返回的回复过大，无法发送到这台设备。",
@@ -117,7 +118,6 @@ export const messages = {
   "error.remote.serverDisconnected": "服务器已断开。",
   "error.remote.preferencesUnreadable": "无法读取已保存的聊天偏好。",
   "error.remote.accountAuthRequired": "需要账号身份验证。",
-  "error.remote.serverIdentityChanged": "服务器身份已变更，拒绝替换受信任的主机密钥。",
   "error.remote.pairedIdentityChanged": "已配对的桌面身份缺失或已变更，请从该桌面重新扫码。",
   "error.remote.permanentInviteNoEmail": "永久邀请无法通过邮件发送。",
   "error.remote.selfHostedInviteNoEmail": "自建账号服务的邀请无法通过邮件发送，请复制链接。",
@@ -187,4 +187,6 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "请更新这台桌面服务器以删除频道。",
   "error.remote.historyRefreshFailed": "消息已发送，但无法刷新对话历史。",
   "error.remote.taskHistoryRefreshFailed": "任务已更改，但无法刷新对话历史。",
+  "error.remote.localServerAccountRemovalFailed":
+    "服务器已在其电脑上删除，但账户中仍列出它。请再次删除以将其从账户中移除。",
 } as const satisfies PartialTranslation<typeof source>;

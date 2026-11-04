@@ -1,4 +1,4 @@
-import type { ChannelCommand, ChannelPage, ChannelSummary } from "@openbot/contracts/ipc";
+import type { AvatarImageInput, ChannelCommand, ChannelPage, ChannelSummary } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import type { AgentProfile } from "@openbot/ui/data";
 import { currentText } from "@openbot/ui/text";
@@ -23,6 +23,8 @@ import type { ChannelsPort } from "./channels-port";
 
 interface ChannelsState {
   channels: ChannelSummary[];
+  /** A list read for this reader has answered. Until then, a client can show the channels of its frame. */
+  listed: boolean;
   selectedId: string | null;
   page: ChannelPage | null;
   loading: boolean;
@@ -51,6 +53,20 @@ export interface ChannelsEnvironment {
   supported: () => boolean;
   /** Whether this reader may delete a channel; `supported()` is checked as well. */
   deletionSupported: () => boolean;
+  /** Whether the host deletes a message (`message-delete-v1`); `supported()` is checked as well. */
+  messageDeletionSupported: () => boolean;
+  /**
+   * Whether this reader may delete the messages of other senders: this computer, or an admin of the
+   * server. Every reader may delete a message that they sent. The host checks it again.
+   */
+  deletesAnyMessage: () => boolean;
+  /** Whether the host takes `cancel` (`channel-task-cancel-v1`); `supported()` is checked as well. */
+  taskCancelSupported: () => boolean;
+  /**
+   * Whether this reader can change the picture of a channel. Only this computer keeps a channel
+   * picture: the Team API does not carry it, so a joined server and the browser client cannot.
+   */
+  pictureSupported: () => boolean;
   /** Clears whatever else covers the workspace, because a channel is about to cover it. */
   beforeOpen: () => void;
   /** Whether a message that arrives now is in front of the reader. */
@@ -82,6 +98,7 @@ function channelAction(input: ChannelCommand, creating: boolean, page: ChannelPa
 export function createChannelsController(env: ChannelsEnvironment) {
   const [state, setState] = createStore<ChannelsState>({
     channels: [],
+    listed: false,
     selectedId: null,
     page: null,
     loading: false,
@@ -164,6 +181,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
         // Keep each summary object, so the sidebar, which keys its rows by object, does not remount
         // every channel row (and close an open menu) on each refresh.
         reconcile(channels, "id")(state.channels);
+        state.listed = true;
         if (selected && !selectedExists) {
           state.selectedId = null;
           state.editing = null;
@@ -365,6 +383,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
           setState((state) => {
             Object.assign(state, {
               channels: [],
+              listed: false,
               selectedId: selected,
               page: null,
               pending: false,
@@ -431,6 +450,23 @@ export function createChannelsController(env: ChannelsEnvironment) {
       }
     });
   }
+  const messageDeletionSupported = () =>
+    supported() && env.messageDeletionSupported() && env.port().agent.deleteChannelMessage !== undefined;
+  /**
+   * Deletes one message of a channel, and removes it from the open page at once. The host also
+   * announces the change. A failure throws to the dialog that asked, not to the channel error.
+   */
+  async function deleteMessage(channelId: string, messageId: string): Promise<void> {
+    const remove = env.port().agent.deleteChannelMessage;
+    if (!remove || !messageDeletionSupported()) throw new Error(currentText().t("error.team.messageDeleteUnsupported"));
+    const account = env.scopeKey();
+    await remove({ channelId, messageId });
+    if (disposed || account !== env.scopeKey()) return;
+    setState((state) => {
+      if (state.page?.channel.id !== channelId) return;
+      state.page.messages = state.page.messages.filter((message) => message.id !== messageId);
+    });
+  }
   return {
     state,
     port: env.port,
@@ -439,6 +475,18 @@ export function createChannelsController(env: ChannelsEnvironment) {
     agents: env.agents,
     supported,
     deletionSupported: () => supported() && env.deletionSupported(),
+    taskCancelSupported: () => supported() && env.taskCancelSupported(),
+    messageDeletionSupported,
+    deletesAnyMessage: env.deletesAnyMessage,
+    deleteMessage,
+    pictureSupported: () => supported() && env.pictureSupported() && env.port().agent.setChannelImage !== undefined,
+    /** Saves or removes the uploaded image of a channel; a failure shows as the channel error. */
+    setImage: (channelId: string, image: AvatarImageInput | null) =>
+      perform(async () => {
+        const setChannelImage = env.port().agent.setChannelImage;
+        if (!setChannelImage) throw new Error(currentText().t("channel.error.update"));
+        await setChannelImage({ channelId, image });
+      }),
     refresh,
     retry: async (onAccepted?: (accepted: ChannelCommand) => void) => {
       const previous = failedCommand;

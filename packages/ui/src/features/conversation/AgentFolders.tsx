@@ -1,5 +1,5 @@
 /**
- * The folders a local agent can change besides its workspace and the shared folder, and the folders in
+ * The folders an agent can change besides its workspace and the shared folder, and the folders in
  * them that it must not change: the Folders row of the settings panel, its page, and the folder half
  * of the chat's drop overlay. With Ask first or Full access the agent can change all files, so the
  * folders apply only in Workspace only.
@@ -11,8 +11,9 @@ import {
   type AgentFolderChange,
   type AgentFolderCoverageReason,
   type AgentFolderList,
+  agentExclusionPlace,
   agentFolderName,
-  folderInside,
+  agentFolderParent,
 } from "@openbot/contracts/ipc";
 import {
   Button,
@@ -39,8 +40,11 @@ export interface AgentFolderCalls {
   choose: (agentId: string, replace?: string) => Promise<AgentFolderChange>;
   add: (agentId: string, path: string) => Promise<AgentFolderChange>;
   remove: (agentId: string, path: string) => Promise<AgentFolderChange>;
-  /** Adds a folder dragged from the computer's file manager. */
-  drop: (agentId: string, folder: File) => Promise<AgentFolderChange>;
+  /**
+   * Adds a folder dragged from the computer's file manager. Absent when the agent runs on another
+   * computer: a folder of this computer is not on the host.
+   */
+  drop?: ((agentId: string, folder: File) => Promise<AgentFolderChange>) | undefined;
   /** Opens the folder picker for a folder the agent must not change. */
   exclude: (agentId: string) => Promise<AgentExclusionChange>;
   addExclusion: (agentId: string, path: string) => Promise<AgentExclusionChange>;
@@ -272,9 +276,14 @@ export function createAgentFolders(source: () => AgentFolderSource | undefined) 
     remove: (path: string) => act(({ agentId, calls }) => calls.remove(agentId, path)),
     exclude: () => actExclusion(({ agentId, calls }) => calls.exclude(agentId)),
     include: (path: string) => actExclusion(({ agentId, calls }) => calls.include(agentId, path)),
+    /** The agent's computer takes a folder dropped from this computer. */
+    canDrop: (): boolean => source()?.calls.drop !== undefined,
     /** One folder at a time, so each toast names its folder and the list ends with all of them. */
     async drop(folders: readonly File[]): Promise<void> {
-      for (const folder of folders) await act(({ agentId, calls }) => calls.drop(agentId, folder));
+      for (const folder of folders)
+        await act(async ({ agentId, calls }) =>
+          calls.drop ? calls.drop(agentId, folder) : { outcome: "cancelled", list: await calls.list(agentId) },
+        );
     },
     clearFlash(): void {
       setState((current) => {
@@ -286,45 +295,18 @@ export function createAgentFolders(source: () => AgentFolderSource | undefined) 
 
 export type AgentFolders = ReturnType<typeof createAgentFolders>;
 
-/** Where the folder is. The name is on the line above, so the path stops at its parent. */
-function folderParent(path: string): string {
-  const end = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-  return end > 0 ? path.slice(0, end) : path;
-}
-
-/**
- * The folder that holds an excluded folder, as the page names it, with the path below it. A folder
- * the user removed from the list no longer holds it, so the path is shown in full.
- */
-function exclusionPlace(
-  path: string,
-  list: AgentFolderList,
-  names: { workspace: string; shared: string },
-): string | null {
-  const holders: [string, string][] = [
-    [list.workspace, names.workspace],
-    [list.shared, names.shared],
-    ...list.folders.map((folder): [string, string] => [folder.path, agentFolderName(folder.path)]),
-  ];
-  const holder = holders.find(([root]) => folderInside(root, path));
-  if (!holder) return null;
-  const below = folderParent(path)
-    .slice(holder[0].length)
-    .replace(/^[/\\]+/, "");
-  return below ? `${holder[1]}/${below}` : holder[1];
-}
-
 /** Drag handlers for a place that takes a dropped folder, with the state that shows it. */
-function createFolderDropTarget(onDrop: (folders: readonly File[]) => void) {
+function createFolderDropTarget(onDrop: (folders: readonly File[]) => void, enabled: () => boolean = () => true) {
   const [over, setOver] = createSignal(false);
+  const takes = (event: DragEvent) => enabled() && carriesFiles(event);
   return {
     over,
     handlers: {
       onDragEnter: (event: DragEvent) => {
-        if (carriesFiles(event)) setOver(true);
+        if (takes(event)) setOver(true);
       },
       onDragOver: (event: DragEvent) => {
-        if (!carriesFiles(event)) return;
+        if (!takes(event)) return;
         event.preventDefault();
         // The chat under the panel does not attach what the user drops here.
         event.stopPropagation();
@@ -337,6 +319,7 @@ function createFolderDropTarget(onDrop: (folders: readonly File[]) => void) {
       },
       onDrop: (event: DragEvent) => {
         setOver(false);
+        if (!enabled()) return;
         const folders = droppedFolders(event.dataTransfer);
         if (!folders) return;
         event.preventDefault();
@@ -359,7 +342,7 @@ export function AgentFoldersRow(props: {
   ref?: (element: HTMLButtonElement) => void;
 }) {
   const { t } = useText();
-  const drop = createFolderDropTarget((folders) => void props.folders.drop(folders));
+  const drop = createFolderDropTarget((folders) => void props.folders.drop(folders), props.folders.canDrop);
   const list = () => props.folders.state.list;
   const added = () => list()?.folders.length ?? 0;
   const lost = () => list()?.folders.filter((folder) => !folder.found).length ?? 0;
@@ -433,7 +416,7 @@ function FolderRow(props: {
 }) {
   const { t } = useText();
   const name = () => props.name ?? agentFolderName(props.path);
-  const where = () => (props.name ? props.path : folderParent(props.path));
+  const where = () => (props.name ? props.path : agentFolderParent(props.path));
   return (
     <div
       class="agent-folders-row"
@@ -494,7 +477,7 @@ function ExclusionRow(props: {
   const name = () => agentFolderName(props.path);
   const where = () => {
     const place = props.place;
-    return place ? t("agentSettings.folders.excludedIn", { folder: place }) : folderParent(props.path);
+    return place ? t("agentSettings.folders.excludedIn", { folder: place }) : agentFolderParent(props.path);
   };
   return (
     <div
@@ -535,10 +518,15 @@ export function AgentFoldersPage(props: {
   wideAccess: string | null;
   /** The label of the level the folders apply in. */
   workspaceAccess: string;
+  /**
+   * Whether to show the excluded folders. Only Workspace only blocks them, so they show there or
+   * under the wide-access note that says so.
+   */
+  showExclusions: boolean;
   onChangeAccess: () => void;
 }) {
   const { t } = useText();
-  const drop = createFolderDropTarget((folders) => void props.folders.drop(folders));
+  const drop = createFolderDropTarget((folders) => void props.folders.drop(folders), props.folders.canDrop);
   // The rows that are there when the page opens do not animate in; a folder added later does.
   let opened = false;
   onSettled(() => {
@@ -621,39 +609,41 @@ export function AgentFoldersPage(props: {
                 </Button>
               </SettingsLinkGroup>
             </div>
-            <SettingsLinkGroup inset title={t("agentSettings.folders.excluded")}>
-              <For each={list().excluded} keyed={(path) => path}>
-                {(path) => {
-                  const fresh = opened;
-                  return (
-                    <ExclusionRow
-                      path={path()}
-                      place={exclusionPlace(path(), list(), {
-                        workspace: t("agentSettings.folders.workspace"),
-                        shared: t("agentSettings.folders.shared"),
-                      })}
-                      fresh={fresh}
-                      flash={flash() === path()}
-                      onFlashEnd={clearFlash}
-                      onInclude={() => void props.folders.include(path())}
-                    />
-                  );
-                }}
-              </For>
-              <Button
-                variant="ghost"
-                type="button"
-                class="settings-link agent-folders-add"
-                onClick={() => void props.folders.exclude()}
-              >
-                <span class="settings-link-label">
-                  <span class="settings-link-icon">
-                    <Plus aria-hidden="true" />
+            <Show when={props.showExclusions}>
+              <SettingsLinkGroup inset title={t("agentSettings.folders.excluded")}>
+                <For each={list().excluded} keyed={(path) => path}>
+                  {(path) => {
+                    const fresh = opened;
+                    return (
+                      <ExclusionRow
+                        path={path()}
+                        place={agentExclusionPlace(path(), list(), {
+                          workspace: t("agentSettings.folders.workspace"),
+                          shared: t("agentSettings.folders.shared"),
+                        })}
+                        fresh={fresh}
+                        flash={flash() === path()}
+                        onFlashEnd={clearFlash}
+                        onInclude={() => void props.folders.include(path())}
+                      />
+                    );
+                  }}
+                </For>
+                <Button
+                  variant="ghost"
+                  type="button"
+                  class="settings-link agent-folders-add"
+                  onClick={() => void props.folders.exclude()}
+                >
+                  <span class="settings-link-label">
+                    <span class="settings-link-icon">
+                      <Plus aria-hidden="true" />
+                    </span>
+                    {t("agentSettings.folders.exclude")}
                   </span>
-                  {t("agentSettings.folders.exclude")}
-                </span>
-              </Button>
-            </SettingsLinkGroup>
+                </Button>
+              </SettingsLinkGroup>
+            </Show>
           </>
         )}
       </Show>

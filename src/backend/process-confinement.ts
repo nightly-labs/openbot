@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { closeSync, existsSync, mkdirSync, openSync, realpathSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, realpathSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { sourceText } from "@openbot/i18n/source";
@@ -10,9 +10,9 @@ import { isPathInside } from "./path-containment";
  * The folders one Workspace only agent may write: its workspace and the shared folder. The temporary
  * folders and the provider's state are added to them.
  *
- * Grok, OpenCode, Antigravity, Cursor and Cline take no sandbox per session, so a Workspace only
- * agent on them gets a provider process of its own, and OpenBot starts that process inside an
- * operating system sandbox. The whole process is confined: the file edit tools, the shell, and every
+ * Grok, OpenCode, Antigravity, Cursor, Cline, Kimi and Devin take no sandbox per session, so a
+ * Workspace only agent on them gets a provider process of its own, and OpenBot starts that process
+ * inside an operating system sandbox. The whole process is confined: the file edit tools, the shell, and every
  * command and MCP server it starts. Nothing inside the process can take the sandbox away. Only macOS
  * has the sandbox now: on Linux and Windows the process does not start, and the user must choose
  * Full access.
@@ -94,14 +94,22 @@ export function grokStatePaths(env: NodeJS.ProcessEnv = process.env, home = home
  * OpenCode process runs, so a confined process gets a cache of its own: `OPENCODE_CONFINED_ENV`.
  */
 export function openCodeStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
-  const xdg = (name: string, fallback: string) => join(env[name]?.trim() || join(home, fallback), "opencode");
   return {
-    writable: [xdg("XDG_DATA_HOME", ".local/share"), xdg("XDG_STATE_HOME", ".local/state"), OPENCODE_CONFINED_CACHE],
+    writable: [
+      openCodeDataDirectory(env, home),
+      join(env.XDG_STATE_HOME?.trim() || join(home, ".local/state"), "opencode"),
+      OPENCODE_CONFINED_CACHE,
+    ],
     protected: [],
   };
 }
 
 const OPENCODE_CONFINED_CACHE = join(tmpdir(), "openbot-confined-cache");
+
+/** OpenCode's data folder: its sessions, its database (`opencode.db`) and its `auth.json`. */
+export function openCodeDataDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return join(env.XDG_DATA_HOME?.trim() || join(home, ".local/share"), "opencode");
+}
 
 /**
  * The Antigravity server keeps its sign-in, sessions and harness files in `antigravity-acp` under
@@ -134,7 +142,7 @@ export function antigravityStatePaths(env: NodeJS.ProcessEnv = process.env, home
 export function cursorStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
   const xdgConfig = env.XDG_CONFIG_HOME?.trim();
   const userConfig = env.CURSOR_CONFIG_DIR?.trim() || (xdgConfig ? join(xdgConfig, "cursor") : join(home, ".cursor"));
-  const dataHome = env.CURSOR_DATA_DIR?.trim() || join(home, ".cursor");
+  const dataHome = cursorDataHome(env, home);
   // `auth.json` and the `sandbox.json` and `hooks.json` files are always in `~/.cursor` on macOS.
   const fixedHome = join(home, ".cursor");
   const settings = [
@@ -162,6 +170,11 @@ export function cursorStatePaths(env: NodeJS.ProcessEnv = process.env, home = ho
       names: [".workspace-trusted", "mcp-approvals.json"],
     },
   };
+}
+
+/** The Cursor CLI's data folder, which holds its sessions and the project data in `projects`. */
+export function cursorDataHome(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.CURSOR_DATA_DIR?.trim() || join(home, ".cursor");
 }
 
 const CURSOR_CONFINED_CACHE = join(tmpdir(), "openbot-confined-cursor-cache");
@@ -233,6 +246,123 @@ export function clineStatePaths(env: NodeJS.ProcessEnv = process.env, home = hom
 }
 
 /**
+ * The folder where Hermes Agent keeps its sign-ins, settings, sessions and memories: `HERMES_HOME`,
+ * else `~/.hermes`, or `%LOCALAPPDATA%\hermes` on Windows. OpenBot shares it with the user's own Hermes.
+ * When the user selected a profile with `hermes profile use <name>`, it is `<root>/profiles/<name>`.
+ */
+export function hermesHome(
+  env: NodeJS.ProcessEnv = process.env,
+  home = homedir(),
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const configured = env.HERMES_HOME?.trim();
+  const root = configured
+    ? configured === "~" || configured.startsWith("~/")
+      ? join(home, configured.slice(1))
+      : configured
+    : platform === "win32"
+      ? join(env.LOCALAPPDATA?.trim() || join(home, "AppData", "Local"), "hermes")
+      : join(home, ".hermes");
+  return basename(dirname(root)) === "profiles" ? root : hermesActiveProfile(root);
+}
+
+/** Hermes 0.21.5 reads `<root>/active_profile` at each start and then uses that profile's folder. */
+function hermesActiveProfile(root: string): string {
+  let name: string;
+  try {
+    name = readFileSync(join(root, "active_profile"), "utf8")
+      .replace(/^\uFEFF/, "")
+      .trim()
+      .toLowerCase();
+  } catch {
+    return root;
+  }
+  if (name === "" || name === "default" || !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(name)) return root;
+  const profile = join(root, "profiles", name);
+  return existsSync(profile) ? profile : root;
+}
+
+/**
+ * Hermes writes its sessions, memories, sign-in refreshes, caches and logs across its whole folder.
+ * Its install, settings, `.env`, identity, skills, hooks, schedules, plugins, profiles and the tools
+ * it downloads load code, commands or instructions for every other Hermes process, so they stay
+ * read-only.
+ */
+export function hermesStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const root = hermesHome(env, home);
+  return {
+    writable: [root],
+    protected: [
+      "hermes-agent",
+      "hermes-setup",
+      "config.yaml",
+      ".env",
+      "SOUL.md",
+      "skills",
+      "skill-bundles",
+      "hooks",
+      "cron",
+      "scripts",
+      "plugins",
+      "desktop-plugins",
+      "relay-plugins.toml",
+      "profiles",
+      "active_profile",
+      "pairing",
+      "platforms",
+      "installs",
+      "bootstrap-cache",
+      "tools",
+    ].map((name) => join(root, name)),
+  };
+}
+
+/**
+ * The Kimi Code CLI keeps its sign-in, sessions, logs and caches in `KIMI_SHARE_DIR`, `~/.kimi` by
+ * default, and writes its plans in `~/.kimi/plans`. Its settings and hooks (`config.toml`), MCP
+ * servers, plugins, skills and downloaded tools are in that folder too, and every other Kimi process
+ * loads them, so they stay read-only.
+ */
+/** The state directory of the Python Kimi CLI: `$KIMI_SHARE_DIR`, or `~/.kimi`. */
+export function kimiHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.KIMI_SHARE_DIR?.trim() || join(home, ".kimi");
+}
+
+export function kimiStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const kimiHome = kimiHomeDirectory(env, home);
+  return {
+    writable: unique([kimiHome, join(home, ".kimi", "plans")]),
+    protected: ["config.toml", "config.json", "mcp.json", "plugins", "skills", "bin"].map((name) =>
+      join(kimiHome, name),
+    ),
+  };
+}
+
+/** The folder of Devin's sign-in and sessions: `$XDG_DATA_HOME/devin`, on macOS too. */
+export function devinDataDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return join(env.XDG_DATA_HOME?.trim() || join(home, ".local", "share"), "devin");
+}
+
+/**
+ * Devin CLI 3000.11.234 writes its sessions, session locks and logs in `devin/cli` of the XDG data
+ * folder, its MCP sign-ins in `devin/mcp`, its caches in the XDG cache folder and its plans in
+ * `~/.devin/plans`. Its settings and MCP servers in the XDG config folder, its sign-in and its
+ * plugins load settings or code for every other Devin process, so they stay read-only.
+ */
+export function devinStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const data = devinDataDirectory(env, home);
+  return {
+    writable: [
+      join(data, "cli"),
+      join(data, "mcp"),
+      join(env.XDG_CACHE_HOME?.trim() || join(home, ".cache"), "devin"),
+      join(home, ".devin", "plans"),
+    ],
+    protected: [join(data, "cli", "plugins")],
+  };
+}
+
+/**
  * A custom agent keeps its state where it wants, and OpenBot cannot know where. A Workspace only
  * custom agent gets no state folder: an agent that must write in its home folder to run needs Full
  * access.
@@ -296,6 +426,12 @@ const PROJECT_SETTINGS = [
   // Cline reads its project rules, workflows, hooks, skills and agents from these two.
   ".cline",
   ".clinerules",
+  // Kimi reads its project skills and instructions from `.kimi`.
+  ".kimi",
+  // Devin reads its project settings, MCP servers, hooks and skills from `.devin`, and Windsurf
+  // rules and hooks from `.windsurf`.
+  ".devin",
+  ".windsurf",
   ".pi",
   ".muse",
   // Antigravity reads project skills from `.gemini` and its customizations from these four.

@@ -26,7 +26,12 @@ import { isBoolean, isDynamicRecord, isFunction, isNumber, isOneOf, isString } f
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import { ANALYTICS_GENERATIONS } from "@openbot/telemetry";
 import { OpenPanelBase, type OpenPanelOptions } from "@openpanel/web";
-import { ANALYTICS_SCHEMA_VERSION, configureDesktopReports, configureErrorReports } from "./error-reports";
+import {
+  ANALYTICS_SCHEMA_VERSION,
+  configureDesktopReports,
+  configureErrorReports,
+  webAnalyticsInstallId,
+} from "./error-reports";
 import { MARKETPLACE_PLUGINS } from "./features/settings/marketplace-plugin-catalog";
 
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
@@ -68,7 +73,7 @@ export type WorkflowAnalyticsAction = (typeof WORKFLOW_ACTIONS)[number];
 interface DesktopAnalyticsEvents {
   desktop_app_opened: { setup_completed: boolean; signed_in: boolean };
   app_updated: { from_version: string; to_version: string };
-  account_sign_in_started: { result: "code_sent" | "failed"; failure_code?: string };
+  account_sign_in_started: { result: "code_sent" | "company_sign_in" | "failed"; failure_code?: string };
   account_sign_in_completed: { result: AnalyticsResult; failure_code?: string };
   account_sign_out: { result: AnalyticsResult; failure_code?: string };
   onboarding_completed: { preferred_provider: AgentProviderId; path?: OnboardingPath; skipped?: boolean };
@@ -85,7 +90,7 @@ interface DesktopAnalyticsEvents {
         failure_code?: string;
       })
     | (Partial<AgentAnalyticsProperties> & {
-        action: "delete" | "duplicate";
+        action: "delete" | "duplicate" | "branch";
         result: AnalyticsResult;
         failure_code?: string;
       });
@@ -326,7 +331,7 @@ interface DesktopAnalyticsEvents {
     failure_code?: string;
   };
   connector_action: {
-    connector: "slack" | "discord" | "telegram" | "github" | "onepassword" | "bitwarden";
+    connector: "slack" | "discord" | "telegram" | "whatsapp" | "github" | "onepassword" | "bitwarden";
     action: "connect_started" | "connected" | "disconnected" | "enabled" | "disabled";
     result: AnalyticsResult;
     failure_code?: string;
@@ -458,6 +463,7 @@ type SanitizedAnalyticsProperties = Partial<Record<AnalyticsPropertyName, Analyt
 type PendingEvent = {
   name: AnalyticsEventName;
   properties: SanitizedAnalyticsProperties;
+  /** The account ID, or null for an event that goes with the install ID. */
   profileId: string | null;
   timestamp: string;
 };
@@ -555,7 +561,7 @@ const SAFE_FAILURE_CODES = new Set([
 ]);
 
 const EVENT_ACTIONS: Partial<Record<AnalyticsEventName, readonly string[]>> = {
-  agent_action: ["create", "update", "delete", "duplicate"],
+  agent_action: ["create", "update", "delete", "duplicate", "branch"],
   agent_input_action: ["prompt", "approval"],
   queue_action: ["cancel", "steer", "edit", "reorder", "interrupt"],
   routine_action: ["create", "update", "delete", "test"],
@@ -638,7 +644,7 @@ const EVENT_ACTIONS: Partial<Record<AnalyticsEventName, readonly string[]>> = {
 
 /** Enum values that differ by event. A key that is not here uses PROPERTY_ENUMS. */
 const EVENT_ENUMS: Partial<Record<AnalyticsEventName, Readonly<Record<string, readonly string[]>>>> = {
-  account_sign_in_started: { result: ["code_sent", "failed"] },
+  account_sign_in_started: { result: ["code_sent", "company_sign_in", "failed"] },
   agent_input_action: { kind: ["prompt", "approval"] },
   search_action: { scope: ["global", "agent"] },
   team_action: { entry_point: ["in_app", "invite_deep_link"] },
@@ -673,7 +679,7 @@ const PROPERTY_ENUMS: Readonly<Record<string, readonly string[]>> = {
   outcome: ["completed", "cancelled"],
   step: ["choose", "plan", "computer", "language"],
   path: ["free", "plan"],
-  connector: ["slack", "discord", "telegram", "github", "onepassword", "bitwarden"],
+  connector: ["slack", "discord", "telegram", "whatsapp", "github", "onepassword", "bitwarden"],
   permission: ["screen-recording", "accessibility"],
   method: ["browser", "code", "api_key"],
   destination: ["discord", "feedback", "guides", "changelog"],
@@ -751,6 +757,8 @@ function sanitizeDesktopAnalyticsEvent(
  * "custom". The main process uses the same rule.
  */
 function reportedModel(value: string): string {
+  // Hermes names a model of the user's own endpoint `custom:<endpoint name>:<model>`.
+  if (value.startsWith("custom:")) return "custom";
   const separator = value.indexOf("/");
   if (separator < 0) return value;
   // A key-only provider never puts its own id before a model id, so that prefix comes from OpenCode.
@@ -831,7 +839,10 @@ class DesktopAnalytics {
   #client: OpenPanelClient | null = null;
   #anonymousClient: OpenPanelClient | null = null;
   #disabled = false;
+  /** The user shares analytics with their account. Off: events go with the install ID only. */
   #trackingEnabled = true;
+  /** The random install ID, for events that do not go with the account. */
+  #installId: string | null = null;
   #identity: AnalyticsIdentity | null = null;
   #pending: PendingEvent[] = [];
   readonly #clientQueue: AnalyticsOperationQueue = { active: false, operations: [] };
@@ -860,6 +871,7 @@ class DesktopAnalytics {
       };
       const client = this.#createClient(clientOptions);
       const anonymousClient = this.#createClient(clientOptions);
+      this.#installId = appInfo.analyticsInstallId ?? null;
       const globalProperties = {
         __referrer: "",
         surface: "desktop",
@@ -873,7 +885,7 @@ class DesktopAnalytics {
       this.#client = client;
       this.#anonymousClient = anonymousClient;
       if (this.#trackingEnabled && this.#identity) this.#identifyClient(this.#identity);
-      if (this.#trackingEnabled) this.#flush();
+      this.#flush();
       return true;
     } catch {
       return false;
@@ -896,6 +908,7 @@ class DesktopAnalytics {
         const clientOptions = { apiUrl: OPENPANEL_API_URL, clientId: OPENPANEL_CLIENT_ID };
         const client = this.#createClient(clientOptions);
         const anonymousClient = this.#createClient(clientOptions);
+        this.#installId = webAnalyticsInstallId();
         const globalProperties = {
           __referrer: "",
           surface: "web",
@@ -909,7 +922,7 @@ class DesktopAnalytics {
         this.#client = client;
         this.#anonymousClient = anonymousClient;
         if (this.#trackingEnabled && this.#identity) this.#identifyClient(this.#identity);
-        if (this.#trackingEnabled) this.#flush();
+        this.#flush();
       } catch {
         return false;
       }
@@ -943,7 +956,8 @@ class DesktopAnalytics {
 
   /**
    * `recordOptOut` is for the user's own change from on to off: one last event records it. A value
-   * loaded at start, a reverted save or another tab's change records nothing.
+   * loaded at start, a reverted save or another tab's change records nothing. After "off", events
+   * go with the install ID, never with the account.
    */
   setTrackingEnabled(enabled: boolean, options: { recordOptOut?: boolean } = {}): void {
     if (this.#trackingEnabled === enabled) return;
@@ -989,9 +1003,10 @@ class DesktopAnalytics {
   #track<Name extends AnalyticsEventName>(
     name: Name,
     properties: DesktopAnalyticsEvents[Name],
-    profileId: string | null,
+    accountId: string | null,
   ): void {
-    if (this.#disabled || !this.#trackingEnabled) return;
+    if (this.#disabled) return;
+    const profileId = this.#trackingEnabled ? accountId : null;
     const sanitized = sanitizeDesktopAnalyticsEvent(name, properties);
     if (!this.#client) {
       this.#pending.push({ name, properties: sanitized, profileId, timestamp: new Date().toISOString() });
@@ -1001,18 +1016,25 @@ class DesktopAnalytics {
     this.#send(name, sanitized, profileId);
   }
 
+  /**
+   * `profileId` is the account ID. A user who does not share analytics sends with the install ID,
+   * and nothing when there is no install ID. A signed-out user who shares analytics sends with no
+   * ID, so the install ID never shows next to an account.
+   */
   #send(
     name: AnalyticsEventName,
     properties: SanitizedAnalyticsProperties,
     profileId: string | null,
     timestamp?: string,
   ): void {
+    const subject = profileId ?? (this.#trackingEnabled ? null : this.#installId);
+    if (!subject && !this.#trackingEnabled) return;
     const client = profileId ? this.#client : this.#anonymousClient;
     this.#enqueue(profileId ? this.#clientQueue : this.#anonymousQueue, "track", () =>
       client?.track(name, {
         ...properties,
         ...(timestamp ? { __timestamp: timestamp } : {}),
-        ...(profileId ? { profileId } : {}),
+        ...(subject ? { profileId: subject } : {}),
       }),
     );
   }

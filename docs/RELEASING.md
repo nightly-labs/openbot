@@ -289,6 +289,26 @@ SHA-256 and size, the SHA-256 of `bin/cline` (`bin/cline.exe` on Windows) and of
 packages have no license file, so set `licenseSha256` to the SHA-256 of `LICENSE` at the
 `cli-v<version>` tag of `github.com/cline/cline`.
 
+## Pin the Kimi CLI
+
+`native-runtime.lock.json` pins the Kimi Code CLI by hand. Read the `releases/latest` tag of
+`github.com/MoonshotAI/kimi-cli` and set `version` and `tag` (the tag has no `v`). For each target,
+download `kimi-<version>-<triple>-onedir.tar.gz` (`.zip` on Windows) from that release, and set the
+asset SHA-256 and size, `installedBytes` above the extracted size, and the SHA-256 of each file in
+`files`: `kimi` (`kimi.exe` on Windows), `_internal/base_library.zip` and the Python library. The
+paths in `files` are relative to the archive's `kimi/` folder. Do not follow or copy the symbolic
+links in the archive. Set `licenseSha256` to the SHA-256 of `LICENSE` at the version tag.
+
+## Pin the Devin CLI
+
+`native-runtime.lock.json` pins the Devin CLI by hand. Read `version` from
+`https://static.devin.ai/cli/current/manifest.json` and set `version`. For each target, download
+`devin-<version>-<triple>.tar.gz` (`.zip` on Windows) from `https://static.devin.ai/cli/<version>/`,
+and check its SHA-256 against the manifest `sha256`. Set `url`, `assetSha256`, `downloadBytes`,
+`installedBytes` (the size of the extracted `bin/` and `share/` folders), and the SHA-256 of
+`bin/devin` (`bin/devin.exe` on Windows). `share/` holds only documentation, so it is not in
+`files`.
+
 ## Pin the OpenCode CLI
 
 `native-runtime.lock.json` also pins the OpenCode CLI that OpenBot downloads for the OpenCode

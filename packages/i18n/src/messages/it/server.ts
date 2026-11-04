@@ -127,6 +127,13 @@ export const messages = {
     other: "Un account può avere {count} server a pagamento. Per aggiungerne un altro, eliminane prima uno.",
   },
   "server.add.limit.manage": "Gestisci i server",
+  "server.upgrade.title": "I tuoi agenti stanno esaurendo lo spazio",
+  "server.upgrade.description":
+    "{server} ha poco spazio libero. Esegui l’upgrade per far lavorare i tuoi agenti senza interruzioni.",
+  "server.upgrade.used": "{used} di {total} usati",
+  "server.upgrade.current": "{plan} (attuale)",
+  "server.upgrade.price": "Prezzo",
+  "server.upgrade.action": "Passa a {plan}",
   "server.hosted.progressTitle": "Configurazione di {name}",
   "server.hosted.paymentTitle": "Completa il pagamento nel browser",
   "server.hosted.paymentDescription": "La configurazione inizia quando Stripe conferma il pagamento.",
@@ -196,6 +203,8 @@ export const messages = {
   "server.rail.restart": "Riavvia il server",
   "server.rail.leave": "Esci dal server",
   "server.rail.delete": "Elimina il server",
+  "server.rail.hide": "Nascondi il server",
+  "server.rail.showLocal": "Mostra {name}",
   "server.select.failedTitle": "Impossibile selezionare il server",
   "server.select.failedDescription": "Impossibile cambiare server. Riprova.",
   "server.select.openAgentFailed": "Impossibile aprire {name}. Trovalo nella barra laterale.",
@@ -297,13 +306,6 @@ export const messages = {
   "server.settings.setUpDesktopDescription": "Visualizza e controlla questo Mac da un altro computer.",
   "server.settings.later": "Più tardi",
   "server.settings.setUp": "Configura",
-  "server.settings.notifications": "Notifiche",
-  "server.settings.muteNotifications": "Silenzia le notifiche",
-  "server.settings.muteDescription":
-    "Ferma le notifiche del desktop, i suoni e gli aggiornamenti nel notch del MacBook da questo server.",
-  "server.settings.mutedUntilDescription": "{until}. Disattiva per riattivare ora.",
-  "server.settings.notifyAbout": "Avvisami per",
-  "server.settings.notifyAboutDescription": "Quali eventi degli agenti mostrano una notifica sul desktop.",
   "server.settings.agents": "Agenti",
   "server.settings.timezone": "Fuso orario",
   "server.settings.timezoneDescription":
@@ -334,6 +336,9 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "La chiave attuale e quella nuova firmano un passaggio. Le app dei membri passano alla nuova chiave alla prossima connessione. Fallo se il file della chiave è stato copiato o esposto.",
   "server.settings.hostKeyRotated": "Chiave del server cambiata",
+  "server.settings.hostKeyChanged": "Ultima modifica",
+  "server.settings.hostKeyChangedDescription":
+    "{date}. La chiave precedente e la nuova chiave hanno firmato questa modifica.",
   "server.settings.hostKeyLocalOnly": "Qui solo il server su questo computer può cambiare la sua chiave.",
   "server.settings.removeTitle": "Rimuovi il server",
   "server.settings.removeDescription":

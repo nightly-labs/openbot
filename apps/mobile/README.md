@@ -39,18 +39,14 @@ Expo modules by default, so a patch to Expo Swift code needs `expo.autolinking.i
 extend `NativeMethods`, which React Native 0.87 removed from its types, so `MaskedView` was not a
 valid JSX component. Remove the patch when a release fixes the types.
 
-react-native-uitextview 2.7.1 is patched in `patches/react-native-uitextview@2.7.1.patch` so the
-native selectable message text applies the same baseline offset as React Native `Text`. React Native
-centers each line in its `lineHeight`. Without the offset, the text view drew each line at the bottom
-of its line box, so iOS message bubbles had more space above the text than below it. Remove the
-patch when a release applies the offset.
-
-Expo Router 58.0.25 is patched in `patches/expo-router@58.0.25.patch` to apply zoom dismissal
-bounds when its enabler registers after the chat mounts. This keeps the avatar-to-header zoom
-interactive from the left edge without enabling dismissal from the middle of the chat.
+react-native-screens 4.30.0 is patched in `patches/react-native-screens@4.30.0.patch` so the full
+screen swipe back of a chat waits for a gesture handler pan in the top screen to fail. The swipe back
+starts anywhere in the chat, and a swipe to the right on a message bubble still replies. Without
+the patch, no rule sets which of the two recognizers gets the swipe. Remove the patch when a
+release sets this failure requirement.
 If a row or pinned avatar is tapped during the native return transition, the app retains that
 tap until the list is focused and `transitionEnd` fires. It then invokes the original Link
-handler once, preserving its AppleZoom source without a fixed delay.
+handler once, without a fixed delay.
 Focus is read from the route's live `isFocused()` state; nested navigators do not always emit
 an initial `focus` event, so a first tap must not depend on receiving one.
 
@@ -191,6 +187,24 @@ When no agents have loaded and the selected server is connecting or offline, the
 `Waiting for connection`. The empty-server prompt appears only once the server is online; agents
 already loaded remain visible during reconnection.
 
+The phone keeps an encrypted copy of the agents, hidden agents, sections, latest chat pages,
+capabilities and last drawer values (`drawer-snapshot.ts`) of each server (`workspace-cache.ts`),
+and writes it when a server load ends and when the app goes to the background. It also keeps the
+last server list of the account service. After a start, the servers of that list connect at once,
+before the account service answers; a server whose key is not the key that the phone trusts waits
+for the account service. Its list then replaces the copy: it removes a server that the account
+left. A server shows its copy at once, and its first connection attempt is quiet for 5 seconds, as
+a return to the app is. The first workspace reads go out with the compatibility read when the copy
+has the capabilities. The UI does not mark the copy: a server that takes longer shows the usual
+reconnect status and faded avatars. Its own reads then replace the copy. Sign-out, an expired
+session and the removal of a server delete it.
+
+The first connect of each server asks the account service for its logical session while the hidden
+peer page loads (`remote-team-transport.tsx`). The account service gives the active session again, so
+the peer then asks only for its ticket. After a return to the app, the other servers wait for the
+selected server for up to 3 seconds. A failed attempt of the selected server, or its host that
+Signal reports offline, ends this wait.
+
 While a server is disconnected, its agent avatars and colored chat bubbles fade locally with the same
 280 ms transition. Voice controls and suggested prompts are disabled until the server is online. The
 chat input and attachments stay usable: a sent message goes to the phone's outbox and is drawn
@@ -327,9 +341,10 @@ Cloud builds require the final `ios.bundleIdentifier` and `android.package` valu
 
 ### Local TestFlight build
 
-On a Mac with Xcode, CocoaPods, Fastlane, and this project's Node and Bun versions installed,
-sign in to Expo with `bunx eas-cli@latest login` from `apps/mobile`. An active Apple Developer
-membership is required for signing and TestFlight distribution.
+On a Mac with Xcode 27.1 or newer (see the iPhone Duo note below), CocoaPods, Fastlane, and this
+project's Node and Bun versions installed, sign in to Expo with `bunx eas-cli@latest login` from
+`apps/mobile`. An active Apple Developer membership is required for signing and TestFlight
+distribution.
 
 From the repository root, run:
 
@@ -354,9 +369,13 @@ it to a tester group. Upload is manual; the command does not run EAS Submit.
 ### GitHub Actions TestFlight release
 
 The `Release iOS to TestFlight` workflow builds the selected `main` commit on a GitHub-hosted
-`macos-26` runner with Xcode 26.6. Expo SDK 58 requires Xcode 26.4 or newer; the desktop release's
-`macos-14` runner is not suitable. EAS CLI 24.1.2 runs with `--local --non-interactive`, so compilation
-uses GitHub Actions compute. Fastlane uploads directly to Apple without EAS Submit.
+`xcode-27` runner (a GitHub preview image) with Xcode 27.1. Expo SDK 58 compiles with Xcode 26.4 or
+newer, but iOS decides the iPhone Duo layout from the SDK of the build: an iOS 26 SDK build shows in
+a small window in the middle of the open iPhone Duo, and only the iOS 27.1 SDK fills the screen and
+moves the bars into the vertical rail. Keep Xcode 27.1 or newer, and check `DTSDKName` in the IPA
+`Info.plist` after a runner change. The desktop release's `macos-14` runner is not suitable. EAS CLI
+24.1.2 runs with `--local --non-interactive`, so compilation uses GitHub Actions compute. Fastlane
+uploads directly to Apple without EAS Submit.
 
 One-time setup:
 

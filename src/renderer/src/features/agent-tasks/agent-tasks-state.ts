@@ -1,8 +1,15 @@
-import type { AgentEvent, AgentTask, AgentTasksSnapshot, ConversationSnapshot } from "@openbot/contracts/ipc";
+import type {
+  AgentEvent,
+  AgentTask,
+  AgentTaskBranch,
+  AgentTasksSnapshot,
+  ConversationSnapshot,
+} from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createStore } from "solid-js";
+import { createEffect, createStore, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
+import { desktopAnalytics } from "../../analytics";
 import { createScopeGuard } from "../../scope-lifetime";
 import type { AgentTasksPort } from "./agent-tasks-port";
 
@@ -39,7 +46,21 @@ export interface AgentTasksOptions {
   editable: () => boolean;
   /** The server keeps the person's read mark of each side thread: the `agent-thread-reads-v1` routes. */
   readable: () => boolean;
-  /** A change of this value reads the active agent's list again, for example when the agent starts again. */
+  /**
+   * The server copies a conversation into a new thread: this computer, or the `agent-thread-branches-v1`
+   * routes. The list of such a server gives the link of each branch; its events do not.
+   */
+  branchable: () => boolean;
+  /** The server takes files in a side thread: this computer, or the `agent-thread-files-v1` routes. */
+  filesAccepted: () => boolean;
+  /** The server takes a reply to a message of a side thread: this computer, or the `agent-thread-replies-v1` route. */
+  repliable: () => boolean;
+  /** The server deletes a message of a side thread: this computer, or the `message-delete-v1` routes. */
+  messageDeletable: () => boolean;
+  /**
+   * A change of this value reads the lists of the active agent and of each agent with a running thread
+   * again, for example when the agent starts again.
+   */
   reloadKey: () => unknown;
 }
 
@@ -50,7 +71,18 @@ export interface AgentTasksOptions {
  * server: a reply that arrives after that owner ends changes nothing.
  */
 export function createAgentTasks(options: AgentTasksOptions) {
-  const { port, activeAgentId, local, available, editable, readable } = options;
+  const {
+    port,
+    activeAgentId,
+    local,
+    available,
+    editable,
+    readable,
+    branchable,
+    filesAccepted,
+    repliable,
+    messageDeletable,
+  } = options;
   const scopeIsCurrent = createScopeGuard();
   const [state, setState] = createStore<AgentTasksState>({ snapshots: {}, conversations: {} });
   const listRequests = new Map<string, number>();
@@ -58,11 +90,27 @@ export function createAgentTasks(options: AgentTasksOptions) {
   /** The message that each thread's read mark last moved to, so a redraw does not send the same mark again. */
   const readMarks = new Map<string, string>();
 
-  /** Stores a thread list. A conversation of a thread that the list no longer has goes with it. */
+  /**
+   * Stores a thread list. A conversation of a thread that the list no longer has goes with it. A task
+   * without `branch` keeps the link that the stored list has: an `agent-tasks-changed` event of a joined
+   * server does not carry it, and a link does not change.
+   */
   function setSnapshot(snapshot: AgentTasksSnapshot): void {
     const ids = new Set(snapshot.tasks.map((task) => task.id));
+    // An event handler runs this too: the stored list is input here, not a dependency.
+    const links = untrack(() => {
+      const stored = new Map<string, AgentTaskBranch>();
+      for (const task of state.snapshots[snapshot.agentId]?.tasks ?? []) {
+        if (task.branch) stored.set(task.id, { ...task.branch });
+      }
+      return stored;
+    });
+    const tasks = snapshot.tasks.map((task) => {
+      const branch = task.branch === undefined ? links.get(task.id) : undefined;
+      return branch ? { ...task, branch } : task;
+    });
     setState((current) => {
-      current.snapshots[snapshot.agentId] = snapshot;
+      current.snapshots[snapshot.agentId] = { ...snapshot, tasks };
       for (const [taskId, conversation] of Object.entries(current.conversations)) {
         if (conversation.agentId === snapshot.agentId && !ids.has(taskId)) delete current.conversations[taskId];
       }
@@ -108,8 +156,22 @@ export function createAgentTasks(options: AgentTasksOptions) {
     });
   }
 
+  /**
+   * A list from an event of a joined server has no branch links. When it has a task that the stored list
+   * does not have, the list is read again: the new task can be a branch from another device.
+   */
+  function applyTasksChanged(snapshot: AgentTasksSnapshot): void {
+    const known = untrack(() => {
+      const stored = state.snapshots[snapshot.agentId];
+      return stored && branchable() ? new Set(stored.tasks.map((task) => task.id)) : undefined;
+    });
+    applySnapshot(snapshot);
+    if (known && snapshot.tasks.some((task) => task.branch === undefined && !known.has(task.id)))
+      void loadTasks(snapshot.agentId);
+  }
+
   function applyEvent(event: AgentTaskEvent): void {
-    if (event.type === "agent-tasks-changed") applySnapshot(event.snapshot);
+    if (event.type === "agent-tasks-changed") applyTasksChanged(event.snapshot);
     else if (event.type === "agent-task-conversation") applyConversation(event.taskId, event.snapshot);
     else applyDelta(event);
   }
@@ -134,9 +196,20 @@ export function createAgentTasks(options: AgentTasksOptions) {
   }
 
   createEffect(
-    () => ({ agentId: activeAgentId(), reload: options.reloadKey(), shown: available() }),
-    ({ agentId, shown }) => {
-      if (agentId && shown) void loadTasks(agentId);
+    () => ({
+      agentId: activeAgentId(),
+      reload: options.reloadKey(),
+      shown: available(),
+      // A running thread can end while the server is away, and the sidebar shows its agent as working.
+      running: untrack(() =>
+        Object.values(state.snapshots).flatMap((snapshot) =>
+          snapshot.tasks.some((task) => task.state === "running") ? [snapshot.agentId] : [],
+        ),
+      ),
+    }),
+    ({ agentId, shown, running }) => {
+      if (!shown) return;
+      for (const id of new Set([...(agentId ? [agentId] : []), ...running])) void loadTasks(id);
     },
   );
 
@@ -161,7 +234,13 @@ export function createAgentTasks(options: AgentTasksOptions) {
   function rememberTask(task: AgentTask): void {
     setState((current) => {
       const snapshot = current.snapshots[task.agentId];
-      if (!snapshot || snapshot.tasks.some((entry) => entry.id === task.id)) return;
+      if (!snapshot) return;
+      const stored = snapshot.tasks.find((entry) => entry.id === task.id);
+      // The event of a joined server can arrive first, without the link of a branch.
+      if (stored) {
+        if (!stored.branch && task.branch) stored.branch = task.branch;
+        return;
+      }
       snapshot.tasks.unshift(task);
     });
   }
@@ -205,12 +284,37 @@ export function createAgentTasks(options: AgentTasksOptions) {
     return task;
   }
 
+  /** Whether the server copies a conversation into a new thread. */
+  const canBranch = (): boolean => branchable() && port().branchTask !== undefined;
+
+  /**
+   * Copies a conversation through an agent answer into a new thread: the agent's own chat when
+   * `sourceTaskId` is null, or a side thread. A retry of one click would send the same request id.
+   */
+  async function branchTask(
+    agentId: string,
+    sourceTaskId: string | null,
+    messageId: string,
+  ): Promise<AgentTask | null> {
+    const branch = port().branchTask;
+    if (!branch || !branchable()) return null;
+    const analytics = desktopAnalytics.scope();
+    const task = await runAction(
+      () => branch({ agentId, taskId: sourceTaskId, messageId, requestId: crypto.randomUUID() }),
+      "conversation.threads.error.branch",
+    );
+    analytics.track("agent_action", { action: "branch", result: task ? "succeeded" : "failed" });
+    if (task && scopeIsCurrent()) rememberTask(task);
+    return task;
+  }
+
   /** Steers the task's running turn, or queues the message in the task. */
   async function sendToTask(
     agentId: string,
     taskId: string,
     text: string,
     attachmentDraftIds: string[] = [],
+    replyToMessageId: string | null = null,
   ): Promise<boolean> {
     const receipt = await runAction(
       () =>
@@ -219,6 +323,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
           taskId,
           text,
           ...(attachmentDraftIds.length ? { attachmentDraftIds } : {}),
+          ...(replyToMessageId ? { replyToMessageId } : {}),
           clientMessageId: crypto.randomUUID(),
         }),
       "conversation.threads.error.send",
@@ -270,6 +375,24 @@ export function createAgentTasks(options: AgentTasksOptions) {
     return true;
   }
 
+  /** Whether the server deletes a message of a side thread. */
+  const canDeleteMessage = (): boolean => messageDeletable() && port().deleteTaskMessage !== undefined;
+
+  /**
+   * Deletes one message of a thread. The server sends the changed conversation, but the thread also
+   * removes the message at once. A failure throws to the dialog that asked.
+   */
+  async function deleteTaskMessage(agentId: string, taskId: string, messageId: string): Promise<void> {
+    const remove = port().deleteTaskMessage;
+    if (!remove || !messageDeletable()) throw new Error(currentText().t("error.team.messageDeleteUnsupported"));
+    await remove({ agentId, taskId, messageId });
+    if (!scopeIsCurrent()) return;
+    setState((current) => {
+      const conversation = current.conversations[taskId];
+      if (conversation) conversation.messages = conversation.messages.filter((message) => message.id !== messageId);
+    });
+  }
+
   /**
    * Moves the person's read mark of a side thread to the message that they see. The member's other
    * devices read the mark, so the phone no longer shows the thread as unread. A failure keeps the
@@ -308,6 +431,8 @@ export function createAgentTasks(options: AgentTasksOptions) {
     available,
     editable,
     local,
+    filesAccepted,
+    repliable,
     snapshot: (agentId: string): AgentTasksSnapshot | undefined => state.snapshots[agentId],
     conversation: (taskId: string): ConversationSnapshot | undefined => state.conversations[taskId],
     applyEvent,
@@ -316,12 +441,16 @@ export function createAgentTasks(options: AgentTasksOptions) {
     openTask,
     startTask,
     runQueuedMessageAsTask,
+    canBranch,
+    branchTask,
     sendToTask,
     stopTask,
     closeTask,
     reopenTask,
     renameTask,
     deleteTask,
+    canDeleteMessage,
+    deleteTaskMessage,
     markTaskRead,
   };
 }

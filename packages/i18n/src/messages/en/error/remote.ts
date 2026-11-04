@@ -88,6 +88,7 @@ export const messages = defineMessages("error.remote", {
   "error.remote.fileTransferFailed": "The WebRTC file transfer failed.",
   "error.remote.fileResumeFailed": "The WebRTC file transfer could not resume before its deadline.",
   "error.remote.fileTransportStopped": "The WebRTC file transport stopped.",
+  "error.remote.downloadStopped": "The download was stopped.",
   "error.remote.fileResumeExpired": "The WebRTC file transfer resume deadline expired.",
   "error.remote.hostRequestFailed": "The host could not complete the request.",
   "error.remote.responseTooLarge": "The reply from the host is too large to send to this device.",
@@ -121,7 +122,6 @@ export const messages = defineMessages("error.remote", {
   "error.remote.serverDisconnected": "The server disconnected.",
   "error.remote.preferencesUnreadable": "The saved chat preferences could not be read.",
   "error.remote.accountAuthRequired": "Account authentication is required.",
-  "error.remote.serverIdentityChanged": "The server identity changed. Refusing to replace the trusted host key.",
   "error.remote.pairedIdentityChanged":
     "The paired desktop identity is missing or changed. Scan a new code from that desktop.",
   "error.remote.permanentInviteNoEmail": "Permanent invitations cannot be sent by email.",
@@ -198,6 +198,8 @@ export const messages = defineMessages("error.remote", {
   // Servers that the desktop app starts on this computer.
   "error.remote.localServerStartFailed": "The server on this computer did not start.",
   "error.remote.localServerNotFound": "This server is not on this computer.",
+  "error.remote.localServerAccountRemovalFailed":
+    "The server is deleted on its computer, but the account still lists it. Delete it again to remove it from the account.",
   "error.remote.localServerLimit":
     "You can have at most {limit} servers on this computer. Delete one to create another.",
   "error.remote.localServersReadOnly":

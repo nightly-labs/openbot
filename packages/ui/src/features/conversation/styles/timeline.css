@@ -300,13 +300,13 @@
   font-size: var(--openbot-text-sm);
   font-weight: 620;
   line-height: 16px;
-  text-align: left;
+  text-align: start;
 }
 
 .unread-messages-mark-read {
   position: relative;
   z-index: 1;
-  margin-left: auto;
+  margin-inline-start: auto;
   padding: 0;
   font-size: var(--openbot-text-sm);
   font-weight: 680;
@@ -379,6 +379,44 @@
   flex: 0 0 auto;
 }
 
+/* A new NEW line: the badge comes in first, then each line grows out from it. */
+.unread-messages-divider[data-arrive] span {
+  animation: unread-divider-badge-in var(--openbot-duration-slow) var(--openbot-ease-out) both;
+}
+
+.unread-messages-divider[data-arrive] hr {
+  animation: unread-divider-line-in var(--openbot-duration-toast-enter) var(--openbot-ease-out) 60ms both;
+}
+
+.unread-messages-divider[data-arrive] hr:first-child {
+  transform-origin: right center;
+}
+
+.unread-messages-divider[data-arrive] hr:last-child {
+  transform-origin: left center;
+}
+
+@keyframes unread-divider-badge-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+    filter: blur(2px);
+  }
+}
+
+@keyframes unread-divider-line-in {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .unread-messages-divider[data-arrive] :is(hr, span) {
+    animation: none;
+  }
+}
+
 .time-marker {
   display: flex;
   align-items: center;
@@ -391,4 +429,13 @@
   font-size: var(--openbot-text-sm);
   line-height: 16px;
   text-align: center;
+}
+
+/* The two lines grow out from the badge. In RTL the first line is on the right. */
+:dir(rtl) .unread-messages-divider[data-arrive] hr:first-child {
+  transform-origin: left center;
+}
+
+:dir(rtl) .unread-messages-divider[data-arrive] hr:last-child {
+  transform-origin: right center;
 }

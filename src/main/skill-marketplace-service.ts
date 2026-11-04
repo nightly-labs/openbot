@@ -124,6 +124,24 @@ export class SkillMarketplaceService {
     });
   }
 
+  /** The skill a shared link names, by its slug. Only a link reads this; it never adds the skill. */
+  getBySlug(slug: string): Effect.Effect<MarketplaceSkillDetail, SkillMarketplaceFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<MarketplaceSkillDetail, SkillMarketplaceFailure> {
+      const detail = yield* this.auth
+        .requestAuthorized(
+          `/v1/skills/slug/${encodeURIComponent(slug)}`,
+          { method: "GET" },
+          decodeMarketplaceSkillDetail,
+        )
+        .pipe(toSkillMarketplaceFailure);
+      return {
+        ...detail,
+        iconUrl: this.absoluteUrl(detail.iconUrl),
+        creatorAvatarUrl: this.absoluteUrl(detail.creatorAvatarUrl ?? null),
+      };
+    });
+  }
+
   listMine(): Effect.Effect<SkillSubmission[], SkillMarketplaceFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<SkillSubmission[], SkillMarketplaceFailure> {
       const submissions = yield* this.auth
@@ -422,6 +440,11 @@ export class SkillMarketplaceService {
       const owned = new Set(Object.values(lock.skills).flatMap(entryFolders));
       for (const folder of folders.keys()) {
         if (owned.has(folder)) continue;
+        // OpenBot writes its own skill to this folder in every workspace, so only an older install can own it.
+        if (MANAGED_SKILL_SLUGS.has(folder))
+          return yield* new SkillMarketplaceFailure({
+            cause: new Error(sourceText("error.skill.managedSlug", { slug: folder })),
+          });
         for (const target of [
           ...targetDirectories(agent.workspacePath, folder),
           disabledDirectory(agent.workspacePath, folder),
@@ -911,6 +934,15 @@ const readLock = Effect.fn("SkillMarketplace.readLock")(function* (
     if (!isSkillsLock(value)) throw new Error(sourceText("error.skill.lockInvalid"));
     return value;
   });
+});
+/** The folder of each installed pack and the folders of its skills. */
+export const readPackFolders = Effect.fn("SkillMarketplace.readPackFolders")(function* (workspace: string) {
+  const lock = yield* readLock(workspace);
+  return new Map(
+    Object.values(lock.skills).flatMap(
+      (entry): Array<[string, string[]]> => (entry.folders ? [[entry.slug, entry.folders]] : []),
+    ),
+  );
 });
 const writeLock = Effect.fn("SkillMarketplace.writeLock")((workspace: string, lock: SkillsLock) =>
   writeFileAtomically(lockPath(workspace), `${JSON.stringify(lock, null, 2)}\n`, { createDirectory: true }).pipe(

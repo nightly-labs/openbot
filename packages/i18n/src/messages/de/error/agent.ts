@@ -24,7 +24,15 @@ export const messages = {
   "error.agent.messageOrAttachmentRequired": "Eine Nachricht oder ein Anhang ist erforderlich.",
   "error.agent.promptAnswersTooLong": "Die Antworten auf die Fragen sind zu lang.",
   "error.agent.gone": "Dieser Agent existiert nicht mehr.",
+  "error.agent.instructionsTooLarge":
+    "Die Anweisungsdatei ist zu groß, um sie hier zu öffnen. Kürze sie in einem Texteditor.",
+  "error.agent.instructionsOutside":
+    "Die Anweisungsdatei verweist auf einen Ort außerhalb des Arbeitsbereichs des Agenten, daher öffnet OpenBot sie nicht.",
+  "error.agent.instructionsReadFailed": "Die Anweisungsdatei konnte nicht gelesen werden.",
+  "error.agent.instructionsSaveFailed": "Die Anweisungsdatei konnte nicht gespeichert werden.",
   "error.agent.profileGenerationBusy": "Die Profilerstellung ist ausgelastet. Versuche es gleich noch einmal.",
+  "error.agent.instructionsChanged":
+    "Der Agent hat die Anweisungsdatei geändert. Ihre letzte Änderung wurde nicht gespeichert. Nehmen Sie sie erneut vor.",
   "error.agent.initialMessageRequired": "Eine erste Nachricht ist erforderlich.",
   "error.agent.initialMessageTooLong": "Die erste Nachricht ist zu lang.",
   "error.agent.setupCleanupFailed":
@@ -38,6 +46,8 @@ export const messages = {
     "Das gewählte Agentenmodell „{model}“ ist nicht verfügbar: {provider} hat keine Modelle aufgeführt.",
   "error.agent.modelNotInProviderList":
     "Das gewählte Agentenmodell „{model}“ ist nicht verfügbar: {provider} führt es nicht auf.",
+  "error.agent.modelVariantNotListed":
+    "Das gewählte Agentenmodell „{model}“ ist nicht verfügbar: {provider} führt es nicht auf. Nutze einen dieser Werte, die {provider} für dieses Modell aufführt: {models}.",
   "error.agent.modelProviderMismatch": "Das gewählte Modell gehört nicht zu diesem Anbieter.",
   "error.agent.modelNotListed": "Das Modell „{model}“ ist nicht verfügbar. Verfügbare Modelle: {models}.",
   "error.agent.providerNotListed":
@@ -134,6 +144,8 @@ export const messages = {
     "Dieser Server hat wenig freien Arbeitsspeicher. Deine Nachricht wartet in der Warteschlange und startet, wenn Speicher frei ist.",
   "error.agent.workspaceOnlyToolMissing":
     "„Nur Arbeitsbereich“ benötigt {tool}, das OpenBot nicht gefunden hat. Installiere es oder wähle „Voller Zugriff“ in den Agenteneinstellungen.",
+  "error.agent.claudeSandboxUnavailable":
+    "„Nur Arbeitsbereich“ braucht die Claude-Sandbox, die Claude auf diesem Computer nicht starten kann: {reason}. Wähle „Voller Zugriff“ oder einen anderen Anbieter in den Agenteneinstellungen.",
   "error.agent.screenCaptureOff":
     "Die Bildschirmaufnahme ist für diesen Agenten deaktiviert. Der Benutzer kann die Computersteuerung in den Agenteneinstellungen aktivieren.",
   "error.agent.screenCaptureUnavailable": "Die Bildschirmaufnahme ist auf diesem Computer nicht verfügbar.",

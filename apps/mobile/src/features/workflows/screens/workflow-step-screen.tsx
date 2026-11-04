@@ -1,4 +1,4 @@
-import type { AgentReasoningEffort, WorkflowNode } from "@openbot/contracts/ipc";
+import { type AgentReasoningEffort, canAdministerServer, type WorkflowNode } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { useQuery } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
@@ -15,7 +15,12 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
-import { useWorkflowDraft } from "@/features/workflows/model/workflow-draft";
+import { DiscordOutputFields } from "@/features/workflows/components/workflow-discord-fields";
+import { GitHubOutputFields } from "@/features/workflows/components/workflow-github-fields";
+import { TelegramOutputFields } from "@/features/workflows/components/workflow-telegram-fields";
+import { useWorkflowGitHubSupported } from "@/features/workflows/model/use-workflows";
+import { useWorkflowDraft, type WorkflowDraft } from "@/features/workflows/model/workflow-draft";
+import { GITHUB_OUTPUT_DEFAULTS } from "@/features/workflows/model/workflow-github";
 import { canMove, outlineListOf } from "@/features/workflows/model/workflow-outline";
 import { draftProblems } from "@/features/workflows/model/workflow-problems";
 import { kindLabel } from "@/features/workflows/model/workflow-steps";
@@ -31,11 +36,14 @@ import { currentText, useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
 const EFFORT_LABEL = {
+  none: "mobile.agent.runtime.effort.none",
+  minimal: "mobile.agent.runtime.effort.minimal",
   low: "mobile.agent.runtime.effort.low",
   medium: "mobile.agent.runtime.effort.medium",
   high: "mobile.agent.runtime.effort.high",
   xhigh: "mobile.agent.runtime.effort.xhigh",
   max: "mobile.agent.runtime.effort.max",
+  ultra: "mobile.agent.runtime.effort.ultra",
 } as const satisfies Record<AgentReasoningEffort, MobileTextKey>;
 
 /** The longest text of a field that `workflows-v1` carries. */
@@ -93,6 +101,7 @@ function AgentChoice({ node, agents }: { node: WorkflowNode; agents: readonly Mo
               agentId={agent.id}
               serverId={agent.serverId}
               hue={agent.avatarHue}
+              color={agent.avatarColor}
               seed={agent.avatarSeed}
               size={30}
               animateIdle={false}
@@ -185,35 +194,71 @@ function ModelChoice({ node, serverId }: { node: WorkflowNode; serverId: string 
   );
 }
 
-/** Where an output sends its result. The phone does not choose a messaging place: an admin sets it on desktop. */
-function OutputChoice({ node }: { node: WorkflowNode }) {
+const SHOWN_TARGET_LABEL = {
+  channel: "mobile.workflow.output.channel",
+  file: "mobile.workflow.output.file",
+  discord: "mobile.workflow.output.discord",
+  telegram: "mobile.workflow.output.telegram",
+  slack: "mobile.workflow.output.slack",
+} as const satisfies Record<string, MobileTextKey>;
+
+/**
+ * Where an output sends its result. The phone does not choose a messaging place, a Discord server or a
+ * Telegram chat: only the computer that runs OpenBot has them. An owner or admin adds a GitHub output, on a host that
+ * runs it, as on desktop.
+ */
+function OutputChoice({ node, draft }: { node: WorkflowNode; draft: WorkflowDraft }) {
   const { t } = useText();
   const accent = String(useCSSVariable("--openbot-accent"));
   const setFields = useWorkflowDraft((state) => state.setFields);
+  const admin = useMobileWorkspaceSelector((current) =>
+    canAdministerServer(current.servers.find((server) => server.id === draft.serverId)?.role),
+  );
+  const githubSupported = useWorkflowGitHubSupported(draft.serverId);
   const target = text(node, "target");
-  const channel = target === "channel";
-  const file = target === "file";
+  const shown =
+    target === "channel" || target === "file" || target === "discord" || target === "telegram" || target === "slack"
+      ? target
+      : null;
+  const notify = shown === null && target !== "github";
+  const check = (on: boolean) => (on ? <Check size={18} color={accent} strokeWidth={2} /> : null);
+  const choose = (next: "notify" | "github") => {
+    if (next === target || (next === "notify" && notify)) return;
+    void haptics.selection();
+    // A Discord, Telegram or Slack output also keeps an `action`, so a change from it writes the GitHub defaults
+    // again.
+    if (next === "github")
+      setFields(node.id, {
+        target: "github",
+        ...(node.fields.action === undefined || target === "discord" || target === "telegram" || target === "slack"
+          ? GITHUB_OUTPUT_DEFAULTS
+          : {}),
+      });
+    else setFields(node.id, { target: "notify", connectionId: undefined, placeId: undefined });
+  };
   return (
     <SettingsSection
       title={t("mobile.workflow.step.sendTo")}
-      footer={channel ? t("mobile.workflow.step.channelHint") : undefined}
+      footer={target === "channel" ? t("mobile.workflow.step.channelHint") : undefined}
     >
-      <SettingsRow
-        checked={!channel && !file}
-        disclosure={false}
-        trailing={!channel && !file ? <Check size={18} color={accent} strokeWidth={2} /> : null}
-        onPress={() => setFields(node.id, { target: "notify", connectionId: undefined, placeId: undefined })}
-      >
+      <SettingsRow checked={notify} disclosure={false} trailing={check(notify)} onPress={() => choose("notify")}>
         <Typography.Paragraph>{t("mobile.workflow.output.notify")}</Typography.Paragraph>
       </SettingsRow>
-      {channel ? (
-        <SettingsRow checked disclosure={false} trailing={<Check size={18} color={accent} strokeWidth={2} />}>
-          <Typography.Paragraph>{t("mobile.workflow.output.channel")}</Typography.Paragraph>
+      {(admin && githubSupported) || target === "github" ? (
+        <SettingsRow
+          checked={target === "github"}
+          disclosure={false}
+          disabled={!admin}
+          supportingText={t("mobile.workflow.output.githubHint")}
+          trailing={check(target === "github")}
+          onPress={() => choose("github")}
+        >
+          <Typography.Paragraph>{t("mobile.workflow.output.github")}</Typography.Paragraph>
         </SettingsRow>
       ) : null}
-      {file ? (
-        <SettingsRow checked disclosure={false} trailing={<Check size={18} color={accent} strokeWidth={2} />}>
-          <Typography.Paragraph>{t("mobile.workflow.output.file")}</Typography.Paragraph>
+      {shown ? (
+        <SettingsRow checked disclosure={false} trailing={check(true)}>
+          <Typography.Paragraph>{t(SHOWN_TARGET_LABEL[shown])}</Typography.Paragraph>
         </SettingsRow>
       ) : null}
     </SettingsSection>
@@ -324,7 +369,14 @@ export function WorkflowStepScreen() {
           placeholder={t("mobile.workflow.step.textPlaceholder")}
         />
       ) : null}
-      {node.kind === "output" ? <OutputChoice node={node} /> : null}
+      {node.kind === "output" ? (
+        <>
+          <OutputChoice node={node} draft={draft} />
+          {text(node, "target") === "github" ? <GitHubOutputFields node={node} draft={draft} /> : null}
+          {text(node, "target") === "discord" ? <DiscordOutputFields node={node} /> : null}
+          {text(node, "target") === "telegram" ? <TelegramOutputFields node={node} /> : null}
+        </>
+      ) : null}
       {outline && (list || node.kind === "condition") ? (
         <SettingsSection>
           {list && canMove(outline, node.id, -1) ? (

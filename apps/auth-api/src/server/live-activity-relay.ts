@@ -53,6 +53,11 @@ const NOTIFICATION_TITLE = "OpenBot";
 const ACTIVITY_ALERT = { title: NOTIFICATION_TITLE, body: NOTIFICATION_TITLE };
 /** Apple keeps a notification this long for a phone that is off. */
 const NOTIFICATION_LIFETIME_SECONDS = 24 * 60 * 60;
+/**
+ * Apple keeps the end of a Live Activity this long for a phone that is off. With no expiry, Apple
+ * tries once, and a phone without network keeps showing the old activity.
+ */
+const LIVE_ACTIVITY_END_LIFETIME_SECONDS = 60 * 60;
 /** Apple refuses a provider token older than one hour, and one made again more often than every 20 minutes. */
 const TOKEN_REUSE_SECONDS = 50 * 60;
 const REQUEST_TIMEOUT_MS = 5_000;
@@ -86,7 +91,7 @@ export class ApnsRelaySender {
         "apns-push-type": "liveactivity",
         "apns-topic": `${this.#config.topic}.push-type.liveactivity`,
         "apns-priority": String(push.priority),
-        "apns-expiration": String(push.staleAt ?? 0),
+        "apns-expiration": String(push.staleAt ?? push.timestamp + LIVE_ACTIVITY_END_LIFETIME_SECONDS),
       },
       liveActivityPayload(push),
     );

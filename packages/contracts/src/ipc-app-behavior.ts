@@ -6,8 +6,9 @@ export interface AppBehaviorPreference {
   /** Open OpenBot when the user signs in. Null in a development run and on a server. */
   launchAtLogin: boolean | null;
   /**
-   * Hide the main window on close and show a tray icon, rather than quit. Null on macOS, where
-   * OpenBot always keeps running after its window closes, and on a server.
+   * Hide the main window on close and show a tray icon, rather than quit. macOS always hides the
+   * window and keeps the Dock icon: there it shows a menu bar icon, and it is on by default.
+   * Null on a server.
    */
   keepRunningInBackground: boolean | null;
   /**

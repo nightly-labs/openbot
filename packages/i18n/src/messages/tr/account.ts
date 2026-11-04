@@ -101,4 +101,5 @@ export const messages = {
   "account.language.previous": "Önceki dil",
   "account.language.next": "Sonraki dil",
   "account.language.continue": "Devam et",
+  "account.language.change": "Dili değiştir",
 } as const satisfies PartialTranslation<typeof source>;

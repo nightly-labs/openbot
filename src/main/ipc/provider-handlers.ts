@@ -2,7 +2,12 @@ import { Effect } from "effect";
 // Signing in to a provider, storing the optional provider API keys, and downloading the CLI
 // runtimes the providers need.
 
-import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
+import {
+  agentProviderDescriptor,
+  agentProviderName,
+  isManagedRuntimeProvider,
+  type ManagedProviderId,
+} from "@openbot/contracts/agent-providers";
 import {
   type AgentProviderId,
   type ConnectProviderAccountInput,
@@ -15,8 +20,10 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { registerSecretValue } from "@openbot/logging";
 import { AgentLifecycleFailed, type AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
+import type { SignInRegion } from "../../backend/kimi-region";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import { parseProviderId } from "./app-inputs";
@@ -40,20 +47,34 @@ export function providerIpcHandlers({
   credentials,
   openLink,
 }: ProviderIpcDependencies): Pick<IpcGroupHandlers, "providers" | "providerRuntimes"> {
+  async function connect(provider: AgentProviderId, region: SignInRegion) {
+    await runCauseEffect(providerRuntimes.ensureKeyProviderCli(provider));
+    return runCauseEffect(
+      service.connectProvider(
+        provider,
+        async (value) => {
+          const url = new URL(value);
+          if (url.protocol !== "https:") throw new Error(sourceText("error.provider.httpsSignInLinkOnly"));
+          await openLink(url.toString());
+        },
+        region,
+      ),
+    );
+  }
+
   return {
     providers: {
       setProviderOn: payloadHandler(parseProviderUseInput, ({ provider, on }) =>
         runCauseEffect(service.setProviderOn(provider, on)),
       ),
-      connectProvider: payloadHandler(parseProviderId, async (provider) => {
-        await runCauseEffect(providerRuntimes.ensureKeyProviderCli(provider));
-        return runCauseEffect(
-          service.connectProvider(provider, async (value) => {
-            const url = new URL(value);
-            if (url.protocol !== "https:") throw new Error(sourceText("error.provider.httpsSignInLinkOnly"));
-            await openLink(url.toString());
-          }),
-        );
+      connectProvider: payloadHandler(parseProviderId, (provider) => connect(provider, "global")),
+      connectProviderInMainlandChina: payloadHandler(parseProviderId, (provider) => {
+        if (!agentProviderDescriptor(provider).mainlandChinaSignInSite) {
+          throw new Error(
+            sourceText("error.provider.noMainlandChinaSignIn", { provider: agentProviderName(provider) }),
+          );
+        }
+        return connect(provider, "mainland-cn");
       }),
       cancelProviderSignIn: payloadHandler(parseProviderId, (provider) =>
         runCauseEffect(service.cancelProviderSignIn(provider)),
@@ -80,6 +101,7 @@ export function providerIpcHandlers({
       // advertises is decided at spawn time: the service writes the key only when it can restart
       // the provider on it, and reports success only once the new process is up.
       setProviderApiKey: payloadHandler(parseProviderApiKeyInput, async ({ provider, key }) => {
+        if (provider === "codex") return signInCodexWithApiKey(service, key);
         await runCauseEffect(providerRuntimes.ensureKeyProviderCli(provider));
         return runCauseEffect(
           service.changeProviderCredential(provider, () =>
@@ -125,6 +147,7 @@ export function providerIpcHandlers({
       removeProviderAccount: payloadHandler(parseRemoveProviderAccountInput, ({ provider, accountId }) =>
         runCauseEffect(service.removeProviderAccount(provider, accountId)),
       ),
+      signOutProvider: payloadHandler(parseProviderId, (provider) => runCauseEffect(service.signOutProvider(provider))),
       providerUsageResets: payloadHandler(parseProviderId, (provider) =>
         runCauseEffect(service.providerUsageResets(provider)),
       ),
@@ -150,6 +173,15 @@ export function providerIpcHandlers({
       checkForUpdates: handler(() => runCauseEffect(providerRuntimes.checkForUpdates())),
     },
   };
+}
+
+/**
+ * Codex keeps its key in its own login, not in OpenBot's store, so the store does not register it for
+ * redaction. It is registered here, before Codex can echo it in a log line.
+ */
+export function signInCodexWithApiKey(service: Pick<AgentService, "signInCodexWithApiKey">, key: string) {
+  registerSecretValue(key);
+  return runCauseEffect(service.signInCodexWithApiKey(key));
 }
 
 /**

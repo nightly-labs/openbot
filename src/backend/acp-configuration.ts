@@ -1,8 +1,9 @@
-import type { ClientSideConnection, SessionConfigOption } from "@agentclientprotocol/sdk";
-import type {
-  AgentSessionSettingOption,
-  AgentSessionSettingsSnapshot,
-  AgentSessionSettingValue,
+import { type ClientSideConnection, RequestError, type SessionConfigOption } from "@agentclientprotocol/sdk";
+import {
+  type AgentSessionSettingOption,
+  type AgentSessionSettingsSnapshot,
+  type AgentSessionSettingValue,
+  isReasoningEffort,
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -86,6 +87,8 @@ export interface AcpConfigurationOptions {
   discoveryCwd?: (() => string) | undefined;
   /** `AcpFlavor.processWideModel`. */
   processWideModel?: boolean;
+  /** `AcpFlavor.modelSetUnsaved`. */
+  modelSetUnsaved?: ((error: RequestError) => boolean) | undefined;
   /**
    * `AcpFlavor.closeKeepsSession` with `session/resume`: a closed session keeps its resources until
    * the process ends, so each discovery resumes the probe session of the process, not a new one.
@@ -307,12 +310,13 @@ export class AcpConfiguration {
       if (category === "thought_level" && thread.currentModelId) {
         const currentModel = models.find((candidate) => candidate.id === thread.currentModelId);
         if (currentModel && currentModel.usesModelReasoningEffort !== null) {
-          if (currentModel.usesModelReasoningEffort && currentModel.supportedReasoningEfforts.includes(value)) {
+          const effort = listedEffort(value, (level) => currentModel.supportedReasoningEfforts.includes(level));
+          if (currentModel.usesModelReasoningEffort && effort) {
             yield* this.#timed("session/set_model", () =>
               this.#connection(thread).request("session/set_model", {
                 sessionId: thread.id,
                 modelId: thread.currentModelId,
-                _meta: { reasoningEffort: currentModel.reasoningEffortWireValues.get(value) ?? value },
+                _meta: { reasoningEffort: currentModel.reasoningEffortWireValues.get(effort) ?? effort },
               }),
             );
           }
@@ -351,6 +355,15 @@ export class AcpConfiguration {
               sessionId: thread.id,
               modelId: value,
             }),
+          ).pipe(
+            Effect.catch((failure) => {
+              const unsaved = this.options.modelSetUnsaved;
+              if (!(failure.cause instanceof RequestError && unsaved?.(failure.cause))) return Effect.fail(failure);
+              logger.warn("An agent changed the session model but did not save it as its default.", {
+                provider: this.options.provider,
+              });
+              return Effect.void;
+            }),
           );
           thread.currentModelId = value;
         }
@@ -359,8 +372,7 @@ export class AcpConfiguration {
       // An effort travels by OpenBot's name, and the agent's own name for it is read from the option
       // this session published, not from the catalog: the session is the one that has to accept it.
       const values = selectValues(option);
-      const wanted =
-        category === "thought_level" ? reasoningEffortWireValues(values.map((entry) => entry.value)).get(value) : value;
+      const wanted = category === "thought_level" ? effortWireValue(values, value) : value;
       const listed = values.some((candidate) => candidate.value === wanted);
       const selected = listed ? wanted : unlisted && option.id === "model" ? value : undefined;
       if (!selected) continue;
@@ -699,11 +711,10 @@ function selectValues(option: Extract<SessionConfigOption, { type: "select" }>) 
 /**
  * What OpenBot's effort names are sent as, keyed by the OpenBot name.
  *
- * The exact name wins over an alias, whichever comes first. OpenCode offers
- * `["minimal", "low", "medium", "high", "xhigh"]`, where `minimal` also reads as low effort: first
- * value per key would make OpenBot's `low` send `minimal`, and a user who asks for low effort would
- * silently get the lowest one the model has. An alias is still kept for a key the agent has no exact
- * name for, which is how a model with `minimal` and no `low` stays reachable.
+ * The exact name wins over an alias, whichever comes first. An agent can offer `off` and `none`
+ * for the same level: first value per key would make OpenBot's `none` send `off`. An alias is kept
+ * for a key the agent has no exact name for, which is how a model with `off` and no `none` stays
+ * reachable.
  */
 function reasoningEffortWireValues(values: string[]): Map<string, string> {
   const result = new Map<string, string>();
@@ -720,12 +731,27 @@ function reasoningEffortWireValues(values: string[]): Map<string, string> {
   return result;
 }
 
+function effortWireValue(values: { value: string }[], effort: string): string | undefined {
+  const wireValues = reasoningEffortWireValues(values.map((entry) => entry.value));
+  const listed = listedEffort(effort, (level) => wireValues.has(level));
+  return listed ? wireValues.get(listed) : undefined;
+}
+
+/**
+ * The level to send for a saved effort. `minimal`, `none` and `off` were `low` before OpenBot had a
+ * name for them, so an agent saved as `low` on a model without it still sends the lowest level.
+ */
+function listedEffort(effort: string, listed: (level: string) => boolean): string | undefined {
+  if (listed(effort)) return effort;
+  return effort === "low" ? ["minimal", "none"].find(listed) : undefined;
+}
+
 function normalizeEffort(value: string): string | null {
   const normalized = value.toLowerCase().replaceAll("-", "_");
-  if (["low", "medium", "high", "xhigh", "max"].includes(normalized)) return normalized;
-  if (["minimal", "none", "off"].includes(normalized)) return "low";
-  // OpenCode offers MiniMax M3 `none` and `thinking` only. Without this the model listed `low`, which
-  // turns thinking off, as its one effort.
+  if (isReasoningEffort(normalized)) return normalized;
+  if (normalized === "off") return "none";
+  // OpenCode offers MiniMax M3 `none` and `thinking` only. Without this the model listed `none` as
+  // its one effort.
   if (normalized === "thinking") return "high";
   if (["extra_high", "very_high"].includes(normalized)) return "xhigh";
   return null;

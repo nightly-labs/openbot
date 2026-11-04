@@ -11,12 +11,12 @@ import {
   MessageHeader,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createMemo, For, Show } from "solid-js";
+import { children, createMemo, For, Show } from "solid-js";
 import { avatarHeadColor } from "../../bloub-avatar";
 import type { AgentMessage, AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
-import type { AttachmentMediaSource } from "./AttachmentCards";
+import type { AttachmentDownloads, AttachmentMediaSource } from "./AttachmentCards";
 import type { MessageImageFile } from "./MarkdownMessageText";
 import { conversationBubbleVariant, MessageBody } from "./MessageRendering";
 
@@ -78,6 +78,8 @@ export interface ChatMessageRowProps {
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
   /** Loads the images and media of a client that gets no `previewUrl`. */
   mediaSource?: AttachmentMediaSource | undefined;
+  /** The download state of attachments from a joined server. */
+  downloads?: AttachmentDownloads | undefined;
   /** Reads an image file that an agent message names, for a preview under the text. */
   loadImageFile?: ((file: MessageImageFile) => Promise<string | null>) | undefined;
   onDownloadImageFile?: ((file: MessageImageFile) => void) | undefined;
@@ -109,7 +111,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
   const authorStyle = () => {
     const currentSeed = seed();
     if (own() || currentSeed === undefined) return undefined;
-    return `--message-author-color: ${avatarHeadColor(currentSeed, props.author.agent?.avatarHue ?? null)}`;
+    return `--message-author-color: ${avatarHeadColor(currentSeed, props.author.agent?.avatarHue ?? null, props.author.agent?.avatarColor ?? null)}`;
   };
   const rowClass = () => [
     "message-entry",
@@ -162,6 +164,92 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
       { capture: true },
     );
   };
+  // Read once: a person's row shows its bubble only when the bubble holds something, such as a voice player.
+  const extra = children(() => props.children);
+  const messageBody = (frame?: (content: JSX.Element, imagesOnly: () => boolean) => JSX.Element) => (
+    <MessageBody
+      frame={frame}
+      animate={props.animate}
+      message={props.message}
+      referencedMessage={props.referencedMessage}
+      referencedAuthorName={props.referencedAuthorName}
+      onOpenReference={props.onOpenReference}
+      referenceState={props.referenceState}
+      agents={props.agents}
+      skills={props.skills}
+      onSelectAgent={props.onSelectAgent}
+      onOpenLink={props.onOpenLink}
+      onPreview={props.onPreview}
+      onAttachmentAction={props.onAttachmentAction}
+      onOpenSharedFile={props.onOpenSharedFile}
+      onOpenWorkspaceFile={props.onOpenWorkspaceFile}
+      onOpenQuote={props.onOpenQuote}
+      onDownload={props.onDownload}
+      mediaSource={props.mediaSource}
+      downloads={props.downloads}
+      loadImageFile={props.loadImageFile}
+      onDownloadImageFile={props.onDownloadImageFile}
+      macWindowControls={props.macWindowControls}
+    />
+  );
+  const bubble = (content: JSX.Element): JSX.Element => (
+    <Bubble
+      class={member() ? "message-bubble-member" : undefined}
+      align={person() ? "end" : "start"}
+      variant={variant()}
+      data-author={person() ? "user" : "assistant"}
+      data-streaming={props.message.streaming === true ? "" : undefined}
+    >
+      <BubbleContent>
+        {content}
+        {extra()}
+      </BubbleContent>
+      <Show when={(props.reactions?.length ?? 0) > 0}>
+        <BubbleReactions
+          class="message-reaction-anchor"
+          align={person() ? "start" : "end"}
+          overflowCount={props.reactionOverflowCount}
+          role="group"
+          aria-label={t("chat.row.reactions", {
+            emoji: (props.reactions ?? []).map((reaction) => reaction.emoji).join(", "),
+          })}
+        >
+          <For each={props.reactions ?? []}>
+            {(reaction) => (
+              <Show
+                when={reaction.actor.kind === "user"}
+                fallback={
+                  <span
+                    class="message-reaction-pill message-reaction-pill-readonly"
+                    role="img"
+                    aria-label={t("chat.row.agentReaction", {
+                      name:
+                        props.agents.find(
+                          (agent) => reaction.actor.kind === "agent" && agent.id === reaction.actor.agentId,
+                        )?.name ?? t("chat.message.agentFallback"),
+                      emoji: reaction.emoji,
+                    })}
+                  >
+                    <span aria-hidden="true">{reaction.emoji}</span>
+                  </span>
+                }
+              >
+                <Button
+                  variant="ghost"
+                  type="button"
+                  class="message-reaction-pill"
+                  aria-label={t("chat.row.removeReaction", { emoji: reaction.emoji })}
+                  onClick={() => props.onRemoveReaction?.()}
+                >
+                  <span aria-hidden="true">{reaction.emoji}</span>
+                </Button>
+              </Show>
+            )}
+          </For>
+        </BubbleReactions>
+      </Show>
+    </Bubble>
+  );
   const body = (): JSX.Element => (
     <>
       <Show when={props.showAuthor && !person()}>
@@ -206,83 +294,16 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
           </MessageHeader>
         </Show>
         <div class="message-shell">
-          <Bubble
-            class={member() ? "message-bubble-member" : undefined}
-            align={person() ? "end" : "start"}
-            variant={variant()}
-            data-author={person() ? "user" : "assistant"}
-            data-streaming={props.message.streaming === true ? "" : undefined}
-          >
-            <BubbleContent>
-              <MessageBody
-                animate={props.animate}
-                message={props.message}
-                referencedMessage={props.referencedMessage}
-                referencedAuthorName={props.referencedAuthorName}
-                onOpenReference={props.onOpenReference}
-                referenceState={props.referenceState}
-                agents={props.agents}
-                skills={props.skills}
-                onSelectAgent={props.onSelectAgent}
-                onOpenLink={props.onOpenLink}
-                onPreview={props.onPreview}
-                onAttachmentAction={props.onAttachmentAction}
-                onOpenSharedFile={props.onOpenSharedFile}
-                onOpenWorkspaceFile={props.onOpenWorkspaceFile}
-                onOpenQuote={props.onOpenQuote}
-                onDownload={props.onDownload}
-                mediaSource={props.mediaSource}
-                loadImageFile={props.loadImageFile}
-                onDownloadImageFile={props.onDownloadImageFile}
-                macWindowControls={props.macWindowControls}
-              />
-              {props.children}
-            </BubbleContent>
-            <Show when={(props.reactions?.length ?? 0) > 0}>
-              <BubbleReactions
-                class="message-reaction-anchor"
-                align={person() ? "start" : "end"}
-                overflowCount={props.reactionOverflowCount}
-                role="group"
-                aria-label={t("chat.row.reactions", {
-                  emoji: (props.reactions ?? []).map((reaction) => reaction.emoji).join(", "),
-                })}
-              >
-                <For each={props.reactions ?? []}>
-                  {(reaction) => (
-                    <Show
-                      when={reaction.actor.kind === "user"}
-                      fallback={
-                        <span
-                          class="message-reaction-pill message-reaction-pill-readonly"
-                          role="img"
-                          aria-label={t("chat.row.agentReaction", {
-                            name:
-                              props.agents.find(
-                                (agent) => reaction.actor.kind === "agent" && agent.id === reaction.actor.agentId,
-                              )?.name ?? t("chat.message.agentFallback"),
-                            emoji: reaction.emoji,
-                          })}
-                        >
-                          <span aria-hidden="true">{reaction.emoji}</span>
-                        </span>
-                      }
-                    >
-                      <Button
-                        variant="ghost"
-                        type="button"
-                        class="message-reaction-pill"
-                        aria-label={t("chat.row.removeReaction", { emoji: reaction.emoji })}
-                        onClick={() => props.onRemoveReaction?.()}
-                      >
-                        <span aria-hidden="true">{reaction.emoji}</span>
-                      </Button>
-                    </Show>
-                  )}
-                </For>
-              </BubbleReactions>
-            </Show>
-          </Bubble>
+          {/* A person's images stand above the bubble, outside it. A message of images only has no bubble. */}
+          <Show when={person()} fallback={bubble(messageBody())}>
+            <div class="message-stack">
+              {messageBody((content, imagesOnly) => (
+                <Show when={!imagesOnly() || (props.reactions?.length ?? 0) > 0 || extra.toArray().length > 0}>
+                  {bubble(content)}
+                </Show>
+              ))}
+            </div>
+          </Show>
         </div>
         {/* The actions and the time stand under the bubble. A named author shows the time beside the name. */}
         <div class="message-action-row">

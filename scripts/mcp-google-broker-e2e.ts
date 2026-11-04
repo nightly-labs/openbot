@@ -3,8 +3,8 @@
 // client secret and a fake Google token endpoint, then signs `McpOAuth` in to Google's real Calendar
 // MCP server: discovery and the authorization page are Google's own, the code is delivered by hand,
 // and the token exchange and the refresh go through the host broker (`src/main/google-token-broker.ts`)
-// and Signal. It also checks that a sign-in app the user saved wins, and that a host with no ticket
-// gets the account sentence. Needs the network and no Google account. Writes
+// and Signal. It also checks that a second account (`#account-…`) gets the OpenBot app, that a
+// sign-in app the user saved wins, and that a host with no ticket gets the account sentence. Needs the network and no Google account. Writes
 // .openbot-build/mcp-google-broker-e2e/report.json and exits non-zero when a check fails.
 import { type ChildProcess, spawn } from "node:child_process";
 import { createHash, generateKeyPairSync, randomBytes, randomUUID } from "node:crypto";
@@ -159,9 +159,9 @@ function oauthWith(
 }
 
 /** Opens Google's page for a sign-in, and answers the page's query. */
-async function openPage(oauth: McpOAuth, opened: string[]) {
-  const attempt = oauth.signIn(SERVER_URL);
-  if (!attempt) throw new Error("No sign-in for the Calendar URL.");
+async function openPage(oauth: McpOAuth, opened: string[], url = SERVER_URL) {
+  const attempt = oauth.signIn(url);
+  if (!attempt) throw new Error(`No sign-in for ${url}.`);
   const pageOpened = await runCauseEffect(attempt.begin());
   const page = opened.at(-1);
   expect(pageOpened && page !== undefined, "No authorization page opened.");
@@ -300,6 +300,28 @@ try {
       expect(page.searchParams.get("client_id") === CLIENT_ID, `client_id: ${page.searchParams.get("client_id")}`);
       expect(oauth.signInApp(SERVER_URL) === null, "The earlier OpenBot app shows as a sign-in app of the user.");
       return "the page names the current client";
+    } finally {
+      await runCauseEffect(oauth.close());
+    }
+  });
+
+  await check("A second account of a Google server signs in with the OpenBot app, on its own entry", async () => {
+    const second = `${SERVER_URL}#account-e2e-second`;
+    const accounts = new Map<string, McpOAuthRecord>();
+    const pages: string[] = [];
+    const oauth = oauthWith(accounts, withTicket, pages);
+    try {
+      const { attempt, page } = await openPage(oauth, pages, second);
+      const query = Object.fromEntries(page.searchParams);
+      expect(query.client_id === CLIENT_ID, `client_id: ${query.client_id}`);
+      expect(query.scope === GOOGLE_MCP_SCOPES[SERVER_URL], `scope: ${query.scope}`);
+      expect(oauth.signInApp(second) === null, "The built-in app shows as a sign-in app of the user.");
+      expect(oauth.receiveAuthorizationCode(query.state ?? "", CODE), "No sign-in waited for the state.");
+      await runCauseEffect(attempt.complete());
+      expect(oauth.signedIn(second), "The second account is not signed in.");
+      expect(!oauth.signedIn(SERVER_URL), "The sign-in of the second account signed in the first one.");
+      expect(accounts.get(second)?.tokens?.refresh_token === REFRESH_TOKEN, "The second account has no tokens.");
+      return "the OpenBot client and scope for the #account- row; tokens on its own entry only";
     } finally {
       await runCauseEffect(oauth.close());
     }

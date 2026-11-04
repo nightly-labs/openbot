@@ -1,15 +1,20 @@
-import { AVATAR_HUE_CHOICES, avatarHueSwatch } from "@openbot/brand/bloub-avatar";
-import type { AvatarHue } from "@openbot/contracts/ipc";
+import {
+  AVATAR_COLOR_CHOICES,
+  type AvatarColorChoice,
+  type AvatarColorPresetId,
+  avatarHeadColor,
+  isAvatarColorChoice,
+} from "@openbot/brand/bloub-avatar";
+import type { AvatarColor, AvatarHue } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Shuffle from "lucide-react-native/icons/shuffle";
 import { memo, type ReactNode, useCallback, useState } from "react";
 import { View } from "react-native";
-import { AgentColorGlow, useAgentColorTransition } from "@/features/agents/components/agent-color-glow";
+import { AgentColorGlow } from "@/features/agents/components/agent-color-glow";
 import { AvatarThumbnail, BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
 import { createAvatarCandidates } from "@/features/agents/model/avatar-candidates";
-import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
@@ -32,9 +37,32 @@ export const HUE_LABELS = {
   320: "mobile.agent.appearance.hue.magenta",
 } as const satisfies Record<AvatarHue, MobileTextKey>;
 
+const PRESET_LABELS = {
+  pink: "mobile.agent.appearance.hue.pink",
+  sky: "mobile.agent.appearance.hue.sky",
+  navy: "mobile.agent.appearance.hue.navy",
+  wine: "mobile.agent.appearance.hue.wine",
+  brown: "mobile.agent.appearance.hue.brown",
+  sand: "mobile.agent.appearance.hue.sand",
+  grey: "mobile.agent.appearance.hue.grey",
+} as const satisfies Record<AvatarColorPresetId, MobileTextKey>;
+
+/** The name of a colour in an agent colour picker. */
+export function avatarColorChoiceLabel(choice: AvatarColorChoice): MobileTextKey {
+  return choice.kind === "hue" ? HUE_LABELS[choice.hue] : PRESET_LABELS[choice.preset];
+}
+
+/** The `avatarHue` and `avatarColor` that a colour choice saves. Both null is the automatic colour. */
+export interface AgentColorValue {
+  hue: AvatarHue | null;
+  color: AvatarColor | null;
+}
+
 interface AgentAppearancePickerProps extends AgentPhotoProps {
   seed: string;
   hue: AvatarHue | null;
+  /** The agent's `avatarColor`. It wins over `hue`. */
+  color: AvatarColor | null;
   name: string;
   nameField: ReactNode;
   photoField?: ReactNode;
@@ -43,7 +71,7 @@ interface AgentAppearancePickerProps extends AgentPhotoProps {
   colorGlow?: boolean;
   disabled: boolean;
   onSeedChange: (seed: string) => void;
-  onHueChange: (hue: AvatarHue | null) => void;
+  onColorChange: (value: AgentColorValue) => void;
 }
 
 export function AgentAppearancePicker({
@@ -52,6 +80,7 @@ export function AgentAppearancePicker({
   imageUrl,
   seed,
   hue,
+  color,
   name,
   nameField,
   photoField,
@@ -59,13 +88,12 @@ export function AgentAppearancePicker({
   colorGlow = false,
   disabled,
   onSeedChange,
-  onHueChange,
+  onColorChange,
 }: AgentAppearancePickerProps) {
   const { t } = useText();
   const [candidates, setCandidates] = useState(() => createAvatarCandidates(seed));
   const shuffle = useCallback(() => setCandidates((current) => createAvatarCandidates(seed, current)), [seed]);
-  const targetColor = getBloubAvatarColor(seed, hue);
-  const color = useAgentColorTransition(targetColor);
+  const targetColor = avatarHeadColor(seed, hue, color);
 
   return (
     <View className="gap-4">
@@ -83,8 +111,9 @@ export function AgentAppearancePicker({
           imageUrl={imageUrl}
           seed={seed}
           hue={hue}
+          color={color}
           size={PREVIEW_SIZE}
-          animatedColor={color}
+          transition="pop"
         />
       </View>
       {nameField}
@@ -94,12 +123,13 @@ export function AgentAppearancePicker({
             seeds={candidates.seeds}
             seed={seed}
             hue={hue}
+            color={color}
             disabled={disabled}
             onSeedChange={onSeedChange}
             onShuffle={shuffle}
             photoField={photoField}
           />
-          <AvatarHueOptions hue={hue} disabled={disabled} onHueChange={onHueChange} />
+          <AvatarColorOptions hue={hue} color={color} disabled={disabled} onColorChange={onColorChange} />
         </>
       ) : photoField ? (
         <View className="flex-row flex-wrap items-center justify-center gap-2">{photoField}</View>
@@ -113,6 +143,7 @@ const AvatarFaceOptions = memo(function AvatarFaceOptions({
   seeds,
   seed,
   hue,
+  color,
   disabled,
   onSeedChange,
   onShuffle,
@@ -121,6 +152,7 @@ const AvatarFaceOptions = memo(function AvatarFaceOptions({
   seeds: string[];
   seed: string;
   hue: AvatarHue | null;
+  color: AvatarColor | null;
   disabled: boolean;
   onSeedChange: (seed: string) => void;
   onShuffle: () => void;
@@ -148,7 +180,7 @@ const AvatarFaceOptions = memo(function AvatarFaceOptions({
           }}
         >
           {/* Android redraws each SVG in software on every frame of a colour fade, twelve at once here. */}
-          <AvatarThumbnail seed={candidate} hue={hue} size={36} animateColor={!isAndroid} />
+          <AvatarThumbnail seed={candidate} hue={hue} color={color} size={36} animateColor={!isAndroid} />
         </Button>
       ))}
       <Button
@@ -168,15 +200,18 @@ const AvatarFaceOptions = memo(function AvatarFaceOptions({
   );
 });
 
-const AvatarHueOptions = memo(function AvatarHueOptions({
+const AvatarColorOptions = memo(function AvatarColorOptions({
   hue,
+  color,
   disabled,
-  onHueChange,
+  onColorChange,
 }: {
   hue: AvatarHue | null;
+  color: AvatarColor | null;
   disabled: boolean;
-  onHueChange: (hue: AvatarHue | null) => void;
+  onColorChange: (value: AgentColorValue) => void;
 }) {
+  const automatic = hue === null && color === null;
   const { t } = useText();
   return (
     <View
@@ -184,37 +219,36 @@ const AvatarHueOptions = memo(function AvatarHueOptions({
       accessibilityRole="radiogroup"
       accessibilityLabel={t("mobile.agent.appearance.color")}
     >
-      {AVATAR_HUE_CHOICES.map((option) => {
-        // A stored hue 100 or 280 shows as its same-color choice.
-        const checked = hue !== null && avatarHueSwatch(hue) === avatarHueSwatch(option.hue);
+      {AVATAR_COLOR_CHOICES.map((choice) => {
+        const checked = isAvatarColorChoice(choice, hue, color);
         return (
           <Button
-            key={option.hue}
+            key={choice.swatch}
             isIconOnly
             variant={checked ? "secondary" : "ghost"}
             accessibilityRole="radio"
-            accessibilityLabel={t(HUE_LABELS[option.hue])}
+            accessibilityLabel={t(avatarColorChoiceLabel(choice))}
             accessibilityState={{ checked, disabled }}
             isDisabled={disabled}
             onPress={() => {
               void haptics.selection();
-              onHueChange(option.hue);
+              onColorChange({ hue: choice.hue, color: choice.color });
             }}
           >
-            <View className="size-6 rounded-full" style={{ backgroundColor: avatarHueSwatch(option.hue) }} />
+            <View className="size-6 rounded-full" style={{ backgroundColor: choice.swatch }} />
           </Button>
         );
       })}
       <Button
         isIconOnly
-        variant={hue === null ? "secondary" : "ghost"}
+        variant={automatic ? "secondary" : "ghost"}
         accessibilityRole="radio"
         accessibilityLabel={t("mobile.agent.appearance.automatic")}
-        accessibilityState={{ checked: hue === null, disabled }}
+        accessibilityState={{ checked: automatic, disabled }}
         isDisabled={disabled}
         onPress={() => {
           void haptics.selection();
-          onHueChange(null);
+          onColorChange({ hue: null, color: null });
         }}
       >
         <Typography type="body-sm" className="font-semibold text-foreground">

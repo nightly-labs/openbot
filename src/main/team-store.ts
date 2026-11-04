@@ -899,6 +899,14 @@ export class TeamStore {
     Effect.uninterruptible,
   ).bind(this);
 
+  /**
+   * The members that this host keeps, with no member of a live session only. Empty before the
+   * host is set up. The audit log compares two of these lists.
+   */
+  listStoredMembers(): TeamMemberSummary[] {
+    return this.#state?.members.map(publicMember) ?? [];
+  }
+
   listMembers(): TeamMemberSummary[] {
     const members = this.#requireState().members.map(publicMember);
     const known = new Set(members.map((member) => member.id));
@@ -982,7 +990,12 @@ export class TeamStore {
       );
       const closed: string[] = [];
       for (const [tokenHash, session] of this.#remoteSessions) {
-        if (activeRoles.get(session.member.id) === session.member.role) continue;
+        if (activeRoles.get(session.member.id) === session.member.role) {
+          // A session that opened before its member was known has the account id as its name.
+          const stored = state.members.find((member) => member.id === session.member.id);
+          if (stored) session.member = { ...publicMember(stored), role: session.member.role, disabled: false };
+          continue;
+        }
         this.#remoteSessions.delete(tokenHash);
         closed.push(session.sessionId);
       }

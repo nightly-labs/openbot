@@ -4,8 +4,10 @@ import { isAgentAdditionalFolders } from "./ipc-agent-folders";
 import {
   type AgentModelId,
   type AgentReasoningEffort,
+  type AvatarColor,
   type AvatarHue,
   isAgentModel,
+  isAvatarColor,
   isAvatarHue,
   isAvatarSeed,
   isReasoningEffort,
@@ -304,6 +306,12 @@ export interface AgentSummary {
   updatedAt: string | null;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
+  /**
+   * The exact colour, when it is not one of the hues. `avatarHue` then holds the nearest hue for
+   * released apps and peers. Absent or null means that `avatarHue` is the colour. A remote client reads
+   * it through `agent-colors-v1`.
+   */
+  avatarColor?: AvatarColor | null;
   avatarUrl: string | null;
   marketplaceSource?: {
     listingId: string;
@@ -362,6 +370,7 @@ function hasAgentSummaryFields(value: DynamicRecord): boolean {
     (value.updatedAt === null || isBoundedString(value.updatedAt, 160)) &&
     isAvatarSeed(value.avatarSeed) &&
     (value.avatarHue === null || isAvatarHue(value.avatarHue)) &&
+    (value.avatarColor === undefined || value.avatarColor === null || isAvatarColor(value.avatarColor)) &&
     (value.avatarUrl === null || isBoundedString(value.avatarUrl, INPUT_LIMITS.avatarUrl)) &&
     (value.marketplaceSource === undefined || isAgentMarketplaceSource(value.marketplaceSource))
   );
@@ -372,6 +381,8 @@ export interface CreateAgentInput {
   description: string;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
+  /** See `AgentSummary.avatarColor`. The store sets `avatarHue` to the nearest hue of the colour. */
+  avatarColor?: AvatarColor | null;
   initialMessage: string;
   /**
    * The provider and model the agent starts on, applied before the initial message is queued.
@@ -414,7 +425,10 @@ export interface UpdateAgentInput {
    */
   leaveUsageLimit?: boolean;
   avatarSeed?: string;
+  /** A hue without `avatarColor` also clears the colour, so that a released app can change the colour. */
   avatarHue?: AvatarHue | null;
+  /** A colour also sets `avatarHue` to its nearest hue. `null` clears the colour. */
+  avatarColor?: AvatarColor | null;
 }
 
 export interface DuplicateAgentResult {

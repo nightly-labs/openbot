@@ -128,7 +128,13 @@ export function StoryChannelConversation(props: ChannelStoryProps) {
     ),
     SettingsPane: () => null,
     AboveComposer: () => (
-      <ChannelStoppedTasks tasks={props.stopped ?? []} members={members} name={agentName} onResume={fn()} />
+      <ChannelStoppedTasks
+        tasks={props.stopped ?? []}
+        members={members}
+        name={agentName}
+        onResume={fn()}
+        onCancel={fn()}
+      />
     ),
     EmptyState: () => (
       <div class="channel-empty">

@@ -8,6 +8,10 @@ export const messages = {
     "OpenBot non è riuscito a registrare il Controllo del computer nella configurazione di Codex. Controlla che il config.toml di Codex sia valido e scrivibile, poi riavvia OpenBot. Puoi disattivare il Controllo del computer nelle impostazioni dell'agente per continuare senza.",
   "error.provider.codexUnresponsive": "Codex ha smesso di rispondere, quindi OpenBot ha terminato il suo processo.",
   "error.provider.acpUnresponsive": "{provider} non ha risposto in tempo, quindi OpenBot ha terminato il suo processo.",
+  "error.provider.acpSignInLost":
+    "{provider} ha perso l’accesso, quindi OpenBot ha terminato il suo processo. Invia di nuovo il messaggio.",
+  "error.provider.acpMcpNotLoaded":
+    "{provider} non ha caricato gli strumenti di OpenBot, quindi questo agente non può usarli né contattare i suoi compagni. Una policy del team {provider} può bloccare i server MCP locali. Chiedi all’amministratore del team di consentirli, poi riprova.",
   "error.provider.endpointsReadOnly":
     "Gli endpoint salvati sono stati scritti da una versione più recente di OpenBot, oppure il file non è leggibile. Aggiorna OpenBot per modificarli.",
   "error.provider.endpointNoSecureStorage":
@@ -61,6 +65,7 @@ export const messages = {
   "error.provider.removeWhileOn": "Disattiva il provider prima di rimuoverne il download.",
   "error.provider.removeWhileDownloading": "Attendi la fine del download, poi rimuovilo.",
   "error.provider.removeIncomplete": "Un programma usa alcuni file di questa CLI. Chiudilo e riprova.",
+  "error.provider.removeDownloadsFailed": "Impossibile rimuovere i download della CLI di {providers}.",
   "error.provider.cliOverride": "Rimuovi l'override esplicito del percorso della CLI prima di aggiornare da OpenBot.",
   "error.provider.runtimeUpdateIncomplete": "L'aggiornamento del runtime non è stato completato.",
   "error.provider.downloadHttp": "Download del runtime non riuscito con HTTP {status}.",
@@ -100,6 +105,8 @@ export const messages = {
   "error.provider.modelIdDuplicate": "Due modelli hanno lo stesso ID.",
   "error.provider.contextWindowInvalid":
     "La finestra di contesto di un modello deve essere un numero intero di token tra {min} e {max}.",
+  "error.provider.maxOutputInvalid":
+    "L’output massimo di un modello deve essere un numero intero di token tra {min} e {max}.",
   "error.provider.headersTooMany": "Ci sono troppi header.",
   "error.provider.headerNameCharacter": "Il nome di un header contiene un carattere non consentito da HTTP.",
   "error.provider.headerNameTooLong": "Il nome di un header è troppo lungo.",
@@ -126,16 +133,6 @@ export const messages = {
   "error.provider.codexManagedNotStarted":
     "ChatGPT è stato scaricato ma non è stato possibile avviarlo. Scaricalo di nuovo in OpenBot.",
   "error.provider.codexMissing": "ChatGPT non è scaricato. Scaricalo in OpenBot per continuare.",
-  "error.provider.codexConfigIgnored": {
-    one: "Codex ha ignorato {count} impostazione nella sua configurazione: {settings}. Correggila o rimuovila, oppure aggiorna Codex.",
-    other:
-      "Codex ha ignorato {count} impostazioni nella sua configurazione: {settings}. Correggile o rimuovile, oppure aggiorna Codex.",
-  },
-  "error.provider.codexConfigIgnoredUnnamed": {
-    one: "Codex ha ignorato {count} impostazione nella sua configurazione. Correggila o rimuovila, oppure aggiorna Codex.",
-    other:
-      "Codex ha ignorato {count} impostazioni nella sua configurazione. Correggile o rimuovile, oppure aggiorna Codex.",
-  },
   "error.provider.claudeOutdated": "Claude Code {version} è troppo vecchio. OpenBot richiede la 2.1.232 o successiva.",
   "error.provider.claudeNotStarted": "La CLI di Claude è stata trovata ma non è stato possibile avviarla.",
   "error.provider.claudeNotStartedHint":
@@ -185,14 +182,21 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider} non ha restituito un account autenticato.",
   "error.provider.signInExpired": "L'accesso a {provider} è scaduto. Accedi di nuovo per continuare.",
   "error.provider.cliActivateFailed": "OpenBot non è riuscito ad attivare la CLI gestita.",
+  "error.provider.noMainlandChinaSignIn": "{provider} non ha un accesso per la Cina continentale.",
+  "error.provider.cliNewVersionNotStarted": "La nuova versione non si è avviata.",
   "error.provider.cliBusyReconnect":
     "La CLI di {provider} sta lavorando a un turno. Attendi che finisca, poi riconnetti.",
+  "error.provider.cliBusySignOut": "La CLI {provider} sta elaborando un turno. Attendi che finisca, poi disconnetti.",
   "error.provider.opencodeCredentialsRejected":
     "Il provider del modello ha rifiutato la chiave API. Correggi la chiave di OpenCode in Impostazioni, oppure la chiave del provider con `opencode auth login`. Poi riprova o scegli un altro modello.\n{detail}",
   "error.provider.opencodeAuthRequired":
     'OpenCode non ha un accesso per il provider del modello "{provider}". Scegli un modello con l\'etichetta Gratuito, oppure collega il provider: incolla una chiave OpenCode Go nelle impostazioni di OpenCode, oppure esegui `opencode auth login` in un terminale. Poi riprova.',
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode non ha un accesso per il provider di questo modello. Scegli un modello con l'etichetta Gratuito, oppure collega il provider: incolla una chiave OpenCode Go nelle impostazioni di OpenCode, oppure esegui `opencode auth login` in un terminale. Poi riprova.",
+  "error.provider.customEndpointKeyRefused":
+    'L\'endpoint "{provider}" ha rifiutato la sua chiave API o le sue intestazioni. Inseriscile di nuovo in Impostazioni server → Provider, poi riprova.',
+  "error.provider.customEndpointKeyMissing":
+    'L\'endpoint "{provider}" ha bisogno di una chiave API. Aggiungi la chiave in Impostazioni server → Provider, poi riprova.',
   "error.provider.opencodeKeyExpired":
     "La tua chiave API di OpenCode è scaduta. Crea una nuova chiave in OpenCode Console, incollala nelle impostazioni di OpenCode, poi riprova.",
   "error.provider.opencodeServiceFailure":
@@ -259,6 +263,20 @@ export const messages = {
   "error.provider.clineNotStarted": "Impossibile avviare Cline. Esegui `cline --version` in un terminale.",
   "error.provider.clineVersionUnreadable": "Impossibile leggere la versione della CLI di Cline.",
   "error.provider.clineSignIn": "Accedi con Cline o imposta CLINE_API_KEY per usare Cline.",
+  "error.provider.kimiArchivePath": "L'archivio di Kimi ha un percorso inatteso.",
+  "error.provider.kimiChecksum": "Checksum del runtime di Kimi non corrispondente.",
+  "error.provider.kimiLicenseChecksum": "Checksum della licenza di Kimi non corrispondente.",
+  "error.provider.kimiMissing": "Kimi non è scaricato. Scaricalo in OpenBot per continuare.",
+  "error.provider.kimiOutdated":
+    "La CLI di Kimi {version} è troppo vecchia. OpenBot richiede la versione 1.52.0 o successiva.",
+  "error.provider.kimiNotStarted": "Impossibile avviare Kimi. Esegui `kimi --version` in un terminale.",
+  "error.provider.kimiVersionUnreadable": "Impossibile leggere la versione della CLI di Kimi.",
+  "error.provider.kimiSignIn": "Accedi con Kimi Code per usare Kimi.",
+  "error.provider.devinSignIn": "Accedi con Devin per usare Devin.",
+  "error.provider.hermesMissing": "Hermes Agent non è installato. Installalo e riprova.",
+  "error.provider.hermesNotStarted": "Impossibile avviare Hermes Agent. Esegui `hermes --version` in un terminale.",
+  "error.provider.hermesVersionUnreadable": "Impossibile leggere la versione di Hermes Agent.",
+  "error.provider.hermesSignIn": "Accedi con Nous Portal o esegui `hermes setup` in un terminale per usare Hermes.",
   "error.provider.usageLimitReached": "L'account ha raggiunto il limite di utilizzo.",
   "error.provider.foreignReasoning":
     "{provider} non ha accettato il ragionamento precedente in questa chat, perché lo ha ricevuto un altro account o un'altra chiave API. OpenBot ha avviato una nuova sessione di {provider} con la cronologia della chat. Riprova.",
@@ -312,6 +330,7 @@ export const messages = {
   "error.provider.customAgentNoSecureStorage":
     "Questo computer non ha un archivio sicuro, quindi non si possono salvare i valori d'ambiente. Rimuovili e riprova.",
   "error.provider.customAgentNotSaved": "Questo agente personalizzato non è salvato. Aggiorna l'elenco e riprova.",
+  "error.provider.customAgentWorkspaceOnly": "{reason}. «Solo workspace» lo blocca. Prova «Accesso completo».",
   "error.provider.customAgentTooMany": "Puoi salvare al massimo {count} agenti personalizzati.",
   "error.provider.customAgentEnvValueMissing": "Inserisci un valore per {name}.",
   "error.provider.off": "{provider} è disattivato in OpenBot. Attivalo prima nelle impostazioni dei provider.",
@@ -323,6 +342,7 @@ export const messages = {
   "error.provider.accountsUnsupported": "{provider} può avere un solo account.",
   "error.provider.accountNeedsConnection": "Connetti {provider} prima di aggiungere un altro account.",
   "error.provider.usageResetUnsupported": "{provider} non può azzerare i limiti di utilizzo.",
+  "error.provider.signOutUnsupported": "OpenBot non può disconnettere l'accesso a {provider}.",
   "error.provider.usageResetNotConnected": "Accedi di nuovo a questo account {provider} prima di azzerarne l'utilizzo.",
   "error.provider.accountLimit": "{provider} può avere al massimo {limit} account.",
   "error.provider.accountNotFound": "Questo account {provider} non è su questo computer. Aggiorna e riprova.",

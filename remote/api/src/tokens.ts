@@ -5,6 +5,11 @@ import {
   type DiscordRouteGuild,
 } from "@openbot/contracts/signal-protocol/discord-route";
 import {
+  GITHUB_ROUTE_AUDIENCE,
+  GITHUB_ROUTE_REPOSITORIES_LIMIT,
+  type GitHubRouteRepository,
+} from "@openbot/contracts/signal-protocol/github-route";
+import {
   SLACK_ROUTE_AUDIENCE,
   SLACK_ROUTE_TEAMS_LIMIT,
   type SlackRouteTeam,
@@ -66,6 +71,8 @@ const remoteTicketClaimsSchema = z.object({
   protocolMaximum: z.number().int().nonnegative(),
   sessionExpiresAt: z.number().int().nonnegative(),
   clientPublicKey: z.string().min(1).max(8_192).optional(),
+  // The Signal machine of the host's room. Without it, the ticket belongs to the entry machine.
+  signal: z.string().min(1).max(64).optional(),
   iat: z.number().int().nonnegative(),
   exp: z.number().int().nonnegative(),
 });
@@ -91,6 +98,12 @@ const webhookRouteClaimsSchema = z.object({
   routes: z
     .array(z.object({ id: identifierSchema, linkedAt: z.number().int().nonnegative() }))
     .max(WEBHOOK_ROUTES_LIMIT),
+});
+const githubRouteClaimsSchema = z.object({
+  hid: identifierSchema,
+  repositories: z
+    .array(z.object({ id: z.int().positive(), installationId: z.int().positive() }))
+    .max(GITHUB_ROUTE_REPOSITORIES_LIMIT),
 });
 const telegramRouteClaimsSchema = z.object({
   hid: identifierSchema,
@@ -134,8 +147,11 @@ export class RemoteTokenService {
   readonly #ticketKey: JWTVerifyGetKey;
   readonly #remoteTicketKey: RemoteJWKSet | null;
   readonly #sessionSecret: Uint8Array;
+  // `SIGNAL_ID`: a ticket or resume token whose `signal` claim names another machine is refused.
+  readonly #signalId: string | null;
   readonly #turnSecret: string;
-  readonly #turnHost: string;
+  // The relay for a host and its clients (`TurnRelays.pick`).
+  readonly #turnHost: (hostId: string) => string;
   readonly #turnPort: number;
   readonly #turnTlsPort: number;
   readonly #validateResumeClaims: (claims: RemoteTicketClaims) => Effect.Effect<boolean, RemoteTokenUnavailableError>;
@@ -162,12 +178,21 @@ export class RemoteTokenService {
   constructor(
     config: Pick<
       RemoteApiConfig,
-      "ticketJwks" | "ticketJwksUrl" | "sessionSecret" | "turnSecret" | "turnHost" | "turnPort" | "turnTlsPort"
+      | "ticketJwks"
+      | "ticketJwksUrl"
+      | "sessionSecret"
+      | "turnSecret"
+      | "turnHosts"
+      | "turnPort"
+      | "turnTlsPort"
+      | "signalId"
     >,
     validateResumeClaims: (claims: RemoteTicketClaims) => Effect.Effect<boolean, RemoteTokenUnavailableError> = () =>
       Effect.succeed(false),
     options: {
       fetch?: FetchImplementation;
+      // Picks the TURN relay of a host. Without it, every host gets `TURN_HOST`.
+      turnHost?: (hostId: string) => string;
       // Asks the account service which links of a route are current. Without it, none is.
       validateSlackRoute?: (hostId: string, teams: SlackRouteTeam[]) => Effect.Effect<string[], RemoteTokenError>;
       // Asks the account service which chats of a Telegram route are current. Without it, none is.
@@ -199,8 +224,10 @@ export class RemoteTokenService {
       this.#ticketKey = remoteTicketKey;
     }
     this.#sessionSecret = new TextEncoder().encode(config.sessionSecret);
+    this.#signalId = config.signalId;
     this.#turnSecret = config.turnSecret;
-    this.#turnHost = config.turnHost;
+    const localTurnHost = config.turnHosts[0] ?? "";
+    this.#turnHost = options.turnHost ?? (() => localTurnHost);
     this.#turnPort = config.turnPort;
     this.#turnTlsPort = config.turnTlsPort;
     this.#validateResumeClaims = validateResumeClaims;
@@ -231,7 +258,7 @@ export class RemoteTokenService {
           currentDate: now,
         }),
       );
-      return yield* tokenDecode(() => decodeTicketClaims(payload, now));
+      return yield* tokenDecode(() => decodeTicketClaims(payload, now, this.#signalId));
     }),
   );
 
@@ -301,6 +328,28 @@ export class RemoteTokenService {
     (hostId: string, routes: WebhookRoute[]) => this.#validateWebhookRoute(hostId, routes),
   );
 
+  /**
+   * The account service checked the repositories with the user's GitHub sign-in when it signed the
+   * ticket, and keeps no link, so there is nothing to validate after a restart: the ticket expires.
+   */
+  readonly verifyGitHubRoute = Effect.fn("RemoteTokens.verifyGitHubRoute")(
+    (token: string, hostId: string, now = new Date()) =>
+      Effect.gen({ self: this }, function* () {
+        const { payload } = yield* tokenCall(() =>
+          jwtVerify(token, this.#ticketKey, {
+            audience: GITHUB_ROUTE_AUDIENCE,
+            algorithms: ["ES256"],
+            requiredClaims: ["exp"],
+            currentDate: now,
+          }),
+        );
+        const claims = yield* tokenDecode(() => githubRouteClaimsSchema.parse(payload));
+        if (claims.hid !== hostId)
+          return yield* new RemoteTokenError({ message: "The GitHub route belongs to another host." });
+        return { repositories: claims.repositories satisfies GitHubRouteRepository[] };
+      }),
+  );
+
   readonly verifyTelegramRoute = Effect.fn("RemoteTokens.verifyTelegramRoute")(
     (token: string, hostId: string, now = new Date()) =>
       Effect.gen({ self: this }, function* () {
@@ -342,7 +391,9 @@ export class RemoteTokenService {
             currentDate: now,
           }),
         );
-        const claims = yield* tokenDecode(() => decodeTicketClaims({ ...payload, aud: REMOTE_TICKET_AUDIENCE }, now));
+        const claims = yield* tokenDecode(() =>
+          decodeTicketClaims({ ...payload, aud: REMOTE_TICKET_AUDIENCE }, now, this.#signalId),
+        );
         if (this.#trustedResumeTokens.has(claims.jti)) return claims;
         if (!(yield* this.validateClaims(claims)))
           return yield* new RemoteTokenError({ message: "The remote session is not active." });
@@ -373,6 +424,8 @@ export class RemoteTokenService {
             protocolMaximum: claims.protocolMaximum,
             sessionExpiresAt: claims.sessionExpiresAt,
             ...(claims.clientPublicKey ? { clientPublicKey: claims.clientPublicKey } : {}),
+            // A resumed socket stays on the Signal machine of its ticket.
+            ...(claims.signal ? { signal: claims.signal } : {}),
           })
             .setProtectedHeader({ alg: "HS256", typ: "JWT" })
             .setJti(jti)
@@ -433,7 +486,9 @@ export class RemoteTokenService {
           currentDate: new Date((expiresAt - 1) * 1_000),
         }),
       );
-      const claims = yield* tokenDecode(() => decodeTicketClaims({ ...payload, aud: REMOTE_TICKET_AUDIENCE }, now));
+      const claims = yield* tokenDecode(() =>
+        decodeTicketClaims({ ...payload, aud: REMOTE_TICKET_AUDIENCE }, now, this.#signalId),
+      );
       if (claims.iat > nowSeconds || claims.exp <= claims.iat) {
         return yield* new RemoteTokenError({ message: "The resume token timestamps are invalid." });
       }
@@ -446,13 +501,14 @@ export class RemoteTokenService {
     if (expiration <= nowSeconds) throw new Error("The remote session has expired.");
     const username = `${expiration}:${claims.sessionId}`;
     const credential = createHmac("sha1", this.#turnSecret).update(username).digest("base64");
+    const host = this.#turnHost(claims.hostId);
     return [
-      { urls: `stun:${this.#turnHost}:${this.#turnPort}` },
+      { urls: `stun:${host}:${this.#turnPort}` },
       {
         urls: [
-          `turn:${this.#turnHost}:${this.#turnPort}?transport=udp`,
-          `turn:${this.#turnHost}:${this.#turnPort}?transport=tcp`,
-          `turns:${this.#turnHost}:${this.#turnTlsPort}?transport=tcp`,
+          `turn:${host}:${this.#turnPort}?transport=udp`,
+          `turn:${host}:${this.#turnPort}?transport=tcp`,
+          `turns:${host}:${this.#turnTlsPort}?transport=tcp`,
         ],
         username,
         credential,
@@ -476,6 +532,14 @@ export function verifySlackSignature(
   if (Math.abs(now / 1_000 - Number(timestamp)) > SLACK_SIGNATURE_TOLERANCE_SECONDS) return false;
   const expected = `v0=${createHmac("sha256", secret).update(`v0:${timestamp}:`).update(body).digest("hex")}`;
   const actualBytes = Buffer.from(signature);
+  const expectedBytes = Buffer.from(expected);
+  return actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes);
+}
+
+/** GitHub's webhook signature: `sha256=` and the hex HMAC-SHA256 of the body with the App's webhook secret. */
+export function verifyGitHubSignature(body: Uint8Array, signature: string, secret: string): boolean {
+  const expected = `sha256=${createHmac("sha256", secret).update(body).digest("hex")}`;
+  const actualBytes = Buffer.from(signature.toLowerCase());
   const expectedBytes = Buffer.from(expected);
   return actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes);
 }
@@ -629,8 +693,11 @@ function parseJwks(value: string): JSONWebKeySet {
   return jwksSchema.parse(JSON.parse(value));
 }
 
-function decodeTicketClaims(value: unknown, now: Date): RemoteTicketClaims {
+function decodeTicketClaims(value: unknown, now: Date, signalId: string | null): RemoteTicketClaims {
   const claims = remoteTicketClaimsSchema.parse(value);
+  // The account service gave the host another Signal machine. The peer gets a new ticket for it.
+  if (signalId && claims.signal !== undefined && claims.signal !== signalId)
+    throw new Error("The ticket belongs to another Signal.");
   if (claims.protocolMinimum > claims.protocolMaximum) throw new Error("Invalid protocol range.");
   if (
     claims.protocolMinimum > REMOTE_TICKET_PROTOCOL_VERSION ||

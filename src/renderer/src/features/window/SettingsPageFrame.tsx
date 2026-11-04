@@ -6,8 +6,8 @@ import { onSettled } from "solid-js";
 
 /**
  * The frame of a settings page, on desktop and on the web: the heading and the section list at the
- * width of the sidebar, and the panel. The settings panel shows its nav and content in the mounts
- * that `onMounts` gets.
+ * width of the sidebar, the path to an open detail page in the top row, and the panel. The settings
+ * panel shows its nav, path and content in the mounts that `onMounts` gets.
  */
 export function SettingsPageFrame(props: {
   heading: JSX.Element;
@@ -20,10 +20,11 @@ export function SettingsPageFrame(props: {
 }) {
   let nav!: HTMLDivElement;
   let content!: HTMLDivElement;
+  let path!: HTMLDivElement;
   let root!: HTMLDivElement;
 
   onSettled(() => {
-    props.onMounts({ nav, content });
+    props.onMounts({ nav, content, path });
     // As on the usage and schedule pages, the heading takes the focus, so a screen reader reads the
     // page that opened. The settings shell puts the focus back on the opener when the page closes.
     root.querySelector<HTMLElement>(".settings-page-title")?.focus({ preventScroll: true });
@@ -53,6 +54,7 @@ export function SettingsPageFrame(props: {
         {props.children}
         <div class="settings-page-sections" ref={nav} hidden={props.sectionsHidden} />
       </div>
+      <div class="settings-page-path-row" ref={path} />
       <div class="settings-page-content" ref={content} />
     </div>
   );

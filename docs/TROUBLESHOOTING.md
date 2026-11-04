@@ -14,7 +14,9 @@ If the command is missing, install Codex using the official installer:
 curl -fsSL https://chatgpt.com/codex/install.sh | sh
 ```
 
-Then run `codex login`, sign in with ChatGPT, fully quit OpenBot, and open it again.
+Then run `codex login`, sign in with ChatGPT, fully quit OpenBot, and open it again. To use OpenAI
+API credits instead of a ChatGPT plan, select Add key under API key in Settings > Providers > ChatGPT,
+or run `printenv OPENAI_API_KEY | codex login --with-api-key`.
 
 You can use Claude instead. Verify and install Claude CLI:
 
@@ -82,6 +84,16 @@ count. A server (`OPENBOT_SERVER=1` or a hosted server) always renders on the CP
 - To try the GPU again, for example after a driver update, remove the file. The log names it.
 - To always use the GPU, start OpenBot with `OPENBOT_DISABLE_GPU=0`.
 - If OpenBot stops at each start, start it with `OPENBOT_DISABLE_GPU=1` to always render on the CPU.
+
+## OpenBot does not start on Linux when the monitor is off
+
+On Wayland, Chromium waits until a monitor is on before it opens a window. When OpenBot starts and
+the Wayland session has no monitor, for example after an automatic update, OpenBot starts again on
+XWayland. The log then shows "The Wayland session had no monitor". The window shows through XWayland
+when a monitor comes on, and the next start uses Wayland again.
+
+- If the session has no XWayland (no `DISPLAY`), OpenBot starts when a monitor is on.
+- To always use XWayland, start OpenBot with `--ozone-platform=x11`.
 
 ## Computer Use is unavailable
 

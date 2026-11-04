@@ -17,6 +17,7 @@ import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { readAloud, stopSpeech } from "../speech/speech-playback";
+import { changeSpeechSpeed, speechSpeed, updateSpeechSettings } from "../speech/speech-speed";
 import { voicePort } from "./voice-port";
 
 interface SettingsVoiceState {
@@ -215,8 +216,8 @@ export function createSettingsVoiceStore(active: () => boolean) {
     setState((draft) => {
       draft.speech.settings = next;
     });
-    return voicePort()
-      .voice.setSpeechSettings(next)
+    // In series with the speed saves of the voice panel and the players, so that no save loses another.
+    return updateSpeechSettings(voicePort().voice, patch)
       .then((saved) => {
         setState((draft) => {
           draft.speech.settings = saved;
@@ -316,6 +317,9 @@ export function createSettingsVoiceStore(active: () => boolean) {
           ...(saved ? {} : { failure_code: "update_failed" }),
         }),
       ),
+    /** The speed of replies, shared with the voice panel and the players of spoken replies. */
+    speechSpeed,
+    setSpeechSpeed: changeSpeechSpeed,
     listen,
     probeServer: (connection: VoiceServerConnection) => voicePort().voice.probeServer(connection),
     saveServer,

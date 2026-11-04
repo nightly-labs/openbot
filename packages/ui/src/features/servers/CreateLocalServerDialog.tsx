@@ -70,7 +70,15 @@ export function CreateLocalServerDialog(props: CreateLocalServerDialogProps) {
                 void create();
               }}
             >
-              <Field label={t("server.local.nameLabel")} htmlFor="create-local-server-name">
+              <Field
+                label={t("server.local.nameLabel")}
+                htmlFor="create-local-server-name"
+                error={
+                  trimmedName() && nameTooShort()
+                    ? t("server.settings.nameTooShort", { limit: INPUT_LIMITS.serverNameMin })
+                    : undefined
+                }
+              >
                 <Input
                   id="create-local-server-name"
                   autocomplete="off"

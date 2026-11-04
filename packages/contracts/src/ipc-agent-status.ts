@@ -64,8 +64,8 @@ export interface AgentProviderStatus {
   restartPending?: boolean;
   /**
    * A saved API key serves the provider's turns in place of the plan sign-in, so the plan's usage
-   * does not apply. Gemini only: its saved key comes before the Google account. Local only:
-   * released Team API adapters omit it.
+   * does not apply. Gemini: its saved key comes before the Google account. Codex: its own login is
+   * an OpenAI API key. Muse: OpenBot's saved key. Local only: released Team API adapters omit it.
    */
   apiKeyInUse?: boolean;
   /**
@@ -160,11 +160,14 @@ export type AgentAuthState =
   | { kind: "antigravity"; email: string | null }
   | { kind: "cursor"; email: string | null }
   | { kind: "cline"; email: string | null }
+  | { kind: "kimi"; email: string | null }
+  | { kind: "devin"; email: string | null }
   | { kind: "pi"; email: string | null }
   | { kind: "muse"; email: string | null }
   | { kind: "inception"; email: string | null }
   | { kind: "deepseek"; email: string | null }
   | { kind: "openrouter"; email: string | null }
+  | { kind: "hermes"; email: string | null }
   | { kind: "acp"; email: string | null };
 
 export interface AccountUsageWindow {
@@ -202,6 +205,11 @@ export interface AccountUsageLimit {
   primary: AccountUsageWindow | null;
   secondary: AccountUsageWindow | null;
   /**
+   * OpenCode only: the weekly or monthly window that `secondary` does not hold. `secondary` is the one
+   * that stops work first, so only the usage list shows this one. The Team API does not send this field.
+   */
+  tertiary?: AccountUsageWindow;
+  /**
    * Antigravity only: each quota group of the plan. `primary` and `secondary` are then the group of
    * the model that was read, or the "Gemini Models" group. The Team API does not send this field.
    */
@@ -228,6 +236,7 @@ export function isAccountUsage(value: unknown): value is AccountUsage {
         (limit.accountId === undefined || isProviderAccountId(limit.accountId)) &&
         (limit.primary === null || isAccountUsageWindow(limit.primary)) &&
         (limit.secondary === null || isAccountUsageWindow(limit.secondary)) &&
+        (limit.tertiary === undefined || isAccountUsageWindow(limit.tertiary)) &&
         (limit.groups === undefined ||
           (Array.isArray(limit.groups) &&
             limit.groups.length <= MAX_USAGE_GROUPS &&

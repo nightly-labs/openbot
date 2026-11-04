@@ -3,6 +3,7 @@ import { Image } from "expo-image";
 import { type ReactNode, useId, useState } from "react";
 import { View } from "react-native";
 import Svg, { Defs, FeColorMatrix, Filter, Image as SvgImage } from "react-native-svg";
+import { AgentOrbitRings } from "@/features/agents/components/agent-orbit-rings";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { DISCONNECTED_APPEARANCE } from "@/features/workspace/components/use-connection-appearance";
 import {
@@ -26,8 +27,17 @@ export function AgentPhoto({
   imageUrl,
   disconnected = false,
   size,
+  rings,
   children,
-}: AgentPhotoProps & { size: number; children: ReactNode }) {
+}: AgentPhotoProps & {
+  size: number;
+  /**
+   * Whether the orbit rings turn around the photo, while the agent works. A photo has no face to show
+   * the work; the plush shows it with its felt dots. `undefined` mounts no ring layer.
+   */
+  rings?: boolean | undefined;
+  children: ReactNode;
+}) {
   const workspace = useMobileWorkspaceReader();
   const queryScope = useQueryScope();
   const avatarUrl = useMobileWorkspaceSelector((current) =>
@@ -53,7 +63,8 @@ export function AgentPhoto({
   const uri = imageUrl === undefined ? photo.data : imageUrl;
   const [failed, setFailed] = useState<string | null>(null);
   const filterId = `photo-offline-${useId().replaceAll(":", "")}`;
-  return uri && uri !== failed ? (
+  if (!uri || uri === failed) return children;
+  const picture = (
     <View style={{ width: size, height: size, borderRadius: size / 2, overflow: "hidden" }}>
       <Image
         source={{ uri }}
@@ -87,7 +98,13 @@ export function AgentPhoto({
         </Svg>
       ) : null}
     </View>
+  );
+  // The ring wrapper stays mounted when work starts and stops.
+  return rings === undefined ? (
+    picture
   ) : (
-    children
+    <AgentOrbitRings active={rings} size={size}>
+      {picture}
+    </AgentOrbitRings>
   );
 }

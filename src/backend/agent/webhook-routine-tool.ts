@@ -59,12 +59,14 @@ const WEBHOOK_REQUEST_FORMAT = {
     "413": "the body is too large",
     "503": "the host is offline or busy; retry later",
   },
+  standardWebhooks:
+    "The URL also accepts Standard Webhooks requests, such as Composio and Svix send: webhook-id, webhook-timestamp and webhook-signature headers, and a JSON object body with a type field. The whole body becomes data, so filters can read /metadata/trigger_slug. The person pastes the sender's signing secret in the routine's settings.",
 };
 
 /**
- * Saves a webhook routine through the main process, which owns the signing secret, the route limit
- * and the relay route. Without `routineId` it makes a new routine. The secret never comes back here:
- * the model must not see it.
+ * Saves or deletes a webhook routine through the main process, which owns the signing secret, the
+ * route limit and the relay route. Without `routineId`, `save` makes a new routine. The secret never
+ * comes back here: the model must not see it.
  */
 export interface WebhookRoutineWriter {
   save(input: {
@@ -78,6 +80,8 @@ export interface WebhookRoutineWriter {
     filters: EventFilter[];
     limitPolicy?: RoutineLimitPolicy;
   }): Effect.Effect<EventRoutine, RoutineOperationFailed>;
+  /** Deletes the routine as Routines settings do. The sync after the change revokes its route. */
+  delete(input: { agentId: string; routineId: string }): Effect.Effect<void, RoutineOperationFailed>;
 }
 
 type WebhookTriggerFields = { eventType: string | null; filters: EventFilter[] };

@@ -11,7 +11,8 @@
 // The client part runs the team client's `followHostKeyHandovers` on the handovers that the host
 // signed, once with the `node:crypto` check of desktop main and once with the check of the other
 // clients: a client that trusts the first key reaches the last key, and a changed signature, a step of
-// another host or a key with no handover fails.
+// another host or a key with no handover fails. `hostKeyChangedAt`, the time that Server settings
+// shows, is the time of the step that leads to the key, and is null for a step that does not verify.
 // Run: `bun scripts/host-key-rotation-e2e.ts`.
 // Writes .openbot-build/host-key-rotation-e2e/report.json.
 import assert from "node:assert/strict";
@@ -24,7 +25,11 @@ import { join, resolve } from "node:path";
 import { decodeHostKeyHandover, type HostKeyHandover } from "@openbot/contracts/host-key-handover";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
 import { verifyEd25519Base64Url } from "@openbot/team-client/ed25519";
-import { followHostKeyHandovers, remoteHostFingerprint } from "@openbot/team-client/host-key-handover";
+import {
+  followHostKeyHandovers,
+  hostKeyChangedAt,
+  remoteHostFingerprint,
+} from "@openbot/team-client/host-key-handover";
 import { Effect } from "effect";
 import { verifyHostKeySignature } from "../src/main/remote-server-host-directory";
 
@@ -132,6 +137,19 @@ async function follows(input: {
   const [desktop, client] = await Promise.all([
     Effect.runPromise(followHostKeyHandovers({ ...input, verify: verifyHostKeySignature })),
     Effect.runPromise(followHostKeyHandovers({ ...input, verify: verifyEd25519Base64Url })),
+  ]);
+  assert.equal(desktop, client, "The desktop check and the client check must agree.");
+  return desktop;
+}
+
+async function changedAt(input: {
+  hostId: string;
+  publicKey: string;
+  handovers: readonly HostKeyHandover[];
+}): Promise<number | null> {
+  const [desktop, client] = await Promise.all([
+    Effect.runPromise(hostKeyChangedAt({ ...input, verify: verifyHostKeySignature })),
+    Effect.runPromise(hostKeyChangedAt({ ...input, verify: verifyEd25519Base64Url })),
   ]);
   assert.equal(desktop, client, "The desktop check and the client check must agree.");
   return desktop;
@@ -246,6 +264,23 @@ async function main(): Promise<void> {
       "A step of another host must fail.",
     );
     checks.otherHostStepFails = true;
+
+    assert.equal(
+      await changedAt({ hostId, publicKey: rotated.publicKey, handovers: [first, second] }),
+      second.issuedAt,
+      "The change time must be the time of the step that leads to the key.",
+    );
+    assert.equal(
+      await changedAt({ hostId, publicKey: completed.publicKey, handovers: [tampered] }),
+      null,
+      "A step with a changed signature must give no change time.",
+    );
+    assert.equal(
+      await changedAt({ hostId: "another-host", publicKey: completed.publicKey, handovers: [first] }),
+      null,
+      "A step of another host must give no change time.",
+    );
+    checks.changeTimeNeedsVerifiedStep = true;
 
     const stranger = generateKeyPairSync("ed25519", {
       publicKeyEncoding: { type: "spki", format: "pem" },

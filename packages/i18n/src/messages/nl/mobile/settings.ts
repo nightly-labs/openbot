@@ -69,9 +69,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "Zet Animaties uit om beweging in de hele app te beperken. Als Beperk beweging aanstaat in de instellingen van je telefoon, beperkt de app ook beweging. De animaties hieronder blijven dan uit.",
   "mobile.settings.animations.all": "Animaties",
-  "mobile.settings.animations.chatZoom": "Inzoomen op chats",
-  "mobile.settings.animations.chatZoomFooter":
-    "Een chat opent vanuit zijn avatar in de lijst en sluit daar weer in. Als dit uitstaat, schuift een chat van opzij in beeld.",
   "mobile.settings.animations.agentFaces": "Geanimeerde agentgezichten",
   "mobile.settings.animations.agentFacesFooter":
     "Agentavatars bewegen hun gezicht terwijl de agents werken en rusten. Als dit uitstaat, blijven de gezichten stil.",
@@ -120,7 +117,6 @@ export const messages = {
     "Meldingen en de live activiteit spelen dit geluid af. De live activiteit laat ook het scherm oplichten. Het OpenBot-geluid is het geluid dat de desktop-app afspeelt als een taak klaar is. De vier geluiden daarna zijn de geluiden van de geluidsthema’s van de desktop-app.",
   "mobile.settings.notifications.soundFooterAndroid":
     "Meldingen spelen dit geluid af. Het OpenBot-geluid is het geluid dat de desktop-app afspeelt als een taak klaar is. De vier geluiden daarna zijn de geluiden van de geluidsthema’s van de desktop-app.",
-  "mobile.settings.notifications.notifyAbout": "Meld mij over",
   "mobile.settings.notifications.level.all": "Alle activiteit",
   "mobile.settings.notifications.level.needsMe": "Alleen als het mij nodig heeft",
   "mobile.settings.notifications.level.nothing": "Niets",
@@ -137,12 +133,29 @@ export const messages = {
     "De gebeurtenissen van deze server die deze telefoon melden. De desktop-app heeft eigen instellingen.",
   "mobile.settings.notifications.serverUnsupported":
     "Deze server kan geen meldingen versturen. Werk OpenBot bij op de computer waarop de server draait.",
+  "mobile.settings.notifications.thisPhone": "Deze telefoon",
+  "mobile.settings.notifications.whatYouHear": "Waarover je hoort",
+  "mobile.settings.notifications.wholeServer": "Hele server",
+  "mobile.settings.notifications.levelShort.all": "Alles",
+  "mobile.settings.notifications.levelShort.needsMe": "Als nodig",
+  "mobile.settings.notifications.levelShort.nothing": "Uit",
+  "mobile.settings.notifications.thisPhoneOnly": "Alleen deze telefoon",
+  "mobile.settings.notifications.offForEveryone": "Uit voor iedereen op deze server",
+  "mobile.settings.notifications.turnOn": "Inschakelen",
+  "mobile.settings.notifications.turnOnFor": "Meldingen van {name} inschakelen voor iedereen op deze server",
+  "mobile.settings.notifications.chooseAgent": "Kies voor één agent",
+  "mobile.settings.notifications.chooseAnotherAgent": "Kies een andere agent",
+  "mobile.settings.notifications.levelsFooter": "Tik nog eens op het niveau van een agent om de server te volgen.",
+  "mobile.settings.notifications.agentsUnsupported": "Werk OpenBot bij op deze server om agents te kiezen.",
+  "mobile.settings.notifications.agentsOffline": "Agents verschijnen als deze server online is.",
+  "mobile.settings.notifications.scopeFooter":
+    "Je keuzes gelden op al je apparaten. Dempen geldt alleen voor deze telefoon.",
   "mobile.settings.notifications.channel": "Agentmeldingen ({sound})",
   "mobile.settings.notifications.channelSilent": "Agentmeldingen (geen geluid)",
   "mobile.settings.privacy.title": "Privacy",
   "mobile.settings.privacy.footer":
-    "Deel functiegebruik en verbindingsresultaten van deze telefoon. Berichtinhoud en bestanden worden niet verstuurd.",
-  "mobile.settings.privacy.analytics": "Productanalyses delen",
+    "Functiegebruik en verbindingsresultaten van deze telefoon gaan altijd naar de analyse van OpenBot. Aan: met je account-ID en e-mailadres. Uit: alleen met een willekeurige installatie-ID. Berichtinhoud en bestanden worden niet verstuurd.",
+  "mobile.settings.privacy.analytics": "Analyse aan mijn account koppelen",
   "mobile.settings.privacy.retry": "Opslaan van privacyinstelling opnieuw proberen",
   "mobile.settings.conversations.title": "Gesprekken",
   "mobile.settings.conversations.hiddenChats": "Verborgen chats",

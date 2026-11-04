@@ -1,34 +1,31 @@
-import { type Block, BloubBot, type BloubBotRef, type StateId } from "@norbert_bodziony/bloub";
-import type { AvatarHue } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
-import type { JSX } from "@solidjs/web";
-import { createEffect, createSignal, For, onSettled, untrack } from "solid-js";
-import { bloubAvatarProfile } from "../../bloub-avatar";
-import { ErrorReference } from "../../error-reference";
+import { createEffect, createSignal, For, onCleanup, onSettled, untrack } from "solid-js";
+import { PlushLoader } from "../../plush-loader";
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
+import { type CrewHop, CrewPileStage } from "./CrewPileStage";
+import { CrewPile, randomCrewSeed } from "./crew-pile";
 
 /*
- * One clock drives the whole screen, so each run shows the same frames. Each frame is a function of
- * the elapsed time: the faces and the status line. The bots are frozen and drawn with `renderAt`, so
- * they have no clock of their own that can drift. The CSS animations start at the same time as the
- * clock: `--app-loading-at` moves them back to the clock's time when the screen mounts.
+ * The app loading screen. In the `pile` scene, a different crew of felt plushes rains into the screen
+ * on each run until it is full. The compositor plays the
+ * pile, so it moves also while the app is busy. When the app is ready, its heavy views mount behind
+ * the screen, then the crew hop out while the screen fades. The `thinking` scene shows the lilac plush, which
+ * watches three felt balls bounce, and joke status lines change below it unless the screen has a title.
+ * The pile scene shows no text: its label is for a screen reader only.
  */
-const CREW_FPS = 30;
-const WAVE_S = 1.6;
-const HOP_STAGGER_S = 0.14;
-// Three waves: each hopper makes a face in its own wave.
-const LOOP_S = WAVE_S * 3;
-const STATUS_EVERY_S = LOOP_S / 2;
-// One cycle holds 2 blocks per loop and at most 200 blocks, so it lasts about 7 minutes before it
-// starts again.
-const LOOPS = 90;
-// When the app is ready before this time, the screen only fades. The crew does not jump out.
+const STATUS_EVERY_S = 2.4;
+// When the app is ready before this time, the screen only fades. The crew do not hop out.
 const QUICK_EXIT_S = 0.6;
-// The longest exit is 760ms of jumps and the fade. If no `animationend` comes, the screen ends after
-// this time, so it cannot cover the app.
-const EXIT_LIMIT_MS = 2500;
+// If no `animationend` comes, the screen ends this long after its fade or hop should start, so it
+// cannot cover the app. The heavy views mount before the hop, so the hop can start late.
+const EXIT_LIMIT_MS = 3000;
+// The fade starts this long after the first hop.
+const EXIT_FADE_DELAY_MS = 300;
+// A screen that makes the hop shows the rain for at least this time, also when the app is ready sooner.
+const MIN_RAIN_S = 2;
 const EXIT_ANIMATION = "app-loading-exit";
+const THINKING_SIZE = 132;
 
 const STATUS_LINES = [
   "webClient.loadingLine.wake",
@@ -39,152 +36,234 @@ const STATUS_LINES = [
   "webClient.loadingLine.almost",
 ] as const satisfies readonly AppTextKey[];
 
-// Only states that keep the body. The others, such as `orbit`, `burst`, `sleep` and `alert`, replace
-// it with dots or a mark.
-const HOPPER_LOOKS: ReadonlyArray<{ seed: string; hue: AvatarHue; face: StateId }> = [
-  { seed: "crew-hopper-one", hue: 215, face: "wink" },
-  { seed: "crew-hopper-two", hue: 320, face: "wide" },
-  { seed: "crew-hopper-three", hue: 55, face: "wink" },
-];
-
-/** Idle, and one face while this hopper is in the air in its own wave. */
-function hopperCycle(index: number, face: StateId): Block[] {
-  const lead = index * (WAVE_S + HOP_STAGGER_S);
-  const blocks: Block[] = lead > 0 ? [{ state: "idle", duration: lead }] : [];
-  for (let loop = 0; loop < LOOPS; loop += 1) {
-    blocks.push({ state: face, duration: WAVE_S }, { state: "idle", duration: LOOP_S - WAVE_S });
-  }
-  return blocks;
-}
-
-const HOPPERS = HOPPER_LOOKS.map((look, index) => ({
-  index,
-  profile: bloubAvatarProfile(look.seed, look.hue),
-  cycle: hopperCycle(index, look.face),
-}));
-const SLEEPER = bloubAvatarProfile("crew-sleeper", 185);
-
-function cycleLength(blocks: readonly Block[]): number {
-  return blocks.reduce((total, block) => total + block.duration, 0);
-}
-
-// Three small scribbled "z" marks that float up from the sleeper's head, one after the other.
-const Z_POINTS = "1.5 1.5 8.5 1.5 1.5 8.5 8.5 8.5";
-const SNORE_MARKS = [0, 1, 2];
-
 /*
- * The screens on one page share one clock. The `/app` page shows a screen while the web client's code
- * loads, and the web client then shows its own. The second screen continues the loop of the first,
- * so the crew does not start again at the handoff.
+ * The screens on one page share one pile. The `/app` page shows a screen while the web client's code
+ * loads, and the web client then shows its own. The second screen continues the pile of the first,
+ * so the crew do not fall again at the handoff. Only the first screen that still waits moves the
+ * pile. A screen that is ready while another screen still shows the pile only fades: it hands the pile
+ * to the next screen, which makes the hop when it is ready. A pile whose crew started to hop out is
+ * not shared again: a new screen gets a new pile.
  */
 const HANDOFF_MS = 1000;
-const sharedClock = { start: 0, screens: 0, lastUnmount: Number.NEGATIVE_INFINITY };
 
-/** The clock time in seconds for a screen that mounts now. A new run starts when no screen is shown. */
-function clockTime(now: number): number {
-  if (sharedClock.screens === 0 && now - sharedClock.lastUnmount > HANDOFF_MS) sharedClock.start = now;
-  return (now - sharedClock.start) / 1000;
+interface PileRun {
+  pile: CrewPile;
+  /** When the run started, from `performance.now()`. */
+  start: number;
+  /** The screens that show this pile, in mount order. */
+  screens: object[];
+  /** The screens that are ready and gave the pile to the next screen. */
+  handedOver: Set<object>;
+  leaving: boolean;
+  /** A screen of this run turned off the quick exit, so the screens after it also make the hop. */
+  playThrough: boolean;
 }
 
-/** Keeps the run going while this screen is shown. Returns the cleanup that ends it. */
-function joinClock(): () => void {
-  sharedClock.screens += 1;
-  return () => {
-    sharedClock.screens -= 1;
-    sharedClock.lastUnmount = performance.now();
+interface PileSeat {
+  pile: CrewPile;
+  start: number;
+  owns: () => boolean;
+  /** No other screen that still waits shows this pile, so its crew can hop out. */
+  alone: () => boolean;
+  /** This screen is ready and fades: the next screen moves the pile and makes the hop. */
+  handOver: () => void;
+  /** The crew hop out also when the app is ready at once. */
+  playThrough: () => boolean;
+  /** The crew hop out: no new screen can show this pile. */
+  hopOut: () => void;
+  leave: () => void;
+}
+
+const shared: { run: PileRun | undefined; lastUnmount: number } = {
+  run: undefined,
+  lastUnmount: Number.NEGATIVE_INFINITY,
+};
+
+function newRun(seed: number, reduced: boolean, now: number): PileRun {
+  // The screen fits the pile to its own size before the pile moves. The window is the best guess.
+  const room = typeof window === "undefined" ? undefined : { width: window.innerWidth, height: window.innerHeight };
+  return {
+    pile: new CrewPile(seed, reduced, room),
+    start: now,
+    screens: [],
+    handedOver: new Set(),
+    leaving: false,
+    playThrough: false,
   };
 }
 
-function snapToFrame(seconds: number): number {
-  return Math.floor(seconds * CREW_FPS) / CREW_FPS;
+/** A pile for a screen that mounts now. A screen with its own seed gets its own pile. */
+function takeSeat(seed: number | undefined, reduced: boolean, playThrough: boolean): PileSeat {
+  const now = performance.now();
+  let run: PileRun;
+  if (seed !== undefined) {
+    run = newRun(seed, reduced, now);
+  } else {
+    const last = shared.run;
+    const recent = last && (last.screens.length > 0 || now - shared.lastUnmount <= HANDOFF_MS);
+    const reusable = last && !last.leaving && last.pile.reduced === reduced;
+    run = last && recent && reusable ? last : newRun(randomCrewSeed(), reduced, now);
+    shared.run = run;
+  }
+  const token = {};
+  run.screens.push(token);
+  if (playThrough) run.playThrough = true;
+  // The screens that still wait. When all are ready, the first screen keeps the pile.
+  const waiting = () => run.screens.filter((screen) => !run.handedOver.has(screen));
+  return {
+    pile: run.pile,
+    start: run.start,
+    owns: () => (waiting()[0] ?? run.screens[0]) === token,
+    alone: () => waiting().length === 1,
+    handOver: () => {
+      run.handedOver.add(token);
+    },
+    playThrough: () => run.playThrough,
+    hopOut: () => {
+      run.leaving = true;
+    },
+    leave: () => {
+      run.screens = run.screens.filter((screen) => screen !== token);
+      run.handedOver.delete(token);
+      shared.lastUnmount = performance.now();
+    },
+  };
 }
 
+type Phase = "loading" | "fade" | "exit";
+
 export interface AppLoadingScreenProps {
-  /** The app is ready: the crew jumps out and the screen fades. Remove the screen in `onExited`. */
-  ready?: boolean;
-  onExited?: () => void;
-  /** Stop the clock and show the frame at this time, in seconds. */
-  at?: number;
+  /** The app is ready: the crew hop out and the screen fades. Remove the screen in `onExited`. */
+  ready?: boolean | undefined;
+  onExited?: (() => void) | undefined;
+  /**
+   * Heavy views can mount now. The screen still covers the window, and the compositor keeps the crew
+   * moving while the views mount. The crew hop out on the first frame after. A screen without the hop
+   * calls this when its fade starts: the compositor runs the fade.
+   */
+  onMountViews?: (() => void) | undefined;
+  /** `pile` is the crew pile-up. `thinking` is the lilac plush with its three balls. */
+  scene?: "pile" | "thinking";
+  /** The same seed always makes the same crew, for a story. The default is a new crew each run. */
+  seed?: number;
   /** What the screen waits for, for a screen reader. The default is the app load. */
   label?: string;
+  /** The line under the plush in the `thinking` scene. The default is a joke status line that changes. */
   title?: string;
-  detail?: string;
-  /** The code of the failure in `detail`, for a user to copy into a report. */
-  reference?: string | null;
-  actions?: JSX.Element;
-  /** Content under the actions, such as an offer that the wait makes useful. */
-  footer?: JSX.Element;
+  /**
+   * When false, the crew rain in and hop out also when the app is ready at once, as on a window reload.
+   * The default only fades a screen that was ready quickly.
+   */
+  quickExit?: boolean;
 }
 
 export function AppLoadingScreen(props: AppLoadingScreenProps) {
   const { t } = useText();
-  // A screen stays in one mode: it shows one frame or it plays.
-  const scrub = untrack(() => props.at !== undefined);
-  const mountedAt = scrub ? 0 : snapToFrame(clockTime(performance.now()));
-  const [clock, setClock] = createSignal(mountedAt);
   const reducedMotion = prefersReducedMotion();
-  const bots: Array<{ ref: BloubBotRef; length: number }> = [];
-  const seconds = () => props.at ?? clock();
-  const status = () => STATUS_LINES[Math.floor(seconds() / STATUS_EVERY_S) % STATUS_LINES.length] ?? STATUS_LINES[0];
-  // The clock stops when the app is ready, so the exit that it selects cannot change.
-  const phase = () => {
-    if (!props.ready) return "loading";
-    return seconds() < QUICK_EXIT_S ? "fade" : "exit";
-  };
-  let frameRequest = 0;
-  let stopped = false;
+  // A screen keeps its scene and its pile.
+  const pileScene = untrack(() => props.scene !== "thinking");
+  const seat = pileScene
+    ? takeSeat(
+        untrack(() => props.seed),
+        reducedMotion,
+        untrack(() => props.quickExit === false),
+      )
+    : undefined;
+  // A screen can be disposed before it settles, so the seat is given back on cleanup.
+  onCleanup(() => seat?.leave());
+  const start = seat?.start ?? performance.now();
+  const age = () => (performance.now() - start) / 1000;
+  const mountedAt = age();
+  const [clock, setClock] = createSignal(mountedAt);
+  const [phase, setPhase] = createSignal<Phase>("loading");
+  const status = () => STATUS_LINES[Math.floor(clock() / STATUS_EVERY_S) % STATUS_LINES.length] ?? STATUS_LINES[0];
+  let statusTimer: ReturnType<typeof setTimeout> | undefined;
   let exitTimer: ReturnType<typeof setTimeout> | undefined;
+  let rainTimer: ReturnType<typeof setTimeout> | undefined;
+  let hopFrame = 0;
   let exited = false;
+  let viewsMounted = false;
+  // The app is ready and the crew will hop out.
+  let hopWanted = false;
+  const [hop, setHop] = createSignal(false);
+  const [fadeDelay, setFadeDelay] = createSignal(EXIT_FADE_DELAY_MS);
   let root: HTMLElement | undefined;
+
+  function mountViews(): void {
+    if (viewsMounted) return;
+    viewsMounted = true;
+    props.onMountViews?.();
+  }
 
   function finishExit(): void {
     if (exited) return;
     exited = true;
     clearTimeout(exitTimer);
+    mountViews();
     props.onExited?.();
   }
 
-  function stopClock(): void {
-    stopped = true;
-    cancelAnimationFrame(frameRequest);
-  }
-
-  function addBot(cycle: readonly Block[]) {
-    return (ref: BloubBotRef) => bots.push({ ref, length: cycleLength(cycle) });
-  }
-
-  createEffect(seconds, (time) => {
-    if (reducedMotion) return;
-    for (const bot of bots) bot.ref.renderAt(time % bot.length);
+  // The effect runs after the DOM shows the new phase, so the computed style has its animation.
+  createEffect(phase, (current) => {
+    if (current !== "fade" && current !== "exit") return;
+    // Without the stylesheet, or in a test DOM, the exit does not animate: end the screen now.
+    if (root && !getComputedStyle(root).animationName.includes(EXIT_ANIMATION)) queueMicrotask(finishExit);
   });
 
   createEffect(
     () => props.ready,
     (ready) => {
-      if (!ready) return;
-      stopClock();
-      exitTimer ??= setTimeout(finishExit, EXIT_LIMIT_MS);
-      // Without the stylesheet, or in a test DOM, the exit does not animate: end the screen now.
-      if (root && !getComputedStyle(root).animationName.includes(EXIT_ANIMATION)) queueMicrotask(finishExit);
+      if (!ready || untrack(phase) !== "loading" || hopWanted) return;
+      clearTimeout(statusTimer);
+      const quick = !seat?.playThrough() && age() < QUICK_EXIT_S;
+      const hopOut = seat && !reducedMotion && seat.owns() && seat.alone() && !quick;
+      const rainLeft = hopOut ? Math.max(0, MIN_RAIN_S - age()) * 1000 : 0;
+      exitTimer ??= setTimeout(finishExit, rainLeft + EXIT_LIMIT_MS);
+      if (seat && !hopOut && !seat.alone()) seat.handOver();
+      if (!hopOut) {
+        setPhase("fade");
+        return;
+      }
+      // No new screen joins this pile. After the minimum rain, the heavy views mount while the
+      // compositor plays the pile, and the crew hop out on the first frame after the mount.
+      seat.hopOut();
+      hopWanted = true;
+      rainTimer = setTimeout(() => {
+        mountViews();
+        hopFrame = requestAnimationFrame(() => setHop(true));
+      }, rainLeft);
     },
   );
 
+  /** The rest of the rain plays fast, then the crew hop out. The screen fades while they hop. */
+  function handleHop(started: CrewHop): void {
+    if (untrack(phase) !== "loading") return;
+    setFadeDelay(started.delay + EXIT_FADE_DELAY_MS);
+    setPhase("exit");
+    clearTimeout(exitTimer);
+    exitTimer = setTimeout(finishExit, started.delay + EXIT_LIMIT_MS);
+  }
+
+  // The status line changes at each step of the run's clock, so screens on one pile show the same line.
   onSettled(() => {
-    if (scrub) return () => clearTimeout(exitTimer);
-    const leaveClock = joinClock();
-    const start = performance.now();
-    const tick = (now: number) => {
-      frameRequest = requestAnimationFrame(tick);
-      // Snap to whole frames, so a given time always draws the same frame.
-      setClock(snapToFrame(mountedAt + Math.max(0, now - start) / 1000));
+    const next = () => {
+      const now = age();
+      setClock(now);
+      statusTimer = setTimeout(next, (STATUS_EVERY_S - (now % STATUS_EVERY_S)) * 1000 + 16);
     };
-    if (!stopped) frameRequest = requestAnimationFrame(tick);
+    if (!props.ready && !pileScene) next();
     return () => {
-      stopClock();
+      clearTimeout(statusTimer);
       clearTimeout(exitTimer);
-      leaveClock();
+      clearTimeout(rainTimer);
+      cancelAnimationFrame(hopFrame);
     };
   });
+
+  // A screen without the hop lets heavy views mount when its fade starts.
+  function handleAnimationStart(event: AnimationEvent): void {
+    if (event.animationName === EXIT_ANIMATION && event.target === event.currentTarget) mountViews();
+  }
 
   function handleAnimationEnd(event: AnimationEvent): void {
     if (event.animationName === EXIT_ANIMATION && event.target === event.currentTarget) finishExit();
@@ -196,80 +275,28 @@ export function AppLoadingScreen(props: AppLoadingScreenProps) {
         root = element;
       }}
       class="app-loading"
-      style={{
-        "--app-loading-wave": `${WAVE_S}s`,
-        "--app-loading-stagger": `${HOP_STAGGER_S}s`,
-        "--app-loading-at": `${props.at ?? mountedAt}s`,
-      }}
+      style={{ "--app-loading-at": `${mountedAt}s`, "--app-loading-exit-delay": `${fadeDelay()}ms` }}
+      data-scene={pileScene ? "pile" : "thinking"}
       data-phase={phase()}
-      data-scrub={scrub ? "true" : undefined}
       role="status"
       aria-live="polite"
       aria-busy={props.ready ? "false" : "true"}
+      onAnimationStart={handleAnimationStart}
       onAnimationEnd={handleAnimationEnd}
     >
       <span class="sr-only">{props.label ?? t("webClient.loading")}</span>
       <div class="app-loading-stage">
-        <div class="app-loading-row" aria-hidden="true">
-          <For each={HOPPERS}>
-            {(hopper) => (
-              <div class="app-loading-agent" style={{ "--app-loading-index": hopper.index }}>
-                <div class="app-loading-body">
-                  <BloubBot
-                    size={100}
-                    shape={hopper.profile.shape}
-                    color={hopper.profile.color}
-                    expression={hopper.profile.expression}
-                    cycle={hopper.cycle}
-                    frozenAt={0}
-                    ref={addBot(hopper.cycle)}
-                    ariaLabel=""
-                    class="app-loading-bot"
-                  />
-                </div>
-              </div>
-            )}
-          </For>
-          <div class="app-loading-agent" data-sleeper="true">
-            <div class="app-loading-snore">
-              <For each={SNORE_MARKS}>
-                {(mark) => (
-                  <span class="app-loading-z" style={{ "--app-loading-z-index": mark }}>
-                    <svg class="app-loading-z-mark" viewBox="0 0 10 10" aria-hidden="true">
-                      <polyline points={Z_POINTS} />
-                    </svg>
-                  </span>
-                )}
-              </For>
-            </div>
-            {/* The clock does not draw the sleeper: `idle` blinks, and a blink on a sleepy face looks
-                like a twitch. It keeps its first pose, and only its CSS breath moves it. */}
-            <div class="app-loading-body">
-              <BloubBot
-                size={100}
-                shape={SLEEPER.shape}
-                color={SLEEPER.color}
-                expression="somnolent"
-                frozenAt={0}
-                ariaLabel=""
-                class="app-loading-bot"
-              />
-            </div>
-          </div>
-        </div>
-        <p class="app-loading-status">
-          {props.title ?? <For each={[status()]}>{(line) => <span class="app-loading-line">{t(line)}</span>}</For>}
-        </p>
-        {props.detail && <p class="server-connection-detail">{props.detail}</p>}
-        <ErrorReference reference={props.reference} />
-        {props.actions && <div class="server-connection-actions">{props.actions}</div>}
-        {props.footer}
+        {seat ? (
+          <CrewPileStage pile={seat.pile} start={seat.start} hop={hop()} onHop={handleHop} />
+        ) : (
+          <PlushLoader layout="stack" size={THINKING_SIZE} />
+        )}
+        {!pileScene && (
+          <p class="app-loading-status">
+            {props.title ?? <For each={[status()]}>{(line) => <span class="app-loading-line">{t(line)}</span>}</For>}
+          </p>
+        )}
       </div>
     </main>
   );
 }
-
-/** The length of the crew's loop in seconds, for a story that shows one frame. */
-export const APP_LOADING_LOOP_S = LOOP_S;
-/** The frame rate of the crew's clock, for a story that shows one frame. */
-export const APP_LOADING_FPS = CREW_FPS;

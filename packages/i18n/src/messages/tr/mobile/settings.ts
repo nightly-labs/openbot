@@ -69,9 +69,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "Uygulamanın tamamında hareketi azaltmak için “Animasyonlar” ayarını kapatın. Telefon ayarlarında “Hareketi Azalt” açıkken uygulama da hareketi azaltır. Bu durumda aşağıdaki animasyonlar kapalı kalır.",
   "mobile.settings.animations.all": "Animasyonlar",
-  "mobile.settings.animations.chatZoom": "Sohbetlere yakınlaştır",
-  "mobile.settings.animations.chatZoomFooter":
-    "Sohbet, listedeki avatarından açılır ve kapanınca ona geri döner. Kapalıyken sohbet yandan kayarak açılır.",
   "mobile.settings.animations.agentFaces": "Hareketli ajan yüzleri",
   "mobile.settings.animations.agentFacesFooter":
     "Ajanlar çalışırken ve dinlenirken avatarlarının yüzleri hareket eder. Kapalıyken yüzler sabit kalır.",
@@ -120,7 +117,6 @@ export const messages = {
     "Bildirimler ve Canlı Etkinlik bu sesi çalar. Canlı Etkinlik ekranı da açar. OpenBot sesi, masaüstü uygulamasının bir görev bittiğinde çaldığı sestir. Sonraki dört ses, masaüstü uygulamasının ses temalarının sesleridir.",
   "mobile.settings.notifications.soundFooterAndroid":
     "Bildirimler bu sesi çalar. OpenBot sesi, masaüstü uygulamasının bir görev bittiğinde çaldığı sestir. Sonraki dört ses, masaüstü uygulamasının ses temalarının sesleridir.",
-  "mobile.settings.notifications.notifyAbout": "Şunun hakkında bildir",
   "mobile.settings.notifications.level.all": "Tüm etkinlikler",
   "mobile.settings.notifications.level.needsMe": "Yalnızca bana ihtiyaç duyduğunda",
   "mobile.settings.notifications.level.nothing": "Hiçbir şey",
@@ -137,12 +133,29 @@ export const messages = {
     "Bu sunucunun bu telefona bildirdiği olaylar. Masaüstü uygulamasının kendi ayarları vardır.",
   "mobile.settings.notifications.serverUnsupported":
     "Bu sunucu bildirim gönderemez. Sunucuyu çalıştıran bilgisayardaki OpenBot'u güncelleyin.",
+  "mobile.settings.notifications.thisPhone": "Bu telefon",
+  "mobile.settings.notifications.whatYouHear": "Neler hakkında bildirim alırsın",
+  "mobile.settings.notifications.wholeServer": "Tüm sunucu",
+  "mobile.settings.notifications.levelShort.all": "Tümü",
+  "mobile.settings.notifications.levelShort.needsMe": "Gerekirse",
+  "mobile.settings.notifications.levelShort.nothing": "Kapalı",
+  "mobile.settings.notifications.thisPhoneOnly": "Yalnızca bu telefon",
+  "mobile.settings.notifications.offForEveryone": "Bu sunucudaki herkes için kapalı",
+  "mobile.settings.notifications.turnOn": "Aç",
+  "mobile.settings.notifications.turnOnFor": "Bu sunucudaki herkes için {name} bildirimlerini aç",
+  "mobile.settings.notifications.chooseAgent": "Bir ajan için seç",
+  "mobile.settings.notifications.chooseAnotherAgent": "Başka bir ajan seç",
+  "mobile.settings.notifications.levelsFooter": "Sunucuyu izlemesi için bir ajanın düzeyine yeniden dokun.",
+  "mobile.settings.notifications.agentsUnsupported": "Ajanları seçmek için bu sunucudaki OpenBot’u güncelle.",
+  "mobile.settings.notifications.agentsOffline": "Bu sunucu çevrimiçi olduğunda ajanlar görünür.",
+  "mobile.settings.notifications.scopeFooter":
+    "Seçimlerin tüm cihazlarında geçerlidir. Sessize alma yalnızca bu telefonda geçerlidir.",
   "mobile.settings.notifications.channel": "Ajan bildirimleri ({sound})",
   "mobile.settings.notifications.channelSilent": "Ajan bildirimleri (sessiz)",
   "mobile.settings.privacy.title": "Gizlilik",
   "mobile.settings.privacy.footer":
-    "Bu telefondan özellik kullanımını ve bağlantı sonuçlarını paylaşın. Mesaj içerikleri ve dosyalar gönderilmez.",
-  "mobile.settings.privacy.analytics": "Ürün analizlerini paylaş",
+    "Bu telefondaki özellik kullanımı ve bağlantı sonuçları her zaman OpenBot analizlerine gönderilir. Açık: hesap kimliğiniz ve e-postanızla birlikte. Kapalı: yalnızca rastgele bir kurulum kimliğiyle. Mesaj içerikleri ve dosyalar gönderilmez.",
+  "mobile.settings.privacy.analytics": "Analizleri hesabıma bağla",
   "mobile.settings.privacy.retry": "Gizlilik ayarını kaydetmeyi tekrar dene",
   "mobile.settings.conversations.title": "Konuşmalar",
   "mobile.settings.conversations.hiddenChats": "Gizli sohbetler",

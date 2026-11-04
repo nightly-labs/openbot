@@ -11,16 +11,15 @@ import { mockSkillPage } from "./mock-skills";
 import { matchesQuery } from "./mock-support";
 
 /** One page of `items`, with the search, filter and cursor of the account service's list routes. */
-function page<T extends { category?: string | undefined; featured?: boolean | undefined }>(
-  items: readonly T[],
-  params: URLSearchParams,
-  text: (item: T) => string,
-) {
+function page<
+  T extends { category?: string | undefined; featured?: boolean | undefined; verified?: boolean | undefined },
+>(items: readonly T[], params: URLSearchParams, text: (item: T) => string) {
   const matches = items.filter(
     (item) =>
       matchesQuery(text(item), params.get("query") ?? undefined) &&
       (!params.has("category") || (item.category ?? "other") === params.get("category")) &&
-      (params.get("featured") !== "true" || item.featured),
+      (params.get("featured") !== "true" || item.featured) &&
+      (!params.has("verified") || (item.verified === true) === (params.get("verified") === "true")),
   );
   const start = Number(params.get("cursor") ?? 0);
   const end = start + Number(params.get("limit") ?? 50);
@@ -55,6 +54,9 @@ function catalogResponse(path: string, params: URLSearchParams): Response {
     );
     return Response.json({ agents: items, nextCursor });
   }
+  const listing = linkedListing(path);
+  if (listing !== null)
+    return listing ? Response.json(listing) : Response.json({ error: "not_found" }, { status: 404 });
   const [, collection, id] = /^\/v1\/(skills|marketplace\/agents|agent-templates)\/([^/]+)$/.exec(path) ?? [];
   const key = id ? decodeURIComponent(id) : "";
   const body =
@@ -66,6 +68,19 @@ function catalogResponse(path: string, params: URLSearchParams): Response {
           ? STORY_AGENT_TEMPLATE_DETAIL
           : undefined;
   return body ? Response.json(body) : Response.json({ error: "not_found" }, { status: 404 });
+}
+
+/**
+ * The read a shared Marketplace link makes: an agent by id at `/listing`, or a skill by slug. Null for
+ * another path; undefined for a listing that the fixtures do not have.
+ */
+function linkedListing(path: string) {
+  const agentId = /^\/v1\/marketplace\/agents\/([^/]+)\/listing$/.exec(path)?.[1];
+  if (agentId) return STORY_MARKETPLACE_AGENT_DETAILS[decodeURIComponent(agentId)];
+  const slug = /^\/v1\/skills\/slug\/([^/]+)$/.exec(path)?.[1];
+  if (slug)
+    return Object.values(STORY_MARKETPLACE_SKILL_DETAILS).find((skill) => skill.slug === decodeURIComponent(slug));
+  return null;
 }
 
 /**

@@ -29,6 +29,7 @@ import {
   parseCodexVersion,
   parseCursorManifestVersion,
   parseGrokVersion,
+  parseKimiVersion,
   parseOpencodeVersion,
 } from "../backend/cli";
 import { sha256File } from "../backend/file-hash";
@@ -139,6 +140,23 @@ function clineTag(version: string): string {
   return `cli-v${version}`;
 }
 
+/** The one folder of a Kimi archive, which the install renames to `bin`. */
+const KIMI_ARCHIVE_ROOT = "kimi";
+
+/** The Rust-style target name in each Kimi asset. */
+const KIMI_TARGETS: Record<RuntimeTarget, string> = {
+  "darwin-arm64": "aarch64-apple-darwin",
+  "darwin-x64": "x86_64-apple-darwin",
+  "linux-x64": "x86_64-unknown-linux-gnu",
+  "linux-arm64": "aarch64-unknown-linux-gnu",
+  "win32-x64": "x86_64-pc-windows-msvc",
+};
+
+/** The PyInstaller folder build of one Kimi release for one target. The single-file build is slower to start. */
+export function kimiAssetName(version: string, target: RuntimeTarget): string {
+  return `kimi-${version}-${KIMI_TARGETS[target]}-onedir.${target === "win32-x64" ? "zip" : "tar.gz"}`;
+}
+
 /** The lock's hash for a file of a pinned version; an upstream release's file has none to compare. */
 function pinnedHash(spec: RuntimeSpec, sha256: string): string | null {
   return spec.source === "lock" ? sha256 : null;
@@ -222,6 +240,7 @@ function layoutManifest(fields: Record<string, string>): string {
 const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDescriptor> = {
   pi: nativeProviderRuntime("pi"),
   muse: nativeProviderRuntime("muse"),
+  devin: nativeProviderRuntime("devin"),
   codex: {
     runtime: "codex",
     spec: (target, lock) => {
@@ -814,6 +833,78 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
         });
     }),
     parseVersion: parseClineVersion,
+  },
+  kimi: {
+    runtime: "kimi",
+    spec: (target, lock) => {
+      const artifact = lock.kimi.artifacts[target];
+      return {
+        runtime: "kimi",
+        target,
+        version: lock.kimi.version,
+        packageVersion: lock.kimi.version,
+        source: "lock",
+        url: `${lock.kimi.repository}/releases/download/${encodeURIComponent(lock.kimi.tag)}/${artifact.asset}`,
+        archiveDigest: { algorithm: "sha256", hex: artifact.assetSha256 },
+        downloadBytes: artifact.downloadBytes,
+        installedBytes: artifact.installedBytes,
+        executableName: artifact.executable,
+      };
+    },
+    // The launcher loads Python from `_internal` beside it, so the whole folder goes to `bin/`. The
+    // macOS Python framework keeps its links: copies of the files would break its code signature.
+    // GNU tar on Linux reads no zip, so the Windows zip is read by OpenBot. The licence comes from
+    // the tagged source, as Cline's does.
+    stage: Effect.fn("ProviderRuntime.kimi.stage")(function* ({
+      spec,
+      downloadedPath,
+      staging,
+      lock,
+      downloadSmallFile,
+    }: ProviderStageContext): Effect.fn.Return<void, ProviderRuntimeFailure> {
+      const message = sourceText("error.provider.kimiArchivePath");
+      if (spec.target === "win32-x64") {
+        yield* extractZipTree(downloadedPath, staging, KIMI_ARCHIVE_ROOT, message);
+      } else {
+        yield* assertSafeArchive(downloadedPath, [KIMI_ARCHIVE_ROOT], message, { links: true });
+        yield* extractArchive(downloadedPath, staging);
+      }
+      yield* rejectNonRegularFiles(staging, { links: true });
+      yield* runtimeIO(() => rename(join(staging, KIMI_ARCHIVE_ROOT), join(staging, "bin")));
+      yield* runtimeIO(() => access(join(staging, "bin", spec.executableName)));
+      const license = yield* downloadSmallFile(
+        `${lock.kimi.repository}/raw/${encodeURIComponent(spec.version)}/LICENSE`,
+        pinnedHash(spec, lock.kimi.licenseSha256),
+      );
+      yield* runtimeIO(() => writeFile(join(staging, "LICENSE"), license));
+      yield* runtimeIO(() =>
+        writeFile(
+          join(staging, "kimi-package.json"),
+          layoutManifest({ version: spec.version, target: spec.target, executable: `bin/${spec.executableName}` }),
+        ),
+      );
+    }),
+    verify: Effect.fn("ProviderRuntime.kimi.verify")(function* (
+      root: string,
+      spec: RuntimeSpec,
+      lock: AgentRuntimeLock,
+    ): Effect.fn.Return<void, ProviderRuntimeFailure> {
+      const files = Object.entries(lock.kimi.artifacts[spec.target].files);
+      const paths = [...files.map(([name]) => join(root, "bin", ...name.split("/"))), join(root, "LICENSE")];
+      const hashes = yield* Effect.forEach(paths, (path) => sha256File(path), { concurrency: "unbounded" }).pipe(
+        Effect.mapError(({ cause }) => new ProviderRuntimeFailure({ cause })),
+      );
+      if (files.some(([, sha256], index) => hashes[index] !== sha256)) {
+        return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.kimiChecksum")) });
+      }
+      if (hashes[files.length] !== lock.kimi.licenseSha256)
+        return yield* new ProviderRuntimeFailure({
+          cause: new Error(sourceText("error.provider.kimiLicenseChecksum")),
+        });
+      // A link added or changed after the install must still point inside its folder.
+      yield* rejectNonRegularFiles(join(root, "bin"), { links: true });
+    }),
+    parseVersion: parseKimiVersion,
   },
   bun: {
     runtime: "bun",

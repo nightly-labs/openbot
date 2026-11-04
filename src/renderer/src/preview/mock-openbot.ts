@@ -1,15 +1,18 @@
 import { AGENT_MEMORY_CONTEXT_BUDGET_BYTES, essentialMemoryBytes } from "@openbot/contracts/agent-memory-context";
 import type {
   AcpRegistryEntry,
+  AgentProviderRef,
   AgentSessionSettings,
   HiddenAgentsSnapshot,
   McpSignInApp,
   McpSignInAppState,
+  ServerNotificationLevel,
 } from "@openbot/contracts/ipc";
 import {
   type AccountUsage,
   AGENT_DEFAULT_KEYS,
   AGENT_FOLDER_LIMIT,
+  AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
   type AgentAccessChange,
   type AgentBrowserProfile,
   type AgentDefaults,
@@ -17,6 +20,7 @@ import {
   type AgentExclusionChange,
   type AgentFolderChange,
   type AgentFolderList,
+  type AgentInstructionsFile,
   type AgentMemory,
   type AgentMemoryLimitPreference,
   type AgentMemorySelection,
@@ -39,13 +43,17 @@ import {
   type AppSetupState,
   type AttachmentImportEvent,
   type AvatarHue,
+  agentAccessAuditChanges,
   agentAutoApprovalEnabled,
   agentAutomationAllowed,
   agentBrowserProfile,
   agentComputerUseEnabled,
   agentExclusionCoverage,
   agentFolderCoverage,
+  agentNewChatAllowed,
+  agentQuickAcknowledgementEnabled,
   agentTaskLimit,
+  type BackgroundProcess,
   type BrowserProfileSummary,
   type BusyMessageModePreference,
   type CentralAuthState,
@@ -70,6 +78,7 @@ import {
   DEFAULT_APP_LOGO_COLOR,
   DEFAULT_APPROVAL_AUTOMATION_PREFERENCE,
   DEFAULT_BUSY_MESSAGE_MODE,
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   DEFAULT_EXTERNAL_LINK_PREFERENCE,
   DEFAULT_MACHINE_ALERT_SETTINGS,
@@ -100,6 +109,7 @@ import {
   isMemoryReviewInterval,
   isPromptCacheTtl,
   isReleasedRoutineSchedule,
+  LOCAL_SERVER_ID,
   type MachineAlertSettings,
   type MacPermissionId,
   type MemoryReviewPreference,
@@ -113,7 +123,9 @@ import {
   type PromptCacheTtlSetting,
   type ProviderAccountStatus,
   type ProviderDetectionSettings,
+  type ProviderModelVisibility,
   parseAgentAccessChange,
+  parseProviderModelVisibilityChange,
   type QueueDelivery,
   type QueuedMessageReceipt,
   type QueueSnapshot,
@@ -128,12 +140,14 @@ import {
   type RoutineRun,
   type RoutineSchedule,
   type SendMessageInput,
+  type ServerAuditEntry,
   type SetAgentAvatarInput,
   type SetMessageReactionInput,
   type SharedTable,
   SIDEBAR_PEOPLE_SECTION_ID,
   SIDEBAR_UNASSIGNED_SECTION_ID,
   type SidebarLayoutSnapshot,
+  type SidebarPinsSnapshot,
   type SteerQueuedMessageInput,
   sameCustomProviderOrigin,
   type TeamPresenceSnapshot,
@@ -172,7 +186,9 @@ import {
   STORY_MARKETPLACE_AGENTS,
   STORY_MCP_SERVERS,
   STORY_MODELS,
+  STORY_PRESENCE,
   STORY_QUEUES,
+  STORY_SERVER_AUDIT_ENTRIES,
   STORY_SHARED_TABLES,
   STORY_SNAPSHOTS,
   STORY_UPDATE_STATUS,
@@ -191,6 +207,7 @@ import { createMockHostTimezone } from "./mock-host-timezone";
 import { createMockHostUpdate, type MockHostUpdateOptions } from "./mock-host-update";
 import { createMockHostedServers } from "./mock-hosted-servers";
 import { createMockLicense } from "./mock-license";
+import { createMockLinkAccount } from "./mock-link-account";
 import { createMockMessaging } from "./mock-messaging";
 import { createMockOnePasswordConnector } from "./mock-onepassword-connector";
 import { createMockProviderRuntimes, type MockProviderRuntimeOptions } from "./mock-provider-runtimes";
@@ -218,6 +235,8 @@ export interface MockOpenBotOptions
     MockRoutineResultsOptions {
   appInfo?: AppInfo;
   analyticsPreference?: AnalyticsPreference;
+  /** The first value of the first-run analytics box. Clear, as in a region that asks for consent. */
+  analyticsDefault?: boolean;
   languagePreference?: AppLanguagePreference;
   setupState?: AppSetupState;
   agentStatus?: AgentStatus;
@@ -305,7 +324,7 @@ function mockTurnTrace(turnId: string, endedAt: Date): ConversationTurnTrace {
 /** Custom models compose as `<provider>/<model>`; preview builds `listModels()` from these. */
 function mockCustomProviderModels(provider: CustomProviderSummary): ClientAgentModelOption[] {
   return provider.models.map((model) => ({
-    provider: "opencode",
+    provider: provider.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
     id: composedCustomModelId(provider.id, model.id),
     name: `${provider.name}/${model.name}`,
     description: `Served by ${provider.baseUrl}.`,
@@ -400,6 +419,25 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     options.setupState ?? { completed: true, preferredProvider: "codex", preferredModel: null },
   );
   const grantedComputerUsePermissions = new Set<MacPermissionId>();
+  // A dev server that an agent left running two hours ago, and one with no owner. Stop removes it.
+  let backgroundProcesses: BackgroundProcess[] = [
+    {
+      id: "48210:1",
+      pid: 48210,
+      command: "node /mock/OpenBot/Agents/research/site/node_modules/.bin/vite --port 5173",
+      startedAt: Date.now() - 2 * 60 * 60_000,
+      ports: [5173],
+      agentId: "research",
+    },
+    {
+      id: "51377:1",
+      pid: 51377,
+      command: "python3 -m http.server 8000",
+      startedAt: Date.now() - 3 * 24 * 60 * 60_000,
+      ports: [8000],
+      agentId: null,
+    },
+  ];
   const computerUseState = (): ComputerUseState => {
     const permissions = (["screen-recording", "accessibility"] as const).map((id) => ({
       id,
@@ -420,7 +458,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   // The disk level is below the preview disk use (82%), so Storage shows a passed level.
   let machineAlerts: MachineAlertSettings = { ...DEFAULT_MACHINE_ALERT_SETTINGS, diskPercent: 80 };
   let promptCacheTtl: PromptCacheTtlSetting = { ...DEFAULT_PROMPT_CACHE_TTL };
+  /** The models each provider's picker shows, after the user changed the list. Unchanged providers show all. */
+  const shownModels = new Map<string, readonly string[]>();
   let agentAccess: AgentAccessChange = { revision: 0, everyone: {}, roles: [] };
+  let serverAudit: ServerAuditEntry[] = clone(STORY_SERVER_AUDIT_ENTRIES);
   const agentMemoryLimitListeners = new Set<(preference: AgentMemoryLimitPreference) => void>();
   let remoteSessionReuse: RemoteSessionReusePreference = { ...DEFAULT_REMOTE_SESSION_REUSE_PREFERENCE };
   let externalLinks: ExternalLinkPreference = clone(DEFAULT_EXTERNAL_LINK_PREFERENCE);
@@ -439,6 +480,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let appearancePreference: AppAppearancePreference = {
     appearance: DEFAULT_APP_APPEARANCE,
     transparentWindow: DEFAULT_TRANSPARENT_WINDOW,
+    palette: null,
+    palettes: [],
   };
   const appearanceListeners = new Set<(preference: AppAppearancePreference) => void>();
   let interfaceSizePreference: AppInterfaceSizePreference = { percent: DEFAULT_APP_INTERFACE_SIZE };
@@ -467,6 +510,18 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     return agentStatus;
   };
   let agents = clone(options.agents ?? STORY_AGENT_SUMMARIES);
+  /** The levels of the preview user on each server, kept for the session as each host keeps them. */
+  const agentNotificationLevels = new Map<string, Map<string, ServerNotificationLevel>>();
+  const notificationLevelsOf = (serverId: string | undefined) => {
+    const key = serverId ?? LOCAL_SERVER_ID;
+    const levels = agentNotificationLevels.get(key) ?? new Map<string, ServerNotificationLevel>();
+    agentNotificationLevels.set(key, levels);
+    return levels;
+  };
+  const notificationLevelsSnapshot = (levels: ReadonlyMap<string, ServerNotificationLevel>) => ({
+    server: null,
+    agents: [...levels].map(([agentId, level]) => ({ agentId, level })),
+  });
   // Two profiles, so the agent select and the manage dialog show a list. "Client B" has no agents.
   let browserProfiles: { id: string; name: string; hue: AvatarHue }[] = [
     { id: "0a1b2c3d4e5f60718293a4b5c6d7e8f9", name: "Client A", hue: 215 },
@@ -552,6 +607,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     redirectUrl: "http://127.0.0.1:28417/mcp-auth",
     app: mcpSignInApps[mcpServerId] ?? null,
   });
+  let sidebarPins: SidebarPinsSnapshot = { items: [], updatedAt: null };
   let sidebarLayout: SidebarLayoutSnapshot = clone(
     options.sidebarLayout ?? {
       revision: 0,
@@ -693,6 +749,14 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     return agent;
   }
 
+  // The instruction file of each agent, in memory. An agent with none shows an empty AGENTS.md.
+  const mockInstructionFiles = new Map<string, AgentInstructionsFile>();
+
+  function mockAgentInstructions(agentId: string): AgentInstructionsFile {
+    requireMockAgent(agentId);
+    return mockInstructionFiles.get(agentId) ?? { fileName: "AGENTS.md", exists: false, text: "" };
+  }
+
   /** The preview has no disk: a folder whose path ends in "(missing)" is not found. */
   function mockAgentFolders(agentId: string): AgentFolderList {
     const agent = requireMockAgent(agentId);
@@ -752,6 +816,24 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     return { outcome: "added", path, replaced, list: mockAgentFolders(agentId) };
   }
 
+  /** Every model the preview providers list, before the picker's model list. */
+  function allModels() {
+    return [...models, ...customProviders.flatMap(mockCustomProviderModels)].filter(
+      (model) => !agentStatus.providers?.some((row) => row.id === model.provider && row.off),
+    );
+  }
+
+  function modelVisibility(provider: AgentProviderRef): ProviderModelVisibility {
+    const listed = allModels().filter((model) => model.provider === provider);
+    const shown = shownModels.get(provider);
+    return clone({
+      provider,
+      models: listed.map((model) => ({ id: model.id, name: model.name })),
+      shown: listed.filter((model) => !shown || shown.includes(model.id)).map((model) => model.id),
+      changed: shown !== undefined,
+    });
+  }
+
   function emitAgentEvent(event: AgentEvent): void {
     emit(agentListeners, event);
   }
@@ -760,6 +842,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const taskConversations = new Map<string, ConversationSnapshot>(
     Object.entries(clone(options.taskConversations ?? {})),
   );
+  /** The branch of each `branchTask` request id, so a retry returns the same branch. */
+  const branches = new Map<string, AgentTask>();
 
   function taskList(agentId: string): AgentTasksSnapshot {
     const list = tasks.get(agentId) ?? [];
@@ -840,8 +924,29 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     return task;
   }
 
+  /** The side thread where a routine runs, made on its first run, as the host does. */
+  function routineTask(agentId: string, routine: { id: string; name: string }): AgentTask {
+    const listed = tasks.get(agentId) ?? [];
+    const existing = listed.find((task) => task.routineId === routine.id);
+    if (existing && !existing.closedAt) return existing;
+    const now = new Date().toISOString();
+    if (existing) {
+      Object.assign(existing, { state: "idle", closedAt: null, updatedAt: now });
+      emitTasks(agentId);
+      return existing;
+    }
+    const task: AgentTask = {
+      ...createTask(agentId, routine.name),
+      origin: "agent",
+      routineId: routine.id,
+    };
+    tasks.set(agentId, [task, ...listed]);
+    emitTasks(agentId);
+    return task;
+  }
+
   /** Runs one mock turn in a task: the user message, a progress line, then a short answer. */
-  function runTaskTurn(task: AgentTask, text: string): QueuedMessageReceipt {
+  function runTaskTurn(task: AgentTask, text: string, replyToMessageId: string | null = null): QueuedMessageReceipt {
     if (task.closedAt) throw new Error(sourceText("error.backend.threadArchived"));
     const deliveryId = `mock-delivery-${messageCounter++}`;
     const turnId = `mock-turn-${messageCounter++}`;
@@ -854,6 +959,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         author: "user",
         source: "user",
         text,
+        replyToMessageId,
         createdAt: new Date().toISOString(),
         status: "completed",
       },
@@ -1040,10 +1146,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     // Only a joined admin changes the setup from outside the window, and the preview has none.
     onSetupState: () => () => undefined,
     getAnalyticsPreference: async () => clone(analyticsPreference),
+    getAnalyticsDefault: async () => ({ enabled: options.analyticsDefault ?? false }),
     setAnalyticsPreference: async ({ enabled }) => {
       analyticsPreference = { enabled };
       return clone(analyticsPreference);
     },
+    onAnalyticsPreference: () => () => undefined,
     getApprovalAutomation: async () => clone(approvalAutomation),
     onApprovalAutomation: (listener) => {
       approvalAutomationListeners.add(listener);
@@ -1114,7 +1222,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     // The Storybook toolbar sets the colors of a story.
     getAppAppearancePreference: async () => clone(appearancePreference),
     setAppAppearancePreference: async (change) => {
-      appearancePreference = { ...appearancePreference, ...change };
+      const next = { ...appearancePreference, ...change };
+      // As main does, a palette id shows only while that palette is listed.
+      const listed = next.palettes.some((palette) => palette.id === next.palette);
+      appearancePreference = { ...next, palette: listed ? next.palette : null };
       for (const listener of appearanceListeners) listener(clone(appearancePreference));
       return clone(appearancePreference);
     },
@@ -1138,6 +1249,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     openChatWindow: async () => undefined,
     getChatWindows: async () => [],
     onChatWindows: () => () => undefined,
+    // Main reads Cmd + Q, and the preview has no main process.
+    onQuitShortcutHint: () => () => undefined,
     // The preview has no native page, so the overlay is never on screen and the DOM dock stays.
     browserDock: {
       publishPresentation: async () => undefined,
@@ -1171,6 +1284,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     macAutomation: {
       request: async (targets) => targets.map((target) => ({ target, status: "granted" })),
     },
+    backgroundProcesses: {
+      list: async () => clone(backgroundProcesses),
+      stop: async (id) => {
+        backgroundProcesses = backgroundProcesses.filter((process) => process.id !== id);
+      },
+    },
     computerUse: {
       getState: async () => computerUseState(),
       // The preview grants the permission the pane was opened for, because the panel's whole job is
@@ -1193,6 +1312,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     },
     openExternal: async () => undefined,
     connectProvider: async () => clone(agentStatus),
+    connectProviderInMainlandChina: async () => clone(agentStatus),
     updateProviderCli: async () => clone(agentStatus),
     refreshAgentProviders: async () => clone(agentStatus),
     // The preview runs no provider process, so a restart has nothing to wait for.
@@ -1211,7 +1331,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     cancelProviderRestart: async () => clone(agentStatus),
     // A code that never completes: the preview has no provider to finish the sign-in, so this shows
     // the waiting screen and leaves it there. Claude signs in with a code its page shows, which the
-    // user pastes back, and Cursor with a page that signs its CLI in by itself.
+    // user pastes back, Cursor with a page that signs its CLI in by itself, and Hermes with a Nous
+    // Portal code.
     startProviderCodeLogin: async (provider) =>
       provider === "claude"
         ? {
@@ -1225,16 +1346,34 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
               verificationUrl: "https://cursor.com/loginDeepControl?mode=login&redirectTarget=cli",
               expiresAt: Date.now() + 10 * 60_000,
             }
-          : {
-              kind: "code",
-              userCode: "KTQ4-B62MX",
-              verificationUrl: "https://auth.openai.com/codex/device",
-              expiresAt: Date.now() + 10 * 60_000,
-            },
+          : provider === "hermes"
+            ? {
+                kind: "code",
+                userCode: "NOUS-1234",
+                verificationUrl: "https://portal.nousresearch.com",
+                expiresAt: Date.now() + 10 * 60_000,
+              }
+            : {
+                kind: "code",
+                userCode: "KTQ4-B62MX",
+                verificationUrl: "https://auth.openai.com/codex/device",
+                expiresAt: Date.now() + 10 * 60_000,
+              },
     cancelProviderCodeLogin: async () => clone(agentStatus),
     cancelProviderSignIn: async () => clone(agentStatus),
     setProviderApiKey: async ({ provider, key }) => {
       if (!key.trim()) throw new Error("A provider key is required.");
+      // Codex keeps its key in its own login: the row says that the key is in use, and no key is stored.
+      if (provider === "codex") {
+        agentStatus = {
+          ...agentStatus,
+          providers: agentStatus.providers?.map((row) =>
+            row.id === "codex" ? { ...row, state: "available", apiKeyInUse: true } : row,
+          ),
+        };
+        emitAgentEvent({ type: "status", status: clone(agentStatus) });
+        return clone(agentStatus);
+      }
       providerApiKeys.add(provider);
       return clone(agentStatus);
     },
@@ -1279,6 +1418,22 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       emitAgentEvent({ type: "agents-changed", agents });
       return clone(
         changeProviderAccounts(provider, (accounts) => accounts.filter((account) => account.id !== accountId)),
+      );
+    },
+    signOutProvider: async (provider) => {
+      agentStatus = {
+        ...agentStatus,
+        providers: agentStatus.providers?.map((row) =>
+          row.id === provider ? { ...row, state: "sign-in-required", email: null, message: null } : row,
+        ),
+      };
+      // The other accounts stay, as on the backend.
+      return clone(
+        changeProviderAccounts(provider, (accounts) =>
+          accounts.map((account) =>
+            account.id === DEFAULT_PROVIDER_ACCOUNT_ID ? { ...account, email: null, state: "signed-out" } : account,
+          ),
+        ),
       );
     },
     // Codex gives the preview's own sign-in two usage resets; each other connected Codex account has none.
@@ -1362,6 +1517,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
     },
     githubConnector: createMockGitHubConnector(),
+    linkAccount: createMockLinkAccount(),
     onePasswordConnector: createMockOnePasswordConnector(),
     bitwardenConnector: createMockBitwardenConnector(),
     vault: createMockVault(),
@@ -1391,6 +1547,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
             hasApiKey: input.apiKey !== null,
             headerNames: input.headers.map((header) => header.name),
             models: input.models.map((model) => ({ ...model })),
+            harness: input.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
           },
         ];
         emitAgentEvent({ type: "status", status: clone(agentStatus) });
@@ -1428,6 +1585,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
                 hasApiKey: input.apiKey !== undefined || keepsKey,
                 headerNames,
                 models: input.models.map((model) => ({ ...model })),
+                harness: input.harness ?? stored.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
               }
             : provider,
         );
@@ -1551,6 +1709,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       usageResets: (provider) => api.providerUsageResets(provider),
       resetUsage: (input) => api.resetProviderUsage(input),
+      signOut: async (provider) => {
+        await api.signOutProvider(provider);
+      },
       startRelaySignIn: async () => undefined,
       startAccountRelaySignIn: async () => undefined,
       relaySignInStatus: async () => ({ page: null, result: null }),
@@ -1616,7 +1777,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           (agent) =>
             matchesQuery(`${agent.name} ${agent.title} ${agent.description} ${agent.creatorName}`, query?.query) &&
             (!query?.category || (agent.category ?? "other") === query.category) &&
-            (query?.featured !== true || agent.featured),
+            (query?.featured !== true || agent.featured) &&
+            (query?.verified === undefined || (agent.verified === true) === query.verified),
         );
         const start = Number(query?.cursor ?? 0);
         const end = start + (query?.limit ?? 50);
@@ -1627,6 +1789,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       get: async (listingId) => {
         const detail = STORY_MARKETPLACE_AGENT_DETAILS[listingId];
+        if (!detail) throw new Error("Agent not found");
+        return clone(detail);
+      },
+      getListing: async (agentId) => {
+        const detail = STORY_MARKETPLACE_AGENT_DETAILS[agentId];
         if (!detail) throw new Error("Agent not found");
         return clone(detail);
       },
@@ -1779,9 +1946,14 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       // respawned OpenCode would: it lists what its config names and nothing else.
       listModels: async (serverId) =>
         clone([
-          ...[...models, ...customProviders.flatMap(mockCustomProviderModels)].filter(
-            (model) => !agentStatus.providers?.some((row) => row.id === model.provider && row.off),
-          ),
+          ...allModels().filter((model) => {
+            const shown = shownModels.get(model.provider);
+            return (
+              !shown ||
+              shown.includes(model.id) ||
+              agents.some((agent) => agent.provider === model.provider && agent.model === model.id)
+            );
+          }),
           ...(serverId === storyForeignServerId ? [STORY_FOREIGN_MODEL] : []),
         ]),
       listAgents: async (serverId) =>
@@ -1799,6 +1971,16 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         emitAgentEvent({ type: "hidden-agents-changed", agents: snapshot.agents });
         emitAgentEvent({ type: "agents-changed", agents });
         return snapshot;
+      },
+      listAgentNotificationLevels: async (serverId) => notificationLevelsSnapshot(notificationLevelsOf(serverId)),
+      setAgentNotificationLevel: async ({ agentId, level }, serverId) => {
+        const known = serverId === storyForeignServerId ? [...agents, STORY_FOREIGN_AGENT] : agents;
+        if (!known.some((agent) => agent.id === agentId))
+          throw new Error(sourceText("error.agent.unknown", { id: agentId }));
+        const levels = notificationLevelsOf(serverId);
+        if (level === null) levels.delete(agentId);
+        else levels.set(agentId, level);
+        return notificationLevelsSnapshot(levels);
       },
       readAgentSessionSettings: async (agentId) => clone(previewSessionSettings(agentId)),
       setAgentSessionSetting: async ({ agentId, settingId, value }) => {
@@ -1863,7 +2045,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       listAgentFolders: async (agentId) => mockAgentFolders(agentId),
       chooseAgentFolder: async ({ agentId, replace }) =>
         addMockAgentFolder(agentId, replace ? `${replace} (found)` : "/mock/Projects/Leads", replace),
-      addAgentFolder: async ({ agentId, path }) => addMockAgentFolder(agentId, path),
+      addAgentFolder: async ({ agentId, path, replace }) => addMockAgentFolder(agentId, path, replace),
       addDroppedAgentFolder: async (agentId, folder) => addMockAgentFolder(agentId, `/mock/Dropped/${folder.name}`),
       removeAgentFolder: async ({ agentId, path }) => {
         const agent = requireMockAgent(agentId);
@@ -1885,6 +2067,31 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         );
         return { outcome: "included", path, list: mockAgentFolders(agentId) };
       },
+      // A small host tree for the folder browser of a joined server.
+      browseAgentFolders: async ({ path }) => {
+        const home = "/mock";
+        const folder = path ?? home;
+        const names = folder === home ? ["Documents", "Projects"] : [];
+        return {
+          path: folder,
+          parentPath: folder === "/" ? null : folder.slice(0, folder.lastIndexOf("/")) || "/",
+          entries: names.map((name) => ({ name, path: `${folder}/${name}` })),
+          truncated: false,
+          home,
+          volumes: [],
+        };
+      },
+      readAgentInstructions: async (agentId) => mockAgentInstructions(agentId),
+      saveAgentInstructions: async ({ agentId, text, expected }) => {
+        const current = mockAgentInstructions(agentId);
+        if (current.text !== expected) throw new Error(sourceText("error.agent.instructionsChanged"));
+        const file: AgentInstructionsFile = { fileName: current.fileName, exists: true, text };
+        mockInstructionFiles.set(agentId, file);
+        return file;
+      },
+      revealAgentInstructions: async (agentId) => {
+        requireMockAgent(agentId);
+      },
       getAgentTaskLimit: async (agentId) => {
         const agent = agents.find((candidate) => candidate.id === agentId);
         if (!agent) throw new Error("Agent not found");
@@ -1893,6 +2100,36 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       updateAgentTaskLimit: async (input) => {
         await api.agent.updateAgent(input);
         return api.agent.getAgentTaskLimit(input.agentId);
+      },
+      getAgentNewChat: async (agentId) => {
+        const agent = agents.find((candidate) => candidate.id === agentId);
+        if (!agent) throw new Error("Agent not found");
+        return { allowNewChat: agentNewChatAllowed(agent, agentDefaults) };
+      },
+      updateAgentNewChat: async (input) => {
+        await api.agent.updateAgent(input);
+        return api.agent.getAgentNewChat(input.agentId);
+      },
+      previewAgentTemplate: (agentId) => api.agentTemplates.preview(agentId),
+      publishAgentTemplate: (input) => api.agentTemplates.publish(input),
+      unpublishAgentTemplate: (agentId) => api.agentTemplates.unpublish(agentId),
+      getAgentPlanCard: async (agentId) => {
+        const agent = agents.find((candidate) => candidate.id === agentId);
+        if (!agent) throw new Error("Agent not found");
+        return { quickAcknowledgement: agentQuickAcknowledgementEnabled(agent, agentDefaults) };
+      },
+      updateAgentPlanCard: async (input) => {
+        await api.agent.updateAgent(input);
+        return api.agent.getAgentPlanCard(input.agentId);
+      },
+      getAgentFastMode: async (agentId) => {
+        const agent = agents.find((candidate) => candidate.id === agentId);
+        if (!agent) throw new Error("Agent not found");
+        return { fastMode: agent.fastMode ?? null };
+      },
+      updateAgentFastMode: async (input) => {
+        await api.agent.updateAgent(input);
+        return api.agent.getAgentFastMode(input.agentId);
       },
       listBrowserProfiles: async () => ({
         profiles: browserProfiles.map(browserProfileSummary),
@@ -1903,6 +2140,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         const hue = nextBrowserProfileHue(browserProfiles.map((profile) => profile.hue));
         const profile = { id: crypto.randomUUID().replaceAll("-", ""), name, hue };
         browserProfiles = [...browserProfiles, profile];
+        emitAgentEvent({ type: "browser-profiles-changed" });
         return browserProfileSummary(profile);
       },
       updateBrowserProfile: async ({ profileId, name, hue }) => {
@@ -1910,10 +2148,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (name !== undefined) requireFreeBrowserProfileName(name, profileId);
         const next = { ...current, name: name ?? current.name, hue: hue ?? current.hue };
         browserProfiles = browserProfiles.map((profile) => (profile.id === profileId ? next : profile));
+        emitAgentEvent({ type: "browser-profiles-changed" });
         return browserProfileSummary(requireBrowserProfile(profileId));
       },
       clearBrowserData: async (input) => {
         if ("profileId" in input) requireBrowserProfile(input.profileId);
+        emitAgentEvent({ type: "browser-profiles-changed" });
       },
       deleteBrowserProfile: async (profileId) => {
         requireBrowserProfile(profileId);
@@ -1922,6 +2162,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           agent.browserProfileId === profileId ? withBrowserProfile(agent, { kind: "shared" }) : agent,
         );
         emitAgentEvent({ type: "agents-changed", agents });
+        emitAgentEvent({ type: "browser-profiles-changed" });
       },
       getAgentBrowserProfile: async (agentId) => {
         const agent = agents.find((candidate) => candidate.id === agentId);
@@ -1932,6 +2173,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (profile.kind === "profile") requireBrowserProfile(profile.profileId);
         agents = agents.map((agent) => (agent.id === agentId ? withBrowserProfile(agent, profile) : agent));
         emitAgentEvent({ type: "agents-changed", agents });
+        emitAgentEvent({ type: "browser-profiles-changed" });
         return api.agent.getAgentBrowserProfile(agentId);
       },
       listBrowserTabProfiles: async () => [],
@@ -2043,6 +2285,16 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         mcpSignInApps = rest;
         forgetMcpSignIn(mcpServerId);
         return mcpSignInAppState(mcpServerId);
+      },
+      getSidebarPins: async () => clone(sidebarPins),
+      setSidebarPins: async ({ items }) => {
+        sidebarPins = { items: clone(items), updatedAt: new Date().toISOString() };
+        emitAgentEvent({ type: "sidebar-pins-changed", ...clone(sidebarPins) });
+        return clone(sidebarPins);
+      },
+      seedSidebarPins: async ({ items }) => {
+        if (sidebarPins.updatedAt === null) sidebarPins = { items: clone(items), updatedAt: new Date().toISOString() };
+        return clone(sidebarPins);
       },
       getSidebarLayout: async () => clone(sidebarLayout),
       mutateSidebarLayout: async (action) => {
@@ -2358,6 +2610,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           input.agentId,
           (routines.get(input.agentId) ?? []).filter((routine) => routine.id !== input.routineId),
         );
+        const thread = tasks.get(input.agentId)?.find((task) => task.routineId === input.routineId);
+        if (thread && !thread.closedAt) {
+          Object.assign(thread, { state: "closed", closedAt: new Date().toISOString() });
+          emitTasks(input.agentId);
+        }
         emitAgentEvent({ type: "routines-changed", agentId: input.agentId });
       },
       testRoutine: async (input) => {
@@ -2380,6 +2637,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           updatedAt: now,
         };
         routineRuns.set(routine.id, [run, ...(routineRuns.get(routine.id) ?? [])]);
+        routineTask(input.agentId, routine);
         emitAgentEvent({ type: "routines-changed", agentId: input.agentId });
         return clone(run);
       },
@@ -2451,6 +2709,32 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (conversationReads.has(input.agentId)) conversationReads.set(input.agentId, state);
         return clone(state);
       },
+      markConversationUnread: async (input) => {
+        const { messages, revision } = getSnapshot(input.agentId);
+        const index = messages.findIndex((message) => message.id === input.fromMessageId);
+        if (index < 0) throw new Error(sourceText("error.backend.readBoundaryUnavailable"));
+        const throughMessageId = messages[index - 1]?.id ?? null;
+        conversationReads.set(input.agentId, { unreadCount: 0, firstUnreadMessageId: null, throughMessageId });
+        emitAgentEvent({ type: "conversation-invalidated", agentId: input.agentId, revision });
+        return clone(conversationReadState(input.agentId));
+      },
+      deleteConversationMessage: async (input) => {
+        if (input.taskId !== undefined) {
+          const task = findTask(input.agentId, input.taskId);
+          const conversation = taskConversation(task);
+          if (!conversation.messages.some((message) => message.id === input.messageId))
+            throw new Error(sourceText("error.backend.messageDeleteNotFound"));
+          conversation.messages = conversation.messages.filter((message) => message.id !== input.messageId);
+          conversation.revision += 1;
+          emitAgentEvent({ type: "agent-task-conversation", taskId: task.id, snapshot: clone(conversation) });
+          return;
+        }
+        if (!getSnapshot(input.agentId).messages.some((message) => message.id === input.messageId))
+          throw new Error(sourceText("error.backend.messageDeleteNotFound"));
+        updateSnapshot(input.agentId, (snapshot) => {
+          snapshot.messages = snapshot.messages.filter((message) => message.id !== input.messageId);
+        });
+      },
       chooseAttachments: async (_input) => [],
       importAttachmentData: async (data) =>
         data.map((file) => ({
@@ -2466,11 +2750,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         attachmentListeners.add(listener);
         return () => attachmentListeners.delete(listener);
       },
+      // The preview imports no files from a drop or a pick, so no import fails and waits for a retry.
+      retryAttachmentImport: () => undefined,
+      discardAttachmentImport: () => undefined,
       discardDraftAttachment: async () => undefined,
       downloadAttachments: async () => {
         throw new Error("ZIP downloads are available in the desktop app.");
       },
       openAttachment: async (_input: OpenAttachmentInput) => undefined,
+      // The preview has no joined server, so no download reports its bytes.
+      stopAttachmentDownload: async () => undefined,
+      onAttachmentDownload: () => () => undefined,
       openSharedFile: async (_input: OpenSharedFileInput) => undefined,
       openWorkspaceFile: async (_input: OpenWorkspaceFileInput) => undefined,
       previewSharedFile: async (input: OpenSharedFileInput) => mockFilePreview(input.path, "shared-file"),
@@ -2484,7 +2774,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       sendMessage: async (input: SendMessageInput) => {
         if (agents.some((agent) => agent.id === input.agentId && agent.hiddenAt !== undefined))
           throw new Error(sourceText("error.backend.recipientHidden"));
-        if (input.taskId) return runTaskTurn(findTask(input.agentId, input.taskId), input.text);
+        if (input.taskId)
+          return runTaskTurn(findTask(input.agentId, input.taskId), input.text, input.replyToMessageId ?? null);
         // As on a host, a repeated client id answers with the first receipt and stores nothing.
         const repeated = input.clientMessageId ? sentReceipts.get(input.clientMessageId) : undefined;
         if (repeated) return repeated;
@@ -2589,16 +2880,39 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
                   id: `${turnId}:plan-continuation`,
                   author: "system",
                   source: "system",
-                  text: sourceText("status.agent.planContinues", { current: 1, limit: 3 }),
+                  text: sourceText("status.agent.planContinues", { current: 1, limit: 8 }),
                   createdAt: new Date().toISOString(),
                   status: "completed",
                   itemType: PLAN_CONTINUATION_ITEM_TYPE,
                 },
               ]
             : [];
+          // A message that asks for a rule adds it to the instruction file, as a real agent does.
+          const instructionsChange: ConversationMessage[] = [];
+          if (/\brule\b/iu.test(input.text)) {
+            const before = mockAgentInstructions(input.agentId);
+            const after = `${before.text}${before.text && !before.text.endsWith("\n") ? "\n" : ""}- ${input.text.slice(0, 200)}\n`;
+            mockInstructionFiles.set(input.agentId, { ...before, exists: true, text: after });
+            instructionsChange.push({
+              id: `${turnId}:instructions-change`,
+              author: "system",
+              source: "system",
+              text: sourceText("status.agent.instructionsChanged"),
+              createdAt: new Date().toISOString(),
+              status: "completed",
+              itemType: AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
+              instructionsChange: { before: before.text, after },
+            });
+          }
           updateSnapshot(input.agentId, (snapshot) => {
             snapshot.activeTurnId = null;
-            snapshot.messages = [...snapshot.messages, assistantMessage, ...memoryMessage, ...planContinuation];
+            snapshot.messages = [
+              ...snapshot.messages,
+              assistantMessage,
+              ...memoryMessage,
+              ...instructionsChange,
+              ...planContinuation,
+            ];
           });
           queues.set(input.agentId, {
             agentId: input.agentId,
@@ -2652,6 +2966,46 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         emitAgentEvent({ type: "queue-changed", snapshot: clone(queue) });
         const task = createTask(input.agentId, delivery.text);
         runTaskTurn(task, delivery.text);
+        return clone(task);
+      },
+      branchTask: async (input) => {
+        const earlier = branches.get(input.requestId);
+        if (earlier) return clone(earlier);
+        const sourceTask = input.taskId === null ? null : findTask(input.agentId, input.taskId);
+        const source = sourceTask ? taskConversation(sourceTask) : getSnapshot(input.agentId);
+        if (source.activeTurnId) throw new Error(sourceText("error.backend.branchSourceBusy"));
+        const index = source.messages.findIndex((message) => message.id === input.messageId);
+        const chosen = source.messages[index];
+        if (chosen?.author !== "assistant" || chosen.status === "streaming") {
+          throw new Error(sourceText("error.backend.branchMessageNotFound"));
+        }
+        const messages = source.messages
+          .slice(0, index + 1)
+          .map(({ delivery: _delivery, reaction: _reaction, reactions: _reactions, ...message }) => ({
+            ...clone(message),
+            id: `mock-branch-message-${messageCounter++}`,
+          }));
+        const lastUserText = messages.findLast((message) => message.author === "user")?.text;
+        const task = createTask(
+          input.agentId,
+          sourceTask ? `${sourceTask.title} #2` : lastUserText?.trim() || sourceText("status.agent.branchTitle"),
+        );
+        const through = messages.at(-1);
+        task.branch = {
+          sourceTaskId: input.taskId,
+          sourceTitle: sourceTask?.title ?? null,
+          sourceMessageId: input.messageId,
+          throughMessageId: through?.id ?? input.messageId,
+        };
+        taskConversations.set(task.id, {
+          agentId: task.agentId,
+          threadId: task.threadId,
+          activeTurnId: null,
+          revision: 0,
+          messages,
+        });
+        branches.set(input.requestId, task);
+        emitTasks(input.agentId);
         return clone(task);
       },
       stopTask: async (input) => {
@@ -2908,6 +3262,13 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return () => undefined;
       },
     },
+    marketplace: {
+      takePendingListing: async () => null,
+      onOpenListing: (listener) => {
+        void listener;
+        return () => undefined;
+      },
+    },
     host: mockTeam.host,
     events: mockEvents,
     // Preview has one host, so every server's name and logo are this computer's.
@@ -2947,6 +3308,16 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         promptCacheTtl = { ttl };
         return clone(promptCacheTtl);
       },
+      // Preview has one host, so every server shares one model list.
+      getModelVisibility: async (provider) => modelVisibility(provider),
+      setModelVisibility: async (input) => {
+        const change = parseProviderModelVisibilityChange(input);
+        // Preview shows every model by default, so a reset forgets the list.
+        if (change.shown === null) shownModels.delete(change.provider);
+        else shownModels.set(change.provider, change.shown);
+        emitAgentEvent({ type: "status", status: clone(agentStatus) });
+        return modelVisibility(change.provider);
+      },
       // Preview has one host, and its user owns it, so `mine` gives every agent.
       getAgentAccess: async () => ({
         ...clone(agentAccess),
@@ -2955,12 +3326,25 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       setAgentAccess: async (input) => {
         const change = parseAgentAccessChange(input);
         if (change.revision !== agentAccess.revision) throw new Error(sourceText("error.team.agentAccessStale"));
+        const names = {
+          member: (id: string) => STORY_PRESENCE.members.find((member) => member.id === id)?.name ?? id,
+          agent: (id: string) => agents.find((agent) => agent.id === id)?.name ?? id,
+        };
+        const at = new Date().toISOString();
+        const actor = { id: "member-self", name: "Norbert" };
+        serverAudit = [
+          ...agentAccessAuditChanges(agentAccess, change, names)
+            .reverse()
+            .map((auditChange) => ({ id: crypto.randomUUID(), at, actor, change: auditChange })),
+          ...serverAudit,
+        ];
         agentAccess = { ...change, revision: change.revision + 1 };
         return {
           ...clone(agentAccess),
           mine: Object.fromEntries(agents.map((agent) => [agent.id, "manage" as const])),
         };
       },
+      getAuditLog: async () => ({ entries: clone(serverAudit) }),
     },
     storage: createMockStorage(),
     agentImport: {

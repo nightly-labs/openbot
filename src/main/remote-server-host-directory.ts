@@ -26,7 +26,11 @@
 
 import { verify } from "node:crypto";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
-import { followHostKeyHandovers, type HostKeySignatureCheck } from "@openbot/team-client/host-key-handover";
+import {
+  followHostKeyHandovers,
+  type HostKeySignatureCheck,
+  hostKeyChangedAt,
+} from "@openbot/team-client/host-key-handover";
 import { Effect } from "effect";
 import type { RemoteHostSummary } from "./central-auth-records";
 import type { PreservedHostIdentity, StoredRemoteServerView } from "./remote-server-store";
@@ -83,7 +87,10 @@ export interface WebRtcHostReconciliationInput {
   readonly username: string;
   /** Development only: keep HTTPS servers that the account directory does not know about. */
   readonly keepOtherTransports: boolean;
-  /** The local servers of this computer. The account directory never lists them, and they stay. */
+  /**
+   * The servers on this computer, and deleted ones that the account can still list. The account
+   * directory lists one while the desktop app has it registered, but this app keeps its loopback entry.
+   */
   readonly isThisComputer?: (serverId: string) => boolean;
   readonly isConnected: (hostId: string) => boolean;
   /** Hosts whose advertised key a verified handover chain leads to, from `followedHostKeyHandovers`. */
@@ -125,10 +132,39 @@ export const followedHostKeyHandovers = Effect.fn("RemoteHostDirectory.followedH
   return followed;
 });
 
+/**
+ * When each host last changed its key: the handover to the key that this computer uses for it, with
+ * both signatures checked. A host without such a handover has no entry. `trustedKey` gives the key
+ * that this computer uses, or null for a host it does not use.
+ */
+export const hostKeyChangeTimes = Effect.fn("RemoteHostDirectory.hostKeyChangeTimes")(function* (
+  hosts: readonly RemoteHostSummary[],
+  trustedKey: (host: RemoteHostSummary) => string | null | undefined,
+) {
+  const times = new Map<string, number>();
+  for (const host of hosts) {
+    const publicKey = trustedKey(host);
+    if (!publicKey || host.keyHandovers.length === 0) continue;
+    const changedAt = yield* hostKeyChangedAt({
+      hostId: host.hostId,
+      publicKey,
+      handovers: host.keyHandovers,
+      verify: verifyHostKeySignature,
+    });
+    if (changedAt !== null) times.set(host.hostId, changedAt);
+  }
+  return times;
+});
+
 export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebRtcHostReconciliation {
   const pinnedKeys: HostKeyPin[] = [];
   const listed = input.hosts
-    .filter((host) => host.hostId !== input.localHostId && !input.isHiddenHost(host.hostId))
+    .filter(
+      (host) =>
+        host.hostId !== input.localHostId &&
+        !input.isHiddenHost(host.hostId) &&
+        input.isThisComputer?.(host.hostId) !== true,
+    )
     .map<StoredRemoteServer>((host) => {
       const handedOver = input.followedHandovers?.has(host.hostId) === true;
       const existing = handedOver ? undefined : pinnedIdentity(input, host.hostId);

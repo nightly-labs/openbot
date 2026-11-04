@@ -1,5 +1,11 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { type AvatarHue, type ChannelDraft, type ChannelSummary, isChannelDraft } from "@openbot/contracts/ipc";
+import {
+  type AvatarColor,
+  type AvatarHue,
+  type ChannelDraft,
+  type ChannelSummary,
+  isChannelDraft,
+} from "@openbot/contracts/ipc";
 import * as Crypto from "expo-crypto";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
@@ -35,6 +41,7 @@ const MemberChoice = memo(function MemberChoice({
   serverId,
   avatarSeed,
   avatarHue,
+  avatarColor,
   selected,
   disabled,
   onToggle,
@@ -44,6 +51,7 @@ const MemberChoice = memo(function MemberChoice({
   serverId: string;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
+  avatarColor: AvatarColor | null;
   selected: boolean;
   disabled: boolean;
   onToggle: (id: string) => void;
@@ -61,7 +69,14 @@ const MemberChoice = memo(function MemberChoice({
       }}
       className="min-h-12 flex-row items-center gap-3 px-4 py-3"
     >
-      <BloubAvatarThumbnail agentId={id} serverId={serverId} seed={avatarSeed} hue={avatarHue} size={32} />
+      <BloubAvatarThumbnail
+        agentId={id}
+        serverId={serverId}
+        seed={avatarSeed}
+        hue={avatarHue}
+        color={avatarColor}
+        size={32}
+      />
       <Typography.Paragraph className="flex-1">{name}</Typography.Paragraph>
       {selected ? <Check size={18} color={accent} strokeWidth={2} /> : null}
     </Pressable>
@@ -297,6 +312,7 @@ function ChannelForm({
             serverId={agent.serverId}
             avatarSeed={agent.avatarSeed}
             avatarHue={agent.avatarHue}
+            avatarColor={agent.avatarColor}
             selected={selectedIds.has(agent.id)}
             disabled={disabled}
             onToggle={toggle}

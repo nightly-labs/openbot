@@ -19,11 +19,14 @@ export function SheetFormField({
       {!hideLabel && (
         <Typography type="body-xs" className="px-4 text-grouped-secondary">
           {label}
+          {isRequired ? " *" : ""}
         </Typography>
       )}
       <View
         className={
-          trailing ? "flex-row items-center rounded-2xl border border-border bg-grouped" : "flex-row items-center"
+          trailing
+            ? `flex-row items-center rounded-2xl bg-grouped ${appearance === "soft" ? "" : "border border-border"}`
+            : "flex-row items-center"
         }
       >
         <View className="min-w-0 flex-1">

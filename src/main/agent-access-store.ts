@@ -6,6 +6,7 @@ import {
   type AgentAccessSnapshot,
   agentAccessRank,
   parseAgentAccessChange,
+  type ServerAuditName,
   type TeamMemberSummary,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
@@ -21,6 +22,14 @@ export interface AgentAccessState {
   everyone: AgentAccessLevels;
   roles: AgentAccessRole[];
 }
+
+/** Records a replace that an owner or admin made, with the roles before and after it. */
+export type AgentAccessAudit = (
+  serverId: string,
+  before: AgentAccessState,
+  after: AgentAccessState,
+  actor: ServerAuditName | null,
+) => Effect.Effect<void>;
 
 /** A replace that named a revision other than the stored one: another admin saved first. */
 export class AgentAccessStale extends Schema.TaggedError<AgentAccessStale>()("AgentAccessStale", {}) {}
@@ -91,6 +100,17 @@ function mergeShown(
   return merged;
 }
 
+/** A copy of `state` with the levels of the agents in `agents` only. */
+function onlyAgents(state: AgentAccessState, agents: ReadonlySet<string>): AgentAccessState {
+  const only = (levels: AgentAccessLevels) =>
+    Object.fromEntries(Object.entries(levels).filter(([agentId]) => agents.has(agentId)));
+  return {
+    revision: state.revision,
+    everyone: only(state.everyone),
+    roles: state.roles.map((role) => ({ ...role, agents: only(role.agents), memberIds: [...role.memberIds] })),
+  };
+}
+
 function copyState(state: AgentAccessState): AgentAccessState {
   return {
     revision: state.revision,
@@ -127,9 +147,11 @@ export class AgentAccessStore {
   #closed = false;
   #writes = Semaphore.makeUnsafe(1);
   readonly #listeners = new Set<(serverId: string, state: AgentAccessState) => void>();
+  readonly #audit: AgentAccessAudit | undefined;
 
-  constructor(path: string) {
+  constructor(path: string, options: { audit?: AgentAccessAudit } = {}) {
     this.#path = path;
+    this.#audit = options.audit;
   }
 
   /** Returns false when the file exists and does not decode. */
@@ -158,7 +180,7 @@ export class AgentAccessStore {
 
   /**
    * Replaces the roles. `shown` names the agents that the caller can see, and `existing` all agents of
-   * the host; see `mergeShown`.
+   * the host; see `mergeShown`. `actor` is the owner or admin who made the change, for the audit log.
    */
   readonly set = Effect.fn("AgentAccessStore.set")(function* (
     this: AgentAccessStore,
@@ -166,8 +188,11 @@ export class AgentAccessStore {
     change: AgentAccessChange,
     shown: ReadonlySet<string>,
     existing: ReadonlySet<string>,
+    actor: ServerAuditName | null,
   ) {
-    return yield* this.#replace(serverId, (current) => {
+    let before: AgentAccessState | undefined;
+    const saved = yield* this.#replace(serverId, (current) => {
+      before = copyState(current);
       if (change.revision !== current.revision) return null;
       const storedRoles = new Map(current.roles.map((role) => [role.id, role]));
       return {
@@ -178,6 +203,10 @@ export class AgentAccessStore {
         })),
       };
     });
+    // A save drops the levels of a deleted agent. Nobody changed those, so the log does not show them.
+    if (before && this.#audit && saved.revision !== before.revision)
+      yield* this.#audit(serverId, onlyAgents(before, existing), onlyAgents(saved, existing), actor);
+    return saved;
   }).bind(this);
 
   /** Takes a removed member out of each role. */

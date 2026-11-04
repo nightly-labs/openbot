@@ -10,6 +10,7 @@ import type { GitHubConnectorPort } from "./github-connector-port";
 import { createMessagingConnector, type MessagingApi, type MessagingConnectorOptions } from "./messaging-connector";
 import { createOnePasswordConnector } from "./onepassword-connector";
 import { type OnePasswordConnectorPort, onePasswordConnectorPort } from "./onepassword-connector-port";
+import { createWhatsAppConnector, type WhatsAppPort } from "./whatsapp-connector";
 
 /** The connectors of one place. A connector that the place cannot reach has no controller. */
 export type ConnectorSet = Partial<Record<ConnectorId, ConnectorController>>;
@@ -20,6 +21,7 @@ export interface ConnectorTransports {
   onePassword?: () => OnePasswordConnectorPort;
   bitwarden?: () => BitwardenConnectorPort;
   messaging?: MessagingApi;
+  whatsapp?: () => WhatsAppPort;
 }
 
 /** This computer's transports, through main. */
@@ -40,6 +42,7 @@ export function createConnectorSet(transports: ConnectorTransports, options: Mes
     set.discord = createMessagingConnector("discord", messaging, options);
     set.telegram = createMessagingConnector("telegram", messaging, options);
   }
+  if (transports.whatsapp) set.whatsapp = createWhatsAppConnector(transports.whatsapp, options);
   if (transports.github) set.github = createGitHubConnector(transports.github, options.hostName);
   if (transports.onePassword) set.onepassword = createOnePasswordConnector(transports.onePassword, options.hostName);
   if (transports.bitwarden) set.bitwarden = createBitwardenConnector(transports.bitwarden, options.hostName);
@@ -106,11 +109,13 @@ export function createConnectorRegistry(
   );
   // GitHub tells its availability only after a read, so a new server is read before it can show. A
   // joined server's capabilities come after its id, so the connectors it can reach are part of the key.
+  // The key is a memo because the server summary changes while a workspace loads, and an effect runs
+  // again each time its key is computed.
   createEffect(
-    () => {
+    createMemo(() => {
       const id = server()?.id;
       return id ? `${id}:${reachable().map((controller) => controller.id)}` : undefined;
-    },
+    }),
     (key) => {
       if (key) reload();
     },

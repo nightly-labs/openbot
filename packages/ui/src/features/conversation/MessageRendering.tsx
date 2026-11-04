@@ -1,4 +1,5 @@
 import { fileReferenceName } from "@openbot/brand/file-reference";
+import { removeAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import type { AttachmentSummary, InstalledSkill, MessageReaction } from "@openbot/contracts/ipc";
 import { canPreviewAttachment, MESSAGE_REACTIONS, MORE_MESSAGE_REACTIONS } from "@openbot/contracts/ipc";
@@ -8,12 +9,17 @@ import {
   type BubbleVariant,
   Button,
   ChevronRight,
+  CircleDot,
+  ConfirmDialog,
   ContextMenu,
   DropdownMenu,
+  Hash,
   Info,
   LoaderCircle,
+  Trash2,
 } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
+import type { JSX } from "@solidjs/web";
 import {
   createEffect,
   createMemo,
@@ -28,11 +34,11 @@ import {
 } from "solid-js";
 import type { AgentMessage, AgentProfile } from "../../data";
 import { useText } from "../../text";
-import { AttachmentCards, type AttachmentMediaSource } from "./AttachmentCards";
+import { AttachmentCards, type AttachmentDownloads, type AttachmentMediaSource } from "./AttachmentCards";
 import { CodeBlock } from "./CodeBlock";
 import { CodePreview } from "./CodePreview";
 import { ComparisonTable } from "./ComparisonTable";
-import { CheckIcon, CopyIcon, PlusIcon, ReactionIcon, ReplyIcon, StopIcon } from "./ConversationIcons";
+import { BranchIcon, CheckIcon, CopyIcon, PlusIcon, ReactionIcon, ReplyIcon, StopIcon } from "./ConversationIcons";
 import { createSmoothHeightResize } from "./createSmoothHeightResize";
 import { DataTable, type MessageContentBlock, messageContentBlocks, reuseUnchangedBlocks } from "./DataTable";
 import { messageFileReferences } from "./FileReference";
@@ -308,6 +314,13 @@ export function MessageBody(props: {
   onOpenQuote?: ((messageId: string, text: string) => void) | undefined;
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
   mediaSource?: AttachmentMediaSource | undefined;
+  /** The download state of attachments from a joined server. */
+  downloads?: AttachmentDownloads | undefined;
+  /**
+   * Draws the images of the message first, outside `frame`, which wraps the rest: the text, the quote
+   * and the files. `imagesOnly` reads true when the rest is empty. Absent, the images stay in the body.
+   */
+  frame?: ((content: JSX.Element, imagesOnly: () => boolean) => JSX.Element) | undefined;
   /**
    * Reads an image file that an agent message names, for a preview under the text. Resolves the
    * image as a `data:` URL, or `null` when it cannot show. Absent, a named file is only a chip.
@@ -349,11 +362,31 @@ export function MessageBody(props: {
           .map((reference) => reference.attachment.id),
       ),
   );
+  /* The web client gets no `previewUrl`. An image that the host sent shows full size, as on desktop.
+     Each loaded image keeps one object, so a load elsewhere does not draw it again. */
+  const mediaImages = new Map<string, AttachmentSummary>();
+  const shownAttachments = createMemo(() =>
+    (props.message.attachments ?? []).map((attachment) => {
+      if (attachment.previewUrl || attachment.previewKind !== "image") return attachment;
+      const url = props.mediaSource?.url(attachment.id);
+      if (!url) return attachment;
+      const key = `${attachment.id}\0${url}`;
+      const known = mediaImages.get(key);
+      if (known) return known;
+      const shown = { ...attachment, previewUrl: url };
+      mediaImages.set(key, shown);
+      return shown;
+    }),
+  );
   const standaloneAttachments = createMemo(() => {
     const referencedIds = referencedAttachmentIds();
     const generatedAttachmentId = generatedImageShown() ? props.message.attachments?.[0]?.id : undefined;
-    return (props.message.attachments ?? []).filter(
-      (attachment) => !referencedIds.has(attachment.id) && attachment.id !== generatedAttachmentId,
+    // An image that a person's message names inline also shows as a thumbnail, as a picked image does.
+    const showsReferencedImages = props.message.author === "you";
+    return shownAttachments().filter(
+      (attachment) =>
+        (!referencedIds.has(attachment.id) || (showsReferencedImages && attachment.kind === "image")) &&
+        attachment.id !== generatedAttachmentId,
     );
   });
   /* The image files that a finished agent message names show under it like attached images. A
@@ -399,13 +432,9 @@ export function MessageBody(props: {
       };
     },
   );
-  const standaloneImageAttachments = createMemo(() =>
-    props.message.author === "agent" ? standaloneAttachments().filter(isLightboxImage) : [],
-  );
+  const standaloneImageAttachments = createMemo(() => standaloneAttachments().filter(isLightboxImage));
   const standaloneFileAttachments = createMemo(() =>
-    props.message.author === "agent"
-      ? standaloneAttachments().filter((attachment) => !isLightboxImage(attachment))
-      : standaloneAttachments(),
+    standaloneAttachments().filter((attachment) => !isLightboxImage(attachment)),
   );
   const contentBlocks = createMemo<MessageContentBlock[]>((previous) =>
     reuseUnchangedBlocks(
@@ -430,6 +459,7 @@ export function MessageBody(props: {
     return -1;
   });
   let messageContentResize: HTMLDivElement | undefined;
+  let mediaBefore: HTMLDivElement | undefined;
   let messageContent: HTMLDivElement | undefined;
   createSmoothHeightResize({
     container: () => messageContentResize,
@@ -444,7 +474,7 @@ export function MessageBody(props: {
     else props.onDownload?.(image);
   };
   const [lightbox, setLightbox] = createSignal<(ImageLightboxOpening & { markdown?: boolean }) | null>(null);
-  const lightboxImages = createMemo(() => (props.message.attachments ?? []).filter(isLightboxImage));
+  const lightboxImages = createMemo(() => shownAttachments().filter(isLightboxImage));
   /* An image opens in the viewer with the other images of its message. A quoted message's image
      is not one of them, so it opens alone. Other files open in the preview panel. */
   const openAttachment = (attachment: AttachmentSummary, origin?: HTMLElement) => {
@@ -494,6 +524,7 @@ export function MessageBody(props: {
     messageContentResize?.parentElement?.querySelector<HTMLElement>(
       `[data-attachment-id="${CSS.escape(attachment.id)}"]`,
     ) ??
+    mediaBefore?.querySelector<HTMLElement>(`[data-attachment-id="${CSS.escape(attachment.id)}"]`) ??
     undefined;
   const renderMarkdownInline = (body: string) => (
     <MarkdownInlineText
@@ -512,7 +543,50 @@ export function MessageBody(props: {
     />
   );
 
-  return (
+  const imageBlock = () => (
+    <Switch>
+      <Match when={standaloneImageAttachments().length > 1}>
+        <ImageGallery images={standaloneImageAttachments()} onOpen={openAttachment} onDownload={props.onDownload} />
+      </Match>
+      <Match when={standaloneImageAttachments().length === 1}>
+        <div class="message-image-attachments">
+          <For each={standaloneImageAttachments()}>
+            {(attachment) => (
+              <ImageGeneration
+                presentation="attachment"
+                status="completed"
+                prompt={attachment.name}
+                aspectRatio="square"
+                attachment={attachment}
+                onPreview={openAttachment}
+                onDownload={props.onDownload}
+              />
+            )}
+          </For>
+        </div>
+      </Match>
+    </Switch>
+  );
+  const lightboxBlock = () => (
+    <Show when={lightbox()}>
+      {(opening) => (
+        <ImageLightbox
+          opening={opening()}
+          thumbnail={imageThumbnail}
+          onDownload={downloadImage}
+          canDownload={(image) =>
+            namedImageFile(image)
+              ? Boolean(props.onDownloadImageFile)
+              : !opening().markdown && Boolean(props.onDownload)
+          }
+          macWindowControls={props.macWindowControls}
+          onClose={() => setLightbox(null)}
+        />
+      )}
+    </Show>
+  );
+  // The images of a person's message can go before the bubble; `withImages` keeps them in it.
+  const body = (withImages: boolean) => (
     <>
       {/*
        * The generic delivery labels - Queued, Cancelled, Failed, Stopped - were taken off the
@@ -663,28 +737,7 @@ export function MessageBody(props: {
           />
         )}
       </Show>
-      <Switch>
-        <Match when={standaloneImageAttachments().length > 1}>
-          <ImageGallery images={standaloneImageAttachments()} onOpen={openAttachment} onDownload={props.onDownload} />
-        </Match>
-        <Match when={standaloneImageAttachments().length === 1}>
-          <div class="message-image-attachments">
-            <For each={standaloneImageAttachments()}>
-              {(attachment) => (
-                <ImageGeneration
-                  presentation="attachment"
-                  status="completed"
-                  prompt={attachment.name}
-                  aspectRatio="square"
-                  attachment={attachment}
-                  onPreview={openAttachment}
-                  onDownload={props.onDownload}
-                />
-              )}
-            </For>
-          </div>
-        </Match>
-      </Switch>
+      {withImages ? imageBlock() : undefined}
       <Switch>
         <Match when={fileImages().length > 1}>
           <ImageGallery images={fileImages()} onOpen={openAttachment} />
@@ -710,28 +763,51 @@ export function MessageBody(props: {
           <AttachmentCards
             attachments={standaloneFileAttachments()}
             mediaSource={props.mediaSource}
+            downloads={props.downloads}
             onPreview={openAttachment}
             onAction={props.onAttachmentAction}
           />
         </div>
       </Show>
-      <Show when={lightbox()}>
-        {(opening) => (
-          <ImageLightbox
-            opening={opening()}
-            thumbnail={imageThumbnail}
-            onDownload={downloadImage}
-            canDownload={(image) =>
-              namedImageFile(image)
-                ? Boolean(props.onDownloadImageFile)
-                : !opening().markdown && Boolean(props.onDownload)
-            }
-            macWindowControls={props.macWindowControls}
-            onClose={() => setLightbox(null)}
-          />
-        )}
-      </Show>
     </>
+  );
+  /**
+   * The bubble would hold nothing but its images, so a frame shows the images alone. A text that only
+   * names the images that show above it says nothing more.
+   */
+  const imagesOnly = () =>
+    !standaloneImageAttachments()
+      .reduce((body, image) => removeAttachmentReferences(body, image.id), props.message.body)
+      .trim() &&
+    !props.referencedMessage &&
+    props.referenceState !== "unavailable" &&
+    !(props.message.kind === "error" && props.message.status) &&
+    standaloneFileAttachments().length === 0 &&
+    fileImages().length === 0;
+
+  return (
+    <Show
+      when={props.frame}
+      fallback={
+        <>
+          {body(true)}
+          {lightboxBlock()}
+        </>
+      }
+    >
+      {(frame) => (
+        <>
+          <Show when={standaloneImageAttachments().length > 0}>
+            <div class="message-media-before" ref={(element) => (mediaBefore = element)}>
+              {imageBlock()}
+            </div>
+          </Show>
+          {/* Built once: a change that the frame reads must not draw the body again. */}
+          {untrack(() => frame()(body(false), () => imagesOnly() && standaloneImageAttachments().length > 0))}
+          {lightboxBlock()}
+        </>
+      )}
+    </Show>
   );
 }
 
@@ -764,6 +840,13 @@ export function MessageActions(props: {
   onCopy: () => void;
   /** Reads the message aloud, or stops it while it is read. Absent where replies cannot be read aloud. */
   readAloud?: { reading: boolean; onToggle: () => void } | undefined;
+  /**
+   * Copies the thread through this message into a new thread. Only the last agent message of a
+   * finished turn has it.
+   */
+  onBranch?: (() => void) | undefined;
+  /** A turn runs in the thread, so Branch shows but does nothing. */
+  branchDisabled?: boolean | undefined;
 }) {
   const { t } = useText();
   const authorName = () => props.authorName ?? t("chat.message.agentFallback");
@@ -874,6 +957,20 @@ export function MessageActions(props: {
           <ReplyIcon />
         </Button>
       </Show>
+      <Show when={props.onBranch}>
+        {(onBranch) => (
+          <Button
+            variant="ghost"
+            type="button"
+            class="message-action-button"
+            aria-label={t("chat.actions.branch")}
+            disabled={props.branchDisabled === true}
+            onClick={() => onBranch()()}
+          >
+            <BranchIcon />
+          </Button>
+        )}
+      </Show>
     </div>
   );
 }
@@ -892,10 +989,21 @@ export function MessageMenu(props: {
   onReply?: (() => void) | undefined;
   onCopy: () => void;
   readAloud?: { reading: boolean; onToggle: () => void } | undefined;
+  /** Marks this message and the messages after it unread. Without it, the menu has no such item. */
+  onMarkUnread?: (() => void) | undefined;
+  /** Copies the thread through this message into a new thread. Without it, the menu has no such item. */
+  onBranch?: (() => void) | undefined;
+  /** A turn runs in the thread, so "Branch from here" shows but does nothing. */
+  branchDisabled?: boolean | undefined;
+  /** Opens a channel with this message in its composer. Without it, or with no channel, the menu has no such item. */
+  sendToChannel?: { channels: { id: string; name: string }[]; onSend: (channelId: string) => void } | undefined;
+  /** Asks to delete this message. Without it, the menu has no such item. */
+  onDelete?: (() => void) | undefined;
 }) {
   const { t } = useText();
   const authorName = () => props.authorName ?? t("chat.message.agentFallback");
   const react = (emoji: MessageReaction) => props.onReact(props.message.reaction === emoji ? null : emoji);
+  const sendToChannel = () => (props.sendToChannel?.channels.length ? props.sendToChannel : undefined);
   return (
     <ContextMenu.Content
       aria-label={
@@ -959,6 +1067,101 @@ export function MessageMenu(props: {
           </ContextMenu.Item>
         )}
       </Show>
+      <Show when={sendToChannel()}>
+        {(sendToChannel) => (
+          <ContextMenu.Sub>
+            <ContextMenu.SubTrigger>
+              <Hash aria-hidden="true" />
+              <span>{t("chat.menu.sendToChannel")}</span>
+              <ChevronRight class="ui-menu-trailing" aria-hidden="true" />
+            </ContextMenu.SubTrigger>
+            <ContextMenu.Portal>
+              <ContextMenu.SubContent class="ui-action-menu" aria-label={t("chat.menu.chooseChannel")}>
+                <For each={sendToChannel().channels}>
+                  {(channel) => (
+                    <ContextMenu.Item onSelectAfterClose={() => sendToChannel().onSend(channel.id)}>
+                      <Hash aria-hidden="true" />
+                      <span>{channel.name}</span>
+                    </ContextMenu.Item>
+                  )}
+                </For>
+              </ContextMenu.SubContent>
+            </ContextMenu.Portal>
+          </ContextMenu.Sub>
+        )}
+      </Show>
+      <Show when={props.onBranch || props.onMarkUnread}>
+        <ContextMenu.Separator />
+      </Show>
+      <Show when={props.onBranch}>
+        {(onBranch) => (
+          <ContextMenu.Item disabled={props.branchDisabled === true} onSelectAfterClose={onBranch()}>
+            <BranchIcon />
+            <span>{t("chat.menu.branch")}</span>
+          </ContextMenu.Item>
+        )}
+      </Show>
+      <Show when={props.onMarkUnread}>
+        {(onMarkUnread) => (
+          <ContextMenu.Item onSelect={onMarkUnread()}>
+            <CircleDot aria-hidden="true" />
+            <span>{t("chat.menu.markUnread")}</span>
+          </ContextMenu.Item>
+        )}
+      </Show>
+      <Show when={props.onDelete}>
+        {(onDelete) => (
+          <>
+            <ContextMenu.Separator />
+            <ContextMenu.Item class="ui-action-menu-danger" onSelectAfterClose={onDelete()}>
+              <Trash2 aria-hidden="true" />
+              <span>{t("chat.menu.delete")}</span>
+            </ContextMenu.Item>
+          </>
+        )}
+      </Show>
     </ContextMenu.Content>
+  );
+}
+
+/**
+ * Asks before a message is deleted, for the Delete item of `MessageMenu`. The dialog stays open while
+ * `onDelete` runs, and shows its failure. It closes when the message is deleted.
+ */
+export function DeleteMessageDialog(props: {
+  /** The message to delete, or null while the dialog is closed. */
+  messageId: string | null;
+  onDelete: (messageId: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const { t, errorMessage } = useText();
+  const [error, setError] = createSignal<string | undefined>();
+  const close = () => {
+    setError(undefined);
+    props.onClose();
+  };
+  const confirm = async () => {
+    const messageId = props.messageId;
+    if (messageId === null) return;
+    setError(undefined);
+    try {
+      await props.onDelete(messageId);
+      close();
+    } catch (failure) {
+      setError(errorMessage(failure, t("chat.errorStatus.deleteMessage")));
+    }
+  };
+  return (
+    <ConfirmDialog
+      open={props.messageId !== null}
+      onCancel={close}
+      onConfirm={confirm}
+      title={t("chat.deleteMessage.title")}
+      description={t("chat.deleteMessage.body")}
+      confirmLabel={t("common.delete")}
+      pendingLabel={t("chat.deleteMessage.pending")}
+      error={error()}
+      initialFocus="cancel"
+    />
   );
 }

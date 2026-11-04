@@ -1,10 +1,10 @@
 {
-  "version": "0.54.0",
+  "version": "0.60.0",
   "highlights": [
-    "Buy a commercial license for work from Billing or from Add server: Starter for 1 user, or Team for 2 to 10 users. A new license is free until 1 December 2026.",
-    "A Workspace only agent can now change files in folders that you add, from the agent's settings or by dropping a folder on the chat.",
-    "openbot.run has a Pricing page with the hosted servers and the licenses in EUR, USD or PLN.",
-    "Set the context window of each model of a custom provider, so OpenCode compacts at the correct size.",
-    "Remote desktop pairing on macOS 27 works again, and Gemini continues when one MCP server does not start."
+    "Talk to your agents from WhatsApp: link a number under Marketplace → Apps → WhatsApp.",
+    "Start a workflow when someone mentions OpenBot in Slack or in a Telegram group, and send its result back there.",
+    "OpenBot is now available in Arabic, with a right-to-left layout.",
+    "Turn models off for each provider, and find the newest models first in the model picker.",
+    "Owners and admins can see an Audit log of member, role and agent access changes in Server settings."
   ]
 }
