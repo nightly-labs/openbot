@@ -2956,6 +2956,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
     turn.toolItems.clear();
     this.#emitSubagents(endSubagentTurn(this.#subagents, turn.id, new Date().toISOString()));
+    // A turn that started no subagent sends no change, so its thread entry is removed here.
+    if (!this.#subagents.turns.has(turn.id)) this.#subagentThreads.delete(turn.id);
     this.#completeMessage(thread, turn, "final_answer");
     if (status === "failed" && error) {
       const detail = this.#redact(failureText(error));
