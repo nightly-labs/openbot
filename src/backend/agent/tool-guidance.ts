@@ -155,7 +155,7 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "start_task":
       return "Use openbot.start_task only when the user asks for long independent work, such as a review, research, or a build, and the chat must stay free for other requests. Do not start a task for quick work, for work that this turn needs next, or for work on the same files as another running task: tasks share your workspace. A task has its own browser tabs and no Computer Use, so keep desktop work in your own chat. Give a short title and a complete brief. Tell the user that the task started as a new thread, which they follow in its tab in the chat header.";
     case "ask_ui":
-      return "Use openbot.ask_ui instead of ask_user when buttons, a list, or a short form make the answer easier: confirm before an action with effects, such as a send or a delete; quick_replies for short replies; choice for a list; form for a few values. It waits like ask_user and returns the actionId and values that you defined, or the user's text. A confirmed block does not replace the provider's approvals. In a channel, each member who reads the channel sees it.";
+      return "openbot.ask_ui is a direct tool: call it without tool_search.";
     case "request_api_key":
     case "list_api_keys":
     case "remove_api_key":
