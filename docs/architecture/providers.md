@@ -901,7 +901,9 @@ A missing CLI is `not-installed`, and the row opens the `hermes-install` guide. 
 the user's `HERMES_HOME` (or `~/.hermes`, `%LOCALAPPDATA%\hermes` on Windows), so the user's memories,
 skills, sign-ins and `SOUL.md` apply. `hermesStatePaths` lets a confined process write that folder
 and protects the Hermes code, `config.yaml`, `.env`, `SOUL.md`, skills, hooks, cron, plugins and
-profiles in it.
+profiles in it. On a server, that is the Hermes of the service user (`/var/lib/openbot`, or `/data` in
+Docker); the server packages include `libatomic1`, which the Node.js of the Hermes installer needs.
+`scripts/hermes-server-e2e.ts` installs Hermes in the release image and runs a turn on a mock model.
 
 Sign in runs `hermes auth add nous --type oauth`, the Nous Portal device-code login. Its first
 question imports shared Nous credentials, and EOF answers yes, so the code sign-in closes the CLI's
