@@ -117,8 +117,11 @@ export class ContextCompaction {
   readonly #rotatesSession: ContextCompactionOptions["rotatesSession"];
   readonly #isStopping: () => boolean;
   readonly #budgets = new Map<string, ThreadContextBudget>();
-  /** The agent of each provider thread that compacts, and the client that runs it once `request` sends it. */
-  readonly #compacting = new Map<string, { agentId: string; client: AgentClient | null }>();
+  /**
+   * The agent of each provider thread that compacts, and the client that runs it once `request` sends it.
+   * `reserved`: `reserve` holds the thread and `request` has not taken the hold yet.
+   */
+  readonly #compacting = new Map<string, { agentId: string; client: AgentClient | null; reserved: boolean }>();
   readonly #refusals = new Map<string, RefusalHold>();
   readonly #timeoutMs: number;
   /** How long a started compaction runs before OpenBot stops it. */
@@ -420,9 +423,18 @@ export class ContextCompaction {
       return false;
     }
     budget.phase = "requested";
-    this.#compacting.set(threadId, { agentId, client: null });
+    this.#compacting.set(threadId, { agentId, client: null, reserved: true });
     this.observeCompaction(threadId, "running");
     return true;
+  }
+
+  /**
+   * Ends a hold that `reserve` made for this agent and that `request` did not take: the work between
+   * them failed. Only `request` arms a deadline, so the hold stayed until a restart (#4960).
+   */
+  dropReservation(agentId: string, threadId: string): void {
+    const compaction = this.#compacting.get(threadId);
+    if (compaction?.reserved && compaction.agentId === agentId) this.#abandon(agentId, threadId);
   }
 
   readonly request = Effect.fn("ContextCompaction.request")(function* (
@@ -430,6 +442,8 @@ export class ContextCompaction {
     agentId: string,
     threadId: string,
   ) {
+    const reservation = this.#compacting.get(threadId);
+    if (reservation) reservation.reserved = false;
     const budget = this.#budgets.get(threadId);
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     const client = agent ? this.#providers.clientForAgent(agent) : null;
@@ -448,7 +462,7 @@ export class ContextCompaction {
       return;
     }
 
-    this.#compacting.set(threadId, { agentId, client });
+    this.#compacting.set(threadId, { agentId, client, reserved: false });
     // A `request` compaction runs inside the request, so it starts now and the request waits as long.
     const runsInRequest = client.contextCompaction === "request";
     this.#armDeadline(agentId, threadId, client, runsInRequest ? this.#runTimeoutMs : this.#timeoutMs);
