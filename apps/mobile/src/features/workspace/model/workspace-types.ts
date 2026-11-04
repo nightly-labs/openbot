@@ -177,7 +177,7 @@ import type { LiveWorkspaceStore } from "./live-workspace-store";
 
 type MobileServerKind = "local" | "remote";
 /** The message that `message-delete-v1` deletes. */
-export type MessageDeleteTarget =
+type MessageDeleteTarget =
   | { kind: "agent"; agentId: string; taskId?: string; messageId: string }
   | { kind: "channel"; channelId: string; messageId: string };
 
