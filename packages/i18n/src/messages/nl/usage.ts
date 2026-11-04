@@ -72,4 +72,6 @@ export const messages = {
   "usage.panel.unsupported":
     "Deze host ondersteunt geen agentanalyses. Werk de host bij om deze weergave te gebruiken.",
   "usage.panel.loadFailed": "Kan gebruik niet laden. Controleer de verbinding en de periode.",
+  "usage.machine.label": "Machinegebruik. CPU: {cpu}, geheugen: {memory}",
+  "usage.machine.openStorage": "Opslag openen. Schijf: {percent}, {detail}",
 } as const satisfies PartialTranslation<typeof source>;
