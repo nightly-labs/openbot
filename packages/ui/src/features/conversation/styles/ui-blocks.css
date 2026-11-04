@@ -10,7 +10,8 @@
   transition: border-color var(--openbot-duration-slow) var(--openbot-ease-out);
 }
 
-.ui-block-card[data-danger] {
+/* Only an open block warns: a closed one has nothing left to press. */
+.ui-block-card[data-danger][data-status="pending"] {
   border-color: var(--openbot-danger-border);
 }
 
@@ -75,29 +76,30 @@
 }
 
 /* The line a frozen block ends with. */
+/* One quiet line: the answer, or why there is none. The icon carries the color. */
 .ui-block-outcome {
   display: flex;
   min-width: 0;
   align-items: center;
   gap: var(--openbot-space-2);
   margin: 0;
-  padding: var(--openbot-space-2) var(--openbot-space-3);
-  border-radius: var(--openbot-radius-lg);
-  background: var(--openbot-glass-surface);
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-md);
   line-height: var(--openbot-leading-md);
 }
 
 .ui-block-outcome[data-status="answered"] {
-  background: var(--openbot-success-soft);
-  color: var(--openbot-success-text);
+  color: var(--openbot-text-secondary);
 }
 
 .ui-block-outcome svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
   flex: 0 0 auto;
+}
+
+.ui-block-outcome-check {
+  color: var(--openbot-success-text);
 }
 
 .ui-block-outcome-text {

@@ -8,6 +8,12 @@ export const messages = {
   "mobile.settings.language.system": "Как в системе",
   "mobile.settings.language.footer":
     "Вариант «Как в системе» берёт первый язык из настроек телефона. Непереведённый текст показывается на английском.",
+  "mobile.settings.language.restartTitle": "Перезапустить OpenBot?",
+  "mobile.settings.language.restartBody":
+    "Этот язык читается в другом направлении. Экраны сменят направление при следующем запуске OpenBot. Если после перезапуска экраны выглядят неправильно, закройте OpenBot в переключателе приложений и откройте его снова.",
+  "mobile.settings.language.restartNow": "Перезапустить сейчас",
+  "mobile.settings.language.restartFailed":
+    "Не удалось перезапустить OpenBot. Экраны сменят направление, когда вы снова откроете OpenBot.",
   "mobile.settings.dictation.language": "Язык диктовки",
   "mobile.settings.about.development": "Разработка",
   "mobile.settings.about.openFailed": "Не удалось открыть ссылку. Повторите попытку.",
@@ -76,7 +82,7 @@ export const messages = {
   "mobile.settings.animations.all": "Анимации",
   "mobile.settings.animations.agentFaces": "Живые лица агентов",
   "mobile.settings.animations.agentFacesFooter":
-    "Аватары агентов двигаются, пока агенты работают и отдыхают. Если выключить, лица останутся неподвижными.",
+    "Аватары агентов двигаются, пока агенты работают и отдыхают. Если выключить, лица останутся неподвижными, а персонажи на экране приветствия и на пустом главном экране перестанут парить.",
   "mobile.settings.animations.composerResize": "Компактное поле сообщения",
   "mobile.settings.animations.composerResizeFooter":
     "Пока клавиатура закрыта, поле сообщения превращается в узкую полоску. Если выключить, поле остаётся полного размера.",

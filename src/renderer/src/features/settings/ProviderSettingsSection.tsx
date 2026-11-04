@@ -62,6 +62,7 @@ import { createEffect, createMemo, createSignal, createStore, Show, untrack } fr
 import { ProviderSignInDialogs } from "../../components/ProviderSignInDialogs";
 import type { ProviderConnectionApi } from "../../components/provider-connection-api";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
+import { createHostDefaultProvider, type HostDefaultProviderSource } from "./provider-host-default";
 import { createProviderModelVisibility, type ProviderModelVisibilitySource } from "./provider-model-visibility";
 import { createProviderPromptCache, type ProviderPromptCacheSource } from "./provider-prompt-cache";
 import { createSettingsGeneralStore, type SettingsGeneralStore } from "./stores/general-store";
@@ -537,8 +538,11 @@ export function HostProviderSettingsPanel(
     promptCache?: ProviderPromptCacheSource | undefined;
     /** The Models section of each provider page, for a host with `model-visibility-v1` that this account administers. */
     modelVisibility?: ProviderModelVisibilitySource | undefined;
+    /** The Default provider of a joined host with `provider-default-v1` that this account administers. */
+    hostDefaultProvider?: HostDefaultProviderSource | undefined;
   },
 ) {
+  const hostDefaultProvider = createHostDefaultProvider(() => props.hostDefaultProvider);
   const promptCache = createProviderPromptCache(() => props.promptCache);
   const modelVisibility = createProviderModelVisibility(
     () => props.modelVisibility,
@@ -578,7 +582,7 @@ export function HostProviderSettingsPanel(
   return (
     <>
       <ProviderSettingsSection
-        defaultProvider={props.defaultProvider}
+        defaultProvider={props.defaultProvider ?? hostDefaultProvider()}
         store={store}
         selectMount={props.selectMount}
         onDownloadProvider={props.onDownloadProvider}

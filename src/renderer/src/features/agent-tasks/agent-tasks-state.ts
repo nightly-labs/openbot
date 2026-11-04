@@ -7,7 +7,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createStore, untrack } from "solid-js";
+import { createEffect, createMemo, createStore, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
 import { createScopeGuard } from "../../scope-lifetime";
@@ -195,11 +195,15 @@ export function createAgentTasks(options: AgentTasksOptions) {
       });
   }
 
+  // An effect runs again each time its key is computed, so the key is a memo. A reconnect gives the
+  // server's capabilities again, and a list read for that alone repeats the read of the runtime snapshot.
+  const listKey = createMemo(() => ({ agentId: activeAgentId(), reload: options.reloadKey(), shown: available() }), {
+    equals: (before, after) =>
+      before.agentId === after.agentId && before.reload === after.reload && before.shown === after.shown,
+  });
   createEffect(
     () => ({
-      agentId: activeAgentId(),
-      reload: options.reloadKey(),
-      shown: available(),
+      ...listKey(),
       // A running thread can end while the server is away, and the sidebar shows its agent as working.
       running: untrack(() =>
         Object.values(state.snapshots).flatMap((snapshot) =>
@@ -409,14 +413,18 @@ export function createAgentTasks(options: AgentTasksOptions) {
   }
 
   /**
-   * Reads the active agent's list and each loaded conversation again, after the server was away. The
-   * lists come first: a thread that another device deleted meanwhile is not read again.
+   * Reads the lists of the active agent, of each agent with a running thread and of each loaded
+   * conversation again, after the server was away. Then it reads each loaded conversation. The lists
+   * come first: a thread that another device deleted meanwhile is not read again.
    */
   function reload(): void {
     if (!available()) return;
     const agentIds = new Set(Object.values(state.conversations).map((conversation) => conversation.agentId));
     const active = activeAgentId();
     if (active) agentIds.add(active);
+    // A running thread can end while the server is away, and the sidebar shows its agent as working.
+    for (const snapshot of Object.values(state.snapshots))
+      if (snapshot.tasks.some((task) => task.state === "running")) agentIds.add(snapshot.agentId);
     for (const agentId of agentIds) {
       void loadTasks(agentId).then((loaded) => {
         if (!loaded) return;

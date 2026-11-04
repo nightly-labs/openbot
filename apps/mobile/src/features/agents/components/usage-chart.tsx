@@ -307,6 +307,9 @@ export function UsageChart({
         onSelect(Math.min(dates.length - 1, Math.max(0, start + step)));
       }}
       className="gap-2"
+      // The plot, its axis and its dates are drawn in screen points, oldest day at the left, in
+      // every language.
+      style={{ direction: "ltr" }}
     >
       <GestureDetector gesture={gesture}>
         <View style={{ height: HEIGHT }} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>

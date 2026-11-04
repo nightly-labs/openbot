@@ -8,6 +8,12 @@ export const messages = {
   "mobile.settings.language.system": "Język systemu",
   "mobile.settings.language.footer":
     "Język systemu to pierwszy język w ustawieniach telefonu. Tekst, który nie jest jeszcze przetłumaczony, jest wyświetlany po angielsku.",
+  "mobile.settings.language.restartTitle": "Uruchomić ponownie OpenBot?",
+  "mobile.settings.language.restartBody":
+    "Ten język czyta się w drugą stronę. Ekrany zmienią kierunek po ponownym uruchomieniu OpenBot. Jeśli po ponownym uruchomieniu ekrany nadal wyglądają źle, zamknij OpenBot w przełączniku aplikacji i otwórz go ponownie.",
+  "mobile.settings.language.restartNow": "Uruchom ponownie teraz",
+  "mobile.settings.language.restartFailed":
+    "Nie udało się ponownie uruchomić OpenBot. Ekrany zmienią kierunek, gdy następnym razem otworzysz OpenBot.",
   "mobile.settings.dictation.language": "Język dyktowania",
   "mobile.settings.about.development": "Rozwój",
   "mobile.settings.about.openFailed": "Nie udało się otworzyć linku. Spróbuj ponownie.",
@@ -76,7 +82,7 @@ export const messages = {
   "mobile.settings.animations.all": "Animacje",
   "mobile.settings.animations.agentFaces": "Animowane twarze agentów",
   "mobile.settings.animations.agentFacesFooter":
-    "Awatary agentów poruszają twarzami, gdy agenci pracują i odpoczywają. Gdy to jest wyłączone, twarze są nieruchome.",
+    "Awatary agentów poruszają twarzami, gdy agenci pracują i odpoczywają. Gdy to jest wyłączone, twarze są nieruchome, a postacie na ekranie powitalnym i pustym ekranie głównym przestają się unosić.",
   "mobile.settings.animations.composerResize": "Kompaktowe pole wiadomości",
   "mobile.settings.animations.composerResizeFooter":
     "Pole wiadomości zmienia się w mały pasek, gdy klawiatura jest zamknięta. Gdy to jest wyłączone, pole ma pełny rozmiar.",

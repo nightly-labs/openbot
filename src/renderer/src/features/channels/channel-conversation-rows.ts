@@ -119,8 +119,8 @@ export function firstUnreadChannelMessageId(
 }
 
 /**
- * Everyone the channel waits on: the owner of a running task, the author of a message that is still
- * arriving, and the lead while it chooses an owner. They read as one row under the transcript,
+ * Everyone the channel waits on: the owner of a running task, the author of a message of an active
+ * task that is still arriving, and the lead while it chooses an owner. They read as one row under the transcript,
  * because a channel runs several agents at once and a row for each would push the messages away.
  *
  * The lead's routing turn moves no task out of `queued` and writes no message of its own. Without
@@ -136,9 +136,21 @@ export function channelWorkers(
   hiddenAgentIds: ReadonlySet<string>,
 ): ChannelWorker[] {
   const ids = new Set<string>();
-  for (const task of page.tasks) if (task.state === "running" && task.ownerAgentId) ids.add(task.ownerAgentId);
+  const active = new Set<string>();
+  for (const task of page.tasks) {
+    if (task.state === "running" && task.ownerAgentId) ids.add(task.ownerAgentId);
+    if (task.state === "queued" || task.state === "running" || task.state === "waiting") active.add(task.id);
+  }
+  // A refresh reads only the newest messages, so an older one keeps the copy the view loaded. A
+  // copy loaded while it streamed showed its author as working after the task ended (#4846). A
+  // follow-up queues the task while its turn still writes, so a queued task keeps its writer.
   for (const entry of page.messages)
-    if (entry.message.status === "streaming" && entry.author.kind !== "member") ids.add(entry.author.id);
+    if (
+      entry.message.status === "streaming" &&
+      entry.author.kind !== "member" &&
+      (entry.taskId === null || active.has(entry.taskId))
+    )
+      ids.add(entry.author.id);
   const lead = page.channel.leadAgentId;
   if (
     lead &&

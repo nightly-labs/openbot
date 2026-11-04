@@ -25,18 +25,23 @@ const MACHINE_TOKEN = "machine-token-of-the-server-on-this-computer";
 
 /** A child that reports ready at once and exits when it is asked to stop. */
 class ReadyChild extends ChildProcess {
-  /** What the parent wrote to standard input. */
-  readonly input: string[] = [];
+  /** What the parent wrote to standard input and to fd 3. */
+  readonly input: { stdin: string[]; control: string[] } = { stdin: [], control: [] };
+  readonly #stdin = new PassThrough();
+  readonly #stdout = new PassThrough();
+  readonly #stderr = new PassThrough();
+  /** fd 3, the control pipe on Windows. */
+  readonly #control = new PassThrough();
+  override readonly stdio: ChildProcess["stdio"] = [this.#stdin, this.#stdout, this.#stderr, this.#control, undefined];
 
   constructor() {
     super();
-    const stdin = new PassThrough();
-    stdin.on("data", (chunk: Buffer) => this.input.push(chunk.toString()));
-    this.stdin = stdin;
-    const stdout = new PassThrough();
-    this.stdout = stdout;
-    this.stderr = new PassThrough();
-    setImmediate(() => stdout.write(`${formatLocalServerReady(READY)}\n`));
+    this.#stdin.on("data", (chunk: Buffer) => this.input.stdin.push(chunk.toString()));
+    this.#control.on("data", (chunk: Buffer) => this.input.control.push(chunk.toString()));
+    this.stdin = this.#stdin;
+    this.stdout = this.#stdout;
+    this.stderr = this.#stderr;
+    setImmediate(() => this.#stdout.write(`${formatLocalServerReady(READY)}\n`));
   }
 
   override kill(signal?: NodeJS.Signals | number): boolean {
@@ -83,6 +88,7 @@ function servers(
   attach: (input: LocalServerAttachInput) => Effect.Effect<ServerSummary, RemoteWorkflowError>,
   onLine: (line: string) => void,
   spawned: Spawned[],
+  platform: NodeJS.Platform = "darwin",
 ): LocalServers {
   const logger = createOpenBotLogger("local-servers", onLine);
   const options: LocalServersOptions = {
@@ -111,7 +117,7 @@ function servers(
       info: (message) => logger.info(message),
       warn: (message, detail) => logger.warn(message, detail === undefined ? "" : toLogValue(detail)),
     },
-    platform: "darwin",
+    platform,
     spawn: (_command: string, args: readonly string[], options: SpawnOptions) => {
       const child = new ReadyChild();
       spawned.push({ args, secret: options.env?.[LOCAL_SERVER_ENVIRONMENT.secret], child });
@@ -161,24 +167,30 @@ describe("servers on this computer", () => {
     expect(log).not.toContain(secret);
   });
 
-  it("gives the machine token only to the child's standard input", async () => {
-    const lines: string[] = [];
-    const spawned: Spawned[] = [];
-    const local = servers(
-      (input) => Effect.succeed(summary(input)),
-      (line) => lines.push(line),
-      spawned,
-    );
-    await Effect.runPromise(local.load());
-    await Effect.runPromise(local.initialize());
-    // A create from another device answers after the registration.
-    await Effect.runPromise(local.create(READY.serverName, "device"));
-    expect(local.list().servers).toEqual([{ serverId: READY.serverId, name: READY.serverName, published: true }]);
-    await Effect.runPromise(local.stop());
+  it.each(["darwin", "win32"] as const)(
+    "gives the machine token only to the child's control pipe on %s",
+    async (platform) => {
+      const lines: string[] = [];
+      const spawned: Spawned[] = [];
+      const local = servers(
+        (input) => Effect.succeed(summary(input)),
+        (line) => lines.push(line),
+        spawned,
+        platform,
+      );
+      await Effect.runPromise(local.load());
+      await Effect.runPromise(local.initialize());
+      // A create from another device answers after the registration.
+      await Effect.runPromise(local.create(READY.serverName, "device"));
+      expect(local.list().servers).toEqual([{ serverId: READY.serverId, name: READY.serverName, published: true }]);
+      await Effect.runPromise(local.stop());
 
-    expect(spawned[0]?.child.input.join("")).toContain(MACHINE_TOKEN);
-    expect(spawned[0]?.args.join(" ")).not.toContain(MACHINE_TOKEN);
-    expect(await readFile(join(root, LOCAL_SERVERS_FILE), "utf8")).not.toContain(MACHINE_TOKEN);
-    expect(lines.join("\n")).not.toContain(MACHINE_TOKEN);
-  });
+      const [used, unused] = platform === "win32" ? (["control", "stdin"] as const) : (["stdin", "control"] as const);
+      expect(spawned[0]?.child.input[used].join("")).toContain(MACHINE_TOKEN);
+      expect(spawned[0]?.child.input[unused].join("")).not.toContain(MACHINE_TOKEN);
+      expect(spawned[0]?.args.join(" ")).not.toContain(MACHINE_TOKEN);
+      expect(await readFile(join(root, LOCAL_SERVERS_FILE), "utf8")).not.toContain(MACHINE_TOKEN);
+      expect(lines.join("\n")).not.toContain(MACHINE_TOKEN);
+    },
+  );
 });

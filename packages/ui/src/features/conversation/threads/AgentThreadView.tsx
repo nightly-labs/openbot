@@ -162,6 +162,8 @@ export interface AgentThreadViewProps {
   waitsForAnswer?: boolean | undefined;
   /** Another card that the thread shows, such as a question or a browser takeover. The app builds it. */
   attention?: JSX.Element | undefined;
+  /** The card that the app draws in the place of a message row, such as an MCP sign-in. Undefined keeps the row. */
+  messageCard?: ((message: AgentMessage) => JSX.Element | undefined) | undefined;
   /** The steps of the finished turn above an answer, or undefined for a message that has none. */
   stepsAbove?: ((messageId: string) => AgentStep[] | undefined) | undefined;
   /** The time that the turn of an answer took, and how many of its steps failed. */
@@ -446,42 +448,52 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             </p>
           </Show>
           <For each={props.messages.filter(shownInThread)} keyed={(message) => message.id}>
-            {(message) => (
-              <div class="virtual-chat-row">
-                <Show when={props.stepsAbove?.(message().id)}>
-                  {(steps) => (
-                    <AgentStepsDisclosure
-                      steps={steps()}
-                      defaultOpen={props.stepsOpenByDefault ?? false}
-                      facts={props.factsAbove?.(message().id)}
-                    />
-                  )}
-                </Show>
-                <ChatMessageRow
-                  message={message()}
-                  author={author(message())}
-                  agents={props.agents}
-                  skills={props.skills}
-                  onSelectAgent={() => undefined}
-                  onOpenLink={props.onOpenLink}
-                  onPreview={props.onPreview}
-                  onAttachmentAction={props.onAttachmentAction}
-                  mediaSource={props.mediaSource}
-                  downloads={props.downloads}
-                  onDownload={(attachment) => props.onAttachmentAction(attachment, "download")}
-                  macWindowControls={props.macWindowControls}
-                  referencedMessage={referenced(message())}
-                  onOpenReference={() => {
-                    const id = message().replyToMessageId;
-                    if (id) showMessage(id);
-                  }}
-                  actions={messageActions(message())}
-                  menu={messageMenu(message())}
-                  data-chat-search-message={message().id}
-                />
-                <Show when={branchDividerAfter(message().id)}>{(source) => <BranchDivider source={source()} />}</Show>
-              </div>
-            )}
+            {(message) => {
+              const card = createMemo(() => props.messageCard?.(message()));
+              return (
+                <div class="virtual-chat-row">
+                  <Show when={props.stepsAbove?.(message().id)}>
+                    {(steps) => (
+                      <AgentStepsDisclosure
+                        steps={steps()}
+                        defaultOpen={props.stepsOpenByDefault ?? false}
+                        facts={props.factsAbove?.(message().id)}
+                      />
+                    )}
+                  </Show>
+                  <Show
+                    when={card()}
+                    fallback={
+                      <ChatMessageRow
+                        message={message()}
+                        author={author(message())}
+                        agents={props.agents}
+                        skills={props.skills}
+                        onSelectAgent={() => undefined}
+                        onOpenLink={props.onOpenLink}
+                        onPreview={props.onPreview}
+                        onAttachmentAction={props.onAttachmentAction}
+                        mediaSource={props.mediaSource}
+                        downloads={props.downloads}
+                        onDownload={(attachment) => props.onAttachmentAction(attachment, "download")}
+                        macWindowControls={props.macWindowControls}
+                        referencedMessage={referenced(message())}
+                        onOpenReference={() => {
+                          const id = message().replyToMessageId;
+                          if (id) showMessage(id);
+                        }}
+                        actions={messageActions(message())}
+                        menu={messageMenu(message())}
+                        data-chat-search-message={message().id}
+                      />
+                    }
+                  >
+                    {card()}
+                  </Show>
+                  <Show when={branchDividerAfter(message().id)}>{(source) => <BranchDivider source={source()} />}</Show>
+                </div>
+              );
+            }}
           </For>
           <Show when={running()}>
             {(task) => (

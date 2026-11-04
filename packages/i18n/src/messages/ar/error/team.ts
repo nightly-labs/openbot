@@ -66,6 +66,8 @@ export const messages = {
   "error.team.sharedDataUnsupported": "البيانات المشتركة غير مدعومة في هذا الاتصال.",
   "error.team.agentInstallUnsupported": "إضافة الوكلاء غير مدعومة في هذا الاتصال.",
   "error.team.agentHideUnsupported": "إخفاء الوكلاء غير مدعوم في هذا الاتصال.",
+  "error.team.agentColorsUnsupported": "هذا الاتصال لا يدعم ألوان الوكلاء.",
+  "error.team.chatColorsUnsupported": "ألوان الدردشة غير مدعومة في هذا الاتصال.",
   "error.team.sidebarFoldersUnsupported": "المجلدات داخل المجلدات غير مدعومة في هذا الاتصال.",
   "error.team.agentNotificationLevelsUnsupported":
     "لا يمكن لهذا الخادم حفظ مستوى الإشعارات الخاص بك لكل وكيل. حدّث OpenBot على الحاسوب الذي يشغّله.",

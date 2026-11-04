@@ -8,6 +8,7 @@ import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { ThinkingTextGradient } from "./thinking-text-gradient";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
@@ -141,7 +142,7 @@ export function ChatActivityRow({
               enabled={spec.shimmer}
             />
           </View>
-          {onPress ? <ChevronRight size={16} color={muted} /> : null}
+          {onPress ? <ChevronRight size={16} color={muted} style={MIRROR_IN_RTL} /> : null}
         </Animated.View>
       </Pressable>
     </Animated.View>

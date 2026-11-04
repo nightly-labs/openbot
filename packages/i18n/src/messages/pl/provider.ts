@@ -137,6 +137,8 @@ export const messages = {
   "provider.picker.noModels": "Brak dostępnych modeli od: {name}.",
   "provider.picker.customEmpty":
     "Dodaj endpoint zgodny z OpenAI – serwer modeli na tym komputerze lub dowolną usługę z bazowym adresem URL i kluczem.",
+  "provider.picker.customPending":
+    "Modele Twoich endpointów nie są jeszcze wczytane. Dostawca odczyta je po zakończeniu bieżącego zadania.",
   "provider.picker.defaultModelLabel": "{name}, domyślny",
   "provider.picker.usageLimit": "Osiągnięto limit użycia",
   "provider.picker.usageLimitWindow": "Limit ({window})",

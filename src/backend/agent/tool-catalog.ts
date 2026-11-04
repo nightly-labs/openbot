@@ -19,6 +19,7 @@ export const BUILTIN_TOOL_CATALOG = [OPENBOT_DYNAMIC_TOOLS, ...BROWSER_DYNAMIC_T
 
 const DIRECT_NAMES = new Set([
   "ask_user",
+  "ask_ui",
   "attach_files_to_response",
   "list_agents",
   "send_message",

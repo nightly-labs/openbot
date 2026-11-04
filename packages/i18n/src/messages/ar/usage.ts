@@ -78,4 +78,6 @@ export const messages = {
   "usage.panel.loading": "جارٍ تحميل الاستخدام…",
   "usage.panel.unsupported": "لا يدعم هذا المضيف تحليلات الوكلاء. حدّث المضيف لاستخدام هذا العرض.",
   "usage.panel.loadFailed": "تعذّر تحميل الاستخدام. تحقّق من الاتصال ونطاق التاريخ.",
+  "usage.machine.label": "استخدام الجهاز. المعالج: {cpu}، الذاكرة: {memory}",
+  "usage.machine.openStorage": "فتح التخزين. القرص: {percent}، {detail}",
 } as const satisfies PartialTranslation<typeof source>;

@@ -12,6 +12,7 @@ import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { typeScale } from "@/shared/lib/type-scale";
 
 export type WorkflowRowAction = "pin" | "run" | "edit";
@@ -124,7 +125,7 @@ export function WorkflowRow({
               {status}
             </Typography.Paragraph>
           </View>
-          <ChevronRight color={String(muted)} size={18} strokeWidth={1.5} />
+          <ChevronRight color={String(muted)} size={18} strokeWidth={1.5} style={MIRROR_IN_RTL} />
         </Pressable>
       </MenuView>
     </View>

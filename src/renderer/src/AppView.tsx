@@ -20,6 +20,14 @@ import { WorkspaceShell } from "./WorkspaceShell";
 // A server switch mounts this gate again. Only the first splash of a start or a reload plays through.
 let startupSplashPlayed = false;
 
+/**
+ * Lets the next start fade the splash as soon as the app is ready, as after a server switch.
+ * Prototype stories render the whole app on each page load and do not need the crew each time.
+ */
+export function skipStartupSplash(): void {
+  startupSplashPlayed = true;
+}
+
 /** The placeholder every lazy view below falls back to while its code loads. */
 function LoadingScreen() {
   const { t } = useText();
@@ -56,7 +64,8 @@ export function AppAccessGate() {
   const settings = useSettings();
   const { joinRemoteDuringSetup } = useServerSelection();
   const started = () => setup.setupLoaded() && platform.appInfo() !== null;
-  const [splashShown, setSplashShown] = createSignal(true);
+  // The landing demo opens on the workspace at once, with no splash.
+  const [splashShown, setSplashShown] = createSignal(!platform.landingPreview);
   // A chat window is a new page too, but it fades as soon as it is ready.
   const splashPlaysThrough = !startupSplashPlayed && platform.chatWindow === null;
   // The splash lets the workspace mount its heavy views before the crew hop out.

@@ -660,7 +660,14 @@ const Conversation = createSimpleContext({
             updateStored(stored, stored.animate === undefined ? message : { ...message, animate: stored.animate });
           return stored;
         });
-        conversation.messages = mergeConversationPage(currentMessages, pageMessages, merge);
+        // A delta that came before this page can show a commentary item as its own message. The page
+        // groups that item under its turn's thinking message, so the loaded copy goes.
+        const pageItemIds = new Set(page.messages.map((message) => message.id));
+        conversation.messages = mergeConversationPage(
+          currentMessages.filter((message) => !pageItemIds.has(message.id)),
+          pageMessages,
+          merge,
+        );
         conversation.references = {
           ...(merge === "replace" ? {} : conversation.references),
           ...Object.fromEntries(

@@ -77,4 +77,6 @@ export const messages = {
   "usage.panel.unsupported":
     "Ten host nie obsługuje analityki agentów. Zaktualizuj hosta, aby korzystać z tego widoku.",
   "usage.panel.loadFailed": "Nie udało się wczytać użycia. Sprawdź połączenie i zakres dat.",
+  "usage.machine.label": "Użycie maszyny. CPU: {cpu}, pamięć: {memory}",
+  "usage.machine.openStorage": "Otwórz Pamięć dyskową. Dysk: {percent}, {detail}",
 } as const satisfies PartialTranslation<typeof source>;

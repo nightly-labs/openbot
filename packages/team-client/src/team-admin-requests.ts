@@ -12,6 +12,7 @@ import {
   type AgentSessionSettings,
   type AnswerWhatsAppRequestInput,
   type BrowseAgentFoldersInput,
+  type ChatColors,
   type DiscordAccess,
   type DiscordRoleList,
   decodeAgentAccessSnapshot,
@@ -28,6 +29,7 @@ import {
   isAgentColors,
   isAgentNotificationLevelsSnapshot,
   isAgentSessionSettings,
+  isChatColors,
   isDiscordAccess,
   isDiscordRoleList,
   isHiddenAgentsSnapshot,
@@ -37,6 +39,7 @@ import {
   type RemoveWhatsAppSenderInput,
   type ResetAgentSessionSettingInput,
   type ServerAuditLog,
+  type SetAgentChatColorInput,
   type SetAgentColorInput,
   type SetAgentHiddenInput,
   type SetAgentNotificationLevelInput,
@@ -59,6 +62,7 @@ import { AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidd
 import { AGENT_MEMORY_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
 import { AGENT_NOTIFICATION_LEVELS_ROUTES } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { AGENT_SESSION_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
+import { CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { CUSTOM_AGENTS_ROUTES } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import type { CUSTOM_PROVIDER_HARNESS_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { DISCORD_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/discord-access-v1";
@@ -1471,6 +1475,26 @@ export function setAgentColor(
 ): Effect.Effect<AgentColors, TeamAdminRequestError> {
   return adminCall(() =>
     request("POST", AGENT_COLORS_ROUTES.set, decodeAgentColors, { agentId: input.agentId, color: input.color }),
+  );
+}
+
+function decodeChatColors(value: unknown): ChatColors {
+  if (!isChatColors(value)) throw new Error("Invalid chat colors response.");
+  return value;
+}
+/**
+ * Any member reads the agent and member chat colours of a host that advertises `chat-colors-v1`. A change
+ * of an agent's chat colour needs manage access.
+ */
+export function readChatColors(request: TeamApiRequest): Effect.Effect<ChatColors, TeamAdminRequestError> {
+  return adminCall(() => request("POST", CHAT_COLORS_ROUTES.read, decodeChatColors, {}));
+}
+export function setAgentChatColor(
+  request: TeamApiRequest,
+  input: SetAgentChatColorInput,
+): Effect.Effect<ChatColors, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", CHAT_COLORS_ROUTES.set, decodeChatColors, { agentId: input.agentId, color: input.color }),
   );
 }
 

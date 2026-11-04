@@ -328,6 +328,7 @@ export class InstanceTransferService {
         avatarSeed: agent.avatarSeed,
         avatarHue: agent.avatarHue,
         ...(agent.avatarColor ? { avatarColor: agent.avatarColor } : {}),
+        ...(agent.chatColor ? { chatColor: agent.chatColor } : {}),
         avatar,
         provider: agent.provider,
         model: agent.model,
@@ -957,6 +958,7 @@ export class InstanceTransferService {
               notifications: source.notifications,
               ...(source.busyMessageMode ? { busyMessageMode: source.busyMessageMode } : {}),
               ...(source.taskLimit === undefined ? {} : { taskLimit: source.taskLimit }),
+              ...(isAvatarColor(source.chatColor) ? { chatColor: source.chatColor } : {}),
             })
             .pipe(Effect.mapError(failure));
           completed = true;
