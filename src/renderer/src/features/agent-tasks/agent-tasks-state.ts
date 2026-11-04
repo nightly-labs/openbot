@@ -7,7 +7,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createStore, untrack } from "solid-js";
+import { createEffect, createMemo, createStore, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
 import { createScopeGuard } from "../../scope-lifetime";
@@ -195,11 +195,15 @@ export function createAgentTasks(options: AgentTasksOptions) {
       });
   }
 
+  // An effect runs again each time its key is computed, so the key is a memo. A reconnect gives the
+  // server's capabilities again, and a list read for that alone repeats the read of the runtime snapshot.
+  const listKey = createMemo(() => ({ agentId: activeAgentId(), reload: options.reloadKey(), shown: available() }), {
+    equals: (before, after) =>
+      before.agentId === after.agentId && before.reload === after.reload && before.shown === after.shown,
+  });
   createEffect(
     () => ({
-      agentId: activeAgentId(),
-      reload: options.reloadKey(),
-      shown: available(),
+      ...listKey(),
       // A running thread can end while the server is away, and the sidebar shows its agent as working.
       running: untrack(() =>
         Object.values(state.snapshots).flatMap((snapshot) =>
