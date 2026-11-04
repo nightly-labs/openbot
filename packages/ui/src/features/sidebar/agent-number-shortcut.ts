@@ -4,8 +4,9 @@ import type { SidebarPinnedItem } from "./sidebar-pins";
 
 /**
  * A key chord an agent number shortcut may act on. A real `KeyboardEvent` carries every field; a
- * visual reply's page reports the six it sends (`ChatVisualKey`) and cannot report `altGraph`, so
- * that one is optional and false when it is absent.
+ * visual reply's page reports the six it sends (`ChatVisualKey`) and no `altGraph`, so that one is
+ * optional and false when it is absent. That is safe because the page drops an AltGr key itself and
+ * never forwards it (see the bootstrap in `@openbot/contracts/chat-visual`).
  */
 export interface AgentNumberShortcutKey {
   code: string;
