@@ -152,9 +152,12 @@ const CLAUDE_NATIVE_SCHEDULING = [
 /**
  * Claude tools that duplicate an OpenBot feature, which OpenBot does not show: `ListAgents` finds the
  * user's other Claude sessions for `SendMessage`, past the teammate rules, and `Workflow` runs a
- * background agent fleet. Their schemas cost about 1.9k tokens in each request.
+ * background agent fleet. Their schemas cost about 1.9k tokens in each request. The
+ * `workflow-authoring` skill documents only that `Workflow` tool. A request for an OpenBot workflow
+ * matched it, and its 17 KB reference went into the context before the agent searched for the
+ * OpenBot workflow tools.
  */
-const CLAUDE_DUPLICATE_TOOLS = ["ListAgents", "Workflow"];
+const CLAUDE_DUPLICATE_TOOLS = ["ListAgents", "Workflow", "Skill(workflow-authoring)"];
 
 interface ClientEvents {
   notification: [notification: AppServerNotification];

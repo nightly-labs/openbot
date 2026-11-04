@@ -21,12 +21,17 @@ such as "read", does not make a result strong. The other results have a short de
 strong result is an `openbot_browser` tool, the results also include `openbot_browser.run_script` with its
 schema. Agents search for the single actions that they know, such as click, and otherwise do not find the
 multi-step tool (see [Browser](browser.md)). The instructions
-tell the agent to describe a tool only when no search result gave its schema. `tool_describe` accepts `names`, or
+tell the agent to describe a tool only when no search result gave its schema. A search with ready schemas, and each
+`tool_describe` result, starts with a `call` note: the tools are not direct tools, so run them with `tool_call`.
+Claude loads its own deferred tools with a search and then calls them directly, and it called a found
+`openbot.list_workflows` as `mcp__openbot__list_workflows`. A search that names a workflow does not get the
+browser note. `tool_describe` accepts `names`, or
 one `name` string, and returns the original schemas for up to ten qualified names, plus guidance from
 `agent/tool-guidance.ts`. Identical guidance appears once per response. The initial catalog lists
 names without schemas.
 
-`tool_call` accepts `{ name: "namespace.tool", arguments: { ... } }`. The router resolves only
+`tool_call` accepts `{ name: "namespace.tool", arguments: { ... } }`, and `tool` as an alias of `name`, because
+a refused call costs a model step. The router resolves only
 original built-in names. It preserves the request, thread, turn, and call identifiers and the abort
 signal, then enters the same dispatch as a direct call. Existing decoders, secure browser input,
 approval cards, image results, cancellation, and message idempotency remain at their existing owners.
