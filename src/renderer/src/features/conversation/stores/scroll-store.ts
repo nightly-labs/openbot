@@ -384,6 +384,8 @@ function lastNarration(thinking: AgentMessage): AgentMessage | null {
       body,
       time: createdAt ? formatMessageTime(createdAt) : thinking.time,
       ...(createdAt ? { createdAt } : {}),
+      // Still a step of the turn: the timeline gives it no stored-message actions.
+      itemType: "commentary",
       kind: "text",
     };
   }
