@@ -897,13 +897,25 @@ The Hermes provider (id `hermes`) starts the user's own Hermes Agent with `herme
 no managed runtime for it: a newer Hermes moves `state.db` and `config.yaml` in `~/.hermes` forward,
 and the user's own older Hermes then cannot read them. `resolveHermesCli` looks for `hermes` on
 `PATH` and in `~/.local/bin`, and reads the version from `Hermes Agent vX.Y.Z` in `hermes --version`.
-A missing CLI is `not-installed`, and the row opens the `hermes-install` guide. The process keeps
+
+A missing CLI is `not-installed`. On macOS and Linux, with no `OPENBOT_HERMES_PATH`, its row has a
+Download: `HermesInstaller` (`src/main/hermes-installer.ts`) runs the official installer as the
+OpenBot user. The script is pinned to the commit of one release (`HERMES_INSTALLER`), and OpenBot
+checks its SHA-256 before it runs. It runs one `--stage <name> --json` at a time, with no browser,
+computer-use or setup stage, so each stage moves the progress bar and Cancel stops its process
+group. Hermes goes to `~/.hermes` and `~/.local/bin/hermes`, as a terminal install puts it, and
+OpenBot does not update or remove it. The installer status is an optional `providers.hermes` in the
+runtime snapshot: `not-downloaded`, `downloading`, `finishing`, `download-error`, and `ready` when
+Hermes is installed, so that a server's row offers its Connect. Team API protocols below 8 never
+carry it; `providers-v8` adds the row, and an older client drops it. On Windows and with
+`OPENBOT_HERMES_PATH`, the row opens the `hermes-install` guide. The process keeps
 the user's `HERMES_HOME` (or `~/.hermes`, `%LOCALAPPDATA%\hermes` on Windows), so the user's memories,
 skills, sign-ins and `SOUL.md` apply. `hermesStatePaths` lets a confined process write that folder
 and protects the Hermes code, `config.yaml`, `.env`, `SOUL.md`, skills, hooks, cron, plugins and
 profiles in it. On a server, that is the Hermes of the service user (`/var/lib/openbot`, or `/data` in
 Docker); the server packages include `libatomic1`, which the Node.js of the Hermes installer needs.
-`scripts/hermes-server-e2e.ts` installs Hermes in the release image and runs a turn on a mock model.
+`scripts/hermes-server-e2e.ts` installs Hermes in the release image with `HermesInstaller` and runs a
+turn on a mock model.
 
 Sign in runs `hermes auth add nous --type oauth`, the Nous Portal device-code login. Its first
 question imports shared Nous credentials, and EOF answers yes, so the code sign-in closes the CLI's

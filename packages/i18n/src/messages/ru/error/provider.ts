@@ -416,6 +416,9 @@ export const messages = {
   "error.provider.registryPrerequisite": "Установите {tool} на хост, прежде чем устанавливать этого агента.",
   "error.provider.registryBindingChanged": "Пользовательский агент изменился во время установки. Повторите попытку.",
   "error.provider.registryInstallFailed": "Не удалось установить агента. Предыдущая установка не изменена.",
+  "error.provider.hermesInstallFailed":
+    "Hermes Agent не установлен. Попробуйте ещё раз или воспользуйтесь инструкцией по установке.",
+  "error.provider.hermesNeedsGitCurl": "Hermes Agent нужны git и curl. Установите их и попробуйте ещё раз.",
   "error.provider.registryRemoveBusy":
     "Дождитесь окончания установки агента и активной работы ACP, прежде чем удалять его.",
 } as const satisfies PartialTranslation<typeof source>;

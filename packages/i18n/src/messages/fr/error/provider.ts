@@ -444,6 +444,9 @@ export const messages = {
   "error.provider.registryBindingChanged": "L’agent personnalisé a changé pendant l’installation. Réessayez.",
   "error.provider.registryInstallFailed":
     "L’installation de l’agent a échoué. L’installation précédente n’a pas changé.",
+  "error.provider.hermesInstallFailed":
+    "Hermes Agent ne s’est pas installé. Réessayez, ou suivez le guide d’installation.",
+  "error.provider.hermesNeedsGitCurl": "Hermes Agent a besoin de git et de curl. Installez-les, puis réessayez.",
   "error.provider.registryRemoveBusy":
     "Attendez la fin de l’installation de l’agent et du travail ACP en cours avant de le supprimer.",
 } as const satisfies PartialTranslation<typeof source>;

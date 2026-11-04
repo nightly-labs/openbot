@@ -25,7 +25,10 @@ Then connect a provider from the app, as on a hosted server (see
 ### Hermes Agent
 
 OpenBot uses the Hermes Agent of the service user, as it uses the user's own Hermes on a desktop
-(see [Hermes](architecture/providers.md#hermes)). Install Hermes as that user, then restart OpenBot:
+(see [Hermes](architecture/providers.md#hermes)). Open the server's provider settings and select
+Download on the Hermes row. OpenBot runs the official Hermes installer as the service user, then the
+row shows Connect. To install Hermes from a terminal instead, run the installer as that user, then
+restart OpenBot:
 
 ```sh
 sudo -u openbot -i bash -c 'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive'
@@ -39,13 +42,13 @@ docker exec openbot bash -c 'curl -fsSL https://hermes-agent.nousresearch.com/in
 docker restart openbot
 ```
 
-Hermes keeps its settings, sign-ins and memories in `~/.hermes` of that user. Then sign in from the
-Hermes row of the server's provider settings: it shows a Nous Portal code. Alternatively, run
+Hermes keeps its settings, sign-ins and memories in `~/.hermes` of that user. Then select Connect on
+the Hermes row of the server's provider settings: it shows a Nous Portal code. Alternatively, run
 `hermes setup` or `hermes model` as that user. OpenBot sees a change to `config.yaml`, `.env` or
 `auth.json` with no restart. A Hermes that another user installed is not used.
 
-The Hermes installer downloads Node.js, which needs `libatomic1`. The service user has no sudo, so
-the server packages include it. `bun run test:hermes-server` checks this setup in Docker.
+The Hermes installer needs `git` and `curl`, and downloads Node.js, which needs `libatomic1`. The
+service user has no sudo, so the server packages include them. `bun run test:hermes-server` checks this setup in Docker.
 
 ### Sign in with a server claim
 

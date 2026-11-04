@@ -11,6 +11,7 @@ import { PROVIDER_HOST_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protoco
 import { PROVIDERS_ADMIN_CODE_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v1";
 import { PROVIDERS_SIGN_IN_V3_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v3";
 import { PROVIDERS_V4_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v4";
+import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v8";
 import { SIGN_IN_RELAY_PROVIDERS } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 
 /**
@@ -198,13 +199,25 @@ export function serverCanAdminister(
  * it also has `providers-v3`, which only a host that can run a pasted code advertises. A host with
  * `providers-v3` alone signs in its own list, and a host with `providers-v1` alone Codex only. The
  * providers that a host signs in on a page are in `hostSignInProviders` and `relaySignInProviders`.
+ *
+ * A host with `providers-v8` also signs in each later provider that has a device code, such as Kimi
+ * and Hermes: it takes any provider id, and the descriptor's `localCodeSignIn` mirrors the driver's
+ * code sign-in. A provider that the relay already signs in, such as Muse, keeps the relay. The
+ * mobile app's `codeSignInProviders` uses the same rule.
  */
 export function serverCodeRouteProviders(server: ServerSummary | undefined): readonly AgentProviderId[] {
   if (server?.kind !== "remote") return [];
   if (serverSupportsCapability(server, "providers-v4")) {
     const paste = serverSupportsCapability(server, "providers-v3");
-    return PROVIDERS_V4_SIGN_IN_PROVIDERS.filter(
+    const v4: readonly AgentProviderId[] = PROVIDERS_V4_SIGN_IN_PROVIDERS.filter(
       (provider) => paste || agentProviderDescriptor(provider).localCodeSignIn !== "paste",
+    );
+    if (!serverSupportsCapability(server, PROVIDERS_V8_CAPABILITY)) return v4;
+    const earlier: readonly AgentProviderId[] = [...PROVIDERS_V4_SIGN_IN_PROVIDERS, ...SIGN_IN_RELAY_PROVIDERS];
+    return AGENT_PROVIDERS.filter(
+      (provider) =>
+        v4.includes(provider) ||
+        (agentProviderDescriptor(provider).localCodeSignIn === "device" && !earlier.includes(provider)),
     );
   }
   if (serverSupportsCapability(server, "providers-v3")) return PROVIDERS_SIGN_IN_V3_PROVIDERS;

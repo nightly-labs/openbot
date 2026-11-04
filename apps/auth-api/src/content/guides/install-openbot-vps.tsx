@@ -225,8 +225,13 @@ export function InstallOpenBotVPS() {
       <h3>Use Hermes Agent on the server</h3>
 
       <p>
-        OpenBot runs the Hermes Agent of its service user, so install Hermes as that user, not as your SSH login. For
-        the Ubuntu installer, run this on the VPS:
+        Open the server's provider settings and select Download on the Hermes row. OpenBot installs Hermes Agent for its
+        service user, then the row shows Connect.
+      </p>
+
+      <p>
+        To install Hermes from a terminal instead, install it as the service user, not as your SSH login. For the Ubuntu
+        installer, run this on the VPS:
       </p>
 
       <pre>
@@ -248,8 +253,8 @@ export function InstallOpenBotVPS() {
       </pre>
 
       <p>
-        Then open the server's provider settings and sign in on the Hermes row with the Nous Portal code. You can also
-        run <code>hermes setup</code> or <code>hermes model</code> as that user to choose another model provider.
+        Then select Connect on the Hermes row and enter the Nous Portal code. You can also run <code>hermes setup</code>{" "}
+        or <code>hermes model</code> as that user to choose another model provider.
       </p>
 
       <h2>5. Read logs and keep the server updated</h2>

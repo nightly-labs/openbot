@@ -14,8 +14,10 @@ xauth
 xvfb
 # The Codex sandbox. Without it on PATH, Codex uses its bundled copy and reports an error.
 bubblewrap
-# The Node.js that the Hermes Agent installer downloads. Without it, the install stops, and the
-# service user cannot install it: that user has no sudo.
+# The Hermes Agent installer clones Hermes with git, and the Node.js that it downloads needs
+# libatomic1. Without them, the install stops, and the service user cannot install them: that user
+# has no sudo.
+git
 libatomic1
 # Electron.
 libasound2t64
