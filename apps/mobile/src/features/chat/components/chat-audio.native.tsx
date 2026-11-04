@@ -444,7 +444,8 @@ function AudioWaveform({
           else if (nativeEvent.actionName === "decrement") onStep(-1);
         }}
         className="min-w-0 flex-1 flex-row items-center justify-between"
-        style={{ height: WAVE_HEIGHT + 4 }}
+        // A recording plays left to right in every language, as the touch position counts it.
+        style={{ height: WAVE_HEIGHT + 4, direction: "ltr" }}
         onLayout={(event) => setTrackWidth(Math.round(event.nativeEvent.layout.width))}
       >
         {bars.map(({ peak, place }) => {

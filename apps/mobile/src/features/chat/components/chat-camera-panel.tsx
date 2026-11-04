@@ -8,6 +8,7 @@ import Animated, { cubicBezier } from "react-native-reanimated";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 // The preview arrives when the hardware is ready, which is not when the panel
 // opens. It fades in over the surface it was given rather than popping in.
@@ -121,7 +122,7 @@ export function ChatCameraContent({
             onCancel();
           }}
         >
-          <ChevronLeft color="white" size={25} />
+          <ChevronLeft color="white" size={25} style={MIRROR_IN_RTL} />
         </Button>
         <Button
           isIconOnly

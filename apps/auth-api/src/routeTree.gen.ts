@@ -74,6 +74,7 @@ import { Route as V1AvatarsUserIdRouteImport } from './routes/v1/avatars/$userId
 import { Route as V1GithubInstallationTokensRouteImport } from './routes/v1/github/installation-tokens'
 import { Route as V1MeAnalyticsRouteImport } from './routes/v1/me/analytics'
 import { Route as V1MeAvatarRouteImport } from './routes/v1/me/avatar'
+import { Route as V1MeChatColorRouteImport } from './routes/v1/me/chat-color'
 import { Route as V1MeProfileRouteImport } from './routes/v1/me/profile'
 import { Route as V1MobileAuthDevicesRouteImport } from './routes/v1/mobile-auth/devices'
 import { Route as V1MobileAuthLinkRouteImport } from './routes/v1/mobile-auth/link'
@@ -525,6 +526,11 @@ const V1MeAnalyticsRoute = V1MeAnalyticsRouteImport.update({
 const V1MeAvatarRoute = V1MeAvatarRouteImport.update({
   id: '/avatar',
   path: '/avatar',
+  getParentRoute: () => V1MeRoute,
+} as any)
+const V1MeChatColorRoute = V1MeChatColorRouteImport.update({
+  id: '/chat-color',
+  path: '/chat-color',
   getParentRoute: () => V1MeRoute,
 } as any)
 const V1MeProfileRoute = V1MeProfileRouteImport.update({
@@ -1263,6 +1269,7 @@ export interface FileRoutesByFullPath {
   '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
   '/v1/me/analytics': typeof V1MeAnalyticsRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
+  '/v1/me/chat-color': typeof V1MeChatColorRoute
   '/v1/me/profile': typeof V1MeProfileRoute
   '/v1/mobile-auth/devices': typeof V1MobileAuthDevicesRouteWithChildren
   '/v1/mobile-auth/link': typeof V1MobileAuthLinkRoute
@@ -1452,6 +1459,7 @@ export interface FileRoutesByTo {
   '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
   '/v1/me/analytics': typeof V1MeAnalyticsRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
+  '/v1/me/chat-color': typeof V1MeChatColorRoute
   '/v1/me/profile': typeof V1MeProfileRoute
   '/v1/mobile-auth/devices': typeof V1MobileAuthDevicesRouteWithChildren
   '/v1/mobile-auth/link': typeof V1MobileAuthLinkRoute
@@ -1642,6 +1650,7 @@ export interface FileRoutesById {
   '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
   '/v1/me/analytics': typeof V1MeAnalyticsRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
+  '/v1/me/chat-color': typeof V1MeChatColorRoute
   '/v1/me/profile': typeof V1MeProfileRoute
   '/v1/mobile-auth/devices': typeof V1MobileAuthDevicesRouteWithChildren
   '/v1/mobile-auth/link': typeof V1MobileAuthLinkRoute
@@ -1833,6 +1842,7 @@ export interface FileRouteTypes {
     | '/v1/github/installation-tokens'
     | '/v1/me/analytics'
     | '/v1/me/avatar'
+    | '/v1/me/chat-color'
     | '/v1/me/profile'
     | '/v1/mobile-auth/devices'
     | '/v1/mobile-auth/link'
@@ -2022,6 +2032,7 @@ export interface FileRouteTypes {
     | '/v1/github/installation-tokens'
     | '/v1/me/analytics'
     | '/v1/me/avatar'
+    | '/v1/me/chat-color'
     | '/v1/me/profile'
     | '/v1/mobile-auth/devices'
     | '/v1/mobile-auth/link'
@@ -2211,6 +2222,7 @@ export interface FileRouteTypes {
     | '/v1/github/installation-tokens'
     | '/v1/me/analytics'
     | '/v1/me/avatar'
+    | '/v1/me/chat-color'
     | '/v1/me/profile'
     | '/v1/mobile-auth/devices'
     | '/v1/mobile-auth/link'
@@ -2957,6 +2969,13 @@ declare module '@tanstack/solid-router' {
       path: '/avatar'
       fullPath: '/v1/me/avatar'
       preLoaderRoute: typeof V1MeAvatarRouteImport
+      parentRoute: typeof V1MeRoute
+    }
+    '/v1/me/chat-color': {
+      id: '/v1/me/chat-color'
+      path: '/chat-color'
+      fullPath: '/v1/me/chat-color'
+      preLoaderRoute: typeof V1MeChatColorRouteImport
       parentRoute: typeof V1MeRoute
     }
     '/v1/me/profile': {
@@ -3819,6 +3838,7 @@ declare module '@tanstack/solid-router' {
 interface V1MeRouteChildren {
   V1MeAnalyticsRoute: typeof V1MeAnalyticsRoute
   V1MeAvatarRoute: typeof V1MeAvatarRoute
+  V1MeChatColorRoute: typeof V1MeChatColorRoute
   V1MeProfileRoute: typeof V1MeProfileRoute
   V1MeBillingPortalRoute: typeof V1MeBillingPortalRoute
   V1MeLicenseCheckoutRoute: typeof V1MeLicenseCheckoutRoute
@@ -3832,6 +3852,7 @@ interface V1MeRouteChildren {
 const V1MeRouteChildren: V1MeRouteChildren = {
   V1MeAnalyticsRoute: V1MeAnalyticsRoute,
   V1MeAvatarRoute: V1MeAvatarRoute,
+  V1MeChatColorRoute: V1MeChatColorRoute,
   V1MeProfileRoute: V1MeProfileRoute,
   V1MeBillingPortalRoute: V1MeBillingPortalRoute,
   V1MeLicenseCheckoutRoute: V1MeLicenseCheckoutRoute,

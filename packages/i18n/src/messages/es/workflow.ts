@@ -98,6 +98,7 @@ export const messages = {
   "workflow.model.providerModels": "Modelos de {name}",
   "workflow.model.effort": "Esfuerzo: {name}",
   "workflow.model.effortRange": "{from}–{to}",
+  "workflow.model.auto": "Auto",
 
   "workflow.llm.title": "LLM",
   "workflow.llm.name": "paso de LLM",

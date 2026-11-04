@@ -236,7 +236,8 @@ export function WorkspaceShell(props: {
   // not stutter, and mounts while the screen fades.
   const chatHeld = () => !!props.behindSplash?.() || (loadingCover() && !coverOpen());
   createEffect(
-    () => fullWindowLoading() && !loadingCover() && !props.behindSplash?.(),
+    // The landing demo loads its mock data at once, so it shows no loading screen.
+    () => !platform.landingPreview && fullWindowLoading() && !loadingCover() && !props.behindSplash?.(),
     (show) => {
       if (!show) return;
       setCoverOpen(false);

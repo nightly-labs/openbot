@@ -121,8 +121,8 @@ function AgentChoice({ node, agents }: { node: WorkflowNode; agents: readonly Mo
 }
 
 /**
- * The model of a model step and its effort. Without a model, the host uses its preferred model, as
- * the desktop does for a step whose model is gone.
+ * The model of a model step or a condition, and its effort. Without a model, the host uses its
+ * preferred model, as the desktop does for a step whose model is gone.
  */
 function ModelChoice({ node, serverId }: { node: WorkflowNode; serverId: string }) {
   const { t } = useText();
@@ -348,6 +348,7 @@ export function WorkflowStepScreen() {
             placeholder={t("mobile.workflow.step.ruleDefault")}
           />
           <SettingsNote>{t("mobile.workflow.step.ruleHint")}</SettingsNote>
+          <ModelChoice node={node} serverId={draft.serverId} />
         </>
       ) : null}
       {node.kind === "approval" ? (

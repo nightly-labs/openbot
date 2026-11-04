@@ -10,6 +10,7 @@
 // A test sign-in uses the same flow. It saves the connection only when it passes, so a connection
 // with a wrong value never takes the email codes away. SCIM from the provider turns a person off.
 
+import { isAvatarColor } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { isValidHostname, normalizeEmailAddress } from "@openbot/contracts/validation";
 import { Effect, Schema } from "effect";
@@ -182,6 +183,7 @@ interface UserRow {
   name: string | null;
   avatar_url: string | null;
   analytics_enabled: number | null;
+  chat_color: string | null;
 }
 
 function mapUser(row: UserRow): AuthUser {
@@ -191,6 +193,7 @@ function mapUser(row: UserRow): AuthUser {
     name: row.name,
     avatarUrl: row.avatar_url,
     analyticsEnabled: row.analytics_enabled === null ? null : row.analytics_enabled === 1,
+    chatColor: isAvatarColor(row.chat_color) ? row.chat_color : null,
   };
 }
 
@@ -563,7 +566,7 @@ export class CompanySignInService {
     const row = yield* storeCall(() =>
       this.#database
         .prepare(
-          `SELECT users.id, users.email, users.name, users.avatar_url, users.analytics_enabled
+          `SELECT users.id, users.email, users.name, users.avatar_url, users.analytics_enabled, users.chat_color
            FROM auth_sessions JOIN users ON users.id = auth_sessions.user_id WHERE auth_sessions.id = ?`,
         )
         .bind(session.id)

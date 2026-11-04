@@ -811,6 +811,7 @@ function ServerSettings() {
           memoryReview={{}}
           hostPromptCacheTtl={{}}
           hostModelVisibility={{}}
+          hostDefaultProvider={{}}
           agentAccess={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           serverAudit={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           initialSection={serverSettingsSection()}
@@ -917,6 +918,7 @@ function AppSettings(props: AccountProps) {
         account={props.account()}
         onUpdateAccountName={auth.updateAccountName}
         onUpdateAccountAvatar={auth.updateAccountAvatar}
+        onSetChatColor={auth.setChatColor}
         onCreateMobileConnect={auth.createMobileConnect}
         onCancelMobileConnect={auth.cancelMobileConnect}
         onGetMobileConnectLink={auth.getMobileConnectLink}

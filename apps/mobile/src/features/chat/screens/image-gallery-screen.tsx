@@ -17,6 +17,7 @@ import { type MenuAction, MenuView } from "@/shared/components/menu-view";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 
 /** The floating header: its buttons are 48 points high, 8 points under the safe area, as in the chat. */
@@ -108,7 +109,7 @@ function GalleryContent({ entry }: { entry: ImageGalleryEntry }) {
               router.back();
             }}
           >
-            <ArrowLeft color={String(foreground)} size={24} strokeWidth={2} />
+            <ArrowLeft color={String(foreground)} size={24} strokeWidth={2} style={MIRROR_IN_RTL} />
           </ChatGlassIconButton>
           <View className="min-w-0 flex-1 flex-row justify-center" pointerEvents="none">
             <GlassView

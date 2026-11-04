@@ -789,6 +789,10 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
     if (value.avatarColor !== null && !isAvatarColor(value.avatarColor)) throw new Error("Invalid avatar color.");
     result.avatarColor = value.avatarColor;
   }
+  if (value.chatColor !== undefined) {
+    if (value.chatColor !== null && !isAvatarColor(value.chatColor)) throw new Error("Invalid chat color.");
+    result.chatColor = value.chatColor;
+  }
   return result;
 }
 

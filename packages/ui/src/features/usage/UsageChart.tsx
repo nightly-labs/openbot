@@ -71,7 +71,8 @@ export function UsageChart(props: { result: HostAnalytics; metric: UsageMetric }
         <YAxis
           tickLine={false}
           axisLine={false}
-          width={80}
+          // Measured from the ticks: a fixed width cut "US$ 2.400,00" in Portuguese.
+          width="auto"
           tickCount={4}
           // Every tick at its own grid line. The default fit moves the top label into the plot and then
           // drops the zero label, which it finds too close.

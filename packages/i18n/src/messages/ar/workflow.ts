@@ -105,6 +105,7 @@ export const messages = {
   "workflow.model.providerModels": "نماذج {name}",
   "workflow.model.effort": "الجهد: {name}",
   "workflow.model.effortRange": "{from}–{to}",
+  "workflow.model.auto": "تلقائي",
 
   "workflow.llm.title": "LLM",
   "workflow.llm.name": "خطوة LLM",

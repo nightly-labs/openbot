@@ -1,3 +1,4 @@
+import type { AvatarColor } from "@openbot/contracts/ipc";
 import type { AccountSession } from "@openbot/contracts/mobile-connect";
 import { isDynamicRecord, isFunction } from "@openbot/contracts/runtime-values";
 import type { Effect } from "effect";
@@ -187,6 +188,8 @@ export interface AuthUser {
   avatarUrl: string | null;
   /** The latest product analytics answer from any device. Null until the user answers. */
   analyticsEnabled: boolean | null;
+  /** The tint of the user's own chat bubbles, which members of every server of the user see. */
+  chatColor: AvatarColor | null;
 }
 
 export interface MobileAuthDevice {
@@ -294,6 +297,11 @@ export interface AuthRepository {
     userId: string,
     enabled: boolean,
     answeredAt: number,
+    now: number,
+  ): Effect.Effect<AuthUser, AuthStoreError>;
+  updateUserChatColor(
+    userId: string,
+    chatColor: AvatarColor | null,
     now: number,
   ): Effect.Effect<AuthUser, AuthStoreError>;
   updateUserAvatar(

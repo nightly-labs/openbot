@@ -7,6 +7,12 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.language.system": "System default",
   "mobile.settings.language.footer":
     "System default follows the first language in your phone settings. Text that is not translated yet shows in English.",
+  "mobile.settings.language.restartTitle": "Restart OpenBot?",
+  "mobile.settings.language.restartBody":
+    "This language reads in the other direction. The screens change direction when OpenBot starts again. If the screens still look wrong after the restart, close OpenBot in the app switcher and open it again.",
+  "mobile.settings.language.restartNow": "Restart now",
+  "mobile.settings.language.restartFailed":
+    "OpenBot could not restart. The screens change direction the next time you open OpenBot.",
   "mobile.settings.dictation.language": "Dictation language",
   "mobile.settings.about.development": "Development",
   "mobile.settings.about.openFailed": "Could not open the link. Try again.",
