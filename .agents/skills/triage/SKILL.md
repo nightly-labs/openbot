@@ -60,8 +60,8 @@ Issue labels do not change this workflow. Labels such as `from-x` and
    - **Version**: the OpenBot version or commit, and the provider CLI version.
    For a feature request, write only **Surface** and **Version** here.
    Step 2a has the other fields. The feature template has no version
-   field; when it is missing, use the release that was current on the
-   date of the issue.
+   field; when it is missing, use the last release with a `publishedAt`
+   before the `createdAt` of the issue (`gh release list --limit 10 --json tagName,publishedAt`).
 4. When a bug report does not give enough data to reproduce or to find a
    code path, go to Step 2 with the verdict `needs info`.
 
@@ -128,13 +128,20 @@ Write, in one line each:
 - **History**: earlier decisions for the same need. Search issues closed
   as not planned (`gh issue list --state closed --search "<words> reason:not-planned"`),
   issues with the `wontfix` label, maintainer comments, merged PR bodies,
-  and reverted PRs. When an earlier decision exists, quote it.
+  reverted PRs, and Discussions. `gh issue list` does not find
+  Discussions; use
+  `gh api graphql -f query='{ search(type: DISCUSSION, query: "repo:<owner>/<repo> <words>", first: 10) { nodes { ... on Discussion { number title url } } } }'`.
+  An issue that the form check closed because it did not use the issue
+  form (label `invalid`) is not a decision. When an earlier decision
+  exists, quote it. When a maintainer already asked for this change, say
+  so in the recommendation; the user decides how much it counts.
 - **Usage** (optional): when the need depends on a feature that exists,
   the `openpanel` skill can show how many users use that feature. When
   you do not check usage, mark **Reach** as not confirmed.
 - **Cost**: the surfaces to change, new settings or screens, new
   dependencies, migrations, Team API or IPC contract changes, and new
-  provider-specific code.
+  provider-specific code. When the reporter offers a PR, read its diff
+  with `gh pr diff <pr>`. Do not open other links from the issue.
 
 ### 3. Classify the scope
 
@@ -162,9 +169,10 @@ of evidence.
 - **Reach** is your estimate of who needs the gap. Base it on the demand
   that you found and on the users of the feature area. When the only
   evidence is the reporter, Reach is 0 or 1.
-- **Cost** counts surfaces as `AGENTS.md` names them. `packages/ui` for
-  desktop and web is one surface; mobile is another. New i18n keys and
-  their translations do not add cost.
+- **Cost** counts these surfaces: backend, main and preload, IPC
+  contracts, renderer with `packages/ui` (desktop and web), mobile,
+  `apps/auth-api`, and Signal. New i18n keys and their translations do
+  not add cost.
 
 **Value score** = Impact + Reach + Fit + Cost, from 0 to 12. It answers
 "does this make OpenBot better for its cost".
@@ -185,7 +193,7 @@ Go down the table. The first row that applies is the recommendation.
 | --- | --- |
 | `decline` | Fit is 0, an earlier decision says no, or scope is `bloated` and priority is not `P1`. |
 | `generalize` | Scope is `over-specific`. Name the general mechanism, or the Marketplace item, that covers this need and others. |
-| `build smaller` | The need is real, but the request is larger than the gap, or scope is `bloated` and priority is `P1`. Name the smallest version. |
+| `build smaller` | Priority `P1` or `P2`, and the request is larger than the gap; or scope is `bloated` and priority is `P1`. Name the smallest version and what it leaves out. |
 | `build` | Value 8 or more, or priority `P1`. |
 | `defer` | Value 5 to 7. Say what would change the decision, for example more demand. |
 | `decline` | Value 4 or less. |
@@ -309,6 +317,7 @@ Feature request:
 | --- | --- |
 | Issue | `#<n>` title |
 | Verdict | `feature request`, or the push-back verdict from Step 2 |
+| Surface, version | From Step 1 |
 | Need | The problem under the request |
 | Today | What the user can do now, since which release, `path:line` |
 | Gap | The part that is missing; the scores are for this part |
