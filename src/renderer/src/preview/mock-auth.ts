@@ -113,6 +113,12 @@ export function createMockAuth(options: MockAuthOptions, { emit }: MockRuntime) 
       emitAuthState(authState);
       return clone(authState);
     },
+    updateChatColor: async (chatColor) => {
+      if (authState.status !== "signed_in") return clone(authState);
+      authState = { ...authState, user: { ...authState.user, chatColor } };
+      emitAuthState(authState);
+      return clone(authState);
+    },
     createMobileConnect: async () => ({
       qrData:
         "openbot://mobile-connect?api=https%3A%2F%2Fapi.openbot.run&ticket=preview-mobile-ticket_1234567890abcdef",

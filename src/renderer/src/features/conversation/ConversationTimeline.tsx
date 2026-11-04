@@ -345,8 +345,11 @@ export function ConversationTimeline() {
       kind: "member",
       name: (member ? teamMemberName(member) : sender.name.trim()) || t("chat.message.memberFallback"),
       avatarSeed: sender.id,
+      chatColor: member?.chatColor,
     };
   };
+  /** The reader's own chat color: the member of the server that is the reader. */
+  const ownChatColor = () => props.presence.members.find((member) => props.isOwnSender(member.id))?.chatColor;
   /** The agent messages of the chat by their exchange id, so a marker finds its text and its request. */
   const agentMessagesByExchangeId = createMemo(
     () =>
@@ -727,9 +730,15 @@ export function ConversationTimeline() {
                   const current = message();
                   const sender = otherSender(current);
                   if (sender) return memberAuthor(sender);
-                  if (current?.author === "you") return { kind: "you", name: t("chat.message.you") };
+                  if (current?.author === "you")
+                    return { kind: "you", name: t("chat.message.you"), chatColor: ownChatColor() };
                   if (channel && current) return channel.author(current);
-                  return { kind: "agent", name: props.agent?.name ?? t("chat.message.agentFallback") };
+                  // The profile gives the row the agent's color, for the name and the bubble tint.
+                  return {
+                    kind: "agent",
+                    name: props.agent?.name ?? t("chat.message.agentFallback"),
+                    agent: props.agent,
+                  };
                 });
                 const referencedMessage = createMemo(() => {
                   const replyToMessageId = message()?.replyToMessageId;

@@ -8,6 +8,8 @@ export const messages = {
     "Un cortafuegos o proxy de esta red impidió que OpenBot accediera a {host}. Pide al administrador de la red que permita {host} e inténtalo de nuevo.",
   "error.auth.signInFirst": "Primero inicia sesión en OpenBot.",
   "error.auth.signInRequired": "Es necesario iniciar sesión.",
+  "error.auth.chatColorUnavailable":
+    "El servicio de cuentas todavía no admite colores de chat. Inténtalo de nuevo más tarde.",
   "error.auth.accountChangedDuringRegister":
     "La cuenta con sesión iniciada cambió mientras se registraba este servidor.",
   "error.auth.hostCredentialUnavailable":

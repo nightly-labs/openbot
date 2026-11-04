@@ -15,6 +15,7 @@ import {
   type HostStatus,
   type InvitePreview,
   type InviteSummary,
+  isAvatarColor,
   REMOTE_DESKTOP_ERROR_CODES,
   type RemoteDesktopConnectResult,
   type RemoteDesktopDisplay,
@@ -379,10 +380,11 @@ function optionalReadState(conversation: DynamicRecord): { readState?: DirectCon
 }
 
 function teamMember(member: DynamicRecord): TeamMemberSummary {
-  const { avatarUrl } = member;
+  const { avatarUrl, chatColor } = member;
   if (avatarUrl !== undefined && avatarUrl !== null && !isString(avatarUrl)) {
     throw new Error("Invalid avatarUrl.");
   }
+  if (chatColor !== undefined && !isAvatarColor(chatColor)) throw new Error("Invalid chatColor.");
   return {
     id: requiredString(member, "id"),
     username: requiredString(member, "username"),
@@ -392,6 +394,7 @@ function teamMember(member: DynamicRecord): TeamMemberSummary {
     role: teamRole(member.role),
     createdAt: requiredString(member, "createdAt"),
     disabled: requiredBoolean(member, "disabled"),
+    ...(chatColor === undefined ? {} : { chatColor }),
   };
 }
 

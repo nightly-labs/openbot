@@ -83,6 +83,20 @@
   --openbot-bg-notch: #000000;
   --openbot-mask-solid: #000000;
   --openbot-transparent: rgba(0, 0, 0, 0);
+  /* The color picker draws real colors, so these stay the same in both themes: the rim and the
+     ends of the saturation area, and the hue spectrum. */
+  --openbot-color-picker-light: #ffffff;
+  --openbot-color-picker-dark: #000000;
+  --openbot-color-picker-spectrum: linear-gradient(
+    to right,
+    #ff0000,
+    #ffff00,
+    #00ff00,
+    #00ffff,
+    #0000ff,
+    #ff00ff,
+    #ff0000
+  );
   --openbot-drawer-scrim: #000000;
   --openbot-scroll-edge-overlay: rgba(0, 0, 0, 0.72);
   --openbot-queue-surface: var(--openbot-bg-surface);

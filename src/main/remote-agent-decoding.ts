@@ -54,6 +54,7 @@ import {
   isAgentProvider,
   isAgentStatus,
   isAttachmentSummary,
+  isChatColors,
   isClientAgentModelOption,
   isClientAgentSummary,
   isQueuedMessageReceipt,
@@ -70,6 +71,7 @@ import { isAgentThreadBranchLinks } from "@openbot/contracts/team-protocol/agent
 
 export const decodeAgentHostSettingsFromHost = guardedDecoder(isAgentHostSettings, "agent host settings response");
 export const decodeRemoteAgentColors = guardedDecoder(isAgentColors, "agent colors response");
+export const decodeRemoteChatColors = guardedDecoder(isChatColors, "chat colors response");
 export const decodeHiddenAgentsFromHost = guardedDecoder(isHiddenAgentsSnapshot, "hidden agents response");
 export const decodeSidebarPinsFromHost = guardedDecoder(isSidebarPinsSnapshot, "pinned chats response");
 export const decodeAgentNotificationLevelsFromHost = guardedDecoder(
