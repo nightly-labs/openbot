@@ -574,7 +574,6 @@ function AgentTaskChat({
           onRespondApproval={(approval, decision) =>
             respondToApproval(serverId, { requestId: approval.requestId, decision })
           }
-          fieldBackground={fieldBackground}
           foreground={foreground}
           messages={messages}
           turnSummaries={turnSummaries}
@@ -592,11 +591,8 @@ function AgentTaskChat({
           focusMessageId={focus}
           onFocusPlaced={clearFocus}
           muted={muted}
-          raised={raised}
           showStarter={false}
           topInset={insets.top}
-          onDismissStarter={() => {}}
-          onSelectStarter={() => {}}
           onRetryHistory={() => void conversation.refetch()}
         />
         {voiceOpen ? (
