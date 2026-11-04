@@ -280,7 +280,7 @@
    * landing page carry type above 24px; .landing-hero-logo is sized in em off
    * --openbot-text-hero, so that token is layout, not just type. */
   --openbot-text-display: 32px;
-  --openbot-text-usage-total: clamp(2rem, 5cqi, 3.5rem);
+  --openbot-text-usage-total: clamp(2rem, 3.5cqi, 2.75rem);
   --openbot-leading-display: 38px;
   --openbot-text-hero: clamp(3rem, 8vw, 6.5rem);
 
