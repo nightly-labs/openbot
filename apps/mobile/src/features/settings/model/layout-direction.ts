@@ -13,7 +13,7 @@ import { currentLocale, currentText } from "@/shared/lib/text";
  *
  * @returns True when the layout of this run has the other direction, so a restart changes it.
  */
-export function syncLayoutDirection(): boolean {
+function syncLayoutDirection(): boolean {
   const rightToLeft = localeDirection(currentLocale()) === "rtl";
   // Both flags, every time: a change back to the first language before the restart cancels the change.
   I18nManager.allowRTL(rightToLeft);
@@ -27,7 +27,7 @@ export function syncLayoutDirection(): boolean {
  * direction that it had when the process started, so some views can keep the previous direction
  * until the user closes the app. The restart question tells the user so.
  */
-export async function restartApp(backgroundColor: string): Promise<void> {
+async function restartApp(backgroundColor: string): Promise<void> {
   if (__DEV__) {
     DevSettings.reload();
     return;
