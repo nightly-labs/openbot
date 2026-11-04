@@ -1779,6 +1779,7 @@ try {
         "openrouter",
         "kimi",
         "devin",
+        "copilot",
         "hermes",
       ],
       3: [
@@ -1794,6 +1795,7 @@ try {
         "openrouter",
         "kimi",
         "devin",
+        "copilot",
         "hermes",
       ],
       4: [
@@ -1808,11 +1810,12 @@ try {
         "openrouter",
         "kimi",
         "devin",
+        "copilot",
         "hermes",
       ],
-      5: ["cursor", "cline", "pi", "muse", "inception", "deepseek", "openrouter", "kimi", "devin", "hermes"],
-      6: ["pi", "muse", "inception", "deepseek", "openrouter", "kimi", "devin", "hermes"],
-      7: ["inception", "deepseek", "openrouter", "kimi", "devin", "hermes"],
+      5: ["cursor", "cline", "pi", "muse", "inception", "deepseek", "openrouter", "kimi", "devin", "copilot", "hermes"],
+      6: ["pi", "muse", "inception", "deepseek", "openrouter", "kimi", "devin", "copilot", "hermes"],
+      7: ["inception", "deepseek", "openrouter", "kimi", "devin", "copilot", "hermes"],
       8: [],
       9: [],
     };

@@ -277,6 +277,7 @@ export const messages = {
   "error.provider.kimiVersionUnreadable": "No se pudo leer la versión de Kimi CLI.",
   "error.provider.kimiSignIn": "Inicia sesión con Kimi Code para usar Kimi.",
   "error.provider.devinSignIn": "Inicia sesión con Devin para usar Devin.",
+  "error.provider.copilotSignIn": "Inicia sesión con GitHub o define COPILOT_GITHUB_TOKEN para usar GitHub Copilot.",
   "error.provider.hermesMissing": "Hermes Agent no está instalado. Instálalo y vuelve a intentarlo.",
   "error.provider.hermesNotStarted": "Hermes Agent no se pudo iniciar. Ejecuta `hermes --version` en una terminal.",
   "error.provider.hermesVersionUnreadable": "No se puede leer la versión de Hermes Agent.",
@@ -298,6 +299,8 @@ export const messages = {
     "Gemini no pudo abrir la página de inicio de sesión en tu navegador. Revisa tu navegador predeterminado y vuelve a conectarte.",
   "error.provider.acpSignInFailed": "El inicio de sesión no se completó.",
   "error.provider.acpSignInFailedReason": "El inicio de sesión no se completó: {reason}",
+  "error.provider.acpSignOutFailed": "El cierre de sesión no se completó.",
+  "error.provider.acpSignOutFailedReason": "El cierre de sesión no se completó: {reason}",
   "error.provider.acpSignInMethodMissing":
     "Este proveedor no ofrece este inicio de sesión en este equipo. Actualiza el proveedor y vuelve a intentarlo.",
   "error.provider.httpsSignInLinkOnly": "Solo se pueden abrir en el navegador enlaces de inicio de sesión HTTPS.",

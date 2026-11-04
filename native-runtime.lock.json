@@ -1954,5 +1954,62 @@
         }
       }
     }
+  },
+  "copilot": {
+    "version": "1.0.105",
+    "license": "GitHub Copilot CLI License",
+    "licenseUrl": "https://github.com/github/copilot-cli/blob/main/LICENSE.md",
+    "artifacts": {
+      "darwin-arm64": {
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.105/copilot-darwin-arm64.tar.gz",
+        "assetSha256": "34aacd03fb478d47e4b3cfc5ca045c37278c5d8d86239466521a16ea54ac84aa",
+        "downloadBytes": 119263282,
+        "installedBytes": 181873376,
+        "executable": "copilot",
+        "files": {
+          "bin/copilot": "5fd7d15ff02deb08a58593b1b488015bb52c1686014b80b5509e28263cb3ad70"
+        }
+      },
+      "darwin-x64": {
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.105/copilot-darwin-x64.tar.gz",
+        "assetSha256": "de5684eeb118ad1e54f9a01f4535cf74e121b8226d26473550b01a7565ce54f5",
+        "downloadBytes": 126087256,
+        "installedBytes": 190321008,
+        "executable": "copilot",
+        "files": {
+          "bin/copilot": "83e8dfacc3e79e55e4ab723edaf5b9a38d83aec85e9e115a131b973c98265801"
+        }
+      },
+      "linux-x64": {
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.105/copilot-linux-x64.tar.gz",
+        "assetSha256": "aba1f06f27bc0447656647f76e0a4cf58b4b2a341c75ff04a750982b6aeb6bd2",
+        "downloadBytes": 129108148,
+        "installedBytes": 198511424,
+        "executable": "copilot",
+        "files": {
+          "bin/copilot": "3bd8bdc75670d7b4ec445725f6a5b9af66ee7ec49e6194646e4a40a0bc09091c"
+        }
+      },
+      "linux-arm64": {
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.105/copilot-linux-arm64.tar.gz",
+        "assetSha256": "e7b488cc04ac3e2ed800e1bf0aace33ada42dcf167529b3d2f48a61e1535a847",
+        "downloadBytes": 130063152,
+        "installedBytes": 194644736,
+        "executable": "copilot",
+        "files": {
+          "bin/copilot": "0e0bde8da81405c2e2bf76d072160c6ec74121721e0be5bbd08784af494d9a22"
+        }
+      },
+      "win32-x64": {
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.105/copilot-win32-x64.zip",
+        "assetSha256": "34e16e9cf47de0e1534920171d6f39fa246638bddbb6ece820870b382bcc061a",
+        "downloadBytes": 112637935,
+        "installedBytes": 172637984,
+        "executable": "copilot.exe",
+        "files": {
+          "bin/copilot.exe": "ab6d710d551c137c766a6c8ef6ee2e7779c106870c96b9a91a91fa17b9748624"
+        }
+      }
+    }
   }
 }

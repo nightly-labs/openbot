@@ -262,6 +262,8 @@ export const messages = {
   "error.provider.kimiVersionUnreadable": "Не удалось прочитать версию Kimi CLI.",
   "error.provider.kimiSignIn": "Войдите через Kimi Code, чтобы использовать Kimi.",
   "error.provider.devinSignIn": "Войдите через Devin, чтобы использовать Devin.",
+  "error.provider.copilotSignIn":
+    "Войдите через GitHub или задайте COPILOT_GITHUB_TOKEN, чтобы использовать GitHub Copilot.",
   "error.provider.hermesMissing": "Hermes Agent не установлен. Установите его и повторите попытку.",
   "error.provider.hermesNotStarted": "Не удалось запустить Hermes Agent. Выполните `hermes --version` в терминале.",
   "error.provider.hermesVersionUnreadable": "Не удаётся прочитать версию Hermes Agent.",
@@ -283,6 +285,8 @@ export const messages = {
     "Gemini не удалось открыть страницу входа в браузере. Проверьте браузер по умолчанию и подключитесь снова.",
   "error.provider.acpSignInFailed": "Вход не завершён.",
   "error.provider.acpSignInFailedReason": "Вход не завершён: {reason}",
+  "error.provider.acpSignOutFailed": "Выход не завершён.",
+  "error.provider.acpSignOutFailedReason": "Выход не завершён: {reason}",
   "error.provider.acpSignInMethodMissing":
     "Этот провайдер не предлагает такой вход на этом компьютере. Обновите провайдера и повторите попытку.",
   "error.provider.httpsSignInLinkOnly": "В браузере можно открыть только ссылки для входа по HTTPS.",
