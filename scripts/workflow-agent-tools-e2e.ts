@@ -140,13 +140,20 @@ async function layoutProblems(label: string, workflowId: string) {
   return { problems, nodes: byId };
 }
 
-/** Calls a workflow tool as an agent does: through the `tool_call` envelope. */
-async function call(label: string, name: string, args: unknown): Promise<{ ok: boolean; value: unknown }> {
+let calls = 0;
+
+/** Calls a workflow tool as an agent does: through the `tool_call` envelope. The same `callKey` is a repeated call. */
+async function call(
+  label: string,
+  name: string,
+  args: unknown,
+  callKey = `call-${++calls}`,
+): Promise<{ ok: boolean; value: unknown }> {
   assert.ok(workflows);
   const resolved = resolveDeferredTool(params("tool_call", { name: `openbot.${name}`, arguments: args }));
   assert.ok(resolved, `tool_call refused openbot.${name}`);
   const response = await runCauseEffect(
-    handleWorkflowTool(resolved.tool, resolved.arguments, workflows, CALLER, AGENTS, confirmDelete),
+    handleWorkflowTool(resolved.tool, resolved.arguments, workflows, CALLER, callKey, AGENTS, confirmDelete),
   );
   assert.ok(response, `no handler for ${name}`);
   const item = response.contentItems[0];
@@ -420,9 +427,15 @@ try {
   });
 
   // 6. Run and read the run.
-  const run = await call("run", "run_workflow", { workflowId });
+  const run = await call("run", "run_workflow", { workflowId }, "run-call");
   check("run_workflow starts a run", run.ok, run.value);
   const { runId } = runStarted.parse(run.value);
+  const repeated = await call("run-repeated", "run_workflow", { workflowId }, "run-call");
+  check(
+    "a repeated run_workflow call starts no second run",
+    repeated.ok && runStarted.parse(repeated.value).runId === runId,
+    repeated.value,
+  );
   const deadline = Date.now() + WAIT_MS;
   let runs = await call("runs", "read_workflow_runs", { workflowId, runId });
   const agentRunning = () =>

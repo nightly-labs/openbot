@@ -1074,6 +1074,10 @@ export class OpenBotToolRouter {
       return openBotToolFailure(
         "Only a person's message, in your OpenBot chat or a thread they opened, can change, delete or run a workflow. Ask the user to request it there.",
       );
+    // A read gives every workflow, its webhook URLs and its run outputs. The Team API hides these
+    // from a member by agent access and admin rights, so a member's message does not get them here.
+    if (WORKFLOW_TOOL_NAMES.has(params.tool) && this.#fromRemoteMember(senderAgentId, params.turnId))
+      return openBotToolFailure("A team member's message cannot read workflows. Ask the member to use Workflows.");
     // The agent list is read only for a workflow tool, not on each OpenBot tool call.
     if (WORKFLOW_TOOL_NAMES.has(params.tool)) {
       const workflowResult = yield* handleWorkflowTool(
@@ -1081,6 +1085,8 @@ export class OpenBotToolRouter {
         params.arguments,
         this.#workflowTools?.() ?? null,
         senderAgentId,
+        // A call that comes again starts no second run.
+        `${params.threadId}:${params.turnId}:${params.callId}`,
         new Set(this.#hooks.listAgents().map((agent) => agent.id)),
         (title) =>
           this.#attention
@@ -1492,18 +1498,27 @@ export class OpenBotToolRouter {
    */
   #requestedByPerson(agentId: string, turnId: string, executionThreadId: string): boolean {
     const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
-    const remote = (messageId: string) => {
-      const member = this.#mailbox.senderMember(messageId);
-      return member !== undefined && (this.#channels.hooks.remotePerson?.(member.id) ?? false);
-    };
     return (
       deliveries.length > 0 &&
-      deliveries.every(({ delivery }) => delivery.sender.kind === "user" && !remote(delivery.messageId)) &&
+      deliveries.every(({ delivery }) => delivery.sender.kind === "user" && !this.#remoteMember(delivery.messageId)) &&
       (!this.#conversation.isExecutionThread(executionThreadId) ||
         (this.#tasks.isPersonThread(agentId, executionThreadId) &&
           !this.#messaging.store.linkForThread(executionThreadId) &&
           !this.#channels.store.channelForThread(executionThreadId)))
     );
+  }
+
+  /** Whether a team member on another computer sent this message. */
+  #remoteMember(messageId: string): boolean {
+    const member = this.#mailbox.senderMember(messageId);
+    return member !== undefined && (this.#channels.hooks.remotePerson?.(member.id) ?? false);
+  }
+
+  /** Whether a team member on another computer sent a message of this turn. */
+  #fromRemoteMember(agentId: string, turnId: string): boolean {
+    return this.#mailbox
+      .findDeliveriesByTurn(agentId, turnId)
+      .some(({ delivery }) => this.#remoteMember(delivery.messageId));
   }
 
   /** Adds the note that an agent changed the Vault. `text` names the item, never a secret. */

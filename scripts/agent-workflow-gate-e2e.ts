@@ -413,7 +413,7 @@ try {
     runsAfterRoutine.text,
   );
 
-  // 3. A team member's message is refused: the Team API checks that member's agent access.
+  // 3. A team member's message is refused, also for a read: the Team API checks that member's agent access.
   const fromMember = await callFromChat(
     "edit from a team member",
     agent.id,
@@ -427,6 +427,18 @@ try {
       fromMember.text.includes(REFUSAL) &&
       JSON.stringify(await stored(workflowId)) === JSON.stringify(before),
     fromMember.text,
+  );
+  const readFromMember = await callFromChat(
+    "read from a team member",
+    agent.id,
+    "read_workflow",
+    { workflowId },
+    MEMBER,
+  );
+  pass(
+    "A team member's message cannot read workflows",
+    !readFromMember.success && !readFromMember.text.includes(workflowId),
+    readFromMember.text,
   );
 
   // 4. A side thread that the person opened counts as the person's chat.

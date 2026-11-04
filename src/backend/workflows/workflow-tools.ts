@@ -636,6 +636,8 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
   workflows: WorkflowTools | null,
   /** The agent that calls the tool. The change event names it, so an open canvas shows its build. */
   callerId: string,
+  /** The same for each delivery of one tool call. A run takes it as its key, so a repeated call starts no second run. */
+  callKey: string,
   agentIds: ReadonlySet<string>,
   /** Asks the user to approve the delete of the named workflow. Each delete asks, also with Full access. */
   confirmDelete: (title: string) => Effect.Effect<boolean, ToolOperationFailed>,
@@ -734,7 +736,7 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
       const input = yield* toolStep(() => runSchema.parse(args));
       const detail = yield* workflows.startRun({
         workflowId: input.workflowId,
-        requestId: crypto.randomUUID(),
+        requestId: callKey,
         ...(input.fromNodeId === undefined ? {} : { fromNodeId: input.fromNodeId }),
       });
       return openBotToolResult({ runId: detail.run.id, number: detail.run.number, status: detail.run.status });
