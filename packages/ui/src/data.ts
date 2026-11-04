@@ -291,6 +291,8 @@ export interface AgentProfile {
   avatarHue: AvatarHue | null;
   /** The exact colour, which wins over `avatarHue`. Absent on a host without `agent-colors-v1`. */
   avatarColor?: AvatarColor | null;
+  /** The tint of the agent's chat bubbles. Absent for no tint, and on a host without `chat-colors-v1`. */
+  chatColor?: AvatarColor | undefined;
   avatarUrl: string | null;
   marketplaceSource?: NonNullable<ClientAgentSummary["marketplaceSource"]>;
   updatedAt?: string | null;

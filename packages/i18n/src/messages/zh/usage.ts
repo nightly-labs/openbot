@@ -69,4 +69,6 @@ export const messages = {
   "usage.panel.loading": "正在加载用量…",
   "usage.panel.unsupported": "这台主机不支持助手分析，请更新主机以使用该视图。",
   "usage.panel.loadFailed": "无法加载用量，请检查连接和日期范围。",
+  "usage.machine.label": "机器使用情况。CPU：{cpu}，内存：{memory}",
+  "usage.machine.openStorage": "打开存储。磁盘：{percent}，{detail}",
 } as const satisfies PartialTranslation<typeof source>;

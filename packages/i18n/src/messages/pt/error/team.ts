@@ -69,6 +69,7 @@ export const messages = {
   "error.team.agentInstallUnsupported": "Esta conexão não oferece suporte à adição de agentes.",
   "error.team.agentHideUnsupported": "Esta conexão não oferece suporte à ocultação de agentes.",
   "error.team.agentColorsUnsupported": "Esta conexão não oferece suporte a cores de agentes.",
+  "error.team.chatColorsUnsupported": "Esta conexão não oferece suporte a cores de chat.",
   "error.team.sidebarFoldersUnsupported": "Esta conexão não oferece suporte a pastas dentro de pastas.",
   "error.team.agentNotificationLevelsUnsupported":
     "Este servidor não pode guardar seu próprio nível de notificações para cada agente. Atualize o OpenBot no computador que o executa.",

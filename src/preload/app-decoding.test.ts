@@ -188,6 +188,22 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     } satisfies CentralAuthState,
   ],
   [
+    "signed in with a chat color",
+    decodeCentralAuthState,
+    {
+      status: "signed_in",
+      user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, chatColor: "#3b82f6" },
+    } satisfies CentralAuthState,
+  ],
+  [
+    "signed in with no chat color",
+    decodeCentralAuthState,
+    {
+      status: "signed_in",
+      user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, chatColor: null },
+    } satisfies CentralAuthState,
+  ],
+  [
     "account error",
     decodeCentralAuthState,
     { status: "error", issue: { code: "offline", message: "No network." } } satisfies CentralAuthState,
@@ -350,6 +366,22 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
     {
       status: "signed_in",
       user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, analyticsEnabled: "yes" },
+    },
+  ],
+  [
+    "an account chat color that is not a lower-case hex color",
+    decodeCentralAuthState,
+    {
+      status: "signed_in",
+      user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, chatColor: "#3B82F6" },
+    },
+  ],
+  [
+    "an account chat color that is a CSS expression",
+    decodeCentralAuthState,
+    {
+      status: "signed_in",
+      user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, chatColor: "red;x:url(a)" },
     },
   ],
   ["a model list with an empty id", decodeDiscoverModelsResult, { models: [{ id: "" }] }],

@@ -29,6 +29,10 @@ export class RemotePresenceCache {
     this.#onSnapshot = options.onSnapshot;
   }
 
+  has(serverId: string): boolean {
+    return this.#snapshots.has(serverId);
+  }
+
   get(serverId: string): TeamPresenceSnapshot {
     const cached = this.#snapshots.get(serverId);
     if (cached) return structuredClone(cached);

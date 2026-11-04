@@ -62,8 +62,10 @@ export function createWebAccountUsage(options: {
   // The composer shows the usage-limit notice with the Usage page closed, so read once for each target.
   // As on desktop, while a reading shows, the read waits for the provider checks to end.
   const hasReading = createMemo(() => (accountUsage()?.limits.length ?? 0) > 0);
+  // An effect runs again each time its key is computed, so the key is a memo: the first reading
+  // changes `hasReading`, and that alone must not read again.
   createEffect(
-    () => (usageReady() && !(hasReading() && providersLoading()) ? usageTargetKey() : null),
+    createMemo(() => (usageReady() && !(hasReading() && providersLoading()) ? usageTargetKey() : null)),
     (target) => {
       if (target) void refreshUsage().catch(() => undefined);
     },

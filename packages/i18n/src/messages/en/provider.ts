@@ -132,6 +132,8 @@ export const messages = defineMessages("provider", {
   "provider.picker.noModels": "No models are available from {name}.",
   "provider.picker.customEmpty":
     "Add an OpenAI-compatible endpoint — a model server on this computer, or any service with a base URL and a key.",
+  "provider.picker.customPending":
+    "The models of your endpoints are not loaded yet. The provider reads them after its current task stops.",
   "provider.picker.defaultModelLabel": "{name}, default",
   "provider.picker.usageLimit": "Usage limit reached",
   "provider.picker.usageLimitWindow": "{window} limit",

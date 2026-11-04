@@ -6,6 +6,7 @@ import { companySignInErrorKey } from "@openbot/contracts/company-sign-in";
 import type { HostKeyHandover } from "@openbot/contracts/host-key-handover";
 import { parseHostedServerClaim } from "@openbot/contracts/hosted-servers";
 import type {
+  AvatarColor,
   AvatarImageInput,
   CentralAuthIssue,
   CentralAuthState,
@@ -288,7 +289,8 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         resolved.name === state.user.name &&
         resolved.email === state.user.email &&
         resolved.avatarUrl === state.user.avatarUrl &&
-        resolved.analyticsEnabled === state.user.analyticsEnabled
+        resolved.analyticsEnabled === state.user.analyticsEnabled &&
+        resolved.chatColor === state.user.chatColor
       )
         return this.getState();
       return this.#setState({ status: "signed_in", user: resolved });
@@ -2032,6 +2034,46 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       return this.#setState({
         status: "signed_in",
         user: { ...this.#state.user, analyticsEnabled: user.analyticsEnabled ?? null },
+      });
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /**
+   * Saves the chat color of the user on the account. Members of each server of the user see it. An
+   * account service from before chat colors has no such route and answers 404.
+   */
+  readonly updateChatColor = Effect.fn("CentralAuth.updateChatColor")(
+    function* (
+      this: CentralAuthManager,
+      chatColor: AvatarColor | null,
+    ): Effect.fn.Return<CentralAuthState, CentralAuthOperationError, CentralAuthTransport> {
+      const sessionToken = this.#sessionToken;
+      if (!sessionToken)
+        return yield* new CentralAuthOperationError({
+          cause: new AuthApiError(401, "unauthorized", sourceText("error.auth.signInRequired")),
+        });
+      const user = yield* this.#authorizedRequestEffect(
+        "/v1/me/chat-color",
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chatColor }),
+        },
+        decodeCentralAuthUser,
+      ).pipe(
+        Effect.mapError((error) =>
+          error.cause instanceof AuthApiError && error.cause.status === 404
+            ? new CentralAuthOperationError({
+                cause: new AuthApiError(404, "chat_color_unavailable", sourceText("error.auth.chatColorUnavailable")),
+              })
+            : error,
+        ),
+      );
+      if (this.#sessionToken !== sessionToken || this.#state.status !== "signed_in") return this.getState();
+      return this.#setState({
+        status: "signed_in",
+        user: { ...this.#state.user, chatColor: user.chatColor ?? null },
       });
     },
     (operation) => this.#owned(operation),

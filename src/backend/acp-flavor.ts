@@ -92,7 +92,8 @@ export interface AcpFlavor {
   thoughtsInsideAnswer?: true;
   /**
    * `session/prompt` stays open with no update while background tasks run, so a silent turn is not
-   * stalled and OpenBot does not end it (`ACP_TURN_STALL_MS`).
+   * stalled and OpenBot does not end it (`ACP_TURN_STALL_MS`). A prompt that gets no update at all
+   * is sent again once, and then fails (`ACP_FIRST_UPDATE_MS`).
    */
   promptOpenForBackgroundTasks?: true;
   /**

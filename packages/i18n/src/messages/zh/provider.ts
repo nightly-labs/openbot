@@ -132,6 +132,7 @@ export const messages = {
   "provider.picker.noModels": "{name} 没有可用的模型。",
   "provider.picker.customEmpty":
     "添加一个兼容 OpenAI 的端点 —— 可以是这台电脑上的模型服务，也可以是任何提供 base URL 和密钥的服务。",
+  "provider.picker.customPending": "端点的模型尚未加载。当前任务结束后服务商会读取这些模型。",
   "provider.picker.defaultModelLabel": "{name}，默认",
   "provider.picker.usageLimit": "已达用量上限",
   "provider.picker.usageLimitWindow": "{window}上限",

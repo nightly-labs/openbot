@@ -21,6 +21,14 @@ export const GUIDES_COLLECTION: ContentCollection<"guides"> = {
   imageEyebrow: "OPENBOT · GUIDES",
   articles: publishedFirst([
     {
+      slug: "ai-workspace-vs-chat",
+      title: "AI Agent Workspace vs Chat History: What Changes in Practice?",
+      description:
+        "Compare an AI agent workspace with chat history in OpenBot. See how saved files, shared work and model changes affect an ongoing research task.",
+      publishedAt: "2026-11-03",
+      author: NEWS_AUTHOR,
+    },
+    {
       slug: "install-openbot-vps",
       title: "How to Install OpenBot on a VPS: Ubuntu and Docker Guide",
       description:
