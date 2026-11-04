@@ -30,6 +30,7 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { ACP_REGISTRY_CAPABILITY } from "@openbot/contracts/team-protocol/acp-registry-v1";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-hidden-v1";
@@ -44,6 +45,7 @@ import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-t
 import { AGENT_THREAD_BRANCHES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
 import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
+import { AGENT_THREAD_REPLIES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
 import { AGENT_THREAD_REWRITE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-rewrite-v1";
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { BROWSER_PAGE_STATE_CAPABILITY } from "@openbot/contracts/team-protocol/browser-page-state-v1";
@@ -65,6 +67,7 @@ import {
   BROWSER_SIGN_IN_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
+  COMPUTER_ACTIVITY_CAPABILITY,
   CONNECTORS_CAPABILITY,
   DISCORD_ACCESS_CAPABILITY,
   EVENTS_CAPABILITY,
@@ -79,12 +82,14 @@ import {
   INSTANCE_TRANSFER_CAPABILITY,
   isTeamCurrentCapability,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
+  LOCAL_SERVERS_CAPABILITY,
   legacyTeamCapabilities,
   MCP_ACCOUNTS_CAPABILITY,
   MCP_SERVERS_CAPABILITY,
   MCP_SIGN_IN_APP_CAPABILITY,
   MCP_SIGN_IN_CAPABILITY,
   MEMORY_REVIEW_CAPABILITY,
+  MODEL_VISIBILITY_CAPABILITY,
   ONEPASSWORD_CONNECTOR_CAPABILITY,
   PROMPT_CACHE_TTL_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_CAPABILITY,
@@ -123,7 +128,9 @@ import {
   VAULT_CAPABILITY,
   VAULT_IMPORT_CAPABILITY,
   VAULT_V2_CAPABILITY,
+  WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
+  WHATSAPP_CONNECTOR_CAPABILITY,
   WORKFLOWS_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
@@ -155,6 +162,10 @@ import {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   withUiBlockAutoAnswers,
 } from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
+import {
+  TEAM_UI_BLOCK_VAULT_CAPABILITY,
+  withUiBlockVaultRequests,
+} from "@openbot/contracts/team-protocol/ui-block-vault-v1";
 import {
   TEAM_APP_VERSION_HEADER,
   TEAM_PROTOCOL_V1,
@@ -224,6 +235,7 @@ import {
   routeAgentPlanCard,
   routeAgentTaskLimit,
 } from "./team-api/route-agent-admin";
+import { agentColorsOf, routeAgentColors, visibleAgentColors } from "./team-api/route-agent-colors";
 import { routeAgentFolders } from "./team-api/route-agent-folders";
 import { routeAgentHidden, visibleSnapshot } from "./team-api/route-agent-hidden";
 import { routeAgentImport } from "./team-api/route-agent-import";
@@ -240,6 +252,7 @@ import {
   routeAgentThreadBranches,
   routeAgentThreadFiles,
   routeAgentThreadReads,
+  routeAgentThreadReplies,
   routeAgentThreads,
 } from "./team-api/route-agent-threads";
 import { routeAgents } from "./team-api/route-agents";
@@ -247,6 +260,7 @@ import { routeBitwardenConnector } from "./team-api/route-bitwarden-connector";
 import { routeBrowser } from "./team-api/route-browser";
 import { routeBrowserProfiles } from "./team-api/route-browser-profiles";
 import { routeChannels } from "./team-api/route-channels";
+import { routeComputerActivity } from "./team-api/route-computer-activity";
 import { routeConnectors } from "./team-api/route-connectors";
 import { routeContextCompact } from "./team-api/route-context-compact";
 import { routeContextReset } from "./team-api/route-context-reset";
@@ -264,11 +278,14 @@ import { routeHostUpdate } from "./team-api/route-host-update";
 import { routeHostedSites } from "./team-api/route-hosted-sites";
 import { routeInstanceTransfer } from "./team-api/route-instance-transfer";
 import { routeLiveActivityPush } from "./team-api/route-live-activity-push";
+import { routeLocalServers } from "./team-api/route-local-servers";
 import { routeMachineResources } from "./team-api/route-machine-resources";
 import { routeMcpServers } from "./team-api/route-mcp";
 import { routeMcpSignIn } from "./team-api/route-mcp-sign-in";
 import { routeMcpSignInApp } from "./team-api/route-mcp-sign-in-app";
 import { routeMemoryReview } from "./team-api/route-memory-review";
+import { routeMessageDelete } from "./team-api/route-message-delete";
+import { routeModelVisibility } from "./team-api/route-model-visibility";
 import { routeOnePasswordConnector } from "./team-api/route-onepassword-connector";
 import { routePromptCacheTtl } from "./team-api/route-prompt-cache-ttl";
 import { routeProviderAccounts } from "./team-api/route-provider-accounts";
@@ -292,6 +309,7 @@ import { routeStorage } from "./team-api/route-storage";
 import { routeTeam } from "./team-api/route-team";
 import { routeVault } from "./team-api/route-vault";
 import { routeVaultImport } from "./team-api/route-vault-import";
+import { routeWhatsAppConnector } from "./team-api/route-whatsapp-connector";
 import { routeWorkflows } from "./team-api/route-workflows";
 import { routeWorkspaceDirectory } from "./team-api/route-workspace-directory";
 import { TeamStoreError } from "./team-store";
@@ -996,6 +1014,7 @@ export class TeamApiServer {
         return;
       if ((await routeConnectors(context, this.#options.connectors)) === "handled") return;
       if ((await routeDiscordAccess(context, this.#options.connectors)) === "handled") return;
+      if ((await routeWhatsAppConnector(context, this.#options.connectors)) === "handled") return;
       if ((await routeOnePasswordConnector(context, this.#options.onePasswordConnector)) === "handled") return;
       if ((await routeBitwardenConnector(context, this.#options.bitwardenConnector)) === "handled") return;
       if ((await routeVault(context, this.#options.vault)) === "handled") return;
@@ -1024,6 +1043,7 @@ export class TeamApiServer {
       if ((await routeAgentFolders(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentInstructions(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentHidden(context, this.#options.hiddenAgents, hidden)) === "handled") return;
+      if ((await routeAgentColors(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeSidebarFolders(context, this.#options.sidebarLayout, this.#options.agents, hidden)) === "handled")
         return;
       if (
@@ -1040,6 +1060,7 @@ export class TeamApiServer {
       if ((await routeAgentThreads(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadReads(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadFiles(context, this.#options.agentTasks, hidden)) === "handled") return;
+      if ((await routeAgentThreadReplies(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadBranches(context, this.#options.agentTasks, hidden)) === "handled") return;
       if (
         (await routeAgentThreadRewrite(context, { tasks: this.#options.agentTasks, hiddenAgentIds: hidden })) ===
@@ -1057,9 +1078,11 @@ export class TeamApiServer {
       if ((await routeHostUpdate(context, this.#options.admin)) === "handled") return;
       if ((await routeHostTimezone(context, this.#options.admin)) === "handled") return;
       if ((await routeHostKeyRotation(context, this.#options.admin)) === "handled") return;
+      if ((await routeLocalServers(context, this.#options.admin)) === "handled") return;
       if ((await routeAgentMemoryLimit(context, this.#options.admin)) === "handled") return;
       if ((await routeMemoryReview(context, this.#options.admin)) === "handled") return;
       if ((await routePromptCacheTtl(context, this.#options.admin)) === "handled") return;
+      if ((await routeModelVisibility(context, this.#options.admin)) === "handled") return;
       if ((await routeProviderDefault(context, this.#options.admin)) === "handled") return;
       if (
         (await routeAgentAccess(
@@ -1078,6 +1101,8 @@ export class TeamApiServer {
         return;
       if ((await routeContextReset(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeContextCompact(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await routeMessageDelete(context, this.#options.agents, this.#options.channels, hidden)) === "handled")
+        return;
       if ((await routeAgentMemoryPage(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeWorkspaceDirectory(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeConversationFiles(context, this.#options.agents)) === "handled") return;
@@ -1096,6 +1121,7 @@ export class TeamApiServer {
       )
         return;
       if ((await routePushNotifications(context, this.#options.pushNotifications)) === "handled") return;
+      if ((await routeComputerActivity(context, this.#options.pushNotifications)) === "handled") return;
       if (
         (await routeFocusUse(context, this.#options.focusUse ? (id) => this.#recordFocusUse(id) : undefined)) ===
         "handled"
@@ -1191,6 +1217,7 @@ export class TeamApiServer {
       skills: this.#options.skills,
       sidebarLayout: this.#options.sidebarLayout,
       duplicateAgent: (agentId, operationId) => this.#duplicateAgent(agentId, operationId),
+      ...(this.#options.admin?.modelVisibility ? { visibleModels: this.#options.admin.modelVisibility } : {}),
     });
   }
 
@@ -1280,9 +1307,11 @@ export class TeamApiServer {
         subagents: capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
         promptMultiSelect: capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
       });
-      return encoded !== null && capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)
+      if (encoded === null) return null;
+      const answered = capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)
         ? withUiBlockAutoAnswers(encoded, visible)
         : encoded;
+      return capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY) ? withUiBlockVaultRequests(answered, visible) : answered;
     }
     return encodeTeamProtocolV1CurrentEvent(visible, options);
   }
@@ -1290,6 +1319,7 @@ export class TeamApiServer {
   #broadcastAgentEvent(event: AgentEvent): void {
     if (event.type !== "conversation") {
       this.#broadcastAgentEventToClients(event);
+      if (event.type === "agents-changed") this.#broadcastAgentColors();
       return;
     }
 
@@ -1477,6 +1507,7 @@ export class TeamApiServer {
         )
           continue;
         // The list of hidden agents does not name an agent that this peer cannot see, as `/v1/hidden-agents` does.
+        // The list of colours does the same, as `/v1/agent-colors` does.
         outgoing = JSON.stringify(
           optional.type === "hidden-agents-changed"
             ? {
@@ -1486,7 +1517,15 @@ export class TeamApiServer {
                   this.hiddenAgentIds(eventProtocol(connection.capabilities), connection.capabilities, member),
                 ),
               }
-            : optional,
+            : optional.type === "agent-colors-changed"
+              ? {
+                  type: optional.type,
+                  ...visibleAgentColors(
+                    optional,
+                    this.hiddenAgentIds(eventProtocol(connection.capabilities), connection.capabilities, member),
+                  ),
+                }
+              : optional,
         );
       } else if (event.type === "conversation" && supportsRuntimeSnapshots) {
         conversationInvalidation ??=
@@ -1509,7 +1548,7 @@ export class TeamApiServer {
           event.snapshot.messages.some((message) => message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE))
       ) {
         // The payloads are shared between clients, so the key holds what the roles allow too.
-        const key = `${blockedKey}:${eventProtocol(connection.capabilities)}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
+        const key = `${blockedKey}:${eventProtocol(connection.capabilities)}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
         let filtered = filteredConversationPayloads.get(key);
         if (!filtered) {
           filtered =
@@ -1550,6 +1589,26 @@ export class TeamApiServer {
       if (Buffer.byteLength(completionSnapshot) > AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) continue;
       client.send(completionSnapshot);
     }
+  }
+
+  #sendAgentColors(client: Ws.WebSocket, connection: EventClientState): void {
+    const member = this.#connectionMember(connection);
+    const hidden = this.hiddenAgentIds(eventProtocol(connection.capabilities), connection.capabilities, member);
+    if (client.readyState !== webSockets.WebSocket.OPEN) return;
+    const colors = visibleAgentColors(agentColorsOf(this.#options.agents.listAgents()), hidden);
+    client.send(JSON.stringify({ type: "agent-colors-changed", ...colors }));
+  }
+
+  /**
+   * Each change of the agents sends `agents-changed`, also a change of a colour or of access. The colours
+   * go out after each one: a peer that can now see an agent gets its colour, and a client ignores a list
+   * that did not change.
+   */
+  #broadcastAgentColors(): void {
+    this.#broadcastAgentEventToClients({
+      type: "agent-colors-changed",
+      ...agentColorsOf(this.#options.agents.listAgents()),
+    });
   }
 
   #sendBrowserPageState(client: Ws.WebSocket, connection: EventClientState): void {
@@ -1661,6 +1720,7 @@ export class TeamApiServer {
             const userControlWasSent = connection.capabilities.has(BROWSER_USER_CONTROL_CAPABILITY);
             const pageStateWasSent = connection.capabilities.has(BROWSER_PAGE_STATE_CAPABILITY);
             const machineAlertsWereSent = connection.capabilities.has(MACHINE_RESOURCES_CAPABILITY);
+            const colorsWereSent = connection.capabilities.has(AGENT_COLORS_CAPABILITY);
             connection.capabilities = new Set(event.capabilities.filter(isTeamCurrentCapability));
             if (connection.capabilities.has("agent-runtime-snapshots") && !snapshotsWereEnabled) {
               this.#sendRuntimeSnapshot(client, connection, false);
@@ -1672,6 +1732,9 @@ export class TeamApiServer {
               this.#sendBrowserUserControl(client, connection);
             if (!pageStateWasSent && connection.capabilities.has(BROWSER_PAGE_STATE_CAPABILITY))
               this.#sendBrowserPageState(client, connection);
+            // The colours can change while a client has no event connection.
+            if (!colorsWereSent && connection.capabilities.has(AGENT_COLORS_CAPABILITY))
+              this.#sendAgentColors(client, connection);
             // An alert that came while the member had no device online.
             if (!machineAlertsWereSent) this.#sendPendingMachineAlerts(client, connection);
           }
@@ -1977,9 +2040,12 @@ export class TeamApiServer {
     const encoded = sideRoute
       ? JSON.stringify(sideRoute.response(route.path, status, effortValue, options))
       : teamHttpCodec(route.protocol).encodeResponse(route.method, route.path, status, effortValue, options);
-    const body = route.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)
+    const answered = route.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)
       ? withUiBlockAutoAnswers(encoded, effortValue)
       : encoded;
+    const body = route.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)
+      ? withUiBlockVaultRequests(answered, effortValue)
+      : answered;
     response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
     response.end(`${body}\n`);
     return "handled";
@@ -2141,6 +2207,7 @@ export class TeamApiServer {
             );
           if (capability === CONNECTORS_CAPABILITY) return this.#options.connectors !== undefined;
           if (capability === DISCORD_ACCESS_CAPABILITY) return this.#options.connectors !== undefined;
+          if (capability === WHATSAPP_CONNECTOR_CAPABILITY) return this.#options.connectors !== undefined;
           if (capability === ONEPASSWORD_CONNECTOR_CAPABILITY) return this.#options.onePasswordConnector !== undefined;
           if (capability === BITWARDEN_CONNECTOR_CAPABILITY) return this.#options.bitwardenConnector !== undefined;
           if (capability === VAULT_CAPABILITY) return this.#options.vault !== undefined;
@@ -2163,11 +2230,14 @@ export class TeamApiServer {
           if (capability === AGENT_FOLDERS_CAPABILITY) return this.#options.admin?.folders !== undefined;
           if (capability === AGENT_INSTRUCTIONS_CAPABILITY) return this.#options.admin?.instructions !== undefined;
           if (capability === AGENT_HIDDEN_CAPABILITY) return this.#options.hiddenAgents !== undefined;
+          // The colour route uses the agent operations, which every host has.
+          if (capability === AGENT_COLORS_CAPABILITY) return true;
           if (capability === AGENT_TASKS_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_THREADS_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_TASK_UI_BLOCKS_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_THREAD_READS_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_THREAD_FILES_CAPABILITY) return this.#options.agentTasks !== undefined;
+          if (capability === AGENT_THREAD_REPLIES_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_THREAD_BRANCHES_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_THREAD_REWRITE_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_HOST_SETTINGS_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
@@ -2203,9 +2273,11 @@ export class TeamApiServer {
           if (capability === HOST_RELEASE_CAPABILITY) return this.#options.admin?.release !== undefined;
           if (capability === HOST_TIMEZONE_CAPABILITY) return this.#options.admin?.timezone !== undefined;
           if (capability === HOST_KEY_ROTATION_CAPABILITY) return this.#options.admin?.hostKey !== undefined;
+          if (capability === LOCAL_SERVERS_CAPABILITY) return this.#options.admin?.localServers !== undefined;
           if (capability === AGENT_MEMORY_LIMIT_CAPABILITY) return this.#options.admin?.memoryLimit !== undefined;
           if (capability === MEMORY_REVIEW_CAPABILITY) return this.#options.admin?.memoryReview !== undefined;
           if (capability === PROMPT_CACHE_TTL_CAPABILITY) return this.#options.admin?.promptCacheTtl !== undefined;
+          if (capability === MODEL_VISIBILITY_CAPABILITY) return this.#options.admin?.modelVisibility !== undefined;
           if (capability === PROVIDER_DEFAULT_CAPABILITY) return this.#options.admin?.defaultProvider !== undefined;
           if (capability === AGENT_ACCESS_CAPABILITY) return this.#options.agentAccess !== undefined;
           if (capability === SERVER_AUDIT_CAPABILITY) return this.#options.serverAudit !== undefined;
@@ -2215,13 +2287,18 @@ export class TeamApiServer {
           if (capability === ROUTINE_RECOVERY_CAPABILITY) return this.#options.events !== undefined;
           if (capability === ROUTINE_RESULTS_CAPABILITY) return this.#options.admin?.routineResults !== undefined;
           if (capability === WEBHOOK_TESTS_CAPABILITY) return this.#options.events !== undefined;
+          if (capability === WEBHOOK_SENDER_SECRET_CAPABILITY) return this.#options.events !== undefined;
           if (capability === AGENT_IMPORT_CAPABILITY) return this.#options.agentImport !== undefined;
           if (capability === INSTANCE_TRANSFER_CAPABILITY) return this.#options.instanceTransfer !== undefined;
           if (capability === LIVE_ACTIVITY_PUSH_CAPABILITY) return this.#options.liveActivityPush !== undefined;
           if (capability === ROUTINE_FLOWS_CAPABILITY) return this.#options.routineFlows !== undefined;
           if (capability === WORKFLOWS_CAPABILITY) return this.#options.workflows !== undefined;
           if (capability === WORKFLOWS_GITHUB_CAPABILITY) return this.#options.workflows?.github !== undefined;
-          if (capability === PUSH_NOTIFICATIONS_CAPABILITY || capability === ANDROID_PUSH_NOTIFICATIONS_CAPABILITY)
+          if (
+            capability === PUSH_NOTIFICATIONS_CAPABILITY ||
+            capability === ANDROID_PUSH_NOTIFICATIONS_CAPABILITY ||
+            capability === COMPUTER_ACTIVITY_CAPABILITY
+          )
             return this.#options.pushNotifications !== undefined;
           if (capability === FOCUS_USE_CAPABILITY) return this.#options.focusUse === true;
           if (capability === AGENT_NOTIFICATION_LEVELS_CAPABILITY)
@@ -2374,6 +2451,7 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
     return "channel-chats-v1";
   if (event.type === "agent-session-settings-changed") return AGENT_SESSION_SETTINGS_CAPABILITY;
   if (event.type === "hidden-agents-changed") return AGENT_HIDDEN_CAPABILITY;
+  if (event.type === "agent-colors-changed") return AGENT_COLORS_CAPABILITY;
   if (event.type === "agent-access-changed") return AGENT_ACCESS_CAPABILITY;
   if (event.type === "browser-user-control-changed") return BROWSER_USER_CONTROL_CAPABILITY;
   if (event.type === "browser-page-state-changed") return BROWSER_PAGE_STATE_CAPABILITY;

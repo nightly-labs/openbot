@@ -1,6 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
-  type AvatarHue,
   agentPermissionLevel,
   canAdministerServer,
   DEFAULT_PROVIDER_ACCOUNT_ID,
@@ -20,14 +19,18 @@ import {
   PERMISSION_LABEL,
   useAgentAdminSettings,
 } from "@/features/agents/components/agent-access-fields";
-import { AgentAppearancePicker } from "@/features/agents/components/agent-appearance-picker";
+import { AgentAppearancePicker, type AgentColorValue } from "@/features/agents/components/agent-appearance-picker";
 import {
   AgentBackupModelPicker,
   AgentBackupModelsPage,
   AgentBackupModelsRow,
 } from "@/features/agents/components/agent-backup-models";
 import { AgentBrowserProfileRow } from "@/features/agents/components/agent-browser-profile";
-import { AgentNewChatSection, AgentNotificationLevelRow } from "@/features/agents/components/agent-chat-settings";
+import {
+  AgentCompactSection,
+  AgentNewChatSection,
+  AgentNotificationLevelRow,
+} from "@/features/agents/components/agent-chat-settings";
 import { AgentFolderBrowser, AgentFolders, AgentFoldersRow } from "@/features/agents/components/agent-folders";
 import {
   AgentBusyMessageField,
@@ -37,6 +40,7 @@ import {
   AgentTaskLimitField,
 } from "@/features/agents/components/agent-host-fields";
 import { AgentInformation } from "@/features/agents/components/agent-information";
+import { AgentInstructionsFileEditor } from "@/features/agents/components/agent-instructions-file";
 import { type AgentPhotoDraft, AgentPhotoPicker } from "@/features/agents/components/agent-photo-picker";
 import { AgentPublish } from "@/features/agents/components/agent-publish";
 import { AgentRuntimeFields, useProviderAccounts } from "@/features/agents/components/agent-runtime-fields";
@@ -60,7 +64,15 @@ import { useText } from "@/shared/lib/text";
 
 type AgentEdits = Pick<
   UpdateAgentInput,
-  "name" | "title" | "description" | "avatarSeed" | "avatarHue" | "provider" | "model" | "reasoningEffort"
+  | "name"
+  | "title"
+  | "description"
+  | "avatarSeed"
+  | "avatarHue"
+  | "avatarColor"
+  | "provider"
+  | "model"
+  | "reasoningEffort"
 >;
 
 type AgentPage =
@@ -70,6 +82,7 @@ type AgentPage =
   | "memories"
   | "skills"
   | "files"
+  | "instructions"
   | "routines"
   | "tables"
   | "publish"
@@ -124,6 +137,8 @@ function AgentForm({
     canManageSharedTables,
     canPublishAgent,
     canStartNewChat,
+    canCompactContext,
+    canManageAgentInstructions,
     canManageAgentAccess,
     canManageAgentHostSettings,
     canManageAgentTaskLimit,
@@ -145,6 +160,7 @@ function AgentForm({
   const showAdvanced =
     Boolean(agent.workspacePath) ||
     canStartNewChat(agent.serverId) ||
+    canCompactContext(agent.serverId) ||
     canManageAgentHostSettings(agent.serverId) ||
     canManageAgentTaskLimit(agent.serverId) ||
     canManageAgentNewChat(agent.serverId) ||
@@ -174,6 +190,7 @@ function AgentForm({
   const description = edits.description ?? agent.description;
   const avatarSeed = edits.avatarSeed ?? agent.avatarSeed;
   const avatarHue = edits.avatarHue === undefined ? agent.avatarHue : edits.avatarHue;
+  const avatarColor = edits.avatarColor === undefined ? agent.avatarColor : edits.avatarColor;
   const photoChanged = photo !== undefined && (photo !== null || Boolean(agent.avatarUrl));
   const dirty =
     photoChanged ||
@@ -182,6 +199,7 @@ function AgentForm({
     description.trim() !== agent.description ||
     avatarSeed !== agent.avatarSeed ||
     avatarHue !== agent.avatarHue ||
+    avatarColor !== agent.avatarColor ||
     (edits.provider !== undefined && edits.provider !== agent.provider) ||
     (edits.model !== undefined && edits.model !== agent.model) ||
     (edits.reasoningEffort !== undefined && edits.reasoningEffort !== agent.reasoningEffort) ||
@@ -219,8 +237,8 @@ function AgentForm({
     setEdits((current) => ({ ...current, avatarSeed }));
     setError(null);
   }, []);
-  const changeAvatarHue = useCallback((avatarHue: AvatarHue | null) => {
-    setEdits((current) => ({ ...current, avatarHue }));
+  const changeAvatarColor = useCallback((value: AgentColorValue) => {
+    setEdits((current) => ({ ...current, avatarHue: value.hue, avatarColor: value.color }));
     setError(null);
   }, []);
   const hasPhoto = photo === undefined ? Boolean(agent.avatarUrl) : Boolean(photo);
@@ -258,6 +276,7 @@ function AgentForm({
             ...(edits.description === undefined ? {} : { description: description.trim() }),
             ...(edits.avatarSeed === undefined ? {} : { avatarSeed }),
             ...(edits.avatarHue === undefined ? {} : { avatarHue }),
+            ...(edits.avatarColor === undefined ? {} : { avatarColor }),
             ...(edits.provider === undefined ? {} : { provider: edits.provider }),
             ...(edits.model === undefined ? {} : { model: edits.model }),
             ...(edits.reasoningEffort === undefined ? {} : { reasoningEffort: edits.reasoningEffort }),
@@ -326,6 +345,7 @@ function AgentForm({
                 serverId={agent.serverId}
                 seed={avatarSeed}
                 hue={avatarHue}
+                color={avatarColor}
                 size={112}
               />
               {/* A photo fills the circle; the generated avatar leaves space around its shape. */}
@@ -373,13 +393,14 @@ function AgentForm({
           imageUrl={photo === undefined ? undefined : (photo?.uri ?? null)}
           seed={avatarSeed}
           hue={avatarHue}
+          color={avatarColor}
           name={name}
           nameField={null}
           showFaces={!hasPhoto}
           photoField={photoField}
           disabled={saving || pickingPhoto}
           onSeedChange={changeAvatarSeed}
-          onHueChange={changeAvatarHue}
+          onColorChange={changeAvatarColor}
         />
       ) : null}
       {page === "runtime" ? (
@@ -402,6 +423,12 @@ function AgentForm({
             setAccount(value);
             setError(null);
           }}
+          // The switch saves at once, for the saved model. An unsaved model change hides it.
+          fastMode={
+            provider === agent.provider && (edits.model ?? agent.model) === agent.model
+              ? { agent, server: host, available }
+              : undefined
+          }
         />
       ) : null}
       {page === "backup-models" ? <AgentBackupModelsPage agent={agent} server={host} available={available} /> : null}
@@ -430,6 +457,7 @@ function AgentForm({
             </SettingsSection>
           ) : null}
           {canStartNewChat(agent.serverId) ? <AgentNewChatSection agent={agent} available={available} /> : null}
+          {canCompactContext(agent.serverId) ? <AgentCompactSection agent={agent} available={available} /> : null}
           <AgentNewChatAllowedField agent={agent} server={host} available={available} />
           {/* After the new-chat switch, as in the desktop Advanced group. */}
           <AgentPlanCardField agent={agent} server={host} available={available} />
@@ -437,6 +465,7 @@ function AgentForm({
       ) : null}
       {page === "folders" ? <AgentFolders agent={agent} host={host} available={available} /> : null}
       {page === "folder-browser" ? <AgentFolderBrowser agent={agent} available={available} /> : null}
+      {page === "instructions" ? <AgentInstructionsFileEditor agent={agent} available={available} /> : null}
       {page === "tables" ? <AgentSharedTables agent={agent} available={available} /> : null}
       {page === "publish" ? <AgentPublish agent={agent} available={available} /> : null}
       {page === "usage" ||
@@ -480,6 +509,19 @@ function AgentForm({
             <AgentBackupModelsRow agent={agent} server={host} available={available} />
           </SettingsSection>
           <SettingsSection title={t("mobile.agent.groups.knows")}>
+            {/* First, as in the desktop group. */}
+            {canManageAgentInstructions(agent.serverId) ? (
+              <SettingsRow
+                onPress={() =>
+                  router.push({
+                    pathname: "/agent-info/[agentId]/instructions",
+                    params: { agentId: agent.id, serverId: agent.serverId },
+                  })
+                }
+              >
+                <Typography.Paragraph>{t("mobile.agent.instructionsFile.title")}</Typography.Paragraph>
+              </SettingsRow>
+            ) : null}
             <SettingsRow
               onPress={() =>
                 router.push({

@@ -196,6 +196,17 @@ export interface RewriteMessageInput {
   requestId: string;
 }
 
+/**
+ * Deletes one message from the chat of an agent, or of one open side task of the agent. The host
+ * removes it from its history and view; the provider session of the agent can still remember it.
+ */
+export interface DeleteConversationMessageInput {
+  agentId: string;
+  messageId: string;
+  /** The open task of this agent whose chat holds the message. Without it, the agent's own chat. */
+  taskId?: string;
+}
+
 export interface SetMessageReactionInput {
   agentId: string;
   messageId: string;

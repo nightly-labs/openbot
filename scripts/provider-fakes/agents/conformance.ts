@@ -6,7 +6,8 @@
 //   a missing one, and `session/load` of a missing session answers null. Each session it opens has `modes`.
 //   It lists its provider as an auth method only when it is signed in, and its stderr is a Python log.
 // - `FAKE_SIGNED_OUT=1` refuses each new session, as an agent does before its sign-in. Hermes refuses
-//   it with "Internal error", and writes the cause only to stderr.
+//   it with "Internal error", and writes the cause only to stderr. Devin CLI 3000.11.234 opens the
+//   session, and lists no model in it.
 // - `FAKE_MODEL_SET=kimi` gives no configuration options. `session/set_model` changes the model and
 //   then fails, as Kimi CLI 1.52.0 does when its config.toml is protected.
 // A prompt with the text `wait` runs until the client cancels it. Each other prompt answers at once.
@@ -37,6 +38,12 @@ const MISSING_ERRORS: Readonly<Partial<Record<string, (sessionId: string) => Acp
   antigravity: (sessionId) => ({ code: -32002, message: "Resource not found", data: { sessionId } }),
   // Kimi CLI 1.52.0.
   kimi: () => ({ code: -32602, message: "Invalid params", data: { session_id: "Session not found" } }),
+  // Devin CLI 3000.11.234.
+  devin: () => ({
+    code: -32016,
+    message: "Session not found",
+    data: { "cognition.ai/errorKind": "session_not_found", "cognition.ai/retryable": false },
+  }),
   // Cursor.
   cursor: (sessionId) => ({
     code: -32602,
@@ -46,6 +53,7 @@ const MISSING_ERRORS: Readonly<Partial<Record<string, (sessionId: string) => Acp
 };
 
 const hermes = process.env.FAKE_MISSING === "hermes";
+const devin = process.env.FAKE_MISSING === "devin";
 /** What Hermes 0.21.5 lists: its provider while that provider's credential resolves, and its terminal setup. */
 const HERMES_AUTH_METHODS = [
   { id: "nous", name: "nous runtime credentials" },
@@ -114,6 +122,12 @@ serveFakeAcpAgent(
           "2026-11-02 10:00:00,000 [WARNING] agent.auxiliary_client: resolve_provider_client: nous requested but Nous Portal not configured (run: hermes auth)\n",
         );
         peer.fail(request, { code: -32603, message: "Internal error" });
+        return;
+      }
+      if (signedOut && devin) {
+        count += 1;
+        const sessionId = `s-${process.pid}-${count}`;
+        peer.reply(request, { sessionId, configOptions: [], models: { availableModels: [], currentModelId: "" } });
         return;
       }
       if (signedOut) {

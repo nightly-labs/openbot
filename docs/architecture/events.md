@@ -173,6 +173,45 @@ from it: a reply and a reaction act on that message; a post goes to a chosen cha
 reaction is a row of `workflow_output_deliveries`. Only the local computer lists Discord servers,
 and only an owner or admin changes a Discord node (`route-workflows.ts`).
 
+### Workflow Telegram triggers
+
+A Telegram trigger uses the Telegram connections of the host's messaging. It has no route, secret or
+table of its own, and Signal does not change: it already passes on each update of a linked chat. One
+connection is one chat. `MessagingService` gives each new conversation in a group (a message that
+mentions the bot or replies to it; not a direct chat, not a message of an existing conversation) to
+`Workflows.receiveTelegram` before it goes to the Telegram Orchestrator. The trigger matches the
+connection (empty: any linked chat) and a text filter (`telegram-matching.ts`). A matched message
+starts one run for each trigger, with source `telegram` (schema v52) and the idempotency key
+`telegram:<node>:<connection>:<message>`, because a Telegram message ID is unique only in its chat. It
+does not start an agent conversation. A workflow with an open run
+skips the message; when all matched triggers skip it, OpenBot adds the failed reaction to it.
+
+The run payload is the message, marked as data, with its chat, thread key and message ID. A Telegram
+output reads them from it only in a run that a Telegram message started: a reply and a reaction act
+on that message; a post goes to the chosen chat, or to the trigger's chat. A reaction is one emoji of
+`WORKFLOW_TELEGRAM_EMOJI`, which Telegram allows a bot to set (`setMessageReaction`). Each post or
+reaction is a row of `workflow_output_deliveries`. Only the local computer lists Telegram chats, and
+only an owner or admin changes a Telegram node (`route-workflows.ts`).
+
+### Workflow Slack triggers
+
+A Slack trigger uses the Slack connection of the host's messaging. It has no route, secret or table
+of its own. The only event is `app_mention` in a channel. `MessagingService` gives each mention in a
+channel (not a direct message, not a reply in an existing conversation) to `Workflows.receiveSlack`
+before it goes to an agent. The trigger matches the connection, the channel (empty: any) and a text
+filter (`slack-matching.ts`). Slack has no people filter: the host has no catalog of Slack people. A
+matched mention starts one run for each trigger, with source `slack` (schema v53) and the idempotency
+key `slack:<node>:<channel>:<message timestamp>`, because a Slack timestamp is unique only in its
+channel. A workflow with an open run skips the mention; when all matched triggers skip it, OpenBot
+adds the failed reaction to the message.
+
+The run payload is the mention, marked as data, with the file names, types and sizes but not their
+addresses, because these need the bot token. A Slack output reads the channel, message and thread
+from it: a reply goes to the mention's thread, and a reaction acts on the mention; a post goes to a
+chosen channel. The reaction emoji map to Slack names (`WORKFLOW_SLACK_EMOJI`). Each post or reaction
+is a row of `workflow_output_deliveries`. Only the local computer lists Slack workspaces, and only an
+owner or admin changes a Slack node (`route-workflows.ts`).
+
 ## Management surfaces
 
 - Local desktop: the `events` IPC group (`packages/contracts/src/ipc-endpoints.ts`).
@@ -190,6 +229,15 @@ and only an owner or admin changes a Discord node (`route-workflows.ts`).
   same verification and receipt path as a relayed request (`HostEventsService.sendTestEvent`). The
   answer names the event type, the receipt status and reason, and the run. The secret stays on the
   host. For a host without the capability, the editor leaves out the test step.
+- Remote hosts with `webhook-sender-secret-v1` (`WEBHOOK_SENDER_SECRET_ROUTES`) also set a routine's
+  secret to a value that the sender made (`HostEventsService.setSecret`). Standard Webhooks senders,
+  such as Composio and Svix, make their own secret. The host encrypts the value in the same column as
+  a secret that it made, so no migration is necessary. The answer is empty. For a host without the
+  capability, the editor and the chat card leave out the button.
+- Signal accepts the `X-OpenBot-*` headers, or the Standard Webhooks `webhook-*` or `svix-*`
+  headers. It relays a Standard Webhooks request only to an ingress socket whose hello lists
+  `standard-webhooks` in `webhookFormats`; for an older host it answers `401`. The host checks the
+  `v1` signature (`verifyStandardWebhookSignature`) and uses the complete body as `data`.
 - Released schedule-only routine views do not show webhook routines. Their delete and test routes
   answer "routine gone" for a webhook routine, because they have no administrator check. Only a
   schedule routine writes a conversation event.
@@ -198,8 +246,8 @@ and only an owner or admin changes a Discord node (`route-workflows.ts`).
 - Workflow GitHub triggers and outputs: the `workflows` IPC group and the `workflows-github-v1` Team
   API capability (`WORKFLOWS_GITHUB_ROUTES`: catalog, options, history, run with last event). All
   routes need a host administrator. A client without the capability does not offer GitHub.
-- Workflow Discord triggers and outputs: no route of their own. Only the desktop that hosts the
-  workflows offers them, and the `workflows-v1` graph save refuses a change from a member.
+- Workflow Discord, Telegram and Slack triggers and outputs: no route of their own. Only the desktop that
+  hosts the workflows offers them, and the `workflows-v1` graph save refuses a change from a member.
 - Desktop and web use the shared routine editor components in
   `packages/ui/src/features/conversation`. Mobile uses native components in
   `apps/mobile/src/features/agents/components`.

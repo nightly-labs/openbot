@@ -58,6 +58,11 @@ export default defineConfig(({ command }) => {
       cloudflare({
         viteEnvironment: { name: "ssr" },
         config(config) {
+          // `vite dev` runs no relay Worker, so local email leaves from the local socket. The plugin
+          // merges arrays from the return value, so the binding must leave the config it passes.
+          if (command === "serve") {
+            config.services = config.services?.filter((service) => service.binding !== "EMAIL_RELAY");
+          }
           return { vars: { ...config.vars, ...localRuntimeVars } };
         },
       }),

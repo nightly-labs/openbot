@@ -154,7 +154,7 @@ export function SidebarPinnedAvatar(props: {
 }) {
   return (
     <span class="agent-row-avatar sidebar-pinned-avatar">
-      <AgentAvatar agent={props.agent} motion="idle" mood={props.mood} />
+      <AgentAvatar agent={props.agent} motion="idle" mood={props.mood} workingFaces />
       <SidebarAgentIndicator state={props.agentState} />
     </span>
   );

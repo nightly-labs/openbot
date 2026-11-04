@@ -37,7 +37,7 @@ export const messages = {
   "settings.keepRunning.title": "Оставлять OpenBot работать в фоне",
   "settings.keepRunning.description": "Активные задачи продолжат выполняться после закрытия окна.",
   "settings.menuBar.title": "Показывать OpenBot в строке меню",
-  "settings.menuBar.description": "Скрывать значок в Dock после закрытия окна. Активные задачи продолжают работать.",
+  "settings.menuBar.description": "Открывать и закрывать OpenBot из значка в строке меню.",
   "settings.keepAwake.title": "Не переводить компьютер в сон",
   "settings.keepAwake.description":
     "Регулярные задачи запускаются вовремя, пока компьютер подключён к сети. Экран всё равно может выключаться.",
@@ -69,6 +69,23 @@ export const messages = {
   "settings.busyMessage.title": "Направлять агентов, пока они работают",
   "settings.busyMessage.description":
     "Новые сообщения присоединяются к текущей работе агента, а не встают в очередь. Работает с ChatGPT и Claude.",
+  "settings.agentDefaults.title": "По умолчанию",
+  "settings.agentDefaults.description": "Агенты следуют этим настройкам, если вы не измените их для агента.",
+  "settings.agentDefaults.value": "По умолчанию: {value}",
+  "settings.agentDefaults.on": "Вкл.",
+  "settings.agentDefaults.off": "Выкл.",
+  "settings.agentDefaults.followDefault": "По умолчанию ({value})",
+  "settings.agentDefaults.count": "Вкл.: {on} из {total}",
+  "settings.agentDefaults.open": "Открыть: {name}",
+  "settings.agentDefaults.agentList": "Вкл. для: {names}",
+  "settings.agentDefaults.defaultTitle": "По умолчанию",
+  "settings.agentDefaults.defaultDescription":
+    "Новые агенты используют это значение. Агенты с вариантом «По умолчанию» следуют ему.",
+  "settings.agentDefaults.agents": "Агенты",
+  "settings.agentDefaults.setAll": "Задать всем",
+  "settings.agentDefaults.setAllLabel": "{setting}: задать всем агентам",
+  "settings.agentDefaults.agentLabel": "{setting}: {agent}",
+  "settings.agentDefaults.loadFailed": "Не удалось загрузить агентов.",
   "settings.backgroundProcesses.title": "Фоновые процессы",
   "settings.backgroundProcesses.description":
     "Программы, которые агенты запустили и оставили работать, например dev-серверы. Они работают и после конца чата, и после выхода из OpenBot.",
@@ -156,6 +173,9 @@ export const messages = {
     "Вкл.: метаданные об использовании и надёжности отправляются в собственную аналитику OpenBot вместе с ID аккаунта и почтой. Выкл.: те же метаданные отправляются только со случайным ID установки. Чаты, файлы и промпты никогда не отправляются. Настройка действует для этого браузера.",
   "settings.tab.general.title": "Основные",
   "settings.tab.general.description": "Как OpenBot ведёт себя на этом компьютере.",
+  "settings.tab.agents.title": "Агенты",
+  "settings.tab.agents.description":
+    "Выберите, что могут делать агенты на этом компьютере, если вы не задали это для агента.",
   "settings.tab.notifications.title": "Уведомления",
   "settings.tab.notifications.description": "Выберите, как OpenBot сообщает вам о событиях.",
   "settings.tab.voice.title": "Голос",
@@ -557,6 +577,7 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "Читать ответы вслух",
   "settings.voice.speech.readReplies.description":
     "Когда вы диктуете сообщение, ответ читается вслух. Чтобы остановить его, начните диктовать снова.",
+  "settings.voice.speech.speed.title": "Скорость",
   "settings.voice.speech.voice.title": "Голос",
   "settings.voice.speech.voice.female": "Женский голос {number}",
   "settings.voice.speech.voice.male": "Мужской голос {number}",

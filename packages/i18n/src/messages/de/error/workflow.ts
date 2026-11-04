@@ -28,6 +28,10 @@ export const messages = {
   "error.workflow.outputPlaceMissing": "Wähle einen Messaging-Ort für diese Ausgabe.",
   "error.workflow.discordNoMessage":
     "Diese Ausgabe wirkt auf die Discord-Nachricht, die den Lauf gestartet hat. Starte den Lauf über eine Discord-Erwähnung oder wähle „Im Kanal posten“.",
+  "error.workflow.slackNoMessage":
+    "Diese Ausgabe wirkt auf die Slack-Nachricht, die den Lauf gestartet hat. Starte den Lauf über eine Slack-Erwähnung oder wähle „Im Kanal posten“.",
+  "error.workflow.telegramNoMessage":
+    "Diese Ausgabe wirkt auf die Telegram-Nachricht, die den Lauf gestartet hat. Starte den Lauf über eine Telegram-Erwähnung oder wähle „Im Chat posten“.",
   "error.workflow.outputConnectionOff":
     "Die Messaging-Verbindung dieser Ausgabe ist aus oder entfernt. Wähle erneut einen Ort.",
   "error.workflow.outputNotRunning": "Die Messaging-Verbindung läuft gerade nicht. Versuche es erneut, wenn sie läuft.",

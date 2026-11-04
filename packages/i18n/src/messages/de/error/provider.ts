@@ -9,6 +9,8 @@ export const messages = {
   "error.provider.codexUnresponsive": "Codex hat nicht mehr geantwortet, daher hat OpenBot den Prozess beendet.",
   "error.provider.acpUnresponsive":
     "{provider} hat nicht rechtzeitig geantwortet, daher hat OpenBot den Prozess beendet.",
+  "error.provider.acpSignInLost":
+    "{provider} hat seine Anmeldung verloren, daher hat OpenBot den Prozess beendet. Sende deine Nachricht erneut.",
   "error.provider.acpMcpNotLoaded":
     "{provider} hat die OpenBot-Tools nicht geladen, daher kann dieser Agent sie nicht nutzen und seine Teammitglieder nicht erreichen. Eine Team-Richtlinie von {provider} kann lokale MCP-Server blockieren. Bitte deinen Team-Admin, sie zu erlauben, und versuche es dann erneut.",
   "error.provider.endpointsReadOnly":
@@ -186,6 +188,7 @@ export const messages = {
   "error.provider.signInExpired":
     "Deine Anmeldung bei {provider} ist abgelaufen. Melde dich erneut an, um fortzufahren.",
   "error.provider.cliActivateFailed": "OpenBot konnte die verwaltete CLI nicht aktivieren.",
+  "error.provider.noMainlandChinaSignIn": "{provider} hat keine Anmeldung für Festlandchina.",
   "error.provider.cliNewVersionNotStarted": "Die neue Version ist nicht gestartet.",
   "error.provider.cliBusyReconnect":
     "Die CLI von {provider} bearbeitet einen Durchlauf. Warte auf den Abschluss und verbinde sie dann erneut.",
@@ -278,6 +281,7 @@ export const messages = {
   "error.provider.kimiNotStarted": "Kimi konnte nicht starten. Führe `kimi --version` in einem Terminal aus.",
   "error.provider.kimiVersionUnreadable": "Die Version von Kimi CLI konnte nicht gelesen werden.",
   "error.provider.kimiSignIn": "Melde dich mit Kimi Code an, um Kimi zu verwenden.",
+  "error.provider.devinSignIn": "Melde dich mit Devin an, um Devin zu verwenden.",
   "error.provider.hermesMissing": "Hermes Agent ist nicht installiert. Installiere ihn und versuche es erneut.",
   "error.provider.hermesNotStarted":
     "Hermes Agent konnte nicht starten. Führe `hermes --version` in einem Terminal aus.",

@@ -85,7 +85,9 @@ export function dictationVoice(voice: VoiceMode, t: MobileTranslate): ComposerVo
  * microphone, End closes the conversation, and Interrupt stops the agent's reply or the wait for it.
  */
 export function liveVoice(live: LiveConversation, name: string, t: MobileTranslate): ComposerVoice {
-  const hearing = live.phase === "listening" && !live.muted && !live.exit;
+  // "Speak now" only once the recognizer hears: while the microphone opens, words would be lost.
+  const opening = live.phase === "listening" && !live.muted && !live.micOpen;
+  const hearing = live.phase === "listening" && !live.muted && !live.exit && live.micOpen;
   const replying = live.phase === "thinking" || live.phase === "speaking";
   return {
     available: live.available,
@@ -100,13 +102,13 @@ export function liveVoice(live: LiveConversation, name: string, t: MobileTransla
       label: t(live.muted ? "mobile.chat.liveVoice.unmute" : "mobile.chat.liveVoice.mute"),
       glyph: live.muted
         ? "micOff"
-        : live.phase === "starting" || live.phase === "sending" || live.phase === "thinking"
+        : opening || live.phase === "starting" || live.phase === "sending" || live.phase === "thinking"
           ? "spinner"
           : live.phase === "offline"
             ? "mic"
             : "level",
       pressable: !live.exit && live.phase !== "offline",
-      busy: live.phase === "starting" || live.phase === "sending" || live.phase === "thinking",
+      busy: opening || live.phase === "starting" || live.phase === "sending" || live.phase === "thinking",
       onPress: live.toggleMute,
     },
     leading: { label: t("mobile.chat.liveVoice.end"), onPress: live.end },
@@ -120,7 +122,11 @@ export function liveVoice(live: LiveConversation, name: string, t: MobileTransla
       title: t("mobile.chat.liveVoice.status", {
         name,
         phase: t(
-          live.muted && live.phase === "listening" ? "mobile.chat.liveVoice.phase.muted" : LIVE_PHASES[live.phase],
+          live.muted && live.phase === "listening"
+            ? "mobile.chat.liveVoice.phase.muted"
+            : opening
+              ? LIVE_PHASES.starting
+              : LIVE_PHASES[live.phase],
         ),
       }),
       // An error says why the conversation waits; otherwise the words heard, or the part read.

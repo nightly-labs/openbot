@@ -2,7 +2,8 @@
   /* Seven rows, then the list scrolls. */
   max-height: calc(7 * var(--queue-row-height) + 2 * var(--queue-row-gutter));
   overflow-y: auto;
-  padding: var(--queue-row-gutter) var(--queue-row-inset-end) var(--queue-row-gutter) var(--queue-row-inset-start);
+  padding-block: var(--queue-row-gutter);
+  padding-inline: var(--queue-row-inset-start) var(--queue-row-inset-end);
   overscroll-behavior: contain;
 }
 
@@ -52,8 +53,9 @@
 .agent-queue-item::before {
   position: absolute;
   z-index: 0;
-  inset: 0 calc(var(--queue-row-gutter) - var(--queue-row-inset-end)) 0
-    calc(var(--queue-row-gutter) - var(--queue-row-inset-start));
+  inset-block: 0;
+  inset-inline: calc(var(--queue-row-gutter) - var(--queue-row-inset-start))
+    calc(var(--queue-row-gutter) - var(--queue-row-inset-end));
   border-radius: var(--openbot-radius-md);
   background: transparent;
   content: "";

@@ -8,6 +8,8 @@
 import {
   DISCORD_ATTACHMENTS_LIMIT,
   DISCORD_CUSTOM_ID_PREFIX,
+  DISCORD_EMBED_TEXT_LIMIT,
+  DISCORD_EMBEDS_LIMIT,
   DISCORD_QUOTE_TEXT_LIMIT,
   DISCORD_ROLES_LIMIT,
   type DiscordDelivery,
@@ -41,13 +43,33 @@ type DiscordAttachmentData = {
   url: string;
 };
 
-/** The text and files of a message, and of a forwarded message in `message_snapshots`. */
+/** The parts of an embed that Signal reads. Discord leaves out each part that the embed does not have. */
+type DiscordEmbedData = {
+  title?: string | undefined;
+  description?: string | undefined;
+  url?: string | undefined;
+  author?: { name?: string | undefined; url?: string | undefined } | undefined;
+  fields?: { name: string; value: string }[] | undefined;
+  footer?: { text?: string | undefined } | undefined;
+  image?: { url?: string | undefined } | undefined;
+  thumbnail?: { url?: string | undefined } | undefined;
+  video?: { url?: string | undefined } | undefined;
+};
+
+/** The text, files and embeds of a message, and of a forwarded message in `message_snapshots`. */
 type DiscordBodyData = {
   content?: string | undefined;
   attachments?: DiscordAttachmentData[] | undefined;
+  embeds?: DiscordEmbedData[] | undefined;
   message_reference?: { type?: number | undefined; message_id?: string | undefined } | undefined;
   message_snapshots?:
-    | { message: { content?: string | undefined; attachments?: DiscordAttachmentData[] | undefined } }[]
+    | {
+        message: {
+          content?: string | undefined;
+          attachments?: DiscordAttachmentData[] | undefined;
+          embeds?: DiscordEmbedData[] | undefined;
+        };
+      }[]
     | undefined;
 };
 
@@ -167,26 +189,71 @@ function attachmentsOf(list: DiscordAttachmentData[]): DiscordInboundAttachment[
 }
 
 /**
- * The text and files of a message. A forward has none of its own: Discord gives the forwarded
- * message's in its snapshot.
+ * The text of each embed, up to Discord's limits: one part on each line, and the links of its
+ * images. An embed without text or links is left out. Colors, icons, timestamps and the provider
+ * name are left out, and so are the components of a message, such as buttons.
+ */
+function embedsOf(list: DiscordEmbedData[]): string[] {
+  const embeds: string[] = [];
+  let remaining = DISCORD_EMBED_TEXT_LIMIT;
+  for (const embed of list.slice(0, DISCORD_EMBEDS_LIMIT)) {
+    if (remaining <= 0) break;
+    const fields = (embed.fields ?? []).map((field) =>
+      [embedPart(field.name), embedPart(field.value)].filter(Boolean).join(": "),
+    );
+    const text = [
+      labelled("Author", embed.author?.name),
+      embedPart(embed.title),
+      labelled("Link", embed.url),
+      embedPart(embed.description),
+      ...fields,
+      labelled("Footer", embed.footer?.text),
+      labelled("Image", embed.image?.url),
+      labelled("Thumbnail", embed.thumbnail?.url),
+      labelled("Video", embed.video?.url),
+    ]
+      .filter(Boolean)
+      .join("\n");
+    if (!text) continue;
+    embeds.push(text.slice(0, remaining));
+    remaining -= text.length;
+  }
+  return embeds;
+}
+
+/** An embed part without the zero-width spaces that bots use for an empty field name. */
+function embedPart(value: string | undefined): string {
+  return (value ?? "").replaceAll("\u200b", "").trim();
+}
+
+function labelled(label: string, value: string | undefined): string {
+  const part = embedPart(value);
+  return part ? `${label}: ${part}` : "";
+}
+
+/**
+ * The text, files and embeds of a message. A forward has none of its own: Discord gives the
+ * forwarded message's in its snapshot.
  */
 export function messageBody(
   message: DiscordBodyData,
   botUserId: string | null,
   botRoleId: string | null = null,
-): { content: string; attachments: DiscordInboundAttachment[]; forwarded: boolean } {
+): { content: string; attachments: DiscordInboundAttachment[]; embeds: string[]; forwarded: boolean } {
   const forwarded = message.message_reference?.type === MessageReferenceType.Forward;
   const body = forwarded ? (message.message_snapshots?.[0]?.message ?? {}) : message;
   return {
     content: stripBotMention(body.content ?? "", botUserId, botRoleId),
     attachments: attachmentsOf(body.attachments ?? []),
+    embeds: embedsOf(body.embeds ?? []),
     forwarded,
   };
 }
 
 /**
- * The replied-to message of a person, or null when Discord gave neither text nor attachments:
- * without the Message Content intent, Discord gives them only for a message that mentions the bot.
+ * The replied-to message of a person or of another bot, or null when Discord gave no text,
+ * attachments or embeds: without the Message Content intent, Discord gives them only for a message
+ * that mentions the bot.
  * A forward is kept without them, so that the host can say that its content is not available.
  */
 function quoteOf(
@@ -194,14 +261,15 @@ function quoteOf(
   botUserId: string,
   botRoleId: string | null,
 ): DiscordInboundQuote | null {
-  const { content, attachments, forwarded } = messageBody(referenced, botUserId, botRoleId);
-  if ((!content && attachments.length === 0 && !forwarded) || !referenced.timestamp) return null;
+  const { content, attachments, embeds, forwarded } = messageBody(referenced, botUserId, botRoleId);
+  if ((!content && attachments.length === 0 && embeds.length === 0 && !forwarded) || !referenced.timestamp) return null;
   return {
     authorId: referenced.author.id,
     authorName: referenced.author.global_name ?? referenced.author.username ?? referenced.author.id,
     content: content.slice(0, DISCORD_QUOTE_TEXT_LIMIT),
     sentAt: referenced.timestamp,
     attachments,
+    embeds,
     forwarded,
   };
 }

@@ -1,4 +1,3 @@
-import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { AGENT_THREAD_REWRITE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-rewrite-v1";
 import { currentText } from "@openbot/ui/text";
 import { createSignal, onCleanup } from "solid-js";
@@ -15,6 +14,7 @@ import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { useAgentThreads } from "../agent-threads/agent-threads-context";
 import { attentionKey } from "../agents/agent-runtime-snapshot";
 import { useAgents } from "../agents/agents-context";
+import { createAttachmentDownloads } from "../conversation/attachment-downloads";
 import { EMPTY_DRAFT } from "../conversation/composer-draft";
 import { composerDraftKey } from "../conversation/conversation-keys";
 import type { ComposerDraft } from "../conversation/conversation-types";
@@ -49,12 +49,20 @@ export function TasksPanel(props: TasksPanelProps) {
   const platform = usePlatform();
   const layout = useLayout();
 
-  function openAttachment(attachment: AttachmentSummary, action: "open" | "reveal" | "download"): void {
-    window.openbot.agent.openAttachment({ attachmentId: attachment.id, action }, props.serverId).catch((error) => {
+  const attachmentFiles = createAttachmentDownloads({
+    serverId: () => props.serverId,
+    calls: () => ({
+      open: (input) => window.openbot.agent.openAttachment(input, props.serverId),
+      stop: (attachmentId) => window.openbot.agent.stopAttachmentDownload(attachmentId, props.serverId),
+      subscribe: window.openbot.agent.onAttachmentDownload,
+    }),
+    // A toast has no target.
+    target: () => undefined,
+    onError: (error) => {
       const { t, errorMessage } = currentText();
       actionToast.error(errorMessage(error, t("attachment.error.open")));
-    });
-  }
+    },
+  });
 
   return (
     <TasksView
@@ -73,7 +81,8 @@ export function TasksPanel(props: TasksPanelProps) {
       agents={agentList()}
       voice={createTasksVoice}
       onOpenLink={(url) => void appPort().openUrl(url)}
-      onAttachmentAction={openAttachment}
+      onAttachmentAction={attachmentFiles.open}
+      downloads={attachmentFiles.downloads}
       files={{
         accepted: threads.filesAccepted,
         import: (data, serverId) => window.openbot.agent.importAttachmentData(data, serverId),

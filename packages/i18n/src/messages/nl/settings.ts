@@ -36,7 +36,7 @@ export const messages = {
   "settings.keepRunning.title": "Laat OpenBot op de achtergrond draaien",
   "settings.keepRunning.description": "Laat actieve taken doorlopen nadat je het venster sluit.",
   "settings.menuBar.title": "OpenBot in de menubalk tonen",
-  "settings.menuBar.description": "Verberg het Dock-symbool nadat je het venster sluit. Actieve taken blijven lopen.",
+  "settings.menuBar.description": "Open of stop OpenBot via een symbool in de menubalk.",
   "settings.keepAwake.title": "Houd deze computer wakker",
   "settings.keepAwake.description":
     "Routines starten op tijd zolang de computer op netstroom is aangesloten. Het scherm kan nog steeds uitgaan.",
@@ -541,6 +541,7 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "Lees antwoorden voor",
   "settings.voice.speech.readReplies.description":
     "Als je een bericht dicteert, wordt het antwoord voorgelezen. Dicteer opnieuw om het te stoppen.",
+  "settings.voice.speech.speed.title": "Snelheid",
   "settings.voice.speech.voice.title": "Stem",
   "settings.voice.speech.voice.female": "Vrouwenstem {number}",
   "settings.voice.speech.voice.male": "Mannenstem {number}",

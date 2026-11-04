@@ -6,6 +6,7 @@ import {
   ONEPASSWORD_MARK_PATH,
   SLACK_MARK_PATH,
   TELEGRAM_MARK_PATH,
+  WHATSAPP_MARK_PATH,
 } from "@openbot/brand/connector-mark-shape";
 
 /** GitHub's mark. Lucide has no brand icons, so the path is GitHub's own. */
@@ -40,6 +41,15 @@ export function TelegramMark(props: { class?: string | undefined }) {
   return (
     <svg class={props.class} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d={TELEGRAM_MARK_PATH} />
+    </svg>
+  );
+}
+
+/** WhatsApp's mark, for the same reason. */
+export function WhatsAppMark(props: { class?: string | undefined }) {
+  return (
+    <svg class={props.class} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d={WHATSAPP_MARK_PATH} />
     </svg>
   );
 }

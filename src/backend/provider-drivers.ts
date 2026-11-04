@@ -18,6 +18,7 @@ import {
   CURSOR_ACP_FLAVOR,
   customAgentFlavor,
   DEFAULT_ACP_FLAVOR,
+  DEVIN_ACP_FLAVOR,
   HERMES_ACP_FLAVOR,
   KIMI_ACP_FLAVOR,
 } from "./acp-flavor";
@@ -39,12 +40,13 @@ import {
   antigravityAnswersUsageCommand,
   antigravityReadsGeminiHome,
   cliPathEnvironment,
-  kimiCodeLoginArgs,
+  kimiLoginArgs,
   resolveAntigravityCli,
   resolveClaudeCli,
   resolveClineCli,
   resolveCodexCli,
   resolveCursorCli,
+  resolveDevinCli,
   resolveGrokCli,
   resolveHermesCli,
   resolveKimiCli,
@@ -56,6 +58,8 @@ import { clineFreeModels } from "./cline-free-models";
 import { readCursorUsage } from "./cursor-usage";
 import { CustomAcpAgentsClient, type CustomAgentConfig, type CustomAgentSource } from "./custom-acp-agents-client";
 import { GrokAgentClient } from "./grok-client";
+import { isPythonKimiCli, kimiPythonLoginEnv, kimiPythonSavedRegionEnv, type SignInRegion } from "./kimi-region";
+import { readKimiUsage } from "./kimi-usage";
 import type { McpOAuthAuthority } from "./mcp-oauth-provider";
 import type { McpOAuthProxySettingsStore } from "./mcp-oauth-proxy";
 import type { McpDropReporter, McpEndpointSource, McpServerSource, McpToolRuntimeSource } from "./mcp-provider-shapes";
@@ -78,6 +82,8 @@ import {
   cursorConfinedEnv,
   cursorStatePaths,
   customAgentStatePaths,
+  devinDataDirectory,
+  devinStatePaths,
   hermesHome,
   hermesStatePaths,
   kimiStatePaths,
@@ -85,6 +91,7 @@ import {
   OPENCODE_CONFINED_ENV,
   openCodeStatePaths,
   type ProcessConfinement,
+  type ProviderStatePaths,
   piAgentDirectory,
   piStatePaths,
   type SpawnTarget,
@@ -102,6 +109,17 @@ interface ProviderCliCommand {
    * default answer instead of waiting. Only for a `device` or `link` sign-in, which reads no code.
    */
   readonly closeInput?: true;
+}
+
+/**
+ * The command of a sign-in. Its arguments and variables can depend on the CLI and on the region of
+ * the account, which only Kimi has: another provider ignores it.
+ */
+interface ProviderSignInCommand extends Omit<ProviderCliCommand, "argv" | "env"> {
+  readonly argv:
+    | readonly string[]
+    | ((cli: AgentCliInfo, region: SignInRegion) => Effect.Effect<readonly string[], ProviderClientOperationError>);
+  readonly env: (cli: AgentCliInfo, region: SignInRegion) => Record<string, string>;
 }
 
 const CLI_LOGIN_TIMEOUT_MS = 10 * 60_000;
@@ -156,7 +174,7 @@ type ProviderSignIn =
   /** The provider's own protocol hands back a URL for OpenBot to open. */
   | { kind: "browser" }
   /** OpenBot spawns the provider's CLI and waits for the process to exit. */
-  | { kind: "cli-command"; command: ProviderCliCommand }
+  | { kind: "cli-command"; command: ProviderSignInCommand }
   /** The user signs in with the CLI themselves; OpenBot only re-probes the provider afterwards. */
   | { kind: "external" }
   /** The host opens an interactive terminal and refreshes the account when it closes. */
@@ -190,15 +208,7 @@ interface AcpAuthenticateSignIn {
 type ProviderCodeSignIn =
   | { kind: "codex-device" }
   | { kind: "muse-device"; timeoutMs: number }
-  | {
-      kind: "cli";
-      flow: "device" | "paste" | "link";
-      command: Omit<ProviderCliCommand, "argv"> & {
-        readonly argv:
-          | readonly string[]
-          | ((cli: AgentCliInfo) => Effect.Effect<readonly string[], ProviderClientOperationError>);
-      };
-    };
+  | { kind: "cli"; flow: "device" | "paste" | "link"; command: ProviderSignInCommand };
 
 /**
  * The Gemini API key sign-in, the other way in when Google's browser sign-in cannot reach this
@@ -356,19 +366,44 @@ const KIMI_ENV: Readonly<Record<string, string>> = { KIMI_CLI_NO_AUTO_UPDATE: "1
 const KIMI_CODE_LOGIN_ENV: Readonly<Record<string, string>> =
   process.platform === "win32" ? KIMI_ENV : { ...KIMI_ENV, BROWSER: "true" };
 
+/** The variables of `kimi login` for the region. Only the Python CLI takes its region from them. */
+function kimiLoginEnv(
+  base: Readonly<Record<string, string>>,
+  cli: AgentCliInfo,
+  region: SignInRegion,
+): Record<string, string> {
+  return isPythonKimiCli(cli) ? { ...base, ...kimiPythonLoginEnv(region) } : { ...base };
+}
+
 /**
- * The sandbox lets a Kimi process write in `~/.kimi`, not create it, so OpenBot makes it. The
- * agent's own environment can move that folder with `KIMI_SHARE_DIR`.
+ * A Python CLI signed in on kimi.ai needs the global hosts in each process; Kimi Code 2.x keeps
+ * them with its sign-in. The agent's own variables come last, so that they can name other hosts.
  */
-function confineKimiTarget(
+function kimiProcessEnv(
+  cli: AgentCliInfo,
+  agentEnvironment: Readonly<Record<string, string>> | undefined,
+): Record<string, string> {
+  const region = isPythonKimiCli(cli) ? kimiPythonSavedRegionEnv({ ...process.env, ...agentEnvironment }) : {};
+  return { ...region, ...agentEnvironment };
+}
+
+/**
+ * The sandbox lets a process write in its state folders, not create them, so OpenBot makes them.
+ * The agent's own environment can move them: `KIMI_SHARE_DIR` for Kimi, the XDG variables for Devin.
+ */
+function confineWithState(
   target: SpawnTarget,
   confinement: ProcessConfinement,
+  statePaths: (env: NodeJS.ProcessEnv) => ProviderStatePaths,
   agentEnvironment: Readonly<Record<string, string>> | undefined,
 ): SpawnTarget {
-  const state = kimiStatePaths({ ...process.env, ...agentEnvironment });
+  const state = statePaths({ ...process.env, ...agentEnvironment });
   for (const folder of state.writable) mkdirSync(folder, { recursive: true, mode: 0o700 });
   return confineSpawnTarget(target, confinement, state);
 }
+
+/** `devin acp` serves the Agent Client Protocol on stdio. */
+const DEVIN_ARGV: readonly string[] = ["acp"];
 
 /**
  * What a client needs from the app at spawn, beyond its own CLI: the stored secrets, and the user's
@@ -1082,17 +1117,23 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     // Kimi's ACP `login` method only checks the sign-in that `kimi login` stored: the user signs in
     // with the CLI. `login` prints a device code and its page, opens the page, and waits until the
     // user confirms the code. A sign-in also writes the account's models into `~/.kimi/config.toml`.
+    // Probe the chosen CLI: Python emits JSON; Kimi Code 2.x emits text. Each takes the region in
+    // its own way (`kimiLoginArgs`).
     signIn: {
       kind: "cli-command",
-      command: { argv: ["login"], env: () => ({ ...KIMI_ENV }), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+      command: {
+        argv: (cli, region) => kimiLoginArgs(cli, kimiLoginEnv(KIMI_ENV, cli, region), { code: false, region }),
+        env: (cli, region) => kimiLoginEnv(KIMI_ENV, cli, region),
+        timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+      },
     },
-    // Probe the chosen CLI: Python emits JSON; Kimi Code 2.x emits text.
     codeSignIn: {
       kind: "cli",
       flow: "device",
       command: {
-        argv: (cli) => kimiCodeLoginArgs(cli, KIMI_CODE_LOGIN_ENV),
-        env: () => ({ ...KIMI_CODE_LOGIN_ENV }),
+        argv: (cli, region) =>
+          kimiLoginArgs(cli, kimiLoginEnv(KIMI_CODE_LOGIN_ENV, cli, region), { code: true, region }),
+        env: (cli, region) => kimiLoginEnv(KIMI_CODE_LOGIN_ENV, cli, region),
         timeoutMs: CLI_LOGIN_TIMEOUT_MS,
       },
     },
@@ -1105,9 +1146,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         argv: ["acp"],
         env: { ...KIMI_ENV },
         ...(confinement
-          ? { confine: (target) => confineKimiTarget(target, confinement, context.agentEnvironment?.()) }
+          ? { confine: (target) => confineWithState(target, confinement, kimiStatePaths, context.agentEnvironment?.()) }
           : {}),
-        extraEnv: () => ({ ...context.agentEnvironment?.() }),
+        extraEnv: () => kimiProcessEnv(cli, context.agentEnvironment?.()),
         signInMessage: sourceText("error.provider.kimiSignIn"),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
@@ -1115,6 +1156,11 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
         history: context.history?.("kimi"),
+        readRateLimits: () =>
+          // Not `kimiProcessEnv`: its region variables repeat the `base_url` that the reader takes from `config.toml`.
+          readKimiUsage(isPythonKimiCli(cli), { ...process.env, ...context.agentEnvironment?.() }).pipe(
+            Effect.mapError((failure) => providerFailure(failure.cause)),
+          ),
       }),
     createProfileClient: (cli, timeout, context) =>
       new AcpAgentClient(cli, timeout, {
@@ -1123,10 +1169,55 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         argv: ["acp"],
         profileGeneration: true,
         env: { ...KIMI_ENV },
+        extraEnv: () => kimiProcessEnv(cli, undefined),
         signInMessage: sourceText("error.provider.kimiSignIn"),
         servesModel: context.servesModel,
       }),
     authState: (account) => ({ kind: "kimi", email: account?.email ?? null }),
+    validateAccount: () => undefined,
+  },
+  {
+    id: "devin",
+    // The ACP `devin-browser` method opens Devin's page in the system browser, and waits until the
+    // page sends the sign-in back to the CLI. `devin auth login` asks for a terminal.
+    signIn: { kind: "acp-authenticate", methodId: "devin-browser", argv: DEVIN_ARGV, timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+    // Devin CLI 3000.11.234 writes its sign-in in `credentials.toml`.
+    signInFiles: () => [join(devinDataDirectory(), "credentials.toml")],
+    signOut: { argv: ["auth", "logout"], env: () => ({}), timeoutMs: 30_000 },
+    resolveCli: resolveDevinCli,
+    createClient: (cli, timeout, context, confinement) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "devin",
+        flavor: DEVIN_ACP_FLAVOR,
+        argv: DEVIN_ARGV,
+        env: {},
+        ...(confinement
+          ? {
+              confine: (target) => confineWithState(target, confinement, devinStatePaths, context.agentEnvironment?.()),
+            }
+          : {}),
+        extraEnv: () => ({ ...context.agentEnvironment?.() }),
+        signInMessage: sourceText("error.provider.devinSignIn"),
+        noModelsWhenSignedOut: true,
+        servesModel: context.servesModel,
+        mcpServers: context.mcpServers,
+        reportMcpDrops: context.reportMcpDrops,
+        mcpToolRuntimes: context.mcpToolRuntimes,
+        mcpEndpoint: context.mcpEndpoint,
+        history: context.history?.("devin"),
+      }),
+    createProfileClient: (cli, timeout, context) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "devin",
+        flavor: DEVIN_ACP_FLAVOR,
+        argv: DEVIN_ARGV,
+        profileGeneration: true,
+        env: {},
+        signInMessage: sourceText("error.provider.devinSignIn"),
+        noModelsWhenSignedOut: true,
+        servesModel: context.servesModel,
+      }),
+    authState: (account) => ({ kind: "devin", email: account?.email ?? null }),
     validateAccount: () => undefined,
   },
   {

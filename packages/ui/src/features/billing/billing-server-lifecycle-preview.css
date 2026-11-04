@@ -84,7 +84,7 @@
 }
 
 .billing-lifecycle-receipt > div > :last-child {
-  text-align: right;
+  text-align: end;
   text-wrap: pretty;
 }
 
@@ -123,7 +123,7 @@
   }
 
   .billing-lifecycle-receipt > div > :last-child {
-    text-align: left;
+    text-align: start;
   }
 }
 

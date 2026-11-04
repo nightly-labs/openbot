@@ -99,19 +99,54 @@ the marker it skips the turn's thinking too, so a later import does not bring a 
 
 ## Routine sessions
 
-A routine run in an agent's own chat (no task, channel or messaging delivery) does not resume the
-chat's provider session. `DrainScheduler.startDelivery` starts a new session for it with
-`ThreadLifecycle.startRoutineThread`: the chat's thread parameters, with `ephemeral: true` and
-`persistSession: false`. `ConversationRuntime` binds the session to the agent's public thread, so the
-run's items show in the chat, and `registerRoutineSession` marks it. The first message reads a short
-handoff of the newest chat messages (`renderRoutineHandoff`, 8,000 characters). Interrupt and steer
-go to the routine session while it runs. Usage records of the run use the session id
-`routine:<external id>`; their origin stays `routine`.
+Each routine of an agent runs in its own side thread, the routine thread. `AgentTasks.routineThread`
+makes the thread on the first run, with the routine's name as its title and `routine_id` set
+(migration 54; a unique index keeps one thread for each routine of an agent, also when it is
+archived). A later run uses the same thread, and a run reopens an archived one. A run also gives the
+thread the routine's current name, unless a person renamed the thread. `RoutineScheduler`
+enqueues the run with the thread's task id, so the run is a task lane in `DrainScheduler`: it counts
+against the agent's task limit (default 4, `AGENT_TASK_LIMIT_DEFAULT`) and does not wait for the
+agent's own chat or for other routines. When the agent has `INPUT_LIMITS.agentTasks` open threads, a
+new routine gets no thread and its run goes to the agent's own chat, as before. Routine threads do not
+count against the limits of tasks that the agent starts, and that cleanup does not archive them.
+Deleting the routine archives its thread. `listQueue` hides side-thread deliveries, so
+`MailboxStore.taskRoutineDeliveries` gives the routine deliveries of side threads to the code that
+follows run status (`MailboxSync.emitQueue`) and to the skip policy of a spent plan. Routine flows,
+routine result destinations and local scripts read the answer of a run with
+`readTurnAssistantMessages(agentId, turnId)`: the `projection_turns` row names the thread that ran the
+turn, so the answer of a run in a routine thread is found. A turn in a routine thread sends no
+`turn-completed` event outside `AgentTasks`, as for other side threads, so the chat keeps its turn
+state. When the run is not quiet, `AgentTasks` sends the local-only `routine-thread-turn-completed`
+event (`taskId` and the inner `turn`). The desktop notification, the phone push and the completion
+sound use it as a `turn-completed`, read the answer from the routine thread (`readTask`), and a click
+opens the routine thread. The Team API adapters drop this event, so a remote client gets no
+notification for a run in a routine thread. The released `agent-tasks-v1` routes do not send
+`routineId`; only this computer's IPC list has it.
 
-When the turn ends, `TurnLifecycle` closes the session (`closeRoutineThread`). A non-quiet run adds a
-short digest of its answer to the chat session's pending handoff (`appendRoutineDigest`: 1,500
-characters for each run, 6,000 in total), so the next chat turn reads it. The chat session keeps its
-id and its context. A restart during a run marks the run interrupted: the session is not saved.
+A routine thread is a side thread, so its runs have no Computer Use: only the agent's own chat
+drives the screen. Its runs keep the tools of the chat that side threads do not have:
+`OpenBotToolRouter` does not count a routine thread as an execution thread, so a run can call
+`await_event` and `start_task`.
+
+A routine run (in its thread, or in the agent's own chat) does not resume a provider session.
+`DrainScheduler.startDelivery` starts a new session for each run with
+`ThreadLifecycle.startRoutineThread`: the thread parameters of the agent's chat, with
+`ephemeral: true` and `persistSession: false`. `ConversationRuntime` binds the session to the public
+thread of the run, the routine thread or the chat, so the run's items show there, and
+`registerRoutineSession` marks it. The first message reads a handoff (`renderRoutineHandoff`, 8,000
+characters): the newest messages of earlier runs from the routine thread, at most half, and then the
+newest chat messages. Interrupt and steer go to the routine session while it runs. Usage records of
+the run use the session id `routine:<external id>`; their origin stays `routine`.
+
+When the turn ends, `TurnLifecycle` closes the session (`closeRoutineThread`). A quiet run in a
+routine thread drops its answer as a quiet run in the chat does. A non-quiet run adds a short digest
+of its answer to the pending handoff of the chat session, and of the routine thread's session
+(`appendRoutineDigest`: 1,500 characters for each run, 6,000 in total), so the next turn of each reads
+it. The chat can start a turn while the digest arrives: one permit orders the digest writes and the
+cleanup after a turn start, and the cleanup removes only the part that the turn sent
+(`unsentHandoff`), so a later digest stays for the next turn. The answer stays in the routine thread; the chat shows the run marker, with an "Open thread" link
+when the thread is in the task list. A Test run from the routine settings opens the routine thread in
+the chat. A restart during a run marks the run interrupted: the session is not saved.
 
 ## Routine calendar feed
 
@@ -225,7 +260,11 @@ changed, on this computer and on a joined host.
   workflow. A GitHub output (`github-output.ts`) changes GitHub as the App's bot through
   `src/main/github-rest.ts`, with 10 actions. "Agent chooses" asks a model to choose labels or a
   person from the repository's own lists, and drops other values. `workflow_github_actions` keeps
-  each change, so a restart does not post a comment, review or issue again.
+  each change, so a restart does not post a comment, review or issue again. When a Discord mention
+  started the run, a new issue or a comment links the files of the mention and of the message that it
+  replies to (`discordTriggerFiles` in `discord-matching.ts`). GitHub has no attachment API for an App
+  token, so `attachFiles` in `github-rest.ts` commits them, before the change is recorded as sent, with the Git Data API to the orphan `openbot-attachments` branch, which has no workflow files
+  and so starts no Actions. A file that it cannot copy keeps its Discord link, which expires.
 - A restart keeps approvals and agent steps, because their state is in the database and the
   mailbox. The first pass fails a model step that was running, and ends a run that was stopping. An
   agent step fails with `agentMissing` when its agent is deleted. A post that did not start is sent; a
@@ -253,6 +292,34 @@ A joined desktop, the web client and the mobile app use the optional `agent-hidd
 owner or an admin hides or restores an agent on a host.
 `/v1/agents` and the released agent codecs do not carry `hiddenAt`.
 
+## Exact agent colours
+
+An agent can have an exact colour, `avatarColor` (`#rrggbb`, lower case). The store also keeps the
+nearest released `avatarHue`, so an older app draws a near colour. `avatarColor: null` removes the
+colour. A hue change without a colour removes the colour too.
+
+The released Team API codecs remove `avatarColor`. A joined desktop and the web client use the
+optional `agent-colors-v1` capability (`packages/contracts/src/team-protocol/agent-colors-v1.ts`,
+protocol 9 only). Host route `routeAgentColors` (`src/main/team-api/route-agent-colors.ts`):
+
+- `POST /v1/agent-colors` gives `{agents: [{agentId, color}]}` for the agents that the member can
+  see. An agent that is not in the list draws its hue.
+- `POST /v1/agent-colors/set` takes `{agentId, color | null}`. It needs manage access to the agent,
+  as the avatar on the released agent route, and goes through `agents.updateAgent`.
+- After each `agents-changed`, the host sends `agent-colors-changed` with the whole list to each peer
+  that has the capability, without the agents that the peer cannot see. It sends the list also when
+  no colour changed, so a peer that can now see an agent gets its colour; a client ignores a list
+  that did not change. A peer that declares the capability on the event socket gets the list at once.
+
+The main process of a joined desktop keeps the last list of each server
+(`RemoteServerEventRefresh`). It puts the colours into each `agents-changed` list and each agent
+result, so the renderer does not get `agent-colors-changed`. A save with a colour or `null` calls the
+set route first. With a colour, the released `PATCH` then leaves out `avatarHue`, because a hue on
+that route removes the colour. With `null`, the hue stays on the `PATCH`. A server without the
+capability gets only the hue. A create sends the hue, then sets the colour; a failed colour change
+does not fail the create. The web client (`web-runtime.ts`, `web-client-context.tsx`) does the same
+and keeps the list in its state.
+
 ## Sidebar folders
 
 The sidebar groups chats in folders. In the stored layout and the released contracts a folder is a
@@ -276,7 +343,9 @@ released actions, `parentId` on `create`, and `nest`. A peer with the capability
 `sidebar-folders-changed`; other peers get `sidebar-layout-changed`, and the released
 `/v1/sidebar-layout` routes leave out `parentId`. A peer without the capability shows each folder at
 the top level, and its changes keep the parents. The iPhone app shows nested folders as one list,
-with the path in each name. An instance transfer creates each folder at the top level, because its
+as the desktop does: "Parent / Name", a folder icon, and the unread count of a closed folder. A closed
+folder hides the folders in it. With the capability, its folder menu has "New folder inside" and
+"Move to" (`nest`). An instance transfer creates each folder at the top level, because its
 file has no field for the parent.
 
 ## Browser profile
@@ -306,7 +375,7 @@ of a side thread is `legacy_task_id ?? thread_id`, so a stored mailbox message a
 that name the task still find it. A mailbox message with a `taskId` belongs to that side thread, and `DrainScheduler` drains each task as its own lane. The main chat
 lane does not count toward the task limit. At most `limit` task turns of one agent run at the same
 time. `agentTaskLimit` gives the limit: the agent's local `taskLimit` setting (1 to
-`AGENT_TASK_LIMIT_MAX`, in `agent_json`), else `AGENT_TASK_LIMIT_DEFAULT` (2). An owner or admin of
+`AGENT_TASK_LIMIT_MAX`, in `agent_json`), else `AGENT_TASK_LIMIT_DEFAULT` (4). An owner or admin of
 a joined server reads and sets it on `agent-task-limit-v1`. A provider whose
 descriptor has `concurrentTurns: false` (custom ACP agents) gets 1, and its chat and tasks run one
 turn at a time. Other task messages wait with a `hold` reason: `task-limit`, `agent-restarting`,
@@ -379,6 +448,14 @@ and text that can be empty. The answers are the frozen `agent-tasks-v1` task and
 uses these routes only for a message with files, so a message without files still works on an older host.
 A joined desktop refuses files for a server without the capability with `error.backend.threadRemoteUnsupported`,
 and the phone shows the plus in the thread composer only on a server that has it. The optional
+`agent-thread-replies-v1` capability (`packages/contracts/src/team-protocol/agent-thread-replies-v1.ts`, host
+route `routeAgentThreadReplies` in `src/main/team-api/route-agent-threads.ts`) adds
+`POST /v1/agent-threads/send-reply`: a message to a side thread with `replyToMessageId`, text, and up to 10
+attachment drafts. The answer is the frozen `agent-tasks-v1` receipt. The host keeps the reply on the delivery,
+as for the main chat; the agent's prompt and the thread quote the message when the thread has it, and the host
+does not refuse an id that the thread does not have. The team client and a joined desktop use this route only for
+a reply. Desktop and the web show Reply on a side thread message only on this computer or on a server with the
+capability; the phone does not reply in a thread. The optional
 `agent-thread-branches-v1` capability (`packages/contracts/src/team-protocol/agent-thread-branches-v1.ts`, host
 route `routeAgentThreadBranches` in `src/main/team-api/route-agent-threads.ts`) adds
 `POST /v1/agent-threads/{branch,branches}`. `branch` takes `{agentId, taskId|null, messageId, requestId}`, needs
@@ -431,6 +508,24 @@ still wait for idle work (`error.agent.waitForTasksBeforeProviderChange` /
 change, because the remote client cannot see it. The channel threads of the agent
 (`ChannelStore.contextThreadsForAgent`) are retired too, and their work steps are saved. A channel
 turn also carries its own self-contained context packet. The instance transfer file keeps `taskLimit`.
+
+## Deleted chat messages
+
+`AgentService.deleteConversationMessage` (`src/backend/agent/message-deletion.ts`) deletes one shown
+message from an agent's own chat or, with `taskId`, from a side thread. Without `deleteAny`, a person
+can delete only a user message that they sent: its `senderMember.id` is their member id, or it has no
+`senderMember` for the user of this computer. A message of the running turn, a streaming message and
+a queued, starting or running delivery are `busy`.
+
+The delete removes the mailbox copy first (`MailboxStore.deleteShownMessage`): a person's message loses
+its delivery to the agent, and the message, its reactions, idempotency keys and unused files go when no
+other delivery remains. A teammate's and a routine's message stay in the mailbox for the other chat and
+the run. Then one `conversation.message-deleted` event removes the projection row and adds a row to
+`projection_deleted_thread_messages` (migration 55). Each read mark on the message moves to the message
+before it. Earlier events of the thread lose the message (`scrubDeletedMessageEvents`), so the event
+log and a replay keep no copy of its text. The record keeps the message out of each later write,
+provider history import, mailbox sync, replay and live publish. The record goes with its thread. The
+provider session, the thread summary text, the event `detail` and usage records are not changed.
 
 ## Agent communication policy
 
@@ -779,7 +874,8 @@ between app versions, so add only optional fields and raise `version` for a chan
 with a higher `version` is refused. An invalid agent is left out with a warning and the others are
 offered; invalid settings are left out the same way.
 
-Each agent carries its profile (name, title, instructions, avatar seed and image), provider, model
+Each agent carries its profile (name, title, instructions, avatar seed, colour and image; the exact
+colour is in the optional `avatarColor` field, and an older app draws the nearest `avatarHue`), provider, model
 and reasoning effort, notifications and busy-message mode, its routines (schedule, limit and missed
 policies; one-time routines are in the optional `oneTimeRoutines` field, so an older app skips them and
 keeps the agent), its memories (with the essential or searchable choice the user made) and the skill folders

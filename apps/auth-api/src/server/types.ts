@@ -25,12 +25,16 @@ export interface WorkerBindings {
   EMAIL_FROM?: string;
   /** The sender of license emails. Empty uses `EMAIL_FROM`. The SMTP account must be allowed to send as it. */
   EMAIL_LICENSE_FROM?: string;
+  /** The email relay Worker. Without it, email leaves from this Worker's own socket. */
+  EMAIL_RELAY?: Fetcher;
   EMAIL_DELIVERY_WEBHOOK_URL?: string;
   EMAIL_DELIVERY_WEBHOOK_SECRET?: string;
   SKILLS_ADMIN_TOKEN?: string;
   SITE_OPERATIONS_ADMIN_TOKEN?: string;
   SERVER_CLAIMS_ADMIN_TOKEN?: string;
   SITE_REPORT_HASH_SECRET?: string;
+  /** Encrypts the client secrets of company sign-in and signs its DNS records. At least 32 bytes. */
+  COMPANY_SIGN_IN_SECRET?: string;
   SITE_COOKIE_ISOLATION_READY?: string;
   SITE_PUBLISH_ENABLED?: string;
   SITE_LOCAL_ORIGIN?: string;

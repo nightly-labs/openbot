@@ -1,3 +1,4 @@
+import { isWorkflowStepKind, type WorkflowNode } from "@openbot/contracts/ipc";
 import * as Clipboard from "expo-clipboard";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { Button, Typography } from "heroui-native";
@@ -6,12 +7,16 @@ import PinOff from "lucide-react-native/icons/pin-off";
 import { useState } from "react";
 import { Alert, View } from "react-native";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { WorkflowGitHubEventRow } from "@/features/workflows/components/workflow-github-event-row";
 import { WorkflowRunRow } from "@/features/workflows/components/workflow-run-row";
-import { workflowStepRows } from "@/features/workflows/components/workflow-steps-list";
+import { WorkflowRunStepRow } from "@/features/workflows/components/workflow-run-step-row";
+import { type WorkflowStepMenu, workflowStepRows } from "@/features/workflows/components/workflow-steps-list";
 import { useWorkflowCommands } from "@/features/workflows/model/use-workflow-commands";
-import { useWorkflowDetail, useWorkflowRuns } from "@/features/workflows/model/use-workflows";
+import { useWorkflowStepActions } from "@/features/workflows/model/use-workflow-step-actions";
+import { useWorkflowDetail, useWorkflowGitHubHistory, useWorkflowRuns } from "@/features/workflows/model/use-workflows";
+import { githubTrigger as githubTriggerSettings, triggerDeliveries } from "@/features/workflows/model/workflow-github";
 import { workflowOutline } from "@/features/workflows/model/workflow-outline";
-import { stepLabel } from "@/features/workflows/model/workflow-steps";
+import { latestSteps, stepLabel, stepText, triggerType } from "@/features/workflows/model/workflow-steps";
 import {
   useMobileWorkspaceActions,
   useMobileWorkspaceSelector,
@@ -27,6 +32,8 @@ import { typeScale } from "@/shared/lib/type-scale";
 const NO_IDS: readonly string[] = [];
 /** The workflow page shows the newest runs; the Runs page shows them all. */
 const LATEST_RUNS = 3;
+/** The workflow page shows the newest GitHub events; the GitHub events page shows them all. */
+const LATEST_EVENTS = 3;
 
 /**
  * Drawer > Workflows > one workflow: run it, edit it, pin it to the drawer, and read its steps,
@@ -52,12 +59,36 @@ export function WorkflowScreen() {
   const moreRuns = runList.length > LATEST_RUNS || Boolean(runs.data?.nextBefore);
   const trigger = workflow?.graph.nodes.find((node) => node.kind === "trigger");
   const triggerState = workflow?.triggers.find((state) => state.nodeId === trigger?.id);
+  const githubTrigger = trigger && triggerType(trigger) === "github" ? trigger : undefined;
+  const github = useWorkflowGitHubHistory(serverId, workflowId, Boolean(githubTrigger));
+  const githubHistory = githubTrigger ? github.data : undefined;
+  const events = githubTrigger && githubHistory ? triggerDeliveries(githubHistory.deliveries, githubTrigger.id) : [];
+  const stepActions = useWorkflowStepActions(serverId, workflowId);
+  const byId = new Map(workflow?.graph.nodes.map((node) => [node.id, node]) ?? []);
+  // The newest step of each node that ran alone, outside a run, in the order of the host.
+  const soloSteps = [...latestSteps(runs.data?.soloSteps ?? []).values()].filter((step) => byId.has(step.nodeId));
 
-  const runNow = async () => {
+  /** Starts a run and opens it; `start` answers the run id, or null when the host refused it. */
+  const startAndOpen = async (start: () => Promise<string | null>) => {
     setStarting(true);
-    const runId = await commands.run(workflowId);
+    const runId = await start();
     setStarting(false);
     if (runId) commands.openRun(workflowId, runId);
+  };
+  const runNow = () => startAndOpen(() => commands.run(workflowId));
+  const stepMenu: WorkflowStepMenu = {
+    // A trigger starts the whole workflow with Run now; a note does not run.
+    actions: (node: WorkflowNode) =>
+      node.kind === "trigger" || !isWorkflowStepKind(node.kind) || workflow?.needsNewerApp
+        ? []
+        : [
+            { id: "run-from", title: t("mobile.workflow.action.runFrom"), image: "play" },
+            { id: "run-step", title: t("mobile.workflow.action.runStep") },
+          ],
+    onAction: (node, actionId) => {
+      if (actionId === "run-from") void startAndOpen(() => commands.run(workflowId, node.id));
+      else if (actionId === "run-step") void commands.runStep(workflowId, node.id);
+    },
   };
   const confirmDelete = () => {
     void haptics.notification("warning");
@@ -152,8 +183,30 @@ export function WorkflowScreen() {
               title={t("mobile.workflow.detail.stepsTitle")}
               footer={workflowOutline(workflow.graph) ? undefined : t("mobile.workflow.detail.canvasOrder")}
             >
-              {workflowStepRows(workflow.graph, serverAgents, t)}
+              {workflowStepRows(workflow.graph, serverAgents, t, stepMenu)}
             </SettingsSection>
+            {soloSteps.length > 0 ? (
+              <SettingsSection
+                title={t("mobile.workflow.detail.soloSteps")}
+                footer={t("mobile.workflow.detail.soloHint")}
+              >
+                {soloSteps.map((step) => {
+                  const node = byId.get(step.nodeId);
+                  return node ? (
+                    <WorkflowRunStepRow
+                      key={step.id}
+                      node={node}
+                      step={step}
+                      agents={serverAgents}
+                      busy={stepActions.busy}
+                      onDecide={stepActions.decide}
+                      onRetry={stepActions.retry}
+                      onStop={stepActions.stop}
+                    />
+                  ) : null;
+                })}
+              </SettingsSection>
+            ) : null}
             {trigger ? (
               <SettingsSection title={t("mobile.workflow.detail.trigger")}>
                 <SettingsRow
@@ -171,7 +224,25 @@ export function WorkflowScreen() {
                   }
                 >
                   <Typography.Paragraph>{stepLabel(trigger, serverAgents, t)}</Typography.Paragraph>
+                  {githubTrigger ? (
+                    <Typography.Paragraph className="text-grouped-secondary" style={typeScale.caption}>
+                      {stepText(githubTrigger, t)}
+                    </Typography.Paragraph>
+                  ) : null}
                 </SettingsRow>
+                {githubTrigger && !workflow.needsNewerApp ? (
+                  <SettingsRow
+                    disclosure={false}
+                    // As on desktop, the trigger needs a repository to find its newest item.
+                    disabled={starting || !githubTriggerSettings(githubTrigger).repository}
+                    supportingText={t("mobile.workflow.github.runLastEventHint")}
+                    onPress={() => void startAndOpen(() => commands.runLastEvent(workflowId, githubTrigger.id))}
+                  >
+                    <Typography.Paragraph className="text-accent-text">
+                      {t("mobile.workflow.github.runLastEvent")}
+                    </Typography.Paragraph>
+                  </SettingsRow>
+                ) : null}
                 {triggerState?.webhookUrl ? (
                   <SettingsRow
                     supportingText={triggerState.webhookUrl}
@@ -183,6 +254,34 @@ export function WorkflowScreen() {
                     accessibilityLabel={t("mobile.workflow.detail.copyWebhook")}
                   >
                     <Typography.Paragraph>{t("mobile.workflow.detail.copyWebhook")}</Typography.Paragraph>
+                  </SettingsRow>
+                ) : null}
+              </SettingsSection>
+            ) : null}
+            {githubHistory ? (
+              <SettingsSection title={t("mobile.workflow.github.history.title")}>
+                {events.length > 0 ? (
+                  events
+                    .slice(0, LATEST_EVENTS)
+                    .map((delivery) => (
+                      <WorkflowGitHubEventRow
+                        key={delivery.id}
+                        delivery={delivery}
+                        history={githubHistory}
+                        runs={runList.map((item) => item.run)}
+                        onOpenRun={(runId) => commands.openRun(workflowId, runId)}
+                      />
+                    ))
+                ) : (
+                  <SettingsRow disclosure={false}>
+                    <Typography.Paragraph className="text-text-secondary">
+                      {t("mobile.workflow.github.history.none")}
+                    </Typography.Paragraph>
+                  </SettingsRow>
+                )}
+                {events.length > LATEST_EVENTS ? (
+                  <SettingsRow onPress={() => commands.openGitHubEvents(workflowId)}>
+                    <Typography.Paragraph>{t("mobile.workflow.github.history.all")}</Typography.Paragraph>
                   </SettingsRow>
                 ) : null}
               </SettingsSection>
@@ -221,6 +320,9 @@ export function WorkflowScreen() {
                 time: formatUpdatedAt(workflow.summary.updatedAt, format),
               })}
             >
+              <SettingsRow onPress={() => commands.openVersions(workflowId)}>
+                <Typography.Paragraph>{t("mobile.workflow.version.history")}</Typography.Paragraph>
+              </SettingsRow>
               <SettingsRow disclosure={false} onPress={confirmDelete}>
                 <Typography.Paragraph className="text-danger-text">
                   {t("mobile.workflow.delete.confirm")}

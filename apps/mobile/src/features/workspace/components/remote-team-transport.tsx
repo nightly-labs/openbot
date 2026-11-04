@@ -62,6 +62,8 @@ export interface RemoteTeamTransportRef {
 }
 
 interface RemoteTeamTransportProps {
+  /** The server of this transport. The first connect asks for its session while the hidden page starts. */
+  hostId: string;
   active: boolean;
   directory: RemoteTeamDirectoryClient;
   onConnectionUpdate: (update: RemoteTeamConnectionUpdate) => void;
@@ -258,10 +260,47 @@ export const RemoteTeamTransport = memo(
       },
       [mailbox],
     );
+    // The page must load and make its key before it asks for a ticket, and the ticket needs the
+    // session. The session does not need the key, so the first connect asks for it while the page
+    // loads. The account service gives the active session again, so the peer gets the same session
+    // as with its own request, one round trip sooner.
+    const earlySession = useRef<{
+      hostId: string;
+      directory: RemoteTeamDirectoryClient;
+      sessionId: Promise<string | null>;
+    } | null>(null);
+    const earlySessionAsked = useRef(false);
+    useEffect(() => {
+      if (!props.active || earlySessionAsked.current) return;
+      earlySessionAsked.current = true;
+      earlySession.current = {
+        hostId: props.hostId,
+        directory: props.directory,
+        sessionId: runTeamEffect(props.directory.startSession(props.hostId)).catch(() => null),
+      };
+    }, [props.active, props.hostId, props.directory]);
     const [actions] = useState(() => ({
       endSession: (sessionId: string) => runTeamEffect(latest.current.props.directory.endSession(sessionId)),
-      getBootstrap: (hostId: string, clientPublicKey: string, existingSessionId: string | null) =>
-        runTeamEffect(latest.current.props.directory.createBootstrap(hostId, clientPublicKey, existingSessionId)),
+      getBootstrap: async (hostId: string, clientPublicKey: string, existingSessionId: string | null) => {
+        const { directory } = latest.current.props;
+        const early = earlySession.current;
+        earlySession.current = null;
+        const earlySessionId =
+          existingSessionId === null && early?.hostId === hostId && early.directory === directory
+            ? await early.sessionId
+            : null;
+        // A failed early request leaves the bootstrap as it was: it asks for the session itself.
+        if (earlySessionId === null)
+          return runTeamEffect(directory.createBootstrap(hostId, clientPublicKey, existingSessionId));
+        // A session that ended meanwhile gets a new one in `createBootstrap`. As there, a failed
+        // ticket ends the session that the bootstrap asked for.
+        return runTeamEffect(directory.createBootstrap(hostId, clientPublicKey, earlySessionId)).catch(
+          async (error: unknown) => {
+            await runTeamEffect(directory.endSession(earlySessionId)).catch(() => undefined);
+            throw error;
+          },
+        );
+      },
       onUploadProgress: async ({ commandId, sent, total }: RemoteUploadProgress) =>
         uploadListeners.current.get(commandId)?.(total > 0 ? sent / total : 1),
       onAccountProfileChanged: () => latest.current.refreshProfile(),

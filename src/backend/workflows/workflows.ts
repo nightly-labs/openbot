@@ -73,21 +73,28 @@ import type {
   MessagingDiscordSend,
   MessagingMentionResult,
   MessagingPostFailure,
+  MessagingSlackMention,
+  MessagingSlackSend,
+  MessagingTelegramMention,
+  MessagingTelegramSend,
 } from "../messaging/messaging-threads";
 import { resultText } from "../routine-results/routine-results";
 import type { ReceivedWebhookEvent } from "../routine-store";
 import {
   type DiscordOutputPlan,
   discordOutputPlan,
+  discordTriggerFiles,
   discordTriggerMatches,
   discordTriggerMessage,
   workflowDiscordPayload,
 } from "./discord-matching";
 import {
+  type GitHubEventFacts,
   githubEventFacts,
   githubFilterRefuses,
   githubTriggerMatches,
-  githubTriggerRepository,
+  githubTriggerRepositories,
+  withoutStaleGitHubRepositories,
   workflowGitHubPayload,
 } from "./github-matching";
 import {
@@ -100,6 +107,20 @@ import {
   githubOutputText,
   githubResultKeys,
 } from "./github-output";
+import {
+  type SlackOutputPlan,
+  slackOutputPlan,
+  slackTriggerMatches,
+  slackTriggerMessage,
+  workflowSlackPayload,
+} from "./slack-matching";
+import {
+  type TelegramOutputPlan,
+  telegramOutputPlan,
+  telegramTriggerMatches,
+  telegramTriggerMessage,
+  workflowTelegramPayload,
+} from "./telegram-matching";
 import { REPEATABLE_GITHUB_ACTIONS, type WorkflowGitHubApi } from "./workflow-github-api";
 import type { WaitingGitHubDelivery, WorkflowGitHubStore } from "./workflow-github-store";
 import {
@@ -162,6 +183,9 @@ interface WorkflowTextRequest {
 }
 
 /** How a run began, and the key that makes a second start of the same run answer the first. */
+/** The part of a Discord or Telegram send that an output delivery keeps. */
+type ChatOutputSend = { action: "reply" | "post"; text: string } | { action: "react"; emoji: string };
+
 interface RunOrigin {
   source: WorkflowRunSource;
   scheduledFor: string | null;
@@ -209,6 +233,16 @@ export interface WorkflowsDependencies {
   discordSend?: (
     connectionId: string,
     send: MessagingDiscordSend,
+  ) => Effect.Effect<{ posted: true } | { failure: MessagingPostFailure }>;
+  /** Replies, posts or reacts in a Telegram chat; absent where this host has no messaging. */
+  telegramSend?: (
+    connectionId: string,
+    send: MessagingTelegramSend,
+  ) => Effect.Effect<{ posted: true } | { failure: MessagingPostFailure }>;
+  /** Replies, posts or reacts in a Slack workspace; absent where this host has no messaging. */
+  slackSend?: (
+    connectionId: string,
+    send: MessagingSlackSend,
   ) => Effect.Effect<{ posted: true } | { failure: MessagingPostFailure }>;
   /** The workflow whose graph, title, versions or runs changed. */
   changed(workflowId: string): void;
@@ -298,6 +332,10 @@ interface WorkflowsShape {
    * when no trigger takes it, and `skipped` when each workflow that takes it is busy or cannot start.
    */
   receiveDiscord(mention: MessagingDiscordMention): Effect.Effect<MessagingMentionResult, WorkflowFailed>;
+  /** As `receiveDiscord`, for a new conversation in a Telegram group. */
+  receiveTelegram(mention: MessagingTelegramMention): Effect.Effect<MessagingMentionResult, WorkflowFailed>;
+  /** As `receiveDiscord`, for the Slack triggers and a mention in a Slack channel. */
+  receiveSlack(mention: MessagingSlackMention): Effect.Effect<MessagingMentionResult, WorkflowFailed>;
   /** Records in each GitHub trigger's history that the host got no GitHub events from `from` to `to`. */
   githubOffline(from: Date, to: Date): Effect.Effect<void, WorkflowFailed>;
   githubHistory(workflowId: string): Effect.Effect<WorkflowGitHubHistory, WorkflowFailed>;
@@ -571,15 +609,22 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             ? dependencies.discordSend(plan.connectionId, plan.send)
             : Effect.succeed({ failure: "not-running" as const });
 
-        /** Keeps a Discord output's reply, post or reaction, then sends it. */
-        const sendDiscord = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) => {
-          const plan = discordPlan(step, node, run);
+        /**
+         * Keeps a chat output's reply, post or reaction, then sends it. Discord, Telegram and Slack differ only in
+         * the plan, the place of the post and the send function, so a fix here applies to all three.
+         */
+        const sendChat = <Plan extends { connectionId: string; send: ChatOutputSend }>(
+          step: StoredWorkflowStep,
+          plan: Plan | { error: string },
+          placeId: (plan: Plan) => string,
+          post: (plan: Plan) => Effect.Effect<{ posted: true } | { failure: MessagingPostFailure }>,
+        ) => {
           if ("error" in plan) {
             settle(step, { status: "failed", error: plan.error });
             return Effect.void;
           }
           const { send } = plan;
-          // Nothing to say: the server gets no post. A reaction needs no text.
+          // Nothing to say: the chat gets no post. A reaction needs no text.
           if (send.action !== "react" && !send.text.trim()) {
             settle(step, { status: "done", output: "" });
             return Effect.void;
@@ -592,14 +637,41 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             {
               stepId: step.id,
               connectionId: plan.connectionId,
-              placeId: send.channelId,
+              placeId: placeId(plan),
               text: send.action === "react" ? send.emoji : send.text,
             },
             now(),
           );
           const output = runs.output(step.id);
-          return output ? startPost(step, output, discordPost(plan)) : Effect.void;
+          return output ? startPost(step, output, post(plan)) : Effect.void;
         };
+
+        const sendDiscord = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) =>
+          sendChat(step, discordPlan(step, node, run), (plan) => plan.send.channelId, discordPost);
+
+        /** The reply, post or reaction of a Telegram output. Only a run that a message started has its message. */
+        const telegramPlan = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) =>
+          telegramOutputPlan(node, step.input, run?.source === "telegram" ? telegramTriggerMessage(run.payload) : null);
+
+        const telegramPost = (plan: Extract<TelegramOutputPlan, { send: unknown }>) =>
+          dependencies.telegramSend
+            ? dependencies.telegramSend(plan.connectionId, plan.send)
+            : Effect.succeed({ failure: "not-running" as const });
+
+        const sendTelegram = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) =>
+          sendChat(step, telegramPlan(step, node, run), (plan) => plan.chatId, telegramPost);
+
+        /** As `discordPlan`, for a Slack output and a run that a Slack mention started. */
+        const slackPlan = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) =>
+          slackOutputPlan(node, step.input, run?.source === "slack" ? slackTriggerMessage(run.payload) : null);
+
+        const slackPost = (plan: Extract<SlackOutputPlan, { send: unknown }>) =>
+          dependencies.slackSend
+            ? dependencies.slackSend(plan.connectionId, plan.send)
+            : Effect.succeed({ failure: "not-running" as const });
+
+        const sendSlack = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) =>
+          sendChat(step, slackPlan(step, node, run), (plan) => plan.send.channelId, slackPost);
 
         /**
          * The key of a GitHub output's change: one for each pass of a node through a run, or one for a step
@@ -645,6 +717,9 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                 people: plan.choose.person ? chosen.people : change.people,
               };
             }
+            // The files go to GitHub before the change is recorded as sent: a restart during the copy
+            // starts the step again, and it does not show the change as uncertain.
+            change = yield* api.attachFiles(change);
             github.startAction(
               {
                 actionKey: key,
@@ -730,6 +805,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             run?.graph ?? null,
             run?.triggerNodeId ?? null,
             step.runId ? github.runItem(step.runId) : null,
+            run?.source === "discord" ? discordTriggerFiles(run.payload) : null,
           );
           if (plan.kind === "failed") {
             settle(step, { status: "failed", error: plan.error });
@@ -766,6 +842,16 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             const plan = discordPlan(step, node, run);
             if ("error" in plan) return settle(step, { status: "failed", error: plan.error });
             return yield* resumeOutput(step, discordPost(plan));
+          }
+          if (node && fieldText(node, "target") === "telegram") {
+            const plan = telegramPlan(step, node, run);
+            if ("error" in plan) return settle(step, { status: "failed", error: plan.error });
+            return yield* resumeOutput(step, telegramPost(plan));
+          }
+          if (node && fieldText(node, "target") === "slack") {
+            const plan = slackPlan(step, node, run);
+            if ("error" in plan) return settle(step, { status: "failed", error: plan.error });
+            return yield* resumeOutput(step, slackPost(plan));
           }
           if (!node || fieldText(node, "target") !== "github") return yield* resumeOutput(step);
           yield* sendGitHub(step, node, run);
@@ -818,6 +904,14 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               }
               if (fieldText(node, "target") === "discord") {
                 yield* sendDiscord(step, node, run);
+                return;
+              }
+              if (fieldText(node, "target") === "telegram") {
+                yield* sendTelegram(step, node, run);
+                return;
+              }
+              if (fieldText(node, "target") === "slack") {
+                yield* sendSlack(step, node, run);
                 return;
               }
               dependencies.notify({
@@ -1015,18 +1109,17 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           return yield* attempt(() => store.listWithGraphs());
         });
 
+        /** The graph as the host saves it. */
+        const prepareGraph = (graph: WorkflowGraph) =>
+          withoutStaleGitHubRepositories(prepareWorkflowSchedules(graph, dependencies.timezone(), now()));
+
         const get = Effect.fn("Workflows.get")(function* (workflowId: string) {
           return yield* attempt(() => detailOf(workflowId));
         });
 
         const create = Effect.fn("Workflows.create")(function* (input: CreateWorkflowInput) {
           const detail = yield* attempt(() =>
-            store.create(
-              input.graph
-                ? { ...input, graph: prepareWorkflowSchedules(input.graph, dependencies.timezone(), now()) }
-                : input,
-              now(),
-            ),
+            store.create(input.graph ? { ...input, graph: prepareGraph(input.graph) } : input, now()),
           );
           changed(detail.summary.id);
           rearm();
@@ -1057,12 +1150,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
 
         const saveGraph = Effect.fn("Workflows.saveGraph")(function* (input: SaveWorkflowGraphInput) {
           const result = yield* attempt(() =>
-            store.saveGraph(
-              input.workflowId,
-              input.baseRevision,
-              prepareWorkflowSchedules(input.graph, dependencies.timezone(), now()),
-              now(),
-            ),
+            store.saveGraph(input.workflowId, input.baseRevision, prepareGraph(input.graph), now()),
           );
           // A conflict changed nothing: the editor that saved gets the newer workflow in the answer.
           if (result.ok) {
@@ -1234,25 +1322,28 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           );
         });
 
-        const receiveDiscord = Effect.fn("Workflows.receiveDiscord")(function* (mention: MessagingDiscordMention) {
-          return yield* locked(
+        /**
+         * Starts a run for each chat trigger that a new conversation matches. Discord, Telegram and Slack differ
+         * only in these values, so a fix here applies to all three.
+         */
+        const receiveMention = (chat: {
+          matches: (node: WorkflowNode) => boolean;
+          /** True when an open run started from the same chat message. */
+          sameMessage: (run: StoredWorkflowRun) => boolean;
+          origin: (node: WorkflowNode) => Omit<RunOrigin, "scheduledFor">;
+          failure: string;
+        }) =>
+          locked(
             Effect.gen(function* (): Effect.fn.Return<MessagingMentionResult, WorkflowFailed> {
               const triggers = (yield* attempt(() => store.listWithGraphs())).flatMap(({ summary, graph }) =>
-                graph.nodes
-                  .filter((node) => discordTriggerMatches(node, mention))
-                  .map((node) => ({ workflowId: summary.id, node })),
+                graph.nodes.filter(chat.matches).map((node) => ({ workflowId: summary.id, node })),
               );
               if (triggers.length === 0) return "none";
               let started = false;
               for (const { workflowId, node } of triggers) {
                 const open = runs.openRuns().filter((run) => run.workflowId === workflowId);
                 // A mention that Signal gives again, after a restart, has its run already.
-                if (
-                  open.some(
-                    (run) =>
-                      run.source === "discord" && discordTriggerMessage(run.payload)?.messageId === mention.messageId,
-                  )
-                ) {
+                if (open.some(chat.sameMessage)) {
                   started = true;
                   continue;
                 }
@@ -1260,20 +1351,13 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                 if (open.length > 0) continue;
                 const detail = yield* attempt(() => store.detail(workflowId));
                 if (!detail) continue;
-                const result = yield* begin(detail, node, {
-                  source: "discord",
-                  scheduledFor: null,
-                  idempotencyKey: `discord:${node.id}:${mention.messageId}`,
-                  payload: workflowDiscordPayload(node.id, mention),
-                }).pipe(Effect.result);
+                const result = yield* begin(detail, node, { ...chat.origin(node), scheduledFor: null }).pipe(
+                  Effect.result,
+                );
                 if (Result.isFailure(result)) {
                   // After a run started, the mention stays with the workflows: no agent answers it too.
                   if (!started && !(result.failure.cause instanceof WorkflowStoreError)) return yield* result.failure;
-                  logger.warn("A Discord mention did not start a workflow run.", {
-                    workflowId,
-                    nodeId: node.id,
-                    cause: String(result.failure.cause),
-                  });
+                  logger.warn(chat.failure, { workflowId, nodeId: node.id, cause: String(result.failure.cause) });
                   continue;
                 }
                 started = true;
@@ -1281,6 +1365,53 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               return started ? "started" : "skipped";
             }),
           );
+
+        const receiveDiscord = Effect.fn("Workflows.receiveDiscord")(function* (mention: MessagingDiscordMention) {
+          return yield* receiveMention({
+            matches: (node) => discordTriggerMatches(node, mention),
+            sameMessage: (run) =>
+              run.source === "discord" && discordTriggerMessage(run.payload)?.messageId === mention.messageId,
+            origin: (node) => ({
+              source: "discord",
+              idempotencyKey: `discord:${node.id}:${mention.messageId}`,
+              payload: workflowDiscordPayload(node.id, mention),
+            }),
+            failure: "A Discord mention did not start a workflow run.",
+          });
+        });
+
+        const receiveTelegram = Effect.fn("Workflows.receiveTelegram")(function* (mention: MessagingTelegramMention) {
+          // A Telegram message id is unique only in its chat, so the chat is part of the match and of the key.
+          return yield* receiveMention({
+            matches: (node) => telegramTriggerMatches(node, mention),
+            sameMessage: (run) => {
+              const message = run.source === "telegram" ? telegramTriggerMessage(run.payload) : null;
+              return message?.connectionId === mention.connectionId && message.messageId === mention.messageId;
+            },
+            origin: (node) => ({
+              source: "telegram",
+              idempotencyKey: `telegram:${node.id}:${mention.connectionId}:${mention.messageId}`,
+              payload: workflowTelegramPayload(node.id, mention),
+            }),
+            failure: "A Telegram message did not start a workflow run.",
+          });
+        });
+
+        const receiveSlack = Effect.fn("Workflows.receiveSlack")(function* (mention: MessagingSlackMention) {
+          // A Slack timestamp is unique only in its channel, so the channel is part of the match and of the key.
+          return yield* receiveMention({
+            matches: (node) => slackTriggerMatches(node, mention),
+            sameMessage: (run) => {
+              const message = run.source === "slack" ? slackTriggerMessage(run.payload) : null;
+              return message?.channelId === mention.channelId && message.messageId === mention.messageId;
+            },
+            origin: (node) => ({
+              source: "slack",
+              idempotencyKey: `slack:${node.id}:${mention.channelId}:${mention.messageId}`,
+              payload: workflowSlackPayload(node.id, mention),
+            }),
+            failure: "A Slack mention did not start a workflow run.",
+          });
         });
 
         // --- GitHub --------------------------------------------------------------------------------
@@ -1290,14 +1421,14 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           store.listWithGraphs().flatMap(({ summary, graph }) =>
             graph.nodes.flatMap((node) => {
               const event = node.fields.event;
-              return githubTriggerRepository(node) && isOneOf(WORKFLOW_GITHUB_EVENTS, event)
+              return githubTriggerRepositories(node).length > 0 && isOneOf(WORKFLOW_GITHUB_EVENTS, event)
                 ? [{ workflowId: summary.id, node, event }]
                 : [];
             }),
           );
 
         const watchedRepositories = () => [
-          ...new Set(githubTriggers().flatMap((trigger) => githubTriggerRepository(trigger.node) ?? [])),
+          ...new Set(githubTriggers().flatMap((trigger) => githubTriggerRepositories(trigger.node))),
         ];
 
         /** Tells the GitHub route which repositories the saved triggers watch. The change it follows stays. */
@@ -1364,8 +1495,12 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           const detail = store.detail(workflowId);
           for (const delivery of github.waiting(workflowId)) {
             if (github.runOpen(workflowId, delivery.item)) continue;
+            // An event of a repository that the trigger no longer watches does not start a run.
+            const repository = delivery.item.repository.toLowerCase();
             const trigger = detail?.graph.nodes.find(
-              (node) => node.id === delivery.nodeId && githubTriggerRepository(node) !== null,
+              (node) =>
+                node.id === delivery.nodeId &&
+                githubTriggerRepositories(node).some((name) => name.toLowerCase() === repository),
             );
             if (!detail || !trigger) github.endWaiting(delivery, { reason: "refused" });
             else if (delivery.causedByBot && chainTooLong(delivery.item))
@@ -1478,29 +1613,40 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           if (!api) return yield* refuse("refused", sourceText("error.workflow.githubNotConnected"));
           const detail = yield* attempt(() => detailOf(input.workflowId));
           const trigger = detail.graph.nodes.find((node) => node.id === input.nodeId);
-          const repository = trigger ? githubTriggerRepository(trigger) : null;
+          const repositories = trigger ? githubTriggerRepositories(trigger) : [];
           const event = trigger?.fields.event;
-          if (!trigger || !repository || !isOneOf(WORKFLOW_GITHUB_EVENTS, event))
+          if (!trigger || repositories.length === 0 || !isOneOf(WORKFLOW_GITHUB_EVENTS, event))
             return yield* refuse("missing", sourceText("error.workflow.nodeMissing"));
-          // GitHub is asked outside the lock: the other runs do not wait for it.
-          const recent = yield* api
-            .recentEvents(repository, event)
-            .pipe(Effect.mapError((failure) => refuse("refused", failure.message)));
+          // GitHub is asked outside the lock: the other runs do not wait for it. The events of different
+          // repositories have no common time, so the first repository in the trigger's order with a
+          // matching event gives it. A repository that GitHub refuses is skipped while another one answers.
           const bot = dependencies.githubApp();
-          const facts = recent
-            .map((candidate) => githubEventFacts(candidate.event, candidate.body, bot))
-            .find(
-              (candidate) =>
-                candidate !== null &&
-                githubTriggerMatches(trigger, candidate) &&
-                !githubFilterRefuses(trigger, candidate),
+          let facts: GitHubEventFacts | undefined;
+          let failure: string | null = null;
+          for (const repository of repositories) {
+            const answer = yield* api.recentEvents(repository, event).pipe(
+              Effect.map((recent) => ({ recent, failure: null })),
+              Effect.catch((error) => Effect.succeed({ recent: [], failure: error.message })),
             );
-          if (!facts) return yield* refuse("refused", sourceText("error.workflow.githubNoEvent"));
+            failure = answer.failure ?? failure;
+            facts = answer.recent
+              .map((candidate) => githubEventFacts(candidate.event, candidate.body, bot))
+              .find(
+                (candidate): candidate is GitHubEventFacts =>
+                  candidate !== null &&
+                  githubTriggerMatches(trigger, candidate) &&
+                  !githubFilterRefuses(trigger, candidate),
+              );
+            if (facts) break;
+          }
+          if (!facts) return yield* refuse("refused", failure ?? sourceText("error.workflow.githubNoEvent"));
+          const found = facts;
+          const repository = found.repository.toLowerCase();
           return yield* locked(
             Effect.gen(function* () {
               const current = yield* attempt(() => detailOf(input.workflowId));
               const node = current.graph.nodes.find((candidate) => candidate.id === trigger.id);
-              if (!node || githubTriggerRepository(node) !== repository)
+              if (!node || !githubTriggerRepositories(node).some((name) => name.toLowerCase() === repository))
                 return yield* refuse("missing", sourceText("error.workflow.nodeMissing"));
               const deliveryId = `last:${input.requestId}`;
               const { run } = yield* begin(
@@ -1510,7 +1656,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                   source: "manual",
                   scheduledFor: null,
                   idempotencyKey: `manual:${input.requestId}`,
-                  payload: workflowGitHubPayload(node.id, deliveryId, event, facts, now().toISOString()),
+                  payload: workflowGitHubPayload(node.id, deliveryId, event, found, now().toISOString()),
                 },
                 // A run that a person starts does not wait for the run of its item.
                 (started) =>
@@ -1519,7 +1665,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                     workflowId: current.summary.id,
                     nodeId: node.id,
                     deliveryId: null,
-                    item: facts.item,
+                    item: found.item,
                     causedByBot: false,
                     startedAt: started.startedAt,
                   }),
@@ -1710,6 +1856,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           receiveWebhook,
           receiveGitHub,
           receiveDiscord,
+          receiveTelegram,
+          receiveSlack,
           githubOffline,
           githubHistory,
           githubLastEvent,

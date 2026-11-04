@@ -292,6 +292,13 @@ export const messages = {
     "Het huidige geheim werkt direct niet meer. Verzoeken die ermee zijn ondertekend worden geweigerd tot de afzender het nieuwe geheim gebruikt.",
   "routine.webhook.regenerateConfirm": "Opnieuw genereren",
   "routine.webhook.regenerateFailed": "Kan het ondertekeningsgeheim niet opnieuw genereren.",
+  "routine.webhook.useSenderSecret": "Geheim van afzender gebruiken",
+  "routine.webhook.senderSecretTitle": "Ondertekeningsgeheim van de afzender gebruiken?",
+  "routine.webhook.senderSecretDescription":
+    "Sommige afzenders, zoals Composio en Svix, maken hun eigen ondertekeningsgeheim. Plak het hier. Het huidige geheim werkt direct niet meer.",
+  "routine.webhook.senderSecretLabel": "Geheim van afzender",
+  "routine.webhook.senderSecretConfirm": "Gebruiken",
+  "routine.webhook.senderSecretFailed": "Kan het geheim van de afzender niet opslaan.",
   "routine.webhook.statusFailed": "Kan niet controleren of de host met de relay verbonden is.",
   "routine.webhook.stepDone": "Klaar",
   "routine.webhook.stepUrl": "Kopieer het endpoint naar de verzendende dienst",

@@ -240,6 +240,7 @@ function layoutManifest(fields: Record<string, string>): string {
 const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDescriptor> = {
   pi: nativeProviderRuntime("pi"),
   muse: nativeProviderRuntime("muse"),
+  devin: nativeProviderRuntime("devin"),
   codex: {
     runtime: "codex",
     spec: (target, lock) => {

@@ -30,6 +30,11 @@ export default function ServerSettingsLayout() {
       })}
     >
       <Stack.Screen name="index" options={{ title: t("mobile.server.route.settings") }} />
+      <Stack.Screen name="general" options={{ title: t("mobile.server.settings.general") }} />
+      <Stack.Screen name="people" options={{ title: t("mobile.server.settings.peopleSection") }} />
+      <Stack.Screen name="ai" options={{ title: t("mobile.server.settings.aiSection") }} />
+      <Stack.Screen name="data" options={{ title: t("mobile.server.settings.dataSection") }} />
+      <Stack.Screen name="maintenance" options={{ title: t("mobile.server.settings.maintenanceSection") }} />
       <Stack.Screen name="members" options={{ title: t("mobile.app.route.members") }} />
       <Stack.Screen name="invite" options={{ title: t("mobile.server.route.invite") }} />
       <Stack.Screen name="member" options={{ title: t("mobile.server.route.member") }} />
@@ -37,6 +42,7 @@ export default function ServerSettingsLayout() {
       <Stack.Screen name="roles" options={{ title: t("mobile.server.route.roles") }} />
       {/* The page names its role in the name field. */}
       <Stack.Screen name="role" options={{ title: t("mobile.server.route.role") }} />
+      <Stack.Screen name="audit" options={{ title: t("mobile.server.route.audit") }} />
       <Stack.Screen name="timezone" options={{ title: t("mobile.server.route.timezone") }} />
       <Stack.Screen name="connectors" options={{ title: t("mobile.server.route.connectors") }} />
       {/* The page names its connector. */}
@@ -51,6 +57,8 @@ export default function ServerSettingsLayout() {
       <Stack.Screen name="sites" options={{ title: t("mobile.server.route.sites") }} />
       <Stack.Screen name="providers" options={{ title: t("mobile.server.route.providers") }} />
       <Stack.Screen name="provider" options={{ title: t("mobile.server.route.provider") }} />
+      {/* The page names its provider, or says Add account. */}
+      <Stack.Screen name="provider-sign-in" options={{ title: t("mobile.server.route.provider") }} />
       {/* The page names its account. */}
       <Stack.Screen name="provider-account" options={{ title: t("mobile.server.route.provider") }} />
       <Stack.Screen name="acp-registry" options={{ title: t("mobile.server.route.acpRegistry") }} />

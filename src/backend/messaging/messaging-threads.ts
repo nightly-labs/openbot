@@ -20,7 +20,7 @@ import { type MessagingContextMessage, messagingPromptText } from "./messaging-p
 import type { MessagingOperationFailed } from "./messaging-service";
 import { type MessagingLink, MessagingStore } from "./messaging-store";
 import { boundedHistory, parseMessagingOutboundTool, parseMessagingTool } from "./messaging-tools";
-import type { ContextEntry, MessageTarget, MessagingPlace } from "./messaging-types";
+import type { ContextEntry, InboundFile, MessageTarget, MessagingPlace } from "./messaging-types";
 
 /** A file the agent attached to its answer, ready to upload. */
 export interface MessagingAnswerFile {
@@ -114,6 +114,70 @@ export interface MessagingOutbound {
     connectionId: string,
     send: MessagingDiscordSend,
   ): Effect.Effect<{ posted: true } | { failure: Exclude<MessagingPostFailure, "gone"> }>;
+  /** A Telegram output of a workflow: a reply, a post or a reaction, in the connection's chat. */
+  telegram(
+    connectionId: string,
+    send: MessagingTelegramSend,
+  ): Effect.Effect<{ posted: true } | { failure: Exclude<MessagingPostFailure, "gone"> }>;
+  /** A Slack output of a workflow: a reply in a thread, a post or a reaction. */
+  slack(
+    connectionId: string,
+    send: MessagingSlackSend,
+  ): Effect.Effect<{ posted: true } | { failure: Exclude<MessagingPostFailure, "gone"> }>;
+}
+
+/**
+ * A post or a reaction of a workflow's Telegram output. One connection is one chat, so a post needs no
+ * place. `threadKey` keeps a reply in the forum topic of the message.
+ */
+export type MessagingTelegramSend =
+  | { action: "reply"; threadKey: string; messageId: string; text: string }
+  | { action: "post"; text: string }
+  | { action: "react"; messageId: string; emoji: string };
+
+/** A message in a Telegram group that starts a conversation with OpenBot, for the Telegram triggers of workflows. */
+export interface MessagingTelegramMention {
+  connectionId: string;
+  chatName: string;
+  chatId: string;
+  /** The topic or reply chain of the message, which a reply keeps. */
+  threadKey: string;
+  messageId: string;
+  authorId: string;
+  authorName: string;
+  /** The text without OpenBot's own mention. */
+  text: string;
+  /** ISO time. */
+  receivedAt: string;
+}
+
+/**
+ * A post or a reaction of a workflow's Slack output, in one channel of the connection's workspace.
+ * `threadId` is the timestamp of the thread's first message; `emoji` is a Slack reaction name.
+ */
+export type MessagingSlackSend =
+  | { action: "reply"; channelId: string; threadId: string; text: string }
+  | { action: "post"; channelId: string; text: string }
+  | { action: "react"; channelId: string; messageId: string; emoji: string };
+
+/** A message in a Slack channel that mentions OpenBot, for the Slack triggers of workflows. */
+export interface MessagingSlackMention {
+  connectionId: string;
+  workspaceName: string;
+  channelId: string;
+  channelName: string;
+  /** The timestamp of the message. */
+  messageId: string;
+  /** The thread a reply goes to: the mention's thread, or the mention itself at the top level. */
+  threadId: string;
+  authorId: string;
+  authorName: string;
+  /** The text with each mention as `@name`. */
+  text: string;
+  /** The files of the message. Their addresses need the bot's token, so a workflow sees only their names. */
+  files: readonly InboundFile[];
+  /** ISO time. */
+  receivedAt: string;
 }
 
 /** A post or a reaction of a workflow's Discord output, in one channel of the connection's server. */
@@ -134,6 +198,8 @@ export interface MessagingDiscordMention {
   authorRoleIds: readonly string[];
   /** The text with each mention as `@name`. */
   text: string;
+  /** The files of the message and of the message it replies to, as signed addresses on Discord's CDN. */
+  files: readonly InboundFile[];
   /** ISO time. */
   receivedAt: string;
 }
@@ -175,7 +241,12 @@ const HISTORY_TIMEOUT_MS = 15_000;
 const FINISHED_TURN_LIMIT = 256;
 /** What a messaging tool answers when its connection does not run. */
 export const MESSAGING_NOT_RUNNING = "This connection does not run now.";
-const PLATFORM_NAMES: Record<MessagingPlatform, string> = { slack: "Slack", discord: "Discord", telegram: "Telegram" };
+const PLATFORM_NAMES: Record<MessagingPlatform, string> = {
+  slack: "Slack",
+  discord: "Discord",
+  telegram: "Telegram",
+  whatsapp: "WhatsApp",
+};
 
 /**
  * Owns the execution threads of external conversations: it enqueues their messages, frames their
@@ -228,6 +299,8 @@ export class MessagingThreads {
     | null = null;
   #outbound: MessagingOutbound | null = null;
   #mentionHandler: ((mention: MessagingDiscordMention) => Effect.Effect<MessagingMentionResult>) | null = null;
+  #telegramMentionHandler: ((mention: MessagingTelegramMention) => Effect.Effect<MessagingMentionResult>) | null = null;
+  #slackMentionHandler: ((mention: MessagingSlackMention) => Effect.Effect<MessagingMentionResult>) | null = null;
 
   constructor(database: OpenBotDatabase, mailbox: MailboxStore, hooks: MessagingThreadsHooks) {
     this.store = new MessagingStore(database);
@@ -282,6 +355,18 @@ export class MessagingThreads {
     return this.#mentionHandler ? this.#mentionHandler(mention) : Effect.succeed("none");
   }
 
+  /** The workflows' side of a Slack mention. Without it, every mention goes to an agent. */
+  setSlackMentionHandler(
+    handler: ((mention: MessagingSlackMention) => Effect.Effect<MessagingMentionResult>) | null,
+  ): void {
+    this.#slackMentionHandler = handler;
+  }
+
+  /** Gives a Slack mention to the workflows first. */
+  slackWorkflowMention(mention: MessagingSlackMention): Effect.Effect<MessagingMentionResult> {
+    return this.#slackMentionHandler ? this.#slackMentionHandler(mention) : Effect.succeed("none");
+  }
+
   /**
    * A Discord output of a workflow. Only an enabled connection of this host can take it. The server is
    * outside this computer, so the messaging side removes secrets from the text.
@@ -296,6 +381,50 @@ export class MessagingThreads {
     const outbound = this.#outbound;
     if (!outbound) return { failure: "not-running" };
     return yield* outbound.discord(connectionId, send);
+  });
+
+  /** The workflows' side of a Telegram group message. Without it, every message goes to an agent. */
+  setTelegramMentionHandler(
+    handler: ((mention: MessagingTelegramMention) => Effect.Effect<MessagingMentionResult>) | null,
+  ): void {
+    this.#telegramMentionHandler = handler;
+  }
+
+  /** Gives a new Telegram group conversation to the workflows first. */
+  workflowTelegramMention(mention: MessagingTelegramMention): Effect.Effect<MessagingMentionResult> {
+    return this.#telegramMentionHandler ? this.#telegramMentionHandler(mention) : Effect.succeed("none");
+  }
+
+  /**
+   * A Telegram output of a workflow. Only an enabled connection of this host can take it. The chat is
+   * outside this computer, so the messaging side removes secrets from the text.
+   */
+  readonly telegramSend = Effect.fn("MessagingThreads.telegramSend")(function* (
+    this: MessagingThreads,
+    connectionId: string,
+    send: MessagingTelegramSend,
+  ): Effect.fn.Return<{ posted: true } | { failure: MessagingPostFailure }> {
+    const record = this.store.connection(connectionId);
+    if (!record?.enabled || record.platform !== "telegram") return { failure: "gone" };
+    const outbound = this.#outbound;
+    if (!outbound) return { failure: "not-running" };
+    return yield* outbound.telegram(connectionId, send);
+  });
+
+  /**
+   * A Slack output of a workflow. Only an enabled connection of this host can take it. The workspace is
+   * outside this computer, so the messaging side removes secrets from the text.
+   */
+  readonly slackSend = Effect.fn("MessagingThreads.slackSend")(function* (
+    this: MessagingThreads,
+    connectionId: string,
+    send: MessagingSlackSend,
+  ): Effect.fn.Return<{ posted: true } | { failure: MessagingPostFailure }> {
+    const record = this.store.connection(connectionId);
+    if (!record?.enabled || record.platform !== "slack") return { failure: "gone" };
+    const outbound = this.#outbound;
+    if (!outbound) return { failure: "not-running" };
+    return yield* outbound.slack(connectionId, send);
   });
 
   /**

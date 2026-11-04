@@ -34,6 +34,7 @@ export default function HostedServerLayout() {
     >
       <Stack.Screen name="index" options={{ title: t("mobile.app.route.hostedServerPlans") }} />
       <Stack.Screen name="setup" options={{ title: t("mobile.app.route.hostedServerSetup") }} />
+      <Stack.Screen name="local" options={{ title: t("mobile.server.local.title") }} />
       {/* Join draws its own title; the header keeps only the back button. */}
       <Stack.Screen name="join" options={{ title: "" }} />
       {/* The header stays, so the push does not hide the bar and move the join page under it. */}

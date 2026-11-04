@@ -8,6 +8,8 @@ export const messages = {
     "OpenBot이 Codex 구성에 컴퓨터 제어를 등록할 수 없었어요. Codex config.toml이 올바르고 쓰기 가능한지 확인한 후 OpenBot을 다시 시작하세요. 에이전트 설정에서 컴퓨터 제어를 끄면 그 기능 없이 계속할 수 있어요.",
   "error.provider.codexUnresponsive": "Codex가 응답하지 않아 OpenBot이 프로세스를 종료했습니다.",
   "error.provider.acpUnresponsive": "{provider}가 제시간에 응답하지 않아 OpenBot이 프로세스를 종료했습니다.",
+  "error.provider.acpSignInLost":
+    "{provider}의 로그인이 끊어져 OpenBot이 프로세스를 종료했습니다. 메시지를 다시 보내세요.",
   "error.provider.acpMcpNotLoaded":
     "{provider}가 OpenBot 도구를 불러오지 않아 이 에이전트는 도구를 사용하거나 팀원에게 연락할 수 없습니다. {provider} 팀 정책이 로컬 MCP 서버를 차단할 수 있습니다. 팀 관리자에게 허용을 요청한 다음 다시 시도하세요.",
   "error.provider.endpointsReadOnly":
@@ -176,6 +178,7 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider}이(가) 인증된 계정을 반환하지 않았어요.",
   "error.provider.signInExpired": "{provider} 로그인이 만료되었어요. 계속하려면 다시 로그인하세요.",
   "error.provider.cliActivateFailed": "OpenBot이 관리형 CLI를 활성화할 수 없었어요.",
+  "error.provider.noMainlandChinaSignIn": "{provider}에는 중국 본토용 로그인이 없습니다.",
   "error.provider.cliNewVersionNotStarted": "새 버전이 시작되지 않았어요.",
   "error.provider.cliBusyReconnect": "{provider} CLI가 턴을 처리하는 중이에요. 끝날 때까지 기다린 후 다시 연결하세요.",
   "error.provider.cliBusySignOut":
@@ -261,6 +264,7 @@ export const messages = {
   "error.provider.kimiNotStarted": "Kimi를 시작할 수 없었어요. 터미널에서 `kimi --version`을 실행해 보세요.",
   "error.provider.kimiVersionUnreadable": "Kimi CLI 버전을 읽을 수 없어요.",
   "error.provider.kimiSignIn": "Kimi를 사용하려면 Kimi Code로 로그인하세요.",
+  "error.provider.devinSignIn": "Devin을 사용하려면 Devin으로 로그인하세요.",
   "error.provider.hermesMissing": "Hermes Agent가 설치되어 있지 않습니다. 설치한 후 다시 시도하세요.",
   "error.provider.hermesNotStarted": "Hermes Agent를 시작할 수 없습니다. 터미널에서 `hermes --version`을 실행하세요.",
   "error.provider.hermesVersionUnreadable": "Hermes Agent 버전을 읽을 수 없습니다.",

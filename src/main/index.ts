@@ -7,7 +7,7 @@ import {
   type HostStatus,
   IPC_ENDPOINTS,
 } from "@openbot/contracts/ipc";
-import { createFormat, resolveLocale, translateFor } from "@openbot/i18n";
+import { createFormat, localeDirection, resolveLocale, translateFor } from "@openbot/i18n";
 import { localizeSourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
@@ -29,6 +29,7 @@ import {
 } from "electron";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
+import { watchAppArchive } from "./app-archive-watch";
 import { readAppVariant, resolveAppIconPath, resolveLogoColorIconPath, resolveMenuBarIconPath } from "./app-icon";
 import { type ApplicationServices, createApplicationServices } from "./application-services";
 import { type BackgroundTray, createBackgroundTray } from "./background-tray";
@@ -109,8 +110,8 @@ import { stopAppImageCrashpadHandlerAtExit } from "./linux-appimage-crashpad";
 import { installLinuxDesktopEntry } from "./linux-desktop-entry";
 import { configureLinuxGpu } from "./linux-gpu-mode";
 import { configureLinuxPasswordStore } from "./linux-password-store";
+import { restartOnXWaylandWithoutMonitor, takeXWaylandRestartMarker } from "./linux-wayland-output";
 import { takeLocalServerChildEnvironment } from "./local-server-child";
-import { hideMacDockWhenNoWindowShows, setDockIcon, showMacDock } from "./mac-dock";
 import { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
   configureApplicationMenu,
@@ -137,6 +138,7 @@ import type { TraceFile } from "./trace-file";
 import { setIpcCallObserver } from "./trusted-ipc";
 import { UPDATE_INSTALL_TIMEOUT_MS } from "./update-service";
 import { setWindowAppearance } from "./window-appearance";
+import { placeWindowButtons } from "./window-buttons";
 
 const logger = createOpenBotLogger("main");
 
@@ -223,7 +225,9 @@ const serverMode = takeServerModeEnvironment(process.env, app.isPackaged, proces
 const localServerChildEnvironment = takeLocalServerChildEnvironment(process.env, commandLineUserDataDirectory);
 const localServerChild = serverMode || hostedServer ? null : localServerChildEnvironment;
 if (serverMode || hostedServer || localServerChild) hideExceptionErrorBox();
-if (serverMode || hostedServer) keepWindowsHidden();
+// A local server keeps a main window that never loads. A second launch on its profile, a deep link or
+// an MCP sign-in showed it as an empty window next to the desktop app.
+if (serverMode || hostedServer || localServerChild) keepWindowsHidden();
 // A local server has no window, so it has no Dock tile either.
 if (localServerChild && process.platform === "darwin") app.dock?.hide();
 const inviteLinkOptions = {
@@ -261,6 +265,16 @@ if (commandLineUserDataDirectory) {
 app.setName("OpenBot");
 app.enableSandbox();
 if (process.platform === "win32") app.setAppUserModelId("app.openbot.desktop");
+// Linux: on Wayland, Chromium waits until a monitor is on before it starts. With none, start again on
+// XWayland. Before the single-instance lock, so that the new process can take it. A parent process or
+// systemd watches the process, the output and the input of a headless server, so it does not restart.
+const startedOnXWayland = takeXWaylandRestartMarker(process.env, process.argv);
+if (
+  app.isPackaged &&
+  !(serverMode || hostedServer || localServerChildEnvironment) &&
+  (await Effect.runPromise(restartOnXWaylandWithoutMonitor(process.env)))
+)
+  app.exit(0);
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 // A second launch exits at once and must not write into the files of the instance that runs.
 if (hasSingleInstanceLock) {
@@ -272,6 +286,8 @@ if (hasSingleInstanceLock) {
   stopAppImageCrashpadHandlerAtExit();
   // A file request that never finishes must not keep the process and its lock after an exit.
   stopStuckExitAfterLimit(join(app.getPath("userData"), "logs"));
+  if (startedOnXWayland)
+    logger.warn("The Wayland session had no monitor, so OpenBot uses XWayland until the next start.");
 }
 // Linux: the GPU stays on until it fails on this computer (#992). `userData` has its final path here.
 configureLinuxGpu({
@@ -426,6 +442,8 @@ const {
   forwardTeamPresence,
   forwardDirectMessage,
   forwardDirectTyping,
+  forwardAttachmentDownload,
+  forwardAttachmentImportProgress,
 } = createRendererForwarders({
   getMainWindow: () => windowHolder.current,
   // A function: the window controller is made after the forwarders, and no event comes before it.
@@ -458,6 +476,7 @@ const windows = createMainWindowController({
   keepRunningInBackground: () => services?.appBehavior.keepRunningInBackground ?? false,
   getServices: () => services,
   getTranslate: () => services?.language.translate ?? translateFor(resolveLocale("system", app.getLocale())),
+  getLayoutDirection: () => localeDirection(services?.language.locale ?? resolveLocale("system", app.getLocale())),
   onRendererLoadStarted: () => {
     deepLinkReceiverReady = false;
     filePreviewPages.clear();
@@ -497,7 +516,7 @@ function applyAppIconColor(color: AppLogoColor): void {
   );
   if (icon.isEmpty()) return;
   if (process.platform === "darwin") {
-    setDockIcon(icon);
+    app.dock?.setIcon(icon);
     return;
   }
   // A window takes `appIconPath` when it is created, so a window opened after the choice gets the
@@ -507,16 +526,6 @@ function applyAppIconColor(color: AppLogoColor): void {
   appIconColorImage = icon;
   for (const window of BrowserWindow.getAllWindows()) window.setIcon(icon);
   backgroundTray?.setIcon(icon);
-}
-
-/**
- * The menu bar setting changed. Turned off, it shows the Dock icon again. Turned on while the main
- * window is closed, it hides the Dock icon. Closing the window and showing it again do the rest.
- */
-function syncMacDock(menuBar: boolean): void {
-  if (process.platform !== "darwin" || localServerChild) return;
-  if (menuBar) hideMacDockWhenNoWindowShows();
-  else void showMacDock();
 }
 
 /**
@@ -627,6 +636,7 @@ function registerIpcHandlers({
   teamStore,
   serverTimezone,
   promptCacheTtl,
+  modelVisibility,
   remoteSessionReuse,
   externalLinkPreference,
   externalLinks,
@@ -828,6 +838,7 @@ function registerIpcHandlers({
       memoryReview,
       machineAlerts,
       promptCacheTtl,
+      modelVisibility,
       agentAccess,
       serverAudit,
       localServerId: () => teamStore.getIdentity()?.serverId,
@@ -894,6 +905,7 @@ function registerIpcHandlers({
         openUrl: (url) => openHttpLink(url, openLink),
       }),
       openExternal: openLink,
+      modelVisibility,
     }),
     ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers, browserView, localSignIn }),
   });
@@ -1207,7 +1219,7 @@ if (!hasSingleInstanceLock) {
       performance.mark("openbot:when-ready");
       // Set the Dock icon before `dock.show()` below. A development build runs the stock Electron.app,
       // so until this call its Dock tile shows the Electron logo.
-      if (process.platform === "darwin" && !localServerChild) setDockIcon(appIconPath);
+      if (process.platform === "darwin" && !localServerChild) app.dock?.setIcon(appIconPath);
       if (!(await runCauseEffect(hostAllowsTenantLaunch()))) {
         app.quit();
         return;
@@ -1246,6 +1258,12 @@ if (!hasSingleInstanceLock) {
       });
       services = built;
       performance.mark("openbot:services-built");
+      // The first window opens before the saved language is read, with the system's direction.
+      placeWindowButtons(BrowserWindow.getAllWindows());
+      // A server has nobody to read the warning; a development build runs no `app.asar`.
+      if (app.isPackaged && !serverMode && !hostedServer && !localServerChild) {
+        teardown.push(0, "app archive watch", watchAppArchive(process.resourcesPath, built.language.translate));
+      }
       // `forwardCentralAuth` reaches the host, the remote servers and analytics only through
       // `services`, so every account change announced during construction was dropped.
       // `createApplicationServices` bound the local host to the one state it read and attributed the
@@ -1372,6 +1390,8 @@ if (!hasSingleInstanceLock) {
       remoteServers.on("presence", forwardTeamPresence);
       remoteServers.on("directMessage", forwardDirectMessage);
       remoteServers.on("directTyping", forwardDirectTyping);
+      remoteServers.on("attachmentDownload", forwardAttachmentDownload);
+      remoteServers.on("attachmentImportProgress", forwardAttachmentImportProgress);
       // Machine alerts are hidden for now: the check does not start, and no alert notification shows.
       // The selected server connects while the window loads. Its WebRTC setup takes seconds, and
       // the first screen waits for it. The other servers start after the load, below. The connection
@@ -1444,19 +1464,8 @@ if (!hasSingleInstanceLock) {
       });
       const tray = backgroundTray;
       tray.sync(appBehavior.keepRunningInBackground);
-      const unsubscribeBackgroundTray = appBehavior.subscribe(() => {
-        tray.sync(appBehavior.keepRunningInBackground);
-        syncMacDock(appBehavior.keepRunningInBackground);
-      });
-      // The main window hides the Dock icon when it closes, unless another window still shows. When
-      // that last window, such as a chat window, closes later, the Dock icon hides then.
-      const hideDockAfterWindow = (_event: Electron.Event, window: BrowserWindow) =>
-        window.once("closed", () => {
-          if (!isQuitting && appBehavior.keepRunningInBackground) syncMacDock(true);
-        });
-      app.on("browser-window-created", hideDockAfterWindow);
+      const unsubscribeBackgroundTray = appBehavior.subscribe(() => tray.sync(appBehavior.keepRunningInBackground));
       teardown.push(0, "background tray", () => {
-        app.off("browser-window-created", hideDockAfterWindow);
         unsubscribeBackgroundTray();
         tray.destroy();
       });
@@ -1476,6 +1485,7 @@ if (!hasSingleInstanceLock) {
         for (const window of BrowserWindow.getAllWindows()) {
           sendToRenderer(window, IPC_ENDPOINTS.app.appLanguagePreference, preference);
         }
+        placeWindowButtons(BrowserWindow.getAllWindows());
       });
       applyAppIconColor(logoColor.preference.color);
       logoColor.subscribe((preference) => {

@@ -77,13 +77,21 @@ export class MailboxSync {
     this.restoreMessageSenders(snapshot);
     if (this.#conversation.isExecutionThread(snapshot.threadId)) return;
     const fromCreatedAt = snapshot.messages[0]?.createdAt;
-    const incomingMailboxMessages =
+    const mailboxCopies =
       mailboxMessages ??
       this.#mailbox.conversationMessages(snapshot.agentId, fromCreatedAt === undefined ? {} : { fromCreatedAt });
     const rewoundIds = snapshot.threadId ? this.#database.rewoundMessageIds(snapshot.threadId) : new Set<string>();
-    const visibleMailboxMessages = incomingMailboxMessages.filter((message) => !rewoundIds.has(message.id));
+    // A teammate's or a routine's message stays in the mailbox after a person deletes it from this
+    // chat, so the record of the delete keeps it out.
+    const deleted = snapshot.threadId
+      ? this.#database.deletedConversationMessageIds(snapshot.threadId)
+      : new Set<string>();
+    const visibleMailboxMessages = mailboxCopies.filter(
+      (message) => !deleted.has(message.id) && !rewoundIds.has(message.id),
+    );
+    // A deleted message keeps its entry here, so its provider copy also leaves the chat.
     const incomingMessages = new Map(
-      visibleMailboxMessages.flatMap((message) =>
+      mailboxCopies.flatMap((message) =>
         message.exchange?.direction === "incoming" ? [[message.exchange.messageId, message] as const] : [],
       ),
     );
@@ -187,7 +195,8 @@ export class MailboxSync {
   emitQueue(agentId: string): void {
     const queue = this.queueSnapshot(agentId);
     let routinesChanged = false;
-    for (const delivery of queue.deliveries) {
+    // A run in a routine's side thread is not in the queue of the chat, but its run still follows it.
+    for (const delivery of [...queue.deliveries, ...this.#mailbox.taskRoutineDeliveries(agentId)]) {
       if (this.#routines.reconcileDelivery(delivery)) routinesChanged = true;
     }
     this.#hooks.emit({ type: "queue-changed", snapshot: queue });

@@ -109,6 +109,13 @@ export function claudeBridgedToolName(name: string, input: unknown): string {
 const BROWSER_SEARCH_NOTE =
   "No browser tool is in these results. A website or web app with no dedicated tool, such as mail or a calendar, is reached through openbot_browser. Call openbot_browser.list_tabs first: your signed-in tabs stay open across sessions.";
 
+/**
+ * Pi declares the tools of the user's MCP servers only after its own `tool_search` loads them. A model
+ * that searches here instead finds none of them, and tool_call refuses their names (#4410).
+ */
+export const DEFERRED_MCP_NOTE =
+  "The tools of the MCP servers in <mcp_servers> are not in this catalog. Load them with the separate tool named exactly tool_search, then call them directly by their mcp__ names.";
+
 function words(text: string): string[] {
   return text
     .toLowerCase()

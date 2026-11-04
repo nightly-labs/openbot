@@ -28,6 +28,7 @@ import {
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { addUiBlockAutoAnswers } from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
+import { addUiBlockVaultRequests } from "@openbot/contracts/team-protocol/ui-block-vault-v1";
 import {
   type TeamProtocolV1CurrentEventControl,
   toWireTeamProtocolV1ClientEvent,
@@ -1469,7 +1470,7 @@ export function createRemoteTeamPeer(
                   }),
                 )
               : yield* peerDecode(() =>
-                  withWireAutoAnswers(
+                  withWireBlockExtensions(
                     state,
                     decodeTeamProtocolV9WebRtcHttpResponse(pending.method, pending.path, status, body),
                     body,
@@ -1517,8 +1518,12 @@ export function createRemoteTeamPeer(
         return yield* new RemotePeerError({ message: sourceText("error.remote.malformedEvent") });
       state.lastEventSequence = frame.sequence;
       if (decoded.status === "known") {
-        // The frozen event codec leaves the automatic answer of a block out; the wire frame has it.
-        if (sendsAutoAnswers(state)) addUiBlockAutoAnswers(decoded.event, frame.payload);
+        // The frozen event codec leaves the automatic answer and the Vault request of a block out; the
+        // wire frame has them.
+        if (sendsBlockExtensions(state)) {
+          addUiBlockAutoAnswers(decoded.event, frame.payload);
+          addUiBlockVaultRequests(decoded.event, frame.payload);
+        }
         yield* RemotePeerIO.use((io) => io.teamEvent(state.hostId, decoded.event));
       }
       yield* sendEventAckEffect(state);
@@ -2147,18 +2152,22 @@ function signalErrorCode(data: string): string | null {
 }
 
 /**
- * Whether the host can send `ui-block-auto-answer-v1`: the client advertises it only on protocol 9,
- * so the walk is skipped for every older host.
+ * Whether the host can send `ui-block-auto-answer-v1` and `ui-block-vault-v1`: the client advertises
+ * them only on protocol 9, so the walk is skipped for every older host.
  */
-function sendsAutoAnswers(state: PeerState): boolean {
+function sendsBlockExtensions(state: PeerState): boolean {
   return (state.hostProtocol ?? 0) >= TEAM_PROTOCOL_V9;
 }
 
 /**
- * A decoded response with the automatic answer of each block, which the frozen response codec leaves
- * out. Only a host that the client told `ui-block-auto-answer-v1` puts it on the wire.
+ * A decoded response with the automatic answer and the Vault request of each block, which the frozen
+ * response codec leaves out. Only a host that the client told `ui-block-auto-answer-v1` or
+ * `ui-block-vault-v1` puts them on the wire.
  */
-function withWireAutoAnswers<T>(state: PeerState, decoded: T, wire: unknown): T {
-  if (sendsAutoAnswers(state)) addUiBlockAutoAnswers(decoded, wire);
+function withWireBlockExtensions<T>(state: PeerState, decoded: T, wire: unknown): T {
+  if (sendsBlockExtensions(state)) {
+    addUiBlockAutoAnswers(decoded, wire);
+    addUiBlockVaultRequests(decoded, wire);
+  }
   return decoded;
 }

@@ -359,7 +359,10 @@ The service stores:
 - rate-limit keys as hashes, their fixed window start time, and the attempt count;
 - short-lived team authentication tickets with a ticket hash, account ID, team server ID, lifecycle
   times, and optional consumption time;
-- remote host records with the owner, name, optional logo, device public key, and authorization epoch;
+- remote host records with the owner, name, optional logo, device public key, and authorization epoch.
+  A server that the desktop app runs on the same computer as its own server gets its own record while
+  the desktop app is signed in, so the owner's phones and other computers can connect to it. Deleting
+  that server removes its record;
 - remote memberships and invitations with roles, states, hashed invitation tokens, and lifecycle times;
 - logical remote session records with the account, host, originating account-session hash, start,
   end, and expiration times;
@@ -394,6 +397,7 @@ The service stores:
   records, install counts, and the skill bundle and icon in R2.
 - reports about a hosted site: the hostname, the reason, the optional details text, a keyed hash of
   the source address (of its /64 for IPv6) for each day, the review state and the creation time.
+- company sign-in, when a server owner sets it up: see [Company sign-in](#company-sign-in).
 
 The service does not store plaintext one-time codes, account session tokens, or team authentication
 tickets in D1. It returns a new plaintext secret only to the client that requested it. The desktop
@@ -460,6 +464,8 @@ Cloudflare runs a maintenance task once each day. The task removes:
 - account sessions after they are revoked (older already-expired sessions are also removed);
 - team authentication tickets after they expire or are consumed;
 - rate-limit records after their 15-minute window ends.
+- company sign-in flows after their 10-minute life ends, and company sign-in codes after they
+  expire or are used.
 
 These technical records are normally removed within 24 hours after they become inactive. A failed
 maintenance run can keep them until a later successful run. The task logs only aggregate deletion
@@ -487,14 +493,19 @@ Mobile hidden and pinned chat preferences are stored on the phone, separately pe
 Conversation read/unread changes are stored on the desktop host and shared with your other connected devices.
 
 The mobile app keeps a copy of what it shows for each server: the agent list, the hidden agents,
-the sections, and the latest page (up to 50 messages) of each chat that it loaded, up to 4 MB for
-each server. So after a start the app shows them at once, while it connects to the server. The copy
-is in the phone's system cache (`Library/Caches` on iOS), which is not in a device backup and which
-the system can delete when the phone is low on storage. Each file is encrypted with AES-256-GCM and
-bound to the account and the server. The key is in the phone's keychain, and it does not leave this
-device. The copy is never sent anywhere. The app replaces it with what the server sends, and deletes
-a server's copy when the account no longer has that server. Sign-out and an expired or disconnected
-session delete all copies and the key. Attachments and files are not in the copy.
+the sections, the server's capabilities, the latest page (up to 50 messages) of each chat that it
+loaded, and the last values of the drawer (the member count, the usage cost, the next routine runs,
+the thread and workflow counts, and the name and last run of each pinned workflow), up to 4 MB for
+each server. It also keeps the last server list that the account service gave: for each server its
+ID, name, logo version, public key and the time of its last key change, membership ID, role, member
+limit, and hosted status. So after a start the app connects and shows them at once, while the
+account service and the server answer. The copy is in the phone's system cache (`Library/Caches` on
+iOS), which is not in a device backup and which the system can delete when the phone is low on
+storage. Each file is encrypted with AES-256-GCM and bound to the account and the server, or to the
+server list. The key is in the phone's keychain, and it does not leave this device. The copy is
+never sent anywhere. The app replaces it with what the server and the account service send, and
+deletes a server's copy when the account no longer has that server. Sign-out and an expired or
+disconnected session delete all copies and the key. Attachments and files are not in the copy.
 
 The mobile app keeps a support log of up to 1,000 events in the phone's system cache: app version,
 system and device model, app state changes, connection steps with server IDs and error text, the
@@ -576,6 +587,50 @@ sent to the agent as a message. The phone then reads the agent's reply aloud wit
   or an analytics event. Remove key in **Settings → Voice** deletes it.
 
 The chosen voice settings are kept on the phone. OpenBot does not store the reply audio.
+
+## Company sign-in
+
+A server owner can connect the company's OpenID Connect provider, such as Microsoft Entra ID, Okta
+or Google Workspace, in Members → Company sign-in. Then people with an email at the company domains
+sign in at the company provider in place of an email code.
+
+The account service stores in D1:
+
+- the connection of the server: the issuer URL, the client ID, the client secret, the time of the
+  last passed test, whether it is on, the account of the owner who saved it, and creation and update
+  times. The client secret is encrypted with a key that only the account service has;
+- the company domains and the server that each domain belongs to;
+- for each person who signed in at the provider: the issuer, the provider's subject ID, the OpenBot
+  account and the link time. The service does not keep the provider's tokens or other claims;
+- the hash of the SCIM token, and its creation time. The token shows once;
+- for each person that the provider manages through SCIM: the server, the OpenBot account, the
+  provider's external ID, whether the person is on, and the update time;
+- sign-in flows in progress, for 10 minutes: the hash of the state, the values of the connection at
+  the start, the PKCE verifier, the nonce, the return address, and the app's challenge;
+- one-time codes as hashes, for 2 minutes, with the account and the session that they gave.
+
+During a sign-in or a test, the person's browser opens the provider's sign-in page with the client
+ID, the return address, the state, the nonce and the PKCE challenge. The provider receives what the
+person types there. The account service then connects to the provider: it reads the provider's
+discovery document and signing keys, and sends the code, the client ID and the client secret to the
+provider's token endpoint. From the ID token, it uses only the subject ID and the email address. On
+a production account service, a test also asks Cloudflare DNS over HTTPS (`cloudflare-dns.com`) for
+the TXT record `_openbot.<domain>` of each domain.
+
+A person who signs in this way gets an OpenBot account for the email address, or the account that
+already has it, and joins the server as a member with no invitation, while the server has a free
+seat. A person whom the owner removed, or who left, stays out.
+
+The web app at `/app` keeps the state and the verifier of a sign-in in an HttpOnly cookie
+(`__Host-openbot-company`) for 10 minutes. The return removes it.
+
+With SCIM, the company's provider sends the email address, the external ID and the on or off state of
+each person to `/scim/v2/Users`. The service does not store other SCIM attributes. Turning a person
+off, or deleting them, ends every session of their account and removes them from the server. Turning
+them on again adds them to the server again.
+
+Removing the connection removes its domains and its SCIM users, and stops SCIM. Deleting the server
+removes the connection. Deleting an account removes its provider links and SCIM records.
 
 ## Email delivery and infrastructure providers
 
@@ -940,7 +995,8 @@ Network traffic can also occur when:
   `Check for updates`. It asks `api.github.com` for Codex and Kimi, `registry.npmjs.org` for Claude,
   OpenCode and Cline, `x.ai/cli` for Grok, and `raw.githubusercontent.com/agentclientprotocol/registry` and
   `dl.google.com` (for the download size) for Gemini, and the same registry and
-  `downloads.cursor.com` (for the download size) for Cursor, and it reads a list of blocked
+  `downloads.cursor.com` (for the download size) for Cursor, `static.devin.ai` (the manifest, and the
+  download size) for Devin, and it reads a list of blocked
   versions from `raw.githubusercontent.com/nightly-labs/openbot`. These requests contain no account, agent,
   conversation or file data;
 - an agent shows a visual reply, an agent checks its page with `html_preview`, or a user opens an
@@ -959,7 +1015,8 @@ Network traffic can also occur when:
 - a user opens an explicitly labeled external support or setup link;
 - a Slack workspace is connected. See [Slack connections](#slack-connections);
 - a Discord server is connected. See [Discord connections](#discord-connections);
-- a Telegram chat is connected. See [Telegram connections](#telegram-connections).
+- a Telegram chat is connected. See [Telegram connections](#telegram-connections);
+- a WhatsApp number is linked. See [WhatsApp connections](#whatsapp-connections).
 
 ## Webhook routines
 
@@ -1017,6 +1074,29 @@ graph, or ID.
   the list. The computer keeps the newest 50 deliveries of each trigger, without the event body: the
   delivery ID, event name, item number, time, and whether it started a run. An event that arrives
   while the computer is offline is lost; the history shows the gap.
+- **Discord triggers** start a run from a mention of the OpenBot Discord app. The trigger's output, and
+  the run that keeps it, has the message text, the author, and the name, type, size and Discord
+  address of each file of the message and of the message that it replies to. These addresses expire
+  after about a day.
+- **Telegram triggers** start a run from a new conversation in a linked Telegram group: a message that
+  mentions the OpenBot bot or replies to it. The trigger's output, and the run that keeps it, has the
+  message text, the author's name and Telegram ID, the chat name and ID, and the message ID. It has no
+  files. A message that starts a run does not go to the Telegram Orchestrator.
+- **Telegram outputs** reply to that message, post in a linked chat, or add one reaction from a fixed
+  list, through Signal as other Telegram posts do. The text is redacted.
+- **Slack triggers** start a run from a mention of the OpenBot Slack app in a channel. The trigger's
+  output, and the run that keeps it, has the message text, the author, the workspace and channel
+  names, and the name, type and size of each file of the message. It does not keep the Slack address
+  of a file, and a GitHub output does not copy Slack files.
+- **Slack outputs** reply in the mention's thread, post in a chosen channel, or add a reaction,
+  through the workspace's Slack connection. The text goes to Slack.
+- **GitHub outputs** make the change through the OpenBot GitHub App: a comment, a label, a person, a
+  review, a close or a new issue. The text goes to GitHub. When a Discord mention started the run, a
+  new issue or a comment also keeps those files: the computer downloads each file of up to 25 MB, and
+  up to 50 MB for each change, from Discord and commits it to the `openbot-attachments` branch of the target repository,
+  under `discord/<message ID>/`. The text links the files there. Everyone who can read the repository
+  can read them, also after the issue or the comment is deleted; delete that branch to delete
+  them. A file that the computer cannot copy is linked at its Discord address.
 
 Members of a joined server can read, change, and run a workflow when they can see and use each
 agent in it (`workflows-v1`). The graph and the step text then go to their computer. Only owners
@@ -1086,14 +1166,14 @@ holds it. Unlike Slack, both directions go through Signal:
   passes on only the messages that mention OpenBot or OpenBot's own role in the server, and the
   presses of OpenBot's buttons: the message
   text, the author's ID, name and role IDs in the server, the channel, the addresses of its files, and
-  the message it replies to when a person wrote it (with its author, time, and the text and file
-  addresses that Discord gave). The computer downloads the files from Discord directly.
+  the message it replies to when OpenBot did not write it (with its author, time, and the text, embed
+  text and file addresses that Discord gave). The computer downloads the files from Discord directly.
 - **From the computer.** The computer sends its posts, edits, reactions, files and name lookups to
   Signal, which makes each call to Discord for it, only in the Discord servers linked to that
   computer. To give context, the computer asks Signal for the earlier messages of a channel after the
   first message of a conversation, for the messages of the 15 minutes before a new conversation,
   and, when an agent asks for them, for the newest messages of the channel it answers in. These
-  earlier messages have the addresses of their files, and the computer downloads those files from
+  earlier messages have their embed text and the addresses of their files, and the computer downloads those files from
   Discord directly. With the Message Content intent, these earlier messages have their text and files
   also when they do not mention OpenBot. It also asks for the names of the people that a message
   mentions, and, when the user chooses who can use OpenBot, for the names of the server's roles.
@@ -1153,7 +1233,8 @@ short-lived signed addresses, in transit only.
   authors and the name of the chat. The OpenBot bot has privacy mode off, because with it on,
   Telegram does not send a plain mention to a bot that is not a group admin. A request starts only
   from a message that mentions the bot, a reply to it, another message of a reply chain that an
-  agent answers, or a message of a direct chat. The other messages of a group stay in the
+  agent answers, or a message of a direct chat. A new conversation in a group can start a workflow
+  run instead; see [Workflows](#workflows). The other messages of a group stay in the
   computer's memory until OpenBot quits, and an agent can read the last of them with its history
   tool, as for Slack.
 - **Given to the Telegram Orchestrator.** Every new Telegram request goes first to the orchestrator
@@ -1175,6 +1256,54 @@ plugin page does not connect your browser to the plugin developer's servers.
 
 Account usage shown in OpenBot is requested through the local Codex App Server. OpenBot does not send
 that usage to its maintainer.
+
+## WhatsApp connections
+
+A WhatsApp number links as a device of the computer that runs the agents, as WhatsApp Web does. The
+computer connects directly to WhatsApp's servers. No OpenBot service takes part: the account service
+and Signal do not know the number, the link or any message, and Meta gets no OpenBot business account.
+To link, the user scans a QR code that OpenBot shows, or types a pairing code on the phone. Before each
+connection, OpenBot asks `web.whatsapp.com` for the current WhatsApp Web version, as a browser does.
+OpenBot uses an unofficial client (a modified copy of the open-source Baileys library), so WhatsApp can
+restrict or block a number that it sees as automated.
+
+- **Stored on the host.** The device's keys, its Signal sessions, the messages that OpenBot sent in the
+  last day (WhatsApp asks for them again when a phone could not decrypt one), the last 30 minutes of
+  received messages that the agents took (so a crash does not lose them), and the reply chains of the
+  last 7 days are in `<userData>/whatsapp/`. Every value is encrypted with a random key that the
+  operating system's secret storage keeps, and the file is readable only by the user. The database
+  holds the number, a masked name, which agent is the WhatsApp Orchestrator, the contacts and groups
+  that the owner allowed, and one row per conversation that an agent answers. The messages of that
+  conversation are kept as a conversation of that agent, and files people send are kept with the
+  agent's attachments. Names and the last messages of allowed chats are kept in memory until OpenBot
+  quits. Pairing requests are kept in memory for at most an hour. Disconnect logs the device out (when
+  OpenBot is connected), deletes its keys and keeps the conversations, the workspace memories and the
+  allowed senders.
+- **Read from WhatsApp.** WhatsApp gives a linked device every message of the account. OpenBot reads
+  only the owner's own "Message yourself" chat, direct messages of the contacts the owner allowed, and
+  the groups the owner allowed, where a request starts only from a mention of the number or a reply in
+  a conversation that an agent answers. Every other chat is dropped when it arrives and is not stored.
+  When a device links, WhatsApp sends it a first part of the account's history; OpenBot keeps from it
+  only contact names and the phone forms of contacts, in memory, and drops the messages. It does not
+  ask WhatsApp for the full or recent history.
+- **Given to the WhatsApp Orchestrator.** Every new WhatsApp request goes first to the orchestrator
+  agent, which runs on its provider like any other agent and passes the work to a teammate with the
+  facts it needs.
+- **Managed from another computer.** An owner or admin of a joined server can link and manage the
+  host's numbers from their own computer or the browser client. The host sends that client the QR code
+  or pairing code of a link, the numbers and their names, the allowed contacts and groups, the pairing
+  requests that wait, and the list of the number's groups, over the encrypted connection of the
+  server. The QR code holds the one-use secret of that link. The stored keys of the device do not
+  leave the host.
+- **Sent to WhatsApp.** The agents' answers and the files they attach, short status posts, reactions,
+  and approval requests with the command, folder and reason the provider gave, redacted. On a number
+  used only by OpenBot, a person whom the owner did not allow gets one message with a pairing code.
+  On the owner's personal number, OpenBot never writes to anyone else first. Any agent can post
+  redacted text to the allowed chats.
+
+Anyone whom the owner allowed can give the agents work. The agents run on the host with the access
+the user gave them. A hosted server that sleeps does not start for a WhatsApp message; WhatsApp keeps
+the message until the server connects again.
 
 ## Agent access
 
@@ -1347,13 +1476,37 @@ for the other providers, when their app supports Cline.
 OpenBot downloads the Kimi Code CLI from `github.com` (GitHub release assets), and its license file
 from `github.com`, when you select Download on the Kimi row. OpenBot starts the CLI as a local
 process. Prompts, attachments, and tool results go to that process, and the CLI sends them to
-Moonshot AI (`api.kimi.com`). Sign in runs `kimi login`, which opens Kimi's sign-in page
-(`auth.kimi.com`) in your browser. The CLI keeps its login, device ID, session files, and settings
-in `~/.kimi`, or in `$KIMI_SHARE_DIR`. OpenBot does not read, copy, or upload these files. Unless you
+Moonshot AI: `api.kimi.ai` for a global account, or `api.kimi.com` for a mainland China account.
+Sign in runs `kimi login`, which opens Kimi's sign-in page in your browser: `auth.kimi.ai` for
+Connect, or `auth.kimi.com` when you select the kimi.com (China) item in the row's ⋯ menu. The CLI
+keeps its login, device ID, session files, and settings in `~/.kimi`, or in `$KIMI_SHARE_DIR`.
+OpenBot reads the API address in `config.toml` on this computer, to start the CLI with the
+region of its login. OpenBot does not copy or upload these files. Unless you
 set `telemetry = false` in `~/.kimi/config.toml`, or set `KIMI_DISABLE_TELEMETRY=1` in the
 environment that starts OpenBot, the CLI sends anonymous usage events to
 `telemetry-logs.kimi.com`. OpenBot does not change this setting. Moonshot AI's terms for Kimi Code
 apply. Team members see the host's Kimi agents when their app supports Kimi.
+
+To show the Kimi Code plan usage in Usage, OpenBot reads the CLI's API address and the name of its
+token in `config.toml`, and the CLI's access token in `credentials`: in `~/.kimi` or
+`$KIMI_SHARE_DIR` for Kimi CLI 1.x, and in `~/.kimi-code` or `$KIMI_CODE_HOME` for Kimi Code 2.x.
+OpenBot sends the token only to Moonshot AI (`api.kimi.ai`, `api.kimi.com`, or `KIMI_CODE_BASE_URL`
+when you set it for the CLI), in the same usage request that the CLI's `/usage` command sends. The
+request contains no conversation, file, or model data. OpenBot does not store, log, or send the
+token or the usage to its maintainer.
+
+### Devin
+
+OpenBot downloads the Devin CLI from `static.devin.ai` when you select Download on the Devin row.
+OpenBot starts the CLI as a local process. Prompts, attachments, and tool results go to that
+process, and the CLI sends them to Cognition (`app.devin.ai` and `api.devin.ai`). Sign in opens
+Devin's sign-in page on `app.devin.ai` in your browser. The CLI keeps its login and session files
+in `~/.local/share/devin`, its settings in `~/.config/devin`, and its plans in `~/.devin`, or in the
+XDG folders that you set. OpenBot does not read, copy, or upload these files; it reads only the
+change time of `credentials.toml`, to see a sign-in. When it starts, the CLI reads feature flags and
+sends product analytics events to Cognition. OpenBot does not change these settings. Cognition's
+terms for Devin apply. Team members see the host's Devin agents when their app supports Devin.
+
 ### Hermes
 
 OpenBot does not download Hermes Agent. It starts the `hermes` that you installed, with `hermes acp`,
@@ -1507,9 +1660,15 @@ host.
 
 The iPhone app can show a notification when an agent finishes a task, stops with an error, or needs
 an answer, an approval, or a step in the browser, while the app is not on screen. The host does not
-send one while the member uses a desktop app. For this, it keeps in memory the time of the last
-send, answer or typing of each session, and on its own computer it reads whether the OpenBot window
-has focus and how long the computer has had no input. While the phone shows the Live Activity of
+send one while the member uses a desktop app or the computer that it runs on. For this, it keeps in
+memory the time of the last send, answer or typing of each session, and on its own computer it reads
+whether the OpenBot window has focus and how long the computer has had no input. The desktop app also
+tells each joined server that shows its events on the desktop, after input, how many seconds ago the
+computer last had keyboard or mouse input, in any app. It sends only this number, not what you typed or
+which app you used. The host keeps the time in memory only, uses it for 30 seconds only to keep your
+phones quiet, and removes it at the next report or when the session ends. A host that sends
+notifications to none of your phones says so, and the desktop app then
+does not tell it again for 5 minutes. While the phone shows the Live Activity of
 that host and the activity shows the event, the host sends no notification. With Play sound on, the
 Live Activity update lights up the screen and plays the sound instead. An event that comes while
 the app looks on screen stays in the memory of the host for at most 5 minutes, in case iOS suspended

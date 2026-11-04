@@ -6,6 +6,7 @@ import { createPointerDrag } from "./createPointerDrag";
 interface PanelResizerProps {
   label: string;
   controls: string;
+  /** The side of the panel in a left-to-right layout. A right-to-left layout swaps it. */
   direction: "left" | "right";
   value: number;
   defaultValue: number;
@@ -87,19 +88,31 @@ export function PanelResizer(props: PanelResizerProps) {
     };
   });
 
+  // The grid mirrors in a right-to-left layout, so the panel is on the other side of the handle.
+  const panelSide = (): "left" | "right" => {
+    if (!handle || getComputedStyle(handle).direction !== "rtl") return props.direction;
+    return props.direction === "left" ? "right" : "left";
+  };
+
   let dragStartValue = 0;
-  const fromDelta = (delta: number) => dragStartValue + (props.direction === "left" ? delta : -delta);
+  let dragSide: "left" | "right" = "left";
+  const fromDelta = (delta: number) => dragStartValue + (dragSide === "left" ? delta : -delta);
   const drag = createPointerDrag({
     axis: "x",
     rootClass: "panel-resizing",
     onStart: () => {
       dragStartValue = displayedValue();
+      dragSide = panelSide();
     },
     onMove: (delta) => resize(fromDelta(delta)),
     onEnd: (delta) => commit(fromDelta(delta)),
   });
 
   const handleKeyDown = (event: KeyboardEvent) => {
+    const side = panelSide();
+    // The arrow that points away from the panel makes it wider.
+    const growKey = side === "left" ? "ArrowRight" : "ArrowLeft";
+    const shrinkKey = side === "left" ? "ArrowLeft" : "ArrowRight";
     let next: number | undefined;
     if (event.key === "Home") {
       event.preventDefault();
@@ -110,14 +123,14 @@ export function PanelResizer(props: PanelResizerProps) {
       });
       return;
     } else if (event.key === "End") next = maximum();
-    else if (event.key === "ArrowRight" && props.snap?.compact) next = props.min;
-    else if (event.key === "ArrowLeft" && props.snap && props.value <= props.min) {
+    else if (event.key === growKey && props.snap?.compact) next = props.min;
+    else if (event.key === shrinkKey && props.snap && props.value <= props.min) {
       event.preventDefault();
       event.stopPropagation();
       withoutTransition(() => props.snap?.onCompactChange(true));
       return;
-    } else if (event.key === "ArrowLeft") next = props.value + (props.direction === "right" ? 12 : -12);
-    else if (event.key === "ArrowRight") next = props.value + (props.direction === "left" ? 12 : -12);
+    } else if (event.key === growKey) next = props.value + 12;
+    else if (event.key === shrinkKey) next = props.value - 12;
     if (next === undefined) return;
     event.preventDefault();
     event.stopPropagation();

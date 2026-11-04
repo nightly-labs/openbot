@@ -55,6 +55,7 @@ import {
   isAppInterfaceSize,
   isAppLanguage,
   isAppLogoColor,
+  isAppThemePaletteId,
   isBrowserDockAction,
   isBrowserDockFrame,
   isBrowserDockPresentation,
@@ -161,14 +162,18 @@ export function parseAppLogoColorPreference(input: unknown): SetAppLogoColorPref
 
 export function parseAppAppearancePreference(input: unknown): SetAppAppearancePreferenceInput {
   if (!isDynamicRecord(input)) throw new Error("Appearance is required.");
-  const { appearance, transparentWindow } = input;
+  const { appearance, transparentWindow, palette } = input;
   if (appearance !== undefined && !isAppAppearance(appearance)) throw new Error("Appearance is invalid.");
   if (transparentWindow !== undefined && typeof transparentWindow !== "boolean")
     throw new Error("Transparent window must be true or false.");
-  if (appearance === undefined && transparentWindow === undefined) throw new Error("Appearance is required.");
+  if (palette !== undefined && palette !== null && !isAppThemePaletteId(palette))
+    throw new Error("Theme palette is invalid.");
+  if (appearance === undefined && transparentWindow === undefined && palette === undefined)
+    throw new Error("Appearance is required.");
   return {
     ...(appearance === undefined ? {} : { appearance }),
     ...(transparentWindow === undefined ? {} : { transparentWindow }),
+    ...(palette === undefined ? {} : { palette }),
   };
 }
 

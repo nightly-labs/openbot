@@ -129,7 +129,9 @@ export function ConversationHeader() {
         disabledReason: t("conversation.header.modelsUnavailable"),
         accountChoice: true,
         providerAccountId: props.agent ? agentNextProviderAccountId(props.agent) : undefined,
-        onChange: (model, provider, accountId) => void selectAndConfirmModel(model, provider, accountId),
+        accountUsage: props.accountUsage,
+        onChange: (model, provider, accountId, effort) =>
+          void selectAndConfirmModel(model, provider, accountId, effort),
         onReasoningEffortChange: (effort) => void selectAndConfirmReasoning(effort),
         // Codex only for now: on this computer, or on a joined server with `agent-fast-mode-v1`.
         fastMode: fastMode(),

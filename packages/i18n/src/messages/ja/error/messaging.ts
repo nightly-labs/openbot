@@ -18,6 +18,11 @@ export const messages = {
     "OpenBot はこのコンピューターから Telegram に接続できません。サインインし、このコンピューターに名前を付けてから、もう一度お試しください。",
   "error.messaging.telegramServiceUnavailable":
     "OpenBot は現在 Telegram に接続できません。しばらくしてからもう一度お試しください。",
+  "error.messaging.whatsappNotConnected": "この WhatsApp 番号は接続されていません。",
+  "error.messaging.whatsappUnsupported": "このコンピューターは WhatsApp に接続できません。",
+  "error.messaging.whatsappTooManySenders": "1 つの WhatsApp 番号で許可できる連絡先とグループは最大 200 件です。",
+  "error.messaging.whatsappRequestEnded":
+    "このリクエストは終了しました。新しいコードを受け取るには、相手にもう一度書き込むよう依頼してください。",
   "error.messaging.memoryLimit":
     "接続したワークスペースに置けるメモリーは {limit} 個までです。先に 1 つ削除してください。",
 } as const satisfies PartialTranslation<typeof source>;

@@ -38,7 +38,7 @@ export const messages = defineMessages("settings", {
   "settings.keepRunning.title": "Keep OpenBot running in the background",
   "settings.keepRunning.description": "Keep active tasks running after you close the window.",
   "settings.menuBar.title": "Show OpenBot in the menu bar",
-  "settings.menuBar.description": "Hide the Dock icon after you close the window. Active tasks keep running.",
+  "settings.menuBar.description": "Open or quit OpenBot from an icon in the menu bar.",
   "settings.keepAwake.title": "Keep this computer awake",
   "settings.keepAwake.description":
     "Routines run on time while the computer is connected to power. The display can still turn off.",
@@ -564,6 +564,7 @@ export const messages = defineMessages("settings", {
   "settings.voice.speech.readReplies.title": "Read replies aloud",
   "settings.voice.speech.readReplies.description":
     "When you dictate a message, the reply is read aloud. Dictate again to stop it.",
+  "settings.voice.speech.speed.title": "Speed",
   "settings.voice.speech.voice.title": "Voice",
   "settings.voice.speech.voice.female": "Female voice {number}",
   "settings.voice.speech.voice.male": "Male voice {number}",

@@ -7,6 +7,7 @@ import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
 export interface ProvidersPort {
   cancelProviderCodeLogin: OpenBotDesktopApi["cancelProviderCodeLogin"];
   connectProvider: OpenBotDesktopApi["connectProvider"];
+  connectProviderInMainlandChina: OpenBotDesktopApi["connectProviderInMainlandChina"];
   cancelProviderSignIn: OpenBotDesktopApi["cancelProviderSignIn"];
   refreshAgentProviders: OpenBotDesktopApi["refreshAgentProviders"];
   setProviderOn: OpenBotDesktopApi["setProviderOn"];
