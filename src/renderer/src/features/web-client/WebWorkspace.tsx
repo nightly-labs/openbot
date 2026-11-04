@@ -565,18 +565,28 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     return current?.state === "incompatible" ? current : null;
   });
   const connectionShown = () => !noHost() && workspace.state.status !== "online" && !blockedServer();
+  /**
+   * A saved frame is on screen and the host did not answer or fail yet. This is a first load: the notice
+   * shows its loading screen, not a reconnect. A reported failure or an offline computer shows the notice.
+   */
+  const frameFirstLoad = () =>
+    workspace.state.workspaceLoaded &&
+    !workspace.state.synced &&
+    !workspace.state.hostOffline &&
+    !workspace.state.connectionError;
   const connectionPhase = () =>
     serverWorkspacePhase({
       hostedSleep: workspace.state.hostedSleep,
       updating: hostUpdating(),
       blocked: workspace.state.recovery?.phase === "suspended",
       loading: workspace.state.status === "connecting",
-      hasContent: workspace.state.workspaceLoaded,
+      hasContent: workspace.state.workspaceLoaded && !frameFirstLoad(),
     });
   // As on desktop, the first load covers the whole window. A server that sleeps, updates or fails
   // shows its screen in the pane only.
   const fullWindowLoading = () =>
     connectionShown() &&
+    // A saved frame stays on screen: the chat shows its history loader until the host answers.
     !workspace.state.workspaceLoaded &&
     !workspace.state.hostOffline &&
     // The status is "offline" before the first attempt too; only a reported failure ends the cover.
@@ -1898,13 +1908,26 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     workspace.state.hostedSleep !== "sleeping" && !workspace.state.hostedIssue && !hostUpdating()
       ? (workspace.state.connectionError ?? null)
       : null;
+  /** The chat shows the loader of its history from the start, so the connect and the history load are one screen. */
+  const frameConnecting = () =>
+    connectionShown() &&
+    frameFirstLoad() &&
+    agentChatOpen() &&
+    (connectionPhase() === "loading" || connectionPhase() === "connecting");
+  const conversationLoading = () =>
+    workspace.state.status === "online" &&
+    !workspace.conversation()?.page &&
+    workspace.conversation()?.loading === true;
+  const conversationError = () =>
+    workspace.state.status === "online" ? (workspace.conversation()?.error ?? null) : null;
   const connectionNotice = (cover = false) => (
     <ServerConnectionNotice
       name={workspace.state.host?.name ?? t("webClient.notice.findingHosts")}
-      initial={cover || !workspace.state.workspaceLoaded}
+      initial={cover || !workspace.state.workspaceLoaded || frameFirstLoad()}
       ready={cover ? !fullWindowLoading() : undefined}
       onExited={cover ? () => setLoadingCover(false) : undefined}
       fullWindow={fullWindowLoading()}
+      screen={!frameConnecting()}
       issue={workspace.state.hostedIssue}
       start={workspace.state.hostedStart}
       updateVersion={workspace.state.hostRestart?.version ?? null}
@@ -1986,6 +2009,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               initialLoading={hostOffline()}
               connection={
                 <>
+                  {/* While the chat loader covers the first load, the notice shows only its delayed toast. */}
                   <Show when={connectionShown() && !fullWindowLoading()}>{connectionNotice()}</Show>
                   <Show when={workspace.state.status === "online" && workspace.state.panelsFailed}>
                     <ServerPanelLoadNotice
@@ -1993,11 +2017,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       onRetry={() => void workspace.retryPanels()}
                     />
                   </Show>
-                  <Show when={workspace.state.status === "online" && agentChatOpen()}>
+                  {/* A frame keeps the loader mounted when its connect fails, so the loader leaves with its exit. */}
+                  <Show
+                    when={(workspace.state.status === "online" || workspace.state.workspaceLoaded) && agentChatOpen()}
+                  >
                     <ConversationLoadNotice
                       name={workspace.selected()?.name ?? ""}
-                      loading={!workspace.conversation()?.page && workspace.conversation()?.loading === true}
-                      error={workspace.conversation()?.error ?? null}
+                      loading={frameConnecting() || conversationLoading()}
+                      error={conversationError()}
                       onRetry={() => {
                         const id = workspace.state.selectedId;
                         if (id) void workspace.select(id);
