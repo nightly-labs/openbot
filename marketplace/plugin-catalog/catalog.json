@@ -41,7 +41,8 @@
     "composio",
     "clickup",
     "coinbase",
-    "robinhood"
+    "robinhood",
+    "specstream"
   ],
   "featured": ["aave", "canva", "notion", "figma"]
 }

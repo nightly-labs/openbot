@@ -252,6 +252,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       featured: false,
       detailSha256: "de85730802e38802ee01f6695c0c4d3adba9381cf4b1665a52a228df00f01939",
     },
+    {
+      slug: "specstream",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "86f7c7f272865ed7105d8106383155c50211d00081aa91fa328564d8634b8491",
+    },
   ],
 };
 
@@ -1792,6 +1798,50 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://robinhood.com",
     privacyPolicyUrl: "https://robinhood.com/us/en/support/articles/privacy-policy/",
     termsUrl: "https://robinhood.com/us/en/about/legal/",
+    skills: [],
+  },
+  specstream: {
+    slug: "specstream",
+    name: "SpecStream",
+    tagline: "Sourced data from the live web",
+    description:
+      "SpecStream builds datasets from the live web. Describe the rows you need in plain words, see the most the run can cost, approve that maximum, and read the rows back with the source URL of every value. Each user signs in to their own SpecStream account, and nothing runs until the user approves a price. New accounts start with $10 of work, no card.",
+    category: "research",
+    creatorName: "SpecStream",
+    iconUrl: "https://specstream.ai/icons/icon-180.png",
+    version: "1.0.0",
+    prompts: [
+      {
+        id: "prompt-leads",
+        text: "Find seed stage fintech startups in France with their founders, and show the source page for each.",
+      },
+      {
+        id: "prompt-grants",
+        text: "List open grants for climate nonprofits in the EU, with deadlines and the page each one comes from.",
+      },
+      {
+        id: "prompt-quote",
+        text: "How much would 200 US dental clinics with a website and phone number cost? Quote it first.",
+      },
+    ],
+    apps: [
+      {
+        id: "app-specstream-mcp",
+        name: "SpecStream",
+        description:
+          "Dataset requests priced up front, runs started only after the approved maximum, and rows with a source URL on every value, over one MCP server.",
+        iconUrl: "https://specstream.ai/icons/icon-180.png",
+        server: {
+          name: "specstream",
+          transport: "http",
+          url: "https://api.specstream.ai/mcp",
+          auth: [{ id: "specstream-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://specstream.ai?utm_source=openbot",
+    privacyPolicyUrl: "https://specstream.ai/privacy?utm_source=openbot",
+    termsUrl: "https://specstream.ai/terms?utm_source=openbot",
     skills: [],
   },
 };

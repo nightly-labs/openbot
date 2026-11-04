@@ -1495,4 +1495,46 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
       },
     ],
   },
+  {
+    slug: "specstream",
+    name: "SpecStream",
+    tagline: "Sourced data from the live web",
+    description:
+      "SpecStream builds datasets from the live web. Describe the rows you need in plain words, see the most the run can cost, approve that maximum, and read the rows back with the source URL of every value. Each user signs in to their own SpecStream account, and nothing runs until the user approves a price. New accounts start with $10 of work, no card.",
+    category: "research",
+    creatorName: "SpecStream",
+    version: "1.0.0",
+    prompts: [
+      {
+        id: "prompt-leads",
+        text: "Find seed stage fintech startups in France with their founders, and show the source page for each.",
+      },
+      {
+        id: "prompt-grants",
+        text: "List open grants for climate nonprofits in the EU, with deadlines and the page each one comes from.",
+      },
+      {
+        id: "prompt-quote",
+        text: "How much would 200 US dental clinics with a website and phone number cost? Quote it first.",
+      },
+    ],
+    websiteUrl: "https://specstream.ai?utm_source=openbot",
+    privacyPolicyUrl: "https://specstream.ai/privacy?utm_source=openbot",
+    termsUrl: "https://specstream.ai/terms?utm_source=openbot",
+    featured: false,
+    apps: [
+      {
+        id: "app-specstream-mcp",
+        name: "SpecStream",
+        description:
+          "Dataset requests priced up front, runs started only after the approved maximum, and rows with a source URL on every value, over one MCP server.",
+        server: {
+          name: "specstream",
+          transport: "http",
+          url: "https://api.specstream.ai/mcp",
+          auth: [{ id: "specstream-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
 ];
