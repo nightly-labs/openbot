@@ -31,6 +31,8 @@ export const messages = {
     other:
       "Deze server heeft de limiet van {count} actieve sites bereikt. Verwijder een site of gebruik een cloudserver met een abonnement met meer sites om nog een site te publiceren.",
   },
+  "error.site.sharedLimit":
+    "De andere actieve sites van je account gebruiken alle sites die deze server kan hebben. De servers zonder abonnement delen hun sites, en een account heeft een limiet voor actieve sites op alle servers. Om hier een site te publiceren, verwijder je een site, voeg je gebruikers toe aan je licentie of gebruik je een cloudserver met een abonnement met meer sites.",
   "error.site.unlinkedLimit": {
     one: "Deze computer is geen server, en het account heeft de limiet van {count} actieve site bereikt. Verwijder een site of gebruik een cloudserver met een abonnement met meer sites om nog een site te publiceren.",
     other:

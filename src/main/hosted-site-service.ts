@@ -316,12 +316,15 @@ export class HostedSiteDesktopService {
   /**
    * The Worker's `site_limit` text is English and does not tell the agent or the user what to do. The text names
    * the limit of the bucket that refused the site; a server's limit comes from its plan, so its list supplies it.
-   * When the list fails, the Worker's own failure stays.
+   * When the list fails, the Worker's own failure stays. A limit of 0 means that other sites use all the slots of
+   * the server: the other servers of its shared pool, or the account cap.
    */
   private siteLimitFailure(failure: HostedSiteFailure, serverScoped: boolean): Effect.Effect<never, HostedSiteFailure> {
     if (authErrorCode(failure.cause) !== "site_limit") return Effect.fail(failure);
     const limitFailure = (key: "error.site.serverLimit" | "error.site.unlinkedLimit", count: number) =>
-      new HostedSiteFailure({ cause: new Error(sourceText(key, { count })) });
+      new HostedSiteFailure({
+        cause: new Error(count === 0 ? sourceText("error.site.sharedLimit") : sourceText(key, { count })),
+      });
     const credential = serverScoped ? this.serverCredential() : null;
     if (!credential) return Effect.fail(limitFailure("error.site.unlinkedLimit", HOSTED_SITE_UNLINKED_LIMIT));
     return this.auth

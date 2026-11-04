@@ -33,6 +33,8 @@ export const messages = {
     other:
       "Ten serwer osiągnął limit {count} aktywnej witryny. Aby opublikować kolejną witrynę, usuń witrynę lub użyj serwera w chmurze z planem, który ma więcej witryn.",
   },
+  "error.site.sharedLimit":
+    "Inne aktywne witryny Twojego konta używają wszystkich witryn, które może mieć ten serwer. Serwery bez planu współdzielą witryny, a konto ma limit aktywnych witryn na wszystkich serwerach. Aby opublikować tu witrynę, usuń witrynę, dodaj użytkowników do licencji lub użyj serwera w chmurze z planem, który ma więcej witryn.",
   "error.site.unlinkedLimit": {
     one: "Ten komputer nie jest serwerem, a jego konto osiągnęło limit {count} aktywnej witryny. Aby opublikować kolejną witrynę, usuń witrynę lub użyj serwera w chmurze z planem, który ma więcej witryn.",
     few: "Ten komputer nie jest serwerem, a jego konto osiągnęło limit {count} aktywnych witryn. Aby opublikować kolejną witrynę, usuń witrynę lub użyj serwera w chmurze z planem, który ma więcej witryn.",

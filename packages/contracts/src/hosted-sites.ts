@@ -16,9 +16,16 @@ export const HOSTED_SITE_UPLOAD_LIMITS = {
 /**
  * The number of active sites that one account can keep with no proven server: a desktop that is not a
  * registered server, or a desktop release from before sites belonged to servers. A server's own limit
- * comes from its plan (`siteLimitForPlan`).
+ * comes from its plan (`siteLimitForPlan`), or from a custom limit in the account server. A server with
+ * neither shares the account's pool (`HOSTED_SITE_SHARED_FREE_LIMIT`, or the license sites).
  */
 export const HOSTED_SITE_UNLINKED_LIMIT = 1;
+
+/**
+ * The active sites that all servers of an account with no plan share when the account has no entitled
+ * license. A license gives `LICENSE_SITES_PER_USER` for each user instead.
+ */
+export const HOSTED_SITE_SHARED_FREE_LIMIT = 1;
 
 /** The request headers that tie a site request to a registered server: its host id and machine token. */
 export const HOSTED_SITE_HOST_ID_HEADER = "OpenBot-Host-Id";

@@ -32,6 +32,8 @@ export const messages = {
     other:
       "Este servidor alcanzó su límite de {count} sitios activos. Para publicar otro sitio, elimina un sitio o usa un servidor en la nube con un plan que tenga más sitios.",
   },
+  "error.site.sharedLimit":
+    "Los otros sitios activos de tu cuenta usan todos los sitios que puede tener este servidor. Los servidores sin plan comparten sus sitios, y una cuenta tiene un límite de sitios activos en todos los servidores. Para publicar un sitio aquí, elimina un sitio, añade usuarios a tu licencia o usa un servidor en la nube con un plan que tenga más sitios.",
   "error.site.unlinkedLimit": {
     one: "Este equipo no es un servidor, y su cuenta alcanzó el límite de {count} sitio activo. Para publicar otro sitio, elimina un sitio o usa un servidor en la nube con un plan que tenga más sitios.",
     other:
