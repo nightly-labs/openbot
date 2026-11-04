@@ -26,7 +26,7 @@ import type { AppTextKey } from "@openbot/i18n";
 import { type JSX, Portal } from "@solidjs/web";
 import ChevronsUpDown from "lucide-solid/icons/chevrons-up-down";
 import Pipette from "lucide-solid/icons/pipette";
-import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import { type Spring, springKeyframes, springProgress } from "./spring-motion";
 import { useText } from "./text";
 
@@ -167,10 +167,11 @@ const START_COLOR = "#3478f6";
 
 export function ColorPicker(props: ColorPickerProps) {
   const { t } = useText();
-  const initial = () => parseHex(props.value ?? START_COLOR) ?? { r: 52, g: 120, b: 246 };
-  const [hsv, setHsv] = createSignal<Hsv>(rgbToHsv(initial()));
+  // The picker owns its state while it is open: the value is read once, as the start value.
+  const start = untrack(() => props.value);
+  const [hsv, setHsv] = createSignal<Hsv>(rgbToHsv(parseHex(start ?? START_COLOR) ?? { r: 52, g: 120, b: 246 }));
   // Null shows "No color" selected. The area keeps the last color, so a drag starts from it.
-  const [cleared, setCleared] = createSignal(props.value === null);
+  const [cleared, setCleared] = createSignal(start === null);
   const hex = createMemo(() => formatHex(hsvToRgb(hsv())));
   const [format, setFormat] = createSignal<Format>("hex");
   const channelFormat = (): ChannelFormat => (format() === "hsl" ? "hsl" : "rgb");
