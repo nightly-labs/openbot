@@ -533,14 +533,10 @@ export const messages = {
     "Будут удалены входы, файлы cookie и данные сайтов профиля. Его открытые вкладки закроются.",
   "mobile.server.browserProfiles.deleteAgents": "Эти агенты перейдут в общий профиль: {agents}.",
   "mobile.server.route.connectors": "Коннекторы",
-  "mobile.server.settings.connectors": "Коннекторы",
   "mobile.server.connectors.unavailable":
     "Подключитесь к этому серверу как владелец или администратор, чтобы управлять его коннекторами.",
   "mobile.server.connectors.unsupported": "Обновите OpenBot на этом сервере, чтобы управлять его коннекторами здесь.",
   "mobile.server.connectors.loading": "Загрузка коннекторов…",
-  "mobile.server.connectors.onServer": "На {name}",
-  "mobile.server.connectors.notSetUp": "Не настроено",
-  "mobile.server.connectors.available": "Доступно",
   "mobile.server.connectors.localOnly": "Только в приложении для компьютера",
   "mobile.server.connectors.statusConnected": "Подключено",
   "mobile.server.connectors.statusAttention": "Требует внимания",
@@ -816,6 +812,127 @@ export const messages = {
   "mobile.server.connectors.telegram.disconnectKept": "Диалоги и Оркестратор Telegram останутся в OpenBot.",
   "mobile.server.connectors.telegram.disconnectDeleted":
     "Это последний чат, поэтому Оркестратор Telegram и его диалоги будут удалены из OpenBot.",
+  "mobile.server.connectors.whatsapp.title": "WhatsApp",
+  "mobile.server.connectors.whatsapp.summary": "Свой чат и разрешённые люди в WhatsApp",
+  "mobile.server.connectors.whatsapp.description":
+    "Привяжите номер WhatsApp к этому серверу. Оркестратор WhatsApp спрашивает нужного агента и отвечает.",
+  "mobile.server.connectors.whatsapp.connected": {
+    one: "{count} номер · отвечает Оркестратор WhatsApp",
+    few: "{count} номера · отвечает Оркестратор WhatsApp",
+    many: "{count} номеров · отвечает Оркестратор WhatsApp",
+    other: "{count} номера · отвечает Оркестратор WhatsApp",
+  },
+  "mobile.server.connectors.whatsapp.noAgent": {
+    one: "{count} номер · пока никто не отвечает",
+    few: "{count} номера · пока никто не отвечает",
+    many: "{count} номеров · пока никто не отвечает",
+    other: "{count} номера · пока никто не отвечает",
+  },
+  "mobile.server.connectors.whatsapp.attention": {
+    one: "{count} номер требует внимания",
+    few: "{count} номера требуют внимания",
+    many: "{count} номеров требуют внимания",
+    other: "{count} номера требуют внимания",
+  },
+  "mobile.server.connectors.whatsapp.numbersTitle": "Номера",
+  "mobile.server.connectors.whatsapp.linkNumber": "Привязать номер",
+  "mobile.server.connectors.whatsapp.ownNumberNote":
+    "OpenBot получает сообщения из вашего чата «Сообщение себе» и от людей, которым вы разрешили писать.",
+  "mobile.server.connectors.whatsapp.dedicatedNote":
+    "OpenBot получает сообщения от людей, которым вы разрешили писать. Остальные получают код, который нужно передать вам.",
+  "mobile.server.connectors.whatsapp.helpLoggedOut":
+    "WhatsApp удалил этот сервер из связанных устройств. Привяжите номер заново.",
+  "mobile.server.connectors.whatsapp.helpError":
+    "OpenBot не может связаться с WhatsApp на этом номере. Переподключите или отключите номер.",
+  "mobile.server.connectors.whatsapp.retryAt": "WhatsApp попросил OpenBot подождать. Следующая попытка в {time}.",
+  "mobile.server.connectors.whatsapp.linkAgain": "Привязать заново",
+  "mobile.server.connectors.whatsapp.ownNumber": "Личный номер",
+  "mobile.server.connectors.whatsapp.ownNumberDescription":
+    "Писать могут только вы в чате «Сообщение себе» и люди, которым вы разрешили. Выключите, если номер только для OpenBot.",
+  "mobile.server.connectors.whatsapp.orchestratorTitle": "Оркестратор WhatsApp",
+  "mobile.server.connectors.whatsapp.orchestratorDescription":
+    "Этот агент получает сообщения для OpenBot со всех ваших привязанных номеров. Короткие он обрабатывает сам, остальную работу передаёт нужному агенту и отвечает в WhatsApp.",
+  "mobile.server.connectors.whatsapp.orchestratorNone":
+    "Добавьте Оркестратора WhatsApp, иначе WhatsApp не получит ответа.",
+  "mobile.server.connectors.whatsapp.addAgent": "Добавьте Оркестратора WhatsApp",
+  "mobile.server.connectors.whatsapp.note":
+    "На личном номере пишите в чат «Сообщение себе». Люди, которым вы разрешили, пишут на этот номер.",
+  "mobile.server.connectors.whatsapp.linkTitle": "Привязка WhatsApp",
+  "mobile.server.connectors.whatsapp.linkDescription":
+    "Выберите номер, затем привяжите этот сервер в WhatsApp на телефоне.",
+  "mobile.server.connectors.whatsapp.codeOnly":
+    "На телефоне привяжите номер кодом привязки. Чтобы сканировать QR-код, используйте OpenBot на компьютере.",
+  "mobile.server.connectors.whatsapp.kindLabel": "Номер",
+  "mobile.server.connectors.whatsapp.kindPersonal": "Мой личный номер",
+  "mobile.server.connectors.whatsapp.kindPersonalDescription":
+    "OpenBot отвечает только в вашем чате «Сообщение себе» и людям, которым вы разрешили.",
+  "mobile.server.connectors.whatsapp.kindDedicated": "Номер только для OpenBot",
+  "mobile.server.connectors.whatsapp.kindDedicatedDescription":
+    "Незнакомые люди получают код, который нужно передать вам. Вы одобряете их здесь.",
+  "mobile.server.connectors.whatsapp.phoneLabel": "Номер телефона",
+  "mobile.server.connectors.whatsapp.phoneDescription": "С кодом страны, например +44 7700 900123.",
+  "mobile.server.connectors.whatsapp.phoneInvalid": "Введите номер телефона с кодом страны.",
+  "mobile.server.connectors.whatsapp.getCode": "Получить код",
+  "mobile.server.connectors.whatsapp.starting": "Запрашиваем код у WhatsApp…",
+  "mobile.server.connectors.whatsapp.codeStepDevices":
+    "В WhatsApp откройте «Связанные устройства» и нажмите «Привязка устройства»",
+  "mobile.server.connectors.whatsapp.codeStepPhone": "Нажмите «Привязать по номеру телефона»",
+  "mobile.server.connectors.whatsapp.codeStepType": "Введите этот код на телефоне",
+  "mobile.server.connectors.whatsapp.codeLabel": "Код привязки {code}",
+  "mobile.server.connectors.whatsapp.copyCode": "Копировать код",
+  "mobile.server.connectors.whatsapp.codeWaiting": "Ожидание телефона.",
+  "mobile.server.connectors.whatsapp.failedTitle": "Не удалось привязать WhatsApp",
+  "mobile.server.connectors.whatsapp.failedTimeout": "Срок действия кода истёк до того, как телефон его использовал.",
+  "mobile.server.connectors.whatsapp.failedRefused":
+    "WhatsApp отклонил привязку. Подождите несколько минут и повторите попытку.",
+  "mobile.server.connectors.whatsapp.failedBusy":
+    "Уже идёт другая привязка. Дождитесь её завершения и повторите попытку.",
+  "mobile.server.connectors.whatsapp.failedUnavailable":
+    "OpenBot не может связаться с WhatsApp. Проверьте подключение к интернету.",
+  "mobile.server.connectors.whatsapp.tryAgain": "Повторить",
+  "mobile.server.connectors.whatsapp.agentStepDescription":
+    "Этот новый агент отвечает на сообщения для OpenBot на {number} и на каждом номере, который вы привяжете позже.",
+  "mobile.server.connectors.whatsapp.doneTitle": "OpenBot привязан к {number}",
+  "mobile.server.connectors.whatsapp.done": "Готово",
+  "mobile.server.connectors.whatsapp.disconnectTitle": "Отключить {number}?",
+  "mobile.server.connectors.whatsapp.disconnectBody":
+    "OpenBot выйдет из WhatsApp на {number}. Если OpenBot был выключен, также удалите устройство в WhatsApp > Связанные устройства.",
+  "mobile.server.connectors.whatsapp.disconnectEffect":
+    "Люди больше не смогут обращаться к вашим агентам через {number}.",
+  "mobile.server.connectors.whatsapp.removeEffectKept": "Диалоги и Оркестратор WhatsApp останутся в OpenBot.",
+  "mobile.server.connectors.whatsapp.removeEffectDeleted":
+    "Это последний номер, поэтому Оркестратор WhatsApp и его диалоги будут удалены из OpenBot.",
+  "mobile.server.connectors.whatsapp.keep": "Оставить привязанным",
+  "mobile.server.connectors.whatsapp.sendersTitle": "Кто может писать на {number}",
+  "mobile.server.connectors.whatsapp.sendersDescription": "Эти контакты и группы могут поручать работу вашим агентам.",
+  "mobile.server.connectors.whatsapp.sendersEmpty": "Писать можете только вы. Добавьте контакт или группу.",
+  "mobile.server.connectors.whatsapp.sendersLimit": "Номер может разрешить не более {count} контактов и групп.",
+  "mobile.server.connectors.whatsapp.senderGroup": "Группа",
+  "mobile.server.connectors.whatsapp.removeSender": "Удалить",
+  "mobile.server.connectors.whatsapp.addContact": "Добавить контакт",
+  "mobile.server.connectors.whatsapp.addGroup": "Добавить группу",
+  "mobile.server.connectors.whatsapp.contactTitle": "Добавить контакт",
+  "mobile.server.connectors.whatsapp.contactDescription":
+    "Этот человек может поручать работу вашим агентам из WhatsApp.",
+  "mobile.server.connectors.whatsapp.contactName": "Имя",
+  "mobile.server.connectors.whatsapp.contactNameDescription":
+    "Необязательно. Если пусто, в списке будет номер телефона.",
+  "mobile.server.connectors.whatsapp.add": "Добавить",
+  "mobile.server.connectors.whatsapp.groupTitle": "Добавить группу",
+  "mobile.server.connectors.whatsapp.groupDescription": "Участники этой группы могут поручать работу вашим агентам.",
+  "mobile.server.connectors.whatsapp.groupSearch": "Поиск групп",
+  "mobile.server.connectors.whatsapp.groupsLoading": "Загрузка групп…",
+  "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot не смог прочитать группы",
+  "mobile.server.connectors.whatsapp.groupsEmpty": "Этот номер не состоит ни в одной группе.",
+  "mobile.server.connectors.whatsapp.groupsNoMatch": "Нет группы с таким названием.",
+  "mobile.server.connectors.whatsapp.groupAdded": "Добавлена",
+  "mobile.server.connectors.whatsapp.requestsTitle": "Запросы на {number}",
+  "mobile.server.connectors.whatsapp.requestsDescription":
+    "Эти люди написали на номер и получили код. Одобряйте человека, только если он назвал вам тот же код.",
+  "mobile.server.connectors.whatsapp.requestsEmpty": "Запросов нет.",
+  "mobile.server.connectors.whatsapp.requestDetail": "Код {code} · {number}",
+  "mobile.server.connectors.whatsapp.approve": "Одобрить",
+  "mobile.server.connectors.whatsapp.deny": "Отклонить",
   "mobile.server.settings.providers": "Провайдеры",
   "mobile.server.settings.providersConnected": {
     one: "{count} подключён",

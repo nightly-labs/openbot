@@ -578,13 +578,9 @@ export const messages = defineMessages("mobile.server", {
   // Server settings › Connectors: the Slack, Discord, Telegram, GitHub and 1Password connections of a
   // joined server, for an owner or admin. {host} and {name} are the server name, such as Studio.
   "mobile.server.route.connectors": "Connectors",
-  "mobile.server.settings.connectors": "Connectors",
   "mobile.server.connectors.unavailable": "Connect to this server as an owner or admin to manage its connectors.",
   "mobile.server.connectors.unsupported": "Update OpenBot on this server to manage its connectors here.",
   "mobile.server.connectors.loading": "Loading connectors…",
-  "mobile.server.connectors.onServer": "On {name}",
-  "mobile.server.connectors.notSetUp": "Not set up",
-  "mobile.server.connectors.available": "Available",
   // A connector that only the desktop app can set up, such as Bitwarden.
   "mobile.server.connectors.localOnly": "Desktop app only",
   "mobile.server.connectors.statusConnected": "Connected",
@@ -850,6 +846,116 @@ export const messages = defineMessages("mobile.server", {
     "The conversations and the Telegram Orchestrator stay in OpenBot.",
   "mobile.server.connectors.telegram.disconnectDeleted":
     "This is the last chat, so the Telegram Orchestrator and its conversations are deleted from OpenBot.",
+  "mobile.server.connectors.whatsapp.title": "WhatsApp",
+  "mobile.server.connectors.whatsapp.summary": "Your own chat and the people you allow in WhatsApp",
+  "mobile.server.connectors.whatsapp.description":
+    "Link a WhatsApp number to this server. The WhatsApp Orchestrator asks the right agent and answers.",
+  "mobile.server.connectors.whatsapp.connected": {
+    one: "{count} number · WhatsApp Orchestrator answers",
+    other: "{count} numbers · WhatsApp Orchestrator answers",
+  },
+  "mobile.server.connectors.whatsapp.noAgent": {
+    one: "{count} number · No agent answers yet",
+    other: "{count} numbers · No agent answers yet",
+  },
+  "mobile.server.connectors.whatsapp.attention": {
+    one: "{count} number needs attention",
+    other: "{count} numbers need attention",
+  },
+  "mobile.server.connectors.whatsapp.numbersTitle": "Numbers",
+  "mobile.server.connectors.whatsapp.linkNumber": "Link a number",
+  "mobile.server.connectors.whatsapp.ownNumberNote":
+    "Your “Message yourself” chat and the people you allow reach OpenBot.",
+  "mobile.server.connectors.whatsapp.dedicatedNote":
+    "The people you allow reach OpenBot. Other people get a code to give you.",
+  "mobile.server.connectors.whatsapp.helpLoggedOut":
+    "WhatsApp removed this server from the linked devices. Link the number again.",
+  "mobile.server.connectors.whatsapp.helpError":
+    "OpenBot cannot reach WhatsApp on this number. Reconnect, or disconnect the number.",
+  "mobile.server.connectors.whatsapp.retryAt": "WhatsApp asked OpenBot to wait. It tries again at {time}.",
+  "mobile.server.connectors.whatsapp.linkAgain": "Link again",
+  "mobile.server.connectors.whatsapp.ownNumber": "Personal number",
+  "mobile.server.connectors.whatsapp.ownNumberDescription":
+    "Only your “Message yourself” chat and the people you allow can write. Turn off for a number only for OpenBot.",
+  "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
+  "mobile.server.connectors.whatsapp.orchestratorDescription":
+    "This agent receives the messages for OpenBot from all your linked numbers. It answers short ones itself, gives other work to the right agent, and answers in WhatsApp.",
+  "mobile.server.connectors.whatsapp.orchestratorNone": "Add the WhatsApp Orchestrator, or WhatsApp gets no answer.",
+  "mobile.server.connectors.whatsapp.addAgent": "Add the WhatsApp Orchestrator",
+  "mobile.server.connectors.whatsapp.note":
+    "On your personal number, write in your “Message yourself” chat. The people you allow write to the number.",
+  "mobile.server.connectors.whatsapp.linkTitle": "Link WhatsApp",
+  "mobile.server.connectors.whatsapp.linkDescription":
+    "Select the number, then link this server from WhatsApp on your phone.",
+  // A phone has no QR code image: the WhatsApp app on the same phone cannot scan its own screen.
+  "mobile.server.connectors.whatsapp.codeOnly":
+    "On a phone, link with a pairing code. To scan a QR code instead, use OpenBot on a computer.",
+  "mobile.server.connectors.whatsapp.kindLabel": "Number",
+  "mobile.server.connectors.whatsapp.kindPersonal": "My personal number",
+  "mobile.server.connectors.whatsapp.kindPersonalDescription":
+    "OpenBot answers only your “Message yourself” chat and the people you allow.",
+  "mobile.server.connectors.whatsapp.kindDedicated": "A number only for OpenBot",
+  "mobile.server.connectors.whatsapp.kindDedicatedDescription":
+    "Unknown people get a code to give you. You approve them here.",
+  "mobile.server.connectors.whatsapp.phoneLabel": "Phone number",
+  "mobile.server.connectors.whatsapp.phoneDescription": "With the country code, such as +44 7700 900123.",
+  "mobile.server.connectors.whatsapp.phoneInvalid": "Type the phone number with its country code.",
+  "mobile.server.connectors.whatsapp.getCode": "Get code",
+  "mobile.server.connectors.whatsapp.starting": "Asking WhatsApp for a code…",
+  "mobile.server.connectors.whatsapp.codeStepDevices": "In WhatsApp, open Linked devices and tap Link a device",
+  "mobile.server.connectors.whatsapp.codeStepPhone": "Tap Link with phone number instead",
+  "mobile.server.connectors.whatsapp.codeStepType": "Type this code on the phone",
+  "mobile.server.connectors.whatsapp.codeLabel": "Pairing code {code}",
+  "mobile.server.connectors.whatsapp.copyCode": "Copy code",
+  "mobile.server.connectors.whatsapp.codeWaiting": "Waiting for the phone.",
+  "mobile.server.connectors.whatsapp.failedTitle": "WhatsApp did not link",
+  "mobile.server.connectors.whatsapp.failedTimeout": "The code expired before the phone used it.",
+  "mobile.server.connectors.whatsapp.failedRefused": "WhatsApp refused the link. Wait a few minutes, then try again.",
+  "mobile.server.connectors.whatsapp.failedBusy": "Another link is running. Wait for it to end, then try again.",
+  "mobile.server.connectors.whatsapp.failedUnavailable":
+    "OpenBot cannot reach WhatsApp. Check the internet connection.",
+  "mobile.server.connectors.whatsapp.tryAgain": "Try again",
+  "mobile.server.connectors.whatsapp.agentStepDescription":
+    "This new agent answers the messages for OpenBot on {number} and on each number that you link later.",
+  "mobile.server.connectors.whatsapp.doneTitle": "OpenBot is linked to {number}",
+  "mobile.server.connectors.whatsapp.done": "Done",
+  "mobile.server.connectors.whatsapp.disconnectTitle": "Disconnect {number}?",
+  "mobile.server.connectors.whatsapp.disconnectBody":
+    "OpenBot logs out of WhatsApp on {number}. If OpenBot was off, also remove the device in WhatsApp > Linked devices.",
+  "mobile.server.connectors.whatsapp.disconnectEffect": "People can no longer reach your agents through {number}.",
+  "mobile.server.connectors.whatsapp.removeEffectKept":
+    "The conversations and the WhatsApp Orchestrator stay in OpenBot.",
+  "mobile.server.connectors.whatsapp.removeEffectDeleted":
+    "This is the last number, so the WhatsApp Orchestrator and its conversations are deleted from OpenBot.",
+  "mobile.server.connectors.whatsapp.keep": "Keep linked",
+  "mobile.server.connectors.whatsapp.sendersTitle": "Who can write to {number}",
+  "mobile.server.connectors.whatsapp.sendersDescription": "These contacts and groups can give work to your agents.",
+  "mobile.server.connectors.whatsapp.sendersEmpty": "Only you can write. Add a contact or a group.",
+  "mobile.server.connectors.whatsapp.sendersLimit": "A number can allow up to {count} contacts and groups.",
+  "mobile.server.connectors.whatsapp.senderGroup": "Group",
+  "mobile.server.connectors.whatsapp.removeSender": "Remove",
+  "mobile.server.connectors.whatsapp.addContact": "Add contact",
+  "mobile.server.connectors.whatsapp.addGroup": "Add group",
+  "mobile.server.connectors.whatsapp.contactTitle": "Add a contact",
+  "mobile.server.connectors.whatsapp.contactDescription": "This person can give work to your agents from WhatsApp.",
+  "mobile.server.connectors.whatsapp.contactName": "Name",
+  "mobile.server.connectors.whatsapp.contactNameDescription": "Optional. Empty, the list shows the phone number.",
+  "mobile.server.connectors.whatsapp.add": "Add",
+  "mobile.server.connectors.whatsapp.groupTitle": "Add a group",
+  "mobile.server.connectors.whatsapp.groupDescription": "People in this group can give work to your agents.",
+  "mobile.server.connectors.whatsapp.groupSearch": "Search groups",
+  "mobile.server.connectors.whatsapp.groupsLoading": "Reading the groups…",
+  "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot could not read the groups",
+  "mobile.server.connectors.whatsapp.groupsEmpty": "This number is in no group.",
+  "mobile.server.connectors.whatsapp.groupsNoMatch": "No group has this name.",
+  "mobile.server.connectors.whatsapp.groupAdded": "Added",
+  "mobile.server.connectors.whatsapp.requestsTitle": "Requests for {number}",
+  "mobile.server.connectors.whatsapp.requestsDescription":
+    "These people wrote to the number and got a code. Approve a person only when they gave you the same code.",
+  "mobile.server.connectors.whatsapp.requestsEmpty": "No requests.",
+  "mobile.server.connectors.whatsapp.requestDetail": "Code {code} · {number}",
+  "mobile.server.connectors.whatsapp.approve": "Approve",
+  "mobile.server.connectors.whatsapp.deny": "Deny",
   "mobile.server.settings.providers": "Providers",
   "mobile.server.settings.providersConnected": { one: "{count} connected", other: "{count} connected" },
   // The AI providers of the computer that runs the server. Owners and admins manage them from the phone.

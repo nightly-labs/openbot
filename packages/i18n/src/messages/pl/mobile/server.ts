@@ -533,14 +533,10 @@ export const messages = {
     "To usuwa logowania, pliki cookie i dane witryn profilu. Jego otwarte karty zostaną zamknięte.",
   "mobile.server.browserProfiles.deleteAgents": "Ci agenci przejdą do profilu wspólnego: {agents}.",
   "mobile.server.route.connectors": "Konektory",
-  "mobile.server.settings.connectors": "Konektory",
   "mobile.server.connectors.unavailable":
     "Połącz się z tym serwerem jako właściciel lub administrator, aby zarządzać jego konektorami.",
   "mobile.server.connectors.unsupported": "Zaktualizuj OpenBot na tym serwerze, aby zarządzać tutaj jego konektorami.",
   "mobile.server.connectors.loading": "Wczytywanie konektorów…",
-  "mobile.server.connectors.onServer": "Na serwerze {name}",
-  "mobile.server.connectors.notSetUp": "Nieskonfigurowany",
-  "mobile.server.connectors.available": "Dostępne",
   "mobile.server.connectors.localOnly": "Tylko aplikacja na komputer",
   "mobile.server.connectors.statusConnected": "Połączono",
   "mobile.server.connectors.statusAttention": "Wymaga uwagi",
@@ -820,6 +816,124 @@ export const messages = {
   "mobile.server.connectors.telegram.disconnectKept": "Rozmowy i Telegram Orchestrator zostają w OpenBot.",
   "mobile.server.connectors.telegram.disconnectDeleted":
     "To ostatni czat, więc Telegram Orchestrator i jego rozmowy zostaną usunięte z OpenBot.",
+  "mobile.server.connectors.whatsapp.title": "WhatsApp",
+  "mobile.server.connectors.whatsapp.summary": "Własny czat i dozwolone osoby w WhatsApp",
+  "mobile.server.connectors.whatsapp.description":
+    "Połącz numer WhatsApp z tym serwerem. WhatsApp Orchestrator pyta odpowiedniego agenta i odpowiada.",
+  "mobile.server.connectors.whatsapp.connected": {
+    one: "{count} numer · odpowiada WhatsApp Orchestrator",
+    few: "{count} numery · odpowiada WhatsApp Orchestrator",
+    many: "{count} numerów · odpowiada WhatsApp Orchestrator",
+    other: "{count} numeru · odpowiada WhatsApp Orchestrator",
+  },
+  "mobile.server.connectors.whatsapp.noAgent": {
+    one: "{count} numer · żaden agent jeszcze nie odpowiada",
+    few: "{count} numery · żaden agent jeszcze nie odpowiada",
+    many: "{count} numerów · żaden agent jeszcze nie odpowiada",
+    other: "{count} numeru · żaden agent jeszcze nie odpowiada",
+  },
+  "mobile.server.connectors.whatsapp.attention": {
+    one: "{count} numer wymaga uwagi",
+    few: "{count} numery wymagają uwagi",
+    many: "{count} numerów wymaga uwagi",
+    other: "{count} numeru wymaga uwagi",
+  },
+  "mobile.server.connectors.whatsapp.numbersTitle": "Numery",
+  "mobile.server.connectors.whatsapp.linkNumber": "Połącz numer",
+  "mobile.server.connectors.whatsapp.ownNumberNote":
+    "Do OpenBot trafiają wiadomości z twojego czatu „Wiadomość do siebie” i od osób, którym pozwolisz.",
+  "mobile.server.connectors.whatsapp.dedicatedNote":
+    "Do OpenBot trafiają wiadomości od osób, którym pozwolisz. Inne osoby dostają kod, który mają ci przekazać.",
+  "mobile.server.connectors.whatsapp.helpLoggedOut":
+    "WhatsApp usunął ten serwer z połączonych urządzeń. Połącz numer ponownie.",
+  "mobile.server.connectors.whatsapp.helpError":
+    "OpenBot nie może połączyć się z WhatsApp na tym numerze. Połącz ponownie lub odłącz numer.",
+  "mobile.server.connectors.whatsapp.retryAt": "WhatsApp poprosił OpenBot o czekanie. Kolejna próba o {time}.",
+  "mobile.server.connectors.whatsapp.linkAgain": "Połącz od nowa",
+  "mobile.server.connectors.whatsapp.ownNumber": "Numer prywatny",
+  "mobile.server.connectors.whatsapp.ownNumberDescription":
+    "Pisać mogą tylko twój czat „Wiadomość do siebie” i osoby, którym pozwolisz. Wyłącz dla numeru tylko dla OpenBot.",
+  "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
+  "mobile.server.connectors.whatsapp.orchestratorDescription":
+    "Ten agent odbiera wiadomości do OpenBot ze wszystkich twoich połączonych numerów. Na krótkie odpowiada sam, inną pracę przekazuje odpowiedniemu agentowi i odpowiada w WhatsApp.",
+  "mobile.server.connectors.whatsapp.orchestratorNone":
+    "Dodaj WhatsApp Orchestrator, inaczej WhatsApp nie dostanie odpowiedzi.",
+  "mobile.server.connectors.whatsapp.addAgent": "Dodaj WhatsApp Orchestrator",
+  "mobile.server.connectors.whatsapp.note":
+    "Na numerze prywatnym pisz w czacie „Wiadomość do siebie”. Osoby, którym pozwolisz, piszą na ten numer.",
+  "mobile.server.connectors.whatsapp.linkTitle": "Połącz WhatsApp",
+  "mobile.server.connectors.whatsapp.linkDescription":
+    "Wybierz numer, a potem połącz ten serwer w WhatsApp na telefonie.",
+  "mobile.server.connectors.whatsapp.codeOnly":
+    "Na telefonie połącz za pomocą kodu parowania. Aby zeskanować kod QR, użyj OpenBot na komputerze.",
+  "mobile.server.connectors.whatsapp.kindLabel": "Numer",
+  "mobile.server.connectors.whatsapp.kindPersonal": "Mój numer prywatny",
+  "mobile.server.connectors.whatsapp.kindPersonalDescription":
+    "OpenBot odpowiada tylko w twoim czacie „Wiadomość do siebie” i osobom, którym pozwolisz.",
+  "mobile.server.connectors.whatsapp.kindDedicated": "Numer tylko dla OpenBot",
+  "mobile.server.connectors.whatsapp.kindDedicatedDescription":
+    "Nieznane osoby dostają kod, który mają ci przekazać. Zatwierdzasz je tutaj.",
+  "mobile.server.connectors.whatsapp.phoneLabel": "Numer telefonu",
+  "mobile.server.connectors.whatsapp.phoneDescription": "Z kodem kraju, np. +44 7700 900123.",
+  "mobile.server.connectors.whatsapp.phoneInvalid": "Wpisz numer telefonu z kodem kraju.",
+  "mobile.server.connectors.whatsapp.getCode": "Pobierz kod",
+  "mobile.server.connectors.whatsapp.starting": "Pobieranie kodu z WhatsApp…",
+  "mobile.server.connectors.whatsapp.codeStepDevices":
+    "W WhatsApp otwórz Połączone urządzenia i naciśnij Połącz urządzenie",
+  "mobile.server.connectors.whatsapp.codeStepPhone": "Naciśnij Połącz za pomocą numeru telefonu",
+  "mobile.server.connectors.whatsapp.codeStepType": "Wpisz ten kod na telefonie",
+  "mobile.server.connectors.whatsapp.codeLabel": "Kod parowania {code}",
+  "mobile.server.connectors.whatsapp.copyCode": "Kopiuj kod",
+  "mobile.server.connectors.whatsapp.codeWaiting": "Czekanie na telefon.",
+  "mobile.server.connectors.whatsapp.failedTitle": "Nie udało się połączyć WhatsApp",
+  "mobile.server.connectors.whatsapp.failedTimeout": "Kod wygasł, zanim telefon go użył.",
+  "mobile.server.connectors.whatsapp.failedRefused":
+    "WhatsApp odrzucił połączenie. Odczekaj kilka minut i spróbuj ponownie.",
+  "mobile.server.connectors.whatsapp.failedBusy": "Trwa inne łączenie. Poczekaj, aż się skończy, i spróbuj ponownie.",
+  "mobile.server.connectors.whatsapp.failedUnavailable":
+    "OpenBot nie może połączyć się z WhatsApp. Sprawdź połączenie z internetem.",
+  "mobile.server.connectors.whatsapp.tryAgain": "Ponów",
+  "mobile.server.connectors.whatsapp.agentStepDescription":
+    "Ten nowy agent odpowiada na wiadomości do OpenBot na numerze {number} i na każdym numerze, który połączysz później.",
+  "mobile.server.connectors.whatsapp.doneTitle": "OpenBot jest połączony z numerem {number}",
+  "mobile.server.connectors.whatsapp.done": "Gotowe",
+  "mobile.server.connectors.whatsapp.disconnectTitle": "Odłączyć {number}?",
+  "mobile.server.connectors.whatsapp.disconnectBody":
+    "OpenBot wyloguje się z WhatsApp na numerze {number}. Jeśli OpenBot był wyłączony, usuń też urządzenie w WhatsApp > Połączone urządzenia.",
+  "mobile.server.connectors.whatsapp.disconnectEffect":
+    "Ludzie nie będą już mogli kontaktować się z twoimi agentami przez numer {number}.",
+  "mobile.server.connectors.whatsapp.removeEffectKept": "Rozmowy i WhatsApp Orchestrator zostają w OpenBot.",
+  "mobile.server.connectors.whatsapp.removeEffectDeleted":
+    "To ostatni numer, więc WhatsApp Orchestrator i jego rozmowy zostaną usunięte z OpenBot.",
+  "mobile.server.connectors.whatsapp.keep": "Nie odłączaj",
+  "mobile.server.connectors.whatsapp.sendersTitle": "Kto może pisać na {number}",
+  "mobile.server.connectors.whatsapp.sendersDescription": "Te kontakty i grupy mogą zlecać pracę twoim agentom.",
+  "mobile.server.connectors.whatsapp.sendersEmpty": "Tylko ty możesz pisać. Dodaj kontakt lub grupę.",
+  "mobile.server.connectors.whatsapp.sendersLimit": "Numer może dopuścić maksymalnie {count} kontaktów i grup.",
+  "mobile.server.connectors.whatsapp.senderGroup": "Grupa",
+  "mobile.server.connectors.whatsapp.removeSender": "Usuń",
+  "mobile.server.connectors.whatsapp.addContact": "Dodaj kontakt",
+  "mobile.server.connectors.whatsapp.addGroup": "Dodaj grupę",
+  "mobile.server.connectors.whatsapp.contactTitle": "Dodaj kontakt",
+  "mobile.server.connectors.whatsapp.contactDescription": "Ta osoba może zlecać pracę twoim agentom z WhatsApp.",
+  "mobile.server.connectors.whatsapp.contactName": "Nazwa",
+  "mobile.server.connectors.whatsapp.contactNameDescription": "Opcjonalnie. Bez nazwy lista pokazuje numer telefonu.",
+  "mobile.server.connectors.whatsapp.add": "Dodaj",
+  "mobile.server.connectors.whatsapp.groupTitle": "Dodaj grupę",
+  "mobile.server.connectors.whatsapp.groupDescription": "Osoby w tej grupie mogą zlecać pracę twoim agentom.",
+  "mobile.server.connectors.whatsapp.groupSearch": "Szukaj grup",
+  "mobile.server.connectors.whatsapp.groupsLoading": "Odczytywanie grup…",
+  "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot nie mógł odczytać grup",
+  "mobile.server.connectors.whatsapp.groupsEmpty": "Ten numer nie należy do żadnej grupy.",
+  "mobile.server.connectors.whatsapp.groupsNoMatch": "Żadna grupa nie ma tej nazwy.",
+  "mobile.server.connectors.whatsapp.groupAdded": "Dodano",
+  "mobile.server.connectors.whatsapp.requestsTitle": "Prośby do numeru {number}",
+  "mobile.server.connectors.whatsapp.requestsDescription":
+    "Te osoby napisały na ten numer i dostały kod. Zatwierdź osobę tylko wtedy, gdy podała ci ten sam kod.",
+  "mobile.server.connectors.whatsapp.requestsEmpty": "Brak próśb.",
+  "mobile.server.connectors.whatsapp.requestDetail": "Kod {code} · {number}",
+  "mobile.server.connectors.whatsapp.approve": "Zatwierdź",
+  "mobile.server.connectors.whatsapp.deny": "Odrzuć",
   "mobile.server.settings.providers": "Dostawcy",
   "mobile.server.settings.providersConnected": {
     one: "{count} połączony",

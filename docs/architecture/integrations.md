@@ -473,6 +473,13 @@ client uses the same WhatsApp page through `hostWhatsAppPort`
 ([`whatsapp-connector.ts`](../../src/renderer/src/features/connectors/whatsapp-connector.ts)). No route
 carries a stored key; the QR code text holds the one-use secret of its link.
 
+The phone uses the same routes in Marketplace › Apps › WhatsApp
+(`apps/mobile/src/features/servers/components/whatsapp-connector-page.tsx`). It links only with a
+pairing code, because the WhatsApp app on the same phone cannot scan a QR code on its own screen. The
+link page reads `linkState` every second while it waits, and cancels the link when the person leaves
+the page before `linked`. The phone adds the WhatsApp Orchestrator with no model choice, so the host
+uses its default provider and model. A host older than this capability shows no WhatsApp row.
+
 The optional capability `onepassword-connector-v1`
 ([`onepassword-connector-v1.ts`](../../packages/contracts/src/team-protocol/onepassword-connector-v1.ts),
 host route [`route-onepassword-connector.ts`](../../src/main/team-api/route-onepassword-connector.ts))
@@ -497,7 +504,7 @@ restart. The host must reach the server address over HTTPS; the instance firewal
 [several instances on one host](../docker.md#several-instances-on-one-host) blocks private
 addresses. A host older than this capability hides Bitwarden.
 
-The phone uses the same routes in Server settings › Connectors › Bitwarden
+The phone uses the same routes in Marketplace › Apps › Bitwarden
 (`apps/mobile/src/features/servers/components/bitwarden-connector-page.tsx`). It reads `status`
 every 3 seconds while the page shows, as for the other connectors, and keeps no copy of the API key
 or the master password. For a host older than this capability, the phone shows Bitwarden as

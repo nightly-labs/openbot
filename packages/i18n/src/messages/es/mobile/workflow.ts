@@ -217,6 +217,8 @@ export const messages = {
   "mobile.workflow.output.discord": "Discord",
   "mobile.workflow.output.slack": "Slack",
   "mobile.workflow.output.telegram": "Telegram",
+  "mobile.workflow.output.telegramHint": "Responde, publica o añade una reacción en un chat de Telegram vinculado.",
+  "mobile.workflow.output.slackHint": "Responde, publica o añade una reacción en un canal de Slack.",
   "mobile.workflow.run.stopStep": "Detener paso",
   "mobile.workflow.run.stopStepFailed": "No se pudo detener el paso",
   "mobile.workflow.version.history": "Historial de versiones",
@@ -359,7 +361,6 @@ export const messages = {
   "mobile.workflow.slack.action.reply": "Responder en el hilo",
   "mobile.workflow.telegram.hostOnly":
     "Solo el ordenador que ejecuta OpenBot tiene los chats de Telegram. Cambia este paso en OpenBot en ese ordenador.",
-  "mobile.workflow.telegram.triggerComputerOnly": "Cambia este disparador en OpenBot en el ordenador que lo ejecuta.",
   "mobile.workflow.telegram.outputSummary": "Telegram · {action}",
   "mobile.workflow.telegram.chat": "Chat",
   "mobile.workflow.telegram.anyChat": "Cualquier chat vinculado",
@@ -376,4 +377,14 @@ export const messages = {
   "mobile.workflow.telegram.action.post": "Publicar en chat",
   "mobile.workflow.telegram.action.react": "Añadir reacción",
   "mobile.workflow.telegram.emoji": "Emoji",
+  "mobile.workflow.chats.adminOnly": "Solo un propietario o administrador puede cambiar este paso.",
+  "mobile.workflow.chats.loadFailed": "Los chats de este servidor no se cargaron. Inténtalo de nuevo más tarde.",
+  "mobile.workflow.slack.hostOnly":
+    "Solo el ordenador que ejecuta OpenBot tiene los espacios de trabajo de Slack. Cambia este paso en OpenBot en ese ordenador.",
+  "mobile.workflow.slack.workspace": "Espacio de trabajo",
+  "mobile.workflow.slack.chooseWorkspace": "Elegir espacio de trabajo",
+  "mobile.workflow.slack.oneWorkspace": "Un espacio de trabajo",
+  "mobile.workflow.slack.chooseChannel": "Elegir canal",
+  "mobile.workflow.slack.needsWorkspace": "Elige un espacio de trabajo. Sin él, el disparador no se inicia.",
+  "mobile.workflow.slack.needsChannel": "Elige un espacio de trabajo y un canal donde publicar.",
 } as const satisfies PartialTranslation<typeof source>;

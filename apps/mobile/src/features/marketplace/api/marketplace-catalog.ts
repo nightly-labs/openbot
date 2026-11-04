@@ -2,9 +2,11 @@ import type {
   MarketplaceAgentDetail,
   MarketplaceAgentPage,
   MarketplaceAgentQuery,
+  MarketplaceAgentSummary,
   MarketplaceSkillDetail,
   MarketplaceSkillPage,
   MarketplaceSkillQuery,
+  MarketplaceSkillSummary,
 } from "@openbot/contracts/ipc";
 import { runTeamEffect } from "@openbot/team-client";
 import { createMarketplaceCatalog, type MarketplaceCatalog } from "@openbot/team-client/marketplace-catalog";
@@ -14,6 +16,8 @@ const CATALOG_REQUEST_TIMEOUT_MS = 10_000;
 
 /** The listings each Marketplace read asks for. The desktop overview asks for the same page size. */
 export const MARKETPLACE_PAGE_SIZE = 50;
+/** The most pages that one list reads, so a catalog that never ends cannot hold the phone. */
+const MARKETPLACE_PAGE_LIMIT = 20;
 
 /**
  * The public catalog of the account service at `apiUrl`. These reads need no account, so no
@@ -75,6 +79,49 @@ export function listMarketplaceSkills(
   signal?: AbortSignal,
 ): Promise<MarketplaceSkillPage> {
   return runTeamEffect(catalogFor(apiUrl).skills.list(query), signal);
+}
+
+/** Every page of a list, in order, as the desktop reads the next page with the cursor of the last one. */
+async function allPages<Item>(
+  read: (cursor: string | undefined) => Promise<{ items: Item[]; nextCursor: string | null | undefined }>,
+): Promise<Item[]> {
+  const items: Item[] = [];
+  let cursor: string | undefined;
+  for (let page = 0; page < MARKETPLACE_PAGE_LIMIT; page += 1) {
+    const next = await read(cursor);
+    items.push(...next.items);
+    if (!next.nextCursor) break;
+    cursor = next.nextCursor;
+  }
+  return items;
+}
+
+/** Every agent listing that matches `query`, from all its pages. */
+export function listAllMarketplaceAgents(
+  apiUrl: string,
+  query: MarketplaceAgentQuery,
+  signal?: AbortSignal,
+): Promise<MarketplaceAgentSummary[]> {
+  return allPages((cursor) =>
+    listMarketplaceAgents(apiUrl, { ...query, cursor }, signal).then((page) => ({
+      items: page.agents,
+      nextCursor: page.nextCursor,
+    })),
+  );
+}
+
+/** Every skill that matches `query`, from all its pages. */
+export function listAllMarketplaceSkills(
+  apiUrl: string,
+  query: MarketplaceSkillQuery,
+  signal?: AbortSignal,
+): Promise<MarketplaceSkillSummary[]> {
+  return allPages((cursor) =>
+    listMarketplaceSkills(apiUrl, { ...query, cursor }, signal).then((page) => ({
+      items: page.skills,
+      nextCursor: page.nextCursor,
+    })),
+  );
 }
 
 export function loadMarketplaceAgent(

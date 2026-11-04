@@ -44,13 +44,15 @@ export default function ServerSettingsLayout() {
       <Stack.Screen name="role" options={{ title: t("mobile.server.route.role") }} />
       <Stack.Screen name="audit" options={{ title: t("mobile.server.route.audit") }} />
       <Stack.Screen name="timezone" options={{ title: t("mobile.server.route.timezone") }} />
-      <Stack.Screen name="connectors" options={{ title: t("mobile.server.route.connectors") }} />
       {/* The page names its connector. */}
       <Stack.Screen name="connector" options={{ title: t("mobile.server.route.connectors") }} />
       <Stack.Screen
         name="github-repositories"
         options={{ title: t("mobile.server.connectors.github.repositoriesTitle") }}
       />
+      <Stack.Screen name="whatsapp-link" options={{ title: t("mobile.server.connectors.whatsapp.linkTitle") }} />
+      <Stack.Screen name="whatsapp-contact" options={{ title: t("mobile.server.connectors.whatsapp.contactTitle") }} />
+      <Stack.Screen name="whatsapp-group" options={{ title: t("mobile.server.connectors.whatsapp.groupTitle") }} />
       <Stack.Screen name="updates" options={{ title: t("mobile.server.route.updates") }} />
       <Stack.Screen name="storage" options={{ title: t("mobile.server.route.storage") }} />
       <Stack.Screen name="storage-files" options={{ title: t("mobile.server.route.storageFiles") }} />

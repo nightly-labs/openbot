@@ -88,12 +88,6 @@ export function useServerSettingsItems(
     ai: pick([
       [workspace.canManageProviders(serverId), "mobile.server.settings.providers"],
       [workspace.canManageMcpServers(serverId), "mobile.server.settings.mcp"],
-      [
-        workspace.canManageConnectors(serverId) ||
-          workspace.canManageOnePasswordConnector(serverId) ||
-          workspace.canManageBitwardenConnector(serverId),
-        "mobile.server.settings.connectors",
-      ],
     ]),
     data: pick([
       [workspace.canManageVault(serverId), "mobile.server.settings.vault"],

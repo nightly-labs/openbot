@@ -36,6 +36,7 @@ import type {
   AgentTasksSnapshot,
   AgentTemplatePreview,
   AgentTemplatePublication,
+  AnswerWhatsAppRequestInput,
   ApplyAgentImportInput,
   ApplyInstanceTransferInput,
   AvatarColor,
@@ -85,11 +86,13 @@ import type {
   McpSignInState,
   McpTestResult,
   MessagingOverview,
+  MessagingWorkspaceInput,
   OnePasswordConnectorStatus,
   QueuedMessageReceipt,
   QueueSnapshot,
   RemoteAgentImportResult,
   RemoteInstanceTransferResult,
+  RemoveWhatsAppSenderInput,
   RenameWorkflowInput,
   ResetAgentSessionSettingInput,
   RespondToApprovalInput,
@@ -111,12 +114,15 @@ import type {
   SetAgentProviderAccountInput,
   SetAgentSessionSettingInput,
   SetEnabledSkillInput,
+  SetMessagingEnabledInput,
   SetRoutineResultDestinationInput,
+  SetWhatsAppOwnNumberInput,
   SharedTable,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
   SidebarPin,
   SignInRelayStatus,
+  StartWhatsAppLinkInput,
   StorageUsage,
   UninstallSkillInput,
   UpdateAgentAdminSettingsInput,
@@ -134,6 +140,10 @@ import type {
   VaultHostImportResult,
   VaultSaveInput,
   VaultState,
+  WhatsAppGroupList,
+  WhatsAppLinkState,
+  WhatsAppOverview,
+  WhatsAppSenderInput,
   WorkflowDetail,
   WorkflowGitHubCatalog,
   WorkflowGitHubHistory,
@@ -469,6 +479,8 @@ export interface MobileWorkspaceContextValue {
   canManageOnePasswordConnector: (serverId: string) => boolean;
   /** The same for the host's Bitwarden connection (`bitwarden-connector-v1`). */
   canManageBitwardenConnector: (serverId: string) => boolean;
+  /** The same for the host's WhatsApp numbers (`whatsapp-connector-v1`). */
+  canManageWhatsAppConnector: (serverId: string) => boolean;
   /** True for an owner or admin of a host that serves its Vault to other devices (`vault-v1`). */
   canManageVault: (serverId: string) => boolean;
   /** The same for a CSV import from this phone (`vault-import-v1`). */
@@ -560,6 +572,25 @@ export interface MobileWorkspaceContextValue {
     input: HostAddMessagingOrchestratorInput,
     serverId: string,
   ) => Promise<AddMessagingOrchestratorResult>;
+  /** The host's WhatsApp numbers and the settings of each. */
+  loadWhatsAppConnector: (serverId: string) => Promise<WhatsAppOverview>;
+  /** The host's WhatsApp session asks WhatsApp for a pairing code or a QR code, and answers it. */
+  startWhatsAppLink: (input: StartWhatsAppLinkInput, serverId: string) => Promise<WhatsAppLinkState>;
+  /** The link that runs now on the host. */
+  loadWhatsAppLinkState: (serverId: string) => Promise<WhatsAppLinkState>;
+  /** Stops a link that did not end, so the phone cannot use its code. */
+  cancelWhatsAppLink: (serverId: string) => Promise<void>;
+  disconnectWhatsAppNumber: (input: MessagingWorkspaceInput, serverId: string) => Promise<void>;
+  reconnectWhatsAppNumber: (input: MessagingWorkspaceInput, serverId: string) => Promise<void>;
+  setWhatsAppEnabled: (input: SetMessagingEnabledInput, serverId: string) => Promise<void>;
+  /** Creates the WhatsApp Orchestrator on the host's default provider and model. */
+  addWhatsAppOrchestrator: (serverId: string) => Promise<AddMessagingOrchestratorResult>;
+  /** The groups of a linked number, to choose from. */
+  loadWhatsAppGroups: (input: MessagingWorkspaceInput, serverId: string) => Promise<WhatsAppGroupList>;
+  addWhatsAppSender: (input: WhatsAppSenderInput, serverId: string) => Promise<void>;
+  removeWhatsAppSender: (input: RemoveWhatsAppSenderInput, serverId: string) => Promise<void>;
+  answerWhatsAppRequest: (input: AnswerWhatsAppRequestInput, serverId: string) => Promise<void>;
+  setWhatsAppOwnNumber: (input: SetWhatsAppOwnNumberInput, serverId: string) => Promise<void>;
   /**
    * How this user reaches the OpenBot update of an online host: an owner or admin through
    * `host-update-v1`, any member through `host-member-update-v1`. Null when neither applies.
@@ -885,6 +916,11 @@ export interface MobileWorkspaceContextValue {
   restoreWorkflowVersion: (input: WorkflowVersionInput, serverId: string) => Promise<WorkflowDetail>;
   /** True when the host advertises `workflows-github-v1`: it runs GitHub triggers and outputs. */
   canUseWorkflowGitHub: (serverId: string) => boolean;
+  /**
+   * True when the host advertises `workflows-chats-v1` and `routine-results-v1`: an owner or admin adds
+   * and changes Telegram and Slack triggers and outputs, with the chats of the routine-results options.
+   */
+  canUseWorkflowChats: (serverId: string) => boolean;
   /** The repositories of the host's GitHub connection. Only an owner or admin reads them. */
   loadWorkflowGitHubCatalog: (serverId: string) => Promise<WorkflowGitHubCatalog>;
   /** The labels and people of one repository. Only an owner or admin reads them. */
@@ -1004,6 +1040,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canBranchThreads"
   | "canUseWorkflows"
   | "canUseWorkflowGitHub"
+  | "canUseWorkflowChats"
   | "canReadServerStorage"
   | "canSetAgentNotificationLevel";
 
@@ -1036,6 +1073,7 @@ type MobileWorkspaceStateKey =
   | "canManageConnectors"
   | "canManageOnePasswordConnector"
   | "canManageBitwardenConnector"
+  | "canManageWhatsAppConnector"
   | "canManageVault"
   | "canImportVault"
   | "canImportAgents"

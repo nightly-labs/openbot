@@ -217,6 +217,8 @@ export const messages = {
   "mobile.workflow.output.discord": "Discord",
   "mobile.workflow.output.slack": "Slack",
   "mobile.workflow.output.telegram": "Telegram",
+  "mobile.workflow.output.telegramHint": "Antwoordt, plaatst of voegt een reactie toe in een gekoppelde Telegram-chat.",
+  "mobile.workflow.output.slackHint": "Antwoordt, plaatst of voegt een reactie toe in een Slack-kanaal.",
   "mobile.workflow.run.stopStep": "Stap stoppen",
   "mobile.workflow.run.stopStepFailed": "Kan de stap niet stoppen",
   "mobile.workflow.version.history": "Versiegeschiedenis",
@@ -359,7 +361,6 @@ export const messages = {
   "mobile.workflow.slack.action.reply": "Reageren in thread",
   "mobile.workflow.telegram.hostOnly":
     "Alleen de computer waarop OpenBot draait heeft de Telegram-chats. Wijzig deze stap in OpenBot op die computer.",
-  "mobile.workflow.telegram.triggerComputerOnly": "Wijzig deze trigger in OpenBot op de computer die hem uitvoert.",
   "mobile.workflow.telegram.outputSummary": "Telegram · {action}",
   "mobile.workflow.telegram.chat": "Chat",
   "mobile.workflow.telegram.anyChat": "Elke gekoppelde chat",
@@ -376,4 +377,14 @@ export const messages = {
   "mobile.workflow.telegram.action.post": "Posten in chat",
   "mobile.workflow.telegram.action.react": "Reactie toevoegen",
   "mobile.workflow.telegram.emoji": "Emoji",
+  "mobile.workflow.chats.adminOnly": "Alleen een eigenaar of beheerder kan deze stap wijzigen.",
+  "mobile.workflow.chats.loadFailed": "De chats van deze server zijn niet geladen. Probeer het later opnieuw.",
+  "mobile.workflow.slack.hostOnly":
+    "Alleen de computer waarop OpenBot draait heeft de Slack-workspaces. Wijzig deze stap in OpenBot op die computer.",
+  "mobile.workflow.slack.workspace": "Workspace",
+  "mobile.workflow.slack.chooseWorkspace": "Workspace kiezen",
+  "mobile.workflow.slack.oneWorkspace": "Eén workspace",
+  "mobile.workflow.slack.chooseChannel": "Kanaal kiezen",
+  "mobile.workflow.slack.needsWorkspace": "Kies een workspace. Zonder workspace start de trigger niet.",
+  "mobile.workflow.slack.needsChannel": "Kies een workspace en een kanaal om in te plaatsen.",
 } as const satisfies PartialTranslation<typeof source>;

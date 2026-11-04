@@ -467,14 +467,10 @@ export const messages = {
     "Dit verwijdert de aanmeldingen, cookies en sitegegevens van het profiel. De open tabbladen sluiten.",
   "mobile.server.browserProfiles.deleteAgents": "Deze agents gaan naar het gedeelde profiel: {agents}.",
   "mobile.server.route.connectors": "Connectors",
-  "mobile.server.settings.connectors": "Connectors",
   "mobile.server.connectors.unavailable":
     "Maak verbinding met deze server als eigenaar of beheerder om de connectors te beheren.",
   "mobile.server.connectors.unsupported": "Werk OpenBot bij op deze server om de connectors hier te beheren.",
   "mobile.server.connectors.loading": "Connectors laden…",
-  "mobile.server.connectors.onServer": "Op {name}",
-  "mobile.server.connectors.notSetUp": "Niet ingesteld",
-  "mobile.server.connectors.available": "Beschikbaar",
   "mobile.server.connectors.localOnly": "Alleen desktop-app",
   "mobile.server.connectors.statusConnected": "Verbonden",
   "mobile.server.connectors.statusAttention": "Aandacht nodig",
@@ -701,6 +697,119 @@ export const messages = {
   "mobile.server.connectors.telegram.disconnectKept": "De gesprekken en de Telegram Orchestrator blijven in OpenBot.",
   "mobile.server.connectors.telegram.disconnectDeleted":
     "Dit is de laatste chat, dus de Telegram Orchestrator en zijn gesprekken worden uit OpenBot verwijderd.",
+  "mobile.server.connectors.whatsapp.title": "WhatsApp",
+  "mobile.server.connectors.whatsapp.summary": "Je eigen chat en de mensen die je toestaat in WhatsApp",
+  "mobile.server.connectors.whatsapp.description":
+    "Koppel een WhatsApp-nummer aan deze server. De WhatsApp Orchestrator vraagt de juiste agent en antwoordt.",
+  "mobile.server.connectors.whatsapp.connected": {
+    one: "{count} nummer · WhatsApp Orchestrator antwoordt",
+    other: "{count} nummers · WhatsApp Orchestrator antwoordt",
+  },
+  "mobile.server.connectors.whatsapp.noAgent": {
+    one: "{count} nummer · Nog geen agent antwoordt",
+    other: "{count} nummers · Nog geen agent antwoordt",
+  },
+  "mobile.server.connectors.whatsapp.attention": {
+    one: "{count} nummer heeft aandacht nodig",
+    other: "{count} nummers hebben aandacht nodig",
+  },
+  "mobile.server.connectors.whatsapp.numbersTitle": "Nummers",
+  "mobile.server.connectors.whatsapp.linkNumber": "Koppel een nummer",
+  "mobile.server.connectors.whatsapp.ownNumberNote":
+    "Je chat “Bericht aan jezelf” en de mensen die je toestaat bereiken OpenBot.",
+  "mobile.server.connectors.whatsapp.dedicatedNote":
+    "De mensen die je toestaat bereiken OpenBot. Anderen krijgen een code om aan jou te geven.",
+  "mobile.server.connectors.whatsapp.helpLoggedOut":
+    "WhatsApp heeft deze server uit de gekoppelde apparaten verwijderd. Koppel het nummer opnieuw.",
+  "mobile.server.connectors.whatsapp.helpError":
+    "OpenBot kan WhatsApp op dit nummer niet bereiken. Verbind opnieuw of koppel het nummer los.",
+  "mobile.server.connectors.whatsapp.retryAt": "WhatsApp vroeg OpenBot te wachten. Het probeert het opnieuw om {time}.",
+  "mobile.server.connectors.whatsapp.linkAgain": "Opnieuw koppelen",
+  "mobile.server.connectors.whatsapp.ownNumber": "Persoonlijk nummer",
+  "mobile.server.connectors.whatsapp.ownNumberDescription":
+    "Alleen je chat “Bericht aan jezelf” en de mensen die je toestaat kunnen schrijven. Zet dit uit voor een nummer alleen voor OpenBot.",
+  "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
+  "mobile.server.connectors.whatsapp.orchestratorDescription":
+    "Deze agent ontvangt de berichten voor OpenBot van al je gekoppelde nummers. Korte berichten beantwoordt hij zelf, ander werk geeft hij aan de juiste agent, en hij antwoordt in WhatsApp.",
+  "mobile.server.connectors.whatsapp.orchestratorNone":
+    "Voeg de WhatsApp Orchestrator toe, anders krijgt WhatsApp geen antwoord.",
+  "mobile.server.connectors.whatsapp.addAgent": "Voeg de WhatsApp Orchestrator toe",
+  "mobile.server.connectors.whatsapp.note":
+    "Schrijf op je persoonlijke nummer in je chat “Bericht aan jezelf”. De mensen die je toestaat schrijven naar het nummer.",
+  "mobile.server.connectors.whatsapp.linkTitle": "Koppel WhatsApp",
+  "mobile.server.connectors.whatsapp.linkDescription":
+    "Kies het nummer en koppel deze server daarna vanuit WhatsApp op je telefoon.",
+  "mobile.server.connectors.whatsapp.codeOnly":
+    "Op een telefoon koppel je met een koppelcode. Gebruik OpenBot op een computer om in plaats daarvan een QR-code te scannen.",
+  "mobile.server.connectors.whatsapp.kindLabel": "Nummer",
+  "mobile.server.connectors.whatsapp.kindPersonal": "Mijn persoonlijke nummer",
+  "mobile.server.connectors.whatsapp.kindPersonalDescription":
+    "OpenBot antwoordt alleen in je chat “Bericht aan jezelf” en aan de mensen die je toestaat.",
+  "mobile.server.connectors.whatsapp.kindDedicated": "Een nummer alleen voor OpenBot",
+  "mobile.server.connectors.whatsapp.kindDedicatedDescription":
+    "Onbekende mensen krijgen een code om aan jou te geven. Je keurt ze hier goed.",
+  "mobile.server.connectors.whatsapp.phoneLabel": "Telefoonnummer",
+  "mobile.server.connectors.whatsapp.phoneDescription": "Met de landcode, zoals +31 6 12345678.",
+  "mobile.server.connectors.whatsapp.phoneInvalid": "Typ het telefoonnummer met de landcode.",
+  "mobile.server.connectors.whatsapp.getCode": "Code ophalen",
+  "mobile.server.connectors.whatsapp.starting": "WhatsApp om een code vragen…",
+  "mobile.server.connectors.whatsapp.codeStepDevices":
+    "Open in WhatsApp Gekoppelde apparaten en tik op Apparaat koppelen",
+  "mobile.server.connectors.whatsapp.codeStepPhone": "Tik op In plaats daarvan koppelen met telefoonnummer",
+  "mobile.server.connectors.whatsapp.codeStepType": "Typ deze code op de telefoon",
+  "mobile.server.connectors.whatsapp.codeLabel": "Koppelcode {code}",
+  "mobile.server.connectors.whatsapp.copyCode": "Kopieer code",
+  "mobile.server.connectors.whatsapp.codeWaiting": "Wachten op de telefoon.",
+  "mobile.server.connectors.whatsapp.failedTitle": "WhatsApp is niet gekoppeld",
+  "mobile.server.connectors.whatsapp.failedTimeout": "De code is verlopen voordat de telefoon hem gebruikte.",
+  "mobile.server.connectors.whatsapp.failedRefused":
+    "WhatsApp weigerde de koppeling. Wacht een paar minuten en probeer het dan opnieuw.",
+  "mobile.server.connectors.whatsapp.failedBusy":
+    "Er loopt al een andere koppeling. Wacht tot die klaar is en probeer het dan opnieuw.",
+  "mobile.server.connectors.whatsapp.failedUnavailable":
+    "OpenBot kan WhatsApp niet bereiken. Controleer de internetverbinding.",
+  "mobile.server.connectors.whatsapp.tryAgain": "Probeer opnieuw",
+  "mobile.server.connectors.whatsapp.agentStepDescription":
+    "Deze nieuwe agent beantwoordt de berichten voor OpenBot op {number} en op elk nummer dat je later koppelt.",
+  "mobile.server.connectors.whatsapp.doneTitle": "OpenBot is gekoppeld aan {number}",
+  "mobile.server.connectors.whatsapp.done": "Klaar",
+  "mobile.server.connectors.whatsapp.disconnectTitle": "{number} loskoppelen?",
+  "mobile.server.connectors.whatsapp.disconnectBody":
+    "OpenBot logt uit bij WhatsApp op {number}. Als OpenBot uit stond, verwijder het apparaat dan ook in WhatsApp > Gekoppelde apparaten.",
+  "mobile.server.connectors.whatsapp.disconnectEffect": "Mensen kunnen je agents niet meer bereiken via {number}.",
+  "mobile.server.connectors.whatsapp.removeEffectKept": "De gesprekken en de WhatsApp Orchestrator blijven in OpenBot.",
+  "mobile.server.connectors.whatsapp.removeEffectDeleted":
+    "Dit is het laatste nummer, dus de WhatsApp Orchestrator en zijn gesprekken worden uit OpenBot verwijderd.",
+  "mobile.server.connectors.whatsapp.keep": "Gekoppeld houden",
+  "mobile.server.connectors.whatsapp.sendersTitle": "Wie naar {number} kan schrijven",
+  "mobile.server.connectors.whatsapp.sendersDescription": "Deze contacten en groepen kunnen werk geven aan je agents.",
+  "mobile.server.connectors.whatsapp.sendersEmpty": "Alleen jij kunt schrijven. Voeg een contact of een groep toe.",
+  "mobile.server.connectors.whatsapp.sendersLimit": "Een nummer kan maximaal {count} contacten en groepen toestaan.",
+  "mobile.server.connectors.whatsapp.senderGroup": "Groep",
+  "mobile.server.connectors.whatsapp.removeSender": "Verwijderen",
+  "mobile.server.connectors.whatsapp.addContact": "Contact toevoegen",
+  "mobile.server.connectors.whatsapp.addGroup": "Groep toevoegen",
+  "mobile.server.connectors.whatsapp.contactTitle": "Voeg een contact toe",
+  "mobile.server.connectors.whatsapp.contactDescription": "Deze persoon kan vanuit WhatsApp werk geven aan je agents.",
+  "mobile.server.connectors.whatsapp.contactName": "Naam",
+  "mobile.server.connectors.whatsapp.contactNameDescription":
+    "Optioneel. Zonder naam toont de lijst het telefoonnummer.",
+  "mobile.server.connectors.whatsapp.add": "Toevoegen",
+  "mobile.server.connectors.whatsapp.groupTitle": "Voeg een groep toe",
+  "mobile.server.connectors.whatsapp.groupDescription": "Mensen in deze groep kunnen werk geven aan je agents.",
+  "mobile.server.connectors.whatsapp.groupSearch": "Zoek groepen",
+  "mobile.server.connectors.whatsapp.groupsLoading": "Groepen lezen…",
+  "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot kon de groepen niet lezen",
+  "mobile.server.connectors.whatsapp.groupsEmpty": "Dit nummer zit in geen enkele groep.",
+  "mobile.server.connectors.whatsapp.groupsNoMatch": "Geen groep heeft deze naam.",
+  "mobile.server.connectors.whatsapp.groupAdded": "Toegevoegd",
+  "mobile.server.connectors.whatsapp.requestsTitle": "Verzoeken voor {number}",
+  "mobile.server.connectors.whatsapp.requestsDescription":
+    "Deze mensen schreven naar het nummer en kregen een code. Keur een persoon alleen goed als die je dezelfde code gaf.",
+  "mobile.server.connectors.whatsapp.requestsEmpty": "Geen verzoeken.",
+  "mobile.server.connectors.whatsapp.requestDetail": "Code {code} · {number}",
+  "mobile.server.connectors.whatsapp.approve": "Goedkeuren",
+  "mobile.server.connectors.whatsapp.deny": "Weigeren",
   "mobile.server.settings.providers": "Aanbieders",
   "mobile.server.settings.providersConnected": { one: "{count} verbonden", other: "{count} verbonden" },
   "mobile.server.providers.description": "De AI-aanbieders van de computer waarop deze server draait.",

@@ -473,14 +473,10 @@ export const messages = {
     "Bu, profilin oturum açma bilgilerini, çerezlerini ve site verilerini siler. Açık sekmeleri kapanır.",
   "mobile.server.browserProfiles.deleteAgents": "Bu ajanlar ortak profile geçer: {agents}.",
   "mobile.server.route.connectors": "Bağlayıcılar",
-  "mobile.server.settings.connectors": "Bağlayıcılar",
   "mobile.server.connectors.unavailable":
     "Bağlayıcılarını yönetmek için bu sunucuya sahip veya yönetici olarak bağlanın.",
   "mobile.server.connectors.unsupported": "Bağlayıcılarını burada yönetmek için bu sunucudaki OpenBot'u güncelleyin.",
   "mobile.server.connectors.loading": "Bağlayıcılar yükleniyor…",
-  "mobile.server.connectors.onServer": "{name} üzerinde",
-  "mobile.server.connectors.notSetUp": "Ayarlanmadı",
-  "mobile.server.connectors.available": "Kullanılabilir",
   "mobile.server.connectors.localOnly": "Yalnızca masaüstü uygulaması",
   "mobile.server.connectors.statusConnected": "Bağlandı",
   "mobile.server.connectors.statusAttention": "Dikkat gerekiyor",
@@ -732,6 +728,119 @@ export const messages = {
   "mobile.server.connectors.telegram.disconnectKept": "Konuşmalar ve Telegram Düzenleyicisi OpenBot'ta kalır.",
   "mobile.server.connectors.telegram.disconnectDeleted":
     "Bu son sohbet olduğundan Telegram Düzenleyicisi ve konuşmaları OpenBot'tan silinir.",
+  "mobile.server.connectors.whatsapp.title": "WhatsApp",
+  "mobile.server.connectors.whatsapp.summary": "WhatsApp'ta kendi sohbetiniz ve izin verdiğiniz kişiler",
+  "mobile.server.connectors.whatsapp.description":
+    "Bir WhatsApp numarasını bu sunucuya bağlayın. WhatsApp Düzenleyicisi doğru ajana sorar ve yanıtlar.",
+  "mobile.server.connectors.whatsapp.connected": {
+    one: "{count} numara · WhatsApp Düzenleyicisi yanıtlıyor",
+    other: "{count} numara · WhatsApp Düzenleyicisi yanıtlıyor",
+  },
+  "mobile.server.connectors.whatsapp.noAgent": {
+    one: "{count} numara · Henüz yanıt veren bir ajan yok",
+    other: "{count} numara · Henüz yanıt veren bir ajan yok",
+  },
+  "mobile.server.connectors.whatsapp.attention": {
+    one: "{count} numara için işlem gerekiyor",
+    other: "{count} numara için işlem gerekiyor",
+  },
+  "mobile.server.connectors.whatsapp.numbersTitle": "Numaralar",
+  "mobile.server.connectors.whatsapp.linkNumber": "Numara bağla",
+  "mobile.server.connectors.whatsapp.ownNumberNote":
+    "“Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler OpenBot'a ulaşır.",
+  "mobile.server.connectors.whatsapp.dedicatedNote":
+    "İzin verdiğiniz kişiler OpenBot'a ulaşır. Diğer kişiler size iletmeleri için bir kod alır.",
+  "mobile.server.connectors.whatsapp.helpLoggedOut":
+    "WhatsApp bu sunucuyu bağlı cihazlardan kaldırdı. Numarayı yeniden bağlayın.",
+  "mobile.server.connectors.whatsapp.helpError":
+    "OpenBot bu numarada WhatsApp'a ulaşamıyor. Yeniden bağlanın veya numaranın bağlantısını kesin.",
+  "mobile.server.connectors.whatsapp.retryAt":
+    "WhatsApp OpenBot'tan beklemesini istedi. {time} saatinde tekrar deneyecek.",
+  "mobile.server.connectors.whatsapp.linkAgain": "Yeniden bağla",
+  "mobile.server.connectors.whatsapp.ownNumber": "Kişisel numara",
+  "mobile.server.connectors.whatsapp.ownNumberDescription":
+    "Yalnızca “Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler yazabilir. Yalnızca OpenBot için olan bir numarada kapatın.",
+  "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Düzenleyicisi",
+  "mobile.server.connectors.whatsapp.orchestratorDescription":
+    "Bu ajan bağlı tüm numaralarınızdan OpenBot'a gelen mesajları alır. Kısa olanları kendisi yanıtlar, diğer işleri doğru ajana iletir ve WhatsApp'ta yanıt verir.",
+  "mobile.server.connectors.whatsapp.orchestratorNone":
+    "WhatsApp Düzenleyicisini ekleyin, aksi takdirde WhatsApp yanıt alamaz.",
+  "mobile.server.connectors.whatsapp.addAgent": "WhatsApp Düzenleyicisini ekleyin",
+  "mobile.server.connectors.whatsapp.note":
+    "Kişisel numaranızda “Kendine mesaj gönder” sohbetinize yazın. İzin verdiğiniz kişiler numaraya yazar.",
+  "mobile.server.connectors.whatsapp.linkTitle": "WhatsApp'ı bağlayın",
+  "mobile.server.connectors.whatsapp.linkDescription":
+    "Numarayı seçin, ardından telefonunuzdaki WhatsApp'tan bu sunucuyu bağlayın.",
+  "mobile.server.connectors.whatsapp.codeOnly":
+    "Telefonda eşleme koduyla bağlayın. Bunun yerine QR kodu taramak için bilgisayarda OpenBot'u kullanın.",
+  "mobile.server.connectors.whatsapp.kindLabel": "Numara",
+  "mobile.server.connectors.whatsapp.kindPersonal": "Kişisel numaram",
+  "mobile.server.connectors.whatsapp.kindPersonalDescription":
+    "OpenBot yalnızca “Kendine mesaj gönder” sohbetinizi ve izin verdiğiniz kişileri yanıtlar.",
+  "mobile.server.connectors.whatsapp.kindDedicated": "Yalnızca OpenBot için bir numara",
+  "mobile.server.connectors.whatsapp.kindDedicatedDescription":
+    "Tanımadığınız kişiler size iletmeleri için bir kod alır. Onları burada onaylarsınız.",
+  "mobile.server.connectors.whatsapp.phoneLabel": "Telefon numarası",
+  "mobile.server.connectors.whatsapp.phoneDescription": "+44 7700 900123 gibi ülke koduyla birlikte.",
+  "mobile.server.connectors.whatsapp.phoneInvalid": "Telefon numarasını ülke koduyla birlikte yazın.",
+  "mobile.server.connectors.whatsapp.getCode": "Kod al",
+  "mobile.server.connectors.whatsapp.starting": "WhatsApp'tan kod isteniyor…",
+  "mobile.server.connectors.whatsapp.codeStepDevices": "WhatsApp'ta Bağlı cihazlar'ı açın ve Cihaz bağla'ya dokunun",
+  "mobile.server.connectors.whatsapp.codeStepPhone": "“Bunun yerine telefon numarasıyla bağla” öğesine dokunun",
+  "mobile.server.connectors.whatsapp.codeStepType": "Bu kodu telefona yazın",
+  "mobile.server.connectors.whatsapp.codeLabel": "Eşleme kodu {code}",
+  "mobile.server.connectors.whatsapp.copyCode": "Kodu kopyala",
+  "mobile.server.connectors.whatsapp.codeWaiting": "Telefon bekleniyor.",
+  "mobile.server.connectors.whatsapp.failedTitle": "WhatsApp bağlanmadı",
+  "mobile.server.connectors.whatsapp.failedTimeout": "Telefon kullanmadan önce kodun süresi doldu.",
+  "mobile.server.connectors.whatsapp.failedRefused":
+    "WhatsApp bağlantıyı reddetti. Birkaç dakika bekleyin, sonra tekrar deneyin.",
+  "mobile.server.connectors.whatsapp.failedBusy":
+    "Başka bir bağlama işlemi sürüyor. Bitmesini bekleyin, sonra tekrar deneyin.",
+  "mobile.server.connectors.whatsapp.failedUnavailable":
+    "OpenBot WhatsApp'a ulaşamıyor. İnternet bağlantısını kontrol edin.",
+  "mobile.server.connectors.whatsapp.tryAgain": "Tekrar dene",
+  "mobile.server.connectors.whatsapp.agentStepDescription":
+    "Bu yeni ajan, {number} üzerinde ve daha sonra bağladığınız her numarada OpenBot'a gelen mesajları yanıtlar.",
+  "mobile.server.connectors.whatsapp.doneTitle": "OpenBot {number} ile bağlandı",
+  "mobile.server.connectors.whatsapp.done": "Bitti",
+  "mobile.server.connectors.whatsapp.disconnectTitle": "{number} bağlantısı kesilsin mi?",
+  "mobile.server.connectors.whatsapp.disconnectBody":
+    "OpenBot {number} üzerinde WhatsApp oturumunu kapatır. OpenBot kapalıysa cihazı WhatsApp > Bağlı cihazlar bölümünden de kaldırın.",
+  "mobile.server.connectors.whatsapp.disconnectEffect": "Kişiler artık {number} üzerinden ajanlarınıza ulaşamaz.",
+  "mobile.server.connectors.whatsapp.removeEffectKept": "Konuşmalar ve WhatsApp Düzenleyicisi OpenBot'ta kalır.",
+  "mobile.server.connectors.whatsapp.removeEffectDeleted":
+    "Bu son numara olduğundan WhatsApp Düzenleyicisi ve konuşmaları OpenBot'tan silinir.",
+  "mobile.server.connectors.whatsapp.keep": "Bağlı tut",
+  "mobile.server.connectors.whatsapp.sendersTitle": "{number} için kimler yazabilir",
+  "mobile.server.connectors.whatsapp.sendersDescription": "Bu kişiler ve gruplar ajanlarınıza iş verebilir.",
+  "mobile.server.connectors.whatsapp.sendersEmpty": "Yalnızca siz yazabilirsiniz. Bir kişi veya grup ekleyin.",
+  "mobile.server.connectors.whatsapp.sendersLimit": "Bir numara en fazla {count} kişiye ve gruba izin verebilir.",
+  "mobile.server.connectors.whatsapp.senderGroup": "Grup",
+  "mobile.server.connectors.whatsapp.removeSender": "Kaldır",
+  "mobile.server.connectors.whatsapp.addContact": "Kişi ekle",
+  "mobile.server.connectors.whatsapp.addGroup": "Grup ekle",
+  "mobile.server.connectors.whatsapp.contactTitle": "Bir kişi ekleyin",
+  "mobile.server.connectors.whatsapp.contactDescription": "Bu kişi WhatsApp'tan ajanlarınıza iş verebilir.",
+  "mobile.server.connectors.whatsapp.contactName": "Ad",
+  "mobile.server.connectors.whatsapp.contactNameDescription":
+    "İsteğe bağlı. Boş bırakılırsa listede telefon numarası gösterilir.",
+  "mobile.server.connectors.whatsapp.add": "Ekle",
+  "mobile.server.connectors.whatsapp.groupTitle": "Bir grup ekleyin",
+  "mobile.server.connectors.whatsapp.groupDescription": "Bu gruptaki kişiler ajanlarınıza iş verebilir.",
+  "mobile.server.connectors.whatsapp.groupSearch": "Grup ara",
+  "mobile.server.connectors.whatsapp.groupsLoading": "Gruplar okunuyor…",
+  "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot grupları okuyamadı",
+  "mobile.server.connectors.whatsapp.groupsEmpty": "Bu numara hiçbir grupta değil.",
+  "mobile.server.connectors.whatsapp.groupsNoMatch": "Bu adda bir grup yok.",
+  "mobile.server.connectors.whatsapp.groupAdded": "Eklendi",
+  "mobile.server.connectors.whatsapp.requestsTitle": "{number} için istekler",
+  "mobile.server.connectors.whatsapp.requestsDescription":
+    "Bu kişiler numaraya yazdı ve bir kod aldı. Bir kişiyi yalnızca size aynı kodu verdiyse onaylayın.",
+  "mobile.server.connectors.whatsapp.requestsEmpty": "İstek yok.",
+  "mobile.server.connectors.whatsapp.requestDetail": "Kod {code} · {number}",
+  "mobile.server.connectors.whatsapp.approve": "Onayla",
+  "mobile.server.connectors.whatsapp.deny": "Reddet",
   "mobile.server.settings.providers": "Sağlayıcılar",
   "mobile.server.settings.providersConnected": { one: "{count} bağlı", other: "{count} bağlı" },
   "mobile.server.providers.description": "Bu sunucuyu çalıştıran bilgisayarın yapay zekâ sağlayıcıları.",

@@ -205,6 +205,8 @@ export const messages = {
   "mobile.workflow.output.discord": "Discord",
   "mobile.workflow.output.slack": "Slack",
   "mobile.workflow.output.telegram": "Telegram",
+  "mobile.workflow.output.telegramHint": "在已关联的 Telegram 聊天中回复、发帖或添加回应。",
+  "mobile.workflow.output.slackHint": "在 Slack 频道中回复、发帖或添加回应。",
   "mobile.workflow.run.stopStep": "停止步骤",
   "mobile.workflow.run.stopStepFailed": "无法停止该步骤",
   "mobile.workflow.version.history": "版本历史",
@@ -341,7 +343,6 @@ export const messages = {
   "mobile.workflow.slack.action.reply": "在消息列中回复",
   "mobile.workflow.telegram.hostOnly":
     "只有运行 OpenBot 的电脑上有 Telegram 聊天。请在那台电脑上的 OpenBot 中更改此步骤。",
-  "mobile.workflow.telegram.triggerComputerOnly": "请在运行此触发器的电脑上的 OpenBot 中更改它。",
   "mobile.workflow.telegram.outputSummary": "Telegram · {action}",
   "mobile.workflow.telegram.chat": "聊天",
   "mobile.workflow.telegram.anyChat": "任意已关联的聊天",
@@ -358,4 +359,14 @@ export const messages = {
   "mobile.workflow.telegram.action.post": "在聊天中发布",
   "mobile.workflow.telegram.action.react": "添加反应",
   "mobile.workflow.telegram.emoji": "表情",
+  "mobile.workflow.chats.adminOnly": "只有所有者或管理员可以更改此步骤。",
+  "mobile.workflow.chats.loadFailed": "未能加载此服务器的聊天。请稍后重试。",
+  "mobile.workflow.slack.hostOnly":
+    "只有运行 OpenBot 的计算机才有 Slack 工作区。请在那台计算机上的 OpenBot 中更改此步骤。",
+  "mobile.workflow.slack.workspace": "工作区",
+  "mobile.workflow.slack.chooseWorkspace": "选择工作区",
+  "mobile.workflow.slack.oneWorkspace": "一个工作区",
+  "mobile.workflow.slack.chooseChannel": "选择频道",
+  "mobile.workflow.slack.needsWorkspace": "请选择工作区。没有工作区，触发器不会启动。",
+  "mobile.workflow.slack.needsChannel": "请选择要发帖的工作区和频道。",
 } as const satisfies PartialTranslation<typeof source>;
