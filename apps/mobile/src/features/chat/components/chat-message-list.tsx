@@ -292,6 +292,13 @@ interface ChatMessageListProps {
   onReply?: (message: ChatBubbleMessage) => void;
   /** Copies the conversation through a message of `branchPoints` into a new thread. */
   onBranch?: (message: ChatBubbleMessage) => void;
+  /** Deletes a message for everyone. Absent where the host cannot delete messages. */
+  onDeleteMessage?: (message: ChatBubbleMessage) => Promise<void>;
+  /** The reader can delete the messages of others too, not only the ones that they sent. */
+  deletesAnyMessage?: boolean;
+  /** The open channels that the text of a message can go to. Keep the list stable while it stays the same. */
+  sendChannels?: readonly { id: string; name: string }[];
+  onSendToChannel?: (message: ChatBubbleMessage, channelId: string) => void;
   /** The messages that offer a branch. Keep the set stable while its ids stay the same. */
   branchPoints?: ReadonlySet<string>;
   /**
@@ -359,6 +366,11 @@ interface MessageRowShared {
   replyHaptics: ReturnType<typeof useReplyHaptics>;
   canReply: boolean;
   canReact: boolean;
+  /** The host deletes messages. A message that the reader did not send also needs `deletesAny`. */
+  canDelete: boolean;
+  deletesAny: boolean;
+  /** The open channels that the text of a message can go to. Empty where it cannot go to one. */
+  sendChannels: readonly { id: string; name: string }[];
   canSelectText: boolean;
   canSelectQuestion: boolean;
   /** The messages that offer a branch. Empty where the chat cannot branch. */
@@ -370,6 +382,8 @@ interface MessageRowShared {
     branch: (message: ChatBubbleMessage) => void;
     selectQuestion: (messageId: string) => void;
     react: (message: ChatBubbleMessage, emoji: string | null) => Promise<void>;
+    delete: (message: ChatBubbleMessage) => Promise<void>;
+    sendToChannel: (message: ChatBubbleMessage, channelId: string) => void;
     selectText: (message: ChatBubbleMessage) => void;
     selectionChange: (selected: string) => void;
     /** The row of the selected message. A tap outside it ends the selection. */
@@ -562,6 +576,15 @@ const MessageRow = memo(function MessageRow({
           onReply: shared.canReply ? () => shared.actions.reply(bubble) : undefined,
           onBranch: shared.branchPoints.has(bubble.id) ? () => shared.actions.branch(bubble) : undefined,
           onSelectText: selectable ? () => shared.actions.selectText(bubble) : undefined,
+          onDelete:
+            shared.canDelete && (shared.deletesAny || bubble.mine) ? () => shared.actions.delete(bubble) : undefined,
+          sendToChannel:
+            shared.sendChannels.length > 0 && bubble.body.trim()
+              ? {
+                  channels: shared.sendChannels,
+                  onSend: (channelId) => shared.actions.sendToChannel(bubble, channelId),
+                }
+              : undefined,
           readAloudId: canReadAloud && bubble.author === "agent" ? bubble.id : undefined,
         }
       : null,
@@ -1006,6 +1029,7 @@ function sameListProps(previous: ChatMessageListProps, next: ChatMessageListProp
 const NO_APPROVALS: readonly PendingApproval[] = [];
 const NO_BROWSER_REQUESTS: readonly BrowserTakeoverRequest[] = [];
 const NO_IDS: ReadonlySet<string> = new Set();
+const NO_CHANNELS: readonly { id: string; name: string }[] = [];
 
 export const ChatMessageList = memo(function ChatMessageList({
   upload,
@@ -1052,6 +1076,10 @@ export const ChatMessageList = memo(function ChatMessageList({
   onRetryHistory,
   onReply,
   onBranch,
+  onDeleteMessage,
+  deletesAnyMessage = false,
+  sendChannels = NO_CHANNELS,
+  onSendToChannel,
   branchPoints = NO_IDS,
   branchDivider = null,
   onOpenBranchSource,
@@ -1220,17 +1248,30 @@ export const ChatMessageList = memo(function ChatMessageList({
     onReply,
     onBranch,
     onReact,
+    onDeleteMessage,
+    onSendToChannel,
     onSelectText,
     onSelectionChange,
     onSelectQuestion,
   });
-  actionHandlers.current = { onReply, onBranch, onReact, onSelectText, onSelectionChange, onSelectQuestion };
+  actionHandlers.current = {
+    onReply,
+    onBranch,
+    onReact,
+    onDeleteMessage,
+    onSendToChannel,
+    onSelectText,
+    onSelectionChange,
+    onSelectQuestion,
+  };
   const actions = useMemo<MessageRowShared["actions"]>(
     () => ({
       reply: (message) => actionHandlers.current.onReply?.(message),
       branch: (message) => actionHandlers.current.onBranch?.(message),
       selectQuestion: (messageId) => actionHandlers.current.onSelectQuestion?.(messageId),
       react: async (message, emoji) => actionHandlers.current.onReact?.(message, emoji),
+      delete: async (message) => actionHandlers.current.onDeleteMessage?.(message),
+      sendToChannel: (message, channelId) => actionHandlers.current.onSendToChannel?.(message, channelId),
       selectText: (message) => actionHandlers.current.onSelectText?.(message),
       selectionChange: (selected) => actionHandlers.current.onSelectionChange?.(selected),
       selectionArea: (view) => {
@@ -1270,6 +1311,8 @@ export const ChatMessageList = memo(function ChatMessageList({
   // `actionHandlers`, so only their presence keeps `shared`, and every row, from rendering again.
   const canReply = Boolean(onReply);
   const canReact = Boolean(onReact);
+  const canDelete = Boolean(onDeleteMessage);
+  const shownSendChannels = onSendToChannel ? sendChannels : NO_CHANNELS;
   const canSelectText = Boolean(onSelectText);
   const canSelectQuestion = Boolean(onSelectQuestion);
   const shownBranchPoints = onBranch ? branchPoints : NO_IDS;
@@ -1301,6 +1344,9 @@ export const ChatMessageList = memo(function ChatMessageList({
       replyHaptics,
       canReply,
       canReact,
+      canDelete,
+      deletesAny: deletesAnyMessage,
+      sendChannels: shownSendChannels,
       canSelectText,
       canSelectQuestion,
       branchPoints: shownBranchPoints,
@@ -1329,6 +1375,9 @@ export const ChatMessageList = memo(function ChatMessageList({
       replyHaptics,
       canReply,
       canReact,
+      canDelete,
+      deletesAnyMessage,
+      shownSendChannels,
       canSelectText,
       canSelectQuestion,
       shownBranchPoints,

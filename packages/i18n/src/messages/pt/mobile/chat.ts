@@ -213,6 +213,12 @@ export const messages = {
   "mobile.chat.message.removeReaction": "Remover sua reação {emoji}",
   "mobile.chat.message.agentReaction": "{name} reagiu com {emoji}",
   "mobile.chat.message.reactionFailed": "Não foi possível atualizar a reação",
+  "mobile.chat.message.deleteTitle": "Excluir esta mensagem?",
+  "mobile.chat.message.deleteBody":
+    "A mensagem é removida para todos neste chat. Os agentes ainda podem se lembrar dela.",
+  "mobile.chat.message.deleteFailed": "Não foi possível excluir a mensagem",
+  "mobile.chat.message.sendToChannel": "Enviar para o canal",
+  "mobile.chat.message.chooseChannel": "Escolha um canal",
   "mobile.chat.day.today": "Hoje {time}",
   "mobile.chat.day.yesterday": "Ontem {time}",
   "mobile.chat.day.date": "{date} {time}",
