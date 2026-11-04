@@ -677,8 +677,8 @@ popover. Release signing secrets and the complete procedure are documented in
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Before we merge a contribution, each
-author from outside the organization signs the [Contributor Assignment Agreement](CLA.md), which
-assigns its copyright to Synthetify Labs. Community behavior is governed by the
+author from outside the organization signs the [Contributor License Agreement](CLA.md), which
+gives Synthetify Labs a license to use the contribution. Community behavior is governed by the
 [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License and attribution

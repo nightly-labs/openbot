@@ -14,6 +14,7 @@ import { Route as AppRouteImport } from './routes/app'
 import { Route as AppPreviewRouteImport } from './routes/app-preview'
 import { Route as BrandingRouteImport } from './routes/branding'
 import { Route as ChangelogRouteImport } from './routes/changelog'
+import { Route as ClaRouteImport } from './routes/cla'
 import { Route as CommercialLicenseRouteImport } from './routes/commercial-license'
 import { Route as CommerciallicenseRouteImport } from './routes/commerciallicense'
 import { Route as ContactRouteImport } from './routes/contact'
@@ -221,6 +222,11 @@ const BrandingRoute = BrandingRouteImport.update({
 const ChangelogRoute = ChangelogRouteImport.update({
   id: '/changelog',
   path: '/changelog',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClaRoute = ClaRouteImport.update({
+  id: '/cla',
+  path: '/cla',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CommercialLicenseRoute = CommercialLicenseRouteImport.update({
@@ -1211,6 +1217,7 @@ export interface FileRoutesByFullPath {
   '/app-preview': typeof AppPreviewRoute
   '/branding': typeof BrandingRoute
   '/changelog': typeof ChangelogRoute
+  '/cla': typeof ClaRoute
   '/commercial-license': typeof CommercialLicenseRoute
   '/commerciallicense': typeof CommerciallicenseRoute
   '/contact': typeof ContactRoute
@@ -1401,6 +1408,7 @@ export interface FileRoutesByTo {
   '/app-preview': typeof AppPreviewRoute
   '/branding': typeof BrandingRoute
   '/changelog': typeof ChangelogRoute
+  '/cla': typeof ClaRoute
   '/commercial-license': typeof CommercialLicenseRoute
   '/commerciallicense': typeof CommerciallicenseRoute
   '/contact': typeof ContactRoute
@@ -1592,6 +1600,7 @@ export interface FileRoutesById {
   '/app-preview': typeof AppPreviewRoute
   '/branding': typeof BrandingRoute
   '/changelog': typeof ChangelogRoute
+  '/cla': typeof ClaRoute
   '/commercial-license': typeof CommercialLicenseRoute
   '/commerciallicense': typeof CommerciallicenseRoute
   '/contact': typeof ContactRoute
@@ -1784,6 +1793,7 @@ export interface FileRouteTypes {
     | '/app-preview'
     | '/branding'
     | '/changelog'
+    | '/cla'
     | '/commercial-license'
     | '/commerciallicense'
     | '/contact'
@@ -1974,6 +1984,7 @@ export interface FileRouteTypes {
     | '/app-preview'
     | '/branding'
     | '/changelog'
+    | '/cla'
     | '/commercial-license'
     | '/commerciallicense'
     | '/contact'
@@ -2164,6 +2175,7 @@ export interface FileRouteTypes {
     | '/app-preview'
     | '/branding'
     | '/changelog'
+    | '/cla'
     | '/commercial-license'
     | '/commerciallicense'
     | '/contact'
@@ -2355,6 +2367,7 @@ export interface RootRouteChildren {
   AppPreviewRoute: typeof AppPreviewRoute
   BrandingRoute: typeof BrandingRoute
   ChangelogRoute: typeof ChangelogRoute
+  ClaRoute: typeof ClaRoute
   CommercialLicenseRoute: typeof CommercialLicenseRoute
   CommerciallicenseRoute: typeof CommerciallicenseRoute
   ContactRoute: typeof ContactRoute
@@ -2549,6 +2562,13 @@ declare module '@tanstack/solid-router' {
       path: '/changelog'
       fullPath: '/changelog'
       preLoaderRoute: typeof ChangelogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cla': {
+      id: '/cla'
+      path: '/cla'
+      fullPath: '/cla'
+      preLoaderRoute: typeof ClaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/commercial-license': {
@@ -3988,6 +4008,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppPreviewRoute: AppPreviewRoute,
   BrandingRoute: BrandingRoute,
   ChangelogRoute: ChangelogRoute,
+  ClaRoute: ClaRoute,
   CommercialLicenseRoute: CommercialLicenseRoute,
   CommerciallicenseRoute: CommerciallicenseRoute,
   ContactRoute: ContactRoute,
