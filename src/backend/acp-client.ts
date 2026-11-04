@@ -2160,14 +2160,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         response = providerResult(yield* send());
       if (thread.activeTurn !== turn || turn.completing) return;
       // `promptId` names this result: a delivery that runs again keeps its turn ID.
-      if (response.usage)
+      const usage = this.#flavor.promptUsage ? this.#flavor.promptUsage(response) : response.usage;
+      if (usage)
         this.emit("notification", {
           method: "openbot/usage",
           params: {
             threadId: thread.id,
             turnId: turn.id,
             promptId: randomUUID(),
-            usage: response.usage,
+            usage,
             ...(turn.reportedCost === null ? {} : { cost: turn.reportedCost }),
           },
         });
