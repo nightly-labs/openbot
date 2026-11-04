@@ -367,7 +367,7 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.overdue": "把我逾期的 Todoist 任务改到明天。",
   "marketplace.plugin.ticktick.tagline": "任务、清单、习惯和专注",
   "marketplace.plugin.ticktick.description":
-    "TickTick 让代理搜索和筛选任务，添加和修改任务，并管理清单、分组、文件夹、标签和评论。代理还可以读取和修改习惯与专注记录，并读取与 TickTick 关联的日历中的日程。每位用户在浏览器中登录自己的 TickTick 账号。代理获得读写权限：可以完成、移动和删除任务，以及删除标签和专注记录。",
+    "TickTick 让助手搜索和筛选任务，添加和修改任务，并管理清单、分组、文件夹、标签和评论。助手还可以读取和修改习惯与专注记录，并读取与 TickTick 关联的日历中的日程。每位用户在浏览器中登录自己的 TickTick 账号。助手获得读写权限：可以完成、移动和删除任务，以及删除标签和专注记录。",
   "marketplace.plugin.ticktick.app": "通过 TickTick 的 MCP 服务器以浏览器登录处理任务、清单、习惯和专注记录。",
   "marketplace.plugin.ticktick.prompt.today": "今天有哪些 TickTick 任务到期？",
   "marketplace.plugin.ticktick.prompt.capture": "把这些待办事项添加到我的 TickTick 收集箱。",

@@ -31,12 +31,12 @@ export const TICKTICK_PLUGIN_GUIDE: PluginGuide = {
     {
       question: "Does the TickTick plugin need an API key?",
       answer:
-        "No. You sign in to your own TickTick account in the browser and allow access. The assistant gets a token, not your password. OpenBot keeps the tokens in encrypted storage and adds the Authorization header. You sign in again only when the token expires after a long time with no use, or when you revoke the access.",
+        "No. You sign in to your own TickTick account in the browser and allow access. The assistant gets a token, not your password. OpenBot keeps the tokens in encrypted storage and adds the Authorization header. When the token expires or you revoke the access, you sign in again.",
     },
     {
       question: "What can the agent see and change in TickTick?",
       answer:
-        "The connection asks for read and write access to your tasks. The agent can read, add, change, complete, move and delete tasks. A deleted task goes to the Trash. The agent can also delete comments, tags, folders and focus records. TickTick gets the requests that the agent sends. Your workspaces, conversations and files stay on the computer that runs OpenBot.",
+        "The connection asks for read and write access to your tasks. The agent can read, add, change, complete, move and delete tasks. A deleted task goes to the Trash. The agent can also delete comments, tags and focus records, and ungroup a folder: its lists stay. TickTick gets the requests that the agent sends. Your workspaces, conversations and files stay on the computer that runs OpenBot.",
     },
     {
       question: "Does the TickTick MCP server support all TickTick features?",
