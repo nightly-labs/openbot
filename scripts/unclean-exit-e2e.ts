@@ -21,6 +21,7 @@ import { join, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { createOpenBotLogger } from "@openbot/logging";
 import { z } from "zod";
+import { RUN_MARKER_FILE } from "../src/main/run-marker";
 import { readDevInstanceRecords } from "./dev-automation/instance-registry";
 
 const ROOT = resolve(import.meta.dirname, "..");
@@ -29,7 +30,6 @@ const portFlag = process.argv.find((argument) => argument.startsWith("--capture-
 const CAPTURE_PORT = Number(portFlag?.slice("--capture-port=".length) ?? 47321);
 const START_TIMEOUT_MS = 240_000;
 const EVENT_TIMEOUT_MS = 60_000;
-const MARKER_FILE = "openbot-run-marker-v1.json";
 const UNCLEAN_LINE = "The previous run did not quit cleanly";
 
 if (process.platform !== "darwin") throw new Error("This check reads the macOS user data folder.");
@@ -206,7 +206,7 @@ async function startStack(run: number): Promise<Started> {
 }
 
 function readMarker(userData: string): RunMarkerFile | null {
-  const path = join(userData, MARKER_FILE);
+  const path = join(userData, RUN_MARKER_FILE);
   if (!existsSync(path)) return null;
   try {
     return runMarkerFile.parse(JSON.parse(readFileSync(path, "utf8")));

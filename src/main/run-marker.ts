@@ -17,7 +17,7 @@ import { Effect, Option, Schema } from "effect";
 
 export const RUN_MARKER_FILE = "openbot-run-marker-v1.json";
 /** How often a live run writes its last sign of life. */
-export const RUN_HEARTBEAT_MS = 60_000;
+const RUN_HEARTBEAT_MS = 60_000;
 /** More dumps than this are sent as this count. */
 const MAX_CRASH_DUMPS = 10;
 /** Crashpad keeps reports in `new`, `pending` and `completed`, or one level deeper on Linux. */
