@@ -554,11 +554,11 @@ export function ConversationTimeline() {
   });
   const showAgentSteps = useShowAgentSteps();
   const traceKeyboard = currentDevicePlatform() === "darwin" ? "mac" : "pc";
-  /** The trace that the steps row above an answer opens. */
-  const traceAbove = (messageId: string | undefined): AgentStepsTrace => ({
+  /** The trace that the steps row above an answer opens. A channel names the agent that answered. */
+  const traceAbove = (messageId: string | undefined, agentName?: string): AgentStepsTrace => ({
     spans: () =>
       turnSteps.traceAbove(messageId, {
-        agent: props.agent?.name ?? t("chat.message.agentFallback"),
+        agent: agentName ?? props.agent?.name ?? t("chat.message.agentFallback"),
         thinking: t("chat.trace.step.thinking"),
         answer: t("chat.trace.step.answer"),
         progress: sourceText,
@@ -1224,6 +1224,22 @@ export function ConversationTimeline() {
                     if (currentMessage) void copyMessage(currentMessage);
                   },
                 };
+                // A channel shows an agent's actions beside the answer. Its steps show only with them, and
+                // they open only the trace.
+                const stepsInRow = () => Boolean(channel) && author().kind === "agent" && !message()?.questionPrompt;
+                const stepsDisclosure = () => (
+                  <Show when={turnSteps.stepsAbove(message()?.id)}>
+                    {(steps) => (
+                      <AgentStepsDisclosure
+                        steps={steps()}
+                        defaultOpen={showAgentSteps()}
+                        list={!stepsInRow()}
+                        trace={traceAbove(message()?.id, stepsInRow() ? author().name : undefined)}
+                        facts={turnSteps.factsAbove(message()?.id)}
+                      />
+                    )}
+                  </Show>
+                );
                 const messageReadAloud = () =>
                   spokenReplyIds().has((message() ?? initialMessage).id)
                     ? undefined
@@ -1259,17 +1275,8 @@ export function ConversationTimeline() {
                         }}
                       />
                     </Show>
-                    <Show when={turnSteps.stepsAbove(message()?.id)}>
-                      {(steps) => (
-                        <ChatRowBoundary>
-                          <AgentStepsDisclosure
-                            steps={steps()}
-                            defaultOpen={showAgentSteps()}
-                            trace={traceAbove(message()?.id)}
-                            facts={turnSteps.factsAbove(message()?.id)}
-                          />
-                        </ChatRowBoundary>
-                      )}
+                    <Show when={!stepsInRow() && turnSteps.stepsAbove(message()?.id)}>
+                      <ChatRowBoundary>{stepsDisclosure()}</ChatRowBoundary>
                     </Show>
                     <ChatRowBoundary>
                       <Show
@@ -1285,6 +1292,8 @@ export function ConversationTimeline() {
                                 : undefined
                             }
                             showTime={!continuesRun()}
+                            steps={stepsInRow() ? stepsDisclosure() : undefined}
+                            actionsBeside={stepsInRow()}
                             animate={animateEntrance}
                             agents={props.agents}
                             skills={installedSkills()}
