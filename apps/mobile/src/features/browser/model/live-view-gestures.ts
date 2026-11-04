@@ -43,7 +43,31 @@ export interface LiveViewGestureHost {
   /** Scrolls the page at `at` by page pixels. */
   wheel(at: Point, deltaX: number, deltaY: number): void;
   setZoom(zoom: Zoom): void;
+  /**
+   * A pinch or a pan of the zoomed picture starts, or ends with null. While it runs, the UI thread
+   * moves the picture from the touches, so `setZoom` only keeps the screen's copy of the zoom.
+   */
+  pinch(start: LiveViewPinch | null): void;
   feedback(kind: "secondary-click" | "drag-start"): void;
+}
+
+/** What the UI thread needs to zoom the picture from two touches, as `moveTwo` does. */
+export interface LiveViewPinch {
+  ids: [number, number];
+  startZoom: Zoom;
+  startMid: Point;
+  startDistance: number;
+  stage: Size;
+  frame: Size;
+}
+
+/** The zoom that two touches give. The JS and UI threads both use it, so they agree. */
+export function pinchedZoom(pinch: LiveViewPinch, first: Point, second: Point): Zoom {
+  "worklet";
+  const mid = { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 };
+  const spread = Math.hypot(first.x - second.x, first.y - second.y);
+  const scale = clamp((pinch.startZoom.scale * spread) / Math.max(1, pinch.startDistance), 1, MAX_ZOOM);
+  return clampZoom(pinch.stage, pinch.frame, pinchZoom(pinch.startZoom, pinch.startMid, mid, scale));
 }
 
 export interface LiveViewScheduler {
@@ -93,6 +117,8 @@ interface TwoFingers {
   startZoom: Zoom;
   lastMid: Point;
   phase: "pending" | "scroll" | "zoom";
+  /** The UI thread moves the picture: `host.pinch` started. */
+  pinching: boolean;
   /** Where the wheel events land, as a fraction of the page. */
   scrollAt: Point;
   samples: { time: number; x: number; y: number }[];
@@ -276,6 +302,7 @@ export function createLiveViewGestures(host: LiveViewGestureHost, scheduler: Liv
       startZoom: layout.zoom,
       lastMid: startMid,
       phase: "pending",
+      pinching: false,
       scrollAt: host.mode() === "trackpad" || !at ? host.pointer() : clampFraction(at),
       samples: [],
     };
@@ -311,8 +338,24 @@ export function createLiveViewGestures(host: LiveViewGestureHost, scheduler: Liv
       host.wheel(fingers.scrollAt, x, y);
       return;
     }
-    const scale = clamp((fingers.startZoom.scale * spread) / Math.max(1, fingers.startDistance), 1, MAX_ZOOM);
-    host.setZoom(clampZoom(layout.stage, layout.frame, pinchZoom(fingers.startZoom, fingers.startMid, mid, scale)));
+    const pinch: LiveViewPinch = {
+      ids: fingers.ids,
+      startZoom: fingers.startZoom,
+      startMid: fingers.startMid,
+      startDistance: fingers.startDistance,
+      stage: layout.stage,
+      frame: layout.frame,
+    };
+    host.setZoom(pinchedZoom(pinch, first, second));
+    if (!fingers.pinching) {
+      fingers.pinching = true;
+      host.pinch(pinch);
+    }
+  };
+
+  /** The two-finger gesture ends: the UI thread stops moving the picture. */
+  const leaveTwo = () => {
+    if (state.kind === "two" && state.pinching) host.pinch(null);
   };
 
   const fling = (at: Point, samples: TwoFingers["samples"], time: number) => {
@@ -381,7 +424,10 @@ export function createLiveViewGestures(host: LiveViewGestureHost, scheduler: Liv
         return;
       }
       // A third finger, or a second one during a drag, is not a gesture of its own.
-      if (current.kind === "two" && touches.size > 2) state = { kind: "lifting" };
+      if (current.kind === "two" && touches.size > 2) {
+        leaveTwo();
+        state = { kind: "lifting" };
+      }
     },
     move(all: readonly LiveViewTouch[], time: number) {
       for (const touch of all) if (touches.has(touch.id)) touches.set(touch.id, { x: touch.x, y: touch.y });
@@ -401,6 +447,7 @@ export function createLiveViewGestures(host: LiveViewGestureHost, scheduler: Liv
           state = { kind: "lifting" };
         } else if (state.kind === "two" && state.ids.includes(touch.id)) {
           endTwo(state, time);
+          leaveTwo();
           state = { kind: "lifting" };
         }
         touches.delete(touch.id);
@@ -415,6 +462,7 @@ export function createLiveViewGestures(host: LiveViewGestureHost, scheduler: Liv
         if (state.phase === "drag" || state.phase === "pointer-drag") host.press("up", host.pointer(), "left", 1);
       }
       endFling();
+      leaveTwo();
       touches.clear();
       state = { kind: "idle" };
       lastTap = null;

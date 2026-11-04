@@ -77,7 +77,7 @@ export const messages = {
   "mobile.settings.animations.all": "애니메이션",
   "mobile.settings.animations.agentFaces": "에이전트 얼굴 애니메이션",
   "mobile.settings.animations.agentFacesFooter":
-    "에이전트가 작업하거나 쉬는 동안 아바타의 얼굴이 움직여요. 끄면 얼굴이 가만히 있어요.",
+    "에이전트가 작업하거나 쉬는 동안 아바타의 얼굴이 움직여요. 끄면 얼굴이 가만히 있고, 환영 화면과 빈 홈 화면의 캐릭터도 더 이상 떠다니지 않아요.",
   "mobile.settings.animations.composerResize": "작은 메시지 입력란",
   "mobile.settings.animations.composerResizeFooter":
     "키보드가 닫혀 있으면 메시지 입력란이 작은 바로 바뀌어요. 끄면 입력란이 원래 크기로 유지돼요.",
