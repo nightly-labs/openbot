@@ -97,6 +97,7 @@ export const messages = defineMessages("workflow", {
   "workflow.model.providerModels": "{name} models",
   "workflow.model.effort": "Effort: {name}",
   "workflow.model.effortRange": "{from}–{to}",
+  "workflow.model.auto": "Auto",
 
   "workflow.llm.title": "LLM",
   "workflow.llm.name": "LLM step",

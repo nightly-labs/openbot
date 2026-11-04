@@ -1,25 +1,34 @@
 /** A condition: a rule that sends the run down one of two branches. */
 
+import { AGENT_REASONING_EFFORTS, type AgentModelId, type AgentReasoningEffort } from "@openbot/contracts/ipc";
 import { Button, CircleCheck, Play, Split, Textarea } from "@openbot/ui";
 import { For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { BRANCH_NAME, resultValue, useBoard } from "./workflow-board";
+import { defaultWorkflowModel } from "./workflow-model";
+import { EffortPill, ModelPill, modelOption } from "./workflow-model-pills";
 import {
+  asProvider,
+  asString,
   FailureAlert,
   Field,
   NodeShell,
   NodeToolbar,
+  oneOf,
   Port,
+  useField,
   useLocked,
   useStepRun,
   useTextField,
+  type WfProvider,
 } from "./workflow-node-parts";
 
 const BRANCHES = ["yes", "no"] as const;
 
 /**
- * A rule that sends the run down one of two branches. Each branch has its own output port on its
- * row. After a run, the branch that the run took has a check and the other branch dims.
+ * A rule that sends the run down one of two branches, and the model that judges it. Each branch has
+ * its own output port on its row. After a run, the branch that the run took has a check and the
+ * other branch dims.
  */
 export function ConditionNode(props: { id: string; rule?: string }) {
   const board = useBoard();
@@ -29,6 +38,22 @@ export function ConditionNode(props: { id: string; rule?: string }) {
     "rule",
     untrack(() => props.rule ?? ""),
   );
+  const models = () => board.catalogs().models;
+  // A condition saved before it had a model has none, and the host chooses one for each run.
+  // The pills then show the model of a new step, with the Auto tag, until the user chooses one.
+  const [model] = useField<AgentModelId>(() => props.id, "model", "", asString);
+  const [provider] = useField<WfProvider | "">(() => props.id, "provider", "", asProvider);
+  const [effort, setEffort] = useField<AgentReasoningEffort | "">(
+    () => props.id,
+    "effort",
+    "",
+    oneOf(AGENT_REASONING_EFFORTS),
+  );
+  const unsaved = () => !model();
+  const host = () => defaultWorkflowModel(board.catalogs());
+  const shown = () => (unsaved() ? host() : modelOption(models(), model()));
+  const shownEffort = (): AgentReasoningEffort =>
+    (!unsaved() && effort()) || shown()?.defaultReasoningEffort || "medium";
   const [locked, setLocked] = useLocked(() => props.id);
   const run = useStepRun(untrack(() => props.id));
   const taken = () => (run.running() ? undefined : resultValue(board.shown(props.id)));
@@ -64,6 +89,35 @@ export function ConditionNode(props: { id: string; rule?: string }) {
           value={rule()}
           onValueChange={setRule}
         />
+        <div class="wfn-field-foot wfn-condition-foot">
+          <span class="wfn-condition-model">
+            <ModelPill
+              provider={(unsaved() ? host()?.provider : provider() || shown()?.provider) ?? "codex"}
+              value={unsaved() ? (host()?.id ?? "") : model()}
+              unsaved={unsaved()}
+              disabled={locked()}
+              onChange={(next, nextProvider) => {
+                const options = modelOption(models(), next);
+                const current = effort();
+                const keep = !unsaved() && current !== "" && options?.supportedReasoningEfforts.includes(current);
+                board.setFields(props.id, {
+                  model: next,
+                  provider: nextProvider,
+                  ...(keep ? {} : { effort: options?.defaultReasoningEffort ?? "medium" }),
+                });
+              }}
+            />
+            <Show when={unsaved()}>
+              <span class="wfn-auto-tag">{t("workflow.model.auto")}</span>
+            </Show>
+          </span>
+          <EffortPill
+            efforts={unsaved() ? [] : (shown()?.supportedReasoningEfforts ?? [])}
+            value={shownEffort()}
+            disabled={locked()}
+            onChange={setEffort}
+          />
+        </div>
       </Field>
       <For each={BRANCHES}>
         {(branch) => (

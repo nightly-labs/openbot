@@ -80,6 +80,8 @@ function modelChips(t: AppTranslate, option: ClientAgentModelOption): PickerChip
 export function ModelPill(props: {
   provider: WfProvider;
   value: AgentModelId;
+  /** The step saves no model, so the pill shows the host's model and a choice of it saves it. */
+  unsaved?: boolean;
   disabled?: boolean;
   onChange: (model: AgentModelId, provider: WfProvider) => void;
 }) {
@@ -103,7 +105,7 @@ export function ModelPill(props: {
   };
   const choose = (id: AgentModelId) => {
     const option = modelOption(models(), id);
-    if (option && id !== props.value) props.onChange(id, option.provider);
+    if (option && (props.unsaved || id !== props.value)) props.onChange(id, option.provider);
     setOpen(false);
   };
   return (

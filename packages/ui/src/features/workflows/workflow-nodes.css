@@ -2460,6 +2460,29 @@ fieldset.wfn-picker-group {
   justify-content: flex-start;
 }
 
+/* The model of a condition starts its row, and the effort ends it, as in an LLM step. */
+.wfn-block-field > .wfn-condition-foot {
+  justify-content: space-between;
+}
+
+.wfn-condition-model {
+  display: inline-flex;
+  gap: var(--openbot-space-1);
+  align-items: center;
+  min-width: 0;
+}
+
+/* A condition with no saved model: the host chooses the model of each run. */
+.wfn-auto-tag {
+  flex: none;
+  padding: 0 var(--openbot-space-1-5);
+  border: 1px solid var(--wfn-ring);
+  border-radius: var(--openbot-radius-pill);
+  color: var(--openbot-text-muted);
+  font-size: var(--wfn-small);
+  font-weight: var(--openbot-weight-medium);
+}
+
 .wfn-block-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
