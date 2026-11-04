@@ -409,7 +409,7 @@ function edgeId(from: string, to: string, type: string, branch: string | undefin
  * Applies the operations to a copy of the graph. Returns the new graph and the node id of each ref.
  * Throws `WorkflowEditRefused` with a message for the model when an operation cannot apply.
  */
-export function applyWorkflowOps(
+function applyWorkflowOps(
   graph: WorkflowGraph,
   ops: readonly WorkflowOp[],
   agentIds: ReadonlySet<string>,
