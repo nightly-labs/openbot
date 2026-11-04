@@ -15,7 +15,8 @@
 //   6. Two compactions that leave a session at 95% of its window give one notice, and OpenBot asks
 //      for no more compactions of that session (#3905).
 //   7. A provider that retries a request three times gives one notice, and a session at 60% of its
-//      window then compacts before its next turn (#4374).
+//      window then compacts before its next turn (#4374). When no usage came after that compaction,
+//      a turn that retries again does not compact the session again (#4819).
 //   8. A channel_history page stays near 24,000 characters. It cuts a long message, and a read by
 //      messageId and offset gives the rest of it. It cuts a long task instruction. A long request is
 //      in the packet once, and a long handoff of an agent is cut with a pointer to the rest.
@@ -95,6 +96,7 @@ let buffer = "";
 let threads = 0;
 let turns = 0;
 let calls = 0;
+const quietCompactions = new Set();
 // The tool calls that wait for the answer of OpenBot, by request id.
 const waiting = new Map();
 process.stdout.on("error", (error) => {
@@ -157,7 +159,9 @@ const answer = (message) => {
       }
       if (assignment.startsWith("USAGE")) steps.push(() => usage(threadId, turnId, 60000));
       if (assignment.startsWith("RETRY")) {
-        steps.push(() => usage(threadId, turnId, 60000));
+        // As in #4819, a compaction of this session and a turn that fails after retries report no usage.
+        quietCompactions.add(threadId);
+        if (!assignment.startsWith("RETRY AGAIN")) steps.push(() => usage(threadId, turnId, 60000));
         for (let index = 0; index < 3; index++)
           steps.push(() => write({ method: "error", params: { threadId, turnId, willRetry: true, error: { message: "stream disconnected before completion" } } }));
       }
@@ -200,7 +204,7 @@ const answer = (message) => {
         () => write({ method: "item/started", params: { threadId, turnId, item } }),
         () => write({ method: "item/completed", params: { threadId, turnId, item } }),
         () => write({ method: "turn/completed", params: { threadId, turn: { id: turnId, status: "completed" } } }),
-        () => usage(threadId, turnId, 10000),
+        ...(quietCompactions.has(threadId) ? [] : [() => usage(threadId, turnId, 10000)]),
       ]);
     }
     case "turn/interrupt": {
@@ -710,6 +714,14 @@ try {
     );
     await waitFor("the compaction after the retries", () => compactions(retryThread) > 0);
     pass("The session compacts after a turn that the provider retried", compactions(retryThread) === 1);
+    // The compaction reported no usage, so nothing tells whether it helped. Each turn compacted again (#4819).
+    await send(channelId, lead.id, "RETRY AGAIN: run the release check.");
+    // A compaction at the end of that turn would start before the next turn of the session.
+    await send(channelId, lead.id, "Say one word.");
+    pass(
+      "A retried turn with no usage since the last compaction does not compact again",
+      compactions(retryThread) === 1,
+    );
 
     // 8. A person posts a message longer than one history part. The Tester then reads the history
     // during an open turn.
