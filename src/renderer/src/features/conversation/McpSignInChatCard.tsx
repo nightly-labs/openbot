@@ -1,7 +1,9 @@
 import type { McpServerConfig } from "@openbot/contracts/ipc";
+import type { AgentMessage } from "@openbot/ui/data";
 import { McpSignInCard, type McpSignInCardState } from "@openbot/ui/features/conversation/McpSignInCard";
 import { useText } from "@openbot/ui/text";
 import { createSignal } from "solid-js";
+import { useConversationViewScope } from "./conversation-scope";
 
 export interface McpSignInChatCardProps {
   config: McpServerConfig;
@@ -44,4 +46,28 @@ export function McpSignInChatCard(props: McpSignInChatCardProps) {
       }}
     />
   );
+}
+
+/**
+ * The sign-in card of a side thread message, as the agent's own chat draws it. Continue goes to that
+ * thread. Another message, or a row this client cannot read, keeps its row.
+ */
+export function useThreadMcpSignInCard(onContinue: (body: string) => boolean) {
+  const { props, mcpServers } = useConversationViewScope();
+  return (message: AgentMessage) => {
+    const marker = message.actionMarker;
+    if (marker?.kind !== "mcp-sign-in") return undefined;
+    const config = mcpServers().find(
+      (candidate) => candidate.id === marker.mcpServerId && candidate.transport === "http",
+    );
+    if (!config) return undefined;
+    return (
+      <McpSignInChatCard
+        config={config}
+        signedIn={props.mcpSignedIn?.(config.id) ?? false}
+        onSignIn={props.onOpenMcpSignIn ? (trigger) => props.onOpenMcpSignIn?.(config.id, trigger) : undefined}
+        onContinue={onContinue}
+      />
+    );
+  };
 }

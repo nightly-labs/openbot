@@ -20,6 +20,7 @@ import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
 import { latestVisibleAgentMessageId } from "./conversation-read-state";
 import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationThreads } from "./conversation-types";
+import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { createTurnSteps } from "./turn-steps";
 
 /** A thread takes files only from this computer, which reads every supported type. */
@@ -208,6 +209,13 @@ export function ConversationThread() {
     const focus = threads.focusMessage;
     return focus && focus.taskId === threads.open?.id ? focus : undefined;
   };
+  /** Continue on a sign-in card goes to the open thread, as the person's next message there. */
+  const mcpSignInCard = useThreadMcpSignInCard((body) => {
+    const threads = props.threads;
+    if (!threads) return false;
+    void threads.onSend(body, [], null);
+    return true;
+  });
   /** The cards that the thread waits for: its browser takeover, and its question as a form. */
   const attention = () => {
     if (!hasAttention()) return undefined;
@@ -293,6 +301,7 @@ export function ConversationThread() {
             onCompactContext={current().threads.onCompactContext}
             waitsForAnswer={props.prompt !== undefined || props.browserTakeover !== undefined}
             attention={attention()}
+            messageCard={mcpSignInCard}
             stepsAbove={turnSteps.stepsAbove}
             factsAbove={turnSteps.factsAbove}
             activeSteps={turnSteps.activeSteps()}
