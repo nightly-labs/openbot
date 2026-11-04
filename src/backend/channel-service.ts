@@ -2917,10 +2917,9 @@ export class ChannelService {
         return refuse("Set recipientAgentId to the agent id of an available channel member.");
       // The agent exists but is not a member. Only a person can add it, so the agent must not retry.
       const name = this.memberName(recipientAgentId);
-      const available = this.eligibleMembers(channel)
-        .filter((id) => id !== agentId)
-        .slice(0, 20)
-        .map((id) => `${this.memberName(id)} (${id})`);
+      const others = this.eligibleMembers(channel).filter((id) => id !== agentId);
+      const available = others.slice(0, 20).map((id) => `${this.memberName(id)} (${id})`);
+      if (others.length > available.length) available.push(`${others.length - available.length} more`);
       return refuse(
         `${name} (${recipientAgentId}) is not a member of this channel. Available members: ${available.join(", ") || "none"}. If the task needs ${name}, ask a person in this channel to add it, then end your turn.`,
         "The recipient is not a member of this channel.",
