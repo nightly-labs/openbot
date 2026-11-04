@@ -537,8 +537,8 @@ export const ProviderUpdateRetry: Story = {
 
 /**
  * Cursor, Antigravity and Cline are installed for other work, so the user turned them off. Agents use
- * Codex and Claude, so those switches stay on. Open Cursor: its Download section offers Remove download,
- * and after it the list reads "Off · Not downloaded".
+ * Codex and Claude, so those switches stay on. Open Cursor: its Danger zone offers Delete, and after
+ * it the list reads "Off · Not downloaded".
  */
 export const ProvidersOff: Story = {
   render: () => (
