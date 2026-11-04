@@ -91,6 +91,8 @@ export interface ChannelHooks {
    * packet leave out the messages that the session read: a compaction resets what it read.
    */
   reportsCompactions?(agentId: string): boolean;
+  /** Whether the agent's provider streams text as the answer before it knows that it is not a step. */
+  provisionalAnswers?(agentId: string): boolean;
   /** The thread's snapshot when main has it in memory, which a streaming turn always has. */
   loadedSnapshot?(threadId: string): ConversationSnapshot | undefined;
   /** Removes live provider state for an execution thread before its durable rows are deleted. */
@@ -2534,6 +2536,11 @@ export class ChannelService {
       return history.get(id) ?? undefined;
     };
     const messages: ChannelMessage[] = [];
+    let provisional: boolean | undefined;
+    const provisionalAnswers = () => {
+      provisional ??= this.hooks.provisionalAnswers?.(snapshot.agentId) === true;
+      return provisional;
+    };
     const active = assignments.find((item) => item.agentId === snapshot.agentId && activeAssignment(item));
     for (let message of turnId === undefined
       ? snapshot.messages
@@ -2570,6 +2577,17 @@ export class ChannelService {
         !message.text.trim() &&
         !message.attachments?.length &&
         !message.questionPrompt
+      )
+        continue;
+      // OpenCode's text before a tool call streams as the answer and becomes a step only at that
+      // call. Copied while it streamed, each such note showed as the member's message and then
+      // folded (#4844). The agent's own chat still streams it; the channel gets it when it completes.
+      if (
+        !original &&
+        message.author === "assistant" &&
+        message.status === "streaming" &&
+        message.itemType === "final_answer" &&
+        provisionalAnswers()
       )
         continue;
       const task = tasks.get(assignment.taskId);
@@ -2888,9 +2906,9 @@ export class ChannelService {
     if (tool !== "channel_assign" && tool !== "channel_transfer")
       return yield* channelFailure(new Error("Unknown channel tool."));
     // The agent can correct these arguments, so it gets the reason as a result. Codex replaces a
-    // failed tool request with "dynamic tool request failed" (#4728).
-    const refuse = (reason: string) => {
-      logger.warn("A channel handoff was refused.", { channelId, agentId, tool, reason });
+    // failed tool request with "dynamic tool request failed" (#4728). The log keeps a fixed reason.
+    const refuse = (reason: string, logReason = reason) => {
+      logger.warn("A channel handoff was refused.", { channelId, agentId, tool, reason: logReason });
       return { accepted: false, reason };
     };
     if (
@@ -2910,12 +2928,21 @@ export class ChannelService {
       );
     const recipientAgentId = args.recipientAgentId;
     const recipient = yield* Effect.result(channelSync(() => this.requireAvailableMember(channel, recipientAgentId)));
-    if (Result.isFailure(recipient))
+    if (Result.isFailure(recipient)) {
+      if (this.hooks.hidden?.(recipientAgentId))
+        return refuse("This member is hidden and takes no new work. Choose another channel member.");
+      if (!this.hooks.agents().some((agent) => agent.id === recipientAgentId))
+        return refuse("Set recipientAgentId to the agent id of an available channel member.");
+      // The agent exists but is not a member. Only a person can add it, so the agent must not retry.
+      const name = this.memberName(recipientAgentId);
+      const others = this.eligibleMembers(channel).filter((id) => id !== agentId);
+      const available = others.slice(0, 20).map((id) => `${this.memberName(id)} (${id})`);
+      if (others.length > available.length) available.push(`${others.length - available.length} more`);
       return refuse(
-        this.hooks.hidden?.(recipientAgentId)
-          ? "This member is hidden and takes no new work. Choose another channel member."
-          : "Set recipientAgentId to the agent id of an available channel member.",
+        `${name} (${recipientAgentId}) is not a member of this channel. Available members: ${available.join(", ") || "none"}. If the task needs ${name}, ask a person in this channel to add it, then end your turn.`,
+        "The recipient is not a member of this channel.",
       );
+    }
     if (args.recipientAgentId === agentId) return refuse("Choose another channel member.");
     const sourceMessageIds = args.sourceMessageIds;
     if (sourceMessageIds.some((id) => !this.store.message(channelId, id)))

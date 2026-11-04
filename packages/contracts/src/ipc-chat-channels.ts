@@ -288,8 +288,16 @@ function isChannelIcon(value: unknown): value is ChannelIcon {
 
 /** Only the fields of a draft, so a save cannot carry a host-owned field such as `imageUrl`. */
 function draftFields(draft: ChannelDraft): ChannelDraft {
-  const { name, title, instructions, members, leadAgentId, icon } = draft;
-  return { name, title, instructions, members, leadAgentId, ...(icon === undefined ? {} : { icon }) };
+  const { name, title, instructions, members, leadAgentId, isolated, icon } = draft;
+  return {
+    name,
+    title,
+    instructions,
+    members,
+    leadAgentId,
+    ...(isolated === undefined ? {} : { isolated }),
+    ...(icon === undefined ? {} : { icon }),
+  };
 }
 
 function isChannelMember(value: unknown): value is ChannelMember {

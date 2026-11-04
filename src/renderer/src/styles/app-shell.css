@@ -2572,8 +2572,9 @@ textarea {
 }
 
 /* The plush body is a picture, not a path, so the same ring follows its edge as four offset shadows
-   in the surface colour. They sit on the whole drawing, in pixels, so the width matches the stroke. */
-.bloub-avatar-svg:has(> g > image) {
+   in the surface colour. They sit on the whole drawing, in pixels, so the width matches the stroke.
+   Bloub nests the body in groups whose depth changes between versions, so any image selects it. */
+.bloub-avatar-svg:has(image) {
   --agent-avatar-ring-color: var(--agent-avatar-outline, transparent);
   --agent-avatar-ring-width: var(--agent-avatar-outline-width, 1.5px);
 
