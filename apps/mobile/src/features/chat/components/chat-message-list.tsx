@@ -4,7 +4,7 @@ import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { AttachmentSummary, BrowserTakeoverRequest } from "@openbot/contracts/ipc";
-import { markdownPlainText } from "@openbot/contracts/markdown-preview-text";
+import { markdownInlinePlainText, markdownPlainText } from "@openbot/contracts/markdown-preview-text";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
@@ -1090,7 +1090,7 @@ export const ChatMessageList = memo(function ChatMessageList({
     if (!questionForm?.question || !promptId || announcedPromptId.current === promptId) return;
     announcedPromptId.current = promptId;
     AccessibilityInfo.announceForAccessibility(
-      t("mobile.chat.question.inputRequired", { question: questionForm.question.question }),
+      t("mobile.chat.question.inputRequired", { question: markdownInlinePlainText(questionForm.question.question) }),
     );
   }, [questionForm?.messageId, questionForm?.question, t]);
   const announcedApprovals = useRef(new Set<string>());

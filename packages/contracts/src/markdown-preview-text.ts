@@ -103,6 +103,14 @@ export function markdownPreviewText(body: string): string {
     .trim();
 }
 
+/**
+ * Inline Markdown as one line of plain text, such as the question of an agent that a card draws as
+ * inline Markdown: a line that starts with `1.` or `#` keeps that text, as the card shows it.
+ */
+export function markdownInlinePlainText(body: string): string {
+  return inlineText(new markdown.Lexer(markdown.defaults).inlineTokens(body)).replace(/\s+/gu, " ").trim();
+}
+
 /** A list as lines, each with its bullet or number, and a nested list indented under its item. */
 function listLines(token: Tokens.List, depth: number): string[] {
   const start = typeof token.start === "number" ? token.start : 1;

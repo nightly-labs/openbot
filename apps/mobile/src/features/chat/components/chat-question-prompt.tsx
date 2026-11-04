@@ -9,6 +9,8 @@ import MessageSquareText from "lucide-react-native/icons/message-square-text";
 import X from "lucide-react-native/icons/x";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
+import { useCSSVariable } from "uniwind";
+import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { ChatVaultRequest } from "@/features/chat/components/chat-vault-request";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
@@ -16,6 +18,22 @@ import { vaultRequestOf } from "@/features/chat/model/vault-request";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
+
+/** The text of a question. An agent can write Markdown in it, such as a link. */
+function QuestionText({ question, variant }: { question: string; variant: "title" | "body" | "secondary" }) {
+  const secondaryColor = useCSSVariable("--openbot-text-secondary");
+  return (
+    <ChatMarkdown
+      body={question}
+      color={variant === "secondary" ? String(secondaryColor) : undefined}
+      compact={variant === "secondary"}
+      fontWeight={variant === "title" ? "500" : undefined}
+      inline
+      finished
+      selectable={false}
+    />
+  );
+}
 
 type ConfirmPlan = Omit<UiConfirmBlock, "fields"> & { fields: UiConfirmValueField[] };
 
@@ -210,7 +228,11 @@ export function ChatQuestionPrompt({
   if (!prompt.resolution && !controller && onActivate) {
     return (
       <View className="max-w-[92%] self-start gap-2 rounded-[20px] bg-control/60 px-4 py-3">
-        {plan ? <ConfirmPlanBody plan={plan} compact /> : <Typography>{prompt.questions[0]?.question}</Typography>}
+        {plan ? (
+          <ConfirmPlanBody plan={plan} compact />
+        ) : (
+          <QuestionText question={prompt.questions[0]?.question ?? ""} variant="body" />
+        )}
         <Button variant="ghost" onPress={onActivate}>
           <Button.Label>{t("mobile.chat.question.answerForm")}</Button.Label>
         </Button>
@@ -246,9 +268,7 @@ export function ChatQuestionPrompt({
         ) : resolution.status === "answered" ? (
           prompt.questions.map((item) => (
             <View key={item.id} className="gap-1">
-              <Typography type="body-sm" className="text-text-secondary">
-                {item.question}
-              </Typography>
+              <QuestionText question={item.question} variant="secondary" />
               <Typography>{promptAnswerLabel(item, resolution, t)}</Typography>
             </View>
           ))
@@ -269,9 +289,9 @@ export function ChatQuestionPrompt({
       accessibilityLabel={t("mobile.chat.question.form")}
     >
       <View className="flex-row items-center gap-2">
-        <Typography weight="medium" className="min-w-0 flex-1">
-          {question.question}
-        </Typography>
+        <View className="min-w-0 flex-1">
+          <QuestionText question={question.question} variant="title" />
+        </View>
         <Button
           variant="ghost"
           size="sm"
