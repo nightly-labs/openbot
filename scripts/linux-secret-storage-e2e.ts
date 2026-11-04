@@ -47,6 +47,9 @@ const KEYRING_SESSION = [
   // The `--unlock` output names the control folder; without it, `--start` starts a second daemon
   // that asks for a password.
   'eval "$(printf e2e-keyring | gnome-keyring-daemon --unlock --components=secrets)"',
+  // The daemon writes a new login keyring in the background. A `--start` before the write ends can
+  // start a second daemon, and that one asks for a password.
+  'tries=0; while [ ! -e "$XDG_DATA_HOME/keyrings/login.keyring" ] && [ "$tries" -lt 200 ]; do sleep 0.05; tries=$((tries + 1)); done',
   'eval "$(gnome-keyring-daemon --start --components=secrets)"',
   "unset XDG_DATA_HOME",
   "export GNOME_KEYRING_CONTROL",

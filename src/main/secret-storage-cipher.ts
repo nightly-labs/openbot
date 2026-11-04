@@ -5,7 +5,17 @@
 // 0600 file in userData. That is file-permission protection, as on a self-hosted server. A keyring
 // that works keeps the secrets. macOS and Windows always use `safeStorage`.
 import { createCipheriv, createDecipheriv, randomBytes, randomUUID } from "node:crypto";
-import { chmodSync, linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  closeSync,
+  fsyncSync,
+  linkSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  writeSync,
+} from "node:fs";
 import { dirname } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
 import { app, safeStorage } from "electron";
@@ -67,10 +77,18 @@ export function createSecretStorage(options: { keyPath: string; platform?: NodeJ
   function createKey(reason: "unavailable" | "decrypt"): Buffer {
     const existing = readKey();
     if (existing) return existing;
-    mkdirSync(dirname(options.keyPath), { recursive: true });
+    const folder = dirname(options.keyPath);
+    mkdirSync(folder, { recursive: true });
     const temporaryPath = `${options.keyPath}.${randomUUID()}.tmp`;
     try {
-      writeFileSync(temporaryPath, `${randomBytes(KEY_BYTES).toString("base64")}\n`, { mode: 0o600, flag: "wx" });
+      // The key is on disk before the link: after a power loss, an empty key file would stop all secrets.
+      const file = openSync(temporaryPath, "wx", 0o600);
+      try {
+        writeSync(file, `${randomBytes(KEY_BYTES).toString("base64")}\n`);
+        fsyncSync(file);
+      } finally {
+        closeSync(file);
+      }
       chmodSync(temporaryPath, 0o600);
       try {
         linkSync(temporaryPath, options.keyPath);
@@ -79,6 +97,12 @@ export function createSecretStorage(options: { keyPath: string; platform?: NodeJ
       }
     } finally {
       rmSync(temporaryPath, { force: true });
+    }
+    const folderHandle = openSync(folder, "r");
+    try {
+      fsyncSync(folderHandle);
+    } finally {
+      closeSync(folderHandle);
     }
     const created = readKey();
     if (!created) throw new Error("The secret storage key file was not made.");
