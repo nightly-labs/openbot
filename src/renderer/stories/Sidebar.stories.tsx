@@ -771,7 +771,11 @@ export const FeltBadges: Story = {
 
 /* The steps of the smoke: a new unread, two counts that go up, the count read to zero, and a routine
  * that fails and then succeeds. Each button sets the state, so each transition can run again. */
-const feltBadgeSteps: { label: string; chief?: SidebarAgentState; sales?: SidebarAgentState }[] = [
+const feltBadgeSteps: {
+  label: string;
+  chief?: SidebarAgentState | undefined;
+  sales?: SidebarAgentState | undefined;
+}[] = [
   { label: "1", chief: { kind: "unread", count: 1 } },
   { label: "10", chief: { kind: "unread", count: 10 } },
   { label: "128", chief: { kind: "unread", count: 128 } },
