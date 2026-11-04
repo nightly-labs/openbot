@@ -1,4 +1,5 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { createHmac } from "node:crypto";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { redactText } from "@openbot/logging";
@@ -10,39 +11,64 @@ import { readScriptArguments } from "./script-arguments";
 // .openbot-build/release-regression/report.json and, with --discord, sends the table to the webhook
 // in RELEASE_REGRESSION_WEBHOOK_URL as colored embeds. The GitHub workflow release-regression.yml runs it with --quiet:
 // the repository is public, so its log must show no numbers, counts or error details. Those go only
-// to the private Discord channel.
+// to the private Discord channel. With --state, the workflow sends only when a status changed, on
+// Monday as a weekly summary, and on a manual run (--always).
 const USAGE = `Usage:
   bun scripts/release-regression-report.ts [options]
 Options:
-  --discord   send the report to RELEASE_REGRESSION_WEBHOOK_URL
-  --quiet     print one line with no data (for public CI logs); errors go to Discord only`;
+  --discord        send the report to RELEASE_REGRESSION_WEBHOOK_URL
+  --quiet          print one line with no data (for public CI logs); errors go to Discord only
+  --state <file>   send only when a status changed since the last send, or on Monday (UTC)
+  --always         send even when no status changed`;
 
 const WINDOW_DAYS = 14;
 const MIN_COMPUTERS = 30;
 const MIN_SAMPLES = 20;
 const MIN_TURNS_FOR_SHARE = 200;
+/** Error rates need more turns, because most error codes are rare. */
+const MIN_TURNS_FOR_RATE = 1_000;
+/** An error code needs this many events in the new release before it can rise. */
+const MIN_ERRORS = 5;
+const MAX_ERROR_ROWS = 5;
 const EARLY_DAYS = 2;
 /** A metric regresses when it is this much worse, relative, and also worse by its floor. */
 const RELATIVE_LIMIT = 0.2;
 /** A metric needs watching when it is this much worse, relative, and also worse by half its floor. */
 const WATCH_LIMIT = 0.1;
-/** Causes that the user's provider account decides, not OpenBot. */
-const ACCOUNT_CAUSES = ["usage_limit", "rate_limit", "billing"];
+/** One-sided z for shares and error rates: p < 0.001 for red and p < 0.05 for yellow. */
+const RED_Z = 3.09;
+const YELLOW_Z = 1.645;
+/**
+ * Causes that the user, the provider account or the network decide, not OpenBot. The names are the
+ * cause_code values of system_turn_completed.
+ */
+const OUTSIDE_CAUSES = [
+  "rate_limit",
+  "usage_limit",
+  "billing",
+  "authentication",
+  "network",
+  "timeout",
+  "provider_unavailable",
+];
 const VERSION = /^\d+\.\d+\.\d+$/u;
+const DATE_TIME = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/u;
 const DISCORD_WEBHOOK = /^https:\/\/(?:discord\.com|discordapp\.com)\/api\/webhooks\/\d+\/[\w-]+$/u;
 /** Discord allows 6000 characters and 10 embeds in one message. */
 const DISCORD_EMBED_CHARACTERS = 5800;
 const DISCORD_EMBEDS = 10;
 
-type Unit = "ms" | "mb" | "share";
+type Unit = "ms" | "mb" | "share" | "per1k";
 /** red: regression. yellow: worse, below the regression limit. waiting: the sample cannot show it yet. */
 type Status = "red" | "yellow" | "green" | "waiting";
+type Section = "turns" | "startup" | "failures" | "errors" | "updates" | "resources";
 
 const STATUS_EMOJI: Record<Status, string> = { red: "🔴", yellow: "🟡", green: "🟢", waiting: "⚪" };
 const STATUS_COLOR: Record<Status, number> = { red: 0xed4245, yellow: 0xfee75c, green: 0x57f287, waiting: 0x99aab5 };
 const STATUS_ORDER: readonly Status[] = ["red", "yellow", "green", "waiting"];
 
 interface Row {
+  readonly section: Section;
   readonly metric: string;
   readonly group: string;
   readonly unit: Unit;
@@ -50,6 +76,8 @@ interface Row {
   readonly next: number | null;
   readonly previousN: number;
   readonly nextN: number;
+  /** How sure the rise is, for shares and error rates; null for times and sizes. */
+  readonly z: number | null;
   readonly status: Status;
   readonly regression: boolean;
   /** False when the sample cannot show a regression yet. */
@@ -64,6 +92,8 @@ interface Report {
   readonly early: boolean;
   readonly rows: readonly Row[];
   readonly regressions: readonly Row[];
+  /** Error codes that rose, also the ones over MAX_ERROR_ROWS; null when there are too few turns. */
+  readonly risenErrorCodes: number | null;
 }
 
 interface MetricSpec {
@@ -73,6 +103,14 @@ interface MetricSpec {
   /** The smallest absolute change that counts, in the metric's unit. */
   readonly floor: number;
   readonly minN: number;
+  /** The column with the sample size of this metric, when it is not `n`. */
+  readonly nColumn?: string;
+}
+
+interface Limit {
+  readonly relative: number;
+  readonly floor: number;
+  readonly z: number;
 }
 
 const environment = "properties['environment'] = 'production'";
@@ -95,15 +133,32 @@ HAVING computers >= ${MIN_COMPUTERS}
 ORDER BY arrayMap(part -> toUInt32(part), splitByChar('.', version)) DESC
 LIMIT 2`;
 
+const completed = "properties['status'] = 'completed'";
+
 const turnSql = (versions: readonly string[]) => `SELECT
   properties['app_version'] AS version,
   properties['platform'] AS platform,
-  countIf(properties['status'] = 'completed') AS n,
-  quantileExactIf(0.5)(${number("duration_ms")}, properties['status'] = 'completed') AS turn_p50,
-  quantileExactIf(0.95)(${number("duration_ms")}, properties['status'] = 'completed') AS turn_p95
+  countIf(${completed}) AS n,
+  quantileExactIf(0.5)(${number("duration_ms")}, ${completed}) AS turn_p50,
+  quantileExactIf(0.95)(${number("duration_ms")}, ${completed}) AS turn_p95,
+  countIf(${completed} AND isNotNull(${number("first_output_ms")})) AS first_output_n,
+  quantileExactIf(0.5)(${number("first_output_ms")}, ${completed}) AS first_output_p50
 FROM events
 WHERE name = 'system_turn_completed' AND ${environment} AND ${window}
   AND properties['app_version'] IN (${versionList(versions)})
+GROUP BY version, platform`;
+
+// An update restarts the app, so a start after an update waits for the install too.
+const startupSql = (versions: readonly string[]) => `SELECT
+  properties['app_version'] AS version,
+  properties['platform'] AS platform,
+  count(${number("workspace_ready_ms")}) AS n,
+  quantileExact(0.5)(${number("workspace_ready_ms")}) AS startup_p50,
+  quantileExact(0.95)(${number("workspace_ready_ms")}) AS startup_p95
+FROM events
+WHERE name = 'system_startup' AND ${environment} AND ${window}
+  AND properties['app_version'] IN (${versionList(versions)})
+  AND properties['start_kind'] != 'updated'
 GROUP BY version, platform`;
 
 const failureSql = (versions: readonly string[]) => `SELECT
@@ -113,11 +168,49 @@ const failureSql = (versions: readonly string[]) => `SELECT
   countIf(properties['status'] = 'failed') / n AS failed_share,
   countIf(properties['status'] = 'failed' AND properties['cause_code'] != '') AS with_cause,
   countIf(properties['status'] = 'failed'
-    AND properties['cause_code'] NOT IN (${versionList(ACCOUNT_CAUSES)})) / n AS own_failed_share
+    AND properties['cause_code'] NOT IN (${versionList(OUTSIDE_CAUSES)})) / n AS own_failed_share
 FROM events
 WHERE name = 'system_turn_completed' AND ${environment} AND ${window}
   AND properties['app_version'] IN (${versionList(versions)})
 GROUP BY version, provider`;
+
+const errorCodeSql = (versions: readonly string[]) => `SELECT
+  properties['app_version'] AS version,
+  properties['failure_code'] AS code,
+  count() AS errors
+FROM events
+WHERE name = 'system_operation_failed' AND ${environment} AND ${window}
+  AND properties['app_version'] IN (${versionList(versions)})
+  AND properties['severity'] = 'error' AND properties['failure_code'] != ''
+GROUP BY version, code`;
+
+const causeSql = (versions: readonly string[]) => `SELECT
+  properties['app_version'] AS version,
+  properties['cause_code'] AS code,
+  count() AS errors
+FROM events
+WHERE name = 'system_turn_completed' AND ${environment} AND ${window}
+  AND properties['app_version'] IN (${versionList(versions)})
+  AND properties['status'] = 'failed' AND properties['cause_code'] != ''
+GROUP BY version, code`;
+
+// update_action has no target version. Before the new release was out, every update went to the
+// release before it; after, to the new release. Computers that already run the target do not count.
+const updateSql = (
+  pair: { previous: string; next: string },
+  previousFirstSeen: string,
+  nextFirstSeen: string,
+) => `SELECT
+  if(created_at >= toDateTime('${nextFirstSeen}'), '${pair.next}', '${pair.previous}') AS version,
+  properties['platform'] AS platform,
+  uniqExact(profile_id) AS n,
+  uniqExactIf(profile_id, properties['result'] = 'failed') / n AS update_failed_share
+FROM events
+WHERE name = 'update_action' AND ${environment} AND ${window}
+  AND created_at >= toDateTime('${previousFirstSeen}')
+  AND properties['action'] IN ('download', 'install')
+  AND properties['app_version'] != version
+GROUP BY version, platform`;
 
 const resourceSql = (versions: readonly string[]) => `SELECT
   properties['app_version'] AS version,
@@ -127,6 +220,7 @@ const resourceSql = (versions: readonly string[]) => `SELECT
   avg(toFloat64OrZero(properties['main_loop_delay_ms_max']) > 5000) AS stall_share,
   quantileExact(0.95)(${number("db_request_ms_p95")}) AS db_p95,
   quantileExact(0.95)(${number("total_rss_mb_p95")}) AS memory_p95,
+  avg(toFloat64OrZero(properties['renderer_gone_count']) > 0) AS renderer_crash_share,
   avg(toFloat64OrZero(properties['child_gone_count']) > 1000) AS crash_loop_share
 FROM events
 WHERE name = 'system_resources' AND ${environment} AND ${window}
@@ -136,13 +230,40 @@ GROUP BY version, platform`;
 const TURN_METRICS: readonly MetricSpec[] = [
   { metric: "turn time p50", column: "turn_p50", unit: "ms", floor: 1_000, minN: MIN_SAMPLES },
   { metric: "turn time p95", column: "turn_p95", unit: "ms", floor: 5_000, minN: MIN_SAMPLES },
+  {
+    metric: "first output p50",
+    column: "first_output_p50",
+    unit: "ms",
+    floor: 1_000,
+    minN: MIN_SAMPLES,
+    nColumn: "first_output_n",
+  },
+];
+const STARTUP_METRICS: readonly MetricSpec[] = [
+  { metric: "startup p50", column: "startup_p50", unit: "ms", floor: 500, minN: MIN_SAMPLES },
+  { metric: "startup p95", column: "startup_p95", unit: "ms", floor: 2_000, minN: MIN_SAMPLES },
+];
+const UPDATE_METRICS: readonly MetricSpec[] = [
+  { metric: "failed updates", column: "update_failed_share", unit: "share", floor: 0.02, minN: MIN_SAMPLES },
 ];
 const RESOURCE_METRICS: readonly MetricSpec[] = [
   { metric: "main loop delay p95", column: "loop_p95", unit: "ms", floor: 50, minN: MIN_SAMPLES },
   { metric: "stall > 5 s (computer-days)", column: "stall_share", unit: "share", floor: 0.02, minN: MIN_SAMPLES },
   { metric: "DB statement p95", column: "db_p95", unit: "ms", floor: 100, minN: MIN_SAMPLES },
   { metric: "memory p95", column: "memory_p95", unit: "mb", floor: 150, minN: MIN_SAMPLES },
+  {
+    metric: "renderer crash (computer-days)",
+    column: "renderer_crash_share",
+    unit: "share",
+    floor: 0.02,
+    minN: MIN_SAMPLES,
+  },
   { metric: "crash loop (computer-days)", column: "crash_loop_share", unit: "share", floor: 0.01, minN: MIN_SAMPLES },
+];
+/** Error rates are per 1,000 turns: red when 1.5 times and 1 more per 1,000 turns. */
+const ERROR_LIMITS: readonly [Limit, Limit] = [
+  { relative: 0.5, floor: 1, z: RED_Z },
+  { relative: 0.2, floor: 0.5, z: YELLOW_Z },
 ];
 
 type ResultRow = QueryResult["data"][number];
@@ -153,16 +274,51 @@ function value(row: ResultRow | undefined, column: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-/** Every metric is worse when it is higher. */
-function status(spec: MetricSpec, previous: Row["previous"], next: Row["next"], judged: boolean): Status {
+/** One-sided two-proportion z: how sure the share rose. */
+function shareZ(previous: number, previousN: number, next: number, nextN: number): number {
+  const pooled = (previous * previousN + next * nextN) / (previousN + nextN);
+  const error = Math.sqrt(pooled * (1 - pooled) * (1 / previousN + 1 / nextN));
+  if (error === 0) return next > previous ? Number.POSITIVE_INFINITY : 0;
+  return (next - previous) / error;
+}
+
+/** One-sided Poisson z for two event counts per turn: how sure the rate rose. */
+function rateZ(previousCount: number, previousTurns: number, nextCount: number, nextTurns: number): number {
+  const error = Math.sqrt(previousCount / previousTurns ** 2 + nextCount / nextTurns ** 2);
+  if (error === 0) return 0;
+  return (nextCount / nextTurns - previousCount / previousTurns) / error;
+}
+
+function defaultLimits(floor: number): readonly [Limit, Limit] {
+  return [
+    { relative: RELATIVE_LIMIT, floor, z: RED_Z },
+    { relative: WATCH_LIMIT, floor: floor / 2, z: YELLOW_Z },
+  ];
+}
+
+/** Every metric is worse when it is higher. A z of null means the metric has no significance test. */
+function status(
+  limits: readonly [Limit, Limit],
+  previous: number | null,
+  next: number | null,
+  z: number | null,
+  judged: boolean,
+): Status {
   if (!judged) return "waiting";
   if (previous === null || next === null) return "green";
-  const worse = (relative: number, floor: number) => next - previous >= floor && next > previous * (1 + relative);
-  if (worse(RELATIVE_LIMIT, spec.floor)) return "red";
-  return worse(WATCH_LIMIT, spec.floor / 2) ? "yellow" : "green";
+  const worse = (limit: Limit) =>
+    next - previous >= limit.floor && next > previous * (1 + limit.relative) && (z === null || z >= limit.z);
+  if (worse(limits[0])) return "red";
+  return worse(limits[1]) ? "yellow" : "green";
+}
+
+function makeRow(fields: Omit<Row, "status" | "regression">, limits: readonly [Limit, Limit]): Row {
+  const rowStatus = status(limits, fields.previous, fields.next, fields.z, fields.judged);
+  return { ...fields, status: rowStatus, regression: rowStatus === "red" };
 }
 
 function compare(
+  section: Section,
   result: QueryResult,
   groupColumn: string,
   versions: { previous: string; next: string },
@@ -175,60 +331,108 @@ function compare(
   return groups.flatMap((group) => {
     const before = find(versions.previous, group);
     const after = find(versions.next, group);
-    const counts: [number, number] = [value(before, "n") ?? 0, value(after, "n") ?? 0];
-    return specs
-      .filter((spec) => counts[0] >= spec.minN && counts[1] >= spec.minN)
-      .map((spec) => {
-        const previous = value(before, spec.column);
-        const next = value(after, spec.column);
-        const rowStatus = status(spec, previous, next, judged);
-        return {
-          metric: spec.metric,
-          group,
-          unit: spec.unit,
-          previous,
-          next,
-          previousN: counts[0],
-          nextN: counts[1],
-          status: rowStatus,
-          regression: rowStatus === "red",
-          judged,
-        };
-      });
+    return specs.flatMap((spec) => {
+      const nColumn = spec.nColumn ?? "n";
+      const previousN = value(before, nColumn) ?? 0;
+      const nextN = value(after, nColumn) ?? 0;
+      if (previousN < spec.minN || nextN < spec.minN) return [];
+      const previous = value(before, spec.column);
+      const next = value(after, spec.column);
+      const z =
+        spec.unit === "share" && previous !== null && next !== null ? shareZ(previous, previousN, next, nextN) : null;
+      return [
+        makeRow(
+          { section, metric: spec.metric, group, unit: spec.unit, previous, next, previousN, nextN, z, judged },
+          defaultLimits(spec.floor),
+        ),
+      ];
+    });
   });
 }
 
+/** True when the release sends a cause on its failed turns. */
+function sendsCause(result: QueryResult, version: string): boolean {
+  return result.data.some((row) => row.version === version && (value(row, "with_cause") ?? 0) > 0);
+}
+
 function failureRows(result: QueryResult, versions: { previous: string; next: string }): Row[] {
-  // The cause is on the turn only from the release that added it. Compare the share without account
+  // The cause is on the turn only from the release that added it. Compare the share without outside
   // causes only when both releases send causes, or the older release would look worse.
-  const withCause = (version: string) =>
-    result.data.some((row) => row.version === version && (value(row, "with_cause") ?? 0) > 0);
   const specs: MetricSpec[] = [
     { metric: "failed turns", column: "failed_share", unit: "share", floor: 0.02, minN: MIN_TURNS_FOR_SHARE },
   ];
-  if (withCause(versions.previous) && withCause(versions.next)) {
+  if (sendsCause(result, versions.previous) && sendsCause(result, versions.next)) {
     specs.push({
-      metric: "failed turns, not account",
+      metric: "failed turns, OpenBot causes",
       column: "own_failed_share",
       unit: "share",
       floor: 0.02,
       minN: MIN_TURNS_FOR_SHARE,
     });
   }
-  return compare(result, "provider", versions, specs);
+  return compare("failures", result, "provider", versions, specs);
+}
+
+/** Turns that ended, completed or failed, of each release. */
+function turnTotal(failures: QueryResult, version: string): number {
+  return failures.data
+    .filter((row) => row.version === version)
+    .reduce((total, row) => total + (value(row, "n") ?? 0), 0);
+}
+
+/** Error codes whose rate per 1,000 turns rose, most certain first. */
+function errorRows(
+  results: readonly { readonly metric: string; readonly result: QueryResult }[],
+  versions: { previous: string; next: string },
+  turns: { previous: number; next: number },
+): Row[] {
+  return results
+    .flatMap(({ metric, result }) => {
+      const codes = [...new Set(result.data.map((row) => String(row.code)))];
+      const count = (version: string, code: string) =>
+        value(
+          result.data.find((row) => row.version === version && String(row.code) === code),
+          "errors",
+        ) ?? 0;
+      return codes.map((code) => {
+        const previousN = count(versions.previous, code);
+        const nextN = count(versions.next, code);
+        return makeRow(
+          {
+            section: "errors",
+            metric,
+            group: code,
+            unit: "per1k",
+            previous: (previousN / turns.previous) * 1000,
+            next: (nextN / turns.next) * 1000,
+            previousN,
+            nextN,
+            z: rateZ(previousN, turns.previous, nextN, turns.next),
+            judged: true,
+          },
+          ERROR_LIMITS,
+        );
+      });
+    })
+    .filter((row) => row.nextN >= MIN_ERRORS && (row.status === "red" || row.status === "yellow"))
+    .sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status) || (b.z ?? 0) - (a.z ?? 0));
 }
 
 function format(unit: Unit, amount: number | null): string {
   if (amount === null) return "-";
   if (unit === "share") return `${(amount * 100).toFixed(1)}%`;
   if (unit === "mb") return `${Math.round(amount)} MB`;
+  if (unit === "per1k") return amount.toFixed(amount >= 10 ? 0 : 2);
   return amount >= 10_000 ? `${(amount / 1000).toFixed(1)} s` : `${Math.round(amount)} ms`;
 }
 
 function change(row: Row): string {
   if (row.previous === null || row.next === null) return "-";
-  if (row.unit === "share") return `${((row.next - row.previous) * 100).toFixed(1)} pp`;
-  if (row.previous === 0) return "-";
+  if (row.unit === "share") {
+    const points = (row.next - row.previous) * 100;
+    return `${points > 0 ? "+" : ""}${points.toFixed(1)} pp`;
+  }
+  if (row.previous === 0) return row.next > 0 ? "new" : "-";
   const percent = ((row.next - row.previous) / row.previous) * 100;
   return `${percent >= 0 ? "+" : ""}${percent.toFixed(0)}%`;
 }
@@ -298,46 +502,74 @@ const RESOURCE_LABELS: Record<string, string> = {
   "stall > 5 s (computer-days)": "Stalls over 5 s",
   "DB statement p95": "Database p95",
   "memory p95": "Memory p95",
+  "renderer crash (computer-days)": "Renderer crashes",
   "crash loop (computer-days)": "Crash loops",
+};
+
+const ERROR_SOURCES: Record<string, string> = {
+  "error code": "",
+  "turn failure cause": " (failed turns)",
 };
 
 function sections(report: Report): Embed[] {
   const embeds: Embed[] = [];
-  const add = (title: string, rows: readonly Row[], line: (row: Row) => string, footer?: string) => {
-    if (rows.length === 0) return;
-    embeds.push({
-      title,
-      description: rows.map(line).join("\n"),
-      color: sectionColor(rows),
-      ...(footer ? { footer: { text: footer } } : {}),
-    });
+  const add = (title: string, lines: readonly string[], rows: readonly Row[], footer: string, color?: number) => {
+    if (lines.length === 0) return;
+    embeds.push({ title, description: lines.join("\n"), color: color ?? sectionColor(rows), footer: { text: footer } });
   };
-  const turns = report.rows.filter((row) => row.metric.startsWith("turn time"));
+  const of = (section: Section) => report.rows.filter((row) => row.section === section);
+  const group = (row: Row) => `**${escapeMarkdown(row.group)}**`;
+  const turns = of("turns");
   add(
     "Turn time",
+    turns.map((row) => statusLine(row, `${group(row)} ${row.metric.replace("turn time ", "")}`)),
     turns,
-    (row) => statusLine(row, `**${escapeMarkdown(row.group)}** ${row.metric.replace("turn time ", "")}`),
-    "Completed turns only.",
+    "Completed turns only. First output is the time to the first answer text.",
   );
-  const failures = report.rows.filter((row) => row.metric.startsWith("failed turns"));
+  const startup = of("startup");
+  add(
+    "Startup",
+    startup.map((row) => statusLine(row, `${group(row)} ${row.metric.replace("startup ", "")}`)),
+    startup,
+    "Time to a ready workspace. Starts after an update do not count.",
+  );
+  const failures = of("failures");
   add(
     "Failed turns",
+    failures.map((row) =>
+      statusLine(row, `${group(row)}${row.metric === "failed turns" ? "" : " OpenBot causes only"}`),
+    ),
     failures,
-    (row) =>
-      statusLine(
-        row,
-        `**${escapeMarkdown(row.group)}**${row.metric === "failed turns" ? "" : " without account limits"}`,
-      ),
-    `Providers with ${MIN_TURNS_FOR_SHARE} turns or more in both releases.`,
+    `Providers with ${MIN_TURNS_FOR_SHARE} turns or more in both releases. OpenBot causes leave out limits, sign-in, network and provider outages.`,
   );
-  const resources = report.rows.filter((row) => !turns.includes(row) && !failures.includes(row));
+  if (report.risenErrorCodes !== null) {
+    const errors = of("errors");
+    const more = report.risenErrorCodes - errors.length;
+    add(
+      "Errors per 1,000 turns",
+      errors.length > 0
+        ? errors.map((row) => statusLine(row, `${group(row)}${ERROR_SOURCES[row.metric] ?? ""}`))
+        : [`${STATUS_EMOJI.green} No error code rose.`],
+      errors,
+      `${more > 0 ? `${more} more codes rose. ` : ""}Error events of each code per 1,000 turns; a code needs ${MIN_ERRORS} events in ${report.next}.`,
+      errors.length > 0 ? undefined : STATUS_COLOR.green,
+    );
+  }
+  const updates = of("updates");
+  add(
+    "Updates",
+    updates.map((row) => statusLine(row, group(row))),
+    updates,
+    `Updating computers with a failed download or install: updates to ${report.previous} → updates to ${report.next}.`,
+  );
+  const resources = of("resources");
   for (const platform of [...new Set(resources.map((row) => row.group))]) {
     const rows = resources.filter((row) => row.group === platform);
     const computerDays = rows[0] ? `${rows[0].previousN} / ${rows[0].nextN} computer-days` : "";
     add(
       `Resources · ${platform}`,
+      rows.map((row) => statusLine(row, RESOURCE_LABELS[row.metric] ?? row.metric)),
       rows,
-      (row) => statusLine(row, RESOURCE_LABELS[row.metric] ?? row.metric),
       report.early
         ? `${computerDays}. ⚪ The daily summary comes a day late, so it mostly describes ${report.previous}.`
         : computerDays,
@@ -367,10 +599,10 @@ function headline(report: Report): Embed {
   const early = report.early ? ` Early sample: first seen ${report.nextFirstSeen.slice(0, 10)}.` : "";
   return {
     title: `${STATUS_EMOJI[worst(report.rows.filter((row) => row.status !== "waiting"))]} Release ${report.next} against ${report.previous}`,
-    description: [tally, ...flagged].join("\n"),
+    description: [tally || `${STATUS_EMOJI.waiting} No metric has enough data.`, ...flagged].join("\n"),
     color: sectionColor(report.rows),
     footer: {
-      text: `Production, last ${WINDOW_DAYS} days.${early} 🔴 ${RELATIVE_LIMIT * 100}% worse and over the floor · 🟡 ${WATCH_LIMIT * 100}% worse and over half the floor · ⚪ not judged yet`,
+      text: `Production, last ${WINDOW_DAYS} days.${early} 🔴 ${RELATIVE_LIMIT * 100}% worse and over the floor · 🟡 ${WATCH_LIMIT * 100}% worse and over half the floor · shares and error rates also need a significant rise · ⚪ not judged yet`,
     },
     timestamp: report.generatedAt,
   };
@@ -429,49 +661,117 @@ async function buildReport(connection: Connection): Promise<Report> {
   if (!VERSION.test(next) || !VERSION.test(previous)) {
     throw new Error(`Fewer than two releases have ${MIN_COMPUTERS} computers in the last ${WINDOW_DAYS} days.`);
   }
-  const pair = { previous, next };
-  // The read-only user may run 2 queries at a time, and a person can be using one.
-  const turns = await query(connection, turnSql([previous, next]));
-  const failures = await query(connection, failureSql([previous, next]));
-  const resources = await query(connection, resourceSql([previous, next]));
   const nextFirstSeen = String(newest?.first_seen ?? "");
+  const previousFirstSeen = String(before?.first_seen ?? "");
+  if (!DATE_TIME.test(nextFirstSeen) || !DATE_TIME.test(previousFirstSeen)) {
+    throw new Error("ClickHouse returned an unknown date format for the first event of a release.");
+  }
+  const pair = { previous, next };
+  const both = [previous, next];
+  // The read-only user may run 2 queries at a time, and a person can be using one.
+  const turns = await query(connection, turnSql(both));
+  const startup = await query(connection, startupSql(both));
+  const failures = await query(connection, failureSql(both));
+  const errorCodes = await query(connection, errorCodeSql(both));
+  const causes =
+    sendsCause(failures, previous) && sendsCause(failures, next) ? await query(connection, causeSql(both)) : null;
+  // The SQL compares whole seconds.
+  const updates = await query(connection, updateSql(pair, previousFirstSeen.slice(0, 19), nextFirstSeen.slice(0, 19)));
+  const resources = await query(connection, resourceSql(both));
   const firstSeenTime = Date.parse(`${nextFirstSeen.replace(" ", "T")}Z`);
-  const early = Number.isFinite(firstSeenTime) && Date.now() - firstSeenTime < EARLY_DAYS * 86_400_000;
+  const early = Date.now() - firstSeenTime < EARLY_DAYS * 86_400_000;
+  const turnTotals = { previous: turnTotal(failures, previous), next: turnTotal(failures, next) };
+  const ratesJudged = turnTotals.previous >= MIN_TURNS_FOR_RATE && turnTotals.next >= MIN_TURNS_FOR_RATE;
+  const risenErrors = ratesJudged
+    ? errorRows(
+        [
+          { metric: "error code", result: errorCodes },
+          ...(causes ? [{ metric: "turn failure cause", result: causes }] : []),
+        ],
+        pair,
+        turnTotals,
+      )
+    : [];
   const rows = [
-    ...compare(turns, "platform", pair, TURN_METRICS),
+    ...compare("turns", turns, "platform", pair, TURN_METRICS),
+    ...compare("startup", startup, "platform", pair, STARTUP_METRICS),
     ...failureRows(failures, pair),
+    ...risenErrors.slice(0, MAX_ERROR_ROWS),
+    ...compare("updates", updates, "platform", pair, UPDATE_METRICS),
     // system_resources summarizes the previous local day but carries the version that sends it, so the
     // first days of a release mostly describe the release before it.
-    ...compare(resources, "platform", pair, RESOURCE_METRICS, !early),
+    ...compare("resources", resources, "platform", pair, RESOURCE_METRICS, !early),
   ];
   return {
-    generatedAt: new Date().toISOString(),
+    generatedAt: new Date(Date.now()).toISOString(),
     previous,
     next,
     nextFirstSeen,
     early,
     rows,
     regressions: rows.filter((row) => row.regression),
+    risenErrorCodes: ratesJudged ? risenErrors.length : null,
   };
 }
 
-async function writeReport(report: Report): Promise<string> {
+function buildDirectory(): string {
   const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-  const path = join(projectRoot, ".openbot-build", "release-regression", "report.json");
+  return join(projectRoot, ".openbot-build", "release-regression");
+}
+
+async function writeReport(report: Report): Promise<string> {
+  const path = join(buildDirectory(), "report.json");
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, `${JSON.stringify(report, null, 2)}\n`);
   return path;
+}
+
+/**
+ * The state file is in the GitHub Actions cache, which pull requests of this public repository can read.
+ * It holds only an HMAC of the statuses, keyed by the private webhook URL, so it shows nothing.
+ */
+const FINGERPRINT = /^[0-9a-f]{64}$/u;
+
+function fingerprint(report: Report): string {
+  const statuses = report.rows.map((row) => `${row.metric}|${row.group}|${row.status}`).sort();
+  return createHmac("sha256", process.env.RELEASE_REGRESSION_WEBHOOK_URL ?? "")
+    .update([`${report.previous}>${report.next}`, ...statuses].join("\n"))
+    .digest("hex");
+}
+
+/** The fingerprint of the last report that was sent; null when there is none or after a failure. */
+async function readState(path: string): Promise<string | null> {
+  const text = await readFile(path, "utf8").catch(() => "");
+  const sent = text.trim();
+  return FINGERPRINT.test(sent) ? sent : null;
+}
+
+async function writeState(path: string, sent: string): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, `${sent}\n`);
+}
+
+/** Without state, every run sends. With state, a run sends on a change and once a week. */
+function shouldSend(sent: string | null, current: string, always: boolean): boolean {
+  const monday = new Date(Date.now()).getUTCDay() === 1;
+  return always || monday || sent !== current;
 }
 
 async function main(): Promise<void> {
   const parsed = readScriptArguments({
     usage: USAGE,
     maxPositionals: 0,
-    options: { discord: { type: "boolean" }, quiet: { type: "boolean" } },
+    options: {
+      discord: { type: "boolean" },
+      quiet: { type: "boolean" },
+      state: { type: "string" },
+      always: { type: "boolean" },
+    },
   });
   if (!parsed) return;
   const discord = parsed.values.discord === true;
   const quiet = parsed.values.quiet === true;
+  const statePath = parsed.values.state;
   try {
     const connection = await connectClickHouse();
     let report: Report;
@@ -481,17 +781,28 @@ async function main(): Promise<void> {
       connection.close();
     }
     const path = await writeReport(report);
-    if (discord) {
+    const current = fingerprint(report);
+    const state = statePath ? await readState(statePath) : null;
+    const send = discord && (!statePath || shouldSend(state, current, parsed.values.always === true));
+    if (send) {
       for (const embeds of discordMessages(report)) await sendDiscord({ embeds });
     }
+    if (statePath && send) await writeState(statePath, current);
     if (quiet) {
-      process.stdout.write(discord ? "The report was sent to Discord.\n" : "The report was written.\n");
+      const line = send
+        ? "The report was sent to Discord."
+        : discord
+          ? "No status changed; nothing was sent."
+          : "The report was written.";
+      process.stdout.write(`${line}\n`);
     } else {
       process.stdout.write(`${summary(report)}\n\n${table(report).join("\n")}\n\n${path}\n`);
     }
   } catch (error) {
     const detail = redactText(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
+    // A failure clears the state, so the next good run sends the full report again.
+    if (statePath) await writeState(statePath, "").catch(() => undefined);
     if (!quiet) {
       process.stderr.write(`${detail}\n`);
       return;

@@ -88,10 +88,20 @@ SQL query "SELECT properties['model'] AS model, count() AS n FROM events
 ## Release regression report
 
 `.github/workflows/release-regression.yml` runs `scripts/release-regression-report.ts` every day.
-The report compares the two newest releases (turn time, failed turns, event loop, database, memory)
-and goes to a private Discord channel. The repository is public, so the log must show no data: keep
-`--quiet`, do not upload the report, and do not open issues from it. Run it locally without
-`--discord` to see the table, or with `--discord` and `RELEASE_REGRESSION_WEBHOOK_URL` to post it.
+The report compares the two newest releases and goes to a private Discord channel: turn time and
+first output, startup, failed turns, error codes per 1,000 turns, update failures, and resources
+(event loop, stalls, database, memory, renderer crashes, crash loops). Startup and first output show
+only when both releases send them. Shares and error rates are red or yellow only when the rise is
+also significant (one-sided z of 3.09 or 1.645).
+
+The repository is public, so the log must show no data: keep `--quiet`, do not upload the report,
+and do not open issues from it. Run it locally without `--discord` to see the table, or with
+`--discord` and `RELEASE_REGRESSION_WEBHOOK_URL` to post it.
+
+The scheduled run sends only when a status changed, and on Monday (UTC). A manual run
+(`workflow_dispatch`) passes `--always`. The last sent statuses are an HMAC, keyed by the webhook URL,
+in the GitHub Actions cache `release-regression-state-*`. Pull requests can read that cache, so do
+not put other data in it. A failed run clears the state, so the next good run sends.
 
 The secrets are in the `analytics` GitHub environment, which only protected branches can use:
 `RELEASE_REGRESSION_SSH_KEY`, `RELEASE_REGRESSION_SSH_KNOWN_HOSTS`, `RELEASE_REGRESSION_SSH_HOST`,

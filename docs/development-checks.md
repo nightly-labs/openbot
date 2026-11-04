@@ -137,9 +137,10 @@ upstream provider CLIs, which reach users without an OpenBot release; see
 [Provider CLI updates](architecture/providers.md#provider-cli-updates).
 
 The `Release regression report` workflow is not a pull request check either. Once a day, it compares
-the two newest releases from production analytics and posts the result to a private Discord channel.
-It runs only on `main`, with the secrets of the `analytics` environment, and its log shows no data.
-A regression does not fail the run; only a broken run fails. See the `openpanel` skill.
+the two newest releases from production analytics and posts the result to a private Discord channel
+when a status changed, on Monday, or on a manual run. It runs only on `main`, with the secrets of the
+`analytics` environment, and its log shows no data. A regression does not fail the run; only a broken
+run fails. See the `openpanel` skill.
 
 `check:api` ends with `api:build:check`, which is the preview build of the Worker, so the API job
 uploads that build as the `cloudflare-preview` artifact. The job has no secrets. After the CI run completes, the trusted
