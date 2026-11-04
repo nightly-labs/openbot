@@ -1,4 +1,5 @@
 import type { EventEndpoint, Untyped } from "@openbot/contracts/ipc";
+import type { BrowserWindow } from "electron";
 
 // A typed event takes its payload, or nothing when the payload is `undefined`. An event whose group is not
 // typed yet takes anything, as every event did before endpoints had types. The payload comes from the
@@ -40,6 +41,27 @@ export function sendToRenderer<Payload>(
     if (isUnavailableRendererError(error)) return false;
     throw error;
   }
+}
+
+/**
+ * Settles when `sendToRenderer` can reach the window, or when the window is gone.
+ *
+ * `loadURL()` settles on `did-finish-load`. `isLoadingMainFrame()` stays true until the next
+ * `did-stop-loading`. Until then, `sendToRenderer` drops each event.
+ */
+export function whenRendererCanReceive(window: BrowserWindow): Promise<void> {
+  if (window.isDestroyed()) return Promise.resolve();
+  const contents = window.webContents;
+  if (contents.isDestroyed() || !contents.isLoadingMainFrame()) return Promise.resolve();
+  return new Promise((resolve) => {
+    const settle = () => {
+      contents.off("did-stop-loading", settle);
+      contents.off("destroyed", settle);
+      resolve();
+    };
+    contents.on("did-stop-loading", settle);
+    contents.on("destroyed", settle);
+  });
 }
 
 function isUnavailableRendererError(error: unknown): boolean {
