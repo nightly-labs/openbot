@@ -14,6 +14,7 @@ export const messages = {
   "mobile.channel.list.deleteFailedBody": "تعذّر حذف هذه القناة. حاول مرة أخرى.",
   "mobile.channel.list.open": "فتح القناة {name}",
   "mobile.channel.list.openWithTitle": "فتح القناة {name}، {title}",
+  "mobile.channel.avatar.more": "+{count}",
   "mobile.channel.list.unread": {
     zero: "لا رسائل غير مقروءة",
     one: "رسالة واحدة غير مقروءة",
