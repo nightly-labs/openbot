@@ -73,8 +73,12 @@ export type AgentEvent =
   | { type: "skills-changed"; agentId: string }
   /** The routine canvas of this agent changed, so the views showing it read it again. */
   | { type: "routine-flows-changed"; agentId: string }
-  /** A workflow of this server changed: its graph, its title, a run or a step. Views showing it read it again. */
-  | { type: "workflows-changed"; workflowId: string }
+  /**
+   * A workflow of this server changed: its graph, its title, a run or a step. Views showing it read it
+   * again. `agentId`: the agent whose tool call made or saved it, so an open canvas shows its build.
+   * Only this computer's event has it: `workflows-v1` sends the workflow id only.
+   */
+  | { type: "workflows-changed"; workflowId: string; agentId?: string }
   /** The Vault of this server changed. Server settings of a joined server read it again. */
   | { type: "vault-changed" }
   /** The named browser profiles of this server, or the profile of one of its agents, changed. */
@@ -233,7 +237,7 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
     case "routine-flows-changed":
       return isIdentifier(value.agentId);
     case "workflows-changed":
-      return isIdentifier(value.workflowId);
+      return isIdentifier(value.workflowId) && (value.agentId === undefined || isIdentifier(value.agentId));
     case "vault-changed":
     case "browser-profiles-changed":
       return true;
