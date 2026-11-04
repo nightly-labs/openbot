@@ -738,16 +738,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   });
 
   /**
-   * A client that did not read the account takes the key decision from the last status of its folder,
-   * which the provider's main client read. Without one, it reads the account once. A failed read
-   * leaves the session without the key, as before (#4831).
+   * A client that did not read the account, such as one for a generation without tools, takes the key
+   * decision from the last status of its folder, which the provider's main client read. It does not read
+   * the account itself: each read can spend the sign-in's refresh token (#4831).
    */
-  readonly #decideApiKeyEffect = Effect.fn("ClaudeAgentClient.decideApiKey")(function* (this: ClaudeAgentClient) {
+  #decideApiKey(): void {
     if (this.#accountRead || !this.#fallbackApiKey?.()) return;
     const last = lastAuthStatuses.get(this.#environment(false).CLAUDE_CONFIG_DIR ?? "");
     if (last) this.#onApiKey = last.loggedIn !== true;
-    else yield* this.#readAccountEffect().pipe(Effect.ignore);
-  });
+  }
 
   /**
    * `claude auth status` exits 1 when signed out and still prints its status. Only a status says
@@ -856,7 +855,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     config: ThreadConfig,
     resume: boolean,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
-    yield* this.#decideApiKeyEffect();
+    this.#decideApiKey();
     const input = new AsyncMessageQueue();
     const appliedEffort = this.#resolveEffort(config.model, config.effort);
     const canUseTool: CanUseTool = (toolName, toolInput, options) =>
