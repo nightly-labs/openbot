@@ -76,6 +76,7 @@ export const messages = {
   "error.team.agentUpdateUnsupported": "当前连接不支持更新助手。",
   "error.team.contextResetUnsupported": "当前连接不支持开始新对话。",
   "error.team.contextCompactUnsupported": "当前连接不支持压缩上下文。",
+  "error.team.messageDeleteUnsupported": "此连接不支持删除消息。",
   "error.team.workspaceDirectoryUnsupported": "当前连接不支持显示文件夹。",
   "error.team.conversationFileSearchUnsupported": "当前连接不支持搜索文件。",
   "error.team.sideQuestionUnsupported": "当前连接不支持旁问。",

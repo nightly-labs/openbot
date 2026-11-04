@@ -298,6 +298,13 @@ export interface ConversationProps {
   /** Marks an agent message and the messages after it unread. Without it, the message menu has no such item. */
   onMarkUnread?: ((messageId: string) => Promise<void>) | undefined;
   /**
+   * Deletes a message after the reader confirms. A failure throws, and the dialog shows it. Without it,
+   * the message menu has no Delete item.
+   */
+  onDeleteMessage?: ((messageId: string) => Promise<void>) | undefined;
+  /** Whether the reader can delete a message. Without it, every finished message can. */
+  canDeleteMessage?: ((message: AgentMessage) => boolean) | undefined;
+  /**
    * The open channels that a message of this agent chat can go to. Each one opens with the text in its
    * composer. Without it, the message menu has no such item.
    */
@@ -462,6 +469,8 @@ export interface ConversationThreads {
    * when the host cannot branch.
    */
   onBranch?: ((sourceTaskId: string | null, messageId: string) => Promise<boolean>) | undefined;
+  /** Deletes a message of the side thread `taskId`. Missing when the host cannot delete messages. */
+  onDeleteMessage?: ((taskId: string, messageId: string) => Promise<void>) | undefined;
   /** Where a side thread came from, when it is a branch. Undefined for a thread that is no branch. */
   branchSource: (task: AgentTask) => ConversationBranchSource | undefined;
   /**

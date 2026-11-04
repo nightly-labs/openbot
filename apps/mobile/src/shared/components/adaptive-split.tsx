@@ -16,6 +16,7 @@ import { ReservedRegionsProvider, useReservedRegions } from "react-native-reserv
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { type SplitPaneMode, setSplitPanePreference, useSplitPanePreference } from "@/shared/lib/split-pane-preference";
+import { END_X } from "@/shared/lib/text-direction";
 
 /**
  * The narrowest window that shows the pane beside the detail. iPad in portrait and landscape and the
@@ -181,12 +182,13 @@ function SplitColumns({ enabled, pane, resizeLabel, children, fold }: SplitColum
     })
     .onUpdate((event) => {
       "worklet";
-      shownWidth.set(Math.min(limit, Math.max(railWidth, dragStart.get() + event.translationX)));
+      // The pane is at the start: on the right in a right-to-left layout, where a drag to the left widens it.
+      shownWidth.set(Math.min(limit, Math.max(railWidth, dragStart.get() + event.translationX * END_X)));
     })
     .onEnd((event) => {
       "worklet";
       // A flick goes on a little past the finger, so a quick swipe collapses or opens the pane.
-      const released = shownWidth.get() + event.velocityX * 0.08;
+      const released = shownWidth.get() + event.velocityX * END_X * 0.08;
       const next = modeAt(released, railWidth);
       const nextWidth =
         next === "list" && foldX === null

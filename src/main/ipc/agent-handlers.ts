@@ -92,6 +92,7 @@ import {
   CONTEXT_COMPACT_ROUTES,
 } from "@openbot/contracts/team-protocol/context-compact-v1";
 import { CONTEXT_RESET_CAPABILITY, CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
+import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
   PROVIDER_ACCOUNTS_CAPABILITY,
   PROVIDER_ACCOUNTS_ROUTES,
@@ -109,6 +110,7 @@ import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { SidebarLayoutStore } from "../../backend/sidebar-layout-store";
 import type { HostService } from "../host-service";
+import { runMessageDelete } from "../message-delete-refusal";
 import { type MessageLinkRelay, openHttpLink } from "../message-link-relay";
 import type { ModelVisibility } from "../model-visibility";
 import {
@@ -148,6 +150,8 @@ import {
   parseCancelQueuedMessage,
   parseChannelId,
   parseCreateAgent,
+  parseDeleteChannelMessage,
+  parseDeleteConversationMessage,
   parseInterrupt,
   parseMarkAgentTaskRead,
   parseMarkConversationRead,
@@ -263,6 +267,16 @@ export function agentIpcHandlers({
   const remoteCompact = async (serverId: string, path: string, body: AgentTaskInput | { agentId: string }) => {
     if (!remoteServers.supportsCapability(serverId, CONTEXT_COMPACT_CAPABILITY))
       throw new Error(sourceText("error.team.contextCompactUnsupported"));
+    await runCauseEffect(remoteServers.request(serverId, path, acceptEmpty, { method: "POST", body }));
+  };
+  // The message-delete-v1 codec has already checked the empty reply. The host says why it refuses.
+  const remoteMessageDelete = async (
+    serverId: string,
+    path: string,
+    body: { agentId: string; taskId?: string; messageId: string } | { channelId: string; messageId: string },
+  ) => {
+    if (!remoteServers.supportsCapability(serverId, MESSAGE_DELETE_CAPABILITY))
+      throw new Error(sourceText("error.backend.messageDeleteUnsupported"));
     await runCauseEffect(remoteServers.request(serverId, path, acceptEmpty, { method: "POST", body }));
   };
   const remoteThreadRequest = (serverId: string, path: string, body: AgentTaskInput & { title?: string }) => {
@@ -509,6 +523,15 @@ export function agentIpcHandlers({
             }),
           );
         },
+      }),
+      // The user of this computer can delete any message of a local channel.
+      deleteChannelMessage: scopedHandler(parseDeleteChannelMessage, {
+        local: (input) => runMessageDelete(service.channels.deleteMessage(input, { memberId: null, deleteAny: true })),
+        remote: (input, serverId) =>
+          remoteMessageDelete(serverId, MESSAGE_DELETE_ROUTES.channel, {
+            channelId: input.channelId,
+            messageId: input.messageId,
+          }),
       }),
       setChannelImage: scopedHandler(parseSetChannelImage, {
         local: (input) => runCauseEffect(service.channels.setImage(input.channelId, input.image)),
@@ -812,6 +835,22 @@ export function agentIpcHandlers({
         remote: () => {
           throw new Error(sourceText("error.backend.markUnreadRemoteUnsupported"));
         },
+      }),
+      // The user of this computer can delete any message of a local agent.
+      deleteConversationMessage: scopedHandler(parseDeleteConversationMessage, {
+        local: (input) =>
+          runMessageDelete(service.deleteConversationMessage(input, { memberId: null, deleteAny: true })),
+        remote: (input, serverId) =>
+          input.taskId === undefined
+            ? remoteMessageDelete(serverId, MESSAGE_DELETE_ROUTES.agent, {
+                agentId: input.agentId,
+                messageId: input.messageId,
+              })
+            : remoteMessageDelete(serverId, MESSAGE_DELETE_ROUTES.task, {
+                agentId: input.agentId,
+                taskId: input.taskId,
+                messageId: input.messageId,
+              }),
       }),
       sendMessage: scopedHandler(parseSendMessage, {
         local: (input) => runCauseEffect(service.sendMessage(input, host.conversationSender())),

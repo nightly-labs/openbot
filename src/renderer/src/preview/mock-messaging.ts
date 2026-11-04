@@ -370,5 +370,18 @@ export function createMockMessaging(orchestrator: () => string): MessagingDeskto
     hostGetDiscordAccess: (input) => api.getDiscordAccess(input),
     hostListDiscordRoles: (input) => api.listDiscordRoles(input),
     hostSetDiscordAccess: (input) => api.setDiscordAccess(input),
+    hostGetWhatsAppOverview: () => api.getWhatsAppOverview(),
+    hostStartWhatsAppLink: (input) => api.startWhatsAppLink(input),
+    hostGetWhatsAppLinkState: () => api.getWhatsAppLinkState(),
+    hostCancelWhatsAppLink: () => api.cancelWhatsAppLink(),
+    hostDisconnectWhatsAppNumber: (input) => api.disconnectWhatsAppNumber(input),
+    hostReconnectWhatsAppNumber: (input) => api.reconnectWhatsAppNumber(input),
+    hostSetWhatsAppEnabled: (input) => api.setWhatsAppEnabled(input),
+    hostAddWhatsAppOrchestrator: () => api.addWhatsAppOrchestrator({}),
+    hostListWhatsAppGroups: (input) => api.listWhatsAppGroups(input),
+    hostAddWhatsAppSender: (input) => api.addWhatsAppSender(input),
+    hostRemoveWhatsAppSender: (input) => api.removeWhatsAppSender(input),
+    hostAnswerWhatsAppRequest: (input) => api.answerWhatsAppRequest(input),
+    hostSetWhatsAppOwnNumber: (input) => api.setWhatsAppOwnNumber(input),
   };
 }

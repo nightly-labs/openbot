@@ -80,6 +80,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion, useTransitionMode } from "@/shared/lib/motion";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { currentText, useText } from "@/shared/lib/text";
+import { fieldDirectionStyle } from "@/shared/lib/text-direction";
 import { typeScale } from "@/shared/lib/type-scale";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 
@@ -802,6 +803,7 @@ export function HomeSearchBar({
                   paddingBottom: 0,
                   paddingTop: 0,
                   textAlignVertical: "center",
+                  ...fieldDirectionStyle(search.query),
                 }}
                 value={search.query}
                 onChangeText={search.setQuery}

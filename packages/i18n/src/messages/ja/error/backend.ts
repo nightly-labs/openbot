@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "OpenBot のデータベースが整合性チェックに失敗しました。",
   "error.backend.webhookRouteLimit": "1 つのホストの Webhook ルーティンは最大 {limit} 個です。",
   "error.backend.webhookSettingsInvalid": "Webhook の設定を確認して、もう一度お試しください。",
+  "error.backend.webhookSenderSecretInvalid":
+    "送信元の署名シークレットをすべて貼り付けてください。16〜1024 文字で、空白は含みません。",
   "error.backend.webhookRouteUnavailable":
     "公開 Webhook ルートの準備ができていません。ホストの接続を確認して、もう一度お試しください。",
   "error.backend.browserViewRemoteOnly": "ライブブラウザービューはリモートホスト専用です。",
@@ -209,6 +211,10 @@ export const messages = {
     "開いている待機は、このコンピューター上のエージェントでのみ使用できます。",
   "error.backend.markUnreadRemoteUnsupported":
     "メッセージを未読にする操作は、このコンピューター上のエージェントでのみ使用できます。",
+  "error.backend.messageDeleteUnsupported": "このサーバーはメッセージの削除に対応していません。",
+  "error.backend.messageDeleteNotFound": "このメッセージはチャットにありません。",
+  "error.backend.messageDeleteBusy": "このメッセージは実行中のターンの一部です。ターンが終わってから削除してください。",
+  "error.backend.messageDeleteForbidden": "削除できるのは自分が送信したメッセージだけです。",
   "error.backend.routineFlowHandoffFailed": "ルーティンはこのエージェントに作業を渡せませんでした。",
   "error.backend.mcpServerLimit": "OpenBot に保存できる MCP サーバーは {limit} 個までです。",
   "error.backend.mcpServerNameTaken": "{name} という名前の MCP サーバーはすでに存在します。",

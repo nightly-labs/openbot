@@ -21,6 +21,7 @@ import { scheduleOnRN, scheduleOnUI } from "react-native-worklets";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
+import { END_X } from "@/shared/lib/text-direction";
 import { FILL, FRAME_RADIUS, MAX_FRAME_WIDTH } from "../model/attachment-frame";
 import { sameShape } from "../model/image-dimensions";
 import type { GalleryTile } from "../model/image-gallery-layout";
@@ -82,9 +83,10 @@ export function ChatImageGallery({
   const cardWidth = Math.min(CARD_WIDTH, Math.min(MAX_FRAME_WIDTH, width - 80) - SPREAD * 2);
   const count = attachments.length;
   const keys = attachments.map((attachment) => attachment.id);
-  // A stack on the right fans out as the mirror image of one on the left, and a card that a screen
-  // reader moves swings toward the open side of the chat.
-  const mirror = alignment === "right" ? -1 : 1;
+  // A stack at the end fans out as the mirror image of one at the start, and a card that a screen
+  // reader moves swings toward the open side of the chat. The alignment is the side in the layout, so
+  // a right-to-left layout puts it on the other side of the screen.
+  const mirror = (alignment === "right" ? -1 : 1) * END_X;
   const viewer = useChatImageSource(null, 0);
   const hiddenSource = viewer.hiddenSource;
   const position = useSharedValue(0);

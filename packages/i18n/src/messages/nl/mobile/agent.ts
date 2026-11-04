@@ -305,6 +305,9 @@ export const messages = {
   "mobile.agent.runtime.retryModels": "Modellen opnieuw laden",
   "mobile.agent.runtime.loadingModels": "Modellen laden…",
   "mobile.agent.runtime.noModels": "Geen modellen beschikbaar voor deze aanbieder.",
+  "mobile.agent.runtime.usageLimit": "Gebruikslimiet bereikt",
+  "mobile.agent.runtime.usageLimitWindow": "Limiet ({window})",
+  "mobile.agent.runtime.usageLimitResets": "{limit} · Reset op {time}",
   "mobile.agent.access.title": "Toegang",
   "mobile.agent.access.label": "Agenttoegang",
   "mobile.agent.access.workspace": "Alleen werkruimte",
@@ -354,7 +357,7 @@ export const messages = {
   "mobile.agent.backupModels.unavailable": "Nu niet beschikbaar · overgeslagen",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.note":
-    "{name} schakelt nooit over nadat het begint te schrijven. Het gaat terug naar {model} als de limiet afloopt, of 10 minuten na een fout van de aanbieder.",
+    "Als een gebruikslimiet {name} stopt nadat het werk is begonnen, gaat {name} met hetzelfde werk verder op het eerste beschikbare model in de volgorde. Het gaat terug naar {model} als de limiet afloopt, of 10 minuten na een fout van de aanbieder.",
   "mobile.agent.busyMessage.label": "Tijdens werk",
   "mobile.agent.busyMessage.footer":
     "Wat een bericht doet als je het stuurt terwijl de agent werkt. Wachtrij bewaart het tot de beurt eindigt. Bijsturen geeft het tijdens de beurt aan de agent.",

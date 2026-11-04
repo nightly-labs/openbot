@@ -77,6 +77,7 @@ export const messages = {
   "error.team.agentUpdateUnsupported": "이 연결에서는 에이전트 업데이트를 지원하지 않아요.",
   "error.team.contextResetUnsupported": "이 연결에서는 새 채팅 시작을 지원하지 않아요.",
   "error.team.contextCompactUnsupported": "이 연결에서는 컨텍스트 압축을 지원하지 않아요.",
+  "error.team.messageDeleteUnsupported": "이 연결은 메시지 삭제를 지원하지 않아요.",
   "error.team.workspaceDirectoryUnsupported": "이 연결에서는 폴더 표시를 지원하지 않아요.",
   "error.team.conversationFileSearchUnsupported": "이 연결에서는 파일 검색을 지원하지 않아요.",
   "error.team.sideQuestionUnsupported": "이 연결에서는 사이드 질문을 지원하지 않아요.",

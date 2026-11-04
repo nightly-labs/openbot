@@ -85,6 +85,7 @@ export const messages = {
   "error.team.contextResetUnsupported":
     "Commencer une nouvelle discussion n’est pas pris en charge par cette connexion.",
   "error.team.contextCompactUnsupported": "Cette connexion ne prend pas en charge la compaction du contexte.",
+  "error.team.messageDeleteUnsupported": "Cette connexion ne permet pas de supprimer des messages.",
   "error.team.workspaceDirectoryUnsupported": "L’affichage des dossiers n’est pas pris en charge par cette connexion.",
   "error.team.conversationFileSearchUnsupported":
     "La recherche de fichiers n’est pas prise en charge par cette connexion.",

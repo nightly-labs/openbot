@@ -78,6 +78,7 @@ export const messages = {
   "error.team.agentUpdateUnsupported": "この接続ではエージェントを更新できません。",
   "error.team.contextResetUnsupported": "この接続では新しいチャットを始められません。",
   "error.team.contextCompactUnsupported": "この接続はコンテキストの圧縮に対応していません。",
+  "error.team.messageDeleteUnsupported": "この接続はメッセージの削除に対応していません。",
   "error.team.workspaceDirectoryUnsupported": "この接続ではフォルダーを表示できません。",
   "error.team.conversationFileSearchUnsupported": "この接続ではファイルを検索できません。",
   "error.team.sideQuestionUnsupported": "この接続ではサイド質問を使えません。",

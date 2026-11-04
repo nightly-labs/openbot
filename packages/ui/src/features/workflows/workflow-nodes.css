@@ -2460,6 +2460,11 @@ fieldset.wfn-picker-group {
   justify-content: flex-start;
 }
 
+/* The model of a condition starts its row, and the effort ends it, as in an LLM step. */
+.wfn-block-field > .wfn-condition-foot {
+  justify-content: space-between;
+}
+
 .wfn-block-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;

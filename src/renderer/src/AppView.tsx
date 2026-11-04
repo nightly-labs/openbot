@@ -64,7 +64,8 @@ export function AppAccessGate() {
   const settings = useSettings();
   const { joinRemoteDuringSetup } = useServerSelection();
   const started = () => setup.setupLoaded() && platform.appInfo() !== null;
-  const [splashShown, setSplashShown] = createSignal(true);
+  // The landing demo opens on the workspace at once, with no splash.
+  const [splashShown, setSplashShown] = createSignal(!platform.landingPreview);
   // A chat window is a new page too, but it fades as soon as it is ready.
   const splashPlaysThrough = !startupSplashPlayed && platform.chatWindow === null;
   // The splash lets the workspace mount its heavy views before the crew hop out.

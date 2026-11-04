@@ -71,6 +71,7 @@ import { readdir, rm } from "node:fs/promises";
 import { homedir, hostname, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
+import type { Readable } from "node:stream";
 import { selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type {
   AgentStatus,
@@ -231,6 +232,7 @@ import { prepareToolRuntimeForTest } from "./ipc/mcp-server-handlers";
 import { LanguageService } from "./language-service";
 import { LinkAccountService } from "./link-account-service";
 import { LinkAccountStore } from "./link-account-store";
+import { ozonePlatformArguments } from "./linux-wayland-output";
 import { localRoutineFeedDocument } from "./local-routine-calendar";
 import { type LocalServerChildEnvironment, startLocalServerChild } from "./local-server-child";
 import { LOCAL_SERVERS_FILE } from "./local-servers/local-server-registry";
@@ -536,6 +538,8 @@ export interface ApplicationServiceContext {
   hostingDeveloperKey: string | null;
   /** Set only in a local server that the desktop app started as its child. See `local-server-child.ts`. */
   localServerChild: LocalServerChildEnvironment | null;
+  /** The control pipe of a local server: the commands of the desktop app. */
+  localServerControl: Readable | null;
   macHapticFeedback: MacHapticFeedback;
   teardown: TeardownRegistry;
   forwardCentralAuth: (state: CentralAuthState) => void;
@@ -934,6 +938,7 @@ export async function createApplicationServices({
   serverMode: serverModeEnvironment,
   hostingDeveloperKey,
   localServerChild,
+  localServerControl,
   macHapticFeedback,
   teardown,
   forwardCentralAuth,
@@ -3047,7 +3052,10 @@ export async function createApplicationServices({
           runtimeRoot: providerRuntimesRoot,
           cipher: safeStorageCipher("error.app.macSecureStorageUnavailable"),
           remoteServers,
-          command: { executable: process.execPath, args: app.isPackaged ? [] : [app.getAppPath()] },
+          command: {
+            executable: process.execPath,
+            args: [...(app.isPackaged ? [] : [app.getAppPath()]), ...ozonePlatformArguments()],
+          },
           trash: (path) => shell.trashItem(path),
           account: {
             accountId: () => {
@@ -3115,7 +3123,7 @@ export async function createApplicationServices({
         host,
         writeReady: (line) => process.stdout.write(line),
         readCommands: (onLine) => {
-          createInterface({ input: process.stdin }).on("line", onLine);
+          if (localServerControl) createInterface({ input: localServerControl }).on("line", onLine);
         },
         // The desktop app registered this server for its account. Its machine token gets the Signal
         // tickets and sends the notifications; this process has no account of its own.
@@ -3406,7 +3414,8 @@ export async function createApplicationServices({
     relaunch: () => {
       // A development build only quits: its supervisor stops the stack, and a relaunched Electron
       // would run outside it with no renderer server.
-      if (app.isPackaged) app.relaunch();
+      // The arguments of `process.argv`: after an XWayland start, they do not keep `--ozone-platform=x11`.
+      if (app.isPackaged) app.relaunch({ args: process.argv.slice(1) });
       app.quit();
     },
     log: (message) => logger.info(message),

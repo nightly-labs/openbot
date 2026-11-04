@@ -17,7 +17,9 @@ import {
   type CreateRoutineInput,
   type DeleteAgentMemoryInput,
   type DeleteChannelMemoryInput,
+  type DeleteChannelMessageInput,
   type DeleteChannelRoutineInput,
+  type DeleteConversationMessageInput,
   type DeleteRoutineInput,
   type DownloadAttachmentsInput,
   type EditQueuedMessageInput,
@@ -659,6 +661,23 @@ export function parseMarkConversationUnread(value: unknown): MarkConversationUnr
   return {
     agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
     fromMessageId: requireString(value.fromMessageId, "fromMessageId", INPUT_LIMITS.identifier),
+  };
+}
+
+export function parseDeleteConversationMessage(value: unknown): DeleteConversationMessageInput {
+  if (!isObject(value)) throw new Error("Invalid message delete request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
+    ...(value.taskId === undefined ? {} : { taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier) }),
+  };
+}
+
+export function parseDeleteChannelMessage(value: unknown): DeleteChannelMessageInput {
+  if (!isObject(value)) throw new Error("Invalid message delete request.");
+  return {
+    channelId: requireString(value.channelId, "channelId", INPUT_LIMITS.identifier),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
   };
 }
 

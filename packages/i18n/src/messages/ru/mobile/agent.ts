@@ -328,6 +328,9 @@ export const messages = {
   "mobile.agent.runtime.retryModels": "Повторить загрузку моделей",
   "mobile.agent.runtime.loadingModels": "Загрузка моделей…",
   "mobile.agent.runtime.noModels": "Для этого провайдера нет доступных моделей.",
+  "mobile.agent.runtime.usageLimit": "Лимит использования исчерпан",
+  "mobile.agent.runtime.usageLimitWindow": "Лимит ({window})",
+  "mobile.agent.runtime.usageLimitResets": "{limit} · Сброс: {time}",
   "mobile.agent.access.title": "Доступ",
   "mobile.agent.access.label": "Доступ агента",
   "mobile.agent.access.workspace": "Только рабочее пространство",
@@ -382,7 +385,7 @@ export const messages = {
   "mobile.agent.backupModels.unavailable": "Сейчас недоступна · пропущена",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.note":
-    "После начала ответа {name} не переключает модель. Когда лимит закончится или через 10 минут после ошибки провайдера, {name} вернётся к {model}.",
+    "Если лимит использования остановит {name} после начала работы, {name} продолжит ту же работу на первой доступной модели из списка. Когда лимит закончится или через 10 минут после ошибки провайдера, {name} вернётся к {model}.",
   "mobile.agent.busyMessage.label": "Во время работы",
   "mobile.agent.busyMessage.footer":
     "Что происходит с сообщением, которое вы отправляете во время работы агента. «Очередь» хранит его до конца хода. «Направлять» передаёт его агенту во время хода.",

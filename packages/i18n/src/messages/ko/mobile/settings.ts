@@ -8,6 +8,12 @@ export const messages = {
   "mobile.settings.language.system": "시스템 기본값",
   "mobile.settings.language.footer":
     "시스템 기본값은 휴대전화 설정의 첫 번째 언어를 따라요. 아직 번역되지 않은 텍스트는 영어로 표시돼요.",
+  "mobile.settings.language.restartTitle": "OpenBot을 다시 시작할까요?",
+  "mobile.settings.language.restartBody":
+    "이 언어는 반대 방향으로 읽어요. OpenBot을 다시 시작하면 화면 방향이 바뀌어요. 다시 시작한 뒤에도 화면이 이상하면 앱 전환기에서 OpenBot을 닫고 다시 열어 주세요.",
+  "mobile.settings.language.restartNow": "지금 다시 시작",
+  "mobile.settings.language.restartFailed":
+    "OpenBot을 다시 시작하지 못했어요. 다음에 OpenBot을 열 때 화면 방향이 바뀌어요.",
   "mobile.settings.dictation.language": "받아쓰기 언어",
   "mobile.settings.about.development": "개발",
   "mobile.settings.about.openFailed": "링크를 열 수 없었어요. 다시 시도해 주세요.",

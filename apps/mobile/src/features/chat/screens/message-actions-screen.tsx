@@ -16,6 +16,7 @@ import { toggleReadAloud, useReadingAloud } from "@/features/voice/model/message
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { useCopyMessage } from "../components/use-copy-message";
 import { releaseMessageActions, useMessageActionsRequest } from "../model/message-actions-sheet";
 
@@ -124,7 +125,7 @@ export function MessageActionsScreen() {
         <SettingsSection>
           {request.onReply ? (
             <SettingsRow
-              leading={<Reply size={ICON_SIZE} color={icon} />}
+              leading={<Reply size={ICON_SIZE} color={icon} style={MIRROR_IN_RTL} />}
               disclosure={false}
               onPress={() => run(() => request.onReply?.())}
             >

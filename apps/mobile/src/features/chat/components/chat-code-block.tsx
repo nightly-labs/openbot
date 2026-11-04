@@ -10,6 +10,7 @@ import { useCSSVariable } from "uniwind";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { CODE_LAYOUT_STYLE, CODE_TEXT_STYLE } from "@/shared/lib/text-direction";
 import { type CodeToken, cachedHighlight, codeLanguageLabel, highlightCode } from "../model/code-highlight";
 import { useListSettled } from "./use-list-settled";
 
@@ -107,11 +108,11 @@ const CodeBlockBody = memo(function CodeBlockBody({
           {copied ? <Check size={14} color={String(muted)} /> : <Copy size={14} color={String(muted)} />}
         </Button>
       </View>
-      <View style={{ paddingHorizontal: 12, paddingTop: 6, paddingBottom: 14 }}>
+      <View style={[CODE_LAYOUT_STYLE, { paddingHorizontal: 12, paddingTop: 6, paddingBottom: 14 }]}>
         <Typography.Code
           selectable={selectable}
           className="bg-transparent p-0"
-          style={{ color: foreground, fontSize: 14, lineHeight: 20 }}
+          style={[CODE_TEXT_STYLE, { color: foreground, fontSize: 14, lineHeight: 20 }]}
         >
           {tokens.map((token) => (
             <Typography.Code

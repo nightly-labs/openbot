@@ -12,6 +12,7 @@ import { z } from "zod";
 import pluginCatalog from "../../resources/plugin-catalog/catalog.json";
 import { advertisedJsonSchema } from "./agent/advertised-json-schema";
 import { interruptAgentToolSchema } from "./agent/agent-interrupt-tool";
+import { createChannelToolSchema, listChannelsToolSchema, updateChannelToolSchema } from "./agent/channel-agent-tools";
 import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
 import { HISTORY_TOOL_DEFINITIONS } from "./agent/history-tools";
 import { MCP_SERVER_TOOL_DEFINITIONS } from "./agent/mcp-tools";
@@ -397,13 +398,25 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     name: "list_channels",
     description:
       "List the open channels with their id, name, lead, and members. A sidebar section (folder) is not a channel.",
-    shape: {},
+    shape: listChannelsToolSchema.shape,
   },
   {
     name: "send_to_channel",
     description:
       "Post a request into a channel when the user gives it work. Members do not see this conversation: write the whole brief. paths attaches local files. recipientAgentIds names members; without it, the lead chooses. No result comes back here. In a channel task, use channel_assign or channel_transfer.",
     shape: sendToChannelToolSchema.shape,
+  },
+  {
+    name: "create_channel",
+    description:
+      "Create a channel: a shared chat where member agents take requests and work together, with an optional picture. Returns the channel.",
+    shape: createChannelToolSchema.shape,
+  },
+  {
+    name: "update_channel",
+    description:
+      "Change or archive a channel from openbot.list_channels, including its picture. Pass only the values to change. Returns the channel.",
+    shape: updateChannelToolSchema.shape,
   },
   {
     name: "list_agents",
@@ -662,7 +675,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "request_api_key",
     description: [
-      "Ask the user for an API key or token that your task needs, such as for a script or a service, and wait for the answer.",
+      "Ask the user for an API key, token, or password that your task needs, such as for IMAP, and wait for the answer.",
       "The user enters it in a secure form in this conversation. OpenBot saves it in a private file outside your workspace for later turns; you never get the value.",
       'The result is JSON: {"status":"saved","name","path"} when the user saved it; {"status":"skipped"} when the user closed the form; or {"status":"expired"} when the turn ended first.',
       "Use the key only by reading the file in your command, and quote the path, which can hold spaces: OPENAI_API_KEY=\"$(cat '<path>')\" python script.py. Never print, echo, log or copy the value, and never write it into the workspace.",

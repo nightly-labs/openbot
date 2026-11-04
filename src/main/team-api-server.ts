@@ -129,7 +129,9 @@ import {
   VAULT_CAPABILITY,
   VAULT_IMPORT_CAPABILITY,
   VAULT_V2_CAPABILITY,
+  WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
+  WHATSAPP_CONNECTOR_CAPABILITY,
   WORKFLOWS_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
@@ -283,6 +285,7 @@ import { routeMcpServers } from "./team-api/route-mcp";
 import { routeMcpSignIn } from "./team-api/route-mcp-sign-in";
 import { routeMcpSignInApp } from "./team-api/route-mcp-sign-in-app";
 import { routeMemoryReview } from "./team-api/route-memory-review";
+import { routeMessageDelete } from "./team-api/route-message-delete";
 import { routeModelVisibility } from "./team-api/route-model-visibility";
 import { routeOnePasswordConnector } from "./team-api/route-onepassword-connector";
 import { routePromptCacheTtl } from "./team-api/route-prompt-cache-ttl";
@@ -307,6 +310,7 @@ import { routeStorage } from "./team-api/route-storage";
 import { routeTeam } from "./team-api/route-team";
 import { routeVault } from "./team-api/route-vault";
 import { routeVaultImport } from "./team-api/route-vault-import";
+import { routeWhatsAppConnector } from "./team-api/route-whatsapp-connector";
 import { routeWorkflows } from "./team-api/route-workflows";
 import { routeWorkspaceDirectory } from "./team-api/route-workspace-directory";
 import { TeamStoreError } from "./team-store";
@@ -1013,6 +1017,7 @@ export class TeamApiServer {
         return;
       if ((await routeConnectors(context, this.#options.connectors)) === "handled") return;
       if ((await routeDiscordAccess(context, this.#options.connectors)) === "handled") return;
+      if ((await routeWhatsAppConnector(context, this.#options.connectors)) === "handled") return;
       if ((await routeOnePasswordConnector(context, this.#options.onePasswordConnector)) === "handled") return;
       if ((await routeBitwardenConnector(context, this.#options.bitwardenConnector)) === "handled") return;
       if ((await routeVault(context, this.#options.vault)) === "handled") return;
@@ -1099,6 +1104,8 @@ export class TeamApiServer {
         return;
       if ((await routeContextReset(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeContextCompact(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await routeMessageDelete(context, this.#options.agents, this.#options.channels, hidden)) === "handled")
+        return;
       if ((await routeAgentMemoryPage(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeWorkspaceDirectory(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeConversationFiles(context, this.#options.agents)) === "handled") return;
@@ -2245,6 +2252,7 @@ export class TeamApiServer {
             );
           if (capability === CONNECTORS_CAPABILITY) return this.#options.connectors !== undefined;
           if (capability === DISCORD_ACCESS_CAPABILITY) return this.#options.connectors !== undefined;
+          if (capability === WHATSAPP_CONNECTOR_CAPABILITY) return this.#options.connectors !== undefined;
           if (capability === ONEPASSWORD_CONNECTOR_CAPABILITY) return this.#options.onePasswordConnector !== undefined;
           if (capability === BITWARDEN_CONNECTOR_CAPABILITY) return this.#options.bitwardenConnector !== undefined;
           if (capability === VAULT_CAPABILITY) return this.#options.vault !== undefined;
@@ -2325,6 +2333,7 @@ export class TeamApiServer {
           if (capability === ROUTINE_RECOVERY_CAPABILITY) return this.#options.events !== undefined;
           if (capability === ROUTINE_RESULTS_CAPABILITY) return this.#options.admin?.routineResults !== undefined;
           if (capability === WEBHOOK_TESTS_CAPABILITY) return this.#options.events !== undefined;
+          if (capability === WEBHOOK_SENDER_SECRET_CAPABILITY) return this.#options.events !== undefined;
           if (capability === AGENT_IMPORT_CAPABILITY) return this.#options.agentImport !== undefined;
           if (capability === INSTANCE_TRANSFER_CAPABILITY) return this.#options.instanceTransfer !== undefined;
           if (capability === LIVE_ACTIVITY_PUSH_CAPABILITY) return this.#options.liveActivityPush !== undefined;

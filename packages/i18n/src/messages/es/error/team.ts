@@ -79,6 +79,7 @@ export const messages = {
   "error.team.agentUpdateUnsupported": "Esta conexión no permite actualizar agentes.",
   "error.team.contextResetUnsupported": "Esta conexión no permite iniciar un nuevo chat.",
   "error.team.contextCompactUnsupported": "Esta conexión no admite compactar el contexto.",
+  "error.team.messageDeleteUnsupported": "Esta conexión no permite eliminar mensajes.",
   "error.team.workspaceDirectoryUnsupported": "Esta conexión no permite mostrar carpetas.",
   "error.team.conversationFileSearchUnsupported": "Esta conexión no permite buscar archivos.",
   "error.team.sideQuestionUnsupported": "Esta conexión no permite preguntas aparte.",

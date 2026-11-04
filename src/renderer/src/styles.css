@@ -20,6 +20,7 @@
 @import "@openbot/ui/features/agents/first-agent-setup.css";
 @import "./styles/app-shell.css";
 @import "@openbot/ui/features/sidebar/sidebar-views.css";
+@import "@openbot/ui/features/sidebar/sidebar-working-badge.css";
 @import "./features/account/account-update-island.css";
 @import "@openbot/ui/features/servers/join-server-dialog.css";
 @import "@openbot/ui/features/servers/add-server-dialog.css";

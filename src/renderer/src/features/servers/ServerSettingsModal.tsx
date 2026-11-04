@@ -22,7 +22,6 @@ import {
   Blocks,
   Button,
   CalendarClock,
-  ChevronRight,
   Download,
   Globe2,
   HardDrive,
@@ -55,6 +54,7 @@ import { actionToast } from "../../action-toast";
 import { type ServerBrowserProfilesOptions, ServerBrowserProfilesPanel } from "../browser/ServerBrowserProfilesPanel";
 import { type ServerStorageOptions, ServerStoragePanel } from "../files/ServerStoragePanel";
 import { type HostProviderSettings, HostProviderSettingsPanel } from "../settings/ProviderSettingsSection";
+import type { HostDefaultProviderOptions, HostDefaultProviderSource } from "../settings/provider-host-default";
 import type { HostModelVisibilityOptions, ProviderModelVisibilitySource } from "../settings/provider-model-visibility";
 import type { HostPromptCacheTtlOptions, ProviderPromptCacheSource } from "../settings/provider-prompt-cache";
 import { type ServerVaultOptions, ServerVaultPanel } from "../vault/ServerVaultPanel";
@@ -216,6 +216,12 @@ export interface ServerSettingsModalProps {
    */
   hostModelVisibility?: HostModelVisibilityOptions | undefined;
   /**
+   * The Providers section of a remote host with `provider-default-v1` that this member administers
+   * shows the host's Default provider only when a caller supplies this. This computer's comes with
+   * `providers`.
+   */
+  hostDefaultProvider?: HostDefaultProviderOptions | undefined;
+  /**
    * The Roles section appears only when a caller supplies this, and only for the local server or a
    * remote host with `agent-access-v1` that this member administers.
    */
@@ -332,6 +338,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   function modelVisibilitySource(): ProviderModelVisibilitySource | undefined {
     const options = props.hostModelVisibility;
     if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "model-visibility-v1")) return undefined;
+    return { ...options, serverId: props.server.id };
+  }
+  function hostDefaultProviderSource(): HostDefaultProviderSource | undefined {
+    const options = props.hostDefaultProvider;
+    if (!options || local() || !actionsAvailable() || !serverCanAdminister(props.server, "provider-default-v1"))
+      return undefined;
     return { ...options, serverId: props.server.id };
   }
   const availableInitialSection = (): Section | null =>
@@ -536,19 +548,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         class="server-settings-modal-shell"
         page={props.page}
         open={props.open}
-        title={
-          <Show when={crumbDetail()} fallback={t(sections[section()].title)}>
-            {(detail) => (
-              <span class="settings-modal-crumbs">
-                <Button type="button" variant="ghost" class="settings-modal-crumb-parent" onClick={detail().back}>
-                  {t(sections[section()].title)}
-                </Button>
-                <ChevronRight class="settings-modal-crumb-separator" aria-hidden="true" />
-                <span class="settings-modal-crumb-current">{detail().title}</span>
-              </span>
-            )}
-          </Show>
-        }
+        title={t(sections[section()].title)}
+        crumb={crumbDetail()}
         description={t(sections[section()].description)}
         contentKey={`${props.server.id}:${section()}`}
         restoreFocusTarget={props.restoreFocusTarget}
@@ -866,6 +867,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                   onDetailChange={setProviderDetail}
                   promptCache={promptCacheSource()}
                   modelVisibility={modelVisibilitySource()}
+                  hostDefaultProvider={hostDefaultProviderSource()}
                 />
               )}
             </Show>

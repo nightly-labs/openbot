@@ -7,6 +7,7 @@ import type { ProviderSession } from "../database/provider-sessions";
 import { getRecord, getString } from "../protocol";
 
 const logger = createOpenBotLogger("usage-collection");
+const GROK_USD_TICKS = 10_000_000_000;
 
 function count(value: unknown): number | null {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
@@ -136,6 +137,23 @@ export function collectProviderUsage(
         cacheCreation: count(value.cachedWriteTokens ?? 0),
         output: output === null ? null : output + (count(value.thoughtTokens ?? 0) ?? 0),
       },
+    });
+    return;
+  }
+  if (session.provider === "grok") {
+    // Grok CLI 1.0.22 and 1.0.70 send the tokens of this prompt only, with its cost in units of
+    // 10^-10 USD. `inputTokens` include the cache reads and writes, and `outputTokens` the reasoning.
+    const ticks = cost(value.costUsdTicks);
+    usage.record({
+      agentId: agent.id,
+      sessionId: session.id,
+      turnId,
+      provider: session.provider,
+      model,
+      counterId: `${session.id}:grok:${getString(params, "promptId") ?? turnId}`,
+      baseline: false,
+      tokens: acpTokens({ ...value, cachedWriteTokens: value.cacheCreationTokens }),
+      reportedCost: ticks === null ? null : ticks / GROK_USD_TICKS,
     });
     return;
   }

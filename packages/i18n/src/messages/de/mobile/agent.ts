@@ -311,6 +311,9 @@ export const messages = {
   "mobile.agent.runtime.retryModels": "Modelle erneut laden",
   "mobile.agent.runtime.loadingModels": "Modelle werden geladen…",
   "mobile.agent.runtime.noModels": "Für diesen Anbieter sind keine Modelle verfügbar.",
+  "mobile.agent.runtime.usageLimit": "Nutzungslimit erreicht",
+  "mobile.agent.runtime.usageLimitWindow": "Limit ({window})",
+  "mobile.agent.runtime.usageLimitResets": "{limit} · Wird am {time} zurückgesetzt",
   "mobile.agent.access.title": "Zugriff",
   "mobile.agent.access.label": "Agentenzugriff",
   "mobile.agent.access.workspace": "Nur Arbeitsbereich",
@@ -361,7 +364,7 @@ export const messages = {
   "mobile.agent.backupModels.unavailable": "Gerade nicht verfügbar · übersprungen",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.note":
-    "{name} wechselt nie, nachdem das Schreiben begonnen hat. Wenn das Limit endet oder 10 Minuten nach einem Anbieterfehler, kehrt {name} zu {model} zurück.",
+    "Stoppt ein Nutzungslimit {name} nach Beginn der Arbeit, setzt {name} dieselbe Arbeit mit dem ersten verfügbaren Modell der Reihenfolge fort. Wenn das Limit endet oder 10 Minuten nach einem Anbieterfehler, kehrt {name} zu {model} zurück.",
   "mobile.agent.busyMessage.label": "Während der Arbeit",
   "mobile.agent.busyMessage.footer":
     "Was mit einer Nachricht passiert, die du sendest, während der Agent arbeitet. Warteschlange behält sie, bis der Durchlauf endet. Steuern gibt sie dem Agenten während des Durchlaufs.",

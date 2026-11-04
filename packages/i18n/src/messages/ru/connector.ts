@@ -355,6 +355,8 @@ export const messages = {
   "connector.whatsapp.title": "WhatsApp",
   "connector.whatsapp.description":
     "Привяжите номер WhatsApp к этому компьютеру. Оркестратор WhatsApp спрашивает нужного агента и отвечает.",
+  "connector.whatsapp.descriptionHost":
+    "Привяжите номер WhatsApp к этому серверу. Оркестратор WhatsApp спрашивает нужного агента и отвечает.",
   "connector.whatsapp.statusConnected": "Подключено",
   "connector.whatsapp.statusAttention": "Требует внимания",
   "connector.whatsapp.summaryConnected": {
@@ -386,6 +388,7 @@ export const messages = {
   "connector.whatsapp.dedicatedNote":
     "OpenBot получает сообщения от людей, которым вы разрешили писать. Остальные получают код, который нужно передать вам.",
   "connector.whatsapp.helpLoggedOut": "WhatsApp удалил этот компьютер из связанных устройств. Привяжите номер заново.",
+  "connector.whatsapp.helpLoggedOutHost": "WhatsApp удалил этот сервер из связанных устройств. Привяжите номер заново.",
   "connector.whatsapp.helpError":
     "OpenBot не может связаться с WhatsApp на этом номере. Переподключите или отключите номер.",
   "connector.whatsapp.retryAt": "WhatsApp попросил OpenBot подождать. Следующая попытка в {time}.",
@@ -414,6 +417,7 @@ export const messages = {
   "connector.whatsapp.stepAgent": "Агент",
   "connector.whatsapp.connectTitle": "Привязка WhatsApp",
   "connector.whatsapp.connectDescription": "Выберите номер, затем привяжите этот компьютер в WhatsApp на телефоне.",
+  "connector.whatsapp.connectDescriptionHost": "Выберите номер, затем привяжите этот сервер в WhatsApp на телефоне.",
   "connector.whatsapp.kindLabel": "Номер",
   "connector.whatsapp.kindPersonal": "Мой личный номер",
   "connector.whatsapp.kindPersonalDescription":

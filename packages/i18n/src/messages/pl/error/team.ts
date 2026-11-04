@@ -78,6 +78,7 @@ export const messages = {
   "error.team.agentUpdateUnsupported": "To połączenie nie obsługuje aktualizowania agentów.",
   "error.team.contextResetUnsupported": "To połączenie nie obsługuje rozpoczynania nowego czatu.",
   "error.team.contextCompactUnsupported": "To połączenie nie obsługuje kompaktowania kontekstu.",
+  "error.team.messageDeleteUnsupported": "To połączenie nie obsługuje usuwania wiadomości.",
   "error.team.workspaceDirectoryUnsupported": "To połączenie nie obsługuje pokazywania folderów.",
   "error.team.conversationFileSearchUnsupported": "To połączenie nie obsługuje wyszukiwania plików.",
   "error.team.sideQuestionUnsupported": "To połączenie nie obsługuje pytań pobocznych.",

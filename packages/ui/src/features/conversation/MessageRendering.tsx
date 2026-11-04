@@ -10,11 +10,13 @@ import {
   Button,
   ChevronRight,
   CircleDot,
+  ConfirmDialog,
   ContextMenu,
   DropdownMenu,
   Hash,
   Info,
   LoaderCircle,
+  Trash2,
 } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
@@ -995,6 +997,8 @@ export function MessageMenu(props: {
   branchDisabled?: boolean | undefined;
   /** Opens a channel with this message in its composer. Without it, or with no channel, the menu has no such item. */
   sendToChannel?: { channels: { id: string; name: string }[]; onSend: (channelId: string) => void } | undefined;
+  /** Asks to delete this message. Without it, the menu has no such item. */
+  onDelete?: (() => void) | undefined;
 }) {
   const { t } = useText();
   const authorName = () => props.authorName ?? t("chat.message.agentFallback");
@@ -1105,6 +1109,59 @@ export function MessageMenu(props: {
           </ContextMenu.Item>
         )}
       </Show>
+      <Show when={props.onDelete}>
+        {(onDelete) => (
+          <>
+            <ContextMenu.Separator />
+            <ContextMenu.Item class="ui-action-menu-danger" onSelectAfterClose={onDelete()}>
+              <Trash2 aria-hidden="true" />
+              <span>{t("chat.menu.delete")}</span>
+            </ContextMenu.Item>
+          </>
+        )}
+      </Show>
     </ContextMenu.Content>
+  );
+}
+
+/**
+ * Asks before a message is deleted, for the Delete item of `MessageMenu`. The dialog stays open while
+ * `onDelete` runs, and shows its failure. It closes when the message is deleted.
+ */
+export function DeleteMessageDialog(props: {
+  /** The message to delete, or null while the dialog is closed. */
+  messageId: string | null;
+  onDelete: (messageId: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const { t, errorMessage } = useText();
+  const [error, setError] = createSignal<string | undefined>();
+  const close = () => {
+    setError(undefined);
+    props.onClose();
+  };
+  const confirm = async () => {
+    const messageId = props.messageId;
+    if (messageId === null) return;
+    setError(undefined);
+    try {
+      await props.onDelete(messageId);
+      close();
+    } catch (failure) {
+      setError(errorMessage(failure, t("chat.errorStatus.deleteMessage")));
+    }
+  };
+  return (
+    <ConfirmDialog
+      open={props.messageId !== null}
+      onCancel={close}
+      onConfirm={confirm}
+      title={t("chat.deleteMessage.title")}
+      description={t("chat.deleteMessage.body")}
+      confirmLabel={t("common.delete")}
+      pendingLabel={t("chat.deleteMessage.pending")}
+      error={error()}
+      initialFocus="cancel"
+    />
   );
 }

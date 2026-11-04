@@ -79,6 +79,7 @@ export const messages = {
   "error.team.agentUpdateUnsupported": "Deze verbinding ondersteunt het bijwerken van agents niet.",
   "error.team.contextResetUnsupported": "Deze verbinding ondersteunt het starten van een nieuwe chat niet.",
   "error.team.contextCompactUnsupported": "Deze verbinding ondersteunt het comprimeren van de context niet.",
+  "error.team.messageDeleteUnsupported": "Deze verbinding ondersteunt het verwijderen van berichten niet.",
   "error.team.workspaceDirectoryUnsupported": "Deze verbinding ondersteunt het tonen van mappen niet.",
   "error.team.conversationFileSearchUnsupported": "Deze verbinding ondersteunt het zoeken in bestanden niet.",
   "error.team.sideQuestionUnsupported": "Deze verbinding ondersteunt geen zijvragen.",

@@ -35,6 +35,7 @@ import {
   CHAT_COLORS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_CAPABILITY } from "@openbot/contracts/team-protocol/focus-use-v1";
+import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
@@ -159,6 +160,8 @@ interface WebWorkspaceState {
   otherTab: boolean;
   recovery: RemoteRecoveryStatus | null;
   workspaceLoaded: boolean;
+  /** The host answered once. A saved frame sets `workspaceLoaded` before that, so the first-load screen waits for this. */
+  synced: boolean;
   panelsFailed: boolean;
   panelsLoading: boolean;
   agentStatus: AgentStatus | null;
@@ -248,6 +251,7 @@ export function createWebWorkspace(
     otherTab: false,
     recovery: null,
     workspaceLoaded: false,
+    synced: false,
     panelsFailed: false,
     panelsLoading: false,
     agentStatus: null,
@@ -910,6 +914,7 @@ export function createWebWorkspace(
           setState((draft) => {
             draft.host = null;
             draft.workspaceLoaded = false;
+            draft.synced = false;
             draft.memberId = null;
             draft.selectedId = null;
             draft.agents = [];
@@ -1029,6 +1034,7 @@ export function createWebWorkspace(
     setState((draft) => {
       draft.revocationRevision += 1;
       draft.workspaceLoaded = false;
+      draft.synced = false;
       draft.agents = [];
       draft.agentsLoaded = false;
       draft.conversations = {};
@@ -1140,6 +1146,7 @@ export function createWebWorkspace(
       if (!sameHost) draft.otherTab = false;
       if (!sameHost) {
         draft.workspaceLoaded = false;
+        draft.synced = false;
         draft.agentStatus = null;
         draft.models = [];
       }
@@ -1241,6 +1248,7 @@ export function createWebWorkspace(
         draft.agentsLoaded = true;
         draft.agentsFromFrame = false;
         draft.workspaceLoaded = true;
+        draft.synced = true;
         draft.agentStatus = agentStatus;
         draft.models = models;
         draft.connectionError = null;
@@ -1877,6 +1885,27 @@ export function createWebWorkspace(
     },
     markRead,
     markAllRead,
+    /**
+     * Deletes one message of an agent's chat on the connected host, and removes it from the loaded
+     * page at once. A reply that quotes it shows the original as deleted. A failure throws to the
+     * dialog that asked.
+     */
+    async deleteMessage(agentId: string, messageId: string): Promise<void> {
+      const remove = runtime.deleteMessage;
+      if (state.status !== "online" || !remove || !state.capabilities.includes(MESSAGE_DELETE_CAPABILITY))
+        throw new Error(currentText().t("error.team.messageDeleteUnsupported"));
+      const current = generation;
+      await remove({ kind: "agent", agentId, messageId });
+      if (disposed || current !== generation) return;
+      setState((draft) => {
+        const item = draft.conversations[agentId];
+        const page = item?.page;
+        if (!item || !page) return;
+        page.messages = page.messages.filter((message) => message.id !== messageId);
+        delete page.references[messageId];
+        item.missingReferences = { ...item.missingReferences, [messageId]: true };
+      });
+    },
     async mutateSidebarLayout(action: SidebarLayoutAction) {
       if (state.status !== "online" || !state.capabilities.includes("sidebar-layout")) {
         throw new Error(currentText().t("webClient.error.sidebarLayout"));

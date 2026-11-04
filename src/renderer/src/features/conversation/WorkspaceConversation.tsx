@@ -10,7 +10,9 @@ import {
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
+import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { hasVisibleToasts } from "@openbot/ui";
+import type { AgentMessage } from "@openbot/ui/data";
 import {
   type BackupModelSource,
   rememberedBackupModels,
@@ -59,6 +61,11 @@ import { useConversation } from "./conversation-context";
 import { useConversationController } from "./conversation-controller-context";
 import { messagePromptRequestKey, promptRequestKey } from "./conversation-keys";
 import type { ConversationThreads } from "./conversation-types";
+import {
+  createAgentMessageDeleteAccess,
+  desktopAgentMessageDeleteAccess,
+  readerCanDeleteMessage,
+} from "./message-delete-access";
 
 /**
  * The transcript of the active Agent, with everything the composer needs to send
@@ -160,6 +167,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     sendMessage,
     markAgentMessagesRead,
     markAgentMessagesUnread,
+    deleteAgentMessage,
     loadOlderAgentMessages,
     loadLatestAgentMessages,
     searchAgentMessages,
@@ -369,6 +377,30 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const usageLimited = (choice: AgentModelChoice) =>
     usageLimitedModels().some((limited) => sameAgentModelChoice(limited, choice));
 
+  /** Whether the reader is the sender `senderId`: a member on a joined server, or anyone on this computer. */
+  const isOwnSender = (senderId: string) => {
+    const state = auth.centralAuth();
+    return isReaderAuthor(senderId, {
+      memberId: currentTeamMember()?.id ?? null,
+      accountUserId: state.status === "signed_in" ? state.user.id : null,
+      onOwnComputer: activeServer()?.kind === "local",
+    });
+  };
+  const deletesAnyAgentMessage = createAgentMessageDeleteAccess(desktopAgentMessageDeleteAccess(activeServer));
+  /** The host deletes messages only with `message-delete-v1`. This computer always can. */
+  const messageDeleteSupported = () => activeServerSupportsCapability(MESSAGE_DELETE_CAPABILITY);
+  /** Whether the reader may delete `message` in the active agent's chat or side threads. */
+  const canDeleteAgentMessage = (message: AgentMessage) =>
+    readerCanDeleteMessage(message, {
+      deleteAny: deletesAnyAgentMessage(activeAgent()?.id),
+      isOwnSender,
+    });
+  const deleteActiveAgentMessage = (messageId: string) => {
+    const agentId = activeAgent()?.id;
+    return agentId ? deleteAgentMessage(agentId, messageId) : Promise.resolve();
+  };
+  /** The Delete action of the active agent's chat. A host without `message-delete-v1` has none. */
+  const deleteMessageAction = () => (messageDeleteSupported() ? deleteActiveAgentMessage : undefined);
   const { t } = useText();
   const agentTasks = useAgentTasks();
   const agentThreads = useAgentThreads();
@@ -574,14 +606,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         server={activeServer()}
         presence={teamPresence()}
         currentUserEmail={props.account().email}
-        isOwnSender={(senderId) => {
-          const state = auth.centralAuth();
-          return isReaderAuthor(senderId, {
-            memberId: currentTeamMember()?.id ?? null,
-            accountUserId: state.status === "signed_in" ? state.user.id : null,
-            onOwnComputer: activeServer()?.kind === "local",
-          });
-        }}
+        isOwnSender={isOwnSender}
         // The browser and the remote desktop show in the main window only.
         browserEnabled={
           !platform.landingPreview && !platform.chatWindow && activeServerSupportsCapability("browser-control")
@@ -629,6 +654,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
               }
             : undefined
         }
+        onDeleteMessage={deleteMessageAction()}
+        canDeleteMessage={canDeleteAgentMessage}
         sendToChannel={sendToChannel()}
         onLoadOlder={() => void loadOlderAgentMessages()}
         onLoadLatest={() => (activeAgent() ? loadLatestAgentMessages(activeAgent()?.id ?? "") : Promise.resolve())}
