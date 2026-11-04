@@ -1,5 +1,6 @@
 import {
   checkHostedSitePath,
+  HOSTED_SITE_ACCOUNT_LIMIT,
   HOSTED_SITE_MIME_TYPES,
   HOSTED_SITE_UPLOAD_LIMITS,
   type HostedSitePathProblem,
@@ -14,11 +15,7 @@ export const HOSTED_SITE_LIMITS = {
   uploadAttemptMultiplier: 2,
   creationsPerHour: 20,
   creationsPerDay: 100,
-  /**
-   * The most active sites of one account on all servers and the unlinked bucket, so that many paid
-   * servers cannot hold sites without bound. Sites on a server with a custom limit do not count.
-   */
-  accountSites: 300,
+  accountSites: HOSTED_SITE_ACCOUNT_LIMIT,
   ...HOSTED_SITE_UPLOAD_LIMITS,
   siteLifetimeMs: 30 * 24 * 60 * 60_000,
   tombstoneLifetimeMs: 90 * 24 * 60 * 60_000,

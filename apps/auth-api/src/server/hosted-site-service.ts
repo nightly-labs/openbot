@@ -87,8 +87,10 @@ export class HostedSiteService {
           .all<SiteRow & { file_count: number; total_bytes: number }>(),
       );
       const bucket = yield* resolveHostedSiteBucket(database, scope.userId, serverId, now);
-      const { limit, used } = yield* hostedSiteSlots(database, scope.userId, bucket, now);
-      return { sites: rows.results.map((row) => mapSite(row, this.localSiteOrigin)), limit, used };
+      const { limit, used, reason } = yield* hostedSiteSlots(database, scope.userId, bucket, now);
+      const sites = rows.results.map((row) => mapSite(row, this.localSiteOrigin));
+      // `limitReason` is optional: released desktops read only `sites`, `limit` and `used`.
+      return reason === null ? { sites, limit, used } : { sites, limit, used, limitReason: reason };
     },
     (operation) => operation.pipe(Effect.provide(HostedSiteStorage.layer(this.database, this.bucket))),
   );

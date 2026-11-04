@@ -31,9 +31,11 @@ export const messages = defineMessages("error.site", {
     other:
       "This server is at its limit of {count} active sites. To publish another site, delete a site or use a cloud server with a plan that has more sites.",
   },
-  // Shown when the limit of a server is 0: the other servers of its pool, or the account cap, use all its sites.
+  // Shown when the servers with no plan use all the sites of their shared pool.
   "error.site.sharedLimit":
-    "The other active sites of your account use all the sites that this server can have. The servers with no plan share their sites, and an account has a limit of active sites on all servers. To publish a site here, delete a site, add users to your license, or use a cloud server with a plan that has more sites.",
+    "The servers of your account with no plan share their active sites, and all of them are in use. To publish a site here, delete a site on one of these servers, add users to your license, or use a cloud server with a plan that has more sites.",
+  "error.site.accountLimit":
+    "Your account has the maximum number of active sites on all its servers: {count}. To publish another site, delete a site.",
   "error.site.unlinkedLimit": {
     one: "This computer is not a server, and its account is at its limit of {count} active site. To publish another site, delete a site or use a cloud server with a plan that has more sites.",
     other:

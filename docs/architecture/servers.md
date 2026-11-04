@@ -88,7 +88,9 @@ bucket with 409 `site_other_server`. Every slot count is one SQL condition (`buc
 cannot take the same last slot, and each count reads the `hosted_sites_owner_status` index. A server's
 list returns its own sites as `used`, and as `limit` the sites it can have now: its own sites plus the
 free slots of its bucket and of the account cap. This keeps the meaning of the frozen `hosted-sites-v1`
-list. A server that adopts unlinked sites at registration takes only the free slots of its bucket.
+list. The optional `limitReason` tells why that limit can be lower than the bucket's own limit:
+`shared` for a server in the shared pool, `account` when the account cap is full. The desktop uses it
+only for the text of a `site_limit` error; the Team API list does not send it. A server that adopts unlinked sites at registration takes only the free slots of its bucket.
 A downgrade deletes nothing: a server above its limit cannot
 create a site, but it can replace one, and the extra sites end at their expiry. Removing a server moves its sites to the owner's unlinked bucket, so the owner's desktop can still delete them. A registered server updates a site that it published before registration in the unlinked scope.
 

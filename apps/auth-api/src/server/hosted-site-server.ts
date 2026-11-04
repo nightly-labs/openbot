@@ -4,6 +4,7 @@ import {
   HOSTED_SITE_HOST_TOKEN_HEADER,
   HOSTED_SITE_SHARED_FREE_LIMIT,
   HOSTED_SITE_UNLINKED_LIMIT,
+  type HostedSiteLimitReason,
 } from "@openbot/contracts/hosted-sites";
 import { LICENSE_SITES_PER_USER } from "@openbot/contracts/license";
 import { Effect } from "effect";
@@ -73,7 +74,7 @@ export const resolveHostedSiteScope = Effect.fn("HostedSites.resolveScope")(func
  * include one before the cleanup removes it. Every slot count uses this condition, so that the list, a new
  * site, an activation and an adoption agree.
  */
-export function holdsSiteSlotSql(alias: string): string {
+function holdsSiteSlotSql(alias: string): string {
   return `${alias}.status IN ('uploading', 'active', 'blocked')
     AND (${alias}.expires_at IS NULL OR ${alias}.expires_at > ?)
     AND (${alias}.status != 'uploading' OR EXISTS (
@@ -158,7 +159,7 @@ function bucketMemberSql(bucket: HostedSiteBucket, alias: string, now: number): 
 }
 
 /** The SQL count of the account's sites that hold a slot of the bucket, except `excludeSiteId`. */
-export function bucketSlotCountSql(
+function bucketSlotCountSql(
   bucket: HostedSiteBucket,
   userId: string,
   excludeSiteId: string | null,
@@ -234,18 +235,28 @@ export const hostedSiteSlots = Effect.fn("HostedSites.slots")(function* (
   const custom = bucket.kind === "server" && bucket.custom;
   const accountFree = custom ? Number.POSITIVE_INFINITY : HOSTED_SITE_LIMITS.accountSites - accountUsed;
   const free = Math.max(0, Math.min(bucket.limit - bucketUsed, accountFree));
+  const accountFull = !custom && accountFree <= 0;
   return {
     limit: Math.min(bucket.limit, used + free),
     used,
-    accountFull: !custom && accountFree <= 0,
+    accountFull,
+    reason: limitReason(bucket, accountFull),
   };
 });
+
+/** The account cap comes first: when it is full, a site on any server of the account frees a slot. */
+function limitReason(bucket: HostedSiteBucket, accountFull: boolean): HostedSiteLimitReason | null {
+  if (accountFull) return "account";
+  return bucket.kind === "shared" ? "shared" : null;
+}
 
 export interface HostedSiteSlots {
   limit: number;
   used: number;
   /** True when the account cap, not the bucket, has no free slot. */
   accountFull: boolean;
+  /** The list's `limitReason`: why other sites can take the slots of this list. */
+  reason: HostedSiteLimitReason | null;
 }
 
 /**

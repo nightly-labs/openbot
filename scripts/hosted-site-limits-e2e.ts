@@ -39,6 +39,7 @@ const listSchema = z.object({
   sites: z.array(z.object({ id: z.string(), status: z.string(), serverId: z.string().nullable() })),
   limit: z.number(),
   used: z.number(),
+  limitReason: z.enum(["shared", "account"]).optional(),
 });
 const uploadSchema = z.object({ uploadId: z.string(), site: z.object({ id: z.string() }) });
 const errorSchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) });
@@ -287,17 +288,19 @@ async function expectList(
   step: string,
   account: Account,
   server: Server | null,
-  expected: { limit: number; used: number; sites?: number },
+  expected: { limit: number; used: number; reason: "shared" | "account" | null; sites?: number },
 ) {
   const list = await account.list(server);
   const sites = list.sites.filter((site) => site.status === "active").length;
+  const reason = list.limitReason ?? null;
   record(
     scenario,
     step,
     list.limit === expected.limit &&
       list.used === expected.used &&
+      reason === expected.reason &&
       (expected.sites === undefined || sites === expected.sites),
-    `limit ${list.limit}, used ${list.used}, active sites ${sites}`,
+    `limit ${list.limit}, used ${list.used}, reason ${reason}, active sites ${sites}`,
   );
 }
 
@@ -307,10 +310,16 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     const second = account.addServer("second");
     expectPublished("free-pool", "the first server gets the 1 free site", await account.publish(first));
     expectRefused("free-pool", "the second server shares it", await account.publish(second), "share 1 active site");
-    await expectList("free-pool", "the first server shows its site", account, first, { limit: 1, used: 1, sites: 1 });
+    await expectList("free-pool", "the first server shows its site", account, first, {
+      limit: 1,
+      used: 1,
+      reason: "shared",
+      sites: 1,
+    });
     await expectList("free-pool", "the second server shows no free slot", account, second, {
       limit: 0,
       used: 0,
+      reason: "shared",
       sites: 0,
     });
     expectPublished("free-pool", "the unlinked bucket stays separate", await account.publish(null));
@@ -327,6 +336,7 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     await expectList("license-pool", "the list shows the effective limit", account, first, {
       limit: 4,
       used: 4,
+      reason: "shared",
       sites: 4,
     });
     account.setLicense(3, "active", Date.now() + 30 * DAY);
@@ -334,6 +344,7 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     await expectList("license-pool", "the second server gets the free slots", account, second, {
       limit: 5,
       used: 3,
+      reason: "shared",
       sites: 3,
     });
     account.setLicense(3, "past_due", Date.now() - DAY);
@@ -342,6 +353,7 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     await expectList("license-pool", "a lapsed license deletes no site", account, first, {
       limit: 1,
       used: 4,
+      reason: "shared",
       sites: 4,
     });
     account.setLicense(3, "canceled", Date.now() + 30 * DAY);
@@ -358,7 +370,12 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     await account.publishMany(paid, 3);
     record("server-plan", "the Starter server has its own 3 sites", true, "3 published with a full pool");
     expectRefused("server-plan", "the Starter server stops at 3", await account.publish(paid), "3 active sites");
-    await expectList("server-plan", "the Starter list shows its plan", account, paid, { limit: 3, used: 3, sites: 3 });
+    await expectList("server-plan", "the Starter list shows its plan", account, paid, {
+      limit: 3,
+      used: 3,
+      reason: null,
+      sites: 3,
+    });
   },
 
   async "custom-limit"(account) {
@@ -374,6 +391,7 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     await expectList("custom-limit", "the custom list shows its limit", account, custom, {
       limit: 3,
       used: 3,
+      reason: null,
       sites: 3,
     });
   },
@@ -399,7 +417,16 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     account.insertActiveSites(pool, 300);
     expectRefused("account-cap", "the 301st site is refused", await account.publish(pool), "limit of 300");
     // The list shows only sites with a deployment, so the filler rows count but do not show.
-    await expectList("account-cap", "the list stops at the cap", account, pool, { limit: 300, used: 300 });
+    await expectList("account-cap", "the list stops at the cap", account, pool, {
+      limit: 300,
+      used: 300,
+      reason: "account",
+    });
+    await expectList("account-cap", "the unlinked bucket stops at the cap", account, null, {
+      limit: 0,
+      used: 0,
+      reason: "account",
+    });
     expectPublished("account-cap", "a custom server is outside the cap", await account.publish(custom));
   },
 };

@@ -33,7 +33,9 @@ export const messages = {
       "Bu sunucu {count} etkin site sınırına ulaştı. Başka bir site yayımlamak için bir siteyi silin veya daha fazla site içeren bir plana sahip bulut sunucusu kullanın.",
   },
   "error.site.sharedLimit":
-    "Hesabınızın diğer etkin siteleri bu sunucunun sahip olabileceği tüm siteleri kullanıyor. Planı olmayan sunucular sitelerini paylaşır ve bir hesabın tüm sunucularda etkin site sınırı vardır. Burada bir site yayımlamak için bir siteyi silin, lisansınıza kullanıcı ekleyin veya daha fazla site içeren bir plana sahip bir bulut sunucusu kullanın.",
+    "Hesabınızın planı olmayan sunucuları etkin sitelerini paylaşır ve hepsi kullanımda. Burada bir site yayımlamak için bu sunuculardan birindeki bir siteyi silin, lisansınıza kullanıcı ekleyin veya daha fazla site içeren bir plana sahip bir bulut sunucusu kullanın.",
+  "error.site.accountLimit":
+    "Hesabınız tüm sunucularında en fazla sayıda etkin siteye sahip: {count}. Başka bir site yayımlamak için bir siteyi silin.",
   "error.site.unlinkedLimit": {
     one: "Bu bilgisayar bir sunucu değil ve hesabı {count} etkin site sınırına ulaştı. Başka bir site yayımlamak için bir siteyi silin veya daha fazla site içeren bir plana sahip bulut sunucusu kullanın.",
     other:

@@ -1,5 +1,5 @@
 import type { HostedSiteList, HostedSiteStatus, HostedSiteSummary } from "./ipc-hosted-sites";
-import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
+import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
 /**
  * The upload rules that the desktop checks before an upload and the account server enforces.
@@ -26,6 +26,27 @@ export const HOSTED_SITE_UNLINKED_LIMIT = 1;
  * license. A license gives `LICENSE_SITES_PER_USER` for each user instead.
  */
 export const HOSTED_SITE_SHARED_FREE_LIMIT = 1;
+
+/**
+ * The most active sites of one account on all servers and the unlinked bucket, so that many paid servers
+ * cannot hold sites without bound. Sites on a server with a custom limit do not count.
+ */
+export const HOSTED_SITE_ACCOUNT_LIMIT = 300;
+
+/**
+ * Why other sites can take the slots of a list: `shared` when the server shares the pool of the servers
+ * with no plan, `account` when the account has `HOSTED_SITE_ACCOUNT_LIMIT` active sites. The account server
+ * sends `limitReason` in a site list only for these cases; an older one never sends it.
+ */
+export const HOSTED_SITE_LIMIT_REASONS = ["shared", "account"] as const;
+export type HostedSiteLimitReason = (typeof HOSTED_SITE_LIMIT_REASONS)[number];
+
+/** The `limitReason` of a site list response, or null when the account server sends none. */
+export function parseHostedSiteLimitReason(value: unknown): HostedSiteLimitReason | null {
+  if (!isDynamicRecord(value)) return null;
+  const reason = value.limitReason;
+  return isOneOf(HOSTED_SITE_LIMIT_REASONS, reason) ? reason : null;
+}
 
 /** The request headers that tie a site request to a registered server: its host id and machine token. */
 export const HOSTED_SITE_HOST_ID_HEADER = "OpenBot-Host-Id";

@@ -35,7 +35,9 @@ export const messages = {
       "Ce serveur a atteint sa limite de {count} sites actifs. Pour publier un autre site, supprimez un site ou utilisez un serveur cloud avec un forfait qui a plus de sites.",
   },
   "error.site.sharedLimit":
-    "Les autres sites actifs de votre compte utilisent tous les sites que ce serveur peut avoir. Les serveurs sans forfait partagent leurs sites, et un compte a une limite de sites actifs sur tous les serveurs. Pour publier un site ici, supprimez un site, ajoutez des utilisateurs à votre licence ou utilisez un serveur cloud avec un forfait qui a plus de sites.",
+    "Les serveurs de votre compte sans forfait partagent leurs sites actifs, et tous sont utilisés. Pour publier un site ici, supprimez un site sur l'un de ces serveurs, ajoutez des utilisateurs à votre licence ou utilisez un serveur cloud avec un forfait qui a plus de sites.",
+  "error.site.accountLimit":
+    "Votre compte a le nombre maximal de sites actifs sur tous ses serveurs : {count}. Pour publier un autre site, supprimez un site.",
   "error.site.unlinkedLimit": {
     one: "Cet ordinateur n’est pas un serveur, et son compte a atteint la limite de {count} site actif. Pour publier un autre site, supprimez un site ou utilisez un serveur cloud avec un forfait qui a plus de sites.",
     other:

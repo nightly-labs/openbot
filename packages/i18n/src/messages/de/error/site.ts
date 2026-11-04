@@ -33,7 +33,9 @@ export const messages = {
       "Dieser Server hat sein Limit von {count} aktiven Websites erreicht. Um eine weitere Website zu veröffentlichen, lösche eine Website oder nutze einen Cloud-Server mit einem Tarif mit mehr Websites.",
   },
   "error.site.sharedLimit":
-    "Die anderen aktiven Websites deines Kontos nutzen alle Websites, die dieser Server haben kann. Die Server ohne Tarif teilen sich ihre Websites, und ein Konto hat ein Limit für aktive Websites auf allen Servern. Um hier eine Website zu veröffentlichen, lösche eine Website, füge deiner Lizenz Nutzer hinzu oder nutze einen Cloud-Server mit einem Tarif, der mehr Websites hat.",
+    "Die Server deines Kontos ohne Tarif teilen sich ihre aktiven Websites, und alle sind belegt. Um hier eine Website zu veröffentlichen, lösche eine Website auf einem dieser Server, füge deiner Lizenz Nutzer hinzu oder nutze einen Cloud-Server mit einem Tarif, der mehr Websites hat.",
+  "error.site.accountLimit":
+    "Dein Konto hat die maximale Anzahl aktiver Websites auf allen seinen Servern: {count}. Um eine weitere Website zu veröffentlichen, lösche eine Website.",
   "error.site.unlinkedLimit": {
     one: "Dieser Computer ist kein Server, und sein Konto hat das Limit von {count} aktiven Website erreicht. Um eine weitere Website zu veröffentlichen, lösche eine Website oder nutze einen Cloud-Server mit einem Tarif mit mehr Websites.",
     other:
