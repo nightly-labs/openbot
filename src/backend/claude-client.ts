@@ -355,6 +355,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #fallbackApiKey: (() => string | null) | undefined;
   /** Whether the last account read found no claude.ai account and signed in with the key. */
   #onApiKey = false;
+  /** Whether this client read the account. A client for one generation without tools does not. */
+  #accountRead = false;
   readonly readHistory: ReadProviderHistory;
   /** Threads whose process was closed for being idle keep the config that resumes them. */
   readonly #threads = new IdleThreadPool<ThreadRuntime, ThreadConfig>({
@@ -722,6 +724,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const onApiKey = status.loggedIn !== true && Boolean(this.#fallbackApiKey?.());
     if (onApiKey) status = yield* this.#readAuthStatusEffect(true);
     this.#onApiKey = onApiKey && status.loggedIn === true;
+    this.#accountRead = true;
     if (status.loggedIn !== true) return { account: null, requiresOpenaiAuth: false };
     return {
       account: {
@@ -732,6 +735,18 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       },
       requiresOpenaiAuth: false,
     };
+  });
+
+  /**
+   * A client that did not read the account takes the key decision from the last status of its folder,
+   * which the provider's main client read. Without one, it reads the account once. A failed read
+   * leaves the session without the key, as before (#4831).
+   */
+  readonly #decideApiKeyEffect = Effect.fn("ClaudeAgentClient.decideApiKey")(function* (this: ClaudeAgentClient) {
+    if (this.#accountRead || !this.#fallbackApiKey?.()) return;
+    const last = lastAuthStatuses.get(this.#environment(false).CLAUDE_CONFIG_DIR ?? "");
+    if (last) this.#onApiKey = last.loggedIn !== true;
+    else yield* this.#readAccountEffect().pipe(Effect.ignore);
   });
 
   /**
@@ -841,6 +856,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     config: ThreadConfig,
     resume: boolean,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
+    yield* this.#decideApiKeyEffect();
     const input = new AsyncMessageQueue();
     const appliedEffort = this.#resolveEffort(config.model, config.effort);
     const canUseTool: CanUseTool = (toolName, toolInput, options) =>
