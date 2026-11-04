@@ -236,6 +236,7 @@ import type { BundledProviderExecutables } from "./cli";
 import type { ConversationMarkerExclusions } from "./conversation-read-store";
 import type { ProviderSession } from "./database/provider-sessions";
 import { reportOriginalFailure } from "./effect-boundary";
+import { GMAIL_MCP_URL } from "./gmail-drafts";
 import type { HostMemory } from "./host-memory";
 import type { SignInRegion } from "./kimi-region";
 import type { LinkWallet } from "./link-wallet";
@@ -1608,6 +1609,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.visualPreview === undefined ? {} : { visualPreview: options.visualPreview }),
       ...(options.screenCapture === undefined ? {} : { screenCapture: options.screenCapture }),
       mcpServers: mcpServersFromGateway(this.#mcp, options.prepareMcpTest),
+      gmailAccounts: () => this.#mcp.accountTokens(GMAIL_MCP_URL),
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
       apiKeys: options.agentApiKeys ?? null,
       hooks: {

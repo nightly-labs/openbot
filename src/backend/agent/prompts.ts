@@ -364,6 +364,17 @@ export function apiKeyPromptResult(blockId: string, saved: SavedApiKey | null): 
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 
+/** What the host did when a block's button was pressed, as the agent reads it: names and ids. */
+export type ConfirmedActionOutput = Readonly<Record<string, string>>;
+
+/**
+ * The result of a block whose button made the host act, such as sending a Gmail draft: what the host
+ * did, never a value the user typed.
+ */
+export function confirmedActionPromptResult(blockId: string, output: ConfirmedActionOutput): DynamicToolResult {
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify({ ...output, blockId }) }] };
+}
+
 type VaultRequestArguments = BrowserToolArguments<"request_vault_item">;
 
 /** The arguments that an agent may fill in, for each kind. A secret field is never one of them. */

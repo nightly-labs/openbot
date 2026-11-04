@@ -367,4 +367,8 @@ export const messages = {
     "Liczba otwartych zadań tego agenta: {count}. Zamknij zadanie, a potem rozpocznij lub otwórz inne.",
   "error.backend.taskRemoteUnsupported": "Zadania są dostępne tylko dla agentów na tym komputerze.",
   "error.backend.taskStartFailed": "OpenBot nie może rozpocząć zadania. Zamiast tego wykonaj pracę w tej turze.",
+  "error.backend.uiBlockActionRunning": "OpenBot jeszcze to wykonuje. Poczekaj, aż skończy.",
+  "error.backend.gmailDraftChanged":
+    "Wersja robocza zmieniła się po tym, jak OpenBot ją pokazał, więc nie została wysłana. Poproś agenta, aby pokazał ją ponownie.",
+  "error.backend.gmailSendFailed": "Gmail nie wysłał wersji roboczej: {reason}",
 } as const satisfies PartialTranslation<typeof source>;

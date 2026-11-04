@@ -365,7 +365,7 @@ export const messages = {
   "marketplace.plugin.trello.prompt.newCards": "이 실행 항목들을 내 Trello 보드에 카드로 추가해 줘.",
   "marketplace.plugin.gmail.tagline": "이메일 검색, 초안, 라벨",
   "marketplace.plugin.gmail.description":
-    "Gmail을 사용하면 에이전트가 이메일 스레드와 메일을 검색하고 읽으며, 초안을 작성하고, 라벨을 붙이거나 떼고, 라벨을 만들고, 이메일을 휴지통으로 옮기거나 되돌리고, 이메일을 스팸으로 표시할 수 있어요. 에이전트는 이메일을 보낼 수 없어요. 에이전트가 초안을 작성하면 사용자가 Gmail에서 확인하고 보내요. 에이전트는 이메일을 영구 삭제할 수 없어요. Google이 공식으로 제공하는 Gmail MCP 서버이며 Developer Preview 단계예요. 사용자는 각자 브라우저에서 자신의 Google 계정으로 로그인하고 Google 동의 화면에서 액세스를 허용해요. OpenBot에는 자체 Google 로그인 앱이 있어서 사용자가 Google Cloud를 설정할 필요가 없어요. 다른 사람이 보낸 이메일에 에이전트를 위한 지시가 들어 있을 수 있으니, 신뢰할 수 없는 이메일을 읽은 뒤 에이전트가 하는 일을 확인하세요.",
+    "Gmail을 사용하면 에이전트가 이메일 스레드와 메일을 검색하고 읽으며, 초안을 작성하고, 라벨을 붙이거나 떼고, 라벨을 만들고, 이메일을 휴지통으로 옮기거나 되돌리고, 이메일을 스팸으로 표시할 수 있어요. 에이전트는 승인을 받아야만 이메일을 보내요. 에이전트가 초안을 작성하면 OpenBot이 받는 사람, 제목, 본문을 보여 주고, 서버 소유자나 관리자가 보내기를 눌러야만 이메일이 전송돼요. 전체 액세스 권한이 있는 에이전트는 사용자가 요청한 경우 카드 없이 보내며, 카드는 채팅에 남아요. 에이전트는 이메일을 영구 삭제할 수 없어요. Google이 공식으로 제공하는 Gmail MCP 서버이며 Developer Preview 단계예요. 사용자는 각자 브라우저에서 자신의 Google 계정으로 로그인하고 Google 동의 화면에서 액세스를 허용해요. OpenBot에는 자체 Google 로그인 앱이 있어서 사용자가 Google Cloud를 설정할 필요가 없어요. 다른 사람이 보낸 이메일에 에이전트를 위한 지시가 들어 있을 수 있으니, 신뢰할 수 없는 이메일을 읽은 뒤 에이전트가 하는 일을 확인하세요.",
   "marketplace.plugin.gmail.app":
     "이메일 검색, 초안, 라벨, 휴지통을 브라우저 로그인 방식의 Google Gmail MCP 서버로 제공해요.",
   "marketplace.plugin.gmail.prompt.unread": "오늘 온 읽지 않은 이메일을 요약해 줘.",

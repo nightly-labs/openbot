@@ -384,4 +384,8 @@ export const messages = {
     "Deze agent heeft {count} open taken. Sluit een taak en start of open dan een andere.",
   "error.backend.taskRemoteUnsupported": "Taken zijn alleen beschikbaar voor agents op deze computer.",
   "error.backend.taskStartFailed": "OpenBot kon de taak niet starten. Doe het werk in plaats daarvan in deze beurt.",
+  "error.backend.uiBlockActionRunning": "OpenBot is hier nog mee bezig. Wacht tot het klaar is.",
+  "error.backend.gmailDraftChanged":
+    "Het concept is gewijzigd nadat OpenBot het liet zien, dus het is niet verzonden. Vraag de agent het opnieuw te tonen.",
+  "error.backend.gmailSendFailed": "Gmail heeft het concept niet verzonden: {reason}",
 } as const satisfies PartialTranslation<typeof source>;

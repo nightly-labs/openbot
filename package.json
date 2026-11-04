@@ -256,6 +256,7 @@
     "test:ui-blocks": "bun scripts/ui-blocks-e2e.ts",
     "test:composer-attachments": "bun scripts/composer-attachments-e2e.ts",
     "test:agent-api-keys": "bun scripts/agent-api-keys-e2e.ts",
+    "test:gmail-send-draft": "bun scripts/gmail-send-draft-e2e.ts",
     "test:antigravity-start": "bun scripts/antigravity-start-e2e.ts",
     "test:pi-sign-in-watch": "bun scripts/pi-sign-in-watch-e2e.ts",
     "test:antigravity-usage": "bun scripts/antigravity-usage-e2e.ts",

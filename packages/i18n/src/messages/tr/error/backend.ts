@@ -362,4 +362,8 @@ export const messages = {
     "Bu ajanın {count} açık görevi var. Bir görevi kapatın, ardından başka bir görev başlatın veya açın.",
   "error.backend.taskRemoteUnsupported": "Görevler yalnızca bu bilgisayardaki ajanlar için kullanılabilir.",
   "error.backend.taskStartFailed": "OpenBot görevi başlatamadı. Bunun yerine işi bu turda yapın.",
+  "error.backend.uiBlockActionRunning": "OpenBot bunu hâlâ yapıyor. Bitmesini bekle.",
+  "error.backend.gmailDraftChanged":
+    "Taslak, OpenBot gösterdikten sonra değişti, bu yüzden gönderilmedi. Ajandan yeniden göstermesini iste.",
+  "error.backend.gmailSendFailed": "Gmail taslağı göndermedi: {reason}",
 } as const satisfies PartialTranslation<typeof source>;

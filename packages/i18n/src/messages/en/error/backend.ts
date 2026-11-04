@@ -367,4 +367,8 @@ export const messages = defineMessages("error.backend", {
     "This agent has {count} open tasks. Close a task, then start or open another one.",
   "error.backend.taskRemoteUnsupported": "Tasks are only available for agents on this computer.",
   "error.backend.taskStartFailed": "OpenBot could not start the task. Do the work in this turn instead.",
+  "error.backend.uiBlockActionRunning": "OpenBot is still doing this. Wait until it is done.",
+  "error.backend.gmailDraftChanged":
+    "The draft changed after OpenBot showed it, so it was not sent. Ask the agent to show it again.",
+  "error.backend.gmailSendFailed": "Gmail did not send the draft: {reason}",
 });

@@ -354,4 +354,8 @@ export const messages = {
     "이 에이전트에는 열린 작업이 {count}개 있어요. 작업 하나를 닫은 후 다른 작업을 시작하거나 여세요.",
   "error.backend.taskRemoteUnsupported": "작업은 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
   "error.backend.taskStartFailed": "OpenBot이 작업을 시작할 수 없었어요. 대신 이 턴에서 작업을 처리하세요.",
+  "error.backend.uiBlockActionRunning": "OpenBot이 아직 처리 중입니다. 끝날 때까지 기다리세요.",
+  "error.backend.gmailDraftChanged":
+    "OpenBot이 표시한 후 초안이 바뀌어 보내지 않았습니다. 에이전트에게 다시 표시해 달라고 요청하세요.",
+  "error.backend.gmailSendFailed": "Gmail이 초안을 보내지 않았습니다: {reason}",
 } as const satisfies PartialTranslation<typeof source>;

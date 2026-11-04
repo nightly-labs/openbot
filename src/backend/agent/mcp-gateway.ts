@@ -19,7 +19,12 @@ import type { AgentProvider } from "../agent-client";
 import { causeHelpers } from "../effect-boundary";
 import type { McpOperationError } from "../mcp-effects";
 import { McpHandoffLog } from "../mcp-handoff-log";
-import { type McpOAuthAuthority, type McpSignInOpener, mcpOAuthAccountKey } from "../mcp-oauth-provider";
+import {
+  type McpOAuthAuthority,
+  type McpSignInOpener,
+  mcpOAuthAccountKey,
+  normalizeResource,
+} from "../mcp-oauth-provider";
 import { McpOAuthProxy, type McpOAuthProxyTarget, mcpOAuthProxyAgentKey, mcpOAuthProxyRoute } from "../mcp-oauth-proxy";
 import { inspectMcpServer, type McpSignInPlace, testMcpServer } from "../mcp-probe";
 import {
@@ -252,6 +257,26 @@ export class McpGateway {
       Effect.map((token) => (token ? { url: config.url, headers: config.headers, token } : null)),
     );
   }
+
+  /**
+   * The token of each enabled row of the server at `url` that is signed in here: the listing row and
+   * its `#account-` rows. For a host action on the user's own account, such as sending a Gmail draft
+   * that the user approved. These tokens never go to a provider.
+   */
+  readonly accountTokens = Effect.fn("McpGateway.accountTokens")(function* (this: McpGateway, url: string) {
+    const oauth = this.#oauth;
+    const server = normalizeResource(url);
+    if (!oauth || !server) return [];
+    const rows = this.#servers
+      .listEnabled()
+      .filter((row) => this.#proxied(row) && normalizeResource(withoutMcpAccountFragment(row.url)) === server);
+    const tokens: { name: string; token: string }[] = [];
+    for (const row of rows) {
+      const token = yield* oauth.accessToken(row.url);
+      if (token) tokens.push({ name: row.name, token });
+    }
+    return tokens;
+  });
 
   /**
    * Remembers a set that leaves for a provider, so its secrets stay redactable after the user edits

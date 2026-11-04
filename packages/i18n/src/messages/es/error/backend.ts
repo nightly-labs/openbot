@@ -381,4 +381,8 @@ export const messages = {
     "Este agente tiene {count} tareas abiertas. Cierra una tarea y después inicia o abre otra.",
   "error.backend.taskRemoteUnsupported": "Las tareas solo están disponibles para los agentes de este equipo.",
   "error.backend.taskStartFailed": "OpenBot no pudo iniciar la tarea. Haz el trabajo en este turno.",
+  "error.backend.uiBlockActionRunning": "OpenBot todavía está haciendo esto. Espera a que termine.",
+  "error.backend.gmailDraftChanged":
+    "El borrador cambió después de que OpenBot lo mostrara, así que no se envió. Pide al agente que lo muestre de nuevo.",
+  "error.backend.gmailSendFailed": "Gmail no envió el borrador: {reason}",
 } as const satisfies PartialTranslation<typeof source>;

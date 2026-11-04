@@ -367,4 +367,8 @@ export const messages = {
     "У этого агента открыто задач: {count}. Закройте задачу, затем начните или откройте другую.",
   "error.backend.taskRemoteUnsupported": "Задачи доступны только для агентов на этом компьютере.",
   "error.backend.taskStartFailed": "OpenBot не удалось запустить задачу. Выполните работу в этом ходе.",
+  "error.backend.uiBlockActionRunning": "OpenBot ещё выполняет это действие. Дождитесь окончания.",
+  "error.backend.gmailDraftChanged":
+    "Черновик изменился после того, как OpenBot его показал, поэтому он не отправлен. Попросите агента показать его снова.",
+  "error.backend.gmailSendFailed": "Gmail не отправил черновик: {reason}",
 } as const satisfies PartialTranslation<typeof source>;

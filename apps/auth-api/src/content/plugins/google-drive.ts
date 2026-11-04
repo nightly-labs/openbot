@@ -37,7 +37,7 @@ export const GOOGLE_DRIVE_PLUGIN_GUIDE: PluginGuide = {
     {
       question: "What can the agent see and change in Google Drive?",
       answer:
-        "The agent can see all the files that your Google account can open (drive.readonly). It can create files (drive.file) and copy any file that it can read (drive). With the drive access, the sign-in token can change all your files, but Google's Drive server has no tool that changes, moves or deletes a file, so the agent cannot do these things. To remove the access, disconnect Google Drive in OpenBot.",
+        "The agent can see all the files that your Google account can open (drive.readonly). It can create files and copy any file that it can read, also into your own folders (drive.file). The sign-in cannot change, move or delete the files that you made, and Google's Drive server has no tool for that either. To remove the access, disconnect Google Drive in OpenBot.",
     },
     {
       question: "Is the Drive MCP server finished?",

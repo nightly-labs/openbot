@@ -364,7 +364,7 @@ export const messages = {
   "marketplace.plugin.trello.prompt.newCards": "把这些待办事项作为卡片添加到我的 Trello 看板。",
   "marketplace.plugin.gmail.tagline": "邮件搜索、草稿和标签",
   "marketplace.plugin.gmail.description":
-    "Gmail 让助手搜索和读取邮件会话和邮件，撰写草稿，添加和移除标签，创建标签，将邮件移到回收站或从回收站恢复，并将邮件标记为垃圾邮件。助手无法发送邮件：助手撰写草稿，由用户在 Gmail 中检查并发送。助手无法永久删除邮件。这是 Google 官方的 Gmail MCP 服务器，目前处于 Developer Preview 阶段。每位用户通过浏览器登录自己的 Google 账号，并在 Google 的授权页面上批准访问。OpenBot 自带 Google 登录应用，因此用户无需设置 Google Cloud。其他人发来的邮件可能包含给助手的指令，因此请检查助手读取不可信邮件后执行的操作。",
+    "Gmail 让助手搜索和读取邮件会话和邮件，撰写草稿，添加和移除标签，创建标签，将邮件移到回收站或从回收站恢复，并将邮件标记为垃圾邮件。助手只有在获得批准后才会发送邮件：助手撰写草稿，OpenBot 显示收件人、主题和正文，只有服务器所有者或管理员点击“发送”后邮件才会发出。 拥有完全访问权限的助手在用户要求时无需卡片即可发送，卡片会保留在聊天中。助手无法永久删除邮件。这是 Google 官方的 Gmail MCP 服务器，目前处于 Developer Preview 阶段。每位用户通过浏览器登录自己的 Google 账号，并在 Google 的授权页面上批准访问。OpenBot 自带 Google 登录应用，因此用户无需设置 Google Cloud。其他人发来的邮件可能包含给助手的指令，因此请检查助手读取不可信邮件后执行的操作。",
   "marketplace.plugin.gmail.app": "通过 Google 的 Gmail MCP 服务器和浏览器登录，提供邮件搜索、草稿、标签和回收站。",
   "marketplace.plugin.gmail.prompt.unread": "总结我今天的未读邮件。",
   "marketplace.plugin.gmail.prompt.thread": "给本周未读的新闻通讯加上“新闻通讯”标签，并将它们移到回收站。",

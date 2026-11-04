@@ -390,4 +390,8 @@ export const messages = {
     "Cet agent a {count} tâches ouvertes. Fermez une tâche, puis lancez-en ou ouvrez-en une autre.",
   "error.backend.taskRemoteUnsupported": "Les tâches sont disponibles uniquement pour les agents de cet ordinateur.",
   "error.backend.taskStartFailed": "OpenBot n’a pas pu lancer la tâche. Faites plutôt le travail dans ce tour.",
+  "error.backend.uiBlockActionRunning": "OpenBot est encore en train de le faire. Attends la fin.",
+  "error.backend.gmailDraftChanged":
+    "Le brouillon a changé après qu'OpenBot l'a affiché, il n'a donc pas été envoyé. Demande à l'agent de l'afficher à nouveau.",
+  "error.backend.gmailSendFailed": "Gmail n'a pas envoyé le brouillon : {reason}",
 } as const satisfies PartialTranslation<typeof source>;

@@ -22,13 +22,14 @@ function scopes(...names: string[]): string {
  * The scopes that each server asks for, keyed by its exact URL. Google's configuration guide
  * (https://developers.google.com/workspace/guides/configure-mcp-servers) names read scopes, and the
  * tool reference names what each write tool needs. Agents write too, so each server also gets the
- * scope of its write tools: `gmail.modify` for labels, trash and spam, `drive` for files that OpenBot
- * did not create, and `calendar.events` to create, change, delete and answer events. Docs and Sheets
+ * scope of its write tools: `gmail.modify` for labels, trash and spam, and `calendar.events` to
+ * create, change, delete and answer events. Drive needs no more than `drive.file`: it creates and
+ * copies files, also into a folder that the user made, and has no tool that changes a file. Docs and Sheets
  * write with `documents` and `spreadsheets`, and Slides with `presentations`.
  */
 export const GOOGLE_MCP_SCOPES: Readonly<Record<string, string>> = {
   "https://gmailmcp.googleapis.com/mcp/v1": scopes("gmail.readonly", "gmail.compose", "gmail.modify"),
-  "https://drivemcp.googleapis.com/mcp/v1": scopes("drive.readonly", "drive.file", "drive"),
+  "https://drivemcp.googleapis.com/mcp/v1": scopes("drive.readonly", "drive.file"),
   "https://docsmcp.googleapis.com/mcp/v1": scopes("drive.readonly", "drive.file", "documents.readonly", "documents"),
   "https://sheetsmcp.googleapis.com/mcp/v1": scopes(
     "drive.readonly",

@@ -379,4 +379,8 @@ export const messages = {
     "このエージェントには {count} 件の開いているタスクがあります。タスクを閉じてから、別のタスクを開始するか開いてください。",
   "error.backend.taskRemoteUnsupported": "タスクは、このコンピューター上のエージェントでのみ利用できます。",
   "error.backend.taskStartFailed": "OpenBot はタスクを開始できませんでした。代わりにこのターンで作業してください。",
+  "error.backend.uiBlockActionRunning": "OpenBot はまだ処理中です。完了するまでお待ちください。",
+  "error.backend.gmailDraftChanged":
+    "OpenBot が表示した後に下書きが変更されたため、送信されませんでした。もう一度表示するようエージェントに依頼してください。",
+  "error.backend.gmailSendFailed": "Gmail は下書きを送信しませんでした: {reason}",
 } as const satisfies PartialTranslation<typeof source>;

@@ -407,6 +407,56 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "ما بطاقات Trello المعيّنة لي؟",
   "marketplace.plugin.trello.prompt.board": "لخّص ما هو قيد التنفيذ على لوحة Trello الخاصة بي.",
   "marketplace.plugin.trello.prompt.newCards": "أضف بنود العمل هذه كبطاقات إلى لوحة Trello الخاصة بي.",
+  "marketplace.plugin.gmail.tagline": "البحث في البريد والمسودات والتصنيفات",
+  "marketplace.plugin.gmail.description":
+    "يتيح Gmail للوكلاء البحث في سلاسل الرسائل والرسائل وقراءتها، وكتابة المسودات، وإضافة التصنيفات وإزالتها، وإنشاء التصنيفات، ونقل الرسائل إلى سلة المهملات وإعادتها منها، ووضع علامة رسائل غير مرغوب فيها على الرسائل. لا يرسل الوكيل بريدًا إلا بموافقة: يكتب مسودة، ويعرض OpenBot المستلمين والموضوع والنص، ولا تُرسل الرسالة إلا عندما يضغط مالك الخادم أو أحد المسؤولين على إرسال. يرسل الوكيل الذي لديه وصول كامل دون البطاقة عندما يطلب المستخدم ذلك، وتبقى البطاقة في المحادثة. لا يمكن للوكلاء حذف الرسائل نهائيًا. هذا هو خادم MCP الرسمي من Google لـ Gmail، وهو في مرحلة Developer Preview. يسجّل كل مستخدم الدخول إلى حساب Google الخاص به عبر المتصفح ويوافق على الوصول في صفحة الموافقة من Google. لدى OpenBot تطبيق خاص به لتسجيل الدخول إلى Google، لذلك لا يحتاج المستخدم إلى إعداد Google Cloud. قد تحتوي رسالة من شخص آخر على تعليمات للوكيل، لذلك تحقّق مما يفعله الوكيل بعد أن يقرأ بريدًا غير موثوق.",
+  "marketplace.plugin.gmail.app":
+    "البحث في البريد والمسودات والتصنيفات وسلة المهملات، عبر خادم MCP الخاص بـ Gmail من Google مع تسجيل الدخول في المتصفح.",
+  "marketplace.plugin.gmail.prompt.unread": "لخّص رسائلي غير المقروءة من اليوم.",
+  "marketplace.plugin.gmail.prompt.thread":
+    "صنّف النشرات الإخبارية غير المقروءة من هذا الأسبوع بتصنيف Newsletters وانقلها إلى سلة المهملات.",
+  "marketplace.plugin.gmail.prompt.draft": "اكتب مسودة رد على آخر رسالة من مديري.",
+  "marketplace.plugin.googleDrive.tagline": "البحث في الملفات وقراءتها وإضافتها",
+  "marketplace.plugin.googleDrive.description":
+    "يتيح Google Drive للوكلاء البحث في الملفات، وعرض الملفات الأخيرة، وقراءة محتوى الملفات وتفاصيلها، ومعرفة من يمكنه الوصول إلى ملف، وإنشاء الملفات ونسخها. يمكن للوكلاء قراءة كل الملفات التي يستطيع المستخدم فتحها. ويمكنهم إنشاء الملفات ونسخ أي ملف يستطيعون قراءته. لا يحتوي خادم Drive من Google على أداة تغيّر ملفًا أو تنقله أو تحذفه. هذا هو خادم MCP الرسمي من Google لـ Drive، وهو في مرحلة Developer Preview. يسجّل كل مستخدم الدخول إلى حساب Google الخاص به عبر المتصفح ويوافق على الوصول في صفحة الموافقة من Google. لدى OpenBot تطبيق خاص به لتسجيل الدخول إلى Google، لذلك لا يحتاج المستخدم إلى إعداد Google Cloud. قد يحتوي ملف من شخص آخر على تعليمات للوكيل، لذلك تحقّق مما يفعله الوكيل بعد أن يقرأ ملفًا غير موثوق.",
+  "marketplace.plugin.googleDrive.app":
+    "البحث في الملفات وقراءتها وإنشاؤها، عبر خادم MCP الخاص بـ Drive من Google مع تسجيل الدخول في المتصفح.",
+  "marketplace.plugin.googleDrive.prompt.find": "ابحث عن خطة التسويق في Google Drive ولخّصها.",
+  "marketplace.plugin.googleDrive.prompt.recent": "اعرض الملفات التي استخدمتها مؤخرًا في Google Drive.",
+  "marketplace.plugin.googleDrive.prompt.access": "أنشئ نسخة من ملف الميزانية في Google Drive للعام القادم.",
+  "marketplace.plugin.googleDocs.tagline": "قراءة المستندات وتعديلها",
+  "marketplace.plugin.googleDocs.description":
+    "يتيح Google Docs للوكلاء قراءة المستندات وتغيير محتواها. يمكن للوكلاء قراءة كل المستندات التي يستطيع المستخدم فتحها، وتعديل المستندات التي يستطيع المستخدم تعديلها. هذا هو خادم MCP الرسمي من Google لـ Docs، وهو في مرحلة Developer Preview. يسجّل كل مستخدم الدخول إلى حساب Google الخاص به عبر المتصفح ويوافق على الوصول في صفحة الموافقة من Google. لدى OpenBot تطبيق خاص به لتسجيل الدخول إلى Google، لذلك لا يحتاج المستخدم إلى إعداد Google Cloud. قد يحتوي مستند من شخص آخر على تعليمات للوكيل، لذلك تحقّق مما يفعله الوكيل بعد أن يقرأ مستندًا غير موثوق.",
+  "marketplace.plugin.googleDocs.app":
+    "قراءة المستندات وتعديلها، عبر خادم MCP الخاص بـ Docs من Google مع تسجيل الدخول في المتصفح.",
+  "marketplace.plugin.googleDocs.prompt.summarize": "لخّص الأسئلة المفتوحة في مستند خطة الإطلاق.",
+  "marketplace.plugin.googleDocs.prompt.edit": "أضف ملخصًا قصيرًا في أعلى مستند ملاحظات الاجتماع.",
+  "marketplace.plugin.googleDocs.prompt.review": "ابحث عن الجمل غير الواضحة في مستند مقترح المشروع.",
+  "marketplace.plugin.googleSheets.tagline": "قراءة جداول البيانات وتحديثها",
+  "marketplace.plugin.googleSheets.description":
+    "يتيح Google Sheets للوكلاء قراءة جداول البيانات وقيم الخلايا، وكتابة القيم والصيغ، وإضافة الصفوف والأعمدة، وتغيير جداول البيانات. يمكن للوكلاء قراءة كل جداول البيانات التي يستطيع المستخدم فتحها، وتغيير جداول البيانات التي يستطيع المستخدم تعديلها. هذا هو خادم MCP الرسمي من Google لـ Sheets، وهو في مرحلة Developer Preview. يسجّل كل مستخدم الدخول إلى حساب Google الخاص به عبر المتصفح ويوافق على الوصول في صفحة الموافقة من Google. لدى OpenBot تطبيق خاص به لتسجيل الدخول إلى Google، لذلك لا يحتاج المستخدم إلى إعداد Google Cloud. قد يحتوي جدول بيانات من شخص آخر على تعليمات للوكيل، لذلك تحقّق مما يفعله الوكيل بعد أن يقرأ جدول بيانات غير موثوق.",
+  "marketplace.plugin.googleSheets.app":
+    "قيم جداول البيانات وصيغها وتحديثاتها، عبر خادم MCP الخاص بـ Sheets من Google مع تسجيل الدخول في المتصفح.",
+  "marketplace.plugin.googleSheets.prompt.summarize": "لخّص المجاميع في جدول بيانات الميزانية.",
+  "marketplace.plugin.googleSheets.prompt.addRows": "أضف هذه النفقات كصفوف جديدة إلى جدول بيانات النفقات.",
+  "marketplace.plugin.googleSheets.prompt.formula": "أضف عمودًا بمجموع كل صف إلى جدول بيانات المبيعات.",
+  "marketplace.plugin.googleSlides.tagline": "قراءة العروض التقديمية وتعديلها",
+  "marketplace.plugin.googleSlides.description":
+    "يتيح Google Slides للوكلاء قراءة العروض التقديمية والشرائح وصورها المصغّرة، وتغيير محتوى العرض التقديمي: إضافة الشرائح والنصوص والأشكال والصور وتغييرها وحذفها. يمكن للوكلاء قراءة كل العروض التقديمية التي يستطيع المستخدم فتحها، وتعديل العروض التي يستطيع المستخدم تعديلها. لا يحتوي خادم Slides من Google على أداة تنشئ عرضًا تقديميًا أو تحذفه. هذا هو خادم MCP الرسمي من Google لـ Slides، وهو في مرحلة Developer Preview. يسجّل كل مستخدم الدخول إلى حساب Google الخاص به عبر المتصفح ويوافق على الوصول في صفحة الموافقة من Google. لدى OpenBot تطبيق خاص به لتسجيل الدخول إلى Google، لذلك لا يحتاج المستخدم إلى إعداد Google Cloud. قد يحتوي عرض تقديمي من شخص آخر على تعليمات للوكيل، لذلك تحقّق مما يفعله الوكيل بعد أن يقرأ عرضًا تقديميًا غير موثوق.",
+  "marketplace.plugin.googleSlides.app":
+    "قراءة العروض التقديمية وتعديلها، عبر خادم MCP الخاص بـ Slides من Google مع تسجيل الدخول في المتصفح.",
+  "marketplace.plugin.googleSlides.prompt.summary": "لخّص عرض المراجعة الفصلية شريحةً شريحة.",
+  "marketplace.plugin.googleSlides.prompt.agenda": "أضف شريحة جدول أعمال بعد شريحة العنوان في عرض اجتماع الفريق.",
+  "marketplace.plugin.googleSlides.prompt.typos": "ابحث عن الأخطاء الإملائية في عرض إطلاق المنتج وصحّحها.",
+  "marketplace.plugin.googleCalendar.tagline": "الأحداث والتقويمات والأوقات المتاحة",
+  "marketplace.plugin.googleCalendar.description":
+    "يتيح Google Calendar للوكلاء عرض التقويمات، وقراءة الأحداث والبحث فيها، وإيجاد الأوقات التي يكون فيها الأشخاص متاحين، وإنشاء الأحداث وتغييرها وحذفها، والرد على الدعوات. هذا هو خادم MCP الرسمي من Google لـ Calendar، وهو في مرحلة Developer Preview. يسجّل كل مستخدم الدخول إلى حساب Google الخاص به عبر المتصفح ويوافق على الوصول في صفحة الموافقة من Google. لدى OpenBot تطبيق خاص به لتسجيل الدخول إلى Google، لذلك لا يحتاج المستخدم إلى إعداد Google Cloud. قد يحتوي حدث من شخص آخر على تعليمات للوكيل، لذلك تحقّق مما يفعله الوكيل بعد أن يقرأ حدثًا غير موثوق.",
+  "marketplace.plugin.googleCalendar.app":
+    "التقويمات والأحداث والأوقات المتاحة، عبر خادم MCP الخاص بـ Calendar من Google مع تسجيل الدخول في المتصفح.",
+  "marketplace.plugin.googleCalendar.prompt.today": "ما الذي في تقويم Google اليوم؟",
+  "marketplace.plugin.googleCalendar.prompt.week": "لخّص اجتماعاتي لهذا الأسبوع.",
+  "marketplace.plugin.googleCalendar.prompt.freeTime":
+    "ابحث عن ساعة متاحة في الأسبوع القادم وأضف اجتماعًا مع Alex إلى تقويمي.",
   "marketplace.plugin.clickup.tagline": "المهام والمستندات وتحديثات الفريق",
   "marketplace.plugin.clickup.description":
     "يتيح ClickUp للوكلاء البحث في المهام والمستندات والتعليقات والدردشة، وإنشاء المهام والقوائم والمستندات وتحديثها، ونشر التعليقات، وإرسال رسائل الدردشة، وتتبع الوقت. يسجّل كل مستخدم الدخول إلى حساب ClickUp الخاص به عبر المتصفح. يحصل الوكلاء على أذونات المستخدم نفسها. يمكنهم نقل المهام إلى سلة المهملات وحذف التعليقات.",

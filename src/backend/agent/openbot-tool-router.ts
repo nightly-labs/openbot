@@ -39,7 +39,17 @@ import type { AgentWaits } from "../agent-waits/agent-waits";
 import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import type { ChannelService } from "../channel-service";
 import type { ProviderSession } from "../database/provider-sessions";
+import {
+  findGmailDraft,
+  GMAIL_SEND_ACTION_ID,
+  type GmailAccountToken,
+  type GmailApi,
+  GmailDraftFailed,
+  gmailSendCardSpec,
+  sendGmailDraft,
+} from "../gmail-drafts";
 import type { MailboxStore } from "../mailbox-store";
+import type { McpOperationError } from "../mcp-effects";
 import { agentMcpServers } from "../mcp-provider-shapes";
 import type { MessagingThreads } from "../messaging/messaging-threads";
 import { MESSAGING_OUTBOUND_TOOLS } from "../messaging/messaging-tools";
@@ -54,6 +64,7 @@ import {
   removeApiKeyToolSchema,
   requestApiKeyToolSchema,
   routineReportFailureToolSchema,
+  sendGmailDraftToolSchema,
   sendToChannelToolSchema,
 } from "../openbot-tools";
 import { type AppServerRequest, type DynamicToolCallParams, type DynamicToolResult, isRecord } from "../protocol";
@@ -224,6 +235,10 @@ export interface OpenBotToolRouterOptions {
   marketplaceAppServer?: ((appId: string) => MarketplaceAppServer | null) | undefined;
   /** The API keys that users saved for agents; null where nothing can save them. */
   apiKeys?: AgentApiKeys | null | undefined;
+  /** The tokens of the Gmail accounts signed in here, for `send_gmail_draft`; null where nothing holds them. */
+  gmailAccounts?: (() => Effect.Effect<GmailAccountToken[], McpOperationError>) | null | undefined;
+  /** Where `send_gmail_draft` reaches Gmail. Only a test changes it. */
+  gmailApi?: GmailApi | undefined;
   hooks: OpenBotToolRouterHooks;
 }
 
@@ -262,6 +277,8 @@ export class OpenBotToolRouter {
   readonly #mcpServers: AgentMcpServers | null;
   readonly #marketplaceAppServer: (appId: string) => MarketplaceAppServer | null;
   readonly #apiKeys: AgentApiKeys | null;
+  readonly #gmailAccounts: (() => Effect.Effect<GmailAccountToken[], McpOperationError>) | null;
+  readonly #gmailApi: GmailApi;
   readonly #hooks: OpenBotToolRouterHooks;
   readonly #interruptTool: AgentInterruptTool;
 
@@ -297,6 +314,8 @@ export class OpenBotToolRouter {
     this.#mcpServers = options.mcpServers ?? null;
     this.#marketplaceAppServer = options.marketplaceAppServer ?? (() => null);
     this.#apiKeys = options.apiKeys ?? null;
+    this.#gmailAccounts = options.gmailAccounts ?? null;
+    this.#gmailApi = options.gmailApi ?? {};
     this.#hooks = options.hooks;
     this.#interruptTool = new AgentInterruptTool({
       store: options.store,
@@ -513,6 +532,11 @@ export class OpenBotToolRouter {
               if (!toolRequest.signal?.aborted && client.running) client.respond(toolRequest.id, result);
               return;
             }
+            if (toolRequest.params.tool === "send_gmail_draft") {
+              const result = yield* this.#sendGmailDraft(client, toolRequest, toolRequest.params);
+              if (result && !toolRequest.signal?.aborted && client.running) client.respond(toolRequest.id, result);
+              return;
+            }
             if (API_KEY_TOOLS.has(toolRequest.params.tool)) {
               const result = yield* this.#apiKeyTool(client, toolRequest, toolRequest.params);
               if (result && !toolRequest.signal?.aborted && client.running) client.respond(toolRequest.id, result);
@@ -649,6 +673,71 @@ export class OpenBotToolRouter {
       spec,
       apiKey: { name: parsed.data.name },
     });
+    return null;
+  });
+
+  /**
+   * Shows the card of a Gmail draft and waits like `ask_ui`. The host sends the draft only when the
+   * server owner or an admin presses Send (`SurfacedUiBlock.confirmed`), so a message that the agent
+   * read cannot make it send email by itself. Null once the card is up: its answer ends the call.
+   */
+  readonly #sendGmailDraft = Effect.fn("OpenBotToolRouter.sendGmailDraft")(function* (
+    this: OpenBotToolRouter,
+    client: AgentClient,
+    request: AppServerRequest,
+    params: DynamicToolCallParams,
+  ) {
+    const agentId = this.#conversation.agentForThread(params.threadId);
+    if (!agentId) throw new Error("The calling OpenBot agent is unknown.");
+    const parsed = sendGmailDraftToolSchema.safeParse(params.arguments);
+    if (!parsed.success)
+      return openBotToolFailure(`${z.prettifyError(parsed.error)}\nCorrect the arguments and retry.`);
+    if (this.#messaging.store.linkForThread(this.#conversation.publicThreadId(agentId, params.threadId)))
+      return openBotToolFailure("send_gmail_draft does not work in an external chat. Ask the user in OpenBot.");
+    const accounts = this.#gmailAccounts
+      ? yield* this.#gmailAccounts().pipe(Effect.catch(() => Effect.succeed<GmailAccountToken[]>([])))
+      : [];
+    if (accounts.length === 0)
+      return openBotToolFailure(
+        "No Gmail account is signed in on this OpenBot server. Ask the user to install Gmail from Apps and sign in.",
+      );
+    const draft = yield* findGmailDraft(accounts, parsed.data.draftId, this.#gmailApi).pipe(
+      Effect.catch((failure) => Effect.succeed(failure)),
+    );
+    if (draft instanceof GmailDraftFailed) return openBotToolFailure(draft.message);
+    if (!draft)
+      return openBotToolFailure(
+        "No signed-in Gmail account has a draft with this id. Use the draft id that create_draft returned.",
+      );
+    const spec = gmailSendCardSpec(draft);
+    if (!spec) return openBotToolFailure("OpenBot could not show this draft.");
+    const api = this.#gmailApi;
+    // The agent skips the press only when the user asked for that (`confirm: false`, such as from a
+    // memory) and gave this agent Full access, which the agent cannot turn on itself. A channel always
+    // asks, as it does for other tools. The host presses Send, and the card stays in the chat with
+    // what was sent.
+    const publicThreadId = this.#conversation.publicThreadId(agentId, params.threadId);
+    const automatic =
+      parsed.data.confirm === false &&
+      this.#approvalAutomation.autoApproves(agentId) &&
+      this.#channels.store.channelForThread(publicThreadId) === null;
+    this.#attention.surfaceUiBlock(
+      client,
+      request,
+      {
+        blockId: randomUUID(),
+        spec,
+        confirmed: {
+          actionId: GMAIL_SEND_ACTION_ID,
+          run: () =>
+            sendGmailDraft(draft, api).pipe(
+              Effect.map((sent) => ({ status: "sent", messageId: sent.messageId, threadId: sent.threadId })),
+              Effect.mapError((failure) => ({ cause: new Error(failure.message) })),
+            ),
+        },
+      },
+      automatic ? { actionId: GMAIL_SEND_ACTION_ID, afterMs: 0 } : undefined,
+    );
     return null;
   });
 

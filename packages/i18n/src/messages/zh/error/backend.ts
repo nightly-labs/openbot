@@ -329,4 +329,7 @@ export const messages = {
   "error.backend.taskOpenLimitReached": "该助手有 {count} 个未关闭的任务。请关闭一个任务，再启动或打开其他任务。",
   "error.backend.taskRemoteUnsupported": "任务仅适用于本电脑上的助手。",
   "error.backend.taskStartFailed": "OpenBot 无法启动该任务，请改为在本轮对话中完成。",
+  "error.backend.uiBlockActionRunning": "OpenBot 仍在执行此操作。请等待完成。",
+  "error.backend.gmailDraftChanged": "OpenBot 显示草稿后草稿已更改，因此未发送。请让智能体再次显示。",
+  "error.backend.gmailSendFailed": "Gmail 未发送草稿：{reason}",
 } as const satisfies PartialTranslation<typeof source>;

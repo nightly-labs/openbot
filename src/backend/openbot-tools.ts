@@ -283,6 +283,19 @@ export const requestApiKeyToolSchema = z.strictObject({
 
 export const removeApiKeyToolSchema = z.strictObject({ name: apiKeyNameSchema });
 
+export const sendGmailDraftToolSchema = z.strictObject({
+  draftId: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,128}$/u)
+    .describe("The draft id from create_draft, such as r123456789."),
+  confirm: z
+    .boolean()
+    .optional()
+    .describe(
+      "false: send without the card. Pass it when a rule from the user in your memory or messages lets you send this email without asking. Default true.",
+    ),
+});
+
 export const sendToChannelToolSchema = z.strictObject({
   channelId: z.string().min(1).max(INPUT_LIMITS.identifier),
   text: z.string().trim().min(1).max(INPUT_LIMITS.messageText),
@@ -682,6 +695,16 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       "Call list_api_keys first: do not ask again for a key that is saved. A new answer replaces the saved key. Only the server owner or an admin can answer. It does not work in an external chat.",
     ].join(" "),
     shape: requestApiKeyToolSchema.shape,
+  },
+  {
+    name: "send_gmail_draft",
+    description: [
+      "Send a Gmail draft that Gmail create_draft wrote. OpenBot shows the user its sender, recipients, subject and body, and sends it only when the server owner or an admin presses Send.",
+      'Result: {"status":"sent","messageId","threadId"}, {"actionId":"cancel"} when not sent, or {"status":"expired"}.',
+      "A draft changed after the card is not sent. Needs Gmail signed in; not in external chats.",
+      "confirm false sends at once only if the user gave you full access and this is not a channel; else the card shows.",
+    ].join(" "),
+    shape: sendGmailDraftToolSchema.shape,
   },
   {
     name: "list_api_keys",

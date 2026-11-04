@@ -2,7 +2,7 @@ import type { PluginGuide } from "./plugin-guide";
 
 // Every statement about Gmail here is taken from Google's documentation of the Google Workspace
 // MCP servers. Each page used is in `sources`. The statements about the sign-in describe OpenBot's
-// own Google sign-in app. Check the sources again, and move `checkedAt`, whenever this file changes.
+// own Google sign-in app, and the statements about sending describe OpenBot's `send_gmail_draft`. Check the sources again, and move `checkedAt`, whenever this file changes.
 
 export const GMAIL_PLUGIN_GUIDE: PluginGuide = {
   uses: [
@@ -15,8 +15,8 @@ export const GMAIL_PLUGIN_GUIDE: PluginGuide = {
       text: "The agent reads unread or recent threads and tells you which ones need an answer, which ones are receipts and which ones you can skip.",
     },
     {
-      title: "Write drafts",
-      text: "The agent writes a reply or a new email as a draft in your Drafts folder. You read it, change it if necessary, and send it from Gmail.",
+      title: "Write and send email",
+      text: "The agent writes a reply or a new email as a draft in your Drafts folder. To send it, the agent asks you in the conversation: OpenBot shows the recipients, the subject and the body, and sends the email only when you press Send. If you gave the agent full access and asked it to send without asking, it sends at once, and the card stays in the conversation. You can also change the draft and send it from Gmail.",
     },
     {
       title: "Organize email",
@@ -37,7 +37,7 @@ export const GMAIL_PLUGIN_GUIDE: PluginGuide = {
     {
       question: "What can the agent see and change in Gmail?",
       answer:
-        "The agent can read all the email in your account (gmail.readonly) and write drafts (gmail.compose). It can also add and remove labels, create labels, move email to the trash and back, and mark email as spam (gmail.modify). The server has no tool that sends email or deletes email permanently, so the agent cannot do these things. To remove the access, disconnect Gmail in OpenBot.",
+        "The agent can read all the email in your account (gmail.readonly) and write drafts (gmail.compose). It can also add and remove labels, create labels, move email to the trash and back, and mark email as spam (gmail.modify). OpenBot sends a draft only after you press Send on the card that shows it, or at once when you gave the agent full access and asked it to send without asking. The server has no tool that deletes email permanently, so the agent cannot do this. To remove the access, disconnect Gmail in OpenBot.",
     },
     {
       question: "Is the Gmail MCP server finished?",

@@ -75,7 +75,9 @@ import {
   approvalPermissions,
   browserTakeoverError,
   browserTakeoverResult,
+  type ConfirmedActionOutput,
   commandText,
+  confirmedActionPromptResult,
   dynamicPromptResult,
   expiredPromptResult,
   MCP_TOOL_CONSENT_ALLOW_ONCE,
@@ -108,7 +110,10 @@ interface PendingPrompt {
   questions: AgentPromptQuestion[];
   /** Set exactly when `responseKind` is `ui-block`. */
   uiBlock?: SurfacedUiBlock;
-  /** True while the answer of a `request_api_key` or `request_vault_item` block is saved. */
+  /**
+   * True while the answer of a `request_api_key` or `request_vault_item` block is saved, or while the
+   * host runs the `confirmed` action of a block.
+   */
   saving?: boolean;
   /** The block's own answer, and the timer that gives it. Removing the prompt clears the timer. */
   autoAnswer?: { state: UiBlockAutoAnswer; timer: ReturnType<typeof setTimeout> };
@@ -124,6 +129,13 @@ export interface SurfacedUiBlock {
   spec: UiBlockSpec;
   apiKey?: { name: string };
   vault?: { kind: UiVaultRequestKind };
+  /**
+   * What the host does itself when the server owner or an admin presses `actionId`, such as sending
+   * the Gmail draft that the card shows. It runs before the agent gets the answer, and a failure
+   * leaves the block open. The agent gets what `run` returns, so the agent cannot act in the user's
+   * name without the press. It never goes on the wire.
+   */
+  confirmed?: { actionId: string; run: () => Effect.Effect<ConfirmedActionOutput, { readonly cause: unknown }> };
 }
 
 /**
@@ -580,11 +592,14 @@ export class AttentionRegistry {
   ) {
     const saved = yield* this.#saveApiKeyAnswer(input, responder);
     const savedItem = yield* this.#saveVaultAnswer(input, responder);
+    const done = yield* this.#runConfirmedAction(input, responder);
     yield* attentionStep(() => {
       const pending = this.#prompts.get(input.requestId);
       // The turn ended while the key or the item was saved. It stays saved, and the agent can list it.
       if (saved && pending !== saved.pending) return;
       if (savedItem && pending !== savedItem.pending) return;
+      // The turn ended while the host acted. The action is done; nobody waits for its answer.
+      if (done && pending !== done.pending) return;
       if (!pending) throw new InactiveAttentionRequest(sourceText("error.backend.promptInactive"));
       const questionIds = new Set(pending.questions.map((question) => question.id));
       if (Object.keys(input.answers).some((id) => !questionIds.has(id))) {
@@ -595,25 +610,27 @@ export class AttentionRegistry {
       this.#routines.markRunningForTurn(getString(pending.params, "turnId"));
 
       // The forms of `request_api_key` and `request_vault_item` never give the agent their values.
-      const result = pending.uiBlock?.apiKey
-        ? apiKeyPromptResult(pending.uiBlock.blockId, saved?.key ?? null)
-        : pending.uiBlock?.vault
-          ? vaultPromptResult(pending.uiBlock.blockId, savedItem?.item ?? null)
-          : pending.uiBlock
-            ? uiBlockPromptResult(
-                uiBlockResponse
-                  ? { status: "answered", blockId: pending.uiBlock.blockId, response: uiBlockResponse }
-                  : { status: "skipped", blockId: pending.uiBlock.blockId },
-              )
-            : pending.responseKind === "dynamic-tool"
-              ? dynamicPromptResult(input.answers)
-              : pending.responseKind === "mcp-elicitation"
-                ? mcpElicitationResult(pending.params, input.answers)
-                : {
-                    answers: Object.fromEntries(
-                      Object.entries(input.answers).map(([id, values]) => [id, { answers: values }]),
-                    ),
-                  };
+      const result = done
+        ? confirmedActionPromptResult(done.pending.uiBlock?.blockId ?? "", done.output)
+        : pending.uiBlock?.apiKey
+          ? apiKeyPromptResult(pending.uiBlock.blockId, saved?.key ?? null)
+          : pending.uiBlock?.vault
+            ? vaultPromptResult(pending.uiBlock.blockId, savedItem?.item ?? null)
+            : pending.uiBlock
+              ? uiBlockPromptResult(
+                  uiBlockResponse
+                    ? { status: "answered", blockId: pending.uiBlock.blockId, response: uiBlockResponse }
+                    : { status: "skipped", blockId: pending.uiBlock.blockId },
+                )
+              : pending.responseKind === "dynamic-tool"
+                ? dynamicPromptResult(input.answers)
+                : pending.responseKind === "mcp-elicitation"
+                  ? mcpElicitationResult(pending.params, input.answers)
+                  : {
+                      answers: Object.fromEntries(
+                        Object.entries(input.answers).map(([id, values]) => [id, { answers: values }]),
+                      ),
+                    };
       pending.client.respond(pending.id, result);
       this.#prompts.delete(input.requestId);
       clearTimeout(pending.autoAnswer?.timer);
@@ -731,6 +748,40 @@ export class AttentionRegistry {
       ...(digits ? { last4: digits.slice(-4) } : {}),
     };
     return { pending: answer.pending, item, saved };
+  });
+
+  /**
+   * Runs the `confirmed` action of a block when its button is pressed, before the prompt resolves, so a
+   * failure leaves the block open for another try. Null for every other prompt and answer.
+   */
+  readonly #runConfirmedAction = Effect.fn("AttentionRegistry.runConfirmedAction")(function* (
+    this: AttentionRegistry,
+    input: RespondToPromptInput,
+    responder: PromptResponder | undefined,
+  ) {
+    const answer = yield* attentionStep(() => {
+      const pending = this.#prompts.get(input.requestId);
+      const confirmed = pending?.uiBlock?.confirmed;
+      if (!pending?.uiBlock || !confirmed) return null;
+      if (pending.saving) throw new Error(sourceText("error.backend.uiBlockActionRunning"));
+      const response = uiBlockAnswer(pending.uiBlock.spec, input.answers, responder);
+      if (response?.actionId !== confirmed.actionId) return null;
+      // The action works with the owner's accounts, whatever the block's buttons say.
+      if (responder && !responder.privileged)
+        throw new ForbiddenAttentionAnswer(sourceText("error.backend.uiBlockActionNotAllowed"));
+      pending.saving = true;
+      return { pending, run: confirmed.run };
+    });
+    if (!answer) return null;
+    const output = yield* answer.run().pipe(
+      toAttentionOperationFailed,
+      Effect.ensuring(
+        Effect.sync(() => {
+          answer.pending.saving = false;
+        }),
+      ),
+    );
+    return { pending: answer.pending, output };
   });
 
   readonly respondToApproval = Effect.fn("AttentionRegistry.respondToApproval")(function* (

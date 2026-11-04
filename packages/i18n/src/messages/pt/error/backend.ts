@@ -380,4 +380,8 @@ export const messages = {
     "Este agente tem {count} tarefas abertas. Feche uma tarefa e depois inicie ou abra outra.",
   "error.backend.taskRemoteUnsupported": "As tarefas só estão disponíveis para agentes neste computador.",
   "error.backend.taskStartFailed": "O OpenBot não conseguiu iniciar a tarefa. Faça o trabalho neste turno.",
+  "error.backend.uiBlockActionRunning": "O OpenBot ainda está fazendo isso. Aguarde até terminar.",
+  "error.backend.gmailDraftChanged":
+    "O rascunho mudou depois que o OpenBot o mostrou, então não foi enviado. Peça ao agente para mostrá-lo de novo.",
+  "error.backend.gmailSendFailed": "O Gmail não enviou o rascunho: {reason}",
 } as const satisfies PartialTranslation<typeof source>;

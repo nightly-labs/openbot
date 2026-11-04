@@ -927,7 +927,11 @@ Network traffic can also occur when:
   PKCE verifier or the refresh token to Google, and returns Google's answer with the new tokens to the
   computer. It does not store or log them. The tokens stay on the computer, and the emails, files and
   events that an agent reads or changes go between the computer and Google directly, not through
-  Signal;
+  Signal. When an agent asks to send a Gmail draft, the computer reads the draft from the Gmail API
+  (`gmail.googleapis.com`) with the token of that Gmail sign-in and shows its sender, recipients,
+  subject and body in the conversation. Only when the server owner or an admin presses Send does the
+  computer ask the Gmail API to send it, or at once when the user asked the agent to send without
+  asking and gave that agent full access. The token does not go to the agent or its provider;
 - the user presses Install on the 1Password page. OpenBot downloads the 1Password CLI release that it
   pins from `cache.agilebits.com`, checks its SHA-256, and keeps it in
   `~/Library/Application Support/OpenBot/provider-state/1password-cli`. The request carries no user
