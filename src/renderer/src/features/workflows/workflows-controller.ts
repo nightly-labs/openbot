@@ -330,11 +330,14 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
   };
 
   const refresh = (workflowId: string | null, agentId?: string) => {
-    // A workflow that an agent makes opens, so the person sees the agent build it.
+    // A workflow that an agent makes opens, so the person sees the agent build it. While the person's
+    // edit saves, the open workflow stays, and the new one only goes into the library.
     if (
       workflowId !== null &&
       agentId !== undefined &&
       workflowId !== current &&
+      writing === 0 &&
+      pending === undefined &&
       !summaries().some((summary) => summary.id === workflowId)
     ) {
       playBuild(workflowId, agentId, null);

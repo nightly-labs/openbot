@@ -381,6 +381,18 @@ function checkedSchedule(value: WorkflowOp["schedule"]) {
   return value;
 }
 
+/**
+ * A new schedule makes a manual trigger a schedule trigger, and a schedule trigger with no schedule
+ * gets the default one, so that the trigger runs on the schedule that the agent gave.
+ */
+function withSchedule(node: WorkflowNode, scheduled: ReturnType<typeof checkedSchedule>): WorkflowNode {
+  if (node.kind !== "trigger") return node;
+  const fields = scheduled && node.fields.trigger === "manual" ? { ...node.fields, trigger: "schedule" } : node.fields;
+  const schedule =
+    scheduled ?? node.schedule ?? (fields.trigger === "schedule" ? { kind: "daily", time: "09:00" } : undefined);
+  return { ...node, fields, ...(schedule ? { schedule } : {}) };
+}
+
 /** The fields that the host needs on a new node when the agent leaves them out. */
 function newNodeFields(kind: WorkflowNodeKind): WorkflowNode["fields"] {
   if (kind === "trigger") return { trigger: "manual" };
@@ -436,18 +448,7 @@ export function applyWorkflowOps(
         checkAgent(fields, n);
         const scheduled = checkedSchedule(op.schedule);
         if (scheduled && op.kind !== "trigger") refuse(`Op ${n}: only a trigger has a schedule.`);
-        const node: WorkflowNode = {
-          id,
-          kind: op.kind,
-          at: { x: 0, y: 0 },
-          fields:
-            op.kind === "trigger" && scheduled && fields.trigger === "manual"
-              ? { ...fields, trigger: "schedule" }
-              : fields,
-          ...(scheduled ? { schedule: scheduled } : {}),
-        };
-        if (node.kind === "trigger" && node.fields.trigger === "schedule" && !node.schedule)
-          node.schedule = { kind: "daily", time: "09:00" };
+        const node = withSchedule({ id, kind: op.kind, at: { x: 0, y: 0 }, fields }, scheduled);
         const upstream = op.from === undefined ? undefined : resolve(op.from, n);
         node.at = op.at
           ? { x: clampCoordinate(op.at.x), y: clampCoordinate(op.at.y) }
@@ -465,7 +466,7 @@ export function applyWorkflowOps(
         checkAgent(fields, n);
         const scheduled = checkedSchedule(op.schedule);
         if (scheduled && node.kind !== "trigger") refuse(`Op ${n}: only a trigger has a schedule.`);
-        replace({ ...node, fields, ...(scheduled ? { schedule: scheduled } : {}) });
+        replace(withSchedule({ ...node, fields }, scheduled));
         return;
       }
       case "move": {
@@ -693,13 +694,28 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
     }
     if (tool === "edit_workflow") {
       const input = yield* toolStep(() => editSchema.parse(args));
-      let workflowId = input.workflowId;
+      const ops = input.ops ?? [];
+      const tidy = input.tidy === true;
+      const workflowId = input.workflowId;
+      // A new workflow is made with its graph in one step, so a refused op leaves no empty workflow.
       if (workflowId === undefined) {
         if (input.title === undefined) return openBotToolFailure("A new workflow needs a title.");
-        workflowId = (yield* workflows.create({ title: input.title }, callerId)).summary.id;
-      } else if (input.title !== undefined) yield* workflows.rename({ workflowId, title: input.title });
-      if (!input.ops?.length && input.tidy !== true) return openBotToolResult({ workflowId });
-      const saved = yield* save(workflowId, input.ops ?? [], input.tidy === true);
+        const applied = yield* toolStep(() =>
+          applyWorkflowOps({ nodes: [], edges: [], strokes: [] }, ops, agentIds, tidy),
+        );
+        const problem = graphProblem(applied.graph);
+        if (problem) return openBotToolFailure(problem);
+        const created = yield* workflows.create({ title: input.title, graph: applied.graph }, callerId);
+        return openBotToolResult({
+          workflowId: created.summary.id,
+          revision: created.revision,
+          ...(Object.keys(applied.ids).length > 0 ? { ids: applied.ids } : {}),
+        });
+      }
+      // The rename comes after the ops, so a refused edit changes nothing.
+      const saved = ops.length > 0 || tidy ? yield* save(workflowId, ops, tidy) : null;
+      if (input.title !== undefined) yield* workflows.rename({ workflowId, title: input.title });
+      if (!saved) return openBotToolResult({ workflowId });
       return openBotToolResult({
         workflowId,
         revision: saved.revision,

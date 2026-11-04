@@ -228,8 +228,8 @@ try {
   const { workflowId, ids } = created.parse(built.value);
   check("the result gives an id for each ref", Object.keys(ids).length === 6, ids);
   check(
-    "the create and the save name the agent that built it",
-    report.changed.filter((change) => change === `${workflowId} by ${CALLER}`).length === 2,
+    "the create, with its graph, is one change that names the agent that built it",
+    report.changed.filter((change) => change === `${workflowId} by ${CALLER}`).length === 1,
     report.changed,
   );
 
@@ -388,11 +388,30 @@ try {
   assert.ok(saved.ok);
   const locked = await call("failure-locked", "edit_workflow", {
     workflowId,
+    title: "Renamed by mistake",
     ops: [{ op: "move", node: ids.start, at: { x: 900, y: 900 } }],
   });
   check("a locked node does not move", !locked.ok && JSON.stringify(locked.value).includes("locked"), locked.value);
   const unchanged = await runCauseEffect(workflows.get(workflowId));
-  check("a refused edit saves nothing", unchanged.revision === saved.revision, unchanged.revision);
+  check(
+    "a refused edit saves nothing, also not its rename",
+    unchanged.revision === saved.revision && unchanged.summary.title === "Morning news digest",
+    unchanged.summary,
+  );
+  const libraryBefore = (await runCauseEffect(workflows.list())).length;
+  const badNew = await call("failure-new", "edit_workflow", {
+    title: "Broken",
+    ops: [
+      { op: "add", ref: "go", kind: "trigger" },
+      { op: "remove", node: "missing" },
+    ],
+  });
+  const libraryAfter = (await runCauseEffect(workflows.list())).length;
+  check("a refused new workflow is not made", !badNew.ok && libraryAfter === libraryBefore, {
+    result: badNew.value,
+    libraryBefore,
+    libraryAfter,
+  });
 
   // 6. Run and read the run.
   const run = await call("run", "run_workflow", { workflowId });
@@ -422,6 +441,17 @@ try {
       JSON.stringify(list.value).includes("Morning news digest") &&
       JSON.stringify(list.value).includes("lastRun"),
     list.value,
+  );
+
+  const scheduled = await call("schedule", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "update", node: ids.start, schedule: { kind: "daily", time: "08:00" } }],
+  });
+  const trigger = (await runCauseEffect(workflows.get(workflowId))).graph.nodes.find((node) => node.id === ids.start);
+  check(
+    "a schedule on a manual trigger makes it a schedule trigger",
+    scheduled.ok && trigger?.fields.trigger === "schedule" && JSON.stringify(trigger.schedule).includes("08:00"),
+    trigger,
   );
 
   // 7. Delete: each one asks the user, and a decline keeps the workflow.

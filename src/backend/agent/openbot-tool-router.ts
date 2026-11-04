@@ -1074,38 +1074,41 @@ export class OpenBotToolRouter {
       return openBotToolFailure(
         "Only a person's message, in your OpenBot chat or a thread they opened, can change, delete or run a workflow. Ask the user to request it there.",
       );
-    const workflowResult = yield* handleWorkflowTool(
-      params.tool,
-      params.arguments,
-      this.#workflowTools?.() ?? null,
-      senderAgentId,
-      new Set(this.#hooks.listAgents().map((agent) => agent.id)),
-      (title) =>
-        this.#attention
-          .awaitToolApproval(
-            client,
-            request,
-            {
-              requestId: request.id,
-              agentId: senderAgentId,
-              threadId: this.#conversation.publicThreadId(senderAgentId, params.threadId),
-              turnId: params.turnId,
-              kind: "permissions",
-              command: null,
-              cwd: null,
-              reason: sourceText("status.agent.workflowDelete", { title }),
-              grantRoot: null,
-              permissions: null,
-            },
-            // A delete loses the run history, so Full access does not answer for the user.
-            { alwaysAsk: true },
-          )
-          .pipe(
-            Effect.map((decision) => decision === "accept"),
-            toToolOperationFailed,
-          ),
-    );
-    if (workflowResult) return workflowResult;
+    // The agent list is read only for a workflow tool, not on each OpenBot tool call.
+    if (WORKFLOW_TOOL_NAMES.has(params.tool)) {
+      const workflowResult = yield* handleWorkflowTool(
+        params.tool,
+        params.arguments,
+        this.#workflowTools?.() ?? null,
+        senderAgentId,
+        new Set(this.#hooks.listAgents().map((agent) => agent.id)),
+        (title) =>
+          this.#attention
+            .awaitToolApproval(
+              client,
+              request,
+              {
+                requestId: request.id,
+                agentId: senderAgentId,
+                threadId: this.#conversation.publicThreadId(senderAgentId, params.threadId),
+                turnId: params.turnId,
+                kind: "permissions",
+                command: null,
+                cwd: null,
+                reason: sourceText("status.agent.workflowDelete", { title }),
+                grantRoot: null,
+                permissions: null,
+              },
+              // A delete loses the run history, so Full access does not answer for the user.
+              { alwaysAsk: true },
+            )
+            .pipe(
+              Effect.map((decision) => decision === "accept"),
+              toToolOperationFailed,
+            ),
+      );
+      if (workflowResult) return workflowResult;
+    }
 
     // An isolated channel keeps what its members learn in it (#4332). The fact becomes a channel
     // memory, which only the packets of this channel show, so the agent's own chats do not get it.
