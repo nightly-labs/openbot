@@ -261,7 +261,8 @@ supports GitHub Copilot.
 
 Hermes uses the Hermes Agent (`hermes`) that you install yourself, with your own `~/.hermes` (or
 `$HERMES_HOME`): its memories, skills, sign-ins and `SOUL.md` apply to OpenBot agents too. OpenBot
-does not download Hermes; when it is missing, the Hermes row opens the installation guide. OpenBot
+does not update Hermes. When it is missing on macOS, Linux or a server, Download on the Hermes row runs
+the official Hermes installer; on Windows, the row opens the installation guide. OpenBot
 starts it with `hermes acp`. Sign in runs `hermes auth add nous` for a Nous Portal plan, or run
 `hermes setup` in a terminal for other providers. The model menu lists the models of each provider
 that Hermes is signed in to. Hermes reads `AGENTS.md` only in a workspace with no `.hermes.md`, and

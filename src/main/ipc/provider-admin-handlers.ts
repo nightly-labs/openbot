@@ -6,7 +6,7 @@ import type { RemoteWorkflowError } from "../remote-service-effects";
 // endpoints. On a joined server they belong to the host, so the request goes there, and the host
 // answers only an owner or admin. A key only travels towards the host; no result carries one.
 
-import type { ManagedProviderId } from "@openbot/contracts/agent-providers";
+import type { DownloadableProviderId } from "@openbot/contracts/agent-providers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentProviderId,
@@ -91,7 +91,7 @@ import { parseDeleteCustomProvider, parseSaveCustomProvider } from "./custom-pro
 import type { IpcGroupHandlers } from "./define-ipc-group";
 import {
   parseConnectProviderAccountInput,
-  parseManagedProviderId,
+  parseDownloadableProviderId,
   parseProviderApiKeyInput,
   parseRemoveProviderAccountInput,
   parseRenameProviderAccountInput,
@@ -317,8 +317,9 @@ export function providerAdminIpcHandlers({
       ? decodeProviderRuntimeSnapshotV8
       : decodeProviderRuntimeSnapshot;
   }
-  const runtime = (route: "runtimesDownload" | "runtimesCancel") => (provider: ManagedProviderId, serverId: string) =>
-    remote(serverId, runtimeRoutes(serverId)[route], { provider }, runtimeDecoder(serverId));
+  const runtime =
+    (route: "runtimesDownload" | "runtimesCancel") => (provider: DownloadableProviderId, serverId: string) =>
+      remote(serverId, runtimeRoutes(serverId)[route], { provider }, runtimeDecoder(serverId));
 
   return {
     providerAdmin: {
@@ -483,11 +484,11 @@ export function providerAdminIpcHandlers({
         local: () => runtimes.getStatus(),
         remote: (serverId) => remote(serverId, runtimeRoutes(serverId).runtimesStatus, {}, runtimeDecoder(serverId)),
       }),
-      downloadRuntime: scopedHandler(parseManagedProviderId, {
+      downloadRuntime: scopedHandler(parseDownloadableProviderId, {
         local: (provider) => runCauseEffect(runtimes.download(provider)),
         remote: runtime("runtimesDownload"),
       }),
-      cancelRuntime: scopedHandler(parseManagedProviderId, {
+      cancelRuntime: scopedHandler(parseDownloadableProviderId, {
         local: (provider) => runCauseEffect(runtimes.cancel(provider)),
         remote: runtime("runtimesCancel"),
       }),

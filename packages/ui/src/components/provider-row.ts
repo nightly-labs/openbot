@@ -1,4 +1,4 @@
-import { agentProviderDescriptor, isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
+import { agentProviderDescriptor, isInstallerProvider, isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
 import type {
   AgentProviderId,
   AgentProviderState,
@@ -176,8 +176,12 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
    * action checks for one.
    */
   // A provider that is off gets no update offer from main, so a check there could only say "up to date".
+  // An installer provider updates itself: OpenBot runs its installer once and checks no versions.
   const updateOffered = () =>
-    Boolean(host.onUpdateProvider) && !off() && (runtimeStatus()?.phase === "ready" || updatable());
+    Boolean(host.onUpdateProvider) &&
+    !off() &&
+    !isInstallerProvider(option().id) &&
+    (runtimeStatus()?.phase === "ready" || updatable());
   const restartOffered = () =>
     Boolean(host.onRestartProvider) && (option().restartPending || (available() && !connecting()));
   const diagnosticsOffered = () => Boolean(option().lastError && option().diagnostics);

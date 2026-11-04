@@ -427,6 +427,9 @@ export const messages = {
     "De aangepaste agent is gewijzigd tijdens de installatie. Probeer het opnieuw.",
   "error.provider.registryInstallFailed":
     "De installatie van de agent is mislukt. De vorige installatie is ongewijzigd.",
+  "error.provider.hermesInstallFailed":
+    "Hermes Agent is niet geïnstalleerd. Probeer het opnieuw, of gebruik de installatiegids.",
+  "error.provider.hermesNeedsGitCurl": "Hermes Agent heeft git en curl nodig. Installeer ze en probeer het opnieuw.",
   "error.provider.registryRemoveBusy":
     "Wacht tot de installatie van de agent en het actieve ACP-werk klaar zijn voordat je de agent verwijdert.",
 } as const satisfies PartialTranslation<typeof source>;

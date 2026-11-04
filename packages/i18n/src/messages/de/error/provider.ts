@@ -449,6 +449,10 @@ export const messages = {
     "Der benutzerdefinierte Agent hat sich während der Installation geändert. Versuche es erneut.",
   "error.provider.registryInstallFailed":
     "Die Installation des Agenten ist fehlgeschlagen. Die vorherige Installation ist unverändert.",
+  "error.provider.hermesInstallFailed":
+    "Hermes Agent wurde nicht installiert. Versuche es erneut oder nutze die Installationsanleitung.",
+  "error.provider.hermesNeedsGitCurl":
+    "Hermes Agent braucht git und curl. Installiere sie und versuche es dann erneut.",
   "error.provider.registryRemoveBusy":
     "Warte, bis die Installation des Agenten und laufende ACP-Arbeit abgeschlossen sind, bevor du ihn entfernst.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -397,5 +397,7 @@ export const messages = {
   "error.provider.registryPrerequisite": "ثبّت {tool} على المضيف قبل تثبيت هذا الوكيل.",
   "error.provider.registryBindingChanged": "تغيّر الوكيل المخصص أثناء التثبيت. أعد المحاولة.",
   "error.provider.registryInstallFailed": "فشل تثبيت الوكيل. التثبيت السابق لم يتغير.",
+  "error.provider.hermesInstallFailed": "لم يُثبَّت Hermes Agent. حاول مرة أخرى، أو استخدم دليل التثبيت.",
+  "error.provider.hermesNeedsGitCurl": "يحتاج Hermes Agent إلى git وcurl. ثبّتهما، ثم حاول مرة أخرى.",
   "error.provider.registryRemoveBusy": "انتظر حتى ينتهي تثبيت الوكيل وعمل ACP النشط قبل إزالته.",
 } as const satisfies PartialTranslation<typeof source>;

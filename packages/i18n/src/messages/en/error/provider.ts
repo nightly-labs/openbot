@@ -409,6 +409,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.registryPrerequisite": "Install {tool} on the host before you install this agent.",
   "error.provider.registryBindingChanged": "The custom agent changed during installation. Try again.",
   "error.provider.registryInstallFailed": "The agent installation failed. The previous installation is unchanged.",
+  "error.provider.hermesInstallFailed": "Hermes Agent did not install. Try again, or use the install guide.",
+  "error.provider.hermesNeedsGitCurl": "Hermes Agent needs git and curl. Install them, then try again.",
   "error.provider.registryRemoveBusy":
     "Wait for the agent installation and active ACP work to finish before you remove it.",
 });

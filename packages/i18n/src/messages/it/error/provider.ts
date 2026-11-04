@@ -428,6 +428,9 @@ export const messages = {
   "error.provider.registryBindingChanged": "L'agente personalizzato è cambiato durante l'installazione. Riprova.",
   "error.provider.registryInstallFailed":
     "Installazione dell'agente non riuscita. L'installazione precedente è invariata.",
+  "error.provider.hermesInstallFailed":
+    "Hermes Agent non è stato installato. Riprova o usa la guida all'installazione.",
+  "error.provider.hermesNeedsGitCurl": "Hermes Agent richiede git e curl. Installali, poi riprova.",
   "error.provider.registryRemoveBusy":
     "Attendi che l'installazione dell'agente e il lavoro ACP attivo finiscano prima di rimuoverlo.",
 } as const satisfies PartialTranslation<typeof source>;
