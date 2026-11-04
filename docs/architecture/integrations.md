@@ -270,16 +270,24 @@ other places.
    `scripts/agent-runtime-lock.ts`, and `src/main/provider-runtime-descriptors.ts`,
    `provider-runtime-releases.ts` and `provider-runtime-manager.ts`.
 5. **Contracts and preload.** The `AgentAuthState` arm in `ipc-agent-status.ts`, then
-   `ipc-provider-admin.ts`, `src/preload/provider-runtime.ts` and `src/preload/agent-decoding.ts`.
+   `src/preload/agent-decoding.ts`. A managed runtime also needs its line in
+   `decodeProviderRuntimeSnapshot` (`ipc-provider-admin.ts`, with `decodeLaterRuntime`) and in
+   `src/preload/provider-runtime.ts`.
 6. **Renderer.** `SetupProviderPicker.tsx`, `ProviderSettingsSection.tsx`, `app-defaults.ts`, and
    the preview `mock-provider-runtimes.ts`.
 7. **Logo.** The `ProviderLogoVariant` union and its SVG in
    [`packages/brand/src/ProviderLogo.tsx`](../../packages/brand/src/ProviderLogo.tsx), and the color
    in `packages/brand/src/tokens.css`.
-8. **Team API.** The provider lists of a released capability are frozen. A new provider on a joined
-   server needs a new `providers-vN` capability (see "Protocol compatibility" in
-   [Providers](providers.md#protocol-compatibility)) and the peer rules in
-   [`provider-visibility.ts`](../../src/main/team-api/provider-visibility.ts).
+8. **Team API.** No edit. Team API v8 and `providers-v8` carry any provider id (see "Protocol
+   compatibility" in [Providers](providers.md#protocol-compatibility)). The host status row names
+   the provider, and the code sign-in, key and runtime routes take its id. The clients (desktop,
+   web and iPhone) read the rest from the descriptor: Connect from a `device` `localCodeSignIn`,
+   Download from `MANAGED_RUNTIME_PROVIDERS` and `INSTALLER_PROVIDERS`, and the key from
+   `KEY_ONLY_PROVIDERS`. A peer below v8 does not see the provider
+   ([`provider-visibility.ts`](../../src/main/team-api/provider-visibility.ts)), and a client that
+   does not know it shows it disabled with "Update OpenBot to use {name}". Do not edit the frozen
+   lists of a released capability. A `paste` or `link` code sign-in, or the sign-in relay, on a
+   joined server needs a new capability.
 9. **Text and docs.** Error keys in `error/provider.ts` and onboarding text in all languages
    ([docs/i18n.md](../i18n.md)). A section in [Providers](providers.md), and a
    `changelog.d/<branch>.md` file.

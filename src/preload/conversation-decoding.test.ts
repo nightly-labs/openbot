@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it } from "vitest";
-import { decodeFilePreview } from "./conversation-decoding";
+import { decodeAgentTaskReadStates, decodeFilePreview } from "./conversation-decoding";
 
 const preview = {
   name: "report.html",
@@ -30,6 +30,21 @@ describe("file preview page decoding", () => {
       1,
     ]) {
       expect(() => decodeFilePreview({ ...preview, pageUrl: address })).toThrow("Invalid file preview response.");
+    }
+  });
+});
+
+describe("thread read state decoding", () => {
+  const read = { taskId: "pricing", unreadCount: 2, firstUnreadMessageId: "m1", throughMessageId: "m0" };
+
+  it("keeps a list of read states", () => {
+    expect(decodeAgentTaskReadStates([read])).toEqual([read]);
+    expect(decodeAgentTaskReadStates([])).toEqual([]);
+  });
+
+  it("rejects a value that is not a list of read states", () => {
+    for (const value of [null, read, [{ ...read, taskId: "" }], [{ ...read, unreadCount: "2" }]]) {
+      expect(() => decodeAgentTaskReadStates(value)).toThrow("Invalid thread read states.");
     }
   });
 });

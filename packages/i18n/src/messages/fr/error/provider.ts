@@ -228,6 +228,8 @@ export const messages = {
     "Le fournisseur du modèle a échoué de son côté. Votre connexion n’en est pas la cause. Réessayez plus tard ou choisissez un autre modèle.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode n’a pas pu se connecter au fournisseur du modèle. Vérifiez la connexion réseau de l’ordinateur qui exécute OpenBot, puis réessayez.\n{detail}",
+  "error.provider.codexStateBusy":
+    "ChatGPT prépare encore son historique local après un démarrage précédent. Attendez quelques minutes, puis réessayez.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode n’a pas pu ouvrir sa base de données, car une version plus récente d’OpenCode l’a modifiée. Mettez OpenCode à jour vers la version 2 ou ultérieure, puis réessayez.",
   "error.provider.opencodeNoAnswer":
@@ -446,6 +448,9 @@ export const messages = {
   "error.provider.registryBindingChanged": "L’agent personnalisé a changé pendant l’installation. Réessayez.",
   "error.provider.registryInstallFailed":
     "L’installation de l’agent a échoué. L’installation précédente n’a pas changé.",
+  "error.provider.hermesInstallFailed":
+    "Hermes Agent ne s’est pas installé. Réessayez, ou suivez le guide d’installation.",
+  "error.provider.hermesNeedsGitCurl": "Hermes Agent a besoin de git et de curl. Installez-les, puis réessayez.",
   "error.provider.registryRemoveBusy":
     "Attendez la fin de l’installation de l’agent et du travail ACP en cours avant de le supprimer.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -198,6 +198,7 @@ export const messages = {
     "فشل مزوّد النموذج من جهته. اتصالك ليس السبب. أعد المحاولة لاحقًا أو اختر نموذجًا آخر.\n{detail}",
   "error.provider.opencodeNetwork":
     "تعذّر على OpenCode الاتصال بمزوّد النموذج. تحقق من اتصال الشبكة للحاسوب الذي يشغّل OpenBot، ثم أعد المحاولة.\n{detail}",
+  "error.provider.codexStateBusy": "لا يزال ChatGPT يجهّز سجله المحلي بعد تشغيل سابق. انتظر بضع دقائق، ثم أعد المحاولة.",
   "error.provider.opencodeDatabaseNewer":
     "تعذّر على OpenCode فتح قاعدة بياناته لأن إصدارًا أحدث من OpenCode غيّرها. حدّث OpenCode إلى الإصدار 2 أو أحدث، ثم أعد المحاولة.",
   "error.provider.opencodeNoAnswer": "أنهى نموذج OpenCode الدور بدون إجابة. أعد المحاولة، أو اختر نموذجًا آخر.",
@@ -397,5 +398,7 @@ export const messages = {
   "error.provider.registryPrerequisite": "ثبّت {tool} على المضيف قبل تثبيت هذا الوكيل.",
   "error.provider.registryBindingChanged": "تغيّر الوكيل المخصص أثناء التثبيت. أعد المحاولة.",
   "error.provider.registryInstallFailed": "فشل تثبيت الوكيل. التثبيت السابق لم يتغير.",
+  "error.provider.hermesInstallFailed": "لم يُثبَّت Hermes Agent. حاول مرة أخرى، أو استخدم دليل التثبيت.",
+  "error.provider.hermesNeedsGitCurl": "يحتاج Hermes Agent إلى git وcurl. ثبّتهما، ثم حاول مرة أخرى.",
   "error.provider.registryRemoveBusy": "انتظر حتى ينتهي تثبيت الوكيل وعمل ACP النشط قبل إزالته.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1,4 +1,4 @@
-import type { ManagedProviderId, ManagedToolRuntimeId } from "./agent-providers";
+import type { InstallerProviderId, ManagedProviderId, ManagedToolRuntimeId } from "./agent-providers";
 import type { AgentModelId, AvatarColor } from "./ipc-agent-identity";
 import type { AgentProviderId } from "./ipc-agent-status";
 import { integerInRange, isFiniteNumber, isIdentifier } from "./ipc-bounded-values";
@@ -169,7 +169,7 @@ export interface ProviderRuntimeSnapshot {
    * managed runtime is absent from `ManagedProviderId`, so it needs no fake entry here, and every
    * provider that is in the tuple has a real status.
    */
-  providers: Record<ManagedProviderId, ProviderRuntimeStatus>;
+  providers: Record<ManagedProviderId, ProviderRuntimeStatus> & InstallerRuntimeStatuses;
   /**
    * The tool runtimes, in a field of their own rather than mixed in above.
    *
@@ -179,6 +179,14 @@ export interface ProviderRuntimeSnapshot {
    */
   toolRuntimes: Record<ManagedToolRuntimeId, ProviderRuntimeStatus>;
 }
+
+/**
+ * The status of a provider that OpenBot installs with the provider's own installer: `ready` where
+ * its CLI is found, so that a server's row offers Connect. Absent where the CLI is missing and this
+ * computer cannot run the installer, and on a host before the installer: the row then shows the
+ * install guide, not Download.
+ */
+export type InstallerRuntimeStatuses = { [Provider in InstallerProviderId]?: ProviderRuntimeStatus };
 
 export interface ExportResult {
   saved: boolean;

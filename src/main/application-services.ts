@@ -1,4 +1,4 @@
-import { isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
+import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
 import { ANALYTICS_GENERATIONS, openPanelTransport, ReportQueue } from "@openbot/telemetry";
 import { fileReportStorage } from "@openbot/telemetry/node";
 import { makeWASocket } from "@openbot/whatsapp/baileys";
@@ -214,6 +214,7 @@ import { GitHubConnectorStore } from "./github-connector-store";
 import { GitHubRelay, receiveGitHubDelivery } from "./github-relay";
 import { createGitHubRest, type WorkflowGitHubDirectory, workflowGitHubDirectory } from "./github-rest";
 import { HermesImportService } from "./hermes-import-service";
+import { HermesInstaller } from "./hermes-installer";
 import { HostEventsRuntime } from "./host-events-runtime";
 import { agentWebhookRoutineWriter, HostEventsService } from "./host-events-service";
 import { HostService } from "./host-service";
@@ -1373,10 +1374,17 @@ export async function createApplicationServices({
       appData: app.getPath("appData"),
       userDataOverride: app.commandLine.getSwitchValue("user-data-dir"),
     });
+  const providerDownloads = join(app.getPath("userData"), "provider-runtimes", ".downloads");
+  const hermesInstaller = new HermesInstaller({
+    downloadRoot: providerDownloads,
+    // `service` exists before the first install can end: the row offers Download from its status.
+    refreshProvider: () => service.refreshProvider("hermes"),
+  });
   const providerRuntimes = new ProviderRuntimeManager({
     isProviderOn: (provider) => !providerUse.off().includes(provider),
     root: providerRuntimesRoot,
-    downloadRoot: join(app.getPath("userData"), "provider-runtimes", ".downloads"),
+    downloadRoot: providerDownloads,
+    hermesInstaller,
     updateRuntime: (runtime, install, signal, onWait) => {
       if (isManagedToolRuntime(runtime)) return install().pipe(Effect.asVoid);
       return service
@@ -2195,15 +2203,34 @@ export async function createApplicationServices({
    * latest upstream release. It knows the copies it downloaded itself; a CLI the user installed is
    * only ever reported in the agent status, so it is passed on from here. Its update offer installs
    * a managed copy and leaves the system installation untouched.
+   *
+   * A hosted server's image installs its own Claude and Codex CLIs, and updates them at boot. That
+   * update can fail with no error, and the user cannot install a CLI on the server. When the CLI is
+   * too old, the server downloads the managed copy itself, once per start: the provider showed as too
+   * old, which the user read as uninstalled (#4995). A too-old row has no `cliSource`, as the
+   * resolution failed; the download does nothing when the copy in the store is already the newest.
+   * A failed download shows its error, and the user can retry it.
    */
+  const replacedOutdatedSystemClis = new Set<ManagedProviderId>();
   const trackSystemCliVersions = (status: AgentStatus): void => {
     let copyInUse = false;
     for (const provider of status.providers ?? []) {
+      if (!isManagedRuntimeProvider(provider.id)) continue;
       const version = provider.cliSource === "system" ? (provider.version ?? null) : null;
-      if (isManagedRuntimeProvider(provider.id) && providerRuntimes.setSystemVersion(provider.id, version))
-        copyInUse = true;
+      if (providerRuntimes.setSystemVersion(provider.id, version)) copyInUse = true;
+      if (
+        hostedServer !== null &&
+        provider.state === "outdated" &&
+        !replacedOutdatedSystemClis.has(provider.id) &&
+        !providerUse.off().includes(provider.id)
+      ) {
+        replacedOutdatedSystemClis.add(provider.id);
+        Effect.runFork(providerRuntimes.download(provider.id).pipe(Effect.ignore));
+      }
     }
     if (copyInUse) Effect.runFork(providerRuntimes.providerUseChanged());
+    // Hermes has a Download only while the agent status finds no Hermes.
+    hermesInstaller.setProvider(status.providers?.find((provider) => provider.id === "hermes"));
   };
   trackSystemCliVersions(service.getStatus());
   service.on("event", (event) => {

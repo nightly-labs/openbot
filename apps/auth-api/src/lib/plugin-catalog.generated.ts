@@ -61,6 +61,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "5ead5bab31fb150bf62410b0f4f59106c1e0aa6b00c8449bd8a0d0557cfd48c5",
     },
     {
+      slug: "ticktick",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "d78a41e454da4e0134d57a11d7da29b5b8c38accf4f5d4dfde2e28bf38601a93",
+    },
+    {
       slug: "trello",
       version: "1.0.0",
       featured: false,
@@ -516,6 +522,40 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://www.todoist.com",
     privacyPolicyUrl: "https://www.todoist.com/privacy",
     termsUrl: "https://www.todoist.com/terms-of-service",
+    skills: [],
+  },
+  ticktick: {
+    slug: "ticktick",
+    name: "TickTick",
+    tagline: "Tasks, lists, habits and focus",
+    description:
+      "TickTick lets agents search and filter tasks, add and update tasks, and manage lists, sections, folders, tags and comments. Agents can also read and change habits and focus records, and read events from the calendars connected to TickTick. Each user signs in to their own TickTick account through the browser. Agents get read and write access: they can complete, move and delete tasks, and delete tags and focus records.",
+    category: "productivity",
+    creatorName: "TickTick",
+    iconUrl: "https://ticktick.com/static/img/apple-touch-icon.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-today", text: "Which TickTick tasks are due today?" },
+      { id: "prompt-capture", text: "Add these action items to my TickTick Inbox." },
+      { id: "prompt-week", text: "Which TickTick tasks did I complete last week?" },
+    ],
+    apps: [
+      {
+        id: "app-ticktick-mcp",
+        name: "TickTick",
+        description: "Tasks, lists, habits and focus records, over TickTick's MCP server with browser sign-in.",
+        iconUrl: "https://ticktick.com/static/img/apple-touch-icon.png",
+        server: {
+          name: "ticktick",
+          transport: "http",
+          url: "https://mcp.ticktick.com",
+          auth: [{ id: "ticktick-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://ticktick.com",
+    privacyPolicyUrl: "https://ticktick.com/privacy",
+    termsUrl: "https://ticktick.com/tos",
     skills: [],
   },
   trello: {

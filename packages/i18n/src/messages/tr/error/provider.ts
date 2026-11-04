@@ -215,6 +215,8 @@ export const messages = {
     "Model sağlayıcısı kendi tarafında başarısız oldu. Bağlantınız bunun nedeni değildir. Daha sonra tekrar deneyin veya başka bir model seçin.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode model sağlayıcısına bağlanamadı. OpenBot'u çalıştıran bilgisayarın ağ bağlantısını kontrol edin, ardından tekrar deneyin.\n{detail}",
+  "error.provider.codexStateBusy":
+    "ChatGPT önceki bir başlatmadan sonra yerel geçmişini hâlâ hazırlıyor. Birkaç dakika bekleyin, sonra yeniden deneyin.",
   "error.provider.opencodeDatabaseNewer":
     "Daha yeni bir OpenCode sürümü veritabanını değiştirdiği için OpenCode veritabanını açamadı. OpenCode'u 2 veya daha yeni bir sürüme güncelleyin, sonra yeniden deneyin.",
   "error.provider.opencodeNoAnswer":
@@ -425,6 +427,8 @@ export const messages = {
   "error.provider.registryPrerequisite": "Bu ajanı kurmadan önce ana makineye {tool} yükleyin.",
   "error.provider.registryBindingChanged": "Özel ajan kurulum sırasında değişti. Tekrar deneyin.",
   "error.provider.registryInstallFailed": "Ajan kurulumu başarısız oldu. Önceki kurulum değişmedi.",
+  "error.provider.hermesInstallFailed": "Hermes Agent kurulmadı. Yeniden deneyin veya kurulum kılavuzunu kullanın.",
+  "error.provider.hermesNeedsGitCurl": "Hermes Agent için git ve curl gerekir. Bunları kurun, sonra yeniden deneyin.",
   "error.provider.registryRemoveBusy":
     "Kaldırmadan önce ajan kurulumunun ve etkin ACP çalışmasının bitmesini bekleyin.",
 } as const satisfies PartialTranslation<typeof source>;

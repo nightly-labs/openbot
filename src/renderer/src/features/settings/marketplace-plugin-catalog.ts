@@ -336,6 +336,46 @@ const TODOIST: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/todoist",
 };
 
+const TICKTICK: MarketplacePluginDetail = {
+  id: "plugin-ticktick",
+  slug: "ticktick",
+  name: "TickTick",
+  tagline: "Tasks, lists, habits and focus",
+  description:
+    "TickTick lets agents search and filter tasks, add and update tasks, and manage lists, sections, folders, tags and comments. Agents can also read and change habits and focus records, and read events from the calendars connected to TickTick. Each user signs in to their own TickTick account through the browser. Agents get read and write access: they can complete, move and delete tasks, and delete tags and focus records.",
+  category: "productivity",
+  creatorName: "TickTick",
+  iconUrl: "https://ticktick.com/static/img/apple-touch-icon.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-today", text: "Which TickTick tasks are due today?" },
+    { id: "prompt-capture", text: "Add these action items to my TickTick Inbox." },
+    { id: "prompt-week", text: "Which TickTick tasks did I complete last week?" },
+  ],
+  apps: [
+    {
+      id: "app-ticktick-mcp",
+      name: "TickTick",
+      description: "Tasks, lists, habits and focus records, over TickTick's MCP server with browser sign-in.",
+      iconUrl: "https://ticktick.com/static/img/apple-touch-icon.png",
+      server: {
+        name: "ticktick",
+        transport: "http",
+        url: "https://mcp.ticktick.com",
+        auth: [{ id: "ticktick-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://ticktick.com",
+  privacyPolicyUrl: "https://ticktick.com/privacy",
+  termsUrl: "https://ticktick.com/tos",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-09-30T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/ticktick",
+};
+
 const TRELLO: MarketplacePluginDetail = {
   id: "plugin-trello",
   slug: "trello",
@@ -1562,6 +1602,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   OBSIDIAN,
   ATLASSIAN,
   TODOIST,
+  TICKTICK,
   TRELLO,
   COBRAIN,
   FIGMA,
