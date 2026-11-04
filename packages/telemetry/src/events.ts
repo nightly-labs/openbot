@@ -15,6 +15,14 @@ export const CauseCode = Schema.Literals([
   "not_found",
   "conflict",
   "provider_unavailable",
+  "context_too_long",
+  "model_not_found",
+  "invalid_request",
+  "content_blocked",
+  "turn_limit",
+  "empty_answer",
+  "provider_internal_error",
+  "provider_exited",
   "attachment_type_unsupported",
   "attachment_too_large",
   "attachment_upload_failed",
@@ -82,7 +90,7 @@ export type ReportContext = Pick<Report, "surface" | "app_version" | "platform" 
  * Change a value only together with ANALYTICS.md.
  */
 export const ANALYTICS_GENERATIONS = {
-  desktop_host: 12,
+  desktop_host: 13,
   desktop: 12,
   web: 2,
   mobile: 4,
@@ -176,7 +184,10 @@ export function safeReport(input: unknown): Report | null {
 const STRUCTURED_CAUSES: Readonly<Record<string, CauseCode>> = {
   invalid_upload_request: "invalid_upload_request",
   usageLimitExceeded: "usage_limit",
-  contextWindowExceeded: "unknown",
+  contextWindowExceeded: "context_too_long",
+  context_length_exceeded: "context_too_long",
+  invalid_request_error: "invalid_request",
+  model_not_found: "model_not_found",
   unauthorized: "authentication",
   authentication_error: "authentication",
   rate_limit_exceeded: "rate_limit",
@@ -192,6 +203,8 @@ const STRUCTURED_CAUSES: Readonly<Record<string, CauseCode>> = {
   ETIMEDOUT: "timeout",
   ENOSPC: "storage",
   EACCES: "permission",
+  ENOENT: "not_found",
+  EPIPE: "provider_exited",
   ABORT_ERR: "cancelled",
 };
 
@@ -213,37 +226,105 @@ export function classifyFailure(error: unknown): CauseCode {
   const message = error instanceof Error ? error.message : typeof error === "string" ? error : record?.message;
   if (typeof message !== "string") return "unknown";
   if (/\binvalid upload request\b/iu.test(message)) return "invalid_upload_request";
+  // Before the status: a 400 or 413 that names the context is a context that is too long.
   if (
-    /\b(?:401 unauthorized|invalid_api_key|not authenticated|authentication failed|authentication_error)\b/iu.test(
+    /\b(?:context[ _-]?(?:length|window)[ _-]?exceeded|context[ _-]overflow|maximum context length|prompt is too long|too many (?:input )?tokens|input token count\b.{0,80}\bexceeds)\b/iu.test(
+      message,
+    )
+  )
+    return "context_too_long";
+  // OpenRouter's 403: "<model> requires moderation. Your input was flagged for …".
+  if (/\b(?:content[ _-]?filter(?:ed)?|requires moderation|was flagged|safety (?:filter|block))\b/iu.test(message))
+    return "content_blocked";
+  if (
+    /\b(?:401 unauthorized|invalid[ _]api[ _]key|api key not valid|API_KEY_INVALID|not authenticated|UNAUTHENTICATED|authentication failed|authentication_error|token (?:has )?expired|sign in again|log in again)\b/iu.test(
       message,
     )
   )
     return "authentication";
-  if (/\b(?:rate[ _-]?limit(?:_error|_exceeded)?|too many requests)\b/iu.test(message)) return "rate_limit";
-  if (/\b(?:insufficient (?:funds|balance|quota)|payment required|credits? exhausted)\b/iu.test(message))
+  // Google's 429 is RESOURCE_EXHAUSTED.
+  if (
+    /\b(?:rate[ _-]?limit(?:ed|ing|_error|_exceeded)?|too many requests|RESOURCE_EXHAUSTED|resource has been exhausted)\b/iu.test(
+      message,
+    )
+  )
+    return "rate_limit";
+  if (
+    /\b(?:insufficient[ _](?:funds|balance|quota|credits?)|payment required|credits? (?:exhausted|depleted)|out of credits)\b/iu.test(
+      message,
+    )
+  )
     return "billing";
-  if (/\b(?:usage limit|hit your (?:weekly |session )?limit)\b/iu.test(message)) return "usage_limit";
+  if (
+    /\b(?:usage limit|hit your (?:weekly |session )?limit|quota (?:exceeded|reached|exhausted)|free[ _-]usage[ _-]exhausted|key limit exceeded)\b/iu.test(
+      message,
+    )
+  )
+    return "usage_limit";
+  if (
+    /\b(?:model[ _]not[ _]found|unknown model|no such model|not a valid model|no endpoints found|model\b.{0,60}\b(?:not found|does not exist|is unavailable|is not supported))\b/iu.test(
+      message,
+    )
+  )
+    return "model_not_found";
   if (/\b(?:timed? out|ETIMEDOUT|gateway time-?out|deadline exceeded|DEADLINE_EXCEEDED)\b/iu.test(message))
     return "timeout";
   if (
-    /\b(?:fetch failed|failed to fetch|network request failed|connection error|socket hang up|stream disconnected|error sending request|ECONNRESET|ECONNREFUSED|ECONNABORTED|ENOTFOUND|EAI_AGAIN)\b/iu.test(
+    /\b(?:fetch failed|failed to fetch|network request failed|connection error|socket hang up|stream disconnected|error sending request|(?:unable to|failed to|could not|cannot) connect|ECONNRESET|ECONNREFUSED|ECONNABORTED|ENOTFOUND|EAI_AGAIN)\b/iu.test(
       message,
     )
   )
     return "network";
   if (/\b(?:ENOSPC|SQLITE_FULL|disk full)\b/iu.test(message)) return "storage";
   if (/\b(?:EACCES|permission denied|403 forbidden)\b/iu.test(message)) return "permission";
-  // An outage: Claude's "API Error: 529 … overloaded_error", OpenAI's "server_error", Google's
-  // UNAVAILABLE status in capitals, or a 5xx status that the text names as a status.
+  if (/\b(?:empty response|no visible content|reasoning_only)\b/iu.test(message)) return "empty_answer";
+  if (/\b(?:turn|request|operation) (?:was )?cancell?ed\b/iu.test(message)) return "cancelled";
+  // An outage: Claude's "API Error: 529 … overloaded_error", OpenAI's "server_error", or Google's
+  // UNAVAILABLE status in capitals.
   if (
     /\b(?:service unavailable|bad gateway|internal server error|overloaded(?:_error)?|server_error|api_error|server had an error|high demand|temporarily unavailable|upstream connect error)\b/iu.test(
       message,
     ) ||
-    /\bUNAVAILABLE\b/u.test(message) ||
-    /\b(?:API Error|status(?: code)?|HTTP(?:\/[\d.]+)?)\W{0,4}5\d\d\b/iu.test(message)
+    /\bUNAVAILABLE\b/u.test(message)
   )
     return "provider_unavailable";
+  // A status that the text names as a status, such as "(status 402)" or "HTTP 413".
+  const status = /\b(?:API Error|status(?: code)?|HTTP(?:\/[\d.]+)?)\W{0,4}(0|[1-5]\d\d)\b/iu.exec(message)?.[1];
+  const statusCause = status === undefined ? null : httpStatusCause(Number(status));
+  if (statusCause) return statusCause;
+  if (/\b(?:invalid[ _]request(?:_error)?|bad request|INVALID_ARGUMENT)\b/iu.test(message)) return "invalid_request";
   return "unknown";
+}
+
+/**
+ * The cause of an HTTP status that a provider answered with, or `null` for a status that names none.
+ * Status 0 is a request that got no answer.
+ */
+export function httpStatusCause(status: number): CauseCode | null {
+  if (status === 0) return "network";
+  if (status === 400 || status === 422) return "invalid_request";
+  if (status === 401) return "authentication";
+  if (status === 402) return "billing";
+  if (status === 403) return "permission";
+  if (status === 404) return "not_found";
+  if (status === 408 || status === 504) return "timeout";
+  if (status === 409) return "conflict";
+  if (status === 413) return "context_too_long";
+  if (status === 429) return "rate_limit";
+  return status >= 500 && status <= 599 ? "provider_unavailable" : null;
+}
+
+/** Causes that say only that the provider refused a request, not why. */
+const REFUSAL_CAUSES: ReadonlySet<CauseCode> = new Set(["invalid_request", "permission", "not_found"]);
+
+/**
+ * The cause that a structured field names, such as an HTTP status or an error name, else the cause
+ * of the text. A field that says only that the request was refused yields to a text that says why,
+ * such as a 400 for a context that is too long or a 403 for a flagged input.
+ */
+export function structuredCause(structured: CauseCode | null, text: CauseCode): CauseCode {
+  if (!structured || (text !== "unknown" && REFUSAL_CAUSES.has(structured))) return text;
+  return structured;
 }
 
 /**

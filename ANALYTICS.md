@@ -19,14 +19,16 @@ Every event has these low-cardinality properties:
 - `surface`: `desktop`, `desktop_host`, `landing`, `web`, `mobile`, `account_api`, or `signal`;
 - `environment`: currently `production` only;
 - `event_schema_version`: the integer schema generation of that surface: currently `12` on `desktop`,
-  `12` on `desktop_host`, `10` on `landing`, `13` on `account_api`, `4` on `mobile`, `2` on `web`, and `1` on
+  `13` on `desktop_host`, `10` on `landing`, `13` on `account_api`, `4` on `mobile`, `2` on `web`, and `1` on
   `signal`;
 - `app_version` and `platform` on desktop surfaces;
 - `acquisition_source` on landing surfaces: `direct`, `search`, `social`, `github`, or `other`;
 - `source_platform` on landing surfaces: an allowlisted platform name, or `unknown`.
 
 Each surface counts its own generations, so a report filters by `surface` and that surface's current
-generation. Host generation 12 adds the main-loop stall attribution (`main_loop_delay_max_phase`,
+generation. Host generation 13 adds `failure_code` and `cause_code` on a failed `system_turn_completed`,
+and the cause codes `context_too_long`, `model_not_found`, `invalid_request`, `content_blocked`,
+`turn_limit`, `empty_answer`, `provider_internal_error` and `provider_exited`. Host generation 12 adds the main-loop stall attribution (`main_loop_delay_max_phase`,
 `main_loop_delay_max_turn_active`, `main_loop_stall_count`), `child_gone_<type>_count`,
 `renderer_long_task_count` and `renderer_input_delay_ms_p95` on `system_resources`, the
 `system_startup` event, and `queue_wait_ms`, `start_ms`, `provider_start_ms` and `first_output_ms` on
@@ -125,9 +127,9 @@ off. Turning analytics off on any surface first sends one `analytics_preference_
 | `agent_action` | Can accounts create and manage agents? | Persistence operation completed |
 | `message_send` | Can accounts send agent and direct messages? | Send operation returned a receipt. From desktop generation 10, `attachment_kinds` lists each kind once: `image`, `document`, `spreadsheet`, `zip`, or `other`. File names and types are not sent |
 | `system_turn_started` | How many host turns begin and from which origin? | Host accepted a unique turn start |
-| `system_turn_completed` | Are turns reliable and fast, and how many tokens do they use? | Host emitted completion; status describes outcome. From host generation 9, a turn that this host saw start adds `token_usage` and the counts that the provider reported for the turn: `uncached_input_tokens`, `cached_input_tokens` (cache reads), `cache_write_tokens`, `output_tokens`, and `total_tokens` (the sum of the sent counts). The counts come from the usage records of the local Usage view, summed over all models of the turn; `model` is the agent's model. `system_token_usage` has the counts of each model `token_usage` is `reported`, `partial` (a count is missing and is not sent), or `unknown` (the provider reported no usage before completion; no count is sent, never 0). From host generation 10, `provider_auth` is how the turn is paid for: `subscription` (a provider plan, such as a ChatGPT plan or OpenCode Go, also when a key signs in to it), `api_key` (a key the user saved), `free` (a free model or a free plan), `custom` (an endpoint that the user added, local or remote) or `unknown`. The host reads it from the sign-in type that the provider CLI reports and from whether a key is saved; it never sends the key or the account. From host generation 12, the turn's time splits into whole milliseconds: `queue_wait_ms` (the message waited in the agent's queue, up to 7 days, for example behind another turn or a usage limit), `start_ms` (from the queue to the provider's start of the turn, which includes `provider_start_ms`), `provider_start_ms` (only when the turn had to start the provider process), and `first_output_ms` (from the provider's start of the turn to its first text, thinking or tool step). A value that the host did not see, such as for a turn that another process started, is not sent |
+| `system_turn_completed` | Are turns reliable and fast, and how many tokens do they use? | Host emitted completion; status describes outcome. From host generation 9, a turn that this host saw start adds `token_usage` and the counts that the provider reported for the turn: `uncached_input_tokens`, `cached_input_tokens` (cache reads), `cache_write_tokens`, `output_tokens`, and `total_tokens` (the sum of the sent counts). The counts come from the usage records of the local Usage view, summed over all models of the turn; `model` is the agent's model. `system_token_usage` has the counts of each model `token_usage` is `reported`, `partial` (a count is missing and is not sent), or `unknown` (the provider reported no usage before completion; no count is sent, never 0). From host generation 10, `provider_auth` is how the turn is paid for: `subscription` (a provider plan, such as a ChatGPT plan or OpenCode Go, also when a key signs in to it), `api_key` (a key the user saved), `free` (a free model or a free plan), `custom` (an endpoint that the user added, local or remote) or `unknown`. The host reads it from the sign-in type that the provider CLI reports and from whether a key is saved; it never sends the key or the account. From host generation 12, the turn's time splits into whole milliseconds: `queue_wait_ms` (the message waited in the agent's queue, up to 7 days, for example behind another turn or a usage limit), `start_ms` (from the queue to the provider's start of the turn, which includes `provider_start_ms`), `provider_start_ms` (only when the turn had to start the provider process), and `first_output_ms` (from the provider's start of the turn to its first text, thinking or tool step). A value that the host did not see, such as for a turn that another process started, is not sent. From host generation 13, a `failed` turn adds `failure_code` and `cause_code` of the error that ended it (the same codes as on `system_operation_failed`). A failed turn with no failure signal, such as a turn stopped by an exit before the host saw an error, omits both |
 | `system_agent_input_requested` | Where do agents need human input? | Host requested a prompt answer or approval |
-| `system_operation_failed` | Which host/provider area fails? | Host emitted a safe, allowlisted operation code and cause code. The host sends this once; remote observers do not repeat it |
+| `system_operation_failed` | Which host/provider area fails? | Host emitted a safe, allowlisted operation code and cause code (see [Cause codes](#cause-codes)). The host sends this once; remote observers do not repeat it |
 | `notification_shown` | Which errors and warnings reach users? | An error/warning toast, shared alert or chat banner, or native error/warning alert is presented. Success, information, and confirmation dialogs are excluded |
 | `client_operation_failed` | Which mobile operations fail? | An existing mobile action event reports a failed result; this diagnostic report has durable delivery |
 | `system_token_usage` | Which providers and models use the tokens? | From host generation 9, one row per provider and model that has usage records in a completed turn, with that model's `token_usage` and counts as on `system_turn_completed`. `provider` and `model` name the model that used the tokens, such as a Claude subagent's model, which can differ from the agent's model; `reasoning_effort` is not sent. A turn with no usage records sends no row. At most 8 rows per turn, the largest totals first |
@@ -381,6 +383,44 @@ when a turn starts. Account changes invalidate pending scopes; an anonymous repo
 assigned to a later account. A known structured provider code takes precedence over a narrow
 message match. Unrecognized causes stay `unknown`. `invalid_upload_request` means the provider
 reported that failure; it does not establish why the upload was rejected.
+
+### Cause codes
+
+`cause_code` is one of a fixed list. The host takes it from structured data first: the ACP error
+code, a flavor's error name (such as OpenCode `errorName`), an HTTP status in the error data or at
+the start of a Pi error, the stop reason, or the kind of failure the host saw. Message rules are a
+fallback for errors that have no structured field. A refusal cause from an HTTP status
+(`invalid_request`, `permission`, `not_found`) yields to a more specific message rule.
+
+| Code | Meaning |
+| --- | --- |
+| `authentication` | The sign-in or key is missing, not valid, or expired |
+| `permission` | The provider or the system refused access |
+| `rate_limit` | Too many requests in a short time |
+| `usage_limit` | A plan or free quota is used up |
+| `billing` | Payment is required or the credits are used up |
+| `network` | The provider cannot be reached |
+| `timeout` | No answer in time, or the turn stalled |
+| `storage` | A local disk failure |
+| `not_found` | A resource that is not a model is missing |
+| `conflict` | A state conflict (HTTP 409) |
+| `provider_unavailable` | The provider is down or overloaded (HTTP 5xx) |
+| `context_too_long` | The prompt is larger than the model context |
+| `model_not_found` | The model does not exist or has no route |
+| `invalid_request` | The provider refused the request as not valid |
+| `content_blocked` | A safety filter or a refusal stopped the answer |
+| `turn_limit` | The turn reached its token or request limit |
+| `empty_answer` | The provider ended the turn with no visible answer |
+| `provider_internal_error` | The provider reported an internal error (JSON-RPC -32603, bad output) |
+| `provider_exited` | The provider process stopped |
+| `invalid_upload_request`, `attachment_type_unsupported`, `attachment_too_large`, `attachment_upload_failed` | Attachment failures |
+| `cancelled` | The turn or request was cancelled |
+| `unknown` | No rule matched |
+
+Codes from `context_too_long` to `provider_exited` start at host generation 13. The message rules
+are shared, so desktop, web and mobile reports at earlier generations can also contain them.
+`rate_limit`, `usage_limit`, `billing`, `authentication`, `network`, `timeout` and
+`provider_unavailable` are user or provider limits; other codes are more likely OpenBot failures.
 
 The random `report_id` identifies this report only. It is not a chat, agent, turn, file, or server
 identifier. Reports contain no message, toast text, exception text, stack trace, command, prompt,
