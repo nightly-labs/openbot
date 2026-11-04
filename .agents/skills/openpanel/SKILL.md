@@ -77,9 +77,11 @@ SQL query "SELECT properties['model'] AS model, count() AS n FROM events
 - Do not add a `FORMAT` clause or `SETTINGS`: the user is `readonly=1`, and the script adds `FORMAT JSON`.
 - `system_resources` values are already daily p95 or max values of one computer, so a p99 of
   `db_request_ms_p95` is "the 99th percentile computer-day", not a request percentile.
-- Output redacts email addresses and the `profile_id`, `device_id` and `session_id` columns. Use
-  `--show-identifiers` only when the developer asks for one ID, and never paste them into issues,
-  pull requests or commits.
+- Output redacts email addresses and the text values of columns whose name has `profile_id`,
+  `device_id` or `session_id`. Counts such as `uniqExact(profile_id)` stay numbers. The match uses
+  the column name, so do not rename an identifier column with `AS`, and do not select the whole
+  `properties` map. Use `--show-identifiers` only when the developer asks for one ID, and never paste
+  identifiers into issues, pull requests or commits.
 - With a tunnel that is already open, set `OPENPANEL_CLICKHOUSE_URL=http://127.0.0.1:<port>/`.
   The script reads the container IP for each run, because Docker can change it.
 

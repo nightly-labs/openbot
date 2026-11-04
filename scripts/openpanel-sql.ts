@@ -111,6 +111,8 @@ const PROPERTY_KEY = /^[a-z][a-z0-9_]*$/u;
 const DATE = /^\d{4}-\d{2}-\d{2}$/u;
 const EMAIL = /[^\s@"'<>,;]+@[^\s@"'<>,;]+\.[a-z]{2,}/giu;
 const IDENTIFIER_COLUMN = /profile_id|device_id|session_id|email/iu;
+// uniqExact(profile_id) and other counts of identifiers are numbers, not identifiers.
+const NUMERIC_TYPE = /^(Nullable\()?(U?Int|Float|Decimal)/u;
 
 const decodeResult = Schema.decodeUnknownSync(
   Schema.fromJsonString(
@@ -159,12 +161,16 @@ function canConnect(port: number): Promise<boolean> {
 
 async function openTunnel(): Promise<Connection> {
   // The container IP changes when Docker recreates the container, so read it for each tunnel.
-  const { stdout } = await execFileAsync("ssh", [
-    "-o",
-    "BatchMode=yes",
-    SSH_HOST,
-    `docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${CONTAINER}`,
-  ]);
+  const { stdout } = await execFileAsync(
+    "ssh",
+    [
+      "-o",
+      "BatchMode=yes",
+      SSH_HOST,
+      `docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${CONTAINER}`,
+    ],
+    { timeout: TUNNEL_TIMEOUT_MS },
+  );
   const containerIp = stdout.trim();
   if (!/^\d{1,3}(\.\d{1,3}){3}$/u.test(containerIp)) {
     throw new Error(`Cannot find the IP address of ${CONTAINER} on ${SSH_HOST}.`);
@@ -213,6 +219,14 @@ interface QueryRequest {
   readonly showIdentifiers: boolean;
 }
 
+// A limit can stop a query after ClickHouse sent part of the rows, with HTTP 500 or, after the
+// headers, HTTP 200. Show only the exception, because those rows are not redacted.
+function clickHouseError(status: number, body: string): Error {
+  const exception = /Code: \d+\. DB::Exception: (?:[^\n"\\]|\\.)*/u.exec(body)?.[0];
+  const detail = exception ? redactText(exception.replace(EMAIL, "<email>")) : "The output is not valid JSON.";
+  return new Error(`ClickHouse returned HTTP ${status}. ${detail}`);
+}
+
 async function runQuery(connection: Connection, request: QueryRequest): Promise<QueryResult> {
   // readonly=1 blocks every setting, also default_format, so the format goes in the query.
   const response = await fetch(connection.url, {
@@ -221,14 +235,21 @@ async function runQuery(connection: Connection, request: QueryRequest): Promise<
     body: `${request.sql.trim().replace(/;+$/u, "")}\nFORMAT JSON`,
   });
   const text = await response.text();
-  if (!response.ok) throw new Error(`ClickHouse returned HTTP ${response.status}. ${redactText(text.trim())}`);
-  // The email pattern stops at a quote, so it cannot change the JSON structure.
-  const result = decodeResult(request.showIdentifiers ? text : text.replace(EMAIL, "<email>"));
+  if (!response.ok) throw clickHouseError(response.status, text);
+  let result: QueryResult;
+  try {
+    // The email pattern stops at a quote, so it cannot change the JSON structure.
+    result = decodeResult(request.showIdentifiers ? text : text.replace(EMAIL, "<email>"));
+  } catch {
+    throw clickHouseError(response.status, text);
+  }
   // JSON output quotes 64-bit integers.
   const integers = result.meta.filter((column) => /^(Nullable\()?U?Int64/u.test(column.type)).map((c) => c.name);
   const identifiers = request.showIdentifiers
     ? []
-    : result.meta.filter((column) => IDENTIFIER_COLUMN.test(column.name)).map((c) => c.name);
+    : result.meta
+        .filter((column) => IDENTIFIER_COLUMN.test(column.name) && !NUMERIC_TYPE.test(column.type))
+        .map((c) => c.name);
   const data = result.data.map((row) =>
     Object.fromEntries(
       Object.entries(row).map(([name, value]) => {
@@ -257,10 +278,12 @@ function propertyKeys(value: string | undefined, fallback: readonly string[], al
   return keys;
 }
 
-function positiveInteger(value: string | undefined, fallback: number, name: string): number {
+function wholeNumber(value: string | undefined, fallback: number, name: string, minimum: number): number {
   if (value === undefined) return fallback;
   const number = Number(value);
-  if (!Number.isInteger(number) || number < 0) throw new Error(`--${name} must be a whole number.`);
+  if (!Number.isInteger(number) || number < minimum) {
+    throw new Error(`--${name} must be a whole number of ${minimum} or more.`);
+  }
   return number;
 }
 
@@ -279,16 +302,17 @@ function presetSql(preset: Preset, options: PresetOptions): string {
   const by = propertyKeys(options.by, preset.by, GROUP_KEYS);
   const metrics = propertyKeys(options.metric, preset.metrics);
   if (metrics.length === 0) throw new Error("Give at least one metric.");
-  const minN = positiveInteger(options["min-n"], 20, "min-n");
+  const minN = wholeNumber(options["min-n"], 20, "min-n", 0);
   const where = [`name = '${preset.event}'`];
   if (options.since !== undefined || options.until !== undefined) {
+    if (options.days !== undefined) throw new Error("Use --days or --since and --until, not both.");
     for (const date of [options.since, options.until]) {
       if (date !== undefined && !DATE.test(date)) throw new Error("--since and --until take YYYY-MM-DD.");
     }
     if (options.since) where.push(`created_at >= toDateTime64('${options.since} 00:00:00', 3, 'UTC')`);
     if (options.until) where.push(`created_at < toDateTime64('${options.until} 00:00:00', 3, 'UTC')`);
   } else {
-    where.push(`created_at >= now() - INTERVAL ${positiveInteger(options.days, 30, "days")} DAY`);
+    where.push(`created_at >= now() - INTERVAL ${wholeNumber(options.days, 30, "days", 1)} DAY`);
   }
   const environment = options.environment ?? "production";
   if (environment !== "any") {
