@@ -728,14 +728,43 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
 }
 
 /**
- * Marks an agent model value that the model id holds as hex: the ACP spec allows any string (DeepSeek
- * Harness sends `["deepseek-official","deepseek-v4-flash"]`), and the contract refuses quotes. A
- * value that starts with the mark is encoded too, so the mark is never ambiguous.
+ * Marks an agent model value that the model id holds escaped: the ACP spec allows any string
+ * (DeepSeek Harness sends `["deepseek-official","deepseek-v4-flash"]`), and the contract refuses
+ * quotes. Each byte that the contract refuses, and `=`, becomes `=` and two hex digits.
  */
-const ENCODED_MODEL_PREFIX = "hex:";
+const ESCAPED_MODEL_PREFIX = "esc:";
+const PLAIN_MODEL_BYTE = /^[A-Za-z0-9._:/[\],-]$/;
 
 /**
- * The agent's models under its id. A value that the contract refuses is encoded; an id that is then
+ * The part of a model id after `<customAgentId>/`: the value itself, or escaped when the contract
+ * refuses it or when it reads as an escaped value.
+ */
+function modelSegment(agentId: string, model: string): string {
+  if (isAgentModel(`${agentId}/${model}`) && agentModelOf(agentId, model) === model) return model;
+  const bytes = [...Buffer.from(model, "utf8")].map((byte) => {
+    const char = String.fromCharCode(byte);
+    return PLAIN_MODEL_BYTE.test(char) ? char : `=${byte.toString(16).padStart(2, "0")}`;
+  });
+  return `${ESCAPED_MODEL_PREFIX}${bytes.join("")}`;
+}
+
+/**
+ * The agent's own value for a model id segment. Only a segment that `modelSegment` makes is decoded,
+ * so a plain value that an agent listed before, such as `esc:x`, goes to the agent as it is.
+ */
+function agentModelOf(agentId: string, segment: string): string {
+  if (!segment.startsWith(ESCAPED_MODEL_PREFIX)) return segment;
+  const body = segment.slice(ESCAPED_MODEL_PREFIX.length);
+  if (!/^(?:[A-Za-z0-9._:/[\],-]|=[0-9a-f]{2})*$/.test(body)) return segment;
+  const bytes = body.match(/=[0-9a-f]{2}|[^=]/g) ?? [];
+  const value = Buffer.from(
+    bytes.map((part) => (part.length === 3 ? Number.parseInt(part.slice(1), 16) : part.charCodeAt(0))),
+  ).toString("utf8");
+  return modelSegment(agentId, value) === segment ? value : segment;
+}
+
+/**
+ * The agent's models under its id. A value that the contract refuses is escaped; an id that is then
  * still refused (too long) is dropped alone: the model list decoders fail closed on the whole array.
  * An agent with no usable model gets the one model `default`, so it stays selectable.
  */
@@ -747,11 +776,7 @@ function routedModels(
   const routed = data.flatMap((item) => {
     const model = item.model?.trim();
     if (!model) return [];
-    const plain = `${config.id}/${model}`;
-    const id =
-      isAgentModel(plain) && !model.startsWith(ENCODED_MODEL_PREFIX)
-        ? plain
-        : `${config.id}/${ENCODED_MODEL_PREFIX}${Buffer.from(model, "utf8").toString("hex")}`;
+    const id = `${config.id}/${modelSegment(config.id, model)}`;
     if (!isAgentModel(id)) {
       refused(model);
       return [];
@@ -768,10 +793,9 @@ function routedModels(
 function forChild(params: unknown, sessionId: string | null): DynamicRecord {
   const record: DynamicRecord = isRecord(params) ? params : {};
   const { model, ...rest } = record;
-  const routed = typeof model === "string" ? model.slice(model.indexOf("/") + 1) : "";
-  const agentModel = routed.startsWith(ENCODED_MODEL_PREFIX)
-    ? Buffer.from(routed.slice(ENCODED_MODEL_PREFIX.length), "hex").toString("utf8")
-    : routed;
+  const routed = typeof model === "string" ? model : "";
+  const slash = routed.indexOf("/");
+  const agentModel = agentModelOf(routed.slice(0, Math.max(slash, 0)), routed.slice(slash + 1));
   return {
     ...rest,
     ...(sessionId === null ? {} : { threadId: sessionId }),
