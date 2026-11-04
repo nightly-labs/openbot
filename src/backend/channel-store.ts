@@ -293,6 +293,19 @@ export class ChannelStore {
     return value;
   }
 
+  /** One task by id, read through the primary key rather than every task of the channel. */
+  task(channelId: string, taskId: string): ChannelTask | null {
+    const row = databaseRow(
+      this.database.connection
+        .prepare("SELECT task_json FROM projection_channel_tasks WHERE channel_id = ? AND task_id = ?")
+        .get(channelId, taskId),
+    );
+    if (!row) return null;
+    const value = JSON.parse(requiredStringColumn(row, "task_json"));
+    if (!isChannelTask(value)) throw new Error("Invalid stored channel task.");
+    return value;
+  }
+
   tasks(channelId: string): ChannelTask[] {
     return databaseRows(
       this.database.connection

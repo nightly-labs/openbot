@@ -180,6 +180,7 @@ import {
   type ProviderPreference,
   startingChoice,
   startingModel,
+  workflowProvider,
 } from "./agent/model-choice";
 import { OpenBotToolRouter } from "./agent/openbot-tool-router";
 import { PlanContinuation } from "./agent/plan-continuation";
@@ -2384,7 +2385,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /**
    * Answers one model step of a workflow. Like a side question, the generation has no tools, no
-   * session and no thread. A missing provider or model falls back to the user's starting choice.
+   * session and no thread. A missing provider or model falls back to the user's starting choice
+   * (see `workflowProvider` for a built-in default that cannot run).
    */
   readonly generateWorkflowText = Effect.fn("AgentService.generateWorkflowText")(
     function* (
@@ -2399,7 +2401,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const failed = (message: string) => new ProfileGenerationFailed({ cause: new Error(message) });
       if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
       if (this.#profileClients.busy()) return yield* failed(sourceText("error.workflow.modelBusy"));
-      const provider = input.provider ?? this.#startingChoice()?.provider ?? this.#providers.preferredProvider();
+      const starting = this.#startingChoice()?.provider ?? this.#providers.preferredProvider();
+      const provider =
+        input.provider ??
+        (input.model === null
+          ? workflowProvider(
+              starting,
+              this.#preference(),
+              this.getStatus().providers ?? [],
+              this.#endpoints.available(),
+            )
+          : starting);
       yield* this.#providers.ensureProvider(provider);
       const models = this.#endpoints.available();
       const model =

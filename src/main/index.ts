@@ -112,7 +112,7 @@ import { installLinuxDesktopEntry } from "./linux-desktop-entry";
 import { configureLinuxGpu } from "./linux-gpu-mode";
 import { configureLinuxPasswordStore } from "./linux-password-store";
 import { restartOnXWaylandWithoutMonitor, takeXWaylandRestartMarker } from "./linux-wayland-output";
-import { takeLocalServerChildEnvironment } from "./local-server-child";
+import { openLocalServerControl, takeLocalServerChildEnvironment } from "./local-server-child";
 import { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
   configureApplicationMenu,
@@ -249,6 +249,11 @@ const serverMode = takeServerModeEnvironment(process.env, app.isPackaged, proces
 // Always taken, so the owner password leaves the environment also when the flag is refused.
 const localServerChildEnvironment = takeLocalServerChildEnvironment(process.env, commandLineUserDataDirectory);
 const localServerChild = serverMode || hostedServer ? null : localServerChildEnvironment;
+const localServerControl = localServerChild
+  ? openLocalServerControl(process.platform, (cause) =>
+      logger.error("The local server has no control pipe from the desktop app:", toLogValue(cause)),
+    )
+  : null;
 if (serverMode || hostedServer || localServerChild) hideExceptionErrorBox();
 // A local server keeps a main window that never loads. A second launch on its profile, a deep link or
 // an MCP sign-in showed it as an empty window next to the desktop app.
@@ -426,11 +431,14 @@ const MAIN_WINDOW_STATE_FILE = "openbot-main-window-state-v1.json";
   process.once("SIGINT", quitAfterSignal);
   process.once("SIGTERM", quitAfterSignal);
   process.once("SIGHUP", quitAfterSignal);
-  // The desktop app holds the other end of stdin. Its end means that the app stopped, also by a crash.
+  // The desktop app holds the other end of the control pipe. Its end means that the app stopped, also
+  // by a crash. A process with no pipe cannot know that, so it quits at once.
   if (localServerChild) {
-    process.stdin.once("end", quitAfterSignal);
-    process.stdin.once("error", quitAfterSignal);
-    process.stdin.resume();
+    if (localServerControl) {
+      localServerControl.once("end", quitAfterSignal);
+      localServerControl.once("error", quitAfterSignal);
+      localServerControl.resume();
+    } else quitAfterSignal();
   }
 }
 
@@ -1285,6 +1293,7 @@ if (!hasSingleInstanceLock) {
         serverMode,
         hostingDeveloperKey,
         localServerChild,
+        localServerControl,
         macHapticFeedback,
         teardown,
         forwardCentralAuth,

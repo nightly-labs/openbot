@@ -72,6 +72,7 @@ import { readdir, rm } from "node:fs/promises";
 import { homedir, hostname, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
+import type { Readable } from "node:stream";
 import { selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type {
   AgentStatus,
@@ -539,6 +540,8 @@ export interface ApplicationServiceContext {
   hostingDeveloperKey: string | null;
   /** Set only in a local server that the desktop app started as its child. See `local-server-child.ts`. */
   localServerChild: LocalServerChildEnvironment | null;
+  /** The control pipe of a local server: the commands of the desktop app. */
+  localServerControl: Readable | null;
   macHapticFeedback: MacHapticFeedback;
   teardown: TeardownRegistry;
   forwardCentralAuth: (state: CentralAuthState) => void;
@@ -941,6 +944,7 @@ export async function createApplicationServices({
   serverMode: serverModeEnvironment,
   hostingDeveloperKey,
   localServerChild,
+  localServerControl,
   macHapticFeedback,
   teardown,
   forwardCentralAuth,
@@ -3143,7 +3147,7 @@ export async function createApplicationServices({
         host,
         writeReady: (line) => process.stdout.write(line),
         readCommands: (onLine) => {
-          createInterface({ input: process.stdin }).on("line", onLine);
+          if (localServerControl) createInterface({ input: localServerControl }).on("line", onLine);
         },
         // The desktop app registered this server for its account. Its machine token gets the Signal
         // tickets and sends the notifications; this process has no account of its own.

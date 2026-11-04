@@ -2,7 +2,7 @@
 // user data directory and agent root (`local-server-child.ts`). The desktop app reaches each one
 // over the loopback Team API, as it reaches a joined server, and logs in as its owner at each start.
 //
-// A child ends when its standard input closes, so it stops also when this process is killed. The
+// A child ends when its control pipe closes, so it stops also when this process is killed. The
 // supervisor starts a child again after it stops on its own, a few times only, so a child that cannot
 // start does not use the computer's power in a loop.
 //
@@ -11,7 +11,7 @@
 //
 // While the desktop app is signed in, each running server is registered for its account, with the
 // child's key and owner member. The machine token of the registration goes to the child on its
-// standard input, so the child meets the owner's devices on Signal and sends their notifications. A
+// control pipe, so the child meets the owner's devices on Signal and sends their notifications. A
 // sign-out tells each child to stop that. A deleted server is removed from the account; until the
 // account service confirms it, the registry keeps its id, so the directory sync does not list it.
 
@@ -20,6 +20,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
+import { Readable, Writable } from "node:stream";
 import { LOCAL_SERVER_LIMIT, type ServerSummary } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
@@ -27,6 +28,7 @@ import { Deferred, Duration, Effect, Exit, Schema, Scope, Semaphore } from "effe
 import { causeHelpers } from "../../backend/effect-boundary";
 import {
   formatLocalServerCommand,
+  LOCAL_SERVER_CONTROL_FD,
   LOCAL_SERVER_ENVIRONMENT,
   LOCAL_SERVER_OWNER_USERNAME,
   LOCAL_SERVER_READY_PREFIX,
@@ -48,7 +50,7 @@ const { io: localIO, sync: localSync, rewrap: toLocalServerFailure } = causeHelp
 
 /** A first start makes the database and the identity keys, so it can take longer than a later one. */
 const READY_TIMEOUT = Duration.seconds(90);
-/** The child quits on its own when its standard input closes. After this it is killed. */
+/** The child quits on its own when its control pipe closes. After this it is killed. */
 const STOP_GRACE_MS = 6_000;
 const RESTART_DELAY = Duration.seconds(5);
 const RESTART_WINDOW_MS = 10 * 60_000;
@@ -100,6 +102,12 @@ function parseReadyLine(line: string): LocalServerReady | null {
   } catch {
     return null;
   }
+}
+
+/** The parent's end of the child's control pipe: `LOCAL_SERVER_CONTROL_FD` on Windows, else standard input. */
+function controlPipe(child: ChildProcess, platform: NodeJS.Platform): Writable | null {
+  const stream = platform === "win32" ? child.stdio[LOCAL_SERVER_CONTROL_FD] : child.stdin;
+  return stream instanceof Writable ? stream : null;
 }
 
 function startFailure(): LocalServerFailure {
@@ -366,11 +374,12 @@ export class LocalServers {
     ]);
   }
 
-  /** Writes one command to the child's standard input. A child that is gone gets nothing. */
+  /** Writes one command to the child's control pipe. A child that is gone gets nothing. */
   #send(id: string, command: LocalServerCommand): void {
     const running = this.#running.get(id);
-    if (!running || running.stopping || !running.child.stdin?.writable) return;
-    running.child.stdin.write(formatLocalServerCommand(command));
+    const control = running && !running.stopping ? controlPipe(running.child, this.#options.platform) : null;
+    if (!control?.writable) return;
+    control.write(formatLocalServerCommand(command));
   }
 
   /** Registers a running server for the signed-in account and gives the child its machine token. */
@@ -471,8 +480,9 @@ export class LocalServers {
         [...this.#options.command.args, `--user-data-dir=${paths.userData}`],
         {
           env: childEnvironment(entry, paths.agentRoot, this.#options.runtimeRoot, secret),
-          // Standard input carries only the account commands, and it closes when OpenBot ends.
-          stdio: ["pipe", "pipe", "pipe"],
+          // The control pipe carries only the account commands, and it closes when OpenBot ends. On
+          // Windows it is fd 3: Electron gives the child a `process.stdin` that only ends (#4868).
+          stdio: this.#options.platform === "win32" ? ["ignore", "pipe", "pipe", "pipe"] : ["pipe", "pipe", "pipe"],
           windowsHide: true,
         },
       ),
@@ -490,7 +500,10 @@ export class LocalServers {
     child.stderr?.resume();
     // A command can reach a child that stopped before its exit event: the closed pipe then fails the
     // write. The exit handler deals with the child, so the write error is dropped.
-    child.stdin?.on("error", () => undefined);
+    const control = controlPipe(child, this.#options.platform);
+    control?.on("error", () => undefined);
+    // The parent's end of fd 3 is also readable. Reading it to its end closes it when the child exits.
+    if (control instanceof Readable && control.readable) control.resume();
     child.once("error", (error: Error) => {
       Deferred.doneUnsafe(ready, Exit.fail(new LocalServerFailure({ cause: error })));
     });
@@ -605,7 +618,7 @@ export class LocalServers {
   });
 
   /**
-   * Ends the child: its standard input closes, then a kill after the grace time. A failed start names
+   * Ends the child: its control pipe closes, then a kill after the grace time. A failed start names
    * its own child in `only`: a restart can already have stopped it, or started a newer child that now
    * holds the entry.
    */
@@ -674,8 +687,10 @@ function terminate(child: ChildProcess, platform: NodeJS.Platform): Effect.Effec
       clearTimeout(timer);
       resume(Effect.void);
     });
-    child.stdin?.end();
-    // On Windows a signal ends the process at once, so the closed input is the only request there.
+    // On Windows, `end()` leaves a pipe that is also readable open, so the child would not see its end.
+    const control = controlPipe(child, platform);
+    control?.end(() => control.destroy());
+    // On Windows a signal ends the process at once, so the closed pipe is the only request there.
     if (platform !== "win32") child.kill("SIGTERM");
   });
 }

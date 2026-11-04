@@ -529,21 +529,39 @@ export class ChannelHistory {
         holder?.author.kind === "agent" && task.instruction.length > HANDOFF_INSTRUCTION_CHARACTERS
           ? cutInstruction(task.instruction, holder)
           : task.instruction;
-      const assignment = `${assignmentText({ ...task, instruction }, request, origin)}\nExpected result: ${task.expectedResult}`;
+      // The message that the request replies to. A reply can be only a mention, and only its
+      // `replyToMessageId` joined it to the quote, so the member answered about other messages (#4841).
+      const replyToMessageId = request?.message.replyToMessageId;
+      const replyTarget = replyToMessageId ? messages.find((message) => message.id === replyToMessageId) : undefined;
+      const requested = `${assignmentText({ ...task, instruction }, request, origin)}\nExpected result: ${task.expectedResult}`;
+      const quote = replyTarget?.message.text.trim() ?? "";
+      // A reply to the message that made the task has the quote in the assignment already. The row of
+      // the quote is a task source, so a long quote or its attachments are read there, not given twice.
+      const assignment =
+        replyTarget && quote !== task.instruction.trim()
+          ? `${requested}\n\nThe request replies to message ${replyTarget.id} from ${replyTarget.author.name}:\n${
+              !quote
+                ? "(The message has no text. Its row in this packet gives its attachments.)"
+                : quote.length > REPEATED_ASSIGNMENT_CHARACTERS
+                  ? "(The message is long. Its row in this packet gives the full text.)"
+                  : quote
+            }`
+          : requested;
+      // A long quote does not take the repeated assignment away from a short request (#3630).
+      const repeated = [assignment, requested].find((text) => text.length <= REPEATED_ASSIGNMENT_CHARACTERS);
       const withoutAssignment = (list: ChannelMessage[]) =>
-        holder
-          ? list.map((message) =>
-              message.id === holder.id
-                ? {
-                    ...message,
-                    message: {
-                      ...message.message,
-                      text: message.message.text.replace(task.instruction, ASSIGNMENT_REFERENCE),
-                    },
-                  }
-                : message,
-            )
-          : list;
+        list.map((message) => {
+          let shown = message;
+          if (message.id === holder?.id)
+            shown = {
+              ...shown,
+              message: { ...shown.message, text: shown.message.text.replace(task.instruction, ASSIGNMENT_REFERENCE) },
+            };
+          // A reply continues the task of the message it quotes, and that marks the quote superseded.
+          // The person asks about it now, so the member reads it as current.
+          if (message.id === replyTarget?.id && message.superseded) shown = { ...shown, superseded: false };
+          return shown;
+        });
       const { instruction: _instruction, expectedResult: _expectedResult, ...taskFacts } = task;
       // Each packet stays in the provider session, and a provider keeps recent user messages
       // through a compaction, so a large packet raises what is left after each one (#3905). The
@@ -648,8 +666,8 @@ export class ChannelHistory {
             : []),
           // A provider can shorten a long message, and the end of the packet then was the only place
           // with the assignment (#3630). It is first now, and a short one is given again here.
-          assignment.length <= REPEATED_ASSIGNMENT_CHARACTERS
-            ? `Current assignment, again:\n${assignment}`
+          repeated !== undefined
+            ? `Current assignment, again:\n${repeated}`
             : 'Answer the assignment under "Current assignment" at the start of this message.',
         ].join("\n\n");
         const counted =

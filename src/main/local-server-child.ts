@@ -9,11 +9,13 @@
  * of this process can read it.
  *
  * While the desktop app is signed in, it registers this server for its account and writes the
- * server's machine token to standard input. This process then also meets the owner's devices on
+ * server's machine token to the control pipe. This process then also meets the owner's devices on
  * Signal, and sends their notifications, with that token. It keeps the token in memory only.
  */
 
+import { Socket } from "node:net";
 import { isAbsolute } from "node:path";
+import type { Readable } from "node:stream";
 import { Effect, Schema, Semaphore } from "effect";
 import type { HostService } from "./host-service";
 import { RemoteWorkflowError } from "./remote-service-effects";
@@ -23,6 +25,30 @@ import type { TeamStore } from "./team-store";
 export const LOCAL_SERVER_OWNER_USERNAME = "owner";
 /** The prefix of the one stdout line that tells the parent where the Team API listens. */
 export const LOCAL_SERVER_READY_PREFIX = "OPENBOT_LOCAL_SERVER_READY ";
+
+/**
+ * The pipe from the desktop app on Windows: there Electron replaces `process.stdin` with a stream that
+ * only ends (#4868). On the other systems the pipe is standard input, which the processes that this
+ * server starts do not inherit.
+ */
+export const LOCAL_SERVER_CONTROL_FD = 3;
+
+/**
+ * The pipe from the desktop app: its commands, and its end when the app stops. Null when the parent
+ * gave no pipe, so that this process cannot know when the app stops.
+ */
+export function openLocalServerControl(
+  platform: NodeJS.Platform,
+  onFailure: (cause: unknown) => void,
+): Readable | null {
+  if (platform !== "win32") return process.stdin;
+  try {
+    return new Socket({ fd: LOCAL_SERVER_CONTROL_FD, readable: true, writable: false });
+  } catch (error) {
+    onFailure(error);
+    return null;
+  }
+}
 
 export const LOCAL_SERVER_ENVIRONMENT = {
   child: "OPENBOT_LOCAL_SERVER_CHILD",
@@ -53,7 +79,7 @@ export interface LocalServerReady {
 }
 
 /**
- * A line that the parent writes to standard input. `publish` gives the machine token of this server's
+ * A line that the parent writes to the control pipe. `publish` gives the machine token of this server's
  * registration; `unpublish` follows a sign-out of the desktop app. No other process sees the token.
  */
 const localServerCommandSchema = Schema.Union([
@@ -111,7 +137,7 @@ export interface StartLocalServerChildOptions {
   teamStore: Pick<TeamStore, "configured" | "configure" | "getIdentity" | "getOwnerMemberId">;
   host: Pick<HostService, "startLoopbackOnly">;
   writeReady: (line: string) => void;
-  /** Calls `onLine` with each line of standard input. */
+  /** Calls `onLine` with each line of the control pipe. */
   readCommands: (onLine: (line: string) => void) => void;
   publisher: LocalServerPublisher;
   /** A failed command leaves the server on loopback only. The message names no secret. */
