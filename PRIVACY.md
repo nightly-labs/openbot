@@ -496,7 +496,8 @@ Conversation read/unread changes are stored on the desktop host and shared with 
 
 The mobile app keeps a copy of what it shows for each server: the agent list, the hidden agents,
 the sections, the server's capabilities, the latest page (up to 50 messages) of each chat that it
-loaded, and the last values of the drawer (the member count, the usage cost, the next routine runs,
+loaded, the channel list with the latest 50 messages of each channel that it opened, and the last
+values of the drawer (the member count, the usage cost, the next routine runs,
 the thread and workflow counts, and the name and last run of each pinned workflow), up to 4 MB for
 each server. It also keeps the last server list that the account service gave: for each server its
 ID, name, logo version, public key and the time of its last key change, membership ID, role, member

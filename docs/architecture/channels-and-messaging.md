@@ -396,8 +396,10 @@ the capability only when its channel service is connected. When a host does not 
 
 Mobile shows channels only on a host that advertises `channel-chats-v1`, and Delete and Restore only
 with `channel-delete-v1`, and Cancel task only with `channel-task-cancel-v1`. It uses the same host channel IDs and commands. The host database stores
-channel settings, members, messages, memories, routines, and read positions. Mobile keeps only an
-in-memory view. Reconnect loads the host list again. `channels-changed` events refresh the list and
+channel settings, members, messages, memories, routines, and read positions. Mobile keeps the channel
+list and the latest 50 messages of each opened channel in its encrypted workspace copy
+(`workspace-cache.ts`) and shows them after a start, before the host answers. The host list then
+replaces them. Reconnect loads the host list again. `channels-changed` events refresh the list and
 open channel history, with one request sequence per host and one pending refresh for an event burst.
 Closing a channel retains a short message window (up to 50 messages), as single chats do,
 and releases larger windows. Only open channels refresh their history. Server removal discards its cached channels and late
