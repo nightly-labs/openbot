@@ -42,7 +42,7 @@
     "effect": "catalog:"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.65.0",
+    "@cloudflare/vite-plugin": "1.66.0",
     "@cloudflare/workers-types": "catalog:",
     "@solidjs/vite-plugin": "catalog:",
     "@tailwindcss/vite": "catalog:",
