@@ -90,7 +90,7 @@ export interface DeliveryPromptSources {
 }
 
 /** What a tagged thread is doing, in the words the provider reads. */
-export type TaggedThreadState = "working" | "queued" | "done" | "failed" | "stopped" | "idle";
+type TaggedThreadState = "working" | "queued" | "done" | "failed" | "stopped" | "idle";
 
 /**
  * The tabs and side threads of the recipient agent, read when a message that tags them is delivered.
