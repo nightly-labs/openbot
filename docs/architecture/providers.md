@@ -355,6 +355,20 @@ install rather than reading as the managed copy. A failure keeps the reason the 
 in one error that goes to the provider row and to the caller - and on, through the Team API, to the
 team's connected clients.
 
+A hosted server (`OPENBOT_HOSTED_SERVER=1`, packaged Linux) has system Claude and Codex CLIs from its image, and the
+image updates them at boot. That update can fail with no error, and the user cannot install a CLI
+there. When a row is `outdated`, main calls `download` for the provider once per start, so the
+managed copy replaces the old CLI with no offer (#4995). The row has no `cliSource`, because the
+resolution failed. An off provider is left alone.
+
+Codex keeps a lease on its state database backfill for 15 minutes, and a process that stops during
+the backfill keeps it. Each Codex start in that time exits with "timed out waiting for state db
+backfill", for any version. `ProviderRuntime` replaces that exit text with
+`error.provider.codexStateBusy`, and an update whose new copy fails this way keeps the copy. Codex
+gets `LONG_START_TIMEOUT_MS` at launch, also when the launch starts all providers, because a stop in
+the request timeout during a slow backfill (the first start after a hosted server's restore) starts
+the lease.
+
 Every runtime the store reaches is on this computer: `window.openbot.providerRuntimes` addresses no
 other one, while the agent status beside it describes whichever server is open. The store therefore
 takes `isLocalServer`, and a workspace on another computer announces no offer and starts no update -
