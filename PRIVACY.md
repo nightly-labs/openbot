@@ -496,7 +496,8 @@ Conversation read/unread changes are stored on the desktop host and shared with 
 
 The mobile app keeps a copy of what it shows for each server: the agent list, the hidden agents,
 the sections, the server's capabilities, the latest page (up to 50 messages) of each chat that it
-loaded, and the last values of the drawer (the member count, the usage cost, the next routine runs,
+loaded, the channel list with the latest 50 messages of each channel that it opened, and the last
+values of the drawer (the member count, the usage cost, the next routine runs,
 the thread and workflow counts, and the name and last run of each pinned workflow), up to 4 MB for
 each server. It also keeps the last server list that the account service gave: for each server its
 ID, name, logo version, public key and the time of its last key change, membership ID, role, member
@@ -959,6 +960,15 @@ Network traffic can also occur when:
   text, as for a typed message, and no recording is kept. Recordings show in the Storage tab of
   **Server Settings**, where the user can delete them, and are part of a data export. A recording is
   deleted with the agent's or channel's data;
+- the user turns on Codex live voice in **Settings → Voice** and opens the Voice pane of a Codex agent
+  on this computer. The app window sends a WebRTC offer to the local Codex App Server, which opens a
+  realtime voice session with OpenAI through the user's own Codex sign-in. The microphone audio then
+  goes from this computer to OpenAI, and the spoken reply comes back, until the pane closes. OpenAI
+  also gets the instructions and the chat context that Codex sends for the agent's thread, as for a
+  typed message. OpenBot never reads the Codex credentials. What the user says is added to the chat
+  as text; no recording is kept. OpenAI handles the audio and the text under its own policy and the
+  user's ChatGPT plan. The setting is saved in `speech-preference.json` in the application data
+  folder. It is off by default;
 - the user connects Bitwarden. OpenBot runs the installed `bw` CLI to sync with the server already
   configured in that CLI, including a self-hosted server. It syncs before listing or filling logins.
   These calls send no OpenBot conversations, files, or agent instructions to Bitwarden. For a
@@ -994,7 +1004,7 @@ Network traffic can also occur when:
   user's agents, conversations or files is sent to Link;
 - an installed build checks GitHub Releases for updates;
 - OpenBot checks for new provider CLI releases when it starts, once an hour, and when you select
-  `Check for updates`. It asks `api.github.com` for Codex and Kimi, `registry.npmjs.org` for Claude,
+  `Check for updates`. It asks `api.github.com` for Codex, Kimi and GitHub Copilot, `registry.npmjs.org` for Claude,
   OpenCode and Cline, `x.ai/cli` for Grok, and `raw.githubusercontent.com/agentclientprotocol/registry` and
   `dl.google.com` (for the download size) for Gemini, and the same registry and
   `downloads.cursor.com` (for the download size) for Cursor, `static.devin.ai` (the manifest, and the
@@ -1508,6 +1518,19 @@ XDG folders that you set. OpenBot does not read, copy, or upload these files; it
 change time of `credentials.toml`, to see a sign-in. When it starts, the CLI reads feature flags and
 sends product analytics events to Cognition. OpenBot does not change these settings. Cognition's
 terms for Devin apply. Team members see the host's Devin agents when their app supports Devin.
+
+### GitHub Copilot
+
+OpenBot downloads the GitHub Copilot CLI from GitHub Releases (`github.com/github/copilot-cli`) when
+you select Download on the GitHub Copilot row. OpenBot starts the CLI as a local process. Prompts,
+attachments, and tool results go to that process, and the CLI sends them to GitHub
+(`api.githubcopilot.com` and `api.github.com`). Sign in opens GitHub's sign-in page on `github.com`
+in your browser. The CLI keeps its sign-in in the system keychain, and its settings and session
+files in `~/.copilot`, or in `$COPILOT_HOME`. OpenBot does not read, copy, or upload them. The CLI
+uses `COPILOT_GITHUB_TOKEN`, `GH_TOKEN` or `GITHUB_TOKEN` when OpenBot's environment has one; OpenBot
+does not log or export these values. The CLI sends its own usage data to GitHub, and OpenBot does not
+change that setting. GitHub's terms for Copilot apply. Team members see the host's Copilot agents
+when their app supports GitHub Copilot.
 
 ### Hermes
 

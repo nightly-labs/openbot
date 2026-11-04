@@ -518,7 +518,7 @@ export const messages = {
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "多数のエージェントとブラウザーの多用向け。",
   // The Voice tab: dictation models and the dictation language.
-  "settings.voice.models.title": "音声入力モデル",
+  "settings.voice.dictation.section": "音声入力",
   "settings.voice.model.parakeet.description": "高速です。ヨーロッパの 25 言語で、話している言語を自動で判別します。",
   "settings.voice.model.bark.description": "高速です。英語のみ。ほとんど小文字で書き、句読点はわずかです。",
   "settings.voice.model.whisper.description": "低速です。約 100 言語に対応し、話す言語を指定できます。",
@@ -534,7 +534,6 @@ export const messages = {
   "settings.voice.model.useLabel": "音声入力に {name} を使用",
   "settings.voice.model.removeLabel": "{name} をこのコンピュータから削除",
   "settings.voice.language.section": "言語",
-  "settings.voice.language.title": "音声入力の言語",
   "settings.voice.language.description": "話す言語です。「自動」は録音から言語を判別します。",
   "settings.voice.language.modelDetects":
     "Parakeet は話している言語を自動で判別します。言語を指定するには Whisper または ElevenLabs を使用してください。",
@@ -561,6 +560,9 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "返信を読み上げる",
   "settings.voice.speech.readReplies.description":
     "メッセージを音声入力すると、返信が読み上げられます。止めるには、もう一度音声入力してください。",
+  "settings.voice.speech.codexLive.title": "Codex ライブ音声",
+  "settings.voice.speech.codexLive.description":
+    "Codex エージェントとの音声会話は、Codex のサインインで OpenAI のライブ音声を使います。音声は OpenAI に送られます。",
   "settings.voice.speech.speed.title": "速度",
   "settings.voice.speech.voice.title": "声",
   "settings.voice.speech.voice.female": "女性の声 {number}",
@@ -569,6 +571,8 @@ export const messages = {
   "settings.voice.speech.voice.stop": "停止",
   "settings.voice.speech.sample": "こんにちは。返信はこのように聞こえます。",
   "settings.voice.speech.listenFailed": "サンプルを再生できませんでした。",
+  "settings.voice.live.section": "ライブ音声",
+  "settings.voice.live.signIn": "ライブ音声を使うには、ChatGPT アカウントで Codex にサインインしてください。",
   "settings.transfer.title": "このサーバーを別のコンピューターに移動",
   "settings.transfer.lede": "エージェントとそのスキル、ルーティン、メモリー、ファイルを 1 つのファイルにまとめます。",
   "settings.transfer.flow.label": "移行の流れ",

@@ -14,6 +14,7 @@ export const messages = {
   "mobile.channel.list.deleteFailedBody": "이 채널을 삭제할 수 없어요. 다시 시도해 주세요.",
   "mobile.channel.list.open": "{name} 채널 열기",
   "mobile.channel.list.openWithTitle": "{name} 채널 열기, {title}",
+  "mobile.channel.avatar.more": "+{count}",
   "mobile.channel.list.unread": { other: "읽지 않은 메시지 {count}개" },
   "mobile.channel.list.noMessages": "아직 메시지가 없어요",
   "mobile.channel.task.task": "작업",

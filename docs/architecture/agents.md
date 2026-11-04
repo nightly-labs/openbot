@@ -271,6 +271,44 @@ changed, on this computer and on a joined host.
   post that was on its way fails as uncertain, and the user retries the step.
 - Image, asset, file output and message trigger nodes are kept in the graph but do not run yet; a
   run that reaches one fails with `nodeUnsupported`.
+- Agents use workflows with six `openbot` tools (`workflow-tools.ts`): `list_workflows`,
+  `read_workflow`, `edit_workflow`, `delete_workflow`, `run_workflow` and `read_workflow_runs`. They
+  are not in the visible set, so before `tool_search` finds them they cost only their names. A search
+  word `workflow` or `workflows` gives the schemas of all six, and no other schema or guidance, so one
+  search covers a build, a run and a delete. A read gives only the runtime fields of each node and no
+  positions, unless the agent asks for the layout; then each node has its position and card size. A run read gives each step's kind and a short label
+  (the agent id, prompt, rule or question), so the agent does not read the workflow again.
+  `edit_workflow` takes a list of operations (add, update, move, remove, connect, disconnect) and saves
+  them as one graph with `saveGraph`; a `ref` names a new node for later operations in the same call.
+  The host places nodes, so the agent sends no coordinates. The layout uses the card width of each
+  kind (`CARD_SIZE` in `workflow-tools.ts` copies `workflow-nodes.css`, or the node's `size`) and
+  leaves a 120 px column gap and a 64 px row gap, so each connection and its port chips show. A new node
+  goes one column right of the node before it, at the same top; a condition's "no" child goes below its
+  "yes" child; a node with no input goes below all nodes. After the operations, a new node that a
+  later `connect` links is placed again: a node put between existing nodes moves them and the nodes
+  after them right by its column. A workflow with no steps before the call, or a call with `tidy`,
+  gets a full layout: a column for each step after its inputs. Locked nodes, text, notes, shapes and
+  nodes that the agent placed stay. Bad arguments, a graph rule, an unknown agent or a locked
+  node is a tool failure that the model reads. On a conflict, the operations apply once more to the newer graph.
+  `Workflows` is built after the agent service, so the tool router reads it through a getter.
+- A tool create or save adds the agent's id to the local `workflows-changed` event. The canvas then
+  plays the change (`workflow-build.ts`): a cursor with the agent's name and avatar colour goes to
+  each node that the agent added, changed or moved, in graph order, and the node and the connections
+  that it completes show one after the other. The Workflows page opens a workflow that an agent made
+  while the page is open. A click on the canvas, reduced motion or an agent that the catalog does not
+  know stops or skips the play. `workflows-v1` still sends only `workflowId`, and its decoder drops
+  the agent id, so a joined desktop reloads the graph with no play.
+- As for channels, only a person's message can use `edit_workflow`, `delete_workflow` or
+  `run_workflow`, in the agent's own chat or in a side thread that the person opened or branched
+  (`AgentTasks.isPersonThread`: origin `user`, no routine, no messaging link or channel). A routine or
+  workflow run, an external chat, a thread that the agent started, an agent message or a team
+  member's message gets a tool failure: a run can carry text from outside, such as a webhook body, and
+  a run can send messages and post to outside services. Reads stay open. No tool waits for a run, so
+  the guidance tells the agent to read the run once and report what still runs.
+- `delete_workflow` also waits for the person's approval card (`awaitToolApproval` with `alwaysAsk`),
+  also for an agent with Full access: a delete loses the runs and versions. A decline is a tool
+  failure that tells the agent not to try again. The guidance tells the agent not to ask in chat
+  first, so the person answers once. `scripts/agent-workflow-gate-e2e.ts` checks both rules.
 
 ## Hidden agents
 

@@ -1875,6 +1875,7 @@ export async function createApplicationServices({
     agentApiKeys,
     localSkillTools: () => localSkillTools(skills),
     routineFlowTools: () => routineFlowRuntime,
+    workflowTools: () => workflowRuntime,
     // `events` is built later, after the account service and the relay.
     webhookRoutines: () => agentWebhookRoutineWriter(events),
     approvalAutomation,
@@ -2005,7 +2006,7 @@ export async function createApplicationServices({
       telegramSend: (connectionId, send) => service.messaging.telegramSend(connectionId, send),
       slackSend: (connectionId, send) => service.messaging.slackSend(connectionId, send),
       // An agent event, so this window, joined clients and the web app hear it the same way.
-      changed: (workflowId) => service.notifyWorkflowsChanged(workflowId),
+      changed: (workflowId, agentId) => service.notifyWorkflowsChanged(workflowId, agentId),
       rearm: () => service.armRoutines(),
       timezone: () => serverTimezone.effective(),
       runEnded: (end) => service.notifyWorkflowRunEnded(end),

@@ -55,6 +55,7 @@ import {
   webhookEventTypeZodSchema,
   webhookFiltersZodSchema,
 } from "./routine-tool-schema";
+import { WORKFLOW_TOOL_DEFINITIONS } from "./workflows/workflow-tools";
 
 interface OpenBotToolDefinition {
   name: string;
@@ -304,6 +305,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   ...DATA_TOOL_DEFINITIONS,
   ...LOCAL_SKILL_TOOL_DEFINITIONS,
   ...ROUTINE_FLOW_TOOL_DEFINITIONS,
+  ...WORKFLOW_TOOL_DEFINITIONS,
   ...MCP_SERVER_TOOL_DEFINITIONS,
   {
     name: "list_sites",
@@ -475,7 +477,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "create_routine",
     description:
-      "Create a scheduled routine for this agent, or for another local agent when agentId is provided. It is active by default. Without a timezone, it uses the timezone of the person whose message this turn answers, or the server timezone when that is unknown. Interval, advanced-every, and custom schedules must not run more often than every 3 minutes. For a one-time reminder or task, use a once schedule: it runs one time and then pauses the routine. When watching a folder for new files and no interval was requested, use a 15 minute interval and keep the folder path plus handling instructions in the routine instruction.",
+      "Create a scheduled routine, one agent's instruction, for this agent or for another local agent when agentId is provided. For several steps in one graph, use edit_workflow. It is active by default. Without a timezone, it uses the timezone of the person whose message this turn answers, or the server timezone when that is unknown. Interval, advanced-every, and custom schedules must not run more often than every 3 minutes. For a one-time reminder or task, use a once schedule: it runs one time and then pauses the routine.",
     shape: {
       agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
       name: z.string().min(1).max(INPUT_LIMITS.routineName),

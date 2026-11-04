@@ -28,7 +28,7 @@ import { stopProcessTree } from "../windows-process-tree";
 import { usageWindowResetSince } from "./account-usage";
 import { captureBrowser } from "./browser-capture";
 import type { ProviderAccountStore, StoredProviderAccount } from "./provider-account-store";
-import { type ProviderProcessFailed, waitForSuccessfulProcess } from "./provider-status";
+import { ProviderProcessFailed, waitForSuccessfulProcess } from "./provider-status";
 import { providerLabel } from "./thread-items";
 import { UsageReadGate } from "./usage-read-gate";
 
@@ -704,15 +704,30 @@ export class ProviderAccounts {
     cli: AgentCliInfo,
     command: NonNullable<ProviderAccountSupport["signOut"]>,
     environment: Readonly<Record<string, string>>,
-  ): Effect.Effect<void, ProviderProcessFailed> {
+  ): Effect.Effect<void, ProviderProcessFailed | ProviderSignInError> {
     return Effect.scoped(
       Effect.gen(function* () {
+        const env = { ...cliPathEnvironment(cli), ...command.env(cli), ...environment };
+        if (command.acpLogout) {
+          const logout = yield* startAcpAuthentication({
+            executable: cli.executable,
+            argv: command.argv,
+            env,
+            methodId: "",
+            timeoutMs: command.timeoutMs,
+            logoutOnly: true,
+          });
+          // A refused ACP sign-out has a safe message, which the account flow shows as the reason.
+          return yield* logout.done.pipe(
+            Effect.mapError((error) => (error.cause instanceof ProviderSignInError ? error.cause : error)),
+          );
+        }
         const target = cliSpawnTarget(cli.executable, command.argv);
         const child = yield* Effect.acquireRelease(
           Effect.sync(() =>
             spawn(target.command, target.args, {
               cwd: process.cwd(),
-              env: { ...process.env, ...cliPathEnvironment(cli), ...command.env(cli), ...environment },
+              env: { ...process.env, ...env },
               stdio: "ignore",
               shell: false,
               windowsHide: process.platform === "win32",
@@ -723,6 +738,12 @@ export class ProviderAccounts {
         );
         yield* waitForSuccessfulProcess(child, command.timeoutMs, "Provider sign-out");
       }),
+    ).pipe(
+      Effect.mapError((cause) =>
+        cause instanceof ProviderProcessFailed || cause instanceof ProviderSignInError
+          ? cause
+          : new ProviderProcessFailed({ cause }),
+      ),
     );
   }
 

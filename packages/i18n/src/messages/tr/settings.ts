@@ -525,7 +525,7 @@ export const messages = {
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Çok sayıda ajan ve yoğun tarayıcı çalışması için.",
   // The Voice tab: dictation models and the dictation language.
-  "settings.voice.models.title": "Dikte modeli",
+  "settings.voice.dictation.section": "Dikte",
   "settings.voice.model.parakeet.description": "Hızlı. Konuşulan dili 25 Avrupa dili arasında kendisi bulur.",
   "settings.voice.model.bark.description":
     "Hızlı. Yalnızca İngilizce. Çoğunlukla küçük harfle ve az noktalamayla yazar.",
@@ -542,7 +542,6 @@ export const messages = {
   "settings.voice.model.useLabel": "Dikte için kullan: {name}",
   "settings.voice.model.removeLabel": "{name} modelini bu bilgisayardan kaldır",
   "settings.voice.language.section": "Dil",
-  "settings.voice.language.title": "Dikte dili",
   "settings.voice.language.description": "Konuştuğunuz dil. Otomatik, dili kayıttan bulur.",
   "settings.voice.language.modelDetects":
     "Parakeet konuşulan dili kendisi bulur. Bir dil belirlemek için Whisper'ı veya ElevenLabs'i kullanın.",
@@ -569,6 +568,9 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "Yanıtları sesli oku",
   "settings.voice.speech.readReplies.description":
     "Bir mesajı dikte ettiğinizde yanıt sesli okunur. Durdurmak için yeniden dikte edin.",
+  "settings.voice.speech.codexLive.title": "Codex canlı ses",
+  "settings.voice.speech.codexLive.description":
+    "Codex ajanlarıyla sesli konuşmalar, Codex oturumunla OpenAI canlı sesini kullanır. Sesin OpenAI'ye gider.",
   "settings.voice.speech.speed.title": "Hız",
   "settings.voice.speech.voice.title": "Ses",
   "settings.voice.speech.voice.female": "Kadın sesi {number}",
@@ -577,6 +579,8 @@ export const messages = {
   "settings.voice.speech.voice.stop": "Durdur",
   "settings.voice.speech.sample": "Merhaba. Yanıtlarınız böyle duyulacak.",
   "settings.voice.speech.listenFailed": "Örnek oynatılamadı.",
+  "settings.voice.live.section": "Canlı ses",
+  "settings.voice.live.signIn": "Canlı sesi kullanmak için ChatGPT hesabınızla Codex'e giriş yapın.",
   "settings.transfer.title": "Bu sunucuyu başka bir bilgisayara taşıyın",
   "settings.transfer.lede": "Ajanlarınız, becerileri, rutinleri, bellekleri ve dosyaları tek bir dosyada toplanır.",
   "settings.transfer.flow.label": "Aktarım nasıl çalışır",

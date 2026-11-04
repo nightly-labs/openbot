@@ -244,8 +244,11 @@ export interface WorkflowsDependencies {
     connectionId: string,
     send: MessagingSlackSend,
   ) => Effect.Effect<{ posted: true } | { failure: MessagingPostFailure }>;
-  /** The workflow whose graph, title, versions or runs changed. */
-  changed(workflowId: string): void;
+  /**
+   * The workflow whose graph, title, versions or runs changed. `agentId` names the agent whose tool
+   * call made or saved it; only this computer's event carries it.
+   */
+  changed(workflowId: string, agentId?: string): void;
   /**
    * Plans the schedule timer again: a trigger changed, or a run ended, and an occurrence that waited
    * for it is due.
@@ -307,10 +310,12 @@ interface WorkflowsShape {
   /** Every workflow with its graph, in one read. */
   listWithGraphs(): Effect.Effect<{ summary: WorkflowSummary; graph: WorkflowGraph }[], WorkflowFailed>;
   get(workflowId: string): Effect.Effect<WorkflowDetail, WorkflowFailed>;
-  create(input: CreateWorkflowInput): Effect.Effect<WorkflowDetail, WorkflowFailed>;
+  /** `agentId`: the agent whose tool call makes it. The change event names it, so an open canvas shows the build. */
+  create(input: CreateWorkflowInput, agentId?: string): Effect.Effect<WorkflowDetail, WorkflowFailed>;
   rename(input: RenameWorkflowInput): Effect.Effect<WorkflowSummary, WorkflowFailed>;
   remove(workflowId: string): Effect.Effect<void, WorkflowFailed>;
-  saveGraph(input: SaveWorkflowGraphInput): Effect.Effect<WorkflowSaveResult, WorkflowFailed>;
+  /** `agentId`: the agent whose tool call saves it, as for `create`. */
+  saveGraph(input: SaveWorkflowGraphInput, agentId?: string): Effect.Effect<WorkflowSaveResult, WorkflowFailed>;
   versions(workflowId: string): Effect.Effect<WorkflowVersion[], WorkflowFailed>;
   restoreVersion(input: WorkflowVersionInput): Effect.Effect<WorkflowDetail, WorkflowFailed>;
   /** The graph that a restore of the version would put back, or null when there is no such version. */
@@ -1117,11 +1122,11 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           return yield* attempt(() => detailOf(workflowId));
         });
 
-        const create = Effect.fn("Workflows.create")(function* (input: CreateWorkflowInput) {
+        const create = Effect.fn("Workflows.create")(function* (input: CreateWorkflowInput, agentId?: string) {
           const detail = yield* attempt(() =>
             store.create(input.graph ? { ...input, graph: prepareGraph(input.graph) } : input, now()),
           );
-          changed(detail.summary.id);
+          changed(detail.summary.id, agentId);
           rearm();
           watchGitHub();
           return detail;
@@ -1148,13 +1153,13 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           );
         });
 
-        const saveGraph = Effect.fn("Workflows.saveGraph")(function* (input: SaveWorkflowGraphInput) {
+        const saveGraph = Effect.fn("Workflows.saveGraph")(function* (input: SaveWorkflowGraphInput, agentId?: string) {
           const result = yield* attempt(() =>
             store.saveGraph(input.workflowId, input.baseRevision, prepareGraph(input.graph), now()),
           );
           // A conflict changed nothing: the editor that saved gets the newer workflow in the answer.
           if (result.ok) {
-            changed(input.workflowId);
+            changed(input.workflowId, agentId);
             rearm();
             watchGitHub();
           }

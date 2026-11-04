@@ -537,7 +537,7 @@ export const messages = {
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Für viele Agenten und intensive Browserarbeit.",
   // The Voice tab: dictation models and the dictation language.
-  "settings.voice.models.title": "Diktiermodell",
+  "settings.voice.dictation.section": "Diktieren",
   "settings.voice.model.parakeet.description":
     "Schnell. Erkennt die gesprochene Sprache selbst, in 25 europäischen Sprachen.",
   "settings.voice.model.bark.description": "Schnell. Nur Englisch. Schreibt meist klein, mit wenigen Satzzeichen.",
@@ -555,7 +555,6 @@ export const messages = {
   "settings.voice.model.useLabel": "{name} für das Diktat verwenden",
   "settings.voice.model.removeLabel": "{name} von diesem Computer entfernen",
   "settings.voice.language.section": "Sprache",
-  "settings.voice.language.title": "Diktiersprache",
   "settings.voice.language.description": "Die Sprache, die du sprichst. Automatisch erkennt sie aus der Aufnahme.",
   "settings.voice.language.modelDetects":
     "Parakeet erkennt die gesprochene Sprache selbst. Um eine Sprache festzulegen, verwende Whisper oder ElevenLabs.",
@@ -582,6 +581,9 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "Antworten vorlesen",
   "settings.voice.speech.readReplies.description":
     "Wenn du eine Nachricht diktierst, wird die Antwort vorgelesen. Diktiere erneut, um sie zu stoppen.",
+  "settings.voice.speech.codexLive.title": "Codex-Live-Sprache",
+  "settings.voice.speech.codexLive.description":
+    "Sprachgespräche mit Codex-Agenten nutzen OpenAI-Live-Sprache mit deiner Codex-Anmeldung. Deine Stimme geht an OpenAI.",
   "settings.voice.speech.speed.title": "Geschwindigkeit",
   "settings.voice.speech.voice.title": "Stimme",
   "settings.voice.speech.voice.female": "Weibliche Stimme {number}",
@@ -590,6 +592,8 @@ export const messages = {
   "settings.voice.speech.voice.stop": "Stoppen",
   "settings.voice.speech.sample": "Hallo. So klingen deine Antworten.",
   "settings.voice.speech.listenFailed": "Die Probe konnte nicht abgespielt werden.",
+  "settings.voice.live.section": "Live-Sprache",
+  "settings.voice.live.signIn": "Melde dich mit deinem ChatGPT-Konto bei Codex an, um Live-Sprache zu nutzen.",
   "settings.transfer.title": "Diesen Server auf einen anderen Computer umziehen",
   "settings.transfer.lede":
     "Deine Agenten mit ihren Fähigkeiten, Routinen, Erinnerungen und Dateien kommen in eine Datei.",

@@ -118,6 +118,7 @@ import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-up
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
+import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v1";
@@ -441,6 +442,7 @@ type HostRequestActions = Pick<
   | "editQueue"
   | "changeQueue"
   | "setMessageReaction"
+  | "deleteMessage"
   | "downloadAttachment"
 >;
 
@@ -640,6 +642,7 @@ export function createHostRequestActions({
     canInstallAgentTemplate: (serverId) => has(serverId, AGENT_INSTALL_CAPABILITY),
     canEditQueue: (serverId) => has(serverId, TEAM_QUEUE_EDIT_CAPABILITY),
     canRetryMessage: (serverId) => has(serverId, TEAM_MESSAGE_CLIENT_ID_CAPABILITY),
+    canDeleteMessages: (serverId) => has(serverId, MESSAGE_DELETE_CAPABILITY),
     attachmentSupport: (serverId) => {
       const advertised = capabilities.get(serverId) ?? [];
       return {
@@ -1221,6 +1224,20 @@ export function createHostRequestActions({
     },
     setMessageReaction: async (agentId, serverId, messageId, emoji) => {
       await request("POST", TEAM_API_ROUTES.agent.reactions(agentId), ignoreResponse, { messageId, emoji }, serverId);
+    },
+    deleteMessage: async (serverId, target) => {
+      requireCapability(capabilities, serverId, MESSAGE_DELETE_CAPABILITY, "error.team.messageDeleteUnsupported");
+      const { messageId } = target;
+      if (target.kind === "channel") {
+        const body = { channelId: target.channelId, messageId };
+        await request("POST", MESSAGE_DELETE_ROUTES.channel, ignoreResponse, body, serverId);
+      } else if (target.taskId) {
+        const body = { agentId: target.agentId, taskId: target.taskId, messageId };
+        await request("POST", MESSAGE_DELETE_ROUTES.task, ignoreResponse, body, serverId);
+      } else {
+        const body = { agentId: target.agentId, messageId };
+        await request("POST", MESSAGE_DELETE_ROUTES.agent, ignoreResponse, body, serverId);
+      }
     },
     downloadAttachment: (serverId, attachmentId) => {
       const download = () =>

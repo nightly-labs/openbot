@@ -43,6 +43,7 @@ export const messages = defineMessages("onboarding", {
   "onboarding.provider.clineAccount": "Free models with a Cline account",
   "onboarding.provider.kimiAccount": "Kimi models with a Kimi Code account",
   "onboarding.provider.devinAccount": "Many models with a Devin account",
+  "onboarding.provider.copilotAccount": "Many models with a Copilot plan",
   "onboarding.provider.hermesNous": "Nous Portal plan or your Hermes setup",
   "onboarding.provider.inceptionKey": "Mercury models with an Inception API key",
   "onboarding.provider.deepseekKey": "DeepSeek models with a DeepSeek API key",
