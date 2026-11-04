@@ -331,18 +331,28 @@ const resolveMcpCommand = Effect.fn("McpShape.resolveCommand")(function* (comman
   );
 });
 
+/** How long a hand-off waits for the file check. A slow answer keeps the path as written. */
+const COMMAND_FILE_CHECK_MS = 2_000;
+
 /**
  * Whether an absolute command path names no file.
  *
  * Only a missing file counts. Any other answer, such as a folder this process cannot read, keeps the
- * path as written, so the provider reports what it can actually start. On Windows, process creation
- * adds an extension to a path without one, so only a path that has a `PATHEXT` extension is checked.
+ * path as written, so the provider reports what it can actually start. The check has a deadline,
+ * because a privacy prompt for a protected folder or a dead network volume can hold the call, and the
+ * hand-off must not wait for it. On Windows, process creation adds an extension to a path without
+ * one, so only a path that has a `PATHEXT` extension is checked.
  */
 const isMissingCommandFile = Effect.fn("McpShape.isMissingCommandFile")(function* (command: string) {
   if (process.platform === "win32" && !isWindowsRunnable(command, process.env.PATHEXT)) return false;
   return yield* mcpShapeIo(() => access(command)).pipe(
     Effect.as(false),
-    Effect.catch((error) => Effect.succeed(isMissingFileError(error.cause))),
+    Effect.catch(({ cause }) =>
+      Effect.succeed(
+        isMissingFileError(cause) || (cause instanceof Error && "code" in cause && cause.code === "ENOTDIR"),
+      ),
+    ),
+    Effect.timeoutOrElse({ duration: COMMAND_FILE_CHECK_MS, orElse: () => Effect.succeed(false) }),
   );
 });
 
