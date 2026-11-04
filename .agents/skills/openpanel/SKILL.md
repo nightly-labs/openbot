@@ -85,6 +85,34 @@ SQL query "SELECT properties['model'] AS model, count() AS n FROM events
 - With a tunnel that is already open, set `OPENPANEL_CLICKHOUSE_URL=http://127.0.0.1:<port>/`.
   The script reads the container IP for each run, because Docker can change it.
 
+## Release regression report
+
+`.github/workflows/release-regression.yml` runs `scripts/release-regression-report.ts` every day.
+The report compares the two newest releases (turn time, failed turns, event loop, database, memory)
+and goes to a private Discord channel. The repository is public, so the log must show no data: keep
+`--quiet`, do not upload the report, and do not open issues from it. Run it locally without
+`--discord` to see the table, or with `--discord` and `RELEASE_REGRESSION_WEBHOOK_URL` to post it.
+
+The secrets are in the `analytics` GitHub environment, which only protected branches can use:
+`RELEASE_REGRESSION_SSH_KEY`, `RELEASE_REGRESSION_SSH_KNOWN_HOSTS`, `RELEASE_REGRESSION_SSH_HOST`,
+`OPENPANEL_CLICKHOUSE_USER`, `OPENPANEL_CLICKHOUSE_PASSWORD` and `RELEASE_REGRESSION_WEBHOOK_URL`.
+Set them with `gh secret set <name> --env analytics < file` or from a pipe; never as an argument.
+
+CI uses its own key, not a developer key. On `sui-alexandria`:
+
+- The user `openpanel-ci` has no shell. Its `authorized_keys` line and a `Match User openpanel-ci`
+  block at the end of `/etc/ssh/sshd_config` allow only `-L` to `127.0.0.1:18123`.
+- `openpanel-clickhouse-proxy.socket` listens on `127.0.0.1:18123`. Its service runs
+  `/usr/local/sbin/openpanel-clickhouse-proxy`, which reads the container IP and starts
+  `systemd-socket-proxyd`. The proxy stops after 60 s without a connection.
+
+To change the key, make a new ed25519 key, replace the line in
+`/var/lib/openpanel-ci/.ssh/authorized_keys`, and set `RELEASE_REGRESSION_SSH_KEY` again.
+To remove the access: delete the `Match User openpanel-ci` block (the backup is
+`/etc/ssh/sshd_config.bak-20261104-openpanel-ci`), run `sshd -t` and `systemctl reload ssh`, then
+`userdel -r openpanel-ci` and `systemctl disable --now openpanel-clickhouse-proxy.socket`, and delete
+the two units and the script.
+
 ## Rotate the token
 
 In OpenPanel, open the OpenBot project, then Settings, Clients. Make a new `root` client. Encrypt
@@ -98,4 +126,5 @@ Make a random password. Put its SHA-256 hex in `<password_sha256_hex>` of user `
 `/root/openpanel/self-hosting/clickhouse/clickhouse-user-config.xml` on `sui-alexandria` (back up the
 file first, and write it in place: Docker mounts this one file, so a new inode is not seen).
 ClickHouse reloads `users.d` without a restart. Encrypt the password as `OPENPANEL_CLICKHOUSE_PASSWORD`
-into both env files with `dotenvx set ... -fk <main checkout>/.env.keys`.
+into both env files with `dotenvx set ... -fk <main checkout>/.env.keys`, and set
+`OPENPANEL_CLICKHOUSE_PASSWORD` in the `analytics` GitHub environment again.

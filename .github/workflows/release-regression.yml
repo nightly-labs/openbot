@@ -1,0 +1,78 @@
+name: Release regression report
+
+# Once a day, compares the newest desktop release with the release before it, from production
+# analytics (scripts/release-regression-report.ts), and sends the table to a private Discord channel.
+# This repository is public, so the log of this workflow must show no data: the script runs with
+# --quiet, the report is not uploaded, and errors go only to Discord. The secrets are in the
+# `analytics` environment, which only `main` can use.
+#
+# Access: the SSH key opens one local forward as the user `openpanel-ci` on the analytics server.
+# That user has no shell and can forward only to 127.0.0.1:18123, a socket proxy to the OpenPanel
+# ClickHouse. There, the ClickHouse user can only read the OpenBot events, with time, memory and
+# query limits.
+on:
+  schedule:
+    - cron: "23 7 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: release-regression
+  cancel-in-progress: false
+
+jobs:
+  report:
+    name: Compare the newest release
+    if: github.repository == 'nightly-labs/openbot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: analytics
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      - name: Open the tunnel to the analytics server
+        env:
+          SSH_KEY: ${{ secrets.RELEASE_REGRESSION_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.RELEASE_REGRESSION_SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.RELEASE_REGRESSION_SSH_HOST }}
+        run: |
+          dir="$RUNNER_TEMP/release-regression-ssh"
+          install -d -m 0700 "$dir"
+          printf '%s\n' "$SSH_KEY" > "$dir/key"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$dir/known_hosts"
+          chmod 0600 "$dir/key" "$dir/known_hosts"
+          # -q keeps the host name out of the log.
+          ssh -q -F /dev/null -i "$dir/key" -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o UserKnownHostsFile="$dir/known_hosts" -o StrictHostKeyChecking=yes \
+            -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 \
+            -M -S "$dir/control" \
+            -f -N -L 127.0.0.1:18123:127.0.0.1:18123 "openpanel-ci@$SSH_HOST" \
+            || { echo "The tunnel did not open."; exit 1; }
+
+      - name: Send the report
+        env:
+          OPENPANEL_CLICKHOUSE_URL: http://127.0.0.1:18123/
+          OPENPANEL_CLICKHOUSE_USER: ${{ secrets.OPENPANEL_CLICKHOUSE_USER }}
+          OPENPANEL_CLICKHOUSE_PASSWORD: ${{ secrets.OPENPANEL_CLICKHOUSE_PASSWORD }}
+          RELEASE_REGRESSION_WEBHOOK_URL: ${{ secrets.RELEASE_REGRESSION_WEBHOOK_URL }}
+        run: bun scripts/release-regression-report.ts --quiet --discord
+
+      - name: Remove the key and the report
+        if: always()
+        run: |
+          dir="$RUNNER_TEMP/release-regression-ssh"
+          if [ -S "$dir/control" ]; then
+            ssh -q -F /dev/null -S "$dir/control" -O exit tunnel || true
+          fi
+          rm -rf "$RUNNER_TEMP/release-regression-ssh" .openbot-build/release-regression
