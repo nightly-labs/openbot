@@ -208,6 +208,8 @@ export const messages = {
   "error.provider.antigravityReleaseShape": "Gemini 发布包的结构异常。",
   "error.provider.antigravityMissing": "Gemini 尚未下载。请在 OpenBot 中下载后继续。",
   "error.provider.antigravityNotStarted": "找到了 Gemini 服务器，但无法读取其版本。",
+  "error.provider.antigravityOverrideInvalid":
+    "OPENBOT_ANTIGRAVITY_PATH 中的 Gemini 服务器不存在或不可执行。请更正路径或删除该变量，然后重启 OpenBot。",
   "error.provider.antigravityVersionUnreadable": "无法读取 Gemini 服务器版本。",
   "error.provider.antigravitySignIn": "请使用 Google 账号登录以使用 Gemini。",
   "error.provider.antigravityRateLimited":

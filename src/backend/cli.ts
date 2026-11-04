@@ -374,6 +374,10 @@ export const resolveAntigravityCli: (input?: {
 
       /* Try the remaining candidates. */
     }
+    // Only the managed copy is downloadable, so a path the user set that cannot run must not say
+    // "not downloaded": Download is refused while the override is set (#4978).
+    if (!found && override.length > 0)
+      throw new CodexCliError(sourceText("error.provider.antigravityOverrideInvalid"), "invalid");
     throw new CodexCliError(
       found ? sourceText("error.provider.antigravityNotStarted") : sourceText("error.provider.antigravityMissing"),
       found ? "invalid" : "missing",
