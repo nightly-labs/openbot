@@ -1099,7 +1099,12 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                     : t("provider.picker.noModels", { name: railName(provider, t) })
                                 }
                               >
-                                <span>{t("provider.picker.customEmpty")}</span>
+                                {/* A saved endpoint lists no model until its provider restarts and reads it. */}
+                                <span>
+                                  {props.customProviders?.length
+                                    ? t("provider.picker.customPending")
+                                    : t("provider.picker.customEmpty")}
+                                </span>
                               </Show>
                             </div>
                           </Show>

@@ -72,4 +72,6 @@ export const messages = {
   "usage.panel.unsupported":
     "이 호스트는 에이전트 분석을 지원하지 않아요. 이 보기를 쓰려면 호스트를 업데이트해 주세요.",
   "usage.panel.loadFailed": "사용량을 불러올 수 없었어요. 연결과 날짜 범위를 확인해 주세요.",
+  "usage.machine.label": "머신 사용량. CPU: {cpu}, 메모리: {memory}",
+  "usage.machine.openStorage": "저장 공간 열기. 디스크: {percent}, {detail}",
 } as const satisfies PartialTranslation<typeof source>;

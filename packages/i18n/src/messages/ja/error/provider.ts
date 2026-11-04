@@ -276,6 +276,8 @@ export const messages = {
   "error.provider.kimiVersionUnreadable": "Kimi CLI のバージョンを読み取れません。",
   "error.provider.kimiSignIn": "Kimi を使うには Kimi Code でサインインしてください。",
   "error.provider.devinSignIn": "Devin を使うには Devin でサインインしてください。",
+  "error.provider.copilotSignIn":
+    "GitHub Copilot を使うには GitHub でサインインするか、COPILOT_GITHUB_TOKEN を設定してください。",
   "error.provider.hermesMissing":
     "Hermes Agent がインストールされていません。インストールしてから、もう一度お試しください。",
   "error.provider.hermesNotStarted":
@@ -299,6 +301,8 @@ export const messages = {
     "Gemini はブラウザーでサインインページを開けませんでした。既定のブラウザーを確認してから、もう一度接続してください。",
   "error.provider.acpSignInFailed": "サインインが完了しませんでした。",
   "error.provider.acpSignInFailedReason": "サインインが完了しませんでした: {reason}",
+  "error.provider.acpSignOutFailed": "サインアウトが完了しませんでした。",
+  "error.provider.acpSignOutFailedReason": "サインアウトが完了しませんでした: {reason}",
   "error.provider.acpSignInMethodMissing":
     "このプロバイダーはこのコンピューターでこのサインイン方法を提供していません。プロバイダーを更新してから、もう一度お試しください。",
   "error.provider.httpsSignInLinkOnly": "ブラウザーで開けるのは HTTPS のサインインリンクだけです。",

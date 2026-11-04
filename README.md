@@ -7,7 +7,7 @@ OpenBot is a local-first desktop workspace for persistent AI teammates. It suppo
 [Codex App Server](https://learn.chatgpt.com/docs/app-server) and
 [Claude Code](https://code.claude.com/docs/en/overview), plus [Grok CLI](https://docs.x.ai/build/overview),
 OpenCode, Gemini, [Cursor CLI](https://cursor.com/cli), [Cline CLI](https://cline.bot/cli), [Kimi Code CLI](https://github.com/MoonshotAI/kimi-cli),
-[Devin CLI](https://cli.devin.ai), and [Hermes Agent](https://hermes-agent.nousresearch.com) through ACP. It gives every agent its own workspace and
+[Devin CLI](https://cli.devin.ai), [GitHub Copilot CLI](https://github.com/github/copilot-cli), and [Hermes Agent](https://hermes-agent.nousresearch.com) through ACP. It gives every agent its own workspace and
 conversation, and provides local queues, file transfers, an embedded browser, and agent-to-agent
 messaging in one desktop app.
 
@@ -20,7 +20,7 @@ messaging in one desktop app.
 ## What works
 
 - Prompt-driven agent creation and editing on desktop and mobile, with editable instructions, avatar, and section review before saving.
-- Persistent agents backed by independent Codex, Claude, Grok, OpenCode, Gemini, Cursor, Cline, Kimi, Devin, or Hermes sessions and local workspaces.
+- Persistent agents backed by independent Codex, Claude, Grok, OpenCode, Gemini, Cursor, Cline, Kimi, Devin, GitHub Copilot, or Hermes sessions and local workspaces.
 - Custom OpenAI-compatible endpoints and custom ACP agents, with detection of local model servers (Ollama, LM Studio) and installed agents.
 - Per-agent context monitoring with automatic compaction before long threads exhaust the model window.
 - FIFO message queues with pause, resume, cancellation, and crash-safe persistence.
@@ -34,7 +34,7 @@ messaging in one desktop app.
 
 OpenBot is local-first, not offline-only. Codex connects to OpenAI, Claude connects to Anthropic,
 Grok connects to xAI, Gemini connects to Google, Cursor connects to Cursor, Cline connects to Cline,
-Kimi connects to Moonshot AI, Devin connects to Cognition, Hermes connects to Nous Portal and to the providers you set up in Hermes,
+Kimi connects to Moonshot AI, Devin connects to Cognition, GitHub Copilot connects to GitHub, Hermes connects to Nous Portal and to the providers you set up in Hermes,
 visited pages use the network, and installed plugins may connect to their own services.
 
 ## Install
@@ -249,6 +249,15 @@ Download on the Devin row in More providers, and starts it with `devin acp`. Sig
 sign-in page in your browser. If you installed `devin` yourself, OpenBot uses it until a download
 exists. Set `OPENBOT_DEVIN_PATH` to select an executable yourself. Devin agents run on this computer.
 Team members see them when their app supports Devin.
+
+GitHub Copilot uses a GitHub account with a Copilot plan. OpenBot downloads and pins the GitHub
+Copilot CLI (`copilot`) when you select Download on the GitHub Copilot row in More providers, and
+starts it with `copilot --acp`. Sign in opens GitHub's sign-in page in your browser. The CLI keeps
+the sign-in in the system keychain. If `COPILOT_GITHUB_TOKEN`, `GH_TOKEN` or `GITHUB_TOKEN` is set
+for OpenBot, the CLI uses that token instead, and Disconnect cannot remove it. If you installed
+`copilot` yourself, OpenBot uses it until a download exists. Set `OPENBOT_COPILOT_PATH` to select
+an executable yourself. Copilot agents run on this computer. Team members see them when their app
+supports GitHub Copilot.
 
 Hermes uses the Hermes Agent (`hermes`) that you install yourself, with your own `~/.hermes` (or
 `$HERMES_HOME`): its memories, skills, sign-ins and `SOUL.md` apply to OpenBot agents too. OpenBot
@@ -628,6 +637,8 @@ in the file manager. Remote hosts must advertise the `svg-attachments` capabilit
 - `~/.kimi` (or `$KIMI_SHARE_DIR`) — login and session history managed exclusively by the Kimi Code CLI.
 - `~/.local/share/devin`, `~/.config/devin` and `~/.devin` (or the XDG folders) — login, settings and
   session history managed exclusively by the Devin CLI.
+- `~/.copilot` (or `$COPILOT_HOME`) — settings and session history managed exclusively by the GitHub
+  Copilot CLI. Its sign-in is in the system keychain.
 - `~/.hermes` (or `$HERMES_HOME`) — your own Hermes Agent settings, memories, skills, sign-ins and
   session history. OpenBot reads only the change time of `auth.json`, `.env` and `config.yaml`, to
   see a sign-in.
@@ -677,8 +688,8 @@ popover. Release signing secrets and the complete procedure are documented in
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Before we merge a contribution, each
-author from outside the organization signs the [Contributor Assignment Agreement](CLA.md), which
-assigns its copyright to Synthetify Labs. Community behavior is governed by the
+author from outside the organization signs the [Contributor License Agreement](CLA.md), which
+gives Synthetify Labs a license to use the contribution. Community behavior is governed by the
 [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License and attribution

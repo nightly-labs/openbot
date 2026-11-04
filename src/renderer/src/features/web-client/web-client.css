@@ -224,7 +224,7 @@
 
   .web-app-frame[data-web-mobile-pane="conversation"]
     .side-panel-docked
-    > :is(.conversation-scroll, .composer-wrap, .unread-messages-banner, .chat-search) {
+    > :is(.conversation-scroll, .composer-wrap, .unread-messages-banner, .chat-search, .subagents-dock) {
     visibility: hidden;
   }
 

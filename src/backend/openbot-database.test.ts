@@ -2435,6 +2435,58 @@ describe("OpenBotDatabase", () => {
     database.close();
   });
 
+  // Released builds stored a workflow handoff with the workflow title as `routine.name`. A title can have
+  // 160 characters and the guard accepts 80, so the read failed for the whole page and stalled the queue.
+  it("reads a workflow handoff that a released build stored with a long title", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-db-long-routine-name-"));
+    roots.push(root);
+    const database = new OpenBotDatabase(root);
+    await runCauseEffect(database.initialize());
+    const threadId = "openbot-thread-agent-chief";
+    database.connection
+      .prepare(
+        `INSERT INTO projection_threads (thread_id, agent_id, title, active_turn_id, created_at, updated_at, last_event_sequence)
+         VALUES (?, 'agent-chief', 'Chief', NULL, '2026-11-02T12:00:00.000Z', '2026-11-02T12:00:00.000Z', 1)`,
+      )
+      .run(threadId);
+    database.connection
+      .prepare(
+        `INSERT INTO projection_thread_messages
+           (thread_id, message_id, turn_id, author, status, item_type, created_at, ordinal, message_json, last_event_sequence,
+            group_start, group_first, group_id, turn_rank)
+         VALUES (?, 'message-1', NULL, 'user', 'completed', 'routine', '2026-11-02T12:00:00.000Z', 0, ?, 1,
+                 '2026-11-02T12:00:00.000Z', 0, 'message:message-1', 0)`,
+      )
+      .run(
+        threadId,
+        JSON.stringify({
+          id: "message-1",
+          author: "user",
+          status: "completed",
+          source: "routine",
+          itemType: "routine",
+          text: "Summarize the report.",
+          createdAt: "2026-11-02T12:00:00.000Z",
+          // 79 letters, then an emoji (two UTF-16 units) across the limit, then more title.
+          routine: {
+            routineId: "workflow-1",
+            runId: "run-1",
+            name: `${"a".repeat(79)}\u{1F680}${"b".repeat(60)}`,
+            scheduledFor: "2026-11-02T12:00:00.000Z",
+          },
+        }),
+      );
+
+    expect(database.readConversationPage("agent-chief", threadId).messages).toEqual([
+      expect.objectContaining({
+        id: "message-1",
+        text: "Summarize the report.",
+        routine: expect.objectContaining({ routineId: "workflow-1", name: "a".repeat(79) }),
+      }),
+    ]);
+    database.close();
+  });
+
   it("rolls back a failed agent id rewrite and succeeds on retry", async () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-db-ids-rollback-"));
     roots.push(root);

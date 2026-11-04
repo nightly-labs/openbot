@@ -78,7 +78,7 @@ export const messages = {
   "mobile.settings.animations.all": "Animações",
   "mobile.settings.animations.agentFaces": "Rostos animados dos agentes",
   "mobile.settings.animations.agentFacesFooter":
-    "Os avatares dos agentes mexem o rosto enquanto os agentes trabalham e descansam. Quando desativado, os rostos ficam parados.",
+    "Os avatares dos agentes mexem o rosto enquanto os agentes trabalham e descansam. Quando desativado, os rostos ficam parados e os personagens da tela de boas-vindas e da tela inicial vazia param de flutuar.",
   "mobile.settings.animations.composerResize": "Campo de mensagem compacto",
   "mobile.settings.animations.composerResizeFooter":
     "O campo de mensagem vira uma barra pequena enquanto o teclado está fechado. Quando desativado, o campo fica no tamanho completo.",

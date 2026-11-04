@@ -77,7 +77,7 @@ export const messages = {
   "mobile.settings.animations.all": "Animaties",
   "mobile.settings.animations.agentFaces": "Geanimeerde agentgezichten",
   "mobile.settings.animations.agentFacesFooter":
-    "Agentavatars bewegen hun gezicht terwijl de agents werken en rusten. Als dit uitstaat, blijven de gezichten stil.",
+    "Agentavatars bewegen hun gezicht terwijl de agents werken en rusten. Als dit uitstaat, blijven de gezichten stil en zweven de figuren op het welkomstscherm en het lege startscherm niet meer.",
   "mobile.settings.animations.composerResize": "Compact berichtveld",
   "mobile.settings.animations.composerResizeFooter":
     "Het berichtveld wordt een kleine balk zolang het toetsenbord dicht is. Als dit uitstaat, blijft het veld op volledige grootte.",

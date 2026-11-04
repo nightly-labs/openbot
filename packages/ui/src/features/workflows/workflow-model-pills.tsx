@@ -80,6 +80,8 @@ function modelChips(t: AppTranslate, option: ClientAgentModelOption): PickerChip
 export function ModelPill(props: {
   provider: WfProvider;
   value: AgentModelId;
+  /** The text of the pill while the step saves no model (`value` is empty) and the host chooses one. */
+  placeholder?: string;
   disabled?: boolean;
   onChange: (model: AgentModelId, provider: WfProvider) => void;
 }) {
@@ -92,6 +94,9 @@ export function ModelPill(props: {
   const [tab, setTab] = createSignal<AgentProviderRef>(untrack(() => props.provider));
   const [query, setQuery] = createSignal("");
   const current = () => modelOption(models(), props.value);
+  /** The placeholder, while the step saves no model. */
+  const placeholder = () => (props.value === "" ? props.placeholder : undefined);
+  const label = () => placeholder() ?? current()?.name ?? props.value;
   let panel: HTMLDivElement | undefined;
   let opening = false;
   const rows = (provider: AgentProviderRef) => {
@@ -124,11 +129,13 @@ export function ModelPill(props: {
     >
       <Popover.Trigger
         class={`${buttonVariants({ variant: "ghost", size: "xs" })} wfn-pill wfn-model-pill`}
-        aria-label={t("workflow.model.label", { name: current()?.name ?? props.value })}
+        aria-label={t("workflow.model.label", { name: label() })}
         disabled={props.disabled}
       >
-        <ProviderLogo provider={wfProviderLogo(props.provider)} class="wfn-model-logo" />
-        <span>{current()?.name ?? props.value}</span>
+        <Show when={!placeholder()}>
+          <ProviderLogo provider={wfProviderLogo(props.provider)} class="wfn-model-logo" />
+        </Show>
+        <span>{label()}</span>
         <ChevronDown aria-hidden="true" />
       </Popover.Trigger>
       <Popover.Portal>

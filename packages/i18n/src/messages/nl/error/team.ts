@@ -68,6 +68,7 @@ export const messages = {
   "error.team.agentInstallUnsupported": "Deze verbinding ondersteunt het toevoegen van agents niet.",
   "error.team.agentHideUnsupported": "Deze verbinding ondersteunt het verbergen van agents niet.",
   "error.team.agentColorsUnsupported": "Deze verbinding ondersteunt geen agentkleuren.",
+  "error.team.chatColorsUnsupported": "Deze verbinding ondersteunt geen chatkleuren.",
   "error.team.sidebarFoldersUnsupported": "Deze verbinding ondersteunt geen mappen in mappen.",
   "error.team.agentNotificationLevelsUnsupported":
     "Deze server kan geen eigen meldingsniveau per agent bewaren. Werk OpenBot bij op de computer waarop de server draait.",

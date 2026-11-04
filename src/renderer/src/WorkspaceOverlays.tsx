@@ -918,6 +918,7 @@ function AppSettings(props: AccountProps) {
         account={props.account()}
         onUpdateAccountName={auth.updateAccountName}
         onUpdateAccountAvatar={auth.updateAccountAvatar}
+        onSetChatColor={auth.setChatColor}
         onCreateMobileConnect={auth.createMobileConnect}
         onCancelMobileConnect={auth.cancelMobileConnect}
         onGetMobileConnectLink={auth.getMobileConnectLink}

@@ -82,7 +82,7 @@ export const messages = {
   "mobile.settings.animations.all": "Анимации",
   "mobile.settings.animations.agentFaces": "Живые лица агентов",
   "mobile.settings.animations.agentFacesFooter":
-    "Аватары агентов двигаются, пока агенты работают и отдыхают. Если выключить, лица останутся неподвижными.",
+    "Аватары агентов двигаются, пока агенты работают и отдыхают. Если выключить, лица останутся неподвижными, а персонажи на экране приветствия и на пустом главном экране перестанут парить.",
   "mobile.settings.animations.composerResize": "Компактное поле сообщения",
   "mobile.settings.animations.composerResizeFooter":
     "Пока клавиатура закрыта, поле сообщения превращается в узкую полоску. Если выключить, поле остаётся полного размера.",

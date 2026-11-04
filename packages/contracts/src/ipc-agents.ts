@@ -312,6 +312,11 @@ export interface AgentSummary {
    * it through `agent-colors-v1`.
    */
   avatarColor?: AvatarColor | null;
+  /**
+   * The chat colour: a soft tint of the agent's chat bubbles, `#rrggbb` in lower case. It is not the
+   * avatar colour. Absent means no chat colour. A remote client reads it through `chat-colors-v1`.
+   */
+  chatColor?: AvatarColor;
   avatarUrl: string | null;
   marketplaceSource?: {
     listingId: string;
@@ -371,6 +376,7 @@ function hasAgentSummaryFields(value: DynamicRecord): boolean {
     isAvatarSeed(value.avatarSeed) &&
     (value.avatarHue === null || isAvatarHue(value.avatarHue)) &&
     (value.avatarColor === undefined || value.avatarColor === null || isAvatarColor(value.avatarColor)) &&
+    (value.chatColor === undefined || isAvatarColor(value.chatColor)) &&
     (value.avatarUrl === null || isBoundedString(value.avatarUrl, INPUT_LIMITS.avatarUrl)) &&
     (value.marketplaceSource === undefined || isAgentMarketplaceSource(value.marketplaceSource))
   );
@@ -429,6 +435,8 @@ export interface UpdateAgentInput {
   avatarHue?: AvatarHue | null;
   /** A colour also sets `avatarHue` to its nearest hue. `null` clears the colour. */
   avatarColor?: AvatarColor | null;
+  /** See `AgentSummary.chatColor`. `null` removes the chat colour. It does not change the avatar colour. */
+  chatColor?: AvatarColor | null;
 }
 
 export interface DuplicateAgentResult {

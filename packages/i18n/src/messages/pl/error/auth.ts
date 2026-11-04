@@ -8,6 +8,7 @@ export const messages = {
     "Zapora lub serwer proxy w tej sieci blokuje połączenie OpenBot z {host}. Poproś administratora sieci o zezwolenie na {host} i spróbuj ponownie.",
   "error.auth.signInFirst": "Najpierw zaloguj się do OpenBot.",
   "error.auth.signInRequired": "Wymagane jest zalogowanie.",
+  "error.auth.chatColorUnavailable": "Usługa kont nie obsługuje jeszcze kolorów czatu. Spróbuj ponownie później.",
   "error.auth.accountChangedDuringRegister": "Zalogowane konto zmieniło się podczas rejestrowania tego serwera.",
   "error.auth.hostCredentialUnavailable": "Poświadczenie zdalnego hosta jest niedostępne. Zarejestruj hosta ponownie.",
   "error.auth.codeNotVerified": "Nie udało się zweryfikować kodu logowania.",

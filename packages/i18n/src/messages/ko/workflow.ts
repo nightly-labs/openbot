@@ -98,6 +98,7 @@ export const messages = {
   "workflow.model.providerModels": "{name} 모델",
   "workflow.model.effort": "강도: {name}",
   "workflow.model.effortRange": "{from}–{to}",
+  "workflow.model.auto": "자동",
 
   "workflow.llm.title": "LLM",
   "workflow.llm.name": "LLM 단계",

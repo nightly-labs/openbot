@@ -24,6 +24,7 @@ import {
   X,
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
+import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createUniqueId, For, Match, Show, Switch } from "solid-js";
 
@@ -43,8 +44,14 @@ function createClock(running: () => boolean) {
   createEffect(running, (active) => {
     setNow(Date.now());
     if (!active) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
-    return () => window.clearInterval(timer);
+    // All clocks tick on the same wall-clock second, so the card and its bar show the same time.
+    const nextSecond = () => 1_000 - (Date.now() % 1_000);
+    const tick = () => {
+      setNow(Date.now());
+      timer = window.setTimeout(tick, nextSecond());
+    };
+    let timer = window.setTimeout(tick, nextSecond());
+    return () => window.clearTimeout(timer);
   });
   return now;
 }
@@ -147,6 +154,38 @@ function LiveLine(props: { subagent: ConversationSubagent }) {
   );
 }
 
+/** How far the subagents of one turn are, and their time together, which runs while one works. */
+function createGroupProgress(subagents: () => readonly ConversationSubagent[]) {
+  const duration = useDuration();
+  const total = () => subagents().length;
+  const running = () => subagents().filter((subagent) => subagent.status === "running").length;
+  const failed = () => subagents().filter((subagent) => subagent.status === "failed").length;
+  const finished = () => total() - running();
+  const now = createClock(() => running() > 0);
+  const elapsed = createMemo(() => {
+    const current = now();
+    const start = Math.min(...subagents().map((subagent) => timeOf(subagent.startedAt, current)));
+    const end = running() > 0 ? current : Math.max(...subagents().map((subagent) => timeOf(subagent.endedAt, current)));
+    return duration(end - start);
+  });
+  return { total, running, failed, finished, now, elapsed };
+}
+
+/** The ring and "1 of 3" of subagents that still work. */
+function RunningProgress(props: { finished: number; total: number }) {
+  const { t } = useText();
+  return (
+    <Badge class="subagents-progress">
+      <RadialProgress
+        class="subagents-ring"
+        aria-label={t("chat.subagents.progressLabel")}
+        value={(props.finished / Math.max(props.total, 1)) * 100}
+      />
+      {t("chat.subagents.progress", { finished: props.finished, total: props.total })}
+    </Badge>
+  );
+}
+
 export interface SubagentGroupProps {
   subagents: readonly ConversationSubagent[];
   /** The subagent that the side panel shows now. */
@@ -164,20 +203,9 @@ export function SubagentGroup(props: SubagentGroupProps) {
   const { t } = useText();
   const duration = useDuration();
   const listId = createUniqueId();
-  const total = () => props.subagents.length;
-  const running = () => props.subagents.filter((subagent) => subagent.status === "running").length;
-  const failed = () => props.subagents.filter((subagent) => subagent.status === "failed").length;
-  const finished = () => total() - running();
-  const now = createClock(() => running() > 0);
+  const { total, running, failed, finished, now, elapsed: groupElapsed } = createGroupProgress(() => props.subagents);
   const [choice, setChoice] = createSignal<boolean>();
   const expanded = () => choice() ?? running() > 0;
-  const groupElapsed = createMemo(() => {
-    const current = now();
-    const start = Math.min(...props.subagents.map((subagent) => timeOf(subagent.startedAt, current)));
-    const end =
-      running() > 0 ? current : Math.max(...props.subagents.map((subagent) => timeOf(subagent.endedAt, current)));
-    return duration(end - start);
-  });
   const rowLabel = (subagent: ConversationSubagent) =>
     t("chat.subagents.open", {
       title: subagent.title,
@@ -209,14 +237,7 @@ export function SubagentGroup(props: SubagentGroupProps) {
             </Badge>
           }
         >
-          <Badge class="subagents-progress">
-            <RadialProgress
-              class="subagents-ring"
-              aria-label={t("chat.subagents.progressLabel")}
-              value={(finished() / Math.max(total(), 1)) * 100}
-            />
-            {t("chat.subagents.progress", { finished: finished(), total: total() })}
-          </Badge>
+          <RunningProgress finished={finished()} total={total()} />
         </Show>
         <span class="subagents-elapsed">{groupElapsed()}</span>
         <ChevronRight class="subagents-group-chevron" aria-hidden="true" />
@@ -251,6 +272,111 @@ export function SubagentGroup(props: SubagentGroupProps) {
         </ul>
       </Show>
     </section>
+  );
+}
+
+/** The morph between the card header in the chat and the bar under the chat header. */
+const DOCK_IN: KeyframeAnimationOptions = { duration: 340, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" };
+const DOCK_OUT: KeyframeAnimationOptions = { ...DOCK_IN, duration: 260 };
+
+/** The offset from `to` to `from`, for a FLIP transform. */
+function offset(from: DOMRect, to: DOMRect): string {
+  return `translate(${from.left - to.left}px, ${from.top - to.top}px)`;
+}
+
+export interface SubagentDockProps {
+  /** The subagents of a card that is out of view while one of them works. Otherwise `undefined`. */
+  subagents: readonly ConversationSubagent[] | undefined;
+  /** Where the header of that card is, held inside the chat view; `undefined` when it is not drawn. */
+  cardHeader: () => DOMRect | undefined;
+  /** Scrolls the chat back to the card. */
+  onReveal: () => void;
+}
+
+/**
+ * The header of a subagent card that the reader scrolled away from while its subagents work. It
+ * morphs from the card to a bar under the chat header, with what a subagent does now, and back when
+ * the card shows again. A click scrolls back to the card.
+ */
+export function SubagentDock(props: SubagentDockProps) {
+  const { t } = useText();
+  // The bar keeps its last subagents while it morphs back to the card.
+  const [shown, setShown] = createSignal<readonly ConversationSubagent[]>();
+  let bar: HTMLElement | undefined;
+  let leaving: Animation | undefined;
+  createEffect(
+    () => props.subagents,
+    (subagents) => {
+      if (subagents) {
+        leaving?.cancel();
+        leaving = undefined;
+        setShown(() => subagents);
+        return;
+      }
+      // The bar morphs back once; a second change while it leaves does not start a second morph.
+      if (leaving) return;
+      const target = props.cardHeader();
+      if (!bar?.isConnected || !target || prefersReducedMotion()) {
+        setShown(undefined);
+        return;
+      }
+      const animation = bar.animate(
+        [
+          { transform: "none", opacity: 1 },
+          { transform: offset(target, bar.getBoundingClientRect()), opacity: 0 },
+        ],
+        DOCK_OUT,
+      );
+      leaving = animation;
+      const done = () => {
+        if (leaving !== animation) return;
+        leaving = undefined;
+        setShown(undefined);
+      };
+      animation.finished.then(done, done);
+    },
+  );
+  const morphIn = (element: HTMLElement) => {
+    bar = element;
+    requestAnimationFrame(() => {
+      const from = props.cardHeader();
+      if (!from || prefersReducedMotion() || !element.isConnected) return;
+      element.animate(
+        [
+          { transform: offset(from, element.getBoundingClientRect()), opacity: 0.2 },
+          { transform: "none", opacity: 1 },
+        ],
+        DOCK_IN,
+      );
+    });
+  };
+  return (
+    <div class="subagents-dock">
+      <Show when={shown()}>
+        {(subagents) => {
+          const progress = createGroupProgress(subagents);
+          /** The newest step of a subagent that works: what the team of the agent does now. */
+          const current = () => subagents().find((subagent) => subagent.status === "running");
+          return (
+            <Button
+              ref={morphIn}
+              type="button"
+              variant="ghost"
+              class="subagents-dock-bar no-drag"
+              onClick={() => props.onReveal()}
+            >
+              <span class="subagents-group-title">{t("chat.subagents.running", { count: progress.total() })}</span>
+              <RunningProgress finished={progress.finished()} total={progress.total()} />
+              <span class="subagents-dock-live">
+                <Show when={current()}>{(subagent) => <LiveLine subagent={subagent()} />}</Show>
+              </span>
+              <span class="subagents-elapsed">{progress.elapsed()}</span>
+              <ChevronRight class="subagents-dock-chevron" aria-hidden="true" />
+            </Button>
+          );
+        }}
+      </Show>
+    </div>
   );
 }
 

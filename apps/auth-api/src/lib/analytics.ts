@@ -10,6 +10,7 @@ import {
 import { isBoolean, isOneOf } from "@openbot/contracts/runtime-values";
 import { OpenPanel, OpenPanelBase, type OpenPanelOptions, type TrackProperties } from "@openpanel/web";
 import { BRAND_ROUTE } from "./brand-page";
+import { CLA_ROUTE } from "./cla";
 import { COMMERCIAL_LICENSE_ROUTE } from "./commercial-license";
 import { CONTACT_TOPICS } from "./contact";
 import { CONTENT_COLLECTIONS } from "./content";
@@ -141,6 +142,7 @@ export type LandingScreenPath =
   | typeof TERMS_ROUTE
   | typeof COMMERCIAL_LICENSE_ROUTE
   | typeof DPA_ROUTE
+  | typeof CLA_ROUTE
   | DownloadPagePath
   | MarketplaceTabPath
   | CollectionIndexRoute
@@ -157,6 +159,7 @@ const FIXED_SCREEN_PATHS = [
   TERMS_ROUTE,
   COMMERCIAL_LICENSE_ROUTE,
   DPA_ROUTE,
+  CLA_ROUTE,
   ...Object.values(OPENBOT_DOWNLOAD_PAGE_LINKS),
   ...Object.values(MARKETPLACE_TAB_ROUTES),
   "/news",

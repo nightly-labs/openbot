@@ -12,6 +12,7 @@ import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
+import { CHAT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
@@ -460,7 +461,8 @@ export function agentIpcHandlers({
       }),
       listAgents: scopedQueryHandler({
         local: () => service.listAgents(),
-        // The released agent list has no exact colour, so `agent-colors-v1` gives it on its own route.
+        // The released agent list has no exact colour and no chat colour, so `agent-colors-v1` and
+        // `chat-colors-v1` give them on their own routes.
         remote: (serverId) =>
           runCauseEffect(
             Effect.all(
@@ -468,6 +470,8 @@ export function agentIpcHandlers({
                 remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries),
                 // A failed read keeps the last colours. An agent without a colour shows its hue.
                 remoteServers.readAgentColors(serverId).pipe(Effect.catch(() => Effect.void)),
+                // A failed read keeps the last chat colours.
+                remoteServers.readChatColors(serverId).pipe(Effect.catch(() => Effect.void)),
               ],
               { concurrency: "unbounded" },
             ).pipe(Effect.map(([agents]) => remoteServers.withAgentColors(serverId, agents))),
@@ -698,12 +702,28 @@ export function agentIpcHandlers({
           }
           // The released agent route does not carry the account, so it changes on its own route after
           // the rest: a provider change on the host returns the agent to the new provider's own sign-in.
-          const { providerAccountId, avatarColor, ...fields } = input;
+          const { providerAccountId, avatarColor, chatColor, ...fields } = input;
           if (
             providerAccountId !== undefined &&
             !remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNTS_CAPABILITY)
           )
             throw new Error(sourceText("error.team.providersUnsupported"));
+          // The released agent route does not carry the chat colour, so it goes on `chat-colors-v1` first.
+          // Without the capability, a change of only the chat colour fails. With other fields, they change
+          // and the chat colour stays.
+          const chatColors = remoteServers.supportsCapability(serverId, CHAT_COLORS_CAPABILITY);
+          if (
+            chatColor !== undefined &&
+            !chatColors &&
+            Object.entries(input).every(
+              ([key, value]) => key === "agentId" || key === "chatColor" || value === undefined,
+            )
+          )
+            throw new Error(sourceText("error.team.chatColorsUnsupported"));
+          if (chatColors && chatColor !== undefined)
+            await runCauseEffect(
+              remoteServers.setAgentChatColor(serverId, { agentId: input.agentId, color: chatColor }),
+            );
           // The released agent route does not carry the exact colour. With `agent-colors-v1` it goes on
           // its own route first. That route also sets the nearest hue, so the profile change then leaves
           // the hue out: on the released route a hue removes the colour. A removed colour keeps the hue,

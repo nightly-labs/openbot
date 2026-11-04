@@ -302,6 +302,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       pi: emptyStatus(unsupportedMessage),
       muse: emptyStatus(unsupportedMessage),
       devin: emptyStatus(unsupportedMessage),
+      copilot: emptyStatus(unsupportedMessage),
       bun: emptyStatus(unsupportedMessage),
     };
   }

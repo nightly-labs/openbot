@@ -7,6 +7,7 @@ import {
   type AgentProviderId,
   type AgentStatus,
   type AppInfo,
+  type AvatarColor,
   CHANNEL_CHATS_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
   type ChannelSummary,
@@ -303,6 +304,8 @@ type WebWorkspaceProps = {
   accountEmail?: string;
   accountName?: string | null;
   accountAvatarUrl?: string | null;
+  /** The account's chat color, which tints the user's bubbles. */
+  accountChatColor?: AvatarColor | null;
   accountFetch: typeof fetch;
   onSessionCheck: () => Promise<void>;
   /** True when the account session has ended, so closing sends no remote session end. */
@@ -498,6 +501,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     email: props.accountEmail ?? "",
     name: props.accountName ?? null,
     avatarUrl: props.accountAvatarUrl ?? null,
+    chatColor: props.accountChatColor ?? null,
   }));
   const accountCalls = createWebAccountCalls(props.accountFetch, props.onSessionCheck);
   const [accountSettingsOpen, setAccountSettingsOpen] = createSignal(false);

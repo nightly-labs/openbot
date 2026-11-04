@@ -95,6 +95,7 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
   const headerBottom = insets.top + HEADER_OFFSET + HEADER_HEIGHT + HEADER_OFFSET;
   const title =
     entry.file?.name ??
+    entry.title ??
     (entry.kind === "html"
       ? t("mobile.chat.preview.htmlTitle")
       : entry.kind === "mermaid"

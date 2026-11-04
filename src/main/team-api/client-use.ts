@@ -17,6 +17,7 @@ import { AGENT_PUBLISH_ROUTES } from "@openbot/contracts/team-protocol/agent-pub
 import { AGENT_TASK_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import { CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { COMPUTER_ACTIVITY_ROUTES } from "@openbot/contracts/team-protocol/computer-activity-v1";
 import { CUSTOM_AGENTS_ROUTES } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import { CUSTOM_PROVIDER_HARNESS_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
@@ -84,6 +85,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   AGENT_NOTIFICATION_LEVELS_ROUTES.read,
   SIDEBAR_PINS_ROUTES.read,
   AGENT_COLORS_ROUTES.read,
+  CHAT_COLORS_ROUTES.read,
   SERVER_AUDIT_ROUTES.read,
   PUSH_NOTIFICATIONS_ROUTES.register,
   PUSH_NOTIFICATIONS_ROUTES.remove,
