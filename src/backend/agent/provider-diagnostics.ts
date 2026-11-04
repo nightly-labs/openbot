@@ -260,10 +260,11 @@ export function isUsageLimitDiagnostic(message: string): boolean {
  */
 export function isPlanLimitDiagnostic(message: string): boolean {
   // Codex offers credits next to the reset on Plus and Pro: "… to purchase more credits or try again at 3:00 PM."
-  if (isBalanceDiagnostic(message) && !/\btry again at\b/iu.test(message)) return false;
+  // Claude's 5-hour spend window writes: "You've hit your individual spend limit · run /usage-credits to raise it … · your 5-hour limit resets 8am (Europe/Lisbon)".
+  if (isBalanceDiagnostic(message) && !/\b(?:try again at|\d+[ -]?hours? limit resets?)\b/iu.test(message)) return false;
   return (
-    /\bhit your (?:(?:session|weekly|usage|plan|opus|sonnet) )*limit\b/iu.test(message) ||
-    /\b(?:session|weekly) (?:usage )?limit\b.{0,80}\b(?:reached|resets?)\b/iu.test(message) ||
+    /\bhit your (?:(?:session|weekly|usage|plan|individual|spend|opus|sonnet) )*limit\b/iu.test(message) ||
+    /\b(?:session|weekly|\d+[ -]?hours?) (?:usage |spend )?limit\b.{0,80}\b(?:reached|resets?)\b/iu.test(message) ||
     /\b(?:GoUsageLimitError|Go usage limit exceeded)\b/u.test(message) ||
     /\busage limit reached for \d+ ?hours?\b/iu.test(message) ||
     /\b(?:daily|weekly|monthly) limit exhausted\b/iu.test(message)
@@ -295,5 +296,7 @@ export function providerResetDelayMs(message: string): number | null {
 
 /** Whether a provider's text names money or a quota, which no wait gives back. */
 export function isBalanceDiagnostic(message: string): boolean {
-  return /\b(?:credits?|balance|quota|billing)\b/iu.test(message);
+  // Ignore slash-command hints like `run /usage-credits to raise it` when checking for balance words.
+  const withoutSlashCommands = message.replace(/(?:^|\s)\/[a-z0-9_-]+/giu, " ");
+  return /\b(?:credits?|balance|quota|billing)\b/iu.test(withoutSlashCommands);
 }

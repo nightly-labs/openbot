@@ -222,7 +222,12 @@ export function classifyFailure(error: unknown): CauseCode {
   if (/\b(?:rate[ _-]?limit(?:_error|_exceeded)?|too many requests)\b/iu.test(message)) return "rate_limit";
   if (/\b(?:insufficient (?:funds|balance|quota)|payment required|credits? exhausted)\b/iu.test(message))
     return "billing";
-  if (/\b(?:usage limit|hit your (?:weekly |session )?limit)\b/iu.test(message)) return "usage_limit";
+  if (
+    /\b(?:usage limit|hit your (?:(?:weekly|session|usage|plan|individual|spend|opus|sonnet) )*limit|\d+[ -]?hours? limit resets?)\b/iu.test(
+      message,
+    )
+  )
+    return "usage_limit";
   if (/\b(?:timed? out|ETIMEDOUT|gateway time-?out|deadline exceeded|DEADLINE_EXCEEDED)\b/iu.test(message))
     return "timeout";
   if (
