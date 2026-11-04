@@ -11,26 +11,29 @@ import { Effect } from "effect";
 import { app, type BrowserWindow, dialog, shell } from "electron";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { DOWNLOAD_URL } from "./app-archive-watch";
-import { electronUpdaterCacheRoot, UPDATE_PREFERENCE_FILE } from "./application-services";
-import { readUpdatePreference } from "./update-preference-store";
+import { readUpdatePreference, UPDATE_PREFERENCE_FILE } from "./update-preference-store";
 import {
+  electronUpdaterCacheDirectory,
   isNixStoreInstall,
   isValidSemver,
+  loadElectronUpdater,
   supportsInstalledUpdates,
-  type UpdateAdapter,
+  UPDATE_INSTALL_TIMEOUT_MS,
   UpdateService,
 } from "./update-service";
 import { listSiblingOpenBotInstances } from "./update-sibling-instances";
 
 const logger = createOpenBotLogger("update");
+// The time that the user has to read the download dialog after a stalled install, before the app exits.
+const STALLED_INSTALL_DIALOG_MS = 10 * 60_000;
 const GUIDE_URL =
   "https://github.com/nightly-labs/openbot/blob/main/docs/TROUBLESHOOTING.md#openbot-says-a-newer-version-saved-your-data";
 
 interface NewerDatabaseRecoveryOptions {
   window: BrowserWindow | null;
   translate: AppTranslate;
-  /** Shutdown preparation of the app, as for an in-app update. */
-  beforeInstall: () => Promise<void>;
+  /** Shutdown preparation of the app, as for an in-app update. It exits the app after the deadline. */
+  beforeInstall: (deadlineMs: number) => Promise<void>;
 }
 
 /**
@@ -56,7 +59,9 @@ export async function recoverFromNewerDatabase(options: NewerDatabaseRecoveryOpt
  * The updater of an installed desktop copy, as `createApplicationServices` builds it. `null` when
  * this copy cannot update itself, or when the user turned off automatic downloads.
  */
-async function createRecoveryUpdater(beforeInstall: () => Promise<void>): Promise<UpdateService | null> {
+async function createRecoveryUpdater(
+  beforeInstall: NewerDatabaseRecoveryOptions["beforeInstall"],
+): Promise<UpdateService | null> {
   const currentVersion = app.getVersion();
   if (
     !app.isPackaged ||
@@ -71,19 +76,15 @@ async function createRecoveryUpdater(beforeInstall: () => Promise<void>): Promis
     readUpdatePreference(join(app.getPath("userData"), UPDATE_PREFERENCE_FILE)),
   ).catch(() => null);
   if (!preference?.autoDownload) return null;
-  let adapter: UpdateAdapter | undefined;
-  try {
-    const updaterModule = await import("electron-updater");
-    adapter = updaterModule.autoUpdater ?? updaterModule.default?.autoUpdater ?? updaterModule.default;
-  } catch (error) {
-    logger.warn("electron-updater failed to load:", toLogValue(error));
-  }
+  const adapter = await loadElectronUpdater();
   if (!adapter) return null;
   return new UpdateService(adapter, {
     currentVersion,
     enabled: true,
     autoDownload: true,
-    beforeInstall,
+    // The install times out after `UPDATE_INSTALL_TIMEOUT_MS` from the end of the shutdown preparation.
+    // The forced exit waits longer, so the download dialog can show after a stalled install.
+    beforeInstall: () => beforeInstall(UPDATE_INSTALL_TIMEOUT_MS + STALLED_INSTALL_DIALOG_MS),
     checkSiblingInstances: () =>
       listSiblingOpenBotInstances({
         executablePath: app.getPath("exe"),
@@ -93,7 +94,7 @@ async function createRecoveryUpdater(beforeInstall: () => Promise<void>): Promis
     ...(typeof process.getuid === "function" ? { currentUid: process.getuid() } : {}),
     platform: process.platform,
     logDirectory: join(app.getPath("userData"), "logs", "update"),
-    updaterCacheDirectory: join(electronUpdaterCacheRoot(), "openbot-updater"),
+    updaterCacheDirectory: electronUpdaterCacheDirectory(),
   });
 }
 
@@ -143,9 +144,9 @@ async function installLatest(updater: UpdateService, quit: { readonly chosen: bo
 }
 
 /**
- * A box that says what happens while the update downloads. It waits for the window, so it does not
- * open behind it. On macOS a box with no visible window blocks the main process, and with it the
- * download, so there it shows only on the window.
+ * A box that says what happens while the update downloads. The main window has not loaded, because
+ * the start stopped before the renderer. On macOS a box with no window blocks the main process, and
+ * with it the download, so there it shows on the empty window.
  */
 async function showUpdating(
   options: NewerDatabaseRecoveryOptions,
@@ -153,10 +154,6 @@ async function showUpdating(
   quit: { chosen: boolean },
 ): Promise<void> {
   const { window, translate } = options;
-  const parent = window && !window.isDestroyed() ? window : null;
-  if (!parent && process.platform === "darwin") return;
-  if (parent && !parent.isVisible()) await new Promise<void>((resolve) => parent.once("show", () => resolve()));
-  if (signal.aborted || parent?.isDestroyed()) return;
   const box = {
     type: "info" as const,
     message: translate("startup.newerDataUpdatingTitle"),
@@ -164,7 +161,13 @@ async function showUpdating(
     buttons: [translate("startup.newerDataQuit")],
     signal,
   };
-  await (parent ? dialog.showMessageBox(parent, box) : dialog.showMessageBox(box));
+  if (process.platform === "darwin") {
+    if (!window || window.isDestroyed()) return;
+    window.show();
+    await dialog.showMessageBox(window, box);
+  } else {
+    await dialog.showMessageBox(box);
+  }
   // The user chose Quit. The abort at the end of the update also closes the box.
   if (signal.aborted) return;
   quit.chosen = true;
