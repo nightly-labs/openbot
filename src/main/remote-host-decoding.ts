@@ -18,6 +18,7 @@ import { decodeHostReleaseStatus, type HostReleaseStatus } from "@openbot/contra
 // a browser preview that is not a bounded JPEG data URL) are covered where they are reached.
 
 import { emptyDecoder } from "@openbot/contracts/ipc-decoding";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 
 export type ResponseDecoder<T> = (value: unknown) => T;
 
@@ -25,6 +26,9 @@ export const decodeVoid = emptyDecoder("The remote server returned data.");
 
 /** Discards the reply of a route whose team-protocol codec has already checked it. */
 export const acceptEmpty = (): undefined => undefined;
+
+/** Whether the host notifies a phone of the member. The `computer-activity-v1` codec has already checked the reply. */
+export const decodeComputerActivityReply = (value: unknown): boolean => isDynamicRecord(value) && value.phones === true;
 
 /** The web client uses the same remote boundary; the preload has its own decoder. */
 export function decodeHostReleaseStatusFromHost(value: unknown): HostReleaseStatus {

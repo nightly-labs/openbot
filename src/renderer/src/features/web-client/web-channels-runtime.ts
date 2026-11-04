@@ -38,12 +38,13 @@ export function createWebChannelsPort(
   eventsEnabled: () => boolean,
   routineRecoveryEnabled: () => boolean,
   webhookTestsEnabled: () => boolean,
+  webhookSenderSecretEnabled: () => boolean,
 ): ChannelsPort {
   const files = createWebAttachmentFiles(remote, hostId);
   const channels = remote.channels;
   const admin = remote.admin;
   const eventRoutines = admin
-    ? webEventRoutinesApi(admin.request, routineRecoveryEnabled, webhookTestsEnabled)
+    ? webEventRoutinesApi(admin.request, routineRecoveryEnabled, webhookTestsEnabled, webhookSenderSecretEnabled)
     : undefined;
   const attachmentMedia = createWebAttachmentMedia(remote, hostId);
   onCleanup(() => attachmentMedia.dispose());
@@ -87,6 +88,7 @@ export function createWebChannelsPort(
       respondToPrompt: (input) => remote.answer(input),
       respondToBrowserTakeover: (input) => remote.respondToTakeover(input),
       respondToBrowserSecret: (input) => remote.respondToBrowserSecret?.(input) ?? unavailable(),
+      deleteChannelMessage: (input) => remote.deleteMessage?.({ kind: "channel", ...input }) ?? unavailable(),
     },
     get eventRoutines() {
       return eventsEnabled() ? eventRoutines : undefined;

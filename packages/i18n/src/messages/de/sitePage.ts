@@ -83,6 +83,9 @@ export const messages = {
   "sitePage.pricing.description":
     "Gehostete Server und eine Lizenz für Teams. OpenBot ist für die private Nutzung auf deinem eigenen Computer kostenlos.",
   "sitePage.pricing.heading": "Preise",
+  "sitePage.pricing.personal.title": "Private Nutzung ist kostenlos",
+  "sitePage.pricing.personal.body":
+    "Alle Funktionen, auf deinem eigenen Computer, mit den KI-Abos, die du schon bezahlst. Kein Server und keine Lizenz.",
   "sitePage.pricing.enterprise.title": "Enterprise",
   "sitePage.pricing.enterprise.body":
     "Größere Server, mehr als {count} Mitglieder oder alles andere, was du brauchst. Mit Enterprise-Support.",

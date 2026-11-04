@@ -46,6 +46,7 @@ import { causeHelpers, runCauseEffect } from "../../backend/effect-boundary";
 import type { MailboxStore } from "../../backend/mailbox-store";
 import { filePreviewFromBytes, localFilePreview, mimeTypeForName } from "../file-preview";
 import { filePreviewPages } from "../file-preview-pages";
+import { AttachmentDownloadStopped } from "../remote-attachment-cache";
 import { decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
 import { remoteCall, remoteDecode } from "../remote-service-effects";
@@ -83,6 +84,7 @@ export interface AttachmentIpcDependencies {
     | "supportsCapability"
     | "request"
     | "downloadAttachment"
+    | "stopAttachmentDownload"
     | "downloadSharedFile"
     | "downloadWorkspaceFile"
     | "uploadAttachment"
@@ -224,6 +226,11 @@ export function attachmentIpcHandlers({
       openAttachment: payloadHandler(agentRequest(parseOpenAttachment), (scoped) =>
         openAttachmentForServer({ mailbox, remoteServers, getMainWindow, translate }, scoped.serverId, scoped.payload),
       ),
+      stopAttachmentDownload: scopedHandler(parseAttachmentId, {
+        // A local file needs no download.
+        local: async () => undefined,
+        remote: async (attachmentId, serverId) => remoteServers.stopAttachmentDownload(attachmentId, serverId),
+      }),
       openSharedFile: scopedHandler(parseOpenSharedFile, {
         local: async (parsed) => {
           // A chat link can name a folder. The file manager shows it; nothing opens it.
@@ -338,7 +345,13 @@ export function openAttachmentForServer(
       await openOrRevealPath(attachment.path);
     },
     remote: async (target) => {
-      const downloaded = await runCauseEffect(remoteServers.downloadAttachment(input.attachmentId, target));
+      const downloaded = await runCauseEffect(
+        remoteServers.downloadAttachment(input.attachmentId, target, false, input.size),
+      ).catch((error: unknown) => {
+        if (error instanceof AttachmentDownloadStopped) return null;
+        throw error;
+      });
+      if (!downloaded) return;
       const suggestedName = basename(downloaded.name) || `attachment-${input.attachmentId}`;
       if (input.action === "download") {
         const filePath = await chooseSavePath(getMainWindow(), translate, suggestedName);
@@ -483,15 +496,20 @@ const uploadRemoteImports = Effect.fn("AttachmentIpc.uploadRemoteImports")(funct
       bytes: item.bytes,
     })),
   ];
-  return yield* uploadRemoteFiles(remoteServers, serverId, files);
+  return yield* uploadRemoteFiles(remoteServers, serverId, files, input.requestId);
 });
 
-/** Checks the names and sizes, then uploads every file at once, as one import. */
+/**
+ * Checks the names and sizes, then uploads every file at once, as one import. With `requestId`, the
+ * import reports the bytes of a single file; several files at once would mix their progress.
+ */
 function uploadRemoteFiles(
   remoteServers: AttachmentIpcDependencies["remoteServers"],
   serverId: string,
   files: { name: string; mimeType: string; bytes: Uint8Array }[],
+  requestId?: string,
 ) {
+  const progressId = files.length === 1 ? requestId : undefined;
   return remoteDecode(() => {
     for (const file of files) assertSupportedAttachmentName(file.name);
     if (files.some((file) => file.bytes.byteLength > ATTACHMENT_LIMITS.fileBytes)) {
@@ -502,9 +520,11 @@ function uploadRemoteFiles(
     }
   }).pipe(
     Effect.andThen(
-      Effect.forEach(files, (file) => remoteServers.uploadAttachment(file.name, file.mimeType, file.bytes, serverId), {
-        concurrency: "unbounded",
-      }),
+      Effect.forEach(
+        files,
+        (file) => remoteServers.uploadAttachment(file.name, file.mimeType, file.bytes, serverId, progressId),
+        { concurrency: "unbounded" },
+      ),
     ),
   );
 }

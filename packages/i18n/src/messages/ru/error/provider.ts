@@ -8,6 +8,8 @@ export const messages = {
     "OpenBot не смог зарегистрировать управление компьютером в конфигурации Codex. Убедитесь, что ваш config.toml для Codex корректен и доступен для записи, затем перезапустите OpenBot. Чтобы продолжить без него, отключите управление компьютером в настройках агента.",
   "error.provider.codexUnresponsive": "Codex перестал отвечать, поэтому OpenBot завершил его процесс.",
   "error.provider.acpUnresponsive": "{provider} не ответил вовремя, поэтому OpenBot завершил его процесс.",
+  "error.provider.acpSignInLost":
+    "{provider} потерял вход в аккаунт, поэтому OpenBot завершил его процесс. Отправьте сообщение ещё раз.",
   "error.provider.acpMcpNotLoaded":
     "{provider} не загрузил инструменты OpenBot, поэтому этот агент не может ими пользоваться и связываться с коллегами. Политика команды {provider} может блокировать локальные MCP-серверы. Попросите администратора команды разрешить их и повторите попытку.",
   "error.provider.endpointsReadOnly":
@@ -172,6 +174,7 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider} не вернул аккаунт с выполненным входом.",
   "error.provider.signInExpired": "Срок входа в {provider} истёк. Войдите снова, чтобы продолжить.",
   "error.provider.cliActivateFailed": "OpenBot не смог активировать управляемый CLI.",
+  "error.provider.noMainlandChinaSignIn": "У {provider} нет входа для материкового Китая.",
   "error.provider.cliNewVersionNotStarted": "Новая версия не запустилась.",
   "error.provider.cliBusyReconnect":
     "{provider} CLI обрабатывает ход. Дождитесь его завершения, затем подключитесь заново.",
@@ -258,6 +261,7 @@ export const messages = {
   "error.provider.kimiNotStarted": "Kimi не удалось запустить. Выполните `kimi --version` в терминале.",
   "error.provider.kimiVersionUnreadable": "Не удалось прочитать версию Kimi CLI.",
   "error.provider.kimiSignIn": "Войдите через Kimi Code, чтобы использовать Kimi.",
+  "error.provider.devinSignIn": "Войдите через Devin, чтобы использовать Devin.",
   "error.provider.hermesMissing": "Hermes Agent не установлен. Установите его и повторите попытку.",
   "error.provider.hermesNotStarted": "Не удалось запустить Hermes Agent. Выполните `hermes --version` в терминале.",
   "error.provider.hermesVersionUnreadable": "Не удаётся прочитать версию Hermes Agent.",

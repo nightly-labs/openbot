@@ -104,6 +104,7 @@ export const messages = defineMessages("marketplace", {
   "marketplace.app.slackTagline": "Mentions and direct messages in Slack",
   "marketplace.app.discordTagline": "Mentions and direct messages in Discord",
   "marketplace.app.telegramTagline": "Groups and direct chats in Telegram",
+  "marketplace.app.whatsappTagline": "Your own chat and the people you allow in WhatsApp",
   "marketplace.app.bitwardenTagline": "Sign in to sites with logins from a shared folder",
   // The category row in the information of a password manager page: 1Password and Bitwarden.
   "marketplace.app.onePasswordCategory": "Login and Credential Management",
@@ -127,6 +128,8 @@ export const messages = defineMessages("marketplace", {
   "marketplace.app.setup.account": "Sign in with your {name} account in the browser.",
   "marketplace.app.setup.key": "Needs an API key from your {name} account.",
   "marketplace.app.setup.keySaved": "{field} saved on {host}.",
+  // {host} is "this computer" or a server name.
+  "marketplace.app.account.removeDescription": "OpenBot deletes the sign-in of this account on {host}.",
   "marketplace.app.setup.desktop": "Runs in the {name} desktop app at {address}.",
   "marketplace.app.setup.desktopConnected": "Connected to {address}.",
   "marketplace.app.setup.open": "No sign-in or key needed.",

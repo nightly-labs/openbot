@@ -45,4 +45,18 @@ export const messages = {
     "OpenBot bu sohbete bağlandı. Ajanlara sormak için {bot} adını anın veya OpenBot'un bir mesajını yanıtlayın.",
   "status.messaging.telegramOrchestratorName": "Telegram Düzenleyicisi",
   "status.messaging.telegramOrchestratorTitle": "Telegram'da yanıt verir ve ekibe sorar",
+  "status.messaging.whatsappNoAgent":
+    "Henüz burada yanıt verebilecek bir ajan yok. OpenBot'ta WhatsApp Düzenleyicisini ekleyin.",
+  "status.messaging.whatsappApprovalMenu": "Onaylamak için 1, reddetmek için 2 yazın.",
+  "status.messaging.whatsappStopMenu": "Durdurmak için “stop” yazın.",
+  "status.messaging.whatsappPairingCode":
+    "Bu numara yalnızca sahibinin izin verdiği kişileri yanıtlar. Sahibine şu kodu verin: {code}",
+  "status.messaging.whatsappPairingApproved": "Artık bu numaraya istek gönderebilirsiniz.",
+  "status.messaging.whatsappOwnChat": "Kendine mesaj gönder",
+  "status.messaging.whatsappWelcomeOwn":
+    "👋 *OpenBot bağlandı*\n\nAjanlarına sormak için buraya yaz. WhatsApp Orchestrator yanıtlar ya da işi doğru ajana verir.\n\nBir isteği durdurmak için *stop* gönder.",
+  "status.messaging.whatsappWelcomeDedicated":
+    "👋 *OpenBot bağlandı*\n\nOpenBot'ta izin verdiğin kişiler artık bu numaraya yazabilir. Yeni bir kişi bir kod alır: OpenBot'ta İstekler altında onayla.\n\nBir isteği durdurmak için *stop* gönder.",
+  "status.messaging.whatsappOrchestratorName": "WhatsApp Düzenleyicisi",
+  "status.messaging.whatsappOrchestratorTitle": "WhatsApp'ta yanıt verir ve ekibe sorar",
 } as const satisfies PartialTranslation<typeof source>;

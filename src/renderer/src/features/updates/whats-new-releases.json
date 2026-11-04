@@ -1,5 +1,85 @@
 [
   {
+    "version": "0.60.0",
+    "date": "2026-11-03",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Talk to your agents from WhatsApp. Link a number under Marketplace → Apps → WhatsApp. A separate number is safer, because WhatsApp can block numbers that it sees as automated.",
+          "Start a workflow when someone mentions OpenBot in Slack or in a Telegram group, and send its result back there.",
+          "Use OpenBot in Arabic. The layout mirrors from right to left.",
+          "Turn models off in Server settings → Providers. The model picker shows the newest models first, and older models are under a fold.",
+          "Server settings has an Audit log of member, role and agent access changes.",
+          "Company sign-in: a server owner can connect Microsoft Entra ID, Okta, Google Workspace or another OpenID Connect provider in Members → Company sign-in. People with a company email then join with no invitation.",
+          "Give a channel a picture or an icon in channel settings.",
+          "A channel can keep its own memories, and an agent can send a task to a channel from your direct chat.",
+          "Side threads have Reply on each message.",
+          "Downloads and uploads of a joined server show their progress, and a failed upload has a Retry button."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Chat messages use more of a wide window.",
+          "Each file that you open from a chat gets its own tab in the side panel.",
+          "A text paste of more than 4,000 characters becomes a pasted-text.txt attachment, so the message keeps all of the text.",
+          "OpenBot is free for personal use, and first run says so."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Sign-in codes reach users in all regions.",
+          "A white window after a crash loads again by itself.",
+          "When Claude cannot reach its server, the chat shows the retries.",
+          "An agent with backup models moves to the next one when a credit balance or quota is spent before it starts to write."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.59.0",
+    "date": "2026-11-02",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kimi is a new provider. OpenBot downloads the Kimi Code CLI, and you sign in with your Kimi Code account.",
+          "Use Hermes Agent from Nous Research as a provider, with your own memories, skills and sign-ins.",
+          "On a Mac, OpenBot has an icon in the menu bar. After you close the window, the Dock icon hides and tasks keep running.",
+          "Start a workflow when someone mentions OpenBot in Discord, and send its result back as a reply, a post or a reaction.",
+          "Sidebar folders can hold folders, up to three levels. Drag a chat or a folder into a folder.",
+          "Choose the None, Minimal and Ultra reasoning levels when a model offers them.",
+          "Pinned agents and channels stay the same on each device that connects to a server.",
+          "Attach SVG images to a chat. The agent reads the SVG text.",
+          "Connect more than one Notion account, and connect ClickUp from Apps.",
+          "An agent can ask you to add a login, a card or an address to the Vault. You type the secret, and the agent gets only the name."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "On a Mac, hold ⌘Q or press it twice to quit. One press by mistake no longer stops your agents.",
+          "An agent continues by itself more often when its plan still has open steps.",
+          "Pasted images show as thumbnails above the message box, and sent images show full size.",
+          "Agents with no photo now show a soft plush bot that shows what the agent does."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Slack mentions and direct messages reach OpenBot again when a computer with the Slack workspace is off.",
+          "Phones and other devices can connect to your servers at once after the computer wakes from sleep.",
+          "An upload to one chat no longer blocks Send in other chats.",
+          "Text that you copy from OpenBot pastes into other apps without the colors of the app."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.58.0",
     "date": "2026-11-01",
     "notices": [],

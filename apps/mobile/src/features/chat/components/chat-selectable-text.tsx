@@ -1,11 +1,13 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { type ColorValue, TextInput, type TextInputInstance, useWindowDimensions } from "react-native";
 import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { fieldDirectionStyle } from "@/shared/lib/text-direction";
+import { CHAT_TEXT_STYLES } from "./chat-text-styles";
 
-/** The body text: 16 points on a 28-point line, as the HeroUI `body` type. */
-const FONT_SIZE = 16;
-const LINE_HEIGHT = 28;
+/** The body text of a message. */
+const FONT_SIZE = CHAT_TEXT_STYLES.body.fontSize;
+const LINE_HEIGHT = CHAT_TEXT_STYLES.body.lineHeight;
 /** The natural line height of Inter, as a multiple of its size: (1984 + 494) / 2048. */
 const FONT_LINE_RATIO = 1.21;
 /**
@@ -38,13 +40,23 @@ export function ChatSelectableText({
   const { t } = useText();
   const { fontScale } = useWindowDimensions();
   const input = useRef<TextInputInstance>(null);
-  useEffect(() => {
+  // The field selects all of its text at its first layout and again when it first reports the size
+  // of its text. The first time a message selects, its text is not laid out yet at the first layout.
+  const selected = useRef({ layout: false, size: false });
+  const selectAll = (step: "layout" | "size") => {
+    if (selected.current[step]) return;
+    selected.current[step] = true;
+    // Select All runs on focus only, so a field that already has focus takes it again.
+    if (input.current?.isFocused()) input.current.blur();
     input.current?.focus();
     input.current?.setSelection(0, text.length);
-  }, [text]);
+  };
   return (
     <TextInput
       ref={input}
+      // On iOS the range set from JS did not show; the native Select All on focus selects the text.
+      selectTextOnFocus
+      onLayout={() => selectAll("layout")}
       accessibilityLabel={t("mobile.chat.message.text")}
       value={text}
       multiline
@@ -54,7 +66,10 @@ export function ChatSelectableText({
       editable={!isIOS}
       showSoftInputOnFocus={false}
       caretHidden
-      onContentSizeChange={({ nativeEvent }) => onHeight(nativeEvent.contentSize.height)}
+      onContentSizeChange={({ nativeEvent }) => {
+        onHeight(nativeEvent.contentSize.height);
+        if (nativeEvent.contentSize.height > 0) selectAll("size");
+      }}
       onSelectionChange={({ nativeEvent }) =>
         onSelectionChange(text.slice(nativeEvent.selection.start, nativeEvent.selection.end))
       }
@@ -64,6 +79,10 @@ export function ChatSelectableText({
         fontSize: FONT_SIZE,
         lineHeight: LINE_HEIGHT,
         transform: isIOS ? [{ translateY: -IOS_BASELINE_SHIFT * fontScale }] : undefined,
+        // An Android field finds the direction of each paragraph from its text. An iOS field
+        // takes it from the first paragraph, as the message text does in most messages. Text with
+        // no letter keeps the layout direction, as the message text does.
+        ...fieldDirectionStyle(text),
       }}
     />
   );

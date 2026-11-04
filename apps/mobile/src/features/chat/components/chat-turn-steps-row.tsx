@@ -7,6 +7,7 @@ import Animated, { cubicBezier } from "react-native-reanimated";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { type MobileText, useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import type { TurnStepsSummary } from "../model/turn-thinking";
 
 const PRESS_EASING = cubicBezier(0.23, 1, 0.32, 1);
@@ -66,7 +67,7 @@ export function ChatTurnStepsRow({
         <Typography.Paragraph type="body-xs" className="text-muted" numberOfLines={1}>
           {label}
         </Typography.Paragraph>
-        <ChevronRight size={14} color={muted} />
+        <ChevronRight size={14} color={muted} style={MIRROR_IN_RTL} />
       </Animated.View>
     </Pressable>
   );

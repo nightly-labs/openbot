@@ -60,6 +60,17 @@ const Agent = Schema.Struct({
   description: text(INPUT_LIMITS.agentDescription),
   avatarSeed: text(128),
   avatarHue: Schema.NullOr(guarded(isAvatarHue)),
+  /**
+   * Added after version 1 shipped: the exact colour, `#rrggbb`. An older app ignores it and draws
+   * `avatarHue`, which is the nearest hue. The import drops an invalid value, so that a newer colour
+   * format cannot refuse the agent.
+   */
+  avatarColor: Schema.optionalKey(Schema.String),
+  /**
+   * Added after version 1 shipped: the chat colour, `#rrggbb`. It is not the avatar colour. An older
+   * app ignores it. The import drops an invalid value, as for `avatarColor`.
+   */
+  chatColor: Schema.optionalKey(Schema.String),
   /** An archive path inside `agents/<key>/`, checked below. */
   avatar: Schema.NullOr(text(512)),
   provider: Provider,

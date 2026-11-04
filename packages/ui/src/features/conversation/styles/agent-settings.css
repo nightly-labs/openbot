@@ -31,14 +31,15 @@
   height: 128%;
 }
 
-.agent-settings-avatar:hover {
+/* A photo keeps its own colours, as on mobile, so only a generated face lights up. */
+.agent-settings-avatar:hover:not(:has(.agent-avatar-custom)) {
   filter: brightness(1.08);
 }
 
 /* The pencil badge of the mobile edit screen: it shows that the face opens an editor. */
 .agent-settings-avatar-badge {
   position: absolute;
-  right: -4px;
+  inset-inline-end: -4px;
   bottom: -4px;
   display: grid;
   width: 24px;
@@ -101,8 +102,9 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  padding: var(--openbot-space-2) 0 var(--openbot-space-2) var(--openbot-space-4);
-  text-align: left;
+  padding-block: var(--openbot-space-2);
+  padding-inline: var(--openbot-space-4) 0;
+  text-align: start;
 }
 
 .agent-routine-row:focus-visible {
@@ -403,7 +405,8 @@
 
 /* What a field misses, under its control, where the field limit goes. */
 .agent-routine-field-error {
-  margin: var(--openbot-space-1-5) 0 0 var(--openbot-space-2);
+  margin-block: var(--openbot-space-1-5) 0;
+  margin-inline: var(--openbot-space-2) 0;
 }
 
 /* Schedule or webhook: two equal choices above the trigger. */
@@ -426,7 +429,8 @@
 /* The schedule and history are fields, so their headings match the field labels. */
 .agent-routine-when h3,
 .agent-routine-history h3 {
-  margin: 0 0 var(--openbot-space-1-5) var(--openbot-space-2);
+  margin-block: 0 var(--openbot-space-1-5);
+  margin-inline: var(--openbot-space-2) 0;
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-md);
   font-weight: inherit;
@@ -465,7 +469,7 @@
   padding: 5px var(--openbot-space-2);
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
-  text-align: left;
+  text-align: start;
 }
 
 .ui-button.agent-routine-run-link {
@@ -593,7 +597,8 @@
   justify-content: space-between;
   gap: var(--openbot-space-3);
   border-bottom: 1px solid var(--openbot-border);
-  padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-3);
+  padding-block: var(--openbot-space-2);
+  padding-inline: var(--openbot-space-3) var(--openbot-space-2);
 }
 
 .agent-memories-heading {
@@ -714,7 +719,7 @@
   padding: var(--openbot-space-2) var(--openbot-space-3);
   color: inherit;
   font: inherit;
-  text-align: left;
+  text-align: start;
 }
 
 .agent-memory-row-main:focus-visible {
@@ -814,7 +819,7 @@
 .agent-memories-search-icon {
   position: absolute;
   top: 50%;
-  left: calc(var(--openbot-space-3) + 1px);
+  inset-inline-start: calc(var(--openbot-space-3) + 1px);
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
   color: var(--openbot-text-muted);
@@ -834,13 +839,6 @@
 
 .agent-memories-search-input::-webkit-search-cancel-button {
   display: none;
-}
-
-.agent-memories-row-title {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .agent-memories-reading {
@@ -1022,6 +1020,15 @@
   }
 }
 
+/* In right-to-left text, each line writes itself from right to left. */
+:dir(rtl) .agent-memories-empty-hand {
+  transform-origin: right top;
+}
+
+:dir(rtl) .agent-memories-empty-line {
+  clip-path: inset(-0.4em -0.2em -0.4em calc(100% + 0.2em));
+}
+
 .agent-memories-empty-meta {
   opacity: 0;
   animation: agent-memories-empty-show 360ms var(--openbot-ease-out) var(--agent-memories-empty-delay) forwards;
@@ -1193,7 +1200,7 @@
   gap: var(--openbot-space-3);
   padding: var(--openbot-space-1);
   color: inherit;
-  text-align: left;
+  text-align: start;
 }
 
 .agent-skill-open:hover {
@@ -1371,7 +1378,7 @@
   }
 
   .agent-memories-header {
-    padding-left: var(--openbot-space-3);
+    padding-inline-start: var(--openbot-space-3);
   }
 }
 
@@ -1463,7 +1470,7 @@
   font-size: var(--openbot-text-md);
   font-weight: var(--openbot-weight-medium);
   line-height: 18px;
-  text-align: left;
+  text-align: start;
 }
 
 .agent-settings-runtime-rows .provider-model-trigger-field .provider-model-trigger-name,

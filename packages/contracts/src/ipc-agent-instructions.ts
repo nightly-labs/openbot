@@ -11,9 +11,9 @@ export const AGENT_INSTRUCTION_FILE_NAMES = ["AGENTS.md", "CLAUDE.md"] as const;
 export type AgentInstructionFileName = (typeof AGENT_INSTRUCTION_FILE_NAMES)[number];
 
 /**
- * The agent's instruction file. Local-only: the Team API does not carry it, so a joined server's
- * agent has none here. `exists` is false when no file is there yet: `text` is empty, and a save
- * writes `fileName`.
+ * The agent's instruction file. A joined server sends it through `agent-instructions-v1` to an owner
+ * or admin. `exists` is false when no file is there yet: `text` is empty, and a save writes
+ * `fileName`.
  */
 export interface AgentInstructionsFile {
   fileName: AgentInstructionFileName;
@@ -37,14 +37,17 @@ export interface SaveAgentInstructionsInput {
  */
 export const AGENT_INSTRUCTIONS_READ_LIMIT = INPUT_LIMITS.agentInstructionsFile * 8;
 
+export function isAgentInstructionsFile(value: unknown): value is AgentInstructionsFile {
+  return (
+    isDynamicRecord(value) &&
+    isOneOf(AGENT_INSTRUCTION_FILE_NAMES, value.fileName) &&
+    typeof value.exists === "boolean" &&
+    isBoundedString(value.text, AGENT_INSTRUCTIONS_READ_LIMIT)
+  );
+}
+
 export function decodeAgentInstructionsFileFromMain(value: unknown): AgentInstructionsFile {
-  if (
-    !isDynamicRecord(value) ||
-    !isOneOf(AGENT_INSTRUCTION_FILE_NAMES, value.fileName) ||
-    typeof value.exists !== "boolean" ||
-    !isBoundedString(value.text, AGENT_INSTRUCTIONS_READ_LIMIT)
-  )
-    throw new Error("Invalid agent instructions.");
+  if (!isAgentInstructionsFile(value)) throw new Error("Invalid agent instructions.");
   return { fileName: value.fileName, exists: value.exists, text: value.text };
 }
 

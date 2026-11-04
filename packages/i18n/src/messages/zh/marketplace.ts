@@ -103,6 +103,7 @@ export const messages = {
   "marketplace.app.slackTagline": "Slack 中的提及和私信",
   "marketplace.app.discordTagline": "Discord 中的提及和私信",
   "marketplace.app.telegramTagline": "Telegram 中的群组和私聊",
+  "marketplace.app.whatsappTagline": "WhatsApp 中你自己的聊天和你允许的人",
   "marketplace.app.bitwardenTagline": "用共享文件夹中的登录信息登录网站",
   // The category row in the 1Password page's information.
   "marketplace.app.onePasswordCategory": "登录与凭据管理",
@@ -123,6 +124,7 @@ export const messages = {
   "marketplace.app.setup.account": "在浏览器中使用你的 {name} 账号登录。",
   "marketplace.app.setup.key": "需要你的 {name} 账号中的 API 密钥。",
   "marketplace.app.setup.keySaved": "{field} 已保存在 {host} 上。",
+  "marketplace.app.account.removeDescription": "OpenBot 会删除 {host} 上该账号的登录凭据。",
   "marketplace.app.setup.desktop": "在 {name} 桌面应用中运行，地址为 {address}。",
   "marketplace.app.setup.desktopConnected": "已连接到 {address}。",
   "marketplace.app.setup.open": "无需登录或密钥。",

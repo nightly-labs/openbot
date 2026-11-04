@@ -119,7 +119,6 @@ export function AgentHoneycomb(props: { rows: HoneycombCell[][] }) {
                         hue={null}
                         shape="squircle"
                         motion="always"
-                        cycleOffset={(cell.index * 3) % 5}
                         animationOffset={scatteredPhase(cell.index)}
                         followPointer={hovered() === cell.index}
                         class="agent-honeycomb-avatar"

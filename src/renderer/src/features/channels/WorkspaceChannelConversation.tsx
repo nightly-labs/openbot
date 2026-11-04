@@ -3,6 +3,7 @@ import { hasVisibleToasts } from "@openbot/ui";
 import { createMemo, Show } from "solid-js";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
+import { quitShortcutHintShown } from "../../quit-shortcut-hint";
 import { useTurns } from "../../turns";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
@@ -10,7 +11,12 @@ import { useBrowserTabs } from "../browser/browser-context";
 import { useConnectors } from "../connectors/connectors-context";
 import { Conversation } from "../conversation/Conversation";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
-import { remoteRoutineRecovery, serverCanAdminister, serverSendsWebhookTests } from "../servers/server-capabilities";
+import {
+  remoteRoutineRecovery,
+  serverCanAdminister,
+  serverSendsWebhookTests,
+  serverSetsWebhookSenderSecret,
+} from "../servers/server-capabilities";
 import { useServerScope } from "../servers/server-scope";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
@@ -81,6 +87,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       eventsServerId: () => (serverCanAdminister(activeServer(), "events-v1") ? activeServer()?.id : undefined),
       routineRecovery: () => remoteRoutineRecovery(activeServer()),
       webhookTests: () => serverSendsWebhookTests(activeServer()),
+      webhookSenderSecret: () => serverSetsWebhookSenderSecret(activeServer()),
     },
     approvals,
     takeovers,
@@ -131,7 +138,8 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
         serverSettingsOpen() ||
         appSettingsOpen() ||
         skillsMarketplaceOpen() ||
-        hasVisibleToasts()
+        hasVisibleToasts() ||
+        quitShortcutHintShown()
       }
       settingsRequest={view.settingsRequest()}
       messageFocusRequest={messageFocusRequest()}
@@ -153,6 +161,8 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       onCloseBrowserTab={closeBrowserTab}
       onOpenRemoteDesktop={openRemoteDesktopWorkspace}
       onStop={view.onStop}
+      onDeleteMessage={view.deleteMessageAction()}
+      canDeleteMessage={view.canDeleteMessage}
     />
   );
 }

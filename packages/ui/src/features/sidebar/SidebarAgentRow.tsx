@@ -97,14 +97,14 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
         }}
       >
         <span class="agent-row-avatar">
-          <AgentAvatar agent={rowProps.agent} motion="idle" mood={mood()} />
+          <AgentAvatar agent={rowProps.agent} motion="idle" mood={mood()} workingFaces />
           <SidebarAgentIndicator state={state} />
         </span>
         <span class="agent-row-copy">
           <span class="agent-row-heading">
             <span class="agent-row-title">
               <span class="agent-row-name">
-                <strong>{rowProps.agent.name}</strong>
+                <strong dir="auto">{rowProps.agent.name}</strong>
                 <Show when={lockLabel()}>
                   <span class="agent-row-access" title={lockLabel()}>
                     <Lock aria-hidden="true" />
@@ -119,7 +119,7 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
               <Show when={title()}>
                 {(label) => (
                   <Badge class="agent-role-badge" title={label()}>
-                    <span>{label()}</span>
+                    <span dir="auto">{label()}</span>
                   </Badge>
                 )}
               </Show>
@@ -151,7 +151,9 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
               {(current) => <SidebarWaitChip reason={current().reason} />}
             </Show>
           </span>
-          <span class="agent-row-preview">{detail()}</span>
+          <span class="agent-row-preview" dir="auto">
+            {detail()}
+          </span>
         </span>
         <Show when={state()}>
           {(state) => <span class="sr-only">{sidebarAgentStateLabel(state(), t, format)}</span>}

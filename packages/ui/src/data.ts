@@ -6,6 +6,7 @@ import type {
   AgentModelId,
   AgentReasoningEffort,
   AttachmentSummary,
+  AvatarColor,
   AvatarHue,
   ChannelRoutingConversationEvent,
   ClientAgentSummary,
@@ -288,6 +289,10 @@ export interface AgentProfile {
   workspacePath?: string;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
+  /** The exact colour, which wins over `avatarHue`. Absent on a host without `agent-colors-v1`. */
+  avatarColor?: AvatarColor | null;
+  /** The tint of the agent's chat bubbles. Absent for no tint, and on a host without `chat-colors-v1`. */
+  chatColor?: AvatarColor | undefined;
   avatarUrl: string | null;
   marketplaceSource?: NonNullable<ClientAgentSummary["marketplaceSource"]>;
   updatedAt?: string | null;
@@ -298,7 +303,7 @@ export interface AgentProfile {
 /** The agent fields that the composer, the queue, rich text and the browser dock read. */
 export type ComposerAgent = Pick<
   AgentProfile,
-  "id" | "name" | "title" | "description" | "avatarSeed" | "avatarHue" | "avatarUrl"
+  "id" | "name" | "title" | "description" | "avatarSeed" | "avatarHue" | "avatarColor" | "avatarUrl"
 >;
 
 /** The skill fields that the composer, the queue and rich text read. */

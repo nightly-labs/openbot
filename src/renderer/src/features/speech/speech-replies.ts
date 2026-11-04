@@ -19,6 +19,7 @@ import {
   type VoiceRecordingSummary,
 } from "./speech-playback";
 import { speechPort } from "./speech-port";
+import { loadSpeechSpeed } from "./speech-speed";
 import { voiceServer } from "./voice-server";
 
 /** A dictated message that is not sent within this time does not make its reply spoken. */
@@ -315,6 +316,8 @@ async function speak(
     const language = text ? (speechLanguageOf(text, fallback) ?? serverLanguage(fallback)) : null;
     if (!language) return;
     spoken = own;
+    // The first part takes longer to synthesize than the speed to load; a late speed applies at once.
+    void loadSpeechSpeed();
     const result = await readAloud(text, language, source);
     analytics.track("speech_reply", {
       trigger,

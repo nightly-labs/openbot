@@ -97,6 +97,7 @@ const meta = {
   args: {
     questions: singleQuestion,
     onSubmit: fn(async () => false),
+    onOpenLink: fn(),
   },
   // The bubble alone on a canvas. "In chat" sets `stage: false`, because the real chat fills the window.
   decorators: [

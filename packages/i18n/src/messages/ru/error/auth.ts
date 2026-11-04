@@ -8,6 +8,7 @@ export const messages = {
     "Брандмауэр или прокси в этой сети не дал OpenBot подключиться к {host}. Попросите сетевого администратора разрешить {host} и повторите попытку.",
   "error.auth.signInFirst": "Сначала войдите в OpenBot.",
   "error.auth.signInRequired": "Требуется вход.",
+  "error.auth.chatColorUnavailable": "Служба учётных записей пока не поддерживает цвета чата. Повторите попытку позже.",
   "error.auth.accountChangedDuringRegister":
     "Аккаунт, в который выполнен вход, изменился во время регистрации этого сервера.",
   "error.auth.hostCredentialUnavailable": "Учётные данные удалённого хоста недоступны. Зарегистрируйте хост заново.",

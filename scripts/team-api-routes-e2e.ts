@@ -3,11 +3,12 @@
 // mailbox and the browser are small in-memory stand-ins that record each call, so a check can show
 // that a refused request did not reach them. The checks cover the protocol and auth gates, sign-in
 // and account tickets, the admin-only routes, the host's Bitwarden connection over a fake `bw`, the
+// host's WhatsApp numbers over a stand-in messaging service (`whatsapp-connector-v1`), the
 // host's Vault (`vault-v1`, its API keys through `vault-v2`, and the CSV import of `vault-import-v1`)
 // over the real service and store,
 // a password that an admin saves from the secure card (`browser-secret-vault-v1`),
 // direct-message isolation, agents hidden from an older
-// protocol, the queue routes, the attachment and file routes with their size limits, and the error
+// protocol, the queue routes, message delete (`message-delete-v1`) under the agent roles, the attachment and file routes with their size limits, and the error
 // codes. Writes .openbot-build/team-api-routes-e2e/report.json.
 // Run: `bun run test:team-api-routes` (the preload gives the server's import graph an `electron`).
 import assert from "node:assert/strict";
@@ -19,22 +20,29 @@ import { isDeepStrictEqual } from "node:util";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_PROVIDERS,
+  type AgentEvent,
   type AgentModelId,
+  type AgentModelOption,
   type AgentProviderId,
   type AgentStatus,
   type AgentSummary,
   type AttachmentDataInput,
   type BitwardenConnectorStatus,
   type CentralAuthUser,
+  CHANNEL_CHATS_CAPABILITY,
   type CustomAgentResult,
   type CustomAgentSummary,
   type CustomProviderResult,
   type CustomProviderSummary,
   DEFAULT_AGENT_DEFAULTS,
+  decodeHostWhatsAppLinkState,
+  decodeHostWhatsAppOverview,
   type HiddenAgentsSnapshot,
   type QueueSnapshot,
   type RoutineResultConnectionOption,
   type RoutineResultDestination,
+  type WhatsAppAccount,
+  type WhatsAppLinkState,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -43,8 +51,17 @@ import {
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_COLORS_CAPABILITY, AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
+import {
+  AGENT_FAST_MODE_CAPABILITY,
+  AGENT_FAST_MODE_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_FOLDERS_CAPABILITY, AGENT_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HIDDEN_CAPABILITY, AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
+import {
+  AGENT_INSTRUCTIONS_CAPABILITY,
+  AGENT_INSTRUCTIONS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-instructions-v1";
 import { AGENT_NEW_CHAT_CAPABILITY, AGENT_NEW_CHAT_ROUTES } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import {
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
@@ -59,6 +76,10 @@ import {
   AGENT_TASK_LIMIT_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import {
+  AGENT_THREAD_REPLIES_CAPABILITY,
+  AGENT_THREAD_REPLIES_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
+import {
   BITWARDEN_CONNECTOR_CAPABILITY,
   BITWARDEN_CONNECTOR_ROUTES,
 } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
@@ -70,6 +91,12 @@ import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
+import { CHAT_COLORS_CAPABILITY, CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
+import {
+  CONTEXT_COMPACT_CAPABILITY,
+  CONTEXT_COMPACT_ROUTES,
+  ContextCompactRefusedError,
+} from "@openbot/contracts/team-protocol/context-compact-v1";
 import {
   CUSTOM_AGENTS_CAPABILITY,
   CUSTOM_AGENTS_CODECS,
@@ -84,6 +111,7 @@ import {
   HOST_KEY_ROTATION_CAPABILITY,
   HOST_KEY_ROTATION_ROUTES,
 } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
+import { LOCAL_SERVERS_CAPABILITY, LOCAL_SERVERS_ROUTES } from "@openbot/contracts/team-protocol/local-servers-v1";
 import {
   MACHINE_RESOURCES_CAPABILITY,
   MACHINE_RESOURCES_ROUTES,
@@ -91,6 +119,7 @@ import {
   machineAlertEvent,
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MEMORY_REVIEW_CAPABILITY, MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
+import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
   PROVIDER_DEFAULT_CAPABILITY,
   PROVIDER_DEFAULT_ROUTES,
@@ -108,6 +137,7 @@ import {
   ROUTINE_RESULTS_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-results-v1";
 import { SIDE_QUESTION_CAPABILITY, SIDE_QUESTION_ROUTES } from "@openbot/contracts/team-protocol/side-question-v1";
+import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import {
   TEAM_APP_VERSION_HEADER,
@@ -118,6 +148,11 @@ import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9 } from "@openbo
 import { VAULT_IMPORT_CAPABILITY, VAULT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY, VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY, VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
+import {
+  WHATSAPP_CONNECTOR_CAPABILITY,
+  WHATSAPP_CONNECTOR_CODECS,
+  WHATSAPP_CONNECTOR_ROUTES,
+} from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
@@ -126,11 +161,14 @@ import { AgentLifecycleFailed } from "../src/backend/agent-service";
 import { BrowserProfileStore } from "../src/backend/browser-profiles/browser-profile-store";
 import type { BrowserTabSession } from "../src/backend/browser-state";
 import { runCauseEffect } from "../src/backend/effect-boundary";
+import { MessageDeleteRefused } from "../src/backend/message-delete";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { RoutineResultError } from "../src/backend/routine-results/routine-results";
 import { TeamChatStore } from "../src/backend/team-chat-store";
+import type { AgentAccessState } from "../src/main/agent-access-store";
 import { createAgentFolders } from "../src/main/agent-folders";
 import { createAgentHostSettings } from "../src/main/agent-host-settings";
+import { createAgentInstructionsFiles } from "../src/main/agent-instructions-files";
 import { AgentNotificationLevelStore } from "../src/main/agent-notification-level-store";
 import { type BitwardenCliRunner, BitwardenConnectorService } from "../src/main/bitwarden-connector-service";
 import { BitwardenConnectorStore } from "../src/main/bitwarden-connector-store";
@@ -138,7 +176,15 @@ import { createBrowserProfileService } from "../src/main/browser-profile-service
 import { MachineAlertMonitor, MachineAlertPreferenceStore } from "../src/main/machine-alerts";
 import { MemoryReviewPreferenceStore } from "../src/main/memory-review-preference-store";
 import { RemoteWorkflowError } from "../src/main/remote-service-effects";
-import type { TeamApiAgents, TeamApiBrowser, TeamApiMailbox } from "../src/main/team-api/dependencies";
+import { SidebarPinStore } from "../src/main/sidebar-pin-store";
+import type {
+  TeamApiAgentAccess,
+  TeamApiAgents,
+  TeamApiAgentTasks,
+  TeamApiBrowser,
+  TeamApiConnectors,
+  TeamApiMailbox,
+} from "../src/main/team-api/dependencies";
 import { isPeerHiddenProvider } from "../src/main/team-api/provider-visibility";
 import { TeamApiServer } from "../src/main/team-api-server";
 import { TeamStore } from "../src/main/team-store";
@@ -249,6 +295,27 @@ function startDisk(volumes: Json | undefined): boolean {
   return list(volumes).some((volume) => field(volume, "path") === root);
 }
 
+// One model with a fast tier and one without: the fast-mode models route lists only the first.
+const FAST_MODE_MODELS: AgentModelOption[] = [
+  {
+    provider: "codex",
+    id: "gpt-fast",
+    name: "GPT Fast",
+    description: "",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["medium"],
+    fastServiceTier: "priority",
+  },
+  {
+    provider: "codex",
+    id: "gpt-standard",
+    name: "GPT Standard",
+    description: "",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["medium"],
+  },
+];
+
 function unused(name: string): () => never {
   return () => {
     throw new Error(`${name} is not used by the Team API routes E2E run.`);
@@ -332,9 +399,26 @@ const NO_STATUS: AgentStatus = {
 
 let hidden: HiddenAgentsSnapshot = { agents: [{ agentId: "agent-pi", hiddenAt: new Date(0).toISOString() }] };
 
+// The host's agent event listener. Only a chat colour change (`chat-colors-v1`) sends an event in this run.
+const agentEventListeners = new Set<(event: AgentEvent) => void>();
+// The roles of this host. Empty roles give every member `manage`, as a host without roles does; the
+// message delete checks set "everyone" to a lower level for one agent.
+let accessLevels: AgentAccessState = { revision: 0, everyone: {}, roles: [] };
+const agentAccess: TeamApiAgentAccess = {
+  get: () => accessLevels,
+  levels: () => accessLevels,
+  subscribe: () => () => undefined,
+  set: unused("agentAccess.set"),
+  copyAgent: unused("agentAccess.copyAgent"),
+};
+
 const fakeAgents: TeamApiAgents = {
-  on: () => undefined,
-  off: () => undefined,
+  on: (_event, listener) => {
+    agentEventListeners.add(listener);
+  },
+  off: (_event, listener) => {
+    agentEventListeners.delete(listener);
+  },
   preferredProvider: () => "claude",
   newAgentProvider: () => "claude",
   getStatus: () => {
@@ -425,7 +509,21 @@ const fakeAgents: TeamApiAgents = {
   committedAgentDuplication: unused("committedAgentDuplication"),
   duplicateAgent: unused("duplicateAgent"),
   commitAgentDuplication: unused("commitAgentDuplication"),
-  updateAgent: unused("updateAgent"),
+  // Only an exact colour (`agent-colors-v1`) or a chat colour (`chat-colors-v1`) reaches this writer in
+  // this run. A chat colour change sends `agents-changed`, as the agent service does.
+  updateAgent: (input) =>
+    Effect.sync(() => {
+      record(input.chatColor === undefined ? "updateAgentColor" : "updateAgentChatColor", input);
+      const target = agents.find((item) => item.id === input.agentId);
+      if (!target) throw new Error("Agent not found.");
+      if (input.avatarColor === null) delete target.avatarColor;
+      else if (input.avatarColor !== undefined) target.avatarColor = input.avatarColor;
+      if (input.chatColor === null) delete target.chatColor;
+      else if (input.chatColor !== undefined) target.chatColor = input.chatColor;
+      if (input.chatColor !== undefined)
+        for (const listener of agentEventListeners) listener({ type: "agents-changed", agents });
+      return target;
+    }),
   getMemorySelection: unused("getMemorySelection"),
   setMemoryInclusion: unused("setMemoryInclusion"),
   listMemories: unused("listMemories"),
@@ -462,12 +560,58 @@ const fakeAgents: TeamApiAgents = {
   listWorkspaceDirectory: unused("listWorkspaceDirectory"),
   sendMessage: unused("sendMessage"),
   setMessageReaction: unused("setMessageReaction"),
+  // A member owns `message-of-<member id>`. `message-gone` is not shown and `message-busy` is in a
+  // running turn, as the agent service answers them.
+  deleteConversationMessage: (input, access) => {
+    record("deleteConversationMessage", input, access);
+    if (input.messageId === "message-gone") return Effect.fail(new MessageDeleteRefused({ reason: "not-found" }));
+    if (input.messageId === "message-busy") return Effect.fail(new MessageDeleteRefused({ reason: "busy" }));
+    if (!access.deleteAny && input.messageId !== `message-of-${access.memberId}`)
+      return Effect.fail(new MessageDeleteRefused({ reason: "forbidden" }));
+    return Effect.void;
+  },
   clearAgentContext: unused("clearAgentContext"),
+  compactAgentContext: (agentId) => Effect.sync(() => record("compactAgentContext", agentId)),
+  compactTaskContext: (input) => {
+    record("compactTaskContext", input);
+    if (input.taskId === "task-busy")
+      return Effect.fail(
+        new AgentLifecycleFailed({
+          operation: "compact task context",
+          cause: new ContextCompactRefusedError(sourceText("error.agent.waitBeforeCompactContext")),
+        }),
+      );
+    return Effect.void;
+  },
   agentIdForRequest: () => undefined,
   respondToPrompt: unused("respondToPrompt"),
   respondToApproval: unused("respondToApproval"),
   respondToBrowserSecret: (input) => Effect.sync(() => record("respondToBrowserSecret", input)),
   respondToBrowserTakeover: unused("respondToBrowserTakeover"),
+};
+
+// Only a reply in a side thread (`agent-thread-replies-v1`) reaches the side threads in this run.
+const fakeAgentTasks: TeamApiAgentTasks = {
+  listAgents: () => agents,
+  listTasks: unused("listTasks"),
+  readTask: unused("readTask"),
+  startTask: unused("startTask"),
+  sendMessage: (input, sender) =>
+    Effect.sync(() => {
+      record("sendTaskMessage", input, sender);
+      return {
+        messageId: "message-reply",
+        deliveries: [{ id: "delivery-reply", recipientAgentId: input.agentId, status: "queued", position: 1 }],
+      };
+    }),
+  stopTask: unused("stopTask"),
+  closeTask: unused("closeTask"),
+  reopenTask: unused("reopenTask"),
+  renameTask: unused("renameTask"),
+  deleteTask: unused("deleteTask"),
+  listTaskReads: unused("listTaskReads"),
+  markTaskRead: unused("markTaskRead"),
+  branchTask: unused("branchTask"),
 };
 
 const mailbox: TeamApiMailbox = {
@@ -596,6 +740,123 @@ const createBitwardenHost = () =>
     },
   });
 const bitwardenConnector = createBitwardenHost();
+// The host's WhatsApp numbers (`whatsapp-connector-v1`): an in-memory stand-in for the messaging
+// service that records each call. The other connector routes are not part of this run.
+const WHATSAPP_NUMBER = "48600100200";
+const whatsappAccount: WhatsAppAccount = {
+  workspaceId: WHATSAPP_NUMBER,
+  ownNumber: true,
+  allowedSenders: [],
+  pendingRequests: [{ code: "K7Q2ZP", senderId: "48600100400", name: "Ola", expiresAt: "2026-11-03T21:00:00.000Z" }],
+};
+/** The link of the stand-in fails with this error, or waits while it is null. */
+let whatsappLinkError: WhatsAppLinkState["error"] = null;
+const whatsappMessaging: TeamApiConnectors["messaging"] = {
+  slackOverview: unused("slackOverview"),
+  discordOverview: unused("discordOverview"),
+  telegramOverview: unused("telegramOverview"),
+  connectSlackWorkspace: unused("connectSlackWorkspace"),
+  connectDiscordGuild: unused("connectDiscordGuild"),
+  connectTelegramChat: unused("connectTelegramChat"),
+  completeSlackWorkspace: unused("completeSlackWorkspace"),
+  completeDiscordGuild: unused("completeDiscordGuild"),
+  disconnectSlackWorkspace: unused("disconnectSlackWorkspace"),
+  disconnectDiscordGuild: unused("disconnectDiscordGuild"),
+  disconnectTelegramChat: unused("disconnectTelegramChat"),
+  addOrchestrator: unused("addOrchestrator"),
+  addTelegramOrchestrator: unused("addTelegramOrchestrator"),
+  discordAccess: unused("discordAccess"),
+  listDiscordRoles: unused("listDiscordRoles"),
+  setDiscordAccess: unused("setDiscordAccess"),
+  reconnect: (platform, workspaceId, opensPage) =>
+    Effect.sync(() => {
+      record("whatsapp.reconnect", platform, workspaceId, opensPage);
+      return null;
+    }),
+  setEnabled: (platform, workspaceId, enabled) =>
+    Effect.sync(() => record("whatsapp.setEnabled", platform, workspaceId, enabled)),
+  whatsappOverview: () => {
+    record("whatsapp.overview");
+    return {
+      connections: [
+        {
+          workspaceId: WHATSAPP_NUMBER,
+          platform: "whatsapp",
+          enabled: true,
+          state: "connected",
+          workspaceName: "+48 600 100 200",
+          botUserId: `${WHATSAPP_NUMBER}:3@s.whatsapp.net`,
+          missingScopes: [],
+          retryAt: null,
+          credentials: "saved",
+          orchestratorAgentId: null,
+        },
+      ],
+      accounts: [structuredClone(whatsappAccount)],
+    };
+  },
+  whatsappLinkState: () => {
+    record("whatsapp.linkState");
+    return {
+      status: whatsappLinkError ? "failed" : "waiting",
+      qr: whatsappLinkError ? null : "2@e2e-qr-ref,e2e-noise-key,e2e-identity-key,e2e-adv-secret",
+      code: null,
+      workspaceId: null,
+      error: whatsappLinkError,
+    };
+  },
+  startWhatsAppLink: (input) =>
+    Effect.sync(() => {
+      record("whatsapp.startLink", input);
+      return {
+        status: "waiting",
+        qr: input.method === "qr" ? "2@e2e-qr-ref,e2e-noise-key,e2e-identity-key,e2e-adv-secret" : null,
+        code: input.method === "code" ? "E2EPAIR1" : null,
+        workspaceId: null,
+        error: null,
+      };
+    }),
+  cancelWhatsAppLink: () => Effect.sync(() => record("whatsapp.cancelLink")),
+  disconnectWhatsAppNumber: (workspaceId) => Effect.sync(() => record("whatsapp.disconnect", workspaceId)),
+  addWhatsAppOrchestrator: (input) =>
+    Effect.sync(() => {
+      record("whatsapp.addOrchestrator", input);
+      return { agentId: "agent-whatsapp-orchestrator", sectionId: "section-integrations" };
+    }),
+  listWhatsAppGroups: (workspaceId) =>
+    Effect.sync(() => {
+      record("whatsapp.groups", workspaceId);
+      return { groups: [{ id: "120363000000000001@g.us", name: "Family" }] };
+    }),
+  addWhatsAppSender: (workspaceId, sender) =>
+    Effect.sync(() => {
+      record("whatsapp.addSender", workspaceId, sender);
+      whatsappAccount.allowedSenders.push(sender);
+    }),
+  removeWhatsAppSender: (workspaceId, senderId) =>
+    Effect.sync(() => {
+      record("whatsapp.removeSender", workspaceId, senderId);
+      whatsappAccount.allowedSenders = whatsappAccount.allowedSenders.filter((sender) => sender.id !== senderId);
+    }),
+  answerWhatsAppRequest: (workspaceId, code, approve) =>
+    Effect.sync(() => record("whatsapp.answerRequest", workspaceId, code, approve)),
+  setWhatsAppOwnNumber: (workspaceId, ownNumber) =>
+    Effect.sync(() => {
+      record("whatsapp.setOwnNumber", workspaceId, ownNumber);
+      whatsappAccount.ownNumber = ownNumber;
+    }),
+};
+const connectors: TeamApiConnectors = {
+  github: {
+    status: unused("github.status"),
+    pages: unused("github.pages"),
+    connect: unused("github.connect"),
+    cancel: unused("github.cancel"),
+    disconnect: unused("github.disconnect"),
+    repositories: unused("github.repositories"),
+  },
+  messaging: whatsappMessaging,
+};
 // The host's Vault: the real service and store, over the same reversible cipher.
 const vaultFile = join(root, "openbot-vault-v1.json");
 const vault = new VaultService({ store: new VaultStore(vaultFile, fakeCipher), canPersist: () => true });
@@ -633,10 +894,15 @@ const memoryReviewFile = join(root, "memory-review.json");
 const ROTATED_HOST_KEY = "-----BEGIN PUBLIC KEY-----\nrotated-e2e\n-----END PUBLIC KEY-----\n";
 /** The account service refuses the next handover, as when it holds another key for the host. */
 let refuseHostKeyRotation = false;
+/** The servers that the stand-in of `LocalServers` runs. */
+const localServerList: { serverId: string; name: string; published: boolean }[] = [];
 const memoryReview = new MemoryReviewPreferenceStore(memoryReviewFile);
 // The real store of the levels that each member chose for each agent, on a temporary file.
 const agentLevelsFile = join(root, "agent-notification-levels.json");
 const agentLevels = new AgentNotificationLevelStore(agentLevelsFile);
+// The real store of the chats that each member pinned, on a temporary file.
+const sidebarPinsFile = join(root, "sidebar-pins.json");
+const sidebarPinStore = new SidebarPinStore(sidebarPinsFile);
 // The host's endpoints in memory. The one on Pi has a header and a context window that stay on the host.
 let customEndpoints: CustomProviderSummary[] = [
   {
@@ -730,6 +996,8 @@ try {
     appVersion: APP_VERSION,
     store,
     agents: fakeAgents,
+    agentTasks: fakeAgentTasks,
+    agentAccess,
     mailbox,
     browser,
     chat: new TeamChatStore(database),
@@ -770,6 +1038,14 @@ try {
         },
         userDataPath: join(root, "user-data"),
       }),
+      // The real instruction file in a temporary workspace, over an agent that records each save.
+      instructions: createAgentInstructionsFiles({
+        listAgents: () => agents,
+        instructionsSaving: (agentId, text) => {
+          record("instructionsSaving", agentId, text);
+          return (written) => record("instructionsSaved", agentId, written);
+        },
+      }),
       agentHost: createAgentHostSettings({
         agents: {
           listAgents: () => agents,
@@ -787,8 +1063,10 @@ try {
               if (input.quickAcknowledgement === null) delete target.quickAcknowledgement;
               else if (input.quickAcknowledgement !== undefined)
                 target.quickAcknowledgement = input.quickAcknowledgement;
+              if (input.fastMode !== undefined) target.fastMode = input.fastMode;
               return target;
             }),
+          listModels: () => FAST_MODE_MODELS,
         },
         busyMessageMode: { get: () => ({ mode: "queue" }) },
         agentDefaults: { get: () => DEFAULT_AGENT_DEFAULTS },
@@ -804,6 +1082,40 @@ try {
                 record("rotateHostKey");
                 return { publicKey: ROTATED_HOST_KEY };
               }),
+      },
+      // A stand-in for `LocalServers`; `local-servers-e2e.ts` starts real children. This checks the gate
+      // and the wire, and that a refused request never reaches the desktop app.
+      localServers: {
+        list: () => Effect.sync(() => ({ servers: [...localServerList], limit: 5 })),
+        create: (name) =>
+          name.trim().length < INPUT_LIMITS.serverNameMin
+            ? Effect.fail(
+                new RemoteWorkflowError({
+                  cause: new Error(
+                    sourceText("error.team.serverNameLength", {
+                      min: INPUT_LIMITS.serverNameMin,
+                      max: INPUT_LIMITS.serverName,
+                    }),
+                  ),
+                }),
+              )
+            : Effect.sync(() => {
+                record("createLocalServer", name);
+                const server = { serverId: `local-server-${localServerList.length + 1}`, name, published: true };
+                localServerList.push(server);
+                return server;
+              }),
+        delete: (serverId) =>
+          Effect.suspend(() => {
+            const index = localServerList.findIndex((server) => server.serverId === serverId);
+            if (index < 0)
+              return Effect.fail(
+                new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.localServerNotFound")) }),
+              );
+            record("deleteLocalServer", serverId);
+            localServerList.splice(index, 1);
+            return Effect.void;
+          }),
       },
       // The setup file in memory. The host writes it and tells the agent service, as `saveSetup` does.
       defaultProvider: {
@@ -897,6 +1209,7 @@ try {
       },
     },
     bitwardenConnector,
+    connectors,
     vault,
     browserProfiles,
     machine,
@@ -923,6 +1236,12 @@ try {
           record("resetProviderUsage", { provider, accountId });
           return "reset" as const;
         }),
+    },
+    sidebarPins: {
+      snapshot: (memberId, hiddenIds) => sidebarPinStore.snapshot(memberId, hiddenIds),
+      set: (memberId, items, hiddenIds) => sidebarPinStore.set(memberId, items, hiddenIds),
+      seed: (memberId, items, hiddenIds) => sidebarPinStore.seed(memberId, items, hiddenIds),
+      subscribe: (listener) => sidebarPinStore.subscribe(listener),
     },
     agentNotificationLevels: {
       snapshot: (memberId, hiddenIds) => agentLevels.snapshot(memberId, hiddenIds),
@@ -1459,6 +1778,7 @@ try {
         "deepseek",
         "openrouter",
         "kimi",
+        "devin",
         "hermes",
       ],
       3: [
@@ -1473,6 +1793,7 @@ try {
         "deepseek",
         "openrouter",
         "kimi",
+        "devin",
         "hermes",
       ],
       4: [
@@ -1486,11 +1807,12 @@ try {
         "deepseek",
         "openrouter",
         "kimi",
+        "devin",
         "hermes",
       ],
-      5: ["cursor", "cline", "pi", "muse", "inception", "deepseek", "openrouter", "kimi", "hermes"],
-      6: ["pi", "muse", "inception", "deepseek", "openrouter", "kimi", "hermes"],
-      7: ["inception", "deepseek", "openrouter", "kimi", "hermes"],
+      5: ["cursor", "cline", "pi", "muse", "inception", "deepseek", "openrouter", "kimi", "devin", "hermes"],
+      6: ["pi", "muse", "inception", "deepseek", "openrouter", "kimi", "devin", "hermes"],
+      7: ["inception", "deepseek", "openrouter", "kimi", "devin", "hermes"],
       8: [],
       9: [],
     };
@@ -2006,6 +2328,374 @@ try {
     );
   }
 
+  // ---- Agent instructions (agent-instructions-v1) ----
+  {
+    const capabilities = [AGENT_INSTRUCTIONS_CAPABILITY];
+    const v9 = { capabilities, protocol: TEAM_PROTOCOL_V9 };
+    const workspace = join(root, "workspaces", "agent-ada");
+    mkdirSync(workspace, { recursive: true });
+    const instructionsPath = join(workspace, "AGENTS.md");
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-instructions-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_INSTRUCTIONS_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(AGENT_INSTRUCTIONS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", AGENT_INSTRUCTIONS_ROUTES.read, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    check(
+      "the instructions routes without the capability get 400 agentInstructionsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.agentInstructionsUnsupported")),
+      summary(unsupported),
+    );
+    const memberRead = await call("POST", AGENT_INSTRUCTIONS_ROUTES.read, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      ...v9,
+    });
+    const memberSave = await call("POST", AGENT_INSTRUCTIONS_ROUTES.save, {
+      token: bobToken,
+      json: { agentId: "agent-ada", text: "# Member\n", expected: "" },
+      ...v9,
+    });
+    check(
+      "a member cannot read or save the instructions of an agent",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberSave, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("instructionsSaving").length === 0 &&
+        !existsSync(instructionsPath),
+      [summary(memberRead), summary(memberSave)],
+    );
+    const empty = await call("POST", AGENT_INSTRUCTIONS_ROUTES.read, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      ...v9,
+    });
+    check(
+      "an admin reads an instruction file that does not exist yet",
+      empty.status === 200 && isDeepStrictEqual(empty.body, { fileName: "AGENTS.md", exists: false, text: "" }),
+      summary(empty),
+    );
+    const saved = await call("POST", AGENT_INSTRUCTIONS_ROUTES.save, {
+      token: adaToken,
+      json: { agentId: "agent-ada", text: "# Ada\nAnswer in Polish.\n", expected: "" },
+      ...v9,
+    });
+    const readBack = await call("POST", AGENT_INSTRUCTIONS_ROUTES.read, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      ...v9,
+    });
+    const file = { fileName: "AGENTS.md", exists: true, text: "# Ada\nAnswer in Polish.\n" };
+    check(
+      "an admin saves the file, the host writes it in the workspace, and a read gives the new text",
+      saved.status === 200 &&
+        isDeepStrictEqual(saved.body, file) &&
+        isDeepStrictEqual(readBack.body, file) &&
+        readFileSync(instructionsPath, "utf8") === file.text &&
+        isDeepStrictEqual(callsOf("instructionsSaved"), [["agent-ada", true]]),
+      [summary(saved), summary(readBack)],
+    );
+    const stale = await call("POST", AGENT_INSTRUCTIONS_ROUTES.save, {
+      token: adaToken,
+      json: { agentId: "agent-ada", text: "# Stale\n", expected: "" },
+      ...v9,
+    });
+    check(
+      "a save from a text that changed gets 409 with the host's sentence, and the file stays",
+      errorIs(stale, 409, sourceText("error.agent.instructionsChanged")) &&
+        readFileSync(instructionsPath, "utf8") === file.text,
+      summary(stale),
+    );
+    const tooLong = await call("POST", AGENT_INSTRUCTIONS_ROUTES.save, {
+      token: adaToken,
+      json: { agentId: "agent-ada", text: "x".repeat(32_001), expected: file.text },
+      ...v9,
+    });
+    check(
+      "a text longer than the editor saves gets 400, and the file stays",
+      tooLong.status === 400 && readFileSync(instructionsPath, "utf8") === file.text,
+      summary(tooLong),
+    );
+    const missing = await call("POST", AGENT_INSTRUCTIONS_ROUTES.read, {
+      token: adaToken,
+      json: { agentId: "agent-none" },
+      ...v9,
+    });
+    const hidden = await call("POST", AGENT_INSTRUCTIONS_ROUTES.read, {
+      token: adaToken,
+      json: { agentId: "agent-pi" },
+      capabilities,
+      protocol: 6,
+    });
+    check(
+      "an unknown agent and an agent that the client protocol does not show get 404",
+      errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hidden, 404, sourceText("error.team.agentNotFound")),
+      [summary(missing), summary(hidden)],
+    );
+  }
+
+  // ---- Exact agent colours (agent-colors-v1) ----
+  {
+    const colorCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_COLORS_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-colors-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_COLORS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(AGENT_COLORS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", AGENT_COLORS_ROUTES.read, { token: bobToken, json: {} });
+    check(
+      "the colour routes without the capability get 400 agentColorsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.agentColorsUnsupported")),
+      summary(unsupported),
+    );
+    const empty = await call("POST", AGENT_COLORS_ROUTES.read, {
+      token: bobToken,
+      json: {},
+      capabilities: colorCapabilities,
+    });
+    check(
+      "a member reads an empty list when no agent has a colour",
+      empty.status === 200 && isDeepStrictEqual(empty.body, { agents: [] }),
+      summary(empty),
+    );
+    const writes = callsOf("updateAgentColor").length;
+    const upperCase = await call("POST", AGENT_COLORS_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-ada", color: "#A1B2C3" },
+      capabilities: colorCapabilities,
+    });
+    const extraField = await call("POST", AGENT_COLORS_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-ada", color: "#a1b2c3", avatarHue: 10 },
+      capabilities: colorCapabilities,
+    });
+    const notShown = await call("POST", AGENT_COLORS_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-pi", color: "#a1b2c3" },
+      capabilities: colorCapabilities,
+      protocol: 6,
+    });
+    check(
+      "a colour that is not lower-case #rrggbb, an unknown field, or an agent that the protocol does not show is refused, and nothing is written",
+      upperCase.status === 400 &&
+        extraField.status === 400 &&
+        errorIs(notShown, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("updateAgentColor").length === writes,
+      [summary(upperCase), summary(extraField), summary(notShown)],
+    );
+    const set = await call("POST", AGENT_COLORS_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-pi", color: "#a1b2c3" },
+      capabilities: colorCapabilities,
+    });
+    const readBack = await call("POST", AGENT_COLORS_ROUTES.read, {
+      token: adaToken,
+      json: {},
+      capabilities: colorCapabilities,
+    });
+    const readV6 = await call("POST", AGENT_COLORS_ROUTES.read, {
+      token: adaToken,
+      json: {},
+      capabilities: colorCapabilities,
+      protocol: 6,
+    });
+    const expected = { agents: [{ agentId: "agent-pi", color: "#a1b2c3" }] };
+    check(
+      "a member with manage access sets a colour through the agent writer, and the read leaves out an agent that the protocol does not show",
+      set.status === 200 &&
+        isDeepStrictEqual(set.body, expected) &&
+        isDeepStrictEqual(readBack.body, expected) &&
+        isDeepStrictEqual(callsOf("updateAgentColor").at(-1), [{ agentId: "agent-pi", avatarColor: "#a1b2c3" }]) &&
+        readV6.status === 200 &&
+        isDeepStrictEqual(readV6.body, { agents: [] }),
+      [summary(set), summary(readBack), summary(readV6)],
+    );
+    const removed = await call("POST", AGENT_COLORS_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-pi", color: null },
+      capabilities: colorCapabilities,
+    });
+    check(
+      "a null colour removes the colour",
+      removed.status === 200 &&
+        isDeepStrictEqual(removed.body, { agents: [] }) &&
+        isDeepStrictEqual(callsOf("updateAgentColor").at(-1), [{ agentId: "agent-pi", avatarColor: null }]),
+      summary(removed),
+    );
+  }
+
+  // ---- Agent chat colours (chat-colors-v1) ----
+  {
+    const chatCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, CHAT_COLORS_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises chat-colors-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(CHAT_COLORS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(CHAT_COLORS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const writes = callsOf("updateAgentChatColor").length;
+    const unsupportedRead = await call("POST", CHAT_COLORS_ROUTES.read, { token: bobToken, json: {} });
+    const unsupportedSet = await call("POST", CHAT_COLORS_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", color: "#a1b2c3" },
+    });
+    check(
+      "the chat colour routes without the capability get 400 chatColorsUnsupported, and nothing is written",
+      errorIs(unsupportedRead, 400, sourceText("error.team.chatColorsUnsupported")) &&
+        errorIs(unsupportedSet, 400, sourceText("error.team.chatColorsUnsupported")) &&
+        callsOf("updateAgentChatColor").length === writes,
+      [summary(unsupportedRead), summary(unsupportedSet)],
+    );
+    const empty = await call("POST", CHAT_COLORS_ROUTES.read, {
+      token: bobToken,
+      json: {},
+      capabilities: chatCapabilities,
+    });
+    check(
+      "a member reads empty lists when no agent and no member has a chat colour",
+      empty.status === 200 && isDeepStrictEqual(empty.body, { agents: [], members: [] }),
+      summary(empty),
+    );
+    const upperCase = await call("POST", CHAT_COLORS_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-ada", color: "#A1B2C3" },
+      capabilities: chatCapabilities,
+    });
+    const extraField = await call("POST", CHAT_COLORS_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-ada", color: "#a1b2c3", avatarColor: "#a1b2c3" },
+      capabilities: chatCapabilities,
+    });
+    const notShown = await call("POST", CHAT_COLORS_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-pi", color: "#a1b2c3" },
+      capabilities: chatCapabilities,
+      protocol: 6,
+    });
+    check(
+      "a chat colour that is not lower-case #rrggbb, an unknown field, or an agent that the protocol does not show is refused, and nothing is written",
+      upperCase.status === 400 &&
+        extraField.status === 400 &&
+        errorIs(notShown, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("updateAgentChatColor").length === writes,
+      [summary(upperCase), summary(extraField), summary(notShown)],
+    );
+    const set = await call("POST", CHAT_COLORS_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-pi", color: "#a1b2c3" },
+      capabilities: chatCapabilities,
+    });
+    const readBack = await call("POST", CHAT_COLORS_ROUTES.read, {
+      token: adaToken,
+      json: {},
+      capabilities: chatCapabilities,
+    });
+    const readV6 = await call("POST", CHAT_COLORS_ROUTES.read, {
+      token: adaToken,
+      json: {},
+      capabilities: chatCapabilities,
+      protocol: 6,
+    });
+    const expected = { agents: [{ agentId: "agent-pi", color: "#a1b2c3" }], members: [] };
+    check(
+      "a member with manage access sets a chat colour through the agent writer, the avatar colour does not change, and the read leaves out an agent that the protocol does not show",
+      set.status === 200 &&
+        isDeepStrictEqual(set.body, expected) &&
+        isDeepStrictEqual(readBack.body, expected) &&
+        isDeepStrictEqual(callsOf("updateAgentChatColor").at(-1), [{ agentId: "agent-pi", chatColor: "#a1b2c3" }]) &&
+        agents.find((item) => item.id === "agent-pi")?.avatarColor === undefined &&
+        readV6.status === 200 &&
+        isDeepStrictEqual(readV6.body, { agents: [], members: [] }),
+      [summary(set), summary(readBack), summary(readV6)],
+    );
+    const removed = await call("POST", CHAT_COLORS_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-pi", color: null },
+      capabilities: chatCapabilities,
+    });
+    check(
+      "a null chat colour removes the chat colour",
+      removed.status === 200 &&
+        isDeepStrictEqual(removed.body, { agents: [], members: [] }) &&
+        isDeepStrictEqual(callsOf("updateAgentChatColor").at(-1), [{ agentId: "agent-pi", chatColor: null }]),
+      summary(removed),
+    );
+
+    // The host sends the whole list when a socket declares the capability, and again after each change.
+    const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+      TEAM_PROTOCOL_V1_WEBSOCKET,
+      `openbot-token.${bobToken}`,
+    ]);
+    const events: unknown[] = [];
+    const waiters = new Set<() => void>();
+    socket.addEventListener("message", (message) => {
+      const value = JSON.parse(String(message.data));
+      if (isDynamicRecord(value) && value.type === "chat-colors-changed") {
+        events.push(value);
+        for (const wake of waiters) wake();
+      }
+    });
+    await new Promise<void>((resolveOpen, reject) => {
+      socket.addEventListener("open", () => resolveOpen(), { once: true });
+      socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+    });
+    /** Whether the socket has `count` chat colour events before the deadline. */
+    const received = (count: number) =>
+      new Promise<boolean>((resolveReceived) => {
+        if (events.length >= count) return resolveReceived(true);
+        const timer = setTimeout(() => {
+          waiters.delete(wake);
+          resolveReceived(false);
+        }, 5_000);
+        const wake = () => {
+          if (events.length < count) return;
+          clearTimeout(timer);
+          waiters.delete(wake);
+          resolveReceived(true);
+        };
+        waiters.add(wake);
+      });
+    socket.send(
+      JSON.stringify({ type: "agent-event-scope", includeConversations: false, capabilities: chatCapabilities }),
+    );
+    const declared = await received(1);
+    await call("POST", CHAT_COLORS_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-ada", color: "#0a0b0c" },
+      capabilities: chatCapabilities,
+    });
+    const changed = await received(2);
+    socket.close();
+    await call("POST", CHAT_COLORS_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-ada", color: null },
+      capabilities: chatCapabilities,
+    });
+    check(
+      "a socket gets the list when it declares chat-colors-v1, and the new list after a change",
+      declared &&
+        changed &&
+        isDeepStrictEqual(events.slice(0, 2), [
+          { type: "chat-colors-changed", agents: [], members: [] },
+          { type: "chat-colors-changed", agents: [{ agentId: "agent-ada", color: "#0a0b0c" }], members: [] },
+        ]),
+      events,
+    );
+  }
+
   // ---- Agent new chats (agent-new-chat-v1) ----
   {
     const newChatCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_NEW_CHAT_CAPABILITY];
@@ -2221,6 +2911,329 @@ try {
     );
   }
 
+  // ---- Fast mode (agent-fast-mode-v1) ----
+  {
+    const fastCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_FAST_MODE_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-fast-mode-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_FAST_MODE_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(AGENT_FAST_MODE_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const writes = callsOf("updateAgent").length;
+    const unsupported = await call("POST", AGENT_FAST_MODE_ROUTES.settings, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+    });
+    check(
+      "the fast mode routes without the capability get 400 agentSettingsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.agentSettingsUnsupported")),
+      summary(unsupported),
+    );
+    const models = await call("POST", AGENT_FAST_MODE_ROUTES.models, {
+      token: bobToken,
+      json: {},
+      capabilities: fastCapabilities,
+    });
+    check(
+      "a member reads only the models that have a fast tier, with the tier id",
+      models.status === 200 &&
+        isDeepStrictEqual(models.body, {
+          models: [{ provider: "codex", id: "gpt-fast", fastServiceTier: "priority" }],
+        }),
+      summary(models),
+    );
+    const unset = await call("POST", AGENT_FAST_MODE_ROUTES.settings, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities: fastCapabilities,
+    });
+    check(
+      "a member reads null for an agent whose fast mode was never set",
+      unset.status === 200 && isDeepStrictEqual(unset.body, { fastMode: null }),
+      summary(unset),
+    );
+    const notBoolean = await call("POST", AGENT_FAST_MODE_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", fastMode: null },
+      capabilities: fastCapabilities,
+    });
+    check(
+      "the host refuses a fast mode value that is not a boolean, and writes nothing",
+      notBoolean.status === 400 && callsOf("updateAgent").length === writes,
+      summary(notBoolean),
+    );
+    const memberOn = await call("POST", AGENT_FAST_MODE_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", fastMode: true },
+      capabilities: fastCapabilities,
+    });
+    const readOn = await call("POST", AGENT_FAST_MODE_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities: fastCapabilities,
+    });
+    check(
+      "a member turns on fast mode through the agent writer, and an admin reads it back",
+      memberOn.status === 200 &&
+        isDeepStrictEqual(memberOn.body, { fastMode: true }) &&
+        isDeepStrictEqual(readOn.body, { fastMode: true }) &&
+        isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", fastMode: true }]),
+      [summary(memberOn), summary(readOn)],
+    );
+    const memberOff = await call("POST", AGENT_FAST_MODE_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", fastMode: false },
+      capabilities: fastCapabilities,
+    });
+    const missing = await call("POST", AGENT_FAST_MODE_ROUTES.settings, {
+      token: bobToken,
+      json: { agentId: "agent-none" },
+      capabilities: fastCapabilities,
+    });
+    check(
+      "a member turns off fast mode, and an unknown agent gets 404",
+      memberOff.status === 200 &&
+        isDeepStrictEqual(memberOff.body, { fastMode: false }) &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")),
+      [summary(memberOff), summary(missing)],
+    );
+    const hiddenSet = await call("POST", AGENT_FAST_MODE_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-pi", fastMode: true },
+      capabilities: fastCapabilities,
+      protocol: 6,
+    });
+    check(
+      "a member cannot set the fast mode of an agent that the client protocol does not show",
+      errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) && callsOf("updateAgent").length === writes + 2,
+      summary(hiddenSet),
+    );
+  }
+
+  // ---- Compact now (context-compact-v1) ----
+  {
+    const compactCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, CONTEXT_COMPACT_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises context-compact-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(CONTEXT_COMPACT_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(CONTEXT_COMPACT_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", CONTEXT_COMPACT_ROUTES.compact, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+    });
+    check(
+      "the compact routes without the capability get 400 contextCompactUnsupported, and compact nothing",
+      errorIs(unsupported, 400, sourceText("error.team.contextCompactUnsupported")) &&
+        callsOf("compactAgentContext").length === 0,
+      summary(unsupported),
+    );
+    const chat = await call("POST", CONTEXT_COMPACT_ROUTES.compact, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities: compactCapabilities,
+    });
+    const task = await call("POST", CONTEXT_COMPACT_ROUTES.compactTask, {
+      token: bobToken,
+      json: { agentId: "agent-ada", taskId: "task-1" },
+      capabilities: compactCapabilities,
+    });
+    check(
+      "a member compacts the agent's chat and one of its tasks, with an empty answer",
+      chat.status === 200 &&
+        isDeepStrictEqual(chat.body, {}) &&
+        task.status === 200 &&
+        isDeepStrictEqual(task.body, {}) &&
+        isDeepStrictEqual(callsOf("compactAgentContext"), [["agent-ada"]]) &&
+        isDeepStrictEqual(callsOf("compactTaskContext"), [[{ agentId: "agent-ada", taskId: "task-1" }]]),
+      [summary(chat), summary(task)],
+    );
+    const busy = await call("POST", CONTEXT_COMPACT_ROUTES.compactTask, {
+      token: bobToken,
+      json: { agentId: "agent-ada", taskId: "task-busy" },
+      capabilities: compactCapabilities,
+    });
+    check(
+      "a refused compaction gets 409 with the host's sentence",
+      errorIs(busy, 409, sourceText("error.agent.waitBeforeCompactContext")),
+      summary(busy),
+    );
+    const missing = await call("POST", CONTEXT_COMPACT_ROUTES.compact, {
+      token: bobToken,
+      json: { agentId: "agent-none" },
+      capabilities: compactCapabilities,
+    });
+    const hidden = await call("POST", CONTEXT_COMPACT_ROUTES.compact, {
+      token: bobToken,
+      json: { agentId: "agent-pi" },
+      capabilities: compactCapabilities,
+      protocol: 6,
+    });
+    check(
+      "an unknown agent, and an agent that the client protocol does not show, get 404 and compact nothing",
+      errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hidden, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("compactAgentContext").length === 1,
+      [summary(missing), summary(hidden)],
+    );
+  }
+
+  // ---- Delete a message (message-delete-v1) ----
+  {
+    const deleteCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, MESSAGE_DELETE_CAPABILITY];
+    const deletes = () => callsOf("deleteConversationMessage");
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises message-delete-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(MESSAGE_DELETE_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(MESSAGE_DELETE_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", MESSAGE_DELETE_ROUTES.agent, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: "message-1" },
+    });
+    check(
+      "the delete routes without the capability get 400 messageDeleteUnsupported, and delete nothing",
+      errorIs(unsupported, 400, sourceText("error.team.messageDeleteUnsupported")) && deletes().length === 0,
+      summary(unsupported),
+    );
+    const chat = await call("POST", MESSAGE_DELETE_ROUTES.agent, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: "message-1" },
+      capabilities: deleteCapabilities,
+    });
+    const task = await call("POST", MESSAGE_DELETE_ROUTES.task, {
+      token: bobToken,
+      json: { agentId: "agent-ada", taskId: "task-1", messageId: "message-2" },
+      capabilities: deleteCapabilities,
+    });
+    check(
+      "a member who manages the agent deletes any message of its chat and of one of its tasks, with an empty answer",
+      chat.status === 200 &&
+        isDeepStrictEqual(chat.body, {}) &&
+        task.status === 200 &&
+        isDeepStrictEqual(task.body, {}) &&
+        isDeepStrictEqual(deletes(), [
+          [
+            { agentId: "agent-ada", messageId: "message-1" },
+            { memberId: bobId, deleteAny: true },
+          ],
+          [
+            { agentId: "agent-ada", taskId: "task-1", messageId: "message-2" },
+            { memberId: bobId, deleteAny: true },
+          ],
+        ]),
+      [summary(chat), summary(task), deletes()],
+    );
+    const busy = await call("POST", MESSAGE_DELETE_ROUTES.agent, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: "message-busy" },
+      capabilities: deleteCapabilities,
+    });
+    const gone = await call("POST", MESSAGE_DELETE_ROUTES.task, {
+      token: bobToken,
+      json: { agentId: "agent-ada", taskId: "task-1", messageId: "message-gone" },
+      capabilities: deleteCapabilities,
+    });
+    check(
+      "a refused delete gets 409 for a running turn and 404 for a message that is not shown, with the host's sentence",
+      errorIs(busy, 409, sourceText("error.backend.messageDeleteBusy")) &&
+        errorIs(gone, 404, sourceText("error.backend.messageDeleteNotFound")),
+      [summary(busy), summary(gone)],
+    );
+    accessLevels = { revision: 1, everyone: { "agent-ada": "chat" }, roles: [] };
+    const before = deletes().length;
+    const others = await call("POST", MESSAGE_DELETE_ROUTES.agent, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: "message-of-someone" },
+      capabilities: deleteCapabilities,
+    });
+    const own = await call("POST", MESSAGE_DELETE_ROUTES.agent, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: `message-of-${bobId}` },
+      capabilities: deleteCapabilities,
+    });
+    const admin = await call("POST", MESSAGE_DELETE_ROUTES.agent, {
+      token: adaToken,
+      json: { agentId: "agent-ada", messageId: "message-of-someone" },
+      capabilities: deleteCapabilities,
+    });
+    check(
+      "with chat on the agent, a member gets 403 for another message and deletes their own; an admin deletes any",
+      errorIs(others, 403, sourceText("error.backend.messageDeleteForbidden")) &&
+        own.status === 200 &&
+        admin.status === 200 &&
+        isDeepStrictEqual(deletes().slice(before), [
+          [
+            { agentId: "agent-ada", messageId: "message-of-someone" },
+            { memberId: bobId, deleteAny: false },
+          ],
+          [
+            { agentId: "agent-ada", messageId: `message-of-${bobId}` },
+            { memberId: bobId, deleteAny: false },
+          ],
+          [
+            { agentId: "agent-ada", messageId: "message-of-someone" },
+            { memberId: adaId, deleteAny: true },
+          ],
+        ]),
+      [summary(others), summary(own), summary(admin)],
+    );
+    accessLevels = { revision: 2, everyone: { "agent-ada": "view" }, roles: [] };
+    const viewOnly = await call("POST", MESSAGE_DELETE_ROUTES.agent, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: `message-of-${bobId}` },
+      capabilities: deleteCapabilities,
+    });
+    accessLevels = { revision: 3, everyone: {}, roles: [] };
+    check(
+      "a member who can only view the agent gets 403 agentViewOnly, and the host deletes nothing",
+      errorIs(viewOnly, 403, sourceText("error.team.agentViewOnly")) && deletes().length === before + 3,
+      summary(viewOnly),
+    );
+    const missing = await call("POST", MESSAGE_DELETE_ROUTES.agent, {
+      token: bobToken,
+      json: { agentId: "agent-none", messageId: "message-1" },
+      capabilities: deleteCapabilities,
+    });
+    const hiddenAgent = await call("POST", MESSAGE_DELETE_ROUTES.task, {
+      token: bobToken,
+      json: { agentId: "agent-pi", taskId: "task-1", messageId: "message-1" },
+      capabilities: deleteCapabilities,
+      protocol: 6,
+    });
+    check(
+      "an unknown agent, and an agent that the client protocol does not show, get 404 and delete nothing",
+      errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
+        deletes().length === before + 3,
+      [summary(missing), summary(hiddenAgent)],
+    );
+    // This host has no channel service, so the channel route answers as every channel route does.
+    // `channel-notifications-e2e.ts` runs the real channel service.
+    const channel = await call("POST", MESSAGE_DELETE_ROUTES.channel, {
+      token: bobToken,
+      json: { channelId: "channel-1", messageId: "message-1" },
+      capabilities: [...deleteCapabilities, CHANNEL_CHATS_CAPABILITY],
+    });
+    check(
+      "the channel delete route on a host without channels gets 400 channelsUnsupported",
+      errorIs(channel, 400, sourceText("error.team.channelsUnsupported")),
+      summary(channel),
+    );
+  }
+
   // ---- Memory review (memory-review-v1) ----
   {
     const capabilities = [MEMORY_REVIEW_CAPABILITY];
@@ -2346,6 +3359,187 @@ try {
       "a refused key change gives the owner 409 with the reason, not a host fault",
       errorIs(refusedRotate, 409, sourceText("error.host.keyRotationRefused")),
       summary(refusedRotate),
+    );
+  }
+
+  // ---- A reply in a side thread (agent-thread-replies-v1) ----
+  {
+    const capabilities = [AGENT_HIDDEN_CAPABILITY, AGENT_THREAD_REPLIES_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-thread-replies-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_THREAD_REPLIES_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(AGENT_THREAD_REPLIES_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const reply = {
+      agentId: "agent-ada",
+      taskId: "task-1",
+      text: "About this answer",
+      attachmentDraftIds: [],
+      replyToMessageId: "message-7",
+      clientMessageId: "client-1",
+    };
+    const unsupported = await call("POST", AGENT_THREAD_REPLIES_ROUTES.send, { token: bobToken, json: reply });
+    check(
+      "the reply route without the capability gets 400 threadRemoteUnsupported, and sends nothing",
+      errorIs(unsupported, 400, sourceText("error.backend.threadRemoteUnsupported")) &&
+        callsOf("sendTaskMessage").length === 0,
+      summary(unsupported),
+    );
+    const sent = await call("POST", AGENT_THREAD_REPLIES_ROUTES.send, { token: bobToken, json: reply, capabilities });
+    const [sentInput, sentSender] = callsOf("sendTaskMessage")[0] ?? [];
+    check(
+      "a member sends a reply to a side thread: the host gets the task, the reply target and the member, and answers the receipt",
+      sent.status === 202 &&
+        field(sent.body, "messageId") === "message-reply" &&
+        isDeepStrictEqual(sentInput, reply) &&
+        isDynamicRecord(sentSender) &&
+        sentSender.id === bobId,
+      [summary(sent), callsOf("sendTaskMessage")],
+    );
+    const extra = await call("POST", AGENT_THREAD_REPLIES_ROUTES.send, {
+      token: bobToken,
+      json: { ...reply, voiceRecordingDraftId: "voice-1" },
+      capabilities,
+    });
+    const empty = await call("POST", AGENT_THREAD_REPLIES_ROUTES.send, {
+      token: bobToken,
+      json: { ...reply, text: " " },
+      capabilities,
+    });
+    const noTarget = await call("POST", AGENT_THREAD_REPLIES_ROUTES.send, {
+      token: bobToken,
+      json: { ...reply, replyToMessageId: "" },
+      capabilities,
+    });
+    check(
+      "the frozen codec refuses an unknown field, a reply with no text and no file, and an empty reply target",
+      extra.status === 400 &&
+        empty.status === 400 &&
+        noTarget.status === 400 &&
+        callsOf("sendTaskMessage").length === 1,
+      [summary(extra), summary(empty), summary(noTarget)],
+    );
+    const hidden = await call("POST", AGENT_THREAD_REPLIES_ROUTES.send, {
+      token: bobToken,
+      json: { ...reply, agentId: "agent-pi" },
+      capabilities,
+      protocol: 6,
+    });
+    const missing = await call("POST", AGENT_THREAD_REPLIES_ROUTES.send, {
+      token: bobToken,
+      json: { ...reply, agentId: "agent-none" },
+      capabilities,
+    });
+    check(
+      "an unknown agent, and an agent that the client protocol does not show, get 404 and send nothing",
+      errorIs(hidden, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("sendTaskMessage").length === 1,
+      [summary(hidden), summary(missing)],
+    );
+  }
+
+  // ---- Servers on the host computer (local-servers-v1) ----
+  {
+    const capabilities = [LOCAL_SERVERS_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises local-servers-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(LOCAL_SERVERS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(LOCAL_SERVERS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", LOCAL_SERVERS_ROUTES.list, { token: owner.sessionToken, json: {} });
+    check(
+      "the local servers route without the capability gets 400 localServersUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.localServersUnsupported")),
+      summary(unsupported),
+    );
+    const adminCreate = await call("POST", LOCAL_SERVERS_ROUTES.create, {
+      token: adaToken,
+      json: { name: "Admin studio" },
+      capabilities,
+    });
+    const memberList = await call("POST", LOCAL_SERVERS_ROUTES.list, { token: bobToken, json: {}, capabilities });
+    check(
+      "an admin and a member cannot list or create servers on the host computer",
+      errorIs(adminCreate, 403, sourceText("error.team.ownerRequired")) &&
+        errorIs(memberList, 403, sourceText("error.team.ownerRequired")) &&
+        callsOf("createLocalServer").length === 0,
+      [summary(adminCreate), summary(memberList)],
+    );
+    const shortName = await call("POST", LOCAL_SERVERS_ROUTES.create, {
+      token: owner.sessionToken,
+      json: { name: "Lab" },
+      capabilities,
+    });
+    check(
+      "a name that the server name check refuses gives the owner 409 with the reason",
+      errorIs(
+        shortName,
+        409,
+        sourceText("error.team.serverNameLength", { min: INPUT_LIMITS.serverNameMin, max: INPUT_LIMITS.serverName }),
+      ) && callsOf("createLocalServer").length === 0,
+      summary(shortName),
+    );
+    const ownerCreate = await call("POST", LOCAL_SERVERS_ROUTES.create, {
+      token: owner.sessionToken,
+      json: { name: "Design studio" },
+      capabilities,
+    });
+    const ownerList = await call("POST", LOCAL_SERVERS_ROUTES.list, {
+      token: owner.sessionToken,
+      json: {},
+      capabilities,
+    });
+    const created = { serverId: "local-server-1", name: "Design studio", published: true };
+    check(
+      "the owner creates a server on the host computer and then lists it with the limit",
+      ownerCreate.status === 200 &&
+        isDeepStrictEqual(ownerCreate.body, created) &&
+        ownerList.status === 200 &&
+        isDeepStrictEqual(ownerList.body, { servers: [created], limit: 5 }) &&
+        isDeepStrictEqual(callsOf("createLocalServer"), [["Design studio"]]),
+      [summary(ownerCreate), summary(ownerList)],
+    );
+    const memberDelete = await call("POST", LOCAL_SERVERS_ROUTES.delete, {
+      token: bobToken,
+      json: { serverId: created.serverId },
+      capabilities,
+    });
+    const unknownDelete = await call("POST", LOCAL_SERVERS_ROUTES.delete, {
+      token: owner.sessionToken,
+      json: { serverId: "not-on-this-computer" },
+      capabilities,
+    });
+    check(
+      "a member cannot delete a server on the host computer, and a server that is not there gets 409",
+      errorIs(memberDelete, 403, sourceText("error.team.ownerRequired")) &&
+        errorIs(unknownDelete, 409, sourceText("error.remote.localServerNotFound")) &&
+        callsOf("deleteLocalServer").length === 0,
+      [summary(memberDelete), summary(unknownDelete)],
+    );
+    const ownerDelete = await call("POST", LOCAL_SERVERS_ROUTES.delete, {
+      token: owner.sessionToken,
+      json: { serverId: created.serverId },
+      capabilities,
+    });
+    const afterDelete = await call("POST", LOCAL_SERVERS_ROUTES.list, {
+      token: owner.sessionToken,
+      json: {},
+      capabilities,
+    });
+    check(
+      "the owner deletes a server on the host computer, and the list no longer has it",
+      ownerDelete.status === 200 &&
+        isDeepStrictEqual(ownerDelete.body, {}) &&
+        isDeepStrictEqual(afterDelete.body, { servers: [], limit: 5 }) &&
+        isDeepStrictEqual(callsOf("deleteLocalServer"), [[created.serverId]]),
+      [summary(ownerDelete), summary(afterDelete)],
     );
   }
 
@@ -2630,6 +3824,233 @@ try {
           },
         ]),
       [bobEvents, adaEvents],
+    );
+  }
+
+  // ---- Pinned chats (sidebar-pins-v1) ----
+  {
+    const capabilities = [SIDEBAR_PINS_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises sidebar-pins-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(SIDEBAR_PINS_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(SIDEBAR_PINS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", SIDEBAR_PINS_ROUTES.read, { token: bobToken, json: {} });
+    check(
+      "the pinned chats routes without the capability get 400 sidebarPinsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.sidebarPinsUnsupported")),
+      summary(unsupported),
+    );
+    const first = await call("POST", SIDEBAR_PINS_ROUTES.read, { token: bobToken, json: {}, capabilities });
+    const seeded = await call("POST", SIDEBAR_PINS_ROUTES.seed, {
+      token: bobToken,
+      json: {
+        items: [
+          { kind: "agent", id: "agent-ada" },
+          { kind: "channel", id: "channel-plans" },
+        ],
+      },
+      capabilities,
+    });
+    const seededAgain = await call("POST", SIDEBAR_PINS_ROUTES.seed, {
+      token: bobToken,
+      json: { items: [{ kind: "agent", id: "agent-oc" }] },
+      capabilities,
+    });
+    check(
+      "a member without pins reads an empty list with no time, and the first seed saves the pins of the device once",
+      first.status === 200 &&
+        isDeepStrictEqual(first.body, { items: [], updatedAt: null }) &&
+        seeded.status === 200 &&
+        isDynamicRecord(seeded.body) &&
+        isDeepStrictEqual(seeded.body.items, [
+          { kind: "agent", id: "agent-ada" },
+          { kind: "channel", id: "channel-plans" },
+        ]) &&
+        typeof seeded.body.updatedAt === "string" &&
+        isDeepStrictEqual(seededAgain.body, seeded.body),
+      [summary(first), summary(seeded), summary(seededAgain)],
+    );
+    const replaced = await call("POST", SIDEBAR_PINS_ROUTES.set, {
+      token: bobToken,
+      json: {
+        items: [
+          { kind: "channel", id: "channel-plans" },
+          { kind: "agent", id: "agent-oc" },
+          { kind: "agent", id: "agent-pi" },
+        ],
+      },
+      capabilities,
+    });
+    const adminRead = await call("POST", SIDEBAR_PINS_ROUTES.read, { token: adaToken, json: {}, capabilities });
+    check(
+      "a member replaces their pins in a new order, and another member does not see them",
+      replaced.status === 200 &&
+        isDynamicRecord(replaced.body) &&
+        isDeepStrictEqual(replaced.body.items, [
+          { kind: "channel", id: "channel-plans" },
+          { kind: "agent", id: "agent-oc" },
+          { kind: "agent", id: "agent-pi" },
+        ]) &&
+        isDeepStrictEqual(adminRead.body, { items: [], updatedAt: null }),
+      [summary(replaced), summary(adminRead)],
+    );
+    // A protocol 6 peer does not see the Pi agent: the read leaves its pin out, and a save keeps it.
+    const olderRead = await call("POST", SIDEBAR_PINS_ROUTES.read, {
+      token: bobToken,
+      json: {},
+      capabilities,
+      protocol: 6,
+    });
+    const olderSet = await call("POST", SIDEBAR_PINS_ROUTES.set, {
+      token: bobToken,
+      json: { items: [{ kind: "agent", id: "agent-oc" }] },
+      capabilities,
+      protocol: 6,
+    });
+    const afterOlder = await call("POST", SIDEBAR_PINS_ROUTES.read, { token: bobToken, json: {}, capabilities });
+    check(
+      "a peer that cannot see an agent does not read its pin, and its save keeps that pin",
+      isDynamicRecord(olderRead.body) &&
+        isDeepStrictEqual(olderRead.body.items, [
+          { kind: "channel", id: "channel-plans" },
+          { kind: "agent", id: "agent-oc" },
+        ]) &&
+        isDynamicRecord(olderSet.body) &&
+        isDeepStrictEqual(olderSet.body.items, [{ kind: "agent", id: "agent-oc" }]) &&
+        isDynamicRecord(afterOlder.body) &&
+        isDeepStrictEqual(afterOlder.body.items, [
+          { kind: "agent", id: "agent-oc" },
+          { kind: "agent", id: "agent-pi" },
+        ]),
+      [summary(olderRead), summary(olderSet), summary(afterOlder)],
+    );
+    const invalid = await Promise.all(
+      [
+        {
+          items: [
+            { kind: "agent", id: "agent-oc" },
+            { kind: "agent", id: "agent-oc" },
+          ],
+        },
+        { items: [{ kind: "workflow", id: "workflow-1" }] },
+        { items: [], extra: true },
+        { items: [{ kind: "agent", id: "" }] },
+      ].map((json) => call("POST", SIDEBAR_PINS_ROUTES.set, { token: bobToken, json, capabilities })),
+    );
+    const afterInvalid = await call("POST", SIDEBAR_PINS_ROUTES.read, { token: bobToken, json: {}, capabilities });
+    check(
+      "a duplicate pin, an unknown kind, an extra field and an empty id get 400 and change nothing",
+      invalid.every((reply) => reply.status === 400) && isDeepStrictEqual(afterInvalid.body, afterOlder.body),
+      [invalid.map(summary), summary(afterInvalid)],
+    );
+    // The file has one entry: the member that pinned. A restart reads it.
+    const saved = JSON.parse(readFileSync(sidebarPinsFile, "utf8"));
+    const pinKeys = isDynamicRecord(saved) && isDynamicRecord(saved.members) ? Object.keys(saved.members) : [];
+    const reloaded = new SidebarPinStore(sidebarPinsFile);
+    await runCauseEffect(reloaded.load());
+    check(
+      "the host keeps the pins after a restart",
+      pinKeys.length === 1 &&
+        isDeepStrictEqual(
+          pinKeys.map((key) => reloaded.snapshot(key)),
+          [afterOlder.body],
+        ),
+      pinKeys.map((key) => reloaded.snapshot(key)),
+    );
+
+    // A change on one device reaches the other devices of the same member at once, and no other member.
+    const openPinsSocket = async (token: string) => {
+      const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+        TEAM_PROTOCOL_V1_WEBSOCKET,
+        `openbot-token.${token}`,
+      ]);
+      const events: unknown[] = [];
+      const waiters = new Set<() => void>();
+      socket.addEventListener("message", (message) => {
+        const value = JSON.parse(String(message.data));
+        if (isDynamicRecord(value) && value.type === "sidebar-pins-changed") {
+          events.push(value);
+          for (const wake of waiters) wake();
+        }
+      });
+      await new Promise<void>((resolveOpen, reject) => {
+        socket.addEventListener("open", () => resolveOpen(), { once: true });
+        socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+      });
+      socket.send(JSON.stringify({ type: "agent-event-scope", includeConversations: false, capabilities }));
+      const arrived = (deadlineMs: number) =>
+        new Promise<boolean>((resolveArrived) => {
+          if (events.length > 0) return resolveArrived(true);
+          const timer = setTimeout(() => {
+            waiters.delete(wake);
+            resolveArrived(false);
+          }, deadlineMs);
+          const wake = () => {
+            clearTimeout(timer);
+            waiters.delete(wake);
+            resolveArrived(true);
+          };
+          waiters.add(wake);
+        });
+      return { socket, events, arrived };
+    };
+    // The host reads the capabilities of the socket from its first message, and no answer says that it
+    // did, so a change can come before it. Each attempt saves a different list, so each one is a change.
+    const changeUntilEvent = async (
+      device: Awaited<ReturnType<typeof openPinsSocket>>,
+      token: string,
+      lists: { kind: string; id: string }[][],
+    ) => {
+      for (const items of lists) {
+        await call("POST", SIDEBAR_PINS_ROUTES.set, { token, json: { items }, capabilities });
+        if (await device.arrived(5_000)) return items;
+      }
+      return null;
+    };
+    // A protocol 9 save replaces the pin of the Pi agent too, so the events below hold only what was sent.
+    await call("POST", SIDEBAR_PINS_ROUTES.set, { token: bobToken, json: { items: [] }, capabilities });
+    const bobOther = await openPinsSocket(bobToken);
+    const adaDevice = await openPinsSocket(adaToken);
+    // Channel pins: these sockets send no protocol capability, so the host leaves out the OpenCode agent.
+    const bobLists = [
+      [{ kind: "channel", id: "channel-bob-1" }],
+      [{ kind: "channel", id: "channel-bob-2" }],
+      [
+        { kind: "channel", id: "channel-bob-1" },
+        { kind: "channel", id: "channel-bob-2" },
+      ],
+    ];
+    const bobSent = await changeUntilEvent(bobOther, bobToken, bobLists);
+    const adaLists = [
+      [{ kind: "channel", id: "channel-ada-1" }],
+      [{ kind: "channel", id: "channel-ada-2" }],
+      [
+        { kind: "channel", id: "channel-ada-1" },
+        { kind: "channel", id: "channel-ada-2" },
+      ],
+    ];
+    const adaSent = await changeUntilEvent(adaDevice, adaToken, adaLists);
+    const bobEvent = bobOther.events[0];
+    const adaEvent = adaDevice.events[0];
+    bobOther.socket.close();
+    adaDevice.socket.close();
+    check(
+      "a change of a member's pins reaches the other devices of that member at once, and no other member",
+      bobSent !== null &&
+        adaSent !== null &&
+        isDynamicRecord(bobEvent) &&
+        // An event of an earlier attempt can come late, so the first event holds one of the sent lists.
+        bobLists.some((items) => isDeepStrictEqual(bobEvent.items, items)) &&
+        typeof bobEvent.updatedAt === "string" &&
+        isDynamicRecord(adaEvent) &&
+        // Ada's own change is her first event: an event of bob would have come before it on her socket.
+        adaLists.some((items) => isDeepStrictEqual(adaEvent.items, items)),
+      [bobEvent, adaEvent],
     );
   }
 
@@ -3476,6 +4897,197 @@ try {
         !existsSync(bitwardenData) &&
         !bitwardenConnector.connected(),
       summary(disconnect),
+    );
+  }
+
+  // ---- WhatsApp numbers on the host (whatsapp-connector-v1) ----
+  {
+    const v9 = { capabilities: [WHATSAPP_CONNECTOR_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const whatsappCalls = () => calls.filter((entry) => entry.method.startsWith("whatsapp."));
+    /** The answer as the client reads it: the frozen codec, then the client's decoder. */
+    const asClient = <T>(route: string, reply: Reply, decode: (value: unknown) => T): T => {
+      const codec = WHATSAPP_CONNECTOR_CODECS.get(route);
+      assert(codec, route);
+      return decode(codec.response(reply.status, reply.body));
+    };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises whatsapp-connector-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(WHATSAPP_CONNECTOR_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(WHATSAPP_CONNECTOR_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", WHATSAPP_CONNECTOR_ROUTES.overview, {
+      token: adaToken,
+      json: {},
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    const memberOverview = await call("POST", WHATSAPP_CONNECTOR_ROUTES.overview, { token: bobToken, json: {}, ...v9 });
+    const memberLink = await call("POST", WHATSAPP_CONNECTOR_ROUTES.linkStart, {
+      token: bobToken,
+      json: { method: "qr", phoneNumber: null, ownNumber: true },
+      ...v9,
+    });
+    check(
+      "a client without the capability gets 400, and a member cannot read or link the host's numbers",
+      errorIs(unsupported, 400, sourceText("error.team.connectorsUnsupported")) &&
+        errorIs(memberOverview, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberLink, 403, sourceText("error.team.adminRequired")) &&
+        whatsappCalls().length === 0,
+      [summary(unsupported), summary(memberOverview), summary(memberLink)],
+    );
+    const overview = await call("POST", WHATSAPP_CONNECTOR_ROUTES.overview, { token: adaToken, json: {}, ...v9 });
+    const read = asClient(WHATSAPP_CONNECTOR_ROUTES.overview, overview, decodeHostWhatsAppOverview);
+    check(
+      "an admin reads the host's numbers, their senders and their pairing requests",
+      overview.status === 200 &&
+        read.connections.length === 1 &&
+        read.connections[0]?.workspaceId === WHATSAPP_NUMBER &&
+        read.connections[0]?.state === "connected" &&
+        read.accounts[0]?.ownNumber === true &&
+        read.accounts[0]?.pendingRequests[0]?.code === "K7Q2ZP",
+      summary(overview),
+    );
+    const qr = await call("POST", WHATSAPP_CONNECTOR_ROUTES.linkStart, {
+      token: adaToken,
+      json: { method: "qr", phoneNumber: null, ownNumber: false },
+      ...v9,
+    });
+    const badPhone = await call("POST", WHATSAPP_CONNECTOR_ROUTES.linkStart, {
+      token: adaToken,
+      json: { method: "code", phoneNumber: "not a number", ownNumber: true },
+      ...v9,
+    });
+    const code = await call("POST", WHATSAPP_CONNECTOR_ROUTES.linkStart, {
+      token: adaToken,
+      json: { method: "code", phoneNumber: "+48 (600) 100-200", ownNumber: true },
+      ...v9,
+    });
+    const qrState = asClient(WHATSAPP_CONNECTOR_ROUTES.linkStart, qr, decodeHostWhatsAppLinkState);
+    const codeState = asClient(WHATSAPP_CONNECTOR_ROUTES.linkStart, code, decodeHostWhatsAppLinkState);
+    check(
+      "a link answers the host's QR code or pairing code; a phone number that is not one is refused before the host links",
+      qrState.status === "waiting" &&
+        qrState.qr?.startsWith("2@") === true &&
+        codeState.code === "E2EPAIR1" &&
+        badPhone.status === 400 &&
+        isDeepStrictEqual(callsOf("whatsapp.startLink"), [
+          [{ method: "qr", phoneNumber: null, ownNumber: false }],
+          [{ method: "code", phoneNumber: WHATSAPP_NUMBER, ownNumber: true }],
+        ]),
+      [summary(qr), summary(badPhone), summary(code)],
+    );
+    whatsappLinkError = "timeout";
+    const failed = await call("POST", WHATSAPP_CONNECTOR_ROUTES.linkState, { token: adaToken, json: {}, ...v9 });
+    whatsappLinkError = null;
+    const cancel = await call("POST", WHATSAPP_CONNECTOR_ROUTES.linkCancel, { token: adaToken, json: {}, ...v9 });
+    const failedState = asClient(WHATSAPP_CONNECTOR_ROUTES.linkState, failed, decodeHostWhatsAppLinkState);
+    // A later host can name a link error that this build does not know; the wire carries it as text.
+    const laterState = asClient(
+      WHATSAPP_CONNECTOR_ROUTES.linkState,
+      { ...failed, body: isDynamicRecord(failed.body) ? { ...failed.body, error: "rate_limited" } : null },
+      decodeHostWhatsAppLinkState,
+    );
+    check(
+      "a failed link reads its error, a later host's unknown error reads as unavailable, and a cancel reaches the host",
+      failedState.status === "failed" &&
+        failedState.error === "timeout" &&
+        laterState.error === "unavailable" &&
+        cancel.status === 200 &&
+        callsOf("whatsapp.cancelLink").length === 1,
+      [summary(failed), summary(cancel)],
+    );
+    const addContact = await call("POST", WHATSAPP_CONNECTOR_ROUTES.senderAdd, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER, sender: { id: "+48 600 100 300", kind: "contact", name: " " } },
+      ...v9,
+    });
+    const badGroup = await call("POST", WHATSAPP_CONNECTOR_ROUTES.senderAdd, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER, sender: { id: "family", kind: "group", name: "Family" } },
+      ...v9,
+    });
+    const groups = await call("POST", WHATSAPP_CONNECTOR_ROUTES.groups, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER },
+      ...v9,
+    });
+    const removeContact = await call("POST", WHATSAPP_CONNECTOR_ROUTES.senderRemove, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER, senderId: "48600100300" },
+      ...v9,
+    });
+    check(
+      "an admin adds a contact in digits, lists the groups and removes the contact; a group id that is not one is refused",
+      addContact.status === 200 &&
+        badGroup.status === 400 &&
+        isDeepStrictEqual(callsOf("whatsapp.addSender"), [
+          [WHATSAPP_NUMBER, { id: "48600100300", kind: "contact", name: "48600100300" }],
+        ]) &&
+        isDeepStrictEqual(field(groups.body, "groups"), [{ id: "120363000000000001@g.us", name: "Family" }]) &&
+        removeContact.status === 200 &&
+        whatsappAccount.allowedSenders.length === 0,
+      [summary(addContact), summary(badGroup), summary(groups), summary(removeContact)],
+    );
+    const badCode = await call("POST", WHATSAPP_CONNECTOR_ROUTES.requestAnswer, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER, code: "??", approve: true },
+      ...v9,
+    });
+    const answer = await call("POST", WHATSAPP_CONNECTOR_ROUTES.requestAnswer, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER, code: "k7q2zp", approve: true },
+      ...v9,
+    });
+    const ownNumber = await call("POST", WHATSAPP_CONNECTOR_ROUTES.ownNumber, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER, ownNumber: false },
+      ...v9,
+    });
+    const orchestrator = await call("POST", WHATSAPP_CONNECTOR_ROUTES.orchestrator, {
+      token: adaToken,
+      json: {},
+      ...v9,
+    });
+    check(
+      "an admin answers a pairing request, sets the number kind and adds the orchestrator on the host's default model",
+      badCode.status === 400 &&
+        answer.status === 200 &&
+        isDeepStrictEqual(callsOf("whatsapp.answerRequest"), [[WHATSAPP_NUMBER, "K7Q2ZP", true]]) &&
+        ownNumber.status === 200 &&
+        whatsappAccount.ownNumber === false &&
+        isDeepStrictEqual(orchestrator.body, {
+          agentId: "agent-whatsapp-orchestrator",
+          sectionId: "section-integrations",
+        }) &&
+        isDeepStrictEqual(callsOf("whatsapp.addOrchestrator"), [[{}]]),
+      [summary(badCode), summary(answer), summary(ownNumber), summary(orchestrator)],
+    );
+    const pause = await call("POST", WHATSAPP_CONNECTOR_ROUTES.enabled, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER, enabled: false },
+      ...v9,
+    });
+    const reconnect = await call("POST", WHATSAPP_CONNECTOR_ROUTES.reconnect, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER },
+      ...v9,
+    });
+    const disconnect = await call("POST", WHATSAPP_CONNECTOR_ROUTES.disconnect, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER },
+      ...v9,
+    });
+    check(
+      "an admin pauses, reconnects and disconnects a number of the host",
+      pause.status === 200 &&
+        reconnect.status === 200 &&
+        disconnect.status === 200 &&
+        isDeepStrictEqual(callsOf("whatsapp.setEnabled"), [["whatsapp", WHATSAPP_NUMBER, false]]) &&
+        isDeepStrictEqual(callsOf("whatsapp.reconnect"), [["whatsapp", WHATSAPP_NUMBER, false]]) &&
+        isDeepStrictEqual(callsOf("whatsapp.disconnect"), [[WHATSAPP_NUMBER]]),
+      [summary(pause), summary(reconnect), summary(disconnect)],
     );
   }
 

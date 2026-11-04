@@ -1,11 +1,15 @@
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import {
+  type AvatarColor,
   assertStorageUsageScope,
   CHANNEL_CHATS_CAPABILITY,
   canAdministerServer,
   decodeAgentAdminSettings,
   decodeAgentBackupModelSettings,
+  decodeAgentFastModels,
+  decodeAgentFastModeSettings,
   decodeAgentHostSettings,
+  decodeAgentInstructionsFileFromMain,
   decodeAgentNewChatSettings,
   decodeAgentPlanCardSettings,
   decodeAgentTaskLimitSettings,
@@ -26,6 +30,7 @@ import {
   type SetAgentHiddenInput,
   STORAGE_CAPABILITY,
   type TeamRole,
+  withFastServiceTiers,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -35,6 +40,16 @@ import {
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import {
+  AGENT_COLORS_CAPABILITY,
+  AGENT_COLORS_ROUTES,
+  type AgentColorsSnapshot,
+  decodeAgentColorsSnapshot,
+} from "@openbot/contracts/team-protocol/agent-colors-v1";
+import {
+  AGENT_FAST_MODE_CAPABILITY,
+  AGENT_FAST_MODE_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-hidden-v1";
 import {
@@ -43,6 +58,10 @@ import {
 } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
 import { AGENT_INSTALL_CAPABILITY } from "@openbot/contracts/team-protocol/agent-install-v1";
+import {
+  AGENT_INSTRUCTIONS_CAPABILITY,
+  AGENT_INSTRUCTIONS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-instructions-v1";
 import { AGENT_MEMORIES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memories-v1";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
 import { AGENT_NEW_CHAT_CAPABILITY, AGENT_NEW_CHAT_ROUTES } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
@@ -58,6 +77,10 @@ import {
   AGENT_TASK_LIMIT_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
+import {
+  AGENT_THREAD_BRANCHES_CAPABILITY,
+  withAgentThreadBranches,
+} from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
 import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
@@ -66,6 +89,10 @@ import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
+import {
+  CONTEXT_COMPACT_CAPABILITY,
+  CONTEXT_COMPACT_ROUTES,
+} from "@openbot/contracts/team-protocol/context-compact-v1";
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
 import {
   CONVERSATION_FILE_SEARCH_CAPABILITY,
@@ -97,6 +124,7 @@ import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/pro
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
+import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SHARED_TABLES_CAPABILITY } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
@@ -105,6 +133,7 @@ import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
+import { WORKFLOWS_GITHUB_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-github-v1";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { readHostAnalytics } from "@openbot/team-client";
@@ -131,6 +160,7 @@ import {
   getHostAgentAccess,
   getHostAgentBrowserProfile,
   getHostAgentMemoryLimit,
+  getHostAuditLog,
   getHostReleaseStatus,
   getHostTimezone,
   getHostUpdateStatus,
@@ -202,12 +232,14 @@ import {
   agentTaskControl,
   applyAgentImport,
   applyInstanceTransfer,
+  branchAgentThread,
   clearAgentContext,
   deleteAgentThread,
   discardAgentImport,
   discardInstanceTransfer,
   downloadInstanceTransfer,
   listAgentTasks,
+  listAgentThreadBranches,
   listAgentThreadReads,
   loadInstanceTransferSummary,
   markAgentThreadRead,
@@ -292,6 +324,7 @@ type HostRequestActions = Pick<
   | "controlAgentTask"
   | "renameAgentThread"
   | "deleteAgentThread"
+  | "branchAgentThread"
   | "loadAgentThreadReads"
   | "markAgentThreadRead"
   | "respondToTaskPrompt"
@@ -314,10 +347,15 @@ type HostRequestActions = Pick<
   | "updateAgentNewChat"
   | "loadAgentPlanCard"
   | "updateAgentPlanCard"
+  | "loadAgentFastMode"
+  | "updateAgentFastMode"
+  | "loadAgentInstructions"
+  | "saveAgentInstructions"
   | "loadProviderAccounts"
   | "loadPlanLimits"
   | "setAgentProviderAccount"
   | "startNewChat"
+  | "compactContext"
   | "loadAgentSessionSettings"
   | "loadAgentFolders"
   | "addAgentFolder"
@@ -331,6 +369,7 @@ type HostRequestActions = Pick<
   | "setAgentMemoryLimit"
   | "loadServerRoles"
   | "setServerRoles"
+  | "loadServerAuditLog"
   | "loadAgentNotificationLevels"
   | "setAgentNotificationLevel"
   | "setOwnServerNotificationLevel"
@@ -435,6 +474,32 @@ export async function writeHostAgentHidden(
   return (await runTeamRequest(setAgentHidden(request, input))).agents;
 }
 
+/** A host that serves `agent-colors-v1` keeps an exact colour beside the hue of each agent. */
+export function hostKeepsAgentColors(capabilities: readonly string[] | undefined): boolean {
+  return capabilities?.includes(AGENT_COLORS_CAPABILITY) ?? false;
+}
+
+/** The agents with a colour on a host that serves `agent-colors-v1`, or null for an older host. */
+export async function readHostAgentColors(
+  request: TeamApiRequest,
+  capabilities: readonly string[],
+): Promise<AgentColorsSnapshot["agents"] | null> {
+  if (!hostKeepsAgentColors(capabilities)) return null;
+  return (await request("POST", AGENT_COLORS_ROUTES.read, decodeAgentColorsSnapshot, {})).agents;
+}
+
+/**
+ * Sets or removes (`null`) the colour of one agent. The host also sets the nearest hue, and answers
+ * with all of its colours.
+ */
+export async function writeHostAgentColor(
+  request: TeamApiRequest,
+  agentId: string,
+  color: AvatarColor | null,
+): Promise<AgentColorsSnapshot["agents"]> {
+  return (await request("POST", AGENT_COLORS_ROUTES.set, decodeAgentColorsSnapshot, { agentId, color })).agents;
+}
+
 /** Workspace actions that only send host requests and read advertised capabilities. */
 export function createHostRequestActions({
   request,
@@ -497,6 +562,9 @@ export function createHostRequestActions({
   /** The read marks of the threads are an optional route set beside the tasks. */
   const threadReadsApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_THREAD_READS_CAPABILITY, "mobile.chat.threads.unsupported");
+  /** The branches of a chat are an optional route set beside the tasks. */
+  const threadBranchesApi = (serverId: string) =>
+    capabilityApi(serverId, AGENT_THREAD_BRANCHES_CAPABILITY, "mobile.chat.threads.unsupported");
   /** The server timezone and the agent memory limit are optional admin route sets. */
   const timezoneAdmin = (serverId: string) =>
     capabilityApi(serverId, HOST_TIMEZONE_CAPABILITY, "mobile.server.settings.timezoneUnsupported");
@@ -505,6 +573,9 @@ export function createHostRequestActions({
   /** The roles that set the agents of each member are an optional admin route set. */
   const rolesAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_ACCESS_CAPABILITY, "mobile.server.roles.unsupported");
+  /** The audit log of the access changes is an optional admin route set. */
+  const auditAdmin = (serverId: string) =>
+    capabilityApi(serverId, SERVER_AUDIT_CAPABILITY, "mobile.server.audit.unsupported");
   /** Each member reads and sets only their own levels, so the host does not check a role. */
   const notificationLevelsApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY, "mobile.agent.notificationLevel.unsupported");
@@ -557,10 +628,14 @@ export function createHostRequestActions({
     canEditThreads: (serverId) => has(serverId, AGENT_THREADS_CAPABILITY),
     canReadThreads: (serverId) => has(serverId, AGENT_THREAD_READS_CAPABILITY),
     canAttachThreadFiles: (serverId) => has(serverId, AGENT_THREAD_FILES_CAPABILITY),
+    canBranchThreads: (serverId) => has(serverId, AGENT_THREAD_BRANCHES_CAPABILITY),
     canUseWorkflows: (serverId) => has(serverId, WORKFLOWS_CAPABILITY),
+    canUseWorkflowGitHub: (serverId) =>
+      has(serverId, WORKFLOWS_CAPABILITY) && has(serverId, WORKFLOWS_GITHUB_CAPABILITY),
     canReadServerStorage: (serverId) => has(serverId, STORAGE_CAPABILITY),
     canSetAgentNotificationLevel: (serverId) => has(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY),
     canStartNewChat: (serverId) => has(serverId, CONTEXT_RESET_CAPABILITY),
+    canCompactContext: (serverId) => has(serverId, CONTEXT_COMPACT_CAPABILITY),
     canChooseNewAgentModel: (serverId) => has(serverId, TEAM_AGENT_CREATE_MODEL_CAPABILITY),
     canInstallAgentTemplate: (serverId) => has(serverId, AGENT_INSTALL_CAPABILITY),
     canEditQueue: (serverId) => has(serverId, TEAM_QUEUE_EDIT_CAPABILITY),
@@ -585,6 +660,7 @@ export function createHostRequestActions({
       runTeamRequest(setHostAgentMemoryLimit(memoryLimitAdmin(serverId), limit)),
     loadServerRoles: async (serverId) => runTeamRequest(getHostAgentAccess(rolesAdmin(serverId))),
     setServerRoles: async (change, serverId) => runTeamRequest(setHostAgentAccess(rolesAdmin(serverId), change)),
+    loadServerAuditLog: async (serverId) => runTeamRequest(getHostAuditLog(auditAdmin(serverId))),
     loadAgentNotificationLevels: async (serverId) =>
       runTeamRequest(listAgentNotificationLevels(notificationLevelsApi(serverId))),
     setAgentNotificationLevel: async (input, serverId) =>
@@ -783,8 +859,8 @@ export function createHostRequestActions({
     testAgentRoutine: async (agentId, routineId, serverId) => {
       await request("POST", TEAM_API_ROUTES.agent.routineTest(agentId, routineId), ignoreResponse, undefined, serverId);
     },
-    loadAgentModels: (serverId) =>
-      request(
+    loadAgentModels: async (serverId) => {
+      const models = request(
         "GET",
         TEAM_API_ROUTES.agents.models,
         (value) => {
@@ -798,7 +874,17 @@ export function createHostRequestActions({
         },
         undefined,
         serverId,
-      ),
+      );
+      // The released model list drops the fast tier, so a host with `agent-fast-mode-v1` gives it on
+      // its own route, as for desktop. The tiers are optional: when that route fails, the models
+      // show with no Fast mode switch.
+      if (!has(serverId, AGENT_FAST_MODE_CAPABILITY)) return models;
+      const [options, fast] = await Promise.all([
+        models,
+        request("POST", AGENT_FAST_MODE_ROUTES.models, decodeAgentFastModels, {}, serverId).catch(() => []),
+      ]);
+      return withFastServiceTiers(options, fast);
+    },
     loadAgentMemorySelection: (agentId, serverId) =>
       runTeamRequest(
         readAgentMemorySelection(memoryRequest(serverId), agentId, has(serverId, AGENT_MEMORIES_CAPABILITY)),
@@ -863,7 +949,14 @@ export function createHostRequestActions({
       );
     },
     // Async, so a host without the capability rejects the promise and does not throw at the call.
-    loadAgentTasks: async (agentId, serverId) => runTeamRequest(listAgentTasks(tasksApi(serverId), agentId)),
+    // A host with `agent-thread-branches-v1` also gives the branch links, read after the tasks so that
+    // each listed branch has its link, as on desktop.
+    loadAgentTasks: async (agentId, serverId) => {
+      const snapshot = await runTeamRequest(listAgentTasks(tasksApi(serverId), agentId));
+      if (!has(serverId, AGENT_THREAD_BRANCHES_CAPABILITY)) return snapshot;
+      const links = await runTeamRequest(listAgentThreadBranches(threadBranchesApi(serverId), agentId));
+      return withAgentThreadBranches(snapshot, links);
+    },
     loadAgentTaskConversation: async (input, serverId) => runTeamRequest(readAgentTask(tasksApi(serverId), input)),
     startAgentTask: async (input, serverId) =>
       runTeamRequest(startAgentTask(threadMessageApi(serverId, input.attachmentDraftIds), input)),
@@ -873,6 +966,7 @@ export function createHostRequestActions({
       runTeamRequest(agentTaskControl(tasksApi(serverId), action, input)),
     renameAgentThread: async (input, serverId) => runTeamRequest(renameAgentThread(threadsApi(serverId), input)),
     deleteAgentThread: async (input, serverId) => runTeamRequest(deleteAgentThread(threadsApi(serverId), input)),
+    branchAgentThread: async (input, serverId) => runTeamRequest(branchAgentThread(threadBranchesApi(serverId), input)),
     loadAgentThreadReads: async (agentId, serverId) =>
       runTeamRequest(listAgentThreadReads(threadReadsApi(serverId), agentId)),
     markAgentThreadRead: async (input, serverId) =>
@@ -979,6 +1073,44 @@ export function createHostRequestActions({
       requireCapability(capabilities, serverId, AGENT_PLAN_CARD_CAPABILITY, "mobile.agent.host.unsupported");
       return request("POST", AGENT_PLAN_CARD_ROUTES.update, decodeAgentPlanCardSettings, { ...input }, serverId);
     },
+    loadAgentFastMode: async (agentId, serverId) =>
+      has(serverId, AGENT_FAST_MODE_CAPABILITY)
+        ? request("POST", AGENT_FAST_MODE_ROUTES.settings, decodeAgentFastModeSettings, { agentId }, serverId)
+        : null,
+    updateAgentFastMode: async (input, serverId) => {
+      requireCapability(capabilities, serverId, AGENT_FAST_MODE_CAPABILITY, "mobile.agent.host.unsupported");
+      return request("POST", AGENT_FAST_MODE_ROUTES.update, decodeAgentFastModeSettings, { ...input }, serverId);
+    },
+    loadAgentInstructions: async (agentId, serverId) => {
+      requireCapability(
+        capabilities,
+        serverId,
+        AGENT_INSTRUCTIONS_CAPABILITY,
+        "mobile.agent.instructionsFile.unsupported",
+      );
+      return request(
+        "POST",
+        AGENT_INSTRUCTIONS_ROUTES.read,
+        decodeAgentInstructionsFileFromMain,
+        { agentId },
+        serverId,
+      );
+    },
+    saveAgentInstructions: async (input, serverId) => {
+      requireCapability(
+        capabilities,
+        serverId,
+        AGENT_INSTRUCTIONS_CAPABILITY,
+        "mobile.agent.instructionsFile.unsupported",
+      );
+      return request(
+        "POST",
+        AGENT_INSTRUCTIONS_ROUTES.save,
+        decodeAgentInstructionsFileFromMain,
+        { ...input },
+        serverId,
+      );
+    },
     loadProviderAccounts: async (serverId) =>
       has(serverId, PROVIDER_ACCOUNTS_CAPABILITY) ? runTeamRequest(listProviderAccounts(teamApi(serverId))) : null,
     loadPlanLimits: (serverId, accounts) => runTeamRequest(readPlanLimits(teamApi(serverId), accounts)),
@@ -995,6 +1127,10 @@ export function createHostRequestActions({
       // A host too old to know the route answers 404, so refuse before the request.
       requireCapability(capabilities, serverId, CONTEXT_RESET_CAPABILITY, "mobile.agent.newChat.unsupported");
       await runTeamRequest(clearAgentContext(teamApi(serverId), agentId));
+    },
+    compactContext: async (agentId, serverId) => {
+      requireCapability(capabilities, serverId, CONTEXT_COMPACT_CAPABILITY, "mobile.agent.compact.unsupported");
+      await request("POST", CONTEXT_COMPACT_ROUTES.compact, ignoreResponse, { agentId }, serverId);
     },
     // Async, so a host without the capability rejects the promise and does not throw at the call.
     listSharedTables: async (serverId) => runTeamRequest(listSharedTables(sharedTablesAdmin(serverId))),

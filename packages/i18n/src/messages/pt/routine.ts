@@ -293,6 +293,13 @@ export const messages = {
     "O segredo atual para de funcionar imediatamente. Requisições assinadas com ele são rejeitadas até o remetente usar o novo segredo.",
   "routine.webhook.regenerateConfirm": "Regenerar",
   "routine.webhook.regenerateFailed": "Não foi possível regenerar o segredo de assinatura.",
+  "routine.webhook.useSenderSecret": "Usar o segredo do remetente",
+  "routine.webhook.senderSecretTitle": "Usar o segredo de assinatura do remetente?",
+  "routine.webhook.senderSecretDescription":
+    "Alguns remetentes, como Composio e Svix, criam o próprio segredo de assinatura. Cole-o aqui. O segredo atual para de funcionar imediatamente.",
+  "routine.webhook.senderSecretLabel": "Segredo do remetente",
+  "routine.webhook.senderSecretConfirm": "Usar segredo",
+  "routine.webhook.senderSecretFailed": "Não foi possível salvar o segredo do remetente.",
   "routine.webhook.statusFailed": "Não foi possível verificar se o computador anfitrião está conectado ao relay.",
   "routine.settings.instruction": "Instrução",
   "routine.settings.instructionPlaceholderAgent": "Descreva o que este agente deve fazer.",

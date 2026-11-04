@@ -6,13 +6,16 @@
   min-width: 0;
   flex-direction: column;
   background: var(--openbot-bg-canvas);
-  transition: padding-right var(--panel-resize-duration, var(--openbot-duration-overlay)) cubic-bezier(0.22, 1, 0.36, 1);
-  --conversation-column-width: 1440px;
+  transition: padding-inline-end var(--panel-resize-duration, var(--openbot-duration-overlay))
+    cubic-bezier(0.22, 1, 0.36, 1);
+  --conversation-column-width: clamp(1440px, 65vw, 1920px);
 }
 
 /*
  * On a very wide screen the chat stops at a column and centers in the pane, so a reply and the
- * user's message stay near each other. A laptop window is narrower than the column and shows the
+ * user's message stay near each other. The column grows with the window from 1440px to 1920px. It
+ * uses the window width, not a percentage, because a percentage refers to a different box in the
+ * message list and in the composer padding. A laptop window is narrower than the column and shows the
  * chat at full width. The scroll area and the composer keep the pane width, so the scroll bar stays
  * at the pane edge. The live content under the messages, such as the working row and a pending
  * question, stays in the same column.
@@ -108,7 +111,7 @@
 }
 
 .direct-conversation-person .person-avatar {
-  --agent-avatar-optical-offset: -8px;
+  --agent-avatar-optical-offset: calc(30px * -0.14);
 
   width: 30px;
   height: 30px;
@@ -255,7 +258,8 @@
   border: 1px solid var(--openbot-border);
   border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-control);
-  padding: 6px 7px 6px 13px;
+  padding-block: 6px;
+  padding-inline: 13px 7px;
   box-shadow: 0 8px 25px var(--openbot-shadow-popover-ambient);
 }
 

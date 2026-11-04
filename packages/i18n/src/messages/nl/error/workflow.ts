@@ -26,6 +26,12 @@ export const messages = {
   "error.workflow.notRetryable": "Alleen een stap die is mislukt of gestopt, kan opnieuw worden uitgevoerd.",
   "error.workflow.noDecision": "Deze stap wacht niet op een beslissing.",
   "error.workflow.outputPlaceMissing": "Kies een berichtenplek voor deze uitvoer.",
+  "error.workflow.discordNoMessage":
+    "Deze uitvoer werkt op het Discord-bericht dat de run startte. Start de run vanuit een vermelding in Discord, of kies Posten in kanaal.",
+  "error.workflow.slackNoMessage":
+    "Deze uitvoer werkt op het Slack-bericht dat de run startte. Start de run vanuit een vermelding in Slack, of kies Posten in kanaal.",
+  "error.workflow.telegramNoMessage":
+    "Deze uitvoer werkt op het Telegram-bericht dat de run startte. Start de run vanuit een vermelding in Telegram, of kies Posten in chat.",
   "error.workflow.outputConnectionOff":
     "De berichtenverbinding van deze uitvoer staat uit of is verwijderd. Kies opnieuw een plek.",
   "error.workflow.outputNotRunning": "De berichtenverbinding draait nu niet. Probeer het opnieuw als hij draait.",

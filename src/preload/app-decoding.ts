@@ -29,6 +29,7 @@ import {
   type AppLogoColorPreference,
   type ApprovalAutomationPreference,
   type AppSetupState,
+  type AppThemePalette,
   type BitwardenConnectorStatus,
   type BusyMessageModePreference,
   type CentralAuthIssue,
@@ -67,6 +68,9 @@ import {
   isAppLanguage,
   isAppLogoColor,
   isApprovalAutomationPreference,
+  isAppThemePalette,
+  isAppThemePaletteId,
+  isAvatarColor,
   isBusyMessageMode,
   isCustomAgentCheckResult,
   isCustomAgentResult,
@@ -81,11 +85,13 @@ import {
   isRemoteDesktopSetupStatus,
   isRemoteDesktopTestStatus,
   isRemoteNetworkRoute,
+  isSpeechSpeed,
   isSpeechVoice,
   isVoiceLanguage,
   isVoiceModelId,
   isVoiceServerProbe,
   isVoiceServerSettings,
+  type LinkAccountStatus,
   type MobileConnectedDevice,
   type MobileConnectLink,
   type MobileConnectTicket,
@@ -95,6 +101,7 @@ import {
   type ProviderDetectionSettings,
   parseGitHubConnectorRepositories,
   parseGitHubConnectorStatus,
+  parseLinkAccountStatus,
   parseOnePasswordConnectorStatus,
   type RemoteDesktopSetupStatus,
   type RemoteDesktopTestStatus,
@@ -210,11 +217,24 @@ export function decodeAppLogoColorPreference(value: unknown): AppLogoColorPrefer
   return { color: preference.color };
 }
 
+/** Only a hex color passes: each one becomes a CSS property value in the page. */
+function decodeThemePalette(palette: DynamicRecord): AppThemePalette {
+  if (!isAppThemePalette(palette)) throw new Error("Invalid theme palette.");
+  return { id: palette.id, name: palette.name, scheme: palette.scheme, colors: { ...palette.colors } };
+}
+
 export function decodeAppAppearancePreference(value: unknown): AppAppearancePreference {
   const preference = decodeRecord(value, "appearance preference");
   if (!isAppAppearance(preference.appearance)) throw new Error("Invalid appearance.");
   if (typeof preference.transparentWindow !== "boolean") throw new Error("Invalid transparent window.");
-  return { appearance: preference.appearance, transparentWindow: preference.transparentWindow };
+  if (preference.palette !== null && !isAppThemePaletteId(preference.palette))
+    throw new Error("Invalid theme palette.");
+  return {
+    appearance: preference.appearance,
+    transparentWindow: preference.transparentWindow,
+    palette: preference.palette,
+    palettes: decodeList(preference.palettes, "theme palettes", decodeThemePalette),
+  };
 }
 
 export function decodeAppInterfaceSizePreference(value: unknown): AppInterfaceSizePreference {
@@ -252,6 +272,14 @@ export function decodeCentralAuthState(value: unknown): CentralAuthState {
         ...(issue === undefined ? {} : { issue: decodeCentralAuthIssue(issue) }),
       };
     }
+    case "company_sign_in": {
+      const { issue } = state;
+      return {
+        status: "company_sign_in",
+        email: requiredString(state, "email"),
+        ...(issue === undefined ? {} : { issue: decodeCentralAuthIssue(issue) }),
+      };
+    }
     case "signed_in":
       return { status: "signed_in", user: decodeCentralAuthUser(state.user) };
     case "error":
@@ -269,7 +297,15 @@ function decodeCentralAuthUser(value: unknown): CentralAuthUser {
     name: nullableString(user, "name"),
     avatarUrl: nullableString(user, "avatarUrl"),
     ...optionalAnalyticsEnabled(user),
+    ...optionalChatColor(user),
   };
+}
+
+function optionalChatColor(user: DynamicRecord): Pick<CentralAuthUser, "chatColor"> {
+  const { chatColor } = user;
+  if (chatColor === undefined) return {};
+  if (chatColor !== null && !isAvatarColor(chatColor)) throw new Error("Invalid chatColor.");
+  return { chatColor };
 }
 
 function optionalAnalyticsEnabled(user: DynamicRecord): Pick<CentralAuthUser, "analyticsEnabled"> {
@@ -491,9 +527,9 @@ export function decodeSpeechModelStatus(value: unknown): SpeechModelStatus {
 
 export function decodeSpeechSettings(value: unknown): SpeechSettings {
   const settings = decodeRecord(value, "speech settings");
-  const { voice } = settings;
-  if (!isSpeechVoice(voice)) throw new Error("Invalid speech settings.");
-  return { readReplies: requiredBoolean(settings, "readReplies"), voice };
+  const { voice, speed } = settings;
+  if (!isSpeechVoice(voice) || !isSpeechSpeed(speed)) throw new Error("Invalid speech settings.");
+  return { readReplies: requiredBoolean(settings, "readReplies"), voice, speed };
 }
 
 export function decodeSpeechAudio(value: unknown): SpeechAudio {
@@ -552,6 +588,12 @@ export function decodeAgentImportSkill(value: unknown): string {
 
 export const decodeVoid = emptyDecoder("IPC returned unexpected data.");
 
+/** True shows the hint that `Cmd + Q` must be held or pressed twice, and false removes it. */
+export function decodeQuitShortcutHint(value: unknown): boolean {
+  if (typeof value === "boolean") return value;
+  throw new Error("Invalid quit shortcut hint.");
+}
+
 export function decodeHostedSite(value: unknown): HostedSiteSummary {
   const site = parseHostedSiteSummary(value);
   if (!site) throw new Error("Invalid hosted site response.");
@@ -574,6 +616,12 @@ export function decodeGitHubConnectorRepositories(value: unknown): GitHubConnect
   const repositories = parseGitHubConnectorRepositories(value);
   if (!repositories) throw new Error("Invalid GitHub repository list response.");
   return repositories;
+}
+
+export function decodeLinkAccountStatus(value: unknown): LinkAccountStatus {
+  const status = parseLinkAccountStatus(value);
+  if (!status) throw new Error("Invalid Link account response.");
+  return status;
 }
 
 export function decodeOnePasswordConnectorStatus(value: unknown): OnePasswordConnectorStatus {

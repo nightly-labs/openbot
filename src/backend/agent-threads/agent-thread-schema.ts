@@ -20,6 +20,11 @@
 // in the branch. They have no foreign key, because the branch outlives its source. All three are null
 // for a thread that is not a branch, or all three are set; the store keeps that rule. They are at the
 // end of the column list, where migration 48 adds them, so a new database and an upgraded one match.
+//
+// `routine_id` (migration 54) names the routine of the agent whose runs go to this thread. Each routine
+// has one thread at most, open or archived, so its runs run next to the chat and its earlier runs stay
+// in one place. It has no foreign key: routines are not in this database. It is null for every other
+// thread.
 
 // The table as migration 47 created it. Frozen: migration 47 runs it, and a change here would change
 // what that shipped migration does.
@@ -46,6 +51,12 @@ const AGENT_THREAD_INDEX_SQL = `
   CREATE INDEX IF NOT EXISTS agent_threads_agent ON projection_agent_threads(agent_id, created_at DESC);
 `;
 
+// Migration 54: one thread for each routine of an agent.
+export const V54_AGENT_THREAD_ROUTINE_INDEX_SQL = `
+  CREATE UNIQUE INDEX IF NOT EXISTS agent_threads_routine ON projection_agent_threads(agent_id, routine_id)
+    WHERE routine_id IS NOT NULL;
+`;
+
 // The latest table, for new databases.
 export const AGENT_THREAD_SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS projection_agent_threads (
@@ -63,9 +74,11 @@ export const AGENT_THREAD_SCHEMA_SQL = `
     last_event_sequence INTEGER NOT NULL,
     branch_source_thread_id TEXT,
     branch_source_message_id TEXT,
-    branch_through_message_id TEXT
+    branch_through_message_id TEXT,
+    routine_id TEXT
   );
   ${AGENT_THREAD_INDEX_SQL}
+  ${V54_AGENT_THREAD_ROUTINE_INDEX_SQL}
 `;
 
 // Migration 47. Every task becomes a side thread with the same thread, title, state and dates: a closed
@@ -95,3 +108,7 @@ export const V48_AGENT_THREAD_BRANCH_COLUMNS_SQL = [
   "branch_source_message_id TEXT",
   "branch_through_message_id TEXT",
 ] as const;
+
+// Migration 54. The routine link, added with no default: no rebuild, no data change, and every existing
+// thread gets null, which is a thread of no routine.
+export const V54_AGENT_THREAD_ROUTINE_COLUMN_SQL = "routine_id TEXT";

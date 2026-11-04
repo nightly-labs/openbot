@@ -13,7 +13,7 @@
 .agent-folders-entry-add {
   position: absolute;
   top: 50%;
-  right: calc(var(--openbot-space-3) + 14px + var(--openbot-space-2));
+  inset-inline-end: calc(var(--openbot-space-3) + 14px + var(--openbot-space-2));
   color: var(--openbot-text-muted);
   transform: translateY(-50%);
 }
@@ -71,7 +71,8 @@
   align-items: center;
   gap: var(--openbot-space-2);
   min-height: 48px;
-  padding: var(--openbot-space-1-5) var(--openbot-space-1-5) var(--openbot-space-1-5) var(--openbot-space-3);
+  padding-block: var(--openbot-space-1-5);
+  padding-inline: var(--openbot-space-3) var(--openbot-space-1-5);
 }
 
 .agent-folders-text {
@@ -107,7 +108,8 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--openbot-space-2);
-  padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-3);
+  padding-block: var(--openbot-space-2);
+  padding-inline: var(--openbot-space-3) var(--openbot-space-2);
 }
 
 .agent-folders-access-text {
@@ -198,7 +200,7 @@
 
 /* The settings panel takes its own drops, so the overlay stops at its edge. */
 .conversation-panel:has(.settings-panel) .agent-folders-chat-drop {
-  right: calc(var(--settings-panel-width, 360px) + var(--openbot-space-3));
+  inset-inline-end: calc(var(--settings-panel-width, 360px) + var(--openbot-space-3));
 }
 
 .agent-folders-chat-zone {
@@ -243,4 +245,41 @@
 
 .agent-folders-chat-zone[data-dragging] svg {
   color: var(--openbot-text-primary);
+}
+
+/* The folder picker for an agent on another computer. It uses the frame of the "More providers"
+   dialog: a title, a close button and one plain list, here with the places, the path and the buttons. */
+.host-folder-picker-places {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-1);
+  padding: 0 var(--openbot-space-3) var(--openbot-space-2);
+}
+
+.host-folder-picker-path {
+  margin: 0;
+  padding: 0 var(--openbot-space-3) var(--openbot-space-2);
+  overflow-wrap: anywhere;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.host-folder-picker .provider-more-list {
+  flex: 1 1 auto;
+  min-height: 160px;
+}
+
+.host-folder-picker-note {
+  margin: 0;
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.host-folder-picker-footer {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-2) var(--openbot-space-1) var(--openbot-space-1);
 }

@@ -1,8 +1,10 @@
 import type { HostedServerIssue, HostedServerSleep, HostedServerStart } from "@openbot/contracts/ipc";
-import { createEffect, createSignal, Show, untrack } from "solid-js";
-import { Button } from "../../button";
+import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
+import { Button, IconButton } from "../../button";
 import { ErrorReference } from "../../error-reference";
+import { X } from "../../icons";
 import { useText } from "../../text";
+import { toast } from "../../toast";
 import { AppLoadingScreen } from "../account/AppLoadingScreen";
 import { ServerStatusDialog } from "./ServerStatusDialog";
 
@@ -44,6 +46,8 @@ export interface ServerConnectionNoticeProps {
   name: string;
   phase: ServerWorkspacePhase;
   initial: boolean;
+  /** The screen covers the whole window, server rail included, so it does not say that another server can be selected. */
+  fullWindow?: boolean;
   issue?: HostedServerIssue | null;
   /** The step of a hosted start, shown with its time while the phase is `waking`. */
   start?: HostedServerStart | null;
@@ -54,6 +58,13 @@ export interface ServerConnectionNoticeProps {
   reference?: string | null;
   /** The OpenBot version that the server restarts into, while it updates. */
   updateVersion?: string | null;
+  /** The first load ended: the full-window screen hops its crew out. Remove the notice in `onExited`. */
+  ready?: boolean | undefined;
+  onExited?: (() => void) | undefined;
+  /** The full-window screen still covers the window, and heavy views can mount before its crew hop out. */
+  onMountViews?: (() => void) | undefined;
+  /** False when another loading screen already covers the window: the first load then shows only its toast. */
+  screen?: boolean;
   /** Removes Details, for a notice that is not about the server connection. */
   hideDetails?: boolean;
   onRetry: () => void;
@@ -62,11 +73,42 @@ export interface ServerConnectionNoticeProps {
   upsell?: { onSeePlans: () => void } | null | undefined;
 }
 
-/** Connection feedback stays visible until the workspace can answer the user's actions. */
+/** A first load that takes longer than this shows its actions in a toast. */
+const FIRST_LOAD_TOAST_DELAY_MS = 10_000;
+let firstLoadToasts = 0;
+
+/**
+ * Connection feedback stays visible until the workspace can answer the user's actions. A first load
+ * shows only the crew. Its actions open in a toast after a long wait, or at once when
+ * the server fails, sleeps or needs the user.
+ */
 export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
   const { t } = useText();
   const since = Date.now();
   const [detailsOpen, setDetailsOpen] = createSignal(false);
+  const toastId = `server-connection-first-load:${++firstLoadToasts}`;
+  // A wait is long after the delay, or at once when the server does not only load. A retry starts a new wait.
+  const [round, setRound] = createSignal(0);
+  const [waitedLong, setWaitedLong] = createSignal(false);
+  const [toastClosed, setToastClosed] = createSignal(false);
+  const urgent = () => Boolean(props.issue) || (props.phase !== "loading" && props.phase !== "connecting");
+  createEffect(round, () => {
+    const timer = setTimeout(() => setWaitedLong(true), FIRST_LOAD_TOAST_DELAY_MS);
+    return () => clearTimeout(timer);
+  });
+  // A server that failed once keeps its toast while it connects again.
+  createEffect(urgent, (now) => {
+    if (!now) return;
+    setWaitedLong(true);
+    // The pane screen has no controls, so a server that needs the user shows its toast again.
+    setToastClosed(false);
+  });
+  const retry = () => {
+    setToastClosed(false);
+    if (props.initial && !urgent()) setWaitedLong(false);
+    setRound((current) => current + 1);
+    props.onRetry();
+  };
   const title = () => {
     switch (props.issue) {
       case "plan_ended":
@@ -123,38 +165,48 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
         : props.issue === "plan_ended"
           ? t("server.connection.planHint")
           : props.initial
-            ? t("server.connection.loadingHint")
+            ? props.fullWindow
+              ? undefined
+              : t("server.connection.loadingHint")
             : t("server.connection.cachedHint"));
+  const manageButton = (size: "default" | "sm") => (
+    <Show when={props.onManage && (props.issue === "plan_ended" || props.phase === "blocked")}>
+      <Button variant="outline" size={size} onClick={() => props.onManage?.()}>
+        {t("server.connection.manage")}
+      </Button>
+    </Show>
+  );
+  const detailsButton = (size: "default" | "sm") => (
+    <Show when={!props.hideDetails}>
+      <Button variant="ghost" size={size} onClick={() => setDetailsOpen(true)}>
+        {t("server.connection.details")}
+      </Button>
+    </Show>
+  );
   const actions = () => (
     <>
-      <Button variant="outline" disabled={props.busy} onClick={() => props.onRetry()}>
+      <Button variant="outline" disabled={props.busy} onClick={retry}>
         {t("server.connection.retry")}
       </Button>
-      <Show when={props.onManage && (props.issue === "plan_ended" || props.phase === "blocked")}>
-        <Button variant="outline" onClick={() => props.onManage?.()}>
-          {t("server.connection.manage")}
-        </Button>
-      </Show>
-      <Show when={!props.hideDetails}>
-        <Button variant="ghost" onClick={() => setDetailsOpen(true)}>
-          {t("server.connection.details")}
-        </Button>
-      </Show>
-      <ServerStatusDialog
-        open={detailsOpen()}
-        onClose={() => setDetailsOpen(false)}
-        name={props.name}
-        title={title()}
-        phase={props.phase}
-        initial={props.initial}
-        issue={props.issue ?? null}
-        updateVersion={props.updateVersion ?? null}
-        remainingSeconds={props.remainingSeconds ?? 0}
-        detail={props.detail ?? null}
-        reference={props.reference ?? null}
-        since={since}
-      />
+      {manageButton("default")}
+      {detailsButton("default")}
     </>
+  );
+  const statusDialog = () => (
+    <ServerStatusDialog
+      open={detailsOpen()}
+      onClose={() => setDetailsOpen(false)}
+      name={props.name}
+      title={title()}
+      phase={props.phase}
+      initial={props.initial}
+      issue={props.issue ?? null}
+      updateVersion={props.updateVersion ?? null}
+      remainingSeconds={props.remainingSeconds ?? 0}
+      detail={props.detail ?? null}
+      reference={props.reference ?? null}
+      since={since}
+    />
   );
   const upsell = () => (
     <Show when={props.upsell}>
@@ -168,30 +220,97 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
       )}
     </Show>
   );
-  return (
-    <Show
-      when={props.initial}
-      fallback={
-        <section class="server-connection-notice" role="status" aria-live="polite">
-          <div>
-            <p>{title()}</p>
-            <p class="server-connection-detail">{detail()}</p>
-            <ErrorReference reference={props.reference} />
-            {upsell()}
-          </div>
-          <div class="server-connection-actions">{actions()}</div>
-        </section>
+  // The toast reads the notice's state, so its detail, time and buttons stay current while it shows.
+  // It opens after a long wait, so its Retry also starts the connection again while one is in progress.
+  const toastCard = () => (
+    <section class="server-connection-toast" aria-label={title()}>
+      <Show when={!urgent()}>
+        <IconButton
+          class="server-connection-toast-close"
+          size="icon-xs"
+          variant="ghost"
+          label={t("common.close")}
+          onClick={() => setToastClosed(true)}
+        >
+          <X aria-hidden="true" />
+        </IconButton>
+      </Show>
+      <strong class="server-connection-toast-title">{title()}</strong>
+      <Show when={detail()}>{(text) => <p class="server-connection-toast-body">{text()}</p>}</Show>
+      <ErrorReference reference={props.reference} />
+      {upsell()}
+      <div class="server-connection-toast-actions">
+        {detailsButton("sm")}
+        {manageButton("sm")}
+        <Button variant="default" size="sm" onClick={retry}>
+          {t("server.connection.retry")}
+        </Button>
+      </div>
+    </section>
+  );
+  let toastShown = false;
+  createEffect(
+    // The card reads the title itself, so a new title or lock only raises the same toast again.
+    () =>
+      props.initial && !props.ready && waitedLong() && !toastClosed() && !detailsOpen()
+        ? { title: title(), locked: urgent() }
+        : null,
+    (message) => {
+      toastShown = message !== null;
+      if (message === null) {
+        // A toast that shows again before the microtask stays.
+        queueMicrotask(() => {
+          if (!toastShown) toast.dismiss(toastId);
+        });
+        return;
       }
-    >
-      <AppLoadingScreen
-        label={title()}
-        title={title()}
-        detail={detail()}
-        reference={props.reference ?? null}
-        actions={actions()}
-        footer={upsell()}
-      />
-    </Show>
+      toast(toastCard, {
+        id: toastId,
+        duration: Number.POSITIVE_INFINITY,
+        unstyled: true,
+        closeButton: false,
+        class: "server-connection-toast-host",
+        // The controls of a server that needs the user are only in this toast, so it cannot be swiped away.
+        dismissible: !message.locked,
+        // A `toast.dismiss` call also calls this. Only a toast that is still wanted was closed by the user.
+        onDismiss: () => {
+          if (toastShown) setToastClosed(true);
+        },
+      });
+    },
+  );
+  // A write to the Toaster from a scope cleanup stops the reactive system, so it waits for a microtask.
+  onCleanup(() => {
+    toastShown = false;
+    queueMicrotask(() => toast.dismiss(toastId));
+  });
+  return (
+    <>
+      <Show
+        when={props.initial}
+        fallback={
+          <section class="server-connection-notice" role="status" aria-live="polite">
+            <div>
+              <p>{title()}</p>
+              <p class="server-connection-detail">{detail()}</p>
+              <ErrorReference reference={props.reference} />
+              {upsell()}
+            </div>
+            <div class="server-connection-actions">{actions()}</div>
+          </section>
+        }
+      >
+        <Show when={props.screen !== false}>
+          <AppLoadingScreen
+            label={title()}
+            ready={props.ready}
+            onExited={props.onExited}
+            onMountViews={props.onMountViews}
+          />
+        </Show>
+      </Show>
+      {statusDialog()}
+    </>
   );
 }
 
@@ -213,12 +332,14 @@ export interface ConversationLoadNoticeProps {
 }
 
 /**
- * While an agent's history loads for the first time, the crew of the app loading screen covers the
- * chat, and jumps out when the history is ready. A failed load shows the notice with Retry.
+ * While an agent's history loads for the first time, the lilac plush of the app loading screen covers
+ * the chat and watches its balls, and the screen fades when the history is ready. A failed load shows the notice with Retry.
  */
 export function ConversationLoadNotice(props: ConversationLoadNoticeProps) {
   const { t } = useText();
-  const waiting = () => props.loading && !props.error;
+  // A memo, so that a read in the loading screen's `onSettled` does not run the caller's prop getter:
+  // a getter such as `a && b` makes a memo when it runs, and `onSettled` does not permit one.
+  const waiting = createMemo(() => props.loading && !props.error);
   // Each wait gets its own screen: a screen that started its exit cannot load again.
   const [screen, setScreen] = createSignal<number | null>(null);
   // The screen that started its exit. It stays ready, so a new wait does not stop its exit.
@@ -240,6 +361,7 @@ export function ConversationLoadNotice(props: ConversationLoadNoticeProps) {
       <Show when={screen()} keyed>
         {(key) => (
           <AppLoadingScreen
+            scene="thinking"
             ready={key === exiting() || !waiting()}
             label={t("server.connection.loading", { name: props.name })}
             title={t("server.connection.loading", { name: props.name })}

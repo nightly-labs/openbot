@@ -312,7 +312,7 @@
   position: absolute;
   z-index: 1;
   top: -8px;
-  right: -8px;
+  inset-inline-end: -8px;
   border: 1px solid var(--openbot-border-strong);
   border-radius: var(--openbot-radius-pill);
   background: color-mix(in srgb, var(--openbot-bg-surface-raised) 72%, transparent);
@@ -376,11 +376,11 @@
 }
 
 :where(.z-badge):has(> [data-icon="inline-start"]) {
-  padding-left: var(--openbot-space-1-5);
+  padding-inline-start: var(--openbot-space-1-5);
 }
 
 :where(.z-badge):has(> [data-icon="inline-end"]) {
-  padding-right: var(--openbot-space-1-5);
+  padding-inline-end: var(--openbot-space-1-5);
 }
 
 :where(.z-badge-variant-default) {
@@ -602,13 +602,13 @@
   --ui-textarea-grip: var(--openbot-text-dim);
 
   position: absolute;
-  right: 1px;
+  inset-inline-end: 1px;
   bottom: 1px;
   width: 20px;
   height: 20px;
   margin: 0;
   border: 0;
-  border-bottom-right-radius: var(--openbot-radius-md);
+  border-end-end-radius: var(--openbot-radius-md);
   padding: 0;
   background-image: linear-gradient(
     135deg,
@@ -634,6 +634,11 @@
 
 .ui-textarea-resizer:focus-visible {
   outline: 0;
+}
+
+/* In a right-to-left page the grip sits in the bottom-left corner, so its lines turn with it. */
+.ui-textarea-resizer:dir(rtl) {
+  scale: -1 1;
 }
 
 html.ui-textarea-resizing {
@@ -676,13 +681,14 @@ html.ui-textarea-resizing {
   border-radius: var(--openbot-radius-md);
   outline: 0;
   background: transparent;
-  padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-2) 10px;
+  padding-block: var(--openbot-space-2);
+  padding-inline: 10px var(--openbot-space-2);
   box-shadow: 0 1px 2px var(--openbot-shadow-popover-ambient);
   color: var(--openbot-text-primary);
   font-family: var(--openbot-font-sans);
   font-size: var(--openbot-text-md);
   line-height: var(--openbot-leading-md);
-  text-align: left;
+  text-align: start;
   transition:
     background-color var(--openbot-duration-hover) ease,
     border-color var(--openbot-duration-hover) ease,
@@ -788,7 +794,7 @@ html.ui-textarea-resizing {
 .ui-search-select-search > svg {
   position: absolute;
   top: 50%;
-  left: var(--openbot-space-3);
+  inset-inline-start: var(--openbot-space-3);
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
   color: var(--openbot-text-muted);
@@ -798,7 +804,7 @@ html.ui-textarea-resizing {
 
 .ui-search-select-input {
   width: 100%;
-  padding-left: var(--openbot-space-8);
+  padding-inline-start: var(--openbot-space-8);
 }
 
 .ui-search-select-root {
@@ -835,7 +841,8 @@ html.ui-textarea-resizing {
   user-select: none;
   border-radius: var(--openbot-radius-sm);
   outline: 0;
-  padding: var(--openbot-space-1-5) var(--openbot-space-8) var(--openbot-space-1-5) var(--openbot-space-2);
+  padding-block: var(--openbot-space-1-5);
+  padding-inline: var(--openbot-space-2) var(--openbot-space-8);
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
@@ -871,7 +878,7 @@ html.ui-textarea-resizing {
 
 .ui-select-item-indicator {
   position: absolute;
-  right: var(--openbot-space-2);
+  inset-inline-end: var(--openbot-space-2);
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
   display: inline-flex;
@@ -931,7 +938,7 @@ html.ui-textarea-resizing {
 }
 
 .ui-field-required {
-  margin-left: var(--openbot-space-0-5);
+  margin-inline-start: var(--openbot-space-0-5);
 }
 
 .ui-field-description,
@@ -1648,6 +1655,20 @@ html.ui-textarea-resizing {
   }
 }
 
+.ui-progress-fill[data-indeterminate]:dir(rtl) {
+  animation-name: ui-progress-travel-rtl;
+}
+
+@keyframes ui-progress-travel-rtl {
+  from {
+    transform: translateX(100%);
+  }
+
+  to {
+    transform: translateX(-286%);
+  }
+}
+
 .ui-radial-progress {
   --ui-radial-progress-color: var(--openbot-accent);
 
@@ -1773,7 +1794,7 @@ html.ui-textarea-resizing {
    even while the control itself is hidden. */
 .ui-toaster.ui-toaster-closeable [data-sonner-toast][data-styled="true"] [data-content],
 .ui-toaster [data-sonner-toast][data-styled="true"]:has([data-close-button]) [data-content] {
-  padding-right: var(--openbot-space-6);
+  padding-inline-end: var(--openbot-space-6);
 }
 
 .ui-toaster [data-sonner-toast][data-styled="true"] [data-title] {
@@ -1839,7 +1860,8 @@ html.ui-textarea-resizing {
   height: var(--openbot-icon-md);
   /* The column gap is zero so that a toast with no icon starts its text at the padding edge. The
      space between the mark and the words is this margin instead. */
-  margin: 1px var(--openbot-space-3) 0 0;
+  margin-block: 1px 0;
+  margin-inline: 0 var(--openbot-space-3);
 }
 
 .ui-toast-icon {
@@ -1888,8 +1910,8 @@ html.ui-textarea-resizing {
 
 .ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button] {
   top: var(--openbot-space-1);
-  right: var(--openbot-space-1);
-  left: auto;
+  inset-inline-end: var(--openbot-space-1);
+  inset-inline-start: auto;
   width: var(--openbot-control-md);
   height: var(--openbot-control-md);
   border: 0;
@@ -1995,6 +2017,231 @@ html.ui-textarea-resizing {
   }
 }
 
+/*
+ * The plush loader: the lilac plush watches three felt balls bounce in a wave, and its eyes follow
+ * the ball in the air. The parent sets --ui-plush-size, the width of the plush. With reduced motion
+ * the plush and the balls stay still.
+ */
+.ui-plush-loader {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: flex-end;
+  gap: calc(var(--ui-plush-size) * 0.18);
+}
+
+.ui-plush-loader[data-layout="stack"] {
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--ui-plush-size) * 0.3);
+}
+
+.ui-plush-mascot {
+  --ui-plush-look: calc(var(--ui-plush-size) * 0.035);
+  position: relative;
+  display: block;
+  width: var(--ui-plush-size);
+  flex: 0 0 auto;
+}
+
+.ui-plush-body {
+  position: relative;
+  display: block;
+  transform-origin: 50% 100%;
+}
+
+.ui-plush-body-image,
+.ui-plush-ball {
+  display: block;
+  width: 100%;
+  max-width: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Each eye layer covers the whole body. Each eye turns about its own centre. */
+.ui-plush-eyes,
+.ui-plush-eye {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  max-width: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.ui-plush-eye {
+  transform-origin: 35.6% 48.1%;
+  transition: scale var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.ui-plush-eye[data-side="right"] {
+  transform-origin: 64.4% 48.1%;
+}
+
+.ui-plush-mascot[data-face="wide"] .ui-plush-eye {
+  scale: 1.18;
+}
+
+.ui-plush-balls {
+  display: flex;
+  gap: calc(var(--ui-plush-size) * 0.08);
+  padding-bottom: calc(var(--ui-plush-size) * 0.04);
+}
+
+.ui-plush-ball {
+  width: calc(var(--ui-plush-size) * 0.24);
+  transform-origin: 50% 100%;
+}
+
+.ui-plush-loader[data-layout="stack"] .ui-plush-balls {
+  padding-bottom: 0;
+}
+
+.ui-plush-loader[data-layout="stack"] .ui-plush-ball {
+  width: calc(var(--ui-plush-size) * 0.2);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ui-plush-body {
+    animation: ui-plush-breathe 3.2s ease-in-out 600ms infinite;
+  }
+
+  .ui-plush-eye {
+    animation: ui-plush-blink 5.2s ease-in-out 1.8s infinite;
+  }
+
+  .ui-plush-eyes {
+    animation: ui-plush-look 6s ease-in-out 2.2s infinite;
+  }
+
+  .ui-plush-mascot[data-face="wink"] .ui-plush-eye[data-side="left"] {
+    animation: ui-plush-wink 600ms var(--openbot-ease-out);
+  }
+
+  .ui-plush-mascot[data-face="happy"] .ui-plush-eye {
+    animation: ui-plush-squint 220ms var(--openbot-ease-out) forwards;
+  }
+
+  .ui-plush-loader > .ui-plush-mascot {
+    animation: ui-plush-pop-in 520ms var(--openbot-ease-out) both;
+  }
+
+  .ui-plush-loader .ui-plush-eyes {
+    animation: ui-plush-follow 1.2s ease-in-out 700ms infinite;
+  }
+
+  .ui-plush-ball {
+    animation:
+      ui-plush-pop-in 360ms var(--openbot-ease-out) 300ms backwards,
+      ui-plush-ball-bounce 1.2s ease-in-out 700ms infinite;
+  }
+
+  .ui-plush-ball:nth-child(2) {
+    animation-delay: 380ms, 850ms;
+  }
+
+  .ui-plush-ball:nth-child(3) {
+    animation-delay: 460ms, 1s;
+  }
+}
+
+@keyframes ui-plush-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@keyframes ui-plush-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.012, 0.978);
+  }
+}
+
+@keyframes ui-plush-blink {
+  0%,
+  93%,
+  100% {
+    transform: scaleY(1);
+  }
+  96% {
+    transform: scaleY(0.1);
+  }
+}
+
+@keyframes ui-plush-wink {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  30%,
+  60% {
+    transform: scaleY(0.1);
+  }
+}
+
+@keyframes ui-plush-squint {
+  to {
+    transform: translateY(-1.5%) scaleY(0.35);
+  }
+}
+
+@keyframes ui-plush-look {
+  0%,
+  28%,
+  86%,
+  100% {
+    transform: translate(0, 0);
+  }
+  34%,
+  50% {
+    transform: translate(calc(var(--ui-plush-look) * -1), calc(var(--ui-plush-look) * 0.2));
+  }
+  58%,
+  78% {
+    transform: translate(var(--ui-plush-look), calc(var(--ui-plush-look) * -0.3));
+  }
+}
+
+@keyframes ui-plush-follow {
+  0%,
+  18% {
+    transform: translate(calc(var(--ui-plush-look) * -0.9), calc(var(--ui-plush-look) * 0.6));
+  }
+  32% {
+    transform: translate(0, calc(var(--ui-plush-look) * 0.6));
+  }
+  46%,
+  70% {
+    transform: translate(calc(var(--ui-plush-look) * 0.9), calc(var(--ui-plush-look) * 0.6));
+  }
+  100% {
+    transform: translate(calc(var(--ui-plush-look) * -0.9), calc(var(--ui-plush-look) * 0.6));
+  }
+}
+
+@keyframes ui-plush-ball-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  22% {
+    transform: translateY(-110%) scale(0.95, 1.06);
+  }
+  42% {
+    transform: translateY(0) scale(1.14, 0.84);
+  }
+  50% {
+    transform: translateY(0) scale(1);
+  }
+}
+
 .ui-skeleton {
   min-height: var(--openbot-leading-md);
   border-radius: var(--openbot-radius-sm);
@@ -2006,6 +2253,33 @@ html.ui-textarea-resizing {
   50% {
     opacity: 0.56;
   }
+}
+
+/* An icon that points along the line points the other way in a right-to-left page, as the layout
+   does: a submenu chevron points to the side its submenu opens on, and Back points to the start.
+   A key in a shortcut hint is the key on the keyboard, so it stays as it is. `:where` keeps the rule
+   weaker than the transform of a component, such as the turn of an open disclosure chevron. */
+:where(
+  svg:is(
+    [class~="lucide-chevron-left"],
+    [class~="lucide-chevron-right"],
+    [class~="lucide-chevrons-left"],
+    [class~="lucide-chevrons-right"],
+    [class~="lucide-arrow-left"],
+    [class~="lucide-arrow-right"],
+    [class~="lucide-arrow-right-to-line"],
+    [class~="lucide-panel-left"],
+    [class~="lucide-panel-right"],
+    [class~="lucide-undo-2"],
+    [class~="lucide-redo-2"],
+    [class~="lucide-log-in"],
+    [class~="lucide-log-out"],
+    [class~="lucide-corner-down-left"],
+    [class~="lucide-message-square-reply"],
+    .ui-rtl-mirror
+  ):dir(rtl):not(.ui-kbd *)
+) {
+  transform: scaleX(-1);
 }
 
 .ui-kbd {
@@ -2021,6 +2295,9 @@ html.ui-textarea-resizing {
   font-family: var(--openbot-font-mono);
   font-size: var(--openbot-text-sm);
   line-height: 1;
+  /* A shortcut such as "⌘F" keeps its key order in a right-to-left page. */
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 .ui-tooltip {
@@ -2269,7 +2546,8 @@ html.ui-textarea-resizing {
   border: 1px solid var(--openbot-border);
   border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-control);
-  padding: var(--openbot-space-3) var(--openbot-space-4) var(--openbot-space-3) var(--openbot-space-8);
+  padding-block: var(--openbot-space-3);
+  padding-inline: var(--openbot-space-8) var(--openbot-space-4);
   list-style: disc;
 }
 
@@ -2407,7 +2685,7 @@ a.ui-bubble-content {
   background: transparent;
   color: inherit;
   font: inherit;
-  text-align: left;
+  text-align: start;
   transition: color var(--openbot-duration-hover) ease;
 }
 
@@ -2424,7 +2702,7 @@ button.ui-bubble-content {
 }
 
 .ui-bubble-variant-default .message-reply-context {
-  border-left-color: var(--openbot-text-muted-on-light);
+  border-inline-start-color: var(--openbot-text-muted-on-light);
   color: var(--openbot-text-on-light);
 }
 
@@ -2511,11 +2789,11 @@ button.ui-bubble-content {
 }
 
 .ui-bubble-reactions-align-start {
-  left: var(--openbot-space-3);
+  inset-inline-start: var(--openbot-space-3);
 }
 
 .ui-bubble-reactions-align-end {
-  right: var(--openbot-space-3);
+  inset-inline-end: var(--openbot-space-3);
 }
 
 .ui-bubble-reaction-overflow {

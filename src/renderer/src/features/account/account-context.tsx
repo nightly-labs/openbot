@@ -1,4 +1,10 @@
-import type { AccountUsage, AccountUsageLimit, AvatarImageInput, CentralAuthState } from "@openbot/contracts/ipc";
+import type {
+  AccountUsage,
+  AccountUsageLimit,
+  AvatarColor,
+  AvatarImageInput,
+  CentralAuthState,
+} from "@openbot/contracts/ipc";
 import { currentText } from "@openbot/ui/text";
 import { createMemo, createSignal, createStore, flush, onCleanup, onSettled } from "solid-js";
 import { type DesktopAnalyticsProperties, desktopAnalytics } from "../../analytics";
@@ -131,7 +137,7 @@ const Auth = createSimpleContext({
       try {
         const state = await accountPort().auth.requestEmailCode(email);
         analytics.track("account_sign_in_started", {
-          result: state.status === "code_sent" ? "code_sent" : "failed",
+          result: state.status === "code_sent" || state.status === "company_sign_in" ? state.status : "failed",
           ...(state.status === "error" ? { failure_code: authFailureCode(state.issue.code) } : {}),
         });
         applyCentralAuthState(state);
@@ -142,6 +148,10 @@ const Auth = createSimpleContext({
         });
         throw error;
       }
+    }
+
+    async function openCompanySignIn(): Promise<void> {
+      applyCentralAuthState(await accountPort().auth.openCompanySignIn());
     }
 
     async function retryCentralAccount(): Promise<void> {
@@ -188,6 +198,11 @@ const Auth = createSimpleContext({
 
     async function updateAccountName(name: string): Promise<void> {
       applyCentralAuthState(await accountPort().auth.updateName(name));
+    }
+
+    /** Saves the chat color on the account. Members of each server of the user see it. */
+    async function setChatColor(color: AvatarColor | null): Promise<void> {
+      applyCentralAuthState(await accountPort().auth.updateChatColor(color));
     }
 
     const accountUsage = () => accountUsageState.data;
@@ -306,11 +321,13 @@ const Auth = createSimpleContext({
       applyAccountUsage,
       refreshAccountUsage,
       requestEmailCode,
+      openCompanySignIn,
       retryCentralAccount,
       verifyEmailCode,
       logoutCentralAccount,
       updateAccountName,
       updateAccountAvatar,
+      setChatColor,
       createMobileConnect,
       cancelMobileConnect: () => trackMobileConnect("cancelled", () => accountPort().auth.cancelMobileConnect()),
       getMobileConnectLink: () => accountPort().auth.getMobileConnectLink(),

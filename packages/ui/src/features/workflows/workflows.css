@@ -42,7 +42,7 @@
 .wfn-menu-check {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
-  margin-left: auto;
+  margin-inline-start: auto;
   color: var(--openbot-text-primary);
 }
 
@@ -123,11 +123,13 @@
   user-select: none;
 }
 
-/* A size that goes back to its default eases there too. */
+/* A size that goes back to its default eases there too. The world is a coordinate space, so it stays
+ * left to right in right-to-left text; the tool bars around it mirror. */
 .wfn-world {
   position: absolute;
   top: 0;
   left: 0;
+  direction: ltr;
   transform-origin: 0 0;
   interpolate-size: allow-keywords;
 }
@@ -183,8 +185,8 @@
 .wfn-hud-top {
   position: absolute;
   top: var(--openbot-space-4);
-  right: var(--openbot-space-4);
-  left: var(--openbot-space-4);
+  inset-inline-end: var(--openbot-space-4);
+  inset-inline-start: var(--openbot-space-4);
   z-index: 3;
   display: flex;
   gap: var(--openbot-space-2);
@@ -212,7 +214,7 @@
 }
 
 .wfn-stage .wfn-hud-add-button {
-  margin-left: var(--openbot-space-1);
+  margin-inline-start: var(--openbot-space-1);
 }
 
 /* A pressed tool, such as Select or an open minimap: a quiet fill, not a colour. */
@@ -431,7 +433,7 @@
 
 .wfn-stage .wfn-hud-show {
   position: absolute;
-  right: var(--wfn-hud-inset);
+  inset-inline-end: var(--wfn-hud-inset);
   bottom: var(--wfn-hud-inset);
   z-index: 3;
   gap: var(--openbot-space-1-5);
@@ -440,7 +442,7 @@
 
 .wfn-hud-zoom {
   bottom: var(--wfn-hud-inset);
-  left: var(--wfn-hud-inset);
+  inset-inline-start: var(--wfn-hud-inset);
 }
 
 .wfn-hud-separator {
@@ -666,7 +668,7 @@
 /* A past run on view. */
 .wfn-hud-viewing {
   gap: var(--openbot-space-1-5);
-  padding-left: var(--openbot-space-3);
+  padding-inline-start: var(--openbot-space-3);
   font-variant-numeric: tabular-nums;
 }
 
@@ -695,7 +697,7 @@
   display: inline-flex;
   gap: var(--openbot-space-1);
   align-items: center;
-  margin-right: var(--openbot-space-1);
+  margin-inline-end: var(--openbot-space-1);
   color: var(--openbot-text-muted);
 }
 
@@ -718,7 +720,7 @@
 }
 
 .wfn-hud-meta {
-  margin-right: var(--openbot-space-1);
+  margin-inline-end: var(--openbot-space-1);
   color: var(--openbot-text-muted);
 }
 
@@ -780,7 +782,7 @@
 }
 
 .wfn-zoom-menu .wfn-menu-text {
-  margin-right: auto;
+  margin-inline-end: auto;
 }
 
 /* The zoom levels: a 3 by 2 grid above the zoom commands, as on the Higgsfield canvas. */
@@ -840,7 +842,7 @@
   display: flex;
   gap: var(--openbot-space-1);
   align-items: center;
-  padding-left: var(--openbot-space-2);
+  padding-inline-start: var(--openbot-space-2);
   border-radius: var(--wfn-tool-radius);
 }
 
@@ -899,7 +901,7 @@
   min-height: var(--openbot-control-md);
   padding: var(--openbot-space-1) var(--openbot-space-2);
   color: var(--openbot-text-primary);
-  text-align: left;
+  text-align: start;
 }
 
 .wfn-search-result .wfn-menu-text {
@@ -954,7 +956,7 @@
 /* The minimap sits over the zoom bar. Nodes are kind-tinted blocks; the view is a bright frame. */
 .wfn-hud.wfn-minimap {
   bottom: calc(var(--wfn-hud-inset) + var(--openbot-control-md) + var(--openbot-space-2) + var(--openbot-space-2));
-  left: var(--wfn-hud-inset);
+  inset-inline-start: var(--wfn-hud-inset);
   height: auto;
   padding: 0;
   overflow: hidden;
@@ -998,7 +1000,7 @@
 }
 
 .wfn-results-menu .wfn-menu-text {
-  margin-right: auto;
+  margin-inline-end: auto;
 }
 
 .wfn-results-menu .wfn-menu-meta {
@@ -1006,7 +1008,7 @@
 }
 
 .wfn-results-menu .wfn-menu-check {
-  margin-left: 0;
+  margin-inline-start: 0;
 }
 
 .wfn-menu-check[data-off] {
@@ -1023,7 +1025,7 @@
   place-items: center;
   width: var(--openbot-icon-lg);
   height: var(--openbot-icon-lg);
-  margin-left: calc(var(--openbot-space-1) * -1);
+  margin-inline-start: calc(var(--openbot-space-1) * -1);
   border-radius: var(--openbot-radius-sm);
   background: color-mix(in srgb, var(--wfn-kind) 16%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wfn-kind) 14%, transparent);
@@ -1221,7 +1223,7 @@
 }
 
 .wfn-hud-step .wfn-hud-meta {
-  margin-right: 0;
+  margin-inline-end: 0;
 }
 
 .wfn-hud-step-name {
@@ -1290,6 +1292,12 @@
   background: var(--openbot-bg-frame);
 }
 
+/* The follow frame holds the card, not the top row. */
+.wfn-canvas[data-frame="window"] .wfn-follow-frame {
+  top: var(--left-header-height);
+  border-radius: var(--wfn-card-inner-radius);
+}
+
 /* The workflow page does not need the Marketplace button that the sidebar keeps in the top row. */
 .wfn-app .sidebar-marketplace-button {
   display: none;
@@ -1298,8 +1306,8 @@
 /* The server menu keeps the start of the top row, so the bar starts after it. */
 .wfn-canvas[data-frame="window"] .wfn-hud-top {
   top: 0;
-  right: var(--openbot-space-3);
-  left: calc(var(--left-panel-width) + var(--openbot-space-3));
+  inset-inline-end: var(--openbot-space-3);
+  inset-inline-start: calc(var(--left-panel-width) + var(--openbot-space-3));
   height: var(--left-header-height);
   align-items: center;
 }
@@ -1361,4 +1369,9 @@
 /* The history clock has no closed shape, so it stays an outline on the highlighted row. */
 .wfs-menu.ui-action-menu [class~="lucide-rotate-ccw-clock"] > * {
   fill: none;
+}
+
+/* Back to the live canvas follows the reading direction. */
+.wfn-hud-version .wfn-hud-button > svg[class~="lucide-arrow-left"]:dir(rtl) {
+  transform: scaleX(-1);
 }

@@ -31,7 +31,7 @@
 }
 
 .awaiting-replies-dismiss {
-  margin-right: var(--openbot-space-2);
+  margin-inline-end: var(--openbot-space-2);
   color: var(--openbot-text-muted);
 }
 
@@ -40,7 +40,7 @@
 }
 
 .awaiting-replies-avatar {
-  --agent-avatar-optical-offset: -1px;
+  --agent-avatar-optical-offset: calc(var(--openbot-icon-md) * -0.14);
 
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);

@@ -10,10 +10,13 @@ import {
   Button,
   ChevronRight,
   CircleDot,
+  ConfirmDialog,
   ContextMenu,
   DropdownMenu,
+  Hash,
   Info,
   LoaderCircle,
+  Trash2,
 } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
@@ -31,7 +34,7 @@ import {
 } from "solid-js";
 import type { AgentMessage, AgentProfile } from "../../data";
 import { useText } from "../../text";
-import { AttachmentCards, type AttachmentMediaSource } from "./AttachmentCards";
+import { AttachmentCards, type AttachmentDownloads, type AttachmentMediaSource } from "./AttachmentCards";
 import { CodeBlock } from "./CodeBlock";
 import { CodePreview } from "./CodePreview";
 import { ComparisonTable } from "./ComparisonTable";
@@ -311,6 +314,8 @@ export function MessageBody(props: {
   onOpenQuote?: ((messageId: string, text: string) => void) | undefined;
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
   mediaSource?: AttachmentMediaSource | undefined;
+  /** The download state of attachments from a joined server. */
+  downloads?: AttachmentDownloads | undefined;
   /**
    * Draws the images of the message first, outside `frame`, which wraps the rest: the text, the quote
    * and the files. `imagesOnly` reads true when the rest is empty. Absent, the images stay in the body.
@@ -758,6 +763,7 @@ export function MessageBody(props: {
           <AttachmentCards
             attachments={standaloneFileAttachments()}
             mediaSource={props.mediaSource}
+            downloads={props.downloads}
             onPreview={openAttachment}
             onAction={props.onAttachmentAction}
           />
@@ -989,10 +995,15 @@ export function MessageMenu(props: {
   onBranch?: (() => void) | undefined;
   /** A turn runs in the thread, so "Branch from here" shows but does nothing. */
   branchDisabled?: boolean | undefined;
+  /** Opens a channel with this message in its composer. Without it, or with no channel, the menu has no such item. */
+  sendToChannel?: { channels: { id: string; name: string }[]; onSend: (channelId: string) => void } | undefined;
+  /** Asks to delete this message. Without it, the menu has no such item. */
+  onDelete?: (() => void) | undefined;
 }) {
   const { t } = useText();
   const authorName = () => props.authorName ?? t("chat.message.agentFallback");
   const react = (emoji: MessageReaction) => props.onReact(props.message.reaction === emoji ? null : emoji);
+  const sendToChannel = () => (props.sendToChannel?.channels.length ? props.sendToChannel : undefined);
   return (
     <ContextMenu.Content
       aria-label={
@@ -1056,6 +1067,29 @@ export function MessageMenu(props: {
           </ContextMenu.Item>
         )}
       </Show>
+      <Show when={sendToChannel()}>
+        {(sendToChannel) => (
+          <ContextMenu.Sub>
+            <ContextMenu.SubTrigger>
+              <Hash aria-hidden="true" />
+              <span>{t("chat.menu.sendToChannel")}</span>
+              <ChevronRight class="ui-menu-trailing" aria-hidden="true" />
+            </ContextMenu.SubTrigger>
+            <ContextMenu.Portal>
+              <ContextMenu.SubContent class="ui-action-menu" aria-label={t("chat.menu.chooseChannel")}>
+                <For each={sendToChannel().channels}>
+                  {(channel) => (
+                    <ContextMenu.Item onSelectAfterClose={() => sendToChannel().onSend(channel.id)}>
+                      <Hash aria-hidden="true" />
+                      <span>{channel.name}</span>
+                    </ContextMenu.Item>
+                  )}
+                </For>
+              </ContextMenu.SubContent>
+            </ContextMenu.Portal>
+          </ContextMenu.Sub>
+        )}
+      </Show>
       <Show when={props.onBranch || props.onMarkUnread}>
         <ContextMenu.Separator />
       </Show>
@@ -1075,6 +1109,59 @@ export function MessageMenu(props: {
           </ContextMenu.Item>
         )}
       </Show>
+      <Show when={props.onDelete}>
+        {(onDelete) => (
+          <>
+            <ContextMenu.Separator />
+            <ContextMenu.Item class="ui-action-menu-danger" onSelectAfterClose={onDelete()}>
+              <Trash2 aria-hidden="true" />
+              <span>{t("chat.menu.delete")}</span>
+            </ContextMenu.Item>
+          </>
+        )}
+      </Show>
     </ContextMenu.Content>
+  );
+}
+
+/**
+ * Asks before a message is deleted, for the Delete item of `MessageMenu`. The dialog stays open while
+ * `onDelete` runs, and shows its failure. It closes when the message is deleted.
+ */
+export function DeleteMessageDialog(props: {
+  /** The message to delete, or null while the dialog is closed. */
+  messageId: string | null;
+  onDelete: (messageId: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const { t, errorMessage } = useText();
+  const [error, setError] = createSignal<string | undefined>();
+  const close = () => {
+    setError(undefined);
+    props.onClose();
+  };
+  const confirm = async () => {
+    const messageId = props.messageId;
+    if (messageId === null) return;
+    setError(undefined);
+    try {
+      await props.onDelete(messageId);
+      close();
+    } catch (failure) {
+      setError(errorMessage(failure, t("chat.errorStatus.deleteMessage")));
+    }
+  };
+  return (
+    <ConfirmDialog
+      open={props.messageId !== null}
+      onCancel={close}
+      onConfirm={confirm}
+      title={t("chat.deleteMessage.title")}
+      description={t("chat.deleteMessage.body")}
+      confirmLabel={t("common.delete")}
+      pendingLabel={t("chat.deleteMessage.pending")}
+      error={error()}
+      initialFocus="cancel"
+    />
   );
 }

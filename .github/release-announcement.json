@@ -1,10 +1,10 @@
 {
-  "version": "0.58.0",
+  "version": "0.60.0",
   "highlights": [
-    "Start a workflow from a GitHub issue, comment, pull request or failed check, and let it comment, label or review on GitHub.",
-    "A joined server opens much faster: the agents and sidebar from your last visit show at once while the app connects.",
-    "On the web, a switch to another server takes about 1 second.",
-    "Marketplace has 17 new OpenBot agents, such as QA Tester, PR Shepherd and Chief of Staff.",
-    "You can move queued messages in a queue of more than 32 messages."
+    "Talk to your agents from WhatsApp: link a number under Marketplace → Apps → WhatsApp.",
+    "Start a workflow when someone mentions OpenBot in Slack or in a Telegram group, and send its result back there.",
+    "OpenBot is now available in Arabic, with a right-to-left layout.",
+    "Turn models off for each provider, and find the newest models first in the model picker.",
+    "Owners and admins can see an Audit log of member, role and agent access changes in Server settings."
   ]
 }

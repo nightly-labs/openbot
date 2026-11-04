@@ -5,13 +5,13 @@
 }
 
 .conversation-panel:has(.settings-panel) .chat-search {
-  right: calc(var(--settings-panel-width, 360px) + 16px);
+  inset-inline-end: calc(var(--settings-panel-width, 360px) + 16px);
   max-width: calc(100% - var(--settings-panel-width, 360px) - 32px);
 }
 
 .conversation-panel:has(#browser-side-panel) .chat-search,
 .conversation-panel:has(#file-preview-panel) .chat-search {
-  right: calc(var(--browser-panel-width, 380px) + 16px);
+  inset-inline-end: calc(var(--browser-panel-width, 380px) + 16px);
   max-width: calc(100% - var(--browser-panel-width, 380px) - 32px);
 }
 

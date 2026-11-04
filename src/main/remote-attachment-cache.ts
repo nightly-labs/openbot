@@ -17,6 +17,14 @@ const REMOTE_ATTACHMENT_CACHE_TTL_MS = 10 * 60_000;
 // 4 MB send buffer, where the host stops and sends again from the last acknowledgement.
 const REMOTE_ATTACHMENT_PREVIEWS_PER_SERVER = 2;
 
+/** The user stopped the download. The open or the save that waited for it does nothing. */
+export class AttachmentDownloadStopped extends Error {
+  constructor() {
+    super("The download was stopped.");
+    this.name = "AttachmentDownloadStopped";
+  }
+}
+
 export interface RemoteAttachment {
   bytes: Uint8Array;
   name: string;

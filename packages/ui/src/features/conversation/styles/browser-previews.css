@@ -150,7 +150,7 @@
 .browser-preview-close {
   position: absolute;
   top: var(--openbot-space-2);
-  right: var(--openbot-space-2);
+  inset-inline-end: var(--openbot-space-2);
   opacity: 0;
 }
 
@@ -199,7 +199,7 @@
 
 .browser-secret-close {
   flex: none;
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 .browser-secret-icon {
@@ -278,7 +278,7 @@
 /* Under the label, past the box. */
 .browser-secret-save-hint {
   margin: 0;
-  padding-left: calc(var(--openbot-icon-sm) + var(--openbot-space-1-5));
+  padding-inline-start: calc(var(--openbot-icon-sm) + var(--openbot-space-1-5));
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
 }
@@ -321,4 +321,9 @@
 .browser-secret-card .browser-takeover-preview-viewport img {
   min-height: 0;
   object-fit: contain;
+}
+
+/* Collapse points to the end edge, where the panel is. */
+:dir(rtl) .side-panel-pane-close svg[class~="lucide-chevron-right"] {
+  transform: scaleX(-1);
 }

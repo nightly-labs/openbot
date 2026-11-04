@@ -1,5 +1,15 @@
-import type { AgentAccessLevels, OpenBotDesktopApi, ServerSummary } from "@openbot/contracts/ipc";
-import type { WorkflowPlace } from "@openbot/ui/features/workflows/workflow-model";
+import {
+  type AgentAccessLevels,
+  MESSAGING_LIMITS,
+  type OpenBotDesktopApi,
+  type ServerSummary,
+} from "@openbot/contracts/ipc";
+import type {
+  WorkflowDiscordServer,
+  WorkflowPlace,
+  WorkflowSlackWorkspace,
+  WorkflowTelegramChat,
+} from "@openbot/ui/features/workflows/workflow-model";
 import {
   type GitHubConnectorPort,
   githubConnectorPort,
@@ -32,6 +42,12 @@ export interface WorkflowHost {
   onChanged(changed: (workflowId: string | null) => void): () => void;
   /** Only this computer keeps messaging places; a joined server gives none. */
   places(): Promise<WorkflowPlace[]>;
+  /** Only this computer runs Discord triggers and outputs; a joined server gives none. */
+  discordServers(): Promise<WorkflowDiscordServer[]>;
+  /** Only this computer runs Telegram triggers and outputs; a joined server gives none. */
+  telegramChats(): Promise<WorkflowTelegramChat[]>;
+  /** Only this computer runs Slack triggers and outputs; a joined server gives none. */
+  slackWorkspaces(): Promise<WorkflowSlackWorkspace[]>;
   /** The level of this account on each agent that it sees, or null when it manages all of them. */
   agentLevels(): Promise<AgentAccessLevels | null>;
   /**
@@ -107,6 +123,55 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
           label: `${connection.connectionName} · ${place.name}`,
         })),
       );
+    },
+    async discordServers() {
+      if (!local()) return [];
+      const [options, overview] = await Promise.all([
+        window.openbot.routineResults.options(),
+        window.openbot.messaging.getDiscordOverview(),
+      ]);
+      const discord = options.filter((option) => option.platform === "discord");
+      return Promise.all(
+        discord.map(async (option) => {
+          // The options name a server only by its name; two servers with one name get no roles.
+          const guilds = overview.connections.filter(
+            (connection) => connection.workspaceName.slice(0, MESSAGING_LIMITS.name) === option.connectionName,
+          );
+          const guild = guilds.length === 1 ? guilds[0] : undefined;
+          const roles = guild
+            ? await window.openbot.messaging.listDiscordRoles({ workspaceId: guild.workspaceId }).then(
+                (list) => list.roles,
+                () => [],
+              )
+            : [];
+          return {
+            connectionId: option.connectionId,
+            name: option.connectionName,
+            // The driver names a channel "#general"; the Discord rows show their own "#" icon.
+            channels: option.places.map((place) => ({ id: place.id, name: place.name.replace(/^#/u, "") })),
+            roles,
+          };
+        }),
+      );
+    },
+    async telegramChats() {
+      if (!local()) return [];
+      const options = await window.openbot.routineResults.options();
+      return options
+        .filter((option) => option.platform === "telegram")
+        .map((option) => ({ connectionId: option.connectionId, name: option.connectionName }));
+    },
+    async slackWorkspaces() {
+      if (!local()) return [];
+      const options = await window.openbot.routineResults.options();
+      return options
+        .filter((option) => option.platform === "slack")
+        .map((option) => ({
+          connectionId: option.connectionId,
+          name: option.connectionName,
+          // The rows show their own "#" icon.
+          channels: option.places.map((place) => ({ id: place.id, name: place.name.replace(/^#/u, "") })),
+        }));
     },
     async agentLevels() {
       if (local() || serverRoleCanAdminister(server())) return null;

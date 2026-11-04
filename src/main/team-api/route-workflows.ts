@@ -85,17 +85,15 @@ function placeOutputs(graph: WorkflowGraph): Map<string, string> {
 }
 
 /**
- * The settings of each GitHub trigger and each GitHub output, by node. Their changes act as the host's
- * GitHub App bot, so only an owner or admin can add or change one (`workflows-github-v1`).
+ * The settings of each GitHub, Discord, Telegram or Slack trigger and output, by node. Their changes act
+ * as the host's GitHub App bot or speak in the host's Discord servers, Telegram chats or Slack workspaces,
+ * so only an owner or admin can add or change one (`workflows-github-v1`).
  */
-function githubNodes(graph: WorkflowGraph): Map<string, string> {
+function adminNodes(graph: WorkflowGraph): Map<string, string> {
   const nodes = new Map<string, string>();
   for (const node of graph.nodes) {
-    const github =
-      node.kind === "trigger"
-        ? node.fields.trigger === "github"
-        : node.kind === "output" && node.fields.target === "github";
-    if (!github) continue;
+    const kind = node.kind === "trigger" ? node.fields.trigger : node.kind === "output" ? node.fields.target : null;
+    if (kind !== "github" && kind !== "discord" && kind !== "telegram" && kind !== "slack") continue;
     const fields = Object.keys(node.fields)
       .sort()
       .map((key) => [key, node.fields[key] ?? null]);
@@ -181,8 +179,8 @@ export async function routeWorkflows(
     requireUsable(after, "manage");
     const old = placeOutputs(before);
     for (const [nodeId, place] of placeOutputs(after)) if (old.get(nodeId) !== place) requireAdmin(member);
-    const oldGitHub = githubNodes(before);
-    for (const [nodeId, settings] of githubNodes(after)) if (oldGitHub.get(nodeId) !== settings) requireAdmin(member);
+    const oldAdmin = adminNodes(before);
+    for (const [nodeId, settings] of adminNodes(after)) if (oldAdmin.get(nodeId) !== settings) requireAdmin(member);
   };
   const visibleDetail = async (workflowId: string) => {
     const detail = await run(workflows.get(workflowId));

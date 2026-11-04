@@ -13,6 +13,8 @@
 //   authentication answer and an agent profile save keep their agent (#3949).
 // - context-usage-v1: a v8 client that asks for it gets the context of each agent it can see; any other
 //   client gets the released runtime snapshot (#3584).
+// - reasoning-efforts-v1: a protocol 9 client that asks for it gets `none`, `minimal` and `ultra`; a
+//   protocol 7 or 8 client gets the nearest released level, and the frozen v7 decoder reads it.
 // Run: `bun scripts/team-api-legacy-clients-e2e.ts`.
 // Writes .openbot-build/team-api-legacy-clients-e2e/report.json.
 import assert from "node:assert/strict";
@@ -21,7 +23,12 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { type AgentContextState, BROWSER_SECRET_RESPONSE_PATH } from "@openbot/contracts/ipc";
+import {
+  type AgentContextState,
+  type AgentModelOption,
+  BROWSER_SECRET_RESPONSE_PATH,
+  LEGACY_AGENT_REASONING_EFFORTS,
+} from "@openbot/contracts/ipc";
 import {
   createTeamProtocolV2Request,
   createTeamProtocolV8Event,
@@ -55,6 +62,10 @@ import {
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import {
+  TEAM_REASONING_EFFORTS,
+  TEAM_REASONING_EFFORTS_CAPABILITY,
+} from "@openbot/contracts/team-protocol/reasoning-efforts-v1";
 import { decodeTeamProtocolSupportV8Base } from "@openbot/contracts/team-protocol/v8-base";
 import { decodeTeamProtocolV8BaseCurrentEvent } from "@openbot/contracts/team-protocol/v8-base-adapter";
 import {
@@ -737,6 +748,7 @@ try {
         { revision: access.get(identity.serverId).revision, everyone: { [duplicate.copyId]: level }, roles: [] },
         agentIds,
         agentIds,
+        null,
       ),
     );
   }
@@ -792,6 +804,113 @@ try {
   });
   // The steps after these read the snapshot that the host builds.
   hostAgents.getRuntimeSnapshot = runtimeSnapshot;
+
+  // --- reasoning-efforts-v1 ---
+
+  // No provider runs here, so the host lists the model that a provider would have listed, and the
+  // source agent is on its highest level.
+  const wideModel: AgentModelOption = {
+    provider: "codex",
+    id: "gpt-5.6-sol",
+    name: "GPT-5.6 Sol",
+    description: "Reasoning model.",
+    defaultReasoningEffort: "none",
+    supportedReasoningEfforts: [...TEAM_REASONING_EFFORTS],
+  };
+  const listModels = hostAgents.listModels.bind(hostAgents);
+  const listAgents = hostAgents.listAgents.bind(hostAgents);
+  hostAgents.listModels = () => [wideModel];
+  hostAgents.listAgents = () =>
+    listAgents().map((agent) =>
+      agent.id === source.id ? { ...agent, model: wideModel.id, reasoningEffort: "ultra" } : agent,
+    );
+
+  /** One request of a current client on `protocol` that declares `capabilities`. */
+  async function current(protocol: number, capabilities: readonly string[], path: string): Promise<WireResponse> {
+    const response = await fetch(`http://127.0.0.1:${port}${path}`, {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${member.token}`,
+        [TEAM_PROTOCOL_VERSION_HEADER]: String(protocol),
+        [TEAM_APP_VERSION_HEADER]: CLIENT_VERSION,
+        [TEAM_CAPABILITIES_HEADER]: capabilities.join(","),
+      },
+    });
+    return { status: response.status, body: await response.json() };
+  }
+
+  /** The efforts of the wide model and of the source agent in what `protocol` and `capabilities` get. */
+  async function efforts(protocol: number, capabilities: readonly string[]) {
+    const models = await current(protocol, capabilities, "/v1/agents/models");
+    const agentList = await current(protocol, capabilities, "/v1/agents");
+    assert.equal(models.status, 200, `GET /v1/agents/models: ${JSON.stringify(models.body)}.`);
+    assert.equal(agentList.status, 200, `GET /v1/agents: ${JSON.stringify(agentList.body)}.`);
+    assert.ok(Array.isArray(models.body) && Array.isArray(agentList.body));
+    const model = record(
+      models.body.find((entry) => isRecord(entry) && entry.id === wideModel.id),
+      "wide model",
+    );
+    const agent = record(
+      agentList.body.find((entry) => isRecord(entry) && entry.id === source.id),
+      "source agent",
+    );
+    return {
+      models: models.body,
+      agents: agentList.body,
+      defaultReasoningEffort: model.defaultReasoningEffort,
+      supportedReasoningEfforts: model.supportedReasoningEfforts,
+      reasoningEffort: agent.reasoningEffort,
+    };
+  }
+
+  try {
+    await step("reasoning-efforts-v1: a protocol 9 client that asks for it gets the exact levels", async () => {
+      const capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9);
+      assert.ok(capabilities.includes(TEAM_REASONING_EFFORTS_CAPABILITY), "A v9 client does not ask for it.");
+      const got = await efforts(TEAM_PROTOCOL_V9, capabilities);
+      assert.equal(got.defaultReasoningEffort, "none");
+      assert.deepEqual(got.supportedReasoningEfforts, [...TEAM_REASONING_EFFORTS]);
+      assert.equal(got.reasoningEffort, "ultra");
+      decodeTeamProtocolV8HttpResponse("GET", "/v1/agents/models", 200, got.models);
+      decodeTeamProtocolV8HttpResponse("GET", "/v1/agents", 200, got.agents);
+      const { models: _models, agents: _agents, ...levels } = got;
+      return levels;
+    });
+
+    await step("reasoning-efforts-v1: a client without it gets the nearest released level", async () => {
+      const results: { protocol: number; reasoningEffort: Json | undefined }[] = [];
+      for (const protocol of [TEAM_PROTOCOL_V7, 8, TEAM_PROTOCOL_V9]) {
+        const capabilities = teamCapabilitiesForProtocol(protocol).filter(
+          (capability) => capability !== TEAM_REASONING_EFFORTS_CAPABILITY,
+        );
+        const got = await efforts(protocol, capabilities);
+        assert.equal(got.defaultReasoningEffort, "low", `Protocol ${protocol}: the default is not low.`);
+        assert.deepEqual(got.supportedReasoningEfforts, [...LEGACY_AGENT_REASONING_EFFORTS]);
+        assert.equal(got.reasoningEffort, "max", `Protocol ${protocol}: the agent effort is not max.`);
+        if (protocol === TEAM_PROTOCOL_V7) {
+          // The frozen v7 decoder knows the five released levels only.
+          decodeTeamProtocolV7HttpResponse("GET", "/v1/agents/models", 200, got.models);
+          decodeTeamProtocolV7HttpResponse("GET", "/v1/agents", 200, got.agents);
+        }
+        const { models: _models, agents: _agents, ...levels } = got;
+        results.push({ protocol, ...levels });
+      }
+      assert.ok(
+        !teamCapabilitiesForProtocol(8).includes(TEAM_REASONING_EFFORTS_CAPABILITY),
+        "A protocol 8 client asks for reasoning-efforts-v1.",
+      );
+      return results;
+    });
+
+    await step("reasoning-efforts-v1: the frozen v7 decoder refuses a level that it does not know", async () => {
+      const wide = await efforts(TEAM_PROTOCOL_V9, teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9));
+      assert.throws(() => decodeTeamProtocolV7HttpResponse("GET", "/v1/agents/models", 200, wide.models));
+      return { refused: "GET /v1/agents/models" };
+    });
+  } finally {
+    hostAgents.listModels = listModels;
+    hostAgents.listAgents = listAgents;
+  }
 
   // --- v2 over WebRTC frames ---
 
@@ -1246,4 +1365,4 @@ try {
   await rm(root, { recursive: true, force: true });
 }
 
-process.stdout.write(`Team API v1-v3, v7 and v8 clients passed. Report: ${join(OUT, "report.json")}\n`);
+process.stdout.write(`Team API v1-v3, v7, v8 and v9 clients passed. Report: ${join(OUT, "report.json")}\n`);

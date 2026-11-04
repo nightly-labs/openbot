@@ -55,6 +55,7 @@ import { useSidebar } from "./features/sidebar/sidebar-context";
 import { useUpdates } from "./features/updates/updates-context";
 import { useWhatsNew } from "./features/updates/whats-new-context";
 import { usePlanLimitRows } from "./features/usage/plan-limit-rows";
+import { createLinkAccountStore } from "./features/vault/stores/link-account-store";
 import { createVaultStore } from "./features/vault/stores/vault-store";
 import { desktopVaultCalls, hostVaultCalls } from "./features/vault/vault-port";
 import { useWindowPage } from "./features/window/window-page-context";
@@ -510,6 +511,8 @@ function ServerSettings() {
     return {
       store: createVaultStore(local ? desktopVaultCalls() : hostVaultCalls(serverId)),
       apiKeys: vaultApiKeys(),
+      // Link signs in on this computer only: a joined server's host has no Link account.
+      link: local ? createLinkAccountStore() : undefined,
     };
   });
   // The workspace belongs to the selected server. For another server, the switch comes first and
@@ -727,6 +730,7 @@ function ServerSettings() {
           onRotateHostKey={server().kind === "local" ? rotateHostKey : undefined}
           onCreateInvite={createServerInvite}
           license={appPort().license}
+          companySignIn={appPort().auth}
           onContactUs={() => void appPort().openExternal("hosted-server-contact")}
           onUpdateMember={updateServerMember}
           onRemoveMember={removeServerMember}
@@ -806,7 +810,10 @@ function ServerSettings() {
           hostMemoryLimit={{}}
           memoryReview={{}}
           hostPromptCacheTtl={{}}
+          hostModelVisibility={{}}
+          hostDefaultProvider={{}}
           agentAccess={{ listAgents: () => appPort().agent.listAgents(server().id) }}
+          serverAudit={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           initialSection={serverSettingsSection()}
           // Any member imports into this computer or a remote host with `agent-import-v1`.
           agentImport={
@@ -911,6 +918,7 @@ function AppSettings(props: AccountProps) {
         account={props.account()}
         onUpdateAccountName={auth.updateAccountName}
         onUpdateAccountAvatar={auth.updateAccountAvatar}
+        onSetChatColor={auth.setChatColor}
         onCreateMobileConnect={auth.createMobileConnect}
         onCancelMobileConnect={auth.cancelMobileConnect}
         onGetMobileConnectLink={auth.getMobileConnectLink}

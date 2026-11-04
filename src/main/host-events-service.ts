@@ -11,15 +11,16 @@ import type {
   ListEventRoutineRunsInput,
   ListEventRoutinesInput,
   SaveEventRoutineInput,
+  SetWebhookSecretInput,
   WebhookTestResult,
 } from "@openbot/contracts/ipc-events";
 import { isEventJsonValue } from "@openbot/contracts/ipc-events";
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import {
   WEBHOOK_DELIVERY_BODY_BYTES_LIMIT,
   type WebhookDeliveryStatus,
 } from "@openbot/contracts/signal-protocol/messages";
-import { WEBHOOK_ROUTES_LIMIT } from "@openbot/contracts/signal-protocol/webhook-route";
+import { STANDARD_WEBHOOKS_FORMAT, WEBHOOK_ROUTES_LIMIT } from "@openbot/contracts/signal-protocol/webhook-route";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, registerSecretValue } from "@openbot/logging";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
@@ -40,7 +41,7 @@ import {
 } from "./host-events-api";
 import type { SecretCipher } from "./provider-credential-store";
 import type { WebhookIngressDelivery } from "./signal-ingress";
-import { signWebhookBody, verifyWebhookSignature } from "./webhook-security";
+import { signWebhookBody, verifyStandardWebhookSignature, verifyWebhookSignature } from "./webhook-security";
 
 const logger = createOpenBotLogger("host-events");
 const DEFAULT_ACTIVITY_LIMIT = 50;
@@ -97,6 +98,9 @@ function eventRoutine(owner: EventRoutineOwner, record: OwnedRoutineRecord): Eve
 function newWebhookSecret(): string {
   return `whsec_${randomBytes(32).toString("base64url")}`;
 }
+
+/** A sender's secret: 16 to 1024 visible ASCII characters, such as `whsec_...` from Svix or a Composio secret. */
+const SENDER_SECRET_PATTERN = /^[\x21-\x7e]{16,1024}$/u;
 
 type TestEventData = { [key: string]: TestEventData | EventScalar };
 
@@ -155,20 +159,45 @@ interface DecodedWebhookBody {
   data: EventJsonValue;
 }
 
-function decodeWebhookBody(body: Uint8Array): DecodedWebhookBody | null {
-  let value: unknown;
+/** The body as a JSON object, or null when it is not UTF-8 JSON or not an object. */
+function parseJsonObject(body: Uint8Array): DynamicRecord | null {
   try {
-    value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(body));
+    const value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(body));
+    return isDynamicRecord(value) ? value : null;
   } catch {
     return null;
   }
-  if (!isDynamicRecord(value) || !isString(value.type)) return null;
-  if (value.type.length < 1 || value.type.length > WEBHOOK_EVENT_TYPE_MAX_LENGTH) return null;
+}
+
+function isEventType(value: unknown): value is string {
+  return isString(value) && value.length >= 1 && value.length <= WEBHOOK_EVENT_TYPE_MAX_LENGTH;
+}
+
+function decodeWebhookBody(body: Uint8Array): DecodedWebhookBody | null {
+  const value = parseJsonObject(body);
+  if (!value || !isEventType(value.type)) return null;
   if (value.occurredAt !== undefined && (!isString(value.occurredAt) || Number.isNaN(Date.parse(value.occurredAt))))
     return null;
   const data = value.data ?? null;
   if (!isEventJsonValue(data)) return null;
   return { type: value.type, occurredAt: value.occurredAt ?? null, data };
+}
+
+/**
+ * A Standard Webhooks body: `type`, an optional `timestamp`, and fields that each sender names, such as
+ * Composio's `metadata.trigger_slug`. The whole body is the event data, so filters and the agent read
+ * every field. A `timestamp` that is not an ISO 8601 date is ignored: the sender defines it, not OpenBot.
+ */
+const ISO_DATE_PREFIX = /^\d{4}-\d{2}-\d{2}T/u;
+
+function decodeStandardWebhookBody(body: Uint8Array): DecodedWebhookBody | null {
+  const value = parseJsonObject(body);
+  if (!value || !isEventType(value.type) || !isEventJsonValue(value)) return null;
+  const occurredAt =
+    isString(value.timestamp) && ISO_DATE_PREFIX.test(value.timestamp) && !Number.isNaN(Date.parse(value.timestamp))
+      ? value.timestamp
+      : null;
+  return { type: value.type, occurredAt, data: value };
 }
 
 /**
@@ -240,6 +269,24 @@ export class HostEventsService implements HostEventsApi {
       const secretCiphertext = yield* this.#encrypt(secret);
       yield* eventStep(() => this.#options.routines.routes.rotateSecret(input.owner, input.id, secretCiphertext));
       return { secret };
+    },
+    (operation) => this.#writes.withPermit(operation),
+  ).bind(this);
+
+  /**
+   * Replaces the signing secret of a webhook routine with one that the sender made, for a sender
+   * that cannot use a secret from the host. The route ID and the URL stay the same.
+   */
+  readonly setSecret = Effect.fn("HostEvents.setSecret")(
+    function* (this: HostEventsService, input: SetWebhookSecretInput) {
+      const secret = input.secret.trim();
+      if (!SENDER_SECRET_PATTERN.test(secret))
+        return yield* eventFailure(sourceText("error.backend.webhookSenderSecretInvalid"));
+      const routine = yield* this.#requireRoutine(input);
+      if (routine.trigger.kind !== "webhook")
+        return yield* eventFailure(sourceText("error.backend.webhookSettingsInvalid"));
+      const secretCiphertext = yield* this.#encrypt(secret);
+      yield* eventStep(() => this.#options.routines.routes.rotateSecret(input.owner, input.id, secretCiphertext));
     },
     (operation) => this.#writes.withPermit(operation),
   ).bind(this);
@@ -464,11 +511,11 @@ export class HostEventsService implements HostEventsApi {
       logger.warn("A webhook signing secret could not be decrypted.");
       return { status: 503, received: null };
     }
-    const authenticated = yield* Effect.result(
-      eventStep(() => verifyWebhookSignature(secret.success, input, input.signature)),
-    );
+    const standard = input.format === STANDARD_WEBHOOKS_FORMAT;
+    const verify = standard ? verifyStandardWebhookSignature : verifyWebhookSignature;
+    const authenticated = yield* Effect.result(eventStep(() => verify(secret.success, input, input.signature)));
     if (authenticated._tag === "Failure") return { status: 401, received: null };
-    const body = decodeWebhookBody(input.body);
+    const body = standard ? decodeStandardWebhookBody(input.body) : decodeWebhookBody(input.body);
     if (!body) return { status: 400, received: null };
     const receivedAt = new Date().toISOString();
     const event = {
@@ -581,6 +628,11 @@ export class HostEventsService implements HostEventsApi {
  * a new secret for the user.
  */
 export function agentWebhookRoutineWriter(events: HostEventsService): WebhookRoutineWriter {
+  const toolFailure = (failure: HostEventsFailure) => {
+    // A reason the model can correct, such as the route limit, comes back as a tool failure.
+    const message = hostEventsFailureMessage(failure);
+    return new RoutineOperationFailed({ cause: message === null ? failure : new RoutineInputError(message) });
+  };
   return {
     save: ({ routineId, agentId, eventType, filters, ...routine }) =>
       events
@@ -592,11 +644,9 @@ export function agentWebhookRoutineWriter(events: HostEventsService): WebhookRou
         })
         .pipe(
           Effect.map((saved) => saved.routine),
-          Effect.mapError((failure) => {
-            // A reason the model can correct, such as the route limit, comes back as a tool failure.
-            const message = hostEventsFailureMessage(failure);
-            return new RoutineOperationFailed({ cause: message === null ? failure : new RoutineInputError(message) });
-          }),
+          Effect.mapError(toolFailure),
         ),
+    delete: ({ agentId, routineId }) =>
+      events.deleteRoutine({ owner: { kind: "agent", id: agentId }, id: routineId }).pipe(Effect.mapError(toolFailure)),
   };
 }

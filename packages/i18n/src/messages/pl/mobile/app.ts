@@ -7,7 +7,7 @@ export const messages = {
   "mobile.app.route.newChannel": "Nowy kanał",
   "mobile.app.route.createAgent": "Utwórz agenta",
   "mobile.app.route.addSharedAgent": "Dodaj udostępnionego agenta",
-  "mobile.app.route.newSection": "Nowa sekcja",
+  "mobile.app.route.newSection": "Nowy folder",
   "mobile.app.route.settings": "Ustawienia",
   "mobile.app.route.profile": "Profil",
   "mobile.app.route.accountSessions": "Sesje konta",

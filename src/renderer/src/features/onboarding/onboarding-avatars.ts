@@ -5,7 +5,6 @@ const ONBOARDING_AVATAR_HUES: readonly AvatarHue[] = [0, 30, 55, 100, 150, 185, 
 export type OnboardingAvatarVariant = {
   seed: string;
   hue: AvatarHue;
-  cycleOffset: number;
   animationOffset: number;
 };
 
@@ -18,7 +17,6 @@ export function createOnboardingAvatarVariant(sessionSeed: string, slot: string)
   return {
     seed: `${sessionSeed}:${slot}:${randomUnit().toString(36)}`,
     hue: randomItem(ONBOARDING_AVATAR_HUES),
-    cycleOffset: randomInt(12),
     animationOffset: randomUnit() * 2.4,
   };
 }

@@ -1,3 +1,4 @@
+import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import type { AgentEvent, DynamicIslandAgentIdentity, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
@@ -23,7 +24,6 @@ import {
 import { encodeLiveActivityBytes } from "@openbot/team-client/live-activity-seal";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert } from "react-native";
-import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { useLiveActivitiesPreference } from "@/features/settings/model/live-activities";
@@ -189,28 +189,48 @@ export function useLiveActivity({
     live?.native.removeAvatars(new Set([...avatars.current.values()].filter((file) => file !== null)));
   }, [live]);
 
-  /** The file of a drawn bloub. It draws the picture the first time. */
-  const bloubFile = useCallback(
-    (agent: Pick<DynamicIslandAgentIdentity, "avatarSeed" | "avatarHue">, mood: LiveActivityMood): string => {
-      if (!live) return "";
+  // `drawBloub` publishes when a picture is ready, and `publish` asks for the pictures it lacks, so
+  // neither depends on the other.
+  const publishRef = useRef<() => void>(() => undefined);
+  /**
+   * Draws the plush of an agent with the face of `mood` into the App Group, the first time it is
+   * needed. Until then the activity shows the mode symbol.
+   */
+  const drawBloub = useCallback(
+    async (agent: Pick<DynamicIslandAgentIdentity, "avatarSeed" | "avatarHue">, mood: LiveActivityMood) => {
+      if (!live) return;
       const file = liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood);
-      const saved = avatars.current.get(file);
-      if (saved !== undefined) return saved ?? "";
+      if (avatars.current.has(file)) return;
+      if (live.native.hasAvatar(file)) {
+        avatars.current.set(file, file);
+        return;
+      }
+      avatars.current.set(file, null);
       let written: string | null = null;
       try {
-        if (live.native.hasAvatar(file)) written = file;
-        else {
-          const dataUrl = live.native.renderBloub(agent.avatarSeed, agent.avatarHue, mood);
-          const base = liveActivityFileName(["bloub", agent.avatarSeed, String(agent.avatarHue ?? ""), mood]);
-          written = dataUrl ? live.native.saveAvatar(base, dataUrl) : null;
-        }
+        const dataUrl = await live.native.renderBloub(agent.avatarSeed, agent.avatarHue, mood);
+        if (disposed.current) return;
+        const base = liveActivityFileName(["bloub", agent.avatarSeed, String(agent.avatarHue ?? ""), mood]);
+        written = live.native.saveAvatar(base, dataUrl);
       } catch {
         // Without the picture the activity shows the mode symbol.
       }
       avatars.current.set(file, written);
-      return written ?? "";
+      if (written) publishRef.current();
     },
     [live],
+  );
+
+  /** The file of a drawn plush, or "" while it is drawn. */
+  const bloubFile = useCallback(
+    (agent: Pick<DynamicIslandAgentIdentity, "avatarSeed" | "avatarHue">, mood: LiveActivityMood): string => {
+      const file = liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood);
+      const saved = avatars.current.get(file);
+      if (saved !== undefined) return saved ?? "";
+      void drawBloub(agent, mood);
+      return avatars.current.get(file) ?? "";
+    },
+    [drawBloub],
   );
 
   /** The `force` skips the background interval, for the stale date that the app must send before iOS suspends it. */
@@ -239,7 +259,7 @@ export function useLiveActivity({
       const servers = new Set(shownOrder);
       const props = liveActivityView(presentation, {
         t: currentText().t,
-        agentColor: getBloubAvatarColor,
+        agentColor: avatarHeadColor,
         avatar,
         unreadAgents: agentsRef.current
           // An agent with its notifications off is not in the island, so it is not in the list.
@@ -278,17 +298,22 @@ export function useLiveActivity({
 
       function avatar(serverId: string, agent: DynamicIslandAgentIdentity, mood: LiveActivityMood): string {
         if (!live) return "";
-        // The app avatar without a photo is the bloub. Its picture is drawn once for each face.
+        // The app avatar without a photo is the plush. Its picture is drawn once for each face.
         if (!agent.avatarUrl) return bloubFile(agent, mood);
         const name = photoName(serverId, agent.id, agent.avatarUrl);
         const saved = avatars.current.get(name);
-        if (saved !== undefined) return saved ?? "";
-        loadPhotoRef.current(serverId, agent.id, agent.avatarUrl);
-        return "";
+        if (saved) return saved;
+        if (saved === undefined) loadPhotoRef.current(serverId, agent.id, agent.avatarUrl);
+        // As in the app, the plush shows while the photo loads, or when it cannot load.
+        return bloubFile(agent, mood);
       }
     },
     [live, liveState, syncFor, bloubFile, keepAvatars],
   );
+  publishRef.current = () => {
+    if (!foregroundRef.current) publish();
+    else timer.current ??= setTimeout(publish, PUBLISH_DELAY_MS);
+  };
 
   /** Loads an agent photo into the App Group, then publishes again with it. */
   const loadPhoto = useCallback(
@@ -555,15 +580,14 @@ export function useLiveActivity({
     const serverAgents = agentsRef.current.filter((agent) => agent.serverId === pushServerId);
     void (async () => {
       // The host names only pictures that exist, so the phone draws each face before the host needs it.
+      // The host names the plush of an agent whose photo it was not given, so a photo agent has its
+      // plush too.
       let drawn = 0;
       for (const agent of serverAgents) {
-        if (agent.avatarUrl) {
-          loadPhotoRef.current(pushServerId, agent.id, agent.avatarUrl);
-          continue;
-        }
+        if (agent.avatarUrl) loadPhotoRef.current(pushServerId, agent.id, agent.avatarUrl);
         for (const mood of LIVE_ACTIVITY_MOODS) {
           if (avatars.current.has(liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood))) continue;
-          bloubFile(agent, mood);
+          await drawBloub(agent, mood);
           drawn += 1;
           if (drawn % BLOUBS_PER_PAUSE === 0) await new Promise((resolve) => setTimeout(resolve, 0));
           if (cancelled) return;
@@ -612,7 +636,7 @@ export function useLiveActivity({
     foreground,
     photos,
     post,
-    bloubFile,
+    drawBloub,
     keepAvatars,
     enqueueRegistration,
   ]);

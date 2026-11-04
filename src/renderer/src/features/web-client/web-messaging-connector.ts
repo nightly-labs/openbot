@@ -3,7 +3,7 @@
 // names. A Slack or Discord install returns to a page of this origin, which gives the sealed grant
 // back to this tab (`@openbot/contracts/web-messaging-install`). This tab sends it on to the host.
 
-import { type MessagingPlatform, messagingPage } from "@openbot/contracts/ipc";
+import { type ConnectorMessagingPlatform, messagingPage } from "@openbot/contracts/ipc";
 import {
   decodeWebMessagingInstallGrant,
   decodeWebMessagingInstallMark,
@@ -136,7 +136,7 @@ export function webHostMessaging(
    */
   const withTab = async (
     serverId: string,
-    platform: MessagingPlatform,
+    platform: ConnectorMessagingPlatform,
     open: (target: TeamApiRequest) => Effect.Effect<MessagingConnectorPage, TeamAdminRequestError>,
   ) => {
     const tab = window.open("about:blank", "_blank");

@@ -1,4 +1,5 @@
 import type {
+  AgentModelListing,
   AgentProviderId,
   AgentProviderStatus,
   AgentStatus,
@@ -20,11 +21,14 @@ import { currentText } from "../text";
 
 /** The efforts that have a name in the catalog. The other efforts show their id. */
 const EFFORT_LABELS: Partial<Record<string, AppTextKey>> = {
+  none: "provider.effort.none",
+  minimal: "provider.effort.minimal",
   low: "provider.effort.low",
   medium: "provider.effort.medium",
   high: "provider.effort.high",
   xhigh: "provider.effort.xhigh",
   max: "provider.effort.max",
+  ultra: "provider.effort.ultra",
 };
 
 export interface PickerModel {
@@ -35,6 +39,8 @@ export interface PickerModel {
   service: string;
   free: boolean;
   variants: { id: string; name: string }[];
+  /** From the host: `older` folds the model under Older models, and `new` labels a recent release. */
+  listing?: AgentModelListing;
 }
 
 export interface PickerModelGroup {
@@ -178,6 +184,7 @@ export function pickerModels(options: ClientAgentModelOption[]): PickerModel[] {
         variants: variants.has(model.id)
           ? [{ id: model.id, name: t("app.modelVariant.default") }, ...(variants.get(model.id) ?? [])]
           : [],
+        ...(model.listing ? { listing: model.listing } : {}),
       };
     });
 }

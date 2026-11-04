@@ -92,6 +92,7 @@ export const messages = {
   "error.remote.fileTransferFailed": "La transferencia de archivos WebRTC falló.",
   "error.remote.fileResumeFailed": "La transferencia de archivos WebRTC no pudo reanudarse antes de su plazo límite.",
   "error.remote.fileTransportStopped": "El transporte de archivos WebRTC se detuvo.",
+  "error.remote.downloadStopped": "Se detuvo la descarga.",
   "error.remote.fileResumeExpired": "El plazo para reanudar la transferencia de archivos WebRTC venció.",
   "error.remote.hostRequestFailed": "El host no pudo completar la solicitud.",
   "error.remote.responseTooLarge": "La respuesta del host es demasiado grande para enviarla a este dispositivo.",
@@ -197,4 +198,6 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "Actualiza este servidor de escritorio para eliminar canales.",
   "error.remote.historyRefreshFailed": "El mensaje se envió, pero no se pudo actualizar el historial del chat.",
   "error.remote.taskHistoryRefreshFailed": "La tarea se cambió, pero no se pudo actualizar el historial del chat.",
+  "error.remote.localServerAccountRemovalFailed":
+    "El servidor está eliminado en su ordenador, pero la cuenta aún lo muestra. Elimínalo otra vez para quitarlo de la cuenta.",
 } as const satisfies PartialTranslation<typeof source>;

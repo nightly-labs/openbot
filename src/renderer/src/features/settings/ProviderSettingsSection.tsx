@@ -51,6 +51,7 @@ import {
 } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import {
   type ProviderDefaultChoice,
+  type ProviderModelVisibilityControl,
   type ProviderPromptCache,
   type ProviderSettingsDetail,
   ProviderSettingsPage,
@@ -61,6 +62,8 @@ import { createEffect, createMemo, createSignal, createStore, Show, untrack } fr
 import { ProviderSignInDialogs } from "../../components/ProviderSignInDialogs";
 import type { ProviderConnectionApi } from "../../components/provider-connection-api";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
+import { createHostDefaultProvider, type HostDefaultProviderSource } from "./provider-host-default";
+import { createProviderModelVisibility, type ProviderModelVisibilitySource } from "./provider-model-visibility";
 import { createProviderPromptCache, type ProviderPromptCacheSource } from "./provider-prompt-cache";
 import { createSettingsGeneralStore, type SettingsGeneralStore } from "./stores/general-store";
 
@@ -112,6 +115,7 @@ interface ProviderSettingsSectionProps {
   usage?: readonly AccountUsageProviderRow[] | undefined;
   onDetailChange?: ((detail: ProviderSettingsDetail | null) => void) | undefined;
   promptCache?: ProviderPromptCache | undefined;
+  modelVisibility?: ((provider: AgentProviderId) => ProviderModelVisibilityControl) | undefined;
 }
 
 /** The provider list of the computer the agents run on, with its custom endpoint dialogs. */
@@ -286,6 +290,7 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
         menuMount={props.selectMount}
         onDetailChange={props.onDetailChange}
         promptCache={props.promptCache}
+        modelVisibility={props.modelVisibility}
         footer={
           <>
             <Show when={props.providerDetection}>
@@ -531,9 +536,18 @@ export function HostProviderSettingsPanel(
     onDetailChange?: ((detail: ProviderSettingsDetail | null) => void) | undefined;
     /** The Claude page's prompt cache time, for a host with `prompt-cache-ttl-v1` that this account administers. */
     promptCache?: ProviderPromptCacheSource | undefined;
+    /** The Models section of each provider page, for a host with `model-visibility-v1` that this account administers. */
+    modelVisibility?: ProviderModelVisibilitySource | undefined;
+    /** The Default provider of a joined host with `provider-default-v1` that this account administers. */
+    hostDefaultProvider?: HostDefaultProviderSource | undefined;
   },
 ) {
+  const hostDefaultProvider = createHostDefaultProvider(() => props.hostDefaultProvider);
   const promptCache = createProviderPromptCache(() => props.promptCache);
+  const modelVisibility = createProviderModelVisibility(
+    () => props.modelVisibility,
+    () => props.agentStatus,
+  );
   const keys = createProviderKeyState({
     open: true,
     get providerKeys() {
@@ -568,7 +582,7 @@ export function HostProviderSettingsPanel(
   return (
     <>
       <ProviderSettingsSection
-        defaultProvider={props.defaultProvider}
+        defaultProvider={props.defaultProvider ?? hostDefaultProvider()}
         store={store}
         selectMount={props.selectMount}
         onDownloadProvider={props.onDownloadProvider}
@@ -597,6 +611,7 @@ export function HostProviderSettingsPanel(
         usage={props.usage}
         onDetailChange={props.onDetailChange}
         promptCache={promptCache()}
+        modelVisibility={modelVisibility()}
         detectionSettings={
           <Show when={props.detectionSettings}>
             {(value) => (

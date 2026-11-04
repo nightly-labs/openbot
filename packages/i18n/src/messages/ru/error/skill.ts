@@ -46,6 +46,7 @@ export const messages = {
     "{name} установлен до появления отслеживания точных версий. Обновите или исправьте его, прежде чем публиковать.",
   "error.skill.tooManySkills": "У агента может быть не более {limit} навыков.",
   "error.skill.unmanagedExists": "Неуправляемый навык уже существует по пути {path}.",
+  "error.skill.managedSlug": "OpenBot даёт каждому агенту свой навык {slug}. Дайте этому навыку другое имя.",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md больше 64 КБ. Сократите его, прежде чем публиковать.",
   "error.skill.localNoRevisions": "У локального навыка нет опубликованных ревизий.",
   "error.skill.localNameTaken": "Локальный навык с таким именем уже существует. Измените его вместо этого.",

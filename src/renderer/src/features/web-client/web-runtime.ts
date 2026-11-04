@@ -7,6 +7,7 @@ import {
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import type {
   AccountUsage,
+  AgentColors,
   AgentEvent,
   AgentNotificationLevelsSnapshot,
   AgentStatus,
@@ -18,6 +19,7 @@ import type {
   BrowserPreview,
   BrowserTab,
   CancelQueuedMessageInput,
+  ChatColors,
   ClientAgentModelOption,
   ClientAgentSummary,
   ConversationPage,
@@ -42,6 +44,8 @@ import type {
   SetMessageReactionInput,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
+  SidebarPin,
+  SidebarPinsSnapshot,
   SteerQueuedMessageInput,
   TeamInviteSummary,
   TeamMemberSummary,
@@ -54,6 +58,8 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   canAdministerServer,
+  decodeAgentFastModels,
+  decodeAgentModelListings,
   decodeWorkspaceDirectory,
   isAccountUsage,
   isAgentStatus,
@@ -66,10 +72,17 @@ import {
   isQueueSnapshot,
   isSidebarLayoutSnapshot,
   isTeamPresenceSnapshot,
+  withFastServiceTiers,
+  withModelListings,
 } from "@openbot/contracts/ipc";
 import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
+import {
+  AGENT_FAST_MODE_CAPABILITY,
+  AGENT_FAST_MODE_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import {
   BROWSER_PAGE_STATE_CAPABILITY,
@@ -86,10 +99,20 @@ import {
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
+import { CHAT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
+import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
+import {
+  MODEL_VISIBILITY_CAPABILITY,
+  MODEL_VISIBILITY_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
+import {
+  SIDEBAR_FOLDERS_CAPABILITY,
+  SIDEBAR_FOLDERS_ROUTES,
+} from "@openbot/contracts/team-protocol/sidebar-folders-v1";
 import { type TeamProtocolSupportV1, teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
@@ -121,10 +144,17 @@ import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery
 import {
   listAgentNotificationLevels,
   listHiddenAgents,
+  readAgentColors,
+  readChatColors,
+  readSidebarPins,
+  seedSidebarPins,
+  setAgentChatColor,
+  setAgentColor,
   setAgentHidden,
   setAgentNotificationLevel,
   setAgentProviderAccount,
   setOwnServerNotificationLevel,
+  setSidebarPins,
 } from "@openbot/team-client/team-admin-requests";
 import {
   cancelQueuedMessage,
@@ -191,6 +221,11 @@ interface WebConnectOptions {
   early?: WebEarlyReads;
 }
 
+/** The message that `message-delete-v1` deletes: in the chat of an agent, or in a channel. */
+type WebMessageDelete =
+  | { kind: "agent"; agentId: string; messageId: string }
+  | { kind: "channel"; channelId: string; messageId: string };
+
 export interface WebWorkspaceRuntime {
   admin?: WebAdminRuntime;
   /** The status connections of the hosts that this tab has not opened. */
@@ -237,6 +272,11 @@ export interface WebWorkspaceRuntime {
   markRead(agentId: string, throughMessageId: string | null): Promise<ConversationReadState>;
   /** This member's read state for each agent, keyed by agent id. Invalid entries are left out. */
   conversationReads(): Promise<Record<string, ConversationReadState>>;
+  /**
+   * Deletes one message of an agent's chat or of a channel, with `message-delete-v1`. A host
+   * without it refuses before a request goes out.
+   */
+  deleteMessage?: (input: WebMessageDelete) => Promise<void>;
   /** Tells a hosted server that this tab has focus. Send it only to a host with `focus-use-v1`. */
   focusUse(): Promise<void>;
   /** Resolves to the conversation message the host stored: the delivery id of the receipt. */
@@ -278,6 +318,17 @@ export interface WebWorkspaceRuntime {
   listHiddenAgents?: () => Promise<HiddenAgentsSnapshot>;
   /** Hides or restores an agent, and returns the host's hidden list. Needs `agent-hidden-v1`. */
   setAgentHidden?: (input: SetAgentHiddenInput) => Promise<HiddenAgentsSnapshot>;
+  /** The exact colours of the agents on the host. A host without `agent-colors-v1` has none. */
+  listAgentColors?: () => Promise<AgentColors>;
+  /** The chat colours of the agents and members on the host. A host without `chat-colors-v1` has none. */
+  listChatColors?: () => Promise<ChatColors>;
+  /** The user's own pinned chats on the open host, for all of their devices. Needs `sidebar-pins-v1`. */
+  sidebarPins?: {
+    read: () => Promise<SidebarPinsSnapshot>;
+    set: (items: SidebarPin[]) => Promise<SidebarPinsSnapshot>;
+    /** Saves `items` only when the user has no list on the host yet. */
+    seed: (items: SidebarPin[]) => Promise<SidebarPinsSnapshot>;
+  };
   /**
    * The user's own level for each agent of a host: the open host, or a host with a status connection.
    * Any member can call it. A host without `agent-notification-levels-v1` has no levels.
@@ -597,6 +648,14 @@ export function createWebWorkspaceRuntime(
     }
     if (!completedDraftIdsByHost.has(hostId)) draftCleanupRetryHosts.delete(hostId);
   }
+  /** With `sidebar-folders-v1`, the layout has the parent of each folder. */
+  async function readSidebarLayout(): Promise<SidebarLayoutSnapshot> {
+    const value = capabilities.includes(SIDEBAR_FOLDERS_CAPABILITY)
+      ? await request("POST", SIDEBAR_FOLDERS_ROUTES.read, {})
+      : await request("GET", TEAM_API_ROUTES.sidebarLayout.state);
+    if (!isSidebarLayoutSnapshot(value)) throw new Error(currentText().t("error.remote.invalidData"));
+    return value;
+  }
   async function request(method: string, path: string, body: TeamProtocolV2Json = {}, upload?: RemoteFileUpload) {
     if (disposed) throw new Error(currentText().t("webClient.error.connectionClosed"));
     const current = generation;
@@ -649,8 +708,22 @@ export function createWebWorkspaceRuntime(
     if (!connectedHost) throw new Error(currentText().t("webClient.error.hostNotConnected"));
     return connectedHost;
   }
+  async function listChatColors(): Promise<ChatColors> {
+    if (!capabilities.includes(CHAT_COLORS_CAPABILITY)) return { agents: [], members: [] };
+    return runTeamEffect(readChatColors(teamApi).pipe(Effect.mapError((error) => error.cause)));
+  }
   async function listMembers(): Promise<TeamMemberSummary[]> {
-    return (await runTeamEffect(directory.listMembers(requireHost().hostId))).map(toTeamMember);
+    // The account service has no chat colours. A failed read from the host gives the members without them.
+    const [members, colors] = await Promise.all([
+      runTeamEffect(directory.listMembers(requireHost().hostId)),
+      listChatColors().catch(() => undefined),
+    ]);
+    const chatColors = new Map(colors?.members.map((entry) => [entry.memberId, entry.color]));
+    return members.map((member) => {
+      const summary = toTeamMember(member);
+      const chatColor = chatColors.get(summary.id);
+      return chatColor ? { ...summary, chatColor } : summary;
+    });
   }
   const admin: WebAdminRuntime = {
     request: teamApi,
@@ -941,13 +1014,17 @@ export function createWebWorkspaceRuntime(
     async browserPreview(tabId) {
       return decodeWebBrowserPreview(await request("POST", TEAM_API_ROUTES.browser.preview, { tabId }));
     },
-    async getSidebarLayout() {
-      const value = await request("GET", TEAM_API_ROUTES.sidebarLayout.state);
-      if (!isSidebarLayoutSnapshot(value)) throw new Error(currentText().t("error.remote.invalidData"));
-      return value;
-    },
+    getSidebarLayout: readSidebarLayout,
     async mutateSidebarLayout(action) {
-      const value = await request("POST", TEAM_API_ROUTES.sidebarLayout.actions, { ...action });
+      const folders = capabilities.includes(SIDEBAR_FOLDERS_CAPABILITY);
+      // The released route has every folder at the top: it refuses `nest`, and would drop a parent.
+      if (!folders && (action.type === "nest" || (action.type === "create" && action.parentId !== undefined)))
+        throw new Error(currentText().t("error.team.sidebarFoldersUnsupported"));
+      const value = await request(
+        "POST",
+        folders ? SIDEBAR_FOLDERS_ROUTES.actions : TEAM_API_ROUTES.sidebarLayout.actions,
+        { ...action },
+      );
       if (!isSidebarLayoutSnapshot(value)) throw new Error(currentText().t("error.remote.invalidData"));
       return value;
     },
@@ -1061,6 +1138,17 @@ export function createWebWorkspaceRuntime(
     },
     async focusUse() {
       await request("POST", FOCUS_USE_ROUTES.ping);
+    },
+    async deleteMessage(input) {
+      if (!capabilities.includes(MESSAGE_DELETE_CAPABILITY))
+        throw new Error(currentText().t("error.team.messageDeleteUnsupported"));
+      if (input.kind === "agent")
+        await request("POST", MESSAGE_DELETE_ROUTES.agent, { agentId: input.agentId, messageId: input.messageId });
+      else
+        await request("POST", MESSAGE_DELETE_ROUTES.channel, {
+          channelId: input.channelId,
+          messageId: input.messageId,
+        });
     },
     async conversationReads() {
       const value = await request("GET", TEAM_API_ROUTES.agents.conversationReads);
@@ -1206,6 +1294,16 @@ export function createWebWorkspaceRuntime(
     listHiddenAgents: () => runTeamEffect(listHiddenAgents(teamApi).pipe(Effect.mapError((error) => error.cause))),
     setAgentHidden: (input) =>
       runTeamEffect(setAgentHidden(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
+    async listAgentColors() {
+      if (!capabilities.includes(AGENT_COLORS_CAPABILITY)) return { agents: [] };
+      return runTeamEffect(readAgentColors(teamApi).pipe(Effect.mapError((error) => error.cause)));
+    },
+    listChatColors,
+    sidebarPins: {
+      read: () => runTeamEffect(readSidebarPins(teamApi).pipe(Effect.mapError((error) => error.cause))),
+      set: (items) => runTeamEffect(setSidebarPins(teamApi, items).pipe(Effect.mapError((error) => error.cause))),
+      seed: (items) => runTeamEffect(seedSidebarPins(teamApi, items).pipe(Effect.mapError((error) => error.cause))),
+    },
     async listAgentNotificationLevels(hostId) {
       if (hostId !== lockedHostId) {
         if (!hosts) throw new Error(currentText().t("webClient.error.hostChanged"));
@@ -1251,10 +1349,21 @@ export function createWebWorkspaceRuntime(
       return runTeamEffect(setOwnServerNotificationLevel(teamApi, level).pipe(Effect.mapError((error) => error.cause)));
     },
     async models() {
-      return guardedListDecoder(
+      const models = guardedListDecoder(
         isClientAgentModelOption,
         "models",
       )(await request("GET", TEAM_API_ROUTES.agents.models));
+      // The fast tiers and the picker listing are optional: when a route fails, the picker gets the
+      // models with no Fast switch or listing.
+      const [fast, listings] = await Promise.all([
+        capabilities.includes(AGENT_FAST_MODE_CAPABILITY)
+          ? request("POST", AGENT_FAST_MODE_ROUTES.models, {}).then(decodeAgentFastModels, () => [])
+          : [],
+        capabilities.includes(MODEL_VISIBILITY_CAPABILITY)
+          ? request("POST", MODEL_VISIBILITY_ROUTES.listing, {}).then(decodeAgentModelListings, () => [])
+          : [],
+      ]);
+      return withModelListings(withFastServiceTiers(models, fast), listings);
     },
     async status() {
       const value = await request("GET", TEAM_API_ROUTES.agents.status);
@@ -1267,9 +1376,20 @@ export function createWebWorkspaceRuntime(
       return value;
     },
     async createAgent(input) {
-      const value = await request("POST", TEAM_API_ROUTES.agents.all, { ...input });
+      // The released route keeps the nearest hue. The exact colour goes on `agent-colors-v1` after it.
+      const { avatarColor, ...profile } = input;
+      const value = await request("POST", TEAM_API_ROUTES.agents.all, { ...profile });
       if (!isClientAgentSummary(value)) throw new Error(currentText().t("error.remote.invalidData"));
-      return value;
+      const agent: ClientAgentSummary = value;
+      if (!avatarColor || !capabilities.includes(AGENT_COLORS_CAPABILITY)) return agent;
+      // The agent exists, so a failed colour change does not fail the create: the agent keeps its hue.
+      const colored = await runTeamEffect(
+        setAgentColor(teamApi, { agentId: agent.id, color: avatarColor }).pipe(Effect.mapError((error) => error.cause)),
+      ).then(
+        (colors) => colors.agents.some((entry) => entry.agentId === agent.id),
+        () => false,
+      );
+      return colored ? { ...agent, avatarColor } : agent;
     },
     async duplicateAgent(agentId) {
       if (!capabilities.includes("agent-duplication")) throw new Error(currentText().t("webClient.error.duplication"));
@@ -1280,15 +1400,59 @@ export function createWebWorkspaceRuntime(
       if (!isDynamicRecord(value) || !isClientAgentSummary(value.agent) || !isSidebarLayoutSnapshot(value.layout))
         throw new Error(currentText().t("error.remote.invalidData"));
       duplicateOperationIds.delete(operationKey);
-      return { agent: value.agent, layout: value.layout } satisfies DuplicateAgentResult;
+      // The released route answers the layout without the parents of the folders. The copy exists, so a
+      // failed read keeps that layout rather than failing the copy; the next layout event has the parents.
+      const answered = value.layout;
+      const layout = capabilities.includes(SIDEBAR_FOLDERS_CAPABILITY)
+        ? await readSidebarLayout().catch(() => answered)
+        : answered;
+      return { agent: value.agent, layout } satisfies DuplicateAgentResult;
     },
     async updateAgent(input) {
       // The released agent route ignores the account, so it goes on `provider-accounts-v1` after the
       // profile: a provider change there returns the agent to the new provider's own sign-in.
       // Backup models stay on the host computer: the Team API does not carry them.
-      const { providerAccountId, backupModels: _backupModels, leaveUsageLimit: _leaveUsageLimit, ...profile } = input;
+      const {
+        providerAccountId,
+        backupModels: _backupModels,
+        leaveUsageLimit: _leaveUsageLimit,
+        avatarColor,
+        chatColor,
+        ...fields
+      } = input;
       if (providerAccountId !== undefined && !capabilities.includes(PROVIDER_ACCOUNTS_CAPABILITY))
         throw new Error(currentText().t("error.team.providersUnsupported"));
+      // The released agent route does not carry the chat colour, so it goes on `chat-colors-v1` first.
+      // Without the capability, a change of only the chat colour fails. With other fields, they change
+      // and the chat colour stays.
+      const chatColors = capabilities.includes(CHAT_COLORS_CAPABILITY);
+      if (
+        chatColor !== undefined &&
+        !chatColors &&
+        Object.entries(input).every(([key, value]) => key === "agentId" || key === "chatColor" || value === undefined)
+      )
+        throw new Error(currentText().t("error.team.chatColorsUnsupported"));
+      if (chatColors && chatColor !== undefined)
+        await runTeamEffect(
+          setAgentChatColor(teamApi, { agentId: input.agentId, color: chatColor }).pipe(
+            Effect.mapError((error) => error.cause),
+          ),
+        );
+      // The released agent route does not carry the exact colour. With `agent-colors-v1` it goes on its
+      // own route first. That route also sets the nearest hue, so the profile change then leaves the hue
+      // out: on the released route a hue removes the colour. A removed colour keeps the hue, which then
+      // sets the colour that the user chose. The released route removes the colour only when the hue
+      // changes, so a removed colour always goes on the colour route. Without the capability, only the
+      // hue goes.
+      const colors = capabilities.includes(AGENT_COLORS_CAPABILITY);
+      const { avatarHue: _avatarHue, ...withoutHue } = fields;
+      const profile = colors && avatarColor ? withoutHue : fields;
+      if (colors && avatarColor !== undefined)
+        await runTeamEffect(
+          setAgentColor(teamApi, { agentId: input.agentId, color: avatarColor }).pipe(
+            Effect.mapError((error) => error.cause),
+          ),
+        );
       await request("PATCH", TEAM_API_ROUTES.agent.one(input.agentId), { ...profile });
       if (providerAccountId === undefined) return;
       await runTeamEffect(

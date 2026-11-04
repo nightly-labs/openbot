@@ -10,9 +10,9 @@ import { isPathInside } from "./path-containment";
  * The folders one Workspace only agent may write: its workspace and the shared folder. The temporary
  * folders and the provider's state are added to them.
  *
- * Grok, OpenCode, Antigravity, Cursor, Cline and Kimi take no sandbox per session, so a Workspace only
- * agent on them gets a provider process of its own, and OpenBot starts that process inside an
- * operating system sandbox. The whole process is confined: the file edit tools, the shell, and every
+ * Grok, OpenCode, Antigravity, Cursor, Cline, Kimi and Devin take no sandbox per session, so a
+ * Workspace only agent on them gets a provider process of its own, and OpenBot starts that process
+ * inside an operating system sandbox. The whole process is confined: the file edit tools, the shell, and every
  * command and MCP server it starts. Nothing inside the process can take the sandbox away. Only macOS
  * has the sandbox now: on Linux and Windows the process does not start, and the user must choose
  * Full access.
@@ -323,13 +323,42 @@ export function hermesStatePaths(env: NodeJS.ProcessEnv = process.env, home = ho
  * servers, plugins, skills and downloaded tools are in that folder too, and every other Kimi process
  * loads them, so they stay read-only.
  */
+/** The state directory of the Python Kimi CLI: `$KIMI_SHARE_DIR`, or `~/.kimi`. */
+export function kimiHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.KIMI_SHARE_DIR?.trim() || join(home, ".kimi");
+}
+
 export function kimiStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
-  const kimiHome = env.KIMI_SHARE_DIR?.trim() || join(home, ".kimi");
+  const kimiHome = kimiHomeDirectory(env, home);
   return {
     writable: unique([kimiHome, join(home, ".kimi", "plans")]),
     protected: ["config.toml", "config.json", "mcp.json", "plugins", "skills", "bin"].map((name) =>
       join(kimiHome, name),
     ),
+  };
+}
+
+/** The folder of Devin's sign-in and sessions: `$XDG_DATA_HOME/devin`, on macOS too. */
+export function devinDataDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return join(env.XDG_DATA_HOME?.trim() || join(home, ".local", "share"), "devin");
+}
+
+/**
+ * Devin CLI 3000.11.234 writes its sessions, session locks and logs in `devin/cli` of the XDG data
+ * folder, its MCP sign-ins in `devin/mcp`, its caches in the XDG cache folder and its plans in
+ * `~/.devin/plans`. Its settings and MCP servers in the XDG config folder, its sign-in and its
+ * plugins load settings or code for every other Devin process, so they stay read-only.
+ */
+export function devinStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const data = devinDataDirectory(env, home);
+  return {
+    writable: [
+      join(data, "cli"),
+      join(data, "mcp"),
+      join(env.XDG_CACHE_HOME?.trim() || join(home, ".cache"), "devin"),
+      join(home, ".devin", "plans"),
+    ],
+    protected: [join(data, "cli", "plugins")],
   };
 }
 
@@ -399,6 +428,10 @@ const PROJECT_SETTINGS = [
   ".clinerules",
   // Kimi reads its project skills and instructions from `.kimi`.
   ".kimi",
+  // Devin reads its project settings, MCP servers, hooks and skills from `.devin`, and Windsurf
+  // rules and hooks from `.windsurf`.
+  ".devin",
+  ".windsurf",
   ".pi",
   ".muse",
   // Antigravity reads project skills from `.gemini` and its customizations from these four.

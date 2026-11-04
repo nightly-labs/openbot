@@ -32,7 +32,10 @@ const config = {
         chunkSizeWarningLimit: 1_200,
       },
       optimizeDeps: {
-        include: ["@norbert_bodziony/bloub", "solid-recharts"],
+        include: ["solid-recharts"],
+        // bloub finds its plush images with `new URL(..., import.meta.url)`. A pre-bundle moves the
+        // code away from the images, so Vite serves the package as it is.
+        exclude: ["@norbert_bodziony/bloub", "@norbert_bodziony/bloub/plush"],
       },
       resolve: {
         alias: [{ find: "solid-js/web", replacement: "@solidjs/web" }],

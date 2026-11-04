@@ -8,6 +8,8 @@ export const messages = {
     "OpenBot kon Computerbesturing niet registreren in de configuratie van Codex. Controleer of je Codex-config.toml geldig en beschrijfbaar is en start OpenBot opnieuw. Je kunt Computerbesturing uitzetten in de instellingen van de teamgenoot om zonder door te gaan.",
   "error.provider.codexUnresponsive": "Codex reageerde niet meer, dus OpenBot heeft het proces beëindigd.",
   "error.provider.acpUnresponsive": "{provider} reageerde niet op tijd, dus OpenBot heeft het proces beëindigd.",
+  "error.provider.acpSignInLost":
+    "{provider} is zijn aanmelding kwijt, dus OpenBot heeft het proces beëindigd. Stuur je bericht opnieuw.",
   "error.provider.acpMcpNotLoaded":
     "{provider} heeft de tools van OpenBot niet geladen, dus deze agent kan ze niet gebruiken en zijn teamgenoten niet bereiken. Een teambeleid van {provider} kan lokale MCP-servers blokkeren. Vraag je teambeheerder om ze toe te staan en probeer het opnieuw.",
   "error.provider.endpointsReadOnly":
@@ -177,6 +179,7 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider} gaf geen geverifieerd account terug.",
   "error.provider.signInExpired": "Je inlog bij {provider} is verlopen. Log opnieuw in om door te gaan.",
   "error.provider.cliActivateFailed": "OpenBot kon de beheerde CLI niet activeren.",
+  "error.provider.noMainlandChinaSignIn": "{provider} heeft geen aanmelding voor het Chinese vasteland.",
   "error.provider.cliNewVersionNotStarted": "De nieuwe versie is niet gestart.",
   "error.provider.cliBusyReconnect":
     "De {provider} CLI werkt aan een beurt. Wacht tot die klaar is en verbind dan opnieuw.",
@@ -265,6 +268,7 @@ export const messages = {
   "error.provider.kimiNotStarted": "Kimi kon niet starten. Voer `kimi --version` uit in een terminal.",
   "error.provider.kimiVersionUnreadable": "Kan de versie van Kimi CLI niet lezen.",
   "error.provider.kimiSignIn": "Log in met Kimi Code om Kimi te gebruiken.",
+  "error.provider.devinSignIn": "Log in met Devin om Devin te gebruiken.",
   "error.provider.hermesMissing": "Hermes Agent is niet geïnstalleerd. Installeer het en probeer het opnieuw.",
   "error.provider.hermesNotStarted": "Hermes Agent kon niet starten. Voer `hermes --version` uit in een terminal.",
   "error.provider.hermesVersionUnreadable": "De versie van Hermes Agent kan niet worden gelezen.",

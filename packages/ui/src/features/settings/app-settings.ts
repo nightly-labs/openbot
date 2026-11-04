@@ -25,7 +25,7 @@ export const ACTION_SOUND_CHOICES = ["off", ...SOUND_THEMES] as const satisfies 
 export interface GeneralSettingsValue {
   /** Null hides the switch: a development run and a server cannot open at login. */
   launchAtLogin: boolean | null;
-  /** Null hides the switch: macOS always keeps running, and a server has no window. */
+  /** Null hides the switch: a server has no window. On macOS it is the menu bar switch. */
   keepRunningInBackground: boolean | null;
   /** Null hides the switch: Linux does not report a change of the power source, and a server never sleeps. */
   keepAwake: boolean | null;

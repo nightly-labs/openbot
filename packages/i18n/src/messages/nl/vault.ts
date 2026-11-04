@@ -93,4 +93,11 @@ export const messages = {
   "vault.reset": "Kluis resetten",
   "vault.resetTitle": "De kluis resetten?",
   "vault.resetDescription": "OpenBot verwijdert het kluisbestand en alle items erin. Je kunt dit niet ongedaan maken.",
+  "vault.request.private": "Gaat naar je Kluis. {agent} ziet het nooit.",
+  "vault.request.privateUnnamed": "Gaat naar je Kluis. De agent ziet het nooit.",
+  "vault.request.addLogin": "Login toevoegen",
+  "vault.request.addCard": "Kaart toevoegen",
+  "vault.request.addContact": "Adres toevoegen",
+  "vault.request.notNow": "Niet nu",
+  "vault.request.saved": "Opgeslagen in de Kluis",
 } as const satisfies PartialTranslation<typeof source>;

@@ -7,10 +7,16 @@
  * The parent passes the server name and the owner password in the environment. The password is
  * removed from the environment here, before any agent or provider process starts, so that no child
  * of this process can read it.
+ *
+ * While the desktop app is signed in, it registers this server for its account and writes the
+ * server's machine token to the control pipe. This process then also meets the owner's devices on
+ * Signal, and sends their notifications, with that token. It keeps the token in memory only.
  */
 
+import { Socket } from "node:net";
 import { isAbsolute } from "node:path";
-import { Effect } from "effect";
+import type { Readable } from "node:stream";
+import { Effect, Schema, Semaphore } from "effect";
 import type { HostService } from "./host-service";
 import { RemoteWorkflowError } from "./remote-service-effects";
 import type { TeamStore } from "./team-store";
@@ -19,6 +25,30 @@ import type { TeamStore } from "./team-store";
 export const LOCAL_SERVER_OWNER_USERNAME = "owner";
 /** The prefix of the one stdout line that tells the parent where the Team API listens. */
 export const LOCAL_SERVER_READY_PREFIX = "OPENBOT_LOCAL_SERVER_READY ";
+
+/**
+ * The pipe from the desktop app on Windows: there Electron replaces `process.stdin` with a stream that
+ * only ends (#4868). On the other systems the pipe is standard input, which the processes that this
+ * server starts do not inherit.
+ */
+export const LOCAL_SERVER_CONTROL_FD = 3;
+
+/**
+ * The pipe from the desktop app: its commands, and its end when the app stops. Null when the parent
+ * gave no pipe, so that this process cannot know when the app stops.
+ */
+export function openLocalServerControl(
+  platform: NodeJS.Platform,
+  onFailure: (cause: unknown) => void,
+): Readable | null {
+  if (platform !== "win32") return process.stdin;
+  try {
+    return new Socket({ fd: LOCAL_SERVER_CONTROL_FD, readable: true, writable: false });
+  } catch (error) {
+    onFailure(error);
+    return null;
+  }
+}
 
 export const LOCAL_SERVER_ENVIRONMENT = {
   child: "OPENBOT_LOCAL_SERVER_CHILD",
@@ -44,6 +74,38 @@ export interface LocalServerReady {
   apiUrl: string;
   fingerprint: string;
   publicKey: string;
+  /** The member that the account service records as the owner's membership when the parent registers this server. */
+  ownerMemberId: string;
+}
+
+/**
+ * A line that the parent writes to the control pipe. `publish` gives the machine token of this server's
+ * registration; `unpublish` follows a sign-out of the desktop app. No other process sees the token.
+ */
+const localServerCommandSchema = Schema.Union([
+  Schema.Struct({ type: Schema.Literal("publish"), machineToken: Schema.String }),
+  Schema.Struct({ type: Schema.Literal("unpublish") }),
+]);
+export type LocalServerCommand = typeof localServerCommandSchema.Type;
+const decodeLocalServerCommand = Schema.decodeUnknownSync(localServerCommandSchema);
+
+export function formatLocalServerCommand(command: LocalServerCommand): string {
+  return `${JSON.stringify(command)}\n`;
+}
+
+/** Null for a line that is not a command, so a stray line does nothing. */
+function parseLocalServerCommand(line: string): LocalServerCommand | null {
+  try {
+    return decodeLocalServerCommand(JSON.parse(line));
+  } catch {
+    return null;
+  }
+}
+
+/** How this server meets the owner's devices once the parent registered it. */
+interface LocalServerPublisher {
+  publish(machineToken: string): Effect.Effect<void, RemoteWorkflowError>;
+  unpublish(): Effect.Effect<void, RemoteWorkflowError>;
 }
 
 /**
@@ -72,9 +134,14 @@ export function formatLocalServerReady(ready: LocalServerReady): string {
 
 export interface StartLocalServerChildOptions {
   environment: LocalServerChildEnvironment;
-  teamStore: Pick<TeamStore, "configured" | "configure" | "getIdentity">;
+  teamStore: Pick<TeamStore, "configured" | "configure" | "getIdentity" | "getOwnerMemberId">;
   host: Pick<HostService, "startLoopbackOnly">;
   writeReady: (line: string) => void;
+  /** Calls `onLine` with each line of the control pipe. */
+  readCommands: (onLine: (line: string) => void) => void;
+  publisher: LocalServerPublisher;
+  /** A failed command leaves the server on loopback only. The message names no secret. */
+  warn: (message: string, cause: unknown) => void;
 }
 
 /**
@@ -86,15 +153,36 @@ export const startLocalServerChild = Effect.fn("LocalServerChild.start")(functio
   teamStore,
   host,
   writeReady,
+  readCommands,
+  publisher,
+  warn,
 }: StartLocalServerChildOptions) {
   if (!teamStore.configured)
     yield* teamStore.configure(environment.serverName, LOCAL_SERVER_OWNER_USERNAME, environment.ownerSecret);
   const status = yield* host.startLoopbackOnly();
   const identity = teamStore.getIdentity();
+  const ownerMemberId = teamStore.getOwnerMemberId();
   // The parent waits for the ready line. An error ends this process now, so the parent does not wait
   // for its time limit.
-  if (!identity || !status.apiUrl)
+  if (!identity || !status.apiUrl || !ownerMemberId)
     return yield* new RemoteWorkflowError({ cause: new Error("The local server has no identity or API address.") });
+  // Before the ready line: the parent can write a command as soon as it reads that line. One command
+  // runs at a time, in the order the parent wrote them.
+  const commands = Semaphore.makeUnsafe(1);
+  readCommands((line) => {
+    const command = parseLocalServerCommand(line);
+    if (!command) return;
+    const run = command.type === "publish" ? publisher.publish(command.machineToken) : publisher.unpublish();
+    Effect.runFork(
+      commands.withPermit(
+        run.pipe(
+          Effect.catch((error) =>
+            Effect.sync(() => warn(`The server on this computer did not ${command.type}.`, error.cause)),
+          ),
+        ),
+      ),
+    );
+  });
   writeReady(
     formatLocalServerReady({
       serverId: identity.serverId,
@@ -102,6 +190,7 @@ export const startLocalServerChild = Effect.fn("LocalServerChild.start")(functio
       apiUrl: status.apiUrl,
       fingerprint: identity.fingerprint,
       publicKey: identity.publicKey,
+      ownerMemberId,
     }),
   );
 });

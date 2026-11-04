@@ -3,11 +3,12 @@ import { constants } from "node:fs";
 import { access, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, extname, isAbsolute, join, posix, resolve, win32 } from "node:path";
-import { promisify } from "node:util";
+import { promisify, stripVTControlCharacters } from "node:util";
 import { type AgentProviderId, agentProviderName } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Result } from "effect";
+import type { SignInRegion } from "./kimi-region";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
 
 const execFileAsync = promisify(execFile);
@@ -19,8 +20,7 @@ const MINIMUM_GROK_VERSION = [1, 0, 5] as const;
 // The first Cline CLI that OpenBot was checked with: its sessions run in-process and it answers a lost
 // session with the ACP resource-not-found error.
 const MINIMUM_CLINE_VERSION = [3, 0, 68] as const;
-// The first Kimi Code CLI that OpenBot was checked with: `kimi acp`, `kimi login --json` and
-// `kimi logout`.
+// The first checked Python Kimi CLI. Login capabilities are probed before code sign-in.
 const MINIMUM_KIMI_VERSION = [1, 52, 0] as const;
 
 /** What every resolved provider CLI carries. */
@@ -604,6 +604,52 @@ export const resolveKimiCli: (input?: {
   Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
 );
 
+/**
+ * The arguments of `kimi login`. The Python CLI supports JSON, and takes its region from the
+ * variables of `kimiPythonLoginEnv`. Kimi Code 2.x prints a device code as text, and takes the
+ * region as an option: without it, a first sign-in goes to kimi.com.
+ */
+export const kimiLoginArgs = Effect.fn("Cli.kimiLoginArgs")(function* (
+  cli: { executable: string; launchPath?: string },
+  env: Readonly<Record<string, string>>,
+  options: { code: boolean; region: SignInRegion },
+): Effect.fn.Return<readonly string[], ProviderClientOperationError> {
+  const target = cliSpawnTarget(cli.executable, ["login", "--help"]);
+  const probe = Effect.tryPromise({
+    try: (signal) =>
+      execFileAsync(target.command, target.args, {
+        signal,
+        timeout: CLI_VERSION_TIMEOUT_MS,
+        maxBuffer: 64 * 1024,
+        windowsHide: process.platform === "win32",
+        windowsVerbatimArguments: target.windowsVerbatimArguments,
+        env: { ...process.env, ...cliPathEnvironment(cli), ...env },
+      }),
+    catch: (cause) => {
+      const timedOut = isDynamicRecord(cause) && cause.killed === true;
+      return providerFailure(
+        new CodexCliError(
+          timedOut
+            ? sourceText("error.provider.cliTimedOutRefresh", { provider: agentProviderName("kimi") })
+            : sourceText("error.provider.noCodeSignIn", { provider: agentProviderName("kimi") }),
+          timedOut ? "timeout" : "invalid",
+        ),
+      );
+    },
+  });
+  // A browser sign-in needs no option, so a probe that fails keeps the plain `kimi login`.
+  const output = options.code ? yield* probe : yield* Effect.orElseSucceed(probe, () => ({ stdout: "", stderr: "" }));
+  const help = stripVTControlCharacters(`${output.stdout}\n${output.stderr}`);
+  if (/\bkimi\b/i.test(help)) {
+    if (/--json(?:\s|[,=]|$)/u.test(help)) return options.code ? ["login", "--json"] : ["login"];
+    if (/--region\b/u.test(help) && /device-code/u.test(help)) return ["login", "--region", options.region];
+  }
+  if (!options.code) return ["login"];
+  return yield* providerFailure(
+    new CodexCliError(sourceText("error.provider.noCodeSignIn", { provider: agentProviderName("kimi") }), "invalid"),
+  );
+});
+
 function bundledOpencodeExecutable(
   platform = process.platform,
   architecture = process.arch,
@@ -729,9 +775,9 @@ function isMinimumVersion(version: string, minimum: readonly number[]): boolean 
   return true;
 }
 
-/** Resolves native RPC providers through the same explicit/managed/system precedence. */
+/** Resolves the native providers through the same explicit/managed/system precedence. */
 const resolveNativeCli = Effect.fn("Cli.resolveNativeCli")(function* (
-  provider: "pi" | "muse",
+  provider: "pi" | "muse" | "devin",
   input: { systemCandidates?: string[]; bundledExecutable?: string | null | undefined } = {},
 ): Effect.fn.Return<AgentCliInfo, ProviderClientOperationError> {
   const candidates = yield* cliCandidates(provider, input.systemCandidates, input.bundledExecutable ?? null);
@@ -743,7 +789,7 @@ const resolveNativeCli = Effect.fn("Cli.resolveNativeCli")(function* (
     const attempt = yield* Effect.result(
       Effect.gen(function* () {
         const { stdout, launch } = yield* readCliVersion(candidate, provider);
-        const version = provider === "pi" ? parsePiVersion(stdout) : parseMuseVersion(stdout);
+        const version = NATIVE_VERSION_PARSERS[provider](stdout);
         if (provider === "pi" && !isMinimumVersion(version, [1, 1, 0]))
           throw new CodexCliError(sourceText("error.provider.piOutdated", { version }), "outdated");
         return { executable: candidate.executable, version, source: candidate.source, ...launch };
@@ -773,19 +819,38 @@ export const resolveMuseCli = (input?: {
   systemCandidates?: string[];
   bundledExecutable?: string | null | undefined;
 }) => resolveNativeCli("muse", input);
+export const resolveDevinCli = (input?: {
+  systemCandidates?: string[];
+  bundledExecutable?: string | null | undefined;
+}) => resolveNativeCli("devin", input);
 
-export function parsePiVersion(output: string): string {
+function parsePiVersion(output: string): string {
   const match = output.trim().match(/(?:^|\s)v?(\d+\.\d+\.\d+)(?:[-+][\w.-]+)?(?:\s|$)/u);
   if (!match?.[1])
     throw new CodexCliError(sourceText("error.provider.nativeVersionUnreadable", { provider: "Pi" }), "invalid");
   return match[1];
 }
-export function parseMuseVersion(output: string): string {
+function parseMuseVersion(output: string): string {
   const match = output.match(/\b\d+\.\d+\.\d+-R\d+(?:\.\d+)?\b/u) ?? output.match(/\b\d+\.\d+\.\d+\b/u);
   if (!match)
     throw new CodexCliError(sourceText("error.provider.nativeVersionUnreadable", { provider: "Muse" }), "invalid");
   return match[0];
 }
+
+/** Devin CLI 3000.11.234 prints `devin 3000.11.234 (92c83011d113)`. */
+function parseDevinVersion(output: string): string {
+  const match = output.match(/\bdevin[ \t]+v?(\d+\.\d+\.\d+)\b/iu) ?? output.match(/\b\d+\.\d+\.\d+\b/u);
+  if (!match)
+    throw new CodexCliError(sourceText("error.provider.nativeVersionUnreadable", { provider: "Devin" }), "invalid");
+  return match[1] ?? match[0];
+}
+
+/** The version parser of each native provider CLI. */
+export const NATIVE_VERSION_PARSERS: Readonly<Record<"pi" | "muse" | "devin", (output: string) => string>> = {
+  pi: parsePiVersion,
+  muse: parseMuseVersion,
+  devin: parseDevinVersion,
+};
 
 export function isVersion(value: string): boolean {
   return /^\d+\.\d+\.\d+(?:(?:-\d{2}-\d{2}-\d{2})?-[0-9a-f]{7,40})?$/u.test(value);

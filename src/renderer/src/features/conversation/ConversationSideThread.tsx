@@ -28,6 +28,7 @@ export function ConversationSideThread(props: { threadId: string }) {
     openExternalMessageUrl,
     previewAttachment,
     attachmentAction,
+    attachmentDownloads,
     installedSkills,
     installedSkillsLoadFailed,
     mcpServers,
@@ -104,6 +105,22 @@ export function ConversationSideThread(props: { threadId: string }) {
     if (!view.threads?.onBranch) return undefined;
     return (messageId: string) => void branchThread(props.threadId, messageId);
   };
+  /** Deletes a message of this thread. A host without `message-delete-v1` has no Delete item. */
+  const deleteMessage = () => {
+    const remove = view.threads?.onDeleteMessage;
+    const taskId = thread()?.task.id;
+    if (!remove || !taskId) return undefined;
+    return (messageId: string) => remove(taskId, messageId);
+  };
+  /** Replies to a message of this thread. */
+  const reply = () => {
+    if (!view.threads?.acceptsReplies) return undefined;
+    return (message: AgentMessage) => threadComposer.setReply(draftKey(), message.id);
+  };
+  const replyTo = () => {
+    const id = view.threads?.acceptsReplies ? draft()?.replyToMessageId : null;
+    return id ? messages.find((message) => message.id === id) : undefined;
+  };
   /** Where this thread came from, when it is a branch. The agent's own chat shows the agent's name. */
   const branchSource = (side: SideThread, agentName: string): AgentThreadBranchSource | undefined => {
     const source = view.threads?.branchSource(side.task);
@@ -140,7 +157,7 @@ export function ConversationSideThread(props: { threadId: string }) {
             rowAttachments={rowImages()}
             pendingImages={threadComposer.pendingImages(draftKey())}
             onRemoveAttachment={(attachment) => threadComposer.removeAttachment(draftKey(), attachment.id)}
-            onPasteFiles={(files, selection) => threadComposer.pasteFiles(files, selection, draftKey())}
+            onPasteFiles={(files, selection, text) => threadComposer.pasteFiles(files, selection, draftKey(), text)}
             onDraftChange={(text) => threadComposer.setText(draftKey(), text)}
             onOpenDraftAttachment={(attachment) =>
               canPreviewAttachment(attachment)
@@ -148,6 +165,7 @@ export function ConversationSideThread(props: { threadId: string }) {
                 : attachmentAction(attachment, "open")
             }
             mediaSource={view.runtime?.attachmentMedia}
+            downloads={attachmentDownloads}
             onSend={(text) => sendSide(current().thread, text)}
             onStop={() => current().thread.onStop()}
             onOpenLink={(url) => void openExternalMessageUrl(url)}
@@ -168,7 +186,12 @@ export function ConversationSideThread(props: { threadId: string }) {
             onCopyMessage={(message) => void copyMessage(message)}
             copiedMessageId={copiedMessageId()}
             onBranch={branch()}
+            onDeleteMessage={deleteMessage()}
+            canDeleteMessage={view.canDeleteMessage}
             branchSource={branchSource(current().thread, current().agent.name)}
+            onReply={reply()}
+            replyTo={replyTo()}
+            onCancelReply={() => threadComposer.setReply(draftKey(), null)}
           />
         )}
       </Show>

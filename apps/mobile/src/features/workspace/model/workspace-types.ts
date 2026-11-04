@@ -11,12 +11,14 @@ import type {
   AgentBackupModelSettings,
   AgentBrowserProfile,
   AgentExclusionChange,
+  AgentFastModeSettings,
   AgentFolderBrowse,
   AgentFolderChange,
   AgentFolderInput,
   AgentFolderList,
   AgentHostSettings,
   AgentImportPreview,
+  AgentInstructionsFile,
   AgentMemory,
   AgentMemorySelectionState,
   AgentModelId,
@@ -36,14 +38,17 @@ import type {
   AgentTemplatePublication,
   ApplyAgentImportInput,
   ApplyInstanceTransferInput,
+  AvatarColor,
   AvatarHue,
   AvatarImageInput,
   BitwardenConnectorStatus,
   BitwardenHostConnectInput,
+  BranchAgentTaskInput,
   BrowserProfileList,
   BrowserProfileSummary,
   ClearableStorageCategory,
   ClearBrowserDataInput,
+  ConnectorMessagingPlatform,
   ConversationFileSearchPage,
   ConversationSearchPage,
   ConversationSnapshot,
@@ -80,7 +85,6 @@ import type {
   McpSignInState,
   McpTestResult,
   MessagingOverview,
-  MessagingPlatform,
   OnePasswordConnectorStatus,
   QueuedMessageReceipt,
   QueueSnapshot,
@@ -98,7 +102,9 @@ import type {
   RoutineResultConnectionOption,
   RoutineResultDestination,
   RoutineResultRoutineInput,
+  SaveAgentInstructionsInput,
   SaveWorkflowGraphInput,
+  ServerAuditLog,
   ServerNotificationLevel,
   SetAgentMemoryInclusionInput,
   SetAgentNotificationLevelInput,
@@ -109,12 +115,14 @@ import type {
   SharedTable,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
+  SidebarPin,
   SignInRelayStatus,
   StorageUsage,
   UninstallSkillInput,
   UpdateAgentAdminSettingsInput,
   UpdateAgentBackupModelsInput,
   UpdateAgentBrowserProfileInput,
+  UpdateAgentFastModeInput,
   UpdateAgentHostSettingsInput,
   UpdateAgentInput,
   UpdateAgentNewChatInput,
@@ -127,12 +135,18 @@ import type {
   VaultSaveInput,
   VaultState,
   WorkflowDetail,
+  WorkflowGitHubCatalog,
+  WorkflowGitHubHistory,
+  WorkflowGitHubRepositoryOptions,
+  WorkflowGraph,
   WorkflowRunDetail,
   WorkflowRunPage,
   WorkflowSaveResult,
   WorkflowStep,
   WorkflowSummary,
   WorkflowTriggerInput,
+  WorkflowVersion,
+  WorkflowVersionInput,
   WorkflowWebhookSecret,
 } from "@openbot/contracts/ipc";
 import type {
@@ -149,7 +163,11 @@ import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-ed
 import type { RemoteConnectionFailure, RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { PlanLimits } from "@openbot/team-client/plan-limits";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
-import type { MessagingConnectorPage } from "@openbot/team-client/team-admin-requests";
+import type {
+  HostLocalServer,
+  HostLocalServerList,
+  MessagingConnectorPage,
+} from "@openbot/team-client/team-admin-requests";
 import type { MobileBrowserTab } from "@/features/browser/model/browser-tabs";
 import type { BrowserViewBridgeEvent, RemoteBrowserViewSession } from "@/features/browser/model/browser-view-bridge";
 import type { MobileChannelStore } from "@/features/channels/model/channel-store";
@@ -214,6 +232,11 @@ export interface MobileAgent {
   avatarUrl?: string | null;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
+  /**
+   * The exact colour, which wins over `avatarHue`. Only a host with `agent-colors-v1` gives it, through
+   * its own route; else it is null.
+   */
+  avatarColor: AvatarColor | null;
   /** The Marketplace listing the agent was added from, and the listing version it has. */
   marketplaceSource?: { listingId: string; version: number } | undefined;
 }
@@ -271,6 +294,11 @@ export interface MobileWorkspaceContextValue {
   respondToBrowserSecret: (serverId: string, input: RespondToBrowserSecretInput) => Promise<void>;
   sidebarByServer: Record<string, { layout: SidebarLayoutSnapshot | null; error: string | null }>;
   mutateSidebarLayout: (serverId: string, action: SidebarLayoutAction) => Promise<void>;
+  /**
+   * Moves a chat in the layout of a host. The list shows the move at once; a failure puts the chat
+   * back and rejects.
+   */
+  moveSidebarChat: (serverId: string, action: Extract<SidebarLayoutAction, { type: "move-agent" }>) => Promise<void>;
   loadQueue: (agentId: string, serverId: string) => Promise<QueueSnapshot>;
   canEditQueue: (serverId: string) => boolean;
   /** True when the host advertises `message-client-id-v1`: a repeat of a message is stored once. */
@@ -310,6 +338,10 @@ export interface MobileWorkspaceContextValue {
   hideChannel: (channelId: string, serverId: string) => boolean;
   unhideChannel: (channelId: string, serverId: string) => boolean;
   toggleChannelPin: (channelId: string, serverId: string) => ToggleAgentPinResult;
+  /** Replaces the pinned agents and channels of a server, in their order, such as after a drag. */
+  setChatPins: (serverId: string, items: readonly SidebarPin[]) => boolean;
+  /** The pinned agents and channels of a server in one list, in the order of the host. */
+  readChatPins: (serverId: string) => SidebarPin[];
   /** The pinned workflows of each server, in the order the drawer shows them. Saved on this device. */
   pinnedWorkflowIds: Readonly<Record<string, readonly string[]>>;
   toggleWorkflowPin: (workflowId: string, serverId: string) => ToggleAgentPinResult;
@@ -370,6 +402,26 @@ export interface MobileWorkspaceContextValue {
   rotateServerKey: (serverId: string) => Promise<{ publicKey: string }>;
   /** Reads the server list again, with its signed key changes. It does not connect again. */
   reloadServerList: () => Promise<void>;
+  /**
+   * The owner of an online host that serves `local-servers-v1`: a desktop app that can run more
+   * servers on its computer. The host checks the role again.
+   */
+  canCreateLocalServers: (serverId: string) => boolean;
+  /** The servers that the desktop app of `serverId` runs on its computer, and how many it can run. */
+  listLocalServers: (serverId: string) => Promise<HostLocalServerList>;
+  /**
+   * Makes a server on the computer of `serverId`, then reads the server list again, so the new server
+   * is in it when the computer registered it for the account.
+   */
+  createLocalServer: (serverId: string, name: string) => Promise<HostLocalServer>;
+  /**
+   * `computer`: the own server of an OpenBot desktop app, which the account cannot remove. `onComputer`:
+   * a server that such an app runs beside its own server, which only that app deletes. Known after the
+   * computer server was online in this session.
+   */
+  localServerKind: (serverId: string) => "computer" | "onComputer" | null;
+  /** Deletes a server on a computer through the computer's own server, which must be online. */
+  deleteLocalServer: (serverId: string) => Promise<void>;
   /** An owner or admin of an online host that serves `host-timezone-v1`. The host checks the role again. */
   canManageServerTimezone: (serverId: string) => boolean;
   /** The zone of a routine that an agent creates with no zone. Owners and admins only. */
@@ -392,6 +444,10 @@ export interface MobileWorkspaceContextValue {
   loadServerRoles: (serverId: string) => Promise<AgentAccessSnapshot>;
   /** Replaces all roles. The host refuses a change made from an earlier revision. */
   setServerRoles: (change: AgentAccessChange, serverId: string) => Promise<AgentAccessSnapshot>;
+  /** An owner or admin of an online host that serves `server-audit-v1`. The host checks the role again. */
+  canReadServerAudit: (serverId: string) => boolean;
+  /** The changes to the members, roles and agent access of the server, newest first. */
+  loadServerAuditLog: (serverId: string) => Promise<ServerAuditLog>;
   /**
    * An owner or admin of an online host that serves `connectors-v1`: its Slack, Discord, Telegram and
    * GitHub connections. The host checks the role again.
@@ -476,7 +532,7 @@ export interface MobileWorkspaceContextValue {
   loadAgentBrowserProfile: (agentId: string, serverId: string) => Promise<AgentBrowserProfile>;
   /** The host closes the open tabs of the agent. */
   updateAgentBrowserProfile: (input: UpdateAgentBrowserProfileInput, serverId: string) => Promise<AgentBrowserProfile>;
-  loadMessagingConnections: (platform: MessagingPlatform, serverId: string) => Promise<MessagingOverview>;
+  loadMessagingConnections: (platform: ConnectorMessagingPlatform, serverId: string) => Promise<MessagingOverview>;
   /** The platform's page that the phone opens. The host opens no page. */
   connectMessaging: (input: HostMessagingConnectInput, serverId: string) => Promise<MessagingConnectorPage>;
   /** Sends the sealed grant of a Slack or Discord install to the host that started it. */
@@ -548,6 +604,10 @@ export interface MobileWorkspaceContextValue {
   addRemoteServer: (input: AddRemoteServerInput) => Promise<string>;
   /** Creates an agent on the active server and returns its id. */
   createAgent: (input: CreateAgentInput) => Promise<string>;
+  /**
+   * Changes an agent. A host with `agent-colors-v1` gets `avatarColor` through its colour route, and
+   * sets the hue itself. An older host gets only `avatarHue`, the nearest hue of the colour.
+   */
   updateAgent: (input: UpdateAgentInput, serverId?: string) => Promise<void>;
   setAgentAvatar: (agentId: string, image: RemoteFileUpload | null, serverId: string) => Promise<void>;
   loadAgentAvatar: (agentId: string, avatarUrl: string, serverId: string) => Promise<string>;
@@ -679,6 +739,22 @@ export interface MobileWorkspaceContextValue {
   loadAgentPlanCard: (agentId: string, serverId: string) => Promise<AgentPlanCardSettings | null>;
   /** Owners and admins only; the host refuses a member. Resolves with the setting the host saved. */
   updateAgentPlanCard: (input: UpdateAgentPlanCardInput, serverId: string) => Promise<AgentPlanCardSettings>;
+  /**
+   * Null when the host does not advertise `agent-fast-mode-v1`. A member with view access reads the
+   * setting, and with manage access changes it, as the model. The host checks the access.
+   */
+  loadAgentFastMode: (agentId: string, serverId: string) => Promise<AgentFastModeSettings | null>;
+  /** Resolves with the setting the host saved. It applies from the next turn. */
+  updateAgentFastMode: (input: UpdateAgentFastModeInput, serverId: string) => Promise<AgentFastModeSettings>;
+  /** An owner or admin of an online host that serves `agent-instructions-v1`. The host checks the role again. */
+  canManageAgentInstructions: (serverId: string) => boolean;
+  /** The instruction file at the root of the agent's workspace on the host. Owners and admins only. */
+  loadAgentInstructions: (agentId: string, serverId: string) => Promise<AgentInstructionsFile>;
+  /**
+   * Owners and admins only. The host refuses the save when the file is different from `expected`
+   * now, or when the text is too long. Resolves with the file the host saved.
+   */
+  saveAgentInstructions: (input: SaveAgentInstructionsInput, serverId: string) => Promise<AgentInstructionsFile>;
   /** An owner or admin of an online host that serves `provider-accounts-v1`. The host checks the role again. */
   canManageProviderAccounts: (serverId: string) => boolean;
   /**
@@ -706,6 +782,8 @@ export interface MobileWorkspaceContextValue {
   resetAgentSessionSetting: (input: ResetAgentSessionSettingInput, serverId: string) => Promise<AgentSessionSettings>;
   /** An owner or admin of an online host that serves `agent-folders-v1`. The host checks the role again. */
   canManageAgentFolders: (serverId: string) => boolean;
+  /** True when the host advertises `sidebar-folders-v1`: a chat list folder can hold folders. */
+  canNestSidebarFolders: (serverId: string) => boolean;
   /** The folders that the agent can change besides its workspace. Owners and admins only. */
   loadAgentFolders: (agentId: string, serverId: string) => Promise<AgentFolderList>;
   /** With `replace`, the folder takes the place of a folder that was moved. */
@@ -717,6 +795,13 @@ export interface MobileWorkspaceContextValue {
   /** The folders in one folder of the host computer; `path` null is the home folder. */
   browseAgentFolders: (agentId: string, path: string | null, serverId: string) => Promise<AgentFolderBrowse>;
   startNewChat: (agentId: string, serverId: string) => Promise<void>;
+  /** True when the host advertises `context-compact-v1`. Any member who can send messages can compact. */
+  canCompactContext: (serverId: string) => boolean;
+  /**
+   * The provider compacts the context of the agent's chat now; the messages stay. The host refuses
+   * while the agent works, or when its provider cannot compact.
+   */
+  compactContext: (agentId: string, serverId: string) => Promise<void>;
   /** An owner or admin of an online host that serves `shared-tables-v1`. The host checks the role again. */
   canManageSharedTables: (serverId: string) => boolean;
   /** Every table that the agents of the host share. Owners and admins only. */
@@ -757,6 +842,8 @@ export interface MobileWorkspaceContextValue {
   canReadThreads: (serverId: string) => boolean;
   /** True when the host advertises `agent-thread-files-v1`: a message in a thread can carry files. */
   canAttachThreadFiles: (serverId: string) => boolean;
+  /** True when the host advertises `agent-thread-branches-v1`: a member who can message an agent can branch its chats. */
+  canBranchThreads: (serverId: string) => boolean;
   /** True when the host advertises `workflows-v1`. The host shows each member the workflows of their agents. */
   canUseWorkflows: (serverId: string) => boolean;
   listWorkflows: (serverId: string) => Promise<WorkflowSummary[]>;
@@ -769,12 +856,31 @@ export interface MobileWorkspaceContextValue {
   /** The newest runs of a workflow, or the runs older than `before`. */
   loadWorkflowRuns: (workflowId: string, serverId: string, before?: string) => Promise<WorkflowRunPage>;
   loadWorkflowRun: (runId: string, serverId: string) => Promise<WorkflowRunDetail>;
-  startWorkflowRun: (workflowId: string, serverId: string) => Promise<WorkflowRunDetail>;
+  /** With `fromNodeId`, runs that step and the steps after it, with the newest results of the steps before it. */
+  startWorkflowRun: (workflowId: string, serverId: string, fromNodeId?: string) => Promise<WorkflowRunDetail>;
   stopWorkflowRun: (runId: string, serverId: string) => Promise<void>;
+  /** Runs one step alone, outside a run, with the newest results of the steps before it. */
+  runWorkflowStep: (input: WorkflowTriggerInput, serverId: string) => Promise<WorkflowStep>;
+  stopWorkflowStep: (stepId: string, serverId: string) => Promise<void>;
   retryWorkflowStep: (stepId: string, serverId: string) => Promise<WorkflowStep>;
   decideWorkflowStep: (input: DecideWorkflowStepInput, serverId: string) => Promise<void>;
   /** A new webhook secret, which the host shows once. Only an owner or admin can make one. */
   rotateWorkflowWebhookSecret: (input: WorkflowTriggerInput, serverId: string) => Promise<WorkflowWebhookSecret>;
+  /** The saved versions of a workflow, newest first. */
+  loadWorkflowVersions: (workflowId: string, serverId: string) => Promise<WorkflowVersion[]>;
+  loadWorkflowVersionGraph: (input: WorkflowVersionInput, serverId: string) => Promise<WorkflowGraph>;
+  /** Makes a version the current graph. The host keeps the graph before it as a version. */
+  restoreWorkflowVersion: (input: WorkflowVersionInput, serverId: string) => Promise<WorkflowDetail>;
+  /** True when the host advertises `workflows-github-v1`: it runs GitHub triggers and outputs. */
+  canUseWorkflowGitHub: (serverId: string) => boolean;
+  /** The repositories of the host's GitHub connection. Only an owner or admin reads them. */
+  loadWorkflowGitHubCatalog: (serverId: string) => Promise<WorkflowGitHubCatalog>;
+  /** The labels and people of one repository. Only an owner or admin reads them. */
+  loadWorkflowGitHubOptions: (repository: string, serverId: string) => Promise<WorkflowGitHubRepositoryOptions>;
+  /** The newest events of the GitHub triggers of a workflow, and the items of their runs. */
+  loadWorkflowGitHubHistory: (workflowId: string, serverId: string) => Promise<WorkflowGitHubHistory>;
+  /** Runs a GitHub trigger with the newest item that matches it. */
+  runWorkflowGitHubLastEvent: (input: WorkflowTriggerInput, serverId: string) => Promise<WorkflowRunDetail>;
   /** The tasks of one agent. The host answers 404 for an agent that this member cannot see. */
   loadAgentTasks: (agentId: string, serverId: string) => Promise<AgentTasksSnapshot>;
   loadAgentTaskConversation: (input: AgentTaskInput, serverId: string) => Promise<ConversationSnapshot>;
@@ -794,6 +900,11 @@ export interface MobileWorkspaceContextValue {
   renameAgentThread: (input: AgentTaskInput & { title: string }, serverId: string) => Promise<void>;
   /** Deletes a thread, its conversation, its files and its queued messages for good. */
   deleteAgentThread: (input: AgentTaskInput, serverId: string) => Promise<void>;
+  /**
+   * Copies the agent's chat (`taskId` null) or a thread through the turn of `messageId` into a new
+   * thread. No turn starts. A retry with the same `requestId` answers the same thread.
+   */
+  branchAgentThread: (input: BranchAgentTaskInput, serverId: string) => Promise<AgentTask>;
   /** The person's read mark of each open thread of the agent. The member's devices share it. */
   loadAgentThreadReads: (agentId: string, serverId: string) => Promise<AgentTaskReadState[]>;
   /** Moves the person's read mark of a thread to a message that they see. */
@@ -869,6 +980,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canRetryMessage"
   | "attachmentSupport"
   | "canStartNewChat"
+  | "canCompactContext"
   | "canChooseNewAgentModel"
   | "canInstallAgentTemplate"
   | "canSearchFiles"
@@ -876,7 +988,9 @@ export type MobileWorkspaceCapabilityCheck =
   | "canEditThreads"
   | "canReadThreads"
   | "canAttachThreadFiles"
+  | "canBranchThreads"
   | "canUseWorkflows"
+  | "canUseWorkflowGitHub"
   | "canReadServerStorage"
   | "canSetAgentNotificationLevel";
 
@@ -899,9 +1013,12 @@ type MobileWorkspaceStateKey =
   | "canUnhideAgent"
   | "canEditServerIdentity"
   | "canRotateServerKey"
+  | "canCreateLocalServers"
+  | "localServerKind"
   | "canManageServerTimezone"
   | "canManageAgentMemoryLimit"
   | "canManageServerRoles"
+  | "canReadServerAudit"
   | "hasAgentAccessLimits"
   | "canManageConnectors"
   | "canManageOnePasswordConnector"
@@ -932,9 +1049,11 @@ type MobileWorkspaceStateKey =
   | "canManageAgentTaskLimit"
   | "canManageAgentNewChat"
   | "canManageAgentPlanCard"
+  | "canManageAgentInstructions"
   | "canManageProviderAccounts"
   | "canManageSharedTables"
   | "canManageAgentFolders"
+  | "canNestSidebarFolders"
   | "canPublishAgent";
 
 /**

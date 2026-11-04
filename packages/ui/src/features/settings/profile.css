@@ -241,6 +241,8 @@
 
 .profile-heatmap-months,
 .profile-heatmap-grid {
+  /* A time axis: the weeks run from the oldest on the left in every language. */
+  direction: ltr;
   display: grid;
   grid-template-columns: repeat(var(--profile-columns), minmax(0, 1fr));
   column-gap: var(--openbot-space-0-5);
@@ -573,6 +575,11 @@
     transform-origin: left center;
     animation: profile-grow calc(var(--openbot-duration-overlay) * 2.5) var(--openbot-ease-out) backwards;
     animation-delay: calc(var(--openbot-duration-overlay) + var(--profile-i, 0) * var(--profile-step) * 2);
+  }
+
+  /* The fill starts at the right edge of a right-to-left track, so it grows from there. */
+  .profile-bar-fill:dir(rtl) {
+    transform-origin: right center;
   }
 
   .profile-hero-actions svg {

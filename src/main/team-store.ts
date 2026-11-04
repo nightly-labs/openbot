@@ -15,13 +15,15 @@ import { avatarFileExtension, isAvatarMimeType, isValidAvatarImage } from "@open
 import { type HostKeyHandover, hostKeyHandoverStatement } from "@openbot/contracts/host-key-handover";
 import { DEFAULT_TEAM_MEMBER_LIMIT, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { permanentInviteExpiresAt } from "@openbot/contracts/invite-links";
-import type {
-  AvatarImageInput,
-  CentralAuthUser,
-  TeamInviteSummary,
-  TeamMemberSummary,
-  TeamRole,
-  TeamSessionSummary,
+import {
+  type AvatarColor,
+  type AvatarImageInput,
+  type CentralAuthUser,
+  isAvatarColor,
+  type TeamInviteSummary,
+  type TeamMemberSummary,
+  type TeamRole,
+  type TeamSessionSummary,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { normalizeEmailAddress, slugifyTeamServerName } from "@openbot/contracts/validation";
@@ -192,6 +194,8 @@ export interface RemoteDirectoryMember {
   email: string;
   name: string | null;
   avatarUrl: string | null;
+  /** The member's account chat color. Missing: the account service is older and sends none. */
+  chatColor?: AvatarColor | null;
   role: TeamRole;
   status: "active" | "revoked";
   createdAt: number;
@@ -603,6 +607,7 @@ export class TeamStore {
             email,
             name: yield* remoteDecode(() => normalizeName(user.name)),
             avatarUrl: yield* remoteDecode(() => normalizeAvatarUrl(user.avatarUrl)),
+            ...(isAvatarColor(user.chatColor) ? { chatColor: user.chatColor } : {}),
             role: "owner",
             disabled: false,
             createdAt: new Date().toISOString(),
@@ -899,6 +904,14 @@ export class TeamStore {
     Effect.uninterruptible,
   ).bind(this);
 
+  /**
+   * The members that this host keeps, with no member of a live session only. Empty before the
+   * host is set up. The audit log compares two of these lists.
+   */
+  listStoredMembers(): TeamMemberSummary[] {
+    return this.#state?.members.map(publicMember) ?? [];
+  }
+
   listMembers(): TeamMemberSummary[] {
     const members = this.#requireState().members.map(publicMember);
     const known = new Set(members.map((member) => member.id));
@@ -959,6 +972,7 @@ export class TeamStore {
             email: yield* remoteDecode(() => normalizeEmail(remote.email)),
             name: yield* remoteDecode(() => normalizeName(remote.name)),
             avatarUrl: yield* remoteDecode(() => normalizeAvatarUrl(remote.avatarUrl)),
+            ...(isAvatarColor(remote.chatColor) ? { chatColor: remote.chatColor } : {}),
             role: remote.role,
             disabled: remote.status !== "active",
             createdAt: new Date(remote.createdAt).toISOString(),
@@ -969,6 +983,7 @@ export class TeamStore {
         member.email = yield* remoteDecode(() => normalizeEmail(remote.email));
         member.name = yield* remoteDecode(() => normalizeName(remote.name));
         member.avatarUrl = yield* remoteDecode(() => normalizeAvatarUrl(remote.avatarUrl));
+        applyChatColor(member, remote.chatColor);
         member.role = remote.role;
         member.disabled = remote.status !== "active";
       }
@@ -982,7 +997,12 @@ export class TeamStore {
       );
       const closed: string[] = [];
       for (const [tokenHash, session] of this.#remoteSessions) {
-        if (activeRoles.get(session.member.id) === session.member.role) continue;
+        if (activeRoles.get(session.member.id) === session.member.role) {
+          // A session that opened before its member was known has the account id as its name.
+          const stored = state.members.find((member) => member.id === session.member.id);
+          if (stored) session.member = { ...publicMember(stored), role: session.member.role, disabled: false };
+          continue;
+        }
         this.#remoteSessions.delete(tokenHash);
         closed.push(session.sessionId);
       }
@@ -1167,6 +1187,7 @@ export class TeamStore {
         existingMember.username = email;
         existingMember.name = yield* remoteDecode(() => normalizeName(user.name));
         existingMember.avatarUrl = yield* remoteDecode(() => normalizeAvatarUrl(user.avatarUrl));
+        applyChatColor(existingMember, user.chatColor);
         this.#consumeInvite(invite);
         const result = yield* remoteDecode(() => this.#createSession(existingMember));
         yield* this.#persistEffect();
@@ -1180,6 +1201,7 @@ export class TeamStore {
         email,
         name: yield* remoteDecode(() => normalizeName(user.name)),
         avatarUrl: yield* remoteDecode(() => normalizeAvatarUrl(user.avatarUrl)),
+        ...(isAvatarColor(user.chatColor) ? { chatColor: user.chatColor } : {}),
         role: invite.role,
         disabled: false,
         createdAt: new Date().toISOString(),
@@ -1211,6 +1233,7 @@ export class TeamStore {
       member.username = email;
       member.name = yield* remoteDecode(() => normalizeName(user.name));
       member.avatarUrl = yield* remoteDecode(() => normalizeAvatarUrl(user.avatarUrl));
+      applyChatColor(member, user.chatColor);
       const result = yield* remoteDecode(() => this.#createSession(member));
       yield* this.#persistEffect();
       return result;
@@ -1434,12 +1457,14 @@ export class TeamStore {
     if (!member) return false;
     const name = normalizeName(user.name);
     const avatarUrl = normalizeAvatarUrl(user.avatarUrl);
+    const chatColor = user.chatColor === undefined ? member.chatColor : user.chatColor;
     if (
       member.email === email &&
       member.accountId === user.id &&
       member.username === email &&
       member.name === name &&
-      (member.avatarUrl ?? null) === avatarUrl
+      (member.avatarUrl ?? null) === avatarUrl &&
+      (member.chatColor ?? null) === (chatColor ?? null)
     ) {
       return false;
     }
@@ -1448,6 +1473,7 @@ export class TeamStore {
     member.username = email;
     member.name = name;
     member.avatarUrl = avatarUrl;
+    applyChatColor(member, user.chatColor);
     return true;
   }
 
@@ -1625,6 +1651,16 @@ function safeTextEqual(left: string, right: string): boolean {
   return leftBytes.length === rightBytes.length && timingSafeEqual(leftBytes, rightBytes);
 }
 
+/**
+ * Copies the account chat color onto a stored member. Null removes it. Undefined keeps the stored
+ * value: an account service from before chat colors sends none.
+ */
+function applyChatColor(member: StoredMember, chatColor: AvatarColor | null | undefined): void {
+  if (chatColor === undefined) return;
+  if (isAvatarColor(chatColor)) member.chatColor = chatColor;
+  else delete member.chatColor;
+}
+
 function publicMember(member: StoredMember): TeamMemberSummary {
   return {
     id: member.id,
@@ -1632,6 +1668,9 @@ function publicMember(member: StoredMember): TeamMemberSummary {
     email: member.email ?? null,
     name: member.name ?? null,
     avatarUrl: member.avatarUrl ?? null,
+    // Optional: a file written before chat colours has none. An invalid value counts as no colour, so the
+    // file still loads and keeps its other data.
+    ...(isAvatarColor(member.chatColor) ? { chatColor: member.chatColor } : {}),
     role: member.role,
     createdAt: member.createdAt,
     disabled: member.disabled,

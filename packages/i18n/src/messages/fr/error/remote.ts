@@ -95,6 +95,7 @@ export const messages = {
   "error.remote.fileTransferFailed": "Le transfert de fichier WebRTC a échoué.",
   "error.remote.fileResumeFailed": "Le transfert de fichier WebRTC n’a pas pu reprendre avant son échéance.",
   "error.remote.fileTransportStopped": "Le transport de fichiers WebRTC s’est arrêté.",
+  "error.remote.downloadStopped": "Le téléchargement a été arrêté.",
   "error.remote.fileResumeExpired": "Le délai de reprise du transfert de fichier WebRTC a expiré.",
   "error.remote.hostRequestFailed": "L’hôte n’a pas pu terminer la requête.",
   "error.remote.responseTooLarge": "La réponse de l’hôte est trop volumineuse pour être envoyée à cet appareil.",
@@ -202,4 +203,6 @@ export const messages = {
     "Le message a été envoyé, mais l’historique de la discussion n’a pas pu être actualisé.",
   "error.remote.taskHistoryRefreshFailed":
     "La tâche a été modifiée, mais l’historique de la discussion n’a pas pu être actualisé.",
+  "error.remote.localServerAccountRemovalFailed":
+    "Le serveur est supprimé sur son ordinateur, mais le compte l’affiche encore. Supprimez-le à nouveau pour le retirer du compte.",
 } as const satisfies PartialTranslation<typeof source>;

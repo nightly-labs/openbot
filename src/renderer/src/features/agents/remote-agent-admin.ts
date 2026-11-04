@@ -2,7 +2,9 @@ import type {
   AgentAdminSettings,
   AgentBackupModelSettings,
   AgentBackupModels,
+  AgentFastModeSettings,
   AgentHostSettings,
+  AgentNewChatSettings,
   AgentPlanCardSettings,
   AgentTaskLimitSettings,
   AgentUsageLimitReturn,
@@ -14,12 +16,14 @@ import type {
 } from "@openbot/contracts/ipc";
 import { AGENT_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
+import { AGENT_NEW_CHAT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import { AGENT_PLAN_CARD_CAPABILITY } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_TASK_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, untrack } from "solid-js";
-import { serverCanAdminister } from "../servers/server-capabilities";
+import { serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { type AgentsPort, agentsPort } from "./agents-port";
 
 /** The web client sends these host calls over its own connection. */
@@ -33,8 +37,12 @@ export type RemoteAgentAdminCalls = Pick<
   | "updateAgentBackupModels"
   | "getAgentTaskLimit"
   | "updateAgentTaskLimit"
+  | "getAgentNewChat"
+  | "updateAgentNewChat"
   | "getAgentPlanCard"
   | "updateAgentPlanCard"
+  | "getAgentFastMode"
+  | "updateAgentFastMode"
 >;
 
 /** A joined server where this account may change agent access and auto-approve. */
@@ -51,8 +59,12 @@ interface RemoteAgentAdminState {
   backupModels: AgentBackupModelSettings | null;
   taskLimitKey: string | null;
   taskLimit: AgentTaskLimitSettings | null;
+  newChatKey: string | null;
+  newChat: AgentNewChatSettings | null;
   planCardKey: string | null;
   planCard: AgentPlanCardSettings | null;
+  fastModeKey: string | null;
+  fastMode: AgentFastModeSettings | null;
 }
 
 /**
@@ -73,8 +85,12 @@ export function createRemoteAgentAdmin(
     backupModels: null,
     taskLimitKey: null,
     taskLimit: null,
+    newChatKey: null,
+    newChat: null,
     planCardKey: null,
     planCard: null,
+    fastModeKey: null,
+    fastMode: null,
   });
   const hostKey = createMemo(() => {
     const current = target();
@@ -185,6 +201,41 @@ export function createRemoteAgentAdmin(
         .catch(() => undefined);
     },
   );
+  const newChatKey = createMemo(() => {
+    const current = target();
+    if (current?.server.kind !== "remote" || !serverCanAdminister(current.server, AGENT_NEW_CHAT_CAPABILITY))
+      return null;
+    return JSON.stringify([current.server.id, current.agentId]);
+  });
+  function acceptNewChat(requestKey: string, settings: AgentNewChatSettings): void {
+    if (newChatKey() !== requestKey) return;
+    setState((draft) => {
+      draft.newChatKey = requestKey;
+      draft.newChat = settings;
+    });
+  }
+  let newChatReadGeneration = 0;
+  createEffect(
+    createMemo(() => JSON.stringify([newChatKey(), target()?.updatedAt])),
+    () => {
+      const requestKey = untrack(newChatKey);
+      const generation = ++newChatReadGeneration;
+      if (untrack(() => state.newChatKey) !== requestKey)
+        setState((draft) => {
+          draft.newChatKey = null;
+          draft.newChat = null;
+        });
+      const current = untrack(target);
+      if (!requestKey || !current) return;
+      calls()
+        .getAgentNewChat(current.agentId, current.server.id)
+        .then((settings) => {
+          if (generation === newChatReadGeneration) acceptNewChat(requestKey, settings);
+        })
+        // A failed read keeps the setting hidden. The host checks the role on every write anyway.
+        .catch(() => undefined);
+    },
+  );
   const planCardKey = createMemo(() => {
     const current = target();
     if (current?.server.kind !== "remote" || !serverCanAdminister(current.server, AGENT_PLAN_CARD_CAPABILITY))
@@ -220,6 +271,42 @@ export function createRemoteAgentAdmin(
         .catch(() => undefined);
     },
   );
+  // Any member can change fast mode, as the model and effort, so this key needs no admin role.
+  const fastModeKey = createMemo(() => {
+    const current = target();
+    if (current?.server.kind !== "remote" || !serverSupportsCapability(current.server, AGENT_FAST_MODE_CAPABILITY))
+      return null;
+    return JSON.stringify([current.server.id, current.agentId]);
+  });
+  function acceptFastMode(requestKey: string, settings: AgentFastModeSettings): void {
+    if (fastModeKey() !== requestKey) return;
+    setState((draft) => {
+      draft.fastModeKey = requestKey;
+      draft.fastMode = settings;
+    });
+  }
+  let fastModeReadGeneration = 0;
+  createEffect(
+    createMemo(() => JSON.stringify([fastModeKey(), target()?.updatedAt])),
+    () => {
+      const requestKey = untrack(fastModeKey);
+      const generation = ++fastModeReadGeneration;
+      if (untrack(() => state.fastModeKey) !== requestKey)
+        setState((draft) => {
+          draft.fastModeKey = null;
+          draft.fastMode = null;
+        });
+      const current = untrack(target);
+      if (!requestKey || !current) return;
+      calls()
+        .getAgentFastMode(current.agentId, current.server.id)
+        .then((settings) => {
+          if (generation === fastModeReadGeneration) acceptFastMode(requestKey, settings);
+        })
+        // A failed read keeps the switch hidden.
+        .catch(() => undefined);
+    },
+  );
   const key = createMemo(() => {
     const current = target();
     if (current?.server.kind !== "remote" || !serverCanAdministerAgents(current.server)) return null;
@@ -251,11 +338,13 @@ export function createRemoteAgentAdmin(
 
   return {
     automation: (): boolean | undefined => currentHostSettings()?.allowAutomation,
+    /** Undefined for a local agent, before the host answers, and without `agent-host-settings-v1`. */
+    computerUse: (): boolean | undefined => currentHostSettings()?.computerUse,
     /** Undefined until the host answers. Null: the agent follows the host default. */
     busyMessageMode: (): BusyMessageMode | null | undefined => currentHostSettings()?.busyMessageMode,
     /** The host's own default. Only the host changes it. */
     defaultBusyMessageMode: (): BusyMessageMode | undefined => currentHostSettings()?.defaultBusyMessageMode,
-    async updateHostSettings(input: Omit<UpdateAgentHostSettingsInput, "computerUse">): Promise<void> {
+    async updateHostSettings(input: UpdateAgentHostSettingsInput): Promise<void> {
       const server = target()?.server;
       if (server?.kind !== "remote" || !serverCanAdminister(server, AGENT_HOST_SETTINGS_CAPABILITY))
         throw new Error(currentText().t("agent.error.adminOnly"));
@@ -289,6 +378,17 @@ export function createRemoteAgentAdmin(
       acceptTaskLimit(JSON.stringify([server.id, agentId]), settings);
     },
     /** Undefined for a local agent, before the host answers, and without the capability. */
+    allowNewChat: (): boolean | undefined =>
+      state.newChatKey !== null && state.newChatKey === newChatKey() ? state.newChat?.allowNewChat : undefined,
+    async updateNewChat(agentId: string, allowNewChat: boolean): Promise<void> {
+      const server = target()?.server;
+      if (server?.kind !== "remote" || !serverCanAdminister(server, AGENT_NEW_CHAT_CAPABILITY))
+        throw new Error(currentText().t("agent.error.adminOnly"));
+      const settings = await calls().updateAgentNewChat({ agentId, allowNewChat }, server.id);
+      if (newChatKey() === JSON.stringify([server.id, agentId])) newChatReadGeneration += 1;
+      acceptNewChat(JSON.stringify([server.id, agentId]), settings);
+    },
+    /** Undefined for a local agent, before the host answers, and without the capability. */
     quickAcknowledgement: (): boolean | undefined =>
       state.planCardKey !== null && state.planCardKey === planCardKey()
         ? state.planCard?.quickAcknowledgement
@@ -300,6 +400,17 @@ export function createRemoteAgentAdmin(
       const settings = await calls().updateAgentPlanCard({ agentId, quickAcknowledgement }, server.id);
       if (planCardKey() === JSON.stringify([server.id, agentId])) planCardReadGeneration += 1;
       acceptPlanCard(JSON.stringify([server.id, agentId]), settings);
+    },
+    /** Undefined for a local agent, before the host answers, and without the capability. Null: never set. */
+    fastMode: (): boolean | null | undefined =>
+      state.fastModeKey !== null && state.fastModeKey === fastModeKey() ? state.fastMode?.fastMode : undefined,
+    async updateFastMode(agentId: string, fastMode: boolean): Promise<void> {
+      const server = target()?.server;
+      if (server?.kind !== "remote" || !serverSupportsCapability(server, AGENT_FAST_MODE_CAPABILITY))
+        throw new Error(currentText().t("error.agent.settingsLocalOnly"));
+      const settings = await calls().updateAgentFastMode({ agentId, fastMode }, server.id);
+      if (fastModeKey() === JSON.stringify([server.id, agentId])) fastModeReadGeneration += 1;
+      acceptFastMode(JSON.stringify([server.id, agentId]), settings);
     },
     /** Null for a local agent, before the first answer, and when the host does not serve the capability. */
     settings: (): AgentAdminSettings | null => (state.key !== null && state.key === key() ? state.settings : null),
@@ -325,24 +436,33 @@ export function createRemoteAgentAdmin(
 
 /**
  * Sends a profile change to an agent of a joined server. The Team API agent route ignores access,
- * so access, Local scripts, the busy-message mode, backup models, the task limit and the plan card go
- * to their admin routes. Other fields keep the agent route.
+ * so access, Computer Use, Local scripts, the busy-message mode, backup models, the task limit, new
+ * chats, the plan card and fast mode go to their own routes. Other fields keep the agent route.
  */
 export async function updateRemoteAgent(
   admin: Pick<
     RemoteAgentAdmin,
-    "update" | "updateHostSettings" | "updateBackupModels" | "updateTaskLimit" | "updatePlanCard"
+    | "update"
+    | "updateHostSettings"
+    | "updateBackupModels"
+    | "updateTaskLimit"
+    | "updateNewChat"
+    | "updatePlanCard"
+    | "updateFastMode"
   >,
   input: UpdateAgentInput,
   updateProfile: (input: UpdateAgentInput) => Promise<void>,
 ): Promise<void> {
   const {
     access,
+    computerUse,
     allowAutomation,
     busyMessageMode,
     backupModels,
     taskLimit,
+    allowNewChat,
     quickAcknowledgement,
+    fastMode,
     agentId,
     ...fields
   } = input;
@@ -351,17 +471,21 @@ export async function updateRemoteAgent(
   // It comes before the first write, so that a wrong call changes nothing.
   if (allowAutomation === null) throw new Error("A joined server has no default for Local scripts.");
   if (quickAcknowledgement === null) throw new Error("A joined server has no default for the plan card.");
+  if (allowNewChat === null) throw new Error("A joined server has no default for new chats.");
   if (access !== undefined) await admin.update({ agentId, access });
   // Null busy-message mode is valid here: the agent follows the host default.
-  if (allowAutomation !== undefined || busyMessageMode !== undefined)
+  if (computerUse !== undefined || allowAutomation !== undefined || busyMessageMode !== undefined)
     await admin.updateHostSettings({
       agentId,
+      ...(computerUse === undefined ? {} : { computerUse }),
       ...(allowAutomation === undefined ? {} : { allowAutomation }),
       ...(busyMessageMode === undefined ? {} : { busyMessageMode }),
     });
   if (backupModels !== undefined) await admin.updateBackupModels(agentId, backupModels);
   if (taskLimit !== undefined) await admin.updateTaskLimit(agentId, taskLimit);
+  if (allowNewChat !== undefined) await admin.updateNewChat(agentId, allowNewChat);
   if (quickAcknowledgement !== undefined) await admin.updatePlanCard(agentId, quickAcknowledgement);
+  if (fastMode !== undefined) await admin.updateFastMode(agentId, fastMode);
   if (Object.keys(fields).length) await updateProfile({ agentId, ...fields });
 }
 

@@ -2,6 +2,7 @@ import {
   type AgentProviderId,
   type AgentReasoningEffort,
   agentProviderName,
+  DEFAULT_PROVIDER_ACCOUNT_ID,
   type ForeignProviderId,
   type ProviderAccountStatus,
   providerDisplayName,
@@ -9,11 +10,20 @@ import {
 } from "@openbot/contracts/ipc";
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
+import { planLimitWindowKind, spentUsageWindow } from "@openbot/team-client/plan-limits";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Typography } from "heroui-native";
+import { useEffect, useState } from "react";
 import { Platform } from "react-native";
 import { useUniwind } from "uniwind";
+import { AgentFastModeField, type AgentHostFieldsProps } from "@/features/agents/components/agent-host-fields";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
+import {
+  PLAN_LIMIT_RESET_FORMAT,
+  planLimitResetDate,
+  planLimitWindowLabel,
+  usePlanLimits,
+} from "@/features/servers/model/plan-limits";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import {
@@ -25,11 +35,14 @@ import { queryKeys } from "@/features/workspace/model/query-keys";
 import { useText } from "@/shared/lib/text";
 
 const EFFORT_LABELS = {
+  none: "mobile.agent.runtime.effort.none",
+  minimal: "mobile.agent.runtime.effort.minimal",
   low: "mobile.agent.runtime.effort.low",
   medium: "mobile.agent.runtime.effort.medium",
   high: "mobile.agent.runtime.effort.high",
   xhigh: "mobile.agent.runtime.effort.xhigh",
   max: "mobile.agent.runtime.effort.max",
+  ultra: "mobile.agent.runtime.effort.ultra",
 } as const satisfies Record<AgentReasoningEffort, MobileTextKey>;
 
 /**
@@ -94,6 +107,7 @@ export function AgentRuntimeFields({
   accountId = "",
   onChange,
   onAccountChange,
+  fastMode,
 }: {
   serverId: string;
   available: boolean;
@@ -114,6 +128,8 @@ export function AgentRuntimeFields({
   accountId?: string;
   onChange: (value: Pick<UpdateAgentInput, "provider" | "model" | "reasoningEffort">) => void;
   onAccountChange?: (accountId: string) => void;
+  /** An existing agent. Its Fast mode switch shows when the chosen model has a fast tier. */
+  fastMode?: AgentHostFieldsProps;
 }) {
   const { t } = useText();
   const accountName = useProviderAccountName();
@@ -130,9 +146,10 @@ export function AgentRuntimeFields({
   const selected = options.find((option) => option.id === model);
   const enabled = available && !saving && options.length > 0;
   const showsModel = foreignProvider === undefined && (!hostDefault || provider !== undefined);
+  const spentLimit = useSpentLimitText(serverId, showsModel ? provider : undefined, accountId, model);
   return (
     <>
-      <SettingsSection title={title}>
+      <SettingsSection title={title} footer={spentLimit}>
         <SettingsRow
           trailing={
             <SettingsPicker<string>
@@ -274,6 +291,7 @@ export function AgentRuntimeFields({
           </SettingsRow>
         ) : null}
       </SettingsSection>
+      {fastMode && showsModel && selected?.fastServiceTier ? <AgentFastModeField {...fastMode} /> : null}
       {models.isError ? (
         <Button variant="ghost" onPress={() => void models.refetch()}>
           <Button.Label>{t("mobile.agent.runtime.retryModels")}</Button.Label>
@@ -285,4 +303,44 @@ export function AgentRuntimeFields({
       ) : null}
     </>
   );
+}
+
+/** The longest delay that `setTimeout` keeps. A longer one runs at once. */
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
+/**
+ * The spent plan window that stops the chosen model, as the desktop model picker and composer show it:
+ * the window and its reset time. It uses the reading of the Usage screen and asks the host for nothing
+ * new. A window that ended gives the quota back, and its reading stays as it was until the next
+ * reading, so the clock moves at the reset.
+ */
+function useSpentLimitText(
+  serverId: string,
+  provider: AgentProviderId | undefined,
+  accountId: string,
+  model: string | undefined,
+): string | null {
+  const { t, format } = useText();
+  const { usage } = usePlanLimits(serverId);
+  const [now, setNow] = useState(Date.now);
+  const spent = provider
+    ? spentUsageWindow(usage?.limits, provider, accountId || DEFAULT_PROVIDER_ACCOUNT_ID, model, now)
+    : null;
+  const spentWindow = spent?.covers ? spent.window : null;
+  const resetsAt = spentWindow?.resetsAt ?? null;
+  useEffect(() => {
+    if (resetsAt === null) return;
+    const delay = Math.min(MAX_TIMER_DELAY_MS, Math.max(0, resetsAt * 1_000 - Date.now()));
+    const timer = setTimeout(() => setNow(Date.now()), delay);
+    return () => clearTimeout(timer);
+  }, [resetsAt]);
+  if (!spentWindow) return null;
+  const limit =
+    planLimitWindowKind(spentWindow.windowDurationMins).kind === "limit"
+      ? t("mobile.agent.runtime.usageLimit")
+      : t("mobile.agent.runtime.usageLimitWindow", { window: planLimitWindowLabel(spentWindow.windowDurationMins, t) });
+  const date = planLimitResetDate(spentWindow);
+  return date
+    ? t("mobile.agent.runtime.usageLimitResets", { limit, time: format.date(date, PLAN_LIMIT_RESET_FORMAT) })
+    : limit;
 }

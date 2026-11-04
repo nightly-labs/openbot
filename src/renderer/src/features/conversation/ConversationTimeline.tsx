@@ -18,8 +18,9 @@ import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
 import { ChatVisual } from "@openbot/ui/features/conversation/ChatVisual";
 import { ContextCompactionMarker, type ContextCompactionView } from "@openbot/ui/features/conversation/ContextUsage";
 import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
+import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { ReplyReturnButton, ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
-import { MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
+import { DeleteMessageDialog, MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
 import { PendingSendStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
 import { SubagentGroup } from "@openbot/ui/features/conversation/Subagents";
 import { TaskList } from "@openbot/ui/features/conversation/TaskList";
@@ -42,6 +43,7 @@ import {
   toggleRecording,
   toggleSpokenReply,
 } from "../speech/speech-replies";
+import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
 import { agentInstructionsCalls } from "./agent-folders-port";
 import { groupedMessageIds } from "./agent-message-timeline";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
@@ -115,6 +117,7 @@ export function ConversationTimeline() {
     activeChatSearchIndex,
     agentActivitySpaceReserved,
     attachmentAction,
+    attachmentDownloads,
     channel,
     chatSearchMatches,
     chatSearchOpen,
@@ -130,6 +133,7 @@ export function ConversationTimeline() {
     editingDeliveryId,
     editPendingSend,
     copyMessage,
+    messageText,
     expandedEmojiMessageId,
     installedSkills,
     scrollFades,
@@ -216,6 +220,28 @@ export function ConversationTimeline() {
     const onMarkUnread = props.onMarkUnread;
     if (channel || !onMarkUnread || !isIncomingAgentMessage(message) || message.streaming) return;
     return () => void onMarkUnread(message.id);
+  };
+  /** The message that the delete dialog asks about. */
+  const [deleteTargetId, setDeleteTargetId] = createSignal<string | null>(null);
+  /** A message that the host stores can be deleted, when the reader may delete it. */
+  const deleteAction = (message: AgentMessage) => {
+    if (!props.onDeleteMessage || message.streaming || message.id.startsWith(PENDING_SEND_ID_PREFIX)) return;
+    if (props.canDeleteMessage && !props.canDeleteMessage(message)) return;
+    return () => setDeleteTargetId(message.id);
+  };
+  const deleteMessage = (messageId: string) => props.onDeleteMessage?.(messageId) ?? Promise.resolve();
+  /** A finished message of an agent chat can start work in a channel. A channel message stays where it is. */
+  const sendToChannelAction = (message: AgentMessage) => {
+    const target = props.sendToChannel;
+    if (
+      channel ||
+      !target ||
+      message.streaming ||
+      !message.body.trim() ||
+      message.id.startsWith(PENDING_SEND_ID_PREFIX)
+    )
+      return;
+    return { channels: target.channels, onSend: (channelId: string) => target.onSend(channelId, messageText(message)) };
   };
   /** The answers of the agent that end a finished turn. Each one offers a branch. */
   const branchPoints = createMemo(() =>
@@ -319,8 +345,11 @@ export function ConversationTimeline() {
       kind: "member",
       name: (member ? teamMemberName(member) : sender.name.trim()) || t("chat.message.memberFallback"),
       avatarSeed: sender.id,
+      chatColor: member?.chatColor,
     };
   };
+  /** The reader's own chat color: the member of the server that is the reader. */
+  const ownChatColor = () => props.presence.members.find((member) => props.isOwnSender(member.id))?.chatColor;
   /** The agent messages of the chat by their exchange id, so a marker finds its text and its request. */
   const agentMessagesByExchangeId = createMemo(
     () =>
@@ -385,6 +414,9 @@ export function ConversationTimeline() {
             onOpenLink={(url) => void openExternalMessageUrl(url)}
             onPreview={(attachment) => void previewAttachment(attachment)}
             onAttachmentAction={attachmentAction}
+            onOpenSharedFile={openSharedFile}
+            // A workspace path is in the workspace of the agent that wrote it, as in a channel.
+            onOpenWorkspaceFile={(path) => openWorkspaceFile(path, undefined, current().exchange?.senderAgentId)}
             onOpenQuote={openQuote}
             macWindowControls={props.platform === "darwin"}
           />
@@ -555,7 +587,9 @@ export function ConversationTimeline() {
     <>
       <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {props.prompt
-          ? t("prompt.inputRequiredAnnouncement", { question: props.prompt.questions[0]?.question ?? "" })
+          ? t("prompt.inputRequiredAnnouncement", {
+              question: markdownPlainText(props.prompt.questions[0]?.question ?? ""),
+            })
           : ""}
       </span>
       <Show when={chatSearchOpen() && !sideThreadOpen()}>
@@ -696,9 +730,15 @@ export function ConversationTimeline() {
                   const current = message();
                   const sender = otherSender(current);
                   if (sender) return memberAuthor(sender);
-                  if (current?.author === "you") return { kind: "you", name: t("chat.message.you") };
+                  if (current?.author === "you")
+                    return { kind: "you", name: t("chat.message.you"), chatColor: ownChatColor() };
                   if (channel && current) return channel.author(current);
-                  return { kind: "agent", name: props.agent?.name ?? t("chat.message.agentFallback") };
+                  // The profile gives the row the agent's color, for the name and the bubble tint.
+                  return {
+                    kind: "agent",
+                    name: props.agent?.name ?? t("chat.message.agentFallback"),
+                    agent: props.agent,
+                  };
                 });
                 const referencedMessage = createMemo(() => {
                   const replyToMessageId = message()?.replyToMessageId;
@@ -729,6 +769,9 @@ export function ConversationTimeline() {
                 // A row the host has not drawn yet has no reactions, replies or menu: its id is not the
                 // host's, even after the host answered.
                 const hostless = createMemo(() => message()?.id.startsWith(PENDING_SEND_ID_PREFIX) === true);
+                // The text before a waiting question is a step of the turn (#4897). A step keeps no
+                // reaction, reply or menu, and the row goes back into the steps after the answer.
+                const turnStep = createMemo(() => message()?.itemType === "commentary");
                 const pendingSend = createMemo(() => {
                   const send = pendingSendFor(message()?.id);
                   return send && send.state !== "sent" ? send : undefined;
@@ -738,6 +781,9 @@ export function ConversationTimeline() {
                 // Only the kind rebuilds the player, so its controls keep focus when it starts or stops.
                 const player = createMemo(() => voicePlayer(message()));
                 const playerKind = createMemo(() => player()?.kind);
+                // Only a reply has a speed: the user's own recording plays at normal speed.
+                const replySpeed = () => (playerKind() === "reply" ? speechSpeed() : undefined);
+                const replySpeedChange = () => (playerKind() === "reply" ? cycleSpeechSpeed : undefined);
                 const pendingState = () => {
                   const state = pendingSend()?.state;
                   return state === "failed" || state === "waiting" ? state : "sending";
@@ -822,6 +868,7 @@ export function ConversationTimeline() {
                                                 )}
                                                 onSelectAgent={props.onSelectAgent}
                                                 onOpenRoutine={openRoutineSettings}
+                                                openRoutineThread={props.threads?.routineThread}
                                                 onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
                                                 onToggleRoutineRun={toggleRoutineRun}
                                                 onToggleAgentMessage={toggleAgentMessage}
@@ -899,6 +946,7 @@ export function ConversationTimeline() {
                               <AttachmentCards
                                 attachments={message()?.attachments ?? []}
                                 mediaSource={runtime.attachmentMedia}
+                                downloads={attachmentDownloads}
                                 onPreview={(attachment) => void previewAttachment(attachment)}
                                 onAction={attachmentAction}
                               />
@@ -1236,6 +1284,7 @@ export function ConversationTimeline() {
                             onOpenQuote={openQuote}
                             onDownload={(attachment) => attachmentAction(attachment, "download")}
                             mediaSource={runtime.attachmentMedia}
+                            downloads={attachmentDownloads}
                             macWindowControls={props.platform === "darwin"}
                             loadImageFile={
                               loadImageFile &&
@@ -1272,7 +1321,7 @@ export function ConversationTimeline() {
                                     }}
                                   />
                                 </Show>
-                                <Show when={!hostless()}>
+                                <Show when={!hostless() && !turnStep()}>
                                   <MessageActions
                                     message={message() ?? initialMessage}
                                     pickerOpen={openReactionMessageId() === message()?.id}
@@ -1302,7 +1351,7 @@ export function ConversationTimeline() {
                               </>
                             }
                             menu={
-                              hostless()
+                              hostless() || turnStep()
                                 ? undefined
                                 : () => (
                                     <MessageMenu
@@ -1312,8 +1361,10 @@ export function ConversationTimeline() {
                                       {...messageActions}
                                       readAloud={messageReadAloud()}
                                       onMarkUnread={markUnreadAction(message() ?? initialMessage)}
+                                      sendToChannel={sendToChannelAction(message() ?? initialMessage)}
                                       onBranch={branchAction(message() ?? initialMessage)}
                                       branchDisabled={Boolean(props.activeTurnId)}
+                                      onDelete={deleteAction(message() ?? initialMessage)}
                                     />
                                   )
                             }
@@ -1329,6 +1380,8 @@ export function ConversationTimeline() {
                                   levels={player()?.levels}
                                   onToggle={() => player()?.onToggle()}
                                   onSeek={(seconds) => player()?.onSeek?.(seconds)}
+                                  speed={replySpeed()}
+                                  onCycleSpeed={replySpeedChange()}
                                 />
                               )}
                             </Show>
@@ -1349,6 +1402,7 @@ export function ConversationTimeline() {
                                       questions={questionPrompt.questions}
                                       resolution={resolution}
                                       onSubmit={async () => false}
+                                      onOpenLink={(url) => void openExternalMessageUrl(url)}
                                     />
                                   </article>
                                 )}
@@ -1449,6 +1503,11 @@ export function ConversationTimeline() {
           </div>
         </Show>
       </div>
+      <DeleteMessageDialog
+        messageId={deleteTargetId()}
+        onDelete={deleteMessage}
+        onClose={() => setDeleteTargetId(null)}
+      />
     </>
   );
 }
