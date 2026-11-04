@@ -1927,6 +1927,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       ready={cover ? !fullWindowLoading() : undefined}
       onExited={cover ? () => setLoadingCover(false) : undefined}
       fullWindow={fullWindowLoading()}
+      screen={!frameConnecting()}
       issue={workspace.state.hostedIssue}
       start={workspace.state.hostedStart}
       updateVersion={workspace.state.hostRestart?.version ?? null}
@@ -2008,9 +2009,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               initialLoading={hostOffline()}
               connection={
                 <>
-                  <Show when={connectionShown() && !fullWindowLoading() && !frameConnecting()}>
-                    {connectionNotice()}
-                  </Show>
+                  {/* While the chat loader covers the first load, the notice shows only its delayed toast. */}
+                  <Show when={connectionShown() && !fullWindowLoading()}>{connectionNotice()}</Show>
                   <Show when={workspace.state.status === "online" && workspace.state.panelsFailed}>
                     <ServerPanelLoadNotice
                       busy={workspace.state.panelsLoading}
