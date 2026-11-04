@@ -23,6 +23,7 @@ export const messages = {
   "status.agent.screenCaptureRegion": "截取 {x}、{y} 处 {width} × {height} 点的屏幕区域，并把图像发送给助手的模型。",
   "status.agent.vaultCardFill":
     "在 {site} 上填入已保存的银行卡 {card}。批准后，助手可以在该网站上免批准填入这张卡。可在“服务器设置 > 保险库”中移除该网站。",
+  "status.agent.workflowDelete": "删除工作流 {title} 及其运行记录和版本。其未完成的步骤会停止。",
   "status.agent.vaultCardFillFrames": "银行卡字段位于来自 {origins} 的框架中。",
   "status.agent.screenCaptureProgress": "正在请求截屏…",
   "status.agent.screenCaptureReviewing": "正在查看截屏…",

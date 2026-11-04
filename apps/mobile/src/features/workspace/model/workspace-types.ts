@@ -176,6 +176,11 @@ import type { MobileConversationStore } from "./conversation-store";
 import type { LiveWorkspaceStore } from "./live-workspace-store";
 
 type MobileServerKind = "local" | "remote";
+/** The message that `message-delete-v1` deletes. */
+type MessageDeleteTarget =
+  | { kind: "agent"; agentId: string; taskId?: string; messageId: string }
+  | { kind: "channel"; channelId: string; messageId: string };
+
 /** The route set that reaches a host's OpenBot update: the admin set or the member set. */
 export type ServerUpdateAccess = "admin" | "member";
 
@@ -303,6 +308,8 @@ export interface MobileWorkspaceContextValue {
   canEditQueue: (serverId: string) => boolean;
   /** True when the host advertises `message-client-id-v1`: a repeat of a message is stored once. */
   canRetryMessage: (serverId: string) => boolean;
+  /** True when the host advertises `message-delete-v1`. */
+  canDeleteMessages: (serverId: string) => boolean;
   /** The files this host accepts beyond the base list, as the desktop picker reads them. */
   attachmentSupport: (serverId: string) => AttachmentSupport;
   changeQueue: (
@@ -314,6 +321,11 @@ export interface MobileWorkspaceContextValue {
   editQueue: (agentId: string, serverId: string, input: QueueEditRequest) => Promise<QueueSnapshot>;
   /** Sets the reader's reaction on a message of an agent chat. `null` removes it. */
   setMessageReaction: (agentId: string, serverId: string, messageId: string, emoji: string | null) => Promise<void>;
+  /**
+   * Deletes one message for everyone, with `message-delete-v1`: from an agent chat, from one task of
+   * the agent (`taskId`), or from a channel. The host refuses a message that the reader may not delete.
+   */
+  deleteMessage: (serverId: string, target: MessageDeleteTarget) => Promise<void>;
   interruptTurn: (agentId: string, turnId: string, serverId?: string) => Promise<void>;
   channelStore: MobileChannelStore;
   /** The servers in the order saved on this device. The app opens on the first one. */
@@ -978,6 +990,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "browserViewSupport"
   | "canEditQueue"
   | "canRetryMessage"
+  | "canDeleteMessages"
   | "attachmentSupport"
   | "canStartNewChat"
   | "canCompactContext"

@@ -352,6 +352,18 @@ export class MobileChannelStore {
       );
     });
   }
+  /**
+   * Takes a message that a member deleted out of the loaded page. A latest page keeps the older
+   * loaded messages, so the host's change event alone leaves it shown.
+   */
+  removeMessage(serverId: string, channelId: string, messageId: string) {
+    const entry = this.entry(serverId);
+    const page = entry.state.pages.get(channelId);
+    if (!page?.messages.some((message) => message.id === messageId)) return;
+    const pages = new Map(entry.state.pages);
+    pages.set(channelId, { ...page, messages: page.messages.filter((message) => message.id !== messageId) });
+    this.publish(entry, { pages });
+  }
   async older(serverId: string, channelId: string) {
     const entry = this.entry(serverId);
     const current = entry.state.pages.get(channelId);

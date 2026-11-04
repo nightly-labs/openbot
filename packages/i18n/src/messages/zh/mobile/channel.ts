@@ -14,6 +14,7 @@ export const messages = {
   "mobile.channel.list.deleteFailedBody": "无法删除该频道，请重试。",
   "mobile.channel.list.open": "打开频道 {name}",
   "mobile.channel.list.openWithTitle": "打开频道 {name}，{title}",
+  "mobile.channel.avatar.more": "+{count}",
   "mobile.channel.list.unread": { other: "{count} 条未读消息" },
   "mobile.channel.list.noMessages": "还没有消息",
   "mobile.channel.task.task": "任务",

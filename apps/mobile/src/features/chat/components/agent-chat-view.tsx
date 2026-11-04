@@ -1,4 +1,5 @@
 import type { RespondToPromptInput } from "@openbot/contracts/ipc";
+import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { ChatChannelWorkRow } from "@/features/channels/components/chat-channel-work-row";
@@ -15,11 +16,13 @@ import { openTurnActivity } from "@/features/workspace/model/agent-activity";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import { useText } from "@/shared/lib/text";
 import { chatRowIndex, latestReadableMessage, projectChatMessages, withFailureReasons } from "../model/chat-messages";
+import { requestComposerFocus, requestComposerText } from "../model/composer-requests";
 import { useAgentMentionSkills } from "../model/use-agent-mention-skills";
 import { MAIN_THREAD_ID, useChatThreadMenu } from "./chat-thread-menu";
 import { ChatView } from "./chat-view";
 import { useBranchThread } from "./use-branch-thread";
 import { useChatQueue } from "./use-chat-queue";
+import { useMessageDelete } from "./use-message-delete";
 import { useOpenAgentTasks } from "./use-open-agent-tasks";
 import { useQuestionPrompt } from "./use-question-prompt";
 
@@ -204,6 +207,25 @@ export function MobileChatView({
       message.turnId === conversation?.activeTurnId,
   );
   const viewOnly = useAgentViewOnly(agent.serverId, agent.id);
+  const messageDelete = useMessageDelete(agent.serverId, { kind: "agent", agentId: agent.id });
+  // As on desktop, the text of a message can start work in an open channel. The channel opens with
+  // the text in its composer. The list changes on each channel event, so it is kept by its contents.
+  const channelKey = JSON.stringify(
+    channels.filter((channel) => !channel.archived).map((channel) => ({ id: channel.id, name: channel.name })),
+  );
+  const sendToChannel = useMemo(() => {
+    const open: { id: string; name: string }[] = JSON.parse(channelKey);
+    if (open.length === 0) return undefined;
+    const serverId = agent.serverId;
+    return {
+      channels: open,
+      onSend: (channelId: string, text: string) => {
+        requestComposerText({ serverId, channelId, text });
+        requestComposerFocus({ serverId, channelId });
+        router.push({ pathname: "/channel/[channelId]", params: { channelId, serverId } });
+      },
+    };
+  }, [channelKey, agent.serverId]);
   const branching = useBranchThread({
     serverId: agent.serverId,
     agentId: agent.id,
@@ -248,6 +270,9 @@ export function MobileChatView({
       stopTurn={stopTurn}
       branchPoints={branching.branchPoints}
       onBranch={branching.branch}
+      deleteMessage={messageDelete.deleteMessage}
+      deletesAnyMessage={messageDelete.deletesAny}
+      sendToChannel={sendToChannel}
       questionForm={questionForm}
       activityAccessory={activityAccessory}
       threadMenu={threadMenu}

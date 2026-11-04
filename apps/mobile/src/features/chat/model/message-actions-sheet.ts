@@ -21,6 +21,18 @@ export interface MessageActionsRequest {
   /** Copies the conversation through this answer into a new thread. Unset where the message has no branch. */
   onBranch?: () => void;
   onSelectText?: () => void;
+  /**
+   * The open channels that the message text can go to, as on desktop. The channel opens with the text
+   * in its composer. Unset outside an agent's own chat, and for a message without text.
+   */
+  sendToChannel?: MessageChannelTargets;
+  /** Asks, then deletes the message for everyone. Unset where the reader cannot delete it. */
+  onDelete?: () => void;
+}
+
+export interface MessageChannelTargets {
+  channels: readonly { id: string; name: string }[];
+  onSend: (channelId: string) => void;
 }
 
 let current: MessageActionsRequest | null = null;

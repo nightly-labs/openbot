@@ -24,6 +24,8 @@ export const messages = {
   "status.agent.screenCaptureWindow": "Capturer la fenêtre {name} et envoyer l’image au modèle de l’agent.",
   "status.agent.screenCaptureRegion":
     "Capturer la zone de l’écran à {x}, {y}, {width} × {height} points et envoyer l’image au modèle de l’agent.",
+  "status.agent.workflowDelete":
+    "Supprimer le workflow {title} avec ses exécutions et ses versions. Ses étapes en cours s'arrêtent.",
   "status.agent.screenCaptureProgress": "Demande de capture d’écran…",
   "status.agent.screenCaptureReviewing": "Analyse de la capture d’écran…",
   "status.agent.browserOpening": "Ouverture d’une page web…",
