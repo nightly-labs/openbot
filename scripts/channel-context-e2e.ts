@@ -576,6 +576,11 @@ try {
       rows(referenced(reply)).some((row) => row.id === request.id),
       referenced(reply),
     );
+    pass(
+      "A reply to the request that made the task does not quote it again",
+      !reply.includes("The request replies to message"),
+      blocks(reply).slice(1, 3).join("\n\n"),
+    );
     pass("The delta does not give the channel rules again", !reply.includes(CHANNEL_RULE));
     pass(
       "The delta has no channel facts while the channel is the same",

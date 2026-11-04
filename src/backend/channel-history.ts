@@ -205,23 +205,15 @@ export function boundedHistoryPage(page: ChannelHistoryPage): ChannelHistoryPage
 }
 
 /**
- * A long instruction that an agent wrote, cut as a long history message is. The note gives the
- * offset in the message that holds it, so channel_history reads the part that is left out.
+ * A long instruction that an agent wrote, or a long quote, cut as a long history message is. The
+ * note gives the offset in the message that holds it, so channel_history reads the part that is
+ * left out.
  */
-function cutInstruction(instruction: string, holder: ChannelMessage): string {
-  const head = Math.floor(HANDOFF_INSTRUCTION_CHARACTERS * HISTORY_HEAD_SHARE);
-  const tail = HANDOFF_INSTRUCTION_CHARACTERS - head;
+function cutInstruction(instruction: string, holder: ChannelMessage, limit = HANDOFF_INSTRUCTION_CHARACTERS): string {
+  const head = Math.floor(limit * HISTORY_HEAD_SHARE);
+  const tail = limit - head;
   const offset = holder.message.text.indexOf(instruction) + head;
   return `${instruction.slice(0, head)}\n[${instruction.length - head - tail} characters left out. Call channel_history with messageId "${holder.id}" and offset ${offset} to read them.]\n${instruction.slice(-tail)}`;
-}
-
-/** A long quote in the assignment, cut as a long instruction is. */
-function cutQuote(quote: string, message: ChannelMessage): string {
-  if (quote.length <= REPEATED_ASSIGNMENT_CHARACTERS) return quote;
-  const head = Math.floor(REPEATED_ASSIGNMENT_CHARACTERS * HISTORY_HEAD_SHARE);
-  const tail = REPEATED_ASSIGNMENT_CHARACTERS - head;
-  const offset = message.message.text.indexOf(quote) + head;
-  return `${quote.slice(0, head)}\n[${quote.length - head - tail} characters left out. Call channel_history with messageId "${message.id}" and offset ${offset} to read them.]\n${quote.slice(-tail)}`;
 }
 
 /** One part of a long channel message, from `offset`, for a `channel_history` read by message ID. */
@@ -542,18 +534,21 @@ export class ChannelHistory {
       // `replyToMessageId` joined it to the quote, so the member answered about other messages (#4841).
       const replyToMessageId = request?.message.replyToMessageId;
       const replyTarget = replyToMessageId ? messages.find((message) => message.id === replyToMessageId) : undefined;
-      const requested = assignmentText({ ...task, instruction }, request, origin);
-      const quote = replyTarget?.message.text.trim();
-      const assignment = [
-        requested,
-        // A follow-up to the request that it continues has the quote in the assignment already.
-        replyTarget && quote && !requested.includes(quote)
-          ? `\nThe request replies to message ${replyTarget.id} from ${replyTarget.author.name}:\n${cutQuote(quote, replyTarget)}`
-          : null,
-        `Expected result: ${task.expectedResult}`,
-      ]
-        .filter((line) => line !== null)
-        .join("\n");
+      const requested = `${assignmentText({ ...task, instruction }, request, origin)}\nExpected result: ${task.expectedResult}`;
+      const quote = replyTarget?.message.text.trim() ?? "";
+      // A reply to the message that made the task has the quote in the assignment already.
+      const assignment =
+        replyTarget && quote !== task.instruction.trim()
+          ? `${requested}\n\nThe request replies to message ${replyTarget.id} from ${replyTarget.author.name}:\n${
+              !quote
+                ? "(The message has no text. Its row in this packet gives its attachments.)"
+                : quote.length > REPEATED_ASSIGNMENT_CHARACTERS
+                  ? cutInstruction(quote, replyTarget, REPEATED_ASSIGNMENT_CHARACTERS)
+                  : quote
+            }`
+          : requested;
+      // A long quote does not take the repeated assignment away from a short request (#3630).
+      const repeated = [assignment, requested].find((text) => text.length <= REPEATED_ASSIGNMENT_CHARACTERS);
       const withoutAssignment = (list: ChannelMessage[]) =>
         list.map((message) => {
           let shown = message;
@@ -671,8 +666,8 @@ export class ChannelHistory {
             : []),
           // A provider can shorten a long message, and the end of the packet then was the only place
           // with the assignment (#3630). It is first now, and a short one is given again here.
-          assignment.length <= REPEATED_ASSIGNMENT_CHARACTERS
-            ? `Current assignment, again:\n${assignment}`
+          repeated !== undefined
+            ? `Current assignment, again:\n${repeated}`
             : 'Answer the assignment under "Current assignment" at the start of this message.',
         ].join("\n\n");
         const counted =
