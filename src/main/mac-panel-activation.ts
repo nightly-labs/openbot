@@ -12,7 +12,13 @@ interface ObjcRuntime {
   sendPointer: (receiver: unknown, selector: unknown) => unknown;
   sendRespondsTo: (receiver: unknown, selector: unknown, query: unknown) => boolean;
   sendBool: (receiver: unknown, selector: unknown, value: boolean) => void;
+  sendCollectionBehavior: (receiver: unknown, selector: unknown) => number | bigint;
+  sendSetCollectionBehavior: (receiver: unknown, selector: unknown, value: number | bigint) => void;
 }
+
+const NS_WINDOW_COLLECTION_BEHAVIOR_MANAGED = 1 << 2;
+const NS_WINDOW_COLLECTION_BEHAVIOR_TRANSIENT = 1 << 3;
+const NS_WINDOW_COLLECTION_BEHAVIOR_STATIONARY = 1 << 4;
 
 let runtime: ObjcRuntime | null = null;
 
@@ -28,6 +34,8 @@ function objcRuntime(): ObjcRuntime {
     sendPointer: objc.func("objc_msgSend", "void *", ["void *", "void *"]),
     sendRespondsTo: objc.func("objc_msgSend", "bool", ["void *", "void *", "void *"]),
     sendBool: objc.func("objc_msgSend", "void", ["void *", "void *", "bool"]),
+    sendCollectionBehavior: objc.func("objc_msgSend", "uint64", ["void *", "void *"]),
+    sendSetCollectionBehavior: objc.func("objc_msgSend", "void", ["void *", "void *", "uint64"]),
   };
   return runtime;
 }
@@ -56,5 +64,47 @@ export function preventPanelActivation(window: BrowserWindow): void {
     objc.sendBool(nsWindow, setPreventsActivation, true);
   } catch (error) {
     logger.warn("Unable to stop the panel from activating OpenBot:", toLogValue(error));
+  }
+}
+
+/**
+ * Keeps the panel on its own Space while the user works on another one.
+ *
+ * AppKit allows at most one of `Managed`, `Transient` and `Stationary`, and a non-normal window
+ * level defaults to `Transient`. Electron also sets `Transient` in `setHiddenInMissionControl`.
+ * OR-ing `Stationary` alone therefore leaves `Transient` in the mask, and macOS still brings
+ * OpenBot's Space back about half a second after the user switches away (#3497). This clears
+ * `Managed` and `Transient` first, then sets `Stationary`. `Stationary` also keeps the island
+ * visible in Mission Control, which is the trade-off of this behavior.
+ */
+export function keepPanelStationary(window: BrowserWindow): void {
+  if (process.platform !== "darwin") return;
+  try {
+    const objc = objcRuntime();
+    const nsWindow = objc.sendPointer(objc.pointerOf(window.getNativeWindowHandle()), objc.sel("window"));
+    const getCollectionBehavior = objc.sel("collectionBehavior");
+    const setCollectionBehavior = objc.sel("setCollectionBehavior:");
+    if (
+      !nsWindow ||
+      !objc.sendRespondsTo(nsWindow, objc.sel("respondsToSelector:"), getCollectionBehavior) ||
+      !objc.sendRespondsTo(nsWindow, objc.sel("respondsToSelector:"), setCollectionBehavior)
+    ) {
+      logger.warn("The panel window has no collectionBehavior methods.");
+      return;
+    }
+    // NSWindowCollectionBehavior is an NSUInteger. Its flags are small, so Number() is exact.
+    const behavior = Number(objc.sendCollectionBehavior(nsWindow, getCollectionBehavior));
+    if (!Number.isFinite(behavior)) {
+      logger.warn("The panel window reported an invalid collectionBehavior.");
+      return;
+    }
+    objc.sendSetCollectionBehavior(
+      nsWindow,
+      setCollectionBehavior,
+      (behavior & ~(NS_WINDOW_COLLECTION_BEHAVIOR_MANAGED | NS_WINDOW_COLLECTION_BEHAVIOR_TRANSIENT)) |
+        NS_WINDOW_COLLECTION_BEHAVIOR_STATIONARY,
+    );
+  } catch (error) {
+    logger.warn("Unable to keep the panel stationary:", toLogValue(error));
   }
 }

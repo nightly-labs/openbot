@@ -18,6 +18,7 @@ import type { BrowserWindow, Display, Rectangle } from "electron";
 import { causeHelpers } from "../backend/effect-boundary";
 import type { CriticalAction } from "./dynamic-island-actions";
 import { readDynamicIslandPreference, writeDynamicIslandPreference } from "./dynamic-island-preference-store";
+import { keepPanelStationary } from "./mac-panel-activation";
 import { sendToRenderer } from "./renderer-ipc";
 
 const logger = createOpenBotLogger("dynamic-island-window");
@@ -338,6 +339,9 @@ export class DynamicIslandWindowController {
     window.setHiddenInMissionControl(true);
     window.setFocusable(false);
     window.setIgnoreMouseEvents(true, { forward: true });
+    // Every window setting that can touch collectionBehavior has run. In particular,
+    // setHiddenInMissionControl above sets Transient, and Stationary excludes Transient.
+    keepPanelStationary(window);
     window.webContents.on("did-finish-load", () => {
       if (this.#windows.get(display.id) !== window || window.isDestroyed()) return;
       const currentDisplay = this.#options.getDisplays().find((candidate) => candidate.id === display.id) ?? display;
