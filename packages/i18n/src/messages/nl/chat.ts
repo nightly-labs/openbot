@@ -430,4 +430,8 @@ export const messages = {
   "chat.compaction.failed": "Kan context niet comprimeren",
   "chat.compaction.tokens": "{before} → {after} tokens",
   "chat.compaction.continues": "Berichten in de wachtrij gaan door.",
+  "chat.reference.kind.tab": "Browsertabblad",
+  "chat.reference.kind.thread": "Thread",
+  "chat.reference.open.tab": "Browsertabblad {name} tonen",
+  "chat.reference.open.thread": "Thread {name} openen",
 } as const satisfies PartialTranslation<typeof source>;

@@ -517,4 +517,8 @@ export const messages = {
   "chat.compaction.failed": "Не удалось сжать контекст",
   "chat.compaction.tokens": "{before} → {after} токенов",
   "chat.compaction.continues": "Сообщения в очереди продолжат отправляться.",
+  "chat.reference.kind.tab": "Вкладка браузера",
+  "chat.reference.kind.thread": "Ветка",
+  "chat.reference.open.tab": "Показать вкладку браузера {name}",
+  "chat.reference.open.thread": "Открыть ветку {name}",
 } as const satisfies PartialTranslation<typeof source>;

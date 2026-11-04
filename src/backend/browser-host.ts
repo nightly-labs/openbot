@@ -493,6 +493,7 @@ export class BrowserHost {
         undefined,
         tabSession,
       );
+      if (stored.sharedThreadIds) tab.sharedThreadIds = new Set(stored.sharedThreadIds);
       this.#tabs.set(tab.id, tab);
       this.#bindTabEvents(tab);
       tabs.push(tab);
@@ -3003,6 +3004,8 @@ export class BrowserHost {
             tab.privateSession,
             tab.tabSession,
           );
+          // A thread that drives a shared tab also drives its popups, for example a sign-in window.
+          if (tab.sharedThreadIds?.size) popup.sharedThreadIds = new Set(tab.sharedThreadIds);
           // Chromium exposes no opener for noopener/noreferrer requests.
           if (options.webContents?.opener) {
             popup.openerTabId = tab.id;
@@ -3268,11 +3271,47 @@ export class BrowserHost {
     );
   }
 
+  /**
+   * The owner thread can use its tab. Another thread of the same agent can use it after a person shared
+   * it with that thread. A tab with no owner agent is never shared.
+   */
   #canUseToolTab(params: DynamicToolCallParams, tab: BrowserTab): boolean {
-    return (
-      tab.ownerThreadId === params.threadId &&
-      (tab.ownerAgentId === null || tab.ownerAgentId === (params.ownerAgentId ?? null))
-    );
+    const ownerAgentId = params.ownerAgentId ?? null;
+    if (tab.ownerThreadId === params.threadId) return tab.ownerAgentId === null || tab.ownerAgentId === ownerAgentId;
+    if (tab.ownerAgentId === null || tab.ownerAgentId !== ownerAgentId) return false;
+    return this.#tabs.get(tab.id)?.sharedThreadIds?.has(params.threadId) ?? false;
+  }
+
+  /**
+   * Lets one more thread of the tab's owner agent use the tab: a person tagged the tab in a message to
+   * that thread. A tab of another agent, or of no agent, does not change, so a false tag shares nothing.
+   */
+  shareTab(tabId: string, target: { agentId: string; threadId: string }): void {
+    const tab = this.#tabs.get(tabId);
+    if (!tab || tab.closing || tab.privateSession || tab.ownerAgentId === null) return;
+    if (tab.ownerAgentId !== target.agentId || tab.ownerThreadId === target.threadId) return;
+    if (tab.sharedThreadIds?.has(target.threadId)) return;
+    tab.sharedThreadIds = (tab.sharedThreadIds ?? new Set()).add(target.threadId);
+    this.#schedulePersist();
+  }
+
+  /** A deleted thread can use no tab. */
+  unshareThread(threadId: string): void {
+    let changed = false;
+    for (const tab of this.#tabs.values()) changed = tab.sharedThreadIds?.delete(threadId) === true || changed;
+    if (changed) this.#schedulePersist();
+  }
+
+  /**
+   * The title and address of a tab of this agent, as its message references show them to the provider,
+   * or null when the agent does not own the tab. A page can put a typed card value in either one, so
+   * both go through the tab's scrub, as the tab list of the browser tool does.
+   */
+  agentTab(tabId: string, agentId: string): { title: string; url: string } | null {
+    const tab = this.#tabs.get(tabId);
+    if (!tab || tab.closing || tab.contents.isDestroyed() || tab.ownerAgentId !== agentId) return null;
+    const { title, url } = toPublicTab(tab);
+    return { title: tab.engine.scrubText(title), url: tab.engine.scrubText(url) };
   }
 
   readonly #enqueue = Effect.fn("BrowserHost.enqueue")(function* <T>(
@@ -3413,6 +3452,7 @@ export class BrowserHost {
         ownerAgentId: tab.ownerAgentId,
         environment: tab.environment,
         ...storedSessionFields(tab.tabSession),
+        ...(tab.sharedThreadIds?.size ? { sharedThreadIds: [...tab.sharedThreadIds] } : {}),
       })),
     };
     yield* this.#persistLock.withPermit(

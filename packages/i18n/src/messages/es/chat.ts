@@ -435,4 +435,8 @@ export const messages = {
   "chat.compaction.failed": "No se pudo compactar el contexto",
   "chat.compaction.tokens": "{before} → {after} tokens",
   "chat.compaction.continues": "Los mensajes en cola continúan.",
+  "chat.reference.kind.tab": "Pestaña del navegador",
+  "chat.reference.kind.thread": "Hilo",
+  "chat.reference.open.tab": "Mostrar la pestaña del navegador {name}",
+  "chat.reference.open.thread": "Abrir el hilo {name}",
 } as const satisfies PartialTranslation<typeof source>;
