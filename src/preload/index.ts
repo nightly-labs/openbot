@@ -894,6 +894,7 @@ const openbotApi: OpenBotDesktopApi = {
     verifyEmailCode: decodeCentralAuthState,
     updateName: decodeCentralAuthState,
     updateAvatar: decodeCentralAuthState,
+    updateChatColor: decodeCentralAuthState,
     createMobileConnect: decodeMobileConnectTicket,
     cancelMobileConnect: decodeVoid,
     getMobileConnectLink: (value) => (value === null ? null : decodeMobileConnectLink(value)),

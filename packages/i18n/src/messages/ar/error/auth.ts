@@ -8,6 +8,7 @@ export const messages = {
     "منع جدار حماية أو وكيل شبكة في هذه الشبكة OpenBot من الوصول إلى {host}. اطلب من مسؤول الشبكة السماح بـ {host}، ثم أعد المحاولة.",
   "error.auth.signInFirst": "سجّل الدخول إلى OpenBot أولًا.",
   "error.auth.signInRequired": "تسجيل الدخول مطلوب.",
+  "error.auth.chatColorUnavailable": "خدمة الحساب لا تدعم ألوان الدردشة بعد. حاول مرة أخرى لاحقًا.",
   "error.auth.accountChangedDuringRegister": "تغيّر الحساب المسجّل الدخول أثناء تسجيل هذا الخادم.",
   "error.auth.hostCredentialUnavailable": "بيانات اعتماد المضيف البعيد غير متاحة. سجّل المضيف مرة أخرى.",
   "error.auth.codeNotVerified": "تعذّر التحقق من رمز تسجيل الدخول.",

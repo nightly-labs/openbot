@@ -42,6 +42,7 @@ import type {
 import {
   type AgentAccessLevel,
   conversationMessageSender,
+  isAvatarColor,
   type ServerAuditName,
   SIGNED_OUT_CHANNEL_MEMBER_ID,
 } from "@openbot/contracts/ipc";
@@ -1217,6 +1218,7 @@ export class HostService extends EventEmitter<HostEvents> {
           email: member.email,
           name: member.name,
           avatarUrl: member.avatarUrl,
+          ...(isAvatarColor(member.chatColor) ? { chatColor: member.chatColor } : {}),
           role: member.role,
           createdAt: new Date(member.createdAt).toISOString(),
           disabled: member.status !== "active",
@@ -1618,9 +1620,11 @@ export class HostService extends EventEmitter<HostEvents> {
     const before = this.#options.store.listStoredMembers();
     const closed = yield* this.#options.store.syncRemoteDirectory(hostId, members);
     yield* this.#auditMembers(hostId, before, by);
-    if (closed.length === 0) return;
     for (const sessionId of closed) yield* this.#closeLocalSession(sessionId);
-    this.#api.refreshPresence();
+    // The presence change also sends the new member chat colors to each connected peer.
+    if (closed.length > 0 || memberChatColorsChanged(before, this.#options.store.listStoredMembers())) {
+      this.#api.refreshPresence();
+    }
   });
 
   /**
@@ -2021,4 +2025,10 @@ function serverLogoUrl(version: string): string {
 function normalizeRemoteDesktopPlatform(platform: NodeJS.Platform): "darwin" | "win32" | "linux" {
   if (platform === "darwin" || platform === "win32") return platform;
   return "linux";
+}
+
+/** True when a directory sync changed the chat color of a member. */
+function memberChatColorsChanged(before: readonly TeamMemberSummary[], after: readonly TeamMemberSummary[]): boolean {
+  const previous = new Map(before.map((member) => [member.id, member.chatColor ?? null]));
+  return after.some((member) => (previous.get(member.id) ?? null) !== (member.chatColor ?? null));
 }

@@ -1,4 +1,10 @@
-import type { AccountUsage, AccountUsageLimit, AvatarImageInput, CentralAuthState } from "@openbot/contracts/ipc";
+import type {
+  AccountUsage,
+  AccountUsageLimit,
+  AvatarColor,
+  AvatarImageInput,
+  CentralAuthState,
+} from "@openbot/contracts/ipc";
 import { currentText } from "@openbot/ui/text";
 import { createMemo, createSignal, createStore, flush, onCleanup, onSettled } from "solid-js";
 import { type DesktopAnalyticsProperties, desktopAnalytics } from "../../analytics";
@@ -194,6 +200,11 @@ const Auth = createSimpleContext({
       applyCentralAuthState(await accountPort().auth.updateName(name));
     }
 
+    /** Saves the chat color on the account. Members of each server of the user see it. */
+    async function setChatColor(color: AvatarColor | null): Promise<void> {
+      applyCentralAuthState(await accountPort().auth.updateChatColor(color));
+    }
+
     const accountUsage = () => accountUsageState.data;
     const accountUsageRefreshRevision = () => accountUsageState.refreshRevision;
     const accountUsageTargetKey = () => accountUsageState.targetKey;
@@ -297,6 +308,8 @@ const Auth = createSimpleContext({
     });
     /** Null while the success animation holds, so the workspace mounts after it. */
     const visibleSignedInAccount = createMemo(() => (authSuccessVisible() ? null : signedInAccount()));
+    /** The chat color of the signed-in account, or null for none or while signed out. */
+    const chatColor = createMemo(() => signedInAccount()?.chatColor ?? null);
 
     return {
       centralAuth,
@@ -316,6 +329,8 @@ const Auth = createSimpleContext({
       logoutCentralAccount,
       updateAccountName,
       updateAccountAvatar,
+      chatColor,
+      setChatColor,
       createMobileConnect,
       cancelMobileConnect: () => trackMobileConnect("cancelled", () => accountPort().auth.cancelMobileConnect()),
       getMobileConnectLink: () => accountPort().auth.getMobileConnectLink(),

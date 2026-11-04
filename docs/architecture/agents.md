@@ -320,6 +320,34 @@ capability gets only the hue. A create sends the hue, then sets the colour; a fa
 does not fail the create. The web client (`web-runtime.ts`, `web-client-context.tsx`) does the same
 and keeps the list in its state.
 
+## Agent chat colours
+
+An agent can have a chat colour, `chatColor` (`#rrggbb`, lower case), for its chat bubbles. It is
+not the avatar colour, and it does not change `avatarColor` or `avatarHue`. `chatColor: null`
+removes it. The colour is in `agent_json`, and an instance transfer carries it. A team member record
+has an optional `chatColor` that comes from the member's account.
+
+The released Team API codecs remove `chatColor` from agents, `/v1/members` and presence. A joined
+desktop and the web client use the optional `chat-colors-v1` capability
+(`packages/contracts/src/team-protocol/chat-colors-v1.ts`, protocol 9 only). Host route
+`routeChatColors` (`src/main/team-api/route-chat-colors.ts`):
+
+- `POST /v1/chat-colors` gives `{agents: [{agentId, color}], members: [{memberId, color}]}`: the
+  agents that the member can see, and all members (at most 100).
+- `POST /v1/chat-colors/set` takes exactly `{agentId, color | null}`. It needs manage access to the
+  agent and goes through `agents.updateAgent`. No route sets a member's colour.
+- The host sends `chat-colors-changed` with the whole list after each `agents-changed`, after each
+  presence change, and when a peer declares the capability. Each peer gets the list without the
+  agents that it cannot see, and only when its list changed.
+
+The main process of a joined desktop keeps the last list of each server
+(`RemoteServerEventRefresh`). It puts the agent colours into each agent list and agent result, and
+the member colours into each presence snapshot and members list. The renderer does not get
+`chat-colors-changed`. A save with `chatColor` calls the set route before the released `PATCH`. A
+server without the capability refuses a change of only the chat colour with
+`error.team.chatColorsUnsupported`; with other fields, the other fields change. The web client
+(`web-runtime.ts`, `web-client-context.tsx`) does the same and keeps the list in its state.
+
 ## Sidebar folders
 
 The sidebar groups chats in folders. In the stored layout and the released contracts a folder is a

@@ -71,6 +71,7 @@ export const messages = {
   "error.team.agentInstallUnsupported": "L’ajout d’agents n’est pas pris en charge par cette connexion.",
   "error.team.agentHideUnsupported": "Le masquage d’agents n’est pas pris en charge par cette connexion.",
   "error.team.agentColorsUnsupported": "Les couleurs d’agents ne sont pas prises en charge par cette connexion.",
+  "error.team.chatColorsUnsupported": "Les couleurs de discussion ne sont pas prises en charge par cette connexion.",
   "error.team.sidebarFoldersUnsupported":
     "Les dossiers dans des dossiers ne sont pas pris en charge par cette connexion.",
   "error.team.agentNotificationLevelsUnsupported":

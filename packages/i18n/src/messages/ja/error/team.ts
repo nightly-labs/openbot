@@ -67,6 +67,7 @@ export const messages = {
   "error.team.agentInstallUnsupported": "この接続ではエージェントを追加できません。",
   "error.team.agentHideUnsupported": "この接続ではエージェントを非表示にできません。",
   "error.team.agentColorsUnsupported": "この接続ではエージェントの色を使用できません。",
+  "error.team.chatColorsUnsupported": "この接続ではチャットの色を使用できません。",
   "error.team.sidebarFoldersUnsupported": "この接続ではフォルダー内のフォルダーを使用できません。",
   "error.team.agentNotificationLevelsUnsupported":
     "このサーバーはエージェントごとの通知レベルを保存できません。サーバーを実行しているコンピューターで OpenBot を更新してください。",

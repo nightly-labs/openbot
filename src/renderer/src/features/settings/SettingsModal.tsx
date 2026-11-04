@@ -1,6 +1,7 @@
 import type {
   AccountSession,
   AppInfo,
+  AvatarColor,
   AvatarImageInput,
   BillingDesktopApi,
   CentralAuthUser,
@@ -85,6 +86,8 @@ export interface SettingsModalProps {
   account: CentralAuthUser;
   onUpdateAccountName: (name: string) => Promise<void>;
   onUpdateAccountAvatar: (image: AvatarImageInput | null) => Promise<void>;
+  /** Saves the chat color of the account. Members of each server of the user see it. */
+  onSetChatColor: (color: AvatarColor | null) => Promise<void>;
   onCreateMobileConnect?: () => Promise<MobileConnectTicket>;
   onCancelMobileConnect?: () => Promise<void>;
   onGetMobileConnectLink?: () => Promise<MobileConnectLink | null>;
@@ -293,6 +296,8 @@ export function SettingsModal(props: SettingsModalProps) {
             onUpdateSetting={updateSetting}
             onUpdateSettings={updateSettings}
             selectMount={modalElement}
+            chatColor={props.account.chatColor ?? null}
+            onSetChatColor={props.onSetChatColor}
           />
         </Tabs.Content>
 

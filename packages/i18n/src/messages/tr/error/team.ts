@@ -67,6 +67,7 @@ export const messages = {
   "error.team.agentInstallUnsupported": "Ajan ekleme bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentHideUnsupported": "Ajan gizleme bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentColorsUnsupported": "Ajan renkleri bu bağlantı tarafından desteklenmiyor.",
+  "error.team.chatColorsUnsupported": "Sohbet renkleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.sidebarFoldersUnsupported": "Klasör içinde klasör bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentNotificationLevelsUnsupported":
     "Bu sunucu her ajan için kendi bildirim düzeyinizi saklayamıyor. Sunucuyu çalıştıran bilgisayarda OpenBot'u güncelleyin.",

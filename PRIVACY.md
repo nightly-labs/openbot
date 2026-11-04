@@ -352,6 +352,8 @@ The service stores:
 
 - an account ID, normalized email address, identity key, optional name, optional avatar URL, and
   creation and update times;
+- an optional chat color that the user picks for their message bubbles. The service gives it to
+  the hosts of the servers where the user is a member, and their members see it;
 - email sign-in challenges with the email address, hashes of the challenge ID, one-time code, and
   source IP address, attempt counts, and lifecycle times;
 - account sessions with a session ID, account ID, token hash, creation time, last-use time,

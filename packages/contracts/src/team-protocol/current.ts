@@ -47,6 +47,7 @@ import {
   TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY,
 } from "./browser-view-v1";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "./channel-attention-v1";
+import { CHAT_COLORS_CAPABILITY } from "./chat-colors-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "./claude-api-key-v1";
 import { COMPUTER_ACTIVITY_CAPABILITY } from "./computer-activity-v1";
 import { CONNECTORS_CAPABILITY } from "./connectors-v1";
@@ -202,6 +203,7 @@ export {
   BROWSER_USER_CONTROL_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
+  CHAT_COLORS_CAPABILITY,
   COMPUTER_ACTIVITY_CAPABILITY,
   CONNECTORS_CAPABILITY,
   CONTEXT_COMPACT_CAPABILITY,
@@ -425,6 +427,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   MODEL_VISIBILITY_CAPABILITY,
   AGENT_THREAD_REPLIES_CAPABILITY,
   AGENT_COLORS_CAPABILITY,
+  CHAT_COLORS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -583,7 +586,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== COMPUTER_ACTIVITY_CAPABILITY &&
     capability !== MODEL_VISIBILITY_CAPABILITY &&
     capability !== AGENT_THREAD_REPLIES_CAPABILITY &&
-    capability !== AGENT_COLORS_CAPABILITY,
+    capability !== AGENT_COLORS_CAPABILITY &&
+    capability !== CHAT_COLORS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -618,6 +622,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   MODEL_VISIBILITY_CAPABILITY,
   AGENT_THREAD_REPLIES_CAPABILITY,
   AGENT_COLORS_CAPABILITY,
+  CHAT_COLORS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -735,6 +740,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== COMPUTER_ACTIVITY_CAPABILITY &&
       capability !== MODEL_VISIBILITY_CAPABILITY &&
       capability !== AGENT_THREAD_REPLIES_CAPABILITY &&
-      capability !== AGENT_COLORS_CAPABILITY,
+      capability !== AGENT_COLORS_CAPABILITY &&
+      capability !== CHAT_COLORS_CAPABILITY,
   );
 }

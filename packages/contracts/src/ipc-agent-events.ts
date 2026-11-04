@@ -19,6 +19,7 @@ import {
 } from "./ipc-approvals";
 import { isIdentifier } from "./ipc-bounded-values";
 import type { BrowserControlState, BrowserTab } from "./ipc-browser";
+import { type AgentChatColorEntry, isChatColors, type MemberChatColorEntry } from "./ipc-chat-colors";
 import { type AgentPromptQuestion, isAgentPromptQuestion, isConversationMessage } from "./ipc-conversation-messages";
 import {
   type ConversationPage,
@@ -85,6 +86,8 @@ export type AgentEvent =
   | { type: "hidden-agents-changed"; agents: HiddenAgent[] }
   /** The whole list of exact agent colours, in the `agent-colors-v1` wire shape. */
   | { type: "agent-colors-changed"; agents: AgentColorEntry[] }
+  /** The whole list of agent and member chat colours, in the `chat-colors-v1` wire shape. */
+  | { type: "chat-colors-changed"; agents: AgentChatColorEntry[]; members: MemberChatColorEntry[] }
   /**
    * The user's own notification levels on this server changed on one of their devices. Only the
    * connections of that member get it (`agent-notification-levels-v1`), with all of their levels.
@@ -229,6 +232,8 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
       return isHiddenAgentsSnapshot({ agents: value.agents });
     case "agent-colors-changed":
       return isAgentColors({ agents: value.agents });
+    case "chat-colors-changed":
+      return isChatColors({ agents: value.agents, members: value.members });
     case "agent-notification-levels-changed":
       return isAgentNotificationLevelsSnapshot({ server: value.server, agents: value.agents });
     case "sidebar-pins-changed":
