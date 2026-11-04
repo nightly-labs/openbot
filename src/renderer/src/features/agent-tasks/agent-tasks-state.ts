@@ -413,14 +413,18 @@ export function createAgentTasks(options: AgentTasksOptions) {
   }
 
   /**
-   * Reads the active agent's list and each loaded conversation again, after the server was away. The
-   * lists come first: a thread that another device deleted meanwhile is not read again.
+   * Reads the lists of the active agent, of each agent with a running thread and of each loaded
+   * conversation again, after the server was away. Then it reads each loaded conversation. The lists
+   * come first: a thread that another device deleted meanwhile is not read again.
    */
   function reload(): void {
     if (!available()) return;
     const agentIds = new Set(Object.values(state.conversations).map((conversation) => conversation.agentId));
     const active = activeAgentId();
     if (active) agentIds.add(active);
+    // A running thread can end while the server is away, and the sidebar shows its agent as working.
+    for (const snapshot of Object.values(state.snapshots))
+      if (snapshot.tasks.some((task) => task.state === "running")) agentIds.add(snapshot.agentId);
     for (const agentId of agentIds) {
       void loadTasks(agentId).then((loaded) => {
         if (!loaded) return;
