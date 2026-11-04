@@ -4,6 +4,7 @@ import { isDynamicRecord, isFunction } from "@openbot/contracts/runtime-values";
 import type { Effect } from "effect";
 import type { AuthStoreError } from "./d1-auth-repository";
 import type { EmailDeliveryError } from "./email-delivery";
+import { observedD1 } from "./observed-d1";
 import type { SmtpContactMessage, SmtpFailure, SmtpLicenseMessage, SmtpWelcomeMessage } from "./smtp-email-delivery";
 
 export interface WorkerBindings {
@@ -168,11 +169,18 @@ function isWorkerBindings(value: unknown): value is WorkerBindings {
   return true;
 }
 
+const observedBindings = new WeakMap<WorkerBindings, WorkerBindings>();
+
+/** The bindings of the Worker. `DB` logs each failed call and runs an overloaded read once more (`observed-d1.ts`). */
 export function requireWorkerBindings(value: unknown): WorkerBindings {
   if (!isWorkerBindings(value)) {
     throw new Error("Cloudflare worker bindings are unavailable.");
   }
-  return value;
+  const known = observedBindings.get(value);
+  if (known) return known;
+  const observed = { ...value, DB: observedD1(value.DB) };
+  observedBindings.set(value, observed);
+  return observed;
 }
 
 export interface MobileAuthSessionResult {
