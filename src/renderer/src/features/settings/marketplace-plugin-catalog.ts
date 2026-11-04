@@ -1414,6 +1414,56 @@ const CLICKUP: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/clickup",
 };
 
+const SPECSTREAM: MarketplacePluginDetail = {
+  id: "plugin-specstream",
+  slug: "specstream",
+  name: "SpecStream",
+  tagline: "Sourced data from the live web",
+  description:
+    "SpecStream builds datasets from the live web. Describe the rows you need in plain words, see the most the run can cost, approve that maximum, and read the rows back with the source URL of every value. Each user signs in to their own SpecStream account, and nothing runs until the user approves a price. New accounts start with $10 of work, no card.",
+  category: "research",
+  creatorName: "SpecStream",
+  iconUrl: "https://specstream.ai/icons/icon-180.png",
+  version: "1.0.0",
+  prompts: [
+    {
+      id: "prompt-leads",
+      text: "Find seed stage fintech startups in France with their founders, and show the source page for each.",
+    },
+    {
+      id: "prompt-grants",
+      text: "List open grants for climate nonprofits in the EU, with deadlines and the page each one comes from.",
+    },
+    {
+      id: "prompt-quote",
+      text: "How much would 200 US dental clinics with a website and phone number cost? Quote it first.",
+    },
+  ],
+  apps: [
+    {
+      id: "app-specstream-mcp",
+      name: "SpecStream",
+      description:
+        "Dataset requests priced up front, runs started only after the approved maximum, and rows with a source URL on every value, over one MCP server.",
+      iconUrl: "https://specstream.ai/icons/icon-180.png",
+      server: {
+        name: "specstream",
+        transport: "http",
+        url: "https://api.specstream.ai/mcp",
+        auth: [{ id: "specstream-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://specstream.ai?utm_source=openbot",
+  privacyPolicyUrl: "https://specstream.ai/privacy?utm_source=openbot",
+  termsUrl: "https://specstream.ai/terms?utm_source=openbot",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-09-30T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/specstream",
+};
+
 export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   AAVE,
   CANVA,
@@ -1446,4 +1496,5 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   RESEND,
   COMPOSIO,
   CLICKUP,
+  SPECSTREAM,
 ];
