@@ -12,7 +12,7 @@ import { type ParamListBase, useNavigation } from "expo-router/react-navigation"
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowDown from "lucide-react-native/icons/arrow-down";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, type SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Keyboard, useColorScheme, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { KeyboardGestureArea } from "react-native-keyboard-controller";
@@ -64,7 +64,7 @@ import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import { useReducedTransparency } from "@/shared/lib/use-reduced-transparency";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
-import { addEditedMessage, openComposerScreen, takeEditedMessages, useComposerDraft } from "../model/composer-drafts";
+import { getComposerDraft, useComposerDraft } from "../model/composer-drafts";
 import {
   deleteComposerFiles,
   takeComposerFocus,
@@ -326,7 +326,23 @@ export function ChatView({
     () => ({ kind: target.kind, serverId: target.serverId, id: target.id }),
     [target.kind, target.serverId, target.id],
   );
-  const [draft, setDraft] = useComposerDraft(draftChat);
+  const [sharedDraft, setSharedDraft] = useComposerDraft(draftChat);
+  // The messages whose text and files are in the composer. The send replaces them. The outbox keeps
+  // them until the send, and they come back stopped when the chat closes.
+  const editedMessages = useRef(new Set<string>());
+  // While this screen holds an Edit, its text stays on this screen, with the files and reply of the
+  // edited messages. Another screen of the chat shows the text from before the first Edit, so it
+  // cannot send the edited text without its files, and a close leaves that text.
+  const [editDraft, setEditDraft] = useState<string | null>(null);
+  const draftBeforeEdit = useRef("");
+  const draft = editDraft ?? sharedDraft;
+  const setDraft = useCallback(
+    (value: SetStateAction<string>) => {
+      if (!editedMessages.current.size) return setSharedDraft(value);
+      setEditDraft((current) => (typeof value === "function" ? value(current ?? "") : value));
+    },
+    [setSharedDraft],
+  );
   const [sendError, setSendError] = useState<{
     agentId: string;
     message: string;
@@ -791,14 +807,14 @@ export function ChatView({
       void haptics.impact();
       setDraft("");
       questionForm.answer([mentionDraft(body).text]);
-      for (const id of takeEditedMessages(draftChat)) void outbox.cancel(id);
+      for (const id of takeEditedMessages()) void outbox.cancel(id);
       return;
     }
 
     setDraft("");
     const submittedReply = replyTarget;
     setReplyTarget(null);
-    const replaces = takeEditedMessages(draftChat);
+    const replaces = takeEditedMessages();
     // While text of a message is selected, the composer text says how to change it, as Describe
     // edits on desktop. A message with files goes as a usual message.
     if (selection && body && files.length === 0) {
@@ -812,6 +828,19 @@ export function ChatView({
       deliver(body, submittedReply ? hostMessageId(submittedReply.id) : null, files, replaces);
     }
     attachments.clear();
+  }
+
+  /** The composer sends what Edit gave it: the messages it came from are replaced. */
+  function takeEditedMessages(): string[] {
+    const ids = [...editedMessages.current];
+    if (!ids.length) return ids;
+    editedMessages.current.clear();
+    setEditDraft(null);
+    // The sent text held the draft from before the first Edit. Text that another screen of the chat
+    // wrote since then stays.
+    const before = draftBeforeEdit.current;
+    setSharedDraft((current) => (current === before ? "" : current));
+    return ids;
   }
 
   function deliver(
@@ -854,19 +883,16 @@ export function ChatView({
     deliver(serializeSelectionInstruction(instruction, selectionQuote), hostMessageId(selection.message.id), []);
   }
 
-  // The messages whose text and files are in the composer. The send replaces them. The outbox keeps
-  // them until the send, and they come back stopped when the last screen of the chat closes. The
-  // chat then keeps the draft from before the first Edit, so that their text does not show both in
-  // the queue and in the composer.
   const mounted = useRef(false);
   useEffect(() => {
     mounted.current = true;
-    const closeScreen = openComposerScreen(draftChat);
+    const edited = editedMessages.current;
     return () => {
       mounted.current = false;
-      outbox.stopEditing(closeScreen());
+      outbox.stopEditing(edited);
+      edited.clear();
     };
-  }, [outbox, draftChat]);
+  }, [outbox]);
   /**
    * Puts the text, reply and files of an outbox message in the composer. A ref, so that a streamed
    * reply does not draw the pending rows again.
@@ -893,7 +919,12 @@ export function ChatView({
       return;
     }
     const { text: body, replyToMessageId, files } = restored;
-    addEditedMessage(draftChat, clientMessageId, body);
+    if (!editedMessages.current.size) draftBeforeEdit.current = getComposerDraft(draftChat);
+    editedMessages.current.add(clientMessageId);
+    setEditDraft((current) => {
+      const base = current ?? draftBeforeEdit.current;
+      return body ? (base ? `${body}\n${base}` : body) : base;
+    });
     const reply = projectedMessages.find(
       (message): message is ChatBubbleMessage => message.kind === "message" && message.id === replyToMessageId,
     );
@@ -907,8 +938,7 @@ export function ChatView({
   });
   // A stopped upload is the person's own choice: the text and files go back to the composer, and no
   // error is needed to explain it.
-  // Only the chat in front takes them, so that two screens of one chat do not put the text in the
-  // shared draft twice.
+  // Only the chat in front takes them, so that one screen of a chat holds the edit.
   useEffect(() => {
     if (!isFocused) return;
     const returned = outboxMessages.filter((message) => message.returned);

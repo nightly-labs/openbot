@@ -41,53 +41,9 @@ export function useComposerDraft(chat: DraftChat): [string, (value: SetStateActi
   return [draft, setDraft];
 }
 
-/**
- * The queued messages whose text Edit put in the draft of a chat, and the draft from before the
- * first Edit. They belong to the chat, not to one screen: two screens of one chat show the same
- * draft, so the screen that sends it must replace these messages.
- */
-const chatEdits = new Map<string, { ids: Set<string>; before: string }>();
-const chatScreens = new Map<string, number>();
-
-/** Puts the text of an edited queued message before the chat's draft. */
-export function addEditedMessage(chat: DraftChat, clientMessageId: string, text: string): void {
-  const key = outboxChatKey(chat);
-  const before = useComposerDrafts.getState().drafts[key]?.text ?? "";
-  const edits = chatEdits.get(key) ?? { ids: new Set<string>(), before };
-  edits.ids.add(clientMessageId);
-  chatEdits.set(key, edits);
-  writeDraft(chat, key, (current) => (text ? (current ? `${text}\n${current}` : text) : current));
-}
-
-/** The messages that the chat's draft replaces when it is sent. */
-export function takeEditedMessages(chat: DraftChat): string[] {
-  const key = outboxChatKey(chat);
-  const ids = [...(chatEdits.get(key)?.ids ?? [])];
-  chatEdits.delete(key);
-  return ids;
-}
-
-/**
- * Counts an open screen of the chat. The returned function closes it. When the last screen of the
- * chat closes, the draft goes back to its text from before the first Edit, and the function returns
- * the edited messages, which the outbox must keep as stopped.
- */
-export function openComposerScreen(chat: DraftChat): () => ReadonlySet<string> {
-  const key = outboxChatKey(chat);
-  chatScreens.set(key, (chatScreens.get(key) ?? 0) + 1);
-  return () => {
-    const screens = (chatScreens.get(key) ?? 1) - 1;
-    if (screens) {
-      chatScreens.set(key, screens);
-      return new Set();
-    }
-    chatScreens.delete(key);
-    const edits = chatEdits.get(key);
-    if (!edits) return new Set();
-    chatEdits.delete(key);
-    writeDraft(chat, key, edits.before);
-    return edits.ids;
-  };
+/** The draft of one chat as it is now, for code that runs after an `await`. */
+export function getComposerDraft(chat: DraftChat): string {
+  return useComposerDrafts.getState().drafts[outboxChatKey(chat)]?.text ?? "";
 }
 
 /** Deletes the drafts of these servers' chats. */
