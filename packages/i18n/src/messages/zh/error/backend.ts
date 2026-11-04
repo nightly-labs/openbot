@@ -58,6 +58,8 @@ export const messages = {
   "error.backend.channelUnconfirmedStart": "该频道有一项未确认的派活启动，请在删除前确认其结果。",
   "error.backend.channelNotFound": "未找到该频道。",
   "error.backend.channelMemberUnavailable": "有频道成员不可用。",
+  "error.backend.channelSkillAddress": "请将这条技能消息发送给频道中的一位助手。",
+  "error.backend.channelSkillUnavailable": "所选技能已不再对该助手可用。",
   "error.backend.channelArchived": "请先恢复该频道，再发送消息或更改任务。",
   "error.backend.channelReferenceUnavailable": "引用的频道消息不可用。",
   "error.backend.channelTaskNotFound": "未找到该频道任务。",

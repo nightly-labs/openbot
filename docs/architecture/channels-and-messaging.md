@@ -205,9 +205,10 @@ The channel composer offers each member's installed skills through `$`. With one
 that member's skills; with several, the picker first selects a member. Selecting a skill inserts
 both a leading agent mention and a skill tag, using the existing message format and routing rule.
 An existing leading mention chooses that member directly. A skill message must address exactly one
-member; `@everyone`, several leading mentions, or an unavailable skill block the send in desktop
-and web clients. MCP servers remain available through `$`, and an ordinary message keeps the
-channel's existing routing behavior.
+member. The host rejects `@everyone`, several leading mentions, or an unavailable skill before it
+stores a skill message or creates work, for every client including mobile. Desktop and web also
+check before sending so that the composer gives immediate feedback. MCP servers remain available
+through `$`, and an ordinary message keeps the channel's existing routing behavior.
 
 Channel tools retrieve history, assign a child task, transfer ownership, and report results. The
 runtime supplies channel and caller identity. A child keeps its parent owner; a transfer changes it.

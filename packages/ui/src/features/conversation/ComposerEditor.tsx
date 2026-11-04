@@ -429,7 +429,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
       }
       if (skillPickerRequest > lastSkillPickerRequest) {
         lastSkillPickerRequest = skillPickerRequest;
-        openSkillPicker();
+        openSkillPicker(disabled);
       }
       // A locked composer keeps the quote until it opens again.
       if (quoteRequest && quoteRequest.id > lastQuoteRequest && !disabled) {
@@ -606,8 +606,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
   }
 
   /* Writes a `$` at the caret, as if typed, so the picker and its query work as for a typed one. */
-  function openSkillPicker() {
-    if (!editor || props.disabled) return;
+  function openSkillPicker(disabled: boolean) {
+    if (!editor || disabled) return;
     editor.focus();
     ensureEditorSelection();
     const selection = window.getSelection();

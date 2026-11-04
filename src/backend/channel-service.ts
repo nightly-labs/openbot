@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, normalize, sep } from "node:path";
-import { leadingAddress } from "@openbot/contracts/chat-tag-references";
+import { chatTagReferences, leadingAddress } from "@openbot/contracts/chat-tag-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentAccessLevel,
@@ -20,13 +20,20 @@ import {
   type CreateChannelMemoryInput,
   channelRoutingConversationEventItemType,
   type DeleteChannelMemoryInput,
+  type InstalledSkill,
   type QueueHold,
   type UpdateChannelMemoryInput,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { isFixedSourceText, matchingSourceKeys, sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
-import { type ChannelOperationError, channelFailure, channelResult, channelSync } from "./channel-effects";
+import {
+  type ChannelOperationError,
+  ChannelSkillValidationError,
+  channelFailure,
+  channelResult,
+  channelSync,
+} from "./channel-effects";
 import {
   assignmentText,
   ChannelHistory,
@@ -54,6 +61,7 @@ import { extractJsonObject, StructuredOutputError } from "./structured-output";
 
 export interface ChannelHooks {
   agents(): AgentSummary[];
+  skills(agentId: string): Effect.Effect<InstalledSkill[], ChannelOperationError>;
   /**
    * Whether the user hid this agent. A hidden member keeps its membership, but the channel gives it
    * no new work until the user restores it. A turn that already runs is not affected.
@@ -409,7 +417,7 @@ export class ChannelService {
       yield* this.wake(channel.id);
       return result;
     }
-    const channel = yield* channelSync(() => this.store.get(command.channelId));
+    let channel = yield* channelSync(() => this.store.get(command.channelId));
     if (command.type === "read") {
       const result = yield* channelSync(() =>
         this.store.markRead(channel.id, actor.id, command.throughSequence, command.operationId),
@@ -446,6 +454,10 @@ export class ChannelService {
     }
     if (channel.archived) return yield* channelFailure(new Error(sourceText("error.backend.channelArchived")));
     if (command.type === "send") {
+      yield* this.#validateSkillSend(channel, command);
+      // Archive does not wait in the command queue and can run while the skill lookup reads files.
+      channel = yield* channelSync(() => this.store.get(command.channelId));
+      if (channel.archived) return yield* channelFailure(new Error(sourceText("error.backend.channelArchived")));
       const recipientAgentId = command.recipientAgentId;
       if (recipientAgentId) yield* channelSync(() => this.requireAvailableMember(channel, recipientAgentId));
       const id = randomUUID();
@@ -2815,6 +2827,42 @@ export class ChannelService {
       }
     }
   }).bind(this);
+
+  /** Check every client before attachments or channel state change. Receipt replay skips this. */
+  readonly #validateSkillSend = Effect.fn("ChannelService.validateSkillSend")(function* (
+    this: ChannelService,
+    channel: Channel,
+    command: Extract<ChannelCommand, { type: "send" }>,
+  ): Effect.fn.Return<void, ChannelOperationError> {
+    const references = chatTagReferences(command.text).filter((reference) => reference.kind === "skill");
+    if (!references.length) return;
+    const address = leadingAddress(command.text);
+    const recipient = address.mentions[0]?.id;
+    if (
+      address.everyone ||
+      address.mentions.length !== 1 ||
+      !recipient ||
+      (command.recipientAgentId != null && command.recipientAgentId !== recipient) ||
+      !channel.members.some((member) => member.agentId === recipient) ||
+      !this.hooks.agents().some((agent) => agent.id === recipient) ||
+      this.hooks.hidden?.(recipient)
+    )
+      return yield* channelFailure(
+        new ChannelSkillValidationError({ message: sourceText("error.backend.channelSkillAddress") }),
+      );
+    const skills = yield* this.hooks.skills(recipient);
+    if (
+      references.some(
+        (reference) =>
+          !skills.some(
+            (skill) => skill.skillId === reference.id && skill.enabled !== false && skill.state !== "needs-repair",
+          ),
+      )
+    )
+      return yield* channelFailure(
+        new ChannelSkillValidationError({ message: sourceText("error.backend.channelSkillUnavailable") }),
+      );
+  });
 
   private requireMember(channel: Channel, agentId: string): void {
     if (
