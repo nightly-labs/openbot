@@ -129,6 +129,8 @@ export const messages = {
   "provider.picker.noModels": "Aucun modèle n’est disponible chez {name}.",
   "provider.picker.customEmpty":
     "Ajoutez un point de terminaison compatible OpenAI : un serveur de modèles sur cet ordinateur, ou tout service avec une URL de base et une clé.",
+  "provider.picker.customPending":
+    "Les modèles de vos points de terminaison ne sont pas encore chargés. Le fournisseur les lit quand sa tâche en cours s’arrête.",
   "provider.picker.defaultModelLabel": "{name}, par défaut",
   "provider.picker.usageLimit": "Limite d’utilisation atteinte",
   "provider.picker.usageLimitWindow": "Limite ({window})",

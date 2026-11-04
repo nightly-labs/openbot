@@ -123,6 +123,8 @@ export const messages = {
   "provider.picker.noModels": "{name} で利用できるモデルはありません。",
   "provider.picker.customEmpty":
     "OpenAI 互換のエンドポイントを追加してください。このコンピューター上のモデルサーバーでも、ベース URL とキーがあるサービスでも使えます。",
+  "provider.picker.customPending":
+    "エンドポイントのモデルはまだ読み込まれていません。プロバイダーは現在のタスクが止まったあとで読み込みます。",
   "provider.picker.defaultModelLabel": "{name}、デフォルト",
   "provider.picker.usageLimit": "使用量の上限に達しました",
   "provider.picker.usageLimitWindow": "{window}の上限",
