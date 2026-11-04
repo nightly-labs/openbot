@@ -13,7 +13,7 @@ import { AppState, Keyboard, Pressable, useColorScheme, View } from "react-nativ
 import { KeyboardGestureArea } from "react-native-keyboard-controller";
 import Animated, { useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useQueryScope } from "@/features/auth/context/mobile-session-context";
+import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useBrowserFeature } from "@/features/browser/components/use-browser-feature";
 import {
   asksForSecret,
@@ -32,12 +32,18 @@ import { useMarkThreadRead } from "@/features/chat/components/use-agent-thread-r
 import { useBranchThread } from "@/features/chat/components/use-branch-thread";
 import { useChatAttachments } from "@/features/chat/components/use-chat-attachments";
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
+import { useMessageDelete } from "@/features/chat/components/use-message-delete";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
 import { useVoiceMode } from "@/features/chat/components/use-voice-mode";
 import { VoiceOverlay } from "@/features/chat/components/voice-overlay";
 import { branchDividerRowId } from "@/features/chat/model/branch-points";
 import { mentionDraft } from "@/features/chat/model/chat-mentions";
-import { chatRowIndex, latestReadableMessage, projectChatMessages } from "@/features/chat/model/chat-messages";
+import {
+  type ChatBubbleMessage,
+  chatRowIndex,
+  latestReadableMessage,
+  projectChatMessages,
+} from "@/features/chat/model/chat-messages";
 import type { AgentChatTarget } from "@/features/chat/model/chat-target";
 import { finishedTurnSummaries, type TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { uploadChatAttachments } from "@/features/chat/model/upload-chat-attachments";
@@ -186,9 +192,12 @@ function AgentTaskChat({
     queryFn: () => loadAgentTaskConversation({ agentId, taskId }, serverId),
   });
   const task = list.data?.tasks.find((item) => item.id === taskId);
+  // The reader's membership marks their own messages, which they can delete, and names the other members.
+  const memberId = server?.membershipId ?? null;
+  const accountUserId = useMobileSession().session?.user.id ?? null;
   const messages = useMemo(
-    () => (conversation.data ? projectChatMessages(conversation.data.messages) : NO_MESSAGES),
-    [conversation.data],
+    () => (conversation.data ? projectChatMessages(conversation.data.messages, memberId, accountUserId) : NO_MESSAGES),
+    [conversation.data, memberId, accountUserId],
   );
   const activeTurnId = task?.activeTurnId ?? null;
   const branching = useBranchThread({
@@ -351,6 +360,17 @@ function AgentTaskChat({
   }, [focusMissing]);
   const closed = task?.state === "closed";
   const canSend = online && !closed && (!isDraft || enabled);
+  const messageDelete = useMessageDelete(serverId, { kind: "agent", agentId, taskId });
+  const removeMessage = messageDelete.deleteMessage;
+  // The host deletes only from an open task. Its thread does not follow the agent's chat events.
+  const deleteTaskMessage = useCallback(
+    async (message: ChatBubbleMessage) => {
+      await removeMessage?.(message.id);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.agentTaskConversation(queryScope, serverId, taskId) });
+    },
+    [removeMessage, queryClient, queryScope, serverId, taskId],
+  );
+  const deleteMessage = removeMessage && !isDraft && !closed ? deleteTaskMessage : undefined;
   const voice = useVoiceMode({
     enabled: isFocused && canSend,
     focused: isFocused,
@@ -586,6 +606,8 @@ function AgentTaskChat({
           olderError={false}
           onLoadOlder={() => {}}
           onBranch={branch ? (message) => void branch(message.id) : undefined}
+          onDeleteMessage={deleteMessage}
+          deletesAnyMessage={messageDelete.deletesAny}
           branchPoints={branching.branchPoints}
           branchDivider={branchDivider}
           onOpenBranchSource={openBranchSource}

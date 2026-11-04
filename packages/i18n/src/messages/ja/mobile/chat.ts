@@ -221,6 +221,12 @@ export const messages = {
   "mobile.chat.message.removeReaction": "自分のリアクション {emoji} を削除",
   "mobile.chat.message.agentReaction": "{name} が {emoji} でリアクションしました",
   "mobile.chat.message.reactionFailed": "リアクションを更新できませんでした",
+  "mobile.chat.message.deleteTitle": "このメッセージを削除しますか？",
+  "mobile.chat.message.deleteBody":
+    "このチャットの全員に対してメッセージが削除されます。エージェントは引き続き覚えている場合があります。",
+  "mobile.chat.message.deleteFailed": "メッセージを削除できませんでした",
+  "mobile.chat.message.sendToChannel": "チャンネルに送信",
+  "mobile.chat.message.chooseChannel": "チャンネルを選択",
   "mobile.chat.day.today": "今日 {time}",
   "mobile.chat.day.yesterday": "昨日 {time}",
   "mobile.chat.day.date": "{date} {time}",

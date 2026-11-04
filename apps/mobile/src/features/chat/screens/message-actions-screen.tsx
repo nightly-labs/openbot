@@ -5,14 +5,18 @@ import { useThemeColor } from "heroui-native/hooks";
 import Copy from "lucide-react-native/icons/copy";
 import SmilePlus from "lucide-react-native/icons/face-slightly-smiling-plus";
 import GitFork from "lucide-react-native/icons/git-fork";
+import Hash from "lucide-react-native/icons/hash";
 import Reply from "lucide-react-native/icons/reply";
 import Square from "lucide-react-native/icons/square";
 import TextCursor from "lucide-react-native/icons/text-cursor";
+import Trash2 from "lucide-react-native/icons/trash";
 import Volume2 from "lucide-react-native/icons/volume-2";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, View } from "react-native";
+import { useCSSVariable } from "uniwind";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { toggleReadAloud, useReadingAloud } from "@/features/voice/model/message-reading";
+import { CoveringMenuView } from "@/shared/components/covering-menu-view";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -38,13 +42,14 @@ function emojiRows(all: boolean): string[][] {
 }
 
 /**
- * The sheet that a touch and hold on a message opens: the reactions on top, then Reply and Branch, then the
- * actions on the text. Each action closes the sheet.
+ * The sheet that a touch and hold on a message opens: the reactions on top, then Reply, Branch and
+ * Send to channel, then the actions on the text, and Delete last. Each action closes the sheet.
  */
 export function MessageActionsScreen() {
   const { t, format } = useText();
   const request = useMessageActionsRequest();
   const [foreground, muted] = useThemeColor(["foreground", "muted"]);
+  const danger = String(useCSSVariable("--openbot-danger-text"));
   const [moreEmoji, setMoreEmoji] = useState(false);
   const reading = useReadingAloud(request?.readAloudId ?? "");
   const { copy } = useCopyMessage(request?.copyText ?? "");
@@ -67,6 +72,7 @@ export function MessageActionsScreen() {
   };
   const icon = String(foreground);
   const readAloudId = request.copyText ? request.readAloudId : undefined;
+  const sendToChannel = request.sendToChannel?.channels.length ? request.sendToChannel : undefined;
   const sent = request.createdAt
     ? format.date(new Date(request.createdAt), { dateStyle: "medium", timeStyle: "short" })
     : undefined;
@@ -121,7 +127,7 @@ export function MessageActionsScreen() {
         </View>
       ) : null}
 
-      {request.onReply || request.onBranch ? (
+      {request.onReply || request.onBranch || sendToChannel ? (
         <SettingsSection>
           {request.onReply ? (
             <SettingsRow
@@ -140,6 +146,24 @@ export function MessageActionsScreen() {
             >
               <Typography>{t("mobile.chat.message.branch")}</Typography>
             </SettingsRow>
+          ) : null}
+          {sendToChannel ? (
+            <CoveringMenuView
+              accessibilityLabel={t("mobile.chat.message.sendToChannel")}
+              title={t("mobile.chat.message.chooseChannel")}
+              actions={sendToChannel.channels.map((channel) => ({ id: channel.id, title: channel.name }))}
+              onPressAction={({ nativeEvent }) => {
+                const channelId = nativeEvent.event;
+                if (!sendToChannel.channels.some((channel) => channel.id === channelId)) return;
+                // The channel opens when the sheet has closed.
+                afterClose.current = () => sendToChannel.onSend(channelId);
+                router.back();
+              }}
+            >
+              <SettingsRow leading={<Hash size={ICON_SIZE} color={icon} />} disclosure={false}>
+                <Typography>{t("mobile.chat.message.sendToChannel")}</Typography>
+              </SettingsRow>
+            </CoveringMenuView>
           ) : null}
         </SettingsSection>
       ) : null}
@@ -183,6 +207,22 @@ export function MessageActionsScreen() {
         <Typography.Paragraph type="body-xs" className="px-4 text-grouped-secondary">
           {sent}
         </Typography.Paragraph>
+      ) : null}
+
+      {request.onDelete ? (
+        <SettingsSection>
+          <SettingsRow
+            leading={<Trash2 size={ICON_SIZE} color={danger} />}
+            disclosure={false}
+            onPress={() => {
+              // The alert that asks shows when the sheet has closed.
+              afterClose.current = request.onDelete;
+              router.back();
+            }}
+          >
+            <Typography className="text-danger-text">{t("common.delete")}</Typography>
+          </SettingsRow>
+        </SettingsSection>
       ) : null}
     </SheetScrollView>
   );

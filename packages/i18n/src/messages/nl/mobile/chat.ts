@@ -193,6 +193,12 @@ export const messages = {
   "mobile.chat.message.removeReaction": "Verwijder je reactie {emoji}",
   "mobile.chat.message.agentReaction": "{name} reageerde met {emoji}",
   "mobile.chat.message.reactionFailed": "Kan de reactie niet bijwerken",
+  "mobile.chat.message.deleteTitle": "Dit bericht verwijderen?",
+  "mobile.chat.message.deleteBody":
+    "Het bericht wordt voor iedereen in deze chat verwijderd. Agents kunnen het nog onthouden.",
+  "mobile.chat.message.deleteFailed": "Kan het bericht niet verwijderen",
+  "mobile.chat.message.sendToChannel": "Naar kanaal sturen",
+  "mobile.chat.message.chooseChannel": "Kies een kanaal",
   "mobile.chat.day.today": "Vandaag {time}",
   "mobile.chat.day.yesterday": "Gisteren {time}",
   "mobile.chat.day.date": "{date} {time}",
