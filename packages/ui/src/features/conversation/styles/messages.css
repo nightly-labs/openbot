@@ -275,24 +275,136 @@
 }
 
 /* Their bubble takes a tint of their name colour, so it does not read as the reader's own. */
-.ui-bubble.message-bubble-member > .ui-bubble-content {
-  background: color-mix(
-    in srgb,
-    var(--message-author-color, var(--openbot-accent)) 22%,
-    var(--openbot-bg-surface-raised)
-  );
+.ui-bubble.message-bubble-member {
+  --message-bubble-tint: var(--message-author-color, var(--openbot-accent));
+  --message-bubble-tint-amount: 22%;
 }
 
 /*
  * A chat color tints the bubble: the reader's own, an agent's, or another person's. The author sets
  * it in Settings or in the agent settings, and everyone in the chat sees the same tint.
  */
-.message-entry-agent .ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content {
-  background: color-mix(in srgb, var(--message-chat-color) 22%, var(--openbot-bg-surface));
+.ui-bubble.message-bubble-colored {
+  --message-bubble-tint: var(--message-chat-color);
+  --message-bubble-tint-amount: 30%;
 }
 
-.message-entry-user .ui-bubble.message-bubble-colored > .ui-bubble-content {
-  background: color-mix(in srgb, var(--message-chat-color) 22%, var(--openbot-bg-surface-raised));
+/* 22% of a color on the dark surface is dull, so the dark theme takes more of a chat color. */
+:root[data-openbot-color-scheme="light"] .ui-bubble.message-bubble-colored {
+  --message-bubble-tint-amount: 22%;
+}
+
+/*
+ * The bubble keeps the plain surface values, because its content sets the same tokens again and a
+ * token cannot refer to itself. A tinted bubble mixes the tint into the raised surface; an agent's
+ * muted bubble mixes it into the surface.
+ */
+.ui-bubble:is(.message-bubble-member, .message-bubble-colored) {
+  --message-plain-canvas: var(--openbot-bg-canvas);
+  --message-plain-sidebar: var(--openbot-bg-sidebar);
+  --message-plain-surface: var(--openbot-bg-surface);
+  --message-plain-surface-raised: var(--openbot-bg-surface-raised);
+  --message-plain-control: var(--openbot-bg-control);
+  --message-plain-control-hover: var(--openbot-bg-control-hover);
+  --message-plain-control-active: var(--openbot-bg-control-active);
+  --message-bubble-base: var(--openbot-bg-surface-raised);
+}
+
+.message-entry-agent .ui-bubble-variant-muted.message-bubble-colored {
+  --message-bubble-base: var(--openbot-bg-surface);
+}
+
+.ui-bubble.message-bubble-member > .ui-bubble-content {
+  background: color-mix(
+    in srgb,
+    var(--message-bubble-tint) var(--message-bubble-tint-amount),
+    var(--message-bubble-base)
+  );
+}
+
+/*
+ * Code, tables, quotes, file chips and cards in a bubble with a chat color take the same tint as the bubble, so
+ * they do not stand on it as neutral panels. Each surface keeps its step from the next one, as in a
+ * plain bubble, and a little of the text colour lifts them all from the bubble: lighter in the dark
+ * theme, darker in the light theme. Without the lift, a block on a tinted bubble shows only its
+ * border.
+ */
+.message-entry-user .ui-bubble.message-bubble-colored > .ui-bubble-content,
+.message-entry-agent .ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content {
+  --message-surface-lift: 5%;
+  --openbot-bg-canvas: color-mix(
+    in srgb,
+    var(--openbot-text-primary) var(--message-surface-lift),
+    color-mix(in srgb, var(--message-bubble-tint) var(--message-bubble-tint-amount), var(--message-plain-canvas))
+  );
+  --openbot-bg-sidebar: color-mix(
+    in srgb,
+    var(--openbot-text-primary) var(--message-surface-lift),
+    color-mix(in srgb, var(--message-bubble-tint) var(--message-bubble-tint-amount), var(--message-plain-sidebar))
+  );
+  --openbot-bg-surface: color-mix(
+    in srgb,
+    var(--openbot-text-primary) var(--message-surface-lift),
+    color-mix(in srgb, var(--message-bubble-tint) var(--message-bubble-tint-amount), var(--message-plain-surface))
+  );
+  --openbot-bg-surface-raised: color-mix(
+    in srgb,
+    var(--openbot-text-primary) var(--message-surface-lift),
+    color-mix(
+      in srgb,
+      var(--message-bubble-tint) var(--message-bubble-tint-amount),
+      var(--message-plain-surface-raised)
+    )
+  );
+  --openbot-bg-control: color-mix(
+    in srgb,
+    var(--openbot-text-primary) var(--message-surface-lift),
+    color-mix(in srgb, var(--message-bubble-tint) var(--message-bubble-tint-amount), var(--message-plain-control))
+  );
+  --openbot-bg-control-hover: color-mix(
+    in srgb,
+    var(--openbot-text-primary) var(--message-surface-lift),
+    color-mix(in srgb, var(--message-bubble-tint) var(--message-bubble-tint-amount), var(--message-plain-control-hover))
+  );
+  --openbot-bg-control-active: color-mix(
+    in srgb,
+    var(--openbot-text-primary) var(--message-surface-lift),
+    color-mix(
+      in srgb,
+      var(--message-bubble-tint) var(--message-bubble-tint-amount),
+      var(--message-plain-control-active)
+    )
+  );
+
+  background: color-mix(
+    in srgb,
+    var(--message-bubble-tint) var(--message-bubble-tint-amount),
+    var(--message-bubble-base)
+  );
+}
+
+/* A menu, a tooltip or a popover that opens in a bubble with a chat color covers the chat, so it stays plain. */
+.ui-bubble.message-bubble-colored
+:is([data-popper-positioner], [role="dialog"], [role="menu"], [role="listbox"], [role="tooltip"]) {
+  --openbot-bg-canvas: var(--message-plain-canvas);
+  --openbot-bg-sidebar: var(--message-plain-sidebar);
+  --openbot-bg-surface: var(--message-plain-surface);
+  --openbot-bg-surface-raised: var(--message-plain-surface-raised);
+  --openbot-bg-control: var(--message-plain-control);
+  --openbot-bg-control-hover: var(--message-plain-control-hover);
+  --openbot-bg-control-active: var(--message-plain-control-active);
+}
+
+/*
+ * A file icon tile is a clear tint of the file colour. On a chat color that tint would mix with the
+ * chat color, so the tile lays it on the plain control and keeps its own colour. An audio or video
+ * card keeps its neutral control tile, which takes the tint of the bubble as the other cards do.
+ */
+:is(
+  .message-entry-user .ui-bubble.message-bubble-colored > .ui-bubble-content,
+  .message-entry-agent .ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content
+) :is(.attachment-file-visual, .attachment-reference-visual):not(.message-attachment[data-media] *) {
+  background: linear-gradient(var(--file-reference-soft) 0 0), var(--message-plain-control);
 }
 
 .message-action-button {
