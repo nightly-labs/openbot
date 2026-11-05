@@ -307,12 +307,15 @@ The change is a `save` through the command queue (`ChannelService.agentSave`), w
 from the stored channel when its turn comes, and the actor id `agent:<agentId>`. A new channel's id
 comes from the tool call id, so a retried call makes no second channel. Members must exist and not
 be hidden, and the lead must be a member; an icon removes an image, as in the channel settings.
-These changes write no `channel-change` note. Inside a channel task, both tools are refused, so only
-a person's request changes the channel there. They also need a turn of only this computer's user's
-messages, in the agent's own chat or in a side thread that the person opened or branched (no routine,
-messaging link or channel): an external chat, a routine run or an agent message can carry text from
-outside, and the Team API checks a team member's agent access. Webhook routines still need the
-agent's own chat.
+These changes write no `channel-change` note. Outside a channel, they need a turn of only this
+computer's user's messages, in the agent's own chat or in a side thread that the person opened or
+branched (no routine or messaging link): an external chat, a routine run or an agent message can
+carry text from outside, and the Team API checks a team member's agent access. Inside a channel task,
+they need a task whose request this computer's user wrote (`ChannelService.requestedByLocalPerson`):
+the same `channelRequester` check as the channel tools, which refuses a routine run, an agent's
+request and a member reply, and also a team member. There, `update_channel` does not change the
+task's own channel: the channel tools change it, write the note, and keep the caller's work from
+stopping. Webhook routines still need the agent's own chat.
 
 Channel work holds only the agent that does it. An agent runs one main-lane turn at a time: its chat,
 a channel delivery or a messaging delivery. While the agent has an active assignment,
