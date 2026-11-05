@@ -5,7 +5,7 @@ name: macOS in-app update E2E
 # `macos-15` is the control.
 on:
   push:
-    branches: [t3/433467fe]
+    branches: [t3/triage-issue-5039]
     paths:
       - scripts/macos-in-app-update-e2e.ts
       - .github/workflows/macos-update-e2e.yml
