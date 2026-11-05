@@ -13,6 +13,7 @@ export const messages = {
   "mobile.app.route.accountSessions": "账号会话",
   "mobile.app.route.about": "关于",
   "mobile.app.route.support": "支持",
+  "mobile.app.route.supportLog": "支持日志",
   "mobile.app.route.hiddenChats": "隐藏的对话",
   "mobile.app.route.share": "分享",
   "mobile.app.route.deletedChannels": "已删除的频道",

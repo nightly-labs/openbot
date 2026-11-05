@@ -12,6 +12,7 @@ export const messages = defineMessages("mobile.app", {
   "mobile.app.route.accountSessions": "Account sessions",
   "mobile.app.route.about": "About",
   "mobile.app.route.support": "Support",
+  "mobile.app.route.supportLog": "Support log",
   "mobile.app.route.hiddenChats": "Hidden chats",
   "mobile.app.route.share": "Share",
   "mobile.app.route.deletedChannels": "Deleted channels",
