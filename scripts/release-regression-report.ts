@@ -29,6 +29,8 @@ const MIN_TURNS_FOR_SHARE = 200;
 const MIN_TURNS_FOR_RATE = 1_000;
 /** An error code needs this many events in the new release before it can rise. */
 const MIN_ERRORS = 5;
+/** An error code needs this many computers in the new release, so one computer in a loop cannot raise it. */
+const MIN_ERROR_COMPUTERS = 3;
 const MAX_ERROR_ROWS = 5;
 const EARLY_DAYS = 2;
 /** A metric regresses when it is this much worse, relative, and also worse by its floor. */
@@ -54,9 +56,11 @@ const OUTSIDE_CAUSES = [
 const VERSION = /^\d+\.\d+\.\d+$/u;
 const DATE_TIME = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/u;
 const DISCORD_WEBHOOK = /^https:\/\/(?:discord\.com|discordapp\.com)\/api\/webhooks\/\d+\/[\w-]+$/u;
-/** Discord allows 6000 characters and 10 embeds in one message. */
+/** Discord allows 6000 characters and 10 embeds in one message, and 4096 characters in a description. */
 const DISCORD_EMBED_CHARACTERS = 5800;
 const DISCORD_EMBEDS = 10;
+const DISCORD_DESCRIPTION = 4096;
+const DISCORD_TIMEOUT_MS = 30_000;
 
 type Unit = "ms" | "mb" | "share" | "per1k";
 /** red: regression. yellow: worse, below the regression limit. waiting: the sample cannot show it yet. */
@@ -177,7 +181,8 @@ GROUP BY version, provider`;
 const errorCodeSql = (versions: readonly string[]) => `SELECT
   properties['app_version'] AS version,
   properties['failure_code'] AS code,
-  count() AS errors
+  count() AS errors,
+  uniqExact(profile_id) AS computers
 FROM events
 WHERE name = 'system_operation_failed' AND ${environment} AND ${window}
   AND properties['app_version'] IN (${versionList(versions)})
@@ -187,7 +192,8 @@ GROUP BY version, code`;
 const causeSql = (versions: readonly string[]) => `SELECT
   properties['app_version'] AS version,
   properties['cause_code'] AS code,
-  count() AS errors
+  count() AS errors,
+  uniqExact(profile_id) AS computers
 FROM events
 WHERE name = 'system_turn_completed' AND ${environment} AND ${window}
   AND properties['app_version'] IN (${versionList(versions)})
@@ -389,30 +395,32 @@ function errorRows(
   return results
     .flatMap(({ metric, result }) => {
       const codes = [...new Set(result.data.map((row) => String(row.code)))];
-      const count = (version: string, code: string) =>
+      const count = (version: string, code: string, column = "errors") =>
         value(
           result.data.find((row) => row.version === version && String(row.code) === code),
-          "errors",
+          column,
         ) ?? 0;
-      return codes.map((code) => {
-        const previousN = count(versions.previous, code);
-        const nextN = count(versions.next, code);
-        return makeRow(
-          {
-            section: "errors",
-            metric,
-            group: code,
-            unit: "per1k",
-            previous: (previousN / turns.previous) * 1000,
-            next: (nextN / turns.next) * 1000,
-            previousN,
-            nextN,
-            z: rateZ(previousN, turns.previous, nextN, turns.next),
-            judged: true,
-          },
-          ERROR_LIMITS,
-        );
-      });
+      return codes
+        .filter((code) => count(versions.next, code, "computers") >= MIN_ERROR_COMPUTERS)
+        .map((code) => {
+          const previousN = count(versions.previous, code);
+          const nextN = count(versions.next, code);
+          return makeRow(
+            {
+              section: "errors",
+              metric,
+              group: code,
+              unit: "per1k",
+              previous: (previousN / turns.previous) * 1000,
+              next: (nextN / turns.next) * 1000,
+              previousN,
+              nextN,
+              z: rateZ(previousN, turns.previous, nextN, turns.next),
+              judged: true,
+            },
+            ERROR_LIMITS,
+          );
+        });
     })
     .filter((row) => row.nextN >= MIN_ERRORS && (row.status === "red" || row.status === "yellow"))
     .sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status) || (b.z ?? 0) - (a.z ?? 0));
@@ -486,10 +494,14 @@ function worst(rows: readonly Row[]): Status {
   return STATUS_ORDER.find((candidate) => rows.some((row) => row.status === candidate)) ?? "green";
 }
 
-function sectionColor(rows: readonly Row[]): number {
-  // A section with only waiting rows is grey; waiting rows do not hide a green or yellow result.
+/** Only waiting rows give waiting; otherwise waiting rows do not hide a green or yellow result. */
+function overall(rows: readonly Row[]): Status {
   const judged = rows.filter((row) => row.status !== "waiting");
-  return STATUS_COLOR[judged.length > 0 ? worst(judged) : "waiting"];
+  return judged.length > 0 ? worst(judged) : "waiting";
+}
+
+function sectionColor(rows: readonly Row[]): number {
+  return STATUS_COLOR[overall(rows)];
 }
 
 function statusLine(row: Row, label: string): string {
@@ -515,7 +527,12 @@ function sections(report: Report): Embed[] {
   const embeds: Embed[] = [];
   const add = (title: string, lines: readonly string[], rows: readonly Row[], footer: string, color?: number) => {
     if (lines.length === 0) return;
-    embeds.push({ title, description: lines.join("\n"), color: color ?? sectionColor(rows), footer: { text: footer } });
+    embeds.push({
+      title,
+      description: fitDescription(lines),
+      color: color ?? sectionColor(rows),
+      footer: { text: footer },
+    });
   };
   const of = (section: Section) => report.rows.filter((row) => row.section === section);
   const group = (row: Row) => `**${escapeMarkdown(row.group)}**`;
@@ -551,7 +568,7 @@ function sections(report: Report): Embed[] {
         ? errors.map((row) => statusLine(row, `${group(row)}${ERROR_SOURCES[row.metric] ?? ""}`))
         : [`${STATUS_EMOJI.green} No error code rose.`],
       errors,
-      `${more > 0 ? `${more} more codes rose. ` : ""}Error events of each code per 1,000 turns; a code needs ${MIN_ERRORS} events in ${report.next}.`,
+      `${more > 0 ? `${more} more codes rose. ` : ""}Error events of each code per 1,000 turns; a code needs ${MIN_ERRORS} events on ${MIN_ERROR_COMPUTERS} computers in ${report.next}.`,
       errors.length > 0 ? undefined : STATUS_COLOR.green,
     );
   }
@@ -578,6 +595,22 @@ function sections(report: Report): Embed[] {
   return embeds;
 }
 
+/** Keeps whole lines within the Discord description limit. */
+function fitDescription(lines: readonly string[]): string {
+  const kept: string[] = [];
+  let size = 0;
+  for (const [index, line] of lines.entries()) {
+    const rest = `… ${lines.length - index} more`;
+    if (size + line.length + 1 + (index < lines.length - 1 ? rest.length + 1 : 0) > DISCORD_DESCRIPTION) {
+      kept.push(rest);
+      break;
+    }
+    kept.push(line);
+    size += line.length + 1;
+  }
+  return kept.join("\n");
+}
+
 function headline(report: Report): Embed {
   const counts = STATUS_ORDER.map(
     (candidate) => [candidate, report.rows.filter((row) => row.status === candidate).length] as const,
@@ -598,8 +631,8 @@ function headline(report: Report): Embed {
     .map((row) => statusLine(row, `${row.metric} · **${escapeMarkdown(row.group)}**`));
   const early = report.early ? ` Early sample: first seen ${report.nextFirstSeen.slice(0, 10)}.` : "";
   return {
-    title: `${STATUS_EMOJI[worst(report.rows.filter((row) => row.status !== "waiting"))]} Release ${report.next} against ${report.previous}`,
-    description: [tally || `${STATUS_EMOJI.waiting} No metric has enough data.`, ...flagged].join("\n"),
+    title: `${STATUS_EMOJI[overall(report.rows)]} Release ${report.next} against ${report.previous}`,
+    description: fitDescription([tally || `${STATUS_EMOJI.waiting} No metric has enough data.`, ...flagged]),
     color: sectionColor(report.rows),
     footer: {
       text: `Production, last ${WINDOW_DAYS} days.${early} 🔴 ${RELATIVE_LIMIT * 100}% worse and over the floor · 🟡 ${WATCH_LIMIT * 100}% worse and over half the floor · shares and error rates also need a significant rise · ⚪ not judged yet`,
@@ -618,7 +651,10 @@ function discordMessages(report: Report): Embed[][] {
   let current: Embed[] = [];
   let size = 0;
   for (const embed of [headline(report), ...sections(report)]) {
-    if (current.length === DISCORD_EMBEDS || size + embedSize(embed) > DISCORD_EMBED_CHARACTERS) {
+    if (
+      current.length === DISCORD_EMBEDS ||
+      (current.length > 0 && size + embedSize(embed) > DISCORD_EMBED_CHARACTERS)
+    ) {
       messages.push(current);
       current = [];
       size = 0;
@@ -640,27 +676,27 @@ async function sendDiscord(message: { readonly content?: string; readonly embeds
       headers: { "Content-Type": "application/json" },
       // No mentions. The messages have no links, so they get no link previews.
       body: JSON.stringify({ ...message, allowed_mentions: { parse: [] } }),
+      signal: AbortSignal.timeout(DISCORD_TIMEOUT_MS),
     });
   } catch {
-    // The error text can contain the URL, which holds the webhook token.
-    throw new Error("Cannot reach the Discord webhook.");
+    // The error text can contain the URL, which holds the webhook token. After a timeout, Discord can
+    // still have posted the message.
+    throw new Error("Cannot reach the Discord webhook, or it did not answer in time.");
   }
   if (!response.ok) throw new Error(`The Discord webhook returned HTTP ${response.status}.`);
 }
 
-async function query(connection: Connection, sql: string): Promise<QueryResult> {
-  const { user, password } = await credentials();
-  return runQuery(connection, { user, password, sql, showIdentifiers: false });
-}
+/** A normal state some time after a release: nothing to compare, and nothing failed. */
+const NO_PAIR = `Fewer than two releases have ${MIN_COMPUTERS} computers in the last ${WINDOW_DAYS} days; nothing to compare.`;
 
-async function buildReport(connection: Connection): Promise<Report> {
-  const versions = await query(connection, versionsSql);
+async function buildReport(connection: Connection): Promise<Report | null> {
+  const { user, password } = await credentials();
+  const query = (sql: string) => runQuery(connection, { user, password, sql, showIdentifiers: false });
+  const versions = await query(versionsSql);
   const [newest, before] = versions.data;
   const next = String(newest?.version ?? "");
   const previous = String(before?.version ?? "");
-  if (!VERSION.test(next) || !VERSION.test(previous)) {
-    throw new Error(`Fewer than two releases have ${MIN_COMPUTERS} computers in the last ${WINDOW_DAYS} days.`);
-  }
+  if (!VERSION.test(next) || !VERSION.test(previous)) return null;
   const nextFirstSeen = String(newest?.first_seen ?? "");
   const previousFirstSeen = String(before?.first_seen ?? "");
   if (!DATE_TIME.test(nextFirstSeen) || !DATE_TIME.test(previousFirstSeen)) {
@@ -669,15 +705,14 @@ async function buildReport(connection: Connection): Promise<Report> {
   const pair = { previous, next };
   const both = [previous, next];
   // The read-only user may run 2 queries at a time, and a person can be using one.
-  const turns = await query(connection, turnSql(both));
-  const startup = await query(connection, startupSql(both));
-  const failures = await query(connection, failureSql(both));
-  const errorCodes = await query(connection, errorCodeSql(both));
-  const causes =
-    sendsCause(failures, previous) && sendsCause(failures, next) ? await query(connection, causeSql(both)) : null;
+  const turns = await query(turnSql(both));
+  const startup = await query(startupSql(both));
+  const failures = await query(failureSql(both));
+  const errorCodes = await query(errorCodeSql(both));
+  const causes = sendsCause(failures, previous) && sendsCause(failures, next) ? await query(causeSql(both)) : null;
   // The SQL compares whole seconds.
-  const updates = await query(connection, updateSql(pair, previousFirstSeen.slice(0, 19), nextFirstSeen.slice(0, 19)));
-  const resources = await query(connection, resourceSql(both));
+  const updates = await query(updateSql(pair, previousFirstSeen.slice(0, 19), nextFirstSeen.slice(0, 19)));
+  const resources = await query(resourceSql(both));
   const firstSeenTime = Date.parse(`${nextFirstSeen.replace(" ", "T")}Z`);
   const early = Date.now() - firstSeenTime < EARLY_DAYS * 86_400_000;
   const turnTotals = { previous: turnTotal(failures, previous), next: turnTotal(failures, next) };
@@ -774,11 +809,15 @@ async function main(): Promise<void> {
   const statePath = parsed.values.state;
   try {
     const connection = await connectClickHouse();
-    let report: Report;
+    let report: Report | null;
     try {
       report = await buildReport(connection);
     } finally {
       connection.close();
+    }
+    if (!report) {
+      process.stdout.write(`${NO_PAIR}\n`);
+      return;
     }
     const path = await writeReport(report);
     const current = fingerprint(report);

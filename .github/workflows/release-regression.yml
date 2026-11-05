@@ -42,6 +42,7 @@ jobs:
           install: ignore-scripts
 
       - name: Open the tunnel to the analytics server
+        id: tunnel
         env:
           SSH_KEY: ${{ secrets.RELEASE_REGRESSION_SSH_KEY }}
           SSH_KNOWN_HOSTS: ${{ secrets.RELEASE_REGRESSION_SSH_KNOWN_HOSTS }}
@@ -81,6 +82,18 @@ jobs:
           always=""
           if [ "$EVENT_NAME" = workflow_dispatch ]; then always="--always"; fi
           bun scripts/release-regression-report.ts --quiet --discord --state "$STATE_FILE" $always
+
+      # The report step sends its own failures. This step covers the tunnel, which runs before it.
+      - name: Send the tunnel failure to Discord
+        if: failure() && steps.tunnel.outcome == 'failure'
+        env:
+          RELEASE_REGRESSION_WEBHOOK_URL: ${{ secrets.RELEASE_REGRESSION_WEBHOOK_URL }}
+        run: |
+          # curl output can contain the webhook URL, so it goes nowhere.
+          curl -sS --fail --max-time 30 -o /dev/null -H 'Content-Type: application/json' \
+            -d '{"allowed_mentions":{"parse":[]},"embeds":[{"title":"🔴 Release regression check failed","description":"The tunnel to the analytics server did not open.","color":15548997}]}' \
+            "$RELEASE_REGRESSION_WEBHOOK_URL?wait=true" 2>/dev/null \
+            || echo "The failure could not be sent to Discord."
 
       - name: Save the sent statuses
         if: always()
