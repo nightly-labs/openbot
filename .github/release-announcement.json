@@ -1,10 +1,10 @@
 {
-  "version": "0.61.0",
+  "version": "0.62.0",
   "highlights": [
-    "Delete a message in a chat or a channel: right-click it and select Delete.",
-    "Agents can build, change and run workflows, and you watch them add each step on the canvas.",
-    "Talk to a Codex agent in real time with Codex live voice, in Settings → Voice.",
-    "Devin and GitHub Copilot are new providers.",
-    "Each routine now runs in its own thread, so it no longer waits for the chat or other routines."
+    "Give each browser profile its own proxy, or send its pages out through your own computer.",
+    "Connect Proton Pass in the Marketplace, and the browser fills the logins of its shared vault.",
+    "Type @ in a chat to give the agent one of its browser tabs or side threads.",
+    "Settings → Voice has two new local dictation models: Parakeet Unified EN and Cohere Transcribe.",
+    "Routines run in the agent's chat again. A new switch keeps a routine in its own thread."
   ]
 }

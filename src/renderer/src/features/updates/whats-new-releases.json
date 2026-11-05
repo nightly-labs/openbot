@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.62.0",
+    "date": "2026-11-05",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Give a browser profile its own proxy in Server settings → Browser profiles, or use your own computer as its proxy on a joined server.",
+          "Connect Proton Pass in the Marketplace. The browser fills the logins of the vault that you share with OpenBot.",
+          "Type @ in an agent's chat to tag one of its browser tabs or side threads.",
+          "Settings → Voice has two more local dictation models: Parakeet Unified EN and Cohere Transcribe.",
+          "A thread shows a blue dot when the agent wrote in it and you did not read it.",
+          "Agents can send files to WhatsApp, Slack, Discord and Telegram chats, and create GitHub repositories.",
+          "Download Hermes Agent from Settings → Providers, and delete a provider and its CLI with one button."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Routines run in the agent's chat again. Turn on \"Run in a separate thread\" to keep a routine in its own thread.",
+          "Agent questions show in one bubble, one question at a time.",
+          "When an agent asks for an API key, the key goes to the Vault for all agents by default.",
+          "Icons have one line weight, and they turn white when you point to them."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot uses less energy when it is open with no task.",
+          "Long chats scroll without stops and open faster.",
+          "OpenBot no longer stays on \"Connecting to OpenBot\" or on the server loading screen at start.",
+          "Routine runs have Computer Use again when it is on for the agent."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.61.0",
     "date": "2026-11-04",
     "notices": [],
