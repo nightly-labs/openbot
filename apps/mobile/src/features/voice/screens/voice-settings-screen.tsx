@@ -1,10 +1,11 @@
-import type { SpeechVoice } from "@openbot/contracts/ipc";
+import { SPEECH_SPEEDS, type SpeechVoice } from "@openbot/contracts/ipc";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
+import { isRunningInExpoGo } from "expo";
 import { router } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import Check from "lucide-react-native/icons/check";
 import { useEffect, useRef, useState } from "react";
-import { Alert } from "react-native";
+import { Alert, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { UsageSegments } from "@/features/agents/components/usage-segments";
 import { modelCaptureAvailable } from "@/features/chat/components/use-model-dictation";
@@ -17,17 +18,21 @@ import {
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 import { DictationLanguageSection } from "../components/dictation-language-section";
+import { PauseSlider } from "../components/pause-slider";
 import { useVoicePreview } from "../components/use-voice-preview";
 import { elevenLabsVoiceParts } from "../model/elevenlabs";
 import { clearElevenLabsVoices, loadElevenLabsVoices, useElevenLabsVoices } from "../model/elevenlabs-voices";
 import type { ModelDownload, ModelState } from "../model/model-download";
 import { parakeetModel, parakeetSupported, useParakeetModel } from "../model/parakeet-model";
+import { canChangeReplySpeed } from "../model/reply-voice";
 import { speechNative } from "../model/speech-native";
 import { supertonicModel, useSupertonicModel } from "../model/supertonic-model";
 import {
   type RecognitionEngine,
   removeElevenLabsKey,
   saveVoiceSettings,
+  TURN_PAUSE_LIMITS,
+  turnPauseMs,
   useVoiceSettings,
   type VoiceEngine,
 } from "../model/voice-settings";
@@ -38,6 +43,13 @@ export function supertonicVoiceLabel(voice: SpeechVoice, t: MobileTranslate): st
     ? t("mobile.settings.voice.supertonic.female", { number })
     : t("mobile.settings.voice.supertonic.male", { number });
 }
+
+/**
+ * Expo Go has no speech module, so voice does not work there. In development the page still shows
+ * all its sections, so its layout can be checked without a native build. The choices save, and the
+ * downloads and samples stay off.
+ */
+const layoutPreview = __DEV__ && isRunningInExpoGo();
 
 /** A model that downloads or failed to: its progress or its failure. Null when it is ready or missing. */
 function downloadStatus(model: ModelState, t: MobileTranslate, percent: (value: number) => string): string | null {
@@ -116,7 +128,7 @@ function RecognitionSection({ onError }: { onError: (message: string) => void })
       <SettingsRow
         checked={settings.recognition === "parakeet"}
         disclosure={false}
-        disabled={!settings.ready || !supported}
+        disabled={!settings.ready || (!supported && !layoutPreview)}
         supportingText={parakeetStatus}
         trailing={mark(settings.recognition === "parakeet")}
         onPress={() => choose("parakeet")}
@@ -200,6 +212,99 @@ function ModelRow({
     <SettingsRow supportingText={status} trailing={action}>
       <Typography.Paragraph>{label}</Typography.Paragraph>
     </SettingsRow>
+  );
+}
+
+/** A segmented choice with a title and a footer, as a settings section. */
+function SegmentSection<T extends string>({
+  title,
+  footer,
+  options,
+  value,
+  onChange,
+}: {
+  title: string;
+  footer: string;
+  options: readonly { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  const ready = useVoiceSettings((state) => state.ready);
+  return (
+    <View className="gap-2">
+      <Typography type="body-xs" className="px-4 text-grouped-secondary">
+        {title}
+      </Typography>
+      <UsageSegments options={options} value={value} disabled={!ready} accessibilityLabel={title} onChange={onChange} />
+      <Typography.Paragraph type="body-xs" className="px-4 text-grouped-secondary">
+        {footer}
+      </Typography.Paragraph>
+    </View>
+  );
+}
+
+/**
+ * How long a voice conversation waits for new words before it sends the words. The slider moves in
+ * half seconds, natively on iOS; the choice is saved when the finger lifts.
+ */
+function TurnPauseSection({ onError }: { onError: (message: string) => void }) {
+  const { t, format } = useText();
+  const ready = useVoiceSettings((state) => state.ready);
+  const saved = useVoiceSettings((state) => state.turnPauseMs);
+  const [dragged, setDragged] = useState<number | null>(null);
+  const shown = dragged ?? saved;
+  const seconds = (milliseconds: number) =>
+    t("mobile.settings.voice.pause.seconds", { seconds: format.number(milliseconds / 1_000) });
+  return (
+    <SettingsSection title={t("mobile.settings.voice.pause.title")} footer={t("mobile.settings.voice.pause.footer")}>
+      <View className="gap-3 px-4 py-3">
+        <View className="flex-row items-center justify-between">
+          <Typography.Paragraph>{t("mobile.settings.voice.pause.label")}</Typography.Paragraph>
+          <Typography.Paragraph className="text-grouped-secondary">{seconds(shown)}</Typography.Paragraph>
+        </View>
+        <PauseSlider
+          value={shown}
+          minimum={TURN_PAUSE_LIMITS.minimum}
+          maximum={TURN_PAUSE_LIMITS.maximum}
+          step={TURN_PAUSE_LIMITS.step}
+          disabled={!ready}
+          label={t("mobile.settings.voice.pause.label")}
+          onChange={(value) => {
+            const next = turnPauseMs(value);
+            if (next !== shown) void haptics.selection();
+            setDragged(next);
+          }}
+          onChangeEnd={(value) => {
+            const next = turnPauseMs(value);
+            setDragged(null);
+            if (next === saved) return;
+            void saveVoiceSettings({ turnPauseMs: next }).catch(() => onError(t("mobile.settings.saveFailed")));
+          }}
+        />
+      </View>
+    </SettingsSection>
+  );
+}
+
+/** The speed of the replies that are read aloud, also in a voice conversation. */
+function ReplySpeedSection({ onError }: { onError: (message: string) => void }) {
+  const { t, format } = useText();
+  const speed = useVoiceSettings((state) => state.speed);
+  return (
+    <SegmentSection
+      title={t("mobile.settings.voice.speed.title")}
+      footer={t("mobile.settings.voice.speed.footer")}
+      options={SPEECH_SPEEDS.map((value) => ({
+        value: String(value),
+        label: t("mobile.settings.voice.speed.value", { speed: format.number(value) }),
+      }))}
+      value={String(speed)}
+      onChange={(next) => {
+        const chosen = SPEECH_SPEEDS.find((value) => String(value) === next);
+        if (chosen === undefined) return;
+        void saveVoiceSettings({ speed: chosen }).catch(() => onError(t("mobile.settings.saveFailed")));
+      }}
+    />
   );
 }
 
@@ -390,8 +495,9 @@ function ElevenLabsSection({
 
 /**
  * Settings > Voice, in two tabs. Listening: what recognizes the user's speech, the phone's
- * recognizer, Parakeet on the phone, or ElevenLabs Scribe. Speaking: the voice that reads replies,
- * Supertonic 3, the default, which runs on the phone as on desktop, or ElevenLabs. Each tab lists its
+ * recognizer, Parakeet on the phone, or ElevenLabs Scribe, and the pause that sends the words in a
+ * voice conversation. Speaking: the voice that reads replies, Supertonic 3, the default, which runs
+ * on the phone as on desktop, or ElevenLabs, and the reply speed. Each tab lists its
  * choices with a check mark, and the section below has the settings of the checked choice only.
  */
 export function VoiceSettingsScreen() {
@@ -400,7 +506,7 @@ export function VoiceSettingsScreen() {
   const engine = useVoiceSettings((state) => state.engine);
   const recognition = useVoiceSettings((state) => state.recognition);
   const hasKey = useVoiceSettings((state) => state.hasElevenLabsKey);
-  const canRecognize = modelCaptureAvailable();
+  const canRecognize = modelCaptureAvailable() || layoutPreview;
   // What hears the user, and what reads the replies: one tab each, so the page stays short.
   const [tab, setTab] = useState<"listening" | "speaking">("listening");
   const [error, setError] = useState<string | null>(null);
@@ -425,7 +531,7 @@ export function VoiceSettingsScreen() {
     shownEngine.current = engine;
     stopPreview.current();
   }, [engine]);
-  if (!speechNative)
+  if (!speechNative && !layoutPreview)
     return (
       <SettingsContent>
         <SettingsNote>{t("mobile.settings.voice.unavailable")}</SettingsNote>
@@ -439,6 +545,7 @@ export function VoiceSettingsScreen() {
       ) : (
         <SupertonicSection preview={preview} onError={showError} />
       )}
+      {canChangeReplySpeed || layoutPreview ? <ReplySpeedSection onError={showError} /> : null}
     </>
   );
   // An app binary without the speech module's microphone has only the phone's recognizer.
@@ -447,6 +554,7 @@ export function VoiceSettingsScreen() {
       <SettingsContent>
         {speaking}
         <DictationLanguageSection />
+        <TurnPauseSection onError={showError} />
       </SettingsContent>
     );
   return (
@@ -466,10 +574,13 @@ export function VoiceSettingsScreen() {
         <>
           <RecognitionSection onError={showError} />
           {recognition === "system" ? <DictationLanguageSection /> : null}
-          {recognition === "parakeet" && parakeetSupported() ? <ParakeetSection onError={showError} /> : null}
+          {recognition === "parakeet" && (parakeetSupported() || layoutPreview) ? (
+            <ParakeetSection onError={showError} />
+          ) : null}
           {recognition === "elevenlabs" && hasKey ? (
             <ElevenLabsSection preview={preview} readsReplies={false} onError={showError} />
           ) : null}
+          <TurnPauseSection onError={showError} />
         </>
       ) : (
         speaking

@@ -22,19 +22,13 @@ import { scheduleOnRN } from "react-native-worklets";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { REPLY_VOICE_FAILURE_TEXT, type ReplyReading, streamReply } from "@/features/voice/model/reply-voice";
 import { speechNative } from "@/features/voice/model/speech-native";
+import { useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText } from "@/shared/lib/text";
 import { type LiveConversationPhase, liveReplyTurn } from "../model/live-conversation";
 import type { OutboxMessage } from "../model/outbox";
 import { useVoiceDictation, type VoiceDictation } from "./use-voice-dictation";
 
-/** The pause after the last recognized words that ends the user's turn. */
-const TURN_END_SILENCE_MS = 1_300;
-/**
- * Loud sound holds the turn open only this long after the last new words. A noisy room or the street
- * keeps the microphone loud with no words, and the turn must still end.
- */
-const SPEECH_WITHOUT_WORDS_MS = 4_000;
 /**
  * The agent's turn ended, or has not shown as running yet, and its answer is not in the
  * conversation: the read that the end starts brings it. After this long the conversation listens again.
@@ -146,7 +140,6 @@ export function useLiveConversation(input: LiveConversationInput): LiveConversat
   const dictation = useVoiceDictation({
     enabled: input.enabled && input.online && state.open && !state.exit,
     onDraft: controller.hear,
-    onSpeaking: controller.speaking,
   });
   dictationRef.current = dictation;
   const { conversation, channel, deliveries, outboxMessages } = input;
@@ -238,8 +231,6 @@ function createController({
   /** Each turn, interruption and the end make the work of the turn before them stale. */
   let generation = 0;
   let pauseTimer: ReturnType<typeof setTimeout> | null = null;
-  /** When the words heard in this turn last changed. */
-  let wordsAt = 0;
   let graceTimer: ReturnType<typeof setTimeout> | null = null;
   /** The recognizer reached `listening` in this session: an end after that is not a failed start. */
   let sessionListened = false;
@@ -257,6 +248,12 @@ function createController({
     update({ muted: next });
   };
   const setCaption = (caption: string) => update({ caption });
+
+  /**
+   * The time with no new words that ends the user's turn, from Settings > Voice. Only words count:
+   * the sound of a loud room or the street does not hold the turn open.
+   */
+  const turnEndSilence = () => useVoiceSettings.getState().turnPauseMs;
 
   function clearTimers(): void {
     if (pauseTimer) clearTimeout(pauseTimer);
@@ -518,20 +515,8 @@ function createController({
       heard = text;
       update({ caption: text });
       if (phase === "sending" || !changed) return;
-      wordsAt = performance.now();
       if (pauseTimer) clearTimeout(pauseTimer);
-      pauseTimer = text.trim() ? setTimeout(endTurn, TURN_END_SILENCE_MS) : null;
-    },
-    /**
-     * The user speaks now. Parakeet and ElevenLabs send text a while after the words, so the pause
-     * that ends the turn counts from the last speech, not from the last text. Loud sound with no new
-     * words for a while is noise: it no longer holds the turn, and the pause already counting ends it.
-     */
-    speaking(): void {
-      if (!open || phase !== "listening" || !heard.trim()) return;
-      if (performance.now() - wordsAt > SPEECH_WITHOUT_WORDS_MS) return;
-      if (pauseTimer) clearTimeout(pauseTimer);
-      pauseTimer = setTimeout(endTurn, TURN_END_SILENCE_MS);
+      pauseTimer = text.trim() ? setTimeout(endTurn, turnEndSilence()) : null;
     },
     followReply,
     recognizerPhase,
