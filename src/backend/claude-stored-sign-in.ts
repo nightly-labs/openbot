@@ -27,20 +27,31 @@ class ClaudeStoredSignInFailed extends Schema.TaggedError<ClaudeStoredSignInFail
 }) {}
 
 /**
- * Variables that sign the CLI in from outside its store, or move the store. `auth status` reports
- * these, so the stored sign-in alone would give a wrong answer.
+ * Variables that sign the CLI in from outside its store, send it to another API backend, or move or
+ * rename the store. `auth status` reports these, so the stored sign-in alone would give a wrong answer.
  */
 const AUTH_OVERRIDE_VARIABLES = [
   "CLAUDE_CODE_OAUTH_TOKEN",
+  "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR",
+  "CLAUDE_CODE_OAUTH_REFRESH_TOKEN",
   "ANTHROPIC_API_KEY",
   "ANTHROPIC_AUTH_TOKEN",
+  "ANTHROPIC_IDENTITY_TOKEN",
+  "ANTHROPIC_IDENTITY_TOKEN_FILE",
   "CLAUDE_CODE_USE_BEDROCK",
   "CLAUDE_CODE_USE_VERTEX",
   "CLAUDE_CODE_USE_FOUNDRY",
+  "CLAUDE_CODE_USE_GATEWAY",
+  "CLAUDE_CODE_USE_ANTHROPIC_AWS",
+  "CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD",
+  "CLAUDE_CODE_USE_MANTLE",
   "CLAUDE_CODE_HOST_CREDS_FILE",
   "CLAUDE_CODE_HOST_AUTH_ENV_VAR",
   "CLAUDE_SECURESTORAGE_CONFIG_DIR",
   "CLAUDE_CODE_FORCE_WINDOWS_CREDMAN",
+  "USE_STAGING_OAUTH",
+  "USE_LOCAL_OAUTH",
+  "CLAUDE_CODE_CUSTOM_OAUTH_URL",
 ];
 
 const StoredCredential = Schema.Struct({
