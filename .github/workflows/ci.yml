@@ -566,6 +566,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:claude-api-key
 
+      - name: Run the Claude stored sign-in E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:claude-stored-sign-in
+
       - name: Run the Cursor usage E2E test
         if: ${{ !cancelled() }}
         run: bun run test:cursor-usage
@@ -647,6 +651,7 @@ jobs:
             .openbot-build/discord-github-files-e2e/
             .openbot-build/opencode-usage-metering-e2e/
             .openbot-build/claude-api-key-e2e/
+            .openbot-build/claude-stored-sign-in-e2e/
             .openbot-build/cursor-usage-e2e/
             .openbot-build/opencode-go-usage-e2e/
             .openbot-build/pi-sign-in-watch-e2e/

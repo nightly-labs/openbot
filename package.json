@@ -274,6 +274,7 @@
     "test:opencode-custom-model": "bun scripts/opencode-custom-model-e2e.ts",
     "test:opencode-azure-responses": "bun scripts/opencode-azure-responses-e2e.ts",
     "test:claude-api-key": "bun scripts/claude-api-key-e2e.ts",
+    "test:claude-stored-sign-in": "bun scripts/claude-stored-sign-in-e2e.ts",
     "test:cursor-usage": "bun scripts/cursor-usage-e2e.ts",
     "test:opencode-go-usage": "bun scripts/opencode-go-usage-e2e.ts",
     "test:cursor-stream-closed": "bun scripts/cursor-stream-closed-e2e.ts",
