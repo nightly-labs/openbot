@@ -669,13 +669,9 @@ export const messages = {
   "mobile.server.vault.deleteBody": "لن يتمكن الوكلاء على {host} من استخدامه بعد الآن. لا يمكنك التراجع عن هذا.",
   "mobile.server.vault.deleteConfirm": "حذف",
   "mobile.server.route.connectors": "الموصلات",
-  "mobile.server.settings.connectors": "الموصلات",
   "mobile.server.connectors.unavailable": "اتصل بهذا الخادم بصفتك مالكًا أو مسؤولًا لإدارة موصلاته.",
   "mobile.server.connectors.unsupported": "حدّث OpenBot على هذا الخادم لإدارة موصلاته من هنا.",
   "mobile.server.connectors.loading": "جارٍ تحميل الموصلات…",
-  "mobile.server.connectors.onServer": "على {name}",
-  "mobile.server.connectors.notSetUp": "غير مُعدّ",
-  "mobile.server.connectors.available": "متاح",
   "mobile.server.connectors.localOnly": "تطبيق سطح المكتب فقط",
   "mobile.server.connectors.statusConnected": "متصل",
   "mobile.server.connectors.statusAttention": "يحتاج إلى انتباه",
@@ -695,9 +691,6 @@ export const messages = {
   "mobile.server.connectors.addAgent": "إضافة وكيل",
   "mobile.server.connectors.later": "لاحقًا",
   "mobile.server.connectors.bitwarden.title": "Bitwarden",
-  "mobile.server.connectors.bitwarden.summary":
-    "يملأ بيانات تسجيل الدخول في المتصفح من Bitwarden. أعدّه في تطبيق سطح المكتب.",
-  "mobile.server.connectors.bitwarden.hostSummary": "يملأ بيانات تسجيل الدخول في المتصفح من Bitwarden أو Vaultwarden",
   "mobile.server.connectors.bitwarden.description":
     "املأ بيانات تسجيل الدخول في المتصفح على {host} من Bitwarden أو Vaultwarden.",
   "mobile.server.connectors.bitwarden.howItWorks":
@@ -724,7 +717,6 @@ export const messages = {
   "mobile.server.connectors.bitwarden.disconnectBody":
     "يزيل {host} مفتاح API وكلمة المرور الرئيسية. لن يتمكن الوكلاء على {host} من ملء بيانات تسجيل الدخول من Bitwarden بعد الآن.",
   "mobile.server.connectors.github.title": "GitHub",
-  "mobile.server.connectors.github.summary": "المستودعات والمشكلات وطلبات السحب لكل وكيل",
   "mobile.server.connectors.github.description":
     "يمكن لكل وكيل على {host} استخدام مستودعات GitHub ومشكلاتك وطلبات السحب، وكذلك gh وgit.",
   "mobile.server.connectors.github.unavailable": "لا يستطيع OpenBot على هذا الخادم ربط GitHub.",
@@ -760,7 +752,6 @@ export const messages = {
   "mobile.server.connectors.github.disconnectBody":
     "يزيل هذا تسجيل دخول @{login} من {host}، ويفقد كل وكيل أدوات GitHub وgh وgit. ثم يُفتح GitHub، حيث يمكنك إلغاء وصول OpenBot.",
   "mobile.server.connectors.onePassword.title": "1Password",
-  "mobile.server.connectors.onePassword.summary": "خزنة مشتركة لتسجيلات الدخول في متصفح OpenBot",
   "mobile.server.connectors.onePassword.description":
     "شارك خزنة 1Password مخصصة مع OpenBot على {host} عبر حساب خدمة، ليتمكن الوكلاء على {host} من تسجيل الدخول إلى المواقع في متصفحه.",
   "mobile.server.connectors.onePassword.howItWorks":
@@ -786,19 +777,8 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectBody":
     "ينسى {host} الرمز المميز. تبقى الخزنة وحساب الخدمة في 1Password؛ أزلهما من هناك إذا لم تعد بحاجة إليهما.",
   "mobile.server.connectors.slack.title": "Slack",
-  "mobile.server.connectors.slack.summary": "يذكر الأشخاص @OpenBot في Slack",
   "mobile.server.connectors.slack.description":
     "يذكر الأشخاص @OpenBot في Slack أو يرسلون إليه رسالة مباشرة. يسأل Slack Orchestrator الوكيل المناسب ويرد.",
-  "mobile.server.connectors.slack.connected": "{workspace} · يرد Slack Orchestrator",
-  "mobile.server.connectors.slack.noAgent": "{workspace} · لا يرد أي وكيل بعد",
-  "mobile.server.connectors.slack.many": {
-    zero: "لا مساحات عمل · يرد Slack Orchestrator",
-    one: "مساحة عمل واحدة · يرد Slack Orchestrator",
-    two: "مساحتا عمل · يرد Slack Orchestrator",
-    few: "{count} مساحات عمل · يرد Slack Orchestrator",
-    many: "{count} مساحة عمل · يرد Slack Orchestrator",
-    other: "{count} مساحة عمل · يرد Slack Orchestrator",
-  },
   "mobile.server.connectors.slack.attention": {
     zero: "لا توجد مساحات عمل تحتاج إلى انتباه",
     one: "مساحة عمل واحدة تحتاج إلى انتباه",
@@ -847,19 +827,8 @@ export const messages = {
     "يرد هذا الوكيل الجديد على كل ما يرسله الأشخاص إلى @OpenBot في {workspace}.",
   "mobile.server.connectors.slack.installFailed": "لم يُكمل Slack التثبيت. أعد المحاولة.",
   "mobile.server.connectors.discord.title": "Discord",
-  "mobile.server.connectors.discord.summary": "يذكر الأشخاص @OpenBot في خادم Discord",
   "mobile.server.connectors.discord.description":
     "يذكر الأشخاص @OpenBot في قناة على خادم Discord. يسأل Discord Orchestrator الوكيل المناسب ويرد.",
-  "mobile.server.connectors.discord.connected": "{workspace} · يرد Discord Orchestrator",
-  "mobile.server.connectors.discord.noAgent": "{workspace} · لا يرد أي وكيل بعد",
-  "mobile.server.connectors.discord.many": {
-    zero: "لا خوادم Discord · يرد Discord Orchestrator",
-    one: "خادم Discord واحد · يرد Discord Orchestrator",
-    two: "خادما Discord · يرد Discord Orchestrator",
-    few: "{count} خوادم Discord · يرد Discord Orchestrator",
-    many: "{count} خادم Discord · يرد Discord Orchestrator",
-    other: "{count} خادم Discord · يرد Discord Orchestrator",
-  },
   "mobile.server.connectors.discord.attention": {
     zero: "لا توجد خوادم Discord تحتاج إلى انتباه",
     one: "خادم Discord واحد يحتاج إلى انتباه",
@@ -907,25 +876,8 @@ export const messages = {
     "يرد هذا الوكيل الجديد على كل ما يرسله الأشخاص إلى @OpenBot في {workspace}.",
   "mobile.server.connectors.discord.installFailed": "لم يُكمل Discord التفويض. أعد المحاولة.",
   "mobile.server.connectors.telegram.title": "Telegram",
-  "mobile.server.connectors.telegram.summary": "أضف بوت OpenBot إلى دردشة Telegram",
   "mobile.server.connectors.telegram.description":
     "أضف بوت OpenBot إلى مجموعة Telegram أو افتح دردشة مباشرة معه. يسأل Telegram Orchestrator الوكيل المناسب ويرد.",
-  "mobile.server.connectors.telegram.connected": {
-    zero: "لا دردشات · يرد Telegram Orchestrator",
-    one: "دردشة واحدة · يرد Telegram Orchestrator",
-    two: "دردشتان · يرد Telegram Orchestrator",
-    few: "{count} دردشات · يرد Telegram Orchestrator",
-    many: "{count} دردشة · يرد Telegram Orchestrator",
-    other: "{count} دردشة · يرد Telegram Orchestrator",
-  },
-  "mobile.server.connectors.telegram.noAgent": {
-    zero: "لا دردشات · لا يرد أي وكيل بعد",
-    one: "دردشة واحدة · لا يرد أي وكيل بعد",
-    two: "دردشتان · لا يرد أي وكيل بعد",
-    few: "{count} دردشات · لا يرد أي وكيل بعد",
-    many: "{count} دردشة · لا يرد أي وكيل بعد",
-    other: "{count} دردشة · لا يرد أي وكيل بعد",
-  },
   "mobile.server.connectors.telegram.attention": {
     zero: "لا توجد دردشات تحتاج إلى انتباه",
     one: "دردشة واحدة تحتاج إلى انتباه",
@@ -969,6 +921,108 @@ export const messages = {
   "mobile.server.connectors.telegram.disconnectKept": "تبقى المحادثات وTelegram Orchestrator في OpenBot.",
   "mobile.server.connectors.telegram.disconnectDeleted":
     "هذه آخر دردشة، لذا يُحذف Telegram Orchestrator ومحادثاته من OpenBot.",
+  "mobile.server.connectors.whatsapp.title": "WhatsApp",
+  "mobile.server.connectors.whatsapp.description":
+    "اربط رقم WhatsApp بهذا الخادم. يسأل WhatsApp Orchestrator الوكيل المناسب ويجيب.",
+  "mobile.server.connectors.whatsapp.attention": {
+    zero: "لا أرقام تحتاج إلى انتباه",
+    one: "رقم واحد يحتاج إلى انتباه",
+    two: "رقمان يحتاجان إلى انتباه",
+    few: "{count} أرقام تحتاج إلى انتباه",
+    many: "{count} رقمًا تحتاج إلى انتباه",
+    other: "{count} رقم تحتاج إلى انتباه",
+  },
+  "mobile.server.connectors.whatsapp.numbersTitle": "الأرقام",
+  "mobile.server.connectors.whatsapp.linkNumber": "ربط رقم",
+  "mobile.server.connectors.whatsapp.ownNumberNote": "تصل دردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم إلى OpenBot.",
+  "mobile.server.connectors.whatsapp.dedicatedNote":
+    "يصل الأشخاص الذين تسمح لهم إلى OpenBot. يحصل الآخرون على رمز ليعطوه لك.",
+  "mobile.server.connectors.whatsapp.helpLoggedOut":
+    "أزال WhatsApp هذا الخادم من الأجهزة المرتبطة. اربط الرقم مرة أخرى.",
+  "mobile.server.connectors.whatsapp.helpError":
+    "لا يستطيع OpenBot الوصول إلى WhatsApp على هذا الرقم. أعد الربط، أو اقطع اتصال الرقم.",
+  "mobile.server.connectors.whatsapp.retryAt": "طلب WhatsApp من OpenBot الانتظار. سيحاول مرة أخرى في {time}.",
+  "mobile.server.connectors.whatsapp.linkAgain": "ربط مرة أخرى",
+  "mobile.server.connectors.whatsapp.ownNumber": "رقم شخصي",
+  "mobile.server.connectors.whatsapp.ownNumberDescription":
+    "يمكن فقط لدردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم المراسلة. أوقف هذا الخيار لرقم مخصص لـ OpenBot فقط.",
+  "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
+  "mobile.server.connectors.whatsapp.orchestratorDescription":
+    "يستقبل هذا الوكيل الرسائل الموجّهة إلى OpenBot من كل أرقامك المرتبطة. يجيب بنفسه عن الرسائل القصيرة، ويسند الأعمال الأخرى إلى الوكيل المناسب، ويجيب في WhatsApp.",
+  "mobile.server.connectors.whatsapp.orchestratorNone": "أضف WhatsApp Orchestrator، وإلا فلن يتلقى WhatsApp أي إجابة.",
+  "mobile.server.connectors.whatsapp.addAgent": "إضافة WhatsApp Orchestrator",
+  "mobile.server.connectors.whatsapp.note":
+    "على رقمك الشخصي، اكتب في دردشة «مراسلة نفسك». يكتب الأشخاص الذين تسمح لهم إلى الرقم.",
+  "mobile.server.connectors.whatsapp.linkTitle": "ربط WhatsApp",
+  "mobile.server.connectors.whatsapp.linkDescription": "اختر الرقم، ثم اربط هذا الخادم من WhatsApp على هاتفك.",
+  "mobile.server.connectors.whatsapp.codeOnly":
+    "على الهاتف، اربط برمز الإقران. لمسح رمز QR بدلًا من ذلك، استخدم OpenBot على كمبيوتر.",
+  "mobile.server.connectors.whatsapp.kindLabel": "الرقم",
+  "mobile.server.connectors.whatsapp.kindPersonal": "رقمي الشخصي",
+  "mobile.server.connectors.whatsapp.kindPersonalDescription":
+    "يجيب OpenBot فقط عن دردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم.",
+  "mobile.server.connectors.whatsapp.kindDedicated": "رقم مخصص لـ OpenBot فقط",
+  "mobile.server.connectors.whatsapp.kindDedicatedDescription":
+    "يحصل الأشخاص غير المعروفين على رمز ليعطوه لك. توافق عليهم هنا.",
+  "mobile.server.connectors.whatsapp.phoneLabel": "رقم الهاتف",
+  "mobile.server.connectors.whatsapp.phoneDescription": "مع رمز الدولة، مثل ‎+44 7700 900123.",
+  "mobile.server.connectors.whatsapp.phoneInvalid": "اكتب رقم الهاتف مع رمز الدولة.",
+  "mobile.server.connectors.whatsapp.getCode": "الحصول على الرمز",
+  "mobile.server.connectors.whatsapp.starting": "جارٍ طلب رمز من WhatsApp…",
+  "mobile.server.connectors.whatsapp.codeStepDevices": "في WhatsApp، افتح الأجهزة المرتبطة واضغط ربط جهاز",
+  "mobile.server.connectors.whatsapp.codeStepPhone": "اضغط ربط برقم الهاتف بدلًا من ذلك",
+  "mobile.server.connectors.whatsapp.codeStepType": "اكتب هذا الرمز على الهاتف",
+  "mobile.server.connectors.whatsapp.codeLabel": "رمز الإقران {code}",
+  "mobile.server.connectors.whatsapp.copyCode": "نسخ الرمز",
+  "mobile.server.connectors.whatsapp.codeWaiting": "في انتظار الهاتف.",
+  "mobile.server.connectors.whatsapp.failedTitle": "لم يتم ربط WhatsApp",
+  "mobile.server.connectors.whatsapp.failedTimeout": "انتهت صلاحية الرمز قبل أن يستخدمه الهاتف.",
+  "mobile.server.connectors.whatsapp.failedRefused": "رفض WhatsApp الربط. انتظر بضع دقائق، ثم أعد المحاولة.",
+  "mobile.server.connectors.whatsapp.failedBusy": "هناك عملية ربط أخرى قيد التنفيذ. انتظر حتى تنتهي، ثم أعد المحاولة.",
+  "mobile.server.connectors.whatsapp.failedUnavailable":
+    "لا يستطيع OpenBot الوصول إلى WhatsApp. تحقق من اتصال الإنترنت.",
+  "mobile.server.connectors.whatsapp.tryAgain": "أعد المحاولة",
+  "mobile.server.connectors.whatsapp.agentStepDescription":
+    "يجيب هذا الوكيل الجديد عن الرسائل الموجّهة إلى OpenBot على {number} وعلى كل رقم تربطه لاحقًا.",
+  "mobile.server.connectors.whatsapp.doneTitle": "OpenBot مرتبط بـ {number}",
+  "mobile.server.connectors.whatsapp.done": "تم",
+  "mobile.server.connectors.whatsapp.disconnectTitle": "هل تريد قطع اتصال {number}؟",
+  "mobile.server.connectors.whatsapp.disconnectBody":
+    "يسجّل OpenBot الخروج من WhatsApp على {number}. إذا كان OpenBot متوقفًا، فأزل الجهاز أيضًا من WhatsApp > الأجهزة المرتبطة.",
+  "mobile.server.connectors.whatsapp.disconnectEffect": "لن يتمكن الأشخاص بعد ذلك من الوصول إلى وكلائك عبر {number}.",
+  "mobile.server.connectors.whatsapp.removeEffectKept": "تبقى المحادثات وWhatsApp Orchestrator في OpenBot.",
+  "mobile.server.connectors.whatsapp.removeEffectDeleted":
+    "هذا آخر رقم، لذلك يُحذف WhatsApp Orchestrator ومحادثاته من OpenBot.",
+  "mobile.server.connectors.whatsapp.keep": "إبقاء الربط",
+  "mobile.server.connectors.whatsapp.sendersTitle": "من يستطيع الكتابة إلى {number}",
+  "mobile.server.connectors.whatsapp.sendersDescription": "يمكن لجهات الاتصال والمجموعات هذه إسناد أعمال إلى وكلائك.",
+  "mobile.server.connectors.whatsapp.sendersEmpty": "أنت فقط تستطيع الكتابة. أضف جهة اتصال أو مجموعة.",
+  "mobile.server.connectors.whatsapp.sendersLimit":
+    "يمكن لرقم واحد أن يسمح بما يصل إلى {count} من جهات الاتصال والمجموعات.",
+  "mobile.server.connectors.whatsapp.senderGroup": "مجموعة",
+  "mobile.server.connectors.whatsapp.removeSender": "إزالة",
+  "mobile.server.connectors.whatsapp.addContact": "إضافة جهة اتصال",
+  "mobile.server.connectors.whatsapp.addGroup": "إضافة مجموعة",
+  "mobile.server.connectors.whatsapp.contactTitle": "إضافة جهة اتصال",
+  "mobile.server.connectors.whatsapp.contactDescription": "يمكن لهذا الشخص إسناد أعمال إلى وكلائك من WhatsApp.",
+  "mobile.server.connectors.whatsapp.contactName": "الاسم",
+  "mobile.server.connectors.whatsapp.contactNameDescription": "اختياري. إذا تُرك فارغًا، تعرض القائمة رقم الهاتف.",
+  "mobile.server.connectors.whatsapp.add": "إضافة",
+  "mobile.server.connectors.whatsapp.groupTitle": "إضافة مجموعة",
+  "mobile.server.connectors.whatsapp.groupDescription": "يمكن للأشخاص في هذه المجموعة إسناد أعمال إلى وكلائك.",
+  "mobile.server.connectors.whatsapp.groupSearch": "بحث في المجموعات",
+  "mobile.server.connectors.whatsapp.groupsLoading": "جارٍ قراءة المجموعات…",
+  "mobile.server.connectors.whatsapp.groupsLoadFailed": "تعذّرت قراءة المجموعات على OpenBot",
+  "mobile.server.connectors.whatsapp.groupsEmpty": "هذا الرقم ليس في أي مجموعة.",
+  "mobile.server.connectors.whatsapp.groupsNoMatch": "لا توجد مجموعة بهذا الاسم.",
+  "mobile.server.connectors.whatsapp.groupAdded": "تمت الإضافة",
+  "mobile.server.connectors.whatsapp.requestsTitle": "طلبات {number}",
+  "mobile.server.connectors.whatsapp.requestsDescription":
+    "كتب هؤلاء الأشخاص إلى الرقم وحصلوا على رمز. وافق على شخص فقط إذا أعطاك الرمز نفسه.",
+  "mobile.server.connectors.whatsapp.requestsEmpty": "لا توجد طلبات.",
+  "mobile.server.connectors.whatsapp.requestDetail": "الرمز {code} · {number}",
+  "mobile.server.connectors.whatsapp.approve": "موافقة",
+  "mobile.server.connectors.whatsapp.deny": "رفض",
   "mobile.server.settings.providers": "المزوّدون",
   "mobile.server.settings.providersConnected": {
     zero: "لا مزوّدين متصلين",

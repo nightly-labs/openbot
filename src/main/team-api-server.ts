@@ -133,6 +133,7 @@ import {
   WEBHOOK_TESTS_CAPABILITY,
   WHATSAPP_CONNECTOR_CAPABILITY,
   WORKFLOWS_CAPABILITY,
+  WORKFLOWS_CHATS_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { CUSTOM_AGENTS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-agents-v1";
@@ -2342,6 +2343,9 @@ export class TeamApiServer {
           if (capability === ROUTINE_FLOWS_CAPABILITY) return this.#options.routineFlows !== undefined;
           if (capability === WORKFLOWS_CAPABILITY) return this.#options.workflows !== undefined;
           if (capability === WORKFLOWS_GITHUB_CAPABILITY) return this.#options.workflows?.github !== undefined;
+          // The chats and workspaces of Telegram and Slack nodes come from the routine-results options.
+          if (capability === WORKFLOWS_CHATS_CAPABILITY)
+            return this.#options.workflows !== undefined && this.#options.admin?.routineResults !== undefined;
           if (
             capability === PUSH_NOTIFICATIONS_CAPABILITY ||
             capability === ANDROID_PUSH_NOTIFICATIONS_CAPABILITY ||

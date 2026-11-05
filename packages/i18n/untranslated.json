@@ -370,7 +370,6 @@
   "mobile.server.connectors.bitwarden.folderKind": ["nl"],
   "mobile.server.connectors.bitwarden.folderName": ["nl"],
   "mobile.server.connectors.bitwarden.folderTitle": ["nl"],
-  "mobile.server.connectors.bitwarden.hostSummary": ["nl"],
   "mobile.server.connectors.bitwarden.howItWorks": ["nl"],
   "mobile.server.connectors.bitwarden.keptHint": ["nl"],
   "mobile.server.connectors.bitwarden.masterPassword": ["nl"],

@@ -235,6 +235,8 @@ export const queryKeys = {
     ...queryKeys.serverWorkflows(scope, serverId),
     "github-catalog",
   ],
+  /** The Telegram chats and Slack workspaces of the host, from the routine-results options. */
+  workflowChats: (scope: QueryScope, serverId: string) => [...queryKeys.serverWorkflows(scope, serverId), "chats"],
   workflowGitHubOptions: (scope: QueryScope, serverId: string, repository: string) => [
     ...queryKeys.serverWorkflows(scope, serverId),
     "github-options",

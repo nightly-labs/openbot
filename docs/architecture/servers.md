@@ -289,9 +289,12 @@ account and server (`pinnedWorkflows`); the host does not know them.
 The phone also uses the version, single-step and stop-step routes, and `workflows-github-v1`, as a
 joined desktop does. An owner or admin adds and changes a GitHub trigger or output there
 (`apps/mobile/src/features/workflows/model/workflow-github.ts` reads and writes the same fields as
-the desktop cards); a member reads them, the event history and the item of a run. Discord triggers
-and outputs show read-only on the phone, because only the computer that runs OpenBot has the Discord
-servers, channels and roles.
+the desktop cards); a member reads them, the event history and the item of a run. With
+`workflows-chats-v1` and `routine-results-v1`, an owner or admin also adds and changes Telegram and
+Slack triggers and outputs (`apps/mobile/src/features/workflows/components/workflow-chat-fields.tsx`).
+The chats, workspaces and channels come from the routine-results options, so the fields are the same
+as on the desktop cards. Discord triggers and outputs show read-only on the phone, because no route
+sends the Discord roles.
 
 ### History extent
 

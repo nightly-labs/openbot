@@ -32,7 +32,7 @@ export function MarketplaceAppConnectScreen() {
   const { serverId, slug } = useLocalSearchParams<{ serverId: string; slug: string }>();
   const { session } = useMobileSession();
   const listing = session?.apiUrl ? appListings(session.apiUrl).find((item) => item.id === slug) : undefined;
-  const plugin = listing?.kind === "app" ? listing.plugin : null;
+  const plugin = listing?.kind === "app" && listing.source === "plugin" ? listing.plugin : null;
   const app = plugin?.apps[0] ?? null;
   const canRelay = useMobileWorkspaceSelector((workspace) => workspace.canRelayMcpSignIn(serverId));
   const method = app ? pluginConnectMethod(app, canRelay) : null;

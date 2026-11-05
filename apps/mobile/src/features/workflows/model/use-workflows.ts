@@ -116,6 +116,28 @@ export function useWorkflowGitHubSupported(serverId: string) {
   return useMobileWorkspaceSelector((current) => current.canUseWorkflowGitHub(serverId));
 }
 
+/** The host runs Telegram and Slack triggers and outputs that a joined owner or admin changes (`workflows-chats-v1`). */
+export function useWorkflowChatsSupported(serverId: string) {
+  return useMobileWorkspaceSelector((current) => current.canUseWorkflowChats(serverId));
+}
+
+/**
+ * The host's Telegram chats and Slack workspaces with their channels, from the routine-results options.
+ * The host gives them only to an owner or admin.
+ */
+export function useWorkflowChats(serverId: string, enabled: boolean) {
+  const queryScope = useQueryScope();
+  const { loadRoutineResultOptions } = useMobileWorkspaceActions();
+  const { ready } = useWorkflowsAvailable(serverId);
+  const supported = useWorkflowChatsSupported(serverId);
+  return useQuery({
+    queryKey: queryKeys.workflowChats(queryScope, serverId),
+    enabled: enabled && ready && supported,
+    retry: false,
+    queryFn: () => loadRoutineResultOptions(serverId),
+  });
+}
+
 /**
  * The events of the GitHub triggers of a workflow, newest first, and the items of their runs. Each
  * `workflows-changed` reads them again, as a new event changes the workflow.

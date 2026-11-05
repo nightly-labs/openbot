@@ -135,6 +135,8 @@ import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
+import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-github-v1";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
@@ -228,6 +230,19 @@ import {
   unpublishAgentTemplate,
   updateHostAgentBrowserProfile,
   updateHostBrowserProfile,
+  whatsappConnectorAddOrchestrator,
+  whatsappConnectorAddSender,
+  whatsappConnectorAnswerRequest,
+  whatsappConnectorCancelLink,
+  whatsappConnectorDisconnect,
+  whatsappConnectorGroups,
+  whatsappConnectorLinkState,
+  whatsappConnectorOverview,
+  whatsappConnectorReconnect,
+  whatsappConnectorRemoveSender,
+  whatsappConnectorSetEnabled,
+  whatsappConnectorSetOwnNumber,
+  whatsappConnectorStartLink,
 } from "@openbot/team-client/team-admin-requests";
 import {
   type AgentMemoriesRequest,
@@ -409,6 +424,19 @@ type HostRequestActions = Pick<
   | "disconnectMessaging"
   | "setMessagingEnabled"
   | "addMessagingOrchestrator"
+  | "loadWhatsAppConnector"
+  | "startWhatsAppLink"
+  | "loadWhatsAppLinkState"
+  | "cancelWhatsAppLink"
+  | "disconnectWhatsAppNumber"
+  | "reconnectWhatsAppNumber"
+  | "setWhatsAppEnabled"
+  | "addWhatsAppOrchestrator"
+  | "loadWhatsAppGroups"
+  | "addWhatsAppSender"
+  | "removeWhatsAppSender"
+  | "answerWhatsAppRequest"
+  | "setWhatsAppOwnNumber"
   | "loadServerUpdate"
   | "checkServerUpdate"
   | "startServerUpdate"
@@ -589,6 +617,8 @@ export function createHostRequestActions({
     capabilityApi(serverId, ONEPASSWORD_CONNECTOR_CAPABILITY, "mobile.server.connectors.unsupported");
   const bitwardenAdmin = (serverId: string) =>
     capabilityApi(serverId, BITWARDEN_CONNECTOR_CAPABILITY, "mobile.server.connectors.unsupported");
+  const whatsappAdmin = (serverId: string) =>
+    capabilityApi(serverId, WHATSAPP_CONNECTOR_CAPABILITY, "mobile.server.connectors.unsupported");
   const vaultAdmin = (serverId: string) => capabilityApi(serverId, VAULT_CAPABILITY, "mobile.server.vault.unsupported");
   const vaultImportAdmin = (serverId: string) =>
     capabilityApi(serverId, VAULT_IMPORT_CAPABILITY, "mobile.server.vault.unsupported");
@@ -635,6 +665,10 @@ export function createHostRequestActions({
     canUseWorkflows: (serverId) => has(serverId, WORKFLOWS_CAPABILITY),
     canUseWorkflowGitHub: (serverId) =>
       has(serverId, WORKFLOWS_CAPABILITY) && has(serverId, WORKFLOWS_GITHUB_CAPABILITY),
+    canUseWorkflowChats: (serverId) =>
+      has(serverId, WORKFLOWS_CAPABILITY) &&
+      has(serverId, WORKFLOWS_CHATS_CAPABILITY) &&
+      has(serverId, ROUTINE_RESULTS_CAPABILITY),
     canReadServerStorage: (serverId) => has(serverId, STORAGE_CAPABILITY),
     canSetAgentNotificationLevel: (serverId) => has(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY),
     canStartNewChat: (serverId) => has(serverId, CONTEXT_RESET_CAPABILITY),
@@ -736,6 +770,29 @@ export function createHostRequestActions({
       runTeamRequest(messagingConnectorSetEnabled(connectorsAdmin(serverId), input)),
     addMessagingOrchestrator: async (input, serverId) =>
       runTeamRequest(messagingConnectorAddOrchestrator(connectorsAdmin(serverId), input)),
+    loadWhatsAppConnector: async (serverId) => runTeamRequest(whatsappConnectorOverview(whatsappAdmin(serverId))),
+    startWhatsAppLink: async (input, serverId) =>
+      runTeamRequest(whatsappConnectorStartLink(whatsappAdmin(serverId), input)),
+    loadWhatsAppLinkState: async (serverId) => runTeamRequest(whatsappConnectorLinkState(whatsappAdmin(serverId))),
+    cancelWhatsAppLink: async (serverId) => runTeamRequest(whatsappConnectorCancelLink(whatsappAdmin(serverId))),
+    disconnectWhatsAppNumber: async (input, serverId) =>
+      runTeamRequest(whatsappConnectorDisconnect(whatsappAdmin(serverId), input)),
+    reconnectWhatsAppNumber: async (input, serverId) =>
+      runTeamRequest(whatsappConnectorReconnect(whatsappAdmin(serverId), input)),
+    setWhatsAppEnabled: async (input, serverId) =>
+      runTeamRequest(whatsappConnectorSetEnabled(whatsappAdmin(serverId), input)),
+    addWhatsAppOrchestrator: async (serverId) =>
+      runTeamRequest(whatsappConnectorAddOrchestrator(whatsappAdmin(serverId))),
+    loadWhatsAppGroups: async (input, serverId) =>
+      runTeamRequest(whatsappConnectorGroups(whatsappAdmin(serverId), input)),
+    addWhatsAppSender: async (input, serverId) =>
+      runTeamRequest(whatsappConnectorAddSender(whatsappAdmin(serverId), input)),
+    removeWhatsAppSender: async (input, serverId) =>
+      runTeamRequest(whatsappConnectorRemoveSender(whatsappAdmin(serverId), input)),
+    answerWhatsAppRequest: async (input, serverId) =>
+      runTeamRequest(whatsappConnectorAnswerRequest(whatsappAdmin(serverId), input)),
+    setWhatsAppOwnNumber: async (input, serverId) =>
+      runTeamRequest(whatsappConnectorSetOwnNumber(whatsappAdmin(serverId), input)),
     loadServerUpdate: async (serverId, access) =>
       runTeamRequest(getHostUpdateStatus(updateApi(serverId, access), access === "member")),
     checkServerUpdate: async (serverId, access) =>

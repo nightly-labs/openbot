@@ -26,7 +26,7 @@ import { useText } from "@/shared/lib/text";
 const DEFAULT_SERVER_URL = "https://vault.bitwarden.com";
 
 /**
- * Server settings › Connectors › Bitwarden of a joined server (`bitwarden-connector-v1`). The host
+ * Marketplace › Apps › Bitwarden of a joined server (`bitwarden-connector-v1`). The host
  * signs in with its own `bw` CLI, so the user enters the vault server, a personal API key and the
  * master password here. They go to the host once; this phone keeps no copy. The host answers
  * `connecting` at once, and the page reads the status again while it shows.
