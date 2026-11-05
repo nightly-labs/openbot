@@ -2937,9 +2937,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         }
         // Refuse Workspace only now, not at the next turn, when this computer cannot confine the
         // provider's own process: the agent then could not start until the user gives it more access.
+        // A requested move to such a provider is refused too while the agent keeps Workspace only.
         const confinedProvider = requestedProvider ?? (previous ? providerForAgent(previous) : undefined);
+        const providerMove = move === null && previous !== undefined && confinedProvider !== providerForAgent(previous);
         if (
-          input.access === "workspace" &&
+          (input.access ?? (providerMove ? previous?.access : undefined)) === "workspace" &&
           confinedProvider !== undefined &&
           agentProviderDescriptor(confinedProvider).workspaceEnforcement === "confined-process" &&
           !canConfineProcesses()
