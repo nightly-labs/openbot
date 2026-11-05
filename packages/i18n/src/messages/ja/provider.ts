@@ -99,6 +99,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "{host} で {name} のサインインを開始しています…",
   "provider.codeLogin.pageOpening": "{host} で {name} のサインインページを開いています…",
   "provider.codeLogin.linkStep": "{name} にログインします。OpenBot は自動で続行します。",
+  "provider.codeLogin.chatgptDeviceSetting":
+    "パソコンの ChatGPT でセキュリティ設定を開き、Codex のデバイスコードによるサインインをオンにします。仕事用アカウントでは、ワークスペースの管理者がオンにします。",
   "provider.useApp.title": "OpenBot アプリで {name} に接続",
   "provider.useApp.description":
     "{name} のサインインは開始したコンピューターに戻るため、ブラウザーのタブでは受け取れません。OpenBot アプリで {name} に接続してください。アプリがサインインを自動で完了します。",

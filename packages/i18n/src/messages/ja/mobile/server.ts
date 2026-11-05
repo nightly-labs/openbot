@@ -857,6 +857,8 @@ export const messages = {
   "mobile.server.providers.copy": "コピー",
   "mobile.server.providers.copyCode": "コードをコピー",
   "mobile.server.providers.paste": "貼り付け",
+  "mobile.server.providers.codeStepChatgpt":
+    "パソコンの ChatGPT でセキュリティ設定を開き、Codex のデバイスコードによるサインインをオンにします。仕事用アカウントでは、ワークスペースの管理者がオンにします。",
   "mobile.server.providers.codeStepCopy": "コードをコピーします。",
   "mobile.server.providers.codeStepEnter": "サインインページを開き、コードを入力します。",
   "mobile.server.providers.codeStepReturn": "OpenBot に戻ります。サインインは自動で完了します。",

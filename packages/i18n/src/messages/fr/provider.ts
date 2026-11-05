@@ -105,6 +105,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "Démarrage de la connexion à {name} sur {host}…",
   "provider.codeLogin.pageOpening": "Ouverture de la page de connexion de {name} sur {host}…",
   "provider.codeLogin.linkStep": "Connectez-vous à {name}. OpenBot continue tout seul.",
+  "provider.codeLogin.chatgptDeviceSetting":
+    "Dans ChatGPT sur un ordinateur, ouvrez les paramètres de sécurité et activez la connexion par code d’appareil pour Codex. Pour un compte professionnel, l’administrateur de votre espace de travail l’active.",
   "provider.useApp.title": "Connectez {name} dans l’app OpenBot",
   "provider.useApp.description":
     "La connexion à {name} revient sur l’ordinateur qui l’a lancée, et un onglet du navigateur ne peut pas la recevoir. Connectez {name} dans l’app OpenBot. L’app termine la connexion toute seule.",

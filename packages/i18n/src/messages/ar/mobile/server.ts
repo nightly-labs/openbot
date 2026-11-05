@@ -1113,6 +1113,8 @@ export const messages = {
   "mobile.server.providers.copy": "نسخ",
   "mobile.server.providers.copyCode": "نسخ الرمز",
   "mobile.server.providers.paste": "لصق",
+  "mobile.server.providers.codeStepChatgpt":
+    "في ChatGPT على كمبيوتر، افتح إعدادات الأمان وفعّل تسجيل الدخول برمز الجهاز لـ Codex. في حساب العمل، يفعّله مسؤول مساحة العمل.",
   "mobile.server.providers.codeStepCopy": "انسخ الرمز.",
   "mobile.server.providers.codeStepEnter": "افتح صفحة تسجيل الدخول وأدخل الرمز.",
   "mobile.server.providers.codeStepReturn": "عد إلى OpenBot. يكتمل تسجيل الدخول تلقائيًا.",
