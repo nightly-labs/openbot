@@ -125,9 +125,6 @@ import { handleUpdateAgentsTool } from "./update-agents-tool";
 
 const logger = createOpenBotLogger("openbot-tool-router");
 
-/** How long the plan card of `acknowledge_request` waits before the host presses its start button. */
-const ACKNOWLEDGE_START_MS = 10_000;
-
 /** The tools that `#apiKeyTool` answers. */
 const API_KEY_TOOLS: ReadonlySet<string> = new Set(["request_api_key", "list_api_keys", "remove_api_key"]);
 
@@ -643,15 +640,16 @@ export class OpenBotToolRouter {
   });
 
   /**
-   * Shows the plan card of `acknowledge_request` and waits like `ask_ui`. When nobody answers in
-   * `ACKNOWLEDGE_START_MS`, the host presses the start button, so the work never waits long for a
-   * person who is away.
+   * Shows the plan card of `acknowledge_request` and waits like `ask_ui`. When nobody answers in the
+   * `planStartAfterMs` of the account defaults, the host presses the start button. With no time, the
+   * card waits for a person, and its prompt raises a notification as `ask_ui` does.
    */
   #acknowledgeRequest(client: AgentClient, request: AppServerRequest, params: DynamicToolCallParams): void {
     const refuse = (message: string) => client.respond(request.id, openBotToolFailure(message));
     const agentId = this.#conversation.agentForThread(params.threadId);
     const agent = agentId ? this.#store.list().find((candidate) => candidate.id === agentId) : undefined;
-    if (!agent || !agentQuickAcknowledgementEnabled(agent, this.#store.agentDefaults())) {
+    const defaults = this.#store.agentDefaults();
+    if (!agent || !agentQuickAcknowledgementEnabled(agent, defaults)) {
       refuse("The user has not turned on the plan card for you. Start the work without it.");
       return;
     }
@@ -685,7 +683,9 @@ export class OpenBotToolRouter {
       client,
       request,
       { blockId: randomUUID(), spec },
-      { actionId: ACKNOWLEDGE_REQUEST_ACTIONS.start, afterMs: ACKNOWLEDGE_START_MS },
+      defaults.planStartAfterMs === null
+        ? undefined
+        : { actionId: ACKNOWLEDGE_REQUEST_ACTIONS.start, afterMs: defaults.planStartAfterMs },
     );
   }
 

@@ -219,8 +219,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "Sohbeti uzadığında ajanın yeni bir sohbet başlatmasına izin verir. Önce notlarını kaydeder.",
   "agentSettings.quickAcknowledgement.title": "Uzun görevlerden önce planı göster",
-  "agentSettings.quickAcknowledgement.description":
-    "Uzun bir görevden önce ajan planını gösterir. 10 sn sonra veya Başlat'a bastığınızda başlar.",
+  "agentSettings.quickAcknowledgement.description": "Uzun bir görevden önce ajan planını gösterir.",
   "agentSettings.browserProfile.label": "Tarayıcı profili",
   "agentSettings.browserProfile.shared": "Paylaşılan",
   "agentSettings.browserProfile.agent": "Yalnızca bu ajan",

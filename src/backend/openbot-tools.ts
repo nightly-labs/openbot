@@ -636,7 +636,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       "Before a long task, show the user a short acknowledgement and your plan in one card, and wait for the answer.",
       "Call it first, before other tools, when the work takes more than about a minute: a fix, a build, research, or a change in many files.",
       "Do not call it for a quick answer, a question, a small change, a routine run, or work that the user already approved in this chat.",
-      "The card has your start button, an optional alternative and a cancel button. When nobody answers in 10 s, OpenBot presses start.",
+      "The card has your start button, an optional alternative and a cancel button. It can start by itself after a wait the user set.",
       'The result is JSON {"status":"answered","actionId":…}: "start" means do the plan; "alternative" means do only the alternative; "cancel" means do not start and ask in one sentence what the user wants;',
       '"_text" with "text" means follow the user\'s words. {"status":"skipped"} or {"status":"expired"} means do not start; answer briefly.',
       "Write in the user's language. It works only when the user turned it on in your settings, and not in a Slack, Discord or Telegram chat. In a channel, each member who reads the channel sees it.",

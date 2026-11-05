@@ -219,8 +219,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "Laat de agent een nieuwe chat starten als de chat lang wordt. Hij slaat eerst notities op.",
   "agentSettings.quickAcknowledgement.title": "Plan tonen vóór lange taken",
-  "agentSettings.quickAcknowledgement.description":
-    "Vóór een lange taak toont de agent zijn plan. Hij begint na 10 s, of als je op Starten drukt.",
+  "agentSettings.quickAcknowledgement.description": "Vóór een lange taak toont de agent zijn plan.",
   "agentSettings.browserProfile.label": "Browserprofiel",
   "agentSettings.browserProfile.shared": "Gedeeld",
   "agentSettings.browserProfile.agent": "Alleen deze agent",

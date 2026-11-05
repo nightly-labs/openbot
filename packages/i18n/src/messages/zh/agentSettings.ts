@@ -209,8 +209,7 @@ export const messages = {
   "agentSettings.agentNewChat.title": "助手自行开始新对话",
   "agentSettings.agentNewChat.description": "对话变长时，让助手自行开始新对话。它会先保存笔记。",
   "agentSettings.quickAcknowledgement.title": "长任务开始前显示计划",
-  "agentSettings.quickAcknowledgement.description":
-    "长任务开始前，助手会先显示计划。10 秒后或你点按“开始”时，任务开始。",
+  "agentSettings.quickAcknowledgement.description": "长任务开始前，助手会先显示计划。",
   "agentSettings.browserProfile.label": "浏览器配置文件",
   "agentSettings.browserProfile.shared": "共享",
   "agentSettings.browserProfile.agent": "仅该助手",

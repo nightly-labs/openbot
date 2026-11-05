@@ -1,0 +1,46 @@
+/* Settings › Agents › Show the plan before long tasks: the Custom panel of "Start the work". */
+.plan-start-popover {
+  display: grid;
+  width: 260px;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-3);
+}
+
+.plan-start-popover-title,
+.plan-start-popover-note {
+  margin: 0;
+}
+
+.plan-start-popover-title {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: 500;
+}
+
+.plan-start-popover-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+.plan-start-amount {
+  width: 56px;
+  text-align: end;
+}
+
+.plan-start-popover-note {
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+.plan-start-popover-note[data-invalid] {
+  color: var(--openbot-danger);
+}
+
+.plan-start-popover-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--openbot-space-2);
+}

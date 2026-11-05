@@ -80,6 +80,7 @@ import {
   isDetectedAcpAgent,
   isDetectedModelServer,
   isDiscoverModelsResult,
+  isPlanStartAfterMs,
   isProviderDetectionSettings,
   isRemoteDesktopSetupStatus,
   isRemoteDesktopTestStatus,
@@ -194,6 +195,8 @@ export function decodeAgentDefaults(value: unknown): AgentDefaults {
   const defaults = decodeRecord(value, "agent defaults");
   const decoded = { ...DEFAULT_AGENT_DEFAULTS };
   for (const key of AGENT_DEFAULT_KEYS) decoded[key] = requiredBoolean(defaults, key);
+  if (!isPlanStartAfterMs(defaults.planStartAfterMs)) throw new Error("Invalid plan start time.");
+  decoded.planStartAfterMs = defaults.planStartAfterMs;
   return decoded;
 }
 
