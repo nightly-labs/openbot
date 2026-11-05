@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { statSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { basename } from "node:path";
 import type {
   AccountUsage,
@@ -187,6 +187,23 @@ const OPENCODE_NEWER_DATABASE = /\bDatabase is not empty and has no session tabl
  * way, with any version of the CLI (#4995).
  */
 const CODEX_STATE_BUSY = /\btimed out waiting for state db backfill\b/u;
+/** An ACP provider CLI that the system stopped, not one that ended by itself. */
+const KILLED_BY_SYSTEM = /\(signal SIGKILL\)/u;
+
+/**
+ * Whether this process has a hard `RLIMIT_RTTIME` of 0. Linux then stops each thread with a CPU-time
+ * timer, such as the threads of the Gemini server, at its first tick. The provider processes get the
+ * limit, and no process can increase it. PipeWire sets it in its client when xdg-desktop-portal has no
+ * rtkit to read the real-time limit from (#4848).
+ */
+function hasZeroRealtimeLimit(): boolean {
+  if (process.platform !== "linux") return false;
+  try {
+    return /^Max realtime timeout\s+\S+\s+0\s/mu.test(readFileSync("/proc/self/limits", "utf8"));
+  } catch {
+    return false;
+  }
+}
 /**
  * The providers whose shared process reads the agent environment only when it starts. Claude reads
  * it at each session start, and Codex with each thread's config.
@@ -2873,6 +2890,9 @@ export class ProviderRuntime implements ProviderPort {
     // The CLI's words name a database step, not a cause the user can act on.
     if (CODEX_STATE_BUSY.test(detailed.message))
       return new AgentProcessExitError(sourceText("error.provider.codexStateBusy"), null, { cause: detailed });
+    // "Stopped (signal SIGKILL)" does not tell the user that the fix is in the system.
+    if (KILLED_BY_SYSTEM.test(detailed.message) && hasZeroRealtimeLimit())
+      return new AgentProcessExitError(sourceText("error.provider.realtimeLimitZero"), null, { cause: detailed });
     return detailed;
   }
 
@@ -3237,6 +3257,8 @@ export class ProviderRuntime implements ProviderPort {
       // The new copy is not at fault: the old one fails the same way until the lease ends. Removing the
       // copy showed "could not update", and the next start downloaded it again (#4995).
       if (status?.message === sourceText("error.provider.codexStateBusy")) return;
+      // The system stops each copy in the same way, so the copy stays for the start after the user's fix.
+      if (status?.message === sourceText("error.provider.realtimeLimitZero")) return;
       if (status?.version !== cli.version || !["available", "sign-in-required"].includes(status.state)) {
         // The update reason keeps catalog text only, so other text would leave only "Try again.".
         // The log keeps the start failure as the cause.
