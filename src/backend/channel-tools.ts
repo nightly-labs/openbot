@@ -56,7 +56,7 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
   },
   {
     name: "channel_reply",
-    description: `Reply in the shared chat to a message of another channel member, in a short message, when you must agree on something with it or ask it a question. That member gets one turn to answer. It is not a task: do not wait for the answer, and use channel_assign for work. A request allows ${CHANNEL_REPLY_LIMIT} member replies, and none after your result. Do not reply only to thank or acknowledge.`,
+    description: `Reply in the shared chat to a message of another channel member, in a short message, when you must ask it a question, agree on something with it, or correct it before you can finish. That member gets one turn to answer, and you continue this task with its answer: end your turn after the call. Use channel_assign for work. A request allows ${CHANNEL_REPLY_LIMIT} member replies, and none after your result. Do not reply only to thank or acknowledge, or when you can answer the person without it.`,
     shape: {
       messageId: z.string().min(1).max(INPUT_LIMITS.identifier),
       text: z.string().min(1).max(CHANNEL_REPLY_CHARACTERS),

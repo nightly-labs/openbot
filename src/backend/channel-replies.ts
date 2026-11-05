@@ -4,13 +4,14 @@ import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values"
 /**
  * Member-to-member replies (#4847). `channel_reply` posts a short message from one member that
  * replies to a message of another member, and gives that member one turn to answer it: a child task
- * of the caller's task that the caller does not wait for. The child is known by its request, which is
- * the reply message itself, so no stored task field and no Team API field changes. The limit counts
- * the stored replies of the run, so it holds after a restart with no new state.
+ * of the caller's task that the caller waits for, as for `channel_assign`. So the caller reads the
+ * answer before it answers the person. The child is known by its request, which is the reply message
+ * itself, so no stored task field and no Team API field changes. The limit counts the stored replies
+ * of the run, so it holds after a restart with no new state.
  *
  * The reply is agent text that reaches another agent. So the limit is small, a reply after the
- * caller's result or after the run ended is refused, and the turn it starts cannot change the channel
- * (`ChannelService.tool` refuses the management tools in it).
+ * caller's result or after the run ended is refused, and the turn it starts only answers:
+ * `ChannelService.tool` refuses replies, handoffs and the management tools in it.
  */
 export const CHANNEL_REPLY_ID_PREFIX = "channel-reply-";
 /** The member replies of one run, whoever writes them. Two members that thank each other stop here. */
@@ -45,6 +46,9 @@ export interface ChannelReplyInput {
   available: (agentId: string) => boolean;
 }
 
+// A model that got a refusal wrote it in the chat, where it means nothing to a person.
+const refuse = (reason: string) => ({ accepted: false as const, reason: `${reason} Do not mention this refusal.` });
+
 /** The message to reply to and the text, or the reason the reply is refused. The agent can act on the reason. */
 export function checkChannelReply(
   input: ChannelReplyInput,
@@ -52,28 +56,22 @@ export function checkChannelReply(
   const { args, agentId, root } = input;
   const text = isString(args.text) ? args.text.trim() : "";
   if (!isString(args.messageId) || !text || text.length > CHANNEL_REPLY_CHARACTERS)
-    return {
-      accepted: false,
-      reason: `A reply needs messageId, the id of another member's message in this channel, and text of at most ${CHANNEL_REPLY_CHARACTERS} characters.`,
-    };
-  if (input.resultPosted) return { accepted: false, reason: "You published your result. Do not reply after it." };
-  if (root.state === "completed" || root.state === "cancelled")
-    return { accepted: false, reason: "This request has ended. Do not reply." };
+    return refuse(
+      `A reply needs messageId, the id of another member's message in this channel, and text of at most ${CHANNEL_REPLY_CHARACTERS} characters.`,
+    );
+  if (input.resultPosted) return refuse("You published your result. Do not reply after it.");
+  if (root.state === "completed" || root.state === "cancelled") return refuse("This request has ended. Do not reply.");
   const target = input.messages.find((message) => message.id === args.messageId);
   if (!target || target.message.status === "streaming")
-    return { accepted: false, reason: "The message is not in this channel, or it is still streaming." };
+    return refuse("The message is not in this channel, or it is still streaming.");
   if (target.author.kind !== "agent" || target.author.id === agentId)
-    return {
-      accepted: false,
-      reason: "Reply only to a message of another channel member. Answer a person in your own reply.",
-    };
+    return refuse("Reply only to a message of another channel member. Answer a person in your own reply.");
   if (!input.available(target.author.id))
-    return { accepted: false, reason: `${target.author.name} takes no work now. Do not reply to it.` };
+    return refuse(`${target.author.name} takes no work now. Do your task without it.`);
   if (runReplyCount(input.messages, input.tasks, root.id) >= CHANNEL_REPLY_LIMIT)
-    return {
-      accepted: false,
-      reason: `This request has its ${CHANNEL_REPLY_LIMIT} member replies. Do not reply again. Finish your own work.`,
-    };
+    return refuse(
+      `This request has its ${CHANNEL_REPLY_LIMIT} member replies. Do not reply again: decide with what you have and finish your task.`,
+    );
   return { accepted: true, target, text };
 }
 
@@ -81,6 +79,6 @@ export function checkChannelReply(
  * What the addressee reads as the expected result. It is model text, not interface text: the task
  * instruction is the reply itself, because the channel shows the instruction of a task.
  */
-export function channelReplyExpectedResult(sender: { id: string; name: string }, replyMessageId: string): string {
-  return `This is a reply from channel member ${sender.name} (${sender.id}) to your message, not a message from the user and not an assignment. Answer it in one short message only when it asks you something or you disagree. Use channel_reply on message ${replyMessageId} only when ${sender.name} must answer you again. Otherwise end your turn with no text. Do not thank or acknowledge, and do not change the channel.`;
+export function channelReplyExpectedResult(sender: { id: string; name: string }): string {
+  return `This is a reply from channel member ${sender.name} (${sender.id}) to your message, not a message from the user and not an assignment. ${sender.name} waits for your answer. Answer it in one short message: answer its question, say if you agree, or say what you disagree with and why. Your message goes back to ${sender.name}. Do not thank, do not use channel tools, and do not change the channel.`;
 }

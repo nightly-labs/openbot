@@ -2571,16 +2571,23 @@ export class ChannelService {
       // The result is the answer of the turn. Answer text that the running turn writes after it, such
       // as a "Yes.", folds into its steps. Before, it showed as a second reply from the same member.
       // Text from before the result has a row with a lower sequence and stays as it is, and so do the
-      // rows of older turns.
+      // rows of older turns. A member reply ends the turn the same way: the task continues with the
+      // answer, so a note such as "I will report back" after the reply is a step, not a message.
+      const end =
+        result?.message.turnId === message.turnId
+          ? result
+          : task?.dependencies
+              .map((id) => tasks.get(id))
+              .flatMap((child) => (child && isReplyTask(child) ? [existing(child.requestMessageId)] : []))
+              .find((reply) => reply?.message.turnId === message.turnId);
       if (
-        result &&
-        result.message.turnId === message.turnId &&
+        end &&
         message.author === "assistant" &&
         !message.questionPrompt &&
         !message.attachments?.length &&
         (!message.itemType || message.itemType === "agentMessage" || message.itemType === "final_answer") &&
         (original
-          ? original.message.itemType === "commentary" && original.sequence > result.sequence
+          ? original.message.itemType === "commentary" && original.sequence > end.sequence
           : activeAssignment(assignment))
       )
         message = { ...message, itemType: "commentary" };
@@ -3014,6 +3021,16 @@ export class ChannelService {
     const operationId = `tool:${turnId}:${callId}`;
     if ((yield* channelSync(() => this.store.database.commandResult(`channels:${operationId}`))) !== undefined)
       return { accepted: true };
+    // A reply turn only answers: its answer goes back to the member that waits for it, so a reply,
+    // an assignment or a transfer from it would only make that member wait longer.
+    if (isReplyTask(task) && (tool === "channel_reply" || tool === "channel_assign" || tool === "channel_transfer")) {
+      logger.warn("A channel tool was refused in a reply turn.", { channelId, agentId, tool });
+      return {
+        accepted: false,
+        reason:
+          "This turn only answers a member reply. Write your answer as your message; it goes back to that member. Do not mention this refusal.",
+      };
+    }
     if (tool === "channel_result") {
       if (
         yield* channelSync(() =>
@@ -3033,6 +3050,7 @@ export class ChannelService {
       message.message.id = message.id;
       message.message.author = "assistant";
       message.message.turnId = turnId;
+      if (isReplyTask(task)) message.message.replyToMessageId = task.requestMessageId;
       yield* channelSync(() => this.store.update(channel, { messages: [message] }, operationId));
       this.publish(channelId);
       return { accepted: true, instruction: "The result is in the shared chat. End your turn now with no more text." };
@@ -3066,15 +3084,23 @@ export class ChannelService {
         ...this.newTask(channelId, reply.id, check.text, check.target.author.id),
         parentTaskId: task.id,
         rootTaskId: task.rootTaskId,
-        expectedResult: channelReplyExpectedResult(sender, reply.id),
+        expectedResult: channelReplyExpectedResult(sender),
       };
-      yield* channelSync(() => this.store.update(channel, { tasks: [answer], messages: [reply] }, operationId));
+      // The caller waits for the answer, as for an assignment: without it, a member that asked to agree
+      // on something answered the person before the other member had answered it.
+      yield* channelSync(() =>
+        this.store.update(
+          channel,
+          { tasks: [{ ...task, dependencies: [...task.dependencies, answer.id] }, answer], messages: [reply] },
+          operationId,
+        ),
+      );
       this.publish(channelId);
       yield* this.wake(channelId);
       return {
         accepted: true,
         messageId: reply.id,
-        instruction: `The reply is in the shared chat. ${check.target.author.name} gets one turn to answer it. Do not wait for the answer: go on with your task.`,
+        instruction: `The reply is in the shared chat. End your turn now with no text and do not promise to report back: you continue this task when ${check.target.author.name} has answered.`,
       };
     }
     /**

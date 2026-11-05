@@ -4,7 +4,8 @@
 // signed in and follows tool instructions.
 //
 // It checks that `channel_reply` posts a reply to the other member's message, that the other member
-// gets one turn for it and its answer replies to the reply, and that a request that asks for more
+// gets one turn for it and its answer replies to the reply, that the caller waits for that answer and
+// continues after it, and that a request that asks for more
 // replies than the limit gets no more than two. The model does the tool calls, so a model that does
 // not follow the instructions fails a step. It makes its own channel and deletes it.
 // Writes .openbot-build/channel-reply-e2e/report.json.
@@ -20,6 +21,7 @@ interface Report {
   reply?: { messageId: string; replyToMessageId: string | null; text: string };
   replyTask?: { ownerAgentId: string | null; parentTaskId: string | null; state: string; awaited: boolean };
   answer?: { replyToMessageId: string | null; text: string };
+  final?: string | null;
   limit?: { replies: number; texts: string[] };
   passed: boolean;
 }
@@ -111,7 +113,7 @@ try {
   };
   assert.equal(replyTask.ownerAgentId, b.id, "The reply turn is not B's.");
   assert.equal(replyTask.state, "completed", "B's reply turn did not complete.");
-  assert.equal(report.replyTask.awaited, false, "A waits for the reply turn.");
+  assert.equal(report.replyTask.awaited, true, "A does not wait for the reply turn.");
 
   const answer = second.channel.messages.find(
     (message) => message.taskId === replyTask.id && message.author.id === b.id && agentText(message),
@@ -119,6 +121,12 @@ try {
   assert.ok(answer, "B did not answer the reply.");
   report.answer = { replyToMessageId: answer.message.replyToMessageId ?? null, text: answer.message.text };
   assert.equal(answer.message.replyToMessageId, reply.id, "B's answer does not reply to the reply.");
+  // A continues with the answer, so its last answer comes after B's.
+  const final = second.channel.messages.findLast(
+    (message) => message.taskId === second.root.id && message.author.id === a.id && agentText(message),
+  );
+  report.final = final?.message.text ?? null;
+  assert.ok(final && final.sequence > answer.sequence, "A did not continue after B's answer.");
 
   // A request that asks for more replies than the limit gets the limit.
   const third = await ask(
