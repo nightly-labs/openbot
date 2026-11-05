@@ -887,6 +887,22 @@ export class MailboxStore {
     });
   }
 
+  /**
+   * The queued deliveries of one task, in queue order, as the agent's own chat lists its queue. The
+   * same deliveries as `queuedTaskMessages`, with their files and state, for the queue of the thread.
+   */
+  taskQueue(agentId: string, taskId: string): QueueDelivery[] {
+    const queued = this.#queuedFor(agentId).filter((delivery) => !waitsForPlanContinuation(delivery));
+    if (queued.length === 0) return [];
+    const messages = this.#messagesById();
+    const deliveries = queued.filter((delivery) => this.#taskIdOf(delivery, messages) === taskId);
+    // The position is in the queue of the thread, as the panel of the thread shows it.
+    const positions = new Map(deliveries.map((delivery, index) => [delivery.id, index + 1]));
+    return deliveries.map((delivery) =>
+      this.#publicDelivery(delivery, positions, this.#requireMessage(delivery.messageId, messages)),
+    );
+  }
+
   /** Whether a delivery of this lane is starting or running: the agent's own chat when `taskId` is null. */
   laneActive(agentId: string, taskId: string | null): boolean {
     return this.#state.deliveries.some(

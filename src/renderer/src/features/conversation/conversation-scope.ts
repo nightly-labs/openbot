@@ -70,6 +70,7 @@ import { createSettingsStore, runtimeSettingsEqual } from "./stores/settings-sto
 import { createSideQuestionStore } from "./stores/side-question-store";
 import { createSkillsStore } from "./stores/skills-store";
 import { createThreadComposerActions } from "./stores/thread-composer-actions";
+import { createThreadQueue } from "./stores/thread-queue-edit";
 import { createVoiceConversation } from "./stores/voice-conversation-store";
 import { createVoiceStore } from "./stores/voice-store";
 
@@ -786,12 +787,22 @@ export function createConversationViewScope(props: ConversationProps) {
   const handleChatSearchShortcut = (event: KeyboardEvent) => {
     (sideThreadOpen() ? threadSearch : search).handleChatSearchShortcut(event);
   };
+  const threadQueue = createThreadQueue({
+    props,
+    threadDrafts: controller.threadDrafts,
+    setThreadDrafts: controller.setThreadDrafts,
+    edit: controller.threadQueueEdit,
+    setEdit: controller.setThreadQueueEdit,
+    persist: persistDrafts,
+  });
   const threadComposer = createThreadComposerActions({
     props,
     threadDrafts: controller.threadDrafts,
     setThreadDrafts: controller.setThreadDrafts,
     pastePreviews,
     setPastePreviews,
+    draftLocked: threadQueue.draftLocked,
+    keepsAttachment: threadQueue.keepsAttachment,
   });
   /** Moves the open thread's caret to the end of the dictated text. */
   const [threadFocusRequest, setThreadFocusRequest] = createSignal(0);
@@ -836,7 +847,11 @@ export function createConversationViewScope(props: ConversationProps) {
         flush();
         const threads = props.threads;
         if (!threads || threadComposer.openDraftKey() !== key) return;
-        await threadComposer.send(threads, threadComposer.draft(key).text.trim());
+        // While a queued message is in the message box, Send saves it in its place.
+        if (threadQueue.editsDraft(key)) {
+          await threadComposer.importsEnded(key);
+          await threadQueue.save(key);
+        } else await threadComposer.send(threads, threadComposer.draft(key).text.trim());
         // The locked editor did not take the earlier focus request.
         if (threadComposer.openDraftKey() === key) setThreadFocusRequest((current) => current + 1);
       },
@@ -2099,6 +2114,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setThreadSearchQuery,
     setThreadScrollElement,
     threadComposer,
+    threadQueue,
     threadFocusRequest,
     branchThread,
     threadVoiceLiveText,

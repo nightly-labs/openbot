@@ -1114,13 +1114,16 @@ export function agentIpcHandlers({
       }),
       reorderQueue: scopedHandler(parseReorderQueue, {
         local: (parsed) => runCauseEffect(service.reorderQueue(parsed)),
-        remote: (parsed, serverId) =>
-          runCauseEffect(
+        remote: (parsed, serverId) => {
+          // `agent-tasks-v1` sends no thread queue, so only a thread on this computer has an order to change.
+          if (parsed.taskId !== undefined) throw new Error(sourceText("error.backend.threadRemoteUnsupported"));
+          return runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueReorder(parsed.agentId), decodeVoid, {
               method: "POST",
               body: { deliveryIds: parsed.deliveryIds },
             }),
-          ),
+          );
+        },
       }),
       interrupt: scopedHandler(parseInterrupt, {
         local: (parsed) => runCauseEffect(service.interrupt(parsed.agentId, parsed.turnId)),
