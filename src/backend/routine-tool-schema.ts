@@ -89,9 +89,7 @@ export const routineMissedPolicyZodSchema = z
 
 export const routineRunPlaceZodSchema = z
   .enum(ROUTINE_RUN_PLACES)
-  .describe(
-    "Where each run posts its work: chat is the agent's own chat, thread is the routine's own side thread, which the user opens from the run message. New routines use chat. Use thread only when the user asks to keep the runs out of the chat. An update with no value keeps the saved place.",
-  );
+  .describe("chat (default) or the routine's own thread. Use thread only when the user asks.");
 
 export const webhookEventTypeZodSchema = z
   .string()
