@@ -12,6 +12,7 @@ import { View } from "react-native";
 import Animated, { cubicBezier } from "react-native-reanimated";
 
 import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
+import { useMotionPreference } from "@/shared/lib/motion";
 
 // CSS animations take `cubicBezier`.
 const EASE_OUT = cubicBezier(0.23, 1, 0.32, 1);
@@ -24,7 +25,8 @@ const POP_IN = {
 };
 // Reduce Motion keeps the fade and drops the movement.
 const FADE_IN = { from: { opacity: 0 }, to: { opacity: 1 } };
-const FLOAT = { from: { transform: [{ translateY: 0 }] }, to: { transform: [{ translateY: -6 }] } };
+// The float is small, so the group rests instead of bobbing.
+const FLOAT = { from: { transform: [{ translateY: 0 }] }, to: { transform: [{ translateY: -3 }] } };
 
 /** How a group moves: fully, with fades only (Reduce Motion), or not at all. */
 export type CrowdMotion = "full" | "fade" | "none";
@@ -67,7 +69,7 @@ const BADGES: readonly { id: string; icon: LucideIcon; x: `${number}%`; y: `${nu
   { id: "search", icon: Search, x: "90%", y: "82%", floatMs: 3200 },
 ];
 const BADGE_SIZE = 40;
-const BADGE_FLOAT = { from: { transform: [{ translateY: 0 }] }, to: { transform: [{ translateY: -5 }] } };
+const BADGE_FLOAT = { from: { transform: [{ translateY: 0 }] }, to: { transform: [{ translateY: -3 }] } };
 // The badges arrive after the characters.
 const BADGE_DELAY_MS = 420;
 
@@ -85,17 +87,22 @@ function share(value: `${number}%`): number {
   return Number.parseFloat(value) / 100;
 }
 
-/** A placeholder character that pops in at its point, then floats. Only index 0 animates its face. */
+/**
+ * A placeholder character that pops in at its point, then floats while `floats`. Only index 0
+ * animates its face.
+ */
 function FloatingBot({
   bot,
   index,
   reducedMotion,
+  floats,
   focused,
   instant = false,
 }: {
   bot: SceneBot;
   index: number;
   reducedMotion: boolean;
+  floats: boolean;
   focused: boolean;
   /** It is there at once: the same character stood in its place on the screen before. */
   instant?: boolean;
@@ -123,9 +130,8 @@ function FloatingBot({
     >
       <Animated.View
         style={
-          reducedMotion
-            ? undefined
-            : {
+          floats
+            ? {
                 animationName: FLOAT,
                 animationDuration: bot.floatMs,
                 animationDelay: instant ? 0 : enterDelay + ENTER_MS,
@@ -135,6 +141,7 @@ function FloatingBot({
                 // The avatar clocks stop when the screen loses focus; the float stops with them.
                 animationPlayState: focused ? "running" : "paused",
               }
+            : undefined
         }
       >
         {/* Only the main character runs a face animation. Each SVG frame redraws a mask and a
@@ -149,12 +156,14 @@ function Badge({
   badge,
   index,
   motion,
+  floats,
   focused,
   instant,
 }: {
   badge: (typeof BADGES)[number];
   index: number;
   motion: CrowdMotion;
+  floats: boolean;
   focused: boolean;
   instant: boolean;
 }) {
@@ -184,7 +193,7 @@ function Badge({
         className="items-center justify-center rounded-full bg-grouped"
         style={[
           { width: BADGE_SIZE, height: BADGE_SIZE },
-          motion === "full"
+          floats
             ? {
                 animationName: BADGE_FLOAT,
                 animationDuration: badge.floatMs,
@@ -204,7 +213,7 @@ function Badge({
 
 /**
  * A layer that holds one member of the group. When the group leaves, it flies off the screen away
- * from the middle of the group, tilts and fades.
+ * from the middle of the group, tilts and fades. Reduce Motion keeps the fade only.
  */
 function Departure({
   x,
@@ -212,6 +221,7 @@ function Departure({
   index,
   reach,
   leaving,
+  motion,
   children,
 }: {
   x: `${number}%`;
@@ -219,11 +229,13 @@ function Departure({
   index: number;
   reach: number;
   leaving: boolean;
+  motion: CrowdMotion;
   children: ReactNode;
 }) {
   const dx = share(x) - 0.5;
   const dy = share(y) - 0.5;
   const length = Math.hypot(dx, dy) || 1;
+  const flies = leaving && motion === "full";
   return (
     <Animated.View
       pointerEvents="none"
@@ -231,13 +243,13 @@ function Departure({
       style={{
         opacity: leaving ? 0 : 1,
         transform: [
-          { translateX: leaving ? (dx / length) * reach : 0 },
-          { translateY: leaving ? (dy / length) * reach : 0 },
-          { rotate: leaving ? `${dx < 0 ? -18 : 18}deg` : "0deg" },
+          { translateX: flies ? (dx / length) * reach : 0 },
+          { translateY: flies ? (dy / length) * reach : 0 },
+          { rotate: flies ? `${dx < 0 ? -18 : 18}deg` : "0deg" },
         ],
         transitionProperty: ["opacity", "transform"],
-        transitionDuration: 300,
-        transitionDelay: leaving ? index * 18 : 0,
+        transitionDuration: motion === "none" ? 0 : 300,
+        transitionDelay: flies ? index * 18 : 0,
         transitionTimingFunction: EASE_OUT,
       }}
     >
@@ -261,6 +273,9 @@ export function AgentCrowd({
   instant?: boolean;
 }) {
   const focused = useIsFocused();
+  // The float is idle motion, as the faces are: the Settings switch for faces stops it too.
+  const faces = useMotionPreference("agentFaces");
+  const floats = motion === "full" && faces;
   const [area, setArea] = useState({ width: 0, height: 0 });
   const reach = Math.max(area.width, area.height) * 0.9;
   return (
@@ -272,13 +287,28 @@ export function AgentCrowd({
       onLayout={({ nativeEvent: { layout } }) => setArea({ width: layout.width, height: layout.height })}
     >
       {CROWD.map((bot, index) => (
-        <Departure key={bot.seed} x={bot.x} y={bot.y} index={index} reach={reach} leaving={leaving}>
-          <FloatingBot bot={bot} index={index} reducedMotion={motion !== "full"} focused={focused} instant={instant} />
+        <Departure key={bot.seed} x={bot.x} y={bot.y} index={index} reach={reach} leaving={leaving} motion={motion}>
+          <FloatingBot
+            bot={bot}
+            index={index}
+            reducedMotion={motion !== "full"}
+            floats={floats}
+            focused={focused}
+            instant={instant}
+          />
         </Departure>
       ))}
       {BADGES.map((badge, index) => (
-        <Departure key={badge.id} x={badge.x} y={badge.y} index={CROWD.length + index} reach={reach} leaving={leaving}>
-          <Badge badge={badge} index={index} motion={motion} focused={focused} instant={instant} />
+        <Departure
+          key={badge.id}
+          x={badge.x}
+          y={badge.y}
+          index={CROWD.length + index}
+          reach={reach}
+          leaving={leaving}
+          motion={motion}
+        >
+          <Badge badge={badge} index={index} motion={motion} floats={floats} focused={focused} instant={instant} />
         </Departure>
       ))}
     </View>

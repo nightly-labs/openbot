@@ -8,6 +8,7 @@ export const messages = {
     "Eine Firewall oder ein Proxy in diesem Netzwerk hat den Zugriff von OpenBot auf {host} blockiert. Bitte deinen Netzwerkadministrator, {host} zu erlauben, und versuche es erneut.",
   "error.auth.signInFirst": "Melde dich zuerst bei OpenBot an.",
   "error.auth.signInRequired": "Eine Anmeldung ist erforderlich.",
+  "error.auth.chatColorUnavailable": "Der Kontodienst unterstützt noch keine Chatfarben. Versuche es später erneut.",
   "error.auth.accountChangedDuringRegister":
     "Das angemeldete Konto wurde während der Registrierung dieses Servers geändert.",
   "error.auth.hostCredentialUnavailable":

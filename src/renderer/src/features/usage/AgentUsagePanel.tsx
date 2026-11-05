@@ -31,6 +31,7 @@ import {
 } from "@openbot/ui/features/usage/usage-format";
 import { useText } from "@openbot/ui/text";
 import { errorReference } from "@openbot/user-errors";
+import type { JSX } from "@solidjs/web";
 import { createEffect, createStore, onSettled, Show } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { type UsagePort, usagePort } from "./usage-port";
@@ -44,6 +45,8 @@ interface AgentUsagePanelProps {
   onBack: () => void;
   /** The web client reads the host through its own connection. The default is the desktop bridge. */
   port?: UsagePort;
+  /** The machine use of the server, before the filters. The desktop app shows it to owners and admins. */
+  machine?: JSX.Element;
 }
 interface UsageState {
   range: HostAnalyticsInput;
@@ -192,6 +195,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
           </h2>
         </div>
         <div class="agent-usage-controls">
+          {props.machine}
           <Select
             options={[
               "all",

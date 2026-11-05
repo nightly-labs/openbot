@@ -38,7 +38,6 @@ const meta = {
     onOpenTab: fn(),
     onCloseTab: fn(),
     onNewTab: fn(),
-    onCollapse: fn(),
   },
   decorators: [
     (Story) => {

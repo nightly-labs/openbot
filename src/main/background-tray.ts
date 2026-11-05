@@ -14,7 +14,7 @@ export interface BackgroundTray {
 /**
  * The tray icon of Windows and Linux, and the menu bar icon of macOS. When the main window is hidden
  * in the background, it is the way back to the window, and the way to quit. On macOS the Dock icon
- * is then hidden, so it is the only way back.
+ * stays, and is a way back too.
  *
  * Linux desktops show the menu on a click and do not report the click, so the menu also opens the
  * window. A desktop with no tray, such as GNOME without an extension, shows nothing: a second

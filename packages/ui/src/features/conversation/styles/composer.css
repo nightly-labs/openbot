@@ -75,7 +75,8 @@
   border: 1px solid var(--openbot-border);
   border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-control);
-  padding: 6px 8px 6px 12px;
+  padding-block: 6px;
+  padding-inline: 12px 8px;
   box-shadow: 0 7px 22px var(--openbot-shadow-popover-ambient);
 }
 
@@ -168,7 +169,8 @@
      under border-box sizing and stretches the circle into a pill. */
   padding: 0;
   background: var(--openbot-hover);
-  color: var(--openbot-text-secondary);
+  /* Muted at rest, as the other icon buttons. The send button sets its own color. */
+  color: var(--openbot-text-muted);
   transition:
     background-color var(--openbot-duration-hover) var(--openbot-ease-out),
     color var(--openbot-duration-hover) var(--openbot-ease-out),
@@ -262,14 +264,14 @@
 }
 
 .voice-morph-bar {
-  right: 46px;
+  inset-inline-end: 46px;
   width: 28px;
   transition: width var(--voice-morph-exit-duration) var(--openbot-ease-out);
 }
 
 .voice-morph-send-blob,
 .voice-morph-finish-blob {
-  right: 12px;
+  inset-inline-end: 12px;
   width: 28px;
   opacity: 0;
   transition: opacity 0s linear var(--voice-morph-exit-duration);
@@ -296,6 +298,10 @@
   opacity: 1;
   transform: translateX(-34px) scale(0.8);
   transition: transform var(--voice-morph-duration) var(--voice-morph-ease);
+}
+
+:dir(rtl) .voice-morph[data-recording] .voice-morph-finish-blob {
+  transform: translateX(34px) scale(0.8);
 }
 
 /* Positioned, so the controls paint over the goo layers before them. */
@@ -332,7 +338,8 @@
   margin: 0;
   border: 0;
   overflow: hidden;
-  padding: 0 3px 0 12px;
+  padding-block: 0;
+  padding-inline: 12px 3px;
   color: var(--openbot-text-secondary);
   animation: voice-morph-content-in var(--openbot-duration-slow) var(--openbot-ease-out) var(--openbot-duration-fast)
     both;
@@ -367,6 +374,8 @@
   justify-content: flex-end;
   overflow: hidden;
   mask-image: linear-gradient(to right, transparent, currentColor 24px);
+  /* A time axis: the newest sample is at the right in every language. */
+  direction: ltr;
 }
 
 .voice-waveform-track {
@@ -533,9 +542,19 @@
   padding: 4px 0;
 }
 
+/*
+ * A chip is 24px and the editor line is 20px, so the first chip made the one-line composer 4px
+ * taller. With a chip, the line is as tall as the chip and the padding is 2px less on each side, so
+ * the composer keeps its height and the text stays in place.
+ */
+.composer[data-compact] .composer-editor-surface:has(.composer-mention-token) {
+  padding-block: 2px;
+  line-height: 24px;
+}
+
 .composer[data-compact] .composer-editor-placeholder {
   top: 4px;
-  left: 0;
+  inset-inline-start: 0;
 }
 
 .composer[data-has-attachments] .composer-input-label,
@@ -585,6 +604,9 @@
   white-space: pre-wrap;
   word-break: break-word;
   user-select: text;
+  /* Each line takes its direction and its start side from its own text. The surface keeps the
+     interface direction, so an empty draft puts the caret on the placeholder's side. */
+  unicode-bidi: plaintext;
 }
 
 .composer-editor-surface[aria-disabled="true"] {
@@ -621,7 +643,7 @@
   display: inline-block;
   width: 2px;
   height: 16px;
-  margin-left: 2px;
+  margin-inline-start: 2px;
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-accent);
   vertical-align: -3px;
@@ -656,7 +678,7 @@
 .composer-editor-placeholder {
   position: absolute;
   top: 2px;
-  left: 4px;
+  inset-inline-start: 4px;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-lg);
   line-height: 20px;
@@ -676,15 +698,15 @@
 
 .composer-editor-root[data-size="compact"] .composer-editor-placeholder {
   top: 4px;
-  left: 0;
+  inset-inline-start: 0;
 }
 
 /* The box comes from `.reference-chip`; this token only loses the chip fill and gains the outline. */
 .composer-mention-token.composer-tag-unavailable {
   border: 1px dashed var(--openbot-border-strong);
   background: transparent;
-  /* No leading icon, so the left inset matches the right one. */
-  padding-left: var(--openbot-space-1-5);
+  /* No leading icon, so the start inset matches the end one. */
+  padding-inline-start: var(--openbot-space-1-5);
   color: var(--openbot-text-muted);
 }
 
@@ -742,15 +764,27 @@
  * panel border and background whole. The scrollbar stays hidden: the fade carries the same news.
  */
 .mention-picker-list {
+  --mention-picker-title-height: 24px;
+  --mention-picker-section-gap: var(--openbot-space-1);
+
+  position: relative;
   display: grid;
   /* A plain auto track grows to the widest row, which would push the badges out of view. */
   grid-template-columns: minmax(0, 1fr);
   /*
-   * Every row is the same height, so the list can state the height its rows need instead of
-   * leaving it to the content. A length on both sides of the change is what lets the panel
-   * travel to its new size while the query narrows, rather than jump to it.
+   * Every row and section title has a fixed height, so the list states the height it needs and
+   * the panel has its full height in the first frame, also while the query narrows it.
    */
-  height: calc(var(--mention-picker-rows, 0) * var(--mention-picker-row-height) + 2 * var(--mention-picker-gutter));
+  height: calc(
+    var(--mention-picker-rows, 0) *
+    var(--mention-picker-row-height) +
+    var(--mention-picker-sections, 0) *
+    var(--mention-picker-title-height) +
+    max(var(--mention-picker-sections, 0) - 1, 0) *
+    var(--mention-picker-section-gap) +
+    2 *
+    var(--mention-picker-gutter)
+  );
   max-height: calc(
     var(--mention-picker-visible-rows) *
     var(--mention-picker-row-height) +
@@ -762,8 +796,51 @@
   padding: var(--mention-picker-gutter);
   overscroll-behavior: contain;
   scrollbar-width: none;
-  transition: height var(--openbot-duration-normal) var(--openbot-ease-out);
-  will-change: height;
+  /* A key press scrolls the active row clear of the scroll fade. */
+  scroll-padding-block: var(--openbot-space-4);
+  /*
+   * The panel stands on the composer, so a height that travels moves its top edge and every row
+   * slides with it. The list takes its new height in one frame; only the rows that come back fade in.
+   */
+  transition: none;
+}
+
+/* The title of a section of the `@` list, with its count. A list with one section has no title. */
+.mention-picker-section {
+  display: flex;
+  height: var(--mention-picker-title-height);
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 8px 4px;
+  color: var(--openbot-queue-action);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.mention-picker-section-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.mention-picker-option + .mention-picker-section {
+  margin-top: var(--mention-picker-section-gap);
+}
+
+/* One highlight slides under the active row (see `trackPickerHighlight`), so a row has no background of its own. */
+.mention-picker-highlight {
+  position: absolute;
+  top: 0;
+  right: var(--mention-picker-gutter);
+  left: var(--mention-picker-gutter);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-hover);
+  pointer-events: none;
+  transition:
+    transform var(--openbot-duration-fast) var(--openbot-ease-out),
+    height var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.mention-picker-highlight[data-instant] {
+  transition: none;
 }
 
 .mention-picker-list::-webkit-scrollbar {
@@ -786,6 +863,8 @@
   display: flex;
   width: 100%;
   /* The list computes its own height from this one, so the two must not drift apart. */
+  position: relative;
+  z-index: 1;
   height: var(--mention-picker-row-height);
   align-items: center;
   gap: 7px;
@@ -794,7 +873,7 @@
   background: transparent;
   padding: 0 8px;
   color: var(--openbot-queue-text);
-  text-align: left;
+  text-align: start;
 }
 
 .mention-picker-file-option .attachment-reference-visual {
@@ -802,9 +881,15 @@
   height: 20px;
 }
 
-.mention-picker-option:hover,
-.mention-picker-option-active {
-  background: var(--openbot-hover);
+/* A row that the query brings back fades in; the rows that stay do not move. */
+.mention-picker-option[data-entering] {
+  animation: mention-picker-row-in var(--openbot-duration-fast) var(--openbot-ease-out) both;
+}
+
+@keyframes mention-picker-row-in {
+  from {
+    opacity: 0;
+  }
 }
 
 .mention-picker-option .agent-avatar {
@@ -830,6 +915,9 @@
 
 .mention-picker-option > strong {
   min-width: 0;
+  /* Unset outside a filter, so the name keeps the row color. */
+  color: var(--mention-picker-name-color);
+  max-width: 50%;
   flex: 0 1 auto;
   overflow: hidden;
   font-size: var(--openbot-text-lg);
@@ -871,10 +959,26 @@
   line-height: 18px;
 }
 
+/* While the user filters, the matched text stands out from the rest, as in the search dialog. */
+.mention-picker-option[data-filtering] {
+  --mention-picker-name-color: var(--openbot-queue-action);
+}
+
+.mention-picker-match {
+  background: transparent;
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-medium);
+}
+
 .mention-picker-badge {
-  margin-left: auto;
+  margin-inline-start: auto;
   flex: 0 0 auto;
   color: var(--openbot-queue-action);
+}
+
+.mention-picker-badge > svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
 }
 
 .composer-attachments {
@@ -914,7 +1018,8 @@
   border: 1px solid var(--openbot-border);
   border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-control);
-  padding: 7px 12px 7px 8px;
+  padding-block: 7px;
+  padding-inline: 8px 12px;
 }
 
 .composer-attachment-copy {
@@ -981,4 +1086,34 @@
   position: absolute;
   inset: 0;
   margin: auto;
+}
+
+/* A file on its way to the server. The dashed edge says that it is not there yet; the ring takes
+   the place of the extension badge. */
+.composer-attachment[data-upload="uploading"] {
+  border-style: dashed;
+}
+
+.composer-attachment[data-upload="failed"] {
+  border-color: var(--openbot-danger);
+}
+
+.composer-attachment[data-upload="failed"] .composer-attachment-copy small {
+  color: var(--openbot-danger-text);
+}
+
+.composer-upload-ring {
+  width: 28px;
+}
+
+.composer-upload-failed-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--openbot-danger-text);
+}
+
+.composer-upload-retry {
+  flex: none;
+  margin-inline-end: -4px;
+  color: var(--openbot-danger-text);
 }

@@ -14,6 +14,7 @@ import {
   type RoutineResultDelivery,
   type RoutineResultDestination,
   type RoutineRunFields,
+  type RoutineRunPlace,
   type RoutineSchedule,
 } from "@openbot/contracts/ipc";
 import type { RoutineWebhookTriggerInput, WebhookTestResult } from "@openbot/contracts/ipc-events";
@@ -85,7 +86,8 @@ type PendingRoutineExit =
   | "close"
   | "new"
   | { kind: "routine-selection"; routine: RoutineEditorRecord | null; routineName: string }
-  | { kind: "conversation-message"; messageId: string };
+  | { kind: "conversation-message"; messageId: string }
+  | { kind: "routine-thread"; routineId: string };
 
 interface RoutineDraft {
   id: string | null;
@@ -97,6 +99,7 @@ interface RoutineDraft {
   scheduleDraft: RoutineScheduleDraft;
   limitPolicy: RoutineLimitPolicy;
   missedPolicy: RoutineMissedPolicy;
+  runIn: RoutineRunPlace;
   triggerKind: "schedule" | "webhook";
   eventType: string;
   eventFilters: EventFilterDraft[];
@@ -130,6 +133,11 @@ interface AgentRoutinesSettingsProps {
   selectionRequest?: RoutineSelectionRequest | null | undefined;
   onSelectionRequestHandled?: ((nonce: number) => void) | undefined;
   onOpenRun?: ((messageId: string) => void) | undefined;
+  /**
+   * Opens the side thread where the routine runs. Resolves false when the routine has no thread, for
+   * example on a host that runs routines in the agent's own chat.
+   */
+  onOpenThread?: ((routineId: string) => Promise<boolean>) | undefined;
 }
 
 function codeUnitOrder(a: string, b: string): number {
@@ -336,6 +344,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
           current.missedPolicy === (base.missedPolicy ?? "skip")
             ? (routine.missedPolicy ?? "skip")
             : current.missedPolicy,
+        runIn: current.runIn === (base.runIn ?? "chat") ? (routine.runIn ?? "chat") : current.runIn,
         ...(triggerEdited || scheduleEdited || webhookEdited ? {} : triggerDraftOf(routine)),
       };
     });
@@ -354,6 +363,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       active: routine.active,
       limitPolicy: routine.limitPolicy ?? "wait",
       missedPolicy: routine.missedPolicy ?? "skip",
+      runIn: routine.runIn ?? "chat",
       ...triggerDraftOf(routine),
       destination: undefined,
     });
@@ -381,6 +391,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       scheduleDraft: NEW_ROUTINE_SCHEDULE,
       limitPolicy: "wait",
       missedPolicy: "skip",
+      runIn: "chat",
       triggerKind: "schedule",
       eventType: "",
       eventFilters: [],
@@ -462,6 +473,10 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       props.onOpenRun?.(target.messageId);
       return;
     }
+    if (target.kind === "routine-thread") {
+      void props.onOpenThread?.(target.routineId);
+      return;
+    }
     closeEditor();
     if (target.routine) {
       openRoutine(target.routine);
@@ -514,6 +529,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         trigger: webhookTriggerOf(current) ?? { kind: "schedule", schedule: current.schedule },
         limitPolicy: current.limitPolicy,
         missedPolicy: current.missedPolicy,
+        ...(props.port.runIn ? { runIn: current.runIn } : {}),
       });
       const saved = result.routine;
       setRoutines((items) => {
@@ -656,6 +672,10 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       await props.port.test(current.id);
       trackRoutineAction(analytics, "test", current, startedAt, "succeeded");
       await loadRuns(current.id);
+      // A test run of a routine that runs in its own thread runs there, so the chat shows it there. The saved
+      // place applies, not a change that the user did not save.
+      if (props.onOpenThread && draftBase?.runIn === "thread")
+        requestExit({ kind: "routine-thread", routineId: current.id });
     } catch (caught) {
       trackRoutineAction(analytics, "test", current, startedAt, "failed");
       setError(errorMessage(caught, t("routine.settings.testFailed")));
@@ -713,6 +733,22 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     setWebhook((state) => {
       state.secret = secret;
     });
+  }
+
+  /** Uses a secret that the sender made. Undefined when the host cannot do this. */
+  function senderSecret(): ((secret: string) => Promise<void>) | undefined {
+    const events = props.port.events;
+    const set = events?.api.setSecret;
+    if (!events || !set) return undefined;
+    return async (secret) => {
+      const id = draft()?.id;
+      if (!id) throw new Error(t("routine.webhook.senderSecretFailed"));
+      await set({ id, owner: events.owner, secret });
+      if (draft()?.id !== id) return;
+      setWebhook((state) => {
+        state.secret = null;
+      });
+    };
   }
 
   /** The saved record of the open draft. Its trigger, not the draft, says whether a URL and a secret exist. */
@@ -995,6 +1031,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                       secret={webhook.secret}
                       onSecretDismiss={resetWebhookState}
                       onRegenerateSecret={regenerateSecret}
+                      onUseSenderSecret={senderSecret()}
                       onSave={() => void saveDraft()}
                       saving={saving()}
                       onSendTest={sendTestEvent()}
@@ -1097,6 +1134,16 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                     </SelectTrigger>
                     <SelectContent />
                   </Select>
+                </div>
+              </Show>
+
+              <Show when={props.port.runIn}>
+                <div class="settings-field agent-routine-run-in">
+                  <SwitchField
+                    label={t("routine.settings.runInThread")}
+                    checked={current().runIn === "thread"}
+                    onChange={(thread) => changeDraft((value) => ({ ...value, runIn: thread ? "thread" : "chat" }))}
+                  />
                 </div>
               </Show>
 

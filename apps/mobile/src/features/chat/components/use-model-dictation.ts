@@ -134,13 +134,11 @@ export function useModelDictation({
   engine,
   enabled,
   onDraft,
-  onSpeaking,
 }: {
   /** Null while the phone's recognizer is in use. */
   engine: ModelRecognition | null;
   enabled: boolean;
   onDraft: (text: string) => void;
-  onSpeaking?: () => void;
 }): VoiceDictation {
   const [id] = useState(() => Symbol("model-dictation"));
   const available = engine !== null && modelCaptureAvailable();
@@ -151,10 +149,8 @@ export function useModelDictation({
   const finished = useRef<(() => void)[]>([]);
   const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onDraftRef = useRef(onDraft);
-  const onSpeakingRef = useRef(onSpeaking);
   useEffect(() => {
     onDraftRef.current = onDraft;
-    onSpeakingRef.current = onSpeaking;
   });
 
   const update = useCallback((next: DictationPhase) => {
@@ -195,10 +191,9 @@ export function useModelDictation({
     const module = speechNative;
     if (!module || typeof module.startCapture !== "function") return;
     const subscriptions = [
-      module.addListener("onCaptureLevel", ({ level: value, speaking }) => {
+      module.addListener("onCaptureLevel", ({ level: value }) => {
         if (owner !== id || !session.current?.native) return;
         level.set(withTiming(Math.min(1, Math.max(0, value)), { duration: 100 }));
-        if (speaking && phaseRef.current === "listening") onSpeakingRef.current?.();
       }),
       module.addListener("onCaptureAudio", ({ pcm }) => {
         if (owner === id && session.current?.native) session.current.scribe?.append(pcm);

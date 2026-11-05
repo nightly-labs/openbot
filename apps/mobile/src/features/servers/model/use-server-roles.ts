@@ -93,6 +93,14 @@ export function useServerRoles(serverId: string) {
  * checks each write.
  */
 export function useAgentViewOnly(serverId: string, agentId: string): boolean {
+  return useAgentAccessLevel(serverId, agentId) === "view";
+}
+
+/**
+ * The level that the roles give this person on `agentId`: `manage` for an owner or admin. Null while
+ * the levels are unknown, and on a host without `agent-access-v1`.
+ */
+export function useAgentAccessLevel(serverId: string, agentId: string): AgentAccessLevel | null {
   const limited = useMobileWorkspaceSelector((workspace) => workspace.hasAgentAccessLimits(serverId));
   // An owner or admin can use all agents, also with levels read before a promotion.
   const role = useMobileWorkspaceSelector(
@@ -108,7 +116,8 @@ export function useAgentViewOnly(serverId: string, agentId: string): boolean {
     gcTime: Number.POSITIVE_INFINITY,
     queryFn: () => loadServerRoles(serverId),
   });
-  return !canAdministerServer(role) && access.data?.mine[agentId] === "view";
+  if (canAdministerServer(role)) return "manage";
+  return access.data?.mine[agentId] ?? null;
 }
 
 /** Adds `memberId` to the role or takes it out. */

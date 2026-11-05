@@ -4,6 +4,8 @@ import {
   OPENBOT_SOCIAL_IMAGE_META,
   OPENBOT_SOCIAL_IMAGE_URL,
   OPENBOT_X_HANDLE,
+  type PageSocialImage,
+  pageSocialImageMeta,
 } from "../../lib/site-metadata";
 import { isMarketplaceMissingData } from "./MarketplaceMissingPage";
 import type { MarketplaceHeadText, MarketplaceListingHeadText } from "./marketplace-page-text";
@@ -32,17 +34,19 @@ function pageMeta(url: string, text: MarketplaceHeadText) {
   ];
 }
 
-/** `/marketplace`, `/marketplace/skills` and `/marketplace/apps`, with the site's own card. */
+/** The social card of the three index tabs. A listing has its own card. */
+const MARKETPLACE_SOCIAL_IMAGE: PageSocialImage = {
+  path: "/social/marketplace.jpg",
+  alt: "Your kind of team. Four OpenBot agents in front of a rainbow",
+};
+
+/** `/marketplace`, `/marketplace/skills` and `/marketplace/apps`, with the Marketplace card. */
 export function marketplaceIndexHead(route: string, siteUrl: string, text: MarketplaceHeadText | undefined) {
   const url = new URL(route, siteUrl).toString();
   if (!text) return { links: [{ rel: "canonical", href: url }] };
+  const image = pageSocialImageMeta(MARKETPLACE_SOCIAL_IMAGE, siteUrl);
   return {
-    meta: [
-      ...pageMeta(url, text),
-      ...OPENBOT_SOCIAL_IMAGE_META,
-      { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
-    ],
+    meta: [...pageMeta(url, text), ...image.openGraph, ...image.twitter],
     links: [{ rel: "canonical", href: url }],
   };
 }

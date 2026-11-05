@@ -67,6 +67,12 @@
   color: var(--openbot-text-muted);
 }
 
+/* Right to left, the arrow points the other way. */
+.instance-transfer-flow-arrow:dir(rtl),
+.instance-transfer-back > svg[class~="lucide-chevron-left"]:dir(rtl) {
+  transform: scaleX(-1);
+}
+
 .instance-transfer-tiles {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -80,7 +86,7 @@
   align-items: flex-start;
   gap: var(--openbot-space-1);
   padding: var(--openbot-space-4);
-  text-align: left;
+  text-align: start;
   white-space: normal;
 }
 

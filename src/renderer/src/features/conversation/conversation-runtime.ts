@@ -37,7 +37,11 @@ export interface ConversationRuntime {
     | "setMessageReaction"
   > &
     // A joined server's sign-in link that the host relays. Absent, a link opens with `openUrl`.
-    Partial<Pick<OpenBotDesktopApi["agent"], "openMessageLink" | "pasteMessageLink" | "cancelMessageLink">>;
+    Partial<Pick<OpenBotDesktopApi["agent"], "openMessageLink" | "pasteMessageLink" | "cancelMessageLink">> &
+    // The progress and stop of an attachment download from a joined server. Absent, a card shows no progress.
+    Partial<Pick<OpenBotDesktopApi["agent"], "stopAttachmentDownload" | "onAttachmentDownload">> &
+    // Retry and remove of a failed file import. Absent, a failed upload chip has only its remove button.
+    Partial<Pick<OpenBotDesktopApi["agent"], "retryAttachmentImport" | "discardAttachmentImport">>;
   browser: Pick<
     OpenBotDesktopApi["browser"],
     | "capturePreview"

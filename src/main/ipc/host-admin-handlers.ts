@@ -5,15 +5,16 @@ import {
 import { HOST_RELEASE_CAPABILITY, HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
 import { Effect, Result } from "effect";
 import type { RemoteWorkflowError } from "../remote-service-effects";
-// The server name, logo, timezone, agent memory limit, memory review, prompt cache time and app
-// update of one server's host. On a joined server the request goes to the host. Identity, timezone,
-// memory limit, memory review, prompt cache time, settings, cancellation, and forced restarts require
-// an owner or admin.
+// The server name, logo, timezone, agent memory limit, memory review, prompt cache time, model list
+// and app update of one server's host. On a joined server the request goes to the host. Identity,
+// timezone, memory limit, memory review, prompt cache time, model list, settings, cancellation, and
+// forced restarts require an owner or admin.
 // Ordinary members can check and request an idle update through host-member-update-v1.
 
 import {
   type AgentAccessChange,
   type AgentAccessSnapshot,
+  type AgentProviderRef,
   decodeAgentAccessSnapshot,
   decodeHostAgentMemoryLimit,
   decodeHostMemoryReview,
@@ -21,6 +22,7 @@ import {
   decodeHostUpdateStatus,
   decodeMachineAlertSettings,
   decodePromptCacheTtlSetting,
+  decodeProviderModelVisibility,
   decodeServerAuditLog,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
@@ -30,7 +32,10 @@ import {
   LOCAL_SERVER_ID,
   type MachineAlertSettings,
   type PromptCacheTtl,
+  type ProviderModelVisibilityChange,
   parseAgentAccessChange,
+  parseProviderModelVisibilityChange,
+  parseProviderModelVisibilityProvider,
   type ServerAuditLog,
   type ServerAuditName,
   type ServerSummary,
@@ -54,6 +59,10 @@ import {
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MEMORY_REVIEW_CAPABILITY, MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import {
+  MODEL_VISIBILITY_CAPABILITY,
+  MODEL_VISIBILITY_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-v1";
+import {
   PROMPT_CACHE_TTL_CAPABILITY,
   PROMPT_CACHE_TTL_ROUTES,
 } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
@@ -65,6 +74,7 @@ import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-s
 import type { HostService } from "../host-service";
 import type { MachineAlertMonitor } from "../machine-alerts";
 import type { MemoryReviewPreferenceStore } from "../memory-review-preference-store";
+import type { ModelVisibility } from "../model-visibility";
 import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preference-store";
 import { acceptEmpty, decodeHostReleaseStatusFromHost, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
@@ -96,6 +106,7 @@ interface HostAdminIpcDependencies {
   memoryReview: MemoryReviewPreferenceStore;
   machineAlerts: Pick<MachineAlertMonitor, "alerts" | "setAlerts" | "canBeResponsible">;
   promptCacheTtl: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
+  modelVisibility: Pick<ModelVisibility, "settings" | "set">;
   agentAccess: Pick<AgentAccessStore, "levels" | "set">;
   serverAudit: Pick<ServerAuditStore, "read">;
   /** The server ID of this computer's host, when it has one. Roles are stored by it. */
@@ -119,6 +130,7 @@ export function hostAdminIpcHandlers({
   memoryReview,
   machineAlerts,
   promptCacheTtl,
+  modelVisibility,
   agentAccess,
   serverAudit,
   localServerId,
@@ -162,6 +174,17 @@ export function hostAdminIpcHandlers({
       throw new Error(sourceText("error.team.promptCacheTtlUnsupported"));
     return runCauseEffect(
       remoteServers.request(serverId, route, decodePromptCacheTtlSetting, { method: "POST", body }),
+    );
+  }
+  function remoteModelVisibility(
+    serverId: string,
+    route: string,
+    body: { provider: AgentProviderRef } | ProviderModelVisibilityChange,
+  ) {
+    if (!remoteServers.supportsCapability(serverId, MODEL_VISIBILITY_CAPABILITY))
+      throw new Error(sourceText("error.team.modelVisibilityUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, route, decodeProviderModelVisibility, { method: "POST", body }),
     );
   }
   function localAccessServerId(): string {
@@ -298,6 +321,14 @@ export function hostAdminIpcHandlers({
       setPromptCacheTtl: scopedHandler(parsePromptCacheTtl, {
         local: (ttl) => runCauseEffect(promptCacheTtl.set(ttl)),
         remote: (ttl, serverId) => remotePromptCacheTtl(serverId, PROMPT_CACHE_TTL_ROUTES.update, { ttl }),
+      }),
+      getModelVisibility: scopedHandler(parseProviderModelVisibilityProvider, {
+        local: (provider) => runCauseEffect(modelVisibility.settings(provider)),
+        remote: (provider, serverId) => remoteModelVisibility(serverId, MODEL_VISIBILITY_ROUTES.settings, { provider }),
+      }),
+      setModelVisibility: scopedHandler(parseProviderModelVisibilityChange, {
+        local: (change) => runCauseEffect(modelVisibility.set(change)),
+        remote: (change, serverId) => remoteModelVisibility(serverId, MODEL_VISIBILITY_ROUTES.update, change),
       }),
       getAgentAccess: scopedQueryHandler({
         local: () => {

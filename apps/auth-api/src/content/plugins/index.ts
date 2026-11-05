@@ -5,10 +5,12 @@ import { BRAVE_SEARCH_PLUGIN_GUIDE } from "./brave-search";
 import { CANVA_PLUGIN_GUIDE } from "./canva";
 import { CLICKUP_PLUGIN_GUIDE } from "./clickup";
 import { COBRAIN_PLUGIN_GUIDE } from "./cobrain";
+import { COINBASE_PLUGIN_GUIDE } from "./coinbase";
 import { COMPOSIO_PLUGIN_GUIDE } from "./composio";
 import { CONTEXT7_PLUGIN_GUIDE } from "./context7";
 import { FIGMA_PLUGIN_GUIDE } from "./figma";
 import { FIRECRAWL_PLUGIN_GUIDE } from "./firecrawl";
+import { HIGGSFIELD_PLUGIN_GUIDE } from "./higgsfield";
 import { HUGGINGFACE_PLUGIN_GUIDE } from "./huggingface";
 import { LINEAR_PLUGIN_GUIDE } from "./linear";
 import { NEON_PLUGIN_GUIDE } from "./neon";
@@ -21,8 +23,11 @@ import { PRISMA_PLUGIN_GUIDE } from "./prisma";
 import { RAILWAY_PLUGIN_GUIDE } from "./railway";
 import { RENDER_PLUGIN_GUIDE } from "./render";
 import { RESEND_PLUGIN_GUIDE } from "./resend";
+import { REVENUECAT_PLUGIN_GUIDE } from "./revenuecat";
+import { ROBINHOOD_PLUGIN_GUIDE } from "./robinhood";
 import { SENTRY_PLUGIN_GUIDE } from "./sentry";
 import { STRIPE_PLUGIN_GUIDE } from "./stripe";
+import { TICKTICK_PLUGIN_GUIDE } from "./ticktick";
 import { TODOIST_PLUGIN_GUIDE } from "./todoist";
 import { TRELLO_PLUGIN_GUIDE } from "./trello";
 import { VERCEL_PLUGIN_GUIDE } from "./vercel";
@@ -43,14 +48,19 @@ const PLUGIN_GUIDES: Readonly<Record<string, PluginGuide>> = {
   linear: LINEAR_PLUGIN_GUIDE,
   notion: NOTION_PLUGIN_GUIDE,
   paper: PAPER_PLUGIN_GUIDE,
+  higgsfield: HIGGSFIELD_PLUGIN_GUIDE,
   posthog: POSTHOG_PLUGIN_GUIDE,
   resend: RESEND_PLUGIN_GUIDE,
   sentry: SENTRY_PLUGIN_GUIDE,
   stripe: STRIPE_PLUGIN_GUIDE,
+  revenuecat: REVENUECAT_PLUGIN_GUIDE,
   vercel: VERCEL_PLUGIN_GUIDE,
   todoist: TODOIST_PLUGIN_GUIDE,
+  ticktick: TICKTICK_PLUGIN_GUIDE,
   trello: TRELLO_PLUGIN_GUIDE,
   clickup: CLICKUP_PLUGIN_GUIDE,
+  coinbase: COINBASE_PLUGIN_GUIDE,
+  robinhood: ROBINHOOD_PLUGIN_GUIDE,
   railway: RAILWAY_PLUGIN_GUIDE,
   render: RENDER_PLUGIN_GUIDE,
   prisma: PRISMA_PLUGIN_GUIDE,

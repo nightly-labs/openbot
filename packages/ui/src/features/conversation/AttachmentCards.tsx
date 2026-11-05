@@ -1,7 +1,19 @@
 import { attachmentMimeTypeForName, playableMediaKind } from "@openbot/contracts/attachment-files";
 import { type AttachmentSummary, canPreviewAttachment } from "@openbot/contracts/ipc";
-import { AudioLines, Button, Download, ExternalLink, Film, LabelTooltip, LabelTooltipTrigger, Play } from "@openbot/ui";
-import { createSignal, For, Show } from "solid-js";
+import {
+  AudioLines,
+  Button,
+  Download,
+  ExternalLink,
+  Film,
+  LabelTooltip,
+  LabelTooltipTrigger,
+  Play,
+  RadialProgress,
+  RefreshCw,
+  Square,
+} from "@openbot/ui";
+import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
 import { attachmentReferenceTone } from "./AttachmentReference";
 import { MediaFilePreview } from "./MediaFilePreview";
@@ -21,9 +33,22 @@ export interface AttachmentMediaSource {
   mediaLimit: number;
 }
 
+/** The download of an attachment from a joined server, from the click until the file arrives. */
+export type AttachmentDownloadState = { phase: "downloading"; received: number; total: number } | { phase: "failed" };
+
+/** Shows and controls the downloads of a joined server. Absent, a card shows no download state. */
+export interface AttachmentDownloads {
+  /** The download of an attachment. Reactive. Undefined when none runs and the last one did not fail. */
+  state(attachmentId: string): AttachmentDownloadState | undefined;
+  stop(attachment: AttachmentSummary): void;
+  /** Repeats the action of the failed download. */
+  retry(attachment: AttachmentSummary): void;
+}
+
 export function AttachmentCards(props: {
   attachments: AttachmentSummary[];
   mediaSource?: AttachmentMediaSource | undefined;
+  downloads?: AttachmentDownloads | undefined;
   /** `origin` is the clicked card, for a viewer that zooms out of it. */
   onPreview: (attachment: AttachmentSummary, origin: HTMLElement) => void;
   onAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
@@ -47,6 +72,24 @@ export function AttachmentCards(props: {
     props.mediaSource !== undefined &&
     attachment.size <= props.mediaSource.mediaLimit &&
     !sourceUrl(attachment);
+  const download = (attachment: AttachmentSummary) => props.downloads?.state(attachment.id);
+  const downloading = (attachment: AttachmentSummary) => {
+    const state = download(attachment);
+    return state?.phase === "downloading" ? state : undefined;
+  };
+  const percent = (state: { received: number; total: number }) =>
+    state.total > 0 ? Math.min(100, Math.floor((state.received / state.total) * 100)) : 0;
+  const status = (attachment: AttachmentSummary) => {
+    if (isMissing(attachment)) return t("attachment.notFound");
+    const state = download(attachment);
+    if (state?.phase === "failed") return t("attachment.downloadFailed");
+    if (state?.phase === "downloading")
+      return t("attachment.downloadProgress", {
+        received: format.fileSizeAmount(state.received, state.total),
+        total: format.fileSize(state.total),
+      });
+    return format.fileSize(attachment.size);
+  };
   const loadMedia = async (attachment: AttachmentSummary) => {
     const source = props.mediaSource;
     if (!source || loadingMedia().has(attachment.id)) return;
@@ -79,6 +122,7 @@ export function AttachmentCards(props: {
               class="message-attachment"
               data-media={mediaKind(attachment) ?? undefined}
               data-status={isMissing(attachment) ? "missing" : undefined}
+              data-download={download(attachment)?.phase}
             >
               <Button
                 variant="ghost"
@@ -124,7 +168,7 @@ export function AttachmentCards(props: {
                 </Show>
                 <span class="attachment-file-copy">
                   <strong title={attachment.name}>{attachment.name}</strong>
-                  <small>{isMissing(attachment) ? t("attachment.notFound") : format.fileSize(attachment.size)}</small>
+                  <small>{status(attachment)}</small>
                 </span>
               </Button>
               <Show when={!isMissing(attachment)}>
@@ -141,15 +185,49 @@ export function AttachmentCards(props: {
                     <Play />
                   </Button>
                 </Show>
-                <Button
-                  variant="ghost"
-                  type="button"
-                  class="attachment-open-button"
-                  aria-label={t("attachment.download", { name: attachment.name })}
-                  onClick={() => props.onAction(attachment, "download")}
+                <Switch
+                  fallback={
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      class="attachment-open-button"
+                      aria-label={t("attachment.download", { name: attachment.name })}
+                      onClick={() => props.onAction(attachment, "download")}
+                    >
+                      <Download />
+                    </Button>
+                  }
                 >
-                  <Download />
-                </Button>
+                  <Match when={downloading(attachment)}>
+                    {(state) => (
+                      <Button
+                        variant="ghost"
+                        type="button"
+                        class="attachment-open-button attachment-download-stop"
+                        aria-label={t("attachment.stopDownload", {
+                          name: attachment.name,
+                          percent: String(percent(state())),
+                        })}
+                        onClick={() => props.downloads?.stop(attachment)}
+                      >
+                        <RadialProgress class="attachment-download-ring" value={percent(state())} aria-hidden="true">
+                          <Square />
+                        </RadialProgress>
+                      </Button>
+                    )}
+                  </Match>
+                  <Match when={download(attachment)?.phase === "failed"}>
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      class="attachment-open-button"
+                      aria-label={t("attachment.retryDownload", { name: attachment.name })}
+                      onClick={() => props.downloads?.retry(attachment)}
+                    >
+                      <RefreshCw />
+                    </Button>
+                  </Match>
+                </Switch>
                 <LabelTooltip content={t("attachment.openFile")}>
                   <LabelTooltipTrigger
                     as={Button}
@@ -157,6 +235,7 @@ export function AttachmentCards(props: {
                     type="button"
                     class="attachment-open-button"
                     aria-label={t("attachment.open", { name: attachment.name })}
+                    disabled={downloading(attachment) !== undefined}
                     onClick={() => props.onAction(attachment, "open")}
                   >
                     <ExternalLink />

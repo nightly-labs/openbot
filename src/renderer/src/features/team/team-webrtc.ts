@@ -6,6 +6,7 @@ import {
   type SignalClientMessage,
   type SignalServerMessage,
 } from "@openbot/contracts/signal-protocol/messages";
+import { BROWSER_EGRESS_CHANNEL } from "@openbot/contracts/team-protocol/browser-egress-v1";
 import { TEAM_PROTOCOL_V2_CHANNELS } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
 import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./team-webrtc-framing";
@@ -22,6 +23,9 @@ export interface BridgeCommand {
     | "restart-ice"
     | "renew-host-signal"
     | "set-private-network"
+    | "open-egress"
+    | "close-egress"
+    | "send-egress"
     | "close";
   peerId: string;
   signalUrl?: string;
@@ -74,6 +78,13 @@ interface PeerState {
   privateNetwork: boolean;
   channels: Partial<Record<"rpc" | "events" | "files" | "desktop", RTCDataChannel>>;
   payloadDecoders: Partial<Record<"rpc" | "events" | "files" | "desktop", TeamWebRtcPayloadDecoder>>;
+  /**
+   * The optional `browser-egress-v1` channel. It is not one of the four channels that make the
+   * connection ready, and its close never drops the connection. Its frames are sent as they are.
+   */
+  egress: RTCDataChannel | null;
+  /** Egress frames go out in the order main sends them, also while the channel waits for buffer space. */
+  egressChain: Promise<void>;
   reconnectAttempt: number;
   reconnectTimer: number | null;
   turnRefreshTimer: number | null;
@@ -174,6 +185,8 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
         privateNetwork: command.peer === "host" && command.privateNetwork === true,
         channels: {},
         payloadDecoders: {},
+        egress: null,
+        egressChain: Promise.resolve(),
         reconnectAttempt: 0,
         reconnectTimer: null,
         turnRefreshTimer: null,
@@ -205,6 +218,31 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
       if (channel?.readyState !== "open" || command.data === undefined)
         throw new Error(sourceText("error.remote.channelNotOpen"));
       await sendChannelPayload(state, channel, command.data);
+    } else if (command.type === "open-egress") {
+      const state = requirePeer(command.peerId);
+      // Only a client opens it, and only on a connection that is up. A new connection needs a new one.
+      if (state.role !== "client" || !state.peerConnection || state.channels.rpc?.readyState !== "open")
+        throw new Error(sourceText("error.remote.channelNotOpen"));
+      // A channel that closes now does not count: its close comes later and opens nothing again.
+      if (!state.egress || state.egress.readyState === "closing" || state.egress.readyState === "closed")
+        bindEgressChannel(state, state.peerConnection.createDataChannel(BROWSER_EGRESS_CHANNEL, { ordered: true }));
+    } else if (command.type === "close-egress") {
+      const state = peers.get(command.peerId);
+      state?.egress?.close();
+    } else if (command.type === "send-egress") {
+      const state = requirePeer(command.peerId);
+      const channel = state.egress;
+      const data = command.data;
+      if (channel?.readyState !== "open" || data === undefined)
+        throw new Error(sourceText("error.remote.channelNotOpen"));
+      const sent = state.egressChain.then(async () => {
+        await waitForWritableChannel(channel);
+        if (channel.readyState !== "open") throw new Error(sourceText("error.remote.channelNotOpen"));
+        if (isString(data)) channel.send(data);
+        else channel.send(data);
+      });
+      state.egressChain = sent.catch(() => undefined);
+      await sent;
     } else if (command.type === "restart-ice") {
       await restartIce(requirePeer(command.peerId));
     } else if (command.type === "renew-host-signal") {
@@ -626,6 +664,11 @@ function createPeerConnection(state: PeerState, iceServers: RTCIceServer[]): RTC
     });
   };
   connection.ondatachannel = (event) => {
+    // A host reads the egress channel of a desktop client. Main decides if it uses it.
+    if (event.channel.label === BROWSER_EGRESS_CHANNEL && state.role === "host") {
+      bindEgressChannel(state, event.channel);
+      return;
+    }
     const channel = channelKind(event.channel.label);
     if (channel) bindDataChannel(state, channel, event.channel);
   };
@@ -717,6 +760,33 @@ function bindDataChannel(
   channel.onclose = () => {
     if (state.closed || state.channels[kind] !== channel) return;
     dropConnection(state);
+  };
+}
+
+/**
+ * Binds the optional egress channel. Its open and close go to main as their own events: they do not
+ * change whether the connection is ready, and a lost egress channel leaves the connection up.
+ */
+function bindEgressChannel(state: PeerState, channel: RTCDataChannel): void {
+  const previous = state.egress;
+  state.egress = channel;
+  previous?.close();
+  channel.binaryType = "arraybuffer";
+  channel.bufferedAmountLowThreshold = 1024 * 1024;
+  const current = () => !state.closed && state.egress === channel;
+  channel.onopen = () => {
+    if (current()) post({ type: "egress-open", peerId: state.id });
+  };
+  channel.onmessage = (event) => {
+    if (!current()) return;
+    const data = egressFrame(event.data);
+    if (data !== null) post({ type: "egress-data", peerId: state.id, data });
+    else channel.close();
+  };
+  channel.onclose = () => {
+    if (state.egress !== channel) return;
+    state.egress = null;
+    if (!state.closed) post({ type: "egress-closed", peerId: state.id });
   };
 }
 
@@ -982,6 +1052,10 @@ function disconnectPeerConnection(state: PeerState): void {
     };
     socket.send(JSON.stringify(message));
   }
+  const egress = state.egress;
+  state.egress = null;
+  egress?.close();
+  if (egress && !state.closed) post({ type: "egress-closed", peerId: state.id });
   state.peerConnection?.close();
   state.peerConnection = null;
   state.connectionId = null;
@@ -1054,4 +1128,9 @@ function channelKind(label: string): "rpc" | "events" | "files" | "desktop" | nu
 
 function post(message: MainBridgeMessage): void {
   mainPort.postMessage(message);
+}
+
+/** An egress frame: a control string or a binary data frame. Anything else is not one. */
+function egressFrame(data: unknown): string | ArrayBuffer | null {
+  return isString(data) || data instanceof ArrayBuffer ? data : null;
 }

@@ -155,6 +155,20 @@ export function isUsageReadDiagnostic(message: string): boolean {
 }
 
 /**
+ * Whether a provider diagnostic is Grok's own record of a `git` command that could not start.
+ *
+ * Grok's CLI runs `git` to read the repository state, and logs `ERROR git_cli: Command::output()
+ * FAILED (spawn error) error=program not found` on stderr when `git` is not on the PATH, as on a
+ * Windows computer without Git. Grok continues without the repository state. The user met the line
+ * as a "Grok error" toast with nothing failing (#4789). It belongs in the log.
+ *
+ * Only a spawn failure counts. A `git` command that ran and failed stays visible.
+ */
+export function isGitSpawnDiagnostic(message: string): boolean {
+  return /\bERROR\s+git_cli:\s+Command::output\(\) FAILED \(spawn error\)/.test(message);
+}
+
+/**
  * Whether a provider diagnostic is the ACP SDK's own copy of an error that the agent also answered.
  *
  * The TypeScript ACP SDK that a Node agent is built on writes `Error handling request`, the whole
@@ -206,6 +220,25 @@ export function isGlogBelowErrorDiagnostic(message: string): boolean {
 }
 
 /**
+ * A Rust log record whose own level is below error, as in
+ * `2026-11-04T23:00:00.123456Z  INFO devin::acp: request failed, will retry` (`tracing`) or
+ * `[2026-11-04T23:00:00Z INFO  devin::acp] …` (`env_logger`).
+ *
+ * ACP gives stderr to the agent for its logs; a failure reaches OpenBot as an answer or as the exit.
+ * Devin CLI 3000.11.234 writes its info records to stderr, and a word such as "failed" in one let it
+ * through as a provider error (#5064). The level of the record decides instead.
+ *
+ * Only a record that opens with the level, after an optional timestamp, counts. An `ERROR` record,
+ * or text without a level - a Rust panic included - stays visible.
+ */
+const RUST_LOG_RECORD =
+  /^\[?(?:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\s+)?(?:TRACE|DEBUG|INFO|WARN)\s/u;
+
+export function isRustLogBelowErrorDiagnostic(message: string): boolean {
+  return RUST_LOG_RECORD.test(message);
+}
+
+/**
  * The timestamp a CLI's log formatter writes before a record, as in
  * `2026-09-23T06:57:23.278161Z ERROR …`. It is removed from what the renderer shows: it is not
  * something to act on, and it makes every repeat of one failure a new message.
@@ -240,7 +273,9 @@ export function isUsageLimitDiagnostic(message: string): boolean {
  * plan's rolling, weekly and monthly windows name no reset: `429: {"type":"GoUsageLimitError",
  * "message":"Go usage limit exceeded"}` (#4256). The z.ai GLM Coding Plan writes "Usage limit reached
  * for 5 hour. Your limit will reset at 2026-11-02 17:37:38" and "Weekly/Monthly Limit Exhausted. Your
- * limit will reset at …" (#4469). Its reset names no zone, so it is not read. A spent credit
+ * limit will reset at …" (#4469). Its reset names no zone, so it is not read. Grok's free tier
+ * writes "subscription:free-usage-exhausted: You've used all the included free usage for model …
+ * Usage resets over a rolling 24-hour window" (#4869). A spent credit
  * balance or quota does not reset, so it is not one: holding work for it would wait forever and hide
  * the provider's reason. A short request-rate throttle says "rate limit".
  */
@@ -252,8 +287,32 @@ export function isPlanLimitDiagnostic(message: string): boolean {
     /\b(?:session|weekly) (?:usage )?limit\b.{0,80}\b(?:reached|resets?)\b/iu.test(message) ||
     /\b(?:GoUsageLimitError|Go usage limit exceeded)\b/u.test(message) ||
     /\busage limit reached for \d+ ?hours?\b/iu.test(message) ||
-    /\b(?:daily|weekly|monthly) limit exhausted\b/iu.test(message)
+    /\b(?:daily|weekly|monthly) limit exhausted\b/iu.test(message) ||
+    /\bsubscription:free-usage-exhausted\b/u.test(message)
   );
+}
+
+const RESET_DELAY_UNIT = "(?:days?|d|hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)(?![a-z])";
+const RESET_DELAY = new RegExp(
+  String.raw`\bresets? (?:in|after) ((?:\d+(?:\.\d+)?\s*${RESET_DELAY_UNIT}(?:,?\s*(?:and\s+)?))+)`,
+  "iu",
+);
+const RESET_DELAY_PART = new RegExp(String.raw`(\d+(?:\.\d+)?)\s*(${RESET_DELAY_UNIT})`, "giu");
+const RESET_DELAY_UNIT_MS: Record<string, number> = { d: 86_400_000, h: 3_600_000, m: 60_000, s: 1_000 };
+
+/**
+ * The wait until a limit resets that a provider error names, in milliseconds, or null. A spent
+ * Gemini quota reads "Your limit will reset in 2 days, 18 hours." (#4368), and an Antigravity
+ * capacity error "Your quota will reset after 18h31m10s".
+ */
+export function providerResetDelayMs(message: string): number | null {
+  const named = RESET_DELAY.exec(message)?.[1];
+  if (!named) return null;
+  let delay = 0;
+  for (const [, amount, unit] of named.matchAll(RESET_DELAY_PART)) {
+    delay += Number(amount) * (RESET_DELAY_UNIT_MS[unit?.[0]?.toLowerCase() ?? ""] ?? 0);
+  }
+  return delay > 0 ? delay : null;
 }
 
 /** Whether a provider's text names money or a quota, which no wait gives back. */

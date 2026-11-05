@@ -11,7 +11,21 @@ import type { MobileAgent } from "./workspace-types";
 
 export type MobileSidebarItem =
   | { kind: "waiting"; id: string; count: number }
-  | { kind: "section"; id: string; name: string; empty: boolean }
+  | {
+      kind: "section";
+      id: string;
+      /** The path, such as "Acme / Engineering", for menus and accessibility. */
+      name: string;
+      /** The own name of the folder, which the header shows after `parentName`. */
+      title: string;
+      /** The name of the folder that holds this one, or null at the top of the list. */
+      parentName: string | null;
+      /** The folders that hold this one, from the top folder down. */
+      ancestorIds: readonly string[];
+      /** A folder of the user, not the "Agents" group of the chats in no folder. */
+      custom: boolean;
+      empty: boolean;
+    }
   | { kind: "agent"; id: string; agent: MobileAgent }
   | { kind: "channel"; id: string; channel: ChannelSummary };
 
@@ -38,20 +52,33 @@ export function mobileSidebarItems(
     group.push(chat);
     groups.set(sectionId, group);
   }
-  // The list is flat: a folder in a folder shows its path, such as "Acme / Engineering", and a closed
+  // As on the desktop, folders do not indent: a folder in a folder shows "Parent / Name", and a closed
   // folder hides the folders in it too.
   const parents = sidebarFolderParents(layout);
   return layout.order.flatMap((id) => {
-    if (sidebarFolderAncestors(parents, id).some((ancestorId) => collapsedSectionIds.has(ancestorId))) return [];
+    const ancestorIds = sidebarFolderAncestors(parents, id);
+    if (ancestorIds.some((ancestorId) => collapsedSectionIds.has(ancestorId))) return [];
     const group = groups.get(id) ?? [];
-    const name = names.has(id)
-      ? sidebarFolderPath(layout, parents, id).join(" / ")
+    const custom = names.has(id);
+    const title = custom
+      ? names.get(id)
       : id === SIDEBAR_UNASSIGNED_SECTION_ID
         ? t("mobile.workspace.section.agents")
-        : null;
-    if (!name || (id === SIDEBAR_UNASSIGNED_SECTION_ID && group.length === 0)) return [];
+        : undefined;
+    if (title === undefined || (id === SIDEBAR_UNASSIGNED_SECTION_ID && group.length === 0)) return [];
+    const parentId = parents.get(id);
     return [
-      { kind: "section" as const, id, name, empty: group.length === 0 },
+      {
+        kind: "section" as const,
+        id,
+        name: custom ? sidebarFolderPath(layout, parents, id).join(" / ") : title,
+        title,
+        parentName: (parentId && names.get(parentId)) ?? null,
+        ancestorIds,
+        custom,
+        // An open folder with only folders in it is not empty.
+        empty: group.length === 0 && ![...parents.values()].includes(id),
+      },
       ...(collapsedSectionIds.has(id) ? [] : group),
     ];
   });

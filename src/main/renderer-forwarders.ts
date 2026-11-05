@@ -27,6 +27,7 @@ import {
   latestTurnAnswer,
   type ServerNotificationLevel,
   type SpeechModelStatus,
+  type VoiceLiveEvent,
   type VoiceModelStatus,
   type VoiceServerSettings,
   type VoiceStreamTranscript,
@@ -336,10 +337,13 @@ export function createRendererForwarders({
     if (notification) closeRetainedNotification(notification);
   }
 
-  async function notifyAgentEvent(serverId: string, event: AgentEvent): Promise<void> {
-    withdrawResolvedNotification(serverId, event);
+  async function notifyAgentEvent(serverId: string, received: AgentEvent): Promise<void> {
+    withdrawResolvedNotification(serverId, received);
+    // A routine thread's turn notifies as a turn of the chat does. Its answer is in the routine thread.
+    const routineTaskId = received.type === "routine-thread-turn-completed" ? received.taskId : null;
+    const event = received.type === "routine-thread-turn-completed" ? received.turn : received;
     // Most events stream while an agent works. Only these can notify, so the others skip the server list.
-    if (!agentEventCanNotify(event) && event.type !== "usage-limit-reached") return;
+    if (!agentEventCanNotify(event) && event.type !== "usage-limit-reached" && event.type !== "subagent-failed") return;
     // Like Discord, nothing pops up while the user is looking at the app. The level is read again
     // after the lookup, with the rest, because the user can change it while the lookup runs.
     const notifyLevel = (agentLevels: ReadonlyMap<string, ServerNotificationLevel> | null) => {
@@ -356,11 +360,11 @@ export function createRendererForwarders({
     const mostOpen = agentId === null ? null : new Map([[agentId, "all" as const]]);
     if (!notifyLevel(mostOpen) || !Notification.isSupported()) return;
     const requestKey = notificationRequestKey(serverId, event);
-    if (!requestKey) return showAgentNotification(serverId, event, notifyLevel, null);
+    if (!requestKey) return showAgentNotification(serverId, event, notifyLevel, null, routineTaskId);
     // A shown notification of the same request stays until the new one replaces it.
     if (!requestNotifications.has(requestKey)) requestNotifications.set(requestKey, null);
     try {
-      await showAgentNotification(serverId, event, notifyLevel, requestKey);
+      await showAgentNotification(serverId, event, notifyLevel, requestKey, null);
     } finally {
       // Nothing was shown, or the lookup failed.
       if (requestNotifications.get(requestKey) === null) requestNotifications.delete(requestKey);
@@ -372,11 +376,14 @@ export function createRendererForwarders({
     event: AgentEvent,
     notifyLevel: (agentLevels: ReadonlyMap<string, ServerNotificationLevel> | null) => ServerNotificationLevel | null,
     requestKey: string | null,
+    routineTaskId: string | null,
   ): Promise<void> {
     const preview = notificationPreviewEnabled();
     const answer =
       preview && event.type === "turn-completed" && event.status === "completed"
-        ? turnAnswer(serverId, event.agentId, event.turnId)
+        ? routineTaskId
+          ? routineTurnAnswer(event.agentId, routineTaskId, event.turnId)
+          : turnAnswer(serverId, event.agentId, event.turnId)
         : null;
     const agentLookup = notificationAgents(serverId);
     const agents = agentLookup instanceof Promise ? await agentLookup : agentLookup;
@@ -450,6 +457,18 @@ export function createRendererForwarders({
     const answer = loaded && latestTurnAnswer(loaded.messages, turnId)?.text;
     // A routine Test run shows the no-update marker in the chat, but it is not news to show.
     return answer && !isNoUpdateAnswer(answer) ? answer : null;
+  }
+
+  /** The answer of a turn in a routine thread of this computer, or null as for `turnAnswer`. */
+  function routineTurnAnswer(agentId: string, taskId: string, turnId: string): string | null {
+    try {
+      const snapshot = getHostService()?.readAgentTask(agentId, taskId);
+      const answer = snapshot && latestTurnAnswer(snapshot.messages, turnId)?.text;
+      return answer && !isNoUpdateAnswer(answer) ? answer : null;
+    } catch {
+      // The routine and its thread were deleted after the turn.
+      return null;
+    }
   }
 
   /** A workflow step that waits for the user, or a workflow output. A click shows the main window. */
@@ -549,6 +568,10 @@ export function createRendererForwarders({
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.voice.streamTranscript, transcript);
   }
 
+  function forwardVoiceLiveEvent(event: VoiceLiveEvent): void {
+    for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.voice.liveEvent, event);
+  }
+
   function forwardProviderRuntimeStatus(snapshot: import("@openbot/contracts/ipc").ProviderRuntimeSnapshot): void {
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.providerRuntimes.event, snapshot);
   }
@@ -569,6 +592,9 @@ export function createRendererForwarders({
 
   function forwardBitwardenConnectorStatus(status: import("@openbot/contracts/ipc").BitwardenConnectorStatus): void {
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.bitwardenConnector.changed, status);
+  }
+  function forwardPasswordManagerStatus(status: import("@openbot/contracts/ipc").PasswordManagerStatus): void {
+    for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.passwordManagers.changed, status);
   }
 
   function forwardVaultState(state: import("@openbot/contracts/ipc").VaultState): void {
@@ -623,6 +649,17 @@ export function createRendererForwarders({
     sendToRenderer(window, IPC_ENDPOINTS.servers.scopedDirectTyping, { serverId, event });
   }
 
+  // Every window can show the chat that holds the attachment.
+  function forwardAttachmentDownload(progress: import("@openbot/contracts/ipc").AttachmentDownloadProgress): void {
+    for (const target of appWindows())
+      sendToRenderer(target, IPC_ENDPOINTS.agentAttachments.attachmentDownload, progress);
+  }
+
+  // The preload of the window that started the import knows its request id; the others drop it.
+  function forwardAttachmentImportProgress(progress: import("@openbot/contracts/ipc").AttachmentImportProgress): void {
+    for (const target of appWindows()) sendToRenderer(target, IPC_ENDPOINTS.attachmentImports.importProgress, progress);
+  }
+
   return {
     forwardAgentEvent,
     forwardWorkflowNotice,
@@ -632,6 +669,7 @@ export function createRendererForwarders({
     forwardUpdatePreference,
     forwardVoiceModelStatus,
     forwardVoiceStreamTranscript,
+    forwardVoiceLiveEvent,
     forwardSpeechModelStatus,
     forwardVoiceServerSettings,
     forwardProviderRuntimeStatus,
@@ -639,6 +677,7 @@ export function createRendererForwarders({
     forwardLinkAccountStatus,
     forwardOnePasswordConnectorStatus,
     forwardBitwardenConnectorStatus,
+    forwardPasswordManagerStatus,
     forwardVaultState,
     forwardHostStatus,
     forwardRemoteDesktopSessions,
@@ -646,5 +685,7 @@ export function createRendererForwarders({
     forwardTeamPresence,
     forwardDirectMessage,
     forwardDirectTyping,
+    forwardAttachmentDownload,
+    forwardAttachmentImportProgress,
   };
 }

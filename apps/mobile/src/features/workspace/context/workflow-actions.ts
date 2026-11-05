@@ -1,8 +1,15 @@
 import type { WorkflowGraph, WorkflowNodeSize } from "@openbot/contracts/ipc";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
+import {
+  WORKFLOWS_GITHUB_CAPABILITY,
+  WORKFLOWS_GITHUB_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-github-v1";
 import { WORKFLOWS_CAPABILITY, WORKFLOWS_ROUTES } from "@openbot/contracts/team-protocol/workflows-v1";
 import {
   decodeRemoteWorkflowDetail,
+  decodeRemoteWorkflowGitHubCatalog,
+  decodeRemoteWorkflowGitHubHistory,
+  decodeRemoteWorkflowGitHubOptions,
   decodeRemoteWorkflowList,
   decodeRemoteWorkflowRunDetail,
   decodeRemoteWorkflowRunPage,
@@ -10,6 +17,8 @@ import {
   decodeRemoteWorkflowSecret,
   decodeRemoteWorkflowStep,
   decodeRemoteWorkflowSummary,
+  decodeRemoteWorkflowVersionGraph,
+  decodeRemoteWorkflowVersions,
 } from "@openbot/team-client/workflow-decoding";
 import * as Crypto from "expo-crypto";
 import type { WorkspaceRequest } from "@/features/workspace/context/host-request-actions";
@@ -32,14 +41,24 @@ type WorkflowActions = Pick<
   | "loadWorkflowRun"
   | "startWorkflowRun"
   | "stopWorkflowRun"
+  | "runWorkflowStep"
+  | "stopWorkflowStep"
   | "retryWorkflowStep"
   | "decideWorkflowStep"
   | "rotateWorkflowWebhookSecret"
+  | "loadWorkflowVersions"
+  | "loadWorkflowVersionGraph"
+  | "restoreWorkflowVersion"
+  | "loadWorkflowGitHubCatalog"
+  | "loadWorkflowGitHubOptions"
+  | "loadWorkflowGitHubHistory"
+  | "runWorkflowGitHubLastEvent"
 >;
 
 /**
- * The workflows of a host, through the `workflows-v1` routes. The host checks the level of the member
- * on each agent of a workflow, so these actions do not check roles.
+ * The workflows of a host, through the `workflows-v1` routes, and its GitHub triggers and outputs,
+ * through the `workflows-github-v1` routes. The host checks the level of the member on each agent of
+ * a workflow, and the role for the GitHub catalog, so these actions do not check roles.
  */
 export function createWorkflowActions({
   request,
@@ -51,6 +70,10 @@ export function createWorkflowActions({
   const send = <T>(serverId: string, path: string, decode: (value: unknown) => T, body: TeamProtocolV2Json) => {
     requireCapability(capabilities, serverId, WORKFLOWS_CAPABILITY, "mobile.workflow.unsupported");
     return request("POST", path, decode, body, serverId);
+  };
+  const sendGitHub = <T>(serverId: string, path: string, decode: (value: unknown) => T, body: TeamProtocolV2Json) => {
+    requireCapability(capabilities, serverId, WORKFLOWS_GITHUB_CAPABILITY, "mobile.workflow.github.unsupported");
+    return send(serverId, path, decode, body);
   };
   return {
     listWorkflows: (serverId) => send(serverId, WORKFLOWS_ROUTES.list, decodeRemoteWorkflowList, {}),
@@ -82,12 +105,20 @@ export function createWorkflowActions({
     loadWorkflowRun: (runId, serverId) =>
       send(serverId, WORKFLOWS_ROUTES.run, decodeRemoteWorkflowRunDetail, { runId }),
     // Each press is a new request: a repeat of the same request would start the run only once.
-    startWorkflowRun: (workflowId, serverId) =>
+    startWorkflowRun: (workflowId, serverId, fromNodeId) =>
       send(serverId, WORKFLOWS_ROUTES.startRun, decodeRemoteWorkflowRunDetail, {
         workflowId,
         requestId: Crypto.randomUUID(),
+        ...(fromNodeId ? { fromNodeId } : {}),
       }),
     stopWorkflowRun: (runId, serverId) => send(serverId, WORKFLOWS_ROUTES.stopRun, ignoreResponse, { runId }),
+    runWorkflowStep: (input, serverId) =>
+      send(serverId, WORKFLOWS_ROUTES.runStep, decodeRemoteWorkflowStep, {
+        workflowId: input.workflowId,
+        nodeId: input.nodeId,
+        requestId: Crypto.randomUUID(),
+      }),
+    stopWorkflowStep: (stepId, serverId) => send(serverId, WORKFLOWS_ROUTES.stopStep, ignoreResponse, { stepId }),
     retryWorkflowStep: (stepId, serverId) =>
       send(serverId, WORKFLOWS_ROUTES.retryStep, decodeRemoteWorkflowStep, { stepId, requestId: Crypto.randomUUID() }),
     decideWorkflowStep: (input, serverId) =>
@@ -96,6 +127,31 @@ export function createWorkflowActions({
       send(serverId, WORKFLOWS_ROUTES.rotateWebhookSecret, decodeRemoteWorkflowSecret, {
         workflowId: input.workflowId,
         nodeId: input.nodeId,
+      }),
+    loadWorkflowVersions: (workflowId, serverId) =>
+      send(serverId, WORKFLOWS_ROUTES.versions, decodeRemoteWorkflowVersions, { workflowId }),
+    loadWorkflowVersionGraph: (input, serverId) =>
+      send(serverId, WORKFLOWS_ROUTES.versionGraph, decodeRemoteWorkflowVersionGraph, {
+        workflowId: input.workflowId,
+        versionId: input.versionId,
+      }),
+    restoreWorkflowVersion: (input, serverId) =>
+      send(serverId, WORKFLOWS_ROUTES.restoreVersion, decodeRemoteWorkflowDetail, {
+        workflowId: input.workflowId,
+        versionId: input.versionId,
+      }),
+    loadWorkflowGitHubCatalog: (serverId) =>
+      sendGitHub(serverId, WORKFLOWS_GITHUB_ROUTES.catalog, decodeRemoteWorkflowGitHubCatalog, {}),
+    loadWorkflowGitHubOptions: (repository, serverId) =>
+      sendGitHub(serverId, WORKFLOWS_GITHUB_ROUTES.options, decodeRemoteWorkflowGitHubOptions, { repository }),
+    loadWorkflowGitHubHistory: (workflowId, serverId) =>
+      sendGitHub(serverId, WORKFLOWS_GITHUB_ROUTES.history, decodeRemoteWorkflowGitHubHistory, { workflowId }),
+    // Each press is a new request, as for a start.
+    runWorkflowGitHubLastEvent: (input, serverId) =>
+      sendGitHub(serverId, WORKFLOWS_GITHUB_ROUTES.runLastEvent, decodeRemoteWorkflowRunDetail, {
+        workflowId: input.workflowId,
+        nodeId: input.nodeId,
+        requestId: Crypto.randomUUID(),
       }),
   };
 }

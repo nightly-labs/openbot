@@ -1,5 +1,6 @@
 import type { BrowserTab } from "@openbot/contracts/ipc";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
+import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import BrowserFullView from "@openbot/ui/features/browser/BrowserFullView";
 import BrowserLocalSignInDialog from "@openbot/ui/features/browser/BrowserLocalSignInDialog";
 import { BROWSER_NEW_TAB_URL } from "@openbot/ui/features/browser/browser-suggestions";
@@ -16,8 +17,8 @@ import {
   syncBrowserTabOrder,
   takeClosedBrowserTab,
 } from "../browser/browser-tab-session";
-import { createBrowserTabProfiles } from "../browser/stores/browser-tab-profiles";
-import { serverSupportsCapability } from "../servers/server-capabilities";
+import { createBrowserTabProfiles, readTabProfilesWithProxies } from "../browser/stores/browser-tab-profiles";
+import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { BrowserDockAdapter } from "./BrowserDockAdapter";
 import { conversationPort } from "./conversation-port";
 import { useConversationViewScope } from "./conversation-scope";
@@ -51,12 +52,18 @@ export default function BrowserFullViewAdapter() {
   const serverId = () => props.server?.id ?? "";
   const tabs = createMemo(() => orderedBrowserTabs(serverId(), allBrowserTabs()));
   // Any member who sees a tab reads its profile label, from a host that serves `browser-profiles-v1`.
+  // An admin also reads the proxy of each profile.
   const readTabProfiles = createMemo(() => {
-    if (props.runtime) return props.runtime.browserProfiles?.tabProfiles;
+    if (props.runtime) {
+      const calls = props.runtime.browserProfiles;
+      return calls && readTabProfilesWithProxies(calls);
+    }
     const server = props.server;
-    return server && serverSupportsCapability(server, BROWSER_PROFILES_CAPABILITY)
-      ? desktopBrowserProfileCalls(server.id).tabProfiles
-      : undefined;
+    if (!server || !serverSupportsCapability(server, BROWSER_PROFILES_CAPABILITY)) return undefined;
+    const calls = desktopBrowserProfileCalls(server.id);
+    return serverRoleCanAdminister(server) && serverSupportsCapability(server, BROWSER_PROXIES_CAPABILITY)
+      ? readTabProfilesWithProxies(calls)
+      : calls.tabProfiles;
   });
   const profileForTab = createBrowserTabProfiles(readTabProfiles, allBrowserTabs);
 

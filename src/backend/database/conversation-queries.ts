@@ -8,6 +8,7 @@ import type {
   ConversationPageAnchor,
   ConversationSearchPage,
   ConversationSnapshot,
+  SentMessageStats,
 } from "@openbot/contracts/ipc";
 import {
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
@@ -101,18 +102,22 @@ export class ConversationQueries {
 
   /**
    * The assistant messages of one turn, in order. A routine flow reads only the answer of a turn,
-   * so it does not load and parse the whole history of the thread for it.
+   * so it does not load and parse the whole history of the thread for it. The turn row names the
+   * thread that ran the turn: the agent's chat or a side thread, such as a routine thread. A branch
+   * keeps the turn ids of the rows it copied, but the turn row stays with the source thread.
    */
-  readTurnAssistantMessages(agentId: string, threadId: string, turnId: string): ConversationMessage[] {
+  readTurnAssistantMessages(agentId: string, turnId: string): ConversationMessage[] {
     const rows = databaseRows(
       this.#core.connection
         .prepare(
-          `SELECT message.message_json FROM projection_thread_messages AS message
-           JOIN projection_threads AS thread ON thread.thread_id = message.thread_id
-           WHERE message.thread_id = ? AND thread.agent_id = ? AND message.turn_id = ? AND message.author = 'assistant'
+          `SELECT message.message_json FROM projection_turns AS turn
+           JOIN projection_threads AS thread ON thread.thread_id = turn.thread_id
+           JOIN projection_thread_messages AS message
+             ON message.thread_id = turn.thread_id AND message.turn_id = turn.turn_id
+           WHERE turn.turn_id = ? AND thread.agent_id = ? AND message.author = 'assistant'
            ORDER BY message.created_at, message.ordinal, message.message_id`,
         )
-        .all(threadId, agentId, turnId),
+        .all(turnId, agentId),
     );
     return rows.map((row) => JSON.parse(requiredStringColumn(row, "message_json")));
   }
@@ -149,6 +154,26 @@ export class ConversationQueries {
       turns.set(threadId, [...(turns.get(threadId) ?? []), requiredStringColumn(row, "turn_id")]);
     }
     return turns;
+  }
+
+  /**
+   * The first time and the number of the messages that a person wrote to an agent on this computer.
+   * A routine run is also a `user` message, with the `routine` item type; it does not count.
+   * One scan of the table: the columns come before the message JSON, so it reads no overflow page.
+   */
+  readSentMessageStats(): SentMessageStats {
+    const row = databaseRow(
+      this.#core.connection
+        .prepare(
+          "SELECT MIN(created_at) AS first_sent_at, COUNT(*) AS sent_count FROM projection_thread_messages WHERE author = 'user' AND item_type IS NOT 'routine'",
+        )
+        .get(),
+    );
+    if (!row) return { firstSentAt: null, sentCount: 0 };
+    return {
+      firstSentAt: optionalStringColumn(row, "first_sent_at"),
+      sentCount: requiredNumberColumn(row, "sent_count"),
+    };
   }
 
   readConversationRevision(agentId: string, threadId: string | null): number {

@@ -2,7 +2,8 @@
 // temporary profile. The events go through `receiveGitHubDelivery`, as the ingress socket gives them: a
 // comment starts a run; a second comment on the same issue waits and starts when the first run ends; a
 // comment on another issue runs at the same time; the same delivery again records nothing; a bot that is
-// not OpenBot's is refused by "not a bot"; an echo of the workflow's own comment is skipped (`self`);
+// not OpenBot's and OpenBot's own bot are refused by "not a bot"; "not a bot" also refuses a person's
+// label on a bot's issue and a bot's label on a person's issue;
 // the fourth run of a chain that OpenBot's bot caused on one issue is skipped (`chain`); an event of a
 // repository that no trigger watches gets 404 and a body that is not JSON gets 400; two close times
 // offline are one gap. A fake GitHub API takes the changes of GitHub outputs: a comment output posts
@@ -10,8 +11,10 @@
 // (`self`); a comment output with only the trigger's event posts nothing; a change that is done already
 // is not made again; each pass of a loop posts its own comment; "Agent chooses" gives the repository's
 // own label; a restart while a comment is on its way does not post it again, but sends a label again;
-// "Run with last event" starts a run with the newest matching item. No app, provider, account, Signal or
-// network is started.
+// "Run with last event" starts a run with the newest matching item. A trigger with two repositories starts
+// on an event of the second one and its output comments there; a list that an older client left behind,
+// whose first line is not `repository`, is not watched; a waiting event of a repository that the user
+// removed does not start. No app, provider, account, Signal or network is started.
 //
 // Run: bun scripts/github-workflow-e2e.ts
 // Writes .openbot-build/github-workflow-e2e/report.json and exits non-zero on a failure.
@@ -56,14 +59,14 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
   report.checks.push(name);
 };
 
-/** A GitHub trigger on comments, and an approval that keeps each run open, or a notice that ends it. */
-const graphOf = (repository: string, step: "approval" | "notify", filters = ""): WorkflowGraph => ({
+/** A GitHub trigger on comments or `event`, and an approval that keeps each run open, or a notice that ends it. */
+const graphOf = (repository: string, step: "approval" | "notify", filters = "", event = "comment"): WorkflowGraph => ({
   nodes: [
     {
       id: "trigger",
       kind: "trigger",
       at: { x: 0, y: 0 },
-      fields: { trigger: "github", repository, event: "comment", filters },
+      fields: { trigger: "github", repository, event, filters },
     },
     step === "approval"
       ? { id: "step", kind: "approval", at: { x: 300, y: 0 }, fields: { question: "Go on?" } }
@@ -120,8 +123,19 @@ const comment = (repository: string, number: number, login: string, type: "User"
       action: "created",
       repository: { full_name: repository },
       sender: { login, type },
-      issue: { number, title: `Issue ${number}`, body: "Steps to see it.", labels: [], user: { login: "ana" } },
-      comment: { id: commentId, body: text ?? `Comment ${commentId}`, user: { login }, author_association: "MEMBER" },
+      issue: {
+        number,
+        title: `Issue ${number}`,
+        body: "Steps to see it.",
+        labels: [],
+        user: { login: "ana", type: "User" },
+      },
+      comment: {
+        id: commentId,
+        body: text ?? `Comment ${commentId}`,
+        user: { login, type },
+        author_association: "MEMBER",
+      },
     }),
   };
 };
@@ -141,6 +155,7 @@ try {
   let createdId = 9_000;
   const hung = new Set<string>();
   const githubApi: WorkflowGitHubApi = {
+    attachFiles: (change) => Effect.succeed({ ...change, files: null }),
     change: (change) =>
       Effect.suspend(() => {
         changes.push(change);
@@ -206,10 +221,10 @@ try {
   service = workflows;
   const run = <A, E>(effect: Effect.Effect<A, E>) => Effect.runPromise(effect);
   let deliveryNumber = 0;
-  const send = (body: string, deliveryId = `delivery-${++deliveryNumber}`) =>
+  const send = (body: string, deliveryId = `delivery-${++deliveryNumber}`, event = "issue_comment") =>
     run(
       receiveGitHubDelivery(workflows, {
-        event: "issue_comment",
+        event,
         deliveryId,
         body: new TextEncoder().encode(body),
       }),
@@ -265,18 +280,9 @@ try {
   const dependabot = await send(comment("acme/app", 3, "dependabot[bot]", "Bot").body);
   const dependabotRow = await delivery(queue.summary.id, dependabot.deliveryId);
   check('"not a bot" refuses another bot', dependabotRow?.reason === "filter", dependabotRow);
-  const echo = comment("acme/app", 4, `${BOT}[bot]`, "Bot");
-  const at = new Date().toISOString();
-  database.connection
-    .prepare(
-      `INSERT INTO workflow_github_actions (action_key, workflow_id, run_id, step_id, repository, number, action, status,
-         object_id, created_at, updated_at)
-       VALUES ('echo', ?, ?, 'step', 'acme/app', 4, 'comment', 'done', ?, ?, ?)`,
-    )
-    .run(queue.summary.id, firstRow?.runId ?? "", `comment:${echo.id}`, at, at);
-  const echoed = await send(echo.body);
-  const echoRow = await delivery(queue.summary.id, echoed.deliveryId);
-  check("an echo of the workflow's own comment is skipped", echoRow?.reason === "self", echoRow);
+  const ownBot = await send(comment("acme/app", 4, `${BOT}[bot]`, "Bot").body);
+  const ownBotRow = await delivery(queue.summary.id, ownBot.deliveryId);
+  check('"not a bot" refuses OpenBot\'s own bot', ownBotRow?.reason === "filter", ownBotRow);
 
   const chainRows = [];
   for (let index = 0; index < 4; index += 1) {
@@ -287,6 +293,39 @@ try {
     "OpenBot's bot starts runs until the chain is too long",
     chainRows.slice(0, 3).every((row) => row?.outcome === "started") && chainRows[3]?.reason === "chain",
     chainRows,
+  );
+
+  const labeled = await run(
+    workflows.create({ title: "Labeled", graph: graphOf("acme/labels", "notify", "notBot", "issue.labeled") }),
+  );
+  const botIssue = {
+    action: "labeled",
+    repository: { full_name: "acme/labels" },
+    sender: { login: "ana", type: "User" },
+    label: { name: "Bug" },
+    issue: { number: 3, title: "Bump a package", labels: [], user: { login: "dependabot[bot]", type: "Bot" } },
+  };
+  const labelSent = await send(JSON.stringify(botIssue), undefined, "issues");
+  const labelRow = await delivery(labeled.summary.id, labelSent.deliveryId);
+  check("\"not a bot\" refuses a person's label on a bot's issue", labelRow?.reason === "filter", labelRow);
+  const personIssue = {
+    ...botIssue,
+    sender: { login: "github-actions[bot]", type: "Bot" },
+    issue: { ...botIssue.issue, number: 4, user: { login: "ana", type: "User" } },
+  };
+  const botLabelSent = await send(JSON.stringify(personIssue), undefined, "issues");
+  const botLabelRow = await delivery(labeled.summary.id, botLabelSent.deliveryId);
+  check("\"not a bot\" refuses a bot's label on a person's issue", botLabelRow?.reason === "filter", botLabelRow);
+  const personLabelSent = await send(
+    JSON.stringify({ ...personIssue, sender: { login: "ben", type: "User" } }),
+    undefined,
+    "issues",
+  );
+  const personLabelRow = await delivery(labeled.summary.id, personLabelSent.deliveryId);
+  check(
+    "\"not a bot\" lets a person's label on a person's issue start a run",
+    personLabelRow?.outcome === "started",
+    personLabelRow,
   );
 
   const unwatched = await send(comment("acme/other", 1, "ana").body);
@@ -337,6 +376,87 @@ try {
   const own = await send(JSON.stringify(ownBody));
   const ownRow = await delivery(reply.summary.id, own.deliveryId);
   check("the event of the output's own comment is skipped", ownRow?.reason === "self", ownRow);
+
+  // A trigger with two repositories starts on an event of the second one, and its "trigger" output acts there.
+  const withRepositories = (graph: WorkflowGraph, repositories: string): WorkflowGraph => ({
+    ...graph,
+    nodes: graph.nodes.map((node) =>
+      node.id === "trigger" ? { ...node, fields: { ...node.fields, repositories } } : node,
+    ),
+  });
+  const many = await run(
+    workflows.create({
+      title: "Many",
+      graph: withRepositories(
+        saying(lineOf("acme/many-a", [githubOutput({ action: "comment" })])),
+        "acme/many-a\nacme/many-b",
+      ),
+    }),
+  );
+  const manyRun = await startedRun(many.summary.id, comment("acme/many-b", 6, "ana").body);
+  const manyEnd = await runEnd(manyRun);
+  const manyPosted = changes.filter((change) => change.repository.startsWith("acme/many-"));
+  check(
+    "a trigger with two repositories starts on the second one, and its output comments there",
+    manyEnd.status === "done" &&
+      manyPosted.length === 1 &&
+      manyPosted[0]?.repository === "acme/many-b" &&
+      manyPosted[0]?.number === 6,
+    { manyEnd, manyPosted },
+  );
+  // A client that knows one repository changed `repository` and kept the old list: the list is not used.
+  await run(
+    workflows.create({
+      title: "Changed by an older client",
+      graph: withRepositories(graphOf("acme/now", "notify"), "acme/before\nacme/before-b"),
+    }),
+  );
+  const stale = await send(comment("acme/before-b", 1, "ana").body);
+  check("a list whose first line is not `repository` is not watched", stale.status === 404, stale);
+  // An older client changes `repository` and later chooses the list's first name again: the save removed
+  // the old list, so its other repository is not watched again.
+  const back = await run(
+    workflows.create({
+      title: "Back",
+      graph: withRepositories(graphOf("acme/back-a", "notify"), "acme/back-a\nacme/back-c"),
+    }),
+  );
+  const resave = async (repository: string) => {
+    const current = await run(workflows.get(back.summary.id));
+    const graph = {
+      ...current.graph,
+      nodes: current.graph.nodes.map((node) =>
+        node.id === "trigger" ? { ...node, fields: { ...node.fields, repository } } : node,
+      ),
+    };
+    await run(workflows.saveGraph({ workflowId: back.summary.id, baseRevision: current.revision, graph }));
+  };
+  await resave("acme/back-b");
+  await resave("acme/back-a");
+  const backC = await send(comment("acme/back-c", 1, "ana").body);
+  check("a list that an older client left behind does not come back", backC.status === 404, backC);
+  // An event that waits for the run of its item does not start after the user removes its repository.
+  const dropGraph = withRepositories(graphOf("acme/drop-a", "approval"), "acme/drop-a\nacme/drop-b");
+  const drop = await run(workflows.create({ title: "Drop", graph: dropGraph }));
+  const dropRun = await startedRun(drop.summary.id, comment("acme/drop-b", 1, "ana").body);
+  const dropWaiting = await send(comment("acme/drop-b", 1, "ben").body);
+  const dropDetail = await run(workflows.get(drop.summary.id));
+  await run(
+    workflows.saveGraph({
+      workflowId: drop.summary.id,
+      baseRevision: dropDetail.revision,
+      graph: withRepositories(dropDetail.graph, "acme/drop-a"),
+    }),
+  );
+  const dropApproval = (await run(workflows.run(dropRun))).steps.find((step) => step.status === "approval");
+  await run(workflows.decide({ stepId: dropApproval?.id ?? "", approved: true }));
+  await run(workflows.sweep());
+  const dropRow = await delivery(drop.summary.id, dropWaiting.deliveryId);
+  check(
+    "a waiting event of a repository that the trigger no longer watches does not start",
+    dropRow?.outcome !== "started" && dropRow?.reason === "refused",
+    dropRow,
+  );
 
   const hold = await run(
     workflows.create({

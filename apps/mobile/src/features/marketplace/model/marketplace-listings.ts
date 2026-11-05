@@ -2,10 +2,13 @@ import {
   type AvatarHue,
   type MarketplaceAgentSummary,
   type MarketplaceSkillSummary,
+  type McpServerConfig,
   SKILL_CATEGORIES,
   type SkillCategory,
 } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
+import type { MobileConnectorId } from "@/features/servers/model/connectors";
+import type { ConnectorRow } from "@/features/servers/model/use-connector-rows";
 import { catalogImageUrl, pluginIconUrl } from "../api/marketplace-catalog";
 import { MOBILE_PLUGINS, type MobilePlugin } from "./plugin-catalog.generated";
 
@@ -36,7 +39,11 @@ export type MarketplaceListing =
       agent: MarketplaceAgentSummary;
     })
   | (ListingBase & { kind: "skill"; installs: number; skill: MarketplaceSkillSummary })
-  | (ListingBase & { kind: "app"; plugin: MobilePlugin });
+  | (ListingBase & { kind: "app"; source: "plugin"; plugin: MobilePlugin })
+  /** A connector of the server: its page is the connector page of Server settings, as on the desktop. */
+  | (ListingBase & { kind: "app"; source: "connector"; connector: MobileConnectorId; connected: boolean })
+  /** An MCP server that the user added and that no catalog app claims. */
+  | (ListingBase & { kind: "app"; source: "custom"; server: McpServerConfig });
 
 export function agentListing(apiUrl: string, agent: MarketplaceAgentSummary): MarketplaceListing {
   return {
@@ -83,9 +90,70 @@ export function appListings(apiUrl: string): MarketplaceListing[] {
       creatorName: plugin.creatorName,
       imageUrl: plugin.apps[0] ? pluginIconUrl(apiUrl, plugin.slug, plugin.apps[0].id) : null,
       featured: plugin.featured,
+      source: "plugin",
       plugin,
     }),
   );
+}
+
+/** The category of each connector app, as the desktop catalog gives it. */
+const CONNECTOR_CATEGORY = {
+  slack: "productivity",
+  discord: "productivity",
+  telegram: "productivity",
+  whatsapp: "productivity",
+  github: "coding",
+  onepassword: "productivity",
+  bitwarden: "productivity",
+  protonpass: "productivity",
+} as const satisfies Record<MobileConnectorId, SkillCategory>;
+
+export const CONNECTOR_TAGLINES = {
+  slack: "mobile.marketplace.app.slackTagline",
+  discord: "mobile.marketplace.app.discordTagline",
+  telegram: "mobile.marketplace.app.telegramTagline",
+  whatsapp: "mobile.marketplace.app.whatsappTagline",
+  github: "mobile.marketplace.app.githubTagline",
+  onepassword: "mobile.marketplace.app.onePasswordTagline",
+  bitwarden: "mobile.marketplace.app.bitwardenTagline",
+  protonpass: "mobile.marketplace.app.protonPassTagline",
+} as const satisfies Record<MobileConnectorId, MobileTextKey>;
+
+/**
+ * A connector that the server runs, as an app. A connector that a phone cannot set up, such as Bitwarden
+ * on a host without `bitwarden-connector-v1`, has no app, as the desktop lists only the ones it can connect.
+ */
+export function connectorListing(row: ConnectorRow, name: string, tagline: string): MarketplaceListing | null {
+  if (row.status === "unavailable") return null;
+  return {
+    kind: "app",
+    source: "connector",
+    id: `connector:${row.id}`,
+    name,
+    description: tagline,
+    category: CONNECTOR_CATEGORY[row.id],
+    creatorName: "",
+    imageUrl: null,
+    featured: false,
+    connector: row.id,
+    connected: row.status !== "idle" && row.status !== "unknown",
+  };
+}
+
+/** An MCP server that the user added, as an app. Its line is its address, or its command. */
+export function customListing(server: McpServerConfig): MarketplaceListing {
+  return {
+    kind: "app",
+    source: "custom",
+    id: `custom:${server.id}`,
+    name: server.name,
+    description: server.transport === "http" ? server.url : [server.command, ...server.args].join(" "),
+    category: null,
+    creatorName: "",
+    imageUrl: null,
+    featured: false,
+    server,
+  };
 }
 
 /** What the filter menu narrows the page to. Nothing set is the overview. */

@@ -9,6 +9,7 @@ export const messages = {
   "mobile.server.drawer.editOrder": "Изменить порядок",
   "mobile.server.drawer.leaveFailed": "Не удалось покинуть {name}",
   "mobile.server.drawer.removeFailed": "Не удалось удалить {name}",
+  "mobile.server.drawer.deleteFailed": "Не удалось удалить {name}",
   "mobile.server.drawer.actionFailed": "OpenBot не смог выполнить это действие. Повторите попытку.",
   "mobile.server.drawer.moveUp": "Выше",
   "mobile.server.drawer.moveDown": "Ниже",
@@ -85,6 +86,28 @@ export const messages = {
   "mobile.server.hosted.speedFaster": "{factor}× быстрее",
   "mobile.server.hosted.joinHint": "Используйте приглашение от владельца сервера.",
   "mobile.server.hosted.join": "Присоединиться к серверу",
+  "mobile.server.local.option": "Новый локальный сервер на компьютере",
+  "mobile.server.local.optionHint": "На компьютере, где работает {name}, со своими агентами, чатами и файлами.",
+  "mobile.server.local.title": "Новый сервер",
+  "mobile.server.local.description":
+    "Сервер работает на компьютере, где работает {name}, со своими агентами, чатами и файлами. Он доступен, пока OpenBot работает на этом компьютере.",
+  "mobile.server.local.nameLabel": "Имя сервера",
+  "mobile.server.local.nameTooShort": "Используйте не менее {limit} символов.",
+  "mobile.server.local.create": "Создать",
+  "mobile.server.local.creating": "Создание…",
+  "mobile.server.local.createFailed": "Не удалось создать сервер.",
+  "mobile.server.local.limitReached":
+    "На компьютере, где работает {name}, уже максимум серверов: {limit}. Удалите один на этом компьютере, чтобы создать другой.",
+  "mobile.server.local.created": "Сервер создан",
+  "mobile.server.local.createdOn": "{name} работает на том же компьютере, что и {computer}.",
+  "mobile.server.local.waiting": "Ожидание, пока {name} будет в сети…",
+  "mobile.server.local.notPublished":
+    "{name} работает, но этот телефон пока не может его открыть. Убедитесь, что в OpenBot на компьютере, где работает {computer}, выполнен вход и он в сети.",
+  "mobile.server.local.open": "Открыть сервер",
+  "mobile.server.local.ownerOnly": "Только владелец может создать сервер на этом компьютере.",
+  "mobile.server.local.unsupported": "Обновите OpenBot на этом компьютере, чтобы создать здесь сервер.",
+  "mobile.server.local.deleteOffline":
+    "Удалить этот сервер может только его компьютер. Откройте OpenBot на этом компьютере и повторите попытку.",
   "mobile.server.hosted.intro.title": "Ваши агенты всегда на связи",
   "mobile.server.hosted.intro.description":
     "Облачный сервер выполняет ваших агентов и регулярные задачи, когда компьютер выключен. OpenBot настраивает его и поддерживает в рабочем состоянии.",
@@ -276,6 +299,10 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Сервер будет удалён из сервиса аккаунтов для всех участников. Файлы и чаты на его компьютере останутся. Чтобы снова использовать сервер, зарегистрируйте его с того компьютера.",
   "mobile.server.settings.remove": "Удалить сервер",
+  "mobile.server.settings.deleteTitle": "Удалить {name}?",
+  "mobile.server.settings.deleteBody":
+    "OpenBot останавливает сервер на его компьютере и перемещает его агентов, чаты и файлы в корзину этого компьютера. Сервер исчезнет из списка серверов на всех ваших устройствах.",
+  "mobile.server.settings.delete": "Удалить сервер",
   "mobile.server.settings.name": "Название сервера",
   "mobile.server.settings.nameLength": "Длина — от {min} до {max} символов.",
   "mobile.server.settings.logo": "Логотип сервера",
@@ -412,6 +439,8 @@ export const messages = {
   "mobile.server.settings.aiSection": "ИИ и инструменты",
   "mobile.server.settings.dataSection": "Данные",
   "mobile.server.settings.maintenanceSection": "Обслуживание",
+  "mobile.server.settings.peopleSection": "Люди",
+  "mobile.server.settings.moveSection": "Импорт и перенос",
   "mobile.server.settings.general": "Общие",
   "mobile.server.settings.timezone": "Часовой пояс",
   "mobile.server.settings.timezoneAutomatic": "Автоматически",
@@ -504,14 +533,10 @@ export const messages = {
     "Будут удалены входы, файлы cookie и данные сайтов профиля. Его открытые вкладки закроются.",
   "mobile.server.browserProfiles.deleteAgents": "Эти агенты перейдут в общий профиль: {agents}.",
   "mobile.server.route.connectors": "Коннекторы",
-  "mobile.server.settings.connectors": "Коннекторы",
   "mobile.server.connectors.unavailable":
     "Подключитесь к этому серверу как владелец или администратор, чтобы управлять его коннекторами.",
   "mobile.server.connectors.unsupported": "Обновите OpenBot на этом сервере, чтобы управлять его коннекторами здесь.",
   "mobile.server.connectors.loading": "Загрузка коннекторов…",
-  "mobile.server.connectors.onServer": "На {name}",
-  "mobile.server.connectors.notSetUp": "Не настроено",
-  "mobile.server.connectors.available": "Доступно",
   "mobile.server.connectors.localOnly": "Только в приложении для компьютера",
   "mobile.server.connectors.statusConnected": "Подключено",
   "mobile.server.connectors.statusAttention": "Требует внимания",
@@ -531,9 +556,6 @@ export const messages = {
   "mobile.server.connectors.addAgent": "Добавить агента",
   "mobile.server.connectors.later": "Позже",
   "mobile.server.connectors.bitwarden.title": "Bitwarden",
-  "mobile.server.connectors.bitwarden.summary":
-    "Подставляет логины в браузере из Bitwarden. Настройте его в приложении для компьютера.",
-  "mobile.server.connectors.bitwarden.hostSummary": "Подставляет логины в браузере из Bitwarden или Vaultwarden",
   "mobile.server.connectors.bitwarden.description":
     "Заполнять логины в браузере на {host} из Bitwarden или Vaultwarden.",
   "mobile.server.connectors.bitwarden.howItWorks":
@@ -560,7 +582,6 @@ export const messages = {
   "mobile.server.connectors.bitwarden.disconnectBody":
     "{host} удалит ключ API и мастер-пароль. Агенты на {host} больше не смогут подставлять логины из Bitwarden.",
   "mobile.server.connectors.github.title": "GitHub",
-  "mobile.server.connectors.github.summary": "Репозитории, задачи и пул-реквесты для каждого агента",
   "mobile.server.connectors.github.description":
     "Каждый агент на сервере {host} может работать с вашими репозиториями, задачами и пул-реквестами GitHub, а также с gh и git.",
   "mobile.server.connectors.github.unavailable": "OpenBot на этом сервере не может подключить GitHub.",
@@ -596,7 +617,6 @@ export const messages = {
   "mobile.server.connectors.github.disconnectBody":
     "Вход @{login} будет удалён с {host}, и все агенты потеряют инструменты GitHub, gh и git. Затем откроется GitHub, где можно отозвать доступ OpenBot.",
   "mobile.server.connectors.onePassword.title": "1Password",
-  "mobile.server.connectors.onePassword.summary": "Общее хранилище для входа на сайты в браузере OpenBot",
   "mobile.server.connectors.onePassword.description":
     "Предоставьте OpenBot на {host} доступ к отдельному хранилищу 1Password через сервисный аккаунт, чтобы агенты на {host} могли входить на сайты в его браузере.",
   "mobile.server.connectors.onePassword.howItWorks":
@@ -620,18 +640,57 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectTitle": "Отключить 1Password?",
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host} забудет токен. Хранилище и сервисный аккаунт останутся в 1Password; если они больше не нужны, удалите их там.",
+  "mobile.server.connectors.protonPass.title": "Proton Pass",
+  "mobile.server.connectors.protonPass.description":
+    "Откройте OpenBot на {host} доступ к одному хранилищу Proton Pass, чтобы агенты на {host} могли входить на сайты в его браузере.",
+  "mobile.server.connectors.protonPass.keyHelp":
+    "Создайте в Proton Pass ключ доступа, который может читать только хранилище, открытое для OpenBot, и вставьте его сюда. {host} хранит ключ; этот телефон — нет.",
+  "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.passwordManager.unavailable": "{name} недоступен на этом сервере.",
+  "mobile.server.connectors.passwordManager.howItWorks":
+    "Войдите в {name} на этом телефоне. Затем {host} создаст общее хранилище и ключ доступа только для чтения к нему и будет хранить только этот ключ. Агенты никогда не видят пароль.",
+  "mobile.server.connectors.passwordManager.connect": "Подключить {name}",
+  "mobile.server.connectors.passwordManager.connecting": "Подключение…",
+  "mobile.server.connectors.passwordManager.useKey": "Использовать ключ доступа",
+  "mobile.server.connectors.passwordManager.key": "Ключ доступа",
+  "mobile.server.connectors.passwordManager.connectWithKey": "Подключить по ключу",
+  "mobile.server.connectors.passwordManager.signInTitle": "Вход в {name}",
+  "mobile.server.connectors.passwordManager.signInFooter":
+    "Войдите на странице {name}. Эта страница изменится, когда вы войдёте.",
+  "mobile.server.connectors.passwordManager.signInWaiting": "{host} получает страницу входа…",
+  "mobile.server.connectors.passwordManager.openSignIn": "Открыть страницу входа",
+  "mobile.server.connectors.passwordManager.copyLink": "Скопировать ссылку",
+  "mobile.server.connectors.passwordManager.extraPassword": "Дополнительный пароль",
+  "mobile.server.connectors.passwordManager.extraPasswordHint":
+    "{name} запрашивает ваш дополнительный пароль. Он один раз передаётся на {host}; этот телефон его не хранит.",
+  "mobile.server.connectors.passwordManager.extraPasswordWrong": "Дополнительный пароль неверен. Попробуйте ещё раз.",
+  "mobile.server.connectors.passwordManager.continue": "Продолжить",
+  "mobile.server.connectors.passwordManager.setupBody": "{host} создаёт общее хранилище…",
+  "mobile.server.connectors.passwordManager.vaultTitle": "Общее хранилище",
+  "mobile.server.connectors.passwordManager.vaultFooter":
+    "Переместите логин в это хранилище в {name}, чтобы агенты могли входить с ним. Удалите его, чтобы прекратить.",
+  "mobile.server.connectors.passwordManager.loginCount": {
+    one: "{count} логин",
+    few: "{count} логина",
+    many: "{count} логинов",
+    other: "{count} логина",
+  },
+  "mobile.server.connectors.passwordManager.keyTitle": "Ключ доступа",
+  "mobile.server.connectors.passwordManager.keyReadOnly": "Только чтение",
+  "mobile.server.connectors.passwordManager.keyExpires": "Только чтение. Истекает {date}.",
+  "mobile.server.connectors.passwordManager.keyExpired": "Истёк {date}",
+  "mobile.server.connectors.passwordManager.plan":
+    "Для инструмента командной строки {name} нужен платный тариф. Измените тариф аккаунта, затем подключитесь снова.",
+  "mobile.server.connectors.passwordManager.expiredTitle": "Срок действия ключа {name} истёк",
+  "mobile.server.connectors.passwordManager.expiredBody":
+    "Агенты на {host} не смогут входить с вашими общими логинами, пока вы не подключитесь снова.",
+  "mobile.server.connectors.passwordManager.disconnect": "Отключить {name}",
+  "mobile.server.connectors.passwordManager.disconnectTitle": "Отключить {name}?",
+  "mobile.server.connectors.passwordManager.disconnectBody":
+    "{host} удалит свой ключ доступа. Хранилище и его логины останутся в вашем аккаунте {name}.",
   "mobile.server.connectors.slack.title": "Slack",
-  "mobile.server.connectors.slack.summary": "Люди упоминают @OpenBot в Slack",
   "mobile.server.connectors.slack.description":
     "Люди упоминают @OpenBot в Slack или пишут ему личным сообщением. Оркестратор Slack спрашивает нужного агента и отвечает.",
-  "mobile.server.connectors.slack.connected": "{workspace} · отвечает Оркестратор Slack",
-  "mobile.server.connectors.slack.noAgent": "{workspace} · пока никто не отвечает",
-  "mobile.server.connectors.slack.many": {
-    one: "{count} рабочее пространство · отвечает Оркестратор Slack",
-    few: "{count} рабочих пространства · отвечает Оркестратор Slack",
-    many: "{count} рабочих пространств · отвечает Оркестратор Slack",
-    other: "{count} рабочего пространства · отвечает Оркестратор Slack",
-  },
   "mobile.server.connectors.slack.attention": {
     one: "{count} рабочее пространство требует внимания",
     few: "{count} рабочих пространства требуют внимания",
@@ -676,17 +735,8 @@ export const messages = {
     "Этот новый агент отвечает на всё, что люди отправляют @OpenBot в {workspace}.",
   "mobile.server.connectors.slack.installFailed": "Slack не завершил установку. Повторите попытку.",
   "mobile.server.connectors.discord.title": "Discord",
-  "mobile.server.connectors.discord.summary": "Люди упоминают @OpenBot на сервере Discord",
   "mobile.server.connectors.discord.description":
     "Люди упоминают @OpenBot в канале сервера Discord. Оркестратор Discord спрашивает нужного агента и отвечает.",
-  "mobile.server.connectors.discord.connected": "{workspace} · отвечает Оркестратор Discord",
-  "mobile.server.connectors.discord.noAgent": "{workspace} · пока никто не отвечает",
-  "mobile.server.connectors.discord.many": {
-    one: "{count} сервер Discord · отвечает Оркестратор Discord",
-    few: "{count} сервера Discord · отвечает Оркестратор Discord",
-    many: "{count} серверов Discord · отвечает Оркестратор Discord",
-    other: "{count} сервера Discord · отвечает Оркестратор Discord",
-  },
   "mobile.server.connectors.discord.attention": {
     one: "{count} сервер Discord требует внимания",
     few: "{count} сервера Discord требуют внимания",
@@ -732,21 +782,8 @@ export const messages = {
     "Этот новый агент отвечает на всё, что люди отправляют @OpenBot в {workspace}.",
   "mobile.server.connectors.discord.installFailed": "Discord не завершил авторизацию. Повторите попытку.",
   "mobile.server.connectors.telegram.title": "Telegram",
-  "mobile.server.connectors.telegram.summary": "Добавьте бота OpenBot в чат Telegram",
   "mobile.server.connectors.telegram.description":
     "Добавьте бота OpenBot в группу Telegram или откройте с ним личный чат. Оркестратор Telegram спрашивает нужного агента и отвечает.",
-  "mobile.server.connectors.telegram.connected": {
-    one: "{count} чат · отвечает Оркестратор Telegram",
-    few: "{count} чата · отвечает Оркестратор Telegram",
-    many: "{count} чатов · отвечает Оркестратор Telegram",
-    other: "{count} чата · отвечает Оркестратор Telegram",
-  },
-  "mobile.server.connectors.telegram.noAgent": {
-    one: "{count} чат · пока никто не отвечает",
-    few: "{count} чата · пока никто не отвечает",
-    many: "{count} чатов · пока никто не отвечает",
-    other: "{count} чата · пока никто не отвечает",
-  },
   "mobile.server.connectors.telegram.attention": {
     one: "{count} чат требует внимания",
     few: "{count} чата требуют внимания",
@@ -787,6 +824,114 @@ export const messages = {
   "mobile.server.connectors.telegram.disconnectKept": "Диалоги и Оркестратор Telegram останутся в OpenBot.",
   "mobile.server.connectors.telegram.disconnectDeleted":
     "Это последний чат, поэтому Оркестратор Telegram и его диалоги будут удалены из OpenBot.",
+  "mobile.server.connectors.whatsapp.title": "WhatsApp",
+  "mobile.server.connectors.whatsapp.description":
+    "Привяжите номер WhatsApp к этому серверу. Оркестратор WhatsApp спрашивает нужного агента и отвечает.",
+  "mobile.server.connectors.whatsapp.attention": {
+    one: "{count} номер требует внимания",
+    few: "{count} номера требуют внимания",
+    many: "{count} номеров требуют внимания",
+    other: "{count} номера требуют внимания",
+  },
+  "mobile.server.connectors.whatsapp.numbersTitle": "Номера",
+  "mobile.server.connectors.whatsapp.linkNumber": "Привязать номер",
+  "mobile.server.connectors.whatsapp.ownNumberNote":
+    "OpenBot получает сообщения из вашего чата «Сообщение себе» и от людей, которым вы разрешили писать.",
+  "mobile.server.connectors.whatsapp.dedicatedNote":
+    "OpenBot получает сообщения от людей, которым вы разрешили писать. Остальные получают код, который нужно передать вам.",
+  "mobile.server.connectors.whatsapp.helpLoggedOut":
+    "WhatsApp удалил этот сервер из связанных устройств. Привяжите номер заново.",
+  "mobile.server.connectors.whatsapp.helpError":
+    "OpenBot не может связаться с WhatsApp на этом номере. Переподключите или отключите номер.",
+  "mobile.server.connectors.whatsapp.retryAt": "WhatsApp попросил OpenBot подождать. Следующая попытка в {time}.",
+  "mobile.server.connectors.whatsapp.linkAgain": "Привязать заново",
+  "mobile.server.connectors.whatsapp.ownNumber": "Личный номер",
+  "mobile.server.connectors.whatsapp.ownNumberDescription":
+    "Писать могут только вы в чате «Сообщение себе» и люди, которым вы разрешили. Выключите, если номер только для OpenBot.",
+  "mobile.server.connectors.whatsapp.orchestratorTitle": "Оркестратор WhatsApp",
+  "mobile.server.connectors.whatsapp.orchestratorDescription":
+    "Этот агент получает сообщения для OpenBot со всех ваших привязанных номеров. Короткие он обрабатывает сам, остальную работу передаёт нужному агенту и отвечает в WhatsApp.",
+  "mobile.server.connectors.whatsapp.orchestratorNone":
+    "Добавьте Оркестратора WhatsApp, иначе WhatsApp не получит ответа.",
+  "mobile.server.connectors.whatsapp.addAgent": "Добавьте Оркестратора WhatsApp",
+  "mobile.server.connectors.whatsapp.note":
+    "На личном номере пишите в чат «Сообщение себе». Люди, которым вы разрешили, пишут на этот номер.",
+  "mobile.server.connectors.whatsapp.linkTitle": "Привязка WhatsApp",
+  "mobile.server.connectors.whatsapp.linkDescription":
+    "Выберите номер, затем привяжите этот сервер в WhatsApp на телефоне.",
+  "mobile.server.connectors.whatsapp.codeOnly":
+    "На телефоне привяжите номер кодом привязки. Чтобы сканировать QR-код, используйте OpenBot на компьютере.",
+  "mobile.server.connectors.whatsapp.kindLabel": "Номер",
+  "mobile.server.connectors.whatsapp.kindPersonal": "Мой личный номер",
+  "mobile.server.connectors.whatsapp.kindPersonalDescription":
+    "OpenBot отвечает только в вашем чате «Сообщение себе» и людям, которым вы разрешили.",
+  "mobile.server.connectors.whatsapp.kindDedicated": "Номер только для OpenBot",
+  "mobile.server.connectors.whatsapp.kindDedicatedDescription":
+    "Незнакомые люди получают код, который нужно передать вам. Вы одобряете их здесь.",
+  "mobile.server.connectors.whatsapp.phoneLabel": "Номер телефона",
+  "mobile.server.connectors.whatsapp.phoneDescription": "С кодом страны, например +44 7700 900123.",
+  "mobile.server.connectors.whatsapp.phoneInvalid": "Введите номер телефона с кодом страны.",
+  "mobile.server.connectors.whatsapp.getCode": "Получить код",
+  "mobile.server.connectors.whatsapp.starting": "Запрашиваем код у WhatsApp…",
+  "mobile.server.connectors.whatsapp.codeStepDevices":
+    "В WhatsApp откройте «Связанные устройства» и нажмите «Привязка устройства»",
+  "mobile.server.connectors.whatsapp.codeStepPhone": "Нажмите «Привязать по номеру телефона»",
+  "mobile.server.connectors.whatsapp.codeStepType": "Введите этот код на телефоне",
+  "mobile.server.connectors.whatsapp.codeLabel": "Код привязки {code}",
+  "mobile.server.connectors.whatsapp.copyCode": "Копировать код",
+  "mobile.server.connectors.whatsapp.codeWaiting": "Ожидание телефона.",
+  "mobile.server.connectors.whatsapp.failedTitle": "Не удалось привязать WhatsApp",
+  "mobile.server.connectors.whatsapp.failedTimeout": "Срок действия кода истёк до того, как телефон его использовал.",
+  "mobile.server.connectors.whatsapp.failedRefused":
+    "WhatsApp отклонил привязку. Подождите несколько минут и повторите попытку.",
+  "mobile.server.connectors.whatsapp.failedBusy":
+    "Уже идёт другая привязка. Дождитесь её завершения и повторите попытку.",
+  "mobile.server.connectors.whatsapp.failedUnavailable":
+    "OpenBot не может связаться с WhatsApp. Проверьте подключение к интернету.",
+  "mobile.server.connectors.whatsapp.tryAgain": "Повторить",
+  "mobile.server.connectors.whatsapp.agentStepDescription":
+    "Этот новый агент отвечает на сообщения для OpenBot на {number} и на каждом номере, который вы привяжете позже.",
+  "mobile.server.connectors.whatsapp.doneTitle": "OpenBot привязан к {number}",
+  "mobile.server.connectors.whatsapp.done": "Готово",
+  "mobile.server.connectors.whatsapp.disconnectTitle": "Отключить {number}?",
+  "mobile.server.connectors.whatsapp.disconnectBody":
+    "OpenBot выйдет из WhatsApp на {number}. Если OpenBot был выключен, также удалите устройство в WhatsApp > Связанные устройства.",
+  "mobile.server.connectors.whatsapp.disconnectEffect":
+    "Люди больше не смогут обращаться к вашим агентам через {number}.",
+  "mobile.server.connectors.whatsapp.removeEffectKept": "Диалоги и Оркестратор WhatsApp останутся в OpenBot.",
+  "mobile.server.connectors.whatsapp.removeEffectDeleted":
+    "Это последний номер, поэтому Оркестратор WhatsApp и его диалоги будут удалены из OpenBot.",
+  "mobile.server.connectors.whatsapp.keep": "Оставить привязанным",
+  "mobile.server.connectors.whatsapp.sendersTitle": "Кто может писать на {number}",
+  "mobile.server.connectors.whatsapp.sendersDescription": "Эти контакты и группы могут поручать работу вашим агентам.",
+  "mobile.server.connectors.whatsapp.sendersEmpty": "Писать можете только вы. Добавьте контакт или группу.",
+  "mobile.server.connectors.whatsapp.sendersLimit": "Номер может разрешить не более {count} контактов и групп.",
+  "mobile.server.connectors.whatsapp.senderGroup": "Группа",
+  "mobile.server.connectors.whatsapp.removeSender": "Удалить",
+  "mobile.server.connectors.whatsapp.addContact": "Добавить контакт",
+  "mobile.server.connectors.whatsapp.addGroup": "Добавить группу",
+  "mobile.server.connectors.whatsapp.contactTitle": "Добавить контакт",
+  "mobile.server.connectors.whatsapp.contactDescription":
+    "Этот человек может поручать работу вашим агентам из WhatsApp.",
+  "mobile.server.connectors.whatsapp.contactName": "Имя",
+  "mobile.server.connectors.whatsapp.contactNameDescription":
+    "Необязательно. Если пусто, в списке будет номер телефона.",
+  "mobile.server.connectors.whatsapp.add": "Добавить",
+  "mobile.server.connectors.whatsapp.groupTitle": "Добавить группу",
+  "mobile.server.connectors.whatsapp.groupDescription": "Участники этой группы могут поручать работу вашим агентам.",
+  "mobile.server.connectors.whatsapp.groupSearch": "Поиск групп",
+  "mobile.server.connectors.whatsapp.groupsLoading": "Загрузка групп…",
+  "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot не смог прочитать группы",
+  "mobile.server.connectors.whatsapp.groupsEmpty": "Этот номер не состоит ни в одной группе.",
+  "mobile.server.connectors.whatsapp.groupsNoMatch": "Нет группы с таким названием.",
+  "mobile.server.connectors.whatsapp.groupAdded": "Добавлена",
+  "mobile.server.connectors.whatsapp.requestsTitle": "Запросы на {number}",
+  "mobile.server.connectors.whatsapp.requestsDescription":
+    "Эти люди написали на номер и получили код. Одобряйте человека, только если он назвал вам тот же код.",
+  "mobile.server.connectors.whatsapp.requestsEmpty": "Запросов нет.",
+  "mobile.server.connectors.whatsapp.requestDetail": "Код {code} · {number}",
+  "mobile.server.connectors.whatsapp.approve": "Одобрить",
+  "mobile.server.connectors.whatsapp.deny": "Отклонить",
   "mobile.server.settings.providers": "Провайдеры",
   "mobile.server.settings.providersConnected": {
     one: "{count} подключён",
@@ -816,22 +961,33 @@ export const messages = {
   "mobile.server.providers.version": "Версия",
   "mobile.server.providers.connect": "Подключить",
   "mobile.server.providers.reconnect": "Переподключить",
-  "mobile.server.providers.connectHint": "Сервер получает вход от провайдера. Вы завершаете его на этом телефоне.",
-  "mobile.server.providers.relayHint": "Вы входите на странице провайдера на этом телефоне. Сервер получает вход.",
+  "mobile.server.providers.connectHint":
+    "Сервер начинает вход. Затем OpenBot показывает шаги, и вы завершаете их на этом телефоне.",
+  "mobile.server.providers.relayHint":
+    "OpenBot открывает страницу входа провайдера на этом телефоне. Если нужно скопировать что-то обратно, OpenBot сначала показывает шаги.",
   "mobile.server.providers.connectOnComputer": "Подключите этого провайдера в OpenBot на компьютере.",
-  "mobile.server.providers.signIn": "Войти",
+  "mobile.server.providers.signInTo": "Вход в {name}",
   "mobile.server.providers.starting": "Запуск входа на сервере…",
   "mobile.server.providers.openPage": "Открыть страницу входа",
   "mobile.server.providers.copy": "Копировать",
   "mobile.server.providers.copyCode": "Копировать код",
-  "mobile.server.providers.codeHint": "Скопируйте код, откройте страницу и введите код. OpenBot продолжит сам.",
-  "mobile.server.providers.pasteHint": "Войдите на странице, затем вставьте код, который она покажет.",
+  "mobile.server.providers.paste": "Вставить",
+  "mobile.server.providers.codeStepCopy": "Скопируйте код.",
+  "mobile.server.providers.codeStepEnter": "Откройте страницу входа и введите код.",
+  "mobile.server.providers.codeStepReturn": "Вернитесь в OpenBot. Вход завершится сам.",
+  "mobile.server.providers.pasteStepSignIn": "Откройте страницу входа и войдите.",
+  "mobile.server.providers.pasteStepCopy": "Скопируйте код, который показывает страница.",
+  "mobile.server.providers.pasteStepReturn": "Вернитесь в OpenBot и вставьте код ниже.",
+  "mobile.server.providers.relayStepSignIn": "Откройте страницу входа и войдите.",
+  "mobile.server.providers.relayStepBlank": "Последняя страница не загрузится. Так и должно быть.",
+  "mobile.server.providers.relayStepCopy": "Нажмите на адресную строку и скопируйте весь адрес.",
+  "mobile.server.providers.relayStepReturn": "Вернитесь в OpenBot и вставьте адрес ниже.",
   "mobile.server.providers.linkHint": "Войдите на странице. OpenBot продолжит сам.",
   "mobile.server.providers.relayWaiting": "Ожидание страницы входа от сервера…",
-  "mobile.server.providers.relayPasteHint":
-    "Войдите на странице. Затем она не загрузится. Нажмите на адресную строку, скопируйте адрес и вставьте сюда.",
   "mobile.server.providers.code": "Код со страницы",
+  "mobile.server.providers.codePlaceholder": "Вставьте код сюда",
   "mobile.server.providers.address": "Адрес последней страницы",
+  "mobile.server.providers.addressPlaceholder": "Вставьте адрес сюда",
   "mobile.server.providers.finish": "Завершить вход",
   "mobile.server.providers.finishing": "Завершение входа",
   "mobile.server.providers.relayAddressInvalid": "Этот адрес не из конца этого входа.",
@@ -859,6 +1015,7 @@ export const messages = {
   "mobile.server.providers.newKey": "Ключ",
   "mobile.server.providers.replaceKey": "Новый ключ",
   "mobile.server.providers.keyPlaceholder": "Вставьте ключ",
+  "mobile.server.providers.replaceKeyPlaceholder": "Вставьте новый ключ",
   "mobile.server.providers.saveKey": "Сохранить ключ",
   "mobile.server.providers.removeKey": "Удалить ключ",
   "mobile.server.providers.removeKeyTitle": "Удалить ключ с сервера?",
@@ -1148,6 +1305,34 @@ export const messages = {
   "mobile.server.roles.level.view": "Просмотр",
   "mobile.server.roles.level.chat": "Чат",
   "mobile.server.roles.level.manage": "Управление",
+  "mobile.server.route.audit": "Журнал аудита",
+  "mobile.server.audit.description":
+    "Изменения участников, ролей и доступа к агентам этого сервера, сначала новые. Хост хранит 500 последних изменений.",
+  "mobile.server.audit.unsupported": "Обновите OpenBot на этом сервере, чтобы увидеть журнал аудита.",
+  "mobile.server.audit.unavailable": "Журнал аудита видит только владелец или администратор сервера в сети.",
+  "mobile.server.audit.loading": "Загрузка изменений…",
+  "mobile.server.audit.loadFailed": "Не удалось загрузить журнал аудита этого сервера.",
+  "mobile.server.audit.filter": "Тип изменения",
+  "mobile.server.audit.filterAll": "Все изменения",
+  "mobile.server.audit.filterMembers": "Участники",
+  "mobile.server.audit.filterRoles": "Роли",
+  "mobile.server.audit.filterAgents": "Доступ к агентам",
+  "mobile.server.audit.search": "Поиск изменений",
+  "mobile.server.audit.changes": "Изменения",
+  "mobile.server.audit.empty": "Изменений пока нет.",
+  "mobile.server.audit.noMatch": "Нет подходящих изменений.",
+  "mobile.server.audit.unknownActor": "Неизвестный участник",
+  "mobile.server.audit.to": "→",
+  "mobile.server.audit.memberJoined": "{member} присоединяется как {role}",
+  "mobile.server.audit.memberLeft": "{member} покидает сервер",
+  "mobile.server.audit.memberRemoved": "Участник {member} удалён с сервера",
+  "mobile.server.audit.memberRole": "{member}: {change}",
+  "mobile.server.audit.roleCreated": "Создана роль {role}",
+  "mobile.server.audit.roleRenamed": "Переименована: {change}",
+  "mobile.server.audit.roleDeleted": "Удалена роль {role}",
+  "mobile.server.audit.roleMemberAdded": "Участник {member} добавлен в роль {role}",
+  "mobile.server.audit.roleMemberRemoved": "Участник {member} удалён из роли {role}",
+  "mobile.server.audit.agentLevel": "{agent} для {role}: {change}",
   // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "Импорт агентов",
   "mobile.server.route.import": "Импорт агентов",

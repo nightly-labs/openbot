@@ -79,6 +79,24 @@
     "APNS_TEAM_ID": "8A47NKRZSJ",
     "APNS_TOPIC": "run.openbot.mobile"
   },
+  // Email leaves through the relay Worker (`wrangler.email-relay.jsonc`), which runs near the mail
+  // host. Only production has it: the preview and test Workers and `vite dev` send from their own
+  // socket. Deploy the relay before this Worker.
+  "services": [
+    {
+      "binding": "EMAIL_RELAY",
+      "service": "openbot-email-relay"
+    }
+  ],
+  // Cloudflare Email Service sends when the SMTP mailbox surely did not, such as when its hourly limit
+  // (500 messages) is spent. The senders must be on an onboarded Email Sending domain (openbot.run).
+  // Only production has it: the preview and test Workers keep SMTP only.
+  "send_email": [
+    {
+      "name": "EMAIL_FALLBACK",
+      "allowed_sender_addresses": ["hello@openbot.run", "licenses@openbot.run"]
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",

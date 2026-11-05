@@ -74,4 +74,6 @@ export const messages = {
   "usage.panel.loading": "Cargando datos de uso…",
   "usage.panel.unsupported": "Este host no admite estadísticas de agentes. Actualiza el host para usar esta vista.",
   "usage.panel.loadFailed": "No se pudieron cargar los datos de uso. Comprueba la conexión y el intervalo de fechas.",
+  "usage.machine.label": "Uso de la máquina. CPU: {cpu}, memoria: {memory}",
+  "usage.machine.openStorage": "Abrir Almacenamiento. Disco: {percent}, {detail}",
 } as const satisfies PartialTranslation<typeof source>;

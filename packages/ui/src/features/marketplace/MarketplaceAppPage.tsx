@@ -588,6 +588,7 @@ const CONNECTOR_LINKS: Readonly<Record<ConnectorId, readonly ConnectorLink[]>> =
   slack: [{ label: "plugin.link.website", url: "https://slack.com" }],
   discord: [{ label: "plugin.link.website", url: "https://discord.com" }],
   telegram: [{ label: "plugin.link.website", url: "https://telegram.org" }],
+  whatsapp: [{ label: "plugin.link.website", url: "https://www.whatsapp.com" }],
   github: [{ label: "plugin.link.website", url: "https://github.com" }],
   onepassword: [
     { label: "plugin.link.website", url: "https://1password.com" },
@@ -595,6 +596,7 @@ const CONNECTOR_LINKS: Readonly<Record<ConnectorId, readonly ConnectorLink[]>> =
     { label: "plugin.link.terms", url: "https://1password.com/legal/terms-of-service" },
   ],
   bitwarden: [{ label: "plugin.link.website", url: "https://bitwarden.com" }],
+  protonpass: [{ label: "plugin.link.website", url: "https://proton.me/pass" }],
 };
 
 /** Who makes each connector's service: the name the user knows it by. */
@@ -602,9 +604,11 @@ const CONNECTOR_DEVELOPER = {
   slack: "connector.slack.title",
   discord: "connector.discord.title",
   telegram: "connector.telegram.title",
+  whatsapp: "connector.whatsapp.title",
   github: "connector.github.title",
   onepassword: "connector.onePassword.title",
   bitwarden: "connector.bitwarden.title",
+  protonpass: "connector.protonPass.title",
 } as const satisfies Record<ConnectorId, AppTextKey>;
 
 /** The information card of a connector page: what it gives, its developer, category and website. */

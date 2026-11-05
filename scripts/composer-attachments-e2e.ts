@@ -71,10 +71,13 @@ async function removeImages(editor: Locator, name = "image.png"): Promise<void> 
   while (await reference.count()) {
     const count = await reference.count();
     await reference.first().press("Delete");
+    // Other files can stay in the draft, so count the references of this name only.
     await page.waitForFunction(
-      (expected) =>
-        document.querySelectorAll(".composer-editor-surface [data-attachment-reference-id]").length === expected,
-      count - 1,
+      ({ expected, name }) =>
+        Array.from(
+          document.querySelectorAll<HTMLElement>(".composer-editor-surface [data-attachment-reference-id]"),
+        ).filter((node) => node.dataset.attachmentReferenceName === name).length === expected,
+      { expected: count - 1, name },
     );
   }
   const remove = page.getByRole("button", { name: `Remove ${name}`, exact: true });
@@ -83,6 +86,7 @@ async function removeImages(editor: Locator, name = "image.png"): Promise<void> 
 
 async function clearTestDraft(editor: Locator): Promise<void> {
   await removeImages(editor);
+  await removeImages(editor, "pasted-text.txt");
   await editor.fill("");
 }
 
@@ -288,6 +292,50 @@ try {
   assert.equal(await layout(nativeTarget), destinationLayout);
   results.push("Native Cmd/Ctrl+C and Cmd/Ctrl+V preserve text and original image bytes across agents.");
   await page.screenshot({ path: resolve(out, "native-clipboard.png") });
+  await removeImages(nativeTarget);
+  await nativeTarget.fill("");
+
+  // A text paste longer than INPUT_LIMITS.pastedText becomes pasted-text.txt at the caret.
+  const longText = `Ünïcödé 😀\ttab\r\nCRLF line\n  indented  \n${"log line 0123456789\n".repeat(300)}`;
+  const longTarget = await openAgent("Chief");
+  await clearTestDraft(longTarget);
+  await longTarget.fill("Draft text ");
+  await caretAtEnd(longTarget);
+  await pasteCopy(longTarget, { "text/plain": "short paste" });
+  assert.equal(await layout(longTarget), "Draft text short paste");
+  results.push("A short text paste stays in the message.");
+  await caretAtEnd(longTarget);
+  await pasteCopy(longTarget, { "text/plain": longText });
+  await page.waitForFunction(
+    () => document.querySelectorAll(".composer-editor-surface [data-attachment-reference-id]").length === 1,
+  );
+  assert.equal(await layout(longTarget), "Draft text short paste[pasted-text.txt]");
+  const stored = await longTarget.evaluate(async (element) => {
+    const id = element.querySelector<HTMLElement>("[data-attachment-reference-id]")?.dataset.attachmentReferenceId;
+    const response = await fetch(`openbot-attachment://file/${id}`);
+    return { type: response.headers.get("content-type"), text: await response.text() };
+  });
+  assert.equal(stored.text, longText);
+  assert.match(stored.type ?? "", /^text\/plain/u);
+  results.push("A long text paste keeps the draft text and stores all its text as pasted-text.txt.");
+  await page.screenshot({ path: resolve(out, "long-paste.png") });
+
+  // At the attachment limit, the file cannot come: the error shows and the text goes in the message.
+  await caretAtEnd(longTarget);
+  await pasteImages(
+    longTarget,
+    Array.from({ length: 9 }, (_, index) => [...png, index]),
+  );
+  await page.waitForFunction(
+    () => document.querySelectorAll(".composer-editor-surface [data-attachment-reference-id]").length === 10,
+  );
+  await caretAtEnd(longTarget);
+  await pasteCopy(longTarget, { "text/plain": longText });
+  await page.getByText("You can attach at most 10 files.", { exact: true }).waitFor();
+  assert.ok((await layout(longTarget)).endsWith(longText.replace(/\r\n?/gu, "\n")));
+  results.push("At the attachment limit, a long text paste shows the error and keeps the text in the message.");
+  await page.screenshot({ path: resolve(out, "long-paste-limit.png") });
+  await clearTestDraft(longTarget);
   passed = true;
 } finally {
   writeFileSync(resolve(out, "report.json"), `${JSON.stringify({ results, passed }, null, 2)}\n`);

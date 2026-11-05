@@ -16,12 +16,14 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AppState, Keyboard, Pressable, View } from "react-native";
 
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { LocalServerOptions, type LocalServerPathname } from "@/features/servers/components/local-server-options";
 import { SERVER_ROLE_KEYS } from "@/features/servers/model/server-role";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { useLiveServerRecovery } from "@/features/workspace/context/server-recovery-countdown";
 import { ErrorReference } from "@/shared/components/error-reference";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { readClipboardText } from "@/shared/lib/clipboard";
 import { haptics } from "@/shared/lib/haptics";
 import { isIOS } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
@@ -54,6 +56,7 @@ export function AddServerScreen({
   onJoined,
   scanHref = "/add-server/scan",
   underHeader = false,
+  localServerPathname,
 }: {
   initialInvite?: string;
   onJoined?: () => void;
@@ -61,6 +64,8 @@ export function AddServerScreen({
   scanHref?: Href;
   /** An inner page under a native header: its back button replaces Cancel. */
   underHeader?: boolean;
+  /** The create page of a server on an owned computer, in this sheet. Without it, the page offers none. */
+  localServerPathname?: LocalServerPathname;
 } = {}) {
   const { t, format, errorDetails, sourceText } = useText();
   const [foreground, accentForeground, success] = useThemeColor(["foreground", "accent-foreground", "success"]);
@@ -270,6 +275,9 @@ export function AddServerScreen({
             </Button>
           )}
 
+          {/* Another way to get a server: one more on a computer that runs OpenBot, while no link is typed. */}
+          {localServerPathname && !inviteLink.trim() ? <LocalServerOptions pathname={localServerPathname} /> : null}
+
           {underHeader ? null : (
             <Pressable
               accessibilityRole="button"
@@ -342,7 +350,7 @@ function PasteInviteButton({ disabled, onPaste }: { disabled: boolean; onPaste: 
       icon={<ClipboardPaste size={18} strokeWidth={1.8} color={foreground} />}
       label={t("mobile.server.join.paste")}
       onPress={() => {
-        void readClipboardLink().then(
+        void readClipboardText().then(
           (value) => {
             if (value) onPaste(value);
           },
@@ -351,12 +359,6 @@ function PasteInviteButton({ disabled, onPaste }: { disabled: boolean; onPaste: 
       }}
     />
   );
-}
-
-async function readClipboardLink(): Promise<string> {
-  const text = (await Clipboard.getStringAsync()).trim();
-  if (text) return text;
-  return ((await Clipboard.getUrlAsync()) ?? "").trim();
 }
 
 /**

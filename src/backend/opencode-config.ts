@@ -52,6 +52,12 @@ interface OpenCodeProviderOptions {
 interface OpenCodeModelEntry {
   readonly name: string;
   readonly limit?: { readonly context: number; readonly output: number };
+  /**
+   * The efforts of the model's effort menu, each sent as `reasoning_effort`. OpenCode 2.2.5 gives a
+   * custom model without `variants` its own Low, Medium and High, and it drops a `reasoning` key
+   * (`migrateModel` in `packages/core/src/v1/config/migrate.ts`). Listed variants replace that set.
+   */
+  readonly variants?: Readonly<Record<string, { readonly reasoningEffort: string }>>;
 }
 
 /** One entry under OpenCode's own `provider` key, keyed there by the endpoint's id. */
@@ -200,13 +206,18 @@ export function customModelOutputLimit(model: CustomProviderModel, contextWindow
 }
 
 function modelEntry(model: CustomProviderModel): OpenCodeModelEntry {
-  // With no window, the entry keeps OpenCode's own defaults, and a saved cap is not written.
-  return model.contextWindow === undefined
-    ? { name: model.name }
-    : {
-        name: model.name,
-        limit: { context: model.contextWindow, output: customModelOutputLimit(model, model.contextWindow) },
-      };
+  return {
+    name: model.name,
+    // With no window, the entry keeps OpenCode's own defaults, and a saved cap is not written.
+    ...(model.contextWindow === undefined
+      ? {}
+      : { limit: { context: model.contextWindow, output: customModelOutputLimit(model, model.contextWindow) } }),
+    ...(model.reasoningEfforts === undefined
+      ? {}
+      : {
+          variants: Object.fromEntries(model.reasoningEfforts.map((effort) => [effort, { reasoningEffort: effort }])),
+        }),
+  };
 }
 
 /**

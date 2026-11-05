@@ -9,6 +9,7 @@ import {
   remoteConnectionFailureDetails,
 } from "@openbot/team-client";
 import { REMOTE_PEER_LOST_AFTER_MS, type RemoteTeamConnectionUpdate } from "@openbot/team-client/remote-peer";
+import { errorReference } from "@openbot/user-errors/reference";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { MobileConnectionAnalytics } from "@/features/analytics/connection";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
@@ -64,6 +65,8 @@ interface Props {
   ): void;
   onMembershipChanged?(): Promise<void>;
   onTeamEvent(hostId: string, event: AgentEvent | TeamRealtimeEvent): void;
+  /** An attempt of this server failed in the foreground, or Signal says that its host is offline. */
+  onUnavailable?(hostId: string): void;
 }
 
 /**
@@ -80,7 +83,10 @@ export const ServerConnection = memo(function ServerConnection({
   onStatus,
   onTeamEvent,
   onMembershipChanged,
+  onUnavailable,
 }: Props) {
+  const onUnavailableRef = useRef(onUnavailable);
+  onUnavailableRef.current = onUnavailable;
   const [client, setClient] = useState<RemoteTeamTransportRef | null>(null);
   const controller = useRef<ReturnType<typeof createRemoteConnectionRecovery> | null>(null);
   const activeRef = useRef(active);
@@ -130,8 +136,9 @@ export const ServerConnection = memo(function ServerConnection({
       supportLog.add(
         update.state === "offline" ? "warn" : "info",
         "connection",
-        `${hostId} ${update.state}${update.code ? ` (${update.code})` : ""}${update.message ? `: ${update.message}` : ""}${update.resync ? ", resync" : ""}`,
+        `${hostId} ${update.state}${update.code ? ` (${update.code})` : ""}${update.message ? `: ${update.message}` : ""}${update.reference ? ` [${update.reference}]` : ""}${update.hostOffline ? ", host not on Signal" : ""}${update.resync ? ", resync" : ""}`,
       );
+      if (update.hostOffline && activeRef.current) onUnavailableRef.current?.(hostId);
       if (update.state === "offline") {
         if (activeRef.current) analytics.lost();
         if (update.code === "session_revoked") {
@@ -170,11 +177,15 @@ export const ServerConnection = memo(function ServerConnection({
             supportLog.add("info", "connection", `${hostId} attempt ${attempt} loaded (${Date.now() - started} ms)`);
           },
           (error) => {
-            if (initiatingContext.isCurrent()) finish("failed", initiatingContext.stage);
+            if (initiatingContext.isCurrent()) {
+              finish("failed", initiatingContext.stage);
+              onUnavailableRef.current?.(hostId);
+            }
+            const reference = errorReference(error);
             supportLog.add(
               "warn",
               "connection",
-              `${hostId} attempt ${attempt} failed at ${initiatingContext.stage} (${Date.now() - started} ms): ${supportLogValue(error)}`,
+              `${hostId} attempt ${attempt} failed at ${initiatingContext.stage} (${Date.now() - started} ms): ${supportLogValue(error)}${reference ? ` [${reference}]` : ""}`,
             );
             throw error;
           },
@@ -258,6 +269,7 @@ export const ServerConnection = memo(function ServerConnection({
   return (
     <RemoteTeamTransport
       ref={attach}
+      hostId={hostId}
       active={active}
       directory={directory}
       onMembershipChanged={onMembershipChanged}

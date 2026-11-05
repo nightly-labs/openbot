@@ -14,6 +14,7 @@ export const messages = {
   "mobile.channel.list.deleteFailedBody": "Impossibile eliminare questo canale. Riprova.",
   "mobile.channel.list.open": "Apri il canale {name}",
   "mobile.channel.list.openWithTitle": "Apri il canale {name}, {title}",
+  "mobile.channel.avatar.more": "+{count}",
   "mobile.channel.list.unread": { one: "{count} messaggio non letto", other: "{count} messaggi non letti" },
   "mobile.channel.list.noMessages": "Ancora nessun messaggio",
   "mobile.channel.task.task": "Attività",

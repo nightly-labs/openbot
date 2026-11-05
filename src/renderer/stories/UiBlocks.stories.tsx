@@ -196,7 +196,7 @@ export const ConfirmExpired: Story = {
   render: (args) => <LiveConfirm spec={confirmSpec} state={{ status: "expired" }} onRespond={args.onRespond} />,
 };
 
-/** A draft taller than the preview box scrolls inside it, and "Show all" under it opens the rest. */
+/** A draft taller than the preview box fades out at its end, and "Show all" under it opens the rest. */
 export const ConfirmLongPreview: Story = {
   render: (args) => (
     <LiveConfirm
@@ -273,6 +273,35 @@ export const FormAnswered: Story = {
       state={answered(formSpec, {
         actionId: "submit",
         values: { subject: "Heating is off", kind: "Bug", due: "2026-10-09", level: "High", note: "Flat 41" },
+      })}
+      onRespond={args.onRespond}
+    />
+  ),
+};
+
+const vaultLoginSpec: UiFormSpec = {
+  type: "form",
+  title: "Test account for the Hetzner console (ask Sam for the password)",
+  fields: [
+    { id: "website", kind: "text", label: "Website", required: true, value: "console.hetzner.com" },
+    { id: "username", kind: "text", label: "Username or email", value: "ada@example.com" },
+    { id: "password", kind: "text", label: "Password", required: true, secret: true },
+  ],
+  submit: "Save to Vault",
+};
+
+/** A form that asks for a secret. Once answered, its values show as rows and the secret shows as hidden. */
+export const SecretFormPending: Story = {
+  render: (args) => <LiveForm spec={vaultLoginSpec} onRespond={args.onRespond} />,
+};
+
+export const SecretFormAnswered: Story = {
+  render: (args) => (
+    <LiveForm
+      spec={vaultLoginSpec}
+      state={answered(vaultLoginSpec, {
+        actionId: "submit",
+        values: { website: "console.hetzner.com", username: "ada@example.com" },
       })}
       onRespond={args.onRespond}
     />

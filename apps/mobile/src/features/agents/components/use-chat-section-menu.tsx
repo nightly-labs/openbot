@@ -1,5 +1,5 @@
 import { SIDEBAR_UNASSIGNED_SECTION_ID, sidebarFolderParents, sidebarFolderPath } from "@openbot/contracts/ipc";
-import { Link } from "expo-router";
+import { Link, router } from "expo-router";
 import { useRef, useState } from "react";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import {
@@ -64,19 +64,27 @@ export function useChatSectionMenu(serverId: string, chatId: string) {
           title: t("mobile.agent.section.moveTo"),
           image: "folder",
           attributes: { disabled },
-          subactions: sections.map((section) => ({
-            id: `section:${section.id}`,
-            title: section.name,
-            state: assigned === section.id ? "on" : "off",
-            attributes: { disabled: disabled || assigned === section.id },
-          })),
+          subactions: [
+            ...sections.map((section) => ({
+              id: `section:${section.id}`,
+              title: section.name,
+              state: assigned === section.id ? ("on" as const) : ("off" as const),
+              attributes: { disabled: disabled || assigned === section.id },
+            })),
+            { id: "section-new", title: t("mobile.agent.section.newFolder"), attributes: { disabled } },
+          ],
         },
       ]
     : [];
+  // As on the desktop, a new folder from this menu takes the chat.
+  const createFolder = () => {
+    if (!disabled) router.push({ pathname: "/section-form", params: { serverId, agentId: chatId } });
+  };
   return {
     androidActions,
     onAction: (id: string) => {
       if (id.startsWith("section:")) void assign(id.slice("section:".length));
+      if (id === "section-new") createFolder();
     },
     menu: layout ? (
       <Link.Menu icon="folder" title={t("mobile.agent.section.moveTo")}>
@@ -90,6 +98,9 @@ export function useChatSectionMenu(serverId: string, chatId: string) {
             {section.name}
           </Link.MenuAction>
         ))}
+        <Link.MenuAction icon="folder.badge.plus" disabled={disabled} onPress={createFolder}>
+          {t("mobile.agent.section.newFolder")}
+        </Link.MenuAction>
       </Link.Menu>
     ) : null,
   };

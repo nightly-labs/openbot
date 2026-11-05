@@ -28,6 +28,10 @@ export const messages = {
   "error.workflow.outputPlaceMissing": "Escolha um local de mensagens para esta saída.",
   "error.workflow.discordNoMessage":
     "Esta saída age na mensagem do Discord que iniciou a execução. Inicie a execução a partir de uma menção no Discord ou escolha Publicar no canal.",
+  "error.workflow.slackNoMessage":
+    "Esta saída age na mensagem do Slack que iniciou a execução. Inicie a execução a partir de uma menção no Slack ou escolha Publicar no canal.",
+  "error.workflow.telegramNoMessage":
+    "Esta saída age na mensagem do Telegram que iniciou a execução. Inicie a execução a partir de uma menção no Telegram ou escolha Publicar no chat.",
   "error.workflow.outputConnectionOff":
     "A conexão de mensagens desta saída está desativada ou foi removida. Escolha um local novamente.",
   "error.workflow.outputNotRunning": "A conexão de mensagens não está em execução agora. Tente de novo quando estiver.",

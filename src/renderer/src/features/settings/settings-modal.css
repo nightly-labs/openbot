@@ -1,68 +1,8 @@
 /*
- * Settings modal rules for markup that only the renderer draws: the server settings detail crumbs,
- * the provider section, the Dynamic Island tab and the voice key row. The shared modal frame and
- * its panels are in `@openbot/ui/features/settings/settings-modal.css`, which `styles.css` imports
+ * Settings modal rules for markup that only the renderer draws: the provider section, the Dynamic
+ * Island tab and the voice key row. The shared modal frame and its panels are in `@openbot/ui/features/settings/settings-modal.css`, which `styles.css` imports
  * immediately before this file.
  */
-
-/*
- * A detail view inside a section keeps the header as the way back, as the agent skills modal does,
- * rather than a back row above the panel.
- */
-.settings-modal-crumbs {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--openbot-space-2);
-}
-
-/*
- * The parent crumb is a ghost button, so `.ui-button` would otherwise win the type properties and
- * draw it smaller than the title it sits in. The selector carries the modal class to take those
- * back. Hover changes only the text colour. The padding gives the keyboard focus ring room, and negative
- * margins cancel it and the border on every side, so the header keeps the same height, the crumb text
- * keeps the title's left edge, and the separator has the same space on both sides.
- */
-.settings-modal .settings-modal-crumb-parent {
-  min-width: 0;
-  height: auto;
-  overflow: hidden;
-  border: 1px solid transparent;
-  border-radius: var(--openbot-radius-md);
-  background: transparent;
-  color: var(--openbot-text-muted);
-  margin-block: calc(-1 * var(--openbot-space-1) - 1px);
-  margin-inline: calc(-1 * var(--openbot-space-2) - 1px);
-  padding: var(--openbot-space-1) var(--openbot-space-2);
-  font-size: inherit;
-  font-weight: inherit;
-  line-height: inherit;
-  letter-spacing: inherit;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  /* The shared ghost hover outweighs the base rule above, so this rule clears its fill. */
-  .settings-modal .settings-modal-crumb-parent:hover:not(:disabled) {
-    background: transparent;
-    color: var(--openbot-text-primary);
-  }
-}
-
-.settings-modal-crumb-separator {
-  flex: 0 0 auto;
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
-  color: var(--openbot-text-muted);
-}
-
-.settings-modal-crumb-current {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 .settings-provider-section {
   display: grid;

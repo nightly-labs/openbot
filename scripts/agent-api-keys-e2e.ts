@@ -3,6 +3,7 @@
 // the key in a temporary folder. It checks that the value reaches the file and the log redaction, and
 // no tool result, event or stored message. It also saves API keys in the real Vault and checks that
 // `list` writes them to files for every agent and that a Vault change rewrites or removes the files.
+// With a Vault, the form saves the key there by default, and "Only this agent" keeps it for the agent.
 // No provider or account is used.
 // `bun scripts/agent-api-keys-e2e.ts`. Writes .openbot-build/agent-api-keys-e2e/report.json.
 import assert from "node:assert/strict";
@@ -14,7 +15,12 @@ import { type UiBlockSpec, uiBlockAnswersFromResponse } from "@openbot/contracts
 import { redactText } from "@openbot/logging";
 import { Effect } from "effect";
 import { AttentionRegistry, type PromptResponder } from "../src/backend/agent/attention-registry";
-import { API_KEY_FIELD_ID, apiKeyFormSpec } from "../src/backend/agent/prompts";
+import {
+  API_KEY_FIELD_ID,
+  API_KEY_SCOPE_AGENT,
+  API_KEY_SCOPE_FIELD_ID,
+  apiKeyFormSpec,
+} from "../src/backend/agent/prompts";
 import { AgentApiKeys } from "../src/backend/agent-api-keys";
 import { CodexAppServerClient } from "../src/backend/app-server-client";
 import { runCauseEffect } from "../src/backend/effect-boundary";
@@ -57,6 +63,7 @@ interface AgentAnswer {
   blockId?: string;
   name?: string;
   path?: string;
+  source?: string;
   next?: string;
 }
 
@@ -80,10 +87,11 @@ const snapshot: ConversationSnapshot = {
   messages: [],
 };
 const events: AgentEvent[] = [];
-const registry = new AttentionRegistry({
+/** The registry options that do not change between the stores. */
+const registryHost = {
   conversation: {
-    agentForThread: (threadId) => (threadId === THREAD ? AGENT : undefined),
-    publicThreadId: (_agentId, threadId) => threadId,
+    agentForThread: (threadId: string) => (threadId === THREAD ? AGENT : undefined),
+    publicThreadId: (_agentId: string, threadId: string) => threadId,
     ensureSnapshot: () => snapshot,
     emitConversation: () => {
       snapshot.revision += 1;
@@ -92,11 +100,28 @@ const registry = new AttentionRegistry({
   browser: { listTabs: () => [], beginTakeover: () => Effect.void, endTakeover: () => {} },
   hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
   routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
-  emit: (event) => events.push(event),
+  emit: (event: AgentEvent) => events.push(event),
   emitError: () => {},
   emitRuntimeSnapshot: () => {},
-  apiKeys,
-});
+};
+const registry = new AttentionRegistry({ ...registryHost, apiKeys });
+
+/** A registry with its own key folder and a real Vault, as OpenBot wires them when the Vault is ready. */
+async function vaultRegistry(name: string) {
+  const vault = new VaultService({
+    store: new VaultStore(join(root, `openbot-vault-${name}.json`), REVERSING_CIPHER),
+    canPersist: () => true,
+  });
+  await Effect.runPromise(vault.load());
+  const keys = new AgentApiKeys(join(root, `${name}-api-keys`), () => vault.items.apiKeys());
+  const registry = new AttentionRegistry({
+    ...registryHost,
+    apiKeys: keys,
+    vaultItems: vault.items,
+    agentName: () => "Coder",
+  });
+  return { vault, keys, registry };
+}
 
 let nextRequest = 1;
 
@@ -307,6 +332,98 @@ try {
       ]);
     },
   );
+
+  await step(
+    "with a Vault, the form saves the key there for every agent and deletes the asking agent's own copy",
+    async () => {
+      const { vault, keys, registry: formRegistry } = await vaultRegistry("form");
+      const formClient = new RecordingClient("/nonexistent/codex");
+      const ask = (name: string, turnId: string) => {
+        const spec = apiKeyFormSpec({ name, title: `${name} for the deploy`, vault: true });
+        assert.ok(spec?.type === "form", "the router would refuse this form");
+        const id = nextRequest++;
+        formRegistry.surfaceUiBlock(
+          formClient,
+          { id, method: "item/tool/call", params: { threadId: THREAD, turnId } },
+          { blockId: `block-${id}`, spec, apiKey: { name, vault: true } },
+        );
+        return { id, spec };
+      };
+      const respond = (requestId: number, answers: Record<string, string[]>, responder?: PromptResponder) =>
+        runCauseEffect(formRegistry.respondToPrompt({ requestId, answers }, responder));
+
+      // The Vault option comes first and is selected when the form opens.
+      const scope = ask("DEPLOY_TOKEN", "turn-vault-0").spec;
+      assert.ok(scope.type === "form");
+      const scopeField = scope.fields?.find((field) => field.id === API_KEY_SCOPE_FIELD_ID);
+      assert.ok(scopeField && scopeField.kind === "segmented");
+      assert.deepEqual(scopeField.options, ["All agents (Vault)", API_KEY_SCOPE_AGENT]);
+      assert.equal(scopeField.value, "All agents (Vault)");
+      formRegistry.cancelRequest(formClient, nextRequest - 1);
+
+      // An agent that asked before keeps its own copy, which would hide the Vault key.
+      await Effect.runPromise(keys.save(AGENT, "DEPLOY_TOKEN", KEY));
+      const { id, spec } = ask("DEPLOY_TOKEN", "turn-vault-1");
+      const values = { [API_KEY_FIELD_ID]: ` ${VAULT_KEY}\n`, [API_KEY_SCOPE_FIELD_ID]: "All agents (Vault)" };
+      const answers = uiBlockAnswersFromResponse(spec, { actionId: "submit", values });
+      await assert.rejects(respond(id, answers, MEMBER));
+      assert.equal(vault.items.apiKeys().length, 0, "a member saved a key in the Vault");
+      await respond(id, answers);
+      const vaultPath = join(root, "form-api-keys", ".vault", "DEPLOY_TOKEN");
+      const result = agentAnswer(formClient.answers.get(id));
+      assert.deepEqual(result, {
+        status: "saved",
+        blockId: `block-${id}`,
+        name: "DEPLOY_TOKEN",
+        path: vaultPath,
+        source: "vault",
+      });
+      assert.deepEqual(vault.items.apiKeys(), [{ name: "DEPLOY_TOKEN", value: VAULT_KEY }]);
+      assert.equal(await readFile(vaultPath, "utf8"), VAULT_KEY);
+      await assert.rejects(stat(join(root, "form-api-keys", AGENT, "DEPLOY_TOKEN")));
+      const otherAgent = await Effect.runPromise(keys.list("agent-4"));
+      assert.deepEqual(otherAgent, [{ name: "DEPLOY_TOKEN", path: vaultPath, source: "vault" }]);
+      const added = vault.state().items.find((item) => item.kind === "apiKey" && item.name === "DEPLOY_TOKEN");
+      assert.equal(added?.addedBy, "Coder");
+      const message = snapshot.messages.find((candidate) => candidate.uiBlock?.blockId === `block-${id}`);
+      assert.equal(message?.uiBlock?.state.status, "answered");
+      assert.equal(message?.uiBlock?.state.outcome, "Saved to Vault: DEPLOY_TOKEN");
+      for (const raw of formClient.answers.values()) assert.ok(!raw.includes(VAULT_KEY), "the key is in a result");
+      assert.ok(!JSON.stringify(events).includes(VAULT_KEY), "the key is in an event");
+      assert.ok(!JSON.stringify(snapshot).includes(VAULT_KEY), "the key is in the stored conversation");
+
+      return { result };
+    },
+  );
+
+  await step("with a Vault, Only this agent keeps the key in the agent's private file", async () => {
+    const { vault, keys, registry: privateRegistry } = await vaultRegistry("private");
+    const spec = apiKeyFormSpec({ name: "PRIVATE_TOKEN", title: "Private token", vault: true });
+    assert.ok(spec);
+    const id = nextRequest++;
+    privateRegistry.surfaceUiBlock(
+      client,
+      { id, method: "item/tool/call", params: { threadId: THREAD, turnId: "turn-private" } },
+      { blockId: `block-${id}`, spec, apiKey: { name: "PRIVATE_TOKEN", vault: true } },
+    );
+    const values = { [API_KEY_FIELD_ID]: KEY, [API_KEY_SCOPE_FIELD_ID]: API_KEY_SCOPE_AGENT };
+    await runCauseEffect(
+      privateRegistry.respondToPrompt({
+        requestId: id,
+        answers: uiBlockAnswersFromResponse(spec, { actionId: "submit", values }),
+      }),
+    );
+    const path = join(root, "private-api-keys", AGENT, "PRIVATE_TOKEN");
+    assert.deepEqual(agentAnswer(client.answers.get(id)), {
+      status: "saved",
+      blockId: `block-${id}`,
+      name: "PRIVATE_TOKEN",
+      path,
+    });
+    assert.equal(await readFile(path, "utf8"), KEY);
+    assert.deepEqual(vault.items.apiKeys(), []);
+    assert.deepEqual(await Effect.runPromise(keys.list("agent-4")), []);
+  });
 
   await writeFile(join(OUT, "report.json"), `${JSON.stringify({ passed: true, steps }, null, 2)}\n`);
   process.stdout.write(`agent-api-keys-e2e: ${steps.length} steps passed\n`);

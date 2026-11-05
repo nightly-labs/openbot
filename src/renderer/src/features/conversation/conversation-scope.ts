@@ -12,6 +12,7 @@ import {
   relayableSignInLink,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
+import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { toast } from "@openbot/ui";
 import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/QuestionPromptBubble";
 import type { QuoteRequest } from "@openbot/ui/features/conversation/ComposerEditor";
@@ -32,6 +33,7 @@ import {
 import { actionToast } from "../../action-toast";
 import { createScopeGuard } from "../../scope-lifetime";
 import { appendVoiceTranscript } from "../../voice-recording";
+import { serverSupportsCapability } from "../servers/server-capabilities";
 import { createAttachmentImportSounds } from "./attachment-import-sounds";
 import type { ChatSearchMatch } from "./chat-search";
 import { useConversationController } from "./conversation-controller-context";
@@ -68,6 +70,7 @@ import { createSettingsStore, runtimeSettingsEqual } from "./stores/settings-sto
 import { createSideQuestionStore } from "./stores/side-question-store";
 import { createSkillsStore } from "./stores/skills-store";
 import { createThreadComposerActions } from "./stores/thread-composer-actions";
+import { createThreadQueue } from "./stores/thread-queue-edit";
 import { createVoiceConversation } from "./stores/voice-conversation-store";
 import { createVoiceStore } from "./stores/voice-store";
 
@@ -124,6 +127,7 @@ export function createConversationViewScope(props: ConversationProps) {
     composerFocusRequest,
     setComposerFocusRequest,
     pendingSends,
+    attachmentUploads,
     showComposerActions,
     setShowComposerActions,
     importingDrafts,
@@ -277,6 +281,9 @@ export function createConversationViewScope(props: ConversationProps) {
     sidePanelOpen,
     setSidePanelMaximized,
     removeSidePanelPane,
+    removeSidePanelFile,
+    moveSidePanelFile,
+    openSidePanelFile,
     filePreviewOpen,
     setActiveRightPanel,
     openRoutineSettings,
@@ -288,6 +295,7 @@ export function createConversationViewScope(props: ConversationProps) {
     hideBrowserPanel,
     previewAttachment,
     attachmentAction,
+    attachmentDownloads,
     openSharedFile,
     openWorkspaceFile,
     openWorkspaceFolder,
@@ -301,7 +309,7 @@ export function createConversationViewScope(props: ConversationProps) {
     downloadSidebarFile,
     downloadMessageImageFile,
     revealSidebarFile,
-    closeSidebarFilePreview,
+    clearSidebarFilePreview,
   } = panels;
   const sideQuestions = createSideQuestionStore({
     props,
@@ -375,8 +383,26 @@ export function createConversationViewScope(props: ConversationProps) {
   /** True while a file import for the chat waits. An import for another chat does not stop this one. */
   const attachmentBusy = (target = currentTarget()) =>
     target !== undefined && importingDrafts().has(composerDraftKey(target));
+  /**
+   * A failed file of the chat stops a typed send until Retry or remove: the message would go
+   * without it. A voice conversation turn does not carry the draft files, so it still sends.
+   */
+  const uploadFailed = (target = currentTarget()) =>
+    target !== undefined && attachmentUploads.hasFailed(composerDraftKey(target));
   const syncAttachmentImports = () =>
     setImportingDrafts(new Set(Array.from(resources.importTargetAgents.values(), composerDraftKey)));
+  const currentUploads = createMemo(() => {
+    const target = currentTarget();
+    return target ? attachmentUploads.list(composerDraftKey(target)) : [];
+  });
+  /** The X of an upload chip. A file that still uploads lands nowhere: its draft attachment is discarded. */
+  const removeUpload = (requestId: string) => {
+    attachmentUploads.remove(requestId);
+    resources.importTargetAgents.delete(requestId);
+    syncAttachmentImports();
+    conversationRuntime(props).agent.discardAttachmentImport?.(requestId);
+  };
+  const retryUpload = (requestId: string) => conversationRuntime(props).agent.retryAttachmentImport?.(requestId);
   const currentPendingSends = createMemo(() => pendingSends.list(currentTarget()));
   // The host queues a message for a moment before it starts it. A send made while the agent was idle
   // stays in the chat for that moment, so it does not jump to the queue panel and back.
@@ -475,18 +501,22 @@ export function createConversationViewScope(props: ConversationProps) {
     return id !== null && sideThreadIds().includes(id) ? id : null;
   };
   /**
-   * The panel button opens the side panel at its last pane or side thread, or at the list of panes
-   * when no tab is open.
+   * The panel button opens the side panel at its last file, pane or side thread, or at the list of
+   * panes when no tab is open. A file that is not loaded is read again. The panel lists the panes
+   * until the file shows, so the panel opens also when the read fails.
    */
   function toggleSidePanel() {
     if (sidePanelOpen()) {
       hideBrowserPanel();
       return;
     }
-    const { panes, selected } = sidePanel();
+    const { panes, selected, files, file } = sidePanel();
     const pane = selected && panes.includes(selected) ? selected : null;
     const thread = shownPanelThreadId() ?? sideThreadIds()[0];
-    if (pane) openSidePanelPane(pane);
+    if (file && files.some((item) => item.key === file)) {
+      setActiveRightPanel("side-panel");
+      openSidePanelFile(file);
+    } else if (pane) openSidePanelPane(pane);
     else if (thread && selected === null) openPanelThread(thread);
     else if (panes[0]) openSidePanelPane(panes[0]);
     else setActiveRightPanel("side-panel");
@@ -504,9 +534,13 @@ export function createConversationViewScope(props: ConversationProps) {
     const rest = ids.filter((other) => other !== id);
     const thread = rest[Math.min(Math.max(index, 0), rest.length - 1)];
     const pane = sidePanel().panes.at(-1);
+    const file = sidePanel().files.at(-1);
     if (thread) openPanelThread(thread);
     else if (pane) openSidePanelPane(pane);
-    else setActiveRightPanel("side-panel");
+    else if (file) {
+      setActiveRightPanel("side-panel");
+      openSidePanelFile(file.key);
+    } else setActiveRightPanel("side-panel");
   }
   /** Closes the tab of a side thread in the side panel. The thread stays in the thread list. */
   function closePanelThread(id: string) {
@@ -523,7 +557,7 @@ export function createConversationViewScope(props: ConversationProps) {
   }
   // A side thread that shows can also leave the side panel from outside it: the thread list or a
   // notification opens it in the chat, or it is archived. The side thread next to it then shows, else
-  // the last pane, as when its tab closes. A thread that is not in the list yet, as before the threads
+  // the last pane or file, as when its tab closes. A thread that is not in the list yet, as before the threads
   // load after a start, did not show, so the panel keeps it.
   createEffect(
     () => ({
@@ -531,6 +565,7 @@ export function createConversationViewScope(props: ConversationProps) {
       requested: activeRightPanel() === "thread" ? panelThreadId() : null,
       ids: sideThreadIds(),
       pane: sidePanel().panes.at(-1),
+      file: sidePanel().files.at(-1)?.key,
     }),
     (next, previous) => {
       if (next.shown !== null || !previous?.shown || next.requested !== previous.shown) return;
@@ -538,6 +573,10 @@ export function createConversationViewScope(props: ConversationProps) {
       const thread = next.ids[Math.min(Math.max(index, 0), next.ids.length - 1)];
       if (thread) openPanelThread(thread);
       else if (next.pane) openSidePanelPane(next.pane);
+      else if (next.file) {
+        setActiveRightPanel("side-panel");
+        openSidePanelFile(next.file);
+      }
     },
   );
   /** The subagent that the side panel shows now, or null. */
@@ -554,9 +593,40 @@ export function createConversationViewScope(props: ConversationProps) {
     const next = removeSidePanelPane(pane);
     if (!shown) return;
     const thread = sideThreadIds()[0];
+    const file = sidePanel().files.at(-1);
     if (next) openSidePanelPane(next);
     else if (thread) openPanelThread(thread);
+    else if (file) {
+      // The closed pane must not stay on screen while the file reads, or after a failed read.
+      setActiveRightPanel("side-panel");
+      openSidePanelFile(file.key);
+    } else setActiveRightPanel("side-panel");
+  }
+  /**
+   * Closes the tab of a file. When the file showed, the file next to it shows, else the last pane or
+   * side thread. With no tab, the panel lists the panes.
+   */
+  function closeSidePanelFile(key: string) {
+    const shown = filePreviewOpen() && sidePanel().file === key;
+    const next = removeSidePanelFile(key);
+    if (!shown) return;
+    // The closed file must not show under the next tab while it loads, or after a failed read.
+    clearSidebarFilePreview();
+    if (next) {
+      setActiveRightPanel("side-panel");
+      openSidePanelFile(next);
+      return;
+    }
+    const pane = sidePanel().panes.at(-1);
+    const thread = sideThreadIds()[0];
+    if (pane) openSidePanelPane(pane);
+    else if (thread) openPanelThread(thread);
     else setActiveRightPanel("side-panel");
+  }
+  /** Closes the tab of the file that shows. */
+  function closeShownSidePanelFile() {
+    const key = sidePanel().file;
+    if (key) closeSidePanelFile(key);
   }
   const viewIsMounted = createScopeGuard();
   let attachmentPicker: HTMLInputElement | undefined;
@@ -587,6 +657,16 @@ export function createConversationViewScope(props: ConversationProps) {
     messageId?.startsWith(PENDING_SEND_ID_PREFIX)
       ? currentPendingSends().find((send) => `${PENDING_SEND_ID_PREFIX}${send.clientMessageId}` === messageId)
       : undefined;
+  // The host id of each sent message, to the key of the row its pending copy drew. The row keeps
+  // that key after the send settles, so it stays mounted while the host's message replaces it.
+  const handedOverRowKeys = createMemo<ReadonlyMap<string, string>>((previous = new Map()) => {
+    const sent = currentPendingSends().flatMap((send) =>
+      send.messageId && !previous.has(send.messageId)
+        ? [[send.messageId, `${PENDING_SEND_ID_PREFIX}${send.clientMessageId}`] as const]
+        : [],
+    );
+    return sent.length ? new Map([...previous, ...sent]) : previous;
+  });
   createEffect(
     () => ({
       target: currentTarget(),
@@ -603,6 +683,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setMarkingRead,
     setComposerError: setScopedComposerError,
     pendingMessages,
+    handedOverRowKeys,
     elements: {
       scrollElement: () => scrollElement,
       virtualRoot: () => virtualRoot,
@@ -706,12 +787,22 @@ export function createConversationViewScope(props: ConversationProps) {
   const handleChatSearchShortcut = (event: KeyboardEvent) => {
     (sideThreadOpen() ? threadSearch : search).handleChatSearchShortcut(event);
   };
+  const threadQueue = createThreadQueue({
+    props,
+    threadDrafts: controller.threadDrafts,
+    setThreadDrafts: controller.setThreadDrafts,
+    edit: controller.threadQueueEdit,
+    setEdit: controller.setThreadQueueEdit,
+    persist: persistDrafts,
+  });
   const threadComposer = createThreadComposerActions({
     props,
     threadDrafts: controller.threadDrafts,
     setThreadDrafts: controller.setThreadDrafts,
     pastePreviews,
     setPastePreviews,
+    draftLocked: threadQueue.draftLocked,
+    keepsAttachment: threadQueue.keepsAttachment,
   });
   /** Moves the open thread's caret to the end of the dictated text. */
   const [threadFocusRequest, setThreadFocusRequest] = createSignal(0);
@@ -756,7 +847,11 @@ export function createConversationViewScope(props: ConversationProps) {
         flush();
         const threads = props.threads;
         if (!threads || threadComposer.openDraftKey() !== key) return;
-        await threadComposer.send(threads, threadComposer.draft(key).text.trim());
+        // While a queued message is in the message box, Send saves it in its place.
+        if (threadQueue.editsDraft(key)) {
+          await threadComposer.importsEnded(key);
+          await threadQueue.save(key);
+        } else await threadComposer.send(threads, threadComposer.draft(key).text.trim());
         // The locked editor did not take the earlier focus request.
         if (threadComposer.openDraftKey() === key) setThreadFocusRequest((current) => current + 1);
       },
@@ -834,6 +929,7 @@ export function createConversationViewScope(props: ConversationProps) {
   const actions = createComposerActions({
     props,
     attachmentBusy,
+    uploadFailed,
     syncAttachmentImports,
     setPastePreviews,
     attachmentImports: resources.importTargetAgents,
@@ -961,7 +1057,8 @@ export function createConversationViewScope(props: ConversationProps) {
     setComposerError: setScopedComposerError,
     setComposerFocusRequest,
   });
-  const { replyToMessage, addPageText, setPageContext, reactToMessage, copyMessage, removeAttachment } = messageActions;
+  const { replyToMessage, addPageText, setPageContext, reactToMessage, copyMessage, messageText, removeAttachment } =
+    messageActions;
   const settings = createSettingsStore({
     props,
     runtimeSettingsAttempts: resources.runtimeSettingsAttempts,
@@ -986,6 +1083,7 @@ export function createConversationViewScope(props: ConversationProps) {
   let latestScrollFrame: number | undefined;
   let latestScrollSettleFrame: number | undefined;
   let lastScrollTop = 0;
+  let lastMaxScrollTop = 0;
   let readerLeftLatest = false;
   let readerDragging = false;
   let readerIntent: { up: boolean; at: number } | undefined;
@@ -1041,6 +1139,15 @@ export function createConversationViewScope(props: ConversationProps) {
     const draft = fastModeDraft();
     return draft && draft.agentId === props.agent?.id ? draft.fastMode : props.agent?.fastMode === true;
   };
+  /**
+   * The Fast switch of the model pickers, in the chat header and in the agent settings. Codex only
+   * for now: on this computer, or on a joined server with `agent-fast-mode-v1`.
+   */
+  const fastModeChange = () =>
+    settingsProvider() === "codex" &&
+    (props.server?.kind === "local" || serverSupportsCapability(props.server, AGENT_FAST_MODE_CAPABILITY))
+      ? (next: boolean) => void changeFastMode(next)
+      : undefined;
   async function changeFastMode(next: boolean): Promise<void> {
     const agentId = props.agent?.id;
     if (!agentId) return;
@@ -1058,24 +1165,34 @@ export function createConversationViewScope(props: ConversationProps) {
   onSettled(() => {
     const importSounds = createAttachmentImportSounds();
     const unsubscribeImport = conversationRuntime(props).agent.onAttachmentImport((event) => {
+      if (event.type === "progress") {
+        attachmentUploads.progress(event.requestId, event.sent);
+        return;
+      }
+      // A retry runs again in the chat of the failed import, also when a side thread is open now.
+      const retried = event.type === "started" ? attachmentUploads.get(event.requestId) : undefined;
       const threadKey = event.type === "started" ? undefined : threadComposer.releaseImport(event.requestId);
       if (event.type === "started") {
         // A side thread covers the agent's own chat, so a file dropped or picked there goes to the thread.
-        if (threadComposer.openDraftKey() !== undefined) {
+        if (!retried && threadComposer.openDraftKey() !== undefined) {
           if (threadComposer.claimImport(event.requestId, event.serverId)) importSounds.started(event.requestId);
           return;
         }
-        const target = currentTarget();
+        const target = retried?.target ?? currentTarget();
         if (target?.serverId === event.serverId) {
           resources.importTargetAgents.set(event.requestId, target);
           clearConversationError(target);
           importSounds.started(event.requestId);
+          // A set over the attachment limits names no files. Main refuses it whole, with a banner.
+          if (event.files.length > 0) attachmentUploads.start(event.requestId, target, event.files);
         }
         syncAttachmentImports();
         setScopedComposerError(null);
       } else if (threadKey !== undefined) {
         if (event.type === "error") {
           importSounds.cancel(event.requestId);
+          // A side thread has no upload chip, so no Retry: the files are not kept for one.
+          conversationRuntime(props).agent.discardAttachmentImport?.(event.requestId);
           actionToast.error(event.message);
         } else {
           // A cancelled import completes with no attachments.
@@ -1089,11 +1206,20 @@ export function createConversationViewScope(props: ConversationProps) {
         syncAttachmentImports();
         if (target) {
           importSounds.finished(event.requestId, "error");
-          setConversationErrors((current) => ({
-            ...current,
-            [composerDraftKey(target)]: event.message,
-          }));
-        }
+          // The chip of the file shows the failure, with Retry. An import with no chip has the banner.
+          // Electron puts the IPC channel in front of the sentence; the chip shows only the sentence.
+          if (attachmentUploads.get(event.requestId)) {
+            const { t, errorMessage } = currentText();
+            attachmentUploads.fail(event.requestId, errorMessage(event.message, t("composer.upload.failed")));
+          } else
+            setConversationErrors((current) => ({
+              ...current,
+              [composerDraftKey(target)]: event.message,
+            }));
+        } else importSounds.cancel(event.requestId);
+        // Only a chip offers Retry, so the files of an import with none are not kept for one.
+        if (!attachmentUploads.get(event.requestId))
+          conversationRuntime(props).agent.discardAttachmentImport?.(event.requestId);
       } else {
         const target = resources.importTargetAgents.get(event.requestId);
         if (target) {
@@ -1102,9 +1228,12 @@ export function createConversationViewScope(props: ConversationProps) {
           else importSounds.cancel(event.requestId);
           void addAttachments(event.attachments, target).finally(() => {
             resources.importTargetAgents.delete(event.requestId);
+            attachmentUploads.remove(event.requestId);
             syncAttachmentImports();
           });
         } else {
+          // The user removed the chip while the file uploaded, so the file lands nowhere.
+          importSounds.cancel(event.requestId);
           syncAttachmentImports();
           for (const attachment of event.attachments) {
             void conversationRuntime(props).agent.discardDraftAttachment(attachment.id, event.serverId);
@@ -1208,7 +1337,10 @@ export function createConversationViewScope(props: ConversationProps) {
     keyboardWindow.addEventListener("pointercancel", endReaderDrag);
     scrollResizeObserver = new ResizeObserver(() => {
       updateVirtualScrollMargin();
-      if (scrollElement && stickToLatest) followConversationBottom(scrollElement);
+      const readerAbove = scrollElement !== undefined && readerAboveShrinkingContent(scrollElement);
+      if (scrollElement && stickToLatest) {
+        if (!readerAbove) followConversationBottom(scrollElement);
+      }
       // An image or a preview that lays out after the opening grows a row above the divider. The chat
       // has no browser scroll anchoring, so without this the divider moves down out of view.
       else if (scrollElement && unreadOpening.holding) scrollToUnreadDivider(scrollElement);
@@ -1286,6 +1418,36 @@ export function createConversationViewScope(props: ConversationProps) {
     // A passage past the message limit would make the composer drop it with the text after it.
     const quoted = limitedQuoteText(text);
     setQuoteRequest((current) => ({ id: (current?.id ?? 0) + 1, messageId, text: quoted }));
+  }
+
+  /*
+   * What `@` can tag beside the agents: the agent's own browser tabs and its side threads that are
+   * not closed, newest first. A channel has many agents, so it tags neither. A tab of an old agent run
+   * has only an owner thread, and the host shares only a tab with an owner agent.
+   */
+  const taggableBrowserTabs = createMemo(() =>
+    props.channel ? [] : browserTabs().filter((tab) => tab.ownerAgentId === props.agent?.id),
+  );
+  const taggableThreads = createMemo(() =>
+    props.channel
+      ? []
+      : (props.threads?.tasks ?? [])
+          .filter((task) => task.closedAt === null)
+          .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
+  );
+
+  /** Shows the browser tab, or the side thread, that a tag names. A tab or a thread that is gone does nothing. */
+  function openTaggedReference(kind: "tab" | "thread", id: string) {
+    if (kind === "tab") {
+      if (!browserTabs().some((tab) => tab.id === id)) return;
+      if (activeBrowserTab()?.id !== id) activateBrowserTab(id);
+      // The same gesture as a preview card: open the page, not the list of tabs.
+      setActiveRightPanel("browser-expanded");
+      return;
+    }
+    if (!taggableThreads().some((task) => task.id === id)) return;
+    if (sideThreadIds().includes(id)) openPanelThread(id);
+    else moveThreadToPanel(id);
   }
 
   /** Scrolls to the passage that a quote points to and marks it. A file passage opens in the side panel. */
@@ -1814,6 +1976,23 @@ export function createConversationViewScope(props: ConversationProps) {
     else if (scrollElement.scrollTop > lastScrollTop) unreadOpening.holding = false;
   }
   /**
+   * Content that gets shorter, such as a plan that closes, keeps the bottom in view by itself when the
+   * chat is at the bottom. A following chat that was more than 80px above the bottom was moved by a
+   * scroll that the chat could not give to the reader. A follow would jump the chat to the old bottom,
+   * and the content would then slide back as it gets shorter, so this resize does not follow. The chat
+   * continues to follow: growth, or a follow that was queued before, still moves it to the bottom.
+   */
+  function readerAboveShrinkingContent(element: HTMLDivElement): boolean {
+    const maxScrollTop = element.scrollHeight - element.clientHeight;
+    const previousMaxScrollTop = lastMaxScrollTop;
+    lastMaxScrollTop = maxScrollTop;
+    return (
+      maxScrollTop < previousMaxScrollTop &&
+      maxScrollTop - element.scrollTop > 1 &&
+      previousMaxScrollTop - element.scrollTop > 80
+    );
+  }
+  /**
    * A scroll is the reader's when the chat moves the way that the reader's last input asked, soon after
    * it, or while the reader drags the scroll bar or a text selection. Input that moves something else,
    * such as a code block that scrolls, a sideways swipe or a key in a field, does not move the chat.
@@ -1821,6 +2000,7 @@ export function createConversationViewScope(props: ConversationProps) {
   const followReaderScroll = (element: HTMLElement) => {
     const moved = element.scrollTop - lastScrollTop;
     lastScrollTop = element.scrollTop;
+    lastMaxScrollTop = element.scrollHeight - element.clientHeight;
     const intent = readerIntent && performance.now() - readerIntent.at < READER_INPUT_WINDOW_MS ? readerIntent : null;
     if (moved < 0 && (readerDragging || intent?.up === true)) leaveLatest();
     else if (moved > 0 && (readerDragging || intent?.up === false)) {
@@ -1911,6 +2091,8 @@ export function createConversationViewScope(props: ConversationProps) {
    * server gets the text only.
    */
   const voiceConversationAvailable = () => !channel && !props.runtime;
+  // A transcribed conversation sends its turns through this view, so it ends with the view.
+  onCleanup(() => controller.voiceSessions.end("transcribed"));
   /** Starts a voice conversation with an agent. It ends with the owner that calls this. */
   const startVoiceConversation = (agentId: string) =>
     createVoiceConversation({
@@ -1932,6 +2114,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setThreadSearchQuery,
     setThreadScrollElement,
     threadComposer,
+    threadQueue,
     threadFocusRequest,
     branchThread,
     threadVoiceLiveText,
@@ -1976,7 +2159,12 @@ export function createConversationViewScope(props: ConversationProps) {
     showBrowserTabOf,
     browserTabOwner,
     attachmentAction,
+    attachmentDownloads,
     attachmentBusy,
+    uploadFailed,
+    currentUploads,
+    removeUpload,
+    retryUpload,
     browserAddress,
     browserSidebarOpen,
     browserExpandedOpen,
@@ -1994,7 +2182,7 @@ export function createConversationViewScope(props: ConversationProps) {
     releaseBrowserControl,
     closeChatSearch,
     clearNewMessages,
-    closeSidebarFilePreview,
+    closeShownSidePanelFile,
     composerError: currentComposerError,
     currentComposerError,
     currentChatError,
@@ -2010,6 +2198,7 @@ export function createConversationViewScope(props: ConversationProps) {
     composerHasContent,
     copiedMessageId,
     copyMessage,
+    messageText,
     pasteFiles,
     releaseCutAttachments,
     clearSubmittedDraft,
@@ -2042,6 +2231,9 @@ export function createConversationViewScope(props: ConversationProps) {
     openSidePanelPane,
     toggleSidePanel,
     closeSidePanelPane,
+    openSidePanelFile,
+    moveSidePanelFile,
+    closeSidePanelFile,
     filePreviewOpen,
     handleChatSearchShortcut,
     hideBrowserPanel,
@@ -2120,6 +2312,9 @@ export function createConversationViewScope(props: ConversationProps) {
     quoteRequest,
     quoteSelection,
     openQuote,
+    taggableBrowserTabs,
+    taggableThreads,
+    openTaggedReference,
     setActiveRightPanel,
     setBrowserAddress,
     setBrowserPanelWidth,
@@ -2127,6 +2322,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setComposerError: setScopedComposerError,
     changeFastMode,
     fastMode,
+    fastModeChange,
     setComposerFocusRequest,
     setDropActive,
     setExpandedEmojiMessageId,

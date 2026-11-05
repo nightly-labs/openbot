@@ -78,4 +78,11 @@ export const messages = {
   "agent.color.indigo": "Indigo",
   "agent.color.violet": "Violet",
   "agent.color.magenta": "Magenta",
+  "agent.color.grey": "Grijs",
+  "agent.color.pink": "Roze",
+  "agent.color.sky": "Hemelsblauw",
+  "agent.color.navy": "Marineblauw",
+  "agent.color.wine": "Wijnrood",
+  "agent.color.brown": "Bruin",
+  "agent.color.sand": "Zand",
 } as const satisfies PartialTranslation<typeof source>;

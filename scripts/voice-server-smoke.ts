@@ -279,8 +279,8 @@ try {
   const badges = await page.getByRole("tabpanel").getByText(t("settings.voice.model.inUse"), { exact: true }).count();
   check("no local dictation model is in use", badges === 0, badges);
   const language = page
-    .locator('[data-settings-row="settings.voice.language.title"]')
-    .getByRole("button", { name: t("settings.voice.language.title") });
+    .locator('[data-settings-row="settings.voice.language.section"]')
+    .getByRole("button", { name: t("settings.voice.language.section") });
   check("the dictation language can be set for the server", await language.isEnabled());
   const voiceRows = await page.locator('[data-settings-row="settings.voice.speech.voice.title"]').count();
   check("the Supertonic voice row is hidden", voiceRows === 0, voiceRows);
@@ -412,7 +412,9 @@ try {
   );
 
   // Use: needs a local model that is ready. A fresh dev profile has none, so the step is then skipped.
-  const use = page.locator('[data-settings-row="settings.voice.models.title"]').getByRole("button", { name: useLabel });
+  const use = page
+    .locator('[data-settings-row="settings.voice.dictation.section"]')
+    .getByRole("button", { name: useLabel });
   if (afterEdit && (await use.count()) > 0) {
     // Server dictation on again, so that Use has something to turn off.
     await page.evaluate((current) => window.openbot.voice.setServer({ server: { ...current, apiKey: null } }), {

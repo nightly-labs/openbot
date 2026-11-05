@@ -88,7 +88,7 @@
 .onboarding-provider {
   width: min(100%, 480px);
   margin-top: 26px;
-  text-align: left;
+  text-align: start;
 }
 
 .onboarding-provider .provider-picker-standalone {
@@ -481,7 +481,7 @@
 /* Drawn like the drag hint of the macOS installer: a note, then a thin arrow into the row. */
 .provider-picker-callout {
   position: absolute;
-  right: calc(100% + 10px);
+  inset-inline-end: calc(100% + 10px);
   bottom: 50%;
   width: 150px;
   display: flex;
@@ -522,14 +522,28 @@
 /* The same note on the right of the list, for "More providers": the text aligns right and the
    arrow is mirrored to point left. */
 .provider-picker-callout-end {
-  right: auto;
-  left: calc(100% + 10px);
+  inset-inline-end: auto;
+  inset-inline-start: calc(100% + 10px);
   align-items: flex-end;
-  text-align: right;
+  text-align: end;
 }
 
 .provider-picker-callout-end .provider-picker-callout-arrow {
   align-self: flex-start;
+  transform: scaleX(-1);
+}
+
+/* Right to left, the notes change sides, so each arrow points the other way. */
+.provider-picker-callout:dir(rtl) .provider-picker-callout-arrow {
+  transform: scaleX(-1);
+}
+
+.provider-picker-callout-end:dir(rtl) .provider-picker-callout-arrow {
+  transform: none;
+}
+
+/* The arrows of the setup routes and the choice rows point to the reading direction. */
+:is(.setup-route-arrow, .first-run-choice-row-chevron):dir(rtl) {
   transform: scaleX(-1);
 }
 
@@ -598,7 +612,7 @@
 /* The steps are not the same width. Each image keeps its own size in the middle, so none stretches. */
 ::view-transition-old(first-run-step),
 ::view-transition-new(first-run-step) {
-  inset-inline-start: 50%;
+  left: 50%;
   inline-size: auto;
   translate: -50% 0;
 }
@@ -796,7 +810,7 @@ html:active-view-transition-type(open)::view-transition-new(*) {
   gap: var(--openbot-space-3);
   border-radius: 0;
   padding: var(--openbot-space-3) var(--openbot-space-4);
-  text-align: left;
+  text-align: start;
   white-space: normal;
 }
 
@@ -853,7 +867,7 @@ html:active-view-transition-type(open)::view-transition-new(*) {
   gap: var(--openbot-space-2);
   border-top: 1px solid var(--openbot-border-grouped);
   padding: var(--openbot-space-3) var(--openbot-space-4);
-  text-align: left;
+  text-align: start;
   cursor: pointer;
 }
 
@@ -876,7 +890,7 @@ html:active-view-transition-type(open)::view-transition-new(*) {
 .first-run-choice-improve-pop {
   position: absolute;
   top: var(--openbot-space-2);
-  right: var(--openbot-space-4);
+  inset-inline-end: var(--openbot-space-4);
   display: flex;
   align-items: flex-end;
   gap: var(--openbot-space-1);

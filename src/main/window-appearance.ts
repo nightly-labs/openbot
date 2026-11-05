@@ -2,6 +2,7 @@ import {
   type AppAppearancePreference,
   DEFAULT_APP_APPEARANCE,
   DEFAULT_TRANSPARENT_WINDOW,
+  selectedThemePalette,
 } from "@openbot/contracts/app-appearance";
 import { type BrowserWindow, nativeTheme } from "electron";
 
@@ -14,6 +15,8 @@ const GLASS_VIBRANCY = "under-window";
 let current: AppAppearancePreference = {
   appearance: DEFAULT_APP_APPEARANCE,
   transparentWindow: DEFAULT_TRANSPARENT_WINDOW,
+  palette: null,
+  palettes: [],
 };
 const listeners = new Set<() => void>();
 
@@ -21,17 +24,25 @@ const listeners = new Set<() => void>();
  * Sets the appearance that window backgrounds follow. While the window is opaque, main leaves
  * `nativeTheme.themeSource` on the system: visited websites and the native menus follow the computer.
  * The blur behind a transparent window takes its light or dark shade from `themeSource`, so while the
- * window is transparent, `themeSource` follows the appearance, and websites and menus follow it too.
+ * window is transparent, `themeSource` follows the appearance, or the scheme of the selected theme
+ * palette, and websites and menus follow it too.
  * Main reports `transparentWindow` as `false` where the window cannot blur.
  */
 export function setWindowAppearance(preference: AppAppearancePreference): void {
   current = { ...preference };
-  nativeTheme.themeSource = preference.transparentWindow ? preference.appearance : "system";
+  const appearance = selectedThemePalette(preference)?.scheme ?? preference.appearance;
+  nativeTheme.themeSource = preference.transparentWindow ? appearance : "system";
   for (const listener of listeners) listener();
 }
 
-/** The background a window shows before its page paints, and around it while it resizes. */
+/**
+ * The background a window shows before its page paints, and around it while it resizes. A theme
+ * palette gives its own canvas, without its alpha: Electron reads eight hex digits as `#aarrggbb`,
+ * and the window under the page is opaque.
+ */
 export function windowBackgroundColor(darkColor: string): string {
+  const palette = selectedThemePalette(current);
+  if (palette !== null) return palette.colors.canvas.slice(0, 7);
   const dark = current.appearance === "system" ? nativeTheme.shouldUseDarkColors : current.appearance === "dark";
   return dark ? darkColor : LIGHT_WINDOW_BACKGROUND;
 }

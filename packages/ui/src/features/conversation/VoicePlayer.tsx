@@ -26,11 +26,16 @@ export interface VoicePlayerProps {
   onToggle: () => void;
   /** Moves a recording to a position, in seconds, and plays it from there. */
   onSeek?: ((seconds: number) => void) | undefined;
+  /** For a reply: the speed it plays at, where 1 is normal speed. */
+  speed?: number | undefined;
+  /** For a reply: changes to the next speed. Without it, the player has no speed button. */
+  onCycleSpeed?: (() => void) | undefined;
 }
 
 /** Plays a spoken turn in its message: the user's recording, or the agent's reply read aloud. */
 export function VoicePlayer(props: VoicePlayerProps) {
-  const { t } = useText();
+  const { t, format } = useText();
+  const speed = () => format.number(props.speed ?? 1);
   /** Where a drag or a key moved the position, in seconds, until the user releases it. */
   const [dragged, setDragged] = createSignal<number | null>(null);
   const active = () => props.state !== "idle";
@@ -108,6 +113,21 @@ export function VoicePlayer(props: VoicePlayerProps) {
       </SeekSlider>
       <Show when={active() || props.duration !== undefined}>
         <span class="voice-player-time">{clock(active() ? elapsed() : duration())}</span>
+      </Show>
+      <Show when={props.onCycleSpeed}>
+        {(cycleSpeed) => (
+          <Button
+            variant="secondary"
+            size="xs"
+            type="button"
+            class="voice-player-speed"
+            aria-label={t("chat.voice.speedLabel", { speed: speed() })}
+            title={t("chat.voice.speed")}
+            onClick={() => cycleSpeed()()}
+          >
+            {t("chat.voice.speedValue", { speed: speed() })}
+          </Button>
+        )}
       </Show>
     </div>
   );

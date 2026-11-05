@@ -88,6 +88,11 @@ export interface AccountReadResult {
     type: string;
     email?: string | null | undefined;
     planType?: string | null | undefined;
+    /**
+     * The organization or workspace of the login, when the CLI gives one: the Claude `orgId` or the
+     * Codex `workspaceName`. One email can sign in to a team and to a personal account.
+     */
+    organization?: string | null | undefined;
   };
   requiresOpenaiAuth: boolean;
 }
@@ -259,11 +264,14 @@ export function decodeAccountReadResult(value: unknown): AccountReadResult {
   const accountRecord = decodeRecord(account, "account");
   const email = optionalString(accountRecord, "email");
   const planType = optionalString(accountRecord, "planType");
+  // The Claude client gives `organization`; the Codex app server gives `workspaceName`.
+  const organization = optionalString(accountRecord, "organization") ?? optionalString(accountRecord, "workspaceName");
   return {
     account: {
       type: requiredString(accountRecord, "type"),
       ...(email === undefined ? {} : { email }),
       ...(planType === undefined ? {} : { planType }),
+      ...(organization === undefined ? {} : { organization }),
     },
     requiresOpenaiAuth: requiresOpenaiAuth === undefined ? false : recordBoolean(record, "requiresOpenaiAuth"),
   };
@@ -530,7 +538,8 @@ export function getRecord(record: unknown, key: string): DynamicRecord | null {
 export function bridgedToolName(item: ThreadItem): string | null {
   const tool = getString(item, "tool") ?? getString(item, "name");
   if (tool !== "tool_call" && tool !== "mcp__openbot__tool_call") return null;
-  return getString(getRecord(item, "arguments"), "name");
+  const args = getRecord(item, "arguments");
+  return getString(args, "name") ?? getString(args, "tool");
 }
 
 export function getArray(record: unknown, key: string): unknown[] {

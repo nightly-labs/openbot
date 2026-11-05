@@ -7,8 +7,8 @@ export interface AppBehaviorPreference {
   launchAtLogin: boolean | null;
   /**
    * Hide the main window on close and show a tray icon, rather than quit. macOS always hides the
-   * window: there it shows a menu bar icon and hides the Dock icon while the window is hidden, and
-   * it is on by default. Null on a server.
+   * window and keeps the Dock icon: there it shows a menu bar icon, and it is on by default.
+   * Null on a server.
    */
   keepRunningInBackground: boolean | null;
   /**

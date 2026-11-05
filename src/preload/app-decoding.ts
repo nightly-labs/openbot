@@ -29,6 +29,7 @@ import {
   type AppLogoColorPreference,
   type ApprovalAutomationPreference,
   type AppSetupState,
+  type AppThemePalette,
   type BitwardenConnectorStatus,
   type BusyMessageModePreference,
   type CentralAuthIssue,
@@ -67,7 +68,11 @@ import {
   isAppLanguage,
   isAppLogoColor,
   isApprovalAutomationPreference,
+  isAppThemePalette,
+  isAppThemePaletteId,
+  isAvatarColor,
   isBusyMessageMode,
+  isCodexLiveVoice,
   isCustomAgentCheckResult,
   isCustomAgentResult,
   isCustomAgentSummary,
@@ -81,6 +86,7 @@ import {
   isRemoteDesktopSetupStatus,
   isRemoteDesktopTestStatus,
   isRemoteNetworkRoute,
+  isSpeechSpeed,
   isSpeechVoice,
   isVoiceLanguage,
   isVoiceModelId,
@@ -102,6 +108,7 @@ import {
   type RemoteDesktopTestStatus,
   type RemoteNetworkRouteState,
   type RemoteSessionReusePreference,
+  type SentMessageStats,
   SPEECH_MODEL_ID,
   type SpeechAudio,
   type SpeechModelStatus,
@@ -109,6 +116,8 @@ import {
   UPDATE_PHASES,
   type UpdatePreference,
   type UpdateStatus,
+  type VoiceLiveEvent,
+  type VoiceLiveSession,
   type VoiceModelStatus,
   type VoiceServerProbe,
   type VoiceServerSettings,
@@ -147,13 +156,15 @@ import {
 
 export function decodeAppInfo(value: unknown): AppInfo {
   const info = decodeRecord(value, "app info");
-  const { platform, variant, analyticsCaptureUrl, analyticsInstallId } = info;
+  const { platform, variant, analyticsCaptureUrl, analyticsInstallId, softwareRendering } = info;
   if (!isOneOf(["darwin", "win32", "linux"] as const, platform)) throw new Error("Invalid platform.");
   if (!isOneOf(["production", "dev", "preview"] as const, variant)) throw new Error("Invalid variant.");
   if (analyticsCaptureUrl !== undefined && !isString(analyticsCaptureUrl))
     throw new Error("Invalid analytics capture URL.");
   if (analyticsInstallId !== undefined && !isString(analyticsInstallId))
     throw new Error("Invalid analytics install ID.");
+  if (softwareRendering !== undefined && !isBoolean(softwareRendering))
+    throw new Error("Invalid software rendering flag.");
   return {
     name: requiredString(info, "name"),
     version: requiredString(info, "version"),
@@ -161,7 +172,15 @@ export function decodeAppInfo(value: unknown): AppInfo {
     variant,
     ...(analyticsCaptureUrl === undefined ? {} : { analyticsCaptureUrl }),
     ...(analyticsInstallId === undefined ? {} : { analyticsInstallId }),
+    ...(softwareRendering === undefined ? {} : { softwareRendering }),
   };
+}
+
+export function decodeSentMessageStats(value: unknown): SentMessageStats {
+  const stats = decodeRecord(value, "sent message stats");
+  const sentCount = requiredNumber(stats, "sentCount");
+  if (!Number.isSafeInteger(sentCount) || sentCount < 0) throw new Error("Invalid sentCount.");
+  return { firstSentAt: nullableString(stats, "firstSentAt"), sentCount };
 }
 
 export function decodeAppSetupState(value: unknown): AppSetupState {
@@ -212,11 +231,24 @@ export function decodeAppLogoColorPreference(value: unknown): AppLogoColorPrefer
   return { color: preference.color };
 }
 
+/** Only a hex color passes: each one becomes a CSS property value in the page. */
+function decodeThemePalette(palette: DynamicRecord): AppThemePalette {
+  if (!isAppThemePalette(palette)) throw new Error("Invalid theme palette.");
+  return { id: palette.id, name: palette.name, scheme: palette.scheme, colors: { ...palette.colors } };
+}
+
 export function decodeAppAppearancePreference(value: unknown): AppAppearancePreference {
   const preference = decodeRecord(value, "appearance preference");
   if (!isAppAppearance(preference.appearance)) throw new Error("Invalid appearance.");
   if (typeof preference.transparentWindow !== "boolean") throw new Error("Invalid transparent window.");
-  return { appearance: preference.appearance, transparentWindow: preference.transparentWindow };
+  if (preference.palette !== null && !isAppThemePaletteId(preference.palette))
+    throw new Error("Invalid theme palette.");
+  return {
+    appearance: preference.appearance,
+    transparentWindow: preference.transparentWindow,
+    palette: preference.palette,
+    palettes: decodeList(preference.palettes, "theme palettes", decodeThemePalette),
+  };
 }
 
 export function decodeAppInterfaceSizePreference(value: unknown): AppInterfaceSizePreference {
@@ -238,9 +270,12 @@ export function decodeCentralAuthState(value: unknown): CentralAuthState {
   const state = decodeRecord(value, "account state");
   switch (state.status) {
     case "loading":
-    case "signed_out":
     case "signing_in":
       return { status: state.status };
+    case "signed_out":
+      if (state.reason === undefined) return { status: "signed_out" };
+      if (state.reason !== "keyring_changed") throw new Error("Invalid signed-out reason.");
+      return { status: "signed_out", reason: state.reason };
     case "code_sent": {
       const { developmentCode, issue } = state;
       if (developmentCode !== undefined && !isString(developmentCode)) throw new Error("Invalid developmentCode.");
@@ -251,6 +286,14 @@ export function decodeCentralAuthState(value: unknown): CentralAuthState {
         expiresAt: requiredNumber(state, "expiresAt"),
         resendAvailableAt: requiredNumber(state, "resendAvailableAt"),
         ...(developmentCode === undefined ? {} : { developmentCode }),
+        ...(issue === undefined ? {} : { issue: decodeCentralAuthIssue(issue) }),
+      };
+    }
+    case "company_sign_in": {
+      const { issue } = state;
+      return {
+        status: "company_sign_in",
+        email: requiredString(state, "email"),
         ...(issue === undefined ? {} : { issue: decodeCentralAuthIssue(issue) }),
       };
     }
@@ -271,7 +314,15 @@ function decodeCentralAuthUser(value: unknown): CentralAuthUser {
     name: nullableString(user, "name"),
     avatarUrl: nullableString(user, "avatarUrl"),
     ...optionalAnalyticsEnabled(user),
+    ...optionalChatColor(user),
   };
+}
+
+function optionalChatColor(user: DynamicRecord): Pick<CentralAuthUser, "chatColor"> {
+  const { chatColor } = user;
+  if (chatColor === undefined) return {};
+  if (chatColor !== null && !isAvatarColor(chatColor)) throw new Error("Invalid chatColor.");
+  return { chatColor };
 }
 
 function optionalAnalyticsEnabled(user: DynamicRecord): Pick<CentralAuthUser, "analyticsEnabled"> {
@@ -493,9 +544,37 @@ export function decodeSpeechModelStatus(value: unknown): SpeechModelStatus {
 
 export function decodeSpeechSettings(value: unknown): SpeechSettings {
   const settings = decodeRecord(value, "speech settings");
-  const { voice } = settings;
-  if (!isSpeechVoice(voice)) throw new Error("Invalid speech settings.");
-  return { readReplies: requiredBoolean(settings, "readReplies"), voice };
+  const { voice, speed, codexLiveVoice } = settings;
+  if (!isSpeechVoice(voice) || !isSpeechSpeed(speed) || !(codexLiveVoice === null || isCodexLiveVoice(codexLiveVoice)))
+    throw new Error("Invalid speech settings.");
+  return {
+    readReplies: requiredBoolean(settings, "readReplies"),
+    voice,
+    speed,
+    codexLive: requiredBoolean(settings, "codexLive"),
+    codexLiveVoice,
+  };
+}
+
+export function decodeVoiceLiveSession(value: unknown): VoiceLiveSession {
+  const session = decodeRecord(value, "live voice session");
+  return { sessionId: requiredString(session, "sessionId"), sdp: requiredString(session, "sdp") };
+}
+
+export function decodeVoiceLiveEvent(value: unknown): VoiceLiveEvent {
+  const event = decodeRecord(value, "live voice event");
+  const sessionId = requiredString(event, "sessionId");
+  if (event.type === "ended") return { type: "ended", sessionId, error: nullableString(event, "error") };
+  const { role } = event;
+  if (event.type !== "transcript" || (role !== "user" && role !== "assistant"))
+    throw new Error("Invalid live voice event.");
+  return {
+    type: "transcript",
+    sessionId,
+    role,
+    text: requiredString(event, "text"),
+    final: requiredBoolean(event, "final"),
+  };
 }
 
 export function decodeSpeechAudio(value: unknown): SpeechAudio {
