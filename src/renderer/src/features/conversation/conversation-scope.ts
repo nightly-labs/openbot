@@ -457,11 +457,7 @@ export function createConversationViewScope(props: ConversationProps) {
     panels: {
       activeRightPanel,
       setActiveRightPanel,
-      closeBrowserPane: () => {
-        // The full view and picture in picture are outside the side panel, so the pane shows first.
-        setActiveRightPanel("browser");
-        closeSidePanelPane("browser");
-      },
+      closeBrowserPane,
     },
   });
   const {
@@ -599,7 +595,18 @@ export function createConversationViewScope(props: ConversationProps) {
     if (pane === "question") deleteSideQuestion();
     const shown = sidePanelOpen() && sidePanel().selected === pane;
     const next = removeSidePanelPane(pane);
-    if (!shown) return;
+    if (shown) showSidePanelInPlaceOf(next);
+  }
+  /**
+   * Closes the browser pane when its last tab closes. The full view and picture in picture are outside the
+   * side panel, so the pane closes from them too. The browser store calls this from an effect, where the
+   * panel mode that a write sets does not show yet, so this does not read the mode.
+   */
+  function closeBrowserPane() {
+    showSidePanelInPlaceOf(removeSidePanelPane("browser"));
+  }
+  /** Shows the next tab of the side panel after a tab closed; with no tab, the panel lists the panes. */
+  function showSidePanelInPlaceOf(next: SidePanelPane | null) {
     const thread = sideThreadIds()[0];
     const file = sidePanel().files.at(-1);
     if (next) openSidePanelPane(next);

@@ -57,7 +57,7 @@ function canonicalBrowserUrl(url: string): string {
 interface BrowserPanels {
   activeRightPanel: () => RightPanelMode;
   setActiveRightPanel: (mode: RightPanelMode, agentId?: string) => void;
-  /** Closes the browser tab of the side panel, also from the full view or picture in picture. */
+  /** Closes the Browser tab of the side panel, also from the full view or picture in picture. */
   closeBrowserPane: () => void;
 }
 
@@ -251,15 +251,15 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     () => ({
       agentId: deps.props.agent?.id,
       count: browserTabs().length,
-      open: screenOpen(),
       enabled: deps.props.browserEnabled !== false,
     }),
-    ({ agentId, count, open, enabled }) => {
+    ({ agentId, count, enabled }) => {
       if (!enabled) return;
+      // Untracked: the close reads the side panel and writes the panel mode, which must not run this effect again.
       const lastTabClosed =
-        open && previousBrowserTabs.agentId === agentId && previousBrowserTabs.count > 0 && count === 0;
+        untrack(screenOpen) && previousBrowserTabs.agentId === agentId && previousBrowserTabs.count > 0 && count === 0;
       previousBrowserTabs = { agentId, count };
-      if (lastTabClosed) deps.panels.closeBrowserPane();
+      if (lastTabClosed) untrack(deps.panels.closeBrowserPane);
     },
   );
 
