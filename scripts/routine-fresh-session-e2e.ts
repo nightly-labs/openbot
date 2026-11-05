@@ -10,7 +10,8 @@
 // for each other. The second routine opens a wait, which a routine thread can do as the chat can.
 // A routine with no run place runs in the chat: its answer shows in the chat, and it gets no thread.
 // It also drives saved password and authenticator fills through the routine tool router, checks
-// the sign-in guidance, and checks that no secret reaches the provider.
+// the sign-in guidance, and checks that no secret reaches the provider. Each run keeps the agent's
+// Computer Use, as the chat does: a scheduled run can drive a desktop app.
 // `bun scripts/routine-fresh-session-e2e.ts`. Writes .openbot-build/routine-fresh-session-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -22,6 +23,8 @@ import {
   AGENT_PROVIDERS,
   type AgentEvent,
   type BrowserTab,
+  COMPUTER_USE_MCP_SERVER_ID,
+  COMPUTER_USE_MCP_SERVER_NAME,
   decodeUsageTokens,
   parseRoutineRunConversationEventItemType,
 } from "@openbot/contracts/ipc";
@@ -113,7 +116,7 @@ const answer = (message) => {
     case "config/batchWrite": return write({ id: message.id, result: {} });
     case "thread/start": {
       const id = "thread-" + (++threads);
-      log({ method: "thread/start", threadId: id, ephemeral: params.ephemeral ?? null, persistSession: params.persistSession ?? null, instructions: params.developerInstructions });
+      log({ method: "thread/start", threadId: id, ephemeral: params.ephemeral ?? null, persistSession: params.persistSession ?? null, instructions: params.developerInstructions, mcpServers: Object.entries((params.config && params.config.mcp_servers) || {}).filter(([, server]) => server.enabled !== false).map(([name]) => name) });
       return write({ id: message.id, result: { thread: { id, turns: [] } } });
     }
     case "thread/resume":
@@ -212,6 +215,7 @@ interface LogEntry {
   prompt?: number;
   text?: string;
   instructions?: string;
+  mcpServers?: string[];
   tool?: string;
   result?: { success: boolean; contentItems: { type: string; text?: string }[] };
   error?: { message: string };
@@ -360,6 +364,20 @@ const agents = new AgentService({
     },
   },
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
+  // The driver is not started: only the entry that the provider is given is checked.
+  computerUseMcpServer: () => ({
+    id: COMPUTER_USE_MCP_SERVER_ID,
+    name: COMPUTER_USE_MCP_SERVER_NAME,
+    transport: "stdio",
+    enabled: true,
+    command: fakeCodex,
+    args: [],
+    env: [],
+    envPassthrough: [],
+    workingDirectory: "",
+    url: "",
+    headers: [],
+  }),
 });
 agents.on("event", (event: AgentEvent) => {
   if (event.type === "browser-takeover-requested") takeoverRequests += 1;
@@ -597,6 +615,14 @@ try {
     ),
   );
   pass("Each routine run starts one new session", routineStarts.length === 3);
+  pass(
+    "Each routine run gets Computer Use",
+    routineStarts.every(
+      (entry) =>
+        entry.mcpServers?.includes(COMPUTER_USE_MCP_SERVER_NAME) &&
+        entry.instructions?.includes(`Use ${COMPUTER_USE_MCP_SERVER_NAME} for every GUI task`),
+    ),
+  );
   pass(
     "Routine sessions are ephemeral and not saved",
     routineStarts.every((entry) => entry.persistSession === false),

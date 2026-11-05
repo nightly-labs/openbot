@@ -205,6 +205,8 @@ export interface ThreadLifecycleOptions {
   channelThread?: (threadId: string) => boolean;
   /** Whether a side thread is a branch: a copy of another conversation, which its first session must receive. */
   branchThread?: (threadId: string) => boolean;
+  /** Whether a side thread takes the runs of a routine. */
+  routineThread?: (threadId: string) => boolean;
 }
 
 /**
@@ -238,6 +240,7 @@ export class ThreadLifecycle {
   readonly #sectionTeammates: (agentId: string) => SectionTeammates | null;
   readonly #channelThread: (threadId: string) => boolean;
   readonly #branchThread: (threadId: string) => boolean;
+  readonly #routineThread: (threadId: string) => boolean;
   readonly #pendingHandoffs = new Map<string, string>();
   /**
    * Routine digests and the cleanup after a turn change a handoff one at a time. A routine thread
@@ -275,6 +278,7 @@ export class ThreadLifecycle {
     this.#sectionTeammates = options.sectionTeammates ?? (() => null);
     this.#channelThread = options.channelThread ?? (() => false);
     this.#branchThread = options.branchThread ?? (() => false);
+    this.#routineThread = options.routineThread ?? (() => false);
   }
 
   /**
@@ -1076,14 +1080,19 @@ export class ThreadLifecycle {
   /**
    * The settings that one session of the agent runs with. A task runs without Computer Use: the
    * agent's own chat keeps the one screen of this computer, so two conversations of the agent never
-   * drive it at the same time.
+   * drive it at the same time. A routine thread keeps it: a scheduled run that sends a message
+   * through a desktop app has no person to continue the step in the chat.
    */
   #sessionAgent(agent: AgentSummary, publicThreadId: string): AgentSummary {
     return this.#computerUseInOwnChat(agent, publicThreadId) ? { ...agent, computerUse: false } : agent;
   }
 
   #computerUseInOwnChat(agent: AgentSummary, publicThreadId: string): boolean {
-    return this.#conversation.isTaskThread(publicThreadId) && agentComputerUseEnabled(agent);
+    return (
+      this.#conversation.isTaskThread(publicThreadId) &&
+      !this.#routineThread(publicThreadId) &&
+      agentComputerUseEnabled(agent)
+    );
   }
 
   /** The enabled servers this agent is given. Without Computer Use the fingerprint changes, so Codex replaces the session. */
