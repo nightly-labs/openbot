@@ -99,8 +99,13 @@ the marker it skips the turn's thinking too, so a later import does not bring a 
 
 ## Routine sessions
 
-Each routine of an agent runs in its own side thread, the routine thread. `AgentTasks.routineThread`
-makes the thread on the first run, with the routine's name as its title and `routine_id` set
+An agent routine runs in the agent's own chat, unless its `runIn` is `thread` (migration 57; existing
+routines got `chat`, the place of runs before 0.61). Then it runs in its own side thread, the routine
+thread. The routine settings show a switch for it on this computer's host only: the Team API admin wire
+does not carry `runIn`, and a remote save without it keeps the saved place. The `create_routine`,
+`update_routine`, `create_webhook_routine` and `update_webhook_routine` tools take `runIn` too. A routine set back to `chat` keeps its thread, but new runs,
+the run marker's "Open thread" link, a test run and the routine's reply digest do not use it.
+`AgentTasks.routineThread` makes the thread on the first run in a thread, with the routine's name as its title and `routine_id` set
 (migration 54; a unique index keeps one thread for each routine of an agent, also when it is
 archived). A later run uses the same thread, and a run reopens an archived one. A run also gives the
 thread the routine's current name, unless a person renamed the thread. `RoutineScheduler`

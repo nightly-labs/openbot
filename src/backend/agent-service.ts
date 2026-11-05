@@ -1557,7 +1557,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           const agent = this.#store.list().find((item) => item.id === agentId);
           const run = this.#routines.runForDelivery(deliveryId);
           if (!agent || !run) return Effect.void;
-          const routineThread = this.#tasks.threadOfRoutine(agentId, run.routineId);
+          // Only a run in the routine's own thread tells that thread's session. A run in the chat does not,
+          // also when an earlier run made the thread or the user changed the place during the run.
+          const thread = this.#tasks.threadOfRoutine(agentId, run.routineId);
+          const routineThread = thread && thread.taskId === this.#mailbox.taskIdForDelivery(deliveryId) ? thread : null;
           return this.#threads
             .addRoutineDigest(agent, run.routineName, answer, routineThread?.threadId)
             .pipe(

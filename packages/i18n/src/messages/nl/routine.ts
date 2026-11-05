@@ -331,6 +331,7 @@ export const messages = {
   "routine.settings.missedPolicy": "Als OpenBot gesloten was op het geplande tijdstip",
   "routine.settings.missedPolicy.skip": "Deze run overslaan",
   "routine.settings.missedPolicy.runOnce": "Eén keer uitvoeren als OpenBot opent",
+  "routine.settings.runInThread": "Uitvoeren in een aparte thread",
   "routine.settings.resultDestination": "Antwoorden sturen naar",
   "routine.settings.resultDestination.none": "Alleen deze chat",
   "routine.settings.resultDestination.place": "{connection} · {place}",

@@ -328,6 +328,7 @@ export const messages = {
   "routine.settings.missedPolicy": "Planlanan zamanda OpenBot kapalıysa",
   "routine.settings.missedPolicy.skip": "Bu çalıştırmayı atla",
   "routine.settings.missedPolicy.runOnce": "OpenBot açıldığında bir kez çalıştır",
+  "routine.settings.runInThread": "Ayrı bir dizide çalıştır",
   "routine.settings.resultDestination": "Yanıtları şuraya gönder",
   "routine.settings.resultDestination.none": "Yalnızca bu sohbet",
   "routine.settings.resultDestination.place": "{connection} · {place}",

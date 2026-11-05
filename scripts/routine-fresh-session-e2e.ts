@@ -1,5 +1,5 @@
-// Checks that each routine of an agent runs in its own side thread, and that each run starts its own
-// provider session, so that it does not send the whole chat context again. Runs the real agent
+// Checks that each routine of an agent that is set to run in a separate thread runs in its own side
+// thread, and that each run starts its own provider session, so that it does not send the whole chat context again. Runs the real agent
 // service on a temporary profile with a fake Codex app-server. The fake keeps the context of each
 // session: each request sends all of the session's earlier input again, as a model request does, and
 // reports that size as input tokens. The chat gets about 45,000 tokens of history, then a routine
@@ -8,6 +8,7 @@
 // the chat, that the chat keeps its session, and that the chat turns read the answers. While the
 // second run is held, a chat message and a run of a second routine must finish: the lanes do not wait
 // for each other. The second routine opens a wait, which a routine thread can do as the chat can.
+// A routine with no run place runs in the chat: its answer shows in the chat, and it gets no thread.
 // It also drives saved password and authenticator fills through the routine tool router, checks
 // the sign-in guidance, and checks that no secret reaches the provider.
 // `bun scripts/routine-fresh-session-e2e.ts`. Writes .openbot-build/routine-fresh-session-e2e/report.json.
@@ -237,6 +238,7 @@ const report: {
   runMarkersInChat?: string[];
   waitInRoutineThread?: unknown[];
   digestInNextTurn?: { marker: boolean; answers: string[] };
+  chatRoutine?: { threads: number; answersInChat: number; runStatus: string };
   checks: { name: string; passed: boolean }[];
   passed: boolean;
   error?: string;
@@ -483,6 +485,7 @@ try {
     active: false,
     timezone: "UTC",
     schedule: { kind: "daily", time: "09:00" },
+    runIn: "thread",
   });
   const secondRoutine = agents.createRoutine({
     agentId: agent.id,
@@ -491,6 +494,7 @@ try {
     active: false,
     timezone: "UTC",
     schedule: { kind: "daily", time: "10:00" },
+    runIn: "thread",
   });
   const buildTurns = () =>
     fakeEntries().filter(
@@ -686,6 +690,37 @@ try {
     "The chat did not resume or restart its session",
     !fakeEntries().some((entry) => entry.method === "thread/resume") &&
       report.threadStarts.filter((entry) => entry.ephemeral !== true).length === 1,
+  );
+
+  // A routine with no run place runs in the chat, as before 0.61.
+  const chatRoutine = agents.createRoutine({
+    agentId: agent.id,
+    name: "Chat check",
+    instruction: "Check the chat and report.",
+    active: false,
+    timezone: "UTC",
+    schedule: { kind: "daily", time: "11:00" },
+  });
+  const chatRun = await runCauseEffect(agents.testRoutine({ agentId: agent.id, routineId: chatRoutine.id }));
+  assert.ok(chatRun.deliveryId, "chat routine: no delivery");
+  const chatRunDeliveryId = chatRun.deliveryId;
+  await settled(chatRunDeliveryId, "chat routine run");
+  const chatRunStatus = await waitFor("the chat routine run to end", () => {
+    const status = agents.listRoutineRuns({ agentId: agent.id, routineId: chatRoutine.id })[0]?.status;
+    return status && status !== "running" && status !== "queued" ? status : null;
+  });
+  const chatRunTurnId = mailbox.getDelivery(chatRunDeliveryId)?.delivery.turnId;
+  report.chatRoutine = {
+    threads: agents.listTasks(agent.id).tasks.filter((task) => task.routineId === chatRoutine.id).length,
+    answersInChat: (await runCauseEffect(agents.readConversation(agent.id))).messages.filter(
+      (message) =>
+        chatRunTurnId !== undefined && message.turnId === chatRunTurnId && message.itemType === "final_answer",
+    ).length,
+    runStatus: chatRunStatus,
+  };
+  pass(
+    "A routine with no run place answers in the chat and gets no thread",
+    report.chatRoutine.threads === 0 && report.chatRoutine.answersInChat === 1 && chatRunStatus === "succeeded",
   );
   report.passed = true;
 } catch (error) {
