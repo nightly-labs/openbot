@@ -108,7 +108,7 @@ export function useWaitingAgentIds(): ReadonlySet<string> {
     const { activityByServer, threadWaitsByServer } = liveState.get();
     const activities = activityByServer[serverId] ?? {};
     const waiting = new Set(Object.keys(activities).filter((agentId) => activities[agentId]?.phase === "waiting"));
-    for (const wait of threadWaitsByServer[serverId] ?? []) waiting.add(wait.agentId);
+    for (const wait of threadWaitsByServer[serverId] ?? []) if (wait.task) waiting.add(wait.agentId);
     return [...waiting].sort().join("\n");
   }, [liveState, online, serverId]);
   const key = useSyncExternalStore(liveState.subscribe, select);

@@ -2,8 +2,10 @@ import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { type MobileAgentWaitReason, WAIT_RANK } from "./agent-activity";
 
 /**
- * A question, approval or takeover that a side thread of an agent waits on. The agent's chat does not
- * show it (see `withoutTaskTurns`), but the home list marks the agent with it.
+ * A question, approval or takeover that an agent waits on. `task` is true when it is on a side thread
+ * that the phone knows: the agent's chat does not show it (see `withoutTaskTurns`), but the home list
+ * marks the agent with it. A request on a thread that is not known yet stays, so that it becomes a
+ * side-thread wait when the agent's task list arrives.
  */
 export interface MobileThreadWait {
   requestId: string | number;
@@ -11,6 +13,7 @@ export interface MobileThreadWait {
   threadId: string;
   turnId: string;
   reason: MobileAgentWaitReason;
+  task: boolean;
 }
 
 /** True when `threadId` is the thread of a side thread of the agent that the phone knows. */
@@ -19,13 +22,25 @@ export type IsTaskThread = (agentId: string, threadId: string) => boolean;
 function threadWait(
   request: { requestId: string | number; agentId: string; threadId: string; turnId: string },
   reason: MobileAgentWaitReason,
+  isTaskThread: IsTaskThread,
 ): MobileThreadWait {
   const { requestId, agentId, threadId, turnId } = request;
-  return { requestId, agentId, threadId, turnId, reason };
+  return { requestId, agentId, threadId, turnId, reason, task: isTaskThread(agentId, threadId) };
 }
 
 function sameRequest(left: MobileThreadWait, right: { requestId: string | number; agentId: string }) {
   return left.agentId === right.agentId && String(left.requestId) === String(right.requestId);
+}
+
+function sameWait(left: MobileThreadWait, right: MobileThreadWait | undefined) {
+  return (
+    right !== undefined &&
+    sameRequest(left, right) &&
+    left.reason === right.reason &&
+    left.threadId === right.threadId &&
+    left.turnId === right.turnId &&
+    left.task === right.task
+  );
 }
 
 function without(current: readonly MobileThreadWait[], drop: (wait: MobileThreadWait) => boolean) {
@@ -34,9 +49,10 @@ function without(current: readonly MobileThreadWait[], drop: (wait: MobileThread
 }
 
 /**
- * Folds one host event into the side-thread waits of one server. Only a request on a thread that
- * `isTaskThread` knows is a side-thread wait; the agent's chat keeps the others. A snapshot is the
- * current state, and a thread that no longer runs waits on nothing.
+ * Folds one host event into the pending requests of one server. Only a request on a thread that
+ * `isTaskThread` knows is a side-thread wait; the agent's chat shows the others. A snapshot is the
+ * current state, a task list marks the requests of its running threads, and a thread that no longer
+ * runs waits on nothing.
  */
 export function reduceThreadWaits(
   current: readonly MobileThreadWait[],
@@ -46,29 +62,29 @@ export function reduceThreadWaits(
   switch (event.type) {
     case "runtime-snapshot": {
       const { snapshot } = event;
-      const all = [
-        ...snapshot.pendingApprovals.map((request) => threadWait(request, "approval")),
-        ...snapshot.pendingBrowserTakeovers.map((request) => threadWait(request, "takeover")),
-        ...snapshot.pendingPrompts.map((request) => threadWait(request, "question")),
+      const waits = [
+        ...snapshot.pendingApprovals.map((request) => threadWait(request, "approval", isTaskThread)),
+        ...snapshot.pendingBrowserTakeovers.map((request) => threadWait(request, "takeover", isTaskThread)),
+        ...snapshot.pendingPrompts.map((request) => threadWait(request, "question", isTaskThread)),
       ];
-      const waits = all.filter((wait) => isTaskThread(wait.agentId, wait.threadId));
-      // A partial snapshot is whole for each agent that it names, also through a wait of its own chat.
-      const named = new Set(all.map((wait) => wait.agentId));
+      // A partial snapshot is whole for each agent that it names.
+      const named = new Set(waits.map((wait) => wait.agentId));
       const next = snapshot.attentionComplete
         ? waits
         : [...current.filter((wait) => !named.has(wait.agentId)), ...waits];
-      return next.length === current.length && next.every((wait, index) => wait === current[index]) ? current : next;
+      return next.length === current.length && next.every((wait, index) => sameWait(wait, current[index]))
+        ? current
+        : next;
     }
     case "prompt":
     case "approval":
     case "browser-takeover-requested": {
       const wait =
         event.type === "prompt"
-          ? threadWait(event, "question")
+          ? threadWait(event, "question", isTaskThread)
           : event.type === "approval"
-            ? threadWait(event.approval, "approval")
-            : threadWait(event.request, "takeover");
-      if (!isTaskThread(wait.agentId, wait.threadId)) return current;
+            ? threadWait(event.approval, "approval", isTaskThread)
+            : threadWait(event.request, "takeover", isTaskThread);
       return [...current.filter((item) => !(sameRequest(item, wait) && item.reason === wait.reason)), wait];
     }
     case "agent-input-resolved": {
@@ -81,8 +97,16 @@ export function reduceThreadWaits(
       return without(current, (wait) => wait.agentId === event.agentId && wait.turnId === event.turnId);
     case "agent-tasks-changed": {
       const { agentId, tasks } = event.snapshot;
-      const running = new Set(tasks.filter((task) => task.state === "running").map((task) => task.threadId));
-      return without(current, (wait) => wait.agentId === agentId && !running.has(wait.threadId));
+      const threads = new Map(tasks.map((task) => [task.threadId, task.state === "running"]));
+      const next = current.flatMap((wait) => {
+        if (wait.agentId !== agentId) return [wait];
+        const running = threads.get(wait.threadId);
+        // A request on a thread that is not a task is a wait of the agent's chat; it stays.
+        if (running === undefined) return wait.task ? [] : [wait];
+        if (!running) return [];
+        return [wait.task ? wait : { ...wait, task: true }];
+      });
+      return next.length === current.length && next.every((wait, index) => wait === current[index]) ? current : next;
     }
     case "agents-changed": {
       const ids = new Set(event.agents.map((agent) => agent.id));
@@ -100,7 +124,8 @@ export function agentThreadWaitReason(
 ): MobileAgentWaitReason | undefined {
   let reason: MobileAgentWaitReason | undefined;
   for (const wait of waits) {
-    if (wait.agentId === agentId && (!reason || WAIT_RANK[wait.reason] > WAIT_RANK[reason])) reason = wait.reason;
+    if (wait.task && wait.agentId === agentId && (!reason || WAIT_RANK[wait.reason] > WAIT_RANK[reason]))
+      reason = wait.reason;
   }
   return reason;
 }

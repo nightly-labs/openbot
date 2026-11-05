@@ -11,7 +11,7 @@ import { queryKeys } from "@/features/workspace/model/query-keys";
 const NO_READS: ReadonlyMap<string, AgentTaskReadState> = new Map();
 
 /** True when `serverId` is online and keeps the read marks of side threads. */
-export function useThreadReadsEnabled(serverId: string): boolean {
+function useThreadReadsEnabled(serverId: string): boolean {
   return useMobileWorkspaceSelector(
     (current) =>
       current.servers.some((server) => server.id === serverId && server.state === "online") &&

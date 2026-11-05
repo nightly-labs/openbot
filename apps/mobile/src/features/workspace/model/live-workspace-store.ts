@@ -8,7 +8,7 @@ import type { TurnStepLines } from "./turn-step-lines";
 /** Workspace state that host events change many times in one turn. */
 export interface LiveWorkspaceState {
   activityByServer: Record<string, MobileAgentActivities>;
-  /** What the side threads of the agents wait on, by server. The agent's chat does not show these. */
+  /** The pending requests of the agents, by server. Those with `task` are side-thread waits that the chat does not show. */
   threadWaitsByServer: Record<string, readonly MobileThreadWait[]>;
   /** The progress lines of the newest turns, by server. The host stores none. */
   turnLinesByServer: Record<string, TurnStepLines>;
