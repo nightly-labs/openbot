@@ -144,6 +144,7 @@ const STARTUP_RETRY_DELAYS_MS = [250, 500, 1_000, 2_000] as const;
 // network is ready only after the window (#5111). Each delay changes by up to a quarter, so clients
 // that lost the service at the same time do not ask at the same time.
 const UNAVAILABLE_RETRY_DELAYS_MS = [5_000, 10_000, 20_000, 30_000, 60_000] as const;
+const MAX_UNAVAILABLE_RETRY_AFTER_SECONDS = 60 * 60;
 const EMAIL_CODE_REQUEST_TIMEOUT_MS = 35_000;
 const RESEND_FALLBACK_DELAY_MS = 60_000;
 const DEFINITIVE_EMAIL_CODE_REQUEST_FAILURES = new Set([
@@ -1447,12 +1448,18 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     this.#unavailableRetryTimer = null;
   }
 
-  /** A `Retry-After` from the service makes the wait longer, never shorter. */
+  /**
+   * A `Retry-After` from the service makes the wait longer, never shorter. It is limited to one hour:
+   * Node runs a timer of more than 2^31 - 1 ms after 1 ms.
+   */
   #scheduleUnavailableRetry(error?: unknown): void {
     this.#cancelUnavailableRetry();
     if (this.#disposed) return;
     const delays = UNAVAILABLE_RETRY_DELAYS_MS;
-    const retryAfterMs = error instanceof AuthApiError ? (error.retryAfterSeconds ?? 0) * 1_000 : 0;
+    const retryAfterMs =
+      error instanceof AuthApiError
+        ? Math.min(error.retryAfterSeconds ?? 0, MAX_UNAVAILABLE_RETRY_AFTER_SECONDS) * 1_000
+        : 0;
     const delayMs = Math.max(delays[Math.min(this.#unavailableRetryFailures, delays.length - 1)] ?? 0, retryAfterMs);
     this.#unavailableRetryFailures += 1;
     this.#unavailableRetryTimer = setTimeout(
