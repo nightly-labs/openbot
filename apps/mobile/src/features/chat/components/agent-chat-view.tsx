@@ -1,3 +1,4 @@
+import { itemTypeCountsAsUnread } from "@openbot/contracts/conversation-read";
 import type { RespondToPromptInput } from "@openbot/contracts/ipc";
 import { router, useIsFocused } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -209,9 +210,10 @@ export function MobileChatView({
   );
   const latest = latestReadBoundaryMessage(conversation?.messages ?? []);
   const latestId = latest?.id;
-  // After Mark unread, the open chat does not read itself again while it stays open, as on desktop.
-  // The sheet that marks it covers the chat, so the hold does not end when the chat loses focus.
-  const readHeldFor = useRef<string | null>(null);
+  // After Mark unread, the open chat does not read itself again until the reader leaves it, as on
+  // desktop. The sheet that marks it covers the chat, so the hold ends only when the chat loses focus
+  // after it was on screen again.
+  const readHeldFor = useRef<{ agentId: string; shown: boolean } | null>(null);
   // The NEW line of this visit, as on desktop. The open chat reads itself at once, so the host read
   // state loses its first unread message: the line keeps it. It takes the host's message until the
   // chat reads itself, and again after the chat was covered, so it does not jump to a reply that
@@ -222,24 +224,30 @@ export function MobileChatView({
   // The agent whose chat has read itself since it was last covered.
   const unreadLineSettledFor = useRef<string | null>(null);
   useEffect(() => {
-    if (!isFocused) unreadLineSettledFor.current = null;
+    const held = readHeldFor.current;
+    if (isFocused) {
+      if (held) held.shown = true;
+      return;
+    }
+    unreadLineSettledFor.current = null;
+    if (held?.shown) readHeldFor.current = null;
   }, [isFocused]);
   useEffect(() => {
     if (firstUnreadMessageId && unreadLineSettledFor.current !== agent.id)
       setUnreadLine({ agentId: agent.id, messageId: firstUnreadMessageId });
   }, [agent.id, firstUnreadMessageId]);
   const markRead = useCallback(() => {
-    if (!latestId || readHeldFor.current === agent.id) return;
+    if (!latestId || readHeldFor.current?.agentId === agent.id) return;
     unreadLineSettledFor.current = agent.id;
     markAgentRead(agent.id, latestId, agent.serverId);
   }, [agent.id, agent.serverId, latestId, markAgentRead]);
   const markUnread = useCallback(
     (messageId: string) => {
       const agentId = agent.id;
-      readHeldFor.current = agentId;
+      readHeldFor.current = { agentId, shown: false };
       setUnreadLine({ agentId, messageId });
       markAgentUnreadFrom(agentId, messageId, agent.serverId).catch((error: unknown) => {
-        if (readHeldFor.current === agentId) readHeldFor.current = null;
+        if (readHeldFor.current?.agentId === agentId) readHeldFor.current = null;
         setUnreadLine((current) => (current?.messageId === messageId ? null : current));
         const text = currentText();
         showFailureAlert(
@@ -251,6 +259,16 @@ export function MobileChatView({
       });
     },
     [agent.id, agent.serverId, markAgentUnreadFrom],
+  );
+  // As on desktop, Mark unread is on the messages that the host counts as unread.
+  const markUnreadMessageIds = useMemo(
+    () =>
+      new Set(
+        (conversation?.messages ?? [])
+          .filter((message) => message.author !== "user" && itemTypeCountsAsUnread(message.itemType))
+          .map((message) => message.id),
+      ),
+    [conversation?.messages],
   );
   const unreadLineMessageId = unreadLine?.agentId === agent.id ? unreadLine.messageId : null;
   // The line shows above the first of these messages that has a row.
@@ -334,6 +352,7 @@ export function MobileChatView({
       deleteMessage={messageDelete.deleteMessage}
       deletesAnyMessage={messageDelete.deletesAny}
       markUnread={canMarkUnreadFrom ? markUnread : undefined}
+      markUnreadMessageIds={markUnreadMessageIds}
       unreadLineMessageIds={unreadLineMessageIds}
       sendToChannel={sendToChannel}
       questionForm={questionForm}

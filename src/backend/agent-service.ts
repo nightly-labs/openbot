@@ -4381,9 +4381,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     agentId: string,
     memberId: string,
     fromMessageId: string | null = null,
+    options?: ConversationMarkerExclusions,
   ): Effect.Effect<ConversationReadState, AgentLifecycleFailed> {
     return this.#reader
-      .markUnread(agentId, memberId, fromMessageId)
+      .markUnread(agentId, memberId, fromMessageId, options)
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "markConversationUnread", cause: failure.cause }),

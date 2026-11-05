@@ -161,13 +161,15 @@ export class ConversationReadStore {
     memberId: string,
     threadId: string | null,
     fromMessageId: string | null = null,
+    options: ConversationMarkerExclusions = {},
   ): ConversationReadState {
     if (!threadId) return emptyReadState();
     const fromKey = fromMessageId ? this.#messageOrderKey(threadId, fromMessageId) : undefined;
     if (fromMessageId && !fromKey) throw new Error(sourceText("error.backend.readBoundaryUnavailable"));
     const throughMessageId = fromKey ? this.#messageBefore(threadId, fromKey) : null;
     this.#saveCursor(threadId, memberId, throughMessageId, "marked");
-    return this.#stateFromDatabase(threadId, throughMessageId);
+    // The answer names a mark that the reader's client holds, as a read does.
+    return this.#withSupportedCursor(threadId, this.#stateFromDatabase(threadId, throughMessageId), options);
   }
 
   #withSupportedCursor(

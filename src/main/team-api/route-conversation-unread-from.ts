@@ -38,16 +38,11 @@ export async function routeConversationUnreadFrom(
   requireAgentLevel(context, agentId, "view");
   const fromMessageId = stringField(body, "fromMessageId");
   // A message the chat does not show to this peer is not found. The page around it starts with it.
+  const exclusions = markerExclusionsForCapabilities(capabilities);
   const page = await runCauseEffect(
-    agents.readConversationPageFor(
-      agentId,
-      member.id,
-      { type: "around", messageId: fromMessageId },
-      1,
-      markerExclusionsForCapabilities(capabilities),
-    ),
+    agents.readConversationPageFor(agentId, member.id, { type: "around", messageId: fromMessageId }, 1, exclusions),
   );
   if (!page.messages.some((message) => message.id === fromMessageId))
     throw new HttpError(404, sourceText("error.backend.readBoundaryUnavailable"));
-  return json(200, await runCauseEffect(agents.markConversationUnread(agentId, member.id, fromMessageId)));
+  return json(200, await runCauseEffect(agents.markConversationUnread(agentId, member.id, fromMessageId, exclusions)));
 }

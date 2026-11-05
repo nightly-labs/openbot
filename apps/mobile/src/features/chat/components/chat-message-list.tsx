@@ -288,6 +288,8 @@ interface ChatMessageListProps {
   deletesAnyMessage?: boolean;
   /** Marks an agent's message and the messages after it unread. Absent where the host cannot. */
   onMarkUnread?: (message: ChatBubbleMessage) => void;
+  /** The messages that Mark unread is on. All agent messages when unset. */
+  markUnreadMessageIds?: ReadonlySet<string>;
   /**
    * The host messages from the one where the NEW line shows to the newest, in chat order. The line
    * shows above the first row of them. Keep the set stable while its ids stay the same.
@@ -383,6 +385,8 @@ interface MessageRowShared {
     react: (message: ChatBubbleMessage, emoji: string | null) => Promise<void>;
     delete: (message: ChatBubbleMessage) => Promise<void>;
     markUnread: (message: ChatBubbleMessage) => void;
+    /** Whether Mark unread is on this message. */
+    marksUnread: (message: ChatBubbleMessage) => boolean;
     sendToChannel: (message: ChatBubbleMessage, channelId: string) => void;
     selectText: (message: ChatBubbleMessage) => void;
     selectionChange: (selected: string) => void;
@@ -652,7 +656,9 @@ const MessageRow = memo(function MessageRow({
             shared.canDelete && (shared.deletesAny || bubble.mine) ? () => shared.actions.delete(bubble) : undefined,
           // As on desktop, only an agent's message marks the chat unread from it.
           onMarkUnread:
-            shared.canMarkUnread && bubble.author === "agent" ? () => shared.actions.markUnread(bubble) : undefined,
+            shared.canMarkUnread && bubble.author === "agent" && shared.actions.marksUnread(bubble)
+              ? () => shared.actions.markUnread(bubble)
+              : undefined,
           sendToChannel:
             shared.sendChannels.length > 0 && bubble.body.trim()
               ? {
@@ -1159,6 +1165,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   onDeleteMessage,
   deletesAnyMessage = false,
   onMarkUnread,
+  markUnreadMessageIds,
   unreadLineMessageIds = null,
   sendChannels = NO_CHANNELS,
   onSendToChannel,
@@ -1332,6 +1339,7 @@ export const ChatMessageList = memo(function ChatMessageList({
     onReact,
     onDeleteMessage,
     onMarkUnread,
+    markUnreadMessageIds,
     onSendToChannel,
     onSelectText,
     onSelectionChange,
@@ -1343,6 +1351,7 @@ export const ChatMessageList = memo(function ChatMessageList({
     onReact,
     onDeleteMessage,
     onMarkUnread,
+    markUnreadMessageIds,
     onSendToChannel,
     onSelectText,
     onSelectionChange,
@@ -1356,6 +1365,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       react: async (message, emoji) => actionHandlers.current.onReact?.(message, emoji),
       delete: async (message) => actionHandlers.current.onDeleteMessage?.(message),
       markUnread: (message) => actionHandlers.current.onMarkUnread?.(message),
+      marksUnread: (message) => actionHandlers.current.markUnreadMessageIds?.has(message.id) ?? true,
       sendToChannel: (message, channelId) => actionHandlers.current.onSendToChannel?.(message, channelId),
       selectText: (message) => actionHandlers.current.onSelectText?.(message),
       selectionChange: (selected) => actionHandlers.current.onSelectionChange?.(selected),

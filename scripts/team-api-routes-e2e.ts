@@ -585,8 +585,8 @@ const fakeAgents: TeamApiAgents = {
   searchConversationFiles: unused("searchConversationFiles"),
   markConversationRead: unused("markConversationRead"),
   // The mark moves to the message shown before `fromMessageId`, which this fake names `before-<id>`.
-  markConversationUnread: (agentId, memberId, fromMessageId) => {
-    record("markConversationUnread", agentId, memberId, fromMessageId);
+  markConversationUnread: (agentId, memberId, fromMessageId, options) => {
+    record("markConversationUnread", agentId, memberId, fromMessageId, options);
     return Effect.succeed({
       unreadCount: 2,
       firstUnreadMessageId: fromMessageId ?? null,
@@ -3267,14 +3267,26 @@ try {
     });
     accessLevels = { revision: 5, everyone: {}, roles: [] };
     check(
-      "a member who can view the agent marks a message unread for themselves and gets the new read state",
+      "a member who can view the agent marks a message unread for themselves and gets the new read state, with the markers that their client does not show",
       viewer.status === 200 &&
         isDeepStrictEqual(viewer.body, {
           unreadCount: 2,
           firstUnreadMessageId: "message-1",
           throughMessageId: "before-message-1",
         }) &&
-        isDeepStrictEqual(marks(), [["agent-ada", bobId, "message-1"]]),
+        isDeepStrictEqual(marks(), [
+          [
+            "agent-ada",
+            bobId,
+            "message-1",
+            {
+              excludeRoutineEvents: true,
+              excludeRoutineRunEvents: true,
+              excludeHostedSiteEvents: true,
+              excludeRoutineQuietAnswers: true,
+            },
+          ],
+        ]),
       [summary(viewer), marks()],
     );
     const gone = await call("POST", CONVERSATION_UNREAD_FROM_ROUTE, {

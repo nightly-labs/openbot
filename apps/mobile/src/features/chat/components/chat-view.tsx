@@ -129,6 +129,8 @@ export interface ChatViewProps {
   deletesAnyMessage?: boolean;
   /** Marks an agent's host message and the messages after it unread. Absent where the host cannot. */
   markUnread?: (messageId: string) => void;
+  /** The host messages that Mark unread is on. Keep the set stable while its ids stay the same. */
+  markUnreadMessageIds?: ReadonlySet<string>;
   /**
    * The host messages from the one where the NEW line shows to the newest, in chat order. The line
    * shows above the first of them that has a row. Null for a chat without the line.
@@ -251,6 +253,7 @@ export function ChatView({
   deleteMessage,
   deletesAnyMessage = false,
   markUnread,
+  markUnreadMessageIds,
   unreadLineMessageIds = null,
   sendToChannel,
   questionForm,
@@ -1119,6 +1122,7 @@ export function ChatView({
               onDeleteMessage={deleteMessage && !readOnly ? deleteListMessage : undefined}
               deletesAnyMessage={deletesAnyMessage}
               onMarkUnread={markUnread ? markListMessageUnread : undefined}
+              markUnreadMessageIds={markUnreadMessageIds}
               unreadLineMessageIds={unreadLineMessageIds}
               sendChannels={sendToChannel?.channels}
               onSendToChannel={sendToChannel && !readOnly ? sendMessageToChannel : undefined}
