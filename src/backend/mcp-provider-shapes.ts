@@ -405,6 +405,7 @@ const lookUpMcpCommand = Effect.fn("McpShape.lookUpCommand")(
   Effect.catch(() => Effect.succeed(null)),
 );
 
+/** Whether a `PATH` candidate is a file this process can run, with the deadline of `isMissingCommandFile`. */
 const isExecutableFile = Effect.fn("McpShape.isExecutableFile")(
   function* (path: string) {
     if (!(yield* mcpShapeIo(() => stat(path))).isFile()) return false;
@@ -412,6 +413,7 @@ const isExecutableFile = Effect.fn("McpShape.isExecutableFile")(
     return true;
   },
   Effect.catch(() => Effect.succeed(false)),
+  Effect.timeoutOrElse({ duration: COMMAND_FILE_CHECK_MS, orElse: () => Effect.succeed(false) }),
 );
 
 /**
@@ -433,9 +435,9 @@ export const needsManagedRuntime = Effect.fn("McpShape.needsManagedRuntime")(fun
 /**
  * The environment a stdio MCP server is launched with, `PATH` included.
  *
- * The `PATH` the command was found in, from the login shell, is the one that makes it run: an `npx` or `uvx`
- * installed by nvm, Homebrew or mise starts with `#!/usr/bin/env node`, so it needs that same `PATH`
- * to find its own runtime. An app the user started from Finder or a launcher inherits none of it,
+ * The `PATH` the command was looked up in is the one that makes it run: an `npx` or `uvx` installed
+ * by nvm, Homebrew or mise starts with `#!/usr/bin/env node`, so it needs that same `PATH` to find
+ * its own runtime. An app the user started from Finder or a launcher inherits none of it,
  * which is a server that tests green from a terminal and fails everywhere else.
  *
  * The resolved `server.path` wins over the configured pairs: it is what the command was looked up
