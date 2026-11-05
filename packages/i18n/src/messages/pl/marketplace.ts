@@ -229,6 +229,15 @@ export const messages = {
     "Użyj stylów z tego repozytorium i zaprojektuj stronę ustawień w Paper.",
   "marketplace.plugin.paper.prompt.tokens":
     "Wypisz tokeny projektu z otwartego pliku Paper i porównaj je z naszym motywem.",
+  "marketplace.plugin.higgsfield.tagline": "Obrazy, wideo i audio z AI",
+  "marketplace.plugin.higgsfield.description":
+    "Higgsfield pozwala agentom generować obrazy, wideo, postacie i audio modelami Higgsfield, takimi jak Seedance, Kling, Veo i MiniMax Hailuo, sprawdzać saldo kredytów i przeglądać Asset Library. Wyniki są zapisywane w Assets Higgsfield użytkownika. Każdy użytkownik loguje się do własnego konta Higgsfield w przeglądarce. Każde generowanie zużywa kredyty tego konta według standardowych stawek, także w planie bez limitu.",
+  "marketplace.plugin.higgsfield.app":
+    "Generowanie obrazów, wideo i audio, postacie, kredyty i zasoby przez serwer MCP Higgsfield z logowaniem w przeglądarce.",
+  "marketplace.plugin.higgsfield.prompt.credits": "Ile mam kredytów w Higgsfield?",
+  "marketplace.plugin.higgsfield.prompt.productShot":
+    "Zrób w Higgsfield zdjęcie produktowe ceramicznego kubka na drewnianym stole.",
+  "marketplace.plugin.higgsfield.prompt.clip": "Zrób w Higgsfield 5-sekundowe wideo fal o zachodzie słońca.",
   "marketplace.plugin.appleApps.tagline": "Mail, Kalendarz i więcej na Twoim Macu",
   "marketplace.plugin.appleApps.description":
     "Apple apps pozwala agentom korzystać z aplikacji Mail, Kalendarz, Kontakty, Przypomnienia, Notatki, Wiadomości i Safari na tym Macu. Działa tylko w macOS. OpenBot uruchamia mcp-icloud, serwer społeczności, którego nie tworzy Apple ani OpenBot. Serwer steruje aplikacjami przez AppleScript na tym komputerze i nie wymaga konta ani klucza. Podczas instalacji OpenBot może od razu poprosić macOS o dostęp do wszystkich tych aplikacji, z jednym pytaniem dla każdej. Jeśli tego nie zrobisz, macOS zapyta, gdy agent po raz pierwszy użyje aplikacji. Aby zmienić to później, otwórz Ustawienia systemowe › Prywatność i ochrona › Automatyzacja. Agenci mogą wysyłać e-maile i wiadomości iMessage oraz zmieniać lub usuwać wydarzenia, kontakty i przypomnienia, więc sprawdź każdy zapis, zanim go zatwierdzisz. To, co odczytują narzędzia, na przykład treść e-maili, trafia do dostawcy modelu agenta.",

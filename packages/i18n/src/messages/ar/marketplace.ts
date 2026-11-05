@@ -231,6 +231,14 @@ export const messages = {
   "marketplace.plugin.paper.prompt.implement": "نفّذ إطار Paper المحدد في قاعدة الشيفرة هذه، وفق أعراف الشيفرة لدينا.",
   "marketplace.plugin.paper.prompt.codeToDesign": "استخدم الأنماط في هذا المستودع وصمّم صفحة إعدادات في Paper.",
   "marketplace.plugin.paper.prompt.tokens": "اعرض رموز التصميم في ملف Paper المفتوح وقارنها بسمتنا.",
+  "marketplace.plugin.higgsfield.tagline": "صور وفيديو وصوت بالذكاء الاصطناعي",
+  "marketplace.plugin.higgsfield.description":
+    "يتيح Higgsfield للوكلاء إنشاء الصور والفيديو والشخصيات والصوت بنماذج Higgsfield مثل Seedance وKling وVeo وMiniMax Hailuo، والتحقق من رصيد الأرصدة، وتصفح Asset Library. تُحفظ النتائج في Assets الخاصة بالمستخدم في Higgsfield. يسجّل كل مستخدم الدخول إلى حسابه في Higgsfield عبر المتصفح. كل عملية إنشاء تستهلك أرصدة ذلك الحساب بالسعر القياسي، حتى في الخطة غير المحدودة.",
+  "marketplace.plugin.higgsfield.app":
+    "إنشاء الصور والفيديو والصوت، والشخصيات، والأرصدة والأصول، عبر خادم MCP الخاص بـ Higgsfield مع تسجيل الدخول في المتصفح.",
+  "marketplace.plugin.higgsfield.prompt.credits": "كم لديّ من أرصدة Higgsfield؟",
+  "marketplace.plugin.higgsfield.prompt.productShot": "أنشئ في Higgsfield صورة منتج لكوب خزفي على طاولة خشبية.",
+  "marketplace.plugin.higgsfield.prompt.clip": "أنشئ في Higgsfield فيديو مدته 5 ثوانٍ لأمواج عند الغروب.",
   "marketplace.plugin.appleApps.tagline": "البريد والتقويم والمزيد على جهاز Mac",
   "marketplace.plugin.appleApps.description":
     "تتيح Apple apps للوكلاء استخدام البريد والتقويم وجهات الاتصال والتذكيرات والملاحظات والرسائل وSafari على جهاز Mac هذا. تعمل على macOS فقط. يشغّل OpenBot mcp-icloud، وهو خادم مجتمعي لم تصنعه Apple ولا OpenBot. يتحكم الخادم في التطبيقات عبر AppleScript على هذا الحاسوب، ولا يحتاج إلى حساب ولا مفتاح. عند تثبيته، يمكن لـ OpenBot أن يطلب من macOS الوصول إلى كل هذه التطبيقات دفعة واحدة، مع طلب واحد لكل تطبيق. وإن لم تفعل، يسأل macOS في أول مرة يستخدم فيها وكيل أحد التطبيقات. لتغيير ذلك لاحقًا، افتح إعدادات النظام › الخصوصية والأمن › الأتمتة. يمكن للوكلاء إرسال البريد الإلكتروني ورسائل iMessage، وتغيير الأحداث وجهات الاتصال والتذكيرات أو حذفها، لذا راجع كل عملية كتابة قبل الموافقة عليها. ما تقرؤه الأدوات، مثل نص البريد الإلكتروني، يذهب إلى مزوّد نموذج الوكيل.",

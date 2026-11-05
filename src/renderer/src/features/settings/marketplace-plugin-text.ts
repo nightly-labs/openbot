@@ -105,6 +105,18 @@ const PLUGIN_TEXT = {
       "prompt-tokens": "marketplace.plugin.paper.prompt.tokens",
     },
   },
+  higgsfield: {
+    tagline: "marketplace.plugin.higgsfield.tagline",
+    description: "marketplace.plugin.higgsfield.description",
+    apps: {
+      "app-higgsfield-mcp": "marketplace.plugin.higgsfield.app",
+    },
+    prompts: {
+      "prompt-credits": "marketplace.plugin.higgsfield.prompt.credits",
+      "prompt-product-shot": "marketplace.plugin.higgsfield.prompt.productShot",
+      "prompt-clip": "marketplace.plugin.higgsfield.prompt.clip",
+    },
+  },
   "apple-apps": {
     tagline: "marketplace.plugin.appleApps.tagline",
     description: "marketplace.plugin.appleApps.description",

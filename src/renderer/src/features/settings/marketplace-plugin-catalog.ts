@@ -547,6 +547,47 @@ const PAPER: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/paper",
 };
 
+const HIGGSFIELD: MarketplacePluginDetail = {
+  id: "plugin-higgsfield",
+  slug: "higgsfield",
+  name: "Higgsfield",
+  tagline: "AI images, videos and audio",
+  description:
+    "Higgsfield lets agents generate images, videos, characters and audio with Higgsfield models such as Seedance, Kling, Veo and MiniMax Hailuo, check the credit balance, and browse the Asset Library. Results are saved to the user's Higgsfield Assets. Each user signs in to their own Higgsfield account through the browser. Every generation uses credits of that account at standard rates, also on an unlimited plan.",
+  category: "design",
+  creatorName: "Higgsfield",
+  iconUrl: "https://higgsfield.ai/apple-touch-icon.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-credits", text: "How many Higgsfield credits do I have?" },
+    { id: "prompt-product-shot", text: "Make a Higgsfield product photo of a ceramic mug on a wooden table." },
+    { id: "prompt-clip", text: "Make a 5-second Higgsfield video of waves at sunset." },
+  ],
+  apps: [
+    {
+      id: "app-higgsfield-mcp",
+      name: "Higgsfield",
+      description:
+        "Image, video and audio generation, characters, credits and assets, over Higgsfield's MCP server with browser sign-in.",
+      iconUrl: "https://higgsfield.ai/apple-touch-icon.png",
+      server: {
+        name: "higgsfield",
+        transport: "http",
+        url: "https://mcp.higgsfield.ai/mcp",
+        auth: [{ id: "higgsfield-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://higgsfield.ai",
+  privacyPolicyUrl: "https://higgsfield.ai/privacy-policy",
+  termsUrl: "https://higgsfield.ai/terms-of-use-agreement",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-09-30T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/higgsfield",
+};
+
 const APPLE_APPS: MarketplacePluginDetail = {
   id: "plugin-apple-apps",
   slug: "apple-apps",
@@ -1607,6 +1648,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   COBRAIN,
   FIGMA,
   PAPER,
+  HIGGSFIELD,
   APPLE_APPS,
   SENTRY,
   VERCEL,

@@ -194,6 +194,15 @@ export const messages = {
     "선택한 Paper 프레임을 우리 코드 컨벤션에 맞게 이 코드베이스에 구현해 줘.",
   "marketplace.plugin.paper.prompt.codeToDesign": "이 저장소의 스타일을 사용해서 Paper에서 설정 페이지를 디자인해 줘.",
   "marketplace.plugin.paper.prompt.tokens": "열려 있는 Paper 파일의 디자인 토큰을 나열하고 우리 테마와 비교해 줘.",
+  "marketplace.plugin.higgsfield.tagline": "AI 이미지, 동영상, 오디오",
+  "marketplace.plugin.higgsfield.description":
+    "Higgsfield를 사용하면 에이전트가 Seedance, Kling, Veo, MiniMax Hailuo 같은 Higgsfield 모델로 이미지, 동영상, 캐릭터, 오디오를 생성하고, 크레딧 잔액을 확인하고, Asset Library를 둘러볼 수 있습니다. 결과는 사용자의 Higgsfield Assets에 저장됩니다. 각 사용자는 브라우저에서 자신의 Higgsfield 계정에 로그인합니다. 모든 생성은 무제한 요금제에서도 그 계정의 크레딧을 표준 요금으로 사용합니다.",
+  "marketplace.plugin.higgsfield.app":
+    "Higgsfield MCP 서버를 통한 이미지·동영상·오디오 생성, 캐릭터, 크레딧, 에셋. 브라우저에서 로그인합니다.",
+  "marketplace.plugin.higgsfield.prompt.credits": "Higgsfield 크레딧이 얼마나 남았어?",
+  "marketplace.plugin.higgsfield.prompt.productShot":
+    "Higgsfield로 나무 테이블 위 세라믹 머그잔의 제품 사진을 만들어 줘.",
+  "marketplace.plugin.higgsfield.prompt.clip": "Higgsfield로 해 질 녘 파도의 5초 동영상을 만들어 줘.",
   "marketplace.plugin.appleApps.tagline": "Mac의 Mail, 캘린더 등",
   "marketplace.plugin.appleApps.description":
     "Apple apps를 사용하면 에이전트가 이 Mac의 Mail, 캘린더, 연락처, 미리 알림, 메모, 메시지, Safari를 사용할 수 있어요. macOS에서만 작동해요. OpenBot은 mcp-icloud를 시작해요. Apple이나 OpenBot이 만들지 않은 커뮤니티 서버예요. 서버는 이 컴퓨터에서 AppleScript로 앱을 제어하며, 계정이나 키가 필요 없어요. 설치할 때 OpenBot이 이 모든 앱에 대한 접근을 macOS에 한 번에 요청할 수 있어요. 앱마다 확인 창이 하나씩 떠요. 요청하지 않으면 에이전트가 앱을 처음 사용할 때 macOS가 물어요. 나중에 바꾸려면 시스템 설정 › 개인정보 보호 및 보안 › 자동화를 여세요. 에이전트는 이메일과 iMessage를 보내고 이벤트, 연락처, 미리 알림을 변경하거나 삭제할 수 있으니, 승인하기 전에 각 쓰기를 확인하세요. 이메일 본문처럼 도구가 읽은 내용은 에이전트의 모델 제공자에게 전송돼요.",
