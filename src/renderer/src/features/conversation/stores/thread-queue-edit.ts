@@ -73,6 +73,12 @@ export function createThreadQueue(deps: ThreadQueueDeps) {
       : null;
   }
 
+  /** Whether Send in this thread draft saves a queued message of the open agent. */
+  function editsDraft(key: string): boolean {
+    const edit = deps.edit();
+    return Boolean(edit && edit.draftKey === key && editOf(edit.taskId));
+  }
+
   /** A pending Save owns the draft: the exact request stays for a retry, as in the agent's own chat. */
   function draftLocked(key: string | undefined): boolean {
     const edit = deps.edit();
@@ -297,7 +303,7 @@ export function createThreadQueue(deps: ThreadQueueDeps) {
     };
   }
 
-  return { view, save, cancel, editOf, draftLocked, keepsAttachment, busy };
+  return { view, save, cancel, editOf, editsDraft, draftLocked, keepsAttachment, busy };
 }
 
 export type ThreadQueue = ReturnType<typeof createThreadQueue>;

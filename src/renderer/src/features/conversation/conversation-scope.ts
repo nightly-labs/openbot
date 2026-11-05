@@ -845,7 +845,11 @@ export function createConversationViewScope(props: ConversationProps) {
         flush();
         const threads = props.threads;
         if (!threads || threadComposer.openDraftKey() !== key) return;
-        await threadComposer.send(threads, threadComposer.draft(key).text.trim());
+        // While a queued message is in the message box, Send saves it in its place.
+        if (threadQueue.editsDraft(key)) {
+          await threadComposer.importsEnded(key);
+          await threadQueue.save(key);
+        } else await threadComposer.send(threads, threadComposer.draft(key).text.trim());
         // The locked editor did not take the earlier focus request.
         if (threadComposer.openDraftKey() === key) setThreadFocusRequest((current) => current + 1);
       },
