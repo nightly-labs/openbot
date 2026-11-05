@@ -102,8 +102,8 @@ in that session. When a scripted page ends, and before the next fill, OpenBot cl
 Cache Storage and service workers. A page whose navigation a service worker handled must reload once;
 a worker that the page registers and claims later served nothing to it. Cookies, localStorage and
 IndexedDB stay, because clearing them signs the user out and deletes offline data. So a site whose
-own code runs a stored value as code is not protected; a crafted URL can already use that type of
-site bug, with no `evaluate`. The same rules apply to `fill_card`. A login matches by 1Password's autofill rule, on the registrable domain
+own code runs a stored value as code is not protected, as from any other script that the site
+loads. The same rules apply to `fill_card`. A login matches by 1Password's autofill rule, on the registrable domain
 with private suffixes such as `github.io` counted. Agents and providers never receive the token, a
 password or a code.
 
