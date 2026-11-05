@@ -189,8 +189,11 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
     const model = activeModel();
     return model && !model.supportsLanguage && !serverDictates() ? FIXED_LANGUAGE[model.id] : undefined;
   };
-  /** A model with its own languages, such as Cohere Transcribe, offers only those and no automatic. */
-  const modelLanguages = () => (serverDictates() ? undefined : activeModel()?.languages);
+  /**
+   * A model with its own languages, such as Cohere Transcribe, offers only those and no automatic.
+   * A memo, so that a save keeps the same list and the options do not change under the Select.
+   */
+  const modelLanguages = createMemo(() => (serverDictates() ? undefined : activeModel()?.languages));
   const shownLanguage = (): VoiceLanguage | null => {
     const fixed = fixedLanguage();
     if (fixed) return fixed.language;
@@ -408,7 +411,7 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
                 class="settings-modal-select"
                 options={languageOptions()}
                 value={shownLanguage()}
-                onChange={(next) => next && props.store.setLanguage(next)}
+                onChange={(next) => next && next !== shownLanguage() && props.store.setLanguage(next)}
                 disabled={languageLocked()}
                 placement="bottom-end"
                 itemComponent={(selectProps) => (
