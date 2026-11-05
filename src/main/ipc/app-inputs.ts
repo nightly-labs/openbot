@@ -140,6 +140,7 @@ export function parseAgentDefaults(input: unknown): AgentDefaults {
     allowNewChat: input.allowNewChat,
     quickAcknowledgement: input.quickAcknowledgement,
     planStartAfterMs: input.planStartAfterMs,
+    automationRunsPerHour: input.automationRunsPerHour,
   };
 }
 

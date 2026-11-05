@@ -1,5 +1,6 @@
 import {
   type AgentProviderId,
+  type ClientAgentModelOption,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   type ProviderAccountStatus,
   type ProviderUsageResetOutcome,
@@ -69,4 +70,23 @@ export function isAgentAccount(agentAccountId: string | undefined | null, accoun
 /** Whether the account is the one of the saved Claude key: it has no sign-in and no plan usage. */
 export function isApiKeyAccount(accountId: string): boolean {
   return accountId === CLAUDE_API_KEY_ACCOUNT_ID;
+}
+
+/**
+ * A model of a provider: from the list of models, or one that only an account after the first
+ * serves. A plan can serve models that the provider's own sign-in does not (#5217).
+ */
+export function findModelOption(
+  options: readonly ClientAgentModelOption[],
+  providers: readonly { id: string; accounts?: readonly ProviderAccountStatus[] | undefined }[] | undefined,
+  provider: string,
+  model: string,
+): ClientAgentModelOption | undefined {
+  return (
+    options.find((option) => option.provider === provider && option.id === model) ??
+    providers
+      ?.find((status) => status.id === provider)
+      ?.accounts?.flatMap((account) => account.models ?? [])
+      .find((option) => option.id === model)
+  );
 }

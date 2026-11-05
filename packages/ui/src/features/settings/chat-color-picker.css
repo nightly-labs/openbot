@@ -370,11 +370,11 @@
 
 /* Presets. The ring hops between them (see Presets in the picker). */
 
-/* The empty choice and the 17 agent colors fill two rows of 9, as the agent color grid does. */
+/* The empty choice and the 11 chat colors fill two rows of 6. */
 .chat-color-picker-presets {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(9, 24px);
+  grid-template-columns: repeat(6, 24px);
   justify-content: space-between;
   row-gap: var(--openbot-space-2);
   padding: var(--openbot-space-1) var(--openbot-space-0-5) 0;

@@ -899,12 +899,7 @@ export class DrainScheduler {
                 runtimeWorkspaceRoots: workspaceWritableRoots(agent, this.#store.sharedRoot),
                 approvalPolicy: "on-request",
                 sandboxPolicy: codexSandboxPolicy(agent, this.#store.sharedRoot),
-                ...(client.provider === "codex"
-                  ? codexServiceTier(
-                      this.#store.list().find((current) => current.id === agent.id) ?? agent,
-                      this.#providers.listModels(),
-                    )
-                  : {}),
+                ...(client.provider === "codex" ? this.#codexServiceTier(agent) : {}),
               },
               decodeTurnResponse,
             )
@@ -1198,6 +1193,15 @@ export class DrainScheduler {
   #deliveryProviders(agentId: string): AgentProvider[] {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     return agent ? [providerForAgent(agent)] : [...AGENT_PROVIDERS];
+  }
+
+  /** The agent's account lists a model that only it serves, with its fast tier, before the catalogue (#5217). */
+  #codexServiceTier(agent: AgentSummary): { serviceTier?: string | null } {
+    const current = this.#store.list().find((candidate) => candidate.id === agent.id) ?? agent;
+    return codexServiceTier(current, [
+      ...this.#providers.accountModels("codex", current.providerAccountId),
+      ...this.#providers.listModels(),
+    ]);
   }
 }
 

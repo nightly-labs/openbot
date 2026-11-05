@@ -119,6 +119,12 @@ export const messages = {
   "settings.planStart.customHint": "5 秒以上。",
   "settings.planStart.customInvalid": "5 秒以上の整数を入力してください。",
   "settings.planStart.set": "設定",
+  "settings.automationLimit.sectionTitle": "上限",
+  "settings.automationLimit.sectionDescription": "このコンピューターのすべてのエージェントに適用されます。",
+  "settings.automationLimit.title": "1時間あたりのリクエスト",
+  "settings.automationLimit.option": "1時間あたり{limit}件",
+  "settings.automationLimit.note":
+    "ローカルスクリプトが1時間に各エージェントへ送れるメッセージとルーティン実行の上限です。",
   "settings.backgroundProcesses.title": "バックグラウンドプロセス",
   "settings.backgroundProcesses.description":
     "エージェントが起動して実行したままにしたプログラム（開発サーバーなど）です。チャットが終わっても、OpenBot を終了しても動き続けます。",

@@ -120,6 +120,12 @@ export const messages = {
   "settings.planStart.customHint": "Не меньше 5 секунд.",
   "settings.planStart.customInvalid": "Введите целое число не меньше 5 секунд.",
   "settings.planStart.set": "Задать",
+  "settings.automationLimit.sectionTitle": "Лимит",
+  "settings.automationLimit.sectionDescription": "Действует для всех агентов на этом компьютере.",
+  "settings.automationLimit.title": "Запросов в час",
+  "settings.automationLimit.option": "{limit} в час",
+  "settings.automationLimit.note":
+    "Наибольшее число сообщений и запусков регулярных задач, которые локальные скрипты могут отправить каждому агенту за час.",
   "settings.backgroundProcesses.title": "Фоновые процессы",
   "settings.backgroundProcesses.description":
     "Программы, которые агенты запустили и оставили работать, например dev-серверы. Они работают и после конца чата, и после выхода из OpenBot.",

@@ -117,6 +117,12 @@ export const messages = {
   "settings.planStart.customHint": "5 ثوانٍ على الأقل.",
   "settings.planStart.customInvalid": "أدخل عددًا صحيحًا لا يقل عن 5 ثوانٍ.",
   "settings.planStart.set": "تعيين",
+  "settings.automationLimit.sectionTitle": "الحد",
+  "settings.automationLimit.sectionDescription": "ينطبق على كل الوكلاء على هذا الحاسوب.",
+  "settings.automationLimit.title": "الطلبات في الساعة",
+  "settings.automationLimit.option": "{limit} في الساعة",
+  "settings.automationLimit.note":
+    "أقصى عدد من الرسائل وتشغيلات المهام الدورية التي يمكن للبرامج النصية المحلية إرسالها إلى كل وكيل في ساعة واحدة.",
   "settings.backgroundProcesses.title": "العمليات في الخلفية",
   "settings.backgroundProcesses.description":
     "برامج بدأها الوكلاء وتركوها تعمل، مثل خوادم التطوير. تستمر في العمل بعد انتهاء الدردشة وبعد إنهاء OpenBot.",

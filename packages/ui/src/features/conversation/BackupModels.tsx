@@ -64,7 +64,10 @@ export function backupModelOption(choice: AgentModelChoice, source: BackupModelS
   const provider = source.providers?.find((status) => status.id === choice.provider);
   const accounts = provider?.accounts;
   const account = accounts?.find((candidate) => candidate.id === accountId);
-  const model = source.modelOptions.find((option) => option.provider === choice.provider && option.id === choice.model);
+  // A model that only the choice's own account serves is in that account's list (#5217).
+  const model =
+    source.modelOptions.find((option) => option.provider === choice.provider && option.id === choice.model) ??
+    account?.models?.find((option) => option.id === choice.model);
   const usable =
     provider !== undefined &&
     provider.off !== true &&

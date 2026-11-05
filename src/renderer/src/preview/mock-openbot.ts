@@ -2433,6 +2433,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           ...(input.model === undefined ? {} : { model: input.model }),
           ...(input.reasoningEffort === undefined ? {} : { reasoningEffort: input.reasoningEffort }),
         });
+        if (input.provider && input.model && input.providerAccountId) agent.providerAccountId = input.providerAccountId;
         agents = [...agents, agent];
         queues.set(agent.id, emptyQueue(agent.id));
         emitAgentEvent({ type: "agents-changed", agents });

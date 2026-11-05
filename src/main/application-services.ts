@@ -3102,7 +3102,10 @@ export async function createApplicationServices({
     Effect.runFork(startup.recordStart());
     teardown.push(TEARDOWN_ORDER.startupTiming, "the startup timing", () => startup.dispose());
   }
-  const connectTrace = new RemoteConnectTrace((span) => trace.record(span));
+  const connectTrace = new RemoteConnectTrace(
+    (span) => trace.record(span),
+    (summary) => analytics.handleRemoteConnect(summary),
+  );
   // Development only: a network round trip added to the WebRTC client, for `bun run perf:remote`.
   const developmentRoundTripMs = app.isPackaged ? 0 : Math.max(0, Number(process.env.OPENBOT_DEV_RTT_MS) || 0);
   installRemoteSyncProfileSink(

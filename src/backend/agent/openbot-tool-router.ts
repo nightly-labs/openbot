@@ -79,7 +79,7 @@ import { loadAvatarFile } from "./avatar-file";
 import type { BrowserUploads } from "./browser-uploads";
 import {
   CHANNEL_AGENT_TOOL_NAMES,
-  channelAgentToolInChannelTask,
+  CHANNEL_AGENT_TOOL_NEEDS_LOCAL_PERSON,
   handleChannelAgentTool,
   listChannelsToolSchema,
 } from "./channel-agent-tools";
@@ -1022,14 +1022,18 @@ export class OpenBotToolRouter {
       return openBotToolResult({ channels: this.#channels.handoffTargets(args.archived === true) });
     }
     if (CHANNEL_AGENT_TOOL_NAMES.has(params.tool)) {
-      if (channelId) return channelAgentToolInChannelTask();
-      if (!this.#requestedByPerson(senderAgentId, params.turnId, executionThreadId))
+      // In a channel task, the request that started the task must come from this computer's user.
+      if (channelId) {
+        if (!(yield* this.#channels.requestedByLocalPerson(channelId, senderAgentId, params.turnId)))
+          return openBotToolFailure(CHANNEL_AGENT_TOOL_NEEDS_LOCAL_PERSON);
+      } else if (!this.#requestedByPerson(senderAgentId, params.turnId, executionThreadId))
         return openBotToolFailure(
           "Only a person's message, in your OpenBot chat or a thread they opened, can create or change a channel. Ask the user to request it there.",
         );
       return yield* handleChannelAgentTool(params, senderAgentId, {
         channels: this.#channels,
         listAgents: () => this.#hooks.listAgents(),
+        taskChannelId: channelId,
       });
     }
     if (params.tool === "send_to_channel") {
@@ -2068,8 +2072,22 @@ export class OpenBotToolRouter {
           .replace(/^"(.*)"$/s, "$1")
           .trim() || null;
       // An answer to a request from a side thread runs in that thread. When the thread is archived, the
-      // answer goes to the recipient's own chat, so it is not lost.
-      const answerTaskId = replyTo ? this.#mailbox.answerTaskId(senderAgentId, replyTo, recipientValues) : null;
+      // answer goes to the recipient's own chat, so it is not lost. A message without replyToMessageId,
+      // such as a question back, goes to the thread of the requests from its recipient that this turn
+      // works on, when they all came from that one thread (#5093). Otherwise it goes to the own chat,
+      // and the automatic result does not follow, so the thread would wait without an answer.
+      // `answerTaskId` routes a message to one recipient only.
+      const answeredRequestIds = replyTo
+        ? [replyTo]
+        : turnDeliveries
+            .filter(
+              ({ delivery }) => delivery.sender.kind === "agent" && delivery.sender.agentId === recipientValues[0],
+            )
+            .map(({ delivery }) => delivery.messageId);
+      const answerTaskIds = new Set(
+        answeredRequestIds.map((requestId) => this.#mailbox.answerTaskId(senderAgentId, requestId, recipientValues)),
+      );
+      const [answerTaskId = null] = answerTaskIds.size === 1 ? answerTaskIds : [];
       const taskId = answerTaskId && this.#tasks.threadId(answerTaskId) !== null ? answerTaskId : undefined;
       const text = params.arguments.text;
       const receipt = yield* this.#mailbox

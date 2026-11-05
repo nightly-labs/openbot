@@ -119,6 +119,11 @@ export const messages = {
   "settings.planStart.customHint": "至少 5 秒。",
   "settings.planStart.customInvalid": "请输入至少 5 秒的整数。",
   "settings.planStart.set": "设置",
+  "settings.automationLimit.sectionTitle": "上限",
+  "settings.automationLimit.sectionDescription": "适用于这台电脑上的所有助手。",
+  "settings.automationLimit.title": "每小时请求数",
+  "settings.automationLimit.option": "每小时 {limit} 次",
+  "settings.automationLimit.note": "本地脚本每小时最多可向每个助手发送的消息和自动化任务运行次数。",
   "settings.backgroundProcesses.title": "后台进程",
   "settings.backgroundProcesses.description":
     "助手启动后仍在运行的程序，例如开发服务器。聊天结束后、退出 OpenBot 后，它们仍会继续运行。",

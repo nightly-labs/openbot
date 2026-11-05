@@ -230,6 +230,18 @@
   background: var(--window-glass-frame);
 }
 
+/* The surfaces in a bubble with a chat colour are clear here, so the tint of the bubble shows through them
+ * already. They keep the clear values; a mix with the chat colour would tint them twice. */
+:root[data-openbot-window-glass] .app-window .ui-bubble.message-bubble-colored > .ui-bubble-content {
+  --openbot-bg-canvas: var(--window-glass-canvas);
+  --openbot-bg-sidebar: var(--window-glass-sidebar);
+  --openbot-bg-surface: var(--window-glass-surface);
+  --openbot-bg-surface-raised: var(--window-glass-surface-raised);
+  --openbot-bg-control: var(--window-glass-control);
+  --openbot-bg-control-hover: var(--window-glass-control-hover);
+  --openbot-bg-control-active: var(--window-glass-control-active);
+}
+
 /* A chat colour is solid, so a mix with the clear surface would make the bubble less clear than the
  * others. The window mixes the colour into the solid surface, then gives the result the same alpha as
  * the plain bubble of that kind. */
@@ -248,7 +260,7 @@
   > .ui-bubble-content {
   background: color-mix(
     in srgb,
-    color-mix(in srgb, var(--message-chat-color) 22%, var(--window-solid-surface)) 35%,
+    color-mix(in srgb, var(--message-chat-color) var(--message-bubble-tint-amount), var(--window-solid-surface)) 35%,
     transparent
   );
 }
@@ -260,7 +272,8 @@
   > .ui-bubble-content {
   background: color-mix(
     in srgb,
-    color-mix(in srgb, var(--message-chat-color) 22%, var(--window-solid-surface-raised)) 40%,
+    color-mix(in srgb, var(--message-chat-color) var(--message-bubble-tint-amount), var(--window-solid-surface-raised))
+      40%,
     transparent
   );
 }

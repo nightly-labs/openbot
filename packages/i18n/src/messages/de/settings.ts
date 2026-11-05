@@ -120,6 +120,12 @@ export const messages = {
   "settings.planStart.customHint": "Mindestens 5 Sekunden.",
   "settings.planStart.customInvalid": "Gib eine ganze Zahl ab 5 Sekunden ein.",
   "settings.planStart.set": "Festlegen",
+  "settings.automationLimit.sectionTitle": "Limit",
+  "settings.automationLimit.sectionDescription": "Es gilt für alle Agenten auf diesem Computer.",
+  "settings.automationLimit.title": "Anfragen pro Stunde",
+  "settings.automationLimit.option": "{limit} pro Stunde",
+  "settings.automationLimit.note":
+    "So viele Nachrichten und Routineläufe können lokale Skripte jedem Agenten pro Stunde höchstens senden.",
   "settings.backgroundProcesses.title": "Hintergrundprozesse",
   "settings.backgroundProcesses.description":
     "Programme, die Agenten gestartet und laufen gelassen haben, etwa Dev-Server. Sie laufen weiter, wenn der Chat endet und wenn du OpenBot beendest.",
