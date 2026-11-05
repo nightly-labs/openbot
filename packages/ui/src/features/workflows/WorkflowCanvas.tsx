@@ -3284,7 +3284,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
             pressed={ui.tool === "select"}
             onClick={() => setTool("select")}
           >
-            <MousePointer2 class="wfn-hud-arrow" />
+            <MousePointer2 />
           </HudButton>
           <HudButton
             label={t("workflow.canvas.tool.pan")}

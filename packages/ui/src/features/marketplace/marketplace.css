@@ -129,6 +129,7 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
 .marketplace-nav-mark > :is(svg, img) {
   width: 100%;
   height: 100%;
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .marketplace-nav-name {
@@ -406,6 +407,7 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
 .skills-marketplace-icon svg {
   width: 20px;
   height: 20px;
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .marketplace-skill-mark[data-kind="icon"] > img {

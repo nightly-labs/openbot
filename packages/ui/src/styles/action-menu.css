@@ -10,8 +10,6 @@
   --ui-menu-highlight: color-mix(in srgb, var(--openbot-text-primary) 5%, transparent);
   --ui-menu-shadow: var(--openbot-shadow-menu);
   --ui-menu-item-hover: color-mix(in srgb, var(--openbot-text-primary) 6%, transparent);
-  /* The highlighted row as one opaque color, for the parts of an icon that are cut out of its fill. */
-  --ui-menu-row-highlight: color-mix(in srgb, var(--openbot-text-primary) 6%, var(--ui-menu-bg));
   --ui-menu-panel-shadow:
     inset 0 1px 0 var(--ui-menu-highlight), 0 0 0 1px var(--ui-menu-edge), 0 4px 6px -1px var(--ui-menu-shadow),
     0 2px 4px -2px var(--ui-menu-shadow);
@@ -128,9 +126,32 @@
    * the SVG defaults instead, painting itself as an opaque filled shape with no outline. */
   fill: none;
   stroke: currentColor;
-  color: var(--openbot-text-secondary);
+  /* Muted at rest, as the page rail icons, so the change on the highlighted row is clear. */
+  color: var(--openbot-text-muted);
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* The icon of the highlighted row, and of the row of an open submenu, takes the primary text color with its
+ * label. It stays an outline, with the same line: a filled icon is too heavy beside the row text. The swap has
+ * no transition. This rule must outrank the item icon rule above; the danger and trailing icon rules below have
+ * the same specificity and come later, so they keep their colors. */
+.ui-action-menu:not([data-menu-layout="grid"])
+  :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]):is(
+    :hover,
+    :focus-visible,
+    [data-highlighted],
+    [aria-expanded="true"]
+  )
+  > svg {
+  color: var(--openbot-text-primary);
+}
+
+/* A disabled item does not react to the pointer, so its icon stays muted with its label. */
+.ui-action-menu:not([data-menu-layout="grid"])
+  :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"])[data-disabled]
+  > svg {
+  color: var(--openbot-text-muted);
 }
 
 /* Lucide ships stroke-width="2" as an attribute, so the weight has to be set here to tame
@@ -218,45 +239,6 @@
   :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"])
   > svg.ui-menu-trailing {
   color: var(--openbot-text-muted);
-}
-
-/* Item icons are muted outlines at rest. On the highlighted row they take the text color and fill in.
- * The swap has no transition. Only the closed shapes fill: open lines stay outlines, and details
- * take the row color, so they are cut out of the fill as in a solid icon set. */
-.ui-action-menu .agent-context-icon {
-  color: var(--openbot-text-muted);
-}
-
-.ui-action-menu .agent-context-icon > * {
-  fill: currentColor;
-  fill-opacity: 0;
-}
-
-/* Class selectors, not [class~=]: Chrome restyles every descendant on each class change for an attribute selector before a combinator. */
-.ui-action-menu .lucide-chart-area > path:first-child,
-.ui-action-menu .lucide-bell-off > path:nth-child(3),
-.ui-action-menu .lucide-app-window > path,
-.ui-action-menu .lucide-bot > *,
-.ui-action-menu .lucide-calendar-clock > * {
-  fill: none;
-}
-
-.ui-action-menu :is(:hover, [data-highlighted], [aria-expanded="true"]) > .agent-context-icon {
-  color: var(--openbot-text-primary);
-}
-
-.ui-action-menu :is(:hover, [data-highlighted], [aria-expanded="true"]) > .agent-context-icon > * {
-  fill-opacity: 1;
-}
-
-/* Cut-outs: the window bar, and the lights on the server racks. */
-.ui-action-menu :is(:hover, [data-highlighted], [aria-expanded="true"]) > .lucide-app-window > path,
-.ui-action-menu
-  :is(:hover, [data-highlighted], [aria-expanded="true"])
-  > .ui-glyph-20:has(> rect + rect + circle)
-  > circle {
-  fill: var(--ui-menu-row-highlight);
-  stroke: var(--ui-menu-row-highlight);
 }
 
 /* A tooltip that opens and closes with the motion of a submenu, and moves to the next trigger of its

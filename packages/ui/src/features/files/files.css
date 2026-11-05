@@ -167,7 +167,7 @@
   flex: 0 0 auto;
   margin-top: 1px;
   color: var(--openbot-text-muted);
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .storage-message[role="alert"] .storage-message-icon {
@@ -494,7 +494,7 @@
   width: 20px;
   height: 20px;
   color: var(--openbot-danger-text);
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .file-list-message-title {
