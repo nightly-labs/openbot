@@ -1447,11 +1447,13 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     this.#unavailableRetryTimer = null;
   }
 
-  #scheduleUnavailableRetry(): void {
+  /** A `Retry-After` from the service makes the wait longer, never shorter. */
+  #scheduleUnavailableRetry(error?: unknown): void {
     this.#cancelUnavailableRetry();
     if (this.#disposed) return;
     const delays = UNAVAILABLE_RETRY_DELAYS_MS;
-    const delayMs = delays[Math.min(this.#unavailableRetryFailures, delays.length - 1)] ?? 0;
+    const retryAfterMs = error instanceof AuthApiError ? (error.retryAfterSeconds ?? 0) * 1_000 : 0;
+    const delayMs = Math.max(delays[Math.min(this.#unavailableRetryFailures, delays.length - 1)] ?? 0, retryAfterMs);
     this.#unavailableRetryFailures += 1;
     this.#unavailableRetryTimer = setTimeout(
       () => {
@@ -1492,7 +1494,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     if (Result.isFailure(probe)) {
       const error = probe.failure.cause;
       if (error instanceof NetworkBlockedError || isTransientStartupError(error)) {
-        this.#scheduleUnavailableRetry();
+        this.#scheduleUnavailableRetry(error);
         return;
       }
     }
@@ -2403,6 +2405,8 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
 
   #setInitializationError(error: unknown): CentralAuthState {
     if (error instanceof NetworkBlockedError) {
+      // A captive portal blocks only until the user signs in to it.
+      this.#scheduleUnavailableRetry();
       return this.#setState({ status: "error", issue: { code: "auth_api_unavailable", message: error.message } });
     }
     if (error instanceof AuthApiError && error.status < 500) {
@@ -2411,7 +2415,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     // The renderer shows the retry screen for `auth_api_unavailable`. The message and the reference
     // say which failure it was.
     const unavailable = serviceUnavailableText(error);
-    this.#scheduleUnavailableRetry();
+    this.#scheduleUnavailableRetry(error);
     return this.#setState({
       status: "error",
       issue: {
