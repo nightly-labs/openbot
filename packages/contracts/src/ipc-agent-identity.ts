@@ -1,11 +1,12 @@
 import {
   AGENT_PROVIDER_DESCRIPTORS,
+  type AgentProviderId,
   type AgentProviderRef,
   agentProviderDescriptor,
+  isAgentProvider,
   isAgentProviderRef,
 } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
-import { type AgentProviderId, isAgentProvider } from "./ipc-agent-status";
 import { isBoundedString } from "./ipc-bounded-values";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isOneOf, isString } from "./runtime-values";
 

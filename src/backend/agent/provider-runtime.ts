@@ -14,6 +14,7 @@ import type {
   CustomAgentUsage,
   CustomProviderHarness,
   CustomProviderRestart,
+  ProviderAccountStatus,
   ProviderCodeLoginStart,
   ProviderUsageResetOutcome,
   ProviderUsageResets,
@@ -626,6 +627,20 @@ export class ProviderRuntime implements ProviderPort {
             this.#refreshUsage(client, model, false).pipe(
               Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })),
             ),
+          // Read as the own sign-in's catalogue is. An account process never gets the saved key.
+          readModels: (client) =>
+            this.#modelCatalog.read(client, requireProviderDriver(client.provider).catalog).pipe(
+              Effect.map(({ models }) => models),
+              Effect.catch((failure) =>
+                Effect.sync(() => {
+                  logger.warn("A provider account did not list its models.", {
+                    provider: client.provider,
+                    timeout: isProviderTimeout(failure.cause),
+                  });
+                  return null;
+                }),
+              ),
+            ),
           resetCredits: (client) => this.#resetCredits.get(client),
           consumeUsageReset: (client) =>
             this.#consumeUsageReset(client).pipe(
@@ -681,7 +696,9 @@ export class ProviderRuntime implements ProviderPort {
         };
         const accounts =
           row.state === "available" && row.id !== "acp"
-            ? this.#providerAccounts?.rows(row.id, row.email ?? null)
+            ? this.#providerAccounts
+                ?.rows(row.id, row.email ?? null)
+                ?.map((account) => this.#extraModels(row.id, account))
             : undefined;
         const withAccounts = accounts ? { ...withSource, accounts } : withSource;
         return this.#restartsWhenIdle.has(row.id) ? { ...withAccounts, restartPending: true } : withAccounts;
@@ -1747,6 +1764,24 @@ export class ProviderRuntime implements ProviderPort {
   /** Gives a saved key its account and checks it again; see `ProviderAccounts.keyChanged`. */
   providerKeyChanged(provider: AgentProvider): Effect.Effect<AgentStatus> {
     return (this.#providerAccounts?.keyChanged(provider) ?? Effect.void).pipe(Effect.map(() => this.status()));
+  }
+
+  /**
+   * The row with only the models that the provider's catalogue does not list. The picker shows the
+   * catalogue, with the models an admin turned off left out, and then these (#5217).
+   */
+  #extraModels(provider: AgentProvider, account: ProviderAccountStatus): ProviderAccountStatus {
+    if (!account.models) return account;
+    const catalogue = this.#modelCatalog.list().filter((model) => model.provider === provider);
+    const models = account.models.filter((model) => !catalogue.some((listed) => listed.id === model.id));
+    return { ...account, models };
+  }
+
+  /** The models of an account after the first, from its last check. Empty for the own sign-in. */
+  accountModels(provider: AgentProvider, accountId: string | undefined): AgentModelOption[] {
+    // A turned-off provider offers no model, as `listModels` does.
+    if (this.#off.has(provider)) return [];
+    return this.#providerAccounts?.models(provider, accountId) ?? [];
   }
 
   /** True when `accountId` names an account after the first that this computer holds. */
