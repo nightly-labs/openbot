@@ -366,12 +366,10 @@ export const messages = {
   "mobile.chat.queue.editEnded": "De wijziging in de wachtrij is beëindigd.",
   "mobile.chat.queue.loadFailed": "Kan de wachtrij niet laden.",
   "mobile.chat.queue.storageUnavailable": "Opslag voor bijlagen is niet beschikbaar.",
-  "mobile.chat.queue.buttonFailed": "De berichten in de wachtrij zijn niet geladen. Toon berichten in wachtrij",
   "mobile.chat.queue.buttonLabel": {
     one: "{count} bericht in wachtrij. Toon berichten in wachtrij",
     other: "{count} berichten in wachtrij. Toon berichten in wachtrij",
   },
-  "mobile.chat.queue.unavailable": "Wachtrij niet beschikbaar",
   "mobile.chat.queue.uploading": "{progress} van {total} uploaden",
   "mobile.chat.queue.cancelUpload": "Annuleer upload in wachtrij",
   "mobile.chat.queue.waitingTitle": "Wachten op de agent",

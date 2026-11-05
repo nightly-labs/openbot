@@ -385,11 +385,9 @@ export const messages = {
   "mobile.chat.queue.editEnded": "キューの編集は終了しました。",
   "mobile.chat.queue.loadFailed": "キューを読み込めませんでした。",
   "mobile.chat.queue.storageUnavailable": "添付ファイルのストレージを利用できません。",
-  "mobile.chat.queue.buttonFailed": "キューのメッセージを読み込めませんでした。キューのメッセージを表示",
   "mobile.chat.queue.buttonLabel": {
     other: "キューに {count} 件のメッセージがあります。キューのメッセージを表示",
   },
-  "mobile.chat.queue.unavailable": "キューを利用できません",
   "mobile.chat.queue.uploading": "アップロード中 {progress} / {total}",
   "mobile.chat.queue.cancelUpload": "キューのアップロードをキャンセル",
   "mobile.chat.queue.waitingTitle": "エージェントを待っています",

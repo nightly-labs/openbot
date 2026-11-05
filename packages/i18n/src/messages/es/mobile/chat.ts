@@ -392,12 +392,10 @@ export const messages = {
   "mobile.chat.queue.editEnded": "La edición de la cola ha terminado.",
   "mobile.chat.queue.loadFailed": "No se pudo cargar la cola.",
   "mobile.chat.queue.storageUnavailable": "El almacenamiento de archivos adjuntos no está disponible.",
-  "mobile.chat.queue.buttonFailed": "No se cargaron los mensajes en cola. Mostrar mensajes en cola",
   "mobile.chat.queue.buttonLabel": {
     one: "{count} mensaje en cola. Mostrar mensajes en cola",
     other: "{count} mensajes en cola. Mostrar mensajes en cola",
   },
-  "mobile.chat.queue.unavailable": "Cola no disponible",
   "mobile.chat.queue.uploading": "Subiendo {progress} de {total}",
   "mobile.chat.queue.cancelUpload": "Cancelar subida en cola",
   "mobile.chat.queue.waitingTitle": "Esperando al agente",

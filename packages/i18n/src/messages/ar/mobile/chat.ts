@@ -428,7 +428,6 @@ export const messages = {
   "mobile.chat.queue.editEnded": "انتهى تعديل قائمة الانتظار.",
   "mobile.chat.queue.loadFailed": "تعذّر تحميل قائمة الانتظار.",
   "mobile.chat.queue.storageUnavailable": "تخزين المرفقات غير متاح.",
-  "mobile.chat.queue.buttonFailed": "لم يتم تحميل الرسائل في قائمة الانتظار. إظهار الرسائل في قائمة الانتظار",
   "mobile.chat.queue.buttonLabel": {
     zero: "لا رسائل في قائمة الانتظار. إظهار الرسائل في قائمة الانتظار",
     one: "رسالة واحدة في قائمة الانتظار. إظهار الرسائل في قائمة الانتظار",
@@ -437,7 +436,6 @@ export const messages = {
     many: "{count} رسالة في قائمة الانتظار. إظهار الرسائل في قائمة الانتظار",
     other: "{count} رسالة في قائمة الانتظار. إظهار الرسائل في قائمة الانتظار",
   },
-  "mobile.chat.queue.unavailable": "قائمة الانتظار غير متاحة",
   "mobile.chat.queue.uploading": "جارٍ رفع {progress} من {total}",
   "mobile.chat.queue.cancelUpload": "إلغاء الرفع في قائمة الانتظار",
   "mobile.chat.queue.waitingTitle": "في انتظار الوكيل",

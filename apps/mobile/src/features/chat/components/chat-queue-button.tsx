@@ -8,7 +8,6 @@ import Clock from "lucide-react-native/icons/clock";
 import CornerDownRight from "lucide-react-native/icons/corner-down-right";
 import Pencil from "lucide-react-native/icons/pencil";
 import Trash2 from "lucide-react-native/icons/trash";
-import TriangleAlert from "lucide-react-native/icons/triangle-alert";
 import { memo, type ReactNode, useState } from "react";
 import { Alert, Pressable, View, type ViewStyle } from "react-native";
 import Animated, { cubicBezier } from "react-native-reanimated";
@@ -78,28 +77,22 @@ export const ChatQueueButton = memo(function ChatQueueButton({
         fallbackBackground={fallbackBackground}
       />
     );
-  // A queue that failed to load reports no messages. Keep the entry, so the failure and its
-  // retry stay reachable instead of leaving the chat with nothing to press.
-  const failed = Boolean(queue.error);
   // The teammates the agent waits for are not queue rows, but the sheet shows them. Keep the
-  // entry for them alone, also before the first answer arrives.
-  if (!failed && !waiting) return null;
-  const label = failed ? t("mobile.chat.queue.unavailable") : t("mobile.chat.queue.repliesTitle");
+  // entry for them alone, also before the first answer arrives. A queue that failed to load,
+  // for example after the connection drops, shows nothing.
+  if (!waiting) return null;
+  const label = t("mobile.chat.queue.repliesTitle");
   return (
     <View className="mb-2 items-center">
       <ChatGlassButton
-        accessibilityLabel={failed ? t("mobile.chat.queue.buttonFailed") : label}
+        accessibilityLabel={label}
         className="h-11 flex-row items-center gap-2 px-4"
         fallbackBackground={fallbackBackground}
         height={44}
         liquidGlassAvailable={liquidGlassAvailable}
         onPress={() => openSheet(queue.chatId)}
       >
-        {failed ? (
-          <TriangleAlert color={String(muted)} size={16} strokeWidth={2} />
-        ) : (
-          <Clock color={String(muted)} size={16} strokeWidth={2} />
-        )}
+        <Clock color={String(muted)} size={16} strokeWidth={2} />
         <Typography.Paragraph type="body-sm" weight="semibold">
           {label}
         </Typography.Paragraph>

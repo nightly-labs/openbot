@@ -397,13 +397,10 @@ export const messages = {
   "mobile.chat.queue.editEnded": "Die Bearbeitung der Warteschlange ist beendet.",
   "mobile.chat.queue.loadFailed": "Die Warteschlange konnte nicht geladen werden.",
   "mobile.chat.queue.storageUnavailable": "Der Speicher für Anhänge ist nicht verfügbar.",
-  "mobile.chat.queue.buttonFailed":
-    "Die Nachrichten in der Warteschlange wurden nicht geladen. Nachrichten in der Warteschlange anzeigen",
   "mobile.chat.queue.buttonLabel": {
     one: "{count} Nachricht in der Warteschlange. Nachrichten in der Warteschlange anzeigen",
     other: "{count} Nachrichten in der Warteschlange. Nachrichten in der Warteschlange anzeigen",
   },
-  "mobile.chat.queue.unavailable": "Warteschlange nicht verfügbar",
   "mobile.chat.queue.uploading": "Hochladen: {progress} von {total}",
   "mobile.chat.queue.cancelUpload": "Hochladen aus der Warteschlange abbrechen",
   "mobile.chat.queue.waitingTitle": "Warten auf den Agenten",
