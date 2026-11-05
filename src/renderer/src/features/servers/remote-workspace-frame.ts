@@ -99,7 +99,8 @@ export function readRemoteWorkspaceFrame(
 export function saveRemoteWorkspaceFrame(
   accountId: string,
   serverId: string,
-  update: Partial<RemoteWorkspaceFrame>,
+  // The recent agents follow `selectedAgentId`, so a caller does not write them.
+  update: Partial<Omit<RemoteWorkspaceFrame, "recentAgentIds">>,
   storage: FrameStorage = window.localStorage,
 ): void {
   const current = readRemoteWorkspaceFrame(accountId, serverId, storage);

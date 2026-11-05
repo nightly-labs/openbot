@@ -5400,8 +5400,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   #emit(event: AgentEvent, memberId?: string): void {
     recordAgentRestartActivity(event);
     if (this.channels?.event(event) || this.messaging?.event(event, this.#scope) || this.#tasks?.event(event)) return;
-    if (memberId === undefined) this.emit("event", event);
-    else this.emit("event", event, memberId);
+    this.emit("event", event, memberId);
   }
 
   /** Removes live provider state for an execution thread before its durable rows are deleted. */
