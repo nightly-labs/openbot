@@ -1,14 +1,17 @@
+import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { access, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { isAbsolute } from "node:path";
 import { agentProviderName, type KeyOnlyProviderId } from "@openbot/contracts/agent-providers";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { redactText } from "@openbot/logging";
+import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure, httpStatusCause, structuredCause } from "@openbot/telemetry";
-import { Effect, Exit, Option, Schema, Scope, Semaphore } from "effect";
+import { Cause, Effect, Exit, Option, Schema, Scope, Semaphore } from "effect";
 import { secretElicitationField } from "./agent/prompts";
+import { waitForSuccessfulProcess } from "./agent/provider-status";
 import { type AgentClient, type DiagnosticOrigin, MissingPiSessionError, RequestTimeoutError } from "./agent-client";
 import { type AgentCliInfo, cliPathEnvironment, cliSpawnTarget } from "./cli";
 import { runCauseEffect } from "./effect-boundary";
@@ -62,6 +65,9 @@ import type {
   ProviderHistoryRequest,
   ReadProviderHistory,
 } from "./provider-history";
+import { stopProcessTree } from "./windows-process-tree";
+
+const logger = createOpenBotLogger("provider-runtime");
 
 /**
  * How long a turn may send nothing, with no tool call or compaction open and no question to the
@@ -70,6 +76,22 @@ import type {
  * retries it after at most 60 seconds, so the limit is longer: Pi's own timeout and retry go first.
  */
 const PI_TURN_STALL_MS = 10 * 60_000;
+
+/**
+ * How long `pi update --models` may take before the model list is read without it. It took 0.7 s in
+ * Pi 1.5.0, and the catalog waits 5 s for each `model/list` request.
+ */
+const PI_CATALOG_REFRESH_TIMEOUT_MS = 4_000;
+
+/**
+ * The variable from which `pi update --models` reads each key-only provider's key. Pi has no built-in
+ * Inception provider, so there is no catalog to refresh for it.
+ */
+const PI_CATALOG_KEY_VARIABLES: Record<KeyOnlyProviderId, string | null> = {
+  inception: null,
+  deepseek: "DEEPSEEK_API_KEY",
+  openrouter: "OPENROUTER_API_KEY",
+};
 
 const PiSessionUsage = Schema.Struct({
   tokens: Schema.Struct({
@@ -293,6 +315,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         break;
       }
       case "model/list":
+        yield* this.#refreshCatalog();
         response = { data: yield* this.#models(timeoutMs) };
         break;
       case "thread/start":
@@ -427,6 +450,58 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         connection
           .stop()
           .pipe(Effect.ensuring(keyExtension ? keyExtension.close().pipe(Effect.orDie) : Effect.void), Effect.orDie),
+    );
+  });
+
+  /**
+   * Pi lists the model catalog that it bundled at its release, or the one it saved from its last
+   * refresh. An RPC process starts that refresh in the background and saves it only when it ends,
+   * but `#models` stops Pi after about 200 ms. A model that OpenRouter added after the Pi release,
+   * such as the stealth model `stealth/crouton-alpha`, did not show in the picker (#4926). This runs
+   * Pi's own command, which saves the refresh before the list is read.
+   *
+   * It runs without confinement: it is OpenBot's own command, with no model and no tools, and it
+   * writes only Pi's catalog cache. Its output is ignored, so the key cannot get into a log. It never
+   * fails: with no network, or with an old Pi, the list is the one that Pi has.
+   */
+  readonly #refreshCatalog = Effect.fn("PiAgentClient.refreshCatalog")(function* (this: PiAgentClient) {
+    const keyProvider = this.options.keyProvider;
+    const environment: Record<string, string> = {};
+    if (keyProvider) {
+      const variable = PI_CATALOG_KEY_VARIABLES[keyProvider.id];
+      const key = keyProvider.apiKey();
+      if (!variable || !key) return;
+      environment[variable] = key;
+    }
+    const target = cliSpawnTarget(this.cli.executable, ["update", "--models"]);
+    const env = { ...process.env, ...cliPathEnvironment(this.cli), ...this.options.extraEnv?.(), ...environment };
+    yield* Effect.scoped(
+      Effect.gen(function* () {
+        const child = yield* Effect.acquireRelease(
+          Effect.sync(() =>
+            spawn(target.command, target.args, {
+              // Not a workspace: Pi would read its project settings.
+              cwd: homedir(),
+              env,
+              stdio: "ignore",
+              shell: false,
+              windowsHide: process.platform === "win32",
+              windowsVerbatimArguments: target.windowsVerbatimArguments,
+            }),
+          ),
+          (child) => stopProcessTree(child).pipe(Effect.ignore),
+        );
+        yield* waitForSuccessfulProcess(child, PI_CATALOG_REFRESH_TIMEOUT_MS, "Pi model catalog refresh");
+      }),
+    ).pipe(
+      Effect.catchCause((cause) =>
+        Effect.sync(() =>
+          logger.warn("Pi could not refresh its model catalog.", {
+            provider: this.provider,
+            error: this.#redact(String(Cause.squash(cause))),
+          }),
+        ),
+      ),
     );
   });
 
