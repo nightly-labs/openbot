@@ -28,13 +28,13 @@ import {
   plushPictureName,
   savedPlushPicture,
 } from "@/features/agents/model/plush/plush-picture";
-import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
+import { useAgentActivity, useAgentListActivity } from "@/features/workspace/components/use-agent-activity";
 import {
   DISCONNECTED_APPEARANCE,
   useConnectionAppearance,
 } from "@/features/workspace/components/use-connection-appearance";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
-import { agentActivityMood } from "@/features/workspace/model/agent-activity";
+import { agentActivityMood, type MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import { useMotionPreference } from "@/shared/lib/motion";
 import { useScreenFocusedWhile } from "@/shared/lib/use-screen-focused-while";
@@ -50,6 +50,8 @@ interface BloubAvatarProps extends AgentPhotoProps {
   animateIdle?: boolean;
   /** Turns the orbit rings around an agent photo while the agent works. A plush shows its felt dots. */
   rings?: boolean;
+  /** The face also shows the work and the waits of the agent's side threads, as the home list does. */
+  withThreads?: boolean;
 }
 
 /**
@@ -59,7 +61,19 @@ interface BloubAvatarProps extends AgentPhotoProps {
  */
 type PlushTransition = "pop" | "cut";
 
-export function BloubAvatar({
+export function BloubAvatar({ withThreads = false, ...props }: BloubAvatarProps) {
+  return withThreads ? <ListBloubAvatar {...props} /> : <ChatBloubAvatar {...props} />;
+}
+
+function ChatBloubAvatar(props: Omit<BloubAvatarProps, "withThreads">) {
+  return <LiveBloubAvatar {...props} activity={useAgentActivity(props.agentId)} />;
+}
+
+function ListBloubAvatar(props: Omit<BloubAvatarProps, "withThreads">) {
+  return <LiveBloubAvatar {...props} activity={useAgentListActivity(props.agentId)} />;
+}
+
+function LiveBloubAvatar({
   agentId,
   serverId: hostId,
   hue,
@@ -68,14 +82,14 @@ export function BloubAvatar({
   size = 54,
   animateIdle = true,
   rings = false,
-}: BloubAvatarProps) {
+  activity,
+}: Omit<BloubAvatarProps, "withThreads"> & { activity: MobileAgentActivity | undefined }) {
   const serverId = useMobileWorkspaceSelector(
     (workspace) => hostId ?? workspace.agents.find((agent) => agent.id === agentId)?.serverId,
   );
   const disconnected = useMobileWorkspaceSelector(
     (workspace) => !workspace.servers.some((server) => server.id === serverId && showsOnline(server)),
   );
-  const activity = useAgentActivity(agentId);
   return (
     <BloubAvatarPreview
       agentId={agentId}

@@ -8,7 +8,7 @@ import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
 import { ChannelAvatar } from "@/features/channels/components/channel-avatar";
-import { useAgentWaitReason } from "@/features/workspace/components/use-agent-activity";
+import { useAgentListWaitReason, useAgentThreadUnread } from "@/features/workspace/components/use-agent-activity";
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileSidebarItem } from "@/features/workspace/model/sidebar-layout";
@@ -57,8 +57,11 @@ function RailUnreadDot() {
 const RailAgent = memo(function RailAgent({ agent }: { agent: MobileAgent }) {
   const { t } = useText();
   const background = useChatRowBackground(agent.id);
-  const unread = useAgentUnread(agent.id);
-  const waitReason = useAgentWaitReason(agent.id);
+  // An unread side thread marks the agent too, as an unread message of its own chat does.
+  const ownUnread = useAgentUnread(agent.id);
+  const threadUnread = useAgentThreadUnread(agent.id);
+  const unread = ownUnread || threadUnread > 0;
+  const waitReason = useAgentListWaitReason(agent.id);
   return (
     <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
       <ChatLinkPressable
@@ -78,6 +81,7 @@ const RailAgent = memo(function RailAgent({ agent }: { agent: MobileAgent }) {
             size={AVATAR_SIZE}
             animateIdle={false}
             rings
+            withThreads
           />
           {waitReason ? <AgentWaitBadge reason={waitReason} size={16} /> : null}
         </View>

@@ -87,6 +87,18 @@ export function applyTaskEvent(
   }
 }
 
+/** True when `threadId` is the thread of a task of the agent that the phone has read. */
+export function taskThreadCheck(
+  queryClient: QueryClient,
+  scope: QueryScope,
+  serverId: string,
+): (agentId: string, threadId: string) => boolean {
+  return (agentId, threadId) =>
+    queryClient
+      .getQueryData<AgentTasksSnapshot>(queryKeys.agentTasks(scope, serverId, agentId))
+      ?.tasks.some((task) => task.threadId === threadId) ?? false;
+}
+
 /**
  * The event as the agent's own chat sees it. A task turn runs on the task's own thread, and the host
  * sends its turn, question, approval and takeover events with that thread, so the chat would show
@@ -102,8 +114,9 @@ export function withoutTaskTurns(
 ): AgentEvent | TeamRealtimeEvent | null {
   const tasksOf = (agentId: string) =>
     queryClient.getQueryData<AgentTasksSnapshot>(queryKeys.agentTasks(scope, serverId, agentId))?.tasks ?? [];
+  const isTaskThread = taskThreadCheck(queryClient, scope, serverId);
   const taskThread = (request: { agentId: string; threadId: string }) =>
-    tasksOf(request.agentId).some((task) => task.threadId === request.threadId);
+    isTaskThread(request.agentId, request.threadId);
   switch (event.type) {
     case "turn-started":
     case "turn-progress":
