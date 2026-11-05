@@ -211,8 +211,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "채팅이 길어지면 에이전트가 새 채팅을 시작하도록 허용해요. 먼저 메모를 저장해요.",
   "agentSettings.quickAcknowledgement.title": "긴 작업 전에 계획 표시",
-  "agentSettings.quickAcknowledgement.description":
-    "긴 작업 전에 에이전트가 계획을 보여줘요. 10초 후 또는 시작을 누르면 작업이 시작돼요.",
+  "agentSettings.quickAcknowledgement.description": "긴 작업 전에 에이전트가 계획을 보여줘요.",
   "agentSettings.browserProfile.label": "브라우저 프로필",
   "agentSettings.browserProfile.shared": "공유",
   "agentSettings.browserProfile.agent": "이 에이전트만",

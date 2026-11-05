@@ -458,6 +458,7 @@
     "./features/settings/logo-color-picker.css": "./src/features/settings/logo-color-picker.css",
     "./features/settings/sound-choice-select.css": "./src/features/settings/sound-choice-select.css",
     "./features/settings/notification-matrix.css": "./src/features/settings/notification-matrix.css",
+    "./features/settings/plan-start.css": "./src/features/settings/plan-start.css",
     "./features/settings/settings-modal.css": "./src/features/settings/settings-modal.css",
     "./features/settings/opencode-key-dialog.css": "./src/features/settings/opencode-key-dialog.css",
     "./features/settings/mcp-connect-dialog.css": "./src/features/settings/mcp-connect-dialog.css",

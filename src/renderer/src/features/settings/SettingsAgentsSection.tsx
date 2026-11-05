@@ -191,6 +191,10 @@ export function createSettingsAgentsSection(options: {
             })
           }
           onDefaultChange={changeDefault}
+          onPlanStartChange={(planStartAfterMs) => {
+            const value = options.value();
+            options.onValueChange({ ...value, agentDefaults: { ...value.agentDefaults, planStartAfterMs } });
+          }}
           onChoiceChange={changeChoice}
         />
         <Show when={!state.setting && state.processes}>

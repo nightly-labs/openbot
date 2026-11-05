@@ -11,6 +11,7 @@ export const messages = {
   "uiBlock.confirm.prompt": "确认：{action}？",
   "uiBlock.confirm.accept": "确认",
   "uiBlock.confirm.autoActionLabel": "{action} · {seconds} 秒",
+  "uiBlock.confirm.autoActionClock": "{action} · {time}",
   "uiBlock.confirm.previewLabel": "预览",
   "uiBlock.confirm.showFullPreview": "显示全部",
   "uiBlock.confirm.hideFullPreview": "收起",

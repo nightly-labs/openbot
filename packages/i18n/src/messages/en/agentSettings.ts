@@ -222,8 +222,7 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.agentNewChat.description":
     "Let the agent start a new chat when its chat gets long. It saves notes first.",
   "agentSettings.quickAcknowledgement.title": "Show the plan before long tasks",
-  "agentSettings.quickAcknowledgement.description":
-    "Before a long task, the agent shows its plan. It starts after 10 s, or when you press Start.",
+  "agentSettings.quickAcknowledgement.description": "Before a long task, the agent shows its plan.",
   "agentSettings.browserProfile.label": "Browser profile",
   "agentSettings.browserProfile.shared": "Shared",
   "agentSettings.browserProfile.agent": "Only this agent",

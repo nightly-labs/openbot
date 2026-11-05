@@ -12,6 +12,7 @@ export const messages = {
   "uiBlock.confirm.prompt": "Bevestigen: {action}?",
   "uiBlock.confirm.accept": "Bevestigen",
   "uiBlock.confirm.autoActionLabel": "{action} · {seconds} s",
+  "uiBlock.confirm.autoActionClock": "{action} · {time}",
   "uiBlock.confirm.previewLabel": "Voorvertoning",
   "uiBlock.confirm.showFullPreview": "Alles tonen",
   "uiBlock.confirm.hideFullPreview": "Minder tonen",

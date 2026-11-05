@@ -258,8 +258,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "Agent może rozpocząć nowy czat, gdy jego czat staje się długi. Najpierw zapisuje notatki.",
   "agentSettings.quickAcknowledgement.title": "Pokaż plan przed długimi zadaniami",
-  "agentSettings.quickAcknowledgement.description":
-    "Przed długim zadaniem agent pokazuje swój plan. Zaczyna po 10 s lub po naciśnięciu Start.",
+  "agentSettings.quickAcknowledgement.description": "Przed długim zadaniem agent pokazuje swój plan.",
   "agentSettings.browserProfile.label": "Profil przeglądarki",
   "agentSettings.browserProfile.shared": "Wspólny",
   "agentSettings.browserProfile.agent": "Tylko ten agent",
