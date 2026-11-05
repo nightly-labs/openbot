@@ -117,6 +117,8 @@ export function parseBrowserProxyAddress(text: string): BrowserProxyAddress | nu
   if (!integerInRange(port, 1, 65_535)) return null;
   const username = signInPart(parts.username);
   const password = signInPart(parts.password);
+  // A proxy signs in with a user name and a password; a password alone is not a sign-in.
+  if (username === null && password !== null) return null;
   if (
     scheme === "socks5" &&
     (utf8Length(username) > SOCKS_SIGN_IN_MAX_BYTES || utf8Length(password) > SOCKS_SIGN_IN_MAX_BYTES)
