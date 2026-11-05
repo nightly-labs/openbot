@@ -416,6 +416,7 @@
     "workerd",
   ],
   "patchedDependencies": {
+    "react-native-reanimated@4.7.1": "patches/react-native-reanimated@4.7.1.patch",
     "react-native-reserved-regions@0.2.0": "patches/react-native-reserved-regions@0.2.0.patch",
     "expo-splash-screen@58.0.11": "patches/expo-splash-screen@58.0.11.patch",
     "react-native-screens@4.30.0": "patches/react-native-screens@4.30.0.patch",
