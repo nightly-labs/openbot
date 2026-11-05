@@ -111,6 +111,7 @@ import {
   desktopCapturer,
   Notification,
   nativeImage,
+  net,
   powerMonitor,
   screen,
   shell,
@@ -1426,6 +1427,9 @@ export async function createApplicationServices({
     isProviderOn: (provider) => !providerUse.off().includes(provider),
     root: providerRuntimesRoot,
     downloadRoot: providerDownloads,
+    // Chromium's network stack, unlike Node's fetch, follows the system proxy and falls back
+    // between IPv6 and IPv4. Tests and Node-only callers keep injecting their own fetch.
+    fetchImpl: (input, init) => net.fetch(input instanceof URL ? input.href : input, init),
     hermesInstaller,
     updateRuntime: (runtime, install, signal, onWait) => {
       if (isManagedToolRuntime(runtime)) return install().pipe(Effect.asVoid);
