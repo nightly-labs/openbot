@@ -86,6 +86,12 @@ export function commandText(params: unknown): string | null {
   return null;
 }
 
+/** The short line under a question, when the request has one. */
+function promptQuestionDetail(question: DynamicRecord): { detail?: string } {
+  const detail = getString(question, "detail")?.trim();
+  return detail ? { detail: detail.slice(0, INPUT_LIMITS.promptQuestion) } : {};
+}
+
 export function promptQuestions(params: unknown): AgentPromptQuestion[] {
   return getArray(params, "questions")
     .filter(isRecord)
@@ -93,6 +99,7 @@ export function promptQuestions(params: unknown): AgentPromptQuestion[] {
       id: getString(question, "id") ?? randomUUID(),
       header: getString(question, "header") ?? "Question",
       question: getString(question, "question") ?? "The agent needs more information.",
+      ...promptQuestionDetail(question),
       isSecret: question.isSecret === true,
       options: Array.isArray(question.options)
         ? question.options.filter(isRecord).map((option) => ({

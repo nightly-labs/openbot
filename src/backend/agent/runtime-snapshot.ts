@@ -27,6 +27,7 @@ export function compactRuntimeQuestion(
     id: question.id,
     header: question.header.slice(0, AGENT_RUNTIME_QUESTION_HEADER_LIMIT),
     question: question.question.slice(0, AGENT_RUNTIME_TEXT_LIMIT),
+    ...(question.detail ? { detail: question.detail.slice(0, AGENT_RUNTIME_TEXT_LIMIT) } : {}),
     isSecret: question.isSecret,
     options:
       question.options?.map((option) => ({
