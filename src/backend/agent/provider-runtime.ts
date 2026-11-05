@@ -1765,6 +1765,8 @@ export class ProviderRuntime implements ProviderPort {
 
   /** The models of an account after the first, from its last check. Empty for the own sign-in. */
   accountModels(provider: AgentProvider, accountId: string | undefined): AgentModelOption[] {
+    // A turned-off provider offers no model, as `listModels` does.
+    if (this.#off.has(provider)) return [];
     return this.#providerAccounts?.models(provider, accountId) ?? [];
   }
 

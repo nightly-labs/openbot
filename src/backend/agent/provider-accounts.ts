@@ -633,8 +633,8 @@ export class ProviderAccounts {
           this.#setState(account.id, { state: "connected", email, organization, message: null });
           // The rail shows an account only with a reading, and no usage request follows a sign-in.
           if (limit) this.#host.usageChanged(limit);
-          // After the connected state, so a slow list does not hold the sign-in. A failed list keeps the
-          // last one.
+          // After the connected state, so a slow list does not delay it; the end of the sign-in still
+          // waits for the list. A failed list keeps the last one.
           const models = yield* this.#host.readModels(client);
           if (models && this.#states.has(account.id)) {
             this.#models.set(account.id, models);

@@ -3122,7 +3122,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     ) {
       const queuedModel =
         requestedModel ??
-        this.#endpoints.available().find((model) => model.provider === queued.provider && model.id === queued.model);
+        this.#agentModels(queued).find((model) => model.provider === queued.provider && model.id === queued.model);
       return yield* queue({
         ...queued,
         ...(requestedModel ? { model: requestedModel.id } : {}),
