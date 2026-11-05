@@ -259,7 +259,8 @@ async function openSocksConnection(upstream: SocksUpstream, target: RelayTarget,
 /** A SOCKS5 proxy with a sign-in as the exit of a relay. */
 export function socksExit(upstream: SocksUpstream): RelayExit {
   return async (target, signal) => {
-    const site = connect({ host: upstream.host, port: upstream.port });
+    // The address keeps an IPv6 host in brackets; a socket takes it without them.
+    const site = connect({ host: upstream.host.replace(/^\[(.*)\]$/u, "$1"), port: upstream.port });
     site.setNoDelay(true);
     const abort = () => site.destroy(new Error("The connection was stopped"));
     signal.addEventListener("abort", abort, { once: true });

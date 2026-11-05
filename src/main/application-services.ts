@@ -511,6 +511,8 @@ const TEARDOWN_ORDER = {
   // After the connections that hold it.
   signalIngress: 86,
   host: 90,
+  /** Before the team WebRTC bridge: the computer proxy streams stop before their channels. */
+  browserEgress: 99,
   teamWebRtcBridge: 100,
   // Before the agent service, so no handoff is sent to an agent while the service stops.
   routineFlows: 103,
@@ -1187,6 +1189,7 @@ export async function createApplicationServices({
   );
   // The computers of members that share their connection with this server, for computer proxies.
   const browserEgress = new BrowserEgressHost(teamWebRtcBridge);
+  teardown.push(TEARDOWN_ORDER.browserEgress, "the computer proxies of members", () => browserEgress.dispose());
   // Only a hosted, self-hosted or container server: one unit or container holds OpenBot and every
   // agent process. The desktop app does not hold turns for memory.
   const hostMemory =
@@ -3192,6 +3195,10 @@ export async function createApplicationServices({
     browserEgressWanted: (serverId) => remoteServers.browserEgressWanted(serverId),
   });
   remoteServers.on("changed", browserEgressClient.reconcile);
+  teardown.push(TEARDOWN_ORDER.browserEgress, "the computer proxy of this computer", () => {
+    remoteServers.off("changed", browserEgressClient.reconcile);
+    browserEgressClient.dispose();
+  });
   performance.mark("openbot:services.plugin-catalog");
   // Not on a server: a local server is a workspace of the desktop app.
   const localServers =

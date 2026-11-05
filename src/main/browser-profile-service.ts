@@ -61,7 +61,13 @@ export interface BrowserProfileServiceDependencies {
   agents: Pick<AgentService, "listAgents" | "updateAgent">;
   browser: Pick<
     BrowserHost,
-    "tabIdsInSession" | "listTabSessions" | "close" | "clearTabSession" | "proxyFailure" | "forgetProxyFailure"
+    | "tabIdsInSession"
+    | "listTabSessions"
+    | "close"
+    | "clearTabSession"
+    | "proxyFailure"
+    | "forgetProxyFailure"
+    | "releaseProfileProxy"
   >;
   /** The name of a member of this server, or null when it is not a member now. Never logged. */
   memberName?: (memberId: string) => string | null;
@@ -223,9 +229,12 @@ export function createBrowserProfileService({
     return proxy;
   }
   const closeProfileTabs = Effect.fn("BrowserProfiles.closeProfileTabs")(function* (profileIds: readonly string[]) {
-    for (const profileId of profileIds)
+    for (const profileId of profileIds) {
       for (const tabId of browser.tabIdsInSession({ kind: "profile", profileId }))
         yield* browser.close(tabId).pipe(toBrowserProfileFailure);
+      // The relay of the old proxy stops with the tabs, not at the next tab.
+      yield* browser.releaseProfileProxy(profileId).pipe(toBrowserProfileFailure);
+    }
   });
 
   const saveProxy = Effect.fn("BrowserProfiles.saveProxy")(function* ({
@@ -260,7 +269,9 @@ export function createBrowserProfileService({
       if (password !== null && !cipher.canPersist())
         throw new BrowserProfileRejectedError(sourceText("error.app.secretStorageUnavailable"));
       // The edit field shows a mask in place of the saved password; a kept mask keeps the password.
-      const keptPassword = existing !== undefined && keepPassword === true ? proxies.password(existing.id) : null;
+      // A password needs a user name, so an address without one keeps no password.
+      const keptPassword =
+        existing !== undefined && keepPassword === true && username !== null ? proxies.password(existing.id) : null;
       const row = {
         scheme,
         host,

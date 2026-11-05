@@ -431,6 +431,11 @@ export class BrowserHost {
    * connection, so a change of the password also applies again. Never logged.
    */
   readonly #appliedProxies = new Map<string, AppliedProxy>();
+  /**
+   * One proxy change at a time. Two tabs that open together in one profile must not both open a
+   * relay: the second would replace the first in `#appliedProxies`, and the first would stay open.
+   */
+  readonly #proxyLock = Semaphore.makeUnsafe(1);
   /** The proxies whose last page load could not connect to them. */
   readonly #proxyFailures = new Map<string, BrowserProxyFailure>();
   /**
@@ -2678,6 +2683,13 @@ export class BrowserHost {
     tabSession: BrowserTabSession | undefined,
   ): Effect.fn.Return<void, BrowserOperationError> {
     if (tabSession?.kind !== "profile") return;
+    yield* this.#proxyLock.withPermit(this.#setSessionProxy(tabSession));
+  }).bind(this);
+
+  readonly #setSessionProxy = Effect.fn("BrowserHost.setSessionProxy")(function* (
+    this: BrowserHost,
+    tabSession: Extract<BrowserTabSession, { kind: "profile" }>,
+  ): Effect.fn.Return<void, BrowserOperationError> {
     const proxy = yield* browserSync(() => this.#profileProxy(tabSession.profileId));
     const partition = browserTabPartition(tabSession);
     const key = JSON.stringify(proxy);
@@ -2727,9 +2739,36 @@ export class BrowserHost {
     this: BrowserHost,
     partition: string,
   ) {
-    const applied = this.#appliedProxies.get(partition);
-    this.#appliedProxies.delete(partition);
-    if (applied?.relay) yield* applied.relay.close;
+    yield* this.#proxyLock.withPermit(
+      Effect.suspend(() => {
+        const applied = this.#appliedProxies.get(partition);
+        this.#appliedProxies.delete(partition);
+        return applied?.relay?.close ?? Effect.void;
+      }),
+    );
+  }).bind(this);
+
+  /**
+   * Stops the relay of a profile after its proxy changed and its tabs closed. A session that a new
+   * tab gave the new proxy keeps it. The session keeps the rules of the stopped relay, so it cannot
+   * connect until the next tab applies the new proxy.
+   */
+  readonly releaseProfileProxy = Effect.fn("BrowserHost.releaseProfileProxy")(function* (
+    this: BrowserHost,
+    profileId: string,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    const tabSession: BrowserTabSession = { kind: "profile", profileId };
+    const partition = browserTabPartition(tabSession);
+    yield* this.#proxyLock.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const applied = this.#appliedProxies.get(partition);
+        if (applied === undefined || this.tabIdsInSession(tabSession).length > 0) return;
+        const proxy = yield* browserSync(() => this.#profileProxy(profileId));
+        if (applied.key === JSON.stringify(proxy)) return;
+        this.#appliedProxies.delete(partition);
+        if (applied.relay) yield* applied.relay.close;
+      }),
+    );
   }).bind(this);
 
   /** The sign-in that a tab gives when its proxy asks. */

@@ -223,7 +223,8 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
       // Only a client opens it, and only on a connection that is up. A new connection needs a new one.
       if (state.role !== "client" || !state.peerConnection || state.channels.rpc?.readyState !== "open")
         throw new Error(sourceText("error.remote.channelNotOpen"));
-      if (!state.egress)
+      // A channel that closes now does not count: its close comes later and opens nothing again.
+      if (!state.egress || state.egress.readyState === "closing" || state.egress.readyState === "closed")
         bindEgressChannel(state, state.peerConnection.createDataChannel(BROWSER_EGRESS_CHANNEL, { ordered: true }));
     } else if (command.type === "close-egress") {
       const state = peers.get(command.peerId);

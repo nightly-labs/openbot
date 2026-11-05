@@ -91,6 +91,7 @@ async function startHost(): Promise<Host> {
       proxyFailure: () => null,
       forgetProxyFailure: () => undefined,
       clearTabSession: () => Effect.void,
+      releaseProfileProxy: () => Effect.void,
     },
   });
   return { database, store, agents, profiles };

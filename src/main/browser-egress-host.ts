@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { isBrowserEgressTargetHost } from "@openbot/contracts/team-protocol/browser-egress-v1";
 import { Effect } from "effect";
 import type { RelayExit } from "../backend/browser-profiles/browser-proxy-relay";
 import { BrowserEgressMux, BrowserEgressRefusedError } from "./browser-egress-mux";
@@ -64,6 +65,9 @@ export class BrowserEgressHost extends EventEmitter<BrowserEgressHostEvents> {
     return async (target, signal) => {
       const mux = this.#current(membershipId);
       if (!mux) throw new BrowserEgressRefusedError("closed");
+      // The computer closes the whole channel on a frame it cannot read, so a site name that the
+      // protocol refuses fails here, alone.
+      if (!isBrowserEgressTargetHost(target.host)) throw new BrowserEgressRefusedError("address");
       return { stream: await mux.open(target.host, target.port, signal), early: Buffer.alloc(0) };
     };
   }

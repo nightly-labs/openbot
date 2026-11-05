@@ -1099,6 +1099,7 @@ try {
       proxyFailure: () => null,
       forgetProxyFailure: () => undefined,
       clearTabSession: (tabSession) => Effect.sync(() => record("clearTabSession", tabSession)),
+      releaseProfileProxy: () => Effect.void,
     },
   });
 
