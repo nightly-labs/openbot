@@ -39,7 +39,7 @@ export function secretElicitationField(id: string, property: DynamicRecord | und
   return SECRET_FIELD_PATTERN.test(`${id} ${getString(property, "title") ?? ""}`);
 }
 
-export function elicitationOptions(property: DynamicRecord): Array<{ label: string; description: string }> | null {
+function elicitationOptions(property: DynamicRecord): Array<{ label: string; description: string }> | null {
   if (Array.isArray(property.oneOf)) {
     return property.oneOf.filter(isRecord).flatMap((option) => {
       const value = getString(option, "const");
