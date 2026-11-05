@@ -48,7 +48,7 @@ import {
   type OpenCodeLaunches,
 } from "./agent/acp-subagent-updates";
 import { acpPlanSteps, PLAN_UPDATED_METHOD } from "./agent/plan-updates";
-import { elicitationOptions, elicitationValue, secretElicitationField } from "./agent/prompts";
+import { elicitationFieldQuestions, elicitationValue } from "./agent/prompts";
 import {
   endSubagentTurn,
   newSubagentState,
@@ -3221,21 +3221,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this: AcpAgentClient,
     params: CreateElicitationRequest,
   ): Effect.fn.Return<CreateElicitationResponse, ProviderClientOperationError> {
-    const schema = getRecord(params, "requestedSchema");
-    const properties = getRecord(schema, "properties") ?? {};
-    const questions = Object.entries(properties).flatMap(([id, rawProperty]) => {
-      if (!isRecord(rawProperty)) return [];
-      const property = rawProperty;
-      return [
-        {
-          id,
-          header: getString(property, "title") ?? id,
-          question: getString(property, "description") ?? getString(params, "message") ?? "ACP needs more information.",
-          isSecret: secretElicitationField(id, property),
-          options: elicitationOptions(property),
-        },
-      ];
-    });
+    const properties = getRecord(getRecord(params, "requestedSchema"), "properties") ?? {};
+    const questions = elicitationFieldQuestions(params, "ACP");
     if (questions.length === 0) {
       questions.push({
         id: "response",

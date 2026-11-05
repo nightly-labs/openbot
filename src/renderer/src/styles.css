@@ -13,6 +13,7 @@
 @import "@openbot/ui/features/dynamic-island/dynamic-island-surface.css";
 @import "@openbot/ui/features/sidebar/sidebar-mobile-app.css";
 @import "./styles/base.css";
+@import "@openbot/ui/styles/sr-only.css";
 @import "@openbot/ui/features/account/auth.css";
 @import "@openbot/ui/features/account/app-loading-screen.css";
 @import "@openbot/ui/features/account/language-wheel.css";
