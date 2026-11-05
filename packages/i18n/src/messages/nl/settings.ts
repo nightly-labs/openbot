@@ -118,6 +118,12 @@ export const messages = {
   "settings.planStart.customHint": "Minstens 5 seconden.",
   "settings.planStart.customInvalid": "Voer een geheel getal van minstens 5 seconden in.",
   "settings.planStart.set": "Instellen",
+  "settings.automationLimit.sectionTitle": "Limiet",
+  "settings.automationLimit.sectionDescription": "Dit geldt voor alle agents op deze computer.",
+  "settings.automationLimit.title": "Verzoeken per uur",
+  "settings.automationLimit.option": "{limit} per uur",
+  "settings.automationLimit.note":
+    "Het maximale aantal berichten en routine-uitvoeringen dat lokale scripts per uur naar elke agent kunnen sturen.",
   "settings.backgroundProcesses.title": "Achtergrondprocessen",
   "settings.backgroundProcesses.description":
     "Programma's die agents hebben gestart en laten draaien, zoals dev-servers. Ze blijven draaien als de chat eindigt en als je OpenBot afsluit.",

@@ -37,8 +37,6 @@ import { approvalDecision, promptAnswers } from "./team-api/request-helpers";
 
 const logger = createOpenBotLogger("automation");
 
-/** A script that loops can wake an agent at most this often, so it cannot spend the user's quota. */
-const AUTOMATION_RUNS_PER_HOUR = 30;
 const HOUR_MS = 60 * 60 * 1000;
 // A payload is at most 4,000 characters; four UTF-8 bytes each plus JSON escapes stay below this.
 const BODY_LIMIT_BYTES = 32 * 1024;
@@ -409,8 +407,10 @@ export class AutomationServer {
     const now = this.#now();
     const recent = (this.#runs.get(agentId) ?? []).filter((time) => now - time < HOUR_MS);
     this.#runs.set(agentId, recent);
-    if (recent.length >= AUTOMATION_RUNS_PER_HOUR) {
-      const params = { limit: AUTOMATION_RUNS_PER_HOUR };
+    // The account default `automationRunsPerHour`: a script that loops cannot spend the user's quota.
+    const limit = this.#options.agentDefaults().automationRunsPerHour;
+    if (recent.length >= limit) {
+      const params = { limit };
       throw new HttpError(
         429,
         routine

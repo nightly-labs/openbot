@@ -74,6 +74,8 @@ const deliveries = new Map<string, FakeDelivery>();
 const updates: UpdateAgentInput[] = [];
 const cleared: string[] = [];
 let busy = false;
+/** The account default "Requests an hour" of Settings › Agents › Local scripts. */
+let automationRunsPerHour = DEFAULT_AGENT_DEFAULTS.automationRunsPerHour;
 
 function deliveryState(
   delivery: FakeDelivery,
@@ -93,7 +95,7 @@ const root = mkdtempSync(join(tmpdir(), "openbot-cli-e2e-"));
 const options: ConstructorParameters<typeof AutomationServer>[0] = {
   root,
   listAgents: () => agents,
-  agentDefaults: () => DEFAULT_AGENT_DEFAULTS,
+  agentDefaults: () => ({ ...DEFAULT_AGENT_DEFAULTS, automationRunsPerHour }),
   listModels: () => models,
   listRoutines: () => [],
   runRoutine: () => Effect.die(new Error("No routine runs in this test.")),
@@ -310,6 +312,18 @@ try {
     return parsed(run).cleared === true && cleared.at(-1) === "agent-ada";
   });
   await check("new-chat needs exactly one agent", ["agent", "new-chat"], 2, (run) => run.stderr.includes("Usage:"));
+  // The restarted server has no runs yet, so the agent gets exactly the limit from the account default.
+  automationRunsPerHour = 2;
+  await check("a message under the limit is accepted", ["run", "Ada", "hello"], 0, () => true);
+  await check("a message at the limit is accepted", ["run", "Ada", "hello"], 0, () => true);
+  const beforeLimit = deliveries.size;
+  await check("a message over the account limit exits 1 with the limit", ["run", "Ada", "hello"], 1, (run) => {
+    return run.stderr.includes("2 message or routine requests") && deliveries.size === beforeLimit;
+  });
+  automationRunsPerHour = 3;
+  await check("a raised limit accepts the next message at once", ["run", "Ada", "hello"], 0, () => {
+    return deliveries.size === beforeLimit + 1;
+  });
   busy = true;
   await check("a refused update exits 1 with its reason", ["agent", "set-account", "Ada", "default"], 1, (run) => {
     return run.stderr.includes("Wait until the agent is idle.");

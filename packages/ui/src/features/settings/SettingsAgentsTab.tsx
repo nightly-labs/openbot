@@ -29,6 +29,7 @@ import {
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import { AutomationLimitRow } from "./AutomationLimitRow";
 import { PlanStartRow } from "./PlanStartRow";
 
 /** A setting of the Agents tab: the three account defaults, and "Steer agents while they work". */
@@ -134,6 +135,8 @@ export interface SettingsAgentsTabProps {
   onDefaultChange: (setting: AgentDefaultSetting, on: boolean) => void;
   /** Sets when the plan card starts the work by itself; `null` waits for Start. */
   onPlanStartChange: (value: number | null) => void;
+  /** Sets how many messages and routine runs local scripts can send each agent in one hour. */
+  onAutomationLimitChange: (value: number) => void;
   /** Gives `choice` to each agent of `agentIds`. */
   onChoiceChange: (agentIds: readonly string[], setting: AgentDefaultSetting, choice: AgentDefaultChoice) => void;
 }
@@ -328,6 +331,21 @@ export function SettingsAgentsTab(props: SettingsAgentsTabProps) {
                   </Item>
                 )}
               </For>
+            </ItemGroup>
+          </SettingsSection>
+        </Show>
+        {/* Not under Default: no agent can override the limit. */}
+        <Show when={setting === "allowAutomation"}>
+          <SettingsSection
+            title={t("settings.automationLimit.sectionTitle")}
+            description={t("settings.automationLimit.sectionDescription")}
+          >
+            <ItemGroup class="settings-modal-card">
+              <AutomationLimitRow
+                value={props.defaults.automationRunsPerHour}
+                menuMount={props.menuMount}
+                onChange={props.onAutomationLimitChange}
+              />
             </ItemGroup>
           </SettingsSection>
         </Show>
