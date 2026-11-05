@@ -15,6 +15,12 @@ import {
   telegramOrchestrator,
   workspaceOrchestrator,
 } from "@/features/servers/model/connectors";
+import {
+  isMobilePasswordManagerId,
+  PASSWORD_MANAGER_TEXT,
+  passwordManagerConnectorStatus,
+  passwordManagerExpired,
+} from "@/features/servers/model/password-managers";
 import { useServerConnectors } from "@/features/servers/model/use-server-connectors";
 import {
   SettingsContent,
@@ -72,12 +78,14 @@ export function ServerConnectorsScreen() {
     connectors,
     onePasswordAvailable,
     bitwardenAvailable,
+    passwordManagersAvailable,
     messaging,
     github,
     onePassword,
     bitwarden,
+    passwordManagers,
   } = useServerConnectors(serverId, "all");
-  if (!server || !(connectors || onePasswordAvailable || bitwardenAvailable))
+  if (!server || !(connectors || onePasswordAvailable || bitwardenAvailable || passwordManagersAvailable))
     return (
       <SettingsContent>
         <SettingsNote>{t(server ? "mobile.server.connectors.unavailable" : "mobile.server.unavailable")}</SettingsNote>
@@ -113,6 +121,28 @@ export function ServerConnectorsScreen() {
             status.connected && status.serverUrl
               ? status.serverUrl
               : t("mobile.server.connectors.bitwarden.hostSummary"),
+        },
+      ];
+    }
+    if (isMobilePasswordManagerId(id)) {
+      // A host lists only the managers that it can connect, so a manager that it does not list has no row.
+      if (!passwordManagersAvailable) return [];
+      const list = passwordManagers.data;
+      if (!list) return passwordManagers.isError ? [unknown(id)] : [];
+      const status = list.find((candidate) => candidate.manager === id);
+      if (!status) return [];
+      const now = Date.now();
+      const expired = passwordManagerExpired(status, now);
+      const state = passwordManagerConnectorStatus(status, now);
+      return [
+        {
+          id,
+          status: state,
+          statusLabel: t(expired ? "mobile.server.connectors.statusExpired" : CONNECTOR_STATUS_KEYS[state]),
+          summary:
+            status.state === "connected" && !expired && status.loginCount !== null
+              ? t("mobile.server.connectors.passwordManager.loginCount", { count: status.loginCount })
+              : t(PASSWORD_MANAGER_TEXT[id].summary),
         },
       ];
     }
@@ -182,9 +212,15 @@ export function ServerConnectorsScreen() {
   const waits = (item: ConnectorRow) => item.status === "idle" || item.status === "unavailable";
   const active = rows.filter((item) => !waits(item));
   const idle = rows.filter(waits);
-  const loading = [messaging.slack, messaging.discord, messaging.telegram, github, onePassword, bitwarden].some(
-    (query) => query.isLoading,
-  );
+  const loading = [
+    messaging.slack,
+    messaging.discord,
+    messaging.telegram,
+    github,
+    onePassword,
+    bitwarden,
+    passwordManagers,
+  ].some((query) => query.isLoading);
   const item = (entry: ConnectorRow) => (
     <SettingsRow
       key={entry.id}

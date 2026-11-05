@@ -249,6 +249,7 @@ import { createWebNotificationRouting } from "./web-notification-routing";
 import { createWebNotificationSettings } from "./web-notification-settings";
 import { requestWebNotificationPermission } from "./web-notifications";
 import { webOnePasswordConnectorPort } from "./web-onepassword-connector";
+import { webPasswordManagersPort } from "./web-password-managers";
 import { createWebProviderSettings, openWebDestination } from "./web-provider-admin";
 import { webRoutineFlowsHost } from "./web-routine-flows";
 import { webScheduleSource } from "./web-schedule";
@@ -1022,6 +1023,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const githubPort = webGitHubConnectorPort(() => hostRequest());
   const onePasswordPort = webOnePasswordConnectorPort(() => hostRequest());
   const bitwardenPort = webBitwardenConnectorPort(() => hostRequest());
+  const passwordManagersPort = webPasswordManagersPort(() => hostRequest());
   const webMessaging = webHostMessaging(hostRequest, () =>
     workspace.state.capabilities.includes(DISCORD_ACCESS_CAPABILITY),
   );
@@ -1038,6 +1040,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         github: () => githubPort,
         onePassword: () => onePasswordPort,
         bitwarden: () => bitwardenPort,
+        passwordManagers: () => passwordManagersPort,
         messaging: hostMessagingApi(
           () => connectorTarget()?.id,
           () => webMessaging.api,

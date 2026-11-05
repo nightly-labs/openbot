@@ -559,4 +559,72 @@ export const messages = {
   "connector.bitwarden.clientSecret": "client_secret van API-sleutel",
   "connector.bitwarden.masterPassword": "Hoofdwachtwoord",
   "connector.bitwarden.connecting": "Verbinden",
+  "connector.protonPass.title": "Proton Pass",
+  "connector.protonPass.description": "Agents loggen in op sites met de logins uit een gedeelde Proton Pass-kluis.",
+  "connector.protonPass.descriptionHost":
+    "Agents op {host} loggen in op sites met de logins uit een gedeelde Proton Pass-kluis.",
+  "connector.protonPass.connect": "Verbinden",
+  "connector.protonPass.moreWays": "Meer manieren om te verbinden",
+  "connector.protonPass.useKey": "Een toegangssleutel gebruiken",
+  "connector.protonPass.keyLabel": "Toegangssleutel",
+  "connector.protonPass.keyPlaceholder": "pst_…",
+  "connector.protonPass.setupTitle": "Instellen",
+  "connector.protonPass.setupDescription":
+    "Verbinden opent de Proton-aanmelding in je browser. Daarna maakt OpenBot de gedeelde kluis en bewaart het alleen een sleutel met leestoegang.",
+  "connector.protonPass.setupDescriptionHost":
+    "Verbinden opent de Proton-aanmelding in je browser. Daarna maakt {host} de gedeelde kluis en bewaart het alleen een sleutel met leestoegang.",
+  "connector.protonPass.vaultName": "Shared with OpenBot",
+  "connector.protonPass.vaultSetup":
+    "OpenBot maakt deze kluis wanneer je verbindt. Verplaats logins erheen om ze te delen.",
+  "connector.protonPass.showSteps": "Stappen tonen",
+  "connector.protonPass.stepsLabel": "Verbindingsstappen",
+  "connector.protonPass.stepSignIn": "Aanmelden",
+  "connector.protonPass.stepVault": "Gedeelde kluis maken",
+  "connector.protonPass.stepDone": "Klaar",
+  "connector.protonPass.signInTitle": "Aanmelden bij Proton",
+  "connector.protonPass.signInStarting": "OpenBot start de aanmelding. De Proton-pagina opent in je browser.",
+  "connector.protonPass.signInDescription":
+    "De aanmelding is open in je browser. Proton vraagt om je wachtwoord en je tweede factor.",
+  "connector.protonPass.signInDescriptionHost":
+    "De aanmelding voor {host} is open in je browser. Proton vraagt om je wachtwoord en je tweede factor.",
+  "connector.protonPass.extraPasswordDescription": "Proton Pass vraagt om je extra wachtwoord.",
+  "connector.protonPass.extraPasswordWrong": "Het extra wachtwoord is niet juist. Voer het opnieuw in.",
+  "connector.protonPass.extraPasswordLabel": "Extra wachtwoord",
+  "connector.protonPass.continue": "Doorgaan",
+  "connector.protonPass.setupStepTitle": "Gedeelde kluis maken",
+  "connector.protonPass.setupStepDescription":
+    "OpenBot maakt de kluis ‘{vault}’ en een sleutel met leestoegang. Daarna meldt het je Proton-sessie af.",
+  "connector.protonPass.doneTitle": "Proton Pass is verbonden",
+  "connector.protonPass.doneDescription": "Verplaats logins naar ‘{vault}’ zodat agents ermee kunnen inloggen.",
+  "connector.protonPass.failedTitle": "Proton Pass is niet verbonden",
+  "connector.protonPass.copyLink": "Link kopiëren",
+  "connector.protonPass.linkCopied": "Gekopieerd",
+  "connector.protonPass.openAgain": "Opnieuw openen",
+  "connector.protonPass.done": "Klaar",
+  "connector.protonPass.close": "Sluiten",
+  "connector.protonPass.statusConnecting": "Verbinden",
+  "connector.protonPass.statusConnected": "Verbonden",
+  "connector.protonPass.statusExpired": "Sleutel verlopen",
+  "connector.protonPass.expiredTitle": "De Proton Pass-sleutel is verlopen",
+  "connector.protonPass.expiredDescription":
+    "Agents kunnen niet inloggen met je gedeelde logins tot je opnieuw aanmeldt.",
+  "connector.protonPass.reconnect": "Opnieuw verbinden",
+  "connector.protonPass.planTitle": "Proton Pass vraagt een betaald abonnement",
+  "connector.protonPass.planDescription":
+    "De Proton Pass CLI werkt alleen met een betaald Proton-abonnement. Wijzig je abonnement en verbind opnieuw.",
+  "connector.protonPass.vaultTitle": "Gedeelde kluis",
+  "connector.protonPass.vaultDescription":
+    "Agents kunnen inloggen met de logins in deze kluis. Verplaats een login erheen om hem te delen.",
+  "connector.protonPass.loginCount": { one: "{count} login", other: "{count} logins" },
+  "connector.protonPass.loginsLoading": "Logins tellen…",
+  "connector.protonPass.keyExpires": "Alleen lezen. Verloopt op {date}.",
+  "connector.protonPass.keyExpired": "Alleen lezen. Verlopen op {date}.",
+  "connector.protonPass.keyNoExpiry": "Alleen lezen. Verloopt niet.",
+  "connector.protonPass.disconnectTitle": "Proton Pass loskoppelen",
+  "connector.protonPass.disconnectSummary":
+    "OpenBot verwijdert zijn toegangssleutel op deze computer. De kluis en de logins erin blijven in je Proton-account.",
+  "connector.protonPass.disconnectSummaryHost":
+    "OpenBot verwijdert zijn toegangssleutel op {host}. De kluis en de logins erin blijven in je Proton-account.",
+  "connector.protonPass.disconnect": "Loskoppelen",
+  "connector.protonPass.actionFailed": "OpenBot kon de Proton Pass-verbinding niet wijzigen.",
 } as const satisfies PartialTranslation<typeof source>;

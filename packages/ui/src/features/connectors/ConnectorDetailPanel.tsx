@@ -18,6 +18,11 @@ import {
   type OnePasswordConnectorPanelProps,
 } from "../settings/OnePasswordConnectorPanel";
 import {
+  ProtonPassConnectorPanel,
+  type ProtonPassConnectorPanelProps,
+  protonPassStatus,
+} from "../settings/ProtonPassConnectorPanel";
+import {
   messagingPlatformText,
   messagingStateUnknown,
   SlackIntegrationPanel,
@@ -45,6 +50,7 @@ export type ConnectorDetail =
   | { id: "github"; props: GitHubConnectorPanelProps }
   | { id: "onepassword"; props: OnePasswordConnectorPanelProps }
   | { id: "bitwarden"; props: BitwardenConnectorPanelProps }
+  | { id: "protonpass"; props: ProtonPassConnectorPanelProps }
   | { id: "slack" | "discord"; props: SlackIntegrationPanelProps }
   | { id: "telegram"; props: TelegramIntegrationPanelProps }
   | { id: "whatsapp"; props: WhatsAppIntegrationPanelProps };
@@ -106,6 +112,24 @@ export function connectorSummary(detail: ConnectorDetail, t: TextValue["t"]): Co
         status: header.status,
         statusLabel: t(header.label),
         summary: host ? t("connector.bitwarden.descriptionHost", { host }) : t("connector.bitwarden.description"),
+      };
+    }
+    case "protonpass": {
+      if (detail.props.statusError) return unknownSummary(t);
+      const status = detail.props.status;
+      const header = protonPassStatus(detail.props);
+      const host = detail.props.hostName;
+      return {
+        status: header.status,
+        statusLabel: t(header.label),
+        summary:
+          header.status === "attention"
+            ? t("connector.protonPass.expiredTitle")
+            : status.state === "connected" && status.loginCount !== null
+              ? t("connector.protonPass.loginCount", { count: status.loginCount })
+              : host
+                ? t("connector.protonPass.descriptionHost", { host })
+                : t("connector.protonPass.description"),
       };
     }
     case "slack":
@@ -203,6 +227,10 @@ export function connectorDescription(detail: ConnectorDetail, t: TextValue["t"])
       const host = detail.props.hostName;
       return host ? t("connector.bitwarden.descriptionHost", { host }) : t("connector.bitwarden.description");
     }
+    case "protonpass": {
+      const host = detail.props.hostName;
+      return host ? t("connector.protonPass.descriptionHost", { host }) : t("connector.protonPass.description");
+    }
     case "slack":
     case "discord":
       return t(messagingPlatformText(detail.id).description);
@@ -221,6 +249,7 @@ export function ConnectorDetailPanel(props: { detail: ConnectorDetail } & Integr
   const github = () => (props.detail.id === "github" ? props.detail : undefined);
   const onePassword = () => (props.detail.id === "onepassword" ? props.detail : undefined);
   const bitwarden = () => (props.detail.id === "bitwarden" ? props.detail : undefined);
+  const protonPass = () => (props.detail.id === "protonpass" ? props.detail : undefined);
   const workspace = () => (props.detail.id === "slack" || props.detail.id === "discord" ? props.detail : undefined);
   const telegram = () => (props.detail.id === "telegram" ? props.detail : undefined);
   const whatsapp = () => (props.detail.id === "whatsapp" ? props.detail : undefined);
@@ -249,6 +278,16 @@ export function ConnectorDetailPanel(props: { detail: ConnectorDetail } & Integr
       <Match when={bitwarden()}>
         {(detail) => (
           <BitwardenConnectorPanel
+            {...detail().props}
+            tagline={props.tagline}
+            intro={props.intro}
+            details={props.details}
+          />
+        )}
+      </Match>
+      <Match when={protonPass()}>
+        {(detail) => (
+          <ProtonPassConnectorPanel
             {...detail().props}
             tagline={props.tagline}
             intro={props.intro}

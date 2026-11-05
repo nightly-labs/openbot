@@ -553,6 +553,50 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectTitle": "1Password 연결을 해제할까요?",
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host}에서 토큰이 삭제돼요. 보관함과 서비스 계정은 1Password에 남아 있으니, 필요 없으면 1Password에서 삭제하세요.",
+  "mobile.server.connectors.protonPass.title": "Proton Pass",
+  "mobile.server.connectors.protonPass.summary": "OpenBot 브라우저 로그인을 위한 공유 보관함",
+  "mobile.server.connectors.protonPass.description":
+    "Proton Pass 보관함 하나를 {host}의 OpenBot과 공유하면 {host}의 에이전트가 브라우저에서 사이트에 로그인할 수 있어요.",
+  "mobile.server.connectors.protonPass.keyHelp":
+    "Proton Pass에서 OpenBot과 공유하는 보관함만 읽을 수 있는 액세스 키를 만든 다음 여기에 붙여 넣으세요. 키는 {host}에 보관되고 이 휴대폰에는 저장되지 않아요.",
+  "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.passwordManager.unavailable": "이 서버에서는 {name}을(를) 사용할 수 없어요.",
+  "mobile.server.connectors.passwordManager.howItWorks":
+    "이 휴대폰에서 {name}에 로그인하세요. 그러면 {host}이(가) 공유 보관함과 그 보관함의 읽기 전용 액세스 키를 만들고, 그 키만 보관해요. 에이전트는 비밀번호를 볼 수 없어요.",
+  "mobile.server.connectors.passwordManager.connect": "{name} 연결",
+  "mobile.server.connectors.passwordManager.connecting": "연결 중…",
+  "mobile.server.connectors.passwordManager.useKey": "액세스 키 사용",
+  "mobile.server.connectors.passwordManager.key": "액세스 키",
+  "mobile.server.connectors.passwordManager.connectWithKey": "키로 연결",
+  "mobile.server.connectors.passwordManager.signInTitle": "{name}에 로그인",
+  "mobile.server.connectors.passwordManager.signInFooter":
+    "{name} 페이지에서 로그인하세요. 로그인이 완료되면 이 페이지가 바뀌어요.",
+  "mobile.server.connectors.passwordManager.signInWaiting": "{host}이(가) 로그인 페이지를 가져오는 중…",
+  "mobile.server.connectors.passwordManager.openSignIn": "로그인 페이지 열기",
+  "mobile.server.connectors.passwordManager.copyLink": "링크 복사",
+  "mobile.server.connectors.passwordManager.extraPassword": "추가 비밀번호",
+  "mobile.server.connectors.passwordManager.extraPasswordHint":
+    "{name}에서 추가 비밀번호를 요청해요. 비밀번호는 {host}에 한 번만 전송되고 이 휴대폰에는 저장되지 않아요.",
+  "mobile.server.connectors.passwordManager.extraPasswordWrong": "추가 비밀번호가 올바르지 않아요. 다시 시도하세요.",
+  "mobile.server.connectors.passwordManager.continue": "계속",
+  "mobile.server.connectors.passwordManager.setupBody": "{host}이(가) 공유 보관함을 만드는 중…",
+  "mobile.server.connectors.passwordManager.vaultTitle": "공유 보관함",
+  "mobile.server.connectors.passwordManager.vaultFooter":
+    "{name}에서 로그인 항목을 이 보관함으로 옮기면 에이전트가 그 항목으로 로그인할 수 있어요. 중지하려면 삭제하세요.",
+  "mobile.server.connectors.passwordManager.loginCount": { other: "로그인 {count}개" },
+  "mobile.server.connectors.passwordManager.keyTitle": "액세스 키",
+  "mobile.server.connectors.passwordManager.keyReadOnly": "읽기 전용",
+  "mobile.server.connectors.passwordManager.keyExpires": "읽기 전용. {date}에 만료돼요.",
+  "mobile.server.connectors.passwordManager.keyExpired": "{date}에 만료됨",
+  "mobile.server.connectors.passwordManager.plan":
+    "{name} 명령줄 도구에는 유료 플랜이 필요해요. 계정의 플랜을 변경한 다음 다시 연결하세요.",
+  "mobile.server.connectors.passwordManager.expiredTitle": "{name} 키가 만료되었어요",
+  "mobile.server.connectors.passwordManager.expiredBody":
+    "다시 연결할 때까지 {host}의 에이전트는 공유 로그인 항목으로 로그인할 수 없어요.",
+  "mobile.server.connectors.passwordManager.disconnect": "{name} 연결 해제",
+  "mobile.server.connectors.passwordManager.disconnectTitle": "{name} 연결을 해제할까요?",
+  "mobile.server.connectors.passwordManager.disconnectBody":
+    "{host}에서 액세스 키가 삭제돼요. 보관함과 로그인 항목은 {name} 계정에 남아 있어요.",
   "mobile.server.connectors.slack.title": "Slack",
   "mobile.server.connectors.slack.summary": "Slack에서 @OpenBot을 멘션해요",
   "mobile.server.connectors.slack.description":

@@ -585,6 +585,54 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectTitle": "¿Desconectar 1Password?",
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host} olvida el token. La bóveda y la cuenta de servicio permanecen en 1Password; elimínalas allí si ya no las necesitas.",
+  "mobile.server.connectors.protonPass.title": "Proton Pass",
+  "mobile.server.connectors.protonPass.summary": "Una bóveda compartida para iniciar sesión en el navegador de OpenBot",
+  "mobile.server.connectors.protonPass.description":
+    "Comparte una bóveda de Proton Pass con OpenBot en {host} para que los agentes de {host} puedan iniciar sesión en sitios desde su navegador.",
+  "mobile.server.connectors.protonPass.keyHelp":
+    "En Proton Pass, crea una clave de acceso que solo pueda leer la bóveda que compartes con OpenBot y pégala aquí. {host} guarda la clave; este teléfono no.",
+  "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.passwordManager.unavailable": "{name} no está disponible en este servidor.",
+  "mobile.server.connectors.passwordManager.howItWorks":
+    "Inicia sesión en {name} en este teléfono. Después, {host} crea una bóveda compartida y una clave de acceso de solo lectura para ella, y guarda solo esa clave. Los agentes nunca ven una contraseña.",
+  "mobile.server.connectors.passwordManager.connect": "Conectar {name}",
+  "mobile.server.connectors.passwordManager.connecting": "Conectando…",
+  "mobile.server.connectors.passwordManager.useKey": "Usar una clave de acceso",
+  "mobile.server.connectors.passwordManager.key": "Clave de acceso",
+  "mobile.server.connectors.passwordManager.connectWithKey": "Conectar con clave",
+  "mobile.server.connectors.passwordManager.signInTitle": "Iniciar sesión en {name}",
+  "mobile.server.connectors.passwordManager.signInFooter":
+    "Inicia sesión en la página de {name}. Esta página cambia cuando hayas iniciado sesión.",
+  "mobile.server.connectors.passwordManager.signInWaiting": "{host} está obteniendo la página de inicio de sesión…",
+  "mobile.server.connectors.passwordManager.openSignIn": "Abrir la página de inicio de sesión",
+  "mobile.server.connectors.passwordManager.copyLink": "Copiar enlace",
+  "mobile.server.connectors.passwordManager.extraPassword": "Contraseña adicional",
+  "mobile.server.connectors.passwordManager.extraPasswordHint":
+    "{name} pide tu contraseña adicional. Se envía a {host} una vez; este teléfono no la guarda.",
+  "mobile.server.connectors.passwordManager.extraPasswordWrong":
+    "La contraseña adicional no es correcta. Inténtalo de nuevo.",
+  "mobile.server.connectors.passwordManager.continue": "Continuar",
+  "mobile.server.connectors.passwordManager.setupBody": "{host} está creando la bóveda compartida…",
+  "mobile.server.connectors.passwordManager.vaultTitle": "Bóveda compartida",
+  "mobile.server.connectors.passwordManager.vaultFooter":
+    "Mueve un inicio de sesión a esta bóveda en {name} para que los agentes puedan usarlo. Elimínalo para dejar de compartirlo.",
+  "mobile.server.connectors.passwordManager.loginCount": {
+    one: "{count} inicio de sesión",
+    other: "{count} inicios de sesión",
+  },
+  "mobile.server.connectors.passwordManager.keyTitle": "Clave de acceso",
+  "mobile.server.connectors.passwordManager.keyReadOnly": "Solo lectura",
+  "mobile.server.connectors.passwordManager.keyExpires": "Solo lectura. Caduca el {date}.",
+  "mobile.server.connectors.passwordManager.keyExpired": "Caducó el {date}",
+  "mobile.server.connectors.passwordManager.plan":
+    "La herramienta de línea de comandos de {name} requiere un plan de pago. Cambia el plan de tu cuenta y vuelve a conectar.",
+  "mobile.server.connectors.passwordManager.expiredTitle": "La clave de {name} caducó",
+  "mobile.server.connectors.passwordManager.expiredBody":
+    "Los agentes de {host} no pueden iniciar sesión con tus inicios de sesión compartidos hasta que vuelvas a conectar.",
+  "mobile.server.connectors.passwordManager.disconnect": "Desconectar {name}",
+  "mobile.server.connectors.passwordManager.disconnectTitle": "¿Desconectar {name}?",
+  "mobile.server.connectors.passwordManager.disconnectBody":
+    "{host} elimina su clave de acceso. La bóveda y sus inicios de sesión permanecen en tu cuenta de {name}.",
   "mobile.server.connectors.slack.title": "Slack",
   "mobile.server.connectors.slack.summary": "Las personas mencionan a @OpenBot en Slack",
   "mobile.server.connectors.slack.description":

@@ -2,6 +2,7 @@ import {
   DISCORD_MARK_PATH,
   GITHUB_MARK_PATH,
   ONEPASSWORD_MARK_PATH,
+  PROTON_MARK_PATH,
   SLACK_MARK_PATH,
   TELEGRAM_MARK_PATH,
 } from "@openbot/brand/connector-mark-shape";
@@ -17,6 +18,7 @@ const MARK_PATHS: Record<Exclude<MobileConnectorId, "bitwarden">, string> = {
   telegram: TELEGRAM_MARK_PATH,
   github: GITHUB_MARK_PATH,
   onepassword: ONEPASSWORD_MARK_PATH,
+  protonpass: PROTON_MARK_PATH,
 };
 
 /** The connector's mark on a tile, as desktop Server settings › Connectors shows it. */

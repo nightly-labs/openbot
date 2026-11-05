@@ -118,6 +118,7 @@ export const messages = {
   "marketplace.app.telegramTagline": "Grupy i czaty prywatne w Telegramie",
   "marketplace.app.whatsappTagline": "Własny czat i dozwolone osoby w WhatsApp",
   "marketplace.app.bitwardenTagline": "Loguj się do witryn danymi logowania z udostępnionego folderu",
+  "marketplace.app.protonPassTagline": "Loguj się do witryn danymi logowania z udostępnionego sejfu",
   "marketplace.app.onePasswordCategory": "Zarządzanie logowaniem i danymi uwierzytelniającymi",
   "marketplace.app.yourApps": "Twoje aplikacje",
   "marketplace.app.addCustom": "Dodaj własną",

@@ -148,6 +148,7 @@ export function ServerSettingsAiScreen() {
     canManageConnectors,
     canManageOnePasswordConnector,
     canManageBitwardenConnector,
+    canManagePasswordManagers,
   } = useMobileWorkspace();
   return (
     <ServerSettingsPage>
@@ -157,7 +158,8 @@ export function ServerSettingsAiScreen() {
           {canManageMcpServers(serverId) ? <ServerMcpRow serverId={serverId} /> : null}
           {canManageConnectors(serverId) ||
           canManageOnePasswordConnector(serverId) ||
-          canManageBitwardenConnector(serverId) ? (
+          canManageBitwardenConnector(serverId) ||
+          canManagePasswordManagers(serverId) ? (
             <LinkRow
               label={t("mobile.server.settings.connectors")}
               pathname="/server-settings/connectors"

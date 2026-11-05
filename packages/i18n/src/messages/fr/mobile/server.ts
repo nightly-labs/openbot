@@ -581,6 +581,51 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectTitle": "Déconnecter 1Password ?",
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host} oublie le jeton. Le coffre et le compte de service restent dans 1Password ; supprimez-les là-bas si vous n’en avez plus besoin.",
+  "mobile.server.connectors.protonPass.title": "Proton Pass",
+  "mobile.server.connectors.protonPass.summary": "Un coffre partagé pour les connexions dans le navigateur OpenBot",
+  "mobile.server.connectors.protonPass.description":
+    "Partagez un coffre Proton Pass avec OpenBot sur {host}, pour que les agents de {host} puissent se connecter à des sites dans son navigateur.",
+  "mobile.server.connectors.protonPass.keyHelp":
+    "Dans Proton Pass, créez une clé d’accès qui peut lire uniquement le coffre partagé avec OpenBot, puis collez-la ici. {host} garde la clé ; ce téléphone non.",
+  "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.passwordManager.unavailable": "{name} n’est pas disponible sur ce serveur.",
+  "mobile.server.connectors.passwordManager.howItWorks":
+    "Connectez-vous à {name} sur ce téléphone. Ensuite, {host} crée un coffre partagé et une clé d’accès en lecture seule pour ce coffre, et ne garde que cette clé. Les agents ne voient jamais de mot de passe.",
+  "mobile.server.connectors.passwordManager.connect": "Connecter {name}",
+  "mobile.server.connectors.passwordManager.connecting": "Connexion…",
+  "mobile.server.connectors.passwordManager.useKey": "Utiliser une clé d’accès",
+  "mobile.server.connectors.passwordManager.key": "Clé d’accès",
+  "mobile.server.connectors.passwordManager.connectWithKey": "Connecter avec la clé",
+  "mobile.server.connectors.passwordManager.signInTitle": "Se connecter à {name}",
+  "mobile.server.connectors.passwordManager.signInFooter":
+    "Connectez-vous sur la page de {name}. Cette page change lorsque vous êtes connecté.",
+  "mobile.server.connectors.passwordManager.signInWaiting": "{host} obtient la page de connexion…",
+  "mobile.server.connectors.passwordManager.openSignIn": "Ouvrir la page de connexion",
+  "mobile.server.connectors.passwordManager.copyLink": "Copier le lien",
+  "mobile.server.connectors.passwordManager.extraPassword": "Mot de passe supplémentaire",
+  "mobile.server.connectors.passwordManager.extraPasswordHint":
+    "{name} demande votre mot de passe supplémentaire. Il est envoyé une fois à {host} ; ce téléphone ne le garde pas.",
+  "mobile.server.connectors.passwordManager.extraPasswordWrong":
+    "Le mot de passe supplémentaire n’est pas correct. Réessayez.",
+  "mobile.server.connectors.passwordManager.continue": "Continuer",
+  "mobile.server.connectors.passwordManager.setupBody": "{host} crée le coffre partagé…",
+  "mobile.server.connectors.passwordManager.vaultTitle": "Coffre partagé",
+  "mobile.server.connectors.passwordManager.vaultFooter":
+    "Déplacez un identifiant dans ce coffre dans {name} pour que les agents puissent l’utiliser. Retirez-le pour arrêter.",
+  "mobile.server.connectors.passwordManager.loginCount": { one: "{count} identifiant", other: "{count} identifiants" },
+  "mobile.server.connectors.passwordManager.keyTitle": "Clé d’accès",
+  "mobile.server.connectors.passwordManager.keyReadOnly": "Lecture seule",
+  "mobile.server.connectors.passwordManager.keyExpires": "Lecture seule. Expire le {date}.",
+  "mobile.server.connectors.passwordManager.keyExpired": "Expirée le {date}",
+  "mobile.server.connectors.passwordManager.plan":
+    "L’outil en ligne de commande de {name} nécessite une offre payante. Changez l’offre de votre compte, puis reconnectez-vous.",
+  "mobile.server.connectors.passwordManager.expiredTitle": "La clé {name} a expiré",
+  "mobile.server.connectors.passwordManager.expiredBody":
+    "Les agents de {host} ne peuvent pas se connecter avec vos identifiants partagés tant que vous ne vous reconnectez pas.",
+  "mobile.server.connectors.passwordManager.disconnect": "Déconnecter {name}",
+  "mobile.server.connectors.passwordManager.disconnectTitle": "Déconnecter {name} ?",
+  "mobile.server.connectors.passwordManager.disconnectBody":
+    "{host} supprime sa clé d’accès. Le coffre et ses identifiants restent dans votre compte {name}.",
   "mobile.server.connectors.slack.title": "Slack",
   "mobile.server.connectors.slack.summary": "Les utilisateurs mentionnent @OpenBot dans Slack",
   "mobile.server.connectors.slack.description":

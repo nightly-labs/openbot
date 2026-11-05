@@ -234,6 +234,7 @@
     "./features/settings/brand-marks": "./src/features/settings/brand-marks.tsx",
     "./features/settings/BitwardenConnectorPanel": "./src/features/settings/BitwardenConnectorPanel.tsx",
     "./features/settings/OnePasswordConnectorPanel": "./src/features/settings/OnePasswordConnectorPanel.tsx",
+    "./features/settings/ProtonPassConnectorPanel": "./src/features/settings/ProtonPassConnectorPanel.tsx",
     "./features/settings/SlackIntegrationPanel": "./src/features/settings/SlackIntegrationPanel.tsx",
     "./features/settings/TelegramIntegrationPanel": "./src/features/settings/TelegramIntegrationPanel.tsx",
     "./features/settings/WhatsAppIntegrationPanel": "./src/features/settings/WhatsAppIntegrationPanel.tsx",

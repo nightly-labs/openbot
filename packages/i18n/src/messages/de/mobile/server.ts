@@ -590,6 +590,51 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectTitle": "1Password trennen?",
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host} vergisst das Token. Der Tresor und das Dienstkonto bleiben in 1Password; entferne sie dort, wenn du sie nicht mehr brauchst.",
+  "mobile.server.connectors.protonPass.title": "Proton Pass",
+  "mobile.server.connectors.protonPass.summary": "Ein geteilter Tresor für Anmeldungen im OpenBot-Browser",
+  "mobile.server.connectors.protonPass.description":
+    "Teile einen Proton-Pass-Tresor mit OpenBot auf {host}, damit Agenten auf {host} sich in dessen Browser bei Websites anmelden können.",
+  "mobile.server.connectors.protonPass.keyHelp":
+    "Erstelle in Proton Pass einen Zugriffsschlüssel, der nur den mit OpenBot geteilten Tresor lesen kann, und füge ihn hier ein. {host} speichert den Schlüssel, dieses Telefon nicht.",
+  "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.passwordManager.unavailable": "{name} ist auf diesem Server nicht verfügbar.",
+  "mobile.server.connectors.passwordManager.howItWorks":
+    "Melde dich auf diesem Telefon bei {name} an. Dann erstellt {host} einen geteilten Tresor und einen schreibgeschützten Zugriffsschlüssel dafür und speichert nur diesen Schlüssel. Agenten sehen nie ein Passwort.",
+  "mobile.server.connectors.passwordManager.connect": "{name} verbinden",
+  "mobile.server.connectors.passwordManager.connecting": "Wird verbunden…",
+  "mobile.server.connectors.passwordManager.useKey": "Zugriffsschlüssel verwenden",
+  "mobile.server.connectors.passwordManager.key": "Zugriffsschlüssel",
+  "mobile.server.connectors.passwordManager.connectWithKey": "Mit Schlüssel verbinden",
+  "mobile.server.connectors.passwordManager.signInTitle": "Bei {name} anmelden",
+  "mobile.server.connectors.passwordManager.signInFooter":
+    "Melde dich auf der Seite von {name} an. Diese Seite ändert sich, sobald du angemeldet bist.",
+  "mobile.server.connectors.passwordManager.signInWaiting": "{host} ruft die Anmeldeseite ab…",
+  "mobile.server.connectors.passwordManager.openSignIn": "Anmeldeseite öffnen",
+  "mobile.server.connectors.passwordManager.copyLink": "Link kopieren",
+  "mobile.server.connectors.passwordManager.extraPassword": "Zusätzliches Passwort",
+  "mobile.server.connectors.passwordManager.extraPasswordHint":
+    "{name} fragt nach deinem zusätzlichen Passwort. Es geht einmal an {host}; dieses Telefon speichert es nicht.",
+  "mobile.server.connectors.passwordManager.extraPasswordWrong":
+    "Das zusätzliche Passwort ist nicht korrekt. Versuche es erneut.",
+  "mobile.server.connectors.passwordManager.continue": "Weiter",
+  "mobile.server.connectors.passwordManager.setupBody": "{host} erstellt den geteilten Tresor…",
+  "mobile.server.connectors.passwordManager.vaultTitle": "Geteilter Tresor",
+  "mobile.server.connectors.passwordManager.vaultFooter":
+    "Verschiebe in {name} ein Login in diesen Tresor, damit Agenten sich damit anmelden können. Entferne es, um das zu beenden.",
+  "mobile.server.connectors.passwordManager.loginCount": { one: "{count} Anmeldung", other: "{count} Anmeldungen" },
+  "mobile.server.connectors.passwordManager.keyTitle": "Zugriffsschlüssel",
+  "mobile.server.connectors.passwordManager.keyReadOnly": "Nur Lesen",
+  "mobile.server.connectors.passwordManager.keyExpires": "Nur Lesen. Läuft am {date} ab.",
+  "mobile.server.connectors.passwordManager.keyExpired": "Abgelaufen am {date}",
+  "mobile.server.connectors.passwordManager.plan":
+    "Das Befehlszeilentool von {name} erfordert einen kostenpflichtigen Tarif. Ändere den Tarif deines Kontos und verbinde dann erneut.",
+  "mobile.server.connectors.passwordManager.expiredTitle": "Der Schlüssel für {name} ist abgelaufen",
+  "mobile.server.connectors.passwordManager.expiredBody":
+    "Agenten auf {host} können sich erst wieder mit deinen geteilten Logins anmelden, wenn du erneut verbindest.",
+  "mobile.server.connectors.passwordManager.disconnect": "{name} trennen",
+  "mobile.server.connectors.passwordManager.disconnectTitle": "{name} trennen?",
+  "mobile.server.connectors.passwordManager.disconnectBody":
+    "{host} löscht seinen Zugriffsschlüssel. Der Tresor und seine Logins bleiben in deinem {name}-Konto.",
   "mobile.server.connectors.slack.title": "Slack",
   "mobile.server.connectors.slack.summary": "Personen erwähnen @OpenBot in Slack",
   "mobile.server.connectors.slack.description":

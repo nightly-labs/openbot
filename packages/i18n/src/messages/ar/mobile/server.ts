@@ -785,6 +785,57 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectTitle": "هل تريد قطع اتصال 1Password؟",
   "mobile.server.connectors.onePassword.disconnectBody":
     "ينسى {host} الرمز المميز. تبقى الخزنة وحساب الخدمة في 1Password؛ أزلهما من هناك إذا لم تعد بحاجة إليهما.",
+  "mobile.server.connectors.protonPass.title": "Proton Pass",
+  "mobile.server.connectors.protonPass.summary": "خزنة مشتركة لتسجيلات الدخول في متصفح OpenBot",
+  "mobile.server.connectors.protonPass.description":
+    "شارك خزنة واحدة من Proton Pass مع OpenBot على {host}، حتى يتمكن الوكلاء على {host} من تسجيل الدخول إلى المواقع في متصفحه.",
+  "mobile.server.connectors.protonPass.keyHelp":
+    "في Proton Pass، أنشئ مفتاح وصول يمكنه قراءة الخزنة التي تشاركها مع OpenBot فقط، ثم الصقه هنا. يحتفظ {host} بالمفتاح؛ ولا يحتفظ به هذا الهاتف.",
+  "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.passwordManager.unavailable": "{name} غير متاح على هذا الخادم.",
+  "mobile.server.connectors.passwordManager.howItWorks":
+    "سجّل الدخول إلى {name} على هذا الهاتف. بعد ذلك ينشئ {host} خزنة مشتركة ومفتاح وصول للقراءة فقط لها، ويحتفظ بهذا المفتاح فقط. لا يرى الوكلاء أي كلمة مرور.",
+  "mobile.server.connectors.passwordManager.connect": "ربط {name}",
+  "mobile.server.connectors.passwordManager.connecting": "جارٍ الاتصال…",
+  "mobile.server.connectors.passwordManager.useKey": "استخدام مفتاح وصول",
+  "mobile.server.connectors.passwordManager.key": "مفتاح الوصول",
+  "mobile.server.connectors.passwordManager.connectWithKey": "الربط بالمفتاح",
+  "mobile.server.connectors.passwordManager.signInTitle": "تسجيل الدخول إلى {name}",
+  "mobile.server.connectors.passwordManager.signInFooter":
+    "سجّل الدخول في صفحة {name}. تتغير هذه الصفحة عند اكتمال تسجيل الدخول.",
+  "mobile.server.connectors.passwordManager.signInWaiting": "يجلب {host} صفحة تسجيل الدخول…",
+  "mobile.server.connectors.passwordManager.openSignIn": "فتح صفحة تسجيل الدخول",
+  "mobile.server.connectors.passwordManager.copyLink": "نسخ الرابط",
+  "mobile.server.connectors.passwordManager.extraPassword": "كلمة المرور الإضافية",
+  "mobile.server.connectors.passwordManager.extraPasswordHint":
+    "يطلب {name} كلمة المرور الإضافية. تُرسل إلى {host} مرة واحدة؛ ولا يحتفظ بها هذا الهاتف.",
+  "mobile.server.connectors.passwordManager.extraPasswordWrong": "كلمة المرور الإضافية غير صحيحة. حاول مرة أخرى.",
+  "mobile.server.connectors.passwordManager.continue": "متابعة",
+  "mobile.server.connectors.passwordManager.setupBody": "ينشئ {host} الخزنة المشتركة…",
+  "mobile.server.connectors.passwordManager.vaultTitle": "الخزنة المشتركة",
+  "mobile.server.connectors.passwordManager.vaultFooter":
+    "انقل بيانات تسجيل دخول إلى هذه الخزنة في {name} ليتمكن الوكلاء من تسجيل الدخول بها. أزلها للإيقاف.",
+  "mobile.server.connectors.passwordManager.loginCount": {
+    zero: "لا بيانات تسجيل دخول",
+    one: "بيانات تسجيل دخول واحدة",
+    two: "بيانات تسجيل دخول اثنتان",
+    few: "{count} بيانات تسجيل دخول",
+    many: "{count} بيانات تسجيل دخول",
+    other: "{count} بيانات تسجيل دخول",
+  },
+  "mobile.server.connectors.passwordManager.keyTitle": "مفتاح الوصول",
+  "mobile.server.connectors.passwordManager.keyReadOnly": "للقراءة فقط",
+  "mobile.server.connectors.passwordManager.keyExpires": "للقراءة فقط. تنتهي صلاحيته في {date}.",
+  "mobile.server.connectors.passwordManager.keyExpired": "انتهت صلاحيته في {date}",
+  "mobile.server.connectors.passwordManager.plan":
+    "تتطلب أداة سطر الأوامر في {name} خطة مدفوعة. غيّر خطة حسابك، ثم أعد الربط.",
+  "mobile.server.connectors.passwordManager.expiredTitle": "انتهت صلاحية مفتاح {name}",
+  "mobile.server.connectors.passwordManager.expiredBody":
+    "لا يستطيع الوكلاء على {host} تسجيل الدخول ببيانات تسجيل الدخول المشتركة حتى تعيد الربط.",
+  "mobile.server.connectors.passwordManager.disconnect": "قطع اتصال {name}",
+  "mobile.server.connectors.passwordManager.disconnectTitle": "هل تريد قطع اتصال {name}؟",
+  "mobile.server.connectors.passwordManager.disconnectBody":
+    "يحذف {host} مفتاح الوصول الخاص به. تبقى الخزنة وبيانات تسجيل الدخول فيها في حساب {name} الخاص بك.",
   "mobile.server.connectors.slack.title": "Slack",
   "mobile.server.connectors.slack.summary": "يذكر الأشخاص @OpenBot في Slack",
   "mobile.server.connectors.slack.description":

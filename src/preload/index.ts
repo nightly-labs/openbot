@@ -37,6 +37,7 @@ import {
   decodeHermesImportResult,
   decodeHostAgentMemoryLimit,
   decodeHostMemoryReview,
+  decodeHostPasswordManagerStatus,
   decodeHostTimezoneSettings,
   decodeHostUpdateStatus,
   decodeInstanceExportResult,
@@ -53,6 +54,8 @@ import {
   decodeOptionalMachineMetrics,
   decodeOptionalStorageDisk,
   decodeOptionalStorageUsage,
+  decodePasswordManagerStatus,
+  decodePasswordManagerStatuses,
   decodePromptCacheTtlSetting,
   decodeProviderHostSignInStatus,
   decodeProviderModelVisibility,
@@ -973,6 +976,21 @@ const openbotApi: OpenBotDesktopApi = {
     cancel: decodeLinkAccountStatus,
     disconnect: decodeLinkAccountStatus,
     changed: decodeLinkAccountStatus,
+  }),
+  // A status never holds a key or a password. A `changed` event for a manager that this build does
+  // not know is dropped.
+  passwordManagers: bridgeGroup(IPC_ENDPOINTS.passwordManagers, {
+    list: decodePasswordManagerStatuses,
+    connect: decodeHostPasswordManagerStatus,
+    cancel: decodeHostPasswordManagerStatus,
+    disconnect: decodeHostPasswordManagerStatus,
+    openSignIn: decodeVoid,
+    changed: dropInvalid(decodePasswordManagerStatus),
+    hostList: decodePasswordManagerStatuses,
+    hostConnect: decodeHostPasswordManagerStatus,
+    hostCancel: decodeHostPasswordManagerStatus,
+    hostDisconnect: decodeHostPasswordManagerStatus,
+    hostOpenSignIn: decodeVoid,
   }),
   bitwardenConnector: bridgeGroup(IPC_ENDPOINTS.bitwardenConnector, {
     status: decodeBitwardenConnectorStatus,

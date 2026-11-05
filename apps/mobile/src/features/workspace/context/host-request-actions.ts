@@ -120,6 +120,7 @@ import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/i
 import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
+import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v1";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
@@ -151,6 +152,7 @@ import {
   checkHostRelease,
   clearHostBrowserData,
   completeSignInRelay,
+  connectPasswordManager,
   createHostBrowserProfile,
   deleteEventRoutine,
   deleteHostBrowserProfile,
@@ -183,6 +185,7 @@ import {
   listHostVault,
   listMcpServers,
   listMcpSignIns,
+  listPasswordManagers,
   listProviderAccounts,
   listRoutineResultOptions,
   listSharedTables,
@@ -194,6 +197,7 @@ import {
   messagingConnectorReconnect,
   messagingConnectorSetEnabled,
   onePasswordConnectorRequest,
+  passwordManagerRequest,
   previewAgentTemplate,
   publishAgentTemplate,
   readAgentFolders,
@@ -382,6 +386,10 @@ type HostRequestActions = Pick<
   | "loadBitwardenConnector"
   | "connectBitwarden"
   | "disconnectBitwarden"
+  | "loadPasswordManagers"
+  | "connectPasswordManager"
+  | "cancelPasswordManager"
+  | "disconnectPasswordManager"
   | "loadVault"
   | "saveVaultItem"
   | "deleteVaultItem"
@@ -588,6 +596,8 @@ export function createHostRequestActions({
     capabilityApi(serverId, ONEPASSWORD_CONNECTOR_CAPABILITY, "mobile.server.connectors.unsupported");
   const bitwardenAdmin = (serverId: string) =>
     capabilityApi(serverId, BITWARDEN_CONNECTOR_CAPABILITY, "mobile.server.connectors.unsupported");
+  const passwordManagersAdmin = (serverId: string) =>
+    capabilityApi(serverId, PASSWORD_MANAGERS_CAPABILITY, "mobile.server.connectors.unsupported");
   const vaultAdmin = (serverId: string) => capabilityApi(serverId, VAULT_CAPABILITY, "mobile.server.vault.unsupported");
   const vaultImportAdmin = (serverId: string) =>
     capabilityApi(serverId, VAULT_IMPORT_CAPABILITY, "mobile.server.vault.unsupported");
@@ -685,6 +695,13 @@ export function createHostRequestActions({
       runTeamRequest(bitwardenConnectorRequest(bitwardenAdmin(serverId), "connect", input)),
     disconnectBitwarden: async (serverId) =>
       runTeamRequest(bitwardenConnectorRequest(bitwardenAdmin(serverId), "disconnect")),
+    loadPasswordManagers: async (serverId) => runTeamRequest(listPasswordManagers(passwordManagersAdmin(serverId))),
+    connectPasswordManager: async (input, serverId) =>
+      runTeamRequest(connectPasswordManager(passwordManagersAdmin(serverId), input)),
+    cancelPasswordManager: async (manager, serverId) =>
+      runTeamRequest(passwordManagerRequest(passwordManagersAdmin(serverId), "cancel", manager)),
+    disconnectPasswordManager: async (manager, serverId) =>
+      runTeamRequest(passwordManagerRequest(passwordManagersAdmin(serverId), "disconnect", manager)),
     loadVault: async (serverId) =>
       runTeamRequest(listHostVault(vaultAdmin(serverId), has(serverId, VAULT_V2_CAPABILITY))),
     saveVaultItem: async (input, serverId) =>

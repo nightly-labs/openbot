@@ -91,7 +91,8 @@ export function useServerSettingsItems(
       [
         workspace.canManageConnectors(serverId) ||
           workspace.canManageOnePasswordConnector(serverId) ||
-          workspace.canManageBitwardenConnector(serverId),
+          workspace.canManageBitwardenConnector(serverId) ||
+          workspace.canManagePasswordManagers(serverId),
         "mobile.server.settings.connectors",
       ],
     ]),

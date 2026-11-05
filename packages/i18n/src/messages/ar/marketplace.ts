@@ -132,6 +132,7 @@ export const messages = {
   "marketplace.app.telegramTagline": "المجموعات والدردشات المباشرة في Telegram",
   "marketplace.app.whatsappTagline": "دردشتك الخاصة والأشخاص الذين تسمح لهم في WhatsApp",
   "marketplace.app.bitwardenTagline": "سجّل الدخول إلى المواقع ببيانات دخول من مجلد مشترك",
+  "marketplace.app.protonPassTagline": "سجّل الدخول إلى المواقع ببيانات دخول من خزنة مشتركة",
   "marketplace.app.onePasswordCategory": "إدارة بيانات الدخول والاعتماد",
   "marketplace.app.yourApps": "تطبيقاتك",
   "marketplace.app.addCustom": "إضافة مخصص",

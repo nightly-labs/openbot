@@ -4,9 +4,17 @@ import type { AppMobileMessages, MobileTextKey } from "@openbot/i18n/mobile";
 /**
  * The connectors of a joined server, in the order of desktop Server settings › Connectors. A host
  * without `bitwarden-connector-v1` connects Bitwarden only on its own computer, so a phone shows it
- * with no action.
+ * with no action. Proton Pass shows only when the host serves `password-managers-v1` and lists it.
  */
-export const MOBILE_CONNECTOR_IDS = ["slack", "discord", "telegram", "github", "onepassword", "bitwarden"] as const;
+export const MOBILE_CONNECTOR_IDS = [
+  "slack",
+  "discord",
+  "telegram",
+  "github",
+  "onepassword",
+  "bitwarden",
+  "protonpass",
+] as const;
 
 export type MobileConnectorId = (typeof MOBILE_CONNECTOR_IDS)[number];
 
@@ -24,6 +32,7 @@ export const CONNECTOR_TITLE_KEYS = {
   github: "mobile.server.connectors.github.title",
   onepassword: "mobile.server.connectors.onePassword.title",
   bitwarden: "mobile.server.connectors.bitwarden.title",
+  protonpass: "mobile.server.connectors.protonPass.title",
 } as const satisfies Record<MobileConnectorId, MobileTextKey>;
 
 /** How a list shows a connector. `idle` is not set up; `unavailable` cannot be set up from a phone. */

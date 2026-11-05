@@ -210,6 +210,7 @@ import { createMockLicense } from "./mock-license";
 import { createMockLinkAccount } from "./mock-link-account";
 import { createMockMessaging } from "./mock-messaging";
 import { createMockOnePasswordConnector } from "./mock-onepassword-connector";
+import { createMockPasswordManagers } from "./mock-password-managers";
 import { createMockProviderRuntimes, type MockProviderRuntimeOptions } from "./mock-provider-runtimes";
 import { mockRoutineCalendar } from "./mock-routine-calendar";
 import { createMockRoutineFeed } from "./mock-routine-feed";
@@ -1524,6 +1525,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     linkAccount: createMockLinkAccount(),
     onePasswordConnector: createMockOnePasswordConnector(),
     bitwardenConnector: createMockBitwardenConnector(),
+    passwordManagers: createMockPasswordManagers(),
     vault: createMockVault(),
     billing: createMockBilling(billingPlans),
     license: createMockLicense(),

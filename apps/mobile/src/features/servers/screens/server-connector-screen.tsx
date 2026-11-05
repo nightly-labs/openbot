@@ -3,7 +3,9 @@ import { BitwardenConnectorPage } from "@/features/servers/components/bitwarden-
 import { GitHubConnectorPage } from "@/features/servers/components/github-connector-page";
 import { MessagingConnectorPage } from "@/features/servers/components/messaging-connector-page";
 import { OnePasswordConnectorPage } from "@/features/servers/components/onepassword-connector-page";
+import { PasswordManagerConnectorPage } from "@/features/servers/components/password-manager-connector-page";
 import { CONNECTOR_TITLE_KEYS, isMobileConnectorId } from "@/features/servers/model/connectors";
+import { isMobilePasswordManagerId } from "@/features/servers/model/password-managers";
 import { useServerConnectors } from "@/features/servers/model/use-server-connectors";
 import { SettingsContent, SettingsNote } from "@/features/settings/components/settings-content";
 import { useText } from "@/shared/lib/text";
@@ -18,14 +20,22 @@ export function ServerConnectorScreen() {
     connectors,
     onePasswordAvailable,
     bitwardenAvailable,
+    passwordManagersAvailable,
     messaging,
     github,
     onePassword,
     bitwarden,
+    passwordManagers,
   } = useServerConnectors(serverId, isMobileConnectorId(id) ? id : null);
   const reachable =
     isMobileConnectorId(id) &&
-    (id === "onepassword" ? onePasswordAvailable : id === "bitwarden" ? bitwardenAvailable : connectors);
+    (id === "onepassword"
+      ? onePasswordAvailable
+      : id === "bitwarden"
+        ? bitwardenAvailable
+        : isMobilePasswordManagerId(id)
+          ? passwordManagersAvailable
+          : connectors);
   if (!server || !reachable)
     return (
       <SettingsContent>
@@ -41,6 +51,8 @@ export function ServerConnectorScreen() {
         <OnePasswordConnectorPage server={server} query={onePassword} />
       ) : id === "bitwarden" ? (
         <BitwardenConnectorPage server={server} query={bitwarden} />
+      ) : isMobilePasswordManagerId(id) ? (
+        <PasswordManagerConnectorPage server={server} manager={id} query={passwordManagers} />
       ) : (
         <MessagingConnectorPage server={server} platform={id} query={messaging[id]} agents={agents} />
       )}
