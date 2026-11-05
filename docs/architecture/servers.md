@@ -1351,7 +1351,8 @@ A client that comes back to a joined server shows the workspace of its last load
 and replaces it when the host answers (`src/renderer/src/features/servers/remote-workspace-frame.ts`).
 
 - The frame holds the agent summaries, the model options, the sidebar layout, the hidden agents, the
-  channel rows and, on the web, the agent that was open. It holds no message text: the `preview` of
+  channel rows and, on the web, the agent that was open and the ids of the 4 agents opened last. It
+  holds no message text: the `preview` of
   each agent is removed before the write, and a channel keeps its name, title, members and lead
   agent, with no last message, instructions or counts. It does not hold capabilities, status,
   queues or conversations. The channel rows stop the agents below them from moving down when the
@@ -1376,7 +1377,9 @@ and replaces it when the host answers (`src/renderer/src/features/servers/remote
 - Both clients write the frame after the workspace read and after the panels read, and again when
   the user hides, restores or moves an agent, and when the channel rows change. The web also writes
   the open agent when it changes. An agent that the user opens during the frame stays open after
-  the load.
+  the load. After the open agent loads, the web reads the latest page of up to 3 of the agents opened
+  last, one at a time, so that the first switch to one shows its messages at once. It does not read
+  an agent that already has a kept page.
 - While the frame shows, the composer says that the client connects, and the setup prompts wait
   for the host's status, so a frame does not show "Complete provider setup".
 - The host answers `GET /v1/agents` when its agents are loaded (`AgentInitializationGate.awaitRoster`).

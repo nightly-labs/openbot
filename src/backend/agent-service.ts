@@ -288,7 +288,8 @@ export type { ResolvedSharedFile } from "./workspace-paths";
 
 interface AgentServiceEvents {
   failure: [failure: FailureSignal];
-  event: [event: AgentEvent];
+  /** With `memberId`, the event is only for the connections of that member, such as a read mark change. */
+  event: [event: AgentEvent, memberId?: string];
   /** Finished tool steps for the local host's product analytics. Never forwarded to a client. */
   toolUsage: [usage: ToolUsageSignal];
   /** A workflow run ended, for the local host's product analytics. Never forwarded to a client. */
@@ -1067,7 +1068,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       mailboxSync: this.#mailboxSync,
       hooks: {
-        emit: (event) => this.#emit(event),
+        emit: (event, memberId) => this.#emit(event, memberId),
         listAgents: () => this.listAgents(),
       },
     });
@@ -5396,10 +5397,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#emit({ type: "runtime-snapshot", snapshot: this.getRuntimeSnapshot() });
   }
 
-  #emit(event: AgentEvent): void {
+  #emit(event: AgentEvent, memberId?: string): void {
     recordAgentRestartActivity(event);
     if (this.channels?.event(event) || this.messaging?.event(event, this.#scope) || this.#tasks?.event(event)) return;
-    this.emit("event", event);
+    this.emit("event", event, memberId);
   }
 
   /** Removes live provider state for an execution thread before its durable rows are deleted. */
