@@ -211,6 +211,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "9bd3408ca7d9f8bc7169e8cb2515e3e6302007cbb38db7a777972f87b0563d24",
     },
     {
+      slug: "email",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "03e193bf416cdbd58d01b36d3b40c40aae547f9826ecfd382a3f1620393be680",
+    },
+    {
       slug: "composio",
       version: "1.1.0",
       featured: false,
@@ -1505,6 +1511,63 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://resend.com",
     privacyPolicyUrl: "https://resend.com/legal/privacy-policy",
     termsUrl: "https://resend.com/legal/terms",
+    skills: [],
+  },
+  email: {
+    slug: "email",
+    name: "Email (IMAP/SMTP)",
+    tagline: "Read, search and send your email",
+    description:
+      "Email lets agents read, search, send, reply to and organize mail in any IMAP and SMTP mailbox: Gmail, Google Workspace, Yahoo, iCloud, Zoho, Fastmail, GMX, AOL and most custom domains. The local server finds the mail servers from the address, so the connection needs only the address and a password. Use an app password where the provider offers one. The password goes only to your mail provider. Outlook and Hotmail are not supported yet.",
+    category: "productivity",
+    creatorName: "sarequl",
+    iconUrl: null,
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-unread", text: "Summarize my unread email from today." },
+      { id: "prompt-reply", text: "Draft a reply to the latest email from my client and save it as a draft." },
+      { id: "prompt-search", text: "Find the invoice emails from last month and download their attachments." },
+      {
+        id: "prompt-tidy",
+        text: "List the newsletters in my inbox that are older than a week, and archive them after I confirm.",
+      },
+    ],
+    apps: [
+      {
+        id: "app-email-mcp",
+        name: "Email",
+        description:
+          "Mail reading, search, sending, drafts, folders, templates and scheduled send, over a local MCP server that connects to the mailbox with IMAP and SMTP.",
+        iconUrl: null,
+        server: {
+          name: "email",
+          transport: "stdio",
+          command: "npx",
+          args: ["-y", "@sarequl/email-mcp@0.1.0"],
+          auth: [
+            {
+              id: "email-password",
+              kind: "key",
+              label: "Address and app password",
+              fields: [
+                { id: "address", label: "Email address", env: "EMAIL_ADDRESS", placeholder: "you@gmail.com" },
+                {
+                  id: "password",
+                  label: "App password",
+                  env: "EMAIL_PASSWORD",
+                  hint: "Gmail: turn on 2-Step Verification, then create one at myaccount.google.com/apppasswords. Use your normal password only if the provider has no app passwords.",
+                },
+              ],
+              docsUrl: "https://github.com/sarequl/email-mcp#setting-up-your-provider",
+              docsLabel: "Set up your provider",
+            },
+          ],
+        },
+      },
+    ],
+    websiteUrl: "https://github.com/sarequl/email-mcp",
+    privacyPolicyUrl: null,
+    termsUrl: null,
     skills: [],
   },
   composio: {

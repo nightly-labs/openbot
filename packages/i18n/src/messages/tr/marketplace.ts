@@ -362,6 +362,16 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "Lansman duyurusu taslağını beta listesine gönder.",
   "marketplace.plugin.resend.prompt.status": "Fatura e-postası müşteriye ulaştı mı?",
   "marketplace.plugin.resend.prompt.template": "Yeni akış için bir parola sıfırlama e-postası taslağı hazırla.",
+  "marketplace.plugin.email.tagline": "E-postanızı okuyun, arayın ve gönderin",
+  "marketplace.plugin.email.description":
+    "Email, ajanların IMAP ve SMTP destekleyen her posta kutusundaki e-postaları okumasını, aramasını, göndermesini, yanıtlamasını ve düzenlemesini sağlar: Gmail, Google Workspace, Yahoo, iCloud, Zoho, Fastmail, GMX, AOL ve çoğu özel alan adı. Yerel sunucu posta sunucularını adresten bulur, bu yüzden bağlantı için yalnızca adres ve parola gerekir. Sağlayıcınız sunuyorsa uygulama parolası kullanın. Parola yalnızca posta sağlayıcınıza gider. Outlook ve Hotmail henüz desteklenmiyor.",
+  "marketplace.plugin.email.app":
+    "E-posta okuma, arama ve gönderme, taslaklar, klasörler, şablonlar ve zamanlanmış gönderim; posta kutusuna IMAP ve SMTP ile bağlanan yerel bir MCP sunucusu üzerinden.",
+  "marketplace.plugin.email.prompt.unread": "Bugünkü okunmamış e-postalarımı özetle.",
+  "marketplace.plugin.email.prompt.reply": "Müşterimden gelen son e-postaya bir yanıt yaz ve taslak olarak kaydet.",
+  "marketplace.plugin.email.prompt.search": "Geçen ayın fatura e-postalarını bul ve eklerini indir.",
+  "marketplace.plugin.email.prompt.tidy":
+    "Gelen kutumdaki bir haftadan eski bültenleri listele ve ben onayladıktan sonra arşivle.",
   "marketplace.plugin.composio.tagline": "Kendi Composio bağlantınız üzerinden birçok uygulama",
   "marketplace.plugin.composio.description":
     "Composio, ajanları tek bir MCP sunucusu üzerinden Gmail, Slack, GitHub ve yüzlerce başka uygulamaya bağlar. İstediğiniz uygulamaları Composio hesabınızda bağlayın, ardından MCP URL'sini ve API anahtarını buraya yapıştırın.",

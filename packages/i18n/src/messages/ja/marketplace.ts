@@ -346,6 +346,17 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "ローンチのお知らせの下書きをベータリストに送信してください。",
   "marketplace.plugin.resend.prompt.status": "請求書のメールは顧客に届きましたか？",
   "marketplace.plugin.resend.prompt.template": "新しいフロー用のパスワードリセットメールの下書きを作成してください。",
+  "marketplace.plugin.email.tagline": "メールの閲覧・検索・送信",
+  "marketplace.plugin.email.description":
+    "Email を使うと、エージェントは IMAP と SMTP に対応したメールボックスのメールを読み、検索し、送信・返信し、整理できます。Gmail、Google Workspace、Yahoo、iCloud、Zoho、Fastmail、GMX、AOL、ほとんどの独自ドメインに対応しています。ローカルサーバーがアドレスからメールサーバーを見つけるため、接続にはアドレスとパスワードだけが必要です。プロバイダーがアプリパスワードを提供している場合はそれを使ってください。パスワードはメールプロバイダーにのみ送られます。Outlook と Hotmail にはまだ対応していません。",
+  "marketplace.plugin.email.app":
+    "メールの閲覧、検索、送信、下書き、フォルダー、テンプレート、予約送信を、IMAP と SMTP でメールボックスに接続するローカル MCP サーバーで行います。",
+  "marketplace.plugin.email.prompt.unread": "今日の未読メールを要約してください。",
+  "marketplace.plugin.email.prompt.reply":
+    "クライアントからの最新メールへの返信を作成し、下書きとして保存してください。",
+  "marketplace.plugin.email.prompt.search": "先月の請求書メールを探して、添付ファイルをダウンロードしてください。",
+  "marketplace.plugin.email.prompt.tidy":
+    "受信トレイにある 1 週間以上前のニュースレターを一覧にし、私が確認してからアーカイブしてください。",
   "marketplace.plugin.composio.tagline": "自分の Composio リンクで多数のアプリを利用",
   "marketplace.plugin.composio.description":
     "Composio は、1 つの MCP サーバーでエージェントを Gmail、Slack、GitHub など数百のアプリに接続します。Composio アカウントで使いたいアプリを接続し、その MCP URL と API キーをここに貼り付けてください。",

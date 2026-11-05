@@ -195,6 +195,12 @@
       "detailSha256": "9bd3408ca7d9f8bc7169e8cb2515e3e6302007cbb38db7a777972f87b0563d24"
     },
     {
+      "slug": "email",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "03e193bf416cdbd58d01b36d3b40c40aae547f9826ecfd382a3f1620393be680"
+    },
+    {
       "slug": "composio",
       "version": "1.1.0",
       "featured": false,

@@ -346,6 +346,17 @@ export const messages = {
   "marketplace.plugin.resend.prompt.status": "L'email della fattura è arrivata al cliente?",
   "marketplace.plugin.resend.prompt.template":
     "Prepara una bozza di email per reimpostare la password nel nuovo flusso.",
+  "marketplace.plugin.email.tagline": "Leggi, cerca e invia le tue email",
+  "marketplace.plugin.email.description":
+    "Email permette agli agenti di leggere, cercare, inviare, rispondere e organizzare la posta di qualsiasi casella IMAP e SMTP: Gmail, Google Workspace, Yahoo, iCloud, Zoho, Fastmail, GMX, AOL e la maggior parte dei domini personalizzati. Il server locale trova i server di posta dall'indirizzo, quindi la connessione richiede solo l'indirizzo e una password. Usa una password per le app se il provider la offre. La password va solo al tuo provider di posta. Outlook e Hotmail non sono ancora supportati.",
+  "marketplace.plugin.email.app":
+    "Lettura, ricerca e invio di email, bozze, cartelle, modelli e invio programmato, tramite un server MCP locale che si collega alla casella con IMAP e SMTP.",
+  "marketplace.plugin.email.prompt.unread": "Riassumi le mie email non lette di oggi.",
+  "marketplace.plugin.email.prompt.reply":
+    "Scrivi una bozza di risposta all'ultima email del mio cliente e salvala come bozza.",
+  "marketplace.plugin.email.prompt.search": "Trova le email delle fatture del mese scorso e scarica i loro allegati.",
+  "marketplace.plugin.email.prompt.tidy":
+    "Elenca le newsletter nella mia posta in arrivo più vecchie di una settimana e archiviale dopo la mia conferma.",
   "marketplace.plugin.composio.tagline": "Tante app tramite il tuo link Composio",
   "marketplace.plugin.composio.description":
     "Composio collega gli agenti a Gmail, Slack, GitHub e centinaia di altre app tramite un solo server MCP. Collega le app che vuoi nel tuo account Composio, poi incolla qui il suo URL MCP e la sua chiave API.",

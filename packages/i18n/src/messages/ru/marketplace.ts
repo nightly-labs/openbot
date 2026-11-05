@@ -363,6 +363,17 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "Отправьте черновик анонса запуска списку бета-тестеров.",
   "marketplace.plugin.resend.prompt.status": "Дошло ли письмо со счётом до клиента?",
   "marketplace.plugin.resend.prompt.template": "Составьте письмо для сброса пароля для нового сценария.",
+  "marketplace.plugin.email.tagline": "Читайте, ищите и отправляйте почту",
+  "marketplace.plugin.email.description":
+    "Email позволяет агентам читать, искать, отправлять, отвечать и упорядочивать письма в любом почтовом ящике с IMAP и SMTP: Gmail, Google Workspace, Yahoo, iCloud, Zoho, Fastmail, GMX, AOL и большинстве собственных доменов. Локальный сервер находит почтовые серверы по адресу, поэтому для подключения нужны только адрес и пароль. Используйте пароль приложения, если провайдер его предлагает. Пароль передаётся только вашему почтовому провайдеру. Outlook и Hotmail пока не поддерживаются.",
+  "marketplace.plugin.email.app":
+    "Чтение, поиск и отправка писем, черновики, папки, шаблоны и отложенная отправка через локальный MCP-сервер, который подключается к ящику по IMAP и SMTP.",
+  "marketplace.plugin.email.prompt.unread": "Кратко перескажи мои непрочитанные письма за сегодня.",
+  "marketplace.plugin.email.prompt.reply":
+    "Напиши ответ на последнее письмо от моего клиента и сохрани его как черновик.",
+  "marketplace.plugin.email.prompt.search": "Найди письма со счетами за прошлый месяц и скачай их вложения.",
+  "marketplace.plugin.email.prompt.tidy":
+    "Покажи рассылки во входящих старше недели и перемести их в архив после моего подтверждения.",
   "marketplace.plugin.composio.tagline": "Множество приложений по вашей ссылке Composio",
   "marketplace.plugin.composio.description":
     "Composio подключает агентов к Gmail, Slack, GitHub и сотням других приложений через один сервер MCP. Подключите нужные приложения в своём аккаунте Composio и вставьте сюда его URL MCP и ключ API.",
