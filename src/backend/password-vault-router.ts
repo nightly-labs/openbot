@@ -1,5 +1,5 @@
-import { Effect } from "effect";
-import type { PasswordVault, VaultLogin } from "./password-vault";
+import { Effect, Result } from "effect";
+import type { PasswordVault, PasswordVaultError, VaultLogin } from "./password-vault";
 
 /** One source of logins. Its ids get `prefix`; the first source keeps an empty prefix. */
 export interface PasswordVaultSource {
@@ -19,12 +19,20 @@ export function passwordVaultRouter(sources: ReadonlyArray<PasswordVaultSource>)
     loginsFor: Effect.fn("PasswordVaultRouter.loginsFor")(function* (origin: string) {
       const found: VaultLogin[] = [];
       let any = false;
+      let failure: PasswordVaultError | null = null;
+      // A source that fails does not hide the logins of the others. Its error shows when no login is found.
       for (const { prefix, vault } of sources) {
-        const list = yield* vault.loginsFor(origin);
+        const result = yield* Effect.result(vault.loginsFor(origin));
+        if (Result.isFailure(result)) {
+          failure ??= result.failure;
+          continue;
+        }
+        const list = result.success;
         if (list === null) continue;
         any = true;
         found.push(...list.map((login) => ({ ...login, id: `${prefix}${login.id}` })));
       }
+      if (found.length === 0 && failure) return yield* Effect.fail(failure);
       return any ? found : null;
     }),
     secretFor: Effect.fn("PasswordVaultRouter.secretFor")(function* (id, origin, kind) {

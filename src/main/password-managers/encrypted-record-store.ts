@@ -54,28 +54,36 @@ export class EncryptedRecordStore<A> {
   }
 
   /**
-   * Stores `record` while `current()` holds. It is asked again after the file is written: an attempt
-   * that was stopped during the write removes the file again. True when the record was kept.
+   * Stores `record` while `current()` holds. It is asked again after the file is written: for an attempt
+   * that was stopped during the write, the file gets the earlier record again. True when the record was kept.
    */
   write(record: A, current: () => boolean): Effect.Effect<boolean, PasswordManagerError> {
     return this.#serialize(
       Effect.gen({ self: this }, function* () {
         if (!current()) return false;
-        const encrypted = yield* sync(() => this.#options.cipher.encrypt(JSON.stringify(record)).toString("base64"));
-        yield* writeJsonFileAtomically(
-          this.#options.path,
-          { version: 1, record: encrypted },
-          { createDirectory: true },
-        ).pipe(Effect.mapError(({ cause }) => new PasswordManagerError({ cause })));
+        yield* this.#writeFile(record);
         if (!current()) {
-          yield* io(() => rm(this.#options.path, { force: true }));
-          this.#record = null;
+          // The stopped attempt does not replace the record that was kept before it.
+          const kept = this.#record;
+          if (kept === null) yield* io(() => rm(this.#options.path, { force: true }));
+          else yield* this.#writeFile(kept);
           return false;
         }
         this.#record = record;
         return true;
       }),
     );
+  }
+
+  #writeFile(record: A): Effect.Effect<void, PasswordManagerError> {
+    return Effect.gen({ self: this }, function* () {
+      const encrypted = yield* sync(() => this.#options.cipher.encrypt(JSON.stringify(record)).toString("base64"));
+      yield* writeJsonFileAtomically(
+        this.#options.path,
+        { version: 1, record: encrypted },
+        { createDirectory: true },
+      ).pipe(Effect.mapError(({ cause }) => new PasswordManagerError({ cause })));
+    });
   }
 
   /** Forgets the record at once, so no later call uses it, then removes the file. */

@@ -583,8 +583,10 @@ export class ProtonPassDriver implements PasswordManagerDriver, PasswordVault {
           const created = yield* call(["vault", "create", "--name", PROTON_PASS_SHARED_VAULT]);
           if (created.code !== 0) return yield* fail(sourceText("error.connector.protonPassSetupFailed"));
         }
-        const agentName = `OpenBot ${this.#options.hostName}`.slice(0, 64);
-        const agentArgs = [
+        // A new name each time: another computer with the same host name keeps its own agent.
+        const hostPart = `OpenBot ${this.#options.hostName}`.slice(0, 57);
+        const agentName = `${hostPart} ${randomBytes(3).toString("hex")}`;
+        const agent = yield* call([
           "agent",
           "create",
           agentName,
@@ -592,13 +594,7 @@ export class ProtonPassDriver implements PasswordManagerDriver, PasswordVault {
           AGENT_EXPIRATION,
           "--vault",
           PROTON_PASS_SHARED_VAULT,
-        ];
-        let agent = yield* call(agentArgs);
-        if (agent.code !== 0) {
-          // An agent of an earlier connection of this host can have the same name.
-          yield* call(["agent", "delete", agentName]);
-          agent = yield* call(agentArgs);
-        }
+        ]);
         const token = agent.code === 0 ? createdAccessKey(agent.stdout) : null;
         if (!token) return yield* fail(sourceText("error.connector.protonPassSetupFailed"));
         registerSecretValue(token);

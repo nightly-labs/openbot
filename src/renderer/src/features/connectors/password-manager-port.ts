@@ -45,7 +45,7 @@ const signingIn = (status: PasswordManagerStatus) => status.state === "signing-i
 
 /**
  * A port to a joined server's managers. The host sends no event, so `onChanged` reads the list while
- * a sign-in runs, and stops when no sign-in runs, after `HOST_POLL_LIMIT` reads, or when a read fails.
+ * a sign-in runs, and stops when no sign-in runs or after `HOST_POLL_LIMIT` reads. A failed read counts as a read.
  */
 export function polledPasswordManagerPort(actions: HostPasswordManagerActions): PasswordManagerPort {
   const listeners = new Set<(status: PasswordManagerStatus) => void>();
@@ -67,7 +67,7 @@ export function polledPasswordManagerPort(actions: HostPasswordManagerActions): 
     timer = setTimeout(() => {
       timer = null;
       reads += 1;
-      void actions.list().then(seenAll, () => undefined);
+      void actions.list().then(seenAll, schedule);
     }, HOST_POLL_MS);
   };
   const note = (status: PasswordManagerStatus) => {
