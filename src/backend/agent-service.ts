@@ -87,6 +87,7 @@ import type {
   SaveMcpServerInput,
   SaveMcpSignInAppInput,
   SendMessageInput,
+  SentMessageStats,
   SetAgentHiddenInput,
   SetAgentMemoryInclusionInput,
   SetAgentSessionSettingInput,
@@ -4343,6 +4344,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   searchConversationFiles(query: string, cursor?: string, limit?: number): ConversationFileSearchPage {
     return this.#reader.searchFiles(query, cursor, limit);
+  }
+
+  readSentMessageStats(): SentMessageStats {
+    return this.#store.database.readSentMessageStats();
   }
 
   listConversationReads(

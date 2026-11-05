@@ -10,6 +10,7 @@ import type {
   ConversationSearchPage,
   ConversationSnapshot,
   HostedSiteConversationEventStatus,
+  SentMessageStats,
 } from "@openbot/contracts/ipc";
 import { AgentHistoryQueries, type AgentHistorySelection } from "./database/agent-history-queries";
 import { type AgentModelChange, AgentRoster } from "./database/agent-roster";
@@ -258,6 +259,10 @@ export class OpenBotDatabase {
 
   searchConversationFiles(query: string, cursor?: string, requestedLimit = 50): ConversationFileSearchPage {
     return this.#conversations.searchConversationFiles(query, cursor, requestedLimit);
+  }
+
+  readSentMessageStats(): SentMessageStats {
+    return this.#conversations.readSentMessageStats();
   }
 
   persistConversation(

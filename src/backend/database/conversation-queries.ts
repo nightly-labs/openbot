@@ -8,6 +8,7 @@ import type {
   ConversationPageAnchor,
   ConversationSearchPage,
   ConversationSnapshot,
+  SentMessageStats,
 } from "@openbot/contracts/ipc";
 import {
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
@@ -153,6 +154,25 @@ export class ConversationQueries {
       turns.set(threadId, [...(turns.get(threadId) ?? []), requiredStringColumn(row, "turn_id")]);
     }
     return turns;
+  }
+
+  /**
+   * The first time and the number of the messages that a person wrote to an agent on this computer.
+   * One scan of the table: the two columns come before the message JSON, so it reads no overflow page.
+   */
+  readSentMessageStats(): SentMessageStats {
+    const row = databaseRow(
+      this.#core.connection
+        .prepare(
+          "SELECT MIN(created_at) AS first_sent_at, COUNT(*) AS sent_count FROM projection_thread_messages WHERE author = 'user'",
+        )
+        .get(),
+    );
+    if (!row) return { firstSentAt: null, sentCount: 0 };
+    return {
+      firstSentAt: optionalStringColumn(row, "first_sent_at"),
+      sentCount: requiredNumberColumn(row, "sent_count"),
+    };
   }
 
   readConversationRevision(agentId: string, threadId: string | null): number {
