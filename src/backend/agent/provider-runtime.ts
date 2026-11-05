@@ -2895,8 +2895,9 @@ export class ProviderRuntime implements ProviderPort {
     // The CLI's words name a database step, not a cause the user can act on.
     if (CODEX_STATE_BUSY.test(detailed.message))
       return new AgentProcessExitError(sourceText("error.provider.codexStateBusy"), null, { cause: detailed });
-    // "Stopped (signal SIGKILL)" does not tell the user that the fix is in the system.
-    if (KILLED_BY_SYSTEM.test(detailed.message) && hasZeroRealtimeLimit())
+    // "Stopped (signal SIGKILL)" does not tell the user that the fix is in the system. Only the ending
+    // counts: the stderr line can quote another process.
+    if (KILLED_BY_SYSTEM.test(error.message) && hasZeroRealtimeLimit())
       return new AgentProcessExitError(sourceText("error.provider.realtimeLimitZero"), null, { cause: detailed });
     return detailed;
   }
@@ -3822,7 +3823,9 @@ export class ProviderRuntime implements ProviderPort {
     const providers = updateProviderStatus(this.#status.providers, client.provider, {
       state: "error",
       version: this.#cli.get(client.provider)?.version ?? null,
-      message: startStopped ? this.#startStoppedMessage(client.provider) : this.#redactMcp(error.message),
+      message: startStopped
+        ? this.#startStoppedMessage(client.provider, error.message)
+        : this.#redactMcp(error.message),
     });
     const anotherProviderIsReady = this.#clients.size > 0 || this.#released.size > 0;
 
@@ -3840,7 +3843,7 @@ export class ProviderRuntime implements ProviderPort {
               providers,
               capabilities: { ...this.#status.capabilities, chat: "unavailable" },
               message: startStopped
-                ? this.#startStoppedMessage(client.provider)
+                ? this.#startStoppedMessage(client.provider, error.message)
                 : `${providerLabel(client.provider)} stopped repeatedly. Restart OpenBot after checking the CLI.`,
             },
       );
@@ -3924,14 +3927,17 @@ export class ProviderRuntime implements ProviderPort {
     return true;
   }
 
-  #startStoppedMessage(provider: AgentProvider): string {
+  #startStoppedMessage(provider: AgentProvider, reason?: string | null): string {
+    // Each start ends in the same way until the user fixes the system, so the fix stays on the row (#4848).
+    const realtimeLimitZero = sourceText("error.provider.realtimeLimitZero");
+    if (reason === realtimeLimitZero) return realtimeLimitZero;
     return sourceText("error.provider.startStopped", { provider: providerLabel(provider) });
   }
 
   /** Shows on the provider row that OpenBot stopped starting it, and answers the message. */
   #showStartStopped(provider: AgentProvider): string {
-    const message = this.#startStoppedMessage(provider);
     const row = this.#status.providers?.find((candidate) => candidate.id === provider);
+    const message = this.#startStoppedMessage(provider, row?.message);
     this.#setStatus({
       providers: updateProviderStatus(this.#status.providers, provider, {
         state: "error",
