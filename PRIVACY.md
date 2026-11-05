@@ -678,6 +678,11 @@ the license tier, the number of users, and whether it ended after a failed payme
 the mail client shows images. The image address is the same in every message and identifies no
 recipient.
 
+When the SMTP provider surely did not send a message, for example because its hourly sending limit
+is spent, Cloudflare Email Service sends the same message instead. It then receives the same
+recipient address and message content as the SMTP provider. OpenBot does not use it after an
+unconfirmed SMTP send, so you do not get the same message twice.
+
 The contact form on `openbot.run/contact` sends your message to the OpenBot mailbox through the same
 SMTP provider. The message contains the email address, topic and text that you enter, and the name and
 company when you enter them. The account service stores none of these values. To limit how many
