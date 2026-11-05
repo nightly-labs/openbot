@@ -1740,6 +1740,8 @@ export async function createApplicationServices({
     loadWindow: loadComputerUseHighlightRenderer,
     place: sendComputerUseHighlightPlacement,
     displays: computerUseDisplays,
+    // `service` is built below; the controller starts only after it.
+    idle: () => service.earliestRunningTurnStartedAt() === null,
     // The driver's own cursor on one screen, OpenBot's inside this overlay on more than one. The
     // runtime answers `null` for the screen it draws itself, so only one cursor is ever drawn.
     readPointer: () => {
@@ -2237,6 +2239,12 @@ export async function createApplicationServices({
       Effect.exit,
     ),
   );
+  // The poll rests while no turn runs, so each turn wakes it.
+  service.on("event", (event) => {
+    if (event.type === "turn-started" && drawsComputerUseHighlight && cuaDriver.mcpServerForProviders()) {
+      computerUseHighlight.start();
+    }
+  });
   /*
    * Where the decision put the download: onboarding, which is the screen this start is about to
    * show. A user who finished onboarding before OpenBot downloaded a runtime at all is asked for

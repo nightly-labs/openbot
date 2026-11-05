@@ -1,5 +1,6 @@
-import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import type { AgentMessage, AgentProfile } from "../../data";
+import { documentFocused } from "../../document-focus";
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -81,11 +82,15 @@ function SampleTurnLoop(props: { agent: AgentProfile; prompt: string; skillName:
   ]);
   const turnLength = () => 2 + steps().length + HOLD_STEPS + 1;
   const [step, setStep] = createSignal(0);
-  onSettled(() => {
-    if (props.still) return;
-    const timer = window.setInterval(() => setStep((value) => value + 1), STEP_MS);
-    return () => window.clearInterval(timer);
-  });
+  // The turn stands where it is while another app has the focus, and plays on when the user is back.
+  createEffect(
+    () => !props.still && documentFocused(),
+    (playing) => {
+      if (!playing) return;
+      const timer = window.setInterval(() => setStep((value) => value + 1), STEP_MS);
+      return () => window.clearInterval(timer);
+    },
+  );
   // Less motion: one still frame, with the prompt and all the steps.
   const frame = createMemo(
     (): TurnFrame =>
