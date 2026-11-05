@@ -370,7 +370,8 @@ export const messages = {
   "marketplace.plugin.email.prompt.unread": "Bugünkü okunmamış e-postalarımı özetle.",
   "marketplace.plugin.email.prompt.reply": "Müşterimden gelen son e-postaya bir yanıt yaz ve taslak olarak kaydet.",
   "marketplace.plugin.email.prompt.search": "Geçen ayın fatura e-postalarını bul ve eklerini indir.",
-  "marketplace.plugin.email.prompt.tidy": "Gelen kutumdaki bir haftadan eski tüm bültenleri arşivle.",
+  "marketplace.plugin.email.prompt.tidy":
+    "Gelen kutumdaki bir haftadan eski bültenleri listele ve ben onayladıktan sonra arşivle.",
   "marketplace.plugin.composio.tagline": "Kendi Composio bağlantınız üzerinden birçok uygulama",
   "marketplace.plugin.composio.description":
     "Composio, ajanları tek bir MCP sunucusu üzerinden Gmail, Slack, GitHub ve yüzlerce başka uygulamaya bağlar. İstediğiniz uygulamaları Composio hesabınızda bağlayın, ardından MCP URL'sini ve API anahtarını buraya yapıştırın.",

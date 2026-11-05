@@ -322,7 +322,7 @@ export const messages = {
   "marketplace.plugin.email.prompt.unread": "总结我今天的未读邮件。",
   "marketplace.plugin.email.prompt.reply": "给我客户最新的一封邮件起草回复，并保存为草稿。",
   "marketplace.plugin.email.prompt.search": "找到上个月的发票邮件并下载其附件。",
-  "marketplace.plugin.email.prompt.tidy": "将收件箱中超过一周的所有新闻通讯归档。",
+  "marketplace.plugin.email.prompt.tidy": "列出收件箱中超过一周的新闻通讯，在我确认后将它们归档。",
   "marketplace.plugin.composio.tagline": "通过你自己的 Composio 链接连接大量应用",
   "marketplace.plugin.composio.description":
     "Composio 通过一个 MCP 服务器把助手连接到 Gmail、Slack、GitHub 以及数百个其他应用。在你的 Composio 账号中连接想要的应用，然后把它的 MCP URL 和 API 密钥粘贴到这里。",

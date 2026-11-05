@@ -42,7 +42,7 @@ export const EMAIL_PLUGIN_GUIDE: PluginGuide = {
     {
       question: "Can the agent delete my email?",
       answer:
-        "It can move messages to Trash, and the provider empties Trash on its own schedule. The server never deletes a message for good. It never deletes a special folder such as the inbox, and deletes a folder that still holds mail only when the agent asks for that on purpose. The sending and deleting tools are marked as destructive, so OpenBot can ask you before they run.",
+        "It can move messages to Trash, and the provider empties Trash on its own schedule. The server never deletes a message for good. It never deletes a special folder such as the inbox, and deletes a folder that still holds mail only when the agent asks for that on purpose. The server marks the tools that send or delete mail as destructive and the tools that move or archive mail as changes, so a client that reads these marks can ask first. In OpenBot, whether the agent asks you before it runs a tool depends on the agent's access setting: with Full access it does not ask.",
     },
     {
       question: "Who makes this server?",

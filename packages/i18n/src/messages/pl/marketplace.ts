@@ -365,7 +365,7 @@ export const messages = {
     "Napisz odpowiedź na ostatni e-mail od mojego klienta i zapisz ją jako wersję roboczą.",
   "marketplace.plugin.email.prompt.search": "Znajdź e-maile z fakturami z zeszłego miesiąca i pobierz ich załączniki.",
   "marketplace.plugin.email.prompt.tidy":
-    "Zarchiwizuj wszystkie newslettery w mojej skrzynce odbiorczej starsze niż tydzień.",
+    "Wypisz newslettery w mojej skrzynce odbiorczej starsze niż tydzień i zarchiwizuj je po moim potwierdzeniu.",
   "marketplace.plugin.composio.tagline": "Wiele aplikacji przez twój link Composio",
   "marketplace.plugin.composio.description":
     "Composio łączy agentów z Gmailem, Slackiem, GitHubem i setkami innych aplikacji przez jeden serwer MCP. Połącz wybrane aplikacje na swoim koncie Composio, a potem wklej tu jego adres URL MCP i klucz API.",

@@ -214,7 +214,7 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       slug: "email",
       version: "1.0.0",
       featured: false,
-      detailSha256: "3bf7dda1b0a49aa5f230a6005580a80310372ff22fbe27e1c0b6eb9ed39c199d",
+      detailSha256: "03e193bf416cdbd58d01b36d3b40c40aae547f9826ecfd382a3f1620393be680",
     },
     {
       slug: "composio",
@@ -1527,7 +1527,10 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
       { id: "prompt-unread", text: "Summarize my unread email from today." },
       { id: "prompt-reply", text: "Draft a reply to the latest email from my client and save it as a draft." },
       { id: "prompt-search", text: "Find the invoice emails from last month and download their attachments." },
-      { id: "prompt-tidy", text: "Archive every newsletter in my inbox that is older than a week." },
+      {
+        id: "prompt-tidy",
+        text: "List the newsletters in my inbox that are older than a week, and archive them after I confirm.",
+      },
     ],
     apps: [
       {

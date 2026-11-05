@@ -360,7 +360,8 @@ export const messages = {
   "marketplace.plugin.email.prompt.unread": "لخّص رسائلي غير المقروءة من اليوم.",
   "marketplace.plugin.email.prompt.reply": "اكتب ردًا على آخر رسالة من عميلي واحفظه كمسودة.",
   "marketplace.plugin.email.prompt.search": "ابحث عن رسائل الفواتير من الشهر الماضي ونزّل مرفقاتها.",
-  "marketplace.plugin.email.prompt.tidy": "أرشف كل النشرات البريدية في صندوق الوارد التي مضى عليها أكثر من أسبوع.",
+  "marketplace.plugin.email.prompt.tidy":
+    "اعرض النشرات البريدية في صندوق الوارد التي مضى عليها أكثر من أسبوع، وأرشفها بعد أن أؤكد.",
   "marketplace.plugin.composio.tagline": "تطبيقات كثيرة عبر رابط Composio الخاص بك",
   "marketplace.plugin.composio.description":
     "يربط Composio الوكلاء بـ Gmail وSlack وGitHub ومئات التطبيقات الأخرى عبر خادم MCP واحد. اربط التطبيقات التي تريدها في حساب Composio، ثم الصق عنوان MCP URL ومفتاح API هنا.",

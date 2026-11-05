@@ -371,7 +371,8 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.email.prompt.unread": "Summarize my unread email from today.",
   "marketplace.plugin.email.prompt.reply": "Draft a reply to the latest email from my client and save it as a draft.",
   "marketplace.plugin.email.prompt.search": "Find the invoice emails from last month and download their attachments.",
-  "marketplace.plugin.email.prompt.tidy": "Archive every newsletter in my inbox that is older than a week.",
+  "marketplace.plugin.email.prompt.tidy":
+    "List the newsletters in my inbox that are older than a week, and archive them after I confirm.",
   "marketplace.plugin.composio.tagline": "Many apps through your own Composio link",
   "marketplace.plugin.composio.description":
     "Composio connects agents to Gmail, Slack, GitHub, and hundreds of other apps through one MCP server. Connect the apps you want in your Composio account, then paste its MCP URL and API key here.",

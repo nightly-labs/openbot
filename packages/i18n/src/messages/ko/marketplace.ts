@@ -322,7 +322,8 @@ export const messages = {
   "marketplace.plugin.email.prompt.unread": "오늘 읽지 않은 메일을 요약해 줘.",
   "marketplace.plugin.email.prompt.reply": "고객이 보낸 최신 메일에 대한 답장을 작성해서 임시 보관함에 저장해 줘.",
   "marketplace.plugin.email.prompt.search": "지난달 청구서 메일을 찾아서 첨부 파일을 다운로드해 줘.",
-  "marketplace.plugin.email.prompt.tidy": "받은편지함에서 일주일이 지난 뉴스레터를 모두 보관해 줘.",
+  "marketplace.plugin.email.prompt.tidy":
+    "받은편지함에서 일주일이 지난 뉴스레터 목록을 보여 주고, 내가 확인하면 보관해 줘.",
   "marketplace.plugin.composio.tagline": "내 Composio 링크로 연결하는 다양한 앱",
   "marketplace.plugin.composio.description":
     "Composio는 MCP 서버 하나로 에이전트를 Gmail, Slack, GitHub 등 수백 개의 앱에 연결해요. Composio 계정에서 원하는 앱을 연결한 다음, 해당 MCP URL과 API 키를 여기에 붙여넣어 주세요.",

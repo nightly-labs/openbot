@@ -356,7 +356,7 @@ export const messages = {
     "クライアントからの最新メールへの返信を作成し、下書きとして保存してください。",
   "marketplace.plugin.email.prompt.search": "先月の請求書メールを探して、添付ファイルをダウンロードしてください。",
   "marketplace.plugin.email.prompt.tidy":
-    "受信トレイにある 1 週間以上前のニュースレターをすべてアーカイブしてください。",
+    "受信トレイにある 1 週間以上前のニュースレターを一覧にし、私が確認してからアーカイブしてください。",
   "marketplace.plugin.composio.tagline": "自分の Composio リンクで多数のアプリを利用",
   "marketplace.plugin.composio.description":
     "Composio は、1 つの MCP サーバーでエージェントを Gmail、Slack、GitHub など数百のアプリに接続します。Composio アカウントで使いたいアプリを接続し、その MCP URL と API キーをここに貼り付けてください。",

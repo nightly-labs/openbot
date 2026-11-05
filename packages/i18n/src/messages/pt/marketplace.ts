@@ -342,7 +342,7 @@ export const messages = {
     "Escreva uma resposta ao último e-mail do meu cliente e salve como rascunho.",
   "marketplace.plugin.email.prompt.search": "Encontre os e-mails de faturas do mês passado e baixe os anexos.",
   "marketplace.plugin.email.prompt.tidy":
-    "Arquive todas as newsletters da minha caixa de entrada com mais de uma semana.",
+    "Liste as newsletters da minha caixa de entrada com mais de uma semana e arquive-as depois que eu confirmar.",
   "marketplace.plugin.composio.tagline": "Muitos apps pelo seu próprio link do Composio",
   "marketplace.plugin.composio.description":
     "O Composio conecta agentes ao Gmail, Slack, GitHub e centenas de outros apps por um único servidor MCP. Conecte os apps que quiser na sua conta Composio e cole aqui a URL do MCP e a chave de API dela.",
