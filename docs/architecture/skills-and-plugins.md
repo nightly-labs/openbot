@@ -119,10 +119,14 @@ site; this feature does not authorize or constrain actions after sign-in.
 API keys that a task needs, such as for a script or a service, use `openbot.request_api_key`. The
 router builds a `form` UI block with one required secret field (`apiKeyFormSpec` in
 `src/backend/agent/prompts.ts`), so every client that shows `ask_ui` shows it; no IPC or Team API
-contract changed. When the user submits it, `AttentionRegistry` saves the value with `AgentApiKeys`
-(`src/backend/agent-api-keys.ts`) before the prompt resolves, as `<userData>/agent-api-keys/<agentId>/<NAME>`:
-a 0600 file in a 0700 folder, outside every workspace, and not encrypted. The agent gets only the name
-and the path, and reads the file in its own command. Only the server owner or an admin can answer. The
+contract changed. When the Vault is ready, the form also has a segmented "Save for" field: "All agents
+(Vault)", which is selected first, or "Only this agent". For the Vault, `AttentionRegistry` saves the
+value with `VaultItems.saveApiKey` and deletes the asking agent's own key with that name, as
+`save_api_key` does; every agent then reads the `.vault/<NAME>` file. Otherwise, `AttentionRegistry` saves the value with
+`AgentApiKeys` (`src/backend/agent-api-keys.ts`) before the prompt resolves, as
+`<userData>/agent-api-keys/<agentId>/<NAME>`: a 0600 file in a 0700 folder, outside every workspace,
+and not encrypted. A failed save leaves the form open. The agent gets only the name and the path, and
+reads the file in its own command. Only the server owner or an admin can answer. The
 value is registered for log redaction when it is saved and at startup, and the stored block keeps no
 secret field value. `list_api_keys` and `remove_api_key` are the reverse actions, and deleting the agent
 deletes its folder. The form is refused in Slack, Discord and Telegram chats.
