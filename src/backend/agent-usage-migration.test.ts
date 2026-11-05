@@ -28,7 +28,11 @@ describe("agent usage migration", () => {
         db
           .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE '%_occurred' ORDER BY name")
           .all(),
-      ).toEqual([{ name: "agent_usage_activity_occurred" }, { name: "agent_usage_occurred" }]);
+      ).toEqual([
+        { name: "agent_usage_activity_occurred" },
+        { name: "agent_usage_occurred" },
+        { name: "agent_usage_skill_loads_occurred" },
+      ]);
       expect(db.prepare("PRAGMA integrity_check").get()).toMatchObject({ integrity_check: "ok" });
       expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
     } finally {
