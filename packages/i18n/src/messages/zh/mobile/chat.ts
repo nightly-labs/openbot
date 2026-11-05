@@ -375,12 +375,10 @@ export const messages = {
   "mobile.chat.queue.editEnded": "队列编辑已结束。",
   "mobile.chat.queue.loadFailed": "无法加载队列。",
   "mobile.chat.queue.storageUnavailable": "附件存储不可用。",
-  "mobile.chat.queue.buttonFailed": "排队的消息未加载。显示排队的消息",
   "mobile.chat.queue.buttonLabel": {
     one: "{count} 条排队消息。显示排队的消息",
     other: "{count} 条排队消息。显示排队的消息",
   },
-  "mobile.chat.queue.unavailable": "队列不可用",
   "mobile.chat.queue.uploading": "正在上传 {progress}/{total}",
   "mobile.chat.queue.cancelUpload": "取消排队中的上传",
   "mobile.chat.queue.waitingTitle": "等待助手处理",

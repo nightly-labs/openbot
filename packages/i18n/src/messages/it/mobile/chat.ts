@@ -394,12 +394,10 @@ export const messages = {
   "mobile.chat.queue.editEnded": "La modifica della coda è terminata.",
   "mobile.chat.queue.loadFailed": "Impossibile caricare la coda.",
   "mobile.chat.queue.storageUnavailable": "L'archivio degli allegati non è disponibile.",
-  "mobile.chat.queue.buttonFailed": "I messaggi in coda non si sono caricati. Mostra i messaggi in coda",
   "mobile.chat.queue.buttonLabel": {
     one: "{count} messaggio in coda. Mostra i messaggi in coda",
     other: "{count} messaggi in coda. Mostra i messaggi in coda",
   },
-  "mobile.chat.queue.unavailable": "Coda non disponibile",
   "mobile.chat.queue.uploading": "Caricamento {progress} di {total}",
   "mobile.chat.queue.cancelUpload": "Annulla il caricamento in coda",
   "mobile.chat.queue.waitingTitle": "In attesa dell'agente",

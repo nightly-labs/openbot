@@ -383,12 +383,10 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.queue.editEnded": "The queue edit has ended.",
   "mobile.chat.queue.loadFailed": "Could not load the queue.",
   "mobile.chat.queue.storageUnavailable": "Attachment storage is unavailable.",
-  "mobile.chat.queue.buttonFailed": "The queued messages did not load. Show queued messages",
   "mobile.chat.queue.buttonLabel": {
     one: "{count} queued message. Show queued messages",
     other: "{count} queued messages. Show queued messages",
   },
-  "mobile.chat.queue.unavailable": "Queue unavailable",
   "mobile.chat.queue.uploading": "Uploading {progress} of {total}",
   "mobile.chat.queue.cancelUpload": "Cancel queued upload",
   "mobile.chat.queue.waitingTitle": "Waiting for the agent",

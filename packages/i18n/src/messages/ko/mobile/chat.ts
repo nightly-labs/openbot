@@ -383,11 +383,9 @@ export const messages = {
   "mobile.chat.queue.editEnded": "대기열 편집이 종료됐어요.",
   "mobile.chat.queue.loadFailed": "대기열을 불러올 수 없어요.",
   "mobile.chat.queue.storageUnavailable": "첨부 파일 저장소를 사용할 수 없어요.",
-  "mobile.chat.queue.buttonFailed": "대기 중인 메시지를 불러오지 못했어요. 대기 중인 메시지 보기",
   "mobile.chat.queue.buttonLabel": {
     other: "대기 중인 메시지 {count}개. 대기 중인 메시지 보기",
   },
-  "mobile.chat.queue.unavailable": "대기열을 사용할 수 없음",
   "mobile.chat.queue.uploading": "{total}개 중 {progress}개 업로드 중",
   "mobile.chat.queue.cancelUpload": "대기 중인 업로드 취소",
   "mobile.chat.queue.waitingTitle": "에이전트를 기다리는 중",

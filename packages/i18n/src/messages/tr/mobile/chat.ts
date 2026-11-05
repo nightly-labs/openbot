@@ -388,12 +388,10 @@ export const messages = {
   "mobile.chat.queue.editEnded": "Kuyruk düzenlemesi sona erdi.",
   "mobile.chat.queue.loadFailed": "Kuyruk yüklenemedi.",
   "mobile.chat.queue.storageUnavailable": "Ek depolaması kullanılamıyor.",
-  "mobile.chat.queue.buttonFailed": "Kuyruktaki mesajlar yüklenemedi. Kuyruktaki mesajları göster",
   "mobile.chat.queue.buttonLabel": {
     one: "Kuyrukta {count} mesaj var. Kuyruktaki mesajları göster",
     other: "Kuyrukta {count} mesaj var. Kuyruktaki mesajları göster",
   },
-  "mobile.chat.queue.unavailable": "Kuyruk kullanılamıyor",
   "mobile.chat.queue.uploading": "{progress} / {total} yükleniyor",
   "mobile.chat.queue.cancelUpload": "Kuyruktaki yüklemeyi iptal et",
   "mobile.chat.queue.waitingTitle": "Ajan bekleniyor",
