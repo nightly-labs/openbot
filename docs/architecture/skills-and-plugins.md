@@ -145,8 +145,8 @@ transcript because the agent sent it; OpenBot keeps no tool arguments in its tra
 
 `password-vault-router.ts` joins metadata from every manager and prefixes Bitwarden ids with
 `bitwarden:` and Proton Pass ids with `proton:`. Existing 1Password ids stay unchanged. The
-password-manager engine gives the router one source for each driver (see
-[integrations](integrations.md#password-managers-on-a-joined-server)). A failed list stops automatic account selection
+router reads 1Password and Bitwarden from their services, and one source for each driver of the
+password-manager engine (see [integrations](integrations.md#password-managers-on-a-joined-server)). A failed list stops automatic account selection
 rather than hiding a source and selecting a different account. Main returns only connection state
 through the local Bitwarden IPC group. The shared panel is used in desktop Marketplace and server
 settings.

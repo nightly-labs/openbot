@@ -191,7 +191,6 @@ import { BitwardenConnectorStore } from "../src/main/bitwarden-connector-store";
 import { createBrowserProfileService } from "../src/main/browser-profile-service";
 import { MachineAlertMonitor, MachineAlertPreferenceStore } from "../src/main/machine-alerts";
 import { MemoryReviewPreferenceStore } from "../src/main/memory-review-preference-store";
-import { bitwardenDriver } from "../src/main/password-managers/bitwarden-driver";
 import type { PasswordManagerDriver } from "../src/main/password-managers/driver";
 import { PasswordManagersService } from "../src/main/password-managers/password-managers-service";
 import { RemoteWorkflowError } from "../src/main/remote-service-effects";
@@ -791,8 +790,8 @@ const createBitwardenHost = () =>
     },
   });
 const bitwardenConnector = createBitwardenHost();
-// The host's password managers (`password-managers-v1`): the real engine with the real Bitwarden
-// adapter and a stand-in Proton Pass driver that records each call. It records the kind of a
+// The host's password managers (`password-managers-v1`): the real engine with a stand-in Proton
+// Pass driver that records each call. It records the kind of a
 // connect method only, so a check can show that the access key reached the driver.
 const PROTON_PASS_KEY = "pst_e2eAccessKeyThatNoAnswerCarries::e2eEncryptionKey";
 const PROTON_PASS_SIGN_IN = "https://account.proton.me/authorize?code=e2e";
@@ -844,7 +843,7 @@ const protonPassDriver: PasswordManagerDriver = {
     return () => protonPassListeners.delete(listener);
   },
 };
-const passwordManagers = new PasswordManagersService([bitwardenDriver(bitwardenConnector), protonPassDriver]);
+const passwordManagers = new PasswordManagersService([protonPassDriver]);
 // The host's WhatsApp numbers (`whatsapp-connector-v1`): an in-memory stand-in for the messaging
 // service that records each call. The other connector routes are not part of this run.
 const WHATSAPP_NUMBER = "48600100200";
@@ -5295,10 +5294,7 @@ try {
       "an admin lists the host's managers with the methods that each one takes",
       isDeepStrictEqual(
         managers.map((status) => [status.manager, status.state, status.methods]),
-        [
-          ["bitwarden", "disconnected", []],
-          ["protonpass", "disconnected", ["browser", "key"]],
-        ],
+        [["protonpass", "disconnected", ["browser", "key"]]],
       ),
       summary(listed),
     );
@@ -5307,17 +5303,26 @@ try {
       json: { manager: "lastpass", method: { kind: "browser" } },
       ...v9,
     });
-    const noMethod = await call("POST", PASSWORD_MANAGERS_ROUTES.connect, {
+    const notRegistered = await call("POST", PASSWORD_MANAGERS_ROUTES.connect, {
       token: adaToken,
       json: { manager: "bitwarden", method: { kind: "browser" } },
       ...v9,
     });
+    // A manager that offers only the browser sign-in refuses a pasted key.
+    setProtonPass({ methods: ["browser"] });
+    const noMethod = await call("POST", PASSWORD_MANAGERS_ROUTES.connect, {
+      token: adaToken,
+      json: { manager: "protonpass", method: { kind: "key", key: PROTON_PASS_KEY } },
+      ...v9,
+    });
+    setProtonPass({ methods: ["browser", "key"] });
     check(
-      "the host refuses an unknown manager and a method that the manager does not take",
+      "the host refuses an unknown manager, a manager that it does not run, and a method that the manager does not take",
       unknown.status === 400 &&
+        notRegistered.status === 400 &&
         errorIs(noMethod, 400, sourceText("error.connector.passwordManagerMethod")) &&
         managerCalls().length === 0,
-      [summary(unknown), summary(noMethod)],
+      [summary(unknown), summary(notRegistered), summary(noMethod)],
     );
     const browser = await call("POST", PASSWORD_MANAGERS_ROUTES.connect, {
       token: adaToken,

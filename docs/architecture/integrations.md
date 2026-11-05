@@ -526,10 +526,10 @@ The password-manager engine
 keeps one driver for each manager
 ([`driver.ts`](../../src/main/password-managers/driver.ts)). A driver owns the sign-in, the stored
 access, the CLI and the logins of its manager. The engine owns the list, the checks that every
-manager shares, and the login sources of `password-vault-router.ts`. The 1Password and Bitwarden
-drivers are adapters over their services, which keep their own panels and capabilities. A new
-manager needs a driver, an id in `PASSWORD_MANAGER_IDS` and a Marketplace descriptor; no new IPC
-group or route.
+manager shares, and the login sources of `password-vault-router.ts`. Proton Pass is its only
+driver: 1Password and Bitwarden keep their own services, panels and capabilities, and the router
+reads their logins directly. A new manager needs a driver, an id in `PASSWORD_MANAGER_IDS` and a
+Marketplace descriptor; no new IPC group or route.
 
 The optional capability `password-managers-v1`
 ([`password-managers-v1.ts`](../../packages/contracts/src/team-protocol/password-managers-v1.ts),

@@ -278,9 +278,7 @@ import { ModelReleaseCatalog, ModelVisibility } from "./model-visibility";
 import { NotificationPreferenceStore } from "./notification-preference-store";
 import { OnePasswordConnectorService } from "./onepassword-connector-service";
 import { OnePasswordConnectorStore } from "./onepassword-connector-store";
-import { bitwardenDriver } from "./password-managers/bitwarden-driver";
 import { EncryptedRecordStore } from "./password-managers/encrypted-record-store";
-import { onePasswordDriver } from "./password-managers/onepassword-driver";
 import { PasswordManagersService } from "./password-managers/password-managers-service";
 import { managedProtonPassCli } from "./password-managers/proton-pass-cli-installer";
 import { ProtonPassDriver, protonPassRecordSchema } from "./password-managers/proton-pass-driver";
@@ -1640,13 +1638,11 @@ export async function createApplicationServices({
   );
   /*
    * The password-manager engine. 1Password and Bitwarden keep their own services, panels and
-   * teardown; the engine shows them with Proton Pass in one list. The Proton Pass CLI data and
-   * OpenBot's copy of `pass-cli` stay outside every root an agent can write.
+   * teardown, and the browser reads their logins directly. The Proton Pass CLI data and OpenBot's
+   * copy of `pass-cli` stay outside every root an agent can write.
    */
   const protonPassCliTarget = runtimeTarget(process.platform, process.arch);
   const passwordManagers = new PasswordManagersService([
-    onePasswordDriver(onePasswordConnector),
-    bitwardenDriver(bitwardenConnector),
     new ProtonPassDriver({
       store: new EncryptedRecordStore({
         path: join(app.getPath("userData"), PROTONPASS_CONNECTOR_FILE),
@@ -1933,7 +1929,12 @@ export async function createApplicationServices({
       mcpServer: () => githubConnector.mcpServer(),
       mcpAuthorization: () => githubConnector.mcpAuthorization().pipe(toMcpGatewayFailed),
     },
-    passwordVault: passwordVaultRouter([...passwordManagers.routes(), { prefix: "openbot:", vault: vault.logins }]),
+    passwordVault: passwordVaultRouter([
+      { prefix: "", vault: onePasswordConnector },
+      { prefix: "bitwarden:", vault: bitwardenConnector },
+      ...passwordManagers.routes(),
+      { prefix: "openbot:", vault: vault.logins },
+    ]),
     vaultItems: vault.items,
     linkWallet: linkAccount,
     agentApiKeys,
