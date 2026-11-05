@@ -621,6 +621,11 @@ export interface BuiltInProviderDriver {
   cliProvider?: AgentProviderId;
   /** Absent for a provider whose `model/list` needs no special reading. */
   catalog?: ProviderModelCatalog;
+  /**
+   * The provider's `account/read` can take the full request timeout, not 5 s. A slow network can
+   * hold the answer past the fast-fail wait, and the provider would look signed out at every start.
+   */
+  readonly slowAccount?: true;
   resolveCli(options?: {
     bundledExecutable?: string | null | undefined;
   }): Effect.Effect<AgentCliInfo, ProviderClientOperationError>;
@@ -799,7 +804,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       signIn: { argv: ["login"], env: () => ({}), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
       signOut: { argv: ["logout"], env: () => ({}), timeoutMs: 30_000 },
     },
-    catalog: { paged: true, modelFields: codexFastServiceTier },
+    slowAccount: true,
+    catalog: { paged: true, slowList: true, modelFields: codexFastServiceTier },
     resolveCli: resolveCodexCli,
     createClient: (cli, requestTimeoutMs, context) =>
       new CodexAppServerClient(cli.executable, requestTimeoutMs, {

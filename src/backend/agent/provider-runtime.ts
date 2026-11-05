@@ -103,6 +103,7 @@ import {
   isUsageReadDiagnostic,
   LOG_TIMESTAMP_PREFIX,
 } from "./provider-diagnostics";
+import { readProviderAccount } from "./provider-request-policy";
 import {
   isProviderTimeout,
   providerFailureStatus,
@@ -2802,9 +2803,9 @@ export class ProviderRuntime implements ProviderPort {
   ) {
     const result = yield* Effect.result(
       Effect.gen({ self: this }, function* () {
-        const account = yield* client
-          .request("account/read", { refreshToken: true }, decodeAccountReadResult, 5_000)
-          .pipe(toProviderOperationFailed);
+        const account = yield* readProviderAccount(client, provider, true, this.#requestTimeoutMs).pipe(
+          toProviderOperationFailed,
+        );
         // An activation can replace this client while the account request is pending.
         if (this.#clients.get(provider) !== client) return;
         if (account.account) {
@@ -3451,9 +3452,9 @@ export class ProviderRuntime implements ProviderPort {
           logger.info("A provider answered initialize.", { provider, durationMs: stageMs() });
           stage = "account";
           stageStartedAt = performance.now();
-          const account = yield* candidate
-            .request("account/read", { refreshToken: false }, decodeAccountReadResult, 5_000)
-            .pipe(toProviderOperationFailed);
+          const account = yield* readProviderAccount(candidate, provider, false, this.#requestTimeoutMs).pipe(
+            toProviderOperationFailed,
+          );
           if (!account.account) {
             const message = this.#signInRequiredMessage(provider);
             yield* candidate.stop().pipe(Effect.catch(() => Effect.void));
