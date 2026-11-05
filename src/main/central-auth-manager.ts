@@ -48,11 +48,12 @@ import {
   type RemoteTicketClaims,
 } from "@openbot/contracts/signal-protocol/ticket";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger } from "@openbot/logging";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { referenceFrom, safeReference } from "@openbot/user-errors";
 import { Deferred, Effect, type Layer, Result, Schema, Semaphore } from "effect";
 import { createLocalJWKSet, jwtVerify } from "jose";
 import { z } from "zod";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { isMissingFileError } from "../backend/file-errors";
 import { authCall, authDecode, CentralAuthOperationError, CentralAuthTransport } from "./central-auth-effects";
 import {
@@ -139,6 +140,11 @@ const TELEGRAM_BOT_USERNAME = /^[A-Za-z0-9_]{5,32}$/u;
 const STARTUP_RETRY_WINDOW_MS = 30_000;
 const STARTUP_REQUEST_TIMEOUT_MS = 3_000;
 const STARTUP_RETRY_DELAYS_MS = [250, 500, 1_000, 2_000] as const;
+// After the start window, the account service is asked again in the background, for example when the
+// network is ready only after the window (#5111). Each delay changes by up to a quarter, so clients
+// that lost the service at the same time do not ask at the same time.
+const UNAVAILABLE_RETRY_DELAYS_MS = [5_000, 10_000, 20_000, 30_000, 60_000] as const;
+const MAX_UNAVAILABLE_RETRY_AFTER_SECONDS = 60 * 60;
 const EMAIL_CODE_REQUEST_TIMEOUT_MS = 35_000;
 const RESEND_FALLBACK_DELAY_MS = 60_000;
 const DEFINITIVE_EMAIL_CODE_REQUEST_FAILURES = new Set([
@@ -204,6 +210,9 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
   /** Ends the company sign-in that waits for the browser. A new one, a cancel, or the shutdown ends it. */
   #companySignInCancel: Deferred.Deferred<void> | null = null;
   #companySignInTestCancel: Deferred.Deferred<void> | null = null;
+  #unavailableRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  #unavailableRetryFailures = 0;
+  #disposed = false;
 
   constructor(options: CentralAuthManagerOptions) {
     super();
@@ -225,6 +234,8 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
 
   readonly #pending = new Set<Deferred.Deferred<void>>();
   readonly dispose = Effect.fn("CentralAuth.dispose")(function* (this: CentralAuthManager) {
+    this.#disposed = true;
+    this.#cancelUnavailableRetry();
     this.stopProfileRefresh();
     this.#endCompanySignIn();
     this.#endCompanySignInTest();
@@ -1409,7 +1420,13 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       if (this.#initialization) return yield* Deferred.await(this.#initialization);
       const pending = Deferred.makeUnsafe<CentralAuthState, CentralAuthOperationError>();
       this.#initialization = pending;
+      this.#cancelUnavailableRetry();
       return yield* this.#initialize().pipe(
+        Effect.tap(() =>
+          Effect.sync(() => {
+            this.#unavailableRetryFailures = 0;
+          }),
+        ),
         Effect.catch((error) => Effect.sync(() => this.#setInitializationError(error.cause))),
         Effect.onExit((exit) => Deferred.done(pending, exit)),
         Effect.ensuring(
@@ -1425,6 +1442,71 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
   retry() {
     return this.initialize();
   }
+
+  #cancelUnavailableRetry(): void {
+    if (this.#unavailableRetryTimer) clearTimeout(this.#unavailableRetryTimer);
+    this.#unavailableRetryTimer = null;
+  }
+
+  /**
+   * A `Retry-After` from the service makes the wait longer, never shorter. It is limited to one hour:
+   * Node runs a timer of more than 2^31 - 1 ms after 1 ms.
+   */
+  #scheduleUnavailableRetry(error?: unknown): void {
+    this.#cancelUnavailableRetry();
+    if (this.#disposed) return;
+    const delays = UNAVAILABLE_RETRY_DELAYS_MS;
+    const retryAfterMs =
+      error instanceof AuthApiError
+        ? Math.min(error.retryAfterSeconds ?? 0, MAX_UNAVAILABLE_RETRY_AFTER_SECONDS) * 1_000
+        : 0;
+    const delayMs = Math.max(delays[Math.min(this.#unavailableRetryFailures, delays.length - 1)] ?? 0, retryAfterMs);
+    this.#unavailableRetryFailures += 1;
+    this.#unavailableRetryTimer = setTimeout(
+      () => {
+        this.#unavailableRetryTimer = null;
+        void runCauseEffect(this.#owned(this.#unavailableRetryEffect())).catch((error) =>
+          logger.warn("The account service retry failed.", toLogValue(error)),
+        );
+      },
+      Math.round(delayMs * (0.75 + Math.random() * 0.5)),
+    );
+    this.#unavailableRetryTimer.unref?.();
+  }
+
+  #isUnavailable(): boolean {
+    return this.#state.status === "error" && this.#state.issue.code === "auth_api_unavailable";
+  }
+
+  /**
+   * Sends one start request with no loading state, so the error screen stays while the service does
+   * not answer. Only an answer from the service starts the sign-in again.
+   */
+  readonly #unavailableRetryEffect = Effect.fn("CentralAuth.unavailableRetry")(function* (
+    this: CentralAuthManager,
+  ): Effect.fn.Return<void, CentralAuthOperationError, CentralAuthTransport> {
+    if (this.#disposed || this.#initialization || !this.#isUnavailable()) return;
+    const sessionToken = this.#sessionToken;
+    const timeoutMs = this.#options.startupRequestTimeoutMs;
+    const request: Effect.Effect<unknown, CentralAuthOperationError, CentralAuthTransport> = sessionToken
+      ? this.#requestEffect(
+          "/v1/me",
+          { method: "GET", headers: { Authorization: `Bearer ${sessionToken}` } },
+          decodeCentralAuthUser,
+          timeoutMs,
+        )
+      : this.#requestEffect("/health/live", { method: "GET" }, decodeRecordHealth, timeoutMs);
+    const probe = yield* Effect.result(request);
+    if (this.#disposed || this.#initialization || !this.#isUnavailable()) return;
+    if (Result.isFailure(probe)) {
+      const error = probe.failure.cause;
+      if (error instanceof NetworkBlockedError || isTransientStartupError(error)) {
+        this.#scheduleUnavailableRetry(error);
+        return;
+      }
+    }
+    yield* this.initialize();
+  });
 
   readonly #initialize = Effect.fn("CentralAuth.initialize")(function* (
     this: CentralAuthManager,
@@ -2123,10 +2205,13 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       deadline += Math.max(0, Date.now() - startedAt - expectedMs);
     };
     let retryIndex = 0;
+    // The code on the error screen names the last failure, such as no network or a 503.
+    let lastFailure: CentralAuthOperationError | null = null;
     while (true) {
       const remainingMs = deadline - Date.now();
       if (remainingMs <= 0)
-        return yield* new CentralAuthOperationError({ cause: new Error(sourceText("error.auth.serviceUnavailable")) });
+        return yield* lastFailure ??
+          new CentralAuthOperationError({ cause: new Error(sourceText("error.auth.serviceUnavailable")) });
       const timeoutMs = Math.max(1, Math.min(this.#options.startupRequestTimeoutMs, remainingMs));
       const startedAt = Date.now();
       const result = yield* this.#requestEffect(
@@ -2140,6 +2225,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       ).pipe(Effect.result);
       if (Result.isSuccess(result)) return result.success;
       excludeBlockedTime(startedAt, timeoutMs);
+      lastFailure = result.failure;
       const error = result.failure.cause;
       if (!isTransientStartupError(error)) return yield* result.failure;
       const delayMs = Math.min(
@@ -2326,6 +2412,8 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
 
   #setInitializationError(error: unknown): CentralAuthState {
     if (error instanceof NetworkBlockedError) {
+      // A captive portal blocks only until the user signs in to it.
+      this.#scheduleUnavailableRetry();
       return this.#setState({ status: "error", issue: { code: "auth_api_unavailable", message: error.message } });
     }
     if (error instanceof AuthApiError && error.status < 500) {
@@ -2334,6 +2422,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     // The renderer shows the retry screen for `auth_api_unavailable`. The message and the reference
     // say which failure it was.
     const unavailable = serviceUnavailableText(error);
+    this.#scheduleUnavailableRetry(error);
     return this.#setState({
       status: "error",
       issue: {
@@ -2510,7 +2599,7 @@ function serviceUnavailableText(error: unknown): { message: string; reference: s
       isDynamicRecord(cause) && isString(cause.code) && /^E[A-Z0-9_]+$/u.test(cause.code) ? cause.code : null;
     return { message: sourceText("error.auth.serviceUnreachable"), reference: referenceFrom("auth", "network", errno) };
   }
-  // The startup retry window ended, or the answer could not be read.
+  // The answer could not be read.
   return { message: sourceText("error.auth.serviceUnavailable"), reference: "auth/unavailable" };
 }
 

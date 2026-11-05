@@ -1383,8 +1383,12 @@ export class TurnLifecycle {
           for (const delivery of deliveries)
             yield* this.#relayAgentResult(agentId, turnId, delivery, latestAssistant.text);
         }
+        // A failed turn sends no result, so the agent that asked gets the failure as its answer.
+        if (!continuation && terminal === "failed") {
+          for (const { delivery } of deliveries) yield* this.#answerFailedRequest(agentId, delivery.id);
+        }
         // The requester holds the answers of the other teammates until each request has ended, so
-        // this end can release them, also when this turn failed and sends no result.
+        // this end can release them, and the failure note above.
         for (const { delivery } of deliveries) {
           if (delivery.sender.kind === "agent") this.#hooks.scheduleDrain(delivery.sender.agentId);
         }
@@ -1694,6 +1698,20 @@ export class TurnLifecycle {
       ),
     );
   }, Effect.uninterruptible);
+
+  /** Sends the agent that asked the note that its request failed. A failed note does not stop the turn's end. */
+  #answerFailedRequest(agentId: string, deliveryId: string): Effect.Effect<void> {
+    return this.#mailbox
+      .answerFailedRequest(deliveryId, (taskId) => this.#hooks.taskOpen(taskId))
+      .pipe(
+        Effect.match({
+          onFailure: (failure) => this.#hooks.emitError("failed_request_answer_failed", failure.cause, agentId),
+          onSuccess: (requesterId) => {
+            if (requesterId) this.#mailboxSync.emitQueue(requesterId);
+          },
+        }),
+      );
+  }
 
   readonly #relayAgentResult = Effect.fn("TurnLifecycle.relayAgentResult")(function* (
     this: TurnLifecycle,

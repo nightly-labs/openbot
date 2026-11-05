@@ -88,7 +88,7 @@ export function MarketplaceListingScreen() {
   let body: ReactNode;
   if (kind === "app")
     body =
-      app?.kind === "app" ? (
+      app?.kind === "app" && app.source === "plugin" ? (
         <AppPage serverId={serverId} listing={app} plugin={app.plugin} onBusy={setBusy} />
       ) : (
         <SettingsNote>{t("mobile.marketplace.listing.notFound")}</SettingsNote>

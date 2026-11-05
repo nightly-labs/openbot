@@ -12,6 +12,7 @@ import {
   relayableSignInLink,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
+import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { toast } from "@openbot/ui";
 import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/QuestionPromptBubble";
 import type { QuoteRequest } from "@openbot/ui/features/conversation/ComposerEditor";
@@ -32,6 +33,7 @@ import {
 import { actionToast } from "../../action-toast";
 import { createScopeGuard } from "../../scope-lifetime";
 import { appendVoiceTranscript } from "../../voice-recording";
+import { serverSupportsCapability } from "../servers/server-capabilities";
 import { createAttachmentImportSounds } from "./attachment-import-sounds";
 import type { ChatSearchMatch } from "./chat-search";
 import { useConversationController } from "./conversation-controller-context";
@@ -1066,6 +1068,7 @@ export function createConversationViewScope(props: ConversationProps) {
   let latestScrollFrame: number | undefined;
   let latestScrollSettleFrame: number | undefined;
   let lastScrollTop = 0;
+  let lastMaxScrollTop = 0;
   let readerLeftLatest = false;
   let readerDragging = false;
   let readerIntent: { up: boolean; at: number } | undefined;
@@ -1121,6 +1124,15 @@ export function createConversationViewScope(props: ConversationProps) {
     const draft = fastModeDraft();
     return draft && draft.agentId === props.agent?.id ? draft.fastMode : props.agent?.fastMode === true;
   };
+  /**
+   * The Fast switch of the model pickers, in the chat header and in the agent settings. Codex only
+   * for now: on this computer, or on a joined server with `agent-fast-mode-v1`.
+   */
+  const fastModeChange = () =>
+    settingsProvider() === "codex" &&
+    (props.server?.kind === "local" || serverSupportsCapability(props.server, AGENT_FAST_MODE_CAPABILITY))
+      ? (next: boolean) => void changeFastMode(next)
+      : undefined;
   async function changeFastMode(next: boolean): Promise<void> {
     const agentId = props.agent?.id;
     if (!agentId) return;
@@ -1310,7 +1322,10 @@ export function createConversationViewScope(props: ConversationProps) {
     keyboardWindow.addEventListener("pointercancel", endReaderDrag);
     scrollResizeObserver = new ResizeObserver(() => {
       updateVirtualScrollMargin();
-      if (scrollElement && stickToLatest) followConversationBottom(scrollElement);
+      const readerAbove = scrollElement !== undefined && readerAboveShrinkingContent(scrollElement);
+      if (scrollElement && stickToLatest) {
+        if (!readerAbove) followConversationBottom(scrollElement);
+      }
       // An image or a preview that lays out after the opening grows a row above the divider. The chat
       // has no browser scroll anchoring, so without this the divider moves down out of view.
       else if (scrollElement && unreadOpening.holding) scrollToUnreadDivider(scrollElement);
@@ -1946,6 +1961,23 @@ export function createConversationViewScope(props: ConversationProps) {
     else if (scrollElement.scrollTop > lastScrollTop) unreadOpening.holding = false;
   }
   /**
+   * Content that gets shorter, such as a plan that closes, keeps the bottom in view by itself when the
+   * chat is at the bottom. A following chat that was more than 80px above the bottom was moved by a
+   * scroll that the chat could not give to the reader. A follow would jump the chat to the old bottom,
+   * and the content would then slide back as it gets shorter, so this resize does not follow. The chat
+   * continues to follow: growth, or a follow that was queued before, still moves it to the bottom.
+   */
+  function readerAboveShrinkingContent(element: HTMLDivElement): boolean {
+    const maxScrollTop = element.scrollHeight - element.clientHeight;
+    const previousMaxScrollTop = lastMaxScrollTop;
+    lastMaxScrollTop = maxScrollTop;
+    return (
+      maxScrollTop < previousMaxScrollTop &&
+      maxScrollTop - element.scrollTop > 1 &&
+      previousMaxScrollTop - element.scrollTop > 80
+    );
+  }
+  /**
    * A scroll is the reader's when the chat moves the way that the reader's last input asked, soon after
    * it, or while the reader drags the scroll bar or a text selection. Input that moves something else,
    * such as a code block that scrolls, a sideways swipe or a key in a field, does not move the chat.
@@ -1953,6 +1985,7 @@ export function createConversationViewScope(props: ConversationProps) {
   const followReaderScroll = (element: HTMLElement) => {
     const moved = element.scrollTop - lastScrollTop;
     lastScrollTop = element.scrollTop;
+    lastMaxScrollTop = element.scrollHeight - element.clientHeight;
     const intent = readerIntent && performance.now() - readerIntent.at < READER_INPUT_WINDOW_MS ? readerIntent : null;
     if (moved < 0 && (readerDragging || intent?.up === true)) leaveLatest();
     else if (moved > 0 && (readerDragging || intent?.up === false)) {
@@ -2273,6 +2306,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setComposerError: setScopedComposerError,
     changeFastMode,
     fastMode,
+    fastModeChange,
     setComposerFocusRequest,
     setDropActive,
     setExpandedEmojiMessageId,

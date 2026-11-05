@@ -211,6 +211,8 @@ export const messages = defineMessages("mobile.workflow", {
   "mobile.workflow.output.discord": "Discord",
   "mobile.workflow.output.slack": "Slack",
   "mobile.workflow.output.telegram": "Telegram",
+  "mobile.workflow.output.telegramHint": "Replies, posts or adds a reaction in a linked Telegram chat.",
+  "mobile.workflow.output.slackHint": "Replies, posts or adds a reaction in a Slack channel.",
   "mobile.workflow.run.stopStep": "Stop step",
   "mobile.workflow.run.stopStepFailed": "Could not stop the step",
   "mobile.workflow.version.history": "Version history",
@@ -351,7 +353,6 @@ export const messages = defineMessages("mobile.workflow", {
   "mobile.workflow.slack.action.reply": "Reply in thread",
   "mobile.workflow.telegram.hostOnly":
     "Only the computer that runs OpenBot has the Telegram chats. Change this step in OpenBot on that computer.",
-  "mobile.workflow.telegram.triggerComputerOnly": "Change this trigger in OpenBot on the computer that runs it.",
   "mobile.workflow.telegram.outputSummary": "Telegram · {action}",
   "mobile.workflow.telegram.chat": "Chat",
   "mobile.workflow.telegram.anyChat": "Any linked chat",
@@ -368,4 +369,14 @@ export const messages = defineMessages("mobile.workflow", {
   "mobile.workflow.telegram.action.post": "Post in chat",
   "mobile.workflow.telegram.action.react": "Add a reaction",
   "mobile.workflow.telegram.emoji": "Emoji",
+  "mobile.workflow.chats.adminOnly": "Only an owner or admin can change this step.",
+  "mobile.workflow.chats.loadFailed": "The chats of this server did not load. Try again later.",
+  "mobile.workflow.slack.hostOnly":
+    "Only the computer that runs OpenBot has the Slack workspaces. Change this step in OpenBot on that computer.",
+  "mobile.workflow.slack.workspace": "Workspace",
+  "mobile.workflow.slack.chooseWorkspace": "Choose workspace",
+  "mobile.workflow.slack.oneWorkspace": "One workspace",
+  "mobile.workflow.slack.chooseChannel": "Choose channel",
+  "mobile.workflow.slack.needsWorkspace": "Choose a workspace. Without one, the trigger does not start.",
+  "mobile.workflow.slack.needsChannel": "Choose a workspace and a channel to post in.",
 });

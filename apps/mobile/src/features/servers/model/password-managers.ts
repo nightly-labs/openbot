@@ -16,15 +16,11 @@ export function isMobilePasswordManagerId(value: string): value is MobilePasswor
 /** The text that is different for each manager. The shared page writes the rest with `{name}`. */
 export const PASSWORD_MANAGER_TEXT = {
   protonpass: {
-    summary: "mobile.server.connectors.protonPass.summary",
     description: "mobile.server.connectors.protonPass.description",
     keyHelp: "mobile.server.connectors.protonPass.keyHelp",
     keyPlaceholder: "mobile.server.connectors.protonPass.keyPlaceholder",
   },
-} as const satisfies Record<
-  MobilePasswordManagerId,
-  Record<"summary" | "description" | "keyHelp" | "keyPlaceholder", string>
->;
+} as const satisfies Record<MobilePasswordManagerId, Record<"description" | "keyHelp" | "keyPlaceholder", string>>;
 
 /**
  * The site of each manager's sign-in page. A joined server names the page that the phone opens, so

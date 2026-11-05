@@ -236,6 +236,8 @@ export const messages = {
   "mobile.workflow.output.discord": "Discord",
   "mobile.workflow.output.slack": "Slack",
   "mobile.workflow.output.telegram": "Telegram",
+  "mobile.workflow.output.telegramHint": "Odpowiada, publikuje lub dodaje reakcję w połączonym czacie Telegram.",
+  "mobile.workflow.output.slackHint": "Odpowiada, publikuje lub dodaje reakcję na kanale Slack.",
   "mobile.workflow.run.stopStep": "Zatrzymaj krok",
   "mobile.workflow.run.stopStepFailed": "Nie udało się zatrzymać kroku",
   "mobile.workflow.version.history": "Historia wersji",
@@ -383,7 +385,6 @@ export const messages = {
   "mobile.workflow.slack.action.reply": "Odpowiedz w wątku",
   "mobile.workflow.telegram.hostOnly":
     "Czaty Telegram ma tylko komputer, na którym działa OpenBot. Zmień ten krok w OpenBot na tym komputerze.",
-  "mobile.workflow.telegram.triggerComputerOnly": "Zmień ten wyzwalacz w OpenBot na komputerze, który go uruchamia.",
   "mobile.workflow.telegram.outputSummary": "Telegram · {action}",
   "mobile.workflow.telegram.chat": "Czat",
   "mobile.workflow.telegram.anyChat": "Dowolny połączony czat",
@@ -400,4 +401,14 @@ export const messages = {
   "mobile.workflow.telegram.action.post": "Opublikuj na czacie",
   "mobile.workflow.telegram.action.react": "Dodaj reakcję",
   "mobile.workflow.telegram.emoji": "Emoji",
+  "mobile.workflow.chats.adminOnly": "Tylko właściciel lub administrator może zmienić ten krok.",
+  "mobile.workflow.chats.loadFailed": "Nie udało się wczytać czatów tego serwera. Spróbuj ponownie później.",
+  "mobile.workflow.slack.hostOnly":
+    "Tylko komputer, na którym działa OpenBot, ma obszary robocze Slack. Zmień ten krok w OpenBot na tym komputerze.",
+  "mobile.workflow.slack.workspace": "Obszar roboczy",
+  "mobile.workflow.slack.chooseWorkspace": "Wybierz obszar roboczy",
+  "mobile.workflow.slack.oneWorkspace": "Jeden obszar roboczy",
+  "mobile.workflow.slack.chooseChannel": "Wybierz kanał",
+  "mobile.workflow.slack.needsWorkspace": "Wybierz obszar roboczy. Bez niego wyzwalacz się nie uruchomi.",
+  "mobile.workflow.slack.needsChannel": "Wybierz obszar roboczy i kanał do publikacji.",
 } as const satisfies PartialTranslation<typeof source>;

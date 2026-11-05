@@ -213,6 +213,9 @@ export const messages = {
   "mobile.workflow.output.discord": "Discord",
   "mobile.workflow.output.slack": "Slack",
   "mobile.workflow.output.telegram": "Telegram",
+  "mobile.workflow.output.telegramHint":
+    "Bağlı bir Telegram sohbetinde yanıt verir, gönderi paylaşır veya tepki ekler.",
+  "mobile.workflow.output.slackHint": "Bir Slack kanalında yanıt verir, gönderi paylaşır veya tepki ekler.",
   "mobile.workflow.run.stopStep": "Adımı durdur",
   "mobile.workflow.run.stopStepFailed": "Adım durdurulamadı",
   "mobile.workflow.version.history": "Sürüm geçmişi",
@@ -358,8 +361,6 @@ export const messages = {
   "mobile.workflow.slack.action.reply": "Zincirde yanıtla",
   "mobile.workflow.telegram.hostOnly":
     "Telegram sohbetleri yalnızca OpenBot'u çalıştıran bilgisayarda bulunur. Bu adımı o bilgisayardaki OpenBot'ta değiştirin.",
-  "mobile.workflow.telegram.triggerComputerOnly":
-    "Bu tetikleyiciyi onu çalıştıran bilgisayardaki OpenBot'ta değiştirin.",
   "mobile.workflow.telegram.outputSummary": "Telegram · {action}",
   "mobile.workflow.telegram.chat": "Sohbet",
   "mobile.workflow.telegram.anyChat": "Bağlı herhangi bir sohbet",
@@ -376,4 +377,14 @@ export const messages = {
   "mobile.workflow.telegram.action.post": "Sohbete gönder",
   "mobile.workflow.telegram.action.react": "Tepki ekle",
   "mobile.workflow.telegram.emoji": "Emoji",
+  "mobile.workflow.chats.adminOnly": "Bu adımı yalnızca bir sahip veya yönetici değiştirebilir.",
+  "mobile.workflow.chats.loadFailed": "Bu sunucunun sohbetleri yüklenemedi. Daha sonra tekrar deneyin.",
+  "mobile.workflow.slack.hostOnly":
+    "Slack çalışma alanları yalnızca OpenBot'u çalıştıran bilgisayarda bulunur. Bu adımı o bilgisayardaki OpenBot'ta değiştirin.",
+  "mobile.workflow.slack.workspace": "Çalışma alanı",
+  "mobile.workflow.slack.chooseWorkspace": "Çalışma alanı seçin",
+  "mobile.workflow.slack.oneWorkspace": "Bir çalışma alanı",
+  "mobile.workflow.slack.chooseChannel": "Kanal seçin",
+  "mobile.workflow.slack.needsWorkspace": "Bir çalışma alanı seçin. Seçmezseniz tetikleyici başlamaz.",
+  "mobile.workflow.slack.needsChannel": "Gönderi için bir çalışma alanı ve kanal seçin.",
 } as const satisfies PartialTranslation<typeof source>;

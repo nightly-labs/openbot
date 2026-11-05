@@ -531,6 +531,10 @@ export const messages = {
   "mobile.agent.list.openPinned": "{name} ile sabitlenmiş sohbeti aç",
   "mobile.agent.list.openPinnedWithTitle": "{name} ile sabitlenmiş sohbeti aç, {title}",
   "mobile.agent.list.withState": "{label}. {state}",
+  "mobile.agent.list.unread": {
+    one: "{count} okunmamış mesaj",
+    other: "{count} okunmamış mesaj",
+  },
   "mobile.agent.list.waiting.title": "Size ihtiyacı var",
   "mobile.agent.list.waiting.label": {
     one: "Size ihtiyacı var, {count} ajan",

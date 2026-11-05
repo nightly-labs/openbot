@@ -522,6 +522,7 @@ export const messages = {
   "mobile.agent.list.openPinned": "ピン留めした {name} とのチャットを開く",
   "mobile.agent.list.openPinnedWithTitle": "ピン留めした {name} とのチャットを開く、{title}",
   "mobile.agent.list.withState": "{label}。{state}",
+  "mobile.agent.list.unread": { other: "未読メッセージ {count} 件" },
   "mobile.agent.list.waiting.title": "対応が必要",
   "mobile.agent.list.waiting.label": { other: "対応が必要なエージェント {count} 件" },
   "mobile.agent.list.waiting.action.question": "回答",

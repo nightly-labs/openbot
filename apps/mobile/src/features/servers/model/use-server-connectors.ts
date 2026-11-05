@@ -16,7 +16,7 @@ import { haptics } from "@/shared/lib/haptics";
 const POLL_MS = 3_000;
 
 /**
- * The connectors of one joined server, as Server settings › Connectors and each connector page show
+ * The connectors of one joined server, as the Marketplace apps and each connector page show
  * them. The pages use the same queries, so a change on one page shows on the others. Only the page
  * on screen reads them again.
  */
@@ -27,14 +27,16 @@ export function useServerConnectors(serverId: string, poll: MobileConnectorId | 
     canManageConnectors,
     canManageOnePasswordConnector,
     canManageBitwardenConnector,
+    canManageWhatsAppConnector,
     canManagePasswordManagers,
   } = useMobileWorkspace();
   const {
     githubConnector,
     loadOnePasswordConnector,
     loadBitwardenConnector,
-    loadPasswordManagers,
     loadMessagingConnections,
+    loadWhatsAppConnector,
+    loadPasswordManagers,
   } = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
   const focused = useIsFocused();
@@ -42,6 +44,7 @@ export function useServerConnectors(serverId: string, poll: MobileConnectorId | 
   const connectors = canManageConnectors(serverId);
   const onePasswordAvailable = canManageOnePasswordConnector(serverId);
   const bitwardenAvailable = canManageBitwardenConnector(serverId);
+  const whatsappAvailable = canManageWhatsAppConnector(serverId);
   const passwordManagersAvailable = canManagePasswordManagers(serverId);
   /** Only the connector that the page on screen shows is read again. */
   const refetchInterval = (id: MobileConnectorId): number | false =>
@@ -56,6 +59,14 @@ export function useServerConnectors(serverId: string, poll: MobileConnectorId | 
   const slack = useQuery(messaging("slack"));
   const discord = useQuery(messaging("discord"));
   const telegram = useQuery(messaging("telegram"));
+  /** A number changes on its own, and a link ends on the phone, so the page reads it again. */
+  const whatsapp = useQuery({
+    queryKey: queryKeys.serverConnector(queryScope, serverId, "whatsapp"),
+    enabled: whatsappAvailable,
+    retry: false,
+    refetchInterval: refetchInterval("whatsapp"),
+    queryFn: () => loadWhatsAppConnector(serverId),
+  });
   const github = useQuery({
     queryKey: queryKeys.serverConnector(queryScope, serverId, "github"),
     enabled: connectors,
@@ -97,8 +108,10 @@ export function useServerConnectors(serverId: string, poll: MobileConnectorId | 
     connectors,
     onePasswordAvailable,
     bitwardenAvailable,
+    whatsappAvailable,
     passwordManagersAvailable,
     messaging: { slack, discord, telegram },
+    whatsapp,
     github,
     onePassword,
     bitwarden,
@@ -154,5 +167,20 @@ export function useGitHubRepositories(serverId: string, connected: boolean) {
     enabled: connected,
     retry: false,
     queryFn: () => loadGitHubRepositories(serverId),
+  });
+}
+
+/**
+ * The groups of one linked WhatsApp number, to choose from. The host reads them from WhatsApp, so the
+ * list is read when the page opens, not on each poll.
+ */
+export function useWhatsAppGroups(serverId: string, workspaceId: string, enabled: boolean) {
+  const { loadWhatsAppGroups } = useMobileWorkspaceActions();
+  const queryScope = useQueryScope();
+  return useQuery({
+    queryKey: queryKeys.serverConnector(queryScope, serverId, `whatsapp-groups:${workspaceId}`),
+    enabled,
+    retry: false,
+    queryFn: () => loadWhatsAppGroups({ workspaceId }, serverId),
   });
 }

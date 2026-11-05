@@ -1,12 +1,14 @@
+import { itemTypeCountsAsUnread } from "@openbot/contracts/conversation-read";
 import type { RespondToPromptInput } from "@openbot/contracts/ipc";
-import { router } from "expo-router";
+import { router, useIsFocused } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { ChatChannelWorkRow } from "@/features/channels/components/chat-channel-work-row";
 import { useChannels } from "@/features/channels/components/use-channels";
 import { useAgentViewOnly } from "@/features/servers/model/use-server-roles";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
-import { useApprovalRequests } from "@/features/workspace/components/use-live-workspace";
+import { useAgentFirstUnreadMessageId, useApprovalRequests } from "@/features/workspace/components/use-live-workspace";
 import {
   type MobileAgent,
   useMobileWorkspaceReader,
@@ -14,9 +16,15 @@ import {
 } from "@/features/workspace/context/mobile-workspace-context";
 import { openTurnActivity } from "@/features/workspace/model/agent-activity";
 import { showsOnline } from "@/features/workspace/model/server-status";
-import { useText } from "@/shared/lib/text";
-import { chatRowIndex, latestReadableMessage, projectChatMessages, withFailureReasons } from "../model/chat-messages";
+import { currentText, useText } from "@/shared/lib/text";
+import {
+  chatRowIndex,
+  latestReadBoundaryMessage,
+  projectChatMessages,
+  withFailureReasons,
+} from "../model/chat-messages";
 import { requestComposerFocus, requestComposerText } from "../model/composer-requests";
+import { messageActionsOpen } from "../model/message-actions-sheet";
 import { useAgentMentionSkills } from "../model/use-agent-mention-skills";
 import { MAIN_THREAD_ID, useChatThreadMenu } from "./chat-thread-menu";
 import { ChatView } from "./chat-view";
@@ -46,6 +54,13 @@ export function MobileChatView({
   const loadLatestMessages = useMobileWorkspaceSelector((current) => current.loadLatestMessages);
   const loadOlderMessages = useMobileWorkspaceSelector((current) => current.loadOlderMessages);
   const markAgentRead = useMobileWorkspaceSelector((current) => current.markAgentRead);
+  const markAgentUnreadFrom = useMobileWorkspaceSelector((current) => current.markAgentUnreadFrom);
+  const canMarkUnreadFrom = useMobileWorkspaceSelector((current) => {
+    const item = current.servers.find((candidate) => candidate.id === agent.serverId);
+    return showsOnline(item) && current.canMarkUnreadFrom(agent.serverId);
+  });
+  const isFocused = useIsFocused();
+  const firstUnreadMessageId = useAgentFirstUnreadMessageId(agent.id);
   const respondToPrompt = useCallback(
     (agentId: string, input: RespondToPromptInput) => workspace().respondToPrompt(agentId, input),
     [workspace],
@@ -194,11 +209,77 @@ export function MobileChatView({
     () => ({ messages: conversation?.messages ?? [], activeTurnId: conversation?.activeTurnId ?? null }),
     [conversation?.messages, conversation?.activeTurnId],
   );
-  const latest = latestReadableMessage(conversation?.messages ?? []);
+  const latest = latestReadBoundaryMessage(conversation?.messages ?? []);
   const latestId = latest?.id;
+  // After Mark unread, the open chat does not read itself again until the reader leaves it, as on
+  // desktop. A message sheet covers the chat but does not leave it, so its focus loss keeps the hold.
+  // The sheet that marks it is open when the hold starts, so the hold waits until the chat is on
+  // screen again.
+  const readHeldFor = useRef<{ agentId: string; shown: boolean } | null>(null);
+  // The NEW line of this visit, as on desktop. The open chat reads itself at once, so the host read
+  // state loses its first unread message: the line keeps it. It takes the host's message until the
+  // chat reads itself, and again after the chat was covered, so it does not jump to a reply that
+  // the reader watches arrive.
+  const [unreadLine, setUnreadLine] = useState<{ agentId: string; messageId: string } | null>(() =>
+    firstUnreadMessageId ? { agentId: agent.id, messageId: firstUnreadMessageId } : null,
+  );
+  // The agent whose chat has read itself since it was last covered.
+  const unreadLineSettledFor = useRef<string | null>(null);
+  useEffect(() => {
+    const held = readHeldFor.current;
+    if (isFocused) {
+      if (held) held.shown = true;
+      return;
+    }
+    unreadLineSettledFor.current = null;
+    if (held?.shown && !messageActionsOpen()) readHeldFor.current = null;
+  }, [isFocused]);
+  useEffect(() => {
+    if (firstUnreadMessageId && unreadLineSettledFor.current !== agent.id)
+      setUnreadLine({ agentId: agent.id, messageId: firstUnreadMessageId });
+  }, [agent.id, firstUnreadMessageId]);
   const markRead = useCallback(() => {
-    if (latestId) markAgentRead(agent.id, latestId, agent.serverId);
+    if (!latestId || readHeldFor.current?.agentId === agent.id) return;
+    unreadLineSettledFor.current = agent.id;
+    markAgentRead(agent.id, latestId, agent.serverId);
   }, [agent.id, agent.serverId, latestId, markAgentRead]);
+  const markUnread = useCallback(
+    (messageId: string) => {
+      const agentId = agent.id;
+      readHeldFor.current = { agentId, shown: false };
+      setUnreadLine({ agentId, messageId });
+      markAgentUnreadFrom(agentId, messageId, agent.serverId).catch((error: unknown) => {
+        if (readHeldFor.current?.agentId === agentId) readHeldFor.current = null;
+        setUnreadLine((current) => (current?.messageId === messageId ? null : current));
+        const text = currentText();
+        showFailureAlert(
+          error,
+          "settings",
+          text.t("mobile.workspace.alert.markUnreadTitle"),
+          text.t("mobile.workspace.alert.markUnreadBody"),
+        );
+      });
+    },
+    [agent.id, agent.serverId, markAgentUnreadFrom],
+  );
+  // As on desktop, Mark unread is on the messages that the host counts as unread.
+  const markUnreadMessageIds = useMemo(
+    () =>
+      new Set(
+        (conversation?.messages ?? [])
+          .filter((message) => message.author !== "user" && itemTypeCountsAsUnread(message.itemType))
+          .map((message) => message.id),
+      ),
+    [conversation?.messages],
+  );
+  const unreadLineMessageId = unreadLine?.agentId === agent.id ? unreadLine.messageId : null;
+  // The line shows above the first of these messages that has a row.
+  const unreadLineMessageIds = useMemo(() => {
+    if (!unreadLineMessageId) return null;
+    const all = conversation?.messages ?? [];
+    const start = all.findIndex((message) => message.id === unreadLineMessageId);
+    return start < 0 ? null : new Set(all.slice(start).map((message) => message.id));
+  }, [unreadLineMessageId, conversation?.messages]);
   const activePrompt = messages.findLast(
     (message) =>
       message.kind === "question" &&
@@ -272,6 +353,9 @@ export function MobileChatView({
       onBranch={branching.branch}
       deleteMessage={messageDelete.deleteMessage}
       deletesAnyMessage={messageDelete.deletesAny}
+      markUnread={canMarkUnreadFrom ? markUnread : undefined}
+      markUnreadMessageIds={markUnreadMessageIds}
+      unreadLineMessageIds={unreadLineMessageIds}
       sendToChannel={sendToChannel}
       questionForm={questionForm}
       activityAccessory={activityAccessory}

@@ -169,10 +169,6 @@ export const messages = {
 
   "agentSettings.runtime.model": "Модель агента",
   "agentSettings.runtime.modelUnavailable": "Модели станут доступны после подключения CLI агента.",
-  "agentSettings.runtime.reasoning": "Рассуждение",
-  "agentSettings.runtime.reasoningLabel": "Уровень рассуждения агента",
-  "agentSettings.runtime.selectReasoning": "Выберите уровень рассуждения",
-  "agentSettings.runtime.reasoningSetByProvider": "Как в {provider}",
   "agentSettings.runtime.access": "Доступ",
   "agentSettings.runtime.accessLabel": "Доступ агента",
   "agentSettings.runtime.busyMessage": "Во время работы",

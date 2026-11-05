@@ -66,6 +66,7 @@ import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9
 import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
+import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 import { sourceText } from "@openbot/i18n/source";
 import {
   createRemoteAccountRefresh,
@@ -554,6 +555,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       for (const id of removedAgentIds) conversationStore.remove(id);
       liveState.update("unreadAgentIds", (current) => current.filter((id) => !removedAgentIds.has(id)));
       liveState.update("unreadCounts", (current) => withoutKeys(current, removedAgentIds));
+      liveState.update("firstUnreadMessageIds", (current) => withoutKeys(current, removedAgentIds));
       liveState.update("activityByServer", (current) => withoutKeys(current, serverIds));
       liveState.update("threadWaitsByServer", (current) => withoutKeys(current, serverIds));
       liveState.update("turnLinesByServer", (current) => withoutKeys(current, serverIds));
@@ -1062,18 +1064,19 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [request, conversationStore],
   );
 
-  const { applyConversationReads, refreshConversationReads, markAgentRead, markAllRead } = useConversationReads({
-    liveState,
-    readRefresh,
-    request,
-    loadConversation,
-    conversationStore,
-    loadGeneration,
-    removedServers,
-    capabilities: serverCapabilities.current,
-    activeServerId: activeServerIdRef,
-    agents: agentsRef,
-  });
+  const { applyConversationReads, refreshConversationReads, markAgentRead, markAgentUnreadFrom, markAllRead } =
+    useConversationReads({
+      liveState,
+      readRefresh,
+      request,
+      loadConversation,
+      conversationStore,
+      loadGeneration,
+      removedServers,
+      capabilities: serverCapabilities.current,
+      activeServerId: activeServerIdRef,
+      agents: agentsRef,
+    });
 
   const loadServer = useCallback(
     async (serverId: string, publicKey: string, client: RemoteTeamTransportRef, context: ServerLoadContext) => {
@@ -2110,6 +2113,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       markAgentUnread: (agentId) => {
         markAgentRead(agentId, null);
       },
+      markAgentUnreadFrom,
       hideChannel: (id, serverId) =>
         Boolean(updatePreferences(serverId, (current) => setChannelHidden(current, id, true))),
       unhideChannel: (id, serverId) =>
@@ -2206,6 +2210,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     loadLatestMessages,
     loadOlderMessages,
     markAgentRead,
+    markAgentUnreadFrom,
     markAllRead,
     updatePreferences,
     changeHostHidden,
@@ -2291,6 +2296,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       canManageConnectors: (serverId) => administers(serverId, CONNECTORS_CAPABILITY),
       canManageOnePasswordConnector: (serverId) => administers(serverId, ONEPASSWORD_CONNECTOR_CAPABILITY),
       canManageBitwardenConnector: (serverId) => administers(serverId, BITWARDEN_CONNECTOR_CAPABILITY),
+      canManageWhatsAppConnector: (serverId) => administers(serverId, WHATSAPP_CONNECTOR_CAPABILITY),
       canManagePasswordManagers: (serverId) => administers(serverId, PASSWORD_MANAGERS_CAPABILITY),
       canManageVault: (serverId) => administers(serverId, VAULT_CAPABILITY),
       canImportVault: (serverId) => administers(serverId, VAULT_IMPORT_CAPABILITY),
