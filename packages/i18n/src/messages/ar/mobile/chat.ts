@@ -82,6 +82,7 @@ export const messages = {
   "mobile.chat.question.answerForm": "نموذج الإجابة",
   "mobile.chat.question.answersSent": "تم إرسال الإجابات",
   "mobile.chat.question.autoAction": "{action} · {seconds} ث",
+  "mobile.chat.question.autoActionClock": "{action} · {time}",
   "mobile.chat.question.autoAnswered": "{outcome} (لم يُجب أحد في الوقت المحدد)",
   "mobile.chat.question.formCancelled": "تم إلغاء النموذج",
   "mobile.chat.question.formExpired": "انتهت صلاحية النموذج",
