@@ -98,6 +98,8 @@ interface PromptState {
   /** The typed answer of each question. */
   drafts: Record<string, string>;
   submitting: boolean;
+  /** The question that a screen reader announces when the page changes with no focus in the bubble. */
+  announced: string;
   /** The answers that this bubble sent, or the cancellation. */
   sent: AgentPromptResolution | null;
 }
@@ -110,6 +112,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     picks: {},
     drafts: {},
     submitting: false,
+    announced: "",
     sent: null,
   });
   const animateEntrance = untrack(() => !props.resolution);
@@ -167,8 +170,11 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     window.clearTimeout(holdTimer);
     const next = Math.max(0, Math.min(total(), step));
     const keepFocus = stage?.closest(".question-prompt-bubble")?.contains(document.activeElement) ?? false;
+    const question = props.questions[next];
     setState((draft) => {
       draft.step = next;
+      // Focus moves into the new page and reads it; an answer from the composer leaves focus there.
+      draft.announced = keepFocus || !question ? "" : markdownPlainText(question.question);
     });
     fitStage(next);
     if (!keepFocus) return;
@@ -254,6 +260,8 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
   }
 
   function type(question: AgentPromptQuestion, value: string): void {
+    // A typed answer stops the move that a pick started.
+    window.clearTimeout(holdTimer);
     setState((draft) => {
       draft.drafts[question.id] = value;
       // A typed answer replaces the pick of a single-select question.
@@ -300,6 +308,8 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     const target = event.target;
     if (target instanceof HTMLTextAreaElement) return;
     if (target instanceof HTMLInputElement && target.type !== "radio" && target.type !== "checkbox") return;
+    // A link in the question text keeps its own keys.
+    if (target instanceof Element && target.closest("a, button")) return;
     const options = question.options ?? [];
     if (event.key === "Enter") {
       event.preventDefault();
@@ -347,6 +357,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
         class="question-prompt-page"
         data-pos={position(pageProps.page)}
         inert={position(pageProps.page) !== "current"}
+        aria-hidden={position(pageProps.page) !== "current" ? "true" : undefined}
         aria-label={markdownPlainText(question().question)}
         onKeyDown={(event) => handleShortcut(event, question(), pageProps.page)}
       >
@@ -434,7 +445,12 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
 
   function Summary() {
     return (
-      <section class="question-prompt-page question-prompt-summary" data-pos={position(total())} inert={!resolved()}>
+      <section
+        class="question-prompt-page question-prompt-summary"
+        data-pos={position(total())}
+        inert={!resolved()}
+        aria-label={resolved() ? statusTitle() : undefined}
+      >
         <Show when={resolved()}>
           <Show
             when={resolution()?.status === "answered"}
@@ -445,7 +461,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
               </p>
             }
           >
-            <p class="question-prompt-sent" role="status">
+            <p class="question-prompt-sent sr-only" role="status">
               {statusTitle()}
             </p>
             <For each={props.questions}>
@@ -528,11 +544,19 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
                 <X aria-hidden="true" />
               </Questionnaire.Cancel>
             </Show>
+            <p class="question-prompt-announce sr-only" aria-live="polite">
+              {resolved() ? "" : state.announced}
+            </p>
             <div ref={stage} class="question-prompt-stage" tabindex="-1">
               <For each={props.questions}>{(question, page) => <QuestionPage question={question} page={page()} />}</For>
               <Summary />
             </div>
-            <div class="question-prompt-fold" data-open={resolved() ? "false" : "true"} inert={resolved()}>
+            <div
+              class="question-prompt-fold"
+              data-open={resolved() ? "false" : "true"}
+              inert={resolved()}
+              aria-hidden={resolved() ? "true" : undefined}
+            >
               <div class="question-prompt-fold-inner">
                 <footer class="question-prompt-footer">
                   <Show when={total() > 1}>

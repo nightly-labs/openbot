@@ -487,7 +487,8 @@
   display: flex;
   align-items: center;
   gap: var(--openbot-space-2);
-  padding: var(--openbot-space-3) var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-2);
+  padding-block: var(--openbot-space-3) var(--openbot-space-1);
+  padding-inline: var(--openbot-space-2) var(--openbot-space-1);
 }
 
 .question-prompt-progress.ui-questionnaire-progress {
@@ -537,7 +538,8 @@
   display: grid;
 }
 
-.question-prompt-sent {
+.question-prompt-sent,
+.question-prompt-announce {
   position: absolute;
   width: 1px;
   height: 1px;
