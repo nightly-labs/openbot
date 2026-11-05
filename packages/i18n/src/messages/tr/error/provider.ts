@@ -215,6 +215,8 @@ export const messages = {
     "Model sağlayıcısı kendi tarafında başarısız oldu. Bağlantınız bunun nedeni değildir. Daha sonra tekrar deneyin veya başka bir model seçin.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode model sağlayıcısına bağlanamadı. OpenBot'u çalıştıran bilgisayarın ağ bağlantısını kontrol edin, ardından tekrar deneyin.\n{detail}",
+  "error.provider.codexStateBusy":
+    "ChatGPT önceki bir başlatmadan sonra yerel geçmişini hâlâ hazırlıyor. Birkaç dakika bekleyin, sonra yeniden deneyin.",
   "error.provider.opencodeDatabaseNewer":
     "Daha yeni bir OpenCode sürümü veritabanını değiştirdiği için OpenCode veritabanını açamadı. OpenCode'u 2 veya daha yeni bir sürüme güncelleyin, sonra yeniden deneyin.",
   "error.provider.opencodeNoAnswer":
@@ -236,6 +238,8 @@ export const messages = {
   "error.provider.antigravityReleaseShape": "Gemini sürümü beklenmeyen bir yapıya sahip.",
   "error.provider.antigravityMissing": "Gemini indirilmedi. Devam etmek için OpenBot içinde indirin.",
   "error.provider.antigravityNotStarted": "Gemini sunucusu bulundu ancak sürümü okunamıyor.",
+  "error.provider.antigravityOverrideInvalid":
+    "OPENBOT_ANTIGRAVITY_PATH içindeki Gemini sunucusu yok veya çalıştırılabilir değil. Yolu düzeltin ya da değişkeni kaldırın, ardından OpenBot'u yeniden başlatın.",
   "error.provider.antigravityVersionUnreadable": "Gemini sunucu sürümü okunamıyor.",
   "error.provider.antigravitySignIn": "Gemini'yi kullanmak için Google ile oturum açın.",
   "error.provider.antigravityRateLimited":
@@ -271,6 +275,8 @@ export const messages = {
   "error.provider.kimiVersionUnreadable": "Kimi CLI sürümü okunamıyor.",
   "error.provider.kimiSignIn": "Kimi'yi kullanmak için Kimi Code ile oturum açın.",
   "error.provider.devinSignIn": "Devin'i kullanmak için Devin ile oturum açın.",
+  "error.provider.copilotSignIn":
+    "GitHub Copilot'ı kullanmak için GitHub ile oturum açın veya COPILOT_GITHUB_TOKEN ayarlayın.",
   "error.provider.hermesMissing": "Hermes Agent yüklü değil. Yükleyin ve yeniden deneyin.",
   "error.provider.hermesNotStarted":
     "Hermes Agent başlatılamadı. Bir terminalde `hermes --version` komutunu çalıştırın.",
@@ -293,6 +299,8 @@ export const messages = {
     "Gemini oturum açma sayfasını tarayıcınızda açamadı. Varsayılan tarayıcınızı kontrol edin, ardından yeniden bağlanın.",
   "error.provider.acpSignInFailed": "Oturum açma tamamlanmadı.",
   "error.provider.acpSignInFailedReason": "Oturum açma tamamlanmadı: {reason}",
+  "error.provider.acpSignOutFailed": "Oturum kapatma tamamlanmadı.",
+  "error.provider.acpSignOutFailedReason": "Oturum kapatma tamamlanmadı: {reason}",
   "error.provider.acpSignInMethodMissing":
     "Bu sağlayıcı bu bilgisayarda bu oturum açma yöntemini sunmuyor. Sağlayıcıyı güncelleyin, ardından tekrar deneyin.",
   "error.provider.httpsSignInLinkOnly": "Tarayıcıda yalnızca HTTPS oturum açma bağlantıları açılabilir.",
@@ -419,6 +427,8 @@ export const messages = {
   "error.provider.registryPrerequisite": "Bu ajanı kurmadan önce ana makineye {tool} yükleyin.",
   "error.provider.registryBindingChanged": "Özel ajan kurulum sırasında değişti. Tekrar deneyin.",
   "error.provider.registryInstallFailed": "Ajan kurulumu başarısız oldu. Önceki kurulum değişmedi.",
+  "error.provider.hermesInstallFailed": "Hermes Agent kurulmadı. Yeniden deneyin veya kurulum kılavuzunu kullanın.",
+  "error.provider.hermesNeedsGitCurl": "Hermes Agent için git ve curl gerekir. Bunları kurun, sonra yeniden deneyin.",
   "error.provider.registryRemoveBusy":
     "Kaldırmadan önce ajan kurulumunun ve etkin ACP çalışmasının bitmesini bekleyin.",
 } as const satisfies PartialTranslation<typeof source>;

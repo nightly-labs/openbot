@@ -4,6 +4,7 @@
 // No JSX here, for the same reason `content-collection.ts` holds none.
 
 import type { LandingIconName } from "../components/landing/LandingIcon";
+import type { PageSocialImage } from "./site-metadata";
 
 export const TEAMS_ROUTE = "/teams";
 
@@ -15,6 +16,11 @@ export const TEAMS_PAGE_META = {
   description:
     "Run OpenBot on managed infrastructure or let us design a custom deployment around your team, workflows and existing systems.",
 } as const;
+
+export const TEAMS_SOCIAL_IMAGE: PageSocialImage = {
+  path: "/social/teams.jpg",
+  alt: "Big plans. Better together. Two OpenBot agents joined by a paper bridge",
+};
 
 export const TEAMS_HERO = {
   heading: "Bring a team of AI coworkers into your company",

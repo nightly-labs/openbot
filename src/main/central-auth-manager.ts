@@ -6,6 +6,7 @@ import { companySignInErrorKey } from "@openbot/contracts/company-sign-in";
 import type { HostKeyHandover } from "@openbot/contracts/host-key-handover";
 import { parseHostedServerClaim } from "@openbot/contracts/hosted-servers";
 import type {
+  AvatarColor,
   AvatarImageInput,
   CentralAuthIssue,
   CentralAuthState,
@@ -92,6 +93,8 @@ interface CentralAuthManagerOptions {
   encrypt: (value: string) => Buffer;
   decrypt: (value: Buffer) => string;
   canPersist?: () => boolean;
+  /** True when the Linux keyring failed in this process and a key file of OpenBot now keeps the secrets. */
+  keyringChanged?: () => boolean;
   fetch?: AuthFetcher;
   startupRetryWindowMs?: number;
   startupRequestTimeoutMs?: number;
@@ -210,6 +213,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       ...options,
       mobileConnectApiUrl: options.mobileConnectApiUrl ?? options.apiUrl,
       canPersist: options.canPersist ?? (() => true),
+      keyringChanged: options.keyringChanged ?? (() => false),
       fetch: fetcher,
       startupRetryWindowMs: options.startupRetryWindowMs ?? STARTUP_RETRY_WINDOW_MS,
       startupRequestTimeoutMs: options.startupRequestTimeoutMs ?? STARTUP_REQUEST_TIMEOUT_MS,
@@ -288,7 +292,8 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         resolved.name === state.user.name &&
         resolved.email === state.user.email &&
         resolved.avatarUrl === state.user.avatarUrl &&
-        resolved.analyticsEnabled === state.user.analyticsEnabled
+        resolved.analyticsEnabled === state.user.analyticsEnabled &&
+        resolved.chatColor === state.user.chatColor
       )
         return this.getState();
       return this.#setState({ status: "signed_in", user: resolved });
@@ -1425,6 +1430,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     this: CentralAuthManager,
   ): Effect.fn.Return<CentralAuthState, CentralAuthOperationError, CentralAuthTransport> {
     this.#setState({ status: "loading" });
+    let keyringChanged = false;
     // A session that cannot be read now stays on disk: a Keychain that is locked or asks for
     // permission at startup can open it at the next start, and the next sign-in replaces it.
     if (this.#options.canPersist()) {
@@ -1441,7 +1447,10 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         const error = attempt4.failure.cause;
         if (!isMissingFileError(error)) {
           this.#forgetSession();
-          logger.warn("The stored account session could not be restored.", storedSessionFailure(stage, error));
+          const failure = storedSessionFailure(stage, error);
+          logger.warn("The stored account session could not be restored.", failure);
+          // The Linux keyring lost its key, so the sign-in screen tells why it shows again.
+          keyringChanged = failure.stage === "decrypt" && this.#options.keyringChanged();
         }
       }
     } else {
@@ -1449,7 +1458,9 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     }
     if (!this.#sessionToken) {
       yield* this.#startupRequestEffect("/health/live", { method: "GET" }, decodeRecordHealth);
-      return this.#setState({ status: "signed_out" });
+      return this.#setState(
+        keyringChanged ? { status: "signed_out", reason: "keyring_changed" } : { status: "signed_out" },
+      );
     }
     const sessionToken = this.#sessionToken;
     return yield* Effect.gen({ self: this }, function* () {
@@ -2032,6 +2043,46 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       return this.#setState({
         status: "signed_in",
         user: { ...this.#state.user, analyticsEnabled: user.analyticsEnabled ?? null },
+      });
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /**
+   * Saves the chat color of the user on the account. Members of each server of the user see it. An
+   * account service from before chat colors has no such route and answers 404.
+   */
+  readonly updateChatColor = Effect.fn("CentralAuth.updateChatColor")(
+    function* (
+      this: CentralAuthManager,
+      chatColor: AvatarColor | null,
+    ): Effect.fn.Return<CentralAuthState, CentralAuthOperationError, CentralAuthTransport> {
+      const sessionToken = this.#sessionToken;
+      if (!sessionToken)
+        return yield* new CentralAuthOperationError({
+          cause: new AuthApiError(401, "unauthorized", sourceText("error.auth.signInRequired")),
+        });
+      const user = yield* this.#authorizedRequestEffect(
+        "/v1/me/chat-color",
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chatColor }),
+        },
+        decodeCentralAuthUser,
+      ).pipe(
+        Effect.mapError((error) =>
+          error.cause instanceof AuthApiError && error.cause.status === 404
+            ? new CentralAuthOperationError({
+                cause: new AuthApiError(404, "chat_color_unavailable", sourceText("error.auth.chatColorUnavailable")),
+              })
+            : error,
+        ),
+      );
+      if (this.#sessionToken !== sessionToken || this.#state.status !== "signed_in") return this.getState();
+      return this.#setState({
+        status: "signed_in",
+        user: { ...this.#state.user, chatColor: user.chatColor ?? null },
       });
     },
     (operation) => this.#owned(operation),

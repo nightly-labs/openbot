@@ -196,9 +196,67 @@
   opacity: 1;
 }
 
+/* A channel shows an agent's actions beside the bubble, in the same line. They go under the bubble
+   only when the line has no room, so only a long answer keeps space for them. */
+.message-entry-actions-beside .message-shell {
+  flex-wrap: wrap;
+  row-gap: var(--openbot-space-1);
+}
+
+/* The face stays at the end of the bubble when the actions go under it. */
+/* Each row scopes its anchor name, so an engine with no anchor-scope keeps the face in the flow. */
+@supports (position-anchor: --message-bubble) and (anchor-scope: --message-bubble) {
+  .message-entry-actions-beside {
+    anchor-scope: --message-bubble;
+  }
+
+  .message-entry-actions-beside .message-shell .ui-bubble {
+    anchor-name: --message-bubble;
+  }
+
+  .message-entry-actions-beside .message-author-avatar {
+    position: absolute;
+    bottom: anchor(--message-bubble bottom);
+    left: 0;
+  }
+}
+
+/* The steps of the turn: a quiet summary at the end of the action row, shown with the actions. */
+.message-steps {
+  min-width: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--openbot-duration-hover) ease;
+}
+
+.message-steps > .agent-steps {
+  margin-bottom: 0;
+}
+
+/* The general steps row rules load later, so these name the steps block too. */
+.message-steps .agent-steps .agent-steps-header {
+  margin-inline-start: 0;
+  padding-block: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.message-steps .agent-steps-summary {
+  font-weight: var(--openbot-weight-regular);
+}
+
+.message-entry:hover .message-steps,
+.message-entry:focus-within .message-steps,
+.message-entry:has(.message-actions-open) .message-steps {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 @media (hover: none), (pointer: coarse) {
   .message-actions,
-  .message-time {
+  .message-time,
+  .message-steps {
     opacity: 1;
     pointer-events: auto;
   }
@@ -223,6 +281,18 @@
     var(--message-author-color, var(--openbot-accent)) 22%,
     var(--openbot-bg-surface-raised)
   );
+}
+
+/*
+ * A chat color tints the bubble: the reader's own, an agent's, or another person's. The author sets
+ * it in Settings or in the agent settings, and everyone in the chat sees the same tint.
+ */
+.message-entry-agent .ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content {
+  background: color-mix(in srgb, var(--message-chat-color) 22%, var(--openbot-bg-surface));
+}
+
+.message-entry-user .ui-bubble.message-bubble-colored > .ui-bubble-content {
+  background: color-mix(in srgb, var(--message-chat-color) 22%, var(--openbot-bg-surface-raised));
 }
 
 .message-action-button {

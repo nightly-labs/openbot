@@ -29,6 +29,9 @@ export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSn
       pi: decodeProviderRuntimeStatus(providers.pi),
       muse: decodeProviderRuntimeStatus(providers.muse),
       devin: decodeProviderRuntimeStatus(providers.devin),
+      copilot: decodeProviderRuntimeStatus(providers.copilot),
+      // Main sends a Hermes status only where it can run the Hermes installer.
+      ...(providers.hermes === undefined ? {} : { hermes: decodeProviderRuntimeStatus(providers.hermes) }),
     },
     toolRuntimes: { bun: decodeProviderRuntimeStatus(toolRuntimes.bun) },
   };

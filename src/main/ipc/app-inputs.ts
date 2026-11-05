@@ -4,6 +4,7 @@ import type {
   AgentMemoryLimitPreference,
   AgentProviderId,
   AppBehaviorPreferenceChange,
+  AvatarColor,
   BrowserDockAction,
   BrowserDockFrame,
   BrowserDockPresentation,
@@ -29,6 +30,7 @@ import type {
   PublishHostedSiteInput,
   RemoteNetworkRoutePreference,
   RemoteSessionReusePreference,
+  RendererTimingReport,
   ReplaceHostedSiteInput,
   SaveSetupInput,
   SetAnalyticsPreferenceInput,
@@ -56,6 +58,7 @@ import {
   isAppLanguage,
   isAppLogoColor,
   isAppThemePaletteId,
+  isAvatarColor,
   isBrowserDockAction,
   isBrowserDockFrame,
   isBrowserDockPresentation,
@@ -68,6 +71,7 @@ import {
   isRemoteNetworkRoute,
   isSkillCategory,
   MAC_AUTOMATION_TARGETS,
+  RENDERER_TIMING_LIMITS,
 } from "@openbot/contracts/ipc";
 import {
   type DynamicRecord,
@@ -101,6 +105,27 @@ export function parseAnalyticsPreference(input: unknown): SetAnalyticsPreference
   if (!isDynamicRecord(input) || !isBoolean(input.enabled)) throw new Error("Analytics preference is required.");
   if (input.chosen !== undefined && !isBoolean(input.chosen)) throw new Error("Analytics choice is not valid.");
   return { enabled: input.enabled, ...(input.chosen ? { chosen: true } : {}) };
+}
+
+function isCount(value: unknown, max: number): value is number {
+  return isNumber(value) && Number.isSafeInteger(value) && value >= 0 && value <= max;
+}
+
+/** Counts and delays only. Each value has a bound, so one window cannot fill the daily summary. */
+export function parseRendererTimingReport(input: unknown): RendererTimingReport {
+  if (!isDynamicRecord(input)) throw new Error("Renderer timing is required.");
+  const { workspaceReady, longTasks, inputs, inputDelaysMs } = input;
+  if (workspaceReady !== undefined && workspaceReady !== true) throw new Error("Workspace ready is not valid.");
+  if (!isCount(longTasks, RENDERER_TIMING_LIMITS.longTasks) || !isCount(inputs, RENDERER_TIMING_LIMITS.inputs))
+    throw new Error("Renderer timing is not valid.");
+  if (
+    !Array.isArray(inputDelaysMs) ||
+    inputDelaysMs.length > Math.min(RENDERER_TIMING_LIMITS.inputDelays, inputs) ||
+    !inputDelaysMs.every((delay) => isCount(delay, RENDERER_TIMING_LIMITS.inputDelayMs))
+  ) {
+    throw new Error("Input delays are not valid.");
+  }
+  return { ...(workspaceReady ? { workspaceReady } : {}), longTasks, inputs, inputDelaysMs: [...inputDelaysMs] };
 }
 
 export function parseBusyMessageModePreference(input: unknown): BusyMessageModePreference {
@@ -320,6 +345,13 @@ export function parseProfileName(input: unknown): string {
     throw new Error(`name must contain ${INPUT_LIMITS.profileNameMin} to ${INPUT_LIMITS.profileName} safe characters.`);
   }
   return validation.name;
+}
+
+/** The chat color of the account: a lower-case `#rrggbb`, or null for no chat color. */
+export function parseChatColor(input: unknown): AvatarColor | null {
+  if (input === null) return null;
+  if (!isAvatarColor(input)) throw new Error("chatColor must be null or a lower-case #rrggbb color.");
+  return input;
 }
 
 // The two marketplaces share query fields and validate their category filters at the boundary.

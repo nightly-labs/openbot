@@ -27,7 +27,7 @@ import type { ServerAuditLog } from "./ipc-server-audit";
 // change on one side is a type error on the other. The types are phantom members: they exist only
 // for the checker, and the runtime value is still `{ kind, channel }`.
 
-import type { AgentProviderRef, ManagedProviderId } from "./agent-providers";
+import type { AgentProviderRef, DownloadableProviderId, ManagedProviderId } from "./agent-providers";
 import type { AppAppearancePreference, SetAppAppearancePreferenceInput } from "./app-appearance";
 import type { AppInterfaceSizePreference, SetAppInterfaceSizePreferenceInput } from "./app-interface-size";
 import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app-language";
@@ -70,7 +70,7 @@ import type {
   BrowseAgentFoldersInput,
   ChooseAgentFolderInput,
 } from "./ipc-agent-folders";
-import type { ClientAgentModelOption } from "./ipc-agent-identity";
+import type { AvatarColor, ClientAgentModelOption } from "./ipc-agent-identity";
 import type {
   AgentImportPreview,
   AgentImportResult,
@@ -168,6 +168,7 @@ import type {
   MacAutomationTarget,
   MacPermissionId,
   ProviderRuntimeSnapshot,
+  RendererTimingReport,
   SaveSetupInput,
   SetAnalyticsPreferenceInput,
   SetCompanySignInEnabledInput,
@@ -543,6 +544,10 @@ import type {
   SpeechModelStatus,
   SpeechSettings,
   VoiceApiKeyInput,
+  VoiceLiveEvent,
+  VoiceLiveSession,
+  VoiceLiveStart,
+  VoiceLiveStop,
   VoiceModelRequest,
   VoiceModelStatus,
   VoiceServerConnection,
@@ -690,6 +695,8 @@ export const IPC_ENDPOINTS = {
     // Main follows the account's answer from another device, so it tells the window.
     analyticsPreference: event<AnalyticsPreference>()("app:analytics-preference"),
     setAnalyticsPreference: request<SetAnalyticsPreferenceInput, AnalyticsPreference>()("app:set-analytics-preference"),
+    // Host analytics only: `system_startup` and the renderer part of `system_resources`.
+    reportRendererTiming: request<RendererTimingReport, void>()("app:report-renderer-timing"),
     getApprovalAutomation: request<undefined, ApprovalAutomationPreference>()("app:get-approval-automation"),
     // A remote owner or admin can change a grant from a phone or the web client, so main tells the
     // window instead of the window only reading the value at start.
@@ -849,8 +856,8 @@ export const IPC_ENDPOINTS = {
   },
   providerRuntimes: {
     getStatus: request<undefined, ProviderRuntimeSnapshot>()("provider-runtimes:get-status"),
-    download: request<ManagedProviderId, ProviderRuntimeSnapshot>()("provider-runtimes:download"),
-    cancel: request<ManagedProviderId, ProviderRuntimeSnapshot>()("provider-runtimes:cancel"),
+    download: request<DownloadableProviderId, ProviderRuntimeSnapshot>()("provider-runtimes:download"),
+    cancel: request<DownloadableProviderId, ProviderRuntimeSnapshot>()("provider-runtimes:cancel"),
     /** What `removeDownload` frees now: nothing while the provider is on. */
     measureDownload: request<ManagedProviderId, ProviderRuntimeDownload>()("provider-runtimes:measure-download"),
     /** Removes the downloaded CLI of a provider that is off. Rejects while it is on or downloading. */
@@ -920,6 +927,14 @@ export const IPC_ENDPOINTS = {
     probeServer: request<VoiceServerConnection, VoiceServerProbe>()("voice:probe-server"),
     setServer: request<VoiceServerSave, VoiceServerSettings | null>()("voice:set-server"),
     serverSettings: event<VoiceServerSettings | null>()("voice:server-settings"),
+    /**
+     * Starts Codex live voice in the chat of a Codex agent on this computer. Answers the WebRTC answer
+     * when OpenAI accepted the offer. A new session ends the one before it.
+     */
+    startLive: request<VoiceLiveStart, VoiceLiveSession>()("voice:start-live"),
+    /** Ends a live voice session. It does nothing when the session ended already. */
+    stopLive: request<VoiceLiveStop, void>()("voice:stop-live"),
+    liveEvent: event<VoiceLiveEvent>()("voice:live-event"),
   },
   dynamicIsland: {
     getPreference: request<undefined, DynamicIslandPreference>()("dynamic-island:get-preference"),
@@ -1100,10 +1115,10 @@ export const IPC_ENDPOINTS = {
     setApiKey: scopedRequest<SetProviderApiKeyInput, AgentStatus, "required">()("provider-admin:set-api-key"),
     clearApiKey: scopedRequest<AgentProviderId, AgentStatus, "required">()("provider-admin:clear-api-key"),
     getRuntimes: scopedQuery<ProviderRuntimeSnapshot, "required">()("provider-admin:get-runtimes"),
-    downloadRuntime: scopedRequest<ManagedProviderId, ProviderRuntimeSnapshot, "required">()(
+    downloadRuntime: scopedRequest<DownloadableProviderId, ProviderRuntimeSnapshot, "required">()(
       "provider-admin:download-runtime",
     ),
-    cancelRuntime: scopedRequest<ManagedProviderId, ProviderRuntimeSnapshot, "required">()(
+    cancelRuntime: scopedRequest<DownloadableProviderId, ProviderRuntimeSnapshot, "required">()(
       "provider-admin:cancel-runtime",
     ),
     checkRuntimeUpdates: scopedQuery<ProviderRuntimeSnapshot, "required">()("provider-admin:check-runtime-updates"),
@@ -1436,6 +1451,7 @@ export const IPC_ENDPOINTS = {
     verifyEmailCode: request<VerifyEmailCodeInput, CentralAuthState>()("auth:verify-email-code"),
     updateName: request<string, CentralAuthState>()("auth:update-name"),
     updateAvatar: request<AvatarImageInput | null, CentralAuthState>()("auth:update-avatar"),
+    updateChatColor: request<AvatarColor | null, CentralAuthState>()("auth:update-chat-color"),
     createMobileConnect: request<undefined, MobileConnectTicket>()("auth:create-mobile-connect"),
     cancelMobileConnect: request<undefined, void>()("auth:cancel-mobile-connect"),
     getMobileConnectLink: request<undefined, MobileConnectLink | null>()("auth:get-mobile-connect-link"),
@@ -1583,7 +1599,8 @@ export const IPC_ENDPOINTS = {
     // A joined server takes these through `agent-threads-v1`.
     renameTask: scopedRequest<RenameAgentTaskInput, void>()("agent:tasks:rename"),
     deleteTask: scopedRequest<AgentTaskInput, void>()("agent:tasks:delete"),
-    // A joined server takes this through `agent-thread-reads-v1`.
+    // A joined server takes these through `agent-thread-reads-v1`.
+    listTaskReads: scopedRequest<string, AgentTaskReadState[]>()("agent:tasks:reads"),
     markTaskRead: scopedRequest<MarkAgentTaskReadInput, AgentTaskReadState>()("agent:tasks:mark-read"),
     acknowledgeFailedTurn: scopedRequest<AcknowledgeFailedTurnInput, void>()("agent:acknowledge-failed-turn"),
     cancelQueuedMessage: scopedRequest<CancelQueuedMessageInput, void>()("agent:cancel-queued-message"),

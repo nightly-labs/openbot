@@ -250,6 +250,8 @@ export interface MockOpenBotOptions
   tasks?: Record<string, AgentTask[]>;
   /** The conversation of each task, keyed by task id. */
   taskConversations?: Record<string, ConversationSnapshot>;
+  /** The agent messages of each task that the user has not read, keyed by task id. A task without one is read. */
+  taskUnread?: Record<string, number>;
   updateStatus?: UpdateStatus;
   memories?: Record<string, AgentMemory[]>;
   tables?: SharedTable[];
@@ -842,6 +844,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const taskConversations = new Map<string, ConversationSnapshot>(
     Object.entries(clone(options.taskConversations ?? {})),
   );
+  const taskUnread = new Map<string, number>(Object.entries(options.taskUnread ?? {}));
   /** The branch of each `branchTask` request id, so a retry returns the same branch. */
   const branches = new Map<string, AgentTask>();
 
@@ -1152,6 +1155,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       return clone(analyticsPreference);
     },
     onAnalyticsPreference: () => () => undefined,
+    reportRendererTiming: async () => undefined,
     getApprovalAutomation: async () => clone(approvalAutomation),
     onApprovalAutomation: (listener) => {
       approvalAutomationListeners.add(listener);
@@ -2436,6 +2440,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           allowAutomation,
           allowNewChat,
           quickAcknowledgement,
+          chatColor,
           ...updates
         } = input;
         const updated: ClientAgentSummary = { ...current, ...updates };
@@ -2455,6 +2460,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         else if (busyMessageMode) updated.busyMessageMode = busyMessageMode;
         if (taskLimit === null) delete updated.taskLimit;
         else if (taskLimit) updated.taskLimit = taskLimit;
+        if (chatColor === null) delete updated.chatColor;
+        else if (chatColor) updated.chatColor = chatColor;
         agents = agents.map((agent) => (agent.id === updated.id ? updated : agent));
         emitAgentEvent({ type: "agents-changed", agents });
         emitTasks(updated.id);
@@ -3064,8 +3071,18 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         taskConversations.delete(input.taskId);
         emitTasks(input.agentId);
       },
+      listTaskReads: async (agentId) =>
+        (tasks.get(agentId) ?? [])
+          .filter((task) => task.state !== "closed")
+          .map((task) => ({
+            taskId: task.id,
+            unreadCount: taskUnread.get(task.id) ?? 0,
+            firstUnreadMessageId: null,
+            throughMessageId: null,
+          })),
       markTaskRead: async (input) => {
         findTask(input.agentId, input.taskId);
+        taskUnread.delete(input.taskId);
         return {
           taskId: input.taskId,
           unreadCount: 0,

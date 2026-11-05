@@ -17,6 +17,7 @@ export const messages = {
   "status.agent.channelRoutineCreated": "{agent} creó la rutina {routine}. {person} lo pidió.",
   "status.agent.channelRoutineUpdated": "{agent} cambió la rutina {routine}. {person} lo pidió.",
   "status.agent.channelRoutineDeleted": "{agent} eliminó la rutina {routine}. {person} lo pidió.",
+  "status.agent.channelTaskCancelled": "{agent} canceló la tarea «{task}» y sus subtareas. {person} lo pidió.",
   "status.agent.screenCaptureScreen": "Capturar la pantalla principal y enviar la imagen al modelo del agente.",
   "status.agent.screenCaptureChannel":
     "La imagen aparece en el canal {channel}, y cada miembro de este servidor que lee el canal puede verla.",
@@ -24,6 +25,8 @@ export const messages = {
   "status.agent.screenCaptureWindow": "Capturar la ventana {name} y enviar la imagen al modelo del agente.",
   "status.agent.screenCaptureRegion":
     "Capturar el área de la pantalla en {x}, {y}, de {width} × {height} puntos, y enviar la imagen al modelo del agente.",
+  "status.agent.workflowDelete":
+    "Eliminar el flujo de trabajo {title} con sus ejecuciones y versiones. Sus pasos abiertos se detienen.",
   "status.agent.screenCaptureProgress": "Pidiendo permiso para capturar la pantalla…",
   "status.agent.screenCaptureReviewing": "Revisando la captura de pantalla…",
   "status.agent.browserOpening": "Abriendo una página web…",

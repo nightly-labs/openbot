@@ -49,6 +49,7 @@ import { StoredStateFailure, storedIO, storedSync, toStoredStateFailure } from "
 export type { ExportedAttachmentFile, GeneratedAttachmentSource } from "./attachment-files";
 
 import { isEmptyStoredFile, parseStoredJson } from "./atomic-json-file";
+import { routineNameInLimit } from "./database/legacy-conversation-message";
 import { mailboxReactionRowKey } from "./database/mailbox-projection";
 import { MailboxDeliveryGate } from "./mailbox-delivery-gate";
 import { OpenBotDatabase } from "./openbot-database";
@@ -588,7 +589,7 @@ export class MailboxStore {
         ...(input.taskId ? { taskId: input.taskId } : {}),
         ...(input.senderTaskId ? { senderTaskId: input.senderTaskId } : {}),
         id: messageId,
-        sender: input.sender,
+        sender: storedSender(input.sender),
         ...(input.sender.kind === "user" && input.senderMember ? { senderMember: input.senderMember } : {}),
         text: rewriteAttachmentReferences(text, (reference) => {
           const attachment = committedByDraftId.get(reference.attachmentId);
@@ -3201,12 +3202,26 @@ function toCurrentMailboxMessage(value: unknown): DynamicRecord | null {
   // mailbox from loading.
   return {
     ...message,
-    sender: toCurrentMailboxActor(value.sender),
+    sender: withRoutineNameInLimit(toCurrentMailboxActor(value.sender)),
     ...(isConversationMessageSender(senderMember) ? { senderMember } : {}),
     // Released builds kept an agent's `replyToMessageId: ""`, which refers to no message, and every
     // conversation that showed the message then failed to read.
     ...(message.replyToMessageId === "" ? { replyToMessageId: null } : {}),
   };
+}
+
+/**
+ * A workflow handoff uses the workflow title as its routine name, and a title can be longer than the
+ * routine name that every reader accepts. A longer name made each read of the message fail.
+ */
+function storedSender(sender: StoredMessage["sender"]): StoredMessage["sender"] {
+  return sender.kind === "routine" ? { ...sender, routineName: routineNameInLimit(sender.routineName) } : sender;
+}
+
+function withRoutineNameInLimit(sender: DynamicRecord | null): DynamicRecord | null {
+  return sender?.kind === "routine" && isString(sender.routineName)
+    ? { ...sender, routineName: routineNameInLimit(sender.routineName) }
+    : sender;
 }
 
 function toCurrentMailboxReaction(value: unknown): DynamicRecord | null {

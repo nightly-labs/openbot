@@ -1,7 +1,17 @@
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { Button, ChevronLeft, ChevronRight, Dialog, Spinner, X } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
-import { createMemo, createSignal, createStore, For, onCleanup, onSettled, Show, untrack } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  createStore,
+  For,
+  onCleanup,
+  onSettled,
+  Show,
+  untrack,
+} from "solid-js";
 import { useText } from "../../text";
 import { CloseIcon, DownloadIcon } from "./ConversationIcons";
 import { justifiedGalleryLayout } from "./image-gallery-layout";
@@ -18,6 +28,7 @@ import {
   ZOOM_OUT,
   ZOOM_OUT_DURATION,
 } from "./lightbox-motion";
+import { createSteadyImageUrl } from "./steady-image-url";
 import { type Camera, DOUBLE_CLICK_ZOOM, MAX_SCALE, WHEEL_ZOOM_RATE, ZOOM_STEP, ZoomControls } from "./ZoomControls";
 
 /** The images that the viewer steps through, the one it opens on, and the thumbnail it grows from. */
@@ -57,14 +68,15 @@ export function ImageGallery(props: {
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
 }) {
   const { t } = useText();
-  const [ratios, setRatios] = createStore<Record<string, number>>({});
+  // By position: a sent message's images get new ids and URLs when the host stores them, and each
+  // tile keeps its size and pixels until the stored copy loads.
+  const [ratios, setRatios] = createStore<Record<number, number>>({});
   const [missing, setMissing] = createStore<Record<string, boolean>>({});
-  const [loaded, setLoaded] = createStore<Record<string, boolean>>({});
   const [width, setWidth] = createSignal(0);
   let gallery: HTMLUListElement | undefined;
   const layout = createMemo(() =>
     justifiedGalleryLayout(
-      props.images.map((image) => ratios[image.id] ?? 1),
+      props.images.map((_, index) => ratios[index] ?? 1),
       {
         width: width(),
         rowHeight: GALLERY_ROW_HEIGHT,
@@ -92,12 +104,29 @@ export function ImageGallery(props: {
       aria-label={t("chat.image.gallery", { count: props.images.length })}
       style={{ height: `${layout().height}px` }}
     >
-      <For each={props.images}>
+      <For each={props.images} keyed={false}>
         {(image, index) => {
-          const box = () => layout().boxes[index()];
-          // Keyed by URL: a new URL for the same attachment gets a new try.
-          const key = () => image.previewUrl ?? image.id;
+          const box = () => layout().boxes[index];
+          // Once the tile draws an image, a new URL draws over it when it loads, with no spinner.
+          const [loaded, setLoaded] = createSignal(false);
+          const url = createSteadyImageUrl(() => image().previewUrl);
+          // Keyed by the drawn URL: a new URL for the same attachment gets a new try.
+          const key = () => url() ?? image().id;
           const isMissing = () => missing[key()] === true;
+          let element: HTMLImageElement | undefined;
+          const measure = ({ naturalHeight, naturalWidth }: HTMLImageElement) => {
+            setLoaded(true);
+            if (naturalWidth <= 0 || naturalHeight <= 0) return;
+            const ratio = Math.min(GALLERY_MAX_RATIO, Math.max(GALLERY_MIN_RATIO, naturalWidth / naturalHeight));
+            setRatios((state) => {
+              state[index] = ratio;
+            });
+          };
+          // An image in the memory cache, such as one the composer showed, is complete at once. Its
+          // `load` comes frames later, and the tile would be square until then.
+          createEffect(url, () => {
+            if (element?.complete && element.naturalWidth > 0) measure(element);
+          });
           return (
             <li
               class="image-gallery-item"
@@ -112,46 +141,36 @@ export function ImageGallery(props: {
                 variant="ghost"
                 type="button"
                 class={["image-gallery-tile", { "image-gallery-tile-missing": isMissing() }]}
-                data-attachment-id={image.id}
+                data-attachment-id={image().id}
                 disabled={isMissing() && !props.onDownload}
                 data-cuelume-tap={isMissing() ? undefined : "open"}
                 aria-label={
                   !isMissing()
-                    ? t("chat.image.preview", { name: image.name })
+                    ? t("chat.image.preview", { name: image().name })
                     : props.onDownload
-                      ? t("chat.image.download", { name: image.name })
+                      ? t("chat.image.download", { name: image().name })
                       : t("chat.image.unavailable")
                 }
                 onClick={(event) => {
-                  if (!isMissing()) props.onOpen(image, event.currentTarget);
-                  else props.onDownload?.(image);
+                  if (!isMissing()) props.onOpen(image(), event.currentTarget);
+                  else props.onDownload?.(image());
                 }}
               >
                 <Show when={!isMissing()} fallback={props.onDownload ? <DownloadIcon /> : <X aria-hidden="true" />}>
-                  <Show when={!loaded[key()]}>
+                  <Show when={!loaded()}>
                     <span class="image-gallery-tile-loading">
                       <Spinner />
                     </span>
                   </Show>
                   <img
-                    src={image.previewUrl ?? ""}
+                    src={url() ?? ""}
                     alt=""
                     decoding="async"
                     draggable={false}
-                    onLoad={(event) => {
-                      setLoaded((state) => {
-                        state[key()] = true;
-                      });
-                      const { naturalHeight, naturalWidth } = event.currentTarget;
-                      if (naturalWidth <= 0 || naturalHeight <= 0) return;
-                      const ratio = Math.min(
-                        GALLERY_MAX_RATIO,
-                        Math.max(GALLERY_MIN_RATIO, naturalWidth / naturalHeight),
-                      );
-                      setRatios((state) => {
-                        state[image.id] = ratio;
-                      });
+                    ref={(node) => {
+                      element = node;
                     }}
+                    onLoad={(event) => measure(event.currentTarget)}
                     onError={() =>
                       setMissing((state) => {
                         state[key()] = true;

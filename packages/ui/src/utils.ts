@@ -26,12 +26,15 @@ export function truncateMiddle(value: string, maxLength: number): string {
   return `${value.slice(0, startLength)}…${value.slice(-endLength)}`;
 }
 
+/** The media query for "the user asked for less animation". Listen to it for a live change. */
+export const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
 /**
  * Whether the user asked for less animation. Import this instead of redeclaring it; several
  * modules once held their own copy under different names. `matchMedia` is optional for jsdom.
  */
 export function prefersReducedMotion(): boolean {
-  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  return window.matchMedia?.(REDUCED_MOTION_QUERY).matches ?? false;
 }
 
 /** Whether the pointer is coarse and hoverless (touch screen). Kept beside `prefersReducedMotion`. */

@@ -291,6 +291,11 @@ export function BoardProvider(props: { board: WfnBoard; children: JSX.Element })
 export interface BoardOptions {
   /** The agents, models, places and files that the nodes offer. The host reads them. */
   catalogs: () => WorkflowCatalogs;
+  /**
+   * While the canvas plays an agent's change: `unbuilt` for a connection that does not show yet, and
+   * `arrived` for one that just showed.
+   */
+  buildState?: (edgeId: string) => "unbuilt" | "arrived" | undefined;
   selected?: string | undefined;
   edges?: readonly WfnEdge[] | undefined;
   /** The world scale. The canvas zooms; the gallery does not. */
@@ -1218,6 +1223,7 @@ export function createBoard(options: BoardOptions) {
                       state.removing === edge.id || isDoomed(edge.from) || isDoomed(edge.to) ? "" : undefined
                     }
                     data-motion={motion ? "" : undefined}
+                    data-build={options.buildState?.(edge.id)}
                   >
                     <path class="wfn-edge-line" d={line().path} />
                     <Show when={tone(edge) === "run"}>
@@ -1297,6 +1303,7 @@ export function createBoard(options: BoardOptions) {
                   <span
                     class="wfn-edge-label"
                     data-branch={edge.branch}
+                    data-build={options.buildState?.(edge.id)}
                     aria-hidden="true"
                     style={{ left: `${spot().x}px`, top: `${spot().y}px` }}
                   >

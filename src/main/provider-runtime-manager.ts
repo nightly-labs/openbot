@@ -25,6 +25,7 @@ import {
   type AgentProviderRef,
   agentProviderDescriptor,
   type CustomProviderHarness,
+  type InstallerProviderId,
   isKeyOnlyProvider,
   isManagedToolRuntime,
   KEY_ONLY_PROVIDERS,
@@ -56,6 +57,7 @@ import { runCauseEffect } from "../backend/effect-boundary";
 import { sha256File } from "../backend/file-hash";
 import { type McpToolRuntimes, NO_MCP_TOOL_RUNTIMES } from "../backend/mcp-provider-shapes";
 import { measureTree } from "../backend/storage-usage";
+import type { HermesInstaller } from "./hermes-installer";
 import { isSafeLinkTarget } from "./provider-runtime-archive";
 import {
   type ArchiveDigest,
@@ -187,6 +189,11 @@ export interface ProviderRuntimeManagerOptions {
   availableDiskBytes?: () => Promise<number>;
   /** How long a commit waits for a stage that another program holds open. Tests shorten it. */
   heldStageWaitMs?: number;
+  /**
+   * Installs Hermes, which has no release archive, with its own installer. Its status joins the
+   * snapshot, and `download` and `cancel` of `hermes` go to it. Without it, Hermes has no status.
+   */
+  hermesInstaller?: HermesInstaller;
   /** The waits, in turn, of one move whose source another program holds open. Tests shorten them. */
   heldSourceWaitsMs?: readonly number[];
   /**
@@ -230,6 +237,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   readonly #availableDiskBytes: () => Promise<number>;
   readonly #heldStageWaitMs: number;
   readonly #heldSourceWaitsMs: readonly number[];
+  readonly #hermesInstaller: HermesInstaller | null;
   readonly #statuses: Record<ManagedRuntimeId, ProviderRuntimeStatus>;
   readonly #controllers = new Map<ManagedRuntimeId, AbortController>();
   readonly #tasks = new Map<ManagedRuntimeId, Fiber.Fiber<void, ProviderRuntimeFailure>>();
@@ -289,6 +297,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       });
     this.#heldStageWaitMs = options.heldStageWaitMs ?? HELD_STAGE_WAIT_MS;
     this.#heldSourceWaitsMs = options.heldSourceWaitsMs ?? HELD_SOURCE_WAITS_MS;
+    this.#hermesInstaller = options.hermesInstaller ?? null;
+    this.#hermesInstaller?.on("status", () => {
+      this.#revision += 1;
+      this.emit("status", this.getStatus());
+    });
     const unsupportedMessage = this.#target ? null : "This platform is not supported.";
     this.#statuses = {
       codex: emptyStatus(unsupportedMessage),
@@ -302,6 +315,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       pi: emptyStatus(unsupportedMessage),
       muse: emptyStatus(unsupportedMessage),
       devin: emptyStatus(unsupportedMessage),
+      copilot: emptyStatus(unsupportedMessage),
       bun: emptyStatus(unsupportedMessage),
     };
   }
@@ -336,7 +350,12 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
           offer && !configuredCliPath(provider) && !automatic && this.#isProviderOn(provider) ? version : null;
       }
     }
-    return { revision: this.#revision, providers, toolRuntimes: { bun } };
+    const hermes = this.#hermesInstaller?.status();
+    return {
+      revision: this.#revision,
+      providers: hermes ? { ...providers, hermes } : providers,
+      toolRuntimes: { bun },
+    };
   }
   checkForUpdates(): Effect.Effect<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
@@ -707,8 +726,18 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     const bin = dirname(executable);
     return { binDirectories: [bin], commandAliases: { npx: join(bin, bunxExecutableName(this.#target)) } };
   }
-  download(runtime: ManagedRuntimeId): Effect.Effect<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
+  download(
+    runtime: ManagedRuntimeId | InstallerProviderId,
+  ): Effect.Effect<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
+      if (runtime === "hermes") {
+        if (!this.#hermesInstaller)
+          return yield* new ProviderRuntimeFailure({
+            cause: new Error(sourceText("error.provider.runtimesUnsupported")),
+          });
+        yield* this.#hermesInstaller.install();
+        return this.getStatus();
+      }
       if (!this.#target)
         return yield* new ProviderRuntimeFailure({
           cause: new Error(sourceText("error.provider.runtimesUnsupported")),
@@ -873,8 +902,14 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       ),
     );
   }
-  cancel(runtime: ManagedRuntimeId): Effect.Effect<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
+  cancel(
+    runtime: ManagedRuntimeId | InstallerProviderId,
+  ): Effect.Effect<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
+      if (runtime === "hermes") {
+        if (this.#hermesInstaller) yield* this.#hermesInstaller.cancel();
+        return this.getStatus();
+      }
       if (this.#statuses[runtime].phase !== "downloading") return this.getStatus();
       const task = this.#tasks.get(runtime);
       const spec = this.#transfers.get(runtime);
@@ -893,6 +928,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       if (this.#checkTimer) clearInterval(this.#checkTimer);
       this.#checkTimer = null;
       for (const controller of this.#controllers.values()) controller.abort();
+      if (this.#hermesInstaller) yield* this.#hermesInstaller.stop();
       yield* Effect.forEach(this.#tasks.values(), Fiber.await, { concurrency: "unbounded", discard: true });
       yield* Effect.forEach(this.#removals.values(), Fiber.await, { concurrency: "unbounded", discard: true });
       yield* Scope.close(this.#scope, Exit.void);

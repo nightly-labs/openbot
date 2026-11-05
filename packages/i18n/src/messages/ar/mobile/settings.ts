@@ -83,7 +83,7 @@ export const messages = {
   "mobile.settings.animations.all": "الحركات",
   "mobile.settings.animations.agentFaces": "وجوه الوكلاء المتحركة",
   "mobile.settings.animations.agentFacesFooter":
-    "تحرّك الصور الرمزية للوكلاء وجوهها أثناء عمل الوكلاء وراحتهم. عند إيقاف هذا، تبقى الوجوه ثابتة.",
+    "تحرّك الصور الرمزية للوكلاء وجوهها أثناء عمل الوكلاء وراحتهم. عند إيقاف هذا، تبقى الوجوه ثابتة، وتتوقف الشخصيات في شاشة الترحيب والشاشة الرئيسية الفارغة عن الطفو.",
   "mobile.settings.animations.composerResize": "حقل رسالة مضغوط",
   "mobile.settings.animations.composerResizeFooter":
     "يصبح حقل الرسالة شريطًا صغيرًا عندما تكون لوحة المفاتيح مغلقة. عند إيقاف هذا، يبقى الحقل بحجمه الكامل.",

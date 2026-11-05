@@ -72,7 +72,8 @@ export const messages = {
     "关闭“动画”可减少整个应用的动态效果。当手机设置中开启“减弱动态效果”时，应用也会减少动效，下面的动画选项将保持关闭。",
   "mobile.settings.animations.all": "动画",
   "mobile.settings.animations.agentFaces": "助手表情动画",
-  "mobile.settings.animations.agentFacesFooter": "助手工作时和休息时，头像上的表情会动。关闭该选项后表情保持静止。",
+  "mobile.settings.animations.agentFacesFooter":
+    "助手工作时和休息时，头像上的表情会动。关闭该选项后表情保持静止，欢迎页和空白主页上的角色也不再漂浮。",
   "mobile.settings.animations.composerResize": "紧凑输入框",
   "mobile.settings.animations.composerResizeFooter":
     "键盘收起时输入框变成一条小工具栏。关闭该选项后输入框保持完整高度。",

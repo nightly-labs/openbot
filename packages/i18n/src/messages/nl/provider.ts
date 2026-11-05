@@ -114,6 +114,8 @@ export const messages = {
   "provider.picker.noModels": "{name} heeft geen modellen beschikbaar.",
   "provider.picker.customEmpty":
     "Voeg een OpenAI-compatibel endpoint toe: een modelserver op deze computer, of een dienst met een basis-URL en een sleutel.",
+  "provider.picker.customPending":
+    "De modellen van je endpoints zijn nog niet geladen. De aanbieder leest ze nadat zijn huidige taak stopt.",
   "provider.picker.defaultModelLabel": "{name}, standaard",
   "provider.picker.usageLimit": "Gebruikslimiet bereikt",
   "provider.picker.usageLimitWindow": "Limiet ({window})",
@@ -284,6 +286,11 @@ export const messages = {
   "provider.settings.turnOnFirst": "Zet eerst {name} aan.",
   "provider.settings.makeDefault": "Als standaard",
   "provider.settings.useTitle": "{name} gebruiken",
+  "provider.settings.deleteTitle": "{name} verwijderen",
+  "provider.settings.deleteOn":
+    "Zet {name} uit en verwijdert de CLI die OpenBot heeft gedownload. Accounts, aanmeldingen en agents blijven.",
+  "provider.settings.deleteOff":
+    "Verwijdert de CLI die OpenBot voor {name} heeft gedownload ({size}). Accounts, aanmeldingen en agents blijven.",
   "provider.settings.endpoints": "Endpoints",
   "provider.settings.noEndpoints": "Geen endpoints.",
   "provider.settings.endpointModels": { one: "{url} · 1 model", other: "{url} · {count} modellen" },

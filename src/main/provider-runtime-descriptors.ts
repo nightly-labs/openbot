@@ -241,6 +241,7 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
   pi: nativeProviderRuntime("pi"),
   muse: nativeProviderRuntime("muse"),
   devin: nativeProviderRuntime("devin"),
+  copilot: nativeProviderRuntime("copilot"),
   codex: {
     runtime: "codex",
     spec: (target, lock) => {

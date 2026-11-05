@@ -12,6 +12,7 @@ import {
   type SupportedAvatarSilhouetteId,
 } from "../../bloub-avatar";
 import type { AgentProfile } from "../../data";
+import { documentSoftwareRendering } from "../../document-rendering";
 
 // Cap avatar animation at 30fps: uncapped bloub clocks measured 30% renderer / 24% GPU
 // for two visible avatars. The shape is 24-40px, so the eye cannot see the difference.
@@ -212,7 +213,10 @@ function GeneratedAvatar(props: {
 }) {
   let element: HTMLSpanElement | undefined;
   const [interacting, setInteracting] = createSignal(false);
-  const [reducedMotion, setReducedMotion] = createSignal(prefersReducedMotion());
+  const [prefersReduced, setPrefersReduced] = createSignal(prefersReducedMotion());
+  // On the CPU, six moving avatars took a third of a core. A window drawn there shows the still
+  // avatars of reduced motion, which run no animation loop.
+  const reducedMotion = () => prefersReduced() || documentSoftwareRendering();
   const cyclesFaces = () => props.workingFaces && props.mood === "working";
   const [workingFace, setWorkingFace] = createSignal<ExpressionId>(nextWorkingFace(null));
   const plushMood = createMemo(
@@ -292,7 +296,7 @@ function GeneratedAvatar(props: {
 
   onSettled(() => {
     const media = window.matchMedia?.("(prefers-reduced-motion: reduce)");
-    const syncReducedMotion = () => setReducedMotion(media?.matches ?? false);
+    const syncReducedMotion = () => setPrefersReduced(media?.matches ?? false);
     syncReducedMotion();
     media?.addEventListener?.("change", syncReducedMotion);
 

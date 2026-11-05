@@ -64,6 +64,8 @@ export const messages = {
   "account.login.unavailableDescription": "OpenBot kan de accountdienst nu niet bereiken.",
   "account.login.signInDescription":
     "Gebruik je e-mailadres om in te loggen of een account te maken. We sturen je een eenmalige code.",
+  "account.login.keyringChangedDescription":
+    "De sleutelhanger van het systeem is je laatste aanmelding kwijt. OpenBot bewaart aanmeldingen nu in een eigen bestand op deze computer. Log nog één keer in.",
   "account.login.codeAccepted": "Je code is geaccepteerd.",
   "account.login.codeSent": "We hebben een code gestuurd naar {email}.",
   "account.login.connectingSecurely": "Veilig verbinden…",

@@ -20,6 +20,7 @@ import { isDeepStrictEqual } from "node:util";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_PROVIDERS,
+  type AgentEvent,
   type AgentModelId,
   type AgentModelOption,
   type AgentProviderId,
@@ -90,6 +91,7 @@ import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
+import { CHAT_COLORS_CAPABILITY, CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import {
   CONTEXT_COMPACT_CAPABILITY,
   CONTEXT_COMPACT_ROUTES,
@@ -397,6 +399,8 @@ const NO_STATUS: AgentStatus = {
 
 let hidden: HiddenAgentsSnapshot = { agents: [{ agentId: "agent-pi", hiddenAt: new Date(0).toISOString() }] };
 
+// The host's agent event listener. Only a chat colour change (`chat-colors-v1`) sends an event in this run.
+const agentEventListeners = new Set<(event: AgentEvent) => void>();
 // The roles of this host. Empty roles give every member `manage`, as a host without roles does; the
 // message delete checks set "everyone" to a lower level for one agent.
 let accessLevels: AgentAccessState = { revision: 0, everyone: {}, roles: [] };
@@ -409,8 +413,12 @@ const agentAccess: TeamApiAgentAccess = {
 };
 
 const fakeAgents: TeamApiAgents = {
-  on: () => undefined,
-  off: () => undefined,
+  on: (_event, listener) => {
+    agentEventListeners.add(listener);
+  },
+  off: (_event, listener) => {
+    agentEventListeners.delete(listener);
+  },
   preferredProvider: () => "claude",
   newAgentProvider: () => "claude",
   getStatus: () => {
@@ -501,14 +509,19 @@ const fakeAgents: TeamApiAgents = {
   committedAgentDuplication: unused("committedAgentDuplication"),
   duplicateAgent: unused("duplicateAgent"),
   commitAgentDuplication: unused("commitAgentDuplication"),
-  // Only an exact colour (`agent-colors-v1`) reaches this writer in this run.
+  // Only an exact colour (`agent-colors-v1`) or a chat colour (`chat-colors-v1`) reaches this writer in
+  // this run. A chat colour change sends `agents-changed`, as the agent service does.
   updateAgent: (input) =>
     Effect.sync(() => {
-      record("updateAgentColor", input);
+      record(input.chatColor === undefined ? "updateAgentColor" : "updateAgentChatColor", input);
       const target = agents.find((item) => item.id === input.agentId);
       if (!target) throw new Error("Agent not found.");
       if (input.avatarColor === null) delete target.avatarColor;
       else if (input.avatarColor !== undefined) target.avatarColor = input.avatarColor;
+      if (input.chatColor === null) delete target.chatColor;
+      else if (input.chatColor !== undefined) target.chatColor = input.chatColor;
+      if (input.chatColor !== undefined)
+        for (const listener of agentEventListeners) listener({ type: "agents-changed", agents });
       return target;
     }),
   getMemorySelection: unused("getMemorySelection"),
@@ -1752,61 +1765,28 @@ try {
     // Each frozen list is the released vocabulary of its protocol. Protocol 8 and later hide none.
     const hiddenBy = (protocol: number) =>
       AGENT_PROVIDERS.filter((provider) => isPeerHiddenProvider(provider, protocol));
-    const expectedHidden: Record<number, readonly string[]> = {
-      1: [
-        "opencode",
-        "antigravity",
-        "acp",
-        "cursor",
-        "cline",
-        "pi",
-        "muse",
-        "inception",
-        "deepseek",
-        "openrouter",
-        "kimi",
-        "devin",
-        "hermes",
-      ],
-      3: [
-        "opencode",
-        "antigravity",
-        "acp",
-        "cursor",
-        "cline",
-        "pi",
-        "muse",
-        "inception",
-        "deepseek",
-        "openrouter",
-        "kimi",
-        "devin",
-        "hermes",
-      ],
-      4: [
-        "antigravity",
-        "acp",
-        "cursor",
-        "cline",
-        "pi",
-        "muse",
-        "inception",
-        "deepseek",
-        "openrouter",
-        "kimi",
-        "devin",
-        "hermes",
-      ],
-      5: ["cursor", "cline", "pi", "muse", "inception", "deepseek", "openrouter", "kimi", "devin", "hermes"],
-      6: ["pi", "muse", "inception", "deepseek", "openrouter", "kimi", "devin", "hermes"],
-      7: ["inception", "deepseek", "openrouter", "kimi", "devin", "hermes"],
-      8: [],
-      9: [],
+    // The released vocabulary of each protocol, written out again here so that a change to the host
+    // copy fails this check. A provider added later is hidden below protocol 8 with no edit here.
+    const known1 = ["codex", "claude", "grok"];
+    const known4 = [...known1, "opencode"];
+    const known5 = [...known4, "antigravity", "acp"];
+    const known6 = [...known5, "cursor", "cline"];
+    const known7 = [...known6, "pi", "muse"];
+    const known: Record<number, readonly string[] | null> = {
+      1: known1,
+      2: known1,
+      3: known1,
+      4: known4,
+      5: known5,
+      6: known6,
+      7: known7,
+      8: null,
+      9: null,
     };
-    const hiddenRows = Object.entries(expectedHidden).map(([protocol, expected]) => ({
+    const hiddenRows = Object.entries(known).map(([protocol, names]) => ({
       protocol: Number(protocol),
       hidden: hiddenBy(Number(protocol)),
-      expected: AGENT_PROVIDERS.filter((provider) => expected.includes(provider)),
+      expected: names === null ? [] : AGENT_PROVIDERS.filter((provider) => !names.includes(provider)),
     }));
     check(
       "the frozen provider lists hide each provider that a protocol below 8 does not know, and protocol 8 hides none",
@@ -2519,6 +2499,167 @@ try {
         isDeepStrictEqual(removed.body, { agents: [] }) &&
         isDeepStrictEqual(callsOf("updateAgentColor").at(-1), [{ agentId: "agent-pi", avatarColor: null }]),
       summary(removed),
+    );
+  }
+
+  // ---- Agent chat colours (chat-colors-v1) ----
+  {
+    const chatCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, CHAT_COLORS_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises chat-colors-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(CHAT_COLORS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(CHAT_COLORS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const writes = callsOf("updateAgentChatColor").length;
+    const unsupportedRead = await call("POST", CHAT_COLORS_ROUTES.read, { token: bobToken, json: {} });
+    const unsupportedSet = await call("POST", CHAT_COLORS_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", color: "#a1b2c3" },
+    });
+    check(
+      "the chat colour routes without the capability get 400 chatColorsUnsupported, and nothing is written",
+      errorIs(unsupportedRead, 400, sourceText("error.team.chatColorsUnsupported")) &&
+        errorIs(unsupportedSet, 400, sourceText("error.team.chatColorsUnsupported")) &&
+        callsOf("updateAgentChatColor").length === writes,
+      [summary(unsupportedRead), summary(unsupportedSet)],
+    );
+    const empty = await call("POST", CHAT_COLORS_ROUTES.read, {
+      token: bobToken,
+      json: {},
+      capabilities: chatCapabilities,
+    });
+    check(
+      "a member reads empty lists when no agent and no member has a chat colour",
+      empty.status === 200 && isDeepStrictEqual(empty.body, { agents: [], members: [] }),
+      summary(empty),
+    );
+    const upperCase = await call("POST", CHAT_COLORS_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-ada", color: "#A1B2C3" },
+      capabilities: chatCapabilities,
+    });
+    const extraField = await call("POST", CHAT_COLORS_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-ada", color: "#a1b2c3", avatarColor: "#a1b2c3" },
+      capabilities: chatCapabilities,
+    });
+    const notShown = await call("POST", CHAT_COLORS_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-pi", color: "#a1b2c3" },
+      capabilities: chatCapabilities,
+      protocol: 6,
+    });
+    check(
+      "a chat colour that is not lower-case #rrggbb, an unknown field, or an agent that the protocol does not show is refused, and nothing is written",
+      upperCase.status === 400 &&
+        extraField.status === 400 &&
+        errorIs(notShown, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("updateAgentChatColor").length === writes,
+      [summary(upperCase), summary(extraField), summary(notShown)],
+    );
+    const set = await call("POST", CHAT_COLORS_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-pi", color: "#a1b2c3" },
+      capabilities: chatCapabilities,
+    });
+    const readBack = await call("POST", CHAT_COLORS_ROUTES.read, {
+      token: adaToken,
+      json: {},
+      capabilities: chatCapabilities,
+    });
+    const readV6 = await call("POST", CHAT_COLORS_ROUTES.read, {
+      token: adaToken,
+      json: {},
+      capabilities: chatCapabilities,
+      protocol: 6,
+    });
+    const expected = { agents: [{ agentId: "agent-pi", color: "#a1b2c3" }], members: [] };
+    check(
+      "a member with manage access sets a chat colour through the agent writer, the avatar colour does not change, and the read leaves out an agent that the protocol does not show",
+      set.status === 200 &&
+        isDeepStrictEqual(set.body, expected) &&
+        isDeepStrictEqual(readBack.body, expected) &&
+        isDeepStrictEqual(callsOf("updateAgentChatColor").at(-1), [{ agentId: "agent-pi", chatColor: "#a1b2c3" }]) &&
+        agents.find((item) => item.id === "agent-pi")?.avatarColor === undefined &&
+        readV6.status === 200 &&
+        isDeepStrictEqual(readV6.body, { agents: [], members: [] }),
+      [summary(set), summary(readBack), summary(readV6)],
+    );
+    const removed = await call("POST", CHAT_COLORS_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-pi", color: null },
+      capabilities: chatCapabilities,
+    });
+    check(
+      "a null chat colour removes the chat colour",
+      removed.status === 200 &&
+        isDeepStrictEqual(removed.body, { agents: [], members: [] }) &&
+        isDeepStrictEqual(callsOf("updateAgentChatColor").at(-1), [{ agentId: "agent-pi", chatColor: null }]),
+      summary(removed),
+    );
+
+    // The host sends the whole list when a socket declares the capability, and again after each change.
+    const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+      TEAM_PROTOCOL_V1_WEBSOCKET,
+      `openbot-token.${bobToken}`,
+    ]);
+    const events: unknown[] = [];
+    const waiters = new Set<() => void>();
+    socket.addEventListener("message", (message) => {
+      const value = JSON.parse(String(message.data));
+      if (isDynamicRecord(value) && value.type === "chat-colors-changed") {
+        events.push(value);
+        for (const wake of waiters) wake();
+      }
+    });
+    await new Promise<void>((resolveOpen, reject) => {
+      socket.addEventListener("open", () => resolveOpen(), { once: true });
+      socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+    });
+    /** Whether the socket has `count` chat colour events before the deadline. */
+    const received = (count: number) =>
+      new Promise<boolean>((resolveReceived) => {
+        if (events.length >= count) return resolveReceived(true);
+        const timer = setTimeout(() => {
+          waiters.delete(wake);
+          resolveReceived(false);
+        }, 5_000);
+        const wake = () => {
+          if (events.length < count) return;
+          clearTimeout(timer);
+          waiters.delete(wake);
+          resolveReceived(true);
+        };
+        waiters.add(wake);
+      });
+    socket.send(
+      JSON.stringify({ type: "agent-event-scope", includeConversations: false, capabilities: chatCapabilities }),
+    );
+    const declared = await received(1);
+    await call("POST", CHAT_COLORS_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-ada", color: "#0a0b0c" },
+      capabilities: chatCapabilities,
+    });
+    const changed = await received(2);
+    socket.close();
+    await call("POST", CHAT_COLORS_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-ada", color: null },
+      capabilities: chatCapabilities,
+    });
+    check(
+      "a socket gets the list when it declares chat-colors-v1, and the new list after a change",
+      declared &&
+        changed &&
+        isDeepStrictEqual(events.slice(0, 2), [
+          { type: "chat-colors-changed", agents: [], members: [] },
+          { type: "chat-colors-changed", agents: [{ agentId: "agent-ada", color: "#0a0b0c" }], members: [] },
+        ]),
+      events,
     );
   }
 

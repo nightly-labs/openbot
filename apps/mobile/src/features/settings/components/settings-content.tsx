@@ -1,7 +1,13 @@
 import { ListGroup, Typography } from "heroui-native";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import { Children, type PropsWithChildren, type ReactNode, useState } from "react";
-import { type LayoutChangeEvent, useWindowDimensions, View } from "react-native";
+import {
+  type AccessibilityActionEvent,
+  type AccessibilityActionInfo,
+  type LayoutChangeEvent,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { useCSSVariable } from "uniwind";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
@@ -83,6 +89,8 @@ export function SettingsRow({
   accessibilityLabel,
   checked,
   expanded,
+  accessibilityActions,
+  onAccessibilityAction,
 }: PropsWithChildren<{
   supportingText?: string;
   onPress?: () => void;
@@ -96,6 +104,12 @@ export function SettingsRow({
   checked?: boolean;
   /** For a row that shows or hides the rows below it. */
   expanded?: boolean;
+  /**
+   * For a control in `trailing` of a row with `onPress`: VoiceOver and TalkBack read the row as one
+   * element, so the control needs an action of the row too.
+   */
+  accessibilityActions?: AccessibilityActionInfo[];
+  onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
 }>) {
   const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
   const { fontScale } = useWindowDimensions();
@@ -146,6 +160,8 @@ export function SettingsRow({
       accessibilityRole={checked === undefined ? "button" : "radio"}
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled, checked, expanded }}
+      accessibilityActions={accessibilityActions}
+      onAccessibilityAction={onAccessibilityAction}
       disabled={disabled}
       onPress={() => {
         void haptics.impact("soft");

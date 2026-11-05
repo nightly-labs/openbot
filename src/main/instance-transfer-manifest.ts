@@ -66,6 +66,11 @@ const Agent = Schema.Struct({
    * format cannot refuse the agent.
    */
   avatarColor: Schema.optionalKey(Schema.String),
+  /**
+   * Added after version 1 shipped: the chat colour, `#rrggbb`. It is not the avatar colour. An older
+   * app ignores it. The import drops an invalid value, as for `avatarColor`.
+   */
+  chatColor: Schema.optionalKey(Schema.String),
   /** An archive path inside `agents/<key>/`, checked below. */
   avatar: Schema.NullOr(text(512)),
   provider: Provider,

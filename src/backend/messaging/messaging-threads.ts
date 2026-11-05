@@ -683,6 +683,9 @@ export class MessagingThreads {
       platform: connection?.platform ?? "slack",
       workspaceName: prompt.workspaceName ?? connection?.workspaceName ?? null,
       isDirect: link.isDirect,
+      // Only the "Message yourself" chat has the linked number as the author of a direct message:
+      // the owner's messages in other chats never reach OpenBot (`whatsapp-senders.ts`).
+      fromOwner: connection?.platform === "whatsapp" && link.isDirect && origin.authorId === connection.workspaceId,
       place: prompt.place,
       authorName: origin.authorName,
       authorId: origin.authorId,

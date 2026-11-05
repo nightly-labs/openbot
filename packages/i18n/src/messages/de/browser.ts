@@ -70,7 +70,6 @@ export const messages = {
   "browser.liveView.copyFailed": "Der Text konnte nicht kopiert werden. Klicke auf die Seite und versuche es erneut.",
   "browser.previews.label": "Browser-Vorschauen",
   "browser.previews.resize": "Größe des rechten Bereichs ändern",
-  "browser.previews.collapse": "Browser-Vorschauen einklappen",
   "browser.previews.empty": "Keine Browser-Tabs",
   "browser.previews.openPage": "Seite öffnen",
   "browser.preview.pageFallback": "Browserseite",

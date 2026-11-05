@@ -104,6 +104,7 @@ export const messages = {
   "chat.awaiting.needsYou": "{name}에게 확인이 필요해요",
   "chat.awaiting.limited": "{name}이(가) 사용 한도를 기다리는 중",
   "chat.awaiting.dismiss": "이 목록 숨기기",
+  "chat.awaiting.stop": "중지",
   "chat.waits.label": "진행 중인 대기",
   "chat.waits.title": { other: "진행 중인 대기 {count}건" },
   "chat.waits.active": "{state}: {note}",
@@ -419,4 +420,8 @@ export const messages = {
   "chat.compaction.failed": "컨텍스트를 압축할 수 없어요",
   "chat.compaction.tokens": "{before} → {after} 토큰",
   "chat.compaction.continues": "대기 중인 메시지는 계속 처리돼요.",
+  "chat.reference.kind.tab": "브라우저 탭",
+  "chat.reference.kind.thread": "스레드",
+  "chat.reference.open.tab": "브라우저 탭 {name} 표시",
+  "chat.reference.open.thread": "스레드 {name} 열기",
 } as const satisfies PartialTranslation<typeof source>;

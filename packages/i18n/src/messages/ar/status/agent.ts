@@ -16,6 +16,7 @@ export const messages = {
   "status.agent.channelRoutineCreated": "أنشأ {agent} المهمة الدورية {routine}. بطلب من {person}.",
   "status.agent.channelRoutineUpdated": "غيّر {agent} المهمة الدورية {routine}. بطلب من {person}.",
   "status.agent.channelRoutineDeleted": "حذف {agent} المهمة الدورية {routine}. بطلب من {person}.",
+  "status.agent.channelTaskCancelled": "ألغى {agent} المهمة «{task}» ومهامها الفرعية. بطلب من {person}.",
   "status.agent.screenCaptureScreen": "التقاط الشاشة الرئيسية وإرسال الصورة إلى نموذج الوكيل.",
   "status.agent.screenCaptureChannel":
     "تظهر الصورة في القناة {channel}، ويمكن لكل عضو في هذا الخادم يقرأ القناة رؤيتها.",
@@ -25,6 +26,7 @@ export const messages = {
     "التقاط منطقة الشاشة عند {x}، {y}، بحجم {width} × {height} نقطة وإرسال الصورة إلى نموذج الوكيل.",
   "status.agent.vaultCardFill":
     "تعبئة البطاقة المحفوظة {card} في {site}. بعد موافقتك، يمكن للوكلاء تعبئة هذه البطاقة في هذا الموقع دون موافقة. أزل الموقع من إعدادات الخادم > الخزنة.",
+  "status.agent.workflowDelete": "احذف سير العمل {title} مع عمليات تشغيله وإصداراته. تتوقف خطواته المفتوحة.",
   "status.agent.vaultCardFillFrames": "حقول البطاقة موجودة في إطارات من {origins}.",
   "status.agent.linkCardFill":
     "تعبئة بطاقة Link لمرة واحدة {card} في {site}. وافقت على هذا الدفع في Link لصالح {merchant}.",

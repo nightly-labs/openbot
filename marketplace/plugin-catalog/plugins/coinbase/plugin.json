@@ -1,0 +1,33 @@
+{
+  "slug": "coinbase",
+  "name": "Coinbase",
+  "tagline": "Crypto prices, portfolios and trading",
+  "description": "Coinbase lets agents read prices, balances, portfolios, orders and fees in Coinbase Advanced Trade, preview and place orders, convert between assets, and move funds between portfolios. Each user signs in to their own Coinbase account through the browser. Agents get the same permissions as the user. Orders and conversions use real funds, and agents can pay for x402 requests from the USDC balance.",
+  "category": "data-analytics",
+  "creatorName": "Coinbase",
+  "iconUrl": "https://www.coinbase.com/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-balances", "text": "What are my Coinbase balances in each portfolio?" },
+    { "id": "prompt-price", "text": "Show the BTC-USD price on Coinbase and how it moved this week." },
+    { "id": "prompt-preview-order", "text": "Preview a 50 USD market buy of ETH on Coinbase. Do not place the order." }
+  ],
+  "apps": [
+    {
+      "id": "app-coinbase-mcp",
+      "name": "Coinbase",
+      "description": "Prices, balances, portfolios, orders and conversions, over Coinbase's MCP server with browser sign-in.",
+      "iconUrl": "https://www.coinbase.com/apple-touch-icon.png",
+      "server": {
+        "name": "coinbase",
+        "transport": "http",
+        "url": "https://agents.coinbase.com/mcp",
+        "auth": [{ "id": "coinbase-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.coinbase.com",
+  "privacyPolicyUrl": "https://www.coinbase.com/legal/privacy",
+  "termsUrl": "https://www.coinbase.com/legal/user_agreement"
+}

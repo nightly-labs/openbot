@@ -4,8 +4,6 @@ import type { messages as source } from "../en/uiBlock";
 export const messages = {
   "uiBlock.status.pending": "需要你回答",
   "uiBlock.status.answered": "已回答",
-  "uiBlock.status.expired": "已过期",
-  "uiBlock.status.closed": "已关闭",
   "uiBlock.outcome.expired": "超时未回答",
   "uiBlock.outcome.closed": "未回答即关闭",
   "uiBlock.outcome.autoAnswered": "{outcome}（无人及时回答）",

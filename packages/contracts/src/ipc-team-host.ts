@@ -1,3 +1,4 @@
+import { type AvatarColor, isAvatarColor } from "./ipc-agent-identity";
 import type { AvatarImageInput } from "./ipc-agents";
 import type { IceServer } from "./signal-protocol/messages";
 import type { HostRestartEvent, HostRestartState } from "./team-protocol/host-update-v1";
@@ -192,6 +193,8 @@ export interface TeamMemberSummary {
   email: string | null;
   name: string | null;
   avatarUrl?: string | null;
+  /** The chat colour from the member's OpenBot account. Absent means no chat colour. Peers read it through `chat-colors-v1`. */
+  chatColor?: AvatarColor;
   role: TeamRole;
   createdAt: string;
   disabled: boolean;
@@ -366,6 +369,7 @@ function isTeamPresenceMember(value: unknown): value is TeamPresenceMember {
     (value.email === null || isLimitedString(value.email, INPUT_LIMITS.email)) &&
     (value.name === null || isLimitedString(value.name, INPUT_LIMITS.accountName)) &&
     (value.avatarUrl === undefined || value.avatarUrl === null || isHttpUrl(value.avatarUrl, INPUT_LIMITS.avatarUrl)) &&
+    (value.chatColor === undefined || isAvatarColor(value.chatColor)) &&
     (value.role === "owner" || value.role === "admin" || value.role === "member") &&
     isTimestamp(value.createdAt) &&
     isBoolean(value.disabled) &&

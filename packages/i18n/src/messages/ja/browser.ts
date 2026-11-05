@@ -68,7 +68,6 @@ export const messages = {
   "browser.liveView.copyFailed": "テキストをコピーできませんでした。ページをクリックしてもう一度お試しください。",
   "browser.previews.label": "ブラウザーのプレビュー",
   "browser.previews.resize": "右のパネルのサイズを変更",
-  "browser.previews.collapse": "ブラウザーのプレビューを折りたたむ",
   "browser.previews.empty": "ブラウザーのタブはありません",
   "browser.previews.openPage": "ページを開く",
   "browser.preview.pageFallback": "ブラウザーのページ",

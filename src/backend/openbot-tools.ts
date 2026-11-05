@@ -6,7 +6,7 @@ import {
   CHAT_VISUAL_TITLE_LIMIT,
 } from "@openbot/contracts/chat-visual";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { API_KEY_NAME_PATTERN, CONNECTOR_IDS } from "@openbot/contracts/ipc";
+import { API_KEY_NAME_PATTERN, CONNECTOR_IDS, VAULT_API_KEY_LIMIT, VAULT_NOTES_LIMIT } from "@openbot/contracts/ipc";
 import { isUiBlockId, UI_BLOCK_LIMITS } from "@openbot/contracts/ui-blocks";
 import { z } from "zod";
 import pluginCatalog from "../../resources/plugin-catalog/catalog.json";
@@ -55,6 +55,7 @@ import {
   webhookEventTypeZodSchema,
   webhookFiltersZodSchema,
 } from "./routine-tool-schema";
+import { WORKFLOW_TOOL_DEFINITIONS } from "./workflows/workflow-tools";
 
 interface OpenBotToolDefinition {
   name: string;
@@ -283,6 +284,16 @@ export const requestApiKeyToolSchema = z.strictObject({
 
 export const removeApiKeyToolSchema = z.strictObject({ name: apiKeyNameSchema });
 
+export const saveApiKeyToolSchema = z.strictObject({
+  name: apiKeyNameSchema,
+  key: z.string().trim().min(1).max(VAULT_API_KEY_LIMIT).describe("The value, as you got it."),
+  notes: z
+    .string()
+    .max(VAULT_NOTES_LIMIT)
+    .optional()
+    .describe("What the key is for. Never a secret. Omit it to keep the saved notes."),
+});
+
 export const sendToChannelToolSchema = z.strictObject({
   channelId: z.string().min(1).max(INPUT_LIMITS.identifier),
   text: z.string().trim().min(1).max(INPUT_LIMITS.messageText),
@@ -304,6 +315,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   ...DATA_TOOL_DEFINITIONS,
   ...LOCAL_SKILL_TOOL_DEFINITIONS,
   ...ROUTINE_FLOW_TOOL_DEFINITIONS,
+  ...WORKFLOW_TOOL_DEFINITIONS,
   ...MCP_SERVER_TOOL_DEFINITIONS,
   {
     name: "list_sites",
@@ -475,7 +487,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "create_routine",
     description:
-      "Create a scheduled routine for this agent, or for another local agent when agentId is provided. It is active by default. Without a timezone, it uses the timezone of the person whose message this turn answers, or the server timezone when that is unknown. Interval, advanced-every, and custom schedules must not run more often than every 3 minutes. For a one-time reminder or task, use a once schedule: it runs one time and then pauses the routine. When watching a folder for new files and no interval was requested, use a 15 minute interval and keep the folder path plus handling instructions in the routine instruction.",
+      "Create a scheduled routine, one agent's instruction, for this agent or for another local agent when agentId is provided. For several steps in one graph, use edit_workflow. It is active by default. Without a timezone, it uses the timezone of the person whose message this turn answers, or the server timezone when that is unknown. Interval, advanced-every, and custom schedules must not run more often than every 3 minutes. For a one-time reminder or task, use a once schedule: it runs one time and then pauses the routine.",
     shape: {
       agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
       name: z.string().min(1).max(INPUT_LIMITS.routineName),
@@ -573,7 +585,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: AWAIT_EVENT_TOOL,
     description:
-      "Open a wait when you cannot finish the current request in this turn because you wait for something outside it: a build, a deploy, a later check. OpenBot shows the wait to the user until you close it. The next run of one of your routines wakes the wait, or a local script event that names its waitId. The run that wakes it repeats the request and your note. Give routineId to let only that routine wake it. After this call, tell the user what you wait for and end your turn.",
+      "Open a wait when the current request waits for something outside this turn that takes over about 15 minutes, such as a long build or a later check. OpenBot shows the wait to the user until you close it. The next run of one of your routines wakes the wait, or a local script event that names its waitId. The run that wakes it repeats the request and your note. Give routineId to let only that routine wake it. Then tell the user what you wait for and end your turn.",
     shape: awaitEventToolSchema.shape,
   },
   {
@@ -688,6 +700,15 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     description:
       'List the API keys you can use, from request_api_key or the Vault ("source":"vault"): the name and the file path of each. Values are never shown.',
     shape: {},
+  },
+  {
+    name: "save_api_key",
+    description: [
+      "Save a key, token or password that you have, such as one the user pasted, in the OpenBot Vault for every agent; list_api_keys gives its path.",
+      "It replaces a Vault key with this name and deletes your own key with this name.",
+      'Returns {"status":"added"|"updated","name","path"}, never the key. Do not repeat the key. Only for a request of a person in your OpenBot chat.',
+    ].join(" "),
+    shape: saveApiKeyToolSchema.shape,
   },
   {
     name: "remove_api_key",

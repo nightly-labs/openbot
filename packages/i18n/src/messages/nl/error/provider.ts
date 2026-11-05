@@ -213,6 +213,8 @@ export const messages = {
     "De modelaanbieder had een storing aan zijn kant. Het ligt niet aan je verbinding. Probeer het later opnieuw of kies een ander model.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode kon geen verbinding maken met de modelaanbieder. Controleer de netwerkverbinding van de computer waarop OpenBot draait en probeer het opnieuw.\n{detail}",
+  "error.provider.codexStateBusy":
+    "ChatGPT bereidt na een eerdere start nog de lokale geschiedenis voor. Wacht een paar minuten en probeer het opnieuw.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode kon de database niet openen, omdat een nieuwere versie van OpenCode deze heeft gewijzigd. Werk OpenCode bij naar versie 2 of nieuwer en probeer het opnieuw.",
   "error.provider.opencodeNoAnswer":
@@ -234,6 +236,8 @@ export const messages = {
   "error.provider.antigravityReleaseShape": "De Gemini-release heeft een onverwachte vorm.",
   "error.provider.antigravityMissing": "Gemini is niet gedownload. Download het in OpenBot om door te gaan.",
   "error.provider.antigravityNotStarted": "De Gemini-server is gevonden, maar de versie kan niet worden gelezen.",
+  "error.provider.antigravityOverrideInvalid":
+    "De Gemini-server in OPENBOT_ANTIGRAVITY_PATH ontbreekt of is niet uitvoerbaar. Corrigeer het pad of verwijder de variabele en start OpenBot daarna opnieuw.",
   "error.provider.antigravityVersionUnreadable": "Kan de versie van de Gemini-server niet lezen.",
   "error.provider.antigravitySignIn": "Log in met Google om Gemini te gebruiken.",
   "error.provider.antigravityRateLimited":
@@ -269,6 +273,7 @@ export const messages = {
   "error.provider.kimiVersionUnreadable": "Kan de versie van Kimi CLI niet lezen.",
   "error.provider.kimiSignIn": "Log in met Kimi Code om Kimi te gebruiken.",
   "error.provider.devinSignIn": "Log in met Devin om Devin te gebruiken.",
+  "error.provider.copilotSignIn": "Log in met GitHub of stel COPILOT_GITHUB_TOKEN in om GitHub Copilot te gebruiken.",
   "error.provider.hermesMissing": "Hermes Agent is niet geïnstalleerd. Installeer het en probeer het opnieuw.",
   "error.provider.hermesNotStarted": "Hermes Agent kon niet starten. Voer `hermes --version` uit in een terminal.",
   "error.provider.hermesVersionUnreadable": "De versie van Hermes Agent kan niet worden gelezen.",
@@ -290,6 +295,8 @@ export const messages = {
     "Gemini kon de inlogpagina niet in je browser openen. Controleer je standaardbrowser en verbind daarna opnieuw.",
   "error.provider.acpSignInFailed": "Het inloggen is niet voltooid.",
   "error.provider.acpSignInFailedReason": "Het inloggen is niet voltooid: {reason}",
+  "error.provider.acpSignOutFailed": "Het uitloggen is niet voltooid.",
+  "error.provider.acpSignOutFailedReason": "Het uitloggen is niet voltooid: {reason}",
   "error.provider.acpSignInMethodMissing":
     "Deze aanbieder biedt deze inlog niet aan op deze computer. Werk de aanbieder bij en probeer het opnieuw.",
   "error.provider.httpsSignInLinkOnly": "Alleen HTTPS-inloglinks kunnen in de browser worden geopend.",
@@ -422,6 +429,9 @@ export const messages = {
     "De aangepaste agent is gewijzigd tijdens de installatie. Probeer het opnieuw.",
   "error.provider.registryInstallFailed":
     "De installatie van de agent is mislukt. De vorige installatie is ongewijzigd.",
+  "error.provider.hermesInstallFailed":
+    "Hermes Agent is niet geïnstalleerd. Probeer het opnieuw, of gebruik de installatiegids.",
+  "error.provider.hermesNeedsGitCurl": "Hermes Agent heeft git en curl nodig. Installeer ze en probeer het opnieuw.",
   "error.provider.registryRemoveBusy":
     "Wacht tot de installatie van de agent en het actieve ACP-werk klaar zijn voordat je de agent verwijdert.",
 } as const satisfies PartialTranslation<typeof source>;

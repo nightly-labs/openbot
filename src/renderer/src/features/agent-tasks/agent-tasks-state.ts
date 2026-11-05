@@ -7,7 +7,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createStore, untrack } from "solid-js";
+import { createEffect, createMemo, createStore, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
 import { createScopeGuard } from "../../scope-lifetime";
@@ -32,6 +32,8 @@ interface AgentTasksState {
   snapshots: Record<string, AgentTasksSnapshot>;
   /** The conversation of each task that loaded one, by task id. */
   conversations: Record<string, ConversationSnapshot>;
+  /** The number of agent messages that the person has not read in each open thread, by agent id and task id. */
+  unread: Record<string, Record<string, number>>;
 }
 
 export interface AgentTasksOptions {
@@ -84,11 +86,14 @@ export function createAgentTasks(options: AgentTasksOptions) {
     messageDeletable,
   } = options;
   const scopeIsCurrent = createScopeGuard();
-  const [state, setState] = createStore<AgentTasksState>({ snapshots: {}, conversations: {} });
+  const [state, setState] = createStore<AgentTasksState>({ snapshots: {}, conversations: {}, unread: {} });
   const listRequests = new Map<string, number>();
   const readRequests = new Map<string, number>();
+  const unreadRequests = new Map<string, number>();
   /** The message that each thread's read mark last moved to, so a redraw does not send the same mark again. */
   const readMarks = new Map<string, string>();
+  /** The threads whose mark move did not answer yet. A list read can be older than the move. */
+  const marking = new Set<string>();
 
   /**
    * Stores a thread list. A conversation of a thread that the list no longer has goes with it. A task
@@ -161,13 +166,20 @@ export function createAgentTasks(options: AgentTasksOptions) {
    * does not have, the list is read again: the new task can be a branch from another device.
    */
   function applyTasksChanged(snapshot: AgentTasksSnapshot): void {
-    const known = untrack(() => {
-      const stored = state.snapshots[snapshot.agentId];
-      return stored && branchable() ? new Set(stored.tasks.map((task) => task.id)) : undefined;
-    });
+    const stored = untrack(() => state.snapshots[snapshot.agentId]);
+    const known = stored && untrack(branchable) ? new Set(stored.tasks.map((task) => task.id)) : undefined;
+    // Each progress line sends a list too. Only a saved message or an end of a turn changes a count.
+    const before = stored ? untrack(() => unreadKey(stored)) : undefined;
     applySnapshot(snapshot);
     if (known && snapshot.tasks.some((task) => task.branch === undefined && !known.has(task.id)))
       void loadTasks(snapshot.agentId);
+    // The host sends no event when a read mark moves, so a changed list reads the marks again.
+    else if (unreadKey(snapshot) !== before) loadUnread(snapshot.agentId);
+  }
+
+  /** What a thread's unread count can follow: the threads, their states and their last changes. */
+  function unreadKey(snapshot: AgentTasksSnapshot): string {
+    return snapshot.tasks.map((task) => `${task.id}:${task.state}:${task.outcome}:${task.updatedAt}`).join("|");
   }
 
   function applyEvent(event: AgentTaskEvent): void {
@@ -185,6 +197,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
       .then((snapshot) => {
         if (!scopeIsCurrent() || listRequests.get(agentId) !== request) return false;
         setSnapshot(snapshot);
+        loadUnread(agentId);
         return true;
       })
       .catch((error) => {
@@ -195,11 +208,15 @@ export function createAgentTasks(options: AgentTasksOptions) {
       });
   }
 
+  // An effect runs again each time its key is computed, so the key is a memo. A reconnect gives the
+  // server's capabilities again, and a list read for that alone repeats the read of the runtime snapshot.
+  const listKey = createMemo(() => ({ agentId: activeAgentId(), reload: options.reloadKey(), shown: available() }), {
+    equals: (before, after) =>
+      before.agentId === after.agentId && before.reload === after.reload && before.shown === after.shown,
+  });
   createEffect(
     () => ({
-      agentId: activeAgentId(),
-      reload: options.reloadKey(),
-      shown: available(),
+      ...listKey(),
       // A running thread can end while the server is away, and the sidebar shows its agent as working.
       running: untrack(() =>
         Object.values(state.snapshots).flatMap((snapshot) =>
@@ -212,6 +229,60 @@ export function createAgentTasks(options: AgentTasksOptions) {
       for (const id of new Set([...(agentId ? [agentId] : []), ...running])) void loadTasks(id);
     },
   );
+
+  /** Starts a read of the marks of an agent. A read that started before it has an older count. */
+  function nextUnreadRequest(agentId: string): number {
+    const request = (unreadRequests.get(agentId) ?? 0) + 1;
+    unreadRequests.set(agentId, request);
+    return request;
+  }
+
+  function setUnread(agentId: string, taskId: string, count: number): void {
+    setState((current) => {
+      current.unread[agentId] ??= {};
+      current.unread[agentId][taskId] = count;
+    });
+  }
+
+  /**
+   * Reads the person's read mark of each open thread of an agent. A failure keeps the old counts: the
+   * next list reads them again.
+   */
+  function loadUnread(agentId: string): void {
+    // An event handler runs this too: the capability is input here, not a dependency.
+    const list = untrack(readable) ? port().listTaskReads : undefined;
+    if (!list) return;
+    const request = nextUnreadRequest(agentId);
+    void list(agentId)
+      .then((reads) => {
+        if (!scopeIsCurrent() || unreadRequests.get(agentId) !== request) return;
+        setState((current) => {
+          const previous = current.unread[agentId] ?? {};
+          current.unread[agentId] = Object.fromEntries(
+            reads.map((read) => [
+              read.taskId,
+              marking.has(read.taskId) ? (previous[read.taskId] ?? 0) : read.unreadCount,
+            ]),
+          );
+        });
+      })
+      .catch(() => undefined);
+  }
+
+  /** The agent messages of a thread that the person has not read. An archived thread has none. */
+  function unreadCount(task: AgentTask): number {
+    return task.state === "closed" ? 0 : (state.unread[task.agentId]?.[task.id] ?? 0);
+  }
+
+  /** The unread agent messages of all open threads, by agent id. Agents without any are left out. */
+  const unreadTotals = createMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const agentId of Object.keys(state.unread)) {
+      const total = (state.snapshots[agentId]?.tasks ?? []).reduce((sum, task) => sum + unreadCount(task), 0);
+      if (total > 0) totals[agentId] = total;
+    }
+    return totals;
+  });
 
   /** Reads the whole conversation of a thread, when its tab opens. */
   function openTask(agentId: string, taskId: string): void {
@@ -395,28 +466,45 @@ export function createAgentTasks(options: AgentTasksOptions) {
 
   /**
    * Moves the person's read mark of a side thread to the message that they see. The member's other
-   * devices read the mark, so the phone no longer shows the thread as unread. A failure keeps the
-   * old mark: the next message moves it.
+   * devices read the mark, so the phone no longer shows the thread as unread. The thread shows as
+   * read at once. A failure keeps the old mark and shows its count again: the next message moves it.
    */
   function markTaskRead(agentId: string, taskId: string, throughMessageId: string): void {
     if (!readable() || readMarks.get(taskId) === throughMessageId) return;
     readMarks.set(taskId, throughMessageId);
+    // A list read that started before this mark has the old count.
+    nextUnreadRequest(agentId);
+    setUnread(agentId, taskId, 0);
+    marking.add(taskId);
     void port()
       .markTaskRead({ agentId, taskId, throughMessageId })
+      .then((read) => {
+        if (readMarks.get(taskId) !== throughMessageId) return;
+        marking.delete(taskId);
+        // A message that arrived after the mark stays unread.
+        if (scopeIsCurrent()) setUnread(agentId, taskId, read.unreadCount);
+      })
       .catch(() => {
-        if (readMarks.get(taskId) === throughMessageId) readMarks.delete(taskId);
+        if (readMarks.get(taskId) !== throughMessageId) return;
+        marking.delete(taskId);
+        readMarks.delete(taskId);
+        if (scopeIsCurrent()) loadUnread(agentId);
       });
   }
 
   /**
-   * Reads the active agent's list and each loaded conversation again, after the server was away. The
-   * lists come first: a thread that another device deleted meanwhile is not read again.
+   * Reads the lists of the active agent, of each agent with a running thread and of each loaded
+   * conversation again, after the server was away. Then it reads each loaded conversation. The lists
+   * come first: a thread that another device deleted meanwhile is not read again.
    */
   function reload(): void {
     if (!available()) return;
     const agentIds = new Set(Object.values(state.conversations).map((conversation) => conversation.agentId));
     const active = activeAgentId();
     if (active) agentIds.add(active);
+    // A running thread can end while the server is away, and the sidebar shows its agent as working.
+    for (const snapshot of Object.values(state.snapshots))
+      if (snapshot.tasks.some((task) => task.state === "running")) agentIds.add(snapshot.agentId);
     for (const agentId of agentIds) {
       void loadTasks(agentId).then((loaded) => {
         if (!loaded) return;
@@ -452,6 +540,9 @@ export function createAgentTasks(options: AgentTasksOptions) {
     canDeleteMessage,
     deleteTaskMessage,
     markTaskRead,
+    unreadCount,
+    unreadTotals,
+    loadUnread,
   };
 }
 

@@ -48,6 +48,9 @@ export function isChannelRoutineTool(tool: string): boolean {
 export const PERSON_REQUEST_REQUIRED =
   "Only a person's request in this channel can change its members, instructions or routines. This task started from a routine run or from an agent.";
 
+export const PERSON_CANCEL_REQUIRED =
+  "Only a person's request in this channel can cancel a run. This task started from a routine run or from an agent.";
+
 /** The schedule routines of the channels, as the channel settings change them. */
 export interface ChannelRoutineToolPort {
   list(channelId: string): ChannelRoutine[];

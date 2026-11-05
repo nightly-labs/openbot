@@ -12,7 +12,7 @@ import { type ParamListBase, useNavigation } from "expo-router/react-navigation"
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowDown from "lucide-react-native/icons/arrow-down";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, type SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Keyboard, useColorScheme, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { KeyboardGestureArea } from "react-native-keyboard-controller";
@@ -64,6 +64,7 @@ import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import { useReducedTransparency } from "@/shared/lib/use-reduced-transparency";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
+import { getComposerDraft, useComposerDraft } from "../model/composer-drafts";
 import {
   deleteComposerFiles,
   takeComposerFocus,
@@ -122,6 +123,18 @@ export interface ChatViewProps {
   branchPoints?: ReadonlySet<string>;
   /** Copies the chat through a host message into a new thread. Absent for a chat that cannot branch. */
   onBranch?: (messageId: string) => Promise<void>;
+  /** Deletes a host message for everyone. Absent where the host cannot delete messages. */
+  deleteMessage?: (messageId: string) => Promise<void>;
+  /** The reader can delete the messages of others too, not only the ones that they sent. */
+  deletesAnyMessage?: boolean;
+  /**
+   * The open channels that the text of a message can go to, in an agent's own chat. Keep the list
+   * stable while it stays the same. Absent where a message cannot go to a channel.
+   */
+  sendToChannel?: {
+    channels: readonly { id: string; name: string }[];
+    onSend: (channelId: string, text: string) => void;
+  };
   questionForm?: QuestionPromptController;
   /** Opens the form of an open question, in a channel where several agents can ask. */
   onSelectQuestion?: (messageId: string) => void;
@@ -228,6 +241,9 @@ export function ChatView({
   stopTurn,
   branchPoints,
   onBranch,
+  deleteMessage,
+  deletesAnyMessage = false,
+  sendToChannel,
   questionForm,
   onSelectQuestion,
   needsAction = false,
@@ -305,7 +321,28 @@ export function ChatView({
   const [selection, setSelection] = useState<{ message: ChatBubbleMessage; selected: string } | null>(null);
   const selectionQuote = selection ? selection.selected.trim() || markdownPlainText(selection.message.body) : "";
   const [replyFocusVersion, setReplyFocusVersion] = useState(0);
-  const [draft, setDraft] = useState("");
+  // Each chat keeps its own unsent text, so a look at another chat does not lose it.
+  const draftChat = useMemo(
+    () => ({ kind: target.kind, serverId: target.serverId, id: target.id }),
+    [target.kind, target.serverId, target.id],
+  );
+  const [sharedDraft, setSharedDraft] = useComposerDraft(draftChat);
+  // The messages whose text and files are in the composer. The send replaces them. The outbox keeps
+  // them until the send, and they come back stopped when the chat closes.
+  const editedMessages = useRef(new Set<string>());
+  // While this screen holds an Edit, its text stays on this screen, with the files and reply of the
+  // edited messages. Another screen of the chat shows the text from before the first Edit, so it
+  // cannot send the edited text without its files, and a close leaves that text.
+  const [editDraft, setEditDraft] = useState<string | null>(null);
+  const draftBeforeEdit = useRef("");
+  const draft = editDraft ?? sharedDraft;
+  const setDraft = useCallback(
+    (value: SetStateAction<string>) => {
+      if (!editedMessages.current.size) return setSharedDraft(value);
+      setEditDraft((current) => (typeof value === "function" ? value(current ?? "") : value));
+    },
+    [setSharedDraft],
+  );
   const [sendError, setSendError] = useState<{
     agentId: string;
     message: string;
@@ -502,24 +539,25 @@ export function ChatView({
   useEffect(() => {
     if (answersQuestion) setAnswerFocusVersion((version) => version + 1);
   }, [answersQuestion]);
-  // Another screen, such as Agent info > Skills or a share from another app, can put text and files
-  // in this composer and close itself. Only a chat in front takes it: a chat under that screen is not
-  // the one the user returns to.
+  // Another screen, such as Agent info > Skills, a share from another app, or Send to channel on a
+  // message, can put text and files in this composer and close itself. Only a chat in front takes it:
+  // a chat under that screen is not the one the user returns to.
   const composerRequest = useComposerRequest((state) => state.request);
   useEffect(() => {
-    if (!isFocused || !composerRequest || target.kind !== "agent") return;
-    const request = takeComposerRequest(target.serverId, target.id);
+    if (!isFocused || !composerRequest) return;
+    const request = takeComposerRequest({ kind: target.kind, serverId: target.serverId, id: target.id });
     if (!request) return;
     const files = request.files ?? [];
     void composerAttachments
       .addShared(request.text, files, (text) => setDraft((current) => (current ? `${current}\n${text}` : text)))
       .finally(() => deleteComposerFiles(files));
-  }, [isFocused, composerRequest, target.kind, target.serverId, target.id, composerAttachments.addShared]);
+  }, [isFocused, composerRequest, target.kind, target.serverId, target.id, composerAttachments.addShared, setDraft]);
   const composerFocus = useComposerRequest((state) => state.focus);
   const [handoffFocusVersion, setHandoffFocusVersion] = useState(0);
   useEffect(() => {
-    if (!isFocused || !composerFocus || target.kind !== "agent") return;
-    if (takeComposerFocus(target.serverId, target.id)) setHandoffFocusVersion((version) => version + 1);
+    if (!isFocused || !composerFocus) return;
+    if (takeComposerFocus({ kind: target.kind, serverId: target.serverId, id: target.id }))
+      setHandoffFocusVersion((version) => version + 1);
   }, [isFocused, composerFocus, target.kind, target.serverId, target.id]);
   const lastUserId =
     messages.findLast((message) => message.kind === "message" && message.author === "user")?.id ?? null;
@@ -795,7 +833,13 @@ export function ChatView({
   /** The composer sends what Edit gave it: the messages it came from are replaced. */
   function takeEditedMessages(): string[] {
     const ids = [...editedMessages.current];
+    if (!ids.length) return ids;
     editedMessages.current.clear();
+    setEditDraft(null);
+    // The sent text held the draft from before the first Edit. Text that another screen of the chat
+    // wrote since then stays.
+    const before = draftBeforeEdit.current;
+    setSharedDraft((current) => (current === before ? "" : current));
     return ids;
   }
 
@@ -839,9 +883,6 @@ export function ChatView({
     deliver(serializeSelectionInstruction(instruction, selectionQuote), hostMessageId(selection.message.id), []);
   }
 
-  // The messages whose text and files are in the composer. The composer draft is not saved, so the
-  // outbox keeps them until it sends, and they come back stopped when the chat closes.
-  const editedMessages = useRef(new Set<string>());
   const mounted = useRef(false);
   useEffect(() => {
     mounted.current = true;
@@ -849,6 +890,7 @@ export function ChatView({
     return () => {
       mounted.current = false;
       outbox.stopEditing(edited);
+      edited.clear();
     };
   }, [outbox]);
   /**
@@ -876,9 +918,13 @@ export function ChatView({
       outbox.stopEditing([clientMessageId]);
       return;
     }
-    editedMessages.current.add(clientMessageId);
     const { text: body, replyToMessageId, files } = restored;
-    if (body) setDraft((current) => (current ? `${body}\n${current}` : body));
+    if (!editedMessages.current.size) draftBeforeEdit.current = getComposerDraft(draftChat);
+    editedMessages.current.add(clientMessageId);
+    setEditDraft((current) => {
+      const base = current ?? draftBeforeEdit.current;
+      return body ? (base ? `${body}\n${base}` : body) : base;
+    });
     const reply = projectedMessages.find(
       (message): message is ChatBubbleMessage => message.kind === "message" && message.id === replyToMessageId,
     );
@@ -892,12 +938,14 @@ export function ChatView({
   });
   // A stopped upload is the person's own choice: the text and files go back to the composer, and no
   // error is needed to explain it.
+  // Only the chat in front takes them, so that one screen of a chat holds the edit.
   useEffect(() => {
+    if (!isFocused) return;
     const returned = outboxMessages.filter((message) => message.returned);
     if (!returned.length) return;
     cancelSend.current();
     for (const message of returned) void editOutboxMessage.current(message.clientMessageId);
-  }, [outboxMessages]);
+  }, [outboxMessages, isFocused]);
   const outboxStatuses = useMemo(() => {
     const statuses = new Map<string, OutboxRowStatus>();
     // The waiting messages share one status line, under the last of them.
@@ -923,7 +971,6 @@ export function ChatView({
   latestSend.current = sendMessage;
   const send = useCallback((value: string) => latestSend.current(value), []);
   const cancelReply = useCallback(() => setReplyTarget(null), []);
-  const dismissStarter = useCallback(() => setShowStarter(false), []);
   const respondToApproval = useCallback(
     (approval: PendingApproval, decision: ApprovalDecision) =>
       workspace().respondToApproval(target.serverId, { requestId: approval.requestId, decision }),
@@ -939,6 +986,15 @@ export function ChatView({
   const branchMessage = useCallback(
     (message: ChatBubbleMessage) => void onBranch?.(hostMessageIds.get(message.id) ?? message.id),
     [onBranch, hostMessageIds],
+  );
+  const onSendToChannel = sendToChannel?.onSend;
+  const sendMessageToChannel = useCallback(
+    (message: ChatBubbleMessage, channelId: string) => onSendToChannel?.(channelId, message.body),
+    [onSendToChannel],
+  );
+  const deleteListMessage = useCallback(
+    async (message: ChatBubbleMessage) => deleteMessage?.(hostMessageIds.get(message.id) ?? message.id),
+    [deleteMessage, hostMessageIds],
   );
   // Select text starts the selection, and a second tap on it ends the selection.
   const selectText = useCallback((message: ChatBubbleMessage) => {
@@ -1035,7 +1091,6 @@ export function ChatView({
               browserRequests={chatBrowserRequests}
               serverName={server?.name ?? ""}
               onRespondApproval={respondToApproval}
-              fieldBackground={fieldBackground}
               foreground={foreground}
               messages={messages}
               messageAliases={messageAliases}
@@ -1048,18 +1103,19 @@ export function ChatView({
               onBranch={onBranch && !readOnly ? branchMessage : undefined}
               branchPoints={branchPoints}
               onReact={canReact && !readOnly ? react : undefined}
+              onDeleteMessage={deleteMessage && !readOnly ? deleteListMessage : undefined}
+              deletesAnyMessage={deletesAnyMessage}
+              sendChannels={sendToChannel?.channels}
+              onSendToChannel={sendToChannel && !readOnly ? sendMessageToChannel : undefined}
               selectingMessageId={selection?.message.id ?? null}
               onSelectText={selectText}
               onSelectionChange={changeSelection}
               onDismissSelection={dismissSelection}
               muted={muted}
-              raised={raised}
               showStarter={
                 showStarter && serverOnline && canSend && ready && !activity && projectedMessages.length === 0
               }
               topInset={insets.top}
-              onDismissStarter={dismissStarter}
-              onSelectStarter={send}
               onRetryHistory={fetchHistory}
               focusMessageId={focusMessageId}
               onFocusPlaced={onFocusPlaced}

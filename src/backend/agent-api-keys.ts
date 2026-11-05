@@ -16,7 +16,10 @@ const VAULT_FOLDER = ".vault";
 export interface SavedApiKey {
   name: string;
   path: string;
-  /** Present for a key from the Vault, which every agent can read and only the user changes. */
+  /**
+   * Present for a key from the Vault, which every agent can read. The user changes it, or an agent with
+   * `save_api_key` when a person asked in the OpenBot chat.
+   */
   source?: "vault";
 }
 

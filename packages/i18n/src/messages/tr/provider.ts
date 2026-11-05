@@ -120,6 +120,8 @@ export const messages = {
   "provider.picker.noModels": "{name} sağlayıcısından kullanılabilir model yok.",
   "provider.picker.customEmpty":
     "OpenAI uyumlu bir uç nokta ekleyin — bu bilgisayardaki bir model sunucusu veya bir temel URL ve anahtara sahip herhangi bir hizmet.",
+  "provider.picker.customPending":
+    "Uç noktalarınızın modelleri henüz yüklenmedi. Sağlayıcı bunları geçerli görevi durduktan sonra okur.",
   "provider.picker.defaultModelLabel": "{name}, varsayılan",
   "provider.picker.usageLimit": "Kullanım sınırına ulaşıldı",
   "provider.picker.usageLimitWindow": "{window} sınırı",
@@ -239,17 +241,10 @@ export const messages = {
   "provider.settings.modelShow": "{name} ({id}) modelini model seçicide göster",
   "provider.settings.modelsNoMatch": "Aramanızla eşleşen model yok.",
   "provider.settings.modelsLoadFailed": "Bu sunucunun modelleri yüklenemedi.",
-  "provider.settings.download": "İndirme",
-  "provider.settings.downloadedCli": "{name} CLI",
-  "provider.settings.downloadDetail": {
-    one: "{version} · 1 sürüm · {size}",
-    other: "{version} · {count} sürüm · {size}",
-  },
-  "provider.settings.downloadVersions": { one: "1 sürüm · {size}", other: "{count} sürüm · {size}" },
-  "provider.settings.downloadAgain": "{name} açıldığında OpenBot CLI'yi yeniden indirir.",
-  "provider.settings.removeDownloadConfirm": "{size} kaldırılsın mı?",
-  "provider.settings.removeDownloadKeeps": "Hesaplar, oturumlar ve ajanlar kalır.",
-  "provider.settings.removeDownload": "İndirmeyi kaldır",
-  "provider.settings.removingDownload": "Kaldırılıyor…",
+  "provider.settings.deleteTitle": "{name} sil",
+  "provider.settings.deleteOn":
+    "{name} kapatılır ve OpenBot'un indirdiği CLI silinir. Hesaplar, oturumlar ve ajanlar kalır.",
+  "provider.settings.deleteOff":
+    "OpenBot'un {name} için indirdiği CLI silinir ({size}). Hesaplar, oturumlar ve ajanlar kalır.",
   "provider.settings.removeDownloadFailed": "İndirme kaldırılamadı.",
 } as const satisfies PartialTranslation<typeof source>;

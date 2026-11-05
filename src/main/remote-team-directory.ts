@@ -54,6 +54,14 @@ export interface RemoteTeamDirectoryOptions {
   servers: Pick<RemoteServerDirectory, "require">;
   request: RemoteRequestFn;
   transport: RemoteControlPlaneTransport | null;
+  /**
+   * A server that this app runs as its child process and registered for the signed-in account. This
+   * app is its owner, so its team goes to the account service like a WebRTC server: the child has no
+   * account session of its own.
+   */
+  isRegisteredThisComputer: (serverId: string) => boolean;
+  /** A development stack: its account service is `http://localhost:<port>`, which invitations otherwise refuse. */
+  allowLocalDevelopmentApiUrl: boolean;
   // Read through a callback rather than held, so an account that gains email delivery later is not
   // frozen out by whatever was true when this object was built.
   sendInviteEmail: (input: {
@@ -68,12 +76,16 @@ export class RemoteTeamDirectory {
   readonly #servers: RemoteTeamDirectoryOptions["servers"];
   readonly #request: RemoteRequestFn;
   readonly #transport: RemoteControlPlaneTransport | null;
+  readonly #isRegisteredThisComputer: RemoteTeamDirectoryOptions["isRegisteredThisComputer"];
+  readonly #allowLocalDevelopmentApiUrl: boolean;
   readonly #sendInviteEmail: RemoteTeamDirectoryOptions["sendInviteEmail"];
 
   constructor(options: RemoteTeamDirectoryOptions) {
     this.#servers = options.servers;
     this.#request = options.request;
     this.#transport = options.transport;
+    this.#isRegisteredThisComputer = options.isRegisteredThisComputer;
+    this.#allowLocalDevelopmentApiUrl = options.allowLocalDevelopmentApiUrl;
     this.#sendInviteEmail = options.sendInviteEmail;
   }
 
@@ -217,7 +229,10 @@ export class RemoteTeamDirectory {
               fingerprint: server.fingerprint,
               token: invite.token,
             },
-            { selfHostedApiOrigin: selfHostedApiOrigin(transport.controlPlaneUrl) },
+            {
+              allowLocalDevelopmentApiUrl: this.#allowLocalDevelopmentApiUrl,
+              selfHostedApiOrigin: selfHostedApiOrigin(transport.controlPlaneUrl),
+            },
           ),
         }));
         const email = input.email;
@@ -254,6 +269,6 @@ export class RemoteTeamDirectory {
 
   #controlPlaneFor(serverId: string): RemoteControlPlaneTransport | null {
     const server = this.#servers.require(serverId);
-    return server.transport === "webrtc-v2" ? this.#transport : null;
+    return server.transport === "webrtc-v2" || this.#isRegisteredThisComputer(server.id) ? this.#transport : null;
   }
 }

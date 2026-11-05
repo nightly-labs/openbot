@@ -10,6 +10,7 @@
     "obsidian",
     "atlassian",
     "todoist",
+    "ticktick",
     "trello",
     "cobrain",
     "figma",
@@ -27,13 +28,16 @@
     "context7",
     "huggingface",
     "stripe",
+    "revenuecat",
     "posthog",
     "airtable",
     "firecrawl",
     "brave-search",
     "resend",
     "composio",
-    "clickup"
+    "clickup",
+    "coinbase",
+    "robinhood"
   ],
   "featured": ["aave", "canva", "notion", "figma"]
 }

@@ -67,6 +67,7 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
           : ofTaskThread(task, takeovers) !== undefined
             ? "takeover"
             : undefined,
+    unread: (task) => tasks.unreadCount(task),
   };
   const lists = threadLists({ ...listInput, open: tabs.openIds(agentId), draft: tabs.hasDraft(agentId) });
   const activeId = activeThreadId(lists.tabs, tabs.activeId(agentId));
@@ -151,6 +152,7 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
       onMove: (id, index) => tabs.moveSide(agentId, id, index),
     },
     open,
+    tasks: list,
     limit: snapshot?.limit ?? 1,
     running: list.filter(isAgentTaskActive).length,
     conversation: open ? tasks.conversation(open.id) : undefined,

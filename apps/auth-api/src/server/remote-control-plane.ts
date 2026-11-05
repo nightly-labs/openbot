@@ -4,6 +4,7 @@ import {
   hostKeyHandoverStatement,
 } from "@openbot/contracts/host-key-handover";
 import { DEFAULT_TEAM_MEMBER_LIMIT } from "@openbot/contracts/input-limits";
+import { isAvatarColor } from "@openbot/contracts/ipc";
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { RemoteAuthEvent } from "@openbot/contracts/signal-protocol/auth-events";
@@ -1082,7 +1083,7 @@ export class RemoteControlPlane {
         dependencies.database
           .prepare(
             `SELECT m.membership_id, m.role, m.status, m.created_at,
-                u.email, u.name, u.avatar_url
+                u.email, u.name, u.avatar_url, u.chat_color
          FROM remote_memberships m
          JOIN users u ON u.id = m.user_id
          WHERE m.host_id = ?
@@ -1097,6 +1098,7 @@ export class RemoteControlPlane {
             email: string;
             name: string | null;
             avatar_url: string | null;
+            chat_color: string | null;
           }>(),
       );
       return (result.results ?? []).map((member) => ({
@@ -1107,6 +1109,7 @@ export class RemoteControlPlane {
         email: member.email,
         name: member.name,
         avatarUrl: member.avatar_url,
+        chatColor: isAvatarColor(member.chat_color) ? member.chat_color : null,
       }));
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),

@@ -61,6 +61,8 @@ function classRegions(source: string): string[] {
 // `agent-row-agent-status agent-row-agent-status-${kind}` puts it after a space, so this
 // anchors on the backtick or the whitespace that starts the class name instead.
 const CLASS_FAMILY_PREFIX = /[`\s]([a-zA-Z][a-zA-Z0-9_-]*-)\$\{/gu;
+/** lucide-solid gives each icon the class `lucide-<name>`, from the file name in its import path. */
+const LUCIDE_ICON_IMPORT = /["']lucide-solid\/icons\/([a-z0-9-]+)["']/gu;
 
 /**
  * Reads a renderer tree and reports every design-system violation in it. Paths in
@@ -204,6 +206,9 @@ export function checkUiFoundation(
   for (const path of markup) {
     const source = readFileSync(path, "utf8");
     for (const word of source.matchAll(/[a-zA-Z][a-zA-Z0-9_-]*/gu)) named.add(word[0]);
+    // A class selector for an icon replaces `[class~="lucide-…"]`, which costs Chrome a restyle of
+    // every descendant on each class change when a combinator follows it.
+    for (const [, icon] of source.matchAll(LUCIDE_ICON_IMPORT)) if (icon !== undefined) named.add(`lucide-${icon}`);
     for (const region of classRegions(source)) {
       for (const [, prefix] of region.matchAll(CLASS_FAMILY_PREFIX)) if (prefix !== undefined) families.push(prefix);
     }

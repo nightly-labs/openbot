@@ -11,12 +11,17 @@
  * While the desktop app is signed in, it registers this server for its account and writes the
  * server's machine token to the control pipe. This process then also meets the owner's devices on
  * Signal, and sends their notifications, with that token. It keeps the token in memory only.
+ *
+ * The account directory needs an account session, which this process does not have. When it must read
+ * its members, it writes a request line to stdout, and the desktop app writes the list to the control
+ * pipe. After the desktop app changes a member, it writes the new list without a request.
  */
 
 import { Socket } from "node:net";
 import { isAbsolute } from "node:path";
 import type { Readable } from "node:stream";
-import { Effect, Schema, Semaphore } from "effect";
+import { Deferred, Effect, Exit, Schema, Semaphore } from "effect";
+import { decodeRemoteMembers, type RemoteMemberRecord } from "./central-auth-records";
 import type { HostService } from "./host-service";
 import { RemoteWorkflowError } from "./remote-service-effects";
 import type { TeamStore } from "./team-store";
@@ -25,6 +30,10 @@ import type { TeamStore } from "./team-store";
 export const LOCAL_SERVER_OWNER_USERNAME = "owner";
 /** The prefix of the one stdout line that tells the parent where the Team API listens. */
 export const LOCAL_SERVER_READY_PREFIX = "OPENBOT_LOCAL_SERVER_READY ";
+/** The stdout line that asks the parent for this server's account directory. It holds no data. */
+export const LOCAL_SERVER_MEMBERS_REQUEST = "OPENBOT_LOCAL_SERVER_REQUEST members";
+/** How long a read of the account directory waits for the parent's answer. */
+const LOCAL_SERVER_MEMBERS_TIMEOUT_MS = 30_000;
 
 /**
  * The pipe from the desktop app on Windows: there Electron replaces `process.stdin` with a stream that
@@ -81,24 +90,85 @@ export interface LocalServerReady {
 /**
  * A line that the parent writes to the control pipe. `publish` gives the machine token of this server's
  * registration; `unpublish` follows a sign-out of the desktop app. No other process sees the token.
+ * `members` is this server's account directory; `members-unavailable` answers a request that the parent
+ * could not read, for example while it is signed out.
  */
 const localServerCommandSchema = Schema.Union([
   Schema.Struct({ type: Schema.Literal("publish"), machineToken: Schema.String }),
   Schema.Struct({ type: Schema.Literal("unpublish") }),
+  Schema.Struct({ type: Schema.Literal("members"), members: Schema.Unknown }),
+  Schema.Struct({ type: Schema.Literal("members-unavailable") }),
 ]);
 export type LocalServerCommand = typeof localServerCommandSchema.Type;
+type ParsedLocalServerCommand =
+  | Exclude<LocalServerCommand, { type: "members" }>
+  | { type: "members"; members: RemoteMemberRecord[] };
 const decodeLocalServerCommand = Schema.decodeUnknownSync(localServerCommandSchema);
 
 export function formatLocalServerCommand(command: LocalServerCommand): string {
   return `${JSON.stringify(command)}\n`;
 }
 
+export function formatLocalServerMembersRequest(): string {
+  return `${LOCAL_SERVER_MEMBERS_REQUEST}\n`;
+}
+
 /** Null for a line that is not a command, so a stray line does nothing. */
-function parseLocalServerCommand(line: string): LocalServerCommand | null {
+function parseLocalServerCommand(line: string): ParsedLocalServerCommand | null {
   try {
-    return decodeLocalServerCommand(JSON.parse(line));
+    const command = decodeLocalServerCommand(JSON.parse(line));
+    return command.type === "members" ? { type: "members", members: decodeRemoteMembers(command) } : command;
   } catch {
     return null;
+  }
+}
+
+function membersUnavailable(): RemoteWorkflowError {
+  return new RemoteWorkflowError({ cause: new Error("The desktop app did not read the account directory.") });
+}
+
+/**
+ * This server's account directory, read through the parent. Requests that wait at the same time share
+ * one answer.
+ */
+export class LocalServerMembers {
+  readonly #request: () => void;
+  #pending: Deferred.Deferred<RemoteMemberRecord[], RemoteWorkflowError> | null = null;
+
+  constructor(request: () => void) {
+    this.#request = request;
+  }
+
+  readonly list = Effect.fn("LocalServerMembers.list")(function* (
+    this: LocalServerMembers,
+  ): Effect.fn.Return<RemoteMemberRecord[], RemoteWorkflowError> {
+    let pending = this.#pending;
+    if (!pending) {
+      pending = Deferred.makeUnsafe<RemoteMemberRecord[], RemoteWorkflowError>();
+      this.#pending = pending;
+      this.#request();
+    }
+    const current = pending;
+    return yield* Deferred.await(current).pipe(
+      Effect.timeoutOrElse({
+        duration: LOCAL_SERVER_MEMBERS_TIMEOUT_MS,
+        orElse: () => Effect.fail(membersUnavailable()),
+      }),
+      Effect.ensuring(
+        Effect.sync(() => {
+          if (this.#pending === current) this.#pending = null;
+        }),
+      ),
+    );
+  }).bind(this);
+
+  /** Gives the parent's answer to the waiting requests. False when no request waits for it. */
+  answer(members: RemoteMemberRecord[] | null): boolean {
+    const pending = this.#pending;
+    if (!pending) return false;
+    this.#pending = null;
+    Deferred.doneUnsafe(pending, members ? Exit.succeed(members) : Exit.fail(membersUnavailable()));
+    return true;
   }
 }
 
@@ -135,7 +205,9 @@ export function formatLocalServerReady(ready: LocalServerReady): string {
 export interface StartLocalServerChildOptions {
   environment: LocalServerChildEnvironment;
   teamStore: Pick<TeamStore, "configured" | "configure" | "getIdentity" | "getOwnerMemberId">;
-  host: Pick<HostService, "startLoopbackOnly">;
+  host: Pick<HostService, "startLoopbackOnly" | "applyAccountDirectory">;
+  /** The reads of the account directory that wait for the parent. */
+  members: Pick<LocalServerMembers, "answer">;
   writeReady: (line: string) => void;
   /** Calls `onLine` with each line of the control pipe. */
   readCommands: (onLine: (line: string) => void) => void;
@@ -155,6 +227,7 @@ export const startLocalServerChild = Effect.fn("LocalServerChild.start")(functio
   writeReady,
   readCommands,
   publisher,
+  members,
   warn,
 }: StartLocalServerChildOptions) {
   if (!teamStore.configured)
@@ -172,6 +245,24 @@ export const startLocalServerChild = Effect.fn("LocalServerChild.start")(functio
   readCommands((line) => {
     const command = parseLocalServerCommand(line);
     if (!command) return;
+    if (command.type === "members-unavailable") {
+      members.answer(null);
+      return;
+    }
+    if (command.type === "members") {
+      // A list that no read waits for follows a member change on the desktop app.
+      if (members.answer(command.members)) return;
+      Effect.runFork(
+        host
+          .applyAccountDirectory(command.members)
+          .pipe(
+            Effect.catch((error) =>
+              Effect.sync(() => warn("The server on this computer did not apply the account directory.", error.cause)),
+            ),
+          ),
+      );
+      return;
+    }
     const run = command.type === "publish" ? publisher.publish(command.machineToken) : publisher.unpublish();
     Effect.runFork(
       commands.withPermit(

@@ -72,4 +72,6 @@ export const messages = {
   "usage.panel.unsupported":
     "Este computador anfitrião não oferece análises dos agentes. Atualize-o para usar esta visualização.",
   "usage.panel.loadFailed": "Não foi possível carregar o uso. Verifique a conexão e o período.",
+  "usage.machine.label": "Uso da máquina. CPU: {cpu}, memória: {memory}",
+  "usage.machine.openStorage": "Abrir Armazenamento. Disco: {percent}, {detail}",
 } as const satisfies PartialTranslation<typeof source>;

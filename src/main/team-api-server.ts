@@ -8,6 +8,7 @@ import {
   type AgentEvent,
   type AgentSummary,
   AnalyticsInputError,
+  type ChatColors,
   canAdministerServer,
   type DirectConversationPage,
   type DirectConversationPageAnchor,
@@ -51,6 +52,7 @@ import { BROWSER_PAGE_STATE_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { BROWSER_PROFILES_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-events-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_USER_CONTROL_CAPABILITY } from "@openbot/contracts/team-protocol/browser-user-control-v1";
+import { CHAT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import {
   AGENT_ADMIN_CAPABILITY,
@@ -258,6 +260,7 @@ import { routeBitwardenConnector } from "./team-api/route-bitwarden-connector";
 import { routeBrowser } from "./team-api/route-browser";
 import { routeBrowserProfiles } from "./team-api/route-browser-profiles";
 import { routeChannels } from "./team-api/route-channels";
+import { chatColorsOf, routeChatColors, visibleChatColors } from "./team-api/route-chat-colors";
 import { routeComputerActivity } from "./team-api/route-computer-activity";
 import { routeConnectors } from "./team-api/route-connectors";
 import { routeContextCompact } from "./team-api/route-context-compact";
@@ -349,6 +352,8 @@ interface EventClientState {
   snapshotResponsePending: boolean;
   snapshotRequestQueued: boolean;
   nextSnapshotRequestAt: number;
+  /** The last `chat-colors-changed` payload sent on this connection, so that the same list is not sent again. */
+  chatColorsSent: string | null;
 }
 
 type ConversationEventAudience = "all" | "modern" | "legacy";
@@ -1042,6 +1047,11 @@ export class TeamApiServer {
       if ((await routeAgentInstructions(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentHidden(context, this.#options.hiddenAgents, hidden)) === "handled") return;
       if ((await routeAgentColors(context, this.#options.agents, hidden)) === "handled") return;
+      if (
+        (await routeChatColors(context, this.#options.agents, () => this.#options.store.listMembers(), hidden)) ===
+        "handled"
+      )
+        return;
       if ((await routeSidebarFolders(context, this.#options.sidebarLayout, this.#options.agents, hidden)) === "handled")
         return;
       if (
@@ -1312,7 +1322,10 @@ export class TeamApiServer {
   #broadcastAgentEvent(event: AgentEvent): void {
     if (event.type !== "conversation") {
       this.#broadcastAgentEventToClients(event);
-      if (event.type === "agents-changed") this.#broadcastAgentColors();
+      if (event.type === "agents-changed") {
+        this.#broadcastAgentColors();
+        this.#broadcastChatColors();
+      }
       return;
     }
 
@@ -1500,7 +1513,7 @@ export class TeamApiServer {
         )
           continue;
         // The list of hidden agents does not name an agent that this peer cannot see, as `/v1/hidden-agents` does.
-        // The list of colours does the same, as `/v1/agent-colors` does.
+        // The lists of colours and chat colours do the same, as `/v1/agent-colors` and `/v1/chat-colors` do.
         outgoing = JSON.stringify(
           optional.type === "hidden-agents-changed"
             ? {
@@ -1518,7 +1531,15 @@ export class TeamApiServer {
                     this.hiddenAgentIds(eventProtocol(connection.capabilities), connection.capabilities, member),
                   ),
                 }
-              : optional,
+              : optional.type === "chat-colors-changed"
+                ? {
+                    type: optional.type,
+                    ...visibleChatColors(
+                      optional,
+                      this.hiddenAgentIds(eventProtocol(connection.capabilities), connection.capabilities, member),
+                    ),
+                  }
+                : optional,
         );
       } else if (event.type === "conversation" && supportsRuntimeSnapshots) {
         conversationInvalidation ??=
@@ -1604,6 +1625,32 @@ export class TeamApiServer {
     });
   }
 
+  #chatColors(): ChatColors {
+    const { store } = this.#options;
+    return chatColorsOf(this.#options.agents.listAgents(), store.getIdentity() ? store.listMembers() : []);
+  }
+
+  /** Sends the chat colours that this peer can see. Without `force`, a list that did not change is not sent again. */
+  #sendChatColors(client: Ws.WebSocket, connection: EventClientState, colors: ChatColors, force: boolean): void {
+    if (!connection.capabilities.has(CHAT_COLORS_CAPABILITY) || client.readyState !== webSockets.WebSocket.OPEN) return;
+    const member = this.#connectionMember(connection);
+    const hidden = this.hiddenAgentIds(eventProtocol(connection.capabilities), connection.capabilities, member);
+    const payload = JSON.stringify({ type: "chat-colors-changed", ...visibleChatColors(colors, hidden) });
+    if (!force && payload === connection.chatColorsSent) return;
+    connection.chatColorsSent = payload;
+    client.send(payload);
+  }
+
+  /**
+   * The chat colours go out after each `agents-changed` and each presence change: a change of an agent, of
+   * access or of a member can change the list. Each connection gets a list only when its own list changed.
+   */
+  #broadcastChatColors(): void {
+    if (this.#eventClients.size === 0) return;
+    const colors = this.#chatColors();
+    for (const [client, connection] of this.#eventClients) this.#sendChatColors(client, connection, colors, false);
+  }
+
   #sendBrowserPageState(client: Ws.WebSocket, connection: EventClientState): void {
     const tabs = this.#options.browser.listTabs().map((tab) => ({
       tabId: tab.id,
@@ -1677,6 +1724,7 @@ export class TeamApiServer {
       snapshotResponsePending: false,
       snapshotRequestQueued: false,
       nextSnapshotRequestAt: 0,
+      chatColorsSent: null,
     };
     this.#eventClients.set(client, connection);
     client.on("error", () => {
@@ -1714,6 +1762,7 @@ export class TeamApiServer {
             const pageStateWasSent = connection.capabilities.has(BROWSER_PAGE_STATE_CAPABILITY);
             const machineAlertsWereSent = connection.capabilities.has(MACHINE_RESOURCES_CAPABILITY);
             const colorsWereSent = connection.capabilities.has(AGENT_COLORS_CAPABILITY);
+            const chatColorsWereSent = connection.capabilities.has(CHAT_COLORS_CAPABILITY);
             connection.capabilities = new Set(event.capabilities.filter(isTeamCurrentCapability));
             if (connection.capabilities.has("agent-runtime-snapshots") && !snapshotsWereEnabled) {
               this.#sendRuntimeSnapshot(client, connection, false);
@@ -1728,6 +1777,8 @@ export class TeamApiServer {
             // The colours can change while a client has no event connection.
             if (!colorsWereSent && connection.capabilities.has(AGENT_COLORS_CAPABILITY))
               this.#sendAgentColors(client, connection);
+            if (!chatColorsWereSent && connection.capabilities.has(CHAT_COLORS_CAPABILITY))
+              this.#sendChatColors(client, connection, this.#chatColors(), true);
             // An alert that came while the member had no device online.
             if (!machineAlertsWereSent) this.#sendPendingMachineAlerts(client, connection);
           }
@@ -1883,6 +1934,7 @@ export class TeamApiServer {
   }
 
   #publishPresence(): void {
+    this.#broadcastChatColors();
     const snapshot = this.getPresence();
     this.#options.onPresence?.(snapshot);
     const event: TeamRealtimeEvent = { type: "team-presence", snapshot };
@@ -2225,6 +2277,8 @@ export class TeamApiServer {
           if (capability === AGENT_HIDDEN_CAPABILITY) return this.#options.hiddenAgents !== undefined;
           // The colour route uses the agent operations, which every host has.
           if (capability === AGENT_COLORS_CAPABILITY) return true;
+          // The chat colour route uses the agent operations and the member list, which every host has.
+          if (capability === CHAT_COLORS_CAPABILITY) return true;
           if (capability === AGENT_TASKS_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_THREADS_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_TASK_UI_BLOCKS_CAPABILITY) return this.#options.agentTasks !== undefined;
@@ -2444,6 +2498,7 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
   if (event.type === "agent-session-settings-changed") return AGENT_SESSION_SETTINGS_CAPABILITY;
   if (event.type === "hidden-agents-changed") return AGENT_HIDDEN_CAPABILITY;
   if (event.type === "agent-colors-changed") return AGENT_COLORS_CAPABILITY;
+  if (event.type === "chat-colors-changed") return CHAT_COLORS_CAPABILITY;
   if (event.type === "agent-access-changed") return AGENT_ACCESS_CAPABILITY;
   if (event.type === "browser-user-control-changed") return BROWSER_USER_CONTROL_CAPABILITY;
   if (event.type === "browser-page-state-changed") return BROWSER_PAGE_STATE_CAPABILITY;

@@ -3,12 +3,12 @@ import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Ellipsis from "lucide-react-native/icons/ellipsis";
 import { useState } from "react";
-import { Pressable, View } from "react-native";
+import { Alert, Pressable, View } from "react-native";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
-import { useText } from "@/shared/lib/text";
-import { openMessageActions } from "../model/message-actions-sheet";
+import { currentText, useText } from "@/shared/lib/text";
+import { type MessageChannelTargets, openMessageActions } from "../model/message-actions-sheet";
 
 /** A message that has actions: it is on the host and does not stream. */
 export interface MessageActionsInput {
@@ -23,8 +23,12 @@ export interface MessageActionsInput {
   /** Unset where the message has no branch: it is not the last answer of a finished turn. */
   onBranch?: () => void;
   onSelectText?: () => void;
-  /** The message that Read aloud reads. Unset where the app cannot read aloud. */
+  /** The message that Read aloud reads. Unset where the message is not a reply. */
   readAloudId?: string;
+  /** The open channels that the message text can go to. Unset where the message cannot go to one. */
+  sendToChannel?: MessageChannelTargets;
+  /** Deletes the message for everyone. Unset where the reader cannot delete it. */
+  onDelete?: () => Promise<void>;
 }
 
 /**
@@ -58,6 +62,29 @@ export function useMessageActions(input: MessageActionsInput | null) {
         });
       }
     : undefined;
+  const onDelete = input?.onDelete;
+  // The sheet has closed when this runs, so the alert shows over the chat.
+  const confirmDelete = onDelete
+    ? () => {
+        const text = currentText();
+        Alert.alert(text.t("mobile.chat.message.deleteTitle"), text.t("mobile.chat.message.deleteBody"), [
+          { text: text.t("common.cancel"), style: "cancel" },
+          {
+            text: text.t("common.delete"),
+            style: "destructive",
+            onPress: () =>
+              onDelete().then(
+                () => void haptics.notification("success"),
+                (error: unknown) => {
+                  void haptics.notification("error");
+                  const title = currentText().t("mobile.chat.message.deleteFailed");
+                  showFailureAlert(error, "team", title, currentText().errorMessage(error, title));
+                },
+              ),
+          },
+        ]);
+      }
+    : undefined;
   const open = input
     ? () =>
         openMessageActions({
@@ -70,6 +97,8 @@ export function useMessageActions(input: MessageActionsInput | null) {
           onReply: input.onReply,
           onBranch: input.onBranch,
           onSelectText: input.onSelectText,
+          sendToChannel: input.sendToChannel,
+          onDelete: confirmDelete,
         })
     : undefined;
   return { shown, react, open };

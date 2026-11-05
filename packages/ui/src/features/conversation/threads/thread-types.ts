@@ -19,6 +19,8 @@ export interface ThreadItem {
   title: string;
   updatedAt: string;
   status: ThreadStatus;
+  /** The agent messages in the thread that the user has not read. Absent when the host keeps no read mark. */
+  unread?: number | undefined;
   /**
    * The tree lines before the title in the thread menu, for a branch under its source thread. Absent
    * at the top level and in the tabs.

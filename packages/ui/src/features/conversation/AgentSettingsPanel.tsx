@@ -111,6 +111,7 @@ import {
 import { useText } from "../../text";
 import { avatarColorChoiceLabel } from "../agents/avatar-hue-label";
 import { SERVER_NOTIFICATION_LEVEL_LABELS } from "../servers/ServerActionItems";
+import { AgentChatColorRow } from "../settings/ChatColorSetting";
 import { type AgentFolderCalls, AgentFoldersPage, AgentFoldersRow, createAgentFolders } from "./AgentFolders";
 import { AgentNewChatDialog } from "./AgentNewChatDialog";
 import { BackupModelsPage } from "./BackupModels";
@@ -1430,6 +1431,16 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     onClick={() => openPage("backup-models")}
                   />
                 </SettingsLinkGroup>
+              </Show>
+              {/* Keyed, so a popup that is open when the agent changes saves to the agent it opened for. */}
+              <Show when={props.agent.id} keyed>
+                {(agentId) => (
+                  <AgentChatColorRow
+                    agentName={props.agent.name}
+                    value={props.agent.chatColor ?? null}
+                    onChange={(chatColor) => void saveAgentPatch({ chatColor }, agentId)}
+                  />
+                )}
               </Show>
               {props.links}
               <SettingsLinkGroup inset title={t("agentSettings.groups.rules")}>

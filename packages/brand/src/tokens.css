@@ -83,6 +83,20 @@
   --openbot-bg-notch: #000000;
   --openbot-mask-solid: #000000;
   --openbot-transparent: rgba(0, 0, 0, 0);
+  /* The color picker draws real colors, so these stay the same in both themes: the rim and the
+     ends of the saturation area, and the hue spectrum. */
+  --openbot-color-picker-light: #ffffff;
+  --openbot-color-picker-dark: #000000;
+  --openbot-color-picker-spectrum: linear-gradient(
+    to right,
+    #ff0000,
+    #ffff00,
+    #00ff00,
+    #00ffff,
+    #0000ff,
+    #ff00ff,
+    #ff0000
+  );
   --openbot-drawer-scrim: #000000;
   --openbot-scroll-edge-overlay: rgba(0, 0, 0, 0.72);
   --openbot-queue-surface: var(--openbot-bg-surface);
@@ -161,6 +175,15 @@
   --openbot-chart-storage-downloads: #9085e9;
   --openbot-chart-storage-runtimes: #c98500;
   --openbot-chart-storage-app: var(--openbot-text-dim);
+  /* The felt sidebar badges. The fills are the colours of the felt art at its edge (light at the
+     top, dark at the bottom), under `assets/plush/felt-pill-lilac.webp` darkened to plum and
+     `felt-x-ball.webp`. They are art colours, so both themes use them. The digits are cream yarn. */
+  --openbot-felt-plum-top: rgb(112 80 131);
+  --openbot-felt-plum-bottom: rgb(74 40 92);
+  --openbot-felt-raspberry-top: rgb(245 32 112);
+  --openbot-felt-raspberry-bottom: rgb(180 6 65);
+  --openbot-felt-cream: #f6efe2;
+  --openbot-felt-cream-stroke: #efe4d2;
   --openbot-logo-production: #d6adf2;
   --openbot-logo-eye: #040007;
   /* The eyes of the release logo. The logo color setting changes it with `--openbot-logo-production`;
@@ -280,7 +303,7 @@
    * landing page carry type above 24px; .landing-hero-logo is sized in em off
    * --openbot-text-hero, so that token is layout, not just type. */
   --openbot-text-display: 32px;
-  --openbot-text-usage-total: clamp(2rem, 5cqi, 3.5rem);
+  --openbot-text-usage-total: clamp(2rem, 3.5cqi, 2.75rem);
   --openbot-leading-display: 38px;
   --openbot-text-hero: clamp(3rem, 8vw, 6.5rem);
 
@@ -430,6 +453,10 @@
 }
 
 [data-provider="devin"] {
+  --openbot-provider-current: var(--openbot-text-primary);
+}
+
+[data-provider="copilot"] {
   --openbot-provider-current: var(--openbot-text-primary);
 }
 

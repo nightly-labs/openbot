@@ -9,7 +9,13 @@ import type {
 import type { AppTextKey } from "@openbot/i18n";
 import { isAgentTaskActive } from "@openbot/team-client/agent-tasks";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
-import type { AgentMessage, AgentProfile, ComposerMcpServer } from "@openbot/ui/data";
+import type {
+  AgentMessage,
+  AgentProfile,
+  ComposerBrowserTab,
+  ComposerMcpServer,
+  ComposerThread,
+} from "@openbot/ui/data";
 import { AgentActivityIndicator, nextAgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
 import {
   type AgentStep,
@@ -112,6 +118,12 @@ export interface AgentThreadViewProps {
   skillsLoadFailed?: boolean | undefined;
   /** The host's MCP servers, offered by the same `$` the skills answer. */
   mcpServers?: ComposerMcpServer[] | undefined;
+  /** The agent's browser tabs, for the `@` picker. */
+  browserTabs?: ComposerBrowserTab[] | undefined;
+  /** The agent's side threads, newest first, for the `@` picker. The view leaves out its own thread. */
+  threads?: ComposerThread[] | undefined;
+  /** Shows the browser tab, or opens the thread by its task id, that a tag names. */
+  onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;
   /** The unsent text of this thread's message box. The host keeps it for each thread. */
   draft: string;
   /** The files that the draft names. */
@@ -162,6 +174,8 @@ export interface AgentThreadViewProps {
   waitsForAnswer?: boolean | undefined;
   /** Another card that the thread shows, such as a question or a browser takeover. The app builds it. */
   attention?: JSX.Element | undefined;
+  /** The card that the app draws in the place of a message row, such as an MCP sign-in. Undefined keeps the row. */
+  messageCard?: ((message: AgentMessage) => JSX.Element | undefined) | undefined;
   /** The steps of the finished turn above an answer, or undefined for a message that has none. */
   stepsAbove?: ((messageId: string) => AgentStep[] | undefined) | undefined;
   /** The time that the turn of an answer took, and how many of its steps failed. */
@@ -214,6 +228,8 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   const [sending, setSending] = createSignal(false);
   const [addMenuOpen, setAddMenuOpen] = createSignal(false);
   const [skillPickerRequest, setSkillPickerRequest] = createSignal(0);
+  /* A thread does not tag itself. */
+  const otherThreads = createMemo(() => props.threads?.filter((thread) => thread.id !== props.task?.id));
   let scroller: HTMLElement | undefined;
   let atEnd = true;
   let shownTaskId = untrack(() => props.task?.id);
@@ -446,42 +462,53 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             </p>
           </Show>
           <For each={props.messages.filter(shownInThread)} keyed={(message) => message.id}>
-            {(message) => (
-              <div class="virtual-chat-row">
-                <Show when={props.stepsAbove?.(message().id)}>
-                  {(steps) => (
-                    <AgentStepsDisclosure
-                      steps={steps()}
-                      defaultOpen={props.stepsOpenByDefault ?? false}
-                      facts={props.factsAbove?.(message().id)}
-                    />
-                  )}
-                </Show>
-                <ChatMessageRow
-                  message={message()}
-                  author={author(message())}
-                  agents={props.agents}
-                  skills={props.skills}
-                  onSelectAgent={() => undefined}
-                  onOpenLink={props.onOpenLink}
-                  onPreview={props.onPreview}
-                  onAttachmentAction={props.onAttachmentAction}
-                  mediaSource={props.mediaSource}
-                  downloads={props.downloads}
-                  onDownload={(attachment) => props.onAttachmentAction(attachment, "download")}
-                  macWindowControls={props.macWindowControls}
-                  referencedMessage={referenced(message())}
-                  onOpenReference={() => {
-                    const id = message().replyToMessageId;
-                    if (id) showMessage(id);
-                  }}
-                  actions={messageActions(message())}
-                  menu={messageMenu(message())}
-                  data-chat-search-message={message().id}
-                />
-                <Show when={branchDividerAfter(message().id)}>{(source) => <BranchDivider source={source()} />}</Show>
-              </div>
-            )}
+            {(message) => {
+              const card = createMemo(() => props.messageCard?.(message()));
+              return (
+                <div class="virtual-chat-row">
+                  <Show when={props.stepsAbove?.(message().id)}>
+                    {(steps) => (
+                      <AgentStepsDisclosure
+                        steps={steps()}
+                        defaultOpen={props.stepsOpenByDefault ?? false}
+                        facts={props.factsAbove?.(message().id)}
+                      />
+                    )}
+                  </Show>
+                  <Show
+                    when={card()}
+                    fallback={
+                      <ChatMessageRow
+                        message={message()}
+                        author={author(message())}
+                        agents={props.agents}
+                        skills={props.skills}
+                        onSelectAgent={() => undefined}
+                        onOpenTag={props.onOpenTag}
+                        onOpenLink={props.onOpenLink}
+                        onPreview={props.onPreview}
+                        onAttachmentAction={props.onAttachmentAction}
+                        mediaSource={props.mediaSource}
+                        downloads={props.downloads}
+                        onDownload={(attachment) => props.onAttachmentAction(attachment, "download")}
+                        macWindowControls={props.macWindowControls}
+                        referencedMessage={referenced(message())}
+                        onOpenReference={() => {
+                          const id = message().replyToMessageId;
+                          if (id) showMessage(id);
+                        }}
+                        actions={messageActions(message())}
+                        menu={messageMenu(message())}
+                        data-chat-search-message={message().id}
+                      />
+                    }
+                  >
+                    {card()}
+                  </Show>
+                  <Show when={branchDividerAfter(message().id)}>{(source) => <BranchDivider source={source()} />}</Show>
+                </div>
+              );
+            }}
           </For>
           <Show when={running()}>
             {(task) => (
@@ -578,6 +605,9 @@ export function AgentThreadView(props: AgentThreadViewProps) {
               skills={props.skills}
               skillsLoadFailed={props.skillsLoadFailed}
               mcpServers={props.mcpServers}
+              browserTabs={props.browserTabs}
+              threads={otherThreads()}
+              onOpenTag={props.onOpenTag}
               attachments={props.draftAttachments}
               value={props.draft}
               placeholder={props.replyTo ? t("composer.placeholder.reply") : placeholder()}

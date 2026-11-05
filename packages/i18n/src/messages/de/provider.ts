@@ -124,6 +124,8 @@ export const messages = {
   "provider.picker.noModels": "Keine Modelle von {name} verfügbar.",
   "provider.picker.customEmpty":
     "Füge einen OpenAI-kompatiblen Endpunkt hinzu: einen Modellserver auf diesem Computer oder einen Dienst mit Basis-URL und Schlüssel.",
+  "provider.picker.customPending":
+    "Die Modelle deiner Endpunkte sind noch nicht geladen. Der Anbieter liest sie, sobald seine aktuelle Aufgabe beendet ist.",
   "provider.picker.defaultModelLabel": "{name}, Standard",
   "provider.picker.usageLimit": "Nutzungslimit erreicht",
   "provider.picker.usageLimitWindow": "Limit ({window})",
@@ -244,17 +246,10 @@ export const messages = {
   "provider.settings.modelShow": "{name} ({id}) in der Modellauswahl zeigen",
   "provider.settings.modelsNoMatch": "Kein Modell passt zur Suche.",
   "provider.settings.modelsLoadFailed": "Die Modelle dieses Servers konnten nicht geladen werden.",
-  "provider.settings.download": "Download",
-  "provider.settings.downloadedCli": "{name}-CLI",
-  "provider.settings.downloadDetail": {
-    one: "{version} · 1 Version · {size}",
-    other: "{version} · {count} Versionen · {size}",
-  },
-  "provider.settings.downloadVersions": { one: "1 Version · {size}", other: "{count} Versionen · {size}" },
-  "provider.settings.downloadAgain": "Wenn du {name} einschaltest, lädt OpenBot die CLI erneut herunter.",
-  "provider.settings.removeDownloadConfirm": "{size} entfernen?",
-  "provider.settings.removeDownloadKeeps": "Konten, Anmeldungen und Agenten bleiben.",
-  "provider.settings.removeDownload": "Download entfernen",
-  "provider.settings.removingDownload": "Wird entfernt…",
+  "provider.settings.deleteTitle": "{name} löschen",
+  "provider.settings.deleteOn":
+    "Schaltet {name} aus und löscht die CLI, die OpenBot heruntergeladen hat. Konten, Anmeldungen und Agenten bleiben.",
+  "provider.settings.deleteOff":
+    "Löscht die CLI, die OpenBot für {name} heruntergeladen hat ({size}). Konten, Anmeldungen und Agenten bleiben.",
   "provider.settings.removeDownloadFailed": "Der Download konnte nicht entfernt werden.",
 } as const satisfies PartialTranslation<typeof source>;

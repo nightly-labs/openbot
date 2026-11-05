@@ -1,11 +1,10 @@
-import type { AttachmentSummary, ConversationReaction, InstalledSkill } from "@openbot/contracts/ipc";
+import type { AttachmentSummary, AvatarColor, ConversationReaction, InstalledSkill } from "@openbot/contracts/ipc";
 import {
   Bubble,
   BubbleContent,
   BubbleReactions,
   Button,
   ContextMenu,
-  Message,
   MessageAvatar,
   MessageContent,
   MessageHeader,
@@ -35,6 +34,11 @@ export interface ChatMessageAuthor {
   agent?: AgentProfile | undefined;
   /** The face to draw when the profile is gone: the author id keeps deleted agents apart. */
   avatarSeed?: string | undefined;
+  /**
+   * The tint of the bubble, for a person. An agent's tint comes from its profile. Without a tint, the
+   * reader's and an agent's bubbles stay grey, and another person's bubble takes their name colour.
+   */
+  chatColor?: AvatarColor | undefined;
 }
 
 export interface ChatMessageRowProps {
@@ -66,6 +70,13 @@ export interface ChatMessageRowProps {
   menu?: (() => JSX.Element) | undefined;
   /** Extra content inside the bubble, under the body: a question prompt, a note about the message. */
   children?: JSX.Element;
+  /**
+   * The steps of the turn that wrote the message. They stand at the end of the action row and show
+   * with the actions, so a channel reads name, answer.
+   */
+  steps?: JSX.Element;
+  /** True when the actions and steps stand beside the bubble, as a channel shows an agent's answer. They go under it when the line has no room. */
+  actionsBeside?: boolean | undefined;
   class?: string | undefined;
   "data-chat-search-message"?: string | undefined;
   onSelectAgent: (agentId: string) => void;
@@ -75,6 +86,7 @@ export interface ChatMessageRowProps {
   onOpenSharedFile?: (path: string) => void;
   onOpenWorkspaceFile?: ((path: string) => void) | undefined;
   onOpenQuote?: ((messageId: string, text: string) => void) | undefined;
+  onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
   /** Loads the images and media of a client that gets no `previewUrl`. */
   mediaSource?: AttachmentMediaSource | undefined;
@@ -108,11 +120,22 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
   // A colour literal in an inline style is refused by `check:ui`, and rightly: this is the agent's
   // own head colour, read through the same helper the action markers use, so a name matches the
   // face beside it.
+  const chatColor = () => props.author.chatColor ?? props.author.agent?.chatColor;
   const authorStyle = () => {
     const currentSeed = seed();
-    if (own() || currentSeed === undefined) return undefined;
-    return `--message-author-color: ${avatarHeadColor(currentSeed, props.author.agent?.avatarHue ?? null, props.author.agent?.avatarColor ?? null)}`;
+    const tint = chatColor();
+    const styles = [
+      own() || currentSeed === undefined
+        ? undefined
+        : `--message-author-color: ${avatarHeadColor(currentSeed, props.author.agent?.avatarHue ?? null, props.author.agent?.avatarColor ?? null)}`,
+      tint === undefined ? undefined : `--message-chat-color: ${tint}`,
+    ].filter((style) => style !== undefined);
+    return styles.length > 0 ? styles.join("; ") : undefined;
   };
+  const bubbleClass = () => ({
+    "message-bubble-member": member(),
+    "message-bubble-colored": chatColor() !== undefined,
+  });
   const rowClass = () => [
     "message-entry",
     {
@@ -120,6 +143,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
       "message-entry-user": person(),
       "message-entry-agent": !person(),
       "message-entry-with-author": props.showAuthor === true && !person(),
+      "message-entry-actions-beside": beside(),
     },
     props.class,
   ];
@@ -166,6 +190,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
   };
   // Read once: a person's row shows its bubble only when the bubble holds something, such as a voice player.
   const extra = children(() => props.children);
+  const steps = children(() => props.steps);
   const messageBody = (frame?: (content: JSX.Element, imagesOnly: () => boolean) => JSX.Element) => (
     <MessageBody
       frame={frame}
@@ -184,6 +209,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
       onOpenSharedFile={props.onOpenSharedFile}
       onOpenWorkspaceFile={props.onOpenWorkspaceFile}
       onOpenQuote={props.onOpenQuote}
+      onOpenTag={props.onOpenTag}
       onDownload={props.onDownload}
       mediaSource={props.mediaSource}
       downloads={props.downloads}
@@ -194,7 +220,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
   );
   const bubble = (content: JSX.Element): JSX.Element => (
     <Bubble
-      class={member() ? "message-bubble-member" : undefined}
+      class={bubbleClass()}
       align={person() ? "end" : "start"}
       variant={variant()}
       data-author={person() ? "user" : "assistant"}
@@ -250,6 +276,22 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
       </Show>
     </Bubble>
   );
+  // The actions, the time and the steps stand under the bubble. A named author shows the time beside
+  // the name. A row beside the bubble goes under it only when the line has no room.
+  const beside = () => props.actionsBeside === true && !person();
+  const actionRow = (): JSX.Element => (
+    <div class="message-action-row">
+      {props.actions}
+      <Show when={!props.showAuthor || own()}>
+        <time class="message-time" datetime={props.message.createdAt}>
+          {props.message.time}
+        </time>
+      </Show>
+      <Show when={steps.toArray().length > 0}>
+        <div class="message-steps">{steps()}</div>
+      </Show>
+    </div>
+  );
   const body = (): JSX.Element => (
     <>
       <Show when={props.showAuthor && !person()}>
@@ -304,71 +346,53 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
               ))}
             </div>
           </Show>
+          <Show when={beside()}>{actionRow()}</Show>
         </div>
-        {/* The actions and the time stand under the bubble. A named author shows the time beside the name. */}
-        <div class="message-action-row">
-          {props.actions}
-          <Show when={!props.showAuthor || own()}>
-            <time class="message-time" datetime={props.message.createdAt}>
-              {props.message.time}
-            </time>
-          </Show>
-        </div>
+        <Show when={!beside()}>{actionRow()}</Show>
       </MessageContent>
     </>
   );
+  // One element with or without a menu. A sent message gets its menu when the host stores it, and a
+  // new element would draw its images again and blink. Without a menu, the trigger is disabled and
+  // the native menu opens.
   return (
-    <Show
-      when={props.menu}
-      fallback={
-        <Message
-          role="article"
-          align={person() ? "end" : "start"}
-          aria-label={t("chat.row.label", { name: props.author.name })}
-          data-author={person() ? "user" : "assistant"}
-          data-chat-search-message={props["data-chat-search-message"]}
-          style={authorStyle()}
-          class={rowClass()}
-        >
-          {body()}
-        </Message>
-      }
-    >
-      {(menu) => (
-        <ContextMenu.Root modal={false}>
-          <ContextMenu.Trigger
-            as="div"
-            ref={keepNativeMenu}
-            aria-keyshortcuts="Shift+F10"
-            onKeyDown={(event: KeyboardEvent & { currentTarget: HTMLElement }) => {
-              if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
-              event.preventDefault();
-              const bounds = event.currentTarget.getBoundingClientRect();
-              event.currentTarget.dispatchEvent(
-                new MouseEvent("contextmenu", {
-                  bubbles: true,
-                  cancelable: true,
-                  clientX: bounds.left,
-                  clientY: bounds.top,
-                }),
-              );
-            }}
-            role="article"
-            // The trigger is the row, so it draws the `Message` primitive's element itself:
-            // `as={Message}` would spread Kobalte's own props onto the DOM.
-            data-slot="message"
-            data-align={person() ? "end" : "start"}
-            aria-label={t("chat.row.label", { name: props.author.name })}
-            data-author={person() ? "user" : "assistant"}
-            data-chat-search-message={props["data-chat-search-message"]}
-            style={authorStyle() ?? ""}
-            class={["ui-message", ...rowClass()]}
-          >
-            {body()}
-          </ContextMenu.Trigger>
-          <ContextMenu.Portal>{menu()()}</ContextMenu.Portal>
-        </ContextMenu.Root>
-      )}
-    </Show>
+    <ContextMenu.Root modal={false}>
+      <ContextMenu.Trigger
+        as="div"
+        disabled={!props.menu}
+        ref={keepNativeMenu}
+        aria-keyshortcuts={props.menu ? "Shift+F10" : undefined}
+        onKeyDown={(event: KeyboardEvent & { currentTarget: HTMLElement }) => {
+          if (!props.menu) return;
+          if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
+          event.preventDefault();
+          const bounds = event.currentTarget.getBoundingClientRect();
+          event.currentTarget.dispatchEvent(
+            new MouseEvent("contextmenu", {
+              bubbles: true,
+              cancelable: true,
+              clientX: bounds.left,
+              clientY: bounds.top,
+            }),
+          );
+        }}
+        role="article"
+        // The trigger is the row, so it draws the `Message` primitive's element itself:
+        // `as={Message}` would spread Kobalte's own props onto the DOM.
+        data-slot="message"
+        data-align={person() ? "end" : "start"}
+        aria-label={t("chat.row.label", { name: props.author.name })}
+        data-author={person() ? "user" : "assistant"}
+        data-chat-search-message={props["data-chat-search-message"]}
+        // The trigger turns off the long-press callout. A row with no menu keeps it, as before.
+        style={[authorStyle(), props.menu ? undefined : "-webkit-touch-callout: default"]
+          .filter((style) => style !== undefined)
+          .join("; ")}
+        class={["ui-message", ...rowClass()]}
+      >
+        {body()}
+      </ContextMenu.Trigger>
+      <Show when={props.menu}>{(menu) => <ContextMenu.Portal>{menu()()}</ContextMenu.Portal>}</Show>
+    </ContextMenu.Root>
   );
 }

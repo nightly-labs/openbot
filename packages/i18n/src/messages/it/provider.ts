@@ -120,6 +120,8 @@ export const messages = {
   "provider.picker.noModels": "{name} non ha modelli disponibili.",
   "provider.picker.customEmpty":
     "Aggiungi un endpoint compatibile con OpenAI: un server di modelli su questo computer, o qualsiasi servizio con un URL di base e una chiave.",
+  "provider.picker.customPending":
+    "I modelli dei tuoi endpoint non sono ancora caricati. Il provider li legge dopo la fine della sua attività in corso.",
   "provider.picker.defaultModelLabel": "{name}, predefinito",
   "provider.picker.usageLimit": "Limite di utilizzo raggiunto",
   "provider.picker.usageLimitWindow": "Limite ({window})",
@@ -239,17 +241,10 @@ export const messages = {
   "provider.settings.modelShow": "Mostra {name} ({id}) nel selettore dei modelli",
   "provider.settings.modelsNoMatch": "Nessun modello corrisponde alla ricerca.",
   "provider.settings.modelsLoadFailed": "Impossibile caricare i modelli di questo server.",
-  "provider.settings.download": "Download",
-  "provider.settings.downloadedCli": "CLI di {name}",
-  "provider.settings.downloadDetail": {
-    one: "{version} · 1 versione · {size}",
-    other: "{version} · {count} versioni · {size}",
-  },
-  "provider.settings.downloadVersions": { one: "1 versione · {size}", other: "{count} versioni · {size}" },
-  "provider.settings.downloadAgain": "Quando attivi {name}, OpenBot scarica di nuovo la sua CLI.",
-  "provider.settings.removeDownloadConfirm": "Rimuovere {size}?",
-  "provider.settings.removeDownloadKeeps": "Account, accessi e agenti restano.",
-  "provider.settings.removeDownload": "Rimuovi download",
-  "provider.settings.removingDownload": "Rimozione…",
+  "provider.settings.deleteTitle": "Elimina {name}",
+  "provider.settings.deleteOn":
+    "Disattiva {name} ed elimina la CLI scaricata da OpenBot. Account, accessi e agenti restano.",
+  "provider.settings.deleteOff":
+    "Elimina la CLI che OpenBot ha scaricato per {name} ({size}). Account, accessi e agenti restano.",
   "provider.settings.removeDownloadFailed": "Impossibile rimuovere il download.",
 } as const satisfies PartialTranslation<typeof source>;

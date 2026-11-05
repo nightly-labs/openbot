@@ -2400,6 +2400,15 @@ html.ui-textarea-resizing {
     animation: none;
   }
 }
+/* A window that Chromium draws on the CPU (no GPU, a blocked GPU or a failed one) has this root
+ * attribute. There a backdrop blur repaints all that is under it on each frame: an open dialog
+ * dropped frames of more than 100 ms. So no surface blurs its backdrop. The rule wins over each
+ * blur, `-webkit-backdrop-filter` included, because that name is an alias in Chromium. */
+:root[data-openbot-software-rendering] *,
+:root[data-openbot-software-rendering] *::before,
+:root[data-openbot-software-rendering] *::after {
+  backdrop-filter: none !important;
+}
 /* The one dialog overlay. Each Dialog.Overlay and AlertDialog.Overlay has this class. It covers the
  * window on the dialog layer, centers the dialog that it holds, and fades in. A dialog changes only
  * what is different for it, such as a nested layer. */

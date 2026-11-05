@@ -11,6 +11,7 @@ import { type BrowserUserControlEvent, browserUserControlEvent } from "./browser
 // Events that optional capabilities add outside the frozen base event vocabularies. The base event
 // adapters reject them, so each transport asks here first and sends or decodes them as they are.
 import { type ChannelEvent, channelEvent } from "./channels-v1";
+import { type ChatColorsEvent, chatColorsEvent } from "./chat-colors-v1";
 import { type HostRestartEvent, hostRestartEvent } from "./host-update-v1";
 import { type MachineAlertEvent, machineAlertEvent } from "./machine-resources-v1";
 import { type QuietTurnCompletedEvent, quietTurnEvent } from "./quiet-turn-v1";
@@ -27,6 +28,7 @@ export type OptionalTeamEvent =
   | AgentHiddenEvent
   | AgentNotificationLevelsEvent
   | AgentSessionSettingsEvent
+  | ChatColorsEvent
   | BrowserPageStateEvent
   | BrowserProfilesEvent
   | BrowserUserControlEvent
@@ -58,6 +60,7 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     agentHiddenEvent(value) ??
     agentNotificationLevelsEvent(value) ??
     agentSessionSettingsEvent(value) ??
+    chatColorsEvent(value) ??
     browserPageStateEvent(value) ??
     browserProfilesEvent(value) ??
     browserUserControlEvent(value) ??

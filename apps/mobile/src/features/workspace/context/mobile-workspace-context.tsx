@@ -116,6 +116,7 @@ import { trackWorkspaceActions } from "@/features/analytics/workspace-actions";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { decodeMobileBrowserTabs } from "@/features/browser/model/browser-tabs";
 import { MobileChannelStore } from "@/features/channels/model/channel-store";
+import { deleteServerDrafts } from "@/features/chat/model/composer-drafts";
 import { useLiveActivity } from "@/features/live-activity/use-live-activity";
 import { NotificationAvatarSync } from "@/features/push-notifications/notification-avatar-sync";
 import { usePushNotifications } from "@/features/push-notifications/use-push-notifications";
@@ -521,6 +522,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const dropServerState = useCallback(
     (serverIds: ReadonlySet<string>) => {
       if (!serverIds.size) return;
+      deleteServerDrafts(serverIds);
       const removedAgentIds = new Set<string>();
       for (const serverId of serverIds) {
         removedServers.current.add(serverId);
@@ -941,10 +943,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           conversations: agents.flatMap((agent) => conversationStore.cachedPage(agent.id) ?? []),
           capabilities: serverCapabilities.current.get(serverId) ?? keptCapabilities.current.get(serverId) ?? null,
           drawer: drawerSnapshot(serverId),
+          channels: channelStore.cachedChannels(serverId),
         })
         .catch(() => undefined);
     },
-    [workspaceCache, conversationStore],
+    [workspaceCache, conversationStore, channelStore],
   );
   // The first time a server is listed in this run, it shows what the phone kept, until its own reads
   // replace it. Its first attempt is then quiet, as a return to the app.
@@ -970,6 +973,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           if (cached.sidebar) applySidebarLayout(id, cached.sidebar);
           replaceServerAgents(id, cached.agents);
           for (const page of cached.conversations) conversationStore.restore(page);
+          if (cached.channels && cached.capabilities)
+            channelStore.restore(id, cached.capabilities, cached.channels.channels, cached.channels.pages);
           const connection = connections.current.get(id);
           if (connection) connection.quietStart();
           else quietStarts.current.add(id);
@@ -984,6 +989,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     applySidebarLayout,
     replaceServerAgents,
     conversationStore,
+    channelStore,
   ]);
 
   const loadConversation = useCallback(
