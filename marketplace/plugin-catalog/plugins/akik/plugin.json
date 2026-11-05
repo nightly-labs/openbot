@@ -2,7 +2,7 @@
   "slug": "akik",
   "name": "Akik",
   "tagline": "Your notes as long-term memory for AI agents",
-  "description": "Akik is a local-first notes app for Mac (iPhone and iPad coming soon) with folders, tags and wiki links. This connector lets AI agents work with the notes you sync to your Akik account: search and read notes, collect open to-dos, follow links, read shared memory and write notes that carry the agent's name. Notes tagged \"Gizli\" (secret) are never visible to any agent. You choose which tags each agent may read and whether it may write to shared memory.",
+  "description": "Akik is a local-first notes app for Mac (iPhone and iPad coming soon) with folders, tags and wiki links. This connector lets AI agents work with the notes you sync to your Akik account: search and read notes, collect open to-dos, follow links, read shared memory and write notes that carry the agent's name. According to Akik, notes tagged \"Gizli\" (secret) are never visible to any agent. You choose which tags each agent may read and whether it may write to shared memory.",
   "category": "productivity",
   "creatorName": "CSY Studio",
   "iconUrl": "https://cansoykanyilmaz.com/assets/img/akik/simge.png",
