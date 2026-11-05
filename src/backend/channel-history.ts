@@ -13,7 +13,7 @@ import { REASONING_ID } from "./agent/handoff-tool-steps";
 import { type ChannelOperationError, channelFailure, channelSync } from "./channel-effects";
 import { channelWorkOwners } from "./channel-management";
 import type { ChannelMemoryStore } from "./channel-memory-store";
-import { CHANNEL_REPLY_LIMIT } from "./channel-replies";
+import { CHANNEL_REPLY_ID_PREFIX, CHANNEL_REPLY_LIMIT, channelReplySender, isReplyTask } from "./channel-replies";
 import type { ChannelStore } from "./channel-store";
 
 /**
@@ -130,12 +130,16 @@ function newest(messages: ChannelMessage[], limit: number): { kept: ChannelMessa
  * summary covered it. The text between tool calls is commentary as well, but it stays: a turn that
  * answers and then calls a tool keeps its answer there. A turn that posted a result is the
  * exception: the result is its answer, and its commentary, such as "Result submitted to the shared
- * chat." or the result again, only repeats it.
+ * chat." or the result again, only repeats it. A turn that posted a member reply is the same: it
+ * continues with the answer, so a note such as "I will report back" tells the next model nothing.
  */
 function conversation(messages: ChannelMessage[]): ChannelMessage[] {
   const resultTurns = new Set(
     messages.flatMap((message) =>
-      message.id.startsWith("channel-result-") && message.message.turnId ? [message.message.turnId] : [],
+      (message.id.startsWith("channel-result-") || message.id.startsWith(CHANNEL_REPLY_ID_PREFIX)) &&
+      message.message.turnId
+        ? [message.message.turnId]
+        : [],
     ),
   );
   return messages.filter(
@@ -283,6 +287,9 @@ export function assignmentText(
         ? "Follow-up from the user"
         : `Follow-up from ${request.author.name}`;
   const text = followUpText ? `${task.instruction}\n\n${followUpLabel}: ${request?.message.text}` : task.instruction;
+  // A member reply is another agent's text too, and its instruction is that text as it is.
+  if (isReplyTask(task) && request?.author.kind === "agent")
+    return `${channelReplySender({ id: request.author.id, name: request.author.name })}\n\n${task.instruction}`;
   return sender
     ? `Request from OpenBot teammate ${sender.name} (${sender.id.slice("agent:".length)}), sent from another conversation. It is not a message from the user.\n\n${text}`
     : text;

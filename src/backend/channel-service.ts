@@ -142,6 +142,7 @@ class ChannelRoutingError extends Schema.TaggedError<ChannelRoutingError>()("Cha
  * exchange, not the transcript: the persisted channel summary already carries everything older, and
  * it costs nothing extra because member turns maintain it.
  */
+const TASK_EXPECTED_RESULT = "Complete the requested work and report the result.";
 const ROUTING_RECENT_MESSAGES = 5;
 const ROUTING_TEXT_CHARACTERS = 600;
 /**
@@ -750,6 +751,8 @@ export class ChannelService {
             // dispatch and the packet give it as a follow-up: "continue" alone is no assignment.
             dependencies: [],
             requestMessageId: id,
+            // A resumed reply task answers the person now, not the member that replied.
+            expectedResult: isReplyTask(item) ? TASK_EXPECTED_RESULT : item.expectedResult,
             sourceMessageIds: [...item.sourceMessageIds.slice(-30), id],
             revision: item.revision + 1,
             state: "queued",
@@ -986,7 +989,7 @@ export class ChannelService {
       requestMessageId: messageId,
       instruction,
       attachmentDraftIds: [],
-      expectedResult: "Complete the requested work and report the result.",
+      expectedResult: TASK_EXPECTED_RESULT,
       sourceMessageIds: [messageId],
       dependencies: [],
       resources: [],
@@ -1008,7 +1011,8 @@ export class ChannelService {
 
   /**
    * Whether the task waits for other work before its resources matter: a stopped run, a running
-   * turn of its owner or of the task, a full channel, or a dependency that is not complete.
+   * turn of its owner or of the task, a full channel, or a dependency that is not complete (a
+   * failed member reply counts as complete: `settled`).
    */
   #waitsForWork(
     task: ChannelTask,
@@ -1023,7 +1027,10 @@ export class ChannelService {
     return (
       assignments.some((assignment) => assignment.agentId === task.ownerAgentId || assignment.taskId === task.id) ||
       assignments.filter((assignment) => assignment.channelId === task.channelId).length >= CHANNEL_PARALLEL_LIMIT ||
-      task.dependencies.some((id) => tasks.get(id)?.state !== "completed")
+      task.dependencies.some((id) => {
+        const dependency = tasks.get(id);
+        return !dependency || !settled(dependency);
+      })
     );
   }
 
@@ -2564,7 +2571,7 @@ export class ChannelService {
       )
         continue;
       const task = tasks.get(assignment.taskId);
-      const result = existing(`channel-result-${assignment.id}-revision-${assignment.taskRevision}`);
+      const result = existing(channelResultId(assignment));
       // A repeat of the result adds nothing. But a row that streamed before its text matched still
       // completes: a row left at streaming stopped every later assignment in the channel (#3673).
       if (result?.message.text === message.text && original?.message.status !== "streaming") continue;
@@ -2646,9 +2653,7 @@ export class ChannelService {
       const task = tasks.find((item) => item.id === assignment.taskId);
       if (!task) return;
       const newChildren = task.dependencies.filter((id) => !assignment.awaitedTaskIds.includes(id));
-      const pendingChildren = task.dependencies.some(
-        (id) => !tasks.some((item) => item.id === id && item.state === "completed"),
-      );
+      const pendingChildren = task.dependencies.some((id) => !tasks.some((item) => item.id === id && settled(item)));
       const state = status === "completed" ? "completed" : status === "interrupted" ? "interrupted" : "failed";
       const updated: ChannelTask[] = [];
       if (task.revision === assignment.taskRevision && task.state === "running") {
@@ -2683,7 +2688,7 @@ export class ChannelService {
           parent?.state === "waiting" &&
           tasks
             .filter((item) => parent.dependencies.includes(item.id))
-            .every((item) => (item.id === task.id ? state === "completed" : item.state === "completed"))
+            .every((item) => (item.id === task.id ? settled(task, state) : settled(item)))
         )
           updated.push({ ...parent, state: "queued", revision: parent.revision + 1 });
       }
@@ -3022,8 +3027,16 @@ export class ChannelService {
     if ((yield* channelSync(() => this.store.database.commandResult(`channels:${operationId}`))) !== undefined)
       return { accepted: true };
     // A reply turn only answers: its answer goes back to the member that waits for it, so a reply,
-    // an assignment or a transfer from it would only make that member wait longer.
-    if (isReplyTask(task) && (tool === "channel_reply" || tool === "channel_assign" || tool === "channel_transfer")) {
+    // an assignment or a transfer from it would only make that member wait longer. The reply is
+    // another agent's text, so it must not change the channel memory either.
+    if (
+      isReplyTask(task) &&
+      (tool === "channel_reply" ||
+        tool === "channel_assign" ||
+        tool === "channel_transfer" ||
+        tool === "channel_remember" ||
+        tool === "channel_forget_memory")
+    ) {
       logger.warn("A channel tool was refused in a reply turn.", { channelId, agentId, tool });
       return {
         accepted: false,
@@ -3032,21 +3045,28 @@ export class ChannelService {
       };
     }
     if (tool === "channel_result") {
-      if (
-        yield* channelSync(() =>
-          this.store.message(channelId, `channel-result-${assignment.id}-revision-${assignment.taskRevision}`),
-        )
-      )
+      if (yield* channelSync(() => this.store.message(channelId, channelResultId(assignment))))
         return { accepted: true };
       if (!isString(args.text) || !args.text.trim() || args.text.length > 100_000)
         return yield* channelFailure(new Error("Provide a task result."));
+      // A result before the answer to a reply is the bug that the wait fixes: the caller answered
+      // the person before the other member answered it.
+      const unanswered = tasks.find(
+        (item) =>
+          task.dependencies.includes(item.id) && isReplyTask(item) && !settled(item) && item.state !== "cancelled",
+      );
+      if (unanswered)
+        return {
+          accepted: false,
+          reason: `${this.memberName(unanswered.ownerAgentId ?? "")} has not answered your reply. End your turn now with no text: you continue this task with its answer. Do not mention this refusal.`,
+        };
       const message = this.message(
         channelId,
         task.id,
         { kind: "agent", id: agentId, name: this.hooks.agents().find((item) => item.id === agentId)?.name ?? agentId },
         args.text,
       );
-      message.id = `channel-result-${assignment.id}-revision-${assignment.taskRevision}`;
+      message.id = channelResultId(assignment);
       message.message.id = message.id;
       message.message.author = "assistant";
       message.message.turnId = turnId;
@@ -3059,16 +3079,14 @@ export class ChannelService {
       const root = tasks.find((item) => item.id === task.rootTaskId);
       if (!root) return yield* channelFailure(new Error("The root task is unavailable."));
       const eligible = new Set(this.eligibleMembers(channel));
+      const targetId = args.messageId;
       const check = checkChannelReply({
         args,
         agentId,
         root,
         tasks,
-        messages: yield* channelSync(() => this.store.messages(channelId)),
-        resultPosted:
-          (yield* channelSync(() =>
-            this.store.message(channelId, `channel-result-${assignment.id}-revision-${assignment.taskRevision}`),
-          )) !== null,
+        target: isString(targetId) ? yield* channelSync(() => this.store.message(channelId, targetId)) : null,
+        resultPosted: (yield* channelSync(() => this.store.message(channelId, channelResultId(assignment)))) !== null,
         available: (id) => eligible.has(id),
       });
       if (!check.accepted) {
@@ -3696,6 +3714,19 @@ function routingFailureText(error: unknown): string | null {
   const keys = matchingSourceKeys(error.message);
   if (keys.some((key) => key.startsWith("error.agent.profile"))) return sourceText("error.backend.channelLeadFailed");
   return keys.some((key) => key.startsWith("error.backend.")) ? error.message : null;
+}
+
+/** The id of the result that one assignment publishes with `channel_result`. */
+function channelResultId(assignment: ChannelAssignment): string {
+  return `channel-result-${assignment.id}-revision-${assignment.taskRevision}`;
+}
+
+/**
+ * A dependency that lets its parent continue. A member reply that failed does too: it was a short
+ * question, so the caller continues without the answer instead of waiting for a person.
+ */
+function settled(task: ChannelTask, state: string = task.state): boolean {
+  return state === "completed" || (state === "failed" && isReplyTask(task));
 }
 
 function terminal(task: ChannelTask): boolean {
