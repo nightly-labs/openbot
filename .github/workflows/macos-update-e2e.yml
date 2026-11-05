@@ -1,0 +1,67 @@
+name: macOS in-app update E2E
+
+# Updates a released OpenBot to the latest release with the real in-app updater on GitHub-hosted
+# Macs, and records whether Squirrel's ShipIt installs it (issue #5039). `xcode-27` runs macOS 27;
+# `macos-15` is the control.
+on:
+  push:
+    branches: [t3/433467fe]
+    paths:
+      - scripts/macos-in-app-update-e2e.ts
+      - .github/workflows/macos-update-e2e.yml
+  workflow_dispatch:
+    inputs:
+      from_version:
+        description: Released version to update from
+        default: 0.61.0
+      to_version:
+        description: Version that the update must install (the latest release)
+        default: 0.62.0
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-update-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  update:
+    name: In-app update on ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [xcode-27, macos-15]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    env:
+      FROM_VERSION: ${{ inputs.from_version || '0.61.0' }}
+      TO_VERSION: ${{ inputs.to_version || '0.62.0' }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      - name: Download the released app
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .openbot-build/release
+          gh release download "v$FROM_VERSION" -R "$GITHUB_REPOSITORY" -p "OpenBot-$FROM_VERSION-arm64.zip" -D .openbot-build/release
+
+      - name: Update the app
+        run: bun scripts/macos-in-app-update-e2e.ts ".openbot-build/release/OpenBot-$FROM_VERSION-arm64.zip" "$TO_VERSION"
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: macos-in-app-update-e2e-${{ matrix.runner }}
+          path: .openbot-build/macos-in-app-update-e2e
+          if-no-files-found: warn
