@@ -703,12 +703,14 @@ export class OpenBotToolRouter {
       return openBotToolFailure(
         "request_api_key does not work in an external chat. Ask the user to give you the key in OpenBot.",
       );
-    const spec = apiKeyFormSpec(parsed.data);
+    // With a Vault, the user can save the key for every agent, so another agent does not ask again.
+    const vault = this.#vaultItems?.ready() === true;
+    const spec = apiKeyFormSpec({ ...parsed.data, vault });
     if (!spec) return openBotToolFailure("OpenBot could not show this form. Use a shorter title and retry.");
     this.#attention.surfaceUiBlock(client, request, {
       blockId: randomUUID(),
       spec,
-      apiKey: { name: parsed.data.name },
+      apiKey: { name: parsed.data.name, vault },
     });
     return null;
   });
