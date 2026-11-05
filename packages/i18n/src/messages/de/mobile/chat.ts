@@ -78,6 +78,7 @@ export const messages = {
   "mobile.chat.question.answerForm": "Formular beantworten",
   "mobile.chat.question.answersSent": "Antworten gesendet",
   "mobile.chat.question.autoAction": "{action} · {seconds} s",
+  "mobile.chat.question.autoActionClock": "{action} · {time}",
   "mobile.chat.question.autoAnswered": "{outcome} (niemand hat rechtzeitig geantwortet)",
   "mobile.chat.question.formCancelled": "Formular abgebrochen",
   "mobile.chat.question.formExpired": "Formular abgelaufen",

@@ -77,6 +77,7 @@ export const messages = {
   "mobile.chat.question.answerForm": "フォームに回答",
   "mobile.chat.question.answersSent": "回答を送信しました",
   "mobile.chat.question.autoAction": "{action} · {seconds}秒",
+  "mobile.chat.question.autoActionClock": "{action} · {time}",
   "mobile.chat.question.autoAnswered": "{outcome}（時間内に回答がありませんでした）",
   "mobile.chat.question.formCancelled": "フォームはキャンセルされました",
   "mobile.chat.question.formExpired": "フォームの期限が切れました",

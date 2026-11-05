@@ -74,6 +74,7 @@ export const messages = {
   "mobile.chat.question.answerForm": "回答表单",
   "mobile.chat.question.answersSent": "回答已发送",
   "mobile.chat.question.autoAction": "{action} · {seconds} 秒",
+  "mobile.chat.question.autoActionClock": "{action} · {time}",
   "mobile.chat.question.autoAnswered": "{outcome}（无人及时回答）",
   "mobile.chat.question.formCancelled": "表单已取消",
   "mobile.chat.question.formExpired": "表单已过期",

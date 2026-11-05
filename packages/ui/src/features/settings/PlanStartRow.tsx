@@ -88,10 +88,7 @@ export function PlanStartRow(props: PlanStartRowProps) {
     if (choice === "custom") return t("settings.planStart.custom");
     return t("settings.planStart.after", { time: delayText(Number(choice)) });
   };
-  const label = () =>
-    props.value === null
-      ? t("settings.planStart.wait")
-      : t("settings.planStart.after", { time: delayText(props.value) });
+  const label = () => choiceText(choiceOf(props.value));
   const draftMs = () => typedMs(state.amount, state.unit);
 
   function openCustom(): void {

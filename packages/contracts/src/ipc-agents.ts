@@ -76,6 +76,7 @@ export function isPlanStartAfterMs(value: unknown): value is number | null {
     value === null ||
     (typeof value === "number" &&
       Number.isSafeInteger(value) &&
+      value % 1_000 === 0 &&
       value >= MIN_PLAN_START_AFTER_MS &&
       value <= MAX_PLAN_START_AFTER_MS)
   );
