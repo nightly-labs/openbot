@@ -66,6 +66,18 @@ const RELATIVE_ANSWER = [
   "  *(Models within this group: Claude Opus, Claude Sonnet, GPT-OSS)*",
   "  - **Weekly Limit Remaining:** 100% remaining",
 ].join("\n");
+/** The wording a spent Gemini quota carries in a refusal (#4368), here on the weekly bucket. */
+const RELATIVE_DAYS_ANSWER = [
+  "### Session Usage",
+  "- No token usage recorded yet.",
+  "### Quota Limits",
+  "- **Gemini Models**",
+  "  *(Models within this group: Gemini Flash, Gemini Pro)*",
+  "  - **Weekly Limit Remaining:** 0% remaining (will reset in 2 days, 18 hours)",
+  "- **Claude and GPT models**",
+  "  *(Models within this group: Claude Opus, Claude Sonnet, GPT-OSS)*",
+  "  - **Weekly Limit Remaining:** 100% remaining",
+].join("\n");
 
 // Logs every request method, and answers a prompt that starts with `/usage` with `FAKE_AGY_ANSWER`
 // in one `agent_message_chunk` before the prompt returns. Any other prompt is a model turn.
@@ -138,6 +150,7 @@ interface Report {
   apiKeySignIn?: UsageCase;
   olderRuntime?: UsageCase;
   relativeReset?: UsageCase;
+  relativeResetDays?: UsageCase;
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-antigravity-usage-e2e-"));
@@ -295,6 +308,21 @@ try {
     relativeResetsAt >= Math.floor(relativeStartedAt) + relativeSeconds - 1 &&
       relativeResetsAt <= Math.ceil(relativeFinishedAt) + relativeSeconds + 1,
     `the relative reset is about now + ${relativeSeconds}s: ${relativeResetsAt}`,
+  );
+
+  // 7. The days form a spent Gemini quota carries in a refusal (#4368) reads the same way on the
+  // usage reading, so a weekly window the provider names in days also lifts by the clock.
+  const daysStartedAt = Date.now() / 1_000;
+  const days = await readUsage("1.4.1", RELATIVE_DAYS_ANSWER, 1, "gemini-3.8-flash-high");
+  report.relativeResetDays = days;
+  const daysFinishedAt = Date.now() / 1_000;
+  const daysResetsAt = days.readings[0]?.rateLimits?.secondary?.resetsAt ?? null;
+  assert.ok(daysResetsAt !== null, "a days-named reset is read, not dropped");
+  const daysSeconds = 2 * 86_400 + 18 * 3_600;
+  assert.ok(
+    daysResetsAt >= Math.floor(daysStartedAt) + daysSeconds - 1 &&
+      daysResetsAt <= Math.ceil(daysFinishedAt) + daysSeconds + 1,
+    `the days reset is about now + ${daysSeconds}s: ${daysResetsAt}`,
   );
 
   report.passed = true;
