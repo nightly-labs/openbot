@@ -536,8 +536,9 @@ never sent anywhere. The app replaces it with what the server and the account se
 deletes a server's copy when the account no longer has that server. Sign-out and an expired or
 disconnected session delete all copies and the key. Attachments and files are not in the copy.
 
-The mobile app keeps a support log of up to 1,000 events in the phone's system cache: app version,
-system and device model, app state changes, connection steps with server IDs and error text, the
+The mobile app keeps a support log of up to 5,000 events in the phone's system cache: app version,
+system and device model, app state changes, connection steps with server IDs, error text and error
+codes, the types and counts of network candidates (such as "relay/udp", never an address), the
 desktop app version and protocol support of each server, the method, address without query, status
 and time of its requests, including Team API requests to the desktop, and app warnings and errors. It
 does not record message text, files, request bodies or headers, and it masks tokens, keys and email
