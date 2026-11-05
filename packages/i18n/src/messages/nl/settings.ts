@@ -584,7 +584,7 @@ export const messages = {
     "Als je een bericht dicteert, wordt het antwoord voorgelezen. Dicteer opnieuw om het te stoppen.",
   "settings.voice.speech.codexLive.title": "Codex live spraak",
   "settings.voice.speech.codexLive.description":
-    "Spraakgesprekken met Codex-agents gebruiken live spraak van OpenAI met je Codex-aanmelding. Je stem gaat naar OpenAI.",
+    "Spraakgesprekken met elke agent gebruiken live spraak van OpenAI met je Codex-aanmelding. Je stem, je verzoeken en de antwoorden van de agent gaan naar OpenAI.",
   "settings.voice.speech.speed.title": "Snelheid",
   "settings.voice.speech.voice.title": "Stem",
   "settings.voice.speech.voice.female": "Vrouwenstem {number}",

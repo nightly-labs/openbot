@@ -620,7 +620,7 @@ export const messages = {
     "Когда вы диктуете сообщение, ответ читается вслух. Чтобы остановить его, начните диктовать снова.",
   "settings.voice.speech.codexLive.title": "Живой голос Codex",
   "settings.voice.speech.codexLive.description":
-    "Голосовые разговоры с агентами Codex используют живой голос OpenAI с вашим входом в Codex. Ваш голос передаётся в OpenAI.",
+    "Голосовые разговоры с любым агентом используют живой голос OpenAI с вашим входом в Codex. Ваш голос, ваши запросы и ответы агента передаются в OpenAI.",
   "settings.voice.speech.speed.title": "Скорость",
   "settings.voice.speech.voice.title": "Голос",
   "settings.voice.speech.voice.female": "Женский голос {number}",

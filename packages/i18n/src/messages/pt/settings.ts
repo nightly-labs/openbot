@@ -590,7 +590,7 @@ export const messages = {
     "Quando você dita uma mensagem, a resposta é lida em voz alta. Dite de novo para parar.",
   "settings.voice.speech.codexLive.title": "Voz ao vivo do Codex",
   "settings.voice.speech.codexLive.description":
-    "As conversas por voz com agentes Codex usam a voz ao vivo da OpenAI com a sua sessão do Codex. A sua voz vai para a OpenAI.",
+    "As conversas por voz com qualquer agente usam a voz ao vivo da OpenAI com a sua sessão do Codex. A sua voz, os seus pedidos e as respostas do agente vão para a OpenAI.",
   "settings.voice.speech.speed.title": "Velocidade",
   "settings.voice.speech.voice.title": "Voz",
   "settings.voice.speech.voice.female": "Voz feminina {number}",

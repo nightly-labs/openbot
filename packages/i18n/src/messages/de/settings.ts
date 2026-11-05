@@ -606,7 +606,7 @@ export const messages = {
     "Wenn du eine Nachricht diktierst, wird die Antwort vorgelesen. Diktiere erneut, um sie zu stoppen.",
   "settings.voice.speech.codexLive.title": "Codex-Live-Sprache",
   "settings.voice.speech.codexLive.description":
-    "Sprachgespräche mit Codex-Agenten nutzen OpenAI-Live-Sprache mit deiner Codex-Anmeldung. Deine Stimme geht an OpenAI.",
+    "Sprachgespräche mit jedem Agenten nutzen OpenAI-Live-Sprache mit deiner Codex-Anmeldung. Deine Stimme, deine Anfragen und die Antworten des Agenten gehen an OpenAI.",
   "settings.voice.speech.speed.title": "Geschwindigkeit",
   "settings.voice.speech.voice.title": "Stimme",
   "settings.voice.speech.voice.female": "Weibliche Stimme {number}",
