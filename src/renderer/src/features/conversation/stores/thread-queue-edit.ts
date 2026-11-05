@@ -305,5 +305,3 @@ export function createThreadQueue(deps: ThreadQueueDeps) {
 
   return { view, save, cancel, editOf, editsDraft, draftLocked, keepsAttachment, busy };
 }
-
-export type ThreadQueue = ReturnType<typeof createThreadQueue>;

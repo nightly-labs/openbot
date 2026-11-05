@@ -495,7 +495,7 @@ export interface ConversationThreads {
 }
 
 /** The actions of the queue of a side thread, as in the agent's own chat. An edit goes through the message box. */
-export interface ThreadQueueActions {
+interface ThreadQueueActions {
   cancel: (deliveryId: string) => void;
   /** Gives a queued message to the running turn of `task`. */
   steer: (task: AgentTask, deliveryId: string) => void;
