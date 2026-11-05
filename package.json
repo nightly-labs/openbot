@@ -222,6 +222,7 @@
     "test:acp-mcp-names": "bun scripts/acp-mcp-server-names-e2e.ts",
     "test:acp-mcp-shared-token": "bun scripts/acp-mcp-shared-token-e2e.ts",
     "test:acp-turn-stall": "bun scripts/acp-turn-stall-e2e.ts",
+    "test:agent-database-host-start": "bun scripts/agent-database-host-start-e2e.ts",
     "test:acp-instructions-once": "bun scripts/acp-instructions-once-e2e.ts",
     "test:acp-audio-input": "bun scripts/acp-audio-input-e2e.ts",
     "test:grok-steer": "bun scripts/grok-steer-e2e.ts",
@@ -511,7 +512,8 @@
     "react-native-reserved-regions@0.2.0": "patches/react-native-reserved-regions@0.2.0.patch",
     "cuelume@0.2.8": "patches/cuelume@0.2.8.patch",
     "react-native-screens@4.30.0": "patches/react-native-screens@4.30.0.patch",
-    "storybook-solidjs-vite@10.7.1": "patches/storybook-solidjs-vite@10.7.1.patch"
+    "storybook-solidjs-vite@10.7.1": "patches/storybook-solidjs-vite@10.7.1.patch",
+    "react-native-reanimated@4.7.1": "patches/react-native-reanimated@4.7.1.patch"
   },
   "trustedDependencies": [
     "electron-winstaller",

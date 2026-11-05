@@ -903,8 +903,10 @@ const Conversation = createSimpleContext({
       heldUnreadAgentChats.delete(requestKey);
       const conversationAtStart = conversations[agentId];
       const visibleMessageIdAtStart = latestVisibleAgentMessageId(conversations[agentId]?.messages);
+      // The same boundary as an automatic read. A chat with no message the host counts reads through its newest message.
       const boundary =
         throughMessageId ??
+        visibleMessageIdAtStart ??
         conversations[agentId]?.messages
           ?.filter((message) => !message.id.startsWith("thinking:") && !message.id.startsWith("ui-"))
           .at(-1)?.id ??

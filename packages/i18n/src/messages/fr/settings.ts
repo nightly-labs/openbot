@@ -540,9 +540,13 @@ export const messages = {
   // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Dictée",
   "settings.voice.model.parakeet.description": "Rapide. Détecte seul la langue parlée, parmi 25 langues européennes.",
+  "settings.voice.model.parakeetUnified.description":
+    "Rapide. Anglais uniquement. Met la ponctuation, avec moins d’erreurs que Parakeet TDT.",
   "settings.voice.model.bark.description":
     "Rapide. Anglais uniquement. Écrit surtout en minuscules, avec peu de ponctuation.",
   "settings.voice.model.whisper.description": "Plus lent. Environ 100 langues, et vous pouvez fixer la langue parlée.",
+  "settings.voice.model.cohere.description":
+    "Plus lent. 14 langues. Vous fixez la langue parlée. Utilise environ 4 Go de mémoire.",
   "settings.voice.model.size": "Taille du téléchargement : {size}",
   "settings.voice.model.downloading": "Téléchargement · {received} sur {total}",
   "settings.voice.model.failed": "Le téléchargement s’est arrêté. Vérifiez la connexion et réessayez.",
@@ -557,10 +561,14 @@ export const messages = {
   "settings.voice.language.section": "Langue",
   "settings.voice.language.description":
     "La langue que vous parlez. « Automatique » la détecte à partir de l’enregistrement.",
+  "settings.voice.language.modelLanguages":
+    "La langue que vous parlez. Ce modèle ne connaît que ces langues et ne détecte pas la langue lui-même.",
   "settings.voice.language.modelDetects":
-    "Parakeet détecte seul la langue parlée. Pour fixer une langue, utilisez Whisper ou ElevenLabs.",
+    "Parakeet détecte seul la langue parlée. Pour fixer une langue, utilisez Whisper, Cohere ou ElevenLabs.",
   "settings.voice.language.englishOnly":
-    "Bark reconnaît uniquement l’anglais. Pour fixer une langue, utilisez Whisper ou ElevenLabs.",
+    "Bark reconnaît uniquement l’anglais. Pour fixer une langue, utilisez Whisper, Cohere ou ElevenLabs.",
+  "settings.voice.language.parakeetUnifiedEnglishOnly":
+    "Parakeet Unified reconnaît uniquement l’anglais. Pour fixer une langue, utilisez Whisper, Cohere ou ElevenLabs.",
   "settings.voice.language.automatic": "Automatique",
   "settings.voice.loadFailed": "Impossible de lire les modèles vocaux.",
   "settings.voice.saveFailed": "Impossible d’enregistrer le réglage vocal. Réessayez.",

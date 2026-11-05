@@ -44,6 +44,7 @@ import {
   isCustomProviderContextWindow,
   isCustomProviderHarness,
   isCustomProviderMaxOutput,
+  isCustomProviderReasoningEfforts,
   type McpServerConfig,
   type Routine,
   type RoutineFlowLink,
@@ -695,11 +696,12 @@ export class InstanceTransferService {
           name: provider.name,
           baseUrl: provider.baseUrl,
           apiKey: null,
-          models: provider.models.map(({ id, name, contextWindow, maxOutput }) => ({
+          models: provider.models.map(({ id, name, contextWindow, maxOutput, reasoningEfforts }) => ({
             id,
             name,
             ...(isCustomProviderContextWindow(contextWindow) ? { contextWindow } : {}),
             ...(isCustomProviderMaxOutput(maxOutput) ? { maxOutput } : {}),
+            ...(isCustomProviderReasoningEfforts(reasoningEfforts) ? { reasoningEfforts: [...reasoningEfforts] } : {}),
           })),
           headers: [],
           ...(isCustomProviderHarness(provider.harness) ? { harness: provider.harness } : {}),

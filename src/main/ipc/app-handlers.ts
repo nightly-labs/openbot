@@ -17,7 +17,7 @@ import {
 } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
 import { analyticsOnByDefault } from "@openbot/telemetry";
-import { app, type BrowserWindow, dialog, type OpenDialogOptions } from "electron";
+import { app, type BrowserWindow, dialog, type OpenDialogOptions, type WebContents } from "electron";
 import { version as developmentVersion } from "../../../package.json";
 import type { AgentService } from "../../backend/agent-service";
 import type { BrowserHost } from "../../backend/browser-host";
@@ -55,6 +55,7 @@ import {
   parseExternalLinkPreference,
   parseRemoteNetworkRoutePreference,
   parseRemoteSessionReusePreference,
+  parseRendererTimingReport,
   parseSetup,
 } from "./app-inputs";
 import { stringPayload } from "./validation";
@@ -115,8 +116,9 @@ const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string | ((translate: A
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { openHttpLink } from "../message-link-relay";
 import type { ResourceMonitor } from "../resource-monitor";
+import type { StartupTiming } from "../startup-timing";
 import type { TraceFile } from "../trace-file";
-import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
+import { eventPayloadHandler, handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 
 export interface AppIpcDependencies {
   service: AgentService;
@@ -148,10 +150,14 @@ export interface AppIpcDependencies {
   analyticsCaptureUrl: string | null;
   analyticsInstallId: string | null;
   getMainWindow: () => BrowserWindow | null;
+  /** True for the main window's own `webContents`, not a chat window's. */
+  isMainWindow: (sender: WebContents) => boolean;
   openChatWindow: (target: ChatWindowTarget) => void;
   chatWindowTargets: () => ChatWindowTarget[];
   trace: TraceFile;
   resources: ResourceMonitor;
+  /** Null for a local server child, which reports no start. */
+  startup: StartupTiming | null;
 }
 
 export function appIpcHandlers({
@@ -182,10 +188,12 @@ export function appIpcHandlers({
   analyticsCaptureUrl,
   analyticsInstallId,
   getMainWindow,
+  isMainWindow,
   openChatWindow,
   chatWindowTargets,
   trace,
   resources,
+  startup,
 }: AppIpcDependencies): Pick<IpcGroupHandlers, "app" | "maintenance"> {
   return {
     app: {
@@ -227,6 +235,12 @@ export function appIpcHandlers({
       setAnalyticsPreference: payloadHandler(parseAnalyticsPreference, (parsed) =>
         runCauseEffect(analyticsPreferences.set(parsed.enabled, parsed.chosen === true)),
       ),
+      // Any window can send its bounded counts. Only the main window's workspace load times the start,
+      // and main times it on its own clock.
+      reportRendererTiming: eventPayloadHandler(parseRendererTimingReport, (event, report) => {
+        if (report.workspaceReady && isMainWindow(event.sender)) startup?.workspaceReady();
+        resources.observeRendererTiming(report);
+      }),
       getApprovalAutomation: handler(() => approvalAutomation.current()),
       getBusyMessageModePreference: handler(() => busyMessageMode.get()),
       setBusyMessageModePreference: payloadHandler(parseBusyMessageModePreference, (parsed) =>

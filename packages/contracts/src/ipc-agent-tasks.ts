@@ -2,6 +2,7 @@ import { type AgentProviderId, agentProviderDescriptor } from "./agent-providers
 import { INPUT_LIMITS } from "./input-limits";
 import { integerInRange, isBoundedString, isIdentifier, isNullableBoundedString } from "./ipc-bounded-values";
 import { type ConversationReadState, isConversationReadState } from "./ipc-conversations";
+import { isQueueDelivery, type QueueDelivery } from "./ipc-queue";
 import { isDynamicRecord, isOneOf } from "./runtime-values";
 
 /** The most tasks of one agent that run a turn at the same time, next to the agent's own chat. */
@@ -82,6 +83,11 @@ export interface AgentTask {
   error: string | null;
   /** The messages that wait to start in this task, oldest first. */
   queuedMessages: AgentTaskQueuedMessage[];
+  /**
+   * The same messages in full, with their files and state, for the queue of the thread. Only this
+   * computer sends it: the frozen `agent-tasks-v1` routes carry `queuedMessages` alone.
+   */
+  queue?: QueueDelivery[];
   createdAt: string;
   updatedAt: string;
   closedAt: string | null;
@@ -205,6 +211,7 @@ export function isAgentTask(value: unknown): value is AgentTask {
     (value.error === null || isBoundedString(value.error, INPUT_LIMITS.agentTaskError)) &&
     Array.isArray(value.queuedMessages) &&
     value.queuedMessages.every(isAgentTaskQueuedMessage) &&
+    (value.queue === undefined || (Array.isArray(value.queue) && value.queue.every(isQueueDelivery))) &&
     isBoundedString(value.createdAt, 160) &&
     isBoundedString(value.updatedAt, 160) &&
     (value.closedAt === null || isBoundedString(value.closedAt, 160)) &&

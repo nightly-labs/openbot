@@ -3,7 +3,7 @@ import { ANALYTICS_GENERATIONS, openPanelTransport, ReportQueue } from "@openbot
 import { fileReportStorage } from "@openbot/telemetry/node";
 import { makeWASocket } from "@openbot/whatsapp/baileys";
 import { makeOpenBotSignalRepository } from "@openbot/whatsapp/signal-repository";
-import { Effect, Fiber } from "effect";
+import { Effect, Fiber, Schema } from "effect";
 import { toAgentRemovalFailed } from "../backend/agent/agent-removal";
 import { toHostedSiteOperationFailed } from "../backend/agent/hosted-site-coordinator";
 import { AgentApiKeys } from "../backend/agent-api-keys";
@@ -29,7 +29,11 @@ import { agentDisplayEnvironment, hasSeparateAgentDisplay } from "./agent-displa
 import { type AgentFolders, createAgentFolders } from "./agent-folders";
 import { type AgentHostSettingsService, createAgentHostSettings } from "./agent-host-settings";
 import { type AgentInstructionsFiles, createAgentInstructionsFiles } from "./agent-instructions-files";
-import { type BrowserProfileService, createBrowserProfileService } from "./browser-profile-service";
+import {
+  type BrowserProfileService,
+  browserProxyConnection,
+  createBrowserProfileService,
+} from "./browser-profile-service";
 import { HostReleaseService, readInstallationMode } from "./host-release-service";
 import {
   CONTAINER_UPDATE_PATHS,
@@ -120,6 +124,7 @@ import { AgentLifecycleFailed, AgentService } from "../backend/agent-service";
 import { AgentStore } from "../backend/agent-store";
 import { BrowserHost } from "../backend/browser-host";
 import { BrowserProfileStore } from "../backend/browser-profiles/browser-profile-store";
+import { BrowserProxyStore } from "../backend/browser-profiles/browser-proxy-store";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { MailboxStore } from "../backend/mailbox-store";
 import { McpOAuth } from "../backend/mcp-oauth-provider";
@@ -166,6 +171,8 @@ import { managedBitwardenCli } from "./bitwarden-cli-installer";
 import { BitwardenConnectorService } from "./bitwarden-connector-service";
 import { BitwardenConnectorStore } from "./bitwarden-connector-store";
 import { BrowserDockOverlay } from "./browser-dock-overlay";
+import { BrowserEgressClient } from "./browser-egress-client";
+import { BrowserEgressHost } from "./browser-egress-host";
 import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { BrowserViewClient } from "./browser-view-client";
 import { BusyMessageModePreferenceStore } from "./busy-message-mode-preference-store";
@@ -278,6 +285,10 @@ import { ModelReleaseCatalog, ModelVisibility } from "./model-visibility";
 import { NotificationPreferenceStore } from "./notification-preference-store";
 import { OnePasswordConnectorService } from "./onepassword-connector-service";
 import { OnePasswordConnectorStore } from "./onepassword-connector-store";
+import { EncryptedRecordStore } from "./password-managers/encrypted-record-store";
+import { PasswordManagersService } from "./password-managers/password-managers-service";
+import { managedProtonPassCli } from "./password-managers/proton-pass-cli-installer";
+import { ProtonPassDriver, protonPassRecordSchema } from "./password-managers/proton-pass-driver";
 import { PromptCacheTtlPreferenceStore } from "./prompt-cache-ttl-preference-store";
 import { ProviderAccountsHost } from "./provider-accounts-host";
 import { createProviderCliAppVersionStore } from "./provider-cli-app-version-store";
@@ -314,6 +325,7 @@ import { ResourceMonitor } from "./resource-monitor";
 import { StatementTimings } from "./resource-summary";
 import { RoutineFeedServer } from "./routine-feed-server";
 import { clearRoutineHold, ROUTINE_HOLD_FILE, takeRoutineHold, writeRoutineHold } from "./routine-hold-file";
+import type { UncleanExitProperties } from "./run-marker";
 import { ScreenCapturer } from "./screen-capture";
 import {
   createSecretStorage,
@@ -338,6 +350,7 @@ import { SignalIngress } from "./signal-ingress";
 import { SkillMarketplaceService } from "./skill-marketplace-service";
 import { SLACK_DEV_CALLBACK_PATH, startSlackDevCallbackServer } from "./slack-dev-callback-server";
 import { SpeechPreferenceStore } from "./speech-preference-store";
+import { StartupTiming } from "./startup-timing";
 import { TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
@@ -363,7 +376,9 @@ import { VoiceApiKeyStore } from "./voice-api-key-store";
 import { openScribeSocket } from "./voice-cloud-stream";
 import {
   BARK_PLUS_MODEL_DIRECTORY,
+  COHERE_TRANSCRIBE_MODEL_DIRECTORY,
   PARAKEET_MODEL_DIRECTORY,
+  PARAKEET_UNIFIED_MODEL_DIRECTORY,
   removeLegacyWhisperCache,
   SUPERTONIC_MODEL_DIRECTORY,
   WHISPER_TURBO_MODEL_DIRECTORY,
@@ -430,6 +445,8 @@ const LINK_ACCOUNT_FILE = "openbot-link-account-v1.json";
 const ONEPASSWORD_CONNECTOR_FILE = "openbot-onepassword-connector-v1.json";
 /** The Bitwarden API key and master password of a host connection (`bitwarden-connector-v1`), with the same cipher. */
 const BITWARDEN_CONNECTOR_FILE = "openbot-bitwarden-connector-v1.json";
+/** The Proton Pass agent access key of this computer or host, with the same cipher. */
+const PROTONPASS_CONNECTOR_FILE = "openbot-protonpass-connector-v1.json";
 /** The logins, payment cards and contact info of the Vault in Server settings, with the same cipher. */
 const VAULT_FILE = "openbot-vault-v1.json";
 /** Which agent each imported Hermes profile made, so a second import updates that agent. */
@@ -453,6 +470,7 @@ const DEVELOPMENT_BUNDLE_IDENTIFIER = "com.github.Electron";
 const TEARDOWN_ORDER = {
   // First, so a process that the teardown ends does not count as a crash.
   resourceMonitor: 9,
+  startupTiming: 9.5,
   updater: 10,
   idleRestart: 11,
   hostUpdateCoordinator: 12,
@@ -493,6 +511,8 @@ const TEARDOWN_ORDER = {
   // After the connections that hold it.
   signalIngress: 86,
   host: 90,
+  /** Before the team WebRTC bridge: the computer proxy streams stop before their channels. */
+  browserEgress: 99,
   teamWebRtcBridge: 100,
   // Before the agent service, so no handoff is sent to an agent while the service stops.
   routineFlows: 103,
@@ -504,6 +524,8 @@ const TEARDOWN_ORDER = {
   // Before the agent service. It holds no file an agent reads; only a CLI run that waits is stopped.
   onePasswordConnector: 106,
   bitwardenConnector: 106.5,
+  // Before the agent service. It holds no file an agent reads; only a CLI run that waits is stopped.
+  passwordManagers: 106.75,
   // Before the agent service, so no agent is handed a token file that is being removed.
   githubConnector: 107,
   // Before the agent service, so no payment wait outlives the agents that asked for it.
@@ -552,6 +574,8 @@ export interface ApplicationServiceContext {
   localServerChild: LocalServerChildEnvironment | null;
   /** The control pipe of a local server: the commands of the desktop app. */
   localServerControl: Readable | null;
+  /** How the previous run ended when it did not quit cleanly (`run-marker.ts`). */
+  previousUncleanExit: UncleanExitProperties | null;
   macHapticFeedback: MacHapticFeedback;
   teardown: TeardownRegistry;
   forwardCentralAuth: (state: CentralAuthState) => void;
@@ -592,6 +616,7 @@ export interface ApplicationServices {
   linkAccount: LinkAccountService;
   onePasswordConnector: OnePasswordConnectorService;
   bitwardenConnector: BitwardenConnectorService;
+  passwordManagers: PasswordManagersService;
   vault: VaultService;
   mailbox: MailboxStore;
   storageUsage: StorageUsageService;
@@ -683,8 +708,12 @@ export interface ApplicationServices {
   computerUseHighlight: ComputerUseHighlightController;
   computerUsePermissionHelp: ComputerUsePermissionHelpWindowController;
   analytics: HostAnalytics;
+  /** Starts the shared agent database host early. The entry point runs it after the first window loads. */
+  prewarmAgentDatabase: Effect.Effect<void>;
   trace: TraceFile;
   resourceMonitor: ResourceMonitor;
+  /** Null for a local server child: its parent desktop reports the start. */
+  startup: StartupTiming | null;
   machineAlerts: MachineAlertMonitor;
   teamStore: TeamStore;
   /**
@@ -947,6 +976,7 @@ export async function createApplicationServices({
   hostingDeveloperKey,
   localServerChild,
   localServerControl,
+  previousUncleanExit,
   macHapticFeedback,
   teardown,
   forwardCentralAuth,
@@ -960,6 +990,8 @@ export async function createApplicationServices({
   prepareForUpdateInstall,
   quitting,
 }: ApplicationServiceContext): Promise<ApplicationServices> {
+  // The start of the first `openbot:services.*` step, for the `system_startup` summary.
+  performance.mark("openbot:services.start");
   // First, so the provider lines of the whole startup reach the file.
   teardown.push(
     TEARDOWN_ORDER.providerLog,
@@ -1155,6 +1187,9 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.teamWebRtcBridge, "the team WebRTC bridge", () =>
     runCauseEffect(teamWebRtcBridge.stop()),
   );
+  // The computers of members that share their connection with this server, for computer proxies.
+  const browserEgress = new BrowserEgressHost(teamWebRtcBridge);
+  teardown.push(TEARDOWN_ORDER.browserEgress, "the computer proxies of members", () => browserEgress.dispose());
   // Only a hosted, self-hosted or container server: one unit or container holds OpenBot and every
   // agent process. The desktop app does not hold turns for memory.
   const hostMemory =
@@ -1180,6 +1215,10 @@ export async function createApplicationServices({
     teardown.push(TEARDOWN_ORDER.serverMemory, "the server memory reading", () => Effect.runPromise(hostMemory.stop()));
   }
   const browserProfileStore = new BrowserProfileStore(store.database);
+  const browserProxyStore = new BrowserProxyStore(store.database);
+  const browserProxyCipher = safeStorageCipher("error.app.secretStorageUnavailable");
+  // The agent service starts after the browser: a proxy failure before it has no open list to update.
+  let browserProxyStatusChanged = () => {};
   const browser = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE), {
     memoryLow: () => (hostMemory?.level() ?? "ok") !== "ok",
     browserProfile: (agentId) => {
@@ -1187,6 +1226,9 @@ export async function createApplicationServices({
       return agent ? agentBrowserProfile(agent) : { kind: "shared" };
     },
     profileExists: (profileId) => browserProfileStore.get(profileId) !== undefined,
+    profileProxy: (profileId) => browserProxyConnection(browserProxyStore, browserProxyCipher, profileId),
+    onProxyStatusChanged: () => browserProxyStatusChanged(),
+    computerExit: (memberId) => browserEgress.exit(memberId),
     quitShortcut: (input) => windows.handleQuitShortcut(mainWindow, input),
   });
   teardown.push(TEARDOWN_ORDER.browser, "the browser", () => runCauseEffect(browser.destroy()));
@@ -1613,6 +1655,36 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.onePasswordConnector, "the 1Password connection", () =>
     runCauseEffect(onePasswordConnector.dispose()),
   );
+  /*
+   * The password-manager engine. 1Password and Bitwarden keep their own services, panels and
+   * teardown, and the browser reads their logins directly. The Proton Pass CLI data and OpenBot's
+   * copy of `pass-cli` stay outside every root an agent can write.
+   */
+  const protonPassCliTarget = runtimeTarget(process.platform, process.arch);
+  const passwordManagers = new PasswordManagersService([
+    new ProtonPassDriver({
+      store: new EncryptedRecordStore({
+        path: join(app.getPath("userData"), PROTONPASS_CONNECTOR_FILE),
+        cipher: secretCipher,
+        decode: Schema.decodeUnknownSync(protonPassRecordSchema),
+        unreadable: sourceText("error.connector.protonPassFileUnreadable"),
+      }),
+      dataDirectory: join(app.getPath("userData"), "provider-state", "protonpass-host"),
+      hostName: hostname(),
+      installCli: protonPassCliTarget
+        ? (signal) =>
+            managedProtonPassCli({
+              directory: join(app.getPath("userData"), "provider-state", "protonpass-cli"),
+              target: protonPassCliTarget,
+              signal,
+            })
+        : null,
+    }),
+  ]);
+  await runCauseEffect(passwordManagers.load());
+  teardown.push(TEARDOWN_ORDER.passwordManagers, "the password managers", () =>
+    runCauseEffect(passwordManagers.dispose()),
+  );
   // Read by the resource monitor, which starts after the analytics that needs the services.
   const statementTimings = new StatementTimings();
   const tables = new AgentTables({
@@ -1879,6 +1951,7 @@ export async function createApplicationServices({
     passwordVault: passwordVaultRouter([
       { prefix: "", vault: onePasswordConnector },
       { prefix: "bitwarden:", vault: bitwardenConnector },
+      ...passwordManagers.routes(),
       { prefix: "openbot:", vault: vault.logins },
     ]),
     vaultItems: vault.items,
@@ -2423,10 +2496,20 @@ export async function createApplicationServices({
   const agentInstructions = createAgentInstructionsFiles(service);
   const browserProfiles = createBrowserProfileService({
     store: browserProfileStore,
+    proxies: browserProxyStore,
+    cipher: browserProxyCipher,
     agents: service,
     browser,
+    memberName: (memberId) => {
+      const member = teamStore.getMember(memberId);
+      return member ? (member.name ?? member.username) : null;
+    },
+    computerOnline: (memberId) => browserEgress.online(memberId),
     onChanged: () => service.notifyBrowserProfilesChanged(),
   });
+  browserProxyStatusChanged = () => service.notifyBrowserProfilesChanged();
+  // A computer that comes online or goes offline changes the proxy list.
+  browserEgress.on("changed", () => service.notifyBrowserProfilesChanged());
   const customProviderChanges = createCustomProviderChanges({ service, customProviders, providerRuntimes });
   const customAgentChanges = createCustomAgentChanges({ service, customAgents });
   const acpRegistry = createAcpRegistry({
@@ -2597,6 +2680,9 @@ export async function createApplicationServices({
     // Present, so the host advertises `bitwarden-connector-v1`. An owner or admin connects it with an
     // API key and the master password: a session key from their computer cannot open this vault.
     bitwardenConnector,
+    // Present, so the host advertises `password-managers-v1`. An owner or admin connects Proton Pass
+    // with a sign-in on the host or with an agent access key. The routes are admin-only.
+    passwordManagers,
     // Present, so the host advertises `vault-v1`. The routes are admin-only.
     vault,
     // Present on Linux, so the host advertises `provider-host-sign-in-v1`. The routes are admin-only.
@@ -2746,6 +2832,7 @@ export async function createApplicationServices({
       toolRuntimes: () => providerRuntimes.mcpToolRuntimes(),
     },
     teamWebRtcBridge,
+    peerMemberChanged: browserEgress.peerMemberChanged,
     privateNetwork: () => remoteNetworkRoute.get().route === "private",
     registerRemoteHost: (input) => centralAuth.registerRemoteHost(input).pipe(toRemoteWorkflowError),
     handOverRemoteHostKey: (hostId, handover) =>
@@ -2952,6 +3039,7 @@ export async function createApplicationServices({
         envKey: (name) => Boolean(process.env[name]?.trim()),
       }),
     resolveTurnUsage: (agentId, turnId, since) => service.getTurnUsage(agentId, turnId, since),
+    resolveTurnTiming: (turnId) => service.takeTurnTiming(turnId),
     resolveMcpServer: (name) => {
       const configs = service.listMcpServers().filter((server) => isReportedMcpServerName(server.name, name));
       if (configs.length === 0) return null;
@@ -2977,6 +3065,7 @@ export async function createApplicationServices({
       }),
     inventoryDay: analyticsInventoryDayStore(join(app.getPath("userData"), ANALYTICS_INVENTORY_FILE)),
     resources: resourceMonitor,
+    uncleanExit: previousUncleanExit,
   });
   teardown.push(TEARDOWN_ORDER.analytics, "host analytics", () => Effect.runPromise(analytics.close()));
   const analyticsPreferences = new AnalyticsPreferenceService({
@@ -2993,6 +3082,19 @@ export async function createApplicationServices({
   analytics.flushPending();
   service.on("failure", (failure) => analytics.handleFailure(failure));
   resourceMonitor.start(() => analytics.checkResources());
+  const startup = localServerChild
+    ? null
+    : new StartupTiming({
+        userDataPath: app.getPath("userData"),
+        appVersion: app.getVersion(),
+        server: hostedServer !== null || serverModeEnvironment !== null,
+        send: (properties) => analytics.handleStartup(properties),
+      });
+  if (startup) {
+    // Not awaited: the summary goes much later, and a start not read by then gives `unknown`.
+    Effect.runFork(startup.recordStart());
+    teardown.push(TEARDOWN_ORDER.startupTiming, "the startup timing", () => startup.dispose());
+  }
   const connectTrace = new RemoteConnectTrace((span) => trace.record(span));
   // Development only: a network round trip added to the WebRTC client, for `bun run perf:remote`.
   const developmentRoundTripMs = app.isPackaged ? 0 : Math.max(0, Number(process.env.OPENBOT_DEV_RTT_MS) || 0);
@@ -3087,6 +3189,16 @@ export async function createApplicationServices({
   // account check and its coalescing; this only forwards the notice to it.
   teamWebRtcBridge.on("accountServersChanged", () => void Effect.runPromise(remoteServers.invalidateDirectory()));
   teardown.push(TEARDOWN_ORDER.remoteServers, "the remote servers", () => runCauseEffect(remoteServers.stop()));
+  // This computer's connection, for the computer proxies of the joined servers that the user shares it with.
+  const browserEgressClient = new BrowserEgressClient(teamWebRtcBridge, {
+    serverIds: () => remoteServers.list().map((server) => server.id),
+    browserEgressWanted: (serverId) => remoteServers.browserEgressWanted(serverId),
+  });
+  remoteServers.on("changed", browserEgressClient.reconcile);
+  teardown.push(TEARDOWN_ORDER.browserEgress, "the computer proxy of this computer", () => {
+    remoteServers.off("changed", browserEgressClient.reconcile);
+    browserEgressClient.dispose();
+  });
   performance.mark("openbot:services.plugin-catalog");
   // Not on a server: a local server is a workspace of the desktop app.
   const localServers =
@@ -3246,12 +3358,18 @@ export async function createApplicationServices({
       "parakeet-tdt-0.6b-v3": app.isPackaged
         ? join(app.getPath("userData"), "runtimes", PARAKEET_MODEL_DIRECTORY)
         : resolve(".openbot-build/voice/model"),
+      "parakeet-unified-en-0.6b": app.isPackaged
+        ? join(app.getPath("userData"), "runtimes", PARAKEET_UNIFIED_MODEL_DIRECTORY)
+        : resolve(".openbot-build/voice", PARAKEET_UNIFIED_MODEL_DIRECTORY),
       "bark-3.0-plus": app.isPackaged
         ? join(app.getPath("userData"), "runtimes", BARK_PLUS_MODEL_DIRECTORY)
         : resolve(".openbot-build/voice", BARK_PLUS_MODEL_DIRECTORY),
       "whisper-turbo": app.isPackaged
         ? join(app.getPath("userData"), "runtimes", WHISPER_TURBO_MODEL_DIRECTORY)
         : resolve(".openbot-build/voice", WHISPER_TURBO_MODEL_DIRECTORY),
+      "cohere-transcribe-03-2026": app.isPackaged
+        ? join(app.getPath("userData"), "runtimes", COHERE_TRANSCRIBE_MODEL_DIRECTORY)
+        : resolve(".openbot-build/voice", COHERE_TRANSCRIBE_MODEL_DIRECTORY),
     },
     preferences: voicePreferences,
     apiKeys: voiceApiKeys,
@@ -3592,6 +3710,7 @@ export async function createApplicationServices({
     linkAccount,
     onePasswordConnector,
     bitwardenConnector,
+    passwordManagers,
     vault,
     mailbox,
     storageUsage,
@@ -3673,8 +3792,10 @@ export async function createApplicationServices({
     computerUseHighlight,
     computerUsePermissionHelp,
     analytics,
+    prewarmAgentDatabase: tables.prewarm(),
     trace,
     resourceMonitor,
+    startup,
     machineAlerts,
     teamStore,
     appliedAccount: signedInState,

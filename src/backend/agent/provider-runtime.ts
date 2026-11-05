@@ -30,6 +30,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { matchingSourceKeys, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
+import { classifyFailure } from "@openbot/telemetry";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
 import { isOpenCodeInternalFailure } from "./../acp-flavor-opencode";
@@ -83,6 +84,7 @@ import { startCliCodeLogin } from "./cli-code-login";
 import { CliLoginFailed, CliLoginFlow, toCliLoginFailed } from "./cli-login-flow";
 import { CodexLoginFlow, toCodexLoginFailed } from "./codex-login";
 import type { ConversationRuntime } from "./conversation-runtime";
+import type { FailureContext } from "./failure-signal";
 import { ModelCatalog } from "./model-catalog";
 import { startMuseDeviceLogin } from "./muse-login";
 import type { ProviderAccountStore, StoredProviderAccount } from "./provider-account-store";
@@ -94,6 +96,7 @@ import {
   isGlogBelowErrorDiagnostic,
   isIgnoredConfigDiagnostic,
   isMcpSubsystemDiagnostic,
+  isRustLogBelowErrorDiagnostic,
   isTelemetryExportDiagnostic,
   isToolCallDiagnostic,
   isUsageLimitDiagnostic,
@@ -359,7 +362,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #conversation: ConversationRuntime;
   readonly #hooks: ProviderHooks;
   readonly #emit: (event: AgentEvent) => void;
-  readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
+  readonly #emitError: (code: string, error: unknown, agentId?: string, context?: FailureContext) => void;
   readonly #requestTimeoutMs: number;
   /** `LONG_START_TIMEOUT_MS`, shorter in an end-to-end script. */
   readonly #longStartTimeoutMs: number;
@@ -511,7 +514,7 @@ export class ProviderRuntime implements ProviderPort {
     conversation: ConversationRuntime;
     hooks: ProviderHooks;
     emit: (event: AgentEvent) => void;
-    emitError: (code: string, error: unknown, agentId?: string) => void;
+    emitError: (code: string, error: unknown, agentId?: string, context?: FailureContext) => void;
     requestTimeoutMs: number;
     longStartTimeoutMs?: number;
     preferredProvider: AgentProvider;
@@ -2348,6 +2351,14 @@ export class ProviderRuntime implements ProviderPort {
     return own !== null && current.key === this.#confinedKey(providerForAgent(agent), own);
   }
 
+  /** True when `ensureAgentClient` would return a process that runs now, without starting one. */
+  agentClientRunning(agent: AgentSummary): boolean {
+    const provider = providerForAgent(agent);
+    if (!this.#clients.has(provider)) return false;
+    const own = this.#ownProcessFor(agent);
+    return own === null || this.#confined.get(agent.id)?.key === this.#confinedKey(provider, own);
+  }
+
   /**
    * The process for this agent's next turn, started when it is needed. Call it only while the agent
    * runs no turn: it stops the agent's own process when that process no longer matches the agent.
@@ -3726,7 +3737,7 @@ export class ProviderRuntime implements ProviderPort {
         stderrLogger.warn("Hermes logged a diagnostic.", { provider: client.provider, message });
         return;
       }
-      if (isGlogBelowErrorDiagnostic(message)) {
+      if (isGlogBelowErrorDiagnostic(message) || isRustLogBelowErrorDiagnostic(message)) {
         stderrLogger.info("A provider logged an info or warning record.", { provider: client.provider, message });
         return;
       }
@@ -3971,7 +3982,13 @@ export class ProviderRuntime implements ProviderPort {
   /** Shows a provider failure to the user and keeps it on the provider row. */
   #emitProviderError(provider: AgentProvider, kind: string, error: unknown, agentId?: string): void {
     this.#recordProviderError(provider, error);
-    this.#emitError(`${provider}_${kind}`, error, agentId);
+    // An exit has no structured code. A known cause in its text (for example EACCES) stays.
+    let context: FailureContext | undefined;
+    if (kind === "exited") {
+      const cause = classifyFailure(error);
+      context = { causeCode: cause === "unknown" ? "provider_exited" : cause };
+    }
+    this.#emitError(`${provider}_${kind}`, error, agentId, context);
     this.#setStatus({});
   }
 

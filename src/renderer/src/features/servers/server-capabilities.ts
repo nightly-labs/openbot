@@ -43,6 +43,7 @@ export function serverSupportsCapability(
       capability === "connectors-v1" ||
       capability === "onepassword-connector-v1" ||
       capability === "bitwarden-connector-v1" ||
+      capability === "password-managers-v1" ||
       capability === "whatsapp-connector-v1" ||
       capability === "vault-v1" ||
       capability === "vault-v2" ||
@@ -109,7 +110,8 @@ export function serverSupportsCapability(
       capability === "agent-fast-mode-v1" ||
       capability === "context-compact-v1" ||
       capability === "agent-instructions-v1" ||
-      capability === "message-delete-v1") &&
+      capability === "message-delete-v1" ||
+      capability === "conversation-unread-from-v1") &&
     server?.kind === "remote"
   ) {
     return server.compatibility?.capabilities.includes(capability) === true;

@@ -297,6 +297,16 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "같은 이름의 브라우저 프로필이 이미 있어요.",
   "error.backend.browserSessionInUse": "탭 하나가 아직 이 브라우저 세션을 사용 중이에요. 다시 시도해 주세요.",
   "error.backend.browserProfileLimit": "브라우저 프로필은 최대 {limit}개까지 만들 수 있어요.",
+  "error.backend.browserProxyNotFound": "이 프록시는 더 이상 없어요.",
+  "error.backend.browserProxyAddressInvalid":
+    "socks5://host:1080 또는 http://user:password@host:3128 같은 프록시 주소를 입력하세요.",
+  "error.backend.browserProxyLimit": "프록시는 최대 {limit}개까지 만들 수 있어요.",
+  "error.backend.browserProxyTaken": "이 주소를 사용하는 프록시가 이미 있어요.",
+  "error.backend.browserProxyChanged": "이 프록시를 연 뒤에 변경되었어요. 다시 확인한 다음 다시 시도해 주세요.",
+  "error.backend.browserProxyUnreachable": "프록시 {name}이(가) 응답하지 않아 페이지를 열지 못했어요.",
+  "error.backend.browserProxySignInRefused": "프록시 {name}이(가) 로그인을 거부해 페이지를 열지 못했어요.",
+  "error.backend.browserProxyComputerUnreachable":
+    "이 프로필이 사용하는 컴퓨터가 응답하지 않아 페이지를 열지 못했어요.",
   "error.backend.browserLowMemory":
     "이 서버의 메모리가 부족해서 브라우저에서 탭을 더 열 수 없어요. 탭을 닫거나 다른 에이전트가 끝날 때까지 기다리세요.",
   "error.backend.browserOpenFailed": "{url}을(를) 열 수 없어요: {reason}",

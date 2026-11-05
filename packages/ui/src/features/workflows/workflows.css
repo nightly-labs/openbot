@@ -1367,7 +1367,7 @@
 }
 
 /* The history clock has no closed shape, so it stays an outline on the highlighted row. */
-.wfs-menu.ui-action-menu [class~="lucide-rotate-ccw-clock"] > * {
+.wfs-menu.ui-action-menu .lucide-rotate-ccw-clock > * {
   fill: none;
 }
 

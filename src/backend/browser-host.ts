@@ -13,6 +13,7 @@ import type {
   BrowserJsonValue,
   BrowserNavigationDirection,
   BrowserPreview,
+  BrowserProxyFailure,
   BrowserSecretRequest,
   BrowserSnapshot,
   BrowserTab,
@@ -85,6 +86,13 @@ import {
   normalizeBrowserUrl,
   preferredBrowserLanguageCodes,
 } from "./browser-policy";
+import {
+  type BrowserProxyRelay,
+  openBrowserProxyRelay,
+  type RelayExit,
+  socksExit,
+} from "./browser-profiles/browser-proxy-relay";
+import type { BrowserProxyConnection } from "./browser-profiles/browser-proxy-store";
 import { BrowserRecorder } from "./browser-recorder";
 import {
   BROWSER_SCRIPT_USER_CONTROL_ERROR,
@@ -260,6 +268,50 @@ function viewContextMenu(
 const IDLE_TAB_SLEEP_MS = 30 * 60_000;
 const LOW_MEMORY_TAB_SLEEP_MS = 5 * 60_000;
 const IDLE_TAB_SWEEP_MS = 60_000;
+/**
+ * The page load errors that say the proxy of the tab did not answer or refused it, and why, with
+ * their Chromium codes. A failed load can give only the code, with no name.
+ */
+const PROXY_ERROR_LIST: readonly (readonly [name: string, code: number, failure: BrowserProxyFailure])[] = [
+  ["net::ERR_PROXY_CONNECTION_FAILED", -130, "unreachable"],
+  ["net::ERR_SOCKS_CONNECTION_FAILED", -120, "unreachable"],
+  ["net::ERR_TUNNEL_CONNECTION_FAILED", -111, "unreachable"],
+  ["net::ERR_PROXY_AUTH_UNSUPPORTED", -115, "signIn"],
+  ["net::ERR_PROXY_AUTH_REQUESTED", -127, "signIn"],
+  ["net::ERR_PROXY_AUTH_REQUESTED_WITH_NO_CONNECTION", -134, "signIn"],
+  ["net::ERR_PROXY_CERTIFICATE_INVALID", -136, "unreachable"],
+  ["net::ERR_MANDATORY_PROXY_CONFIGURATION_FAILED", -131, "unreachable"],
+];
+const PROXY_ERRORS = new Map(PROXY_ERROR_LIST.map(([name, , failure]) => [name, failure]));
+const PROXY_ERROR_CODES = new Map(PROXY_ERROR_LIST.map(([, code, failure]) => [code, failure]));
+
+/** The proxy failure in the text of a failed page load: a Chromium error name, or `(<code>)`. */
+function proxyErrorInText(text: string): BrowserProxyFailure | undefined {
+  const name = /\bERR_[A-Z_]+/u.exec(text)?.[0];
+  if (name !== undefined) return PROXY_ERRORS.get(`net::${name}`);
+  const code = /\((-\d+)\)/u.exec(text)?.[1];
+  return code === undefined ? undefined : PROXY_ERROR_CODES.get(Number(code));
+}
+
+/** How many times one document answers the sign-in of its proxy. More means the sign-in is wrong. */
+const PROXY_SIGN_IN_ANSWERS = 8;
+
+/** The Chromium proxy rule of a saved proxy. The host has no characters that the rule format splits on. */
+function proxyRules(proxy: Extract<BrowserProxyConnection, { kind: "address" }>): string {
+  return `${proxy.scheme}://${proxy.host}:${proxy.port}`;
+}
+
+/** The proxy that Chromium connects to, and the sign-in that it gives when that proxy asks. */
+interface AppliedProxy {
+  key: string;
+  proxy: BrowserProxyConnection | null;
+  signIn: { host: string; port: number; username: string; password: string } | null;
+  /**
+   * A local relay. Chromium cannot sign in to SOCKS5, so a SOCKS5 proxy with a sign-in goes through
+   * it; the computer of a member is not a proxy server, so its traffic goes through it too.
+   */
+  relay: BrowserProxyRelay | null;
+}
 
 interface BrowserConsoleMessageDetails {
   level: "info" | "warning" | "error" | "debug";
@@ -371,6 +423,26 @@ export class BrowserHost {
   readonly #tabSessions = new Map<string, Session>();
   readonly #browserProfile: (agentId: string) => AgentBrowserProfile;
   readonly #profileExists: (profileId: string) => boolean;
+  readonly #profileProxy: (profileId: string) => BrowserProxyConnection | null;
+  readonly #onProxyStatusChanged: () => void;
+  readonly #computerExit: (memberId: string) => RelayExit;
+  /**
+   * The proxy that each named profile session uses now, by partition. The key holds the whole
+   * connection, so a change of the password also applies again. Never logged.
+   */
+  readonly #appliedProxies = new Map<string, AppliedProxy>();
+  /**
+   * One proxy change at a time. Two tabs that open together in one profile must not both open a
+   * relay: the second would replace the first in `#appliedProxies`, and the first would stay open.
+   */
+  readonly #proxyLock = Semaphore.makeUnsafe(1);
+  /** The proxies whose last page load could not connect to them. */
+  readonly #proxyFailures = new Map<string, BrowserProxyFailure>();
+  /**
+   * The tabs whose proxy asked for a sign-in that the tab did not give again, until a page loads.
+   * Chromium then reports a failed tunnel, which alone means that the proxy did not answer.
+   */
+  readonly #proxySignInRefused = new WeakSet<BrowserHostTab>();
   readonly #quitShortcut: (input: Input) => boolean;
   readonly #downloadsRoot: string;
   readonly #statePath: string;
@@ -423,6 +495,18 @@ export class BrowserHost {
       browserProfile?: (agentId: string) => AgentBrowserProfile;
       /** Whether a named profile still exists. A tab never opens in a deleted profile. */
       profileExists?: (profileId: string) => boolean;
+      /**
+       * The proxy of a named profile, with its password, or null for the proxy settings of the
+       * computer. It throws when the password cannot be read: the tab then does not open.
+       */
+      profileProxy?: (profileId: string) => BrowserProxyConnection | null;
+      /** Runs when a proxy starts or stops failing. */
+      onProxyStatusChanged?: () => void;
+      /**
+       * Opens connections through the computer of a member. Without it, each connection of a profile
+       * with a computer proxy fails: there is no direct fallback.
+       */
+      computerExit?: (memberId: string) => RelayExit;
       /** True when the key is part of the Mac quit shortcut, which a focused tab must not give to the menu. */
       quitShortcut?: (input: Input) => boolean;
     } = {},
@@ -431,6 +515,9 @@ export class BrowserHost {
     this.#memoryLow = options.memoryLow ?? (() => false);
     this.#browserProfile = options.browserProfile ?? (() => ({ kind: "shared" }));
     this.#profileExists = options.profileExists ?? (() => false);
+    this.#profileProxy = options.profileProxy ?? (() => null);
+    this.#onProxyStatusChanged = options.onProxyStatusChanged ?? (() => {});
+    this.#computerExit = options.computerExit ?? (() => () => Promise.reject(new Error("No computer exit")));
     this.#quitShortcut = options.quitShortcut ?? (() => false);
     this.#downloadsRoot = downloadsRoot;
     this.#statePath = statePath;
@@ -483,6 +570,11 @@ export class BrowserHost {
       // a deleted profile does not come back: no other session may load its page.
       const tabSession = storedTabSession(stored);
       if (tabSession?.kind === "profile" && !this.#profileExists(tabSession.profileId)) continue;
+      // A tab whose proxy cannot apply does not come back: it would load its page without the proxy.
+      if (Exit.isFailure(yield* Effect.exit(this.#applyProfileProxy(tabSession)))) {
+        logger.warn("Unable to apply the proxy of a restored browser tab");
+        continue;
+      }
       const tab = this.#createTab(
         stored.id,
         stored.url,
@@ -788,6 +880,7 @@ export class BrowserHost {
     const normalizedUrl = yield* browserSync(() => normalizeBrowserUrl(url));
     const previouslyFocused = focus ? null : this.#focusedContentsOutsideTabs();
     const tabSession = privateSession || !ownerAgentId ? undefined : yield* this.#agentTabSession(ownerAgentId);
+    yield* this.#applyProfileProxy(tabSession);
     const tab = this.#createTab(
       randomUUID(),
       normalizedUrl,
@@ -839,6 +932,8 @@ export class BrowserHost {
             }
             this.#emitChanged();
             yield* this.#persistState();
+            const proxyFailure = this.#proxyLoadFailure(tab, operationFailure);
+            if (proxyFailure !== operationFailure) return yield* proxyFailure;
             return yield* browserFailure(
               new Error(sourceText("error.backend.browserOpenFailed", { url: normalizedUrl, reason: String(error) })),
             );
@@ -903,6 +998,7 @@ export class BrowserHost {
             tab,
             navigateAndWait(tab.contents, () => tab.contents.loadURL(normalizedUrl, browserLoadOptions())),
           ).pipe(
+            Effect.mapError((failure) => this.#proxyLoadFailure(tab, failure)),
             // A same-document load or a load that does not start leaves the flag for the next navigation.
             Effect.ensuring(
               Effect.sync(() => {
@@ -2236,7 +2332,7 @@ export class BrowserHost {
       "navigate",
       undefined,
       (tab, deadline) =>
-        Effect.gen(function* () {
+        Effect.gen({ self: this }, function* () {
           const operationTimeout = remainingTime(deadline, "Browser navigate timed out.");
           if (url) {
             const normalizedUrl = yield* browserSync(() => normalizeBrowserUrl(url));
@@ -2245,7 +2341,7 @@ export class BrowserHost {
               tab.contents,
               () => tab.contents.loadURL(normalizedUrl, browserLoadOptions()),
               operationTimeout,
-            );
+            ).pipe(Effect.mapError((failure) => this.#proxyLoadFailure(tab, failure)));
           } else if (direction === "reload") {
             yield* navigateAndWait(
               tab.contents,
@@ -2498,6 +2594,7 @@ export class BrowserHost {
         this.#closingTabDrains.clear();
         for (const target of this.#persistentSessions()) target.flushStorageData();
         yield* this.#persistLock.withPermit(Effect.void);
+        yield* Effect.forEach([...this.#appliedProxies.keys()], this.#dropAppliedProxy, { discard: true });
         yield* Scope.close(this.#scope, Exit.void);
         const failure = results.find(Exit.isFailure);
         if (failure) return yield* Effect.failCause(failure.cause);
@@ -2543,6 +2640,7 @@ export class BrowserHost {
       return;
     const target = this.#tabSessions.get(partition) ?? session.fromPartition(`persist:${partition}`, { cache: true });
     this.#tabSessions.delete(partition);
+    yield* this.#dropAppliedProxy(partition);
     yield* browserCall(() => target.clearStorageData());
     yield* browserCall(() => target.clearCache());
   }).bind(this);
@@ -2574,6 +2672,170 @@ export class BrowserHost {
       return yield* browserFailure(new Error(sourceText("error.backend.browserProfileMissing")));
     return { kind: "profile", profileId: profile.profileId };
   }).bind(this);
+
+  /**
+   * Gives a named profile session its proxy before a tab opens in it. A change closes the open
+   * connections and the saved proxy sign-in, so no request goes out the old way. With a proxy there
+   * is no direct fallback: a proxy that does not answer fails the page load.
+   */
+  readonly #applyProfileProxy = Effect.fn("BrowserHost.applyProfileProxy")(function* (
+    this: BrowserHost,
+    tabSession: BrowserTabSession | undefined,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    if (tabSession?.kind !== "profile") return;
+    yield* this.#proxyLock.withPermit(this.#setSessionProxy(tabSession));
+  }).bind(this);
+
+  readonly #setSessionProxy = Effect.fn("BrowserHost.setSessionProxy")(function* (
+    this: BrowserHost,
+    tabSession: Extract<BrowserTabSession, { kind: "profile" }>,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    const proxy = yield* browserSync(() => this.#profileProxy(tabSession.profileId));
+    const partition = browserTabPartition(tabSession);
+    const key = JSON.stringify(proxy);
+    const previous = this.#appliedProxies.get(partition);
+    if (previous?.key === key) return;
+    const target = this.#persistentTabSession(tabSession);
+    // Until the new proxy applies, the session has none that a new tab may use.
+    this.#appliedProxies.delete(partition);
+    const computerExit = this.#computerExit;
+    const applied = yield* Effect.gen(function* () {
+      const exit =
+        proxy?.kind === "computer"
+          ? computerExit(proxy.memberId)
+          : proxy?.scheme === "socks5" && proxy.username !== null
+            ? socksExit({
+                host: proxy.host,
+                port: proxy.port,
+                username: proxy.username,
+                password: proxy.password ?? "",
+              })
+            : null;
+      const relay = exit === null ? null : yield* openBrowserProxyRelay(exit);
+      const rules =
+        relay !== null ? `http://${relay.host}:${relay.port}` : proxy?.kind === "address" ? proxyRules(proxy) : null;
+      yield* Effect.gen(function* () {
+        yield* browserCall(() =>
+          target.setProxy(rules === null ? { mode: "system" } : { mode: "fixed_servers", proxyRules: rules }),
+        );
+        yield* browserCall(() => target.closeAllConnections());
+        yield* browserCall(() => target.clearAuthCache());
+      }).pipe(Effect.onError(() => relay?.close ?? Effect.void));
+      const signIn =
+        relay ??
+        (proxy?.kind !== "address" || proxy.username === null
+          ? null
+          : { host: proxy.host, port: proxy.port, username: proxy.username, password: proxy.password ?? "" });
+      return { key, proxy, signIn, relay } satisfies AppliedProxy;
+    }).pipe(
+      // The old relay stops also when the new proxy fails: a session without its proxy must not connect.
+      Effect.ensuring(previous?.relay?.close ?? Effect.void),
+    );
+    this.#appliedProxies.set(partition, applied);
+  }).bind(this);
+
+  /** Forgets the proxy of a session and stops its relay. */
+  readonly #dropAppliedProxy = Effect.fn("BrowserHost.dropAppliedProxy")(function* (
+    this: BrowserHost,
+    partition: string,
+  ) {
+    yield* this.#proxyLock.withPermit(
+      Effect.suspend(() => {
+        const applied = this.#appliedProxies.get(partition);
+        this.#appliedProxies.delete(partition);
+        return applied?.relay?.close ?? Effect.void;
+      }),
+    );
+  }).bind(this);
+
+  /**
+   * Stops the relay of a profile after its proxy changed and its tabs closed. A session that a new
+   * tab gave the new proxy keeps it. The session keeps the rules of the stopped relay, so it cannot
+   * connect until the next tab applies the new proxy.
+   */
+  readonly releaseProfileProxy = Effect.fn("BrowserHost.releaseProfileProxy")(function* (
+    this: BrowserHost,
+    profileId: string,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    const tabSession: BrowserTabSession = { kind: "profile", profileId };
+    const partition = browserTabPartition(tabSession);
+    yield* this.#proxyLock.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const applied = this.#appliedProxies.get(partition);
+        if (applied === undefined || this.tabIdsInSession(tabSession).length > 0) return;
+        const proxy = yield* browserSync(() => this.#profileProxy(profileId));
+        if (applied.key === JSON.stringify(proxy)) return;
+        this.#appliedProxies.delete(partition);
+        if (applied.relay) yield* applied.relay.close;
+      }),
+    );
+  }).bind(this);
+
+  /** The sign-in that a tab gives when its proxy asks. */
+  #tabProxySignIn(tab: Pick<BrowserHostTab, "tabSession">): AppliedProxy["signIn"] {
+    if (tab.tabSession?.kind !== "profile") return null;
+    return this.#appliedProxies.get(browserTabPartition(tab.tabSession))?.signIn ?? null;
+  }
+
+  /** The proxy that a tab's page loads go through, or null. */
+  #tabProxy(tab: Pick<BrowserHostTab, "tabSession">): BrowserProxyConnection | null {
+    if (tab.tabSession?.kind !== "profile") return null;
+    return this.#appliedProxies.get(browserTabPartition(tab.tabSession))?.proxy ?? null;
+  }
+
+  /** The relay of a tab's session, or null when its proxy has none. */
+  #tabRelay(tab: Pick<BrowserHostTab, "tabSession">): BrowserProxyRelay | null {
+    if (tab.tabSession?.kind !== "profile") return null;
+    return this.#appliedProxies.get(browserTabPartition(tab.tabSession))?.relay ?? null;
+  }
+
+  /** Why a page load through the proxy of a tab failed, from the error that Chromium gives. */
+  #tabProxyFailure(tab: BrowserHostTab, error: BrowserProxyFailure): BrowserProxyFailure {
+    if (this.#proxySignInRefused.has(tab)) return "signIn";
+    // Through a relay, Chromium sees only a failed tunnel. The relay knows whether the proxy refused the sign-in.
+    return this.#tabRelay(tab)?.exitFailure() ?? error;
+  }
+
+  /** Records whether a page load could reach the proxy of its tab, and why not. */
+  #noteProxyLoad(tab: BrowserHostTab, failure: BrowserProxyFailure | null): void {
+    const proxyId = this.#tabProxy(tab)?.proxyId;
+    if (proxyId === undefined || (this.#proxyFailures.get(proxyId) ?? null) === failure) return;
+    if (failure === null) this.#proxyFailures.delete(proxyId);
+    else this.#proxyFailures.set(proxyId, failure);
+    this.#onProxyStatusChanged();
+  }
+
+  /**
+   * The failure of a page load that the proxy of its tab stopped, with a message that names the proxy.
+   * Other failures stay as they are.
+   */
+  #proxyLoadFailure(tab: BrowserHostTab, failure: BrowserOperationError): BrowserOperationError {
+    const proxy = this.#tabProxy(tab);
+    const proxyError = proxyErrorInText(String(failure.cause));
+    if (proxy === null || proxyError === undefined) return failure;
+    if (proxy.kind === "computer")
+      return browserFailure(new Error(sourceText("error.backend.browserProxyComputerUnreachable")));
+    // The network error of this load came first and recorded why. Chromium commits its error page
+    // before the load fails here, and that commit clears the sign-in mark of the tab.
+    const reason = this.#proxyFailures.get(proxy.proxyId) ?? this.#tabProxyFailure(tab, proxyError);
+    return browserFailure(
+      new Error(
+        reason === "signIn"
+          ? sourceText("error.backend.browserProxySignInRefused", { name: proxy.host })
+          : sourceText("error.backend.browserProxyUnreachable", { name: proxy.host }),
+      ),
+    );
+  }
+
+  /** Why the last page load through a proxy failed, or null when it did not fail. */
+  proxyFailure(proxyId: string): BrowserProxyFailure | null {
+    return this.#proxyFailures.get(proxyId) ?? null;
+  }
+
+  /** Forgets the failure of a proxy that changed or went away. The next page load reports again. */
+  forgetProxyFailure(proxyId: string): void {
+    this.#proxyFailures.delete(proxyId);
+  }
 
   #persistentSessions(): Session[] {
     return [this.#session, ...this.#tabSessions.values()];
@@ -2671,6 +2933,8 @@ export class BrowserHost {
     });
     target.webRequest.onCompleted((details) => {
       const tab = [...this.#tabs.values()].find((candidate) => candidate.contents.id === details.webContentsId);
+      if (tab && details.resourceType === "mainFrame")
+        this.#noteProxyLoad(tab, details.statusCode === 407 ? "signIn" : null);
       if (!tab || tab.secret) return;
       tab.diagnostics.add({
         kind: "network",
@@ -2684,6 +2948,9 @@ export class BrowserHost {
     });
     target.webRequest.onErrorOccurred((details) => {
       const tab = [...this.#tabs.values()].find((candidate) => candidate.contents.id === details.webContentsId);
+      const proxyError = PROXY_ERRORS.get(details.error);
+      if (tab && details.resourceType === "mainFrame" && proxyError !== undefined)
+        this.#noteProxyLoad(tab, this.#tabProxyFailure(tab, proxyError));
       if (!tab || tab.secret) return;
       // The page or a navigation cancelled a subresource request: it did not fail. Live pages cancel
       // many. A cancelled page load can be a blocked navigation, so it stays an error.
@@ -2735,6 +3002,31 @@ export class BrowserHost {
   #bindTabEvents(tab: BrowserHostTab): void {
     const contents = tab.contents;
     const changed = () => this.#emitChanged();
+    // WebRTC must not send UDP around the proxy: the page would see the real address.
+    if (this.#tabProxy(tab)) contents.setWebRTCIPHandlingPolicy("disable_non_proxied_udp");
+    // The proxy asks for its sign-in. A wrong one asks again, so each document gets a few answers only.
+    let proxySignIns = 0;
+    contents.on("login", (event, _details, authInfo, callback) => {
+      if (!authInfo.isProxy) return;
+      event.preventDefault();
+      const signIn = this.#tabProxySignIn(tab);
+      if (
+        signIn === null ||
+        proxySignIns >= PROXY_SIGN_IN_ANSWERS ||
+        authInfo.host.replace(/^\[|\]$/gu, "") !== signIn.host.replace(/^\[|\]$/gu, "") ||
+        authInfo.port !== signIn.port
+      ) {
+        this.#proxySignInRefused.add(tab);
+        callback();
+        return;
+      }
+      proxySignIns += 1;
+      callback(signIn.username, signIn.password);
+    });
+    contents.on("did-navigate", () => {
+      proxySignIns = 0;
+      this.#proxySignInRefused.delete(tab);
+    });
     contents.on("close", () => {
       // `#closeRenderer` closes the old contents of a tab that stays open.
       if (tab.contents !== contents) return;

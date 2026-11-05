@@ -4,6 +4,8 @@
 // that a refused request did not reach them. The checks cover the protocol and auth gates, sign-in
 // and account tickets, the admin-only routes, the host's Bitwarden connection over a fake `bw`, the
 // host's WhatsApp numbers over a stand-in messaging service (`whatsapp-connector-v1`), the
+// host's password managers (`password-managers-v1`) over the real engine with a stand-in Proton
+// Pass driver and the real Bitwarden adapter, the
 // host's Vault (`vault-v1`, its API keys through `vault-v2`, and the CSV import of `vault-import-v1`)
 // over the real service and store,
 // a password that an admin saves from the secure card (`browser-secret-vault-v1`),
@@ -35,9 +37,14 @@ import {
   type CustomProviderResult,
   type CustomProviderSummary,
   DEFAULT_AGENT_DEFAULTS,
+  decodeHostPasswordManagerList,
+  decodeHostPasswordManagerStatus,
   decodeHostWhatsAppLinkState,
   decodeHostWhatsAppOverview,
+  disconnectedPasswordManager,
   type HiddenAgentsSnapshot,
+  type PasswordManagerConnectMethod,
+  type PasswordManagerStatus,
   type QueueSnapshot,
   type RoutineResultConnectionOption,
   type RoutineResultDestination,
@@ -98,6 +105,10 @@ import {
   ContextCompactRefusedError,
 } from "@openbot/contracts/team-protocol/context-compact-v1";
 import {
+  CONVERSATION_UNREAD_FROM_CAPABILITY,
+  CONVERSATION_UNREAD_FROM_ROUTE,
+} from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
+import {
   CUSTOM_AGENTS_CAPABILITY,
   CUSTOM_AGENTS_CODECS,
   CUSTOM_AGENTS_ROUTES,
@@ -120,6 +131,11 @@ import {
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MEMORY_REVIEW_CAPABILITY, MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
+import {
+  PASSWORD_MANAGERS_CAPABILITY,
+  PASSWORD_MANAGERS_CODECS,
+  PASSWORD_MANAGERS_ROUTES,
+} from "@openbot/contracts/team-protocol/password-managers-v1";
 import {
   PROVIDER_DEFAULT_CAPABILITY,
   PROVIDER_DEFAULT_ROUTES,
@@ -159,6 +175,7 @@ import { Effect } from "effect";
 import { SteerUnsupportedError } from "../src/backend/agent/queue-controls";
 import { AgentLifecycleFailed } from "../src/backend/agent-service";
 import { BrowserProfileStore } from "../src/backend/browser-profiles/browser-profile-store";
+import { BrowserProxyStore } from "../src/backend/browser-profiles/browser-proxy-store";
 import type { BrowserTabSession } from "../src/backend/browser-state";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { MessageDeleteRefused } from "../src/backend/message-delete";
@@ -175,6 +192,8 @@ import { BitwardenConnectorStore } from "../src/main/bitwarden-connector-store";
 import { createBrowserProfileService } from "../src/main/browser-profile-service";
 import { MachineAlertMonitor, MachineAlertPreferenceStore } from "../src/main/machine-alerts";
 import { MemoryReviewPreferenceStore } from "../src/main/memory-review-preference-store";
+import type { PasswordManagerDriver } from "../src/main/password-managers/driver";
+import { PasswordManagersService } from "../src/main/password-managers/password-managers-service";
 import { RemoteWorkflowError } from "../src/main/remote-service-effects";
 import { SidebarPinStore } from "../src/main/sidebar-pin-store";
 import type {
@@ -552,11 +571,43 @@ const fakeAgents: TeamApiAgents = {
   resolveAvatar: unused("resolveAvatar"),
   readConversation: unused("readConversation"),
   readConversationFor: unused("readConversationFor"),
-  readConversationPageFor: unused("readConversationPageFor"),
+  // The chat of each agent shows every message but `message-gone`. A page around a message starts with it.
+  readConversationPageFor: (agentId, memberId, anchor, limit, options) => {
+    record("readConversationPageFor", agentId, memberId, anchor, limit, options);
+    const shown = anchor?.type === "around" && anchor.messageId !== "message-gone";
+    return Effect.succeed({
+      agentId,
+      threadId: `thread-${agentId}`,
+      activeTurnId: null,
+      revision: 1,
+      messages:
+        shown && anchor?.type === "around"
+          ? [
+              {
+                id: anchor.messageId,
+                author: "assistant",
+                text: "Reply",
+                createdAt: "2026-11-05T08:00:00.000Z",
+                status: "completed",
+              },
+            ]
+          : [],
+      references: {},
+      pageInfo: { hasOlder: false, olderCursor: null },
+    });
+  },
   searchConversationMessages: unused("searchConversationMessages"),
   searchConversationFiles: unused("searchConversationFiles"),
   markConversationRead: unused("markConversationRead"),
-  markConversationUnread: unused("markConversationUnread"),
+  // The mark moves to the message shown before `fromMessageId`, which this fake names `before-<id>`.
+  markConversationUnread: (agentId, memberId, fromMessageId, options) => {
+    record("markConversationUnread", agentId, memberId, fromMessageId, options);
+    return Effect.succeed({
+      unreadCount: 2,
+      firstUnreadMessageId: fromMessageId ?? null,
+      throughMessageId: fromMessageId ? `before-${fromMessageId}` : null,
+    });
+  },
   listWorkspaceDirectory: unused("listWorkspaceDirectory"),
   sendMessage: unused("sendMessage"),
   setMessageReaction: unused("setMessageReaction"),
@@ -740,6 +791,60 @@ const createBitwardenHost = () =>
     },
   });
 const bitwardenConnector = createBitwardenHost();
+// The host's password managers (`password-managers-v1`): the real engine with a stand-in Proton
+// Pass driver that records each call. It records the kind of a
+// connect method only, so a check can show that the access key reached the driver.
+const PROTON_PASS_KEY = "pst_e2eAccessKeyThatNoAnswerCarries::e2eEncryptionKey";
+const PROTON_PASS_SIGN_IN = "https://account.proton.me/authorize?code=e2e";
+let protonPassStatus = disconnectedPasswordManager("protonpass", ["browser", "key"]);
+const protonPassListeners = new Set<(status: PasswordManagerStatus) => void>();
+function setProtonPass(change: Partial<PasswordManagerStatus>): PasswordManagerStatus {
+  protonPassStatus = { ...protonPassStatus, ...change };
+  for (const listener of protonPassListeners) listener(protonPassStatus);
+  return protonPassStatus;
+}
+const protonPassDriver: PasswordManagerDriver = {
+  id: "protonpass",
+  prefix: "proton:",
+  brand: "Proton Pass",
+  signInHosts: ["account.proton.me"],
+  vault: {
+    connected: () => protonPassStatus.state === "connected",
+    loginsFor: () => Effect.succeed(null),
+    secretFor: () => Effect.succeed(null),
+  },
+  status: () => protonPassStatus,
+  connect: (method: PasswordManagerConnectMethod) =>
+    Effect.sync(() => {
+      record("protonpass.connect", method.kind, method.kind === "key" && method.key === PROTON_PASS_KEY);
+      return method.kind === "key"
+        ? setProtonPass({
+            state: "connected",
+            step: null,
+            signInUrl: null,
+            vaultNames: ["Shared with OpenBot"],
+            loginCount: 0,
+          })
+        : setProtonPass({ state: "signing-in", step: "browser", signInUrl: PROTON_PASS_SIGN_IN });
+    }),
+  cancel: () =>
+    Effect.sync(() => {
+      record("protonpass.cancel");
+      return protonPassStatus.state === "signing-in"
+        ? setProtonPass(disconnectedPasswordManager("protonpass", ["browser", "key"]))
+        : protonPassStatus;
+    }),
+  disconnect: () =>
+    Effect.sync(() => {
+      record("protonpass.disconnect");
+      return setProtonPass(disconnectedPasswordManager("protonpass", ["browser", "key"]));
+    }),
+  onChanged: (listener) => {
+    protonPassListeners.add(listener);
+    return () => protonPassListeners.delete(listener);
+  },
+};
+const passwordManagers = new PasswordManagersService([protonPassDriver]);
 // The host's WhatsApp numbers (`whatsapp-connector-v1`): an in-memory stand-in for the messaging
 // service that records each call. The other connector routes are not part of this run.
 const WHATSAPP_NUMBER = "48600100200";
@@ -961,6 +1066,9 @@ try {
       : left.kind === "agent" && right.kind === "agent" && left.key === right.key;
   const browserProfiles = createBrowserProfileService({
     store: new BrowserProfileStore(database),
+    proxies: new BrowserProxyStore(database),
+    // The script saves no proxy password, so the cipher only has to exist.
+    cipher: { canPersist: () => true, encrypt: (value) => Buffer.from(value, "utf8") },
     agents: {
       listAgents: () => agents,
       updateAgent: (input) =>
@@ -988,7 +1096,10 @@ try {
             1,
           );
         }),
+      proxyFailure: () => null,
+      forgetProxyFailure: () => undefined,
       clearTabSession: (tabSession) => Effect.sync(() => record("clearTabSession", tabSession)),
+      releaseProfileProxy: () => Effect.void,
     },
   });
 
@@ -1209,6 +1320,7 @@ try {
       },
     },
     bitwardenConnector,
+    passwordManagers,
     connectors,
     vault,
     browserProfiles,
@@ -3201,6 +3313,94 @@ try {
     );
   }
 
+  // ---- Mark unread from a message (conversation-unread-from-v1) ----
+  {
+    const unreadCapabilities = [AGENT_HIDDEN_CAPABILITY, CONVERSATION_UNREAD_FROM_CAPABILITY];
+    const marks = () => callsOf("markConversationUnread");
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises conversation-unread-from-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(CONVERSATION_UNREAD_FROM_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(CONVERSATION_UNREAD_FROM_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", CONVERSATION_UNREAD_FROM_ROUTE, {
+      token: bobToken,
+      json: { agentId: "agent-ada", fromMessageId: "message-1" },
+    });
+    check(
+      "the route without the capability gets 400 markUnreadUnsupported, and marks nothing",
+      errorIs(unsupported, 400, sourceText("error.team.markUnreadUnsupported")) && marks().length === 0,
+      summary(unsupported),
+    );
+    accessLevels = { revision: 4, everyone: { "agent-ada": "view" }, roles: [] };
+    const viewer = await call("POST", CONVERSATION_UNREAD_FROM_ROUTE, {
+      token: bobToken,
+      json: { agentId: "agent-ada", fromMessageId: "message-1" },
+      capabilities: unreadCapabilities,
+    });
+    accessLevels = { revision: 5, everyone: {}, roles: [] };
+    check(
+      "a member who can view the agent marks a message unread for themselves and gets the new read state, with the markers that their client does not show",
+      viewer.status === 200 &&
+        isDeepStrictEqual(viewer.body, {
+          unreadCount: 2,
+          firstUnreadMessageId: "message-1",
+          throughMessageId: "before-message-1",
+        }) &&
+        isDeepStrictEqual(marks(), [
+          [
+            "agent-ada",
+            bobId,
+            "message-1",
+            {
+              excludeRoutineEvents: true,
+              excludeRoutineRunEvents: true,
+              excludeHostedSiteEvents: true,
+              excludeRoutineQuietAnswers: true,
+            },
+          ],
+        ]),
+      [summary(viewer), marks()],
+    );
+    const gone = await call("POST", CONVERSATION_UNREAD_FROM_ROUTE, {
+      token: bobToken,
+      json: { agentId: "agent-ada", fromMessageId: "message-gone" },
+      capabilities: unreadCapabilities,
+    });
+    const missing = await call("POST", CONVERSATION_UNREAD_FROM_ROUTE, {
+      token: bobToken,
+      json: { agentId: "agent-none", fromMessageId: "message-1" },
+      capabilities: unreadCapabilities,
+    });
+    const hiddenAgent = await call("POST", CONVERSATION_UNREAD_FROM_ROUTE, {
+      token: bobToken,
+      json: { agentId: "agent-pi", fromMessageId: "message-1" },
+      capabilities: unreadCapabilities,
+      protocol: 6,
+    });
+    check(
+      "a message the chat does not show, an unknown agent, and a hidden agent get 404 and mark nothing",
+      errorIs(gone, 404, sourceText("error.backend.readBoundaryUnavailable")) &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
+        marks().length === 1,
+      [summary(gone), summary(missing), summary(hiddenAgent)],
+    );
+    const malformed = await call("POST", CONVERSATION_UNREAD_FROM_ROUTE, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities: unreadCapabilities,
+    });
+    check(
+      "a body without fromMessageId fails the wire codec and marks nothing",
+      malformed.status === 400 && marks().length === 1,
+      summary(malformed),
+    );
+  }
+
   // ---- Memory review (memory-review-v1) ----
   {
     const capabilities = [MEMORY_REVIEW_CAPABILITY];
@@ -5055,6 +5255,135 @@ try {
         isDeepStrictEqual(callsOf("whatsapp.reconnect"), [["whatsapp", WHATSAPP_NUMBER, false]]) &&
         isDeepStrictEqual(callsOf("whatsapp.disconnect"), [[WHATSAPP_NUMBER]]),
       [summary(pause), summary(reconnect), summary(disconnect)],
+    );
+  }
+
+  // ---- Password managers on the host (password-managers-v1) ----
+  {
+    const v9 = { capabilities: [PASSWORD_MANAGERS_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const managerCalls = () => calls.filter((entry) => entry.method.startsWith("protonpass."));
+    /** The answer as the client reads it: the frozen codec, then the client's decoder. */
+    const asClient = <T>(route: string, reply: Reply, decode: (value: unknown) => T): T => {
+      const codec = PASSWORD_MANAGERS_CODECS.get(route);
+      assert(codec, route);
+      return decode(codec.response(reply.status, reply.body));
+    };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises password-managers-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PASSWORD_MANAGERS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(PASSWORD_MANAGERS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", PASSWORD_MANAGERS_ROUTES.list, {
+      token: adaToken,
+      json: {},
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    const memberList = await call("POST", PASSWORD_MANAGERS_ROUTES.list, { token: bobToken, json: {}, ...v9 });
+    const memberConnect = await call("POST", PASSWORD_MANAGERS_ROUTES.connect, {
+      token: bobToken,
+      json: { manager: "protonpass", method: { kind: "key", key: PROTON_PASS_KEY } },
+      ...v9,
+    });
+    check(
+      "a client without the capability gets 400, and a member cannot read or connect the host's managers",
+      errorIs(unsupported, 400, sourceText("error.team.connectorsUnsupported")) &&
+        errorIs(memberList, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberConnect, 403, sourceText("error.team.adminRequired")) &&
+        managerCalls().length === 0,
+      [summary(unsupported), summary(memberList), summary(memberConnect)],
+    );
+    const listed = await call("POST", PASSWORD_MANAGERS_ROUTES.list, { token: adaToken, json: {}, ...v9 });
+    const managers = asClient(PASSWORD_MANAGERS_ROUTES.list, listed, decodeHostPasswordManagerList);
+    check(
+      "an admin lists the host's managers with the methods that each one takes",
+      isDeepStrictEqual(
+        managers.map((status) => [status.manager, status.state, status.methods]),
+        [["protonpass", "disconnected", ["browser", "key"]]],
+      ),
+      summary(listed),
+    );
+    const unknown = await call("POST", PASSWORD_MANAGERS_ROUTES.connect, {
+      token: adaToken,
+      json: { manager: "lastpass", method: { kind: "browser" } },
+      ...v9,
+    });
+    const notRegistered = await call("POST", PASSWORD_MANAGERS_ROUTES.connect, {
+      token: adaToken,
+      json: { manager: "bitwarden", method: { kind: "browser" } },
+      ...v9,
+    });
+    // A manager that offers only the browser sign-in refuses a pasted key.
+    setProtonPass({ methods: ["browser"] });
+    const noMethod = await call("POST", PASSWORD_MANAGERS_ROUTES.connect, {
+      token: adaToken,
+      json: { manager: "protonpass", method: { kind: "key", key: PROTON_PASS_KEY } },
+      ...v9,
+    });
+    setProtonPass({ methods: ["browser", "key"] });
+    check(
+      "the host refuses an unknown manager, a manager that it does not run, and a method that the manager does not take",
+      unknown.status === 400 &&
+        notRegistered.status === 400 &&
+        errorIs(noMethod, 400, sourceText("error.connector.passwordManagerMethod")) &&
+        managerCalls().length === 0,
+      [summary(unknown), summary(notRegistered), summary(noMethod)],
+    );
+    const browser = await call("POST", PASSWORD_MANAGERS_ROUTES.connect, {
+      token: adaToken,
+      json: { manager: "protonpass", method: { kind: "browser" } },
+      ...v9,
+    });
+    const signingIn = asClient(PASSWORD_MANAGERS_ROUTES.connect, browser, decodeHostPasswordManagerStatus);
+    const cancel = await call("POST", PASSWORD_MANAGERS_ROUTES.cancel, {
+      token: adaToken,
+      json: { manager: "protonpass" },
+      ...v9,
+    });
+    const cancelled = asClient(PASSWORD_MANAGERS_ROUTES.cancel, cancel, decodeHostPasswordManagerStatus);
+    check(
+      "a browser sign-in answers the sign-in page on the manager's host, and cancel stops it",
+      signingIn.state === "signing-in" &&
+        signingIn.step === "browser" &&
+        passwordManagers.signInPage("protonpass", signingIn) === PROTON_PASS_SIGN_IN &&
+        passwordManagers.signInPage("protonpass", { ...signingIn, signInUrl: "https://evil.example/authorize" }) ===
+          null &&
+        cancelled.state === "disconnected" &&
+        isDeepStrictEqual(callsOf("protonpass.connect"), [["browser", false]]) &&
+        callsOf("protonpass.cancel").length === 1,
+      [summary(browser), summary(cancel)],
+    );
+    const connect = await call("POST", PASSWORD_MANAGERS_ROUTES.connect, {
+      token: adaToken,
+      json: { manager: "protonpass", method: { kind: "key", key: PROTON_PASS_KEY } },
+      ...v9,
+    });
+    const connected = asClient(PASSWORD_MANAGERS_ROUTES.connect, connect, decodeHostPasswordManagerStatus);
+    const after = await call("POST", PASSWORD_MANAGERS_ROUTES.list, { token: adaToken, json: {}, ...v9 });
+    check(
+      "an admin connects with an access key; the key reaches the driver and no answer carries it",
+      connected.state === "connected" &&
+        isDeepStrictEqual(connected.vaultNames, ["Shared with OpenBot"]) &&
+        isDeepStrictEqual(callsOf("protonpass.connect").at(-1), ["key", true]) &&
+        !connect.text.includes(PROTON_PASS_KEY) &&
+        !after.text.includes(PROTON_PASS_KEY) &&
+        passwordManagers.routes().some((route) => route.prefix === "proton:" && route.vault.connected()),
+      [summary(connect), summary(after)],
+    );
+    const disconnect = await call("POST", PASSWORD_MANAGERS_ROUTES.disconnect, {
+      token: adaToken,
+      json: { manager: "protonpass" },
+      ...v9,
+    });
+    const disconnected = asClient(PASSWORD_MANAGERS_ROUTES.disconnect, disconnect, decodeHostPasswordManagerStatus);
+    check(
+      "disconnect stops the connection on the host",
+      disconnected.state === "disconnected" &&
+        callsOf("protonpass.disconnect").length === 1 &&
+        !protonPassDriver.vault.connected(),
+      summary(disconnect),
     );
   }
 

@@ -92,6 +92,10 @@ import {
   CONTEXT_COMPACT_ROUTES,
 } from "@openbot/contracts/team-protocol/context-compact-v1";
 import { CONTEXT_RESET_CAPABILITY, CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
+import {
+  CONVERSATION_UNREAD_FROM_CAPABILITY,
+  CONVERSATION_UNREAD_FROM_ROUTE,
+} from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
   PROVIDER_ACCOUNTS_CAPABILITY,
@@ -135,6 +139,7 @@ import {
   decodeSidebarLayoutSnapshot,
   decodeSidebarPinsFromHost,
 } from "../remote-agent-decoding";
+import { decodeConversationReadState } from "../remote-conversation-decoding";
 import { acceptEmpty, decodeVoid, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
 import { OWNER_PIN_KEY, type SidebarPinStore } from "../sidebar-pin-store";
@@ -833,8 +838,16 @@ export function agentIpcHandlers({
       }),
       markConversationUnread: scopedHandler(parseMarkConversationUnread, {
         local: (parsed) => runCauseEffect(host.markAgentConversationUnread(parsed)),
-        remote: () => {
-          throw new Error(sourceText("error.backend.markUnreadRemoteUnsupported"));
+        // A joined server marks one message unread through `conversation-unread-from-v1`.
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, CONVERSATION_UNREAD_FROM_CAPABILITY))
+            throw new Error(sourceText("error.backend.markUnreadRemoteUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, CONVERSATION_UNREAD_FROM_ROUTE, decodeConversationReadState, {
+              method: "POST",
+              body: { agentId: parsed.agentId, fromMessageId: parsed.fromMessageId },
+            }),
+          );
         },
       }),
       // The user of this computer can delete any message of a local agent.
@@ -1101,13 +1114,16 @@ export function agentIpcHandlers({
       }),
       reorderQueue: scopedHandler(parseReorderQueue, {
         local: (parsed) => runCauseEffect(service.reorderQueue(parsed)),
-        remote: (parsed, serverId) =>
-          runCauseEffect(
+        remote: (parsed, serverId) => {
+          // `agent-tasks-v1` sends no thread queue, so only a thread on this computer has an order to change.
+          if (parsed.taskId !== undefined) throw new Error(sourceText("error.backend.threadRemoteUnsupported"));
+          return runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueReorder(parsed.agentId), decodeVoid, {
               method: "POST",
               body: { deliveryIds: parsed.deliveryIds },
             }),
-          ),
+          );
+        },
       }),
       interrupt: scopedHandler(parseInterrupt, {
         local: (parsed) => runCauseEffect(service.interrupt(parsed.agentId, parsed.turnId)),

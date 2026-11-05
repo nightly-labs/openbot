@@ -34,4 +34,20 @@ export const messages = {
   "error.connector.bitwardenCliInstallFailed":
     "No se pudo instalar la CLI de Bitwarden en este servidor. Comprueba su conexión de red y conecta de nuevo.",
   "error.connector.bitwardenFileUnreadable": "El archivo de conexión de Bitwarden no se puede leer.",
+  "error.connector.passwordManagerUnknown": "OpenBot no conoce este gestor de contraseñas.",
+  "error.connector.passwordManagerMethod": "Este gestor de contraseñas no se puede conectar de esta forma.",
+  "error.connector.passwordManagerNoSignIn": "No hay ninguna página de inicio de sesión abierta. Vuelve a conectar.",
+  "error.connector.protonPassFailed": "No se pudo conectar Proton Pass. Vuelve a conectar.",
+  "error.connector.protonPassCliInstallFailed":
+    "No se pudo instalar la CLI de Proton Pass. Comprueba la conexión de red y vuelve a conectar.",
+  "error.connector.protonPassPlan":
+    "Tu plan de Proton no permite la CLI de Proton Pass. Cambia el plan y vuelve a conectar.",
+  "error.connector.protonPassExpired": "El acceso a Proton Pass ha terminado. Vuelve a conectar.",
+  "error.connector.protonPassKeyInvalid": "Introduce una clave de acceso de Proton Pass que empiece por pst_.",
+  "error.connector.protonPassExtraPassword": "La contraseña adicional no es correcta. Introdúcela de nuevo.",
+  "error.connector.protonPassExtraPasswordNotAsked": "Proton Pass no ha pedido una contraseña adicional.",
+  "error.connector.protonPassFileUnreadable": "El archivo de conexión de Proton Pass no se puede leer.",
+  "error.connector.protonPassSignInTimeout": "El inicio de sesión de Proton tardó demasiado. Vuelve a conectar.",
+  "error.connector.protonPassSetupFailed":
+    "No se pudo crear la bóveda Shared with OpenBot ni su clave de acceso en Proton Pass. Vuelve a conectar.",
 } as const satisfies PartialTranslation<typeof source>;

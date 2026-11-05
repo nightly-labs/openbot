@@ -24,7 +24,12 @@ import {
   matchesFilter,
   NO_MARKETPLACE_FILTER,
 } from "../model/marketplace-listings";
-import { type MarketplaceInstalled, useMarketplaceCatalog, useMarketplaceInstalled } from "../model/use-marketplace";
+import {
+  type MarketplaceCatalog,
+  type MarketplaceInstalled,
+  useMarketplaceCatalog,
+  useMarketplaceInstalled,
+} from "../model/use-marketplace";
 
 /** The agents of the shelf and the skills of the list on the overview. */
 const OVERVIEW_ROWS = 8;
@@ -45,10 +50,19 @@ export function MarketplaceScreen() {
   const [filter, setFilter] = useState<MarketplaceFilter>(NO_MARKETPLACE_FILTER);
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
-  const catalog = useMarketplaceCatalog({ query, filter });
+  const catalog = useMarketplaceCatalog({ serverId, query, filter });
   const installed = useMarketplaceInstalled(serverId);
   const title = t("mobile.app.route.marketplace");
   const listing = (item: MarketplaceListing) => {
+    // A connector and an MCP server that the user added open their own pages, as on the desktop.
+    if (item.kind === "app" && item.source === "connector") {
+      router.push({ pathname: "/server-settings/connector", params: { serverId, id: item.connector } });
+      return;
+    }
+    if (item.kind === "app" && item.source === "custom") {
+      router.push({ pathname: "/server-settings/mcp-server", params: { serverId, mcpServerId: item.server.id } });
+      return;
+    }
     // The name goes along, so the sheet has its title before the listing loads.
     router.push({
       pathname: "/marketplace-listing",
@@ -81,6 +95,7 @@ export function MarketplaceScreen() {
         listings={catalog.listings.filter((item) => matchesFilter(item, filter, installed.installed))}
         filter={filter}
         pending={catalog.pending}
+        more={catalog}
         installed={installed}
         onOpen={listing}
         onClear={() => {
@@ -253,6 +268,7 @@ function FilteredList({
   listings,
   filter,
   pending,
+  more,
   installed,
   onOpen,
   onClear,
@@ -260,6 +276,8 @@ function FilteredList({
   listings: MarketplaceListing[];
   filter: MarketplaceFilter;
   pending: boolean;
+  /** The next catalog page, as the desktop "Load more". */
+  more: Pick<MarketplaceCatalog, "hasMore" | "loadingMore" | "loadMoreFailed" | "loadMore">;
   installed: MarketplaceInstalled;
   onOpen: (listing: MarketplaceListing) => void;
   onClear: () => void;
@@ -305,6 +323,17 @@ function FilteredList({
       ) : (
         <SettingsNote>{t("mobile.marketplace.empty")}</SettingsNote>
       )}
+      {more.loadMoreFailed ? <SettingsNote>{t("mobile.marketplace.loadFailed")}</SettingsNote> : null}
+      {more.hasMore ? (
+        <Button
+          variant="secondary"
+          className="self-center"
+          isDisabled={more.loadingMore}
+          onPress={() => void more.loadMore()}
+        >
+          <Button.Label>{t("mobile.marketplace.loadMore")}</Button.Label>
+        </Button>
+      ) : null}
     </View>
   );
 }

@@ -2,8 +2,10 @@ import {
   DISCORD_MARK_PATH,
   GITHUB_MARK_PATH,
   ONEPASSWORD_MARK_PATH,
+  PROTON_MARK_PATH,
   SLACK_MARK_PATH,
   TELEGRAM_MARK_PATH,
+  WHATSAPP_MARK_PATH,
 } from "@openbot/brand/connector-mark-shape";
 import { useThemeColor } from "heroui-native/hooks";
 import Lock from "lucide-react-native/icons/lock";
@@ -15,11 +17,13 @@ const MARK_PATHS: Record<Exclude<MobileConnectorId, "bitwarden">, string> = {
   slack: SLACK_MARK_PATH,
   discord: DISCORD_MARK_PATH,
   telegram: TELEGRAM_MARK_PATH,
+  whatsapp: WHATSAPP_MARK_PATH,
   github: GITHUB_MARK_PATH,
   onepassword: ONEPASSWORD_MARK_PATH,
+  protonpass: PROTON_MARK_PATH,
 };
 
-/** The connector's mark on a tile, as desktop Server settings › Connectors shows it. */
+/** The connector's mark on a tile, as the desktop Marketplace shows it. */
 export function ConnectorLogo({ id, size = 32 }: { id: MobileConnectorId; size?: number }) {
   const foreground = useThemeColor("foreground");
   const mark = Math.round(size * 0.55);

@@ -292,6 +292,16 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "يوجد بالفعل ملف تعريف متصفح بهذا الاسم.",
   "error.backend.browserSessionInUse": "لا تزال علامة تبويب تستخدم جلسة المتصفح هذه. حاول مرة أخرى.",
   "error.backend.browserProfileLimit": "يمكن أن يكون لديك {limit} ملفات تعريف للمتصفح كحد أقصى.",
+  "error.backend.browserProxyNotFound": "لم يعد هذا البروكسي موجودًا.",
+  "error.backend.browserProxyAddressInvalid":
+    "اكتب عنوان بروكسي مثل socks5://host:1080 أو http://user:password@host:3128.",
+  "error.backend.browserProxyLimit": "يمكن أن يكون لديك {limit} بروكسي كحد أقصى.",
+  "error.backend.browserProxyTaken": "يوجد بالفعل بروكسي بهذا العنوان.",
+  "error.backend.browserProxyChanged": "تغيّر هذا البروكسي بعد أن فتحته. راجعه مرة أخرى، ثم حاول مجددًا.",
+  "error.backend.browserProxyUnreachable": "الوكيل {name} لا يستجيب، لذلك لم تُفتح الصفحة.",
+  "error.backend.browserProxySignInRefused": "رفض الوكيل {name} تسجيل الدخول، لذلك لم تُفتح الصفحة.",
+  "error.backend.browserProxyComputerUnreachable":
+    "الكمبيوتر الذي يستخدمه هذا الملف الشخصي لا يستجيب، لذلك لم تُفتح الصفحة.",
   "error.backend.browserLowMemory":
     "ذاكرة هذا الخادم منخفضة، لذا لا يمكن للمتصفح فتح علامة تبويب أخرى. أغلق علامة تبويب، أو انتظر حتى ينتهي الوكلاء الآخرون.",
   "error.backend.browserOpenFailed": "تعذّر فتح {url}: {reason}",

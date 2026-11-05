@@ -18,6 +18,7 @@ import {
   type RemoteTeamDiagnostic,
   type RemoteUploadProgress,
 } from "@openbot/team-client/remote-peer";
+import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery";
 import { referenceFrom } from "@openbot/user-errors";
 import type { DOMProps } from "expo/dom";
 import * as Crypto from "expo-crypto";
@@ -158,6 +159,9 @@ export const RemoteTeamTransport = memo(
                   path: next.path,
                   body: next.body,
                   upload: next.upload,
+                  // As on desktop and web: a read that makes the server usable fails in seconds, so a
+                  // dead path does not keep the connection attempt running for the 10 min request limit.
+                  timeoutMs: remoteWorkspaceReadTimeout(next.method, next.path),
                   // The transfer file is the one answer larger than an attachment.
                   ...(next.path === INSTANCE_TRANSFER_ROUTES.export
                     ? { largeDownload: { maxBytes: INSTANCE_TRANSFER_REMOTE_BYTES, mimeType: "application/zip" } }
@@ -206,7 +210,11 @@ export const RemoteTeamTransport = memo(
           const request = `${hostIdRef.current ?? "unknown server"} ${method} ${supportLogUrl(path)}`;
           const time = `(${Date.now() - started} ms)`;
           if (!result.ok)
-            supportLog.add("warn", "connection", `${request} -> failed: ${result.error ?? "no error"} ${time}`);
+            supportLog.add(
+              "warn",
+              "connection",
+              `${request} -> failed: ${result.error ?? "no error"}${result.reference ? ` [${result.reference}]` : ""} ${time}`,
+            );
           else
             supportLog.add(
               result.status !== undefined && result.status >= 400 ? "warn" : "info",
@@ -250,9 +258,18 @@ export const RemoteTeamTransport = memo(
 
     // A page that loads again, such as after Android ends its renderer, has none of the commands.
     // The page takes later states from the handle only, so it gets the current one before its commands.
+    // A second load means that the system ended the page's web process, such as in the background.
+    const pageLoads = useRef(0);
     const handleReady = useCallback(async () => {
+      pageLoads.current += 1;
+      const outstanding = mailbox.outstanding();
+      supportLog.add(
+        "info",
+        "connection",
+        `${latest.current.props.hostId} page ready, load ${pageLoads.current}, ${outstanding.length} commands waiting`,
+      );
       sendActive(latest.current.props.active);
-      deliverCommands(mailbox.outstanding());
+      deliverCommands(outstanding);
     }, [sendActive, deliverCommands, mailbox]);
     const handleCommandResult = useCallback(
       async (result: RemoteTeamCommandResult) => {
@@ -313,7 +330,7 @@ export const RemoteTeamTransport = memo(
       onConnectionUpdate: async (update: RemoteTeamConnectionUpdate) => latest.current.props.onConnectionUpdate(update),
       onDiagnostic: async ({ hostId, step, detail }: RemoteTeamDiagnostic) =>
         supportLog.add(
-          step === "failed" ? "warn" : "info",
+          step === "failed" || step === "stalled" || step === "signal-error" ? "warn" : "info",
           "connection",
           `${hostId} peer ${step}${detail ? `: ${detail}` : ""}`,
         ),

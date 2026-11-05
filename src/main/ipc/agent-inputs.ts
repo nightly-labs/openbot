@@ -921,7 +921,11 @@ export function parsePreviewSharedFile(value: unknown): PreviewSharedFileInput {
 
 export function parsePreviewWorkspaceFile(value: unknown): PreviewWorkspaceFileInput {
   if (!isObject(value)) throw new Error("Invalid workspace file request.");
-  return { ...parseOpenWorkspaceFile(value), ...optionalPreviewByteLimit(value.maxBytes) };
+  return {
+    ...parseOpenWorkspaceFile(value),
+    ...optionalPreviewByteLimit(value.maxBytes),
+    ...(value.exactPath === true ? { exactPath: true } : {}),
+  };
 }
 
 function optionalPreviewByteLimit(value: unknown): { maxBytes?: number } {
@@ -988,6 +992,7 @@ export function parseReorderQueue(value: unknown): ReorderQueueInput {
   return {
     agentId: requireString(value.agentId, "agentId"),
     deliveryIds: parseIdentifierList(value.deliveryIds, "delivery ids", INPUT_LIMITS.queueReorder),
+    ...(value.taskId === undefined ? {} : { taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier) }),
   };
 }
 

@@ -94,7 +94,7 @@ export const messages = defineMessages("vault", {
   "vault.importMenu": "Import from CSV",
   "vault.importTitle": "Import from a CSV file",
   "vault.importDescription":
-    "Import logins from a CSV file that 1Password, Bitwarden, Chrome, Edge, Firefox, Safari, Apple Passwords or LastPass exports. OpenBot reads the file on this computer and does not upload it.",
+    "Import logins from a CSV file that 1Password, Bitwarden, Chrome, Edge, Firefox, Safari, Apple Passwords, LastPass or Proton Pass exports. OpenBot reads the file on this computer and does not upload it.",
   "vault.importChoose": "Choose CSV file",
   "vault.importDone": "Imported: {imported}. Skipped: {skipped}.",
   "vault.unavailableTitle": "This computer cannot keep secrets",

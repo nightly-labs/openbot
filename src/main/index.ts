@@ -1,3 +1,4 @@
+import { uptime } from "node:os";
 import { join, resolve } from "node:path";
 import { parseInviteUrl, selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import {
@@ -90,6 +91,7 @@ import { memoryIpcHandlers } from "./ipc/memory-handlers";
 import { messagingIpcHandlers } from "./ipc/messaging-handlers";
 import { notificationIpcHandlers } from "./ipc/notification-handlers";
 import { onePasswordConnectorIpcHandlers } from "./ipc/onepassword-connector-handlers";
+import { passwordManagersIpcHandlers } from "./ipc/password-managers-handlers";
 import { pluginIpcHandlers } from "./ipc/plugin-handlers";
 import { providerAdminIpcHandlers } from "./ipc/provider-admin-handlers";
 import { providerDetectionIpcHandlers } from "./ipc/provider-detection-handlers";
@@ -130,6 +132,7 @@ import { watchRemoteHostDirectory } from "./remote-server-host-directory";
 import { createRendererForwarders } from "./renderer-forwarders";
 import { sendToRenderer } from "./renderer-ipc";
 import { RoutineWake } from "./routine-wake";
+import { RunMarker, type UncleanExitProperties } from "./run-marker";
 import { memberAuditName } from "./server-audit-store";
 import { takeServerModeEnvironment } from "./server-mode";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
@@ -149,6 +152,10 @@ const logger = createOpenBotLogger("main");
 // add a redacted log line and a trace span, so a diagnostics export shows that the main process failed
 // and how often.
 let crashTrace: TraceFile | null = null;
+/** How this run ends, for the next start (`run-marker.ts`). Only the process with the lock has one. */
+let runMarker: RunMarker | null = null;
+/** How the previous run ended when it did not quit cleanly. Host analytics sends it once. */
+let previousUncleanExit: UncleanExitProperties | null = null;
 process.on("unhandledRejection", (reason) => reportMainProcessFailure("unhandledRejection", reason));
 process.on("uncaughtExceptionMonitor", (error, origin) => reportMainProcessFailure(origin, error));
 
@@ -185,6 +192,7 @@ function recordExit(reason: ExitReason): void {
   if (exitRecorded) return;
   exitRecorded = true;
   logger.info(`Quitting: ${reason}.`);
+  runMarker?.quitting(reason);
   if (!crashTrace) return;
   crashTrace.record({ kind: "exit", name: reason, durationMs: 0, outcome: "requested" });
   Effect.runFork(crashTrace.flush());
@@ -289,6 +297,21 @@ if (hasSingleInstanceLock) {
   // Crash dumps stay in `crashDumps` on this computer. Crashpad removes old reports itself. Without
   // them, a window that disappeared on Windows left nothing to tell a crash from a quit (#2675).
   crashReporter.start({ uploadToServer: false });
+  // After the crash reporter: the next start counts the dumps written after this run's last sign of life.
+  // The desktop stops a local server child with SIGKILL after a grace period, so the child has no marker.
+  if (!localServerChild)
+    ({ marker: runMarker, previous: previousUncleanExit } = RunMarker.start({
+      userDataPath: app.getPath("userData"),
+      crashDumpsPath: app.getPath("crashDumps"),
+      appVersion: app.getVersion(),
+      server: hostedServer !== null || serverMode !== null,
+      now: Date.now(),
+      bootedAt: Date.now() - uptime() * 1_000,
+    }));
+  if (previousUncleanExit)
+    logger.warn(
+      `The previous run did not quit cleanly (${previousUncleanExit.phase}, ${previousUncleanExit.uptime_class}, ${previousUncleanExit.crash_dump_count} crash dumps).`,
+    );
   // Linux AppImage: the handler must stop before the AppImage unmounts (#3066).
   stopAppImageCrashpadHandlerAtExit();
   // A file request that never finishes must not keep the process and its lock after an exit.
@@ -446,6 +469,7 @@ const {
   forwardLinkAccountStatus,
   forwardOnePasswordConnectorStatus,
   forwardBitwardenConnectorStatus,
+  forwardPasswordManagerStatus,
   forwardVaultState,
   forwardHostStatus,
   forwardRemoteDesktopSessions,
@@ -668,6 +692,7 @@ function registerIpcHandlers({
   linkAccount,
   onePasswordConnector,
   bitwardenConnector,
+  passwordManagers,
   vault,
   billing,
   license,
@@ -695,6 +720,7 @@ function registerIpcHandlers({
   machineAlerts,
   trace,
   resourceMonitor,
+  startup,
   routineFlows,
   workflows,
   workflowGitHub,
@@ -738,10 +764,15 @@ function registerIpcHandlers({
       analyticsCaptureUrl,
       analyticsInstallId,
       getMainWindow: getDialogParent,
+      isMainWindow: (sender) => {
+        const window = windowHolder.current;
+        return window !== null && !window.isDestroyed() && window.webContents === sender;
+      },
       openChatWindow: windows.openChatWindow,
       chatWindowTargets: windows.chatWindowTargets,
       trace,
       resources: resourceMonitor,
+      startup,
     }),
     ...dynamicIslandIpcHandlers({ dynamicIsland }),
     ...browserDockIpcHandlers({ browserDock }),
@@ -773,6 +804,7 @@ function registerIpcHandlers({
     ...linkAccountIpcHandlers({ linkAccount }),
     ...onePasswordConnectorIpcHandlers({ onePasswordConnector, remoteServers }),
     ...bitwardenConnectorIpcHandlers({ bitwardenConnector, remoteServers }),
+    ...passwordManagersIpcHandlers({ passwordManagers, remoteServers, openExternal: openLink }),
     ...vaultIpcHandlers({ vault, getMainWindow: getDialogParent, translate: language.translate, remoteServers }),
     ...billingIpcHandlers({ billing }),
     ...licenseIpcHandlers({ license }),
@@ -1228,6 +1260,10 @@ if (!hasSingleInstanceLock) {
     .then(async () => {
       // Startup marks for `dev:bench`, which reads them over the inspector. They change nothing.
       performance.mark("openbot:when-ready");
+      // A run that ends in sleep, or in an OS shutdown that Electron reports, is told apart at the next start.
+      powerMonitor.on("suspend", () => runMarker?.suspend());
+      powerMonitor.on("resume", () => runMarker?.resume());
+      powerMonitor.on("shutdown", () => runMarker?.osShutdown());
       // Set the Dock icon before `dock.show()` below. A development build runs the stock Electron.app,
       // so until this call its Dock tile shows the Electron logo.
       if (process.platform === "darwin" && !localServerChild) app.dock?.setIcon(appIconPath);
@@ -1255,6 +1291,7 @@ if (!hasSingleInstanceLock) {
         hostingDeveloperKey,
         localServerChild,
         localServerControl,
+        previousUncleanExit,
         macHapticFeedback,
         teardown,
         forwardCentralAuth,
@@ -1396,6 +1433,7 @@ if (!hasSingleInstanceLock) {
       built.linkAccount.onChanged(forwardLinkAccountStatus);
       built.onePasswordConnector.onChanged(forwardOnePasswordConnectorStatus);
       built.bitwardenConnector.onChanged(forwardBitwardenConnectorStatus);
+      built.passwordManagers.onChanged(forwardPasswordManagerStatus);
       built.vault.onChanged(forwardVaultState);
       remoteServers.on("changed", forwardServers);
       remoteServers.on("agent", (serverId, event, bufferedLive) => {
@@ -1534,6 +1572,9 @@ if (!hasSingleInstanceLock) {
       reconcileDynamicIsland();
       await windows.loadRenderer(mainWindow);
       performance.mark("openbot:renderer-loaded");
+      built.startup?.rendererLoaded();
+      // After the first window, so the new process does not compete with the start for the CPU.
+      Effect.runFork(built.prewarmAgentDatabase);
       // After the load: `sendToRenderer` drops events aimed at a window that is still loading.
       await Effect.runPromise(remoteServers.startEventConnections());
       screen.on("display-added", reconcileDynamicIsland);
@@ -1738,6 +1779,7 @@ const SHUTDOWN_DEADLINE_MS = 30_000;
 function forceExitAfterShutdownDeadline(deadlineMs: number): void {
   setTimeout(() => {
     logger.error(`OpenBot did not quit within ${deadlineMs} ms and will exit now.`);
+    runMarker?.quitTimedOut();
     app.exit(0);
   }, deadlineMs);
 }
@@ -1779,4 +1821,5 @@ async function prepareForShutdown(deadlineMs = SHUTDOWN_DEADLINE_MS): Promise<vo
   services?.dynamicIsland.destroy();
   macHapticFeedback.destroy();
   await teardown.runAll();
+  runMarker?.clean();
 }

@@ -45,6 +45,7 @@ import {
 import Animated, {
   Easing,
   FadeInDown,
+  Keyframe,
   ReduceMotion,
   useAnimatedStyle,
   useSharedValue,
@@ -70,6 +71,7 @@ import {
   type ChatMessage,
   chatRowIndex,
   type ExchangeGroup,
+  firstChatRowOf,
   groupExchangeMarkers,
   indexChatMessages,
   type RoutineMarkerEvent,
@@ -86,7 +88,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
-import { lineDirectionStyle, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
+import { END_X, lineDirectionStyle, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { chatDayLabels } from "../model/chat-day-markers";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
@@ -122,7 +124,7 @@ const OPENING_ROWS_TO_USER = 12;
 const ROW_STYLE = { paddingBottom: CHAT_ROW_GAP };
 /** The side padding of the list. */
 const LIST_PADDING = 16;
-/** A user's message is at most this part of the list width, as `max-w-[92%]` on its row. */
+/** A user's text bubble is at most this part of the list width, as `max-w-[92%]` on its row. */
 const USER_BUBBLE_WIDTH = 0.92;
 
 /** The list keeps the sizes it measured by message, so rows that stay keep their place when the data changes. */
@@ -284,6 +286,15 @@ interface ChatMessageListProps {
   onDeleteMessage?: (message: ChatBubbleMessage) => Promise<void>;
   /** The reader can delete the messages of others too, not only the ones that they sent. */
   deletesAnyMessage?: boolean;
+  /** Marks an agent's message and the messages after it unread. Absent where the host cannot. */
+  onMarkUnread?: (message: ChatBubbleMessage) => void;
+  /** The messages that Mark unread is on. All agent messages when unset. */
+  markUnreadMessageIds?: ReadonlySet<string>;
+  /**
+   * The host messages from the one where the NEW line shows to the newest, in chat order. The line
+   * shows above the first row of them. Keep the set stable while its ids stay the same.
+   */
+  unreadLineMessageIds?: ReadonlySet<string> | null;
   /** The open channels that the text of a message can go to. Keep the list stable while it stays the same. */
   sendChannels?: readonly { id: string; name: string }[];
   onSendToChannel?: (message: ChatBubbleMessage, channelId: string) => void;
@@ -357,6 +368,8 @@ interface MessageRowShared {
   /** The host deletes messages. A message that the reader did not send also needs `deletesAny`. */
   canDelete: boolean;
   deletesAny: boolean;
+  /** The host marks an agent's message unread for the reader. */
+  canMarkUnread: boolean;
   /** The open channels that the text of a message can go to. Empty where it cannot go to one. */
   sendChannels: readonly { id: string; name: string }[];
   canSelectText: boolean;
@@ -371,6 +384,9 @@ interface MessageRowShared {
     selectQuestion: (messageId: string) => void;
     react: (message: ChatBubbleMessage, emoji: string | null) => Promise<void>;
     delete: (message: ChatBubbleMessage) => Promise<void>;
+    markUnread: (message: ChatBubbleMessage) => void;
+    /** Whether Mark unread is on this message. */
+    marksUnread: (message: ChatBubbleMessage) => boolean;
     sendToChannel: (message: ChatBubbleMessage, channelId: string) => void;
     selectText: (message: ChatBubbleMessage) => void;
     selectionChange: (selected: string) => void;
@@ -435,6 +451,78 @@ function ContextResetMarkerRow({ muted }: { muted: ViewStyle["backgroundColor"] 
         {t("mobile.chat.contextReset")}
       </Typography.Paragraph>
       <View className="h-px flex-1" style={{ backgroundColor: muted, opacity: 0.35 }} />
+    </View>
+  );
+}
+
+/*
+ * The NEW line arrives as on desktop: the badge comes in first, then each line grows out from it.
+ * Layout animations run on the UI thread. Reduced motion shows the line at once.
+ */
+const LINE_EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
+const UNREAD_BADGE_IN = new Keyframe({
+  0: { opacity: 0, transform: [{ scale: 0.9 }] },
+  100: { opacity: 1, transform: [{ scale: 1 }], easing: LINE_EASE_OUT },
+})
+  .duration(200)
+  .reduceMotion(ReduceMotion.System);
+const UNREAD_LINE_IN = new Keyframe({
+  0: { opacity: 0, transform: [{ scaleX: 0 }] },
+  100: { opacity: 1, transform: [{ scaleX: 1 }], easing: LINE_EASE_OUT },
+})
+  .duration(340)
+  .delay(60)
+  .reduceMotion(ReduceMotion.System);
+// Each line grows from its end at the badge. The row runs right to left in RTL, so the ends swap.
+const LINE_BEFORE_ORIGIN = END_X === 1 ? "100% 50%" : "0% 50%";
+const LINE_AFTER_ORIGIN = END_X === 1 ? "0% 50%" : "100% 50%";
+
+/**
+ * The NEW line above the first unread message of the chat, as on desktop. With chat colors on, it has
+ * the agent's color, as the reader's bubbles do; else the accent of the unread marks. It animates once
+ * for each new place: the list draws a row again when it scrolls back into view, and that draw shows
+ * the line at once. `animated` holds the rows where it already arrived.
+ */
+function UnreadLineRow({
+  rowId,
+  color,
+  animated,
+}: {
+  rowId: string;
+  color: string | undefined;
+  animated: Set<string>;
+}) {
+  const { t } = useText();
+  const [arrives] = useState(() => !animated.has(rowId));
+  useEffect(() => {
+    animated.add(rowId);
+  }, [animated, rowId]);
+  const line = color ? { backgroundColor: color } : undefined;
+  return (
+    <View
+      accessible
+      accessibilityLabel={t("mobile.chat.unread.lineLabel")}
+      className="flex-row items-center gap-2 pt-1 pb-3"
+    >
+      <Animated.View
+        entering={arrives ? UNREAD_LINE_IN : undefined}
+        className="h-px flex-1 bg-accent"
+        style={[{ transformOrigin: LINE_BEFORE_ORIGIN }, line]}
+      />
+      <Animated.View entering={arrives ? UNREAD_BADGE_IN : undefined}>
+        <Typography.Paragraph
+          type="body-xs"
+          className="font-semibold text-accent"
+          style={color ? { color } : undefined}
+        >
+          {t("mobile.chat.unread.line")}
+        </Typography.Paragraph>
+      </Animated.View>
+      <Animated.View
+        entering={arrives ? UNREAD_LINE_IN : undefined}
+        className="h-px flex-1 bg-accent"
+        style={[{ transformOrigin: LINE_AFTER_ORIGIN }, line]}
+      />
     </View>
   );
 }
@@ -566,6 +654,11 @@ const MessageRow = memo(function MessageRow({
           onSelectText: selectable ? () => shared.actions.selectText(bubble) : undefined,
           onDelete:
             shared.canDelete && (shared.deletesAny || bubble.mine) ? () => shared.actions.delete(bubble) : undefined,
+          // As on desktop, only an agent's message marks the chat unread from it.
+          onMarkUnread:
+            shared.canMarkUnread && bubble.author === "agent" && shared.actions.marksUnread(bubble)
+              ? () => shared.actions.markUnread(bubble)
+              : undefined,
           sendToChannel:
             shared.sendChannels.length > 0 && bubble.body.trim()
               ? {
@@ -740,11 +833,17 @@ const MessageRow = memo(function MessageRow({
             animateSize={shared.textReveal}
             className={
               message.author === "user"
-                ? `self-end px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"} ${message.attachments?.length ? "max-w-[92%]" : "max-w-full"}`
+                ? `max-w-full self-end px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"}`
                 : `max-w-full self-start ${waiting ? "" : "px-4 py-3"}`
             }
             style={[
               { borderCurve: "circular", overflow: "hidden" },
+              // A row with files is as wide as the list, and its column takes the width of its widest
+              // child. A percentage would be of that column: the text wraps after the row has its
+              // height, and the bubble covers the next row. The width in points does not depend on it.
+              message.author === "user" && message.attachments?.length
+                ? { maxWidth: shared.listWidth * USER_BUBBLE_WIDTH }
+                : undefined,
               message.author === "user"
                 ? memberColor
                   ? { backgroundColor: `${memberColor}38` }
@@ -889,6 +988,12 @@ interface RowContextValue {
   dayLabels: ReadonlyMap<string, string>;
   /** The "Branched from" line and the row that it follows. */
   branchDivider: { rowId: string; label: string | null; onOpen: (() => void) | undefined } | null;
+  /** The row that the NEW line shows above. */
+  unreadLineRowId: string | null;
+  /** The agent color of the NEW line, with chat colors on. */
+  unreadLineColor: string | undefined;
+  /** The rows where the NEW line already arrived, so a row drawn again does not animate it again. */
+  unreadLineAnimated: Set<string>;
 }
 
 const RowContext = createContext<RowContextValue | null>(null);
@@ -910,6 +1015,9 @@ function ChatRow({ message }: { message: VisibleMessage }) {
         <Typography.Paragraph type="body-xs" align="center" className="pb-3 pt-1 text-muted">
           {day}
         </Typography.Paragraph>
+      ) : null}
+      {message.id === row.unreadLineRowId ? (
+        <UnreadLineRow rowId={message.id} color={row.unreadLineColor} animated={row.unreadLineAnimated} />
       ) : null}
       {turn && openTurn ? (
         <ChatTurnStepsRow summary={turn} muted={row.shared.themeMuted} onPress={() => openTurn(turn.turnId)} />
@@ -1062,6 +1170,9 @@ export const ChatMessageList = memo(function ChatMessageList({
   onBranch,
   onDeleteMessage,
   deletesAnyMessage = false,
+  onMarkUnread,
+  markUnreadMessageIds,
+  unreadLineMessageIds = null,
   sendChannels = NO_CHANNELS,
   onSendToChannel,
   branchPoints = NO_IDS,
@@ -1233,6 +1344,8 @@ export const ChatMessageList = memo(function ChatMessageList({
     onBranch,
     onReact,
     onDeleteMessage,
+    onMarkUnread,
+    markUnreadMessageIds,
     onSendToChannel,
     onSelectText,
     onSelectionChange,
@@ -1243,6 +1356,8 @@ export const ChatMessageList = memo(function ChatMessageList({
     onBranch,
     onReact,
     onDeleteMessage,
+    onMarkUnread,
+    markUnreadMessageIds,
     onSendToChannel,
     onSelectText,
     onSelectionChange,
@@ -1255,6 +1370,8 @@ export const ChatMessageList = memo(function ChatMessageList({
       selectQuestion: (messageId) => actionHandlers.current.onSelectQuestion?.(messageId),
       react: async (message, emoji) => actionHandlers.current.onReact?.(message, emoji),
       delete: async (message) => actionHandlers.current.onDeleteMessage?.(message),
+      markUnread: (message) => actionHandlers.current.onMarkUnread?.(message),
+      marksUnread: (message) => actionHandlers.current.markUnreadMessageIds?.has(message.id) ?? true,
       sendToChannel: (message, channelId) => actionHandlers.current.onSendToChannel?.(message, channelId),
       selectText: (message) => actionHandlers.current.onSelectText?.(message),
       selectionChange: (selected) => actionHandlers.current.onSelectionChange?.(selected),
@@ -1296,6 +1413,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   const canReply = Boolean(onReply);
   const canReact = Boolean(onReact);
   const canDelete = Boolean(onDeleteMessage);
+  const canMarkUnread = Boolean(onMarkUnread);
   const shownSendChannels = onSendToChannel ? sendChannels : NO_CHANNELS;
   const canSelectText = Boolean(onSelectText);
   const canSelectQuestion = Boolean(onSelectQuestion);
@@ -1330,6 +1448,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       canReact,
       canDelete,
       deletesAny: deletesAnyMessage,
+      canMarkUnread,
       sendChannels: shownSendChannels,
       canSelectText,
       canSelectQuestion,
@@ -1361,6 +1480,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       canReact,
       canDelete,
       deletesAnyMessage,
+      canMarkUnread,
       shownSendChannels,
       canSelectText,
       canSelectQuestion,
@@ -1393,6 +1513,14 @@ export const ChatMessageList = memo(function ChatMessageList({
     );
     return row?.id ?? null;
   }, [branchDivider?.afterId, visibleMessages]);
+  // The NEW line shows above the first unread row. A message without a row, such as a thinking step,
+  // gives the line to the next row that has one.
+  const unreadLineColor = target.kind === "agent" && agentColorMessages ? userBubbleColor : undefined;
+  const unreadLineAnimated = useRef(new Set<string>());
+  const unreadLineRowId = useMemo(() => {
+    if (!unreadLineMessageIds) return null;
+    return visibleMessages[firstChatRowOf(visibleMessages, unreadLineMessageIds)]?.id ?? null;
+  }, [unreadLineMessageIds, visibleMessages]);
   const rowBranchDivider = useMemo<RowContextValue["branchDivider"]>(
     () =>
       dividerRowId && branchDivider
@@ -1422,6 +1550,9 @@ export const ChatMessageList = memo(function ChatMessageList({
       onOpenTurn,
       dayLabels,
       branchDivider: rowBranchDivider,
+      unreadLineRowId,
+      unreadLineColor,
+      unreadLineAnimated: unreadLineAnimated.current,
     }),
     [
       shared,
@@ -1440,6 +1571,8 @@ export const ChatMessageList = memo(function ChatMessageList({
       onOpenTurn,
       dayLabels,
       rowBranchDivider,
+      unreadLineRowId,
+      unreadLineColor,
     ],
   );
   const activitySpec = (activity?: MobileAgentActivity): ChatActivitySpec | null => {

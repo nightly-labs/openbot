@@ -236,10 +236,11 @@
   color: var(--openbot-text-primary);
 }
 
+/* Name the Lucide shapes: with `> *` after the :has(), Chrome restyles the whole page on each inserted element. */
 .ui-action-menu.window-rail-more-menu
   .window-rail-more-row:is(:hover, :has([data-highlighted]))
   > [role="menuitem"]
   > .agent-context-icon
-  > * {
+  > :is(path, circle, rect, line, polyline, polygon, ellipse) {
   fill-opacity: 1;
 }

@@ -402,6 +402,36 @@ export function createAgentTasks(options: AgentTasksOptions) {
     return receipt !== null;
   }
 
+  /** Removes a queued message of a thread. */
+  function cancelQueuedMessage(agentId: string, deliveryId: string): void {
+    const queue = port().queue;
+    if (queue) void runAction(() => queue.cancelQueuedMessage({ agentId, deliveryId }), "app.errorStatus.cancel");
+  }
+
+  /**
+   * Gives a queued message of a thread to the thread's running turn. After the turn ended, the
+   * message runs as the next turn, so the refusal is not shown, as in the agent's own chat (#3206).
+   */
+  function steerQueuedMessage(agentId: string, taskId: string, deliveryId: string, expectedTurnId: string): void {
+    const queue = port().queue;
+    if (!queue) return;
+    void queue.steerQueuedMessage({ agentId, deliveryId, expectedTurnId }).catch((error: unknown) => {
+      if (!scopeIsCurrent()) return;
+      const task = state.snapshots[agentId]?.tasks.find((entry) => entry.id === taskId);
+      if (task?.activeTurnId !== expectedTurnId) return;
+      // A message that left the queue is in the turn already.
+      if (!task.queue?.some((delivery) => delivery.id === deliveryId)) return;
+      const { t, errorMessage } = currentText();
+      actionToast.error(errorMessage(error, t("app.errorStatus.steer")));
+    });
+  }
+
+  /** Orders the queued messages of one thread. The other work of the agent keeps its places. */
+  function reorderQueue(agentId: string, taskId: string, deliveryIds: string[]): void {
+    const queue = port().queue;
+    if (queue) void runAction(() => queue.reorderQueue({ agentId, taskId, deliveryIds }), "app.errorStatus.reorder");
+  }
+
   function stopTask(agentId: string, taskId: string): void {
     void runAction(() => port().stopTask({ agentId, taskId }), "conversation.threads.error.stop");
   }
@@ -533,6 +563,10 @@ export function createAgentTasks(options: AgentTasksOptions) {
     branchTask,
     sendToTask,
     stopTask,
+    queueActions: (): boolean => port().queue !== undefined,
+    cancelQueuedMessage,
+    steerQueuedMessage,
+    reorderQueue,
     closeTask,
     reopenTask,
     renameTask,

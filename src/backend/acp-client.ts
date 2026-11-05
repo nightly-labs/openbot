@@ -27,6 +27,7 @@ import type { AgentSessionSettingsSnapshot, AgentSessionSettingValue } from "@op
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
+import { type CauseCode, classifyFailure, httpStatusCause, structuredCause } from "@openbot/telemetry";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Exit, Fiber, Result, Scope, Semaphore } from "effect";
 import {
@@ -55,7 +56,12 @@ import {
   type SubagentChange,
   stopSubagents,
 } from "./agent/subagent-updates";
-import { type AgentProvider, type DiagnosticOrigin, ProviderTurnActiveError } from "./agent-client";
+import {
+  AgentProcessExitError,
+  type AgentProvider,
+  type DiagnosticOrigin,
+  ProviderTurnActiveError,
+} from "./agent-client";
 import type { AgentCliInfo } from "./cli";
 import { runCauseEffect } from "./effect-boundary";
 import { IdleThreadPool } from "./idle-thread-pool";
@@ -205,6 +211,11 @@ interface AcpTurn {
   providerError: string | null;
   /** The agent's process lost its sign-in (`AcpFlavor.signInLostChunk`), and ends after this turn. */
   signInLost: boolean;
+  /**
+   * The cause of the failure that ends this turn, when OpenBot knows it better than the error that
+   * the turn ends with: that error is then a sentence for the user. Null: the error decides.
+   */
+  failureCause: CauseCode | null;
   /**
    * Where the answer text stood when Antigravity logged that its SDK failed this prompt. The
    * server then sends the failure as answer text and ends the turn as a success.
@@ -2166,6 +2177,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       interruptedAnswer: null,
       providerError: null,
       signInLost: false,
+      failureCause: null,
       sdkFailureAt: null,
       answerOptional,
       messages: [],
@@ -2238,6 +2250,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       // empty on purpose, and an error there costs no answer the user waits for.
       const emptyAnswerFailure = this.#flavor.emptyAnswerFailure;
       if (emptyAnswerFailure && response.stopReason === "end_turn" && !turn.receivedOutput && !turn.answerOptional) {
+        turn.failureCause = "empty_answer";
         yield* this.#completeTurn(thread, turn, "failed", emptyAnswerFailure(turn.reasoned));
         return;
       }
@@ -2248,6 +2261,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         const failureAt = turn.sdkFailureAt ?? (sdkHarness.answerIsFailure.test(turn.text) ? 0 : null);
         const failure = failureAt === null ? "" : turn.text.slice(failureAt).trim();
         if (failureAt !== null) {
+          turn.failureCause = classifyFailure(failure || turn.text.trim());
           turn.providerError = sdkHarness.turnFailure(failure || turn.text.trim());
           turn.text = failure ? turn.text.slice(0, failureAt) : "";
         }
@@ -2326,6 +2340,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         });
         // The lost prompt can still run in the harness. The next prompt opens the session again.
         thread.needsResume = true;
+        // Not `timeout`: a backup model must not start while the prompt can still run here.
+        turn.failureCause = "stalled";
         // A plain message, as `#watchStall` gives: the user reads it as it is.
         return Result.fail(
           providerFailure(
@@ -2492,6 +2508,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (this.#flavor.signInLostChunk?.test(update.content.text)) {
         turn.receivedOutput = true;
         turn.signInLost = true;
+        turn.failureCause = "authentication";
         turn.providerError = sourceText("error.provider.acpSignInLost", { provider: this.#label });
         return;
       }
@@ -2499,6 +2516,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       const quota = this.#flavor.sdkHarness?.quota(update.content.text) ?? null;
       if (quota !== null) {
         turn.receivedOutput = true;
+        turn.failureCause = "usage_limit";
         turn.providerError = quota;
         return;
       }
@@ -2721,6 +2739,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       }
       this.emit("diagnostic", `${this.#label} sent nothing for ${silentFor} ms; ending turn ${turn.id}.`);
       yield* providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id })).pipe(Effect.ignore);
+      // The agent can ignore the cancel, so a backup model must not start on this stall.
+      turn.failureCause = "stalled";
       yield* this.#abandonTurn(
         thread,
         turn,
@@ -2769,7 +2789,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (thread && transport !== this.#transport) {
       const turn = thread.activeTurn;
       const message = sourceText("error.provider.acpUnresponsive", { provider: this.#label });
-      if (turn) yield* this.#abandonTurn(thread, turn, "failed", message);
+      if (turn) {
+        // The transport stops below, so the prompt cannot still run and a backup model can start.
+        turn.failureCause = "timeout";
+        yield* this.#abandonTurn(thread, turn, "failed", message);
+      }
       thread.needsResume = true;
       yield* transport.stop(Effect.void).pipe(Effect.ignore);
       return true;
@@ -3081,9 +3105,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           thread.currentModelId,
           this.options.customEndpoint?.(thread.currentModelId) ?? null,
         ) ?? detail;
+      // A fixed code, so analytics and failover need not read the cause again from the sentence.
+      const causeCode = turn.failureCause ?? acpFailureCause(error, this.#flavor, message);
       this.emit("notification", {
         method: "error",
-        params: { threadId: thread.id, turnId: turn.id, message },
+        params: { threadId: thread.id, turnId: turn.id, message, causeCode },
       });
     }
     const append = this.options.history?.append;
@@ -3415,6 +3441,50 @@ function failureDetail(error: RequestError): string | null {
         ? (data.details ?? data.detail ?? data.message ?? data.error)
         : undefined;
   return typeof detail === "string" && detail ? detail : null;
+}
+
+/**
+ * The cause of a failed turn, from structured fields first: the flavor's own field, an HTTP status
+ * in the error's data, the stop reason, and the protocol's error code. The text decides only when
+ * those name none. The flavor's sentence counts after the raw text: a flavor can read a field that
+ * the generic rules do not know, such as Antigravity's `code: 429`.
+ */
+function acpFailureCause(error: unknown, flavor: AcpFlavor, sentence: string): CauseCode {
+  if (error instanceof RequestError) return acpRequestCause(error, flavor, sentence);
+  const flavored = flavor.failureCause?.(error) ?? null;
+  if (flavored) return flavored;
+  // The stop reasons of a turn that ended before the model answered in full.
+  if (error === "max_tokens" || error === "max_turn_requests") return "turn_limit";
+  if (error === "refusal") return "content_blocked";
+  const cause = textCause(classifyFailure(error), sentence);
+  return cause === "unknown" && error instanceof AgentProcessExitError ? "provider_exited" : cause;
+}
+
+function acpRequestCause(error: RequestError, flavor: AcpFlavor, sentence: string): CauseCode {
+  if (error.code === -32000) return "authentication";
+  const status = dataHttpStatus(error.data);
+  const structured = flavor.failureCause?.(error) ?? (status === null ? null : httpStatusCause(status));
+  const cause = structuredCause(structured, textCause(classifyFailure(failureText(error)), sentence));
+  if (cause !== "unknown") return cause;
+  if (error.code === -32600 || error.code === -32601 || error.code === -32602) return "invalid_request";
+  if (error.code === -32002) return "not_found";
+  // An error inside the agent that it names no reason for.
+  return error.code === -32603 ? "provider_internal_error" : "unknown";
+}
+
+function textCause(raw: CauseCode, sentence: string): CauseCode {
+  return raw === "unknown" ? classifyFailure(sentence) : raw;
+}
+
+/** The HTTP status that the agent's error data names, such as Grok 1.0.67's `http_status`. */
+function dataHttpStatus(data: unknown): number | null {
+  if (!isRecord(data)) return null;
+  for (const key of ["http_status", "httpStatus", "statusCode", "status"]) {
+    const value = data[key];
+    if (typeof value === "number" && Number.isInteger(value)) return value;
+    if (typeof value === "string" && /^\d{1,3}$/u.test(value)) return Number(value);
+  }
+  return null;
 }
 
 /** The text of a failed request, with the agent's explanation. */

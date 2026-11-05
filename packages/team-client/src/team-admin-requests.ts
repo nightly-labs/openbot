@@ -136,6 +136,8 @@ import {
   decodeHostMemoryReview,
   decodeHostMessagingOverview,
   decodeHostOnePasswordConnectorStatus,
+  decodeHostPasswordManagerList,
+  decodeHostPasswordManagerStatus,
   decodeHostProviderAccounts,
   decodeHostProviderAccountUsage,
   decodeHostReleaseStatus,
@@ -196,6 +198,9 @@ import {
   type MessagingOverview,
   type OnePasswordConnectorStatus,
   type OnePasswordHostConnectInput,
+  type PasswordManagerConnectInput,
+  type PasswordManagerId,
+  type PasswordManagerStatus,
   type PromptCacheTtl,
   type PromptCacheTtlSetting,
   type ProviderCodeLoginStart,
@@ -282,6 +287,7 @@ import { MCP_SIGN_IN_APP_ROUTES } from "@openbot/contracts/team-protocol/mcp-sig
 import { MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
 import { ONEPASSWORD_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
+import { PASSWORD_MANAGERS_ROUTES } from "@openbot/contracts/team-protocol/password-managers-v1";
 import type {
   ProviderAccountRelay,
   ProviderAccountRelayProvider,
@@ -1611,6 +1617,43 @@ export function bitwardenConnectorRequest(
 ): Effect.Effect<BitwardenConnectorStatus, TeamAdminRequestError> {
   return adminCall(() =>
     request("POST", BITWARDEN_CONNECTOR_ROUTES[route], decodeHostBitwardenConnectorStatus, { ...body }),
+  );
+}
+
+/**
+ * The password managers of the host (`password-managers-v1`), such as Proton Pass. The host lists
+ * only the managers that it can connect. No answer carries an access key or a password.
+ */
+export function listPasswordManagers(
+  request: TeamApiRequest,
+): Effect.Effect<PasswordManagerStatus[], TeamAdminRequestError> {
+  return adminCall(() => request("POST", PASSWORD_MANAGERS_ROUTES.list, decodeHostPasswordManagerList, {}));
+}
+
+/**
+ * Starts a connection of one manager, or sends the extra password that a `browser` connection asks
+ * for. The host answers the status at once; the client reads it again until the state changes.
+ */
+export function connectPasswordManager(
+  request: TeamApiRequest,
+  input: PasswordManagerConnectInput,
+): Effect.Effect<PasswordManagerStatus, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", PASSWORD_MANAGERS_ROUTES.connect, decodeHostPasswordManagerStatus, {
+      manager: input.manager,
+      method: { ...input.method },
+    }),
+  );
+}
+
+/** Stops a connection that has not ended (`cancel`), or removes the host's access (`disconnect`). */
+export function passwordManagerRequest(
+  request: TeamApiRequest,
+  route: "cancel" | "disconnect",
+  manager: PasswordManagerId,
+): Effect.Effect<PasswordManagerStatus, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", PASSWORD_MANAGERS_ROUTES[route], decodeHostPasswordManagerStatus, { manager }),
   );
 }
 

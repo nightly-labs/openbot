@@ -21,7 +21,7 @@ import {
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { type CauseCode, classifyFailure } from "@openbot/telemetry";
+import { type CauseCode, classifyFailure, isCauseCode } from "@openbot/telemetry";
 import { Cause, Deferred, Effect, Exit, Schema, Scope } from "effect";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
@@ -225,6 +225,37 @@ export interface TurnHooks {
   ): Effect.Effect<void>;
 }
 
+/** When the drain took a delivery from the queue, and its provider process start (null: it was running). */
+export interface DeliveryStart {
+  pickedAt: number;
+  providerStartMs: number | null;
+}
+
+/**
+ * Where the time of a finished turn went, in milliseconds. Each value is null when it is not known.
+ * `queueWaitMs`: from the message to the drain. `startMs`: from the drain to the provider's
+ * `turn/started`, `providerStartMs` included. `firstOutputMs`: from `turn/started` to the first text,
+ * thinking or tool step.
+ */
+export interface TurnTiming {
+  queueWaitMs: number | null;
+  startMs: number | null;
+  providerStartMs: number | null;
+  firstOutputMs: number | null;
+}
+
+/** Entries kept for starts and finished turns that nothing took. Older ones go first. */
+const TURN_TIMING_LIMIT = 64;
+
+function keepBounded<V>(map: Map<string, V>, key: string, value: V): void {
+  map.delete(key);
+  map.set(key, value);
+  for (const oldest of map.keys()) {
+    if (map.size <= TURN_TIMING_LIMIT) break;
+    map.delete(oldest);
+  }
+}
+
 export interface TurnLifecycleOptions {
   store: AgentStore;
   mailbox: MailboxStore;
@@ -299,11 +330,16 @@ export class TurnLifecycle {
       threadId: string;
       startedAt: number;
       sentAt: number | null;
+      start: DeliveryStart | null;
       firstOutputAt: number | null;
       produced: boolean;
       acted: boolean;
     }
   >();
+  /** The drain's start of each starting delivery, until its turn starts. */
+  readonly #deliveryStarts = new Map<string, DeliveryStart>();
+  /** The timing of each finished turn, until host analytics takes it. */
+  readonly #turnTimings = new Map<string, TurnTiming>();
   /** Running turns a provider plan refused, with the reset in epoch seconds when the provider gave it. */
   readonly #limitedTurns = new Map<string, number | null>();
   /**
@@ -384,6 +420,30 @@ export class TurnLifecycle {
     this.#lastEventAt.delete(agentId);
     for (const [childId, parent] of this.#codexChildren)
       if (parent.agentId === agentId) this.#codexChildren.delete(childId);
+  }
+
+  deliveriesStarting(deliveryIds: readonly string[], start: DeliveryStart): void {
+    for (const id of deliveryIds) keepBounded(this.#deliveryStarts, id, start);
+  }
+
+  /** Where the time of this finished turn went. Once: a second call gives null. */
+  takeTurnTiming(turnId: string): TurnTiming | null {
+    const timing = this.#turnTimings.get(turnId) ?? null;
+    this.#turnTimings.delete(turnId);
+    return timing;
+  }
+
+  #keepTurnTiming(
+    turnId: string,
+    running: { startedAt: number; sentAt: number | null; start: DeliveryStart | null; firstOutputAt: number | null },
+  ): void {
+    const { start } = running;
+    keepBounded(this.#turnTimings, turnId, {
+      queueWaitMs: start === null || running.sentAt === null ? null : Math.max(0, start.pickedAt - running.sentAt),
+      startMs: start === null ? null : Math.max(0, running.startedAt - start.pickedAt),
+      providerStartMs: start?.providerStartMs ?? null,
+      firstOutputMs: running.firstOutputAt === null ? null : running.firstOutputAt - running.startedAt,
+    });
   }
 
   /** When this running turn sent `turn/started`, in epoch milliseconds. Null for a turn that is not running. */
@@ -480,6 +540,8 @@ export class TurnLifecycle {
       this.#attention.clearForTurn(turn.threadId, turnId);
       if (this.#observedCompactions.get(turn.threadId) === turnId) this.#observedCompactions.delete(turn.threadId);
       this.#compaction.abandonCompaction(turn.threadId);
+      // The running entry is gone already, so `#completeTurn` cannot keep the timing.
+      this.#keepTurnTiming(turnId, turn);
       yield* this.#completeTurn(turn.agentId, turn.threadId, turnId, "interrupted").pipe(
         Effect.catchCause((cause) =>
           reportOriginalFailure(cause, (failure) =>
@@ -610,12 +672,16 @@ export class TurnLifecycle {
         const taskId = this.#taskForThread(agentId, threadId);
         const starting = unprompted ? undefined : this.#mailbox.startingDeliveryForAgent(agentId, taskId)?.delivery;
         const sentAt = starting ? Date.parse(starting.createdAt) : Number.NaN;
+        const start = starting ? (this.#deliveryStarts.get(starting.id) ?? null) : null;
+        // The other deliveries of the batch share this start and start no turn of their own.
+        for (const [id, candidate] of this.#deliveryStarts) if (candidate === start) this.#deliveryStarts.delete(id);
         this.#runningTurns.set(turnId, {
           client: source,
           agentId,
           threadId,
           startedAt: Date.now(),
           sentAt: Number.isFinite(sentAt) ? sentAt : null,
+          start,
           firstOutputAt: null,
           produced: false,
           acted: false,
@@ -849,6 +915,10 @@ export class TurnLifecycle {
         // an exhausted plan included, into the renderer's generic sentence under the usage notice.
         const error = getRecord(params, "error");
         const message = getString(params, "message") ?? getString(error, "message") ?? "";
+        // An ACP or Pi client names the cause that it read from structured fields, before the
+        // error became a sentence for the user. The other clients leave it to the error.
+        const reportedCause = isRecord(params) && isCauseCode(params.causeCode) ? params.causeCode : null;
+        const causeCode = reportedCause ?? classifyFailure(error ?? message);
         if (notification.method === "warning" && isNonActionableCodexWarning(message)) {
           // No banner, but the log keeps the reason, such as a closed WebSocket.
           logger.info("A provider warning needs no action.", {
@@ -899,7 +969,7 @@ export class TurnLifecycle {
             turnId: errorTurnId,
             provider: source.provider,
             model: agentId && errorTurnId ? this.#hooks.turnModel(agentId, errorTurnId) : null,
-            causeCode: classifyFailure(error ?? message),
+            causeCode,
             severity: notification.method === "warning" ? ("warning" as const) : ("error" as const),
           };
           yield* this.#providers.refreshUsageAfterLimit(source);
@@ -920,7 +990,7 @@ export class TurnLifecycle {
           return;
         }
         const context = {
-          causeCode: classifyFailure(error ?? message),
+          causeCode,
           provider: source.provider,
           model: agentId && errorTurnId ? this.#hooks.turnModel(agentId, errorTurnId) : null,
           turnId: errorTurnId,
@@ -1043,6 +1113,7 @@ export class TurnLifecycle {
       const reportedFailure = this.#reportedFailures.get(turnId);
       this.#reportedFailures.delete(turnId);
       if (running) {
+        this.#keepTurnTiming(turnId, running);
         // `waitMs` is OpenBot's part of a slow reply: the queue (a usage-limit hold included), the
         // provider start, the session and its settings. `firstOutputMs` is the provider's: the time
         // to its first text, thinking or tool step.
@@ -1312,8 +1383,12 @@ export class TurnLifecycle {
           for (const delivery of deliveries)
             yield* this.#relayAgentResult(agentId, turnId, delivery, latestAssistant.text);
         }
+        // A failed turn sends no result, so the agent that asked gets the failure as its answer.
+        if (!continuation && terminal === "failed") {
+          for (const { delivery } of deliveries) yield* this.#answerFailedRequest(agentId, delivery.id);
+        }
         // The requester holds the answers of the other teammates until each request has ended, so
-        // this end can release them, also when this turn failed and sends no result.
+        // this end can release them, and the failure note above.
         for (const { delivery } of deliveries) {
           if (delivery.sender.kind === "agent") this.#hooks.scheduleDrain(delivery.sender.agentId);
         }
@@ -1432,7 +1507,9 @@ export class TurnLifecycle {
   ) {
     const report = (cause: Cause.Cause<TurnOperationFailed>) =>
       reportOriginalFailure(cause, (failure) => this.#hooks.emitError("turn_completion_failed", failure, agentId));
-    const runningThreadId = this.#runningTurns.get(turnId)?.threadId ?? threadId;
+    const running = this.#runningTurns.get(turnId);
+    const runningThreadId = running?.threadId ?? threadId;
+    if (running) this.#keepTurnTiming(turnId, running);
     this.#runningTurns.delete(turnId);
     this.#reportedFailures.delete(turnId);
     this.#markEnded(turnId);
@@ -1621,6 +1698,20 @@ export class TurnLifecycle {
       ),
     );
   }, Effect.uninterruptible);
+
+  /** Sends the agent that asked the note that its request failed. A failed note does not stop the turn's end. */
+  #answerFailedRequest(agentId: string, deliveryId: string): Effect.Effect<void> {
+    return this.#mailbox
+      .answerFailedRequest(deliveryId, (taskId) => this.#hooks.taskOpen(taskId))
+      .pipe(
+        Effect.match({
+          onFailure: (failure) => this.#hooks.emitError("failed_request_answer_failed", failure.cause, agentId),
+          onSuccess: (requesterId) => {
+            if (requesterId) this.#mailboxSync.emitQueue(requesterId);
+          },
+        }),
+      );
+  }
 
   readonly #relayAgentResult = Effect.fn("TurnLifecycle.relayAgentResult")(function* (
     this: TurnLifecycle,

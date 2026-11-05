@@ -105,6 +105,7 @@ export const messages = {
   "error.provider.modelIdDuplicate": "모델 두 개의 ID가 같아요.",
   "error.provider.contextWindowInvalid": "모델의 컨텍스트 창은 {min}에서 {max} 사이의 정수 토큰 수여야 해요.",
   "error.provider.maxOutputInvalid": "모델의 최대 출력은 {min}에서 {max} 사이의 정수 토큰 수여야 해요.",
+  "error.provider.reasoningEffortsInvalid": "모델의 추론 강도가 올바르지 않아요.",
   "error.provider.headersTooMany": "헤더가 너무 많아요.",
   "error.provider.headerNameCharacter": "헤더 이름에 HTTP에서 허용하지 않는 문자가 있어요.",
   "error.provider.headerNameTooLong": "헤더 이름이 너무 길어요.",

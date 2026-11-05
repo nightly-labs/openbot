@@ -563,4 +563,74 @@ export const messages = {
   "connector.bitwarden.clientSecret": "API キーの client_secret",
   "connector.bitwarden.masterPassword": "マスターパスワード",
   "connector.bitwarden.connecting": "接続中",
+  "connector.protonPass.title": "Proton Pass",
+  "connector.protonPass.description":
+    "共有の Proton Pass 保管庫のログイン情報で、エージェントがサイトにサインインします。",
+  "connector.protonPass.descriptionHost":
+    "{host} のエージェントが、共有の Proton Pass 保管庫のログイン情報でサイトにサインインします。",
+  "connector.protonPass.connect": "接続",
+  "connector.protonPass.moreWays": "その他の接続方法",
+  "connector.protonPass.useKey": "アクセスキーを使う",
+  "connector.protonPass.keyLabel": "アクセスキー",
+  "connector.protonPass.keyPlaceholder": "pst_…",
+  "connector.protonPass.setupTitle": "設定",
+  "connector.protonPass.setupDescription":
+    "「接続」でブラウザーに Proton のサインインが開きます。その後、OpenBot が共有保管庫を作成し、読み取り専用キーだけを保持します。",
+  "connector.protonPass.setupDescriptionHost":
+    "「接続」でブラウザーに Proton のサインインが開きます。その後、{host} が共有保管庫を作成し、読み取り専用キーだけを保持します。",
+  "connector.protonPass.vaultName": "Shared with OpenBot",
+  "connector.protonPass.vaultSetup":
+    "接続すると OpenBot がこの保管庫を作成します。共有するログイン情報をここに移動してください。",
+  "connector.protonPass.showSteps": "手順を表示",
+  "connector.protonPass.stepsLabel": "接続の手順",
+  "connector.protonPass.stepSignIn": "サインイン",
+  "connector.protonPass.stepVault": "共有保管庫を作成",
+  "connector.protonPass.stepDone": "完了",
+  "connector.protonPass.signInTitle": "Proton にサインイン",
+  "connector.protonPass.signInStarting": "OpenBot がサインインを開始します。Proton のページがブラウザーで開きます。",
+  "connector.protonPass.signInDescription":
+    "サインインがブラウザーで開いています。Proton がパスワードと 2 要素目を求めます。",
+  "connector.protonPass.signInDescriptionHost":
+    "{host} のサインインがブラウザーで開いています。Proton がパスワードと 2 要素目を求めます。",
+  "connector.protonPass.extraPasswordDescription": "Proton Pass が追加パスワードを求めています。",
+  "connector.protonPass.extraPasswordWrong": "追加パスワードが正しくありません。もう一度入力してください。",
+  "connector.protonPass.extraPasswordLabel": "追加パスワード",
+  "connector.protonPass.continue": "続ける",
+  "connector.protonPass.setupStepTitle": "共有保管庫を作成中",
+  "connector.protonPass.setupStepDescription":
+    "OpenBot が保管庫「{vault}」と読み取り専用キーを作成します。その後、Proton のセッションからサインアウトします。",
+  "connector.protonPass.doneTitle": "Proton Pass に接続しました",
+  "connector.protonPass.doneDescription":
+    "ログイン情報を「{vault}」に移動すると、エージェントがそれでサインインできます。",
+  "connector.protonPass.failedTitle": "Proton Pass に接続できませんでした",
+  "connector.protonPass.copyLink": "リンクをコピー",
+  "connector.protonPass.linkCopied": "コピーしました",
+  "connector.protonPass.openAgain": "もう一度開く",
+  "connector.protonPass.done": "完了",
+  "connector.protonPass.close": "閉じる",
+  "connector.protonPass.statusConnecting": "接続中",
+  "connector.protonPass.statusConnected": "接続済み",
+  "connector.protonPass.statusExpired": "キーの期限切れ",
+  "connector.protonPass.expiredTitle": "Proton Pass のキーの期限が切れました",
+  "connector.protonPass.expiredDescription":
+    "もう一度サインインするまで、エージェントは共有ログイン情報でサインインできません。",
+  "connector.protonPass.reconnect": "再接続",
+  "connector.protonPass.planTitle": "Proton Pass には有料プランが必要です",
+  "connector.protonPass.planDescription":
+    "Proton Pass CLI は有料の Proton プランでのみ使えます。プランを変更してから、もう一度接続してください。",
+  "connector.protonPass.vaultTitle": "共有保管庫",
+  "connector.protonPass.vaultDescription":
+    "エージェントはこの保管庫のログイン情報でサインインできます。共有するログイン情報をここに移動してください。",
+  "connector.protonPass.loginCount": { other: "ログイン情報 {count} 件" },
+  "connector.protonPass.loginsLoading": "ログイン情報を数えています…",
+  "connector.protonPass.keyExpires": "読み取り専用。{date} に期限切れ。",
+  "connector.protonPass.keyExpired": "読み取り専用。{date} に期限切れになりました。",
+  "connector.protonPass.keyNoExpiry": "読み取り専用。期限なし。",
+  "connector.protonPass.disconnectTitle": "Proton Pass を切断",
+  "connector.protonPass.disconnectSummary":
+    "OpenBot はこのコンピューター上のアクセスキーを削除します。保管庫とそのログイン情報は Proton アカウントに残ります。",
+  "connector.protonPass.disconnectSummaryHost":
+    "OpenBot は {host} 上のアクセスキーを削除します。保管庫とそのログイン情報は Proton アカウントに残ります。",
+  "connector.protonPass.disconnect": "切断",
+  "connector.protonPass.actionFailed": "OpenBot は Proton Pass の接続を変更できませんでした。",
 } as const satisfies PartialTranslation<typeof source>;

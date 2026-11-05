@@ -80,6 +80,12 @@ export const messages = {
   "customProvider.model.contextWindowPlaceholder": "Tokens",
   "customProvider.model.maxOutput": "Saída máxima do modelo {number}",
   "customProvider.model.maxOutputPlaceholder": "Tokens",
+  "customProvider.model.efforts": "Esforço do modelo {number}",
+  "customProvider.model.effortsLabel": "Esforço",
+  "customProvider.model.effortsHintOpenCode":
+    "Selecione os níveis de esforço que cada modelo aceita. Sem seleção, o OpenCode oferece Baixo, Médio e Alto.",
+  "customProvider.model.effortsHintPi":
+    "Selecione os níveis de esforço que cada modelo aceita. Sem seleção, o modelo não raciocina.",
   "customProvider.model.remove": "Remover modelo {number}",
   "customProvider.model.add": "Adicionar modelo",
   "customProvider.headers": "Cabeçalhos",

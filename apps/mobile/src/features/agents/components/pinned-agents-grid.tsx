@@ -14,6 +14,7 @@ import Animated, {
 import { useAgentChatPreview } from "@/features/agents/components/agent-chat-preview";
 import { AgentAndroidMenu, AgentContextMenuLink } from "@/features/agents/components/agent-context-menu";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
+import { AgentUnreadBadge } from "@/features/agents/components/agent-unread-badge";
 import { AGENT_WAIT_STATE, AgentWaitBadge } from "@/features/agents/components/agent-wait-badge";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import {
@@ -25,8 +26,7 @@ import {
   useHoldMenu,
 } from "@/features/agents/components/chat-drag";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
-import { useAgentWaitReason } from "@/features/workspace/components/use-agent-activity";
-import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
+import { useAgentListUnreadCount, useAgentListWaitReason } from "@/features/workspace/components/use-agent-activity";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
@@ -110,7 +110,6 @@ function PinDropZone({ dropTarget }: { dropTarget: ReturnType<typeof useChatDrop
 
 const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
   const { t } = useText();
-  const [background, accent] = useThemeColor(["background", "accent"]);
   const agentChatPreview = useAgentChatPreview(agent);
   // Each long press mounts the Android menu again, so it opens even if an earlier one did not close.
   const [menuKey, setMenuKey] = useState(0);
@@ -121,8 +120,8 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
     preview: <AgentDragPreview agent={agent} />,
   }));
   const holdMenu = useHoldMenu(drag, () => setMenuKey((key) => key + 1));
-  const isUnread = useAgentUnread(agent.id);
-  const waitReason = useAgentWaitReason(agent.id);
+  const unreadCount = useAgentListUnreadCount(agent.id);
+  const waitReason = useAgentListWaitReason(agent.id);
 
   const openLabel = agent.title.trim()
     ? t("mobile.agent.list.openPinnedWithTitle", { name: agent.name, title: agent.title.trim() })
@@ -133,7 +132,12 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
       accessibilityLabel={
         waitReason
           ? t("mobile.agent.list.withState", { label: openLabel, state: t(AGENT_WAIT_STATE[waitReason]) })
-          : openLabel
+          : unreadCount > 0
+            ? t("mobile.agent.list.withState", {
+                label: openLabel,
+                state: t("mobile.agent.list.unread", { count: unreadCount }),
+              })
+            : openLabel
       }
       accessibilityRole="button"
       className="w-full items-center gap-2 px-1"
@@ -153,14 +157,14 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
           size={64}
           animateIdle={false}
           rings
+          withThreads
         />
-        {isUnread ? (
-          <View
-            className="absolute right-0 top-0 size-3.5 rounded-full border-2 bg-accent"
-            style={{ borderColor: background, backgroundColor: accent }}
-          />
+        {/* As on the desktop, a wait outranks the unread count in the corner of the avatar. */}
+        {waitReason ? (
+          <AgentWaitBadge reason={waitReason} size={22} />
+        ) : unreadCount > 0 ? (
+          <AgentUnreadBadge count={unreadCount} avatarSize={64} />
         ) : null}
-        {waitReason ? <AgentWaitBadge reason={waitReason} size={22} /> : null}
       </AgentPinAvatar>
       <View className="w-full gap-0.5">
         <Typography.Paragraph

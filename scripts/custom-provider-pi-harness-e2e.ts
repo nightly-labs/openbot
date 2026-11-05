@@ -3,7 +3,8 @@
 // runs on OpenCode stays out of Pi. Pi reads `$` and a leading `!` in a key or a header as an
 // environment reference or a shell command, so the key and the header must arrive literally. The
 // key and the header value must not reach the extension file or an error message. A saved output
-// limit must reach the request as the model's budget (#4234).
+// limit must reach the request as the model's budget (#4234). A model with saved efforts must list
+// exactly those efforts and send the effort of the turn; a model with none must not reason (#4154).
 // `PI_CLI=<pi> bun run test:custom-provider-pi`. Writes .openbot-build/custom-provider-pi-harness/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -28,6 +29,9 @@ const REPLY = "pong from the fake endpoint";
 const KEY = "!sk-e2e-$HOME-literal";
 const HEADER_VALUE = "team-$PATH";
 const FAILING_MODEL = "fake-broken";
+/** #4154: an endpoint that accepts None, Low and Max for this model, and no other effort. */
+const EFFORT_MODEL = "fake-thinker";
+const SAVED_EFFORTS = ["none", "low", "max"] as const;
 
 interface Request {
   path: string;
@@ -36,12 +40,16 @@ interface Request {
   model: string | null;
   /** `max_completion_tokens` or `max_tokens`, whichever Pi sent. */
   budget: number | null;
+  /** The `reasoning_effort` that the request sent, or null. */
+  reasoningEffort: string | null;
 }
 
 interface Report {
   passed: boolean;
   piVersion?: string;
   models?: string[];
+  /** The efforts that OpenBot listed for each model. */
+  efforts?: Record<string, string[]>;
   requests: Request[];
   reply?: string;
   status?: string | null;
@@ -61,14 +69,16 @@ function header(request: IncomingMessage, name: string): string | null {
 }
 
 /** The model that a chat completion request names, and the output budget that it asks for. */
-async function requestedModel(request: IncomingMessage): Promise<Pick<Request, "model" | "budget">> {
+async function requestedModel(
+  request: IncomingMessage,
+): Promise<Pick<Request, "model" | "budget" | "reasoningEffort">> {
   const chunks: Buffer[] = [];
   for await (const part of request) chunks.push(Buffer.from(part));
   const text = Buffer.concat(chunks).toString("utf8");
   const value = text ? JSON.parse(text) : null;
   const sent = isRecord(value) ? (value.max_completion_tokens ?? value.max_tokens) : null;
   const budget = typeof sent === "number" ? sent : null;
-  return { model: getString(value, "model"), budget };
+  return { model: getString(value, "model"), budget, reasoningEffort: getString(value, "reasoning_effort") };
 }
 
 /** One server-sent event of a streamed chat completion: the reply text, or the end of the reply. */
@@ -82,9 +92,10 @@ function chunk(model: string, content: string | null): string {
 
 const server = createServer((request: IncomingMessage, response: ServerResponse) => {
   void (async () => {
-    const { model, budget } = await requestedModel(request);
+    const sent = await requestedModel(request);
+    const { model } = sent;
     const authorization = header(request, "authorization");
-    report.requests.push({ path: request.url ?? "", authorization, header: header(request, "x-e2e"), model, budget });
+    report.requests.push({ path: request.url ?? "", authorization, header: header(request, "x-e2e"), ...sent });
     if (model === FAILING_MODEL) {
       // A server that names the key it refused. Pi passes the body on, so OpenBot must redact it.
       response.writeHead(401, { "content-type": "application/json" });
@@ -140,6 +151,7 @@ try {
     models: [
       { id: "fake-coder", name: "Fake coder", contextWindow: 32_768, maxOutput: 12_000 },
       { id: FAILING_MODEL, name: "Fake broken" },
+      { id: EFFORT_MODEL, name: "Fake thinker", reasoningEfforts: [...SAVED_EFFORTS] },
     ],
     harness: "pi",
   };
@@ -180,6 +192,18 @@ try {
   report.models = getArray(listed, "data").flatMap((model) => getString(model, "model") ?? []);
   assert.ok(report.models.includes("spark-e2e/fake-coder"), "Pi must list the endpoint's model.");
   assert.ok(!report.models.some((model) => model.startsWith("oc-only/")), "Pi must not list the OpenCode endpoint.");
+  report.efforts = Object.fromEntries(
+    getArray(listed, "data").map((model) => [
+      getString(model, "model") ?? "",
+      getArray(model, "supportedReasoningEfforts").flatMap((effort) => getString(effort, "reasoningEffort") ?? []),
+    ]),
+  );
+  assert.deepEqual(
+    report.efforts[`spark-e2e/${EFFORT_MODEL}`],
+    [...SAVED_EFFORTS],
+    "A model with saved efforts must list exactly those efforts.",
+  );
+  assert.deepEqual(report.efforts["spark-e2e/fake-coder"], [], "A model with no saved efforts must not reason.");
 
   const thread = await startThread(client, { cwd: workspace, model: "spark-e2e/fake-coder" });
   const files = await extensionFiles(stateDirectory);
@@ -202,6 +226,19 @@ try {
   assert.equal(sent.authorization, `Bearer ${KEY}`, "Pi must send the key literally.");
   assert.equal(sent.header, HEADER_VALUE, "Pi must send the header literally.");
   assert.equal(sent.budget, 12_000, "Pi must ask for the saved output limit.");
+  assert.equal(sent.reasoningEffort, null, "A model with no saved efforts must not send an effort.");
+
+  for (const effort of ["max", "none"] as const) {
+    const effortTurn = await runTurn(client, thread, {
+      model: `spark-e2e/${EFFORT_MODEL}`,
+      effort,
+      text: "Think.",
+      timeoutMs: 60_000,
+    });
+    assert.equal(effortTurn.error, null, `The turn at ${effort} failed: ${effortTurn.error}`);
+    const last = report.requests.filter((request) => request.model === EFFORT_MODEL).at(-1);
+    assert.equal(last?.reasoningEffort, effort, `Pi must send the effort ${effort}.`);
+  }
 
   // A refused request: the error reaches the user, but not the key.
   const failure = await runTurn(client, thread, {

@@ -110,6 +110,7 @@ interface HostServiceOptions {
   connectors?: ForwardedApiOptions["connectors"];
   onePasswordConnector?: ForwardedApiOptions["onePasswordConnector"];
   bitwardenConnector?: ForwardedApiOptions["bitwardenConnector"];
+  passwordManagers?: ForwardedApiOptions["passwordManagers"];
   vault?: ForwardedApiOptions["vault"];
   providerHostSignIns?: ForwardedApiOptions["providerHostSignIns"];
   providerAccounts?: ForwardedApiOptions["providerAccounts"];
@@ -153,7 +154,8 @@ interface HostServiceOptions {
   localDevelopmentHost?: boolean;
   /**
    * A server on this computer: its owner is a password member that the desktop app logs in as, so a
-   * directory sync keeps the owner's row.
+   * directory sync keeps the owner's row. It has no account session, so a name or logo change skips
+   * the account owner check and the account steps.
    */
   passwordOwner?: boolean;
   logDirectory?: string;
@@ -183,6 +185,8 @@ interface HostServiceOptions {
   platform?: "darwin" | "win32" | "linux";
   unattended?: boolean;
   teamWebRtcBridge?: TeamWebRtcBridge;
+  /** A device signed in as a membership, or (`null`) its session ended. Computer proxies use it. */
+  peerMemberChanged?: (peerId: string, membershipId: string | null) => void;
   /** Whether devices may connect to this computer only over a private network, such as Tailscale. */
   privateNetwork?: () => boolean;
   registerRemoteHost?: (input: {
@@ -448,6 +452,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.connectors === undefined ? {} : { connectors: options.connectors }),
       ...(options.onePasswordConnector === undefined ? {} : { onePasswordConnector: options.onePasswordConnector }),
       ...(options.bitwardenConnector === undefined ? {} : { bitwardenConnector: options.bitwardenConnector }),
+      ...(options.passwordManagers === undefined ? {} : { passwordManagers: options.passwordManagers }),
       ...(options.vault === undefined ? {} : { vault: options.vault }),
       ...(options.providerHostSignIns === undefined ? {} : { providerHostSignIns: options.providerHostSignIns }),
       ...(options.providerAccounts === undefined ? {} : { providerAccounts: options.providerAccounts }),
@@ -555,6 +560,7 @@ export class HostService extends EventEmitter<HostEvents> {
             }
           },
           unknownMemberConnected: (membershipId) => this.#dispatch(this.#learnConnectedMember(membershipId)),
+          ...(options.peerMemberChanged ? { peerMemberChanged: options.peerMemberChanged } : {}),
           ...(options.verifyRemoteSessionTicket ? { verifyClientTicket: options.verifyRemoteSessionTicket } : {}),
           ...(options.privateNetwork ? { privateNetwork: options.privateNetwork } : {}),
         })
@@ -814,10 +820,14 @@ export class HostService extends EventEmitter<HostEvents> {
     function* (this: HostService, input: UpdateHostIdentityInput): Effect.fn.Return<HostStatus, RemoteWorkflowError> {
       const optionalRegisterRemoteHost = this.#options.registerRemoteHost;
       const optionalUpdateRemoteHostLogo = this.#options.updateRemoteHostLogo;
-      yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
+      // A server on this computer has no account session (#5092). Only the desktop app knows its
+      // owner password, and the Team API route already required an admin.
+      const passwordOwner = this.#options.passwordOwner === true;
+      if (!passwordOwner)
+        yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
       const identity = yield* this.#options.store.updateIdentity(input);
-      // Before anything is published: the store checked the account before it resolved, and a
-      // switch landing in this gap would show the previous account's name and logo.
+      // Before anything is published: the account was checked before the store resolved (except for
+      // a password owner), and a switch landing in this gap would show the previous account's name and logo.
       if (!this.#isActiveHost(identity.serverId)) return this.getStatus();
       this.#setStatus({
         serverName: identity.serverName,
@@ -825,6 +835,8 @@ export class HostService extends EventEmitter<HostEvents> {
         message: sourceText("status.host.identityUpdated"),
       });
       this.#api.refreshIdentity();
+      // The desktop app registers it for the account at each start, with the name of that start.
+      if (passwordOwner) return this.getStatus();
       const ownerMembershipId = yield* remoteDecode(() => this.#requiredOwnerMemberId());
       if (optionalRegisterRemoteHost) yield* this.#registerRemoteHost(optionalRegisterRemoteHost, ownerMembershipId);
       if (input.logo !== undefined && this.#isActiveHost(identity.serverId)) {

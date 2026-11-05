@@ -882,7 +882,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         },
       },
       emit: (event) => this.#emit(event),
-      emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+      emitError: (code, error, agentId, context) => this.#emitError(code, error, agentId, context),
       requestTimeoutMs,
       preferredProvider,
       preferredModel,
@@ -1415,6 +1415,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         mayContinueOnBackup: (agentId) => this.#usageLimitBackup(agentId, true) !== undefined,
         turnEnded: (turnId) => this.#turn.hasEnded(turnId),
         turnRestarting: (turnId) => this.#turn.forgetEnded(turnId),
+        deliveriesStarting: (deliveryIds, start) => this.#turn.deliveriesStarting(deliveryIds, start),
         startRequestedNewChat: (agentId) => this.#startRequestedNewChat(agentId),
         dropRequestedNewChat: (agentId) => {
           if (this.#requestedNewChats.delete(agentId))
@@ -1717,6 +1718,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** The provider-reported token counts of one turn by provider and model, for host analytics. */
   getTurnUsage(agentId: string, turnId: string, since: string) {
     return this.#store.database.usage.readTurn(agentId, turnId, since);
+  }
+
+  /** Where the time of a finished turn went, for host analytics. Once per turn. */
+  takeTurnTiming(turnId: string) {
+    return this.#turn.takeTurnTiming(turnId);
   }
 
   readonly getUsage = Effect.fn("AgentService.getUsage")(function* (this: AgentService, agentId?: string) {
@@ -3597,16 +3603,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
   }).bind(this);
 
-  /** The local user can open files outside a workspace when access is unrestricted. */
+  /**
+   * The local user can open files outside a workspace when access is unrestricted. `exactPath` does not
+   * use a file with the same name from the thread's tool history, so an inline image shows no older file.
+   */
   readonly resolveLocalWorkspaceFile = Effect.fn("AgentService.resolveLocalWorkspaceFile")(function* (
     this: AgentService,
     agentId: string,
     inputPath: string,
+    options: { exactPath?: boolean } = {},
   ) {
     const agent = yield* lifecycleStep("find workspace agent", () => this.#agentForFile(agentId));
     return yield* resolveWorkspaceFile(agent, inputPath, {
       allowOutside: !workspaceAccessEnforced(agent),
-      fileHistory: this.#turn.fileHistory.paths(agent.id, agent.threadId),
+      ...(options.exactPath ? {} : { fileHistory: this.#turn.fileHistory.paths(agent.id, agent.threadId) }),
     }).pipe(
       Effect.mapError(
         (failure) => new AgentLifecycleFailed({ operation: "resolve local workspace file", cause: failure.cause }),
@@ -4380,9 +4390,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     agentId: string,
     memberId: string,
     fromMessageId: string | null = null,
+    options?: ConversationMarkerExclusions,
   ): Effect.Effect<ConversationReadState, AgentLifecycleFailed> {
     return this.#reader
-      .markUnread(agentId, memberId, fromMessageId)
+      .markUnread(agentId, memberId, fromMessageId, options)
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "markConversationUnread", cause: failure.cause }),

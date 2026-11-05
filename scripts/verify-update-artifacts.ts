@@ -62,8 +62,10 @@ if (!existsSync(join(resourcesRoot, "voice", "runtime", "sherpa-onnx.node"))) {
 }
 if (
   existsSync(join(resourcesRoot, "voice", "model")) ||
+  existsSync(join(resourcesRoot, "voice", "parakeet-unified-en-0.6b-int8")) ||
   existsSync(join(resourcesRoot, "voice", "bark-3.0-plus-int8")) ||
   existsSync(join(resourcesRoot, "voice", "whisper-turbo-int8")) ||
+  existsSync(join(resourcesRoot, "voice", "cohere-transcribe-14-lang-int8")) ||
   existsSync(join(resourcesRoot, "voice", "supertonic-3-int8")) ||
   existsSync(join(resourcesRoot, "voice", "runtime", "encoder.int8.onnx")) ||
   existsSync(join(resourcesRoot, "voice", "runtime", "turbo-encoder.int8.onnx"))

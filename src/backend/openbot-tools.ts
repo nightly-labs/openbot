@@ -688,7 +688,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     name: "request_api_key",
     description: [
       "Ask the user for an API key, token, or password that your task needs, such as for IMAP, and wait for the answer.",
-      "The user enters it in a secure form in this conversation. OpenBot saves it in a private file outside your workspace for later turns; you never get the value.",
+      "The user enters it in a secure form in this conversation. OpenBot saves it outside your workspace, for all agents or only you; you never get the value.",
       'The result is JSON: {"status":"saved","name","path"} when the user saved it; {"status":"skipped"} when the user closed the form; or {"status":"expired"} when the turn ended first.',
       "Use the key only by reading the file in your command, and quote the path, which can hold spaces: OPENAI_API_KEY=\"$(cat '<path>')\" python script.py. Never print, echo, log or copy the value, and never write it into the workspace.",
       "Call list_api_keys first: do not ask again for a key that is saved. A new answer replaces the saved key. Only the server owner or an admin can answer. It does not work in an external chat.",
@@ -718,7 +718,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   },
   {
     name: "suggest_marketplace_app",
-    description: `Call this when the user needs a service in this list and you have no working tools for it: ${MARKETPLACE_APP_IDS.join(", ")}. It shows a card in the chat to connect the app; nothing connects without the user. For an installed app, it tests the app and returns the fix, such as a Sign in card or setup steps.`,
+    description: `Call this when the user needs a service in this list and you have no working tools for it: ${MARKETPLACE_APP_IDS.join(", ")}. It shows a card in the chat to connect the app; only the user connects it. For an installed app, it tests it and returns the fix, such as a Sign in card or setup steps.`,
     shape: {
       app: z.string().min(1).max(63).describe("An app from the list, such as notion. Use github for GitHub."),
     },
