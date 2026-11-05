@@ -40,6 +40,16 @@ a named browser profile, which every agent assigned to that profile can use.
 When the server tab still shows a sign-in step, the app also sends the address of the window's page,
 and the server tab opens it.
 Neither computer logs the cookie values. The desktop app then removes the window's session.
+An owner or admin can give a named browser profile a proxy. The pages of that profile then go
+through the proxy server that they chose, and that server can see which sites the profile opens.
+OpenBot keeps the proxy password encrypted on the computer that runs OpenBot, sends it only to that
+proxy, and does not log it or send it back to a client.
+An owner or admin of a joined server can also share the internet connection of their own computer
+with that server. While their desktop app is open and sharing is on, the pages of the profiles that
+use that computer go through it: the sites see the address of that computer, and the bytes go
+through the encrypted host connection, through an OpenBot TURN relay when no direct path exists.
+The computer connects only to public internet addresses, so the server cannot reach its local
+network. Neither computer logs the sites or the bytes. Stop sharing, or a closed app, stops it.
 To show each server's state, the browser also keeps a status connection to each host of the account
 that no tab has open, as the mobile app does; the host then shows the member as present. Host logos
 come from the account Worker to members of the host, and the browser can cache them.
@@ -810,6 +820,23 @@ server can change it.
   service account token for that server in Marketplace › Apps › 1Password. The token goes once, over the
   encrypted connection, to the server, which keeps it in the same file on its own disk. The
   computer that sent it does not keep it, and no answer from the server carries it.
+- The Proton Pass connection (Marketplace › Apps › Proton Pass) runs Proton's `pass-cli`, which
+  OpenBot downloads from proton.me and checks against a pinned SHA-256. The computer or server talks
+  to Proton directly. A sign-in on Proton's web page makes an agent access key that reads only the
+  vault `Shared with OpenBot`; you can also paste an agent access key that you made. OpenBot keeps
+  only that access key, in `openbot-protonpass-connector-v1.json` in its application data folder,
+  encrypted by the operating system's secret storage, and the CLI's session in
+  `provider-state/protonpass-host` in the same folder. An extra password goes to the CLI once,
+  through a pipe, and is not saved. OpenBot keeps the list of logins (titles, user names and web
+  addresses) in memory, never on disk. Each time it reads a login, the CLI sends Proton the reason
+  "OpenBot fills this login in its browser." A password or a one-time code goes only to the browser
+  page that it fills, never to an agent, a provider, a log or a team member. The access key, the
+  extra password and each filled value are redacted from logs, exports and diagnostics. An owner or
+  admin of a joined server connects that server's Proton Pass from their own computer or phone: the
+  sign-in page opens there, and the access key or the extra password goes once, over the encrypted
+  connection, to the server. No answer from the server carries it. Disconnect deletes the file and
+  the session; the agent access key stays on your Proton account until it ends after one year or
+  you remove it in Proton Pass.
 - The Vault (Server settings › Vault) is kept in
   `~/Library/Application Support/OpenBot/openbot-vault-v1.json`, encrypted by the operating system's
   secret storage. It holds the logins, payment cards (number, expiry, security code, name), contact
@@ -1607,7 +1634,8 @@ DeepSeek row saves a DeepSeek API key. OpenBot encrypts it in its existing provi
 store, gives it to the local Pi process in its environment, and redacts it from logs. Pi does not
 write the key to a file. Prompts, attachments, and tool results go to that process, and Pi sends
 them with this key to `api.deepseek.com`, also when Pi has its own DeepSeek key. When OpenBot reads
-the DeepSeek model list, Pi reads its built-in list and does not contact DeepSeek. Pi keeps its
+the DeepSeek model list, Pi first refreshes its model catalog, as described in
+[Pi, Muse, and ACP registry setup](#pi-muse-and-acp-registry-setup). Pi keeps its
 session files in its own folder, as for Pi agents. OpenBot does not copy or upload these files.
 DeepSeek's terms apply:
 <https://cdn.deepseek.com/policies/en-US/deepseek-open-platform-terms-of-service.html>.
@@ -1621,8 +1649,9 @@ store, gives it to the local Pi process in its environment, and redacts it from 
 write the key to a file. Prompts, attachments, and tool results go to that process, and Pi sends
 them with this key to `openrouter.ai`, also when Pi has its own OpenRouter key. OpenRouter sends the
 request to the company that serves the selected model, and that company's terms also apply. When
-OpenBot reads the OpenRouter model list, Pi reads its built-in list and does not contact OpenRouter.
-Pi keeps its session files in its own folder, as for Pi agents. OpenBot does not copy or upload these
+OpenBot reads the OpenRouter model list, Pi first refreshes its model catalog, as described in
+[Pi, Muse, and ACP registry setup](#pi-muse-and-acp-registry-setup). It also asks `openrouter.ai`,
+with the key, for the models that the key can use. Pi keeps its session files in its own folder, as for Pi agents. OpenBot does not copy or upload these
 files. OpenRouter's terms apply: <https://openrouter.ai/terms>. OpenRouter agents stay on this
 computer: OpenBot does not show them to team members.
 
@@ -1896,7 +1925,10 @@ provider credentials; the event carries only the agent ID.
 
 ACP registry search fetches the catalog from `cdn.agentclientprotocol.com`; search text is matched
 on the host. Installation downloads the selected distribution from its published source. Pi update
-checks use `api.github.com`. Muse update checks use `api.meta.ai`, and manifests and binaries come
+checks use `api.github.com`. When OpenBot reads the model list of Pi, DeepSeek or OpenRouter, it runs
+`pi update --models`. Pi then gets the current model list of each provider that has a key from
+`pi.dev`. This request contains no key and no conversation data. Pi saves the lists in
+`models-store.json` in its own folder. Muse update checks use `api.meta.ai`, and manifests and binaries come
 from `lookaside.facebook.com`. Download requests reveal the host IP address and requested artifact.
 Registry install records remain on the host, separate from conversations and credentials.
 

@@ -2,6 +2,7 @@ import {
   DISCORD_MARK_PATH,
   GITHUB_MARK_PATH,
   ONEPASSWORD_MARK_PATH,
+  PROTON_MARK_PATH,
   SLACK_MARK_PATH,
   TELEGRAM_MARK_PATH,
   WHATSAPP_MARK_PATH,
@@ -19,6 +20,7 @@ const MARK_PATHS: Record<Exclude<MobileConnectorId, "bitwarden">, string> = {
   whatsapp: WHATSAPP_MARK_PATH,
   github: GITHUB_MARK_PATH,
   onepassword: ONEPASSWORD_MARK_PATH,
+  protonpass: PROTON_MARK_PATH,
 };
 
 /** The connector's mark on a tile, as the desktop Marketplace shows it. */

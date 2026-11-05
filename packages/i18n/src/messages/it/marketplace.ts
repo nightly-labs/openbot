@@ -99,6 +99,7 @@ export const messages = {
   "marketplace.app.telegramTagline": "Gruppi e chat dirette in Telegram",
   "marketplace.app.whatsappTagline": "La tua chat personale e le persone che autorizzi in WhatsApp",
   "marketplace.app.bitwardenTagline": "Accedi ai siti con le credenziali di una cartella condivisa",
+  "marketplace.app.protonPassTagline": "Accedi ai siti con le credenziali di una cassaforte condivisa",
   "marketplace.app.onePasswordCategory": "Gestione di accessi e credenziali",
   "marketplace.app.yourApps": "Le tue app",
   "marketplace.app.addCustom": "Aggiungi personalizzata",

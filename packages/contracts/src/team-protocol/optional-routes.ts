@@ -32,6 +32,7 @@ import { AGENT_UPDATE_CODECS } from "./agent-update-v1";
 import { BITWARDEN_CONNECTOR_CODECS } from "./bitwarden-connector-v1";
 import { BROWSER_PAGE_STATE_CODECS } from "./browser-page-state-v1";
 import { BROWSER_PROFILES_CODECS } from "./browser-profiles-v1";
+import { BROWSER_PROXIES_CODECS } from "./browser-proxies-v1";
 import { BROWSER_SECRET_VAULT_CODECS } from "./browser-secret-vault-v1";
 import { BROWSER_SIGN_IN_CODECS } from "./browser-sign-in-v1";
 import { BROWSER_USER_CONTROL_CODECS } from "./browser-user-control-v1";
@@ -64,6 +65,7 @@ import { MEMORY_REVIEW_CODECS } from "./memory-review-v1";
 import { MESSAGE_DELETE_CODECS } from "./message-delete-v1";
 import { MODEL_VISIBILITY_CODECS } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CODECS } from "./onepassword-connector-v1";
+import { PASSWORD_MANAGERS_CODECS } from "./password-managers-v1";
 import { PROMPT_CACHE_TTL_CODECS } from "./prompt-cache-ttl-v1";
 import { PROVIDER_ACCOUNT_RELAY_CODECS } from "./provider-account-relay-v1";
 import { PROVIDER_ACCOUNT_RELAY_V2_CODECS } from "./provider-account-relay-v2";
@@ -181,6 +183,8 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...WHATSAPP_CONNECTOR_CODECS,
   ...MESSAGE_DELETE_CODECS,
   ...CONVERSATION_UNREAD_FROM_CODECS,
+  ...PASSWORD_MANAGERS_CODECS,
+  ...BROWSER_PROXIES_CODECS,
   ...AGENT_NOTIFICATION_LEVELS_CODECS,
   ...SIDEBAR_PINS_CODECS,
   ...AGENT_PLAN_CARD_CODECS,

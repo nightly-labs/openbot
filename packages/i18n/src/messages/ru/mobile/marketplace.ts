@@ -23,6 +23,7 @@ export const messages = {
   "mobile.marketplace.app.githubTagline": "Репозитории, задачи и пул-реквесты",
   "mobile.marketplace.app.onePasswordTagline": "Вход на сайты с общими учётными данными",
   "mobile.marketplace.app.bitwardenTagline": "Вход на сайты с учётными данными из общей папки",
+  "mobile.marketplace.app.protonPassTagline": "Вход на сайты с учётными данными из общего хранилища",
   "mobile.marketplace.search.placeholder": "Поиск по каталогу",
   "mobile.marketplace.search.clear": "Очистить поиск",
   "mobile.marketplace.search.close": "Закрыть поиск",

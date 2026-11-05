@@ -541,6 +541,47 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectTitle": "断开 1Password？",
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host} 会忘记该令牌。保险库和服务账号仍保留在 1Password 中；如果不再需要，请在那里删除。",
+  "mobile.server.connectors.protonPass.title": "Proton Pass",
+  "mobile.server.connectors.protonPass.description":
+    "与 {host} 上的 OpenBot 共享一个 Proton Pass 保险库，让 {host} 上的代理可以在其浏览器中登录网站。",
+  "mobile.server.connectors.protonPass.keyHelp":
+    "在 Proton Pass 中创建一个只能读取你与 OpenBot 共享的保险库的访问密钥，然后粘贴到这里。{host} 保存该密钥；这部手机不保存。",
+  "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.passwordManager.unavailable": "{name} 在此服务器上不可用。",
+  "mobile.server.connectors.passwordManager.howItWorks":
+    "在这部手机上登录 {name}。然后 {host} 会创建一个共享保险库及其只读访问密钥，并只保存该密钥。代理永远看不到密码。",
+  "mobile.server.connectors.passwordManager.connect": "连接 {name}",
+  "mobile.server.connectors.passwordManager.connecting": "正在连接…",
+  "mobile.server.connectors.passwordManager.useKey": "使用访问密钥",
+  "mobile.server.connectors.passwordManager.key": "访问密钥",
+  "mobile.server.connectors.passwordManager.connectWithKey": "使用密钥连接",
+  "mobile.server.connectors.passwordManager.signInTitle": "登录 {name}",
+  "mobile.server.connectors.passwordManager.signInFooter": "在 {name} 页面上登录。登录完成后，此页面会更新。",
+  "mobile.server.connectors.passwordManager.signInWaiting": "{host} 正在获取登录页面…",
+  "mobile.server.connectors.passwordManager.openSignIn": "打开登录页面",
+  "mobile.server.connectors.passwordManager.copyLink": "复制链接",
+  "mobile.server.connectors.passwordManager.extraPassword": "额外密码",
+  "mobile.server.connectors.passwordManager.extraPasswordHint":
+    "{name} 要求输入你的额外密码。密码只发送给 {host} 一次；这部手机不会保存。",
+  "mobile.server.connectors.passwordManager.extraPasswordWrong": "额外密码不正确。请重试。",
+  "mobile.server.connectors.passwordManager.continue": "继续",
+  "mobile.server.connectors.passwordManager.setupBody": "{host} 正在创建共享保险库…",
+  "mobile.server.connectors.passwordManager.vaultTitle": "共享保险库",
+  "mobile.server.connectors.passwordManager.vaultFooter":
+    "在 {name} 中将登录项移到此保险库，代理即可用它登录。移除即可停止。",
+  "mobile.server.connectors.passwordManager.loginCount": { other: "{count} 个登录信息" },
+  "mobile.server.connectors.passwordManager.keyTitle": "访问密钥",
+  "mobile.server.connectors.passwordManager.keyReadOnly": "只读",
+  "mobile.server.connectors.passwordManager.keyExpires": "只读。将于 {date} 过期。",
+  "mobile.server.connectors.passwordManager.keyExpired": "已于 {date} 过期",
+  "mobile.server.connectors.passwordManager.plan": "{name} 命令行工具需要付费方案。请更改账户的方案，然后重新连接。",
+  "mobile.server.connectors.passwordManager.expiredTitle": "{name} 密钥已过期",
+  "mobile.server.connectors.passwordManager.expiredBody":
+    "在你重新连接之前，{host} 上的代理无法使用你共享的登录项登录。",
+  "mobile.server.connectors.passwordManager.disconnect": "断开 {name}",
+  "mobile.server.connectors.passwordManager.disconnectTitle": "断开 {name}？",
+  "mobile.server.connectors.passwordManager.disconnectBody":
+    "{host} 会删除其访问密钥。保险库及其登录项仍保留在你的 {name} 账户中。",
   // Slack: a workspace installs the one OpenBot app, and the Slack Orchestrator agent answers.
   // {workspace} is the Slack workspace name.
   "mobile.server.connectors.slack.title": "Slack",

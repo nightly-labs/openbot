@@ -316,6 +316,18 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "Ya existe un perfil de navegador con este nombre.",
   "error.backend.browserSessionInUse": "Una pestaña todavía usa esta sesión del navegador. Inténtalo de nuevo.",
   "error.backend.browserProfileLimit": "Puedes tener hasta {limit} perfiles de navegador.",
+  "error.backend.browserProxyNotFound": "Este proxy ya no existe.",
+  "error.backend.browserProxyAddressInvalid":
+    "Escribe una dirección de proxy, como socks5://host:1080 o http://user:password@host:3128.",
+  "error.backend.browserProxyLimit": "Puedes tener hasta {limit} proxies.",
+  "error.backend.browserProxyTaken": "Ya existe un proxy con esta dirección.",
+  "error.backend.browserProxyChanged":
+    "Este proxy cambió después de que lo abrieras. Revísalo de nuevo y vuelve a intentarlo.",
+  "error.backend.browserProxyUnreachable": "El proxy {name} no responde, así que la página no se abrió.",
+  "error.backend.browserProxySignInRefused":
+    "El proxy {name} rechazó el inicio de sesión, así que la página no se abrió.",
+  "error.backend.browserProxyComputerUnreachable":
+    "El ordenador que usa este perfil no responde, así que la página no se abrió.",
   "error.backend.browserLowMemory":
     "Este servidor tiene poca memoria disponible, por lo que el navegador no puede abrir otra pestaña. Cierra una pestaña o espera a que terminen otros agentes.",
   "error.backend.browserOpenFailed": "No se pudo abrir {url}: {reason}",

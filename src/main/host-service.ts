@@ -110,6 +110,7 @@ interface HostServiceOptions {
   connectors?: ForwardedApiOptions["connectors"];
   onePasswordConnector?: ForwardedApiOptions["onePasswordConnector"];
   bitwardenConnector?: ForwardedApiOptions["bitwardenConnector"];
+  passwordManagers?: ForwardedApiOptions["passwordManagers"];
   vault?: ForwardedApiOptions["vault"];
   providerHostSignIns?: ForwardedApiOptions["providerHostSignIns"];
   providerAccounts?: ForwardedApiOptions["providerAccounts"];
@@ -184,6 +185,8 @@ interface HostServiceOptions {
   platform?: "darwin" | "win32" | "linux";
   unattended?: boolean;
   teamWebRtcBridge?: TeamWebRtcBridge;
+  /** A device signed in as a membership, or (`null`) its session ended. Computer proxies use it. */
+  peerMemberChanged?: (peerId: string, membershipId: string | null) => void;
   /** Whether devices may connect to this computer only over a private network, such as Tailscale. */
   privateNetwork?: () => boolean;
   registerRemoteHost?: (input: {
@@ -449,6 +452,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.connectors === undefined ? {} : { connectors: options.connectors }),
       ...(options.onePasswordConnector === undefined ? {} : { onePasswordConnector: options.onePasswordConnector }),
       ...(options.bitwardenConnector === undefined ? {} : { bitwardenConnector: options.bitwardenConnector }),
+      ...(options.passwordManagers === undefined ? {} : { passwordManagers: options.passwordManagers }),
       ...(options.vault === undefined ? {} : { vault: options.vault }),
       ...(options.providerHostSignIns === undefined ? {} : { providerHostSignIns: options.providerHostSignIns }),
       ...(options.providerAccounts === undefined ? {} : { providerAccounts: options.providerAccounts }),
@@ -556,6 +560,7 @@ export class HostService extends EventEmitter<HostEvents> {
             }
           },
           unknownMemberConnected: (membershipId) => this.#dispatch(this.#learnConnectedMember(membershipId)),
+          ...(options.peerMemberChanged ? { peerMemberChanged: options.peerMemberChanged } : {}),
           ...(options.verifyRemoteSessionTicket ? { verifyClientTicket: options.verifyRemoteSessionTicket } : {}),
           ...(options.privateNetwork ? { privateNetwork: options.privateNetwork } : {}),
         })

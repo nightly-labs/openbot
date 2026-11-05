@@ -65,7 +65,7 @@ function contents(db: DatabaseSync) {
   );
 }
 
-/** Migration 56 gives each agent routine the chat as the place where it runs. */
+/** Migration 57 gives each agent routine the chat as the place where it runs. */
 function withChatRunPlace(rows: ReturnType<typeof contents>): ReturnType<typeof contents> {
   const routines = rows.projection_agent_routines;
   return routines ? { ...rows, projection_agent_routines: routines.map((row) => ({ ...row, run_in: "chat" })) } : rows;
@@ -84,7 +84,7 @@ function indexColumns(db: DatabaseSync) {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 56 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 57 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -144,9 +144,9 @@ describe("routine flow sweep index migration", () => {
     const db = databaseAt(41);
     seedRoutineFlow(db, 41);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(57, 'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(58, 'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version = 57; DELETE FROM schema_migrations WHERE version = 20");
+    db.exec("DELETE FROM schema_migrations WHERE version = 58; DELETE FROM schema_migrations WHERE version = 20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(indexColumns(db)).toEqual(NO_INDEXES);

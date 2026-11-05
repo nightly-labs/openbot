@@ -564,6 +564,49 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectTitle": "Disconnettere 1Password?",
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host} dimentica il token. Il vault e l'account di servizio restano in 1Password: rimuovili lì se non ti servono più.",
+  "mobile.server.connectors.protonPass.title": "Proton Pass",
+  "mobile.server.connectors.protonPass.description":
+    "Condividi un vault di Proton Pass con OpenBot su {host}, così gli agenti su {host} possono accedere ai siti nel suo browser.",
+  "mobile.server.connectors.protonPass.keyHelp":
+    "In Proton Pass, crea una chiave di accesso che può leggere solo il vault che condividi con OpenBot, poi incollala qui. {host} conserva la chiave; questo telefono no.",
+  "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.passwordManager.unavailable": "{name} non è disponibile su questo server.",
+  "mobile.server.connectors.passwordManager.howItWorks":
+    "Accedi a {name} su questo telefono. Poi {host} crea un vault condiviso e una chiave di accesso in sola lettura per il vault, e conserva solo quella chiave. Gli agenti non vedono mai una password.",
+  "mobile.server.connectors.passwordManager.connect": "Connetti {name}",
+  "mobile.server.connectors.passwordManager.connecting": "Connessione…",
+  "mobile.server.connectors.passwordManager.useKey": "Usa una chiave di accesso",
+  "mobile.server.connectors.passwordManager.key": "Chiave di accesso",
+  "mobile.server.connectors.passwordManager.connectWithKey": "Connetti con la chiave",
+  "mobile.server.connectors.passwordManager.signInTitle": "Accedi a {name}",
+  "mobile.server.connectors.passwordManager.signInFooter":
+    "Accedi nella pagina di {name}. Questa pagina cambia quando hai effettuato l'accesso.",
+  "mobile.server.connectors.passwordManager.signInWaiting": "{host} sta ottenendo la pagina di accesso…",
+  "mobile.server.connectors.passwordManager.openSignIn": "Apri la pagina di accesso",
+  "mobile.server.connectors.passwordManager.copyLink": "Copia link",
+  "mobile.server.connectors.passwordManager.extraPassword": "Password aggiuntiva",
+  "mobile.server.connectors.passwordManager.extraPasswordHint":
+    "{name} chiede la tua password aggiuntiva. Va a {host} una volta; questo telefono non la conserva.",
+  "mobile.server.connectors.passwordManager.extraPasswordWrong": "La password aggiuntiva non è corretta. Riprova.",
+  "mobile.server.connectors.passwordManager.continue": "Continua",
+  "mobile.server.connectors.passwordManager.setupBody": "{host} sta creando il vault condiviso…",
+  "mobile.server.connectors.passwordManager.vaultTitle": "Vault condiviso",
+  "mobile.server.connectors.passwordManager.vaultFooter":
+    "Sposta un login in questo vault in {name} per permettere agli agenti di usarlo. Rimuovilo per smettere.",
+  "mobile.server.connectors.passwordManager.loginCount": { one: "{count} accesso", other: "{count} accessi" },
+  "mobile.server.connectors.passwordManager.keyTitle": "Chiave di accesso",
+  "mobile.server.connectors.passwordManager.keyReadOnly": "Sola lettura",
+  "mobile.server.connectors.passwordManager.keyExpires": "Sola lettura. Scade il {date}.",
+  "mobile.server.connectors.passwordManager.keyExpired": "Scaduta il {date}",
+  "mobile.server.connectors.passwordManager.plan":
+    "Lo strumento da riga di comando di {name} richiede un piano a pagamento. Cambia il piano del tuo account, poi connetti di nuovo.",
+  "mobile.server.connectors.passwordManager.expiredTitle": "La chiave di {name} è scaduta",
+  "mobile.server.connectors.passwordManager.expiredBody":
+    "Gli agenti su {host} non possono accedere con i tuoi login condivisi finché non connetti di nuovo.",
+  "mobile.server.connectors.passwordManager.disconnect": "Disconnetti {name}",
+  "mobile.server.connectors.passwordManager.disconnectTitle": "Disconnettere {name}?",
+  "mobile.server.connectors.passwordManager.disconnectBody":
+    "{host} elimina la sua chiave di accesso. Il vault e i suoi login restano nel tuo account {name}.",
   "mobile.server.connectors.slack.title": "Slack",
   "mobile.server.connectors.slack.description":
     "Le persone menzionano @OpenBot in Slack o gli mandano un messaggio diretto. Lo Slack Orchestrator interpella l'agente giusto e risponde.",

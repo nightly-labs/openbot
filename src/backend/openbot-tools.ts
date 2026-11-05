@@ -721,7 +721,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   },
   {
     name: "suggest_marketplace_app",
-    description: `Call this when the user needs a service in this list and you have no working tools for it: ${MARKETPLACE_APP_IDS.join(", ")}. It shows a card in the chat to connect the app; nothing connects without the user. For an installed app, it tests the app and returns the fix, such as a Sign in card or setup steps.`,
+    description: `Call this when the user needs a service in this list and you have no working tools for it: ${MARKETPLACE_APP_IDS.join(", ")}. It shows a card in the chat to connect the app; only the user connects it. For an installed app, it tests it and returns the fix, such as a Sign in card or setup steps.`,
     shape: {
       app: z.string().min(1).max(63).describe("An app from the list, such as notion. Use github for GitHub."),
     },

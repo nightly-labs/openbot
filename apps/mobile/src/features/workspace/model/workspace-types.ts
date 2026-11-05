@@ -88,6 +88,9 @@ import type {
   MessagingOverview,
   MessagingWorkspaceInput,
   OnePasswordConnectorStatus,
+  PasswordManagerConnectInput,
+  PasswordManagerId,
+  PasswordManagerStatus,
   QueuedMessageReceipt,
   QueueSnapshot,
   RemoteAgentImportResult,
@@ -483,6 +486,8 @@ export interface MobileWorkspaceContextValue {
   canManageBitwardenConnector: (serverId: string) => boolean;
   /** The same for the host's WhatsApp numbers (`whatsapp-connector-v1`). */
   canManageWhatsAppConnector: (serverId: string) => boolean;
+  /** The same for the host's password managers, such as Proton Pass (`password-managers-v1`). */
+  canManagePasswordManagers: (serverId: string) => boolean;
   /** True for an owner or admin of a host that serves its Vault to other devices (`vault-v1`). */
   canManageVault: (serverId: string) => boolean;
   /** The same for a CSV import from this phone (`vault-import-v1`). */
@@ -517,6 +522,17 @@ export interface MobileWorkspaceContextValue {
   connectBitwarden: (input: BitwardenHostConnectInput, serverId: string) => Promise<BitwardenConnectorStatus>;
   /** Also stops a sign-in that has not ended. */
   disconnectBitwarden: (serverId: string) => Promise<BitwardenConnectorStatus>;
+  /** The managers that the host can connect, each with its status. */
+  loadPasswordManagers: (serverId: string) => Promise<PasswordManagerStatus[]>;
+  /**
+   * Starts a sign-in on the host, connects with an access key, or sends the extra password that the
+   * sign-in asks for. The key and the password go to the host once. No answer carries them.
+   */
+  connectPasswordManager: (input: PasswordManagerConnectInput, serverId: string) => Promise<PasswordManagerStatus>;
+  /** Stops a sign-in that has not ended. */
+  cancelPasswordManager: (manager: PasswordManagerId, serverId: string) => Promise<PasswordManagerStatus>;
+  /** The host deletes its access key. The vault stays in the manager. */
+  disconnectPasswordManager: (manager: PasswordManagerId, serverId: string) => Promise<PasswordManagerStatus>;
   /** The host's Vault. No answer carries a password, a card number or a security code. */
   loadVault: (serverId: string) => Promise<VaultState>;
   /** A new secret goes to the host once; a null secret keeps the saved one. */
@@ -1082,6 +1098,7 @@ type MobileWorkspaceStateKey =
   | "canManageOnePasswordConnector"
   | "canManageBitwardenConnector"
   | "canManageWhatsAppConnector"
+  | "canManagePasswordManagers"
   | "canManageVault"
   | "canImportVault"
   | "canImportAgents"

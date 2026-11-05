@@ -578,4 +578,74 @@ export const messages = {
   "connector.bitwarden.clientSecret": "API-Schlüssel client_secret",
   "connector.bitwarden.masterPassword": "Master-Passwort",
   "connector.bitwarden.connecting": "Verbinden",
+  "connector.protonPass.title": "Proton Pass",
+  "connector.protonPass.description":
+    "Agents melden sich bei Websites mit den Zugangsdaten aus einem geteilten Proton-Pass-Tresor an.",
+  "connector.protonPass.descriptionHost":
+    "Agents auf {host} melden sich bei Websites mit den Zugangsdaten aus einem geteilten Proton-Pass-Tresor an.",
+  "connector.protonPass.connect": "Verbinden",
+  "connector.protonPass.moreWays": "Weitere Verbindungswege",
+  "connector.protonPass.useKey": "Zugriffsschlüssel verwenden",
+  "connector.protonPass.keyLabel": "Zugriffsschlüssel",
+  "connector.protonPass.keyPlaceholder": "pst_…",
+  "connector.protonPass.setupTitle": "Einrichten",
+  "connector.protonPass.setupDescription":
+    "Verbinden öffnet die Proton-Anmeldung im Browser. Dann erstellt OpenBot den geteilten Tresor und behält nur einen Schlüssel mit Lesezugriff.",
+  "connector.protonPass.setupDescriptionHost":
+    "Verbinden öffnet die Proton-Anmeldung im Browser. Dann erstellt {host} den geteilten Tresor und behält nur einen Schlüssel mit Lesezugriff.",
+  "connector.protonPass.vaultName": "Shared with OpenBot",
+  "connector.protonPass.vaultSetup":
+    "OpenBot erstellt diesen Tresor beim Verbinden. Verschieben Sie Zugangsdaten hinein, um sie zu teilen.",
+  "connector.protonPass.showSteps": "Schritte zeigen",
+  "connector.protonPass.stepsLabel": "Verbindungsschritte",
+  "connector.protonPass.stepSignIn": "Anmelden",
+  "connector.protonPass.stepVault": "Geteilten Tresor erstellen",
+  "connector.protonPass.stepDone": "Fertig",
+  "connector.protonPass.signInTitle": "Bei Proton anmelden",
+  "connector.protonPass.signInStarting": "OpenBot startet die Anmeldung. Die Proton-Seite öffnet sich im Browser.",
+  "connector.protonPass.signInDescription":
+    "Die Anmeldung ist im Browser geöffnet. Proton fragt nach Ihrem Passwort und Ihrem zweiten Faktor.",
+  "connector.protonPass.signInDescriptionHost":
+    "Die Anmeldung für {host} ist im Browser geöffnet. Proton fragt nach Ihrem Passwort und Ihrem zweiten Faktor.",
+  "connector.protonPass.extraPasswordDescription": "Proton Pass fragt nach Ihrem zusätzlichen Passwort.",
+  "connector.protonPass.extraPasswordWrong": "Das zusätzliche Passwort ist falsch. Geben Sie es erneut ein.",
+  "connector.protonPass.extraPasswordLabel": "Zusätzliches Passwort",
+  "connector.protonPass.continue": "Weiter",
+  "connector.protonPass.setupStepTitle": "Geteilter Tresor wird erstellt",
+  "connector.protonPass.setupStepDescription":
+    "OpenBot erstellt den Tresor „{vault}“ und einen Schlüssel mit Lesezugriff dafür. Dann meldet es Ihre Proton-Sitzung ab.",
+  "connector.protonPass.doneTitle": "Proton Pass ist verbunden",
+  "connector.protonPass.doneDescription":
+    "Verschieben Sie Zugangsdaten nach „{vault}“, damit Agents sich damit anmelden können.",
+  "connector.protonPass.failedTitle": "Proton Pass ist nicht verbunden",
+  "connector.protonPass.copyLink": "Link kopieren",
+  "connector.protonPass.linkCopied": "Kopiert",
+  "connector.protonPass.openAgain": "Erneut öffnen",
+  "connector.protonPass.done": "Fertig",
+  "connector.protonPass.close": "Schließen",
+  "connector.protonPass.statusConnecting": "Verbinden",
+  "connector.protonPass.statusConnected": "Verbunden",
+  "connector.protonPass.statusExpired": "Schlüssel abgelaufen",
+  "connector.protonPass.expiredTitle": "Der Proton-Pass-Schlüssel ist abgelaufen",
+  "connector.protonPass.expiredDescription":
+    "Agents können sich erst wieder mit Ihren geteilten Zugangsdaten anmelden, wenn Sie sich erneut anmelden.",
+  "connector.protonPass.reconnect": "Neu verbinden",
+  "connector.protonPass.planTitle": "Proton Pass braucht einen bezahlten Plan",
+  "connector.protonPass.planDescription":
+    "Die Proton Pass CLI funktioniert nur mit einem bezahlten Proton-Plan. Ändern Sie Ihren Plan und verbinden Sie dann erneut.",
+  "connector.protonPass.vaultTitle": "Geteilter Tresor",
+  "connector.protonPass.vaultDescription":
+    "Agents können sich mit den Zugangsdaten in diesem Tresor anmelden. Verschieben Sie Zugangsdaten hinein, um sie zu teilen.",
+  "connector.protonPass.loginCount": { one: "{count} Anmeldung", other: "{count} Anmeldungen" },
+  "connector.protonPass.loginsLoading": "Zugangsdaten werden gezählt…",
+  "connector.protonPass.keyExpires": "Nur Lesezugriff. Läuft am {date} ab.",
+  "connector.protonPass.keyExpired": "Nur Lesezugriff. Am {date} abgelaufen.",
+  "connector.protonPass.keyNoExpiry": "Nur Lesezugriff. Läuft nicht ab.",
+  "connector.protonPass.disconnectTitle": "Proton Pass trennen",
+  "connector.protonPass.disconnectSummary":
+    "OpenBot löscht seinen Zugriffsschlüssel auf diesem Computer. Der Tresor und seine Zugangsdaten bleiben in Ihrem Proton-Konto.",
+  "connector.protonPass.disconnectSummaryHost":
+    "OpenBot löscht seinen Zugriffsschlüssel auf {host}. Der Tresor und seine Zugangsdaten bleiben in Ihrem Proton-Konto.",
+  "connector.protonPass.disconnect": "Trennen",
+  "connector.protonPass.actionFailed": "OpenBot konnte die Proton-Pass-Verbindung nicht ändern.",
 } as const satisfies PartialTranslation<typeof source>;

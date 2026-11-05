@@ -117,6 +117,8 @@ export interface TeamWebRtcHostPeerOptions {
   pathChanged?: (sessionId: string, lost: boolean) => void;
   /** A session opened for a membership that this host has not read from the account directory yet. */
   unknownMemberConnected?: (membershipId: string) => void;
+  /** The peer is signed in as a membership, or (`null`) it is not signed in any more. */
+  peerMemberChanged?: (peerId: string, membershipId: string | null) => void;
   verifyClientTicket?:
     | ((ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>)
     | undefined;
@@ -152,6 +154,9 @@ export class TeamWebRtcHostPeer {
   readonly #closeSession: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
   readonly #pathChanged: (sessionId: string, lost: boolean) => void;
   readonly #unknownMemberConnected: (membershipId: string) => void;
+  readonly #peerMemberChanged: (peerId: string, membershipId: string | null) => void;
+  /** The membership of the open session. */
+  #sessionMembershipId: string | null = null;
   readonly #verifyClientTicket:
     | ((ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>)
     | null;
@@ -216,6 +221,7 @@ export class TeamWebRtcHostPeer {
     this.#closeSession = options.closeSession ?? (() => Effect.void);
     this.#pathChanged = options.pathChanged ?? (() => undefined);
     this.#unknownMemberConnected = options.unknownMemberConnected ?? (() => undefined);
+    this.#peerMemberChanged = options.peerMemberChanged ?? (() => undefined);
     this.#verifyClientTicket = options.verifyClientTicket ?? null;
     this.#bridge.on("connected", this.#onConnected);
     this.#bridge.on("data", this.#onData);
@@ -234,6 +240,11 @@ export class TeamWebRtcHostPeer {
     yield* this.#beginDisposal();
     if (peerId) yield* this.#bridge.disconnectPeer(peerId).pipe(Effect.catch(() => Effect.void));
   }).bind(this);
+
+  #setPeerAuthenticated(peerId: string, authenticated: boolean): void {
+    this.#files.setPeerAuthenticated(peerId, authenticated);
+    this.#peerMemberChanged(peerId, authenticated ? this.#sessionMembershipId : null);
+  }
 
   /** Whether this device has a file transfer moving right now, either direction. */
   hasActiveTransfers(): boolean {
@@ -305,7 +316,7 @@ export class TeamWebRtcHostPeer {
       this.#sessionBinding.remoteFingerprint === binding.remoteFingerprint
     ) {
       this.#pendingConnection = null;
-      this.#files.setPeerAuthenticated(peerId, true);
+      this.#setPeerAuthenticated(peerId, true);
       return;
     }
     this.#dispatch(this.#closeLocalSession(false));
@@ -329,6 +340,7 @@ export class TeamWebRtcHostPeer {
     const session = yield* remoteDecode(() => this.#store.openRemoteSession({ ...connection, expiresAt }));
     this.#localSessionToken = session.sessionToken;
     this.#localSessionId = connection.sessionId;
+    this.#sessionMembershipId = connection.membershipId;
     this.#scheduleSessionExpiration(expiresAt);
     if (!this.#store.getMember(connection.membershipId)) this.#unknownMemberConnected(connection.membershipId);
   });
@@ -389,7 +401,7 @@ export class TeamWebRtcHostPeer {
 
   readonly #onDisconnected = (peerId: string): void => {
     if (peerId === this.#peerId) {
-      this.#files.setPeerAuthenticated(peerId, false);
+      this.#setPeerAuthenticated(peerId, false);
       this.#sessionPreparation = null;
       this.#pendingConnection = null;
       this.#peerBinding = null;
@@ -504,7 +516,7 @@ export class TeamWebRtcHostPeer {
     if (!this.#peerBinding)
       return yield* new RemoteWorkflowError({ cause: new Error("The WebRTC fingerprint binding is unavailable.") });
     this.#sessionBinding = { ...this.#peerBinding };
-    this.#files.setPeerAuthenticated(peerId, true);
+    this.#setPeerAuthenticated(peerId, true);
     yield* HostPeerTransport.use((transport) =>
       transport.send(
         peerId,
@@ -968,7 +980,7 @@ export class TeamWebRtcHostPeer {
 
   readonly #failProtocol = Effect.fn("TeamHostPeer.failProtocol")(function* (this: TeamWebRtcHostPeer, peerId: string) {
     if (peerId !== this.#peerId) return;
-    this.#files.setPeerAuthenticated(peerId, false);
+    this.#setPeerAuthenticated(peerId, false);
     yield* this.#closeLocalSession();
     yield* this.#bridge.disconnectPeer(peerId).pipe(Effect.catch(() => Effect.void));
   });
@@ -1079,7 +1091,7 @@ export class TeamWebRtcHostPeer {
     endLogicalSession = true,
   ) {
     const closingSessionId = this.#localSessionId;
-    if (this.#peerId) this.#files.setPeerAuthenticated(this.#peerId, false);
+    if (this.#peerId) this.#setPeerAuthenticated(this.#peerId, false);
     if (this.#sessionExpirationTimer) clearTimeout(this.#sessionExpirationTimer);
     this.#sessionExpirationTimer = null;
     this.#closeDesktopSockets();
@@ -1093,6 +1105,7 @@ export class TeamWebRtcHostPeer {
     }
     this.#localSessionId = null;
     this.#localSessionToken = null;
+    this.#sessionMembershipId = null;
     this.#sessionBinding = null;
     this.#sessionPreparation = null;
     this.#authenticationCompletion = null;

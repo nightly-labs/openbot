@@ -35,6 +35,7 @@ import { AGENT_TASK_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
+import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
 import { AGENT_HIDDEN_CAPABILITY, TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
@@ -249,6 +250,7 @@ import { createWebNotificationRouting } from "./web-notification-routing";
 import { createWebNotificationSettings } from "./web-notification-settings";
 import { requestWebNotificationPermission } from "./web-notifications";
 import { webOnePasswordConnectorPort } from "./web-onepassword-connector";
+import { webPasswordManagersPort } from "./web-password-managers";
 import { createWebProviderSettings, openWebDestination } from "./web-provider-admin";
 import { webRoutineFlowsHost } from "./web-routine-flows";
 import { webScheduleSource } from "./web-schedule";
@@ -842,6 +844,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     webhookTestsEnabled,
     () => workspace.state.capabilities.includes(BROWSER_PROFILES_CAPABILITY),
     webhookSenderSecretEnabled,
+    () => workspace.state.capabilities.includes(BROWSER_PROXIES_CAPABILITY),
   );
   const remoteAgentAdmin = createRemoteAgentAdmin(
     () => {
@@ -1022,6 +1025,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const githubPort = webGitHubConnectorPort(() => hostRequest());
   const onePasswordPort = webOnePasswordConnectorPort(() => hostRequest());
   const bitwardenPort = webBitwardenConnectorPort(() => hostRequest());
+  const passwordManagersPort = webPasswordManagersPort(() => hostRequest());
   const webMessaging = webHostMessaging(hostRequest, () =>
     workspace.state.capabilities.includes(DISCORD_ACCESS_CAPABILITY),
   );
@@ -1038,6 +1042,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         github: () => githubPort,
         onePassword: () => onePasswordPort,
         bitwarden: () => bitwardenPort,
+        passwordManagers: () => passwordManagersPort,
         messaging: hostMessagingApi(
           () => connectorTarget()?.id,
           () => webMessaging.api,

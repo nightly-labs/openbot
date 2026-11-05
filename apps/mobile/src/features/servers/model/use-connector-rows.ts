@@ -6,6 +6,7 @@ import {
   messagingStatus,
   whatsappStatus,
 } from "@/features/servers/model/connectors";
+import { passwordManagerConnectorStatus } from "@/features/servers/model/password-managers";
 import { useServerConnectors } from "@/features/servers/model/use-server-connectors";
 
 /** The status of one connector. A connector that the server cannot run has no row. */
@@ -26,11 +27,13 @@ export function useConnectorRows(serverId: string): ConnectorRow[] {
     onePasswordAvailable,
     bitwardenAvailable,
     whatsappAvailable,
+    passwordManagersAvailable,
     messaging,
     whatsapp,
     github,
     onePassword,
     bitwarden,
+    passwordManagers,
   } = useServerConnectors(serverId, null);
   const { data: slackData, isError: slackError } = messaging.slack;
   const { data: discordData, isError: discordError } = messaging.discord;
@@ -39,6 +42,7 @@ export function useConnectorRows(serverId: string): ConnectorRow[] {
   const { data: githubData, isError: githubError } = github;
   const { data: onePasswordData, isError: onePasswordError } = onePassword;
   const { data: bitwardenData, isError: bitwardenError } = bitwarden;
+  const { data: passwordManagersData, isError: passwordManagersError } = passwordManagers;
 
   // The query data keeps its reference while it does not change, so the Marketplace listings stay cached.
   return useMemo(() => {
@@ -50,6 +54,13 @@ export function useConnectorRows(serverId: string): ConnectorRow[] {
         const status = bitwardenData;
         if (!status) return failed(id, bitwardenError);
         return [{ id, status: status.connecting ? "connecting" : status.connected ? "connected" : "idle" }];
+      }
+      if (id === "protonpass") {
+        // A host lists only the managers that it can connect, so a manager that it does not list has no row.
+        if (!passwordManagersAvailable) return [];
+        if (!passwordManagersData) return failed(id, passwordManagersError);
+        const status = passwordManagersData.find((candidate) => candidate.manager === id);
+        return status ? [{ id, status: passwordManagerConnectorStatus(status, Date.now()) }] : [];
       }
       if (id === "whatsapp") {
         if (!whatsappAvailable) return [];
@@ -99,6 +110,7 @@ export function useConnectorRows(serverId: string): ConnectorRow[] {
     onePasswordAvailable,
     bitwardenAvailable,
     whatsappAvailable,
+    passwordManagersAvailable,
     slackData,
     slackError,
     discordData,
@@ -113,5 +125,7 @@ export function useConnectorRows(serverId: string): ConnectorRow[] {
     onePasswordError,
     bitwardenData,
     bitwardenError,
+    passwordManagersData,
+    passwordManagersError,
   ]);
 }

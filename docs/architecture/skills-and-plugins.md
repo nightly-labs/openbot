@@ -145,8 +145,10 @@ the calling agent's own key with that name, because the agent's own key wins in 
 Another agent's own key with that name stays and still wins for that agent. The value is in the provider's
 transcript because the agent sent it; OpenBot keeps no tool arguments in its trace.
 
-`password-vault-router.ts` joins metadata from both managers and prefixes Bitwarden ids with
-`bitwarden:`. Existing 1Password ids stay unchanged. A failed list stops automatic account selection
+`password-vault-router.ts` joins metadata from every manager and prefixes Bitwarden ids with
+`bitwarden:` and Proton Pass ids with `proton:`. Existing 1Password ids stay unchanged. The
+router reads 1Password and Bitwarden from their services, and one source for each driver of the
+password-manager engine (see [integrations](integrations.md#password-managers-on-a-joined-server)). A failed list stops automatic account selection
 rather than hiding a source and selecting a different account. Main returns only connection state
 through the local Bitwarden IPC group. The shared panel is used in desktop Marketplace and server
 settings.
@@ -179,7 +181,13 @@ the user token to `POST /v1/github/installation-tokens` on the account Worker
 (`apps/auth-api/src/server/github-installation-tokens.ts`). The Worker holds the app's private key
 (`GITHUB_APP_PRIVATE_KEY`, PKCS #8) and signs an app JWT. It mints one installation token for each
 installation of this app, limited to the repositories where the user can push, maintain or
-administer, and stores nothing. With no key it answers 503, and the desktop keeps the user token.
+administer, and stores nothing. The request names the permissions that the installation granted,
+without `administration`: GitHub limits a user token to what its user can do, but not an
+installation token, so a user with push access would get admin access through one. The app asks
+for `administration: write` only because GitHub needs it to create a repository. Creation uses the
+user token, so a user creates only where GitHub lets that user create. When an installation has not
+granted the permission, the proxy adds an explanation to the `create_repository` error that the
+agent can give to the user. With no key it answers 503, and the desktop keeps the user token.
 `src/main/github-bot-tokens.ts` renews the set ten minutes before the first token expires.
 - `git`: the helper runs with `useHttpPath`, and takes the bot token for the repository from
   `provider-state/github/repositories`, or else the user token.

@@ -22,6 +22,7 @@ export const messages = defineMessages("mobile.marketplace", {
   "mobile.marketplace.app.githubTagline": "Repositories, issues and pull requests",
   "mobile.marketplace.app.onePasswordTagline": "Sign in to sites with logins you share",
   "mobile.marketplace.app.bitwardenTagline": "Sign in to sites with logins from a shared folder",
+  "mobile.marketplace.app.protonPassTagline": "Sign in to sites with logins from a shared vault",
   "mobile.marketplace.search.placeholder": "Search the Marketplace",
   "mobile.marketplace.search.clear": "Clear search",
   "mobile.marketplace.search.close": "Close search",

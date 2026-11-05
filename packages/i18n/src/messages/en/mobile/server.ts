@@ -681,6 +681,53 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.onePassword.disconnectTitle": "Disconnect 1Password?",
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host} forgets the token. The vault and the service account stay in 1Password; remove them there if you no longer need them.",
+  // Proton Pass: the host signs in with the Proton Pass CLI and reads one shared vault.
+  "mobile.server.connectors.protonPass.title": "Proton Pass",
+  "mobile.server.connectors.protonPass.description":
+    "Share one Proton Pass vault with OpenBot on {host}, so agents on {host} can sign in to sites in its browser.",
+  "mobile.server.connectors.protonPass.keyHelp":
+    "In Proton Pass, make an access key that can read only the vault you share with OpenBot, then paste it here. {host} keeps the key; this phone does not.",
+  "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  // A password manager that the host connects through its CLI. {name} is the manager, such as
+  // Proton Pass. {date} is a date, such as 5 Nov 2026.
+  "mobile.server.connectors.passwordManager.unavailable": "{name} is not available on this server.",
+  "mobile.server.connectors.passwordManager.howItWorks":
+    "Sign in to {name} on this phone. Then {host} makes a shared vault and a read-only access key for it, and keeps only that key. Agents never see a password.",
+  "mobile.server.connectors.passwordManager.connect": "Connect {name}",
+  "mobile.server.connectors.passwordManager.connecting": "Connecting…",
+  "mobile.server.connectors.passwordManager.useKey": "Use an access key",
+  "mobile.server.connectors.passwordManager.key": "Access key",
+  "mobile.server.connectors.passwordManager.connectWithKey": "Connect with key",
+  "mobile.server.connectors.passwordManager.signInTitle": "Sign in to {name}",
+  "mobile.server.connectors.passwordManager.signInFooter":
+    "Sign in on the {name} page. This page changes when you are signed in.",
+  "mobile.server.connectors.passwordManager.signInWaiting": "{host} is getting the sign-in page…",
+  "mobile.server.connectors.passwordManager.openSignIn": "Open sign-in page",
+  "mobile.server.connectors.passwordManager.copyLink": "Copy link",
+  "mobile.server.connectors.passwordManager.extraPassword": "Extra password",
+  "mobile.server.connectors.passwordManager.extraPasswordHint":
+    "{name} asks for your extra password. It goes to {host} once; this phone does not keep it.",
+  "mobile.server.connectors.passwordManager.extraPasswordWrong": "The extra password is not correct. Try again.",
+  "mobile.server.connectors.passwordManager.continue": "Continue",
+  "mobile.server.connectors.passwordManager.setupBody": "{host} is making the shared vault…",
+  "mobile.server.connectors.passwordManager.vaultTitle": "Shared vault",
+  "mobile.server.connectors.passwordManager.vaultFooter":
+    "Move a login into this vault in {name} to let agents sign in with it. Remove it to stop.",
+  // {count} is a number, such as 3.
+  "mobile.server.connectors.passwordManager.loginCount": { one: "{count} login", other: "{count} logins" },
+  "mobile.server.connectors.passwordManager.keyTitle": "Access key",
+  "mobile.server.connectors.passwordManager.keyReadOnly": "Read only",
+  "mobile.server.connectors.passwordManager.keyExpires": "Read only. Expires on {date}.",
+  "mobile.server.connectors.passwordManager.keyExpired": "Expired on {date}",
+  "mobile.server.connectors.passwordManager.plan":
+    "The {name} command-line tool needs a paid plan. Change the plan of your account, then connect again.",
+  "mobile.server.connectors.passwordManager.expiredTitle": "The {name} key expired",
+  "mobile.server.connectors.passwordManager.expiredBody":
+    "Agents on {host} cannot sign in with your shared logins until you connect again.",
+  "mobile.server.connectors.passwordManager.disconnect": "Disconnect {name}",
+  "mobile.server.connectors.passwordManager.disconnectTitle": "Disconnect {name}?",
+  "mobile.server.connectors.passwordManager.disconnectBody":
+    "{host} deletes its access key. The vault and its logins stay in your {name} account.",
   // Slack: a workspace installs the one OpenBot app, and the Slack Orchestrator agent answers.
   // {workspace} is the Slack workspace name.
   "mobile.server.connectors.slack.title": "Slack",

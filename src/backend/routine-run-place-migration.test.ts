@@ -6,13 +6,13 @@ import { migrateOpenBotDatabase } from "./openbot-database-schema";
 // Failure modes: the upgrade changes or loses a row of any table; an old agent routine runs in a thread; a
 // channel routine gets the column; a failed upgrade leaves the column or the marker; a retry adds the column
 // twice or drops a development value; a newer or incomplete history is accepted; the CHECK accepts a place
-// that the app cannot read. Sources 8 to 34 reach version 56 in `routine-run-columns-migration.test.ts`.
+// that the app cannot read. Sources 8 to 34 reach version 57 in `routine-run-columns-migration.test.ts`.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
 });
 
-const SOURCES = Array.from({ length: 23 }, (_, index) => index + 33);
+const SOURCES = Array.from({ length: 24 }, (_, index) => index + 33);
 
 function databaseAt(version: number): DatabaseSync {
   const db = new DatabaseSync(":memory:");
@@ -86,7 +86,7 @@ function columns(db: DatabaseSync, table: string): string[] {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 56 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 57 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -97,8 +97,8 @@ describe("agent routine run place migration", () => {
     it(`keeps every row from released schema ${source}, and each agent routine runs in the chat`, () => {
       const db = databaseAt(source);
       seed(db);
-      // The earlier migrations run first; the rows after them are what v56 must keep.
-      if (source < 55) migrateUpTo(db, 55);
+      // The earlier migrations run first; the rows after them are what v57 must keep.
+      if (source < 56) migrateUpTo(db, 56);
       const before = contents(db);
       migrateOpenBotDatabase(db);
       expect(contents(db)).toEqual(withChatRunPlace(before));
@@ -109,16 +109,16 @@ describe("agent routine run place migration", () => {
   }
 
   it("rolls back the column and the marker after a late failure, then retries", () => {
-    const db = databaseAt(55);
+    const db = databaseAt(56);
     seed(db);
     const before = contents(db);
     const columnsBefore = columns(db, "projection_agent_routines");
-    db.exec(`CREATE TEMP TRIGGER fail_marker BEFORE INSERT ON schema_migrations WHEN new.version=56
+    db.exec(`CREATE TEMP TRIGGER fail_marker BEFORE INSERT ON schema_migrations WHEN new.version=57
       BEGIN SELECT RAISE(ABORT, 'late failure'); END;`);
-    expect(() => migrateOpenBotDatabase(db)).toThrow("migration to version 56 failed");
+    expect(() => migrateOpenBotDatabase(db)).toThrow("migration to version 57 failed");
     expect(contents(db)).toEqual(before);
     expect(columns(db, "projection_agent_routines")).toEqual(columnsBefore);
-    expect(db.prepare("SELECT version FROM schema_migrations WHERE version=56").all()).toEqual([]);
+    expect(db.prepare("SELECT version FROM schema_migrations WHERE version=57").all()).toEqual([]);
     expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
     db.exec("DROP TRIGGER fail_marker");
     migrateOpenBotDatabase(db);
@@ -127,7 +127,7 @@ describe("agent routine run place migration", () => {
   });
 
   it("keeps a column and its value that a development build added before the marker", () => {
-    const db = databaseAt(55);
+    const db = databaseAt(56);
     seed(db);
     db.exec(`ALTER TABLE projection_agent_routines ADD COLUMN run_in TEXT NOT NULL DEFAULT 'chat'
       CHECK(run_in IN ('chat', 'thread'))`);
@@ -141,31 +141,31 @@ describe("agent routine run place migration", () => {
   });
 
   it("rejects newer and incomplete migration histories before it adds the column", () => {
-    const db = databaseAt(55);
+    const db = databaseAt(56);
     seed(db);
     const before = contents(db);
     const columnsBefore = columns(db, "projection_agent_routines");
-    db.exec("INSERT INTO schema_migrations VALUES(57,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(58,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=57; DELETE FROM schema_migrations WHERE version=54");
+    db.exec("DELETE FROM schema_migrations WHERE version=58; DELETE FROM schema_migrations WHERE version=54");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 54");
     expect(contents(db)).toEqual(before);
     expect(columns(db, "projection_agent_routines")).toEqual(columnsBefore);
   });
 
-  it("refuses to open a version 56 database in an older application", () => {
-    const db = databaseAt(55);
+  it("refuses to open a version 57 database in an older application", () => {
+    const db = databaseAt(56);
     seed(db);
     migrateOpenBotDatabase(db);
     const after = contents(db);
-    // An application one release older knows versions up to 56 at most: version 57 is newer than it supports.
-    db.exec("INSERT INTO schema_migrations VALUES(57,'now')");
+    // An application one release older knows versions up to 57 at most: version 58 is newer than it supports.
+    db.exec("INSERT INTO schema_migrations VALUES(58,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
     expect(contents(db)).toEqual(after);
   });
 
   it("rejects a place that the app cannot read, in an upgraded and in a new database", () => {
-    const upgraded = databaseAt(55);
+    const upgraded = databaseAt(56);
     seed(upgraded);
     migrateOpenBotDatabase(upgraded);
     const created = new DatabaseSync(":memory:");

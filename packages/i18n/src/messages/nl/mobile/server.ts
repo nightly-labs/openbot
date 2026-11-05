@@ -542,6 +542,50 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectTitle": "1Password ontkoppelen?",
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host} vergeet het token. De kluis en het serviceaccount blijven in 1Password; verwijder ze daar als je ze niet meer nodig hebt.",
+  "mobile.server.connectors.protonPass.title": "Proton Pass",
+  "mobile.server.connectors.protonPass.description":
+    "Deel een Proton Pass-kluis met OpenBot op {host}, zodat agents op {host} zich in de browser bij sites kunnen aanmelden.",
+  "mobile.server.connectors.protonPass.keyHelp":
+    "Maak in Proton Pass een toegangssleutel die alleen de kluis kan lezen die je met OpenBot deelt, en plak die hier. {host} bewaart de sleutel; deze telefoon niet.",
+  "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.passwordManager.unavailable": "{name} is niet beschikbaar op deze server.",
+  "mobile.server.connectors.passwordManager.howItWorks":
+    "Meld je op deze telefoon aan bij {name}. Daarna maakt {host} een gedeelde kluis en een alleen-lezen toegangssleutel ervoor, en bewaart alleen die sleutel. Agents zien nooit een wachtwoord.",
+  "mobile.server.connectors.passwordManager.connect": "{name} verbinden",
+  "mobile.server.connectors.passwordManager.connecting": "Verbinden…",
+  "mobile.server.connectors.passwordManager.useKey": "Een toegangssleutel gebruiken",
+  "mobile.server.connectors.passwordManager.key": "Toegangssleutel",
+  "mobile.server.connectors.passwordManager.connectWithKey": "Verbinden met sleutel",
+  "mobile.server.connectors.passwordManager.signInTitle": "Aanmelden bij {name}",
+  "mobile.server.connectors.passwordManager.signInFooter":
+    "Meld je aan op de pagina van {name}. Deze pagina verandert zodra je bent aangemeld.",
+  "mobile.server.connectors.passwordManager.signInWaiting": "{host} haalt de aanmeldpagina op…",
+  "mobile.server.connectors.passwordManager.openSignIn": "Aanmeldpagina openen",
+  "mobile.server.connectors.passwordManager.copyLink": "Link kopiëren",
+  "mobile.server.connectors.passwordManager.extraPassword": "Extra wachtwoord",
+  "mobile.server.connectors.passwordManager.extraPasswordHint":
+    "{name} vraagt om je extra wachtwoord. Het gaat één keer naar {host}; deze telefoon bewaart het niet.",
+  "mobile.server.connectors.passwordManager.extraPasswordWrong":
+    "Het extra wachtwoord is niet juist. Probeer het opnieuw.",
+  "mobile.server.connectors.passwordManager.continue": "Doorgaan",
+  "mobile.server.connectors.passwordManager.setupBody": "{host} maakt de gedeelde kluis…",
+  "mobile.server.connectors.passwordManager.vaultTitle": "Gedeelde kluis",
+  "mobile.server.connectors.passwordManager.vaultFooter":
+    "Verplaats in {name} een login naar deze kluis zodat agents zich ermee kunnen aanmelden. Verwijder hem om te stoppen.",
+  "mobile.server.connectors.passwordManager.loginCount": { one: "{count} login", other: "{count} logins" },
+  "mobile.server.connectors.passwordManager.keyTitle": "Toegangssleutel",
+  "mobile.server.connectors.passwordManager.keyReadOnly": "Alleen lezen",
+  "mobile.server.connectors.passwordManager.keyExpires": "Alleen lezen. Verloopt op {date}.",
+  "mobile.server.connectors.passwordManager.keyExpired": "Verlopen op {date}",
+  "mobile.server.connectors.passwordManager.plan":
+    "De opdrachtregeltool van {name} vereist een betaald abonnement. Wijzig het abonnement van je account en verbind daarna opnieuw.",
+  "mobile.server.connectors.passwordManager.expiredTitle": "De sleutel van {name} is verlopen",
+  "mobile.server.connectors.passwordManager.expiredBody":
+    "Agents op {host} kunnen zich pas weer aanmelden met je gedeelde logins als je opnieuw verbindt.",
+  "mobile.server.connectors.passwordManager.disconnect": "{name} ontkoppelen",
+  "mobile.server.connectors.passwordManager.disconnectTitle": "{name} ontkoppelen?",
+  "mobile.server.connectors.passwordManager.disconnectBody":
+    "{host} verwijdert zijn toegangssleutel. De kluis en de logins erin blijven in je {name}-account.",
   "mobile.server.connectors.slack.title": "Slack",
   "mobile.server.connectors.slack.description":
     "Mensen noemen @OpenBot in Slack of sturen een direct bericht. De Slack Orchestrator vraagt het de juiste agent en antwoordt.",

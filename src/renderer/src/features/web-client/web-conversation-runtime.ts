@@ -125,6 +125,7 @@ export function createWebConversationRuntime(
   webhookTestsEnabled?: () => boolean,
   browserProfilesEnabled?: () => boolean,
   webhookSenderSecretEnabled?: () => boolean,
+  browserProxiesEnabled?: () => boolean,
 ): ConversationRuntime {
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
   const files = createWebAttachmentFiles(remote, hostId);
@@ -259,7 +260,9 @@ export function createWebConversationRuntime(
   });
   // The host's relay routes are admin only, so only an admin relays a sign-in link.
   const messageLinks = adminRequest ? webMessageLinks(adminRequest, () => signInRelayEnabled?.() === true) : {};
-  const browserProfiles = adminRequest ? webBrowserProfileCalls(adminRequest, onHostEvent) : undefined;
+  const browserProfiles = adminRequest
+    ? webBrowserProfileCalls(adminRequest, onHostEvent, () => browserProxiesEnabled?.() === true)
+    : undefined;
   const listLevels = remote.listAgentNotificationLevels;
   return {
     agent: {

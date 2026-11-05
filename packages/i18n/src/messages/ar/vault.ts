@@ -93,7 +93,7 @@ export const messages = {
   "vault.importMenu": "استيراد من CSV",
   "vault.importTitle": "استيراد من ملف CSV",
   "vault.importDescription":
-    "استورد بيانات الدخول من ملف CSV يصدّره 1Password أو Bitwarden أو Chrome أو Edge أو Firefox أو Safari أو Apple Passwords أو LastPass. يقرأ OpenBot الملف على هذا الحاسوب ولا يرفعه.",
+    "استورد بيانات الدخول من ملف CSV يصدّره 1Password أو Bitwarden أو Chrome أو Edge أو Firefox أو Safari أو Apple Passwords أو LastPass أو Proton Pass. يقرأ OpenBot الملف على هذا الحاسوب ولا يرفعه.",
   "vault.importChoose": "اختيار ملف CSV",
   "vault.importDone": "المستورد: {imported}. المتخطى: {skipped}.",
   "vault.unavailableTitle": "لا يمكن لهذا الحاسوب حفظ الأسرار",

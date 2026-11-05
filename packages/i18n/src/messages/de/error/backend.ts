@@ -330,6 +330,18 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "Es gibt bereits ein Browserprofil mit diesem Namen.",
   "error.backend.browserSessionInUse": "Ein Tab verwendet diese Browsersitzung noch. Versuche es noch einmal.",
   "error.backend.browserProfileLimit": "Du kannst bis zu {limit} Browserprofile haben.",
+  "error.backend.browserProxyNotFound": "Dieser Proxy existiert nicht mehr.",
+  "error.backend.browserProxyAddressInvalid":
+    "Gib eine Proxy-Adresse ein, etwa socks5://host:1080 oder http://user:password@host:3128.",
+  "error.backend.browserProxyLimit": "Du kannst bis zu {limit} Proxys haben.",
+  "error.backend.browserProxyTaken": "Ein Proxy mit dieser Adresse existiert bereits.",
+  "error.backend.browserProxyChanged":
+    "Dieser Proxy wurde geändert, nachdem du ihn geöffnet hast. Sieh ihn dir erneut an und versuche es noch einmal.",
+  "error.backend.browserProxyUnreachable": "Der Proxy {name} antwortet nicht, daher wurde die Seite nicht geöffnet.",
+  "error.backend.browserProxySignInRefused":
+    "Der Proxy {name} hat die Anmeldung abgelehnt, daher wurde die Seite nicht geöffnet.",
+  "error.backend.browserProxyComputerUnreachable":
+    "Der Computer dieses Profils antwortet nicht, daher wurde die Seite nicht geöffnet.",
   "error.backend.browserLowMemory":
     "Dieser Server hat wenig freien Arbeitsspeicher. Der Browser kann daher keinen weiteren Tab öffnen. Schließe einen Tab oder warte, bis andere Agenten fertig sind.",
   "error.backend.browserOpenFailed": "{url} konnte nicht geöffnet werden: {reason}",

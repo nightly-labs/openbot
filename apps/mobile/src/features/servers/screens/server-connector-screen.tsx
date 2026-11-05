@@ -3,8 +3,10 @@ import { BitwardenConnectorPage } from "@/features/servers/components/bitwarden-
 import { GitHubConnectorPage } from "@/features/servers/components/github-connector-page";
 import { MessagingConnectorPage } from "@/features/servers/components/messaging-connector-page";
 import { OnePasswordConnectorPage } from "@/features/servers/components/onepassword-connector-page";
+import { PasswordManagerConnectorPage } from "@/features/servers/components/password-manager-connector-page";
 import { WhatsAppConnectorPage } from "@/features/servers/components/whatsapp-connector-page";
 import { CONNECTOR_TITLE_KEYS, isMobileConnectorId } from "@/features/servers/model/connectors";
+import { isMobilePasswordManagerId } from "@/features/servers/model/password-managers";
 import { useServerConnectors } from "@/features/servers/model/use-server-connectors";
 import { SettingsContent, SettingsNote } from "@/features/settings/components/settings-content";
 import { useText } from "@/shared/lib/text";
@@ -20,11 +22,13 @@ export function ServerConnectorScreen() {
     onePasswordAvailable,
     bitwardenAvailable,
     whatsappAvailable,
+    passwordManagersAvailable,
     messaging,
     whatsapp,
     github,
     onePassword,
     bitwarden,
+    passwordManagers,
   } = useServerConnectors(serverId, isMobileConnectorId(id) ? id : null);
   const reachable =
     isMobileConnectorId(id) &&
@@ -34,7 +38,9 @@ export function ServerConnectorScreen() {
         ? bitwardenAvailable
         : id === "whatsapp"
           ? whatsappAvailable
-          : connectors);
+          : isMobilePasswordManagerId(id)
+            ? passwordManagersAvailable
+            : connectors);
   if (!server || !reachable)
     return (
       <SettingsContent>
@@ -52,6 +58,8 @@ export function ServerConnectorScreen() {
         <BitwardenConnectorPage server={server} query={bitwarden} />
       ) : id === "whatsapp" ? (
         <WhatsAppConnectorPage server={server} query={whatsapp} agents={agents} />
+      ) : isMobilePasswordManagerId(id) ? (
+        <PasswordManagerConnectorPage server={server} manager={id} query={passwordManagers} />
       ) : (
         <MessagingConnectorPage server={server} platform={id} query={messaging[id]} agents={agents} />
       )}

@@ -19,6 +19,7 @@ import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import { AgentService } from "../src/backend/agent-service";
 import { AgentStore } from "../src/backend/agent-store";
 import { BrowserProfileStore } from "../src/backend/browser-profiles/browser-profile-store";
+import { BrowserProxyStore } from "../src/backend/browser-profiles/browser-proxy-store";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
@@ -79,12 +80,18 @@ async function startHost(): Promise<Host> {
   const agents = new AgentService({ store, mailbox, browser: agentBrowser });
   const profiles = createBrowserProfileService({
     store: new BrowserProfileStore(store.database),
+    proxies: new BrowserProxyStore(store.database),
+    // The script saves no proxy password, so the cipher only has to exist.
+    cipher: { canPersist: () => true, encrypt: (value) => Buffer.from(value, "utf8") },
     agents,
     browser: {
       tabIdsInSession: () => [],
       listTabSessions: () => [],
       close: () => Effect.void,
+      proxyFailure: () => null,
+      forgetProxyFailure: () => undefined,
       clearTabSession: () => Effect.void,
+      releaseProfileProxy: () => Effect.void,
     },
   });
   return { database, store, agents, profiles };

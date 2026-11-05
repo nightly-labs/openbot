@@ -99,7 +99,7 @@ the marker it skips the turn's thinking too, so a later import does not bring a 
 
 ## Routine sessions
 
-An agent routine runs in the agent's own chat, unless its `runIn` is `thread` (migration 56; existing
+An agent routine runs in the agent's own chat, unless its `runIn` is `thread` (migration 57; existing
 routines got `chat`, the place of runs before 0.61). Then it runs in its own side thread, the routine
 thread. The routine settings show a switch for it on this computer's host only: the Team API admin wire
 does not carry `runIn`, and a remote save without it keeps the saved place. The `create_routine` and

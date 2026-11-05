@@ -640,6 +640,55 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectTitle": "Odłączyć 1Password?",
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host} zapomina token. Sejf i konto usługi zostają w 1Password; usuń je tam, jeśli już ich nie potrzebujesz.",
+  "mobile.server.connectors.protonPass.title": "Proton Pass",
+  "mobile.server.connectors.protonPass.description":
+    "Udostępnij jeden sejf Proton Pass OpenBotowi na {host}, aby agenci na {host} mogli logować się do stron w jego przeglądarce.",
+  "mobile.server.connectors.protonPass.keyHelp":
+    "W Proton Pass utwórz klucz dostępu, który może czytać tylko sejf udostępniony OpenBotowi, i wklej go tutaj. {host} przechowuje klucz; ten telefon nie.",
+  "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.passwordManager.unavailable": "{name} nie jest dostępny na tym serwerze.",
+  "mobile.server.connectors.passwordManager.howItWorks":
+    "Zaloguj się do {name} na tym telefonie. Potem {host} tworzy udostępniony sejf i klucz dostępu tylko do odczytu dla niego, i przechowuje tylko ten klucz. Agenci nigdy nie widzą hasła.",
+  "mobile.server.connectors.passwordManager.connect": "Połącz {name}",
+  "mobile.server.connectors.passwordManager.connecting": "Łączenie…",
+  "mobile.server.connectors.passwordManager.useKey": "Użyj klucza dostępu",
+  "mobile.server.connectors.passwordManager.key": "Klucz dostępu",
+  "mobile.server.connectors.passwordManager.connectWithKey": "Połącz kluczem",
+  "mobile.server.connectors.passwordManager.signInTitle": "Zaloguj się do {name}",
+  "mobile.server.connectors.passwordManager.signInFooter":
+    "Zaloguj się na stronie {name}. Ta strona zmieni się po zalogowaniu.",
+  "mobile.server.connectors.passwordManager.signInWaiting": "{host} pobiera stronę logowania…",
+  "mobile.server.connectors.passwordManager.openSignIn": "Otwórz stronę logowania",
+  "mobile.server.connectors.passwordManager.copyLink": "Kopiuj link",
+  "mobile.server.connectors.passwordManager.extraPassword": "Dodatkowe hasło",
+  "mobile.server.connectors.passwordManager.extraPasswordHint":
+    "{name} prosi o dodatkowe hasło. Trafia ono do {host} jeden raz; ten telefon go nie przechowuje.",
+  "mobile.server.connectors.passwordManager.extraPasswordWrong":
+    "Dodatkowe hasło jest nieprawidłowe. Spróbuj ponownie.",
+  "mobile.server.connectors.passwordManager.continue": "Dalej",
+  "mobile.server.connectors.passwordManager.setupBody": "{host} tworzy udostępniony sejf…",
+  "mobile.server.connectors.passwordManager.vaultTitle": "Udostępniony sejf",
+  "mobile.server.connectors.passwordManager.vaultFooter":
+    "Przenieś login do tego sejfu w {name}, aby agenci mogli się nim logować. Usuń go, aby przestać.",
+  "mobile.server.connectors.passwordManager.loginCount": {
+    one: "{count} login",
+    few: "{count} loginy",
+    many: "{count} loginów",
+    other: "{count} loginu",
+  },
+  "mobile.server.connectors.passwordManager.keyTitle": "Klucz dostępu",
+  "mobile.server.connectors.passwordManager.keyReadOnly": "Tylko do odczytu",
+  "mobile.server.connectors.passwordManager.keyExpires": "Tylko do odczytu. Wygasa {date}.",
+  "mobile.server.connectors.passwordManager.keyExpired": "Wygasł {date}",
+  "mobile.server.connectors.passwordManager.plan":
+    "Narzędzie wiersza poleceń {name} wymaga płatnego planu. Zmień plan konta, a potem połącz ponownie.",
+  "mobile.server.connectors.passwordManager.expiredTitle": "Klucz {name} wygasł",
+  "mobile.server.connectors.passwordManager.expiredBody":
+    "Agenci na {host} nie mogą logować się udostępnionymi loginami, dopóki nie połączysz ponownie.",
+  "mobile.server.connectors.passwordManager.disconnect": "Odłącz {name}",
+  "mobile.server.connectors.passwordManager.disconnectTitle": "Odłączyć {name}?",
+  "mobile.server.connectors.passwordManager.disconnectBody":
+    "{host} usuwa swój klucz dostępu. Sejf i jego loginy zostają na Twoim koncie {name}.",
   "mobile.server.connectors.slack.title": "Slack",
   "mobile.server.connectors.slack.description":
     "Ludzie oznaczają @OpenBot w Slacku lub wysyłają mu wiadomość prywatną. Slack Orchestrator pyta odpowiedniego agenta i odpowiada.",

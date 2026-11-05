@@ -55,7 +55,9 @@ import {
   agentTaskLimit,
   type BackgroundProcess,
   type BrowserProfileSummary,
+  type BrowserProxySummary,
   type BusyMessageModePreference,
+  browserProxyAddressText,
   type CentralAuthState,
   type ClientAgentModelOption,
   type ClientAgentSummary,
@@ -125,6 +127,7 @@ import {
   type ProviderDetectionSettings,
   type ProviderModelVisibility,
   parseAgentAccessChange,
+  parseBrowserProxyAddress,
   parseProviderModelVisibilityChange,
   type QueueDelivery,
   type QueuedMessageReceipt,
@@ -210,6 +213,7 @@ import { createMockLicense } from "./mock-license";
 import { createMockLinkAccount } from "./mock-link-account";
 import { createMockMessaging } from "./mock-messaging";
 import { createMockOnePasswordConnector } from "./mock-onepassword-connector";
+import { createMockPasswordManagers } from "./mock-password-managers";
 import { createMockProviderRuntimes, type MockProviderRuntimeOptions } from "./mock-provider-runtimes";
 import { mockRoutineCalendar } from "./mock-routine-calendar";
 import { createMockRoutineFeed } from "./mock-routine-feed";
@@ -558,6 +562,24 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       browserProfiles.some((profile) => profile.id !== profileId && profile.name.toLowerCase() === name.toLowerCase())
     )
       throw new Error(sourceText("error.backend.browserProfileNameTaken"));
+  };
+  // One saved proxy that "Client A" uses, so the menu shows a choice.
+  let browserProxies: BrowserProxySummary[] = [
+    {
+      id: "1b2c3d4e5f60718293a4b5c6d7e8f90a",
+      scheme: "socks5",
+      host: "proxy.example.net",
+      port: 1080,
+      username: null,
+      hasPassword: false,
+      profileIds: ["0a1b2c3d4e5f60718293a4b5c6d7e8f9"],
+      failure: null,
+    },
+  ];
+  const requireBrowserProxy = (proxyId: string) => {
+    const proxy = browserProxies.find((candidate) => candidate.id === proxyId);
+    if (!proxy) throw new Error(sourceText("error.backend.browserProxyNotFound"));
+    return proxy;
   };
   const sessionSettings = new Map<string, AgentSessionSettings>();
   function previewSessionSettings(agentId: string): AgentSessionSettings {
@@ -1531,6 +1553,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     linkAccount: createMockLinkAccount(),
     onePasswordConnector: createMockOnePasswordConnector(),
     bitwardenConnector: createMockBitwardenConnector(),
+    passwordManagers: createMockPasswordManagers(),
     vault: createMockVault(),
     billing: createMockBilling(billingPlans),
     license: createMockLicense(),
@@ -2195,6 +2218,57 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         emitAgentEvent({ type: "agents-changed", agents });
         emitAgentEvent({ type: "browser-profiles-changed" });
         return api.agent.getAgentBrowserProfile(agentId);
+      },
+      // The preview has no joined server, so no member shares a computer with it.
+      listBrowserProxies: async () => ({ proxies: browserProxies, computers: [] }),
+      getBrowserComputerSharing: async () => null,
+      setBrowserComputerSharing: async () => {
+        throw new Error(sourceText("error.team.agentSettingsUnsupported"));
+      },
+      saveBrowserProxy: async ({ proxyId, previousAddress, keepPassword, address }) => {
+        const parsed = parseBrowserProxyAddress(address);
+        if (parsed === null) throw new Error(sourceText("error.backend.browserProxyAddressInvalid"));
+        const { scheme, host, port, username, password } = parsed;
+        const existing = proxyId === undefined ? undefined : requireBrowserProxy(proxyId);
+        if (existing && browserProxyAddressText(existing) !== previousAddress)
+          throw new Error(sourceText("error.backend.browserProxyChanged"));
+        const saved: BrowserProxySummary = {
+          id: existing?.id ?? crypto.randomUUID().replaceAll("-", ""),
+          scheme,
+          host,
+          port,
+          username,
+          hasPassword: password !== null || (existing?.hasPassword === true && keepPassword === true),
+          profileIds: existing?.profileIds ?? [],
+          failure: null,
+        };
+        browserProxies = existing
+          ? browserProxies.map((proxy) => (proxy.id === saved.id ? saved : proxy))
+          : [...browserProxies, saved];
+        emitAgentEvent({ type: "browser-profiles-changed" });
+        return saved;
+      },
+      deleteBrowserProxy: async ({ proxyId, profileIds }) => {
+        const existing = requireBrowserProxy(proxyId);
+        if (
+          existing.profileIds.length !== profileIds.length ||
+          existing.profileIds.some((id) => !profileIds.includes(id))
+        )
+          throw new Error(sourceText("error.backend.browserProxyChanged"));
+        browserProxies = browserProxies.filter((proxy) => proxy.id !== proxyId);
+        emitAgentEvent({ type: "browser-profiles-changed" });
+      },
+      setBrowserProfileProxy: async ({ profileId, proxyId }) => {
+        requireBrowserProfile(profileId);
+        if (proxyId !== null) requireBrowserProxy(proxyId);
+        browserProxies = browserProxies.map((proxy) => ({
+          ...proxy,
+          profileIds: [
+            ...proxy.profileIds.filter((id) => id !== profileId),
+            ...(proxy.id === proxyId ? [profileId] : []),
+          ],
+        }));
+        emitAgentEvent({ type: "browser-profiles-changed" });
       },
       listBrowserTabProfiles: async () => [],
       updateAgentAdminSettings: async ({ agentId, access, autoApprove }) => {
