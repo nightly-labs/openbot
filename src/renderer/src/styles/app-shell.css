@@ -1804,7 +1804,28 @@ textarea {
   position: sticky;
   top: -4px;
   z-index: 2;
+  overflow: visible;
   background: var(--openbot-bg-sidebar);
+  container-type: scroll-state;
+}
+
+/* A stuck header fades the rows that scroll under it, so no row is cut at its edge. The header
+   that sticks below it lies over this fade. */
+.sidebar:not(.sidebar-compact) .sidebar-folder > header::after {
+  position: absolute;
+  top: 100%;
+  inset-inline: 0;
+  height: 18px;
+  background: linear-gradient(to bottom, var(--openbot-bg-sidebar), transparent);
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+}
+
+@container scroll-state(stuck: top) {
+  .sidebar:not(.sidebar-compact) .sidebar-folder > header::after {
+    opacity: 1;
+  }
 }
 
 /* Each header sticks below the 32px headers of its parents. */
