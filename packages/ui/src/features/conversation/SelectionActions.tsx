@@ -157,7 +157,8 @@ export function MessageSelectionActions(props: {
   createEffect(
     () => selection(),
     (active) => {
-      clearPersistentHighlight();
+      // The cleanup clears the highlight of the previous selection. Without a selection, the highlight
+      // can be of other actions, such as those of a side thread, so it stays.
       if (!active) {
         setFallbackHighlight(false);
         return;

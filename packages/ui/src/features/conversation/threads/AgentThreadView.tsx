@@ -545,7 +545,8 @@ export function AgentThreadView(props: AgentThreadViewProps) {
           <MessageSelectionActions
             scope={selectionScope()}
             contextKey={props.task?.id}
-            disabled={!props.task}
+            // As the message box: a quote waits in a locked box, and could go to the next thread.
+            disabled={!props.task || sending() || voicePhase() === "transcribing"}
             onSend={(messageId, body) => actions().onSend(messageId, body)}
             onQuote={quoteSelection}
             quoteShortcut={actions().quoteShortcut}
