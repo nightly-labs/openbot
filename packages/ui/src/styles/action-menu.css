@@ -147,6 +147,13 @@
   color: var(--openbot-text-primary);
 }
 
+/* A disabled item does not react to the pointer, so its icon stays muted with its label. */
+.ui-action-menu:not([data-menu-layout="grid"])
+  :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"])[data-disabled]
+  > svg {
+  color: var(--openbot-text-muted);
+}
+
 /* Lucide ships stroke-width="2" as an attribute, so the weight has to be set here to tame
  * it - but this selector outranks the zero-specificity :where(.ui-glyph-*) classes, and
  * setting it unconditionally would undo their viewBox scaling for any hand-drawn icon in

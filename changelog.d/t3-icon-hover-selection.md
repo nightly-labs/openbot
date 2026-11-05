@@ -7,6 +7,7 @@
 ### Fixed
 
 - In menus, icons are grey at rest, as on the page rail. The icon of the row under the pointer or the keyboard turns white with its label.
-- In the settings navigation and on the composer, icons are grey at rest and turn white when you point to them. The icon of the open section, and the add button while its menu is open, stay white.
+- In the settings navigation and on the composer, icons are grey at rest and turn white when you point to them or move to them with the keyboard. The icon of the open section, and a composer button while its menu is open, stay white. The warning icon of a marketplace app keeps its color.
+- The icon of a disabled menu item stays grey when you point to it.
 - Icons in setting rows, such as the 1Password steps and a background process with no agent, have the size of the other large icons. Their titles now align with the titles of agent rows.
 - The file icon in the agent instructions bar and the icon of a custom provider now have the correct size.

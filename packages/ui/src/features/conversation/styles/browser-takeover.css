@@ -151,7 +151,7 @@
   width: var(--openbot-icon-lg);
   height: var(--openbot-icon-lg);
   margin-bottom: var(--openbot-space-1);
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .browser-takeover-preview-fallback strong {
