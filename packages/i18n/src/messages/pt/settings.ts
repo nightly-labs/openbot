@@ -525,8 +525,12 @@ export const messages = {
   // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Ditado",
   "settings.voice.model.parakeet.description": "Rápido. Detecta sozinho o idioma falado, em 25 idiomas europeus.",
+  "settings.voice.model.parakeetUnified.description":
+    "Rápido. Só inglês. Coloca pontuação, com menos erros que o Parakeet TDT.",
   "settings.voice.model.bark.description": "Rápido. Só inglês. Escreve quase tudo em minúsculas, com pouca pontuação.",
   "settings.voice.model.whisper.description": "Mais lento. Cerca de 100 idiomas, e você pode definir o idioma falado.",
+  "settings.voice.model.cohere.description":
+    "Mais lento. 14 idiomas. Você define o idioma falado. Usa cerca de 4 GB de memória.",
   "settings.voice.model.size": "Tamanho do download: {size}",
   "settings.voice.model.downloading": "Baixando · {received} de {total}",
   "settings.voice.model.failed": "O download parou. Verifique a conexão e tente de novo.",
@@ -540,10 +544,14 @@ export const messages = {
   "settings.voice.model.removeLabel": "Remover {name} deste computador",
   "settings.voice.language.section": "Idioma",
   "settings.voice.language.description": "O idioma que você fala. Automático o detecta a partir da gravação.",
+  "settings.voice.language.modelLanguages":
+    "O idioma que você fala. Este modelo conhece só estes idiomas e não detecta o idioma sozinho.",
   "settings.voice.language.modelDetects":
-    "O Parakeet detecta sozinho o idioma falado. Para definir um idioma, use o Whisper ou o ElevenLabs.",
+    "O Parakeet detecta sozinho o idioma falado. Para definir um idioma, use o Whisper, o Cohere ou o ElevenLabs.",
   "settings.voice.language.englishOnly":
-    "O Bark reconhece só inglês. Para definir um idioma, use o Whisper ou o ElevenLabs.",
+    "O Bark reconhece só inglês. Para definir um idioma, use o Whisper, o Cohere ou o ElevenLabs.",
+  "settings.voice.language.parakeetUnifiedEnglishOnly":
+    "O Parakeet Unified reconhece só inglês. Para definir um idioma, use o Whisper, o Cohere ou o ElevenLabs.",
   "settings.voice.language.automatic": "Automático",
   "settings.voice.loadFailed": "Não foi possível ler os modelos de voz.",
   "settings.voice.saveFailed": "Não foi possível salvar a configuração de voz. Tente de novo.",

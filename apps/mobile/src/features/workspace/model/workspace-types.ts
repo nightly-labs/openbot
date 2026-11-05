@@ -320,6 +320,8 @@ export interface MobileWorkspaceContextValue {
   canRetryMessage: (serverId: string) => boolean;
   /** True when the host advertises `message-delete-v1`. */
   canDeleteMessages: (serverId: string) => boolean;
+  /** True when the host advertises `conversation-unread-from-v1`: a message of an agent chat can be marked unread. */
+  canMarkUnreadFrom: (serverId: string) => boolean;
   /** The files this host accepts beyond the base list, as the desktop picker reads them. */
   attachmentSupport: (serverId: string) => AttachmentSupport;
   changeQueue: (
@@ -1003,6 +1005,11 @@ export interface MobileWorkspaceContextValue {
   unhideAgent: (agentId: string) => void;
   markAgentRead: (agentId: string, throughMessageId?: string, serverId?: string) => void;
   markAgentUnread: (agentId: string) => void;
+  /**
+   * Marks a message of an agent chat and the messages after it unread. It rejects when the host
+   * refuses it. Only a host with `canMarkUnreadFrom` takes it.
+   */
+  markAgentUnreadFrom: (agentId: string, fromMessageId: string, serverId: string) => Promise<void>;
   /** Marks every unread chat of the active server read. It rejects when a chat stays unread. */
   markAllRead: () => Promise<void>;
   toggleAgentPin: (agentId: string) => ToggleAgentPinResult;
@@ -1027,6 +1034,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canEditQueue"
   | "canRetryMessage"
   | "canDeleteMessages"
+  | "canMarkUnreadFrom"
   | "attachmentSupport"
   | "canStartNewChat"
   | "canCompactContext"

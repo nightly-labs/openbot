@@ -109,7 +109,8 @@ export function serverSupportsCapability(
       capability === "agent-fast-mode-v1" ||
       capability === "context-compact-v1" ||
       capability === "agent-instructions-v1" ||
-      capability === "message-delete-v1") &&
+      capability === "message-delete-v1" ||
+      capability === "conversation-unread-from-v1") &&
     server?.kind === "remote"
   ) {
     return server.compatibility?.capabilities.includes(capability) === true;

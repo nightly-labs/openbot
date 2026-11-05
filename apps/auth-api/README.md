@@ -230,6 +230,18 @@ for a team invitation. The message is never sent in that case, so the app can
 ask again later. Namecheap Private Email allows 500 messages an hour for each
 mailbox, and every sign-in code and invitation spends that same quota.
 
+Production has a fallback: the `EMAIL_FALLBACK` `send_email` binding of Cloudflare Email Service.
+When SMTP surely did not send a message (a sender limit, a refusal of the sender or the message, or
+a connection that stopped before `DATA`), the Worker sends the same message through Cloudflare. It
+does not fall back after `smtp_delivery_unknown`, an invalid input or configuration, or a refused
+recipient. The fallback uses only the time left in the 25-second delivery budget of a sign-in code,
+and it does not start with less than 2 seconds left, as after three SMTP timeouts. When
+Cloudflare also fails, the answer stays the SMTP failure, so a sender limit keeps its 429. Each
+fallback sends an `email_fallback_sent` analytics event. Before the first deploy with the binding,
+onboard `openbot.run` in the Cloudflare dashboard under Email Sending, and keep
+`allowed_sender_addresses` equal to `EMAIL_FROM` and `EMAIL_LICENSE_FROM`. The preview and test
+Workers have no fallback.
+
 The contact form on `/contact` posts to `/v1/contact`. The Worker sends each message to
 `EMAIL_FROM` through SMTP, with the visitor's address in `Reply-To`, and stores nothing.
 The D1 counter of sign-in allows 3 messages for each IP address and 15 in total in each 15-minute

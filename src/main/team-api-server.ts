@@ -267,6 +267,7 @@ import { routeConnectors } from "./team-api/route-connectors";
 import { routeContextCompact } from "./team-api/route-context-compact";
 import { routeContextReset } from "./team-api/route-context-reset";
 import { routeConversationFiles } from "./team-api/route-conversation-files";
+import { routeConversationUnreadFrom } from "./team-api/route-conversation-unread-from";
 import { routeCustomAgents } from "./team-api/route-custom-agents";
 import { routeDirect } from "./team-api/route-direct";
 import { routeDiscordAccess } from "./team-api/route-discord-access";
@@ -1107,6 +1108,7 @@ export class TeamApiServer {
       if ((await routeContextCompact(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeMessageDelete(context, this.#options.agents, this.#options.channels, hidden)) === "handled")
         return;
+      if ((await routeConversationUnreadFrom(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentMemoryPage(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeWorkspaceDirectory(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeConversationFiles(context, this.#options.agents)) === "handled") return;

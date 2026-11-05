@@ -514,8 +514,10 @@ export const messages = {
   // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "听写",
   "settings.voice.model.parakeet.description": "速度快，可自动识别语言，支持 25 种欧洲语言。",
+  "settings.voice.model.parakeetUnified.description": "速度快，仅支持英语。会加标点，错误比 Parakeet TDT 少。",
   "settings.voice.model.bark.description": "速度快，仅支持英语。输出多为小写，标点很少。",
   "settings.voice.model.whisper.description": "速度较慢，支持约 100 种语言，可手动指定语言。",
+  "settings.voice.model.cohere.description": "速度较慢，支持 14 种语言，需手动指定语言。约占用 4 GB 内存。",
   "settings.voice.model.size": "下载大小：{size}",
   "settings.voice.model.downloading": "下载中 · {received} / {total}",
   "settings.voice.model.failed": "下载已中断，请检查网络后重试。",
@@ -529,8 +531,12 @@ export const messages = {
   "settings.voice.model.removeLabel": "从这台电脑移除 {name}",
   "settings.voice.language.section": "语言",
   "settings.voice.language.description": "你所说的语言。选择自动会从录音中识别。",
-  "settings.voice.language.modelDetects": "Parakeet 会自动识别语言。若需指定语言，请使用 Whisper 或 ElevenLabs。",
-  "settings.voice.language.englishOnly": "Bark 只能识别英语。要指定语言，请使用 Whisper 或 ElevenLabs。",
+  "settings.voice.language.modelLanguages": "你说的语言。此模型只支持这些语言，不会自动识别语言。",
+  "settings.voice.language.modelDetects":
+    "Parakeet 会自动识别语言。若需指定语言，请使用 Whisper、Cohere 或 ElevenLabs。",
+  "settings.voice.language.englishOnly": "Bark 只能识别英语。要指定语言，请使用 Whisper、Cohere 或 ElevenLabs。",
+  "settings.voice.language.parakeetUnifiedEnglishOnly":
+    "Parakeet Unified 只能识别英语。要指定语言，请使用 Whisper、Cohere 或 ElevenLabs。",
   "settings.voice.language.automatic": "自动",
   "settings.voice.loadFailed": "无法读取语音模型。",
   "settings.voice.saveFailed": "无法保存语音设置，请重试。",

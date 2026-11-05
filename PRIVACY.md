@@ -536,8 +536,9 @@ never sent anywhere. The app replaces it with what the server and the account se
 deletes a server's copy when the account no longer has that server. Sign-out and an expired or
 disconnected session delete all copies and the key. Attachments and files are not in the copy.
 
-The mobile app keeps a support log of up to 1,000 events in the phone's system cache: app version,
-system and device model, app state changes, connection steps with server IDs and error text, the
+The mobile app keeps a support log of up to 5,000 events in the phone's system cache: app version,
+system and device model, app state changes, connection steps with server IDs, error text and error
+codes, the types and counts of network candidates (such as "relay/udp", never an address), the
 desktop app version and protocol support of each server, the method, address without query, status
 and time of its requests, including Team API requests to the desktop, and app warnings and errors. It
 does not record message text, files, request bodies or headers, and it masks tokens, keys and email
@@ -676,6 +677,11 @@ try, and the link to the Stripe page of the invoice. When a paid license ends, t
 the license tier, the number of users, and whether it ended after a failed payment. The HTML version of a message loads the OpenBot logo from `openbot.run` when
 the mail client shows images. The image address is the same in every message and identifies no
 recipient.
+
+When the SMTP provider surely did not send a message, for example because its hourly sending limit
+is spent, Cloudflare Email Service sends the same message instead. It then receives the same
+recipient address and message content as the SMTP provider. OpenBot does not use it after an
+unconfirmed SMTP send, so you do not get the same message twice.
 
 The contact form on `openbot.run/contact` sends your message to the OpenBot mailbox through the same
 SMTP provider. The message contains the email address, topic and text that you enter, and the name and
@@ -962,8 +968,8 @@ Network traffic can also occur when:
   `~/Library/Application Support/OpenBot/provider-state/1password-cli`. The request carries no user
   data;
 - the user dictates or opens the Voice pane for the first time, or presses Download in **Settings →
-  Voice**. OpenBot downloads the speech model that it pins, Parakeet, Underdog Bark 3.0 Plus or
-  Whisper turbo, from `huggingface.co`, checks its size and SHA-256, and keeps it in `runtimes` in
+  Voice**. OpenBot downloads the speech model that it pins, Parakeet TDT, Parakeet Unified EN,
+  Underdog Bark 3.0 Plus, Whisper turbo or Cohere Transcribe, from `huggingface.co`, checks its size and SHA-256, and keeps it in `runtimes` in
   the application data folder. The request carries no user data. Dictation audio from these models
   stays on the computer, and the chosen model and language are saved in `voice-preference.json` in
   the same folder;

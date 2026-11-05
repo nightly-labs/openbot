@@ -55,6 +55,7 @@ import { CONTEXT_COMPACT_CAPABILITY } from "./context-compact-v1";
 import { CONTEXT_RESET_CAPABILITY } from "./context-reset-v1";
 import { TEAM_CONTEXT_USAGE_CAPABILITY } from "./context-usage-v1";
 import { CONVERSATION_FILE_SEARCH_CAPABILITY } from "./conversation-file-search-v1";
+import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "./conversation-unread-from-v1";
 import { CUSTOM_AGENTS_CAPABILITY } from "./custom-agents-v1";
 import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "./custom-provider-harness-v1";
 import { DISCORD_ACCESS_CAPABILITY } from "./discord-access-v1";
@@ -213,6 +214,7 @@ export {
   CONTEXT_COMPACT_CAPABILITY,
   CONTEXT_RESET_CAPABILITY,
   CONVERSATION_FILE_SEARCH_CAPABILITY,
+  CONVERSATION_UNREAD_FROM_CAPABILITY,
   CUSTOM_AGENTS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   DISCORD_ACCESS_CAPABILITY,
@@ -439,6 +441,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WHATSAPP_CONNECTOR_CAPABILITY,
   MESSAGE_DELETE_CAPABILITY,
+  CONVERSATION_UNREAD_FROM_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
 ] as const;
 
@@ -603,6 +606,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== WEBHOOK_SENDER_SECRET_CAPABILITY &&
     capability !== WHATSAPP_CONNECTOR_CAPABILITY &&
     capability !== MESSAGE_DELETE_CAPABILITY &&
+    capability !== CONVERSATION_UNREAD_FROM_CAPABILITY &&
     capability !== WORKFLOWS_CHATS_CAPABILITY,
 );
 /**
@@ -642,6 +646,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WHATSAPP_CONNECTOR_CAPABILITY,
   MESSAGE_DELETE_CAPABILITY,
+  CONVERSATION_UNREAD_FROM_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -765,6 +770,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== WEBHOOK_SENDER_SECRET_CAPABILITY &&
       capability !== WHATSAPP_CONNECTOR_CAPABILITY &&
       capability !== MESSAGE_DELETE_CAPABILITY &&
+      capability !== CONVERSATION_UNREAD_FROM_CAPABILITY &&
       capability !== WORKFLOWS_CHATS_CAPABILITY,
   );
 }

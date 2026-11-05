@@ -29,6 +29,8 @@ export interface MessageActionsInput {
   sendToChannel?: MessageChannelTargets;
   /** Deletes the message for everyone. Unset where the reader cannot delete it. */
   onDelete?: () => Promise<void>;
+  /** Marks the message and the messages after it unread for the reader. Unset where it cannot. */
+  onMarkUnread?: () => void;
 }
 
 /**
@@ -97,6 +99,7 @@ export function useMessageActions(input: MessageActionsInput | null) {
           onReply: input.onReply,
           onBranch: input.onBranch,
           onSelectText: input.onSelectText,
+          onMarkUnread: input.onMarkUnread,
           sendToChannel: input.sendToChannel,
           onDelete: confirmDelete,
         })

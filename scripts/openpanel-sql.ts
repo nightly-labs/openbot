@@ -126,9 +126,9 @@ const decodeResult = Schema.decodeUnknownSync(
     }),
   ),
 );
-type QueryResult = ReturnType<typeof decodeResult>;
+export type QueryResult = ReturnType<typeof decodeResult>;
 
-interface Connection {
+export interface Connection {
   readonly url: string;
   readonly close: () => void;
 }
@@ -212,7 +212,13 @@ async function openTunnel(): Promise<Connection> {
   return { url: `http://127.0.0.1:${port}/`, close };
 }
 
-interface QueryRequest {
+/** Uses OPENPANEL_CLICKHOUSE_URL when a tunnel is already open, for example in CI. */
+export async function connectClickHouse(): Promise<Connection> {
+  const existing = process.env.OPENPANEL_CLICKHOUSE_URL;
+  return existing ? { url: existing, close: () => {} } : openTunnel();
+}
+
+export interface QueryRequest {
   readonly user: string;
   readonly password: string;
   readonly sql: string;
@@ -227,7 +233,7 @@ function clickHouseError(status: number, body: string): Error {
   return new Error(`ClickHouse returned HTTP ${status}. ${detail}`);
 }
 
-async function runQuery(connection: Connection, request: QueryRequest): Promise<QueryResult> {
+export async function runQuery(connection: Connection, request: QueryRequest): Promise<QueryResult> {
   // readonly=1 blocks every setting, also default_format, so the format goes in the query.
   const response = await fetch(connection.url, {
     method: "POST",
@@ -369,7 +375,7 @@ function printTable(result: QueryResult, hidden: ReadonlySet<string>): void {
   );
 }
 
-async function credentials(): Promise<{ user: string; password: string }> {
+export async function credentials(): Promise<{ user: string; password: string }> {
   let user = process.env.OPENPANEL_CLICKHOUSE_USER;
   let password = process.env.OPENPANEL_CLICKHOUSE_PASSWORD;
   if (!user || !password) {
@@ -434,8 +440,7 @@ async function main(): Promise<void> {
   }
 
   const { user, password } = await credentials();
-  const existing = process.env.OPENPANEL_CLICKHOUSE_URL;
-  const connection = existing ? { url: existing, close: () => {} } : await openTunnel();
+  const connection = await connectClickHouse();
   try {
     const showIdentifiers = values["show-identifiers"] === true;
     const result = await runQuery(connection, { user, password, sql, showIdentifiers });

@@ -9,8 +9,10 @@ import {
   isLocalVoiceModelId,
   LOCAL_VOICE_MODEL_IDS,
   type LocalVoiceModelId,
+  modelLanguage,
   VOICE_AUDIO_LIMITS,
   VOICE_MODEL_IDS,
+  VOICE_MODELS,
   type VoiceModelId,
   type VoiceModelStatus,
   type VoiceSettings,
@@ -29,7 +31,13 @@ import {
   scribeRealtimeUrl,
   VoiceStreamFailure,
 } from "./voice-cloud-stream";
-import { VOICE_RUNTIME_ADDON, VoiceModelService, VoiceOperationError } from "./voice-model-service";
+import {
+  TRANSCRIPTION_SESSION_CONFIGS,
+  transcriptionHostThreads,
+  VOICE_RUNTIME_ADDON,
+  VoiceModelService,
+  VoiceOperationError,
+} from "./voice-model-service";
 import type { VoicePreferenceStore } from "./voice-preference-store";
 import type {
   VoiceTranscriptionEngine,
@@ -41,23 +49,41 @@ import type {
 const logger = createOpenBotLogger("voice-transcription-service");
 
 const TRANSCRIPTION_TIMEOUT_MS = 180_000;
-const MODEL_ENGINES: Record<LocalVoiceModelId, VoiceTranscriptionEngine> = {
+/** The sherpa-onnx engine of each local model. The bench and smoke scripts use it too. */
+export const MODEL_ENGINES: Record<LocalVoiceModelId, VoiceTranscriptionEngine> = {
   "parakeet-tdt-0.6b-v3": "nemo-transducer",
+  "parakeet-unified-en-0.6b": "nemo-transducer",
   "bark-3.0-plus": "nemo-transducer",
   "whisper-turbo": "whisper",
+  "cohere-transcribe-03-2026": "cohere-transcribe",
 };
 /** Bark was evaluated with 0.25 s of silence before the speech; without it, it can lose the first word. */
 const LEADING_SILENCE_SAMPLES: Record<LocalVoiceModelId, number> = {
   "parakeet-tdt-0.6b-v3": 0,
+  "parakeet-unified-en-0.6b": 0,
   "bark-3.0-plus": 4_000,
   "whisper-turbo": 0,
+  "cohere-transcribe-03-2026": 0,
 };
+
+/**
+ * The language the host gets: a code, or empty to let Whisper find it. Parakeet and Bark take none,
+ * and Cohere Transcribe takes only its own languages.
+ */
+function hostLanguage(modelId: LocalVoiceModelId, language: VoiceSettings["language"]): string {
+  if (MODEL_ENGINES[modelId] === "nemo-transducer") return "";
+  const model = VOICE_MODELS.find((candidate) => candidate.id === modelId);
+  const used = model ? modelLanguage(model, language) : language;
+  return used === AUTOMATIC_VOICE_LANGUAGE ? "" : used;
+}
 
 /**
  * The loaded model holds about 2 GB, so the host ends after this long without a request. While
  * the user speaks, the renderer asks about once per second, so the host stays loaded until then.
  */
 const HOST_IDLE_MS = 60_000;
+/** A loaded model keeps its thread count, so the count is read once. */
+const HOST_THREADS = transcriptionHostThreads();
 /** `parseVoiceTranscription` accepts only the canonical 44-byte header before the PCM data. */
 const WAV_HEADER_BYTES = 44;
 const BYTES_PER_SECOND = 32_000;
@@ -139,8 +165,10 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
     };
     this.#models = {
       "parakeet-tdt-0.6b-v3": model("parakeet-tdt-0.6b-v3"),
+      "parakeet-unified-en-0.6b": model("parakeet-unified-en-0.6b"),
       "bark-3.0-plus": model("bark-3.0-plus"),
       "whisper-turbo": model("whisper-turbo"),
+      "cohere-transcribe-03-2026": model("cohere-transcribe-03-2026"),
     };
   }
 
@@ -404,8 +432,10 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
         addonPath: this.#addonPath,
         modelDirectory: this.#models[modelId].directory,
         engine,
-        language: engine === "whisper" && language !== AUTOMATIC_VOICE_LANGUAGE ? language : "",
+        language: hostLanguage(modelId, language),
         leadingSilenceSamples: LEADING_SILENCE_SAMPLES[modelId],
+        numThreads: HOST_THREADS,
+        sessionConfig: TRANSCRIPTION_SESSION_CONFIGS[modelId],
         pcm,
       });
       return Effect.sync(() => {

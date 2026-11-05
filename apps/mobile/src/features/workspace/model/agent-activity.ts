@@ -52,7 +52,10 @@ export function agentActivityMood(activity: MobileAgentActivity | undefined): Av
 }
 
 /** When two requests wait in one turn, the higher rank names the wait, as on the desktop. */
-const WAIT_RANK = { approval: 0, takeover: 1, question: 2 } as const satisfies Record<MobileAgentWaitReason, number>;
+export const WAIT_RANK = { approval: 0, takeover: 1, question: 2 } as const satisfies Record<
+  MobileAgentWaitReason,
+  number
+>;
 
 function sameActivity(left: MobileAgentActivity | undefined, right: MobileAgentActivity) {
   return (
