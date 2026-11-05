@@ -541,7 +541,7 @@ export const messages = defineMessages("settings", {
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "For many agents and heavy browser work.",
   // The Voice tab: dictation models and the dictation language.
-  "settings.voice.models.title": "Dictation model",
+  "settings.voice.dictation.section": "Dictation",
   "settings.voice.model.parakeet.description": "Fast. Finds the spoken language itself, in 25 European languages.",
   "settings.voice.model.bark.description": "Fast. English only. Writes mostly lowercase, with little punctuation.",
   "settings.voice.model.whisper.description": "Slower. About 100 languages, and you can set the spoken language.",
@@ -557,7 +557,6 @@ export const messages = defineMessages("settings", {
   "settings.voice.model.useLabel": "Use {name} for dictation",
   "settings.voice.model.removeLabel": "Remove {name} from this computer",
   "settings.voice.language.section": "Language",
-  "settings.voice.language.title": "Dictation language",
   "settings.voice.language.description": "The language that you speak. Automatic finds it from the recording.",
   "settings.voice.language.modelDetects":
     "Parakeet finds the spoken language itself. To set a language, use Whisper or ElevenLabs.",
@@ -583,6 +582,9 @@ export const messages = defineMessages("settings", {
   "settings.voice.speech.readReplies.title": "Read replies aloud",
   "settings.voice.speech.readReplies.description":
     "When you dictate a message, the reply is read aloud. Dictate again to stop it.",
+  "settings.voice.speech.codexLive.title": "Codex live voice",
+  "settings.voice.speech.codexLive.description":
+    "Voice conversations with Codex agents use OpenAI live voice with your Codex sign-in. Your voice goes to OpenAI.",
   "settings.voice.speech.speed.title": "Speed",
   "settings.voice.speech.voice.title": "Voice",
   "settings.voice.speech.voice.female": "Female voice {number}",
@@ -591,6 +593,8 @@ export const messages = defineMessages("settings", {
   "settings.voice.speech.voice.stop": "Stop",
   "settings.voice.speech.sample": "Hello. This is how your replies will sound.",
   "settings.voice.speech.listenFailed": "Could not play the sample.",
+  "settings.voice.live.section": "Live voice",
+  "settings.voice.live.signIn": "Sign in to Codex with your ChatGPT account to use live voice.",
   "settings.voice.server.section": "Voice server",
   "settings.voice.server.title": "OpenAI-compatible server",
   "settings.voice.server.notSetUp": "Not set up",

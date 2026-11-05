@@ -46,6 +46,9 @@ export function ConversationThread() {
     installedSkills,
     installedSkillsLoadFailed,
     mcpServers,
+    taggableBrowserTabs,
+    taggableThreads,
+    openTaggedReference,
     threadComposer,
     threadFocusRequest,
     threadVoiceLiveText,
@@ -264,6 +267,9 @@ export function ConversationThread() {
             skills={installedSkills()}
             skillsLoadFailed={installedSkillsLoadFailed()}
             mcpServers={mcpServers()}
+            browserTabs={taggableBrowserTabs()}
+            threads={taggableThreads()}
+            onOpenTag={openTaggedReference}
             draft={draft()?.text ?? ""}
             draftAttachments={draft()?.attachments}
             rowAttachments={rowImages()}

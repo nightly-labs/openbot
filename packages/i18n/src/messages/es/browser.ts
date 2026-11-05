@@ -69,7 +69,6 @@ export const messages = {
   "browser.liveView.copyFailed": "No se pudo copiar el texto. Haz clic en la página e inténtalo de nuevo.",
   "browser.previews.label": "Vistas previas del navegador",
   "browser.previews.resize": "Cambiar tamaño del panel derecho",
-  "browser.previews.collapse": "Contraer vistas previas del navegador",
   "browser.previews.empty": "No hay pestañas del navegador",
   "browser.previews.openPage": "Abrir una página",
   "browser.preview.pageFallback": "Página del navegador",

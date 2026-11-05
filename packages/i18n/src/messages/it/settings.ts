@@ -523,7 +523,7 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Per un piccolo team con routine quotidiane.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Per molti agenti e un uso intenso del browser.",
-  "settings.voice.models.title": "Modello di dettatura",
+  "settings.voice.dictation.section": "Dettatura",
   "settings.voice.model.parakeet.description": "Veloce. Riconosce da solo la lingua parlata, in 25 lingue europee.",
   "settings.voice.model.bark.description":
     "Veloce. Solo inglese. Scrive quasi tutto in minuscolo, con poca punteggiatura.",
@@ -540,7 +540,6 @@ export const messages = {
   "settings.voice.model.useLabel": "Usa {name} per la dettatura",
   "settings.voice.model.removeLabel": "Rimuovi {name} da questo computer",
   "settings.voice.language.section": "Lingua",
-  "settings.voice.language.title": "Lingua della dettatura",
   "settings.voice.language.description": "La lingua che parli. «Automatica» la riconosce dalla registrazione.",
   "settings.voice.language.modelDetects":
     "Parakeet riconosce da solo la lingua parlata. Per impostare una lingua, usa Whisper o ElevenLabs.",
@@ -567,6 +566,9 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "Leggi le risposte ad alta voce",
   "settings.voice.speech.readReplies.description":
     "Quando detti un messaggio, la risposta viene letta ad alta voce. Detta di nuovo per fermarla.",
+  "settings.voice.speech.codexLive.title": "Voce dal vivo di Codex",
+  "settings.voice.speech.codexLive.description":
+    "Le conversazioni vocali con gli agenti Codex usano la voce dal vivo di OpenAI con il tuo accesso a Codex. La tua voce va a OpenAI.",
   "settings.voice.speech.speed.title": "Velocità",
   "settings.voice.speech.voice.title": "Voce",
   "settings.voice.speech.voice.female": "Voce femminile {number}",
@@ -575,6 +577,8 @@ export const messages = {
   "settings.voice.speech.voice.stop": "Ferma",
   "settings.voice.speech.sample": "Ciao. Ecco come suoneranno le tue risposte.",
   "settings.voice.speech.listenFailed": "Impossibile riprodurre l’esempio.",
+  "settings.voice.live.section": "Voce dal vivo",
+  "settings.voice.live.signIn": "Accedi a Codex con il tuo account ChatGPT per usare la voce dal vivo.",
   "settings.transfer.title": "Sposta questo server su un altro computer",
   "settings.transfer.lede": "I tuoi agenti, le loro skill, routine, memorie e file vanno in un unico file.",
   "settings.transfer.flow.label": "Come funziona un trasferimento",

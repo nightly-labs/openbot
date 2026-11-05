@@ -315,15 +315,106 @@ export type SpeechLanguage = (typeof SPEECH_LANGUAGES)[number];
 export const SPEECH_SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const;
 export type SpeechSpeed = (typeof SPEECH_SPEEDS)[number];
 
+/** The order in which a speed button goes through the speeds: from normal speed up, then the slower ones. */
+const SPEECH_SPEED_CYCLE: readonly SpeechSpeed[] = [
+  ...SPEECH_SPEEDS.filter((speed) => speed >= 1),
+  ...SPEECH_SPEEDS.filter((speed) => speed < 1),
+];
+
+/** The speed after `speed` on a speed button: 1×, 1.25×, 1.5×, 2×, 0.75×, then 1× again. */
+export function nextSpeechSpeed(speed: number): SpeechSpeed {
+  const index = SPEECH_SPEED_CYCLE.findIndex((step) => step === speed);
+  return SPEECH_SPEED_CYCLE[(index + 1) % SPEECH_SPEED_CYCLE.length] ?? 1;
+}
+
 export interface SpeechSettings {
   /** Read the reply to a dictated message aloud. */
   readReplies: boolean;
   voice: SpeechVoice;
   /** The speed of each reply that is read aloud. The pitch stays the same. */
   speed: SpeechSpeed;
+  /**
+   * A voice conversation with a Codex agent uses Codex live voice: the Codex App Server connects the
+   * microphone to OpenAI's realtime model with the user's own Codex sign-in.
+   */
+  codexLive: boolean;
+  /** The voice of Codex live voice. Null lets OpenAI choose. */
+  codexLiveVoice: CodexLiveVoice | null;
 }
 
-export const DEFAULT_SPEECH_SETTINGS: SpeechSettings = { readReplies: false, voice: "F1", speed: 1 };
+export const DEFAULT_SPEECH_SETTINGS: SpeechSettings = {
+  readReplies: false,
+  voice: "F1",
+  speed: 1,
+  codexLive: false,
+  codexLiveVoice: null,
+};
+
+/**
+ * The realtime v3 voices that Codex App Server's `realtime/listVoices` gives for a ChatGPT sign-in.
+ * Its list has no default v3 voice. The names are the voices' own names, in every language.
+ */
+export const CODEX_LIVE_VOICES = [
+  "juniper",
+  "maple",
+  "spruce",
+  "ember",
+  "vale",
+  "breeze",
+  "arbor",
+  "sol",
+  "cove",
+  "aube",
+  "bubbie",
+  "haetsal",
+  "hanul",
+  "himari",
+  "leher",
+  "miko",
+  "neer",
+  "porto",
+  "rindo",
+  "rio",
+  "rivage",
+  "selva",
+  "sonna",
+  "tinta",
+  "viola",
+] as const;
+export type CodexLiveVoice = (typeof CODEX_LIVE_VOICES)[number];
+
+/**
+ * The start of a Codex live voice session. `sdp` is the WebRTC offer of the renderer's peer
+ * connection: one audio track and the `oai-events` data channel.
+ */
+export interface VoiceLiveStart {
+  agentId: string;
+  sdp: string;
+}
+
+/** A live voice session that runs. `sdp` is the answer to the offer of `VoiceLiveStart`. */
+export interface VoiceLiveSession {
+  sessionId: string;
+  sdp: string;
+}
+
+export interface VoiceLiveStop {
+  sessionId: string;
+}
+
+/**
+ * What a live voice session sends while it runs. A transcript part with `final: false` is new text
+ * of the part that is spoken now; `final: true` gives the whole part. `ended` is the last event of a
+ * session; `error` is null when the user or the app ended it.
+ */
+export type VoiceLiveEvent =
+  | { type: "transcript"; sessionId: string; role: "user" | "assistant"; text: string; final: boolean }
+  | { type: "ended"; sessionId: string; error: string | null };
+
+export const VOICE_LIVE_LIMITS = {
+  /** A WebRTC offer of one audio track and one data channel is a few kilobytes. */
+  maximumSdpLength: 65_536,
+} as const;
 
 export interface SpeechModelStatus extends Omit<VoiceModelStatus, "modelId"> {
   modelId: SpeechModelId;
@@ -348,6 +439,10 @@ export interface SpeechAudio {
 
 export function isSpeechVoice(value: unknown): value is SpeechVoice {
   return isOneOf(SPEECH_VOICES, value);
+}
+
+export function isCodexLiveVoice(value: unknown): value is CodexLiveVoice {
+  return isOneOf(CODEX_LIVE_VOICES, value);
 }
 
 export function isSpeechSpeed(value: unknown): value is SpeechSpeed {

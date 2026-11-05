@@ -136,6 +136,13 @@ const BROWSER_SEARCH_NOTE =
 export const DEFERRED_MCP_NOTE =
   "The tools of the MCP servers in <mcp_servers> are not in this catalog. Load them with the separate tool named exactly tool_search, then call them directly by their mcp__ names.";
 
+/**
+ * Codex defers the tools of the user's MCP servers, except Computer Use (#4468): behind its own
+ * `tool_search`, or, for a code-mode-only model, into `ALL_TOOLS` in `exec`.
+ */
+export const CODEX_DEFERRED_MCP_NOTE =
+  "The tools of your MCP servers are not in this catalog. Find them with the separate tool named exactly tool_search. When you have exec instead, read ALL_TOOLS in an exec cell, where MCP tool names start with mcp__, and call the tool on tools.";
+
 function words(text: string): string[] {
   return text
     .toLowerCase()

@@ -336,6 +336,46 @@ const TODOIST: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/todoist",
 };
 
+const TICKTICK: MarketplacePluginDetail = {
+  id: "plugin-ticktick",
+  slug: "ticktick",
+  name: "TickTick",
+  tagline: "Tasks, lists, habits and focus",
+  description:
+    "TickTick lets agents search and filter tasks, add and update tasks, and manage lists, sections, folders, tags and comments. Agents can also read and change habits and focus records, and read events from the calendars connected to TickTick. Each user signs in to their own TickTick account through the browser. Agents get read and write access: they can complete, move and delete tasks, and delete tags and focus records.",
+  category: "productivity",
+  creatorName: "TickTick",
+  iconUrl: "https://ticktick.com/static/img/apple-touch-icon.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-today", text: "Which TickTick tasks are due today?" },
+    { id: "prompt-capture", text: "Add these action items to my TickTick Inbox." },
+    { id: "prompt-week", text: "Which TickTick tasks did I complete last week?" },
+  ],
+  apps: [
+    {
+      id: "app-ticktick-mcp",
+      name: "TickTick",
+      description: "Tasks, lists, habits and focus records, over TickTick's MCP server with browser sign-in.",
+      iconUrl: "https://ticktick.com/static/img/apple-touch-icon.png",
+      server: {
+        name: "ticktick",
+        transport: "http",
+        url: "https://mcp.ticktick.com",
+        auth: [{ id: "ticktick-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://ticktick.com",
+  privacyPolicyUrl: "https://ticktick.com/privacy",
+  termsUrl: "https://ticktick.com/tos",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-09-30T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/ticktick",
+};
+
 const TRELLO: MarketplacePluginDetail = {
   id: "plugin-trello",
   slug: "trello",
@@ -1040,6 +1080,65 @@ const STRIPE: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/stripe",
 };
 
+const REVENUECAT: MarketplacePluginDetail = {
+  id: "plugin-revenuecat",
+  slug: "revenuecat",
+  name: "RevenueCat",
+  tagline: "Subscriptions, products and paywalls",
+  description:
+    "RevenueCat lets agents read and change the setup of your in-app subscriptions: apps, products, entitlements, offerings, packages, paywalls and experiments. Agents can also look up customers and their purchases, and read charts and metrics. A RevenueCat secret API key goes into one Authorization header. The key reaches one project. With a read-only key, agents can only read. With a write key, agents can submit products to the App Store for review, grant entitlements to customers, and delete packages, targeting rules and webhooks.",
+  category: "other",
+  creatorName: "RevenueCat",
+  iconUrl: "https://www.revenuecat.com/favicon/favicon-192x192.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-offerings", text: "Which offerings and packages does my RevenueCat project have?" },
+    { id: "prompt-revenue", text: "How did my RevenueCat revenue and active subscriptions change this month?" },
+    { id: "prompt-customer", text: "Which entitlements does this RevenueCat customer have, and when do they expire?" },
+  ],
+  apps: [
+    {
+      id: "app-revenuecat-mcp",
+      name: "RevenueCat",
+      description:
+        "Products, entitlements, offerings, paywalls and metrics, over RevenueCat's MCP server with a secret API key.",
+      iconUrl: "https://www.revenuecat.com/favicon/favicon-192x192.png",
+      server: {
+        name: "revenuecat",
+        transport: "http",
+        url: "https://mcp.revenuecat.ai/mcp",
+        auth: [
+          {
+            id: "revenuecat-key",
+            kind: "key",
+            label: "API key",
+            fields: [
+              {
+                id: "token",
+                label: "API key",
+                header: "Authorization",
+                prefix: "Bearer ",
+                placeholder: "sk_…",
+                hint: "In the RevenueCat dashboard, open API keys in your project and create a secret API key. A read-only key is enough to view data.",
+              },
+            ],
+            docsUrl: "https://www.revenuecat.com/docs/projects/authentication#finding-api-keys",
+            docsLabel: "Create a key",
+          },
+        ],
+      },
+    },
+  ],
+  websiteUrl: "https://www.revenuecat.com",
+  privacyPolicyUrl: "https://www.revenuecat.com/privacy",
+  termsUrl: "https://www.revenuecat.com/terms",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-09-30T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/revenuecat",
+};
+
 const POSTHOG: MarketplacePluginDetail = {
   id: "plugin-posthog",
   slug: "posthog",
@@ -1414,6 +1513,87 @@ const CLICKUP: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/clickup",
 };
 
+const COINBASE: MarketplacePluginDetail = {
+  id: "plugin-coinbase",
+  slug: "coinbase",
+  name: "Coinbase",
+  tagline: "Crypto prices, portfolios and trading",
+  description:
+    "Coinbase lets agents read prices, balances, portfolios, orders and fees in Coinbase Advanced Trade, preview and place orders, convert between assets, and move funds between portfolios. Each user signs in to their own Coinbase account through the browser. Agents get the same permissions as the user. Orders and conversions use real funds, and agents can pay for x402 requests from the USDC balance.",
+  category: "data-analytics",
+  creatorName: "Coinbase",
+  iconUrl: "https://www.coinbase.com/apple-touch-icon.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-balances", text: "What are my Coinbase balances in each portfolio?" },
+    { id: "prompt-price", text: "Show the BTC-USD price on Coinbase and how it moved this week." },
+    { id: "prompt-preview-order", text: "Preview a 50 USD market buy of ETH on Coinbase. Do not place the order." },
+  ],
+  apps: [
+    {
+      id: "app-coinbase-mcp",
+      name: "Coinbase",
+      description:
+        "Prices, balances, portfolios, orders and conversions, over Coinbase's MCP server with browser sign-in.",
+      iconUrl: "https://www.coinbase.com/apple-touch-icon.png",
+      server: {
+        name: "coinbase",
+        transport: "http",
+        url: "https://agents.coinbase.com/mcp",
+        auth: [{ id: "coinbase-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://www.coinbase.com",
+  privacyPolicyUrl: "https://www.coinbase.com/legal/privacy",
+  termsUrl: "https://www.coinbase.com/legal/user_agreement",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-09-30T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/coinbase",
+};
+
+const ROBINHOOD: MarketplacePluginDetail = {
+  id: "plugin-robinhood",
+  slug: "robinhood",
+  name: "Robinhood",
+  tagline: "Brokerage accounts and agentic trading",
+  description:
+    "Robinhood lets agents read the accounts, positions, balances, transaction history and watchlists of a Robinhood customer, read market data, and place stock, options and crypto orders. Each user signs in to their own Robinhood account through the browser. At the first sign-in, Robinhood asks the user to open a separate Agentic account. Agents can trade only in that account, and by default they place orders without asking the user to approve each one.",
+  category: "data-analytics",
+  creatorName: "Robinhood",
+  iconUrl: "https://robinhood.com/favicon.ico",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-positions", text: "Summarize my Robinhood positions and how they moved today." },
+    { id: "prompt-watchlist", text: "How did each stock on my Robinhood watchlist move this week?" },
+    { id: "prompt-agentic-cash", text: "How much cash is in my Robinhood Agentic account?" },
+  ],
+  apps: [
+    {
+      id: "app-robinhood-mcp",
+      name: "Robinhood",
+      description: "Accounts, positions, market data and trades, over Robinhood's MCP server with browser sign-in.",
+      iconUrl: "https://robinhood.com/favicon.ico",
+      server: {
+        name: "robinhood",
+        transport: "http",
+        url: "https://agent.robinhood.com/mcp/trading",
+        auth: [{ id: "robinhood-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://robinhood.com",
+  privacyPolicyUrl: "https://robinhood.com/us/en/support/articles/privacy-policy/",
+  termsUrl: "https://robinhood.com/us/en/about/legal/",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-09-30T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/robinhood",
+};
+
 export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   AAVE,
   CANVA,
@@ -1422,6 +1602,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   OBSIDIAN,
   ATLASSIAN,
   TODOIST,
+  TICKTICK,
   TRELLO,
   COBRAIN,
   FIGMA,
@@ -1439,6 +1620,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   CONTEXT7,
   HUGGINGFACE,
   STRIPE,
+  REVENUECAT,
   POSTHOG,
   AIRTABLE,
   FIRECRAWL,
@@ -1446,4 +1628,6 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   RESEND,
   COMPOSIO,
   CLICKUP,
+  COINBASE,
+  ROBINHOOD,
 ];

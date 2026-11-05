@@ -275,6 +275,18 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "Busca este pago y explica por qué falló.",
   "marketplace.plugin.stripe.prompt.customer": "Resume las facturas de este cliente y su saldo pendiente.",
   "marketplace.plugin.stripe.prompt.link": "Redacta un enlace de pago para el plan Pro a 49 al mes.",
+  "marketplace.plugin.revenuecat.tagline": "Suscripciones, productos y paywalls",
+  "marketplace.plugin.revenuecat.description":
+    "RevenueCat permite a los agentes leer y cambiar la configuración de tus suscripciones dentro de la app: apps, productos, entitlements, offerings, paquetes, paywalls y experimentos. Los agentes también pueden consultar clientes y sus compras, y leer gráficos y métricas. Una clave de API secreta de RevenueCat va en una cabecera Authorization. La clave da acceso a un proyecto. Con una clave de solo lectura, los agentes solo pueden leer. Con una clave de escritura, los agentes pueden enviar productos a revisión en la App Store, conceder entitlements a clientes y eliminar paquetes, reglas de segmentación y webhooks.",
+  "marketplace.plugin.revenuecat.app":
+    "Productos, entitlements, offerings, paywalls y métricas, a través del servidor MCP de RevenueCat con una clave de API secreta.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "¿Qué offerings y paquetes tiene mi proyecto de RevenueCat?",
+  "marketplace.plugin.revenuecat.prompt.revenue":
+    "¿Cómo cambiaron este mes mis ingresos y mis suscripciones activas en RevenueCat?",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "¿Qué entitlements tiene este cliente de RevenueCat y cuándo caducan?",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "En el panel de RevenueCat, abre API keys en tu proyecto y crea una clave de API secreta. Una clave de solo lectura basta para ver datos.",
   "marketplace.plugin.posthog.tagline": "Analítica de producto y flags",
   "marketplace.plugin.posthog.description":
     "PostHog permite a los agentes consultar eventos y embudos, inspeccionar feature flags y resumir qué cambió tras una versión. Una clave de API personal de los ajustes del proyecto va en un único encabezado Authorization.",
@@ -402,6 +414,14 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "¿Qué tareas de Todoist vencen hoy?",
   "marketplace.plugin.todoist.prompt.capture": "Añade estas tareas pendientes a mi bandeja de entrada de Todoist.",
   "marketplace.plugin.todoist.prompt.overdue": "Pasa mis tareas vencidas de Todoist a mañana.",
+  "marketplace.plugin.ticktick.tagline": "Tareas, listas, hábitos y concentración",
+  "marketplace.plugin.ticktick.description":
+    "TickTick permite a los agentes buscar y filtrar tareas, añadir y cambiar tareas, y gestionar listas, secciones, carpetas, etiquetas y comentarios. Los agentes también pueden leer y cambiar hábitos y registros de concentración, y leer eventos de los calendarios conectados a TickTick. Cada usuario inicia sesión en su propia cuenta de TickTick en el navegador. Los agentes obtienen acceso de lectura y escritura: pueden completar, mover y eliminar tareas, y eliminar etiquetas y registros de concentración.",
+  "marketplace.plugin.ticktick.app":
+    "Tareas, listas, hábitos y registros de concentración, a través del servidor MCP de TickTick con inicio de sesión en el navegador.",
+  "marketplace.plugin.ticktick.prompt.today": "¿Qué tareas de TickTick vencen hoy?",
+  "marketplace.plugin.ticktick.prompt.capture": "Añade estos puntos de acción a mi bandeja de entrada de TickTick.",
+  "marketplace.plugin.ticktick.prompt.week": "¿Qué tareas de TickTick completé la semana pasada?",
   "marketplace.plugin.trello.tagline": "Tableros, listas y tarjetas",
   "marketplace.plugin.trello.description":
     "Trello permite a los agentes buscar y leer tableros, listas, tarjetas, listas de comprobación y comentarios, crear tableros y tarjetas, mover listas y tarjetas, marcar tarjetas como completadas y añadir listas de comprobación, comentarios y etiquetas. Los agentes también pueden leer y añadir tarjetas en la Bandeja de entrada de Trello del usuario y leer los eventos del Planner, que pueden venir de un calendario de Google u Outlook conectado. Cada usuario inicia sesión en su propia cuenta de Trello desde el navegador y elige los espacios de trabajo en una pantalla de consentimiento. Los agentes tienen los mismos permisos que el usuario en esos espacios de trabajo. Pueden archivar tarjetas y listas, pero el servidor no puede eliminar nada de forma permanente.",
@@ -419,6 +439,24 @@ export const messages = {
   "marketplace.plugin.clickup.prompt.createTask": "Crea una tarea de ClickUp con estas tareas pendientes y asígnamela.",
   "marketplace.plugin.clickup.prompt.summarizeDoc":
     "Busca la última actualización del proyecto en ClickUp y resume las preguntas abiertas.",
+  "marketplace.plugin.coinbase.tagline": "Precios cripto, carteras y trading",
+  "marketplace.plugin.coinbase.description":
+    "Coinbase permite a los agentes leer precios, saldos, carteras, órdenes y comisiones en Coinbase Advanced Trade, previsualizar y colocar órdenes, convertir entre activos y mover fondos entre carteras. Cada usuario inicia sesión en su propia cuenta de Coinbase desde el navegador. Los agentes tienen los mismos permisos que el usuario. Las órdenes y conversiones usan fondos reales, y los agentes pueden pagar solicitudes x402 con el saldo en USDC.",
+  "marketplace.plugin.coinbase.app":
+    "Precios, saldos, carteras, órdenes y conversiones, a través del servidor MCP de Coinbase con inicio de sesión en el navegador.",
+  "marketplace.plugin.coinbase.prompt.balances": "¿Cuáles son mis saldos de Coinbase en cada cartera?",
+  "marketplace.plugin.coinbase.prompt.price": "Muestra el precio de BTC-USD en Coinbase y cómo se movió esta semana.",
+  "marketplace.plugin.coinbase.prompt.previewOrder":
+    "Previsualiza una compra a mercado de ETH por 50 USD en Coinbase. No coloques la orden.",
+  "marketplace.plugin.robinhood.tagline": "Cuentas de bolsa y trading con agentes",
+  "marketplace.plugin.robinhood.description":
+    "Robinhood permite a los agentes leer las cuentas, posiciones, saldos, historial de transacciones y listas de seguimiento de un cliente de Robinhood, leer datos de mercado y colocar órdenes de acciones, opciones y cripto. Cada usuario inicia sesión en su propia cuenta de Robinhood desde el navegador. En el primer inicio de sesión, Robinhood pide al usuario que abra una cuenta Agentic aparte. Los agentes solo pueden operar en esa cuenta y, por defecto, colocan órdenes sin pedir al usuario que apruebe cada una.",
+  "marketplace.plugin.robinhood.app":
+    "Cuentas, posiciones, datos de mercado y operaciones, a través del servidor MCP de Robinhood con inicio de sesión en el navegador.",
+  "marketplace.plugin.robinhood.prompt.positions": "Resume mis posiciones en Robinhood y cómo se movieron hoy.",
+  "marketplace.plugin.robinhood.prompt.watchlist":
+    "¿Cómo se movió esta semana cada acción de mi lista de seguimiento de Robinhood?",
+  "marketplace.plugin.robinhood.prompt.agenticCash": "¿Cuánto efectivo hay en mi cuenta Agentic de Robinhood?",
   "marketplace.plugin.huggingface.tagline": "Modelos, datasets y artículos en el Hub",
   "marketplace.plugin.huggingface.description":
     "Hugging Face permite a los agentes buscar modelos, datasets, Spaces, colecciones y artículos en el Hugging Face Hub, leer model cards y archivos de repositorios, ver una vista previa de datasets y buscar en la documentación de Hugging Face. Usa datos públicos del Hub y no necesita cuenta ni clave. Las herramientas solo leen: los agentes no pueden crear repositorios ni ejecutar jobs.",

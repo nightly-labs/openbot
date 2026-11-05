@@ -287,8 +287,10 @@ binary, never stops startup.
 
 A provider that is off in this profile runs no CLI, so the manager does not stamp its versions. Pi
 counts as in use while a key-only provider that runs on it is on. Its
-provider page in Settings offers Remove download (#3321), which removes every version of that CLI and
-this profile's partial downloads of it, and leaves accounts and sign-ins alone. It is refused while
+provider page in Settings offers Delete (#3321), which removes every version of that CLI and
+this profile's partial downloads of it, and leaves accounts and sign-ins alone. On a provider that
+is on and runs the CLI that OpenBot downloaded, Delete first turns the provider off. An agent that
+uses the provider stops it, as it stops the switch. It is refused while
 the provider is on, while its download runs, and for a provider with an explicit CLI path. The same
 age rule keeps a version another instance stamped, with one change: the manager remembers its own
 last stamp of each directory, and a directory whose mtime is not later than that stamp counts as
@@ -354,6 +356,22 @@ the binary, not from the client that runs it, so a provider that is signed out s
 install rather than reading as the managed copy. A failure keeps the reason the CLI gave, redacted,
 in one error that goes to the provider row and to the caller - and on, through the Team API, to the
 team's connected clients.
+
+A hosted server (`OPENBOT_HOSTED_SERVER=1`, packaged Linux) has system Claude and Codex CLIs from its image, and the
+image updates them at boot. That update can fail with no error, and the user cannot install a CLI
+there. When a row is `outdated`, main calls `download` for the provider once per start, so the
+managed copy replaces the old CLI with no offer (#4995). The row has no `cliSource`, because the
+resolution failed. An off provider is left alone.
+
+Codex keeps a lease on its state database backfill for 15 minutes, and a process that stops during
+the backfill keeps it. Each Codex start in that time exits with "timed out waiting for state db
+backfill", for any version. `ProviderRuntime` replaces that exit text with
+`error.provider.codexStateBusy`, and an update whose new copy fails this way keeps the copy. Codex
+gets `LONG_START_TIMEOUT_MS` on each start that has no wait of its own: at launch, also when the
+launch starts all providers, and for an agent's own process. A stop in the request timeout during a
+slow backfill (the first start after a hosted server's restore) starts the lease. At launch this
+default is not a learned wait: a timeout after it gives the next start `LONG_START_TIMEOUT_MS` again,
+not twice that time.
 
 Every runtime the store reaches is on this computer: `window.openbot.providerRuntimes` addresses no
 other one, while the agent status beside it describes whichever server is open. The store therefore
@@ -897,11 +915,25 @@ The Hermes provider (id `hermes`) starts the user's own Hermes Agent with `herme
 no managed runtime for it: a newer Hermes moves `state.db` and `config.yaml` in `~/.hermes` forward,
 and the user's own older Hermes then cannot read them. `resolveHermesCli` looks for `hermes` on
 `PATH` and in `~/.local/bin`, and reads the version from `Hermes Agent vX.Y.Z` in `hermes --version`.
-A missing CLI is `not-installed`, and the row opens the `hermes-install` guide. The process keeps
+
+A missing CLI is `not-installed`. On macOS and Linux, with no `OPENBOT_HERMES_PATH`, its row has a
+Download: `HermesInstaller` (`src/main/hermes-installer.ts`) runs the official installer as the
+OpenBot user. The script is pinned to the commit of one release (`HERMES_INSTALLER`), and OpenBot
+checks its SHA-256 before it runs. It runs one `--stage <name> --json` at a time, with no browser,
+computer-use or setup stage, so each stage moves the progress bar and Cancel stops its process
+group. Hermes goes to `~/.hermes` and `~/.local/bin/hermes`, as a terminal install puts it, and
+OpenBot does not update or remove it. The installer status is an optional `providers.hermes` in the
+runtime snapshot: `not-downloaded`, `downloading`, `finishing`, `download-error`, and `ready` when
+Hermes is installed, so that a server's row offers its Connect. Team API protocols below 8 never
+carry it; `providers-v8` adds the row, and an older client drops it. On Windows and with
+`OPENBOT_HERMES_PATH`, the row opens the `hermes-install` guide. The process keeps
 the user's `HERMES_HOME` (or `~/.hermes`, `%LOCALAPPDATA%\hermes` on Windows), so the user's memories,
 skills, sign-ins and `SOUL.md` apply. `hermesStatePaths` lets a confined process write that folder
 and protects the Hermes code, `config.yaml`, `.env`, `SOUL.md`, skills, hooks, cron, plugins and
-profiles in it.
+profiles in it. On a server, that is the Hermes of the service user (`/var/lib/openbot`, or `/data` in
+Docker); the server packages include `libatomic1`, which the Node.js of the Hermes installer needs.
+`scripts/hermes-server-e2e.ts` installs Hermes in the release image with `HermesInstaller` and runs a
+turn on a mock model.
 
 Sign in runs `hermes auth add nous --type oauth`, the Nous Portal device-code login. Its first
 question imports shared Nous credentials, and EOF answers yes, so the code sign-in closes the CLI's

@@ -17,6 +17,8 @@ export const messages = {
   "status.agent.channelRoutineCreated": "{agent} がルーティン {routine} を作成しました。{person} の依頼です。",
   "status.agent.channelRoutineUpdated": "{agent} がルーティン {routine} を変更しました。{person} の依頼です。",
   "status.agent.channelRoutineDeleted": "{agent} がルーティン {routine} を削除しました。{person} の依頼です。",
+  "status.agent.channelTaskCancelled":
+    "{agent} がタスク「{task}」とそのサブタスクをキャンセルしました。{person} の依頼です。",
   "status.agent.screenCaptureScreen": "メイン画面をキャプチャし、その画像をエージェントのモデルに送信します。",
   "status.agent.screenCaptureChannel":
     "画像はチャンネル {channel} に表示され、このサーバーでチャンネルを読むメンバー全員が見ることができます。",

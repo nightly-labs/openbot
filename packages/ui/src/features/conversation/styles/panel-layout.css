@@ -95,6 +95,8 @@
   .agent-row-agent-status-unread,
   .mention-picker,
   .mention-picker-list,
+  .mention-picker-highlight,
+  .mention-picker-option[data-entering],
   .settings-panel {
     animation: none;
     transition: none;

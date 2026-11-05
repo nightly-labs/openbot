@@ -216,6 +216,8 @@ export const messages = {
   "mobile.chat.message.copy": "Copier le message",
   "mobile.chat.message.readAloud": "Lire à voix haute",
   "mobile.chat.message.stopReading": "Arrêter la lecture",
+  "mobile.chat.message.readAloudSpeed": "Vitesse de lecture : {speed}×",
+  "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "Impossible de lire le message à voix haute",
   "mobile.chat.message.selectText": "Sélectionner le texte",
   "mobile.chat.message.text": "Texte du message",

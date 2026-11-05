@@ -507,7 +507,7 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "매일 루틴을 실행하는 소규모 팀을 위한 요금제예요.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "많은 에이전트와 무거운 브라우저 작업을 위한 요금제예요.",
-  "settings.voice.models.title": "받아쓰기 모델",
+  "settings.voice.dictation.section": "받아쓰기",
   "settings.voice.model.parakeet.description": "빨라요. 유럽 언어 25개에서 말하는 언어를 스스로 찾아내요.",
   "settings.voice.model.bark.description": "빨라요. 영어만 지원해요. 대부분 소문자로, 문장 부호가 거의 없이 써요.",
   "settings.voice.model.whisper.description": "느려요. 약 100개 언어를 지원하고 말하는 언어를 지정할 수 있어요.",
@@ -523,7 +523,6 @@ export const messages = {
   "settings.voice.model.useLabel": "받아쓰기에 {name} 사용",
   "settings.voice.model.removeLabel": "이 컴퓨터에서 {name} 삭제",
   "settings.voice.language.section": "언어",
-  "settings.voice.language.title": "받아쓰기 언어",
   "settings.voice.language.description": "말하는 언어예요. 자동을 선택하면 녹음에서 언어를 찾아내요.",
   "settings.voice.language.modelDetects":
     "Parakeet는 말하는 언어를 스스로 찾아내요. 언어를 지정하려면 Whisper나 ElevenLabs를 사용해 주세요.",
@@ -550,6 +549,9 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "답변 소리 내어 읽기",
   "settings.voice.speech.readReplies.description":
     "음성으로 메시지를 입력하면 답변을 소리 내어 읽어줘요. 다시 음성 입력을 하면 멈춰요.",
+  "settings.voice.speech.codexLive.title": "Codex 라이브 음성",
+  "settings.voice.speech.codexLive.description":
+    "Codex 에이전트와의 음성 대화는 Codex 로그인으로 OpenAI 라이브 음성을 사용해요. 음성은 OpenAI로 전송돼요.",
   "settings.voice.speech.speed.title": "속도",
   "settings.voice.speech.voice.title": "음성",
   "settings.voice.speech.voice.female": "여성 음성 {number}",
@@ -558,6 +560,8 @@ export const messages = {
   "settings.voice.speech.voice.stop": "중지",
   "settings.voice.speech.sample": "안녕하세요. 답변은 이런 소리로 들려요.",
   "settings.voice.speech.listenFailed": "샘플을 재생할 수 없어요.",
+  "settings.voice.live.section": "라이브 음성",
+  "settings.voice.live.signIn": "라이브 음성을 사용하려면 ChatGPT 계정으로 Codex에 로그인하세요.",
   "settings.transfer.title": "이 서버를 다른 컴퓨터로 옮기기",
   "settings.transfer.lede": "에이전트와 스킬, 루틴, 메모리, 파일이 하나의 파일에 담겨요.",
   "settings.transfer.flow.label": "이전 방법",

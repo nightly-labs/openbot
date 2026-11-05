@@ -93,6 +93,8 @@ interface CentralAuthManagerOptions {
   encrypt: (value: string) => Buffer;
   decrypt: (value: Buffer) => string;
   canPersist?: () => boolean;
+  /** True when the Linux keyring failed in this process and a key file of OpenBot now keeps the secrets. */
+  keyringChanged?: () => boolean;
   fetch?: AuthFetcher;
   startupRetryWindowMs?: number;
   startupRequestTimeoutMs?: number;
@@ -211,6 +213,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       ...options,
       mobileConnectApiUrl: options.mobileConnectApiUrl ?? options.apiUrl,
       canPersist: options.canPersist ?? (() => true),
+      keyringChanged: options.keyringChanged ?? (() => false),
       fetch: fetcher,
       startupRetryWindowMs: options.startupRetryWindowMs ?? STARTUP_RETRY_WINDOW_MS,
       startupRequestTimeoutMs: options.startupRequestTimeoutMs ?? STARTUP_REQUEST_TIMEOUT_MS,
@@ -1427,6 +1430,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     this: CentralAuthManager,
   ): Effect.fn.Return<CentralAuthState, CentralAuthOperationError, CentralAuthTransport> {
     this.#setState({ status: "loading" });
+    let keyringChanged = false;
     // A session that cannot be read now stays on disk: a Keychain that is locked or asks for
     // permission at startup can open it at the next start, and the next sign-in replaces it.
     if (this.#options.canPersist()) {
@@ -1443,7 +1447,10 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         const error = attempt4.failure.cause;
         if (!isMissingFileError(error)) {
           this.#forgetSession();
-          logger.warn("The stored account session could not be restored.", storedSessionFailure(stage, error));
+          const failure = storedSessionFailure(stage, error);
+          logger.warn("The stored account session could not be restored.", failure);
+          // The Linux keyring lost its key, so the sign-in screen tells why it shows again.
+          keyringChanged = failure.stage === "decrypt" && this.#options.keyringChanged();
         }
       }
     } else {
@@ -1451,7 +1458,9 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     }
     if (!this.#sessionToken) {
       yield* this.#startupRequestEffect("/health/live", { method: "GET" }, decodeRecordHealth);
-      return this.#setState({ status: "signed_out" });
+      return this.#setState(
+        keyringChanged ? { status: "signed_out", reason: "keyring_changed" } : { status: "signed_out" },
+      );
     }
     const sessionToken = this.#sessionToken;
     return yield* Effect.gen({ self: this }, function* () {

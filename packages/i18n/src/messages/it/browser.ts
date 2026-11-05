@@ -69,7 +69,6 @@ export const messages = {
   "browser.liveView.copyFailed": "Impossibile copiare il testo. Fai clic sulla pagina e riprova.",
   "browser.previews.label": "Anteprime del browser",
   "browser.previews.resize": "Ridimensiona il pannello destro",
-  "browser.previews.collapse": "Comprimi le anteprime del browser",
   "browser.previews.empty": "Nessuna scheda del browser",
   "browser.previews.openPage": "Apri una pagina",
   "browser.preview.pageFallback": "Pagina del browser",

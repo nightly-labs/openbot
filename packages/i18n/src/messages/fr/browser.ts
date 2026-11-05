@@ -69,7 +69,6 @@ export const messages = {
   "browser.liveView.copyFailed": "Impossible de copier le texte. Cliquez sur la page et réessayez.",
   "browser.previews.label": "Aperçus du navigateur",
   "browser.previews.resize": "Redimensionner le panneau de droite",
-  "browser.previews.collapse": "Réduire les aperçus du navigateur",
   "browser.previews.empty": "Aucun onglet de navigateur",
   "browser.previews.openPage": "Ouvrir une page",
   "browser.preview.pageFallback": "Page du navigateur",

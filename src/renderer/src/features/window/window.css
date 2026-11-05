@@ -129,7 +129,7 @@
   .app-window
     > .app-frame-edge
     :is(.settings-panel, .browser-panel)
-    > :is(.settings-panel-header, .file-preview-header, .browser-preview-header)::before {
+    > :is(.settings-panel-header, .file-preview-header)::before {
     position: absolute;
     top: 50%;
     width: 1px;
@@ -161,14 +161,14 @@
   .app-window
     > .app-frame-edge
     :is(.settings-panel, .browser-panel)
-    > :is(.settings-panel-header, .file-preview-header, .browser-preview-header) {
+    > :is(.settings-panel-header, .file-preview-header) {
     position: relative;
   }
 
   .app-window
     > .app-frame-edge
     :is(.settings-panel, .browser-panel)
-    > :is(.settings-panel-header, .file-preview-header, .browser-preview-header)::before {
+    > :is(.settings-panel-header, .file-preview-header)::before {
     inset-inline-start: 0;
   }
 
@@ -182,7 +182,7 @@
     > .app-frame-edge
     .side-panel-docked
     > :is(.settings-panel, .browser-panel)
-    > :is(.settings-panel-header, .file-preview-header, .browser-preview-header)::before {
+    > :is(.settings-panel-header, .file-preview-header)::before {
     content: none;
   }
 

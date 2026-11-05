@@ -264,24 +264,10 @@ export const messages = {
   "provider.settings.modelShow": "Показывать {name} ({id}) в выборе модели",
   "provider.settings.modelsNoMatch": "Нет моделей по вашему запросу.",
   "provider.settings.modelsLoadFailed": "Не удалось загрузить модели этого сервера.",
-  "provider.settings.download": "Загрузка",
-  "provider.settings.downloadedCli": "CLI {name}",
-  "provider.settings.downloadDetail": {
-    one: "{version} · {count} версия · {size}",
-    few: "{version} · {count} версии · {size}",
-    many: "{version} · {count} версий · {size}",
-    other: "{version} · {count} версии · {size}",
-  },
-  "provider.settings.downloadVersions": {
-    one: "{count} версия · {size}",
-    few: "{count} версии · {size}",
-    many: "{count} версий · {size}",
-    other: "{count} версии · {size}",
-  },
-  "provider.settings.downloadAgain": "Когда вы включите {name}, OpenBot снова загрузит CLI.",
-  "provider.settings.removeDownloadConfirm": "Удалить {size}?",
-  "provider.settings.removeDownloadKeeps": "Аккаунты, входы и агенты останутся.",
-  "provider.settings.removeDownload": "Удалить загрузку",
-  "provider.settings.removingDownload": "Удаление…",
+  "provider.settings.deleteTitle": "Удалить {name}",
+  "provider.settings.deleteOn":
+    "Выключает {name} и удаляет CLI, загруженный OpenBot. Аккаунты, входы и агенты останутся.",
+  "provider.settings.deleteOff":
+    "Удаляет CLI, который OpenBot загрузил для {name} ({size}). Аккаунты, входы и агенты останутся.",
   "provider.settings.removeDownloadFailed": "Не удалось удалить загрузку.",
 } as const satisfies PartialTranslation<typeof source>;

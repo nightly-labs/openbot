@@ -133,7 +133,15 @@ async function main(): Promise<void> {
     if (status.phase !== "ready") throw new Error(`The model is not ready: ${status.phase} ${status.message ?? ""}`);
     const downloadMs = Date.now() - downloadStartedAt;
     for (const sample of SAMPLES) {
-      await Effect.runPromise(speech.setSettings({ readReplies: true, voice: sample.voice, speed: 1 }));
+      await Effect.runPromise(
+        speech.setSettings({
+          readReplies: true,
+          voice: sample.voice,
+          speed: 1,
+          codexLive: false,
+          codexLiveVoice: null,
+        }),
+      );
       const startedAt = Date.now();
       const audio = await Effect.runPromise(speech.speak({ text: sample.text, language: sample.language }));
       const synthesisMs = Date.now() - startedAt;

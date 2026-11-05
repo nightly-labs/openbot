@@ -7,6 +7,7 @@ import {
   type SpeechModelStatus,
   type SpeechSettings,
   VOICE_MODEL_IDS,
+  type VoiceLiveEvent,
   type VoiceModelId,
   type VoiceModelStatus,
   type VoiceServerModels,
@@ -80,6 +81,8 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
   let speechTransfer: { settle: (status: SpeechModelStatus) => void } | null = null;
   let server: VoiceServerSettings | null = clone(options.voiceServer ?? null);
   const serverListeners = new Set<Listener<VoiceServerSettings | null>>();
+  const liveListeners = new Set<Listener<VoiceLiveEvent>>();
+  const liveAnswerers = new Map<string, RTCPeerConnection>();
   const setSpeechStatus = (next: SpeechModelStatus) => {
     speechStatus = next;
     emit(speechListeners, clone(next));
@@ -232,6 +235,36 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
     onServerSettings: (listener) => {
       serverListeners.add(listener);
       return () => serverListeners.delete(listener);
+    },
+    // The preview has no Codex App Server: a peer in this page answers the offer, and the transcript
+    // shows what a live session sends. No audio plays.
+    startLive: async ({ sdp }) => {
+      const answerer = new RTCPeerConnection();
+      await answerer.setRemoteDescription({ type: "offer", sdp });
+      const answer = await answerer.createAnswer();
+      await answerer.setLocalDescription(answer);
+      const sessionId = crypto.randomUUID();
+      liveAnswerers.set(sessionId, answerer);
+      schedule(() => {
+        if (!liveAnswerers.has(sessionId)) return;
+        emit(liveListeners, { type: "transcript", sessionId, role: "user", text: "Mock live question", final: true });
+        emit(liveListeners, {
+          type: "transcript",
+          sessionId,
+          role: "assistant",
+          text: "Mock live answer",
+          final: true,
+        });
+      }, 1_000);
+      return { sessionId, sdp: answer.sdp ?? "" };
+    },
+    stopLive: async ({ sessionId }) => {
+      liveAnswerers.get(sessionId)?.close();
+      liveAnswerers.delete(sessionId);
+    },
+    onLiveEvent: (listener) => {
+      liveListeners.add(listener);
+      return () => liveListeners.delete(listener);
     },
   };
   return { voice };

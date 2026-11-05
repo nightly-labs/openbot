@@ -261,6 +261,18 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "Zoek deze betaling op en leg uit waarom die mislukte.",
   "marketplace.plugin.stripe.prompt.customer": "Vat de facturen en het openstaande saldo van deze klant samen.",
   "marketplace.plugin.stripe.prompt.link": "Stel een betaallink op voor het Pro-abonnement van 49 per maand.",
+  "marketplace.plugin.revenuecat.tagline": "Abonnementen, producten en paywalls",
+  "marketplace.plugin.revenuecat.description":
+    "Met RevenueCat kunnen agents de instellingen van je in-app-abonnementen lezen en wijzigen: apps, producten, entitlements, offerings, pakketten, paywalls en experimenten. Agents kunnen ook klanten en hun aankopen opzoeken, en grafieken en statistieken lezen. Een geheime RevenueCat-API-sleutel gaat in één Authorization-header. De sleutel geeft toegang tot één project. Met een alleen-lezensleutel kunnen agents alleen lezen. Met een schrijfsleutel kunnen agents producten ter beoordeling naar de App Store sturen, klanten entitlements geven en pakketten, targetingregels en webhooks verwijderen.",
+  "marketplace.plugin.revenuecat.app":
+    "Producten, entitlements, offerings, paywalls en statistieken, via de MCP-server van RevenueCat met een geheime API-sleutel.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "Welke offerings en pakketten heeft mijn RevenueCat-project?",
+  "marketplace.plugin.revenuecat.prompt.revenue":
+    "Hoe zijn mijn RevenueCat-omzet en actieve abonnementen deze maand veranderd?",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "Welke entitlements heeft deze RevenueCat-klant, en wanneer verlopen ze?",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "Open in het RevenueCat-dashboard API keys in je project en maak een geheime API-sleutel. Een alleen-lezensleutel is genoeg om gegevens te bekijken.",
   "marketplace.plugin.posthog.tagline": "Productanalyse en flags",
   "marketplace.plugin.posthog.description":
     "Met PostHog kunnen agents events en funnels opvragen, feature flags inspecteren en samenvatten wat er na een release veranderde. Een persoonlijke API-sleutel uit de projectinstellingen gaat in één Authorization-header.",
@@ -385,6 +397,14 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "Welke Todoist-taken moeten vandaag af?",
   "marketplace.plugin.todoist.prompt.capture": "Zet deze actiepunten in mijn Todoist-inbox.",
   "marketplace.plugin.todoist.prompt.overdue": "Verzet mijn achterstallige Todoist-taken naar morgen.",
+  "marketplace.plugin.ticktick.tagline": "Taken, lijsten, gewoonten en focus",
+  "marketplace.plugin.ticktick.description":
+    "Met TickTick kunnen agents taken zoeken en filteren, taken toevoegen en wijzigen, en lijsten, secties, mappen, tags en opmerkingen beheren. Agents kunnen ook gewoonten en focusrecords lezen en wijzigen, en afspraken lezen uit de agenda's die aan TickTick gekoppeld zijn. Elke gebruiker meldt zich in de browser aan bij een eigen TickTick-account. Agents krijgen lees- en schrijftoegang: ze kunnen taken afronden, verplaatsen en verwijderen, en tags en focusrecords verwijderen.",
+  "marketplace.plugin.ticktick.app":
+    "Taken, lijsten, gewoonten en focusrecords, via de MCP-server van TickTick met aanmelding in de browser.",
+  "marketplace.plugin.ticktick.prompt.today": "Welke TickTick-taken zijn vandaag aan de beurt?",
+  "marketplace.plugin.ticktick.prompt.capture": "Zet deze actiepunten in mijn TickTick-inbox.",
+  "marketplace.plugin.ticktick.prompt.week": "Welke TickTick-taken heb ik vorige week afgerond?",
   "marketplace.plugin.trello.tagline": "Borden, lijsten en kaarten",
   "marketplace.plugin.trello.description":
     "Met Trello kunnen agents borden, lijsten, kaarten, checklists en opmerkingen zoeken en lezen, borden en kaarten maken, lijsten en kaarten verplaatsen, kaarten als klaar markeren, en checklists, opmerkingen en labels toevoegen. Agents kunnen ook kaarten in de Trello-inbox van de gebruiker lezen en toevoegen, en Planner-events lezen, die uit een gekoppelde Google- of Outlook-agenda kunnen komen. Elke gebruiker logt via de browser in met een eigen Trello-account en kiest de werkruimten op een toestemmingsscherm. Agents krijgen dezelfde rechten als de gebruiker in die werkruimten. Ze kunnen kaarten en lijsten archiveren, maar de server kan niets definitief verwijderen.",
@@ -402,6 +422,24 @@ export const messages = {
   "marketplace.plugin.clickup.prompt.createTask": "Maak een ClickUp-taak van deze actiepunten en wijs die aan mij toe.",
   "marketplace.plugin.clickup.prompt.summarizeDoc":
     "Zoek de nieuwste projectupdate in ClickUp en vat de open vragen samen.",
+  "marketplace.plugin.coinbase.tagline": "Cryptokoersen, portefeuilles en handel",
+  "marketplace.plugin.coinbase.description":
+    "Met Coinbase lezen agents koersen, saldi, portefeuilles, orders en kosten in Coinbase Advanced Trade, bekijken en plaatsen ze orders, wisselen ze tussen assets en verplaatsen ze geld tussen portefeuilles. Elke gebruiker meldt zich in de browser aan bij een eigen Coinbase-account. Agents hebben dezelfde rechten als de gebruiker. Orders en omwisselingen gebruiken echt geld, en agents kunnen x402-verzoeken betalen met het USDC-saldo.",
+  "marketplace.plugin.coinbase.app":
+    "Koersen, saldi, portefeuilles, orders en omwisselingen, via de MCP-server van Coinbase met aanmelden in de browser.",
+  "marketplace.plugin.coinbase.prompt.balances": "Wat zijn mijn Coinbase-saldi in elke portefeuille?",
+  "marketplace.plugin.coinbase.prompt.price": "Toon de BTC-USD-koers op Coinbase en hoe die deze week bewoog.",
+  "marketplace.plugin.coinbase.prompt.previewOrder":
+    "Bekijk vooraf een marktaankoop van 50 USD aan ETH op Coinbase. Plaats de order niet.",
+  "marketplace.plugin.robinhood.tagline": "Beleggingsrekeningen en handel door agents",
+  "marketplace.plugin.robinhood.description":
+    "Met Robinhood lezen agents de rekeningen, posities, saldi, transactiegeschiedenis en volglijsten van een Robinhood-klant, lezen ze marktgegevens en plaatsen ze orders voor aandelen, opties en crypto. Elke gebruiker meldt zich in de browser aan bij een eigen Robinhood-account. Bij de eerste aanmelding vraagt Robinhood de gebruiker om een aparte Agentic-rekening te openen. Agents kunnen alleen op die rekening handelen en plaatsen standaard orders zonder de gebruiker om goedkeuring per order te vragen.",
+  "marketplace.plugin.robinhood.app":
+    "Rekeningen, posities, marktgegevens en transacties, via de MCP-server van Robinhood met aanmelden in de browser.",
+  "marketplace.plugin.robinhood.prompt.positions": "Vat mijn Robinhood-posities samen en hoe ze vandaag bewogen.",
+  "marketplace.plugin.robinhood.prompt.watchlist": "Hoe bewoog elk aandeel op mijn Robinhood-volglijst deze week?",
+  "marketplace.plugin.robinhood.prompt.agenticCash":
+    "Hoeveel contant geld staat er op mijn Robinhood Agentic-rekening?",
   "marketplace.plugin.huggingface.tagline": "Modellen, datasets en papers op de Hub",
   "marketplace.plugin.huggingface.description":
     "Met Hugging Face kunnen agents modellen, datasets, Spaces, collecties en papers op de Hugging Face Hub zoeken, modelkaarten en repositorybestanden lezen, datasets bekijken en de Hugging Face-documentatie doorzoeken. Het gebruikt openbare Hub-data en heeft geen account en geen sleutel nodig. De tools lezen alleen: agents kunnen geen repository’s maken of jobs uitvoeren.",

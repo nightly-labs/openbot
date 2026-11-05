@@ -250,17 +250,10 @@ export const messages = {
   "provider.settings.modelShow": "Afficher {name} ({id}) dans le sélecteur de modèle",
   "provider.settings.modelsNoMatch": "Aucun modèle ne correspond à votre recherche.",
   "provider.settings.modelsLoadFailed": "Impossible de charger les modèles de ce serveur.",
-  "provider.settings.download": "Téléchargement",
-  "provider.settings.downloadedCli": "CLI {name}",
-  "provider.settings.downloadDetail": {
-    one: "{version} · 1 version · {size}",
-    other: "{version} · {count} versions · {size}",
-  },
-  "provider.settings.downloadVersions": { one: "1 version · {size}", other: "{count} versions · {size}" },
-  "provider.settings.downloadAgain": "Quand vous activez {name}, OpenBot télécharge à nouveau sa CLI.",
-  "provider.settings.removeDownloadConfirm": "Supprimer {size} ?",
-  "provider.settings.removeDownloadKeeps": "Les comptes, les connexions et les agents restent.",
-  "provider.settings.removeDownload": "Supprimer le téléchargement",
-  "provider.settings.removingDownload": "Suppression…",
+  "provider.settings.deleteTitle": "Supprimer {name}",
+  "provider.settings.deleteOn":
+    "Désactive {name} et supprime la CLI qu'OpenBot a téléchargée. Les comptes, les connexions et les agents restent.",
+  "provider.settings.deleteOff":
+    "Supprime la CLI qu'OpenBot a téléchargée pour {name} ({size}). Les comptes, les connexions et les agents restent.",
   "provider.settings.removeDownloadFailed": "Impossible de supprimer le téléchargement.",
 } as const satisfies PartialTranslation<typeof source>;

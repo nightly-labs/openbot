@@ -70,6 +70,8 @@ export const messages = {
   "account.login.connectingDescription": "جارٍ بدء خدمة الحساب. يستغرق هذا عادةً لحظة.",
   "account.login.unavailableDescription": "يتعذّر على OpenBot الوصول إلى خدمة الحساب الآن.",
   "account.login.signInDescription": "استخدم بريدك الإلكتروني لتسجيل الدخول أو إنشاء حساب. سنرسل إليك رمزًا لمرة واحدة.",
+  "account.login.keyringChangedDescription":
+    "فقدت سلسلة مفاتيح النظام آخر تسجيل دخول لك. يحفظ OpenBot الآن تسجيلات الدخول في ملف خاص به على هذا الحاسوب. سجّل الدخول مرة أخرى.",
   "account.login.codeAccepted": "قُبل رمزك.",
   "account.login.codeSent": "أرسلنا رمزًا إلى {email}.",
   "account.login.connectingSecurely": "جارٍ الاتصال بأمان…",

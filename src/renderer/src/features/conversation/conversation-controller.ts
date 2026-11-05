@@ -38,6 +38,7 @@ import type { PastePreview } from "./stores/composer-actions";
 import type { SidePanelsState } from "./stores/panels-store";
 import { createPendingSendStore } from "./stores/pending-send-store";
 import type { SideQuestionState } from "./stores/side-question-store";
+import { createVoiceSessions } from "./stores/voice-session-store";
 import type { VoiceCloudStream } from "./stores/voice-store";
 
 const BROWSER_PANEL_DEFAULT = 380;
@@ -438,6 +439,8 @@ export function createServerConversationState() {
   const [hiddenAwaitingReplyIds, setHiddenAwaitingReplyIds] = createSignal<ReadonlySet<string>>(new Set());
   // Keyed by agent id, as `rightPanels` is: a side question lives as long as its pane, not its view.
   const [sideQuestions, setSideQuestions] = createStore<Record<string, SideQuestionState>>({});
+  // A voice conversation lives as long as its Voice tab, not its view.
+  const voiceSessions = createVoiceSessions(sidePanels);
 
   return {
     showComposerActions,
@@ -488,6 +491,7 @@ export function createServerConversationState() {
     setHiddenAwaitingReplyIds,
     sideQuestions,
     setSideQuestions,
+    voiceSessions,
   };
 }
 

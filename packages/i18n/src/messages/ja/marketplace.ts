@@ -271,6 +271,19 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "この決済を調べて、失敗した理由を説明してください。",
   "marketplace.plugin.stripe.prompt.customer": "この顧客の請求書と未払い残高をまとめてください。",
   "marketplace.plugin.stripe.prompt.link": "Pro プランの月額 49 の支払いリンクの下書きを作成してください。",
+  "marketplace.plugin.revenuecat.tagline": "サブスクリプション、プロダクト、ペイウォール",
+  "marketplace.plugin.revenuecat.description":
+    "RevenueCat を使うと、エージェントはアプリ内サブスクリプションの設定を読み取り、変更できます。対象はアプリ、プロダクト、エンタイトルメント、オファリング、パッケージ、ペイウォール、実験です。エージェントは顧客とその購入を調べ、チャートと指標を読むこともできます。RevenueCat のシークレット API キーは 1 つの Authorization ヘッダーに入ります。キーが使えるのは 1 つのプロジェクトです。読み取り専用キーでは、エージェントは読み取りだけができます。書き込みキーでは、エージェントはプロダクトを App Store の審査に提出し、顧客にエンタイトルメントを付与し、パッケージ、ターゲティングルール、Webhook を削除できます。",
+  "marketplace.plugin.revenuecat.app":
+    "RevenueCat の MCP サーバーとシークレット API キーで使う、プロダクト、エンタイトルメント、オファリング、ペイウォール、指標。",
+  "marketplace.plugin.revenuecat.prompt.offerings":
+    "私の RevenueCat プロジェクトにはどのオファリングとパッケージがありますか？",
+  "marketplace.plugin.revenuecat.prompt.revenue":
+    "今月、RevenueCat の収益とアクティブなサブスクリプションはどう変わりましたか？",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "この RevenueCat の顧客にはどのエンタイトルメントがあり、いつ期限が切れますか？",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "RevenueCat のダッシュボードでプロジェクトの API keys を開き、シークレット API キーを作成します。データを見るだけなら読み取り専用キーで十分です。",
   "marketplace.plugin.posthog.tagline": "プロダクト分析とフラグ",
   "marketplace.plugin.posthog.description":
     "PostHog を使うと、エージェントはイベントとファネルを照会し、フィーチャーフラグを調べ、リリース後に何が変わったかをまとめられます。プロジェクト設定の個人用 API キーを 1 つの Authorization ヘッダーに入れます。",
@@ -396,6 +409,14 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "今日が期限の Todoist タスクはどれですか？",
   "marketplace.plugin.todoist.prompt.capture": "これらのアクション項目を Todoist のインボックスに追加してください。",
   "marketplace.plugin.todoist.prompt.overdue": "期限切れの Todoist タスクを明日に移してください。",
+  "marketplace.plugin.ticktick.tagline": "タスク、リスト、習慣、集中",
+  "marketplace.plugin.ticktick.description":
+    "TickTick を使うと、エージェントはタスクを検索・絞り込み、タスクを追加・変更し、リスト、セクション、フォルダー、タグ、コメントを管理できます。習慣と集中記録の読み取りと変更、TickTick に接続したカレンダーの予定の読み取りもできます。各ユーザーはブラウザーで自分の TickTick アカウントにサインインします。エージェントには読み取りと書き込みのアクセス権があり、タスクの完了、移動、削除、タグと集中記録の削除ができます。",
+  "marketplace.plugin.ticktick.app":
+    "タスク、リスト、習慣、集中記録を、ブラウザーでのサインインで TickTick の MCP サーバー経由で扱います。",
+  "marketplace.plugin.ticktick.prompt.today": "今日が期限の TickTick タスクはどれですか？",
+  "marketplace.plugin.ticktick.prompt.capture": "これらのアクション項目を TickTick の受信箱に追加してください。",
+  "marketplace.plugin.ticktick.prompt.week": "先週完了した TickTick タスクはどれですか？",
   "marketplace.plugin.trello.tagline": "ボード、リスト、カード",
   "marketplace.plugin.trello.description":
     "Trello を使うと、エージェントはボード、リスト、カード、チェックリスト、コメントを検索して読み、ボードとカードを作成し、リストとカードを移動し、カードを完了にし、チェックリスト、コメント、ラベルを追加できます。また、ユーザーの Trello インボックスのカードを読んで追加し、Planner の予定を読むこともできます。予定は、接続された Google または Outlook のカレンダーから来ることがあります。各ユーザーはブラウザーで自分の Trello アカウントにサインインし、同意画面でワークスペースを選びます。エージェントには、それらのワークスペースでユーザーと同じ権限があります。カードとリストをアーカイブできますが、サーバーは何も完全には削除できません。",
@@ -414,6 +435,23 @@ export const messages = {
     "これらのアクション項目で ClickUp タスクを作成し、私に割り当ててください。",
   "marketplace.plugin.clickup.prompt.summarizeDoc":
     "ClickUp で最新のプロジェクト更新を探し、未解決の質問を要約してください。",
+  "marketplace.plugin.coinbase.tagline": "暗号資産の価格、ポートフォリオ、取引",
+  "marketplace.plugin.coinbase.description":
+    "Coinbase を使うと、エージェントは Coinbase Advanced Trade の価格、残高、ポートフォリオ、注文、手数料を読み取り、注文のプレビューと発注、資産間の交換、ポートフォリオ間の資金移動ができます。各ユーザーはブラウザで自分の Coinbase アカウントにサインインします。エージェントにはユーザーと同じ権限があります。注文と交換には実際の資金が使われ、エージェントは USDC 残高から x402 リクエストの支払いもできます。",
+  "marketplace.plugin.coinbase.app":
+    "価格、残高、ポートフォリオ、注文、交換。Coinbase の MCP サーバーとブラウザでのサインインを使います。",
+  "marketplace.plugin.coinbase.prompt.balances": "各ポートフォリオの Coinbase 残高を教えてください。",
+  "marketplace.plugin.coinbase.prompt.price": "Coinbase の BTC-USD 価格と今週の値動きを見せてください。",
+  "marketplace.plugin.coinbase.prompt.previewOrder":
+    "Coinbase で ETH を 50 USD 分成行買いする注文をプレビューしてください。発注はしないでください。",
+  "marketplace.plugin.robinhood.tagline": "証券口座とエージェントによる取引",
+  "marketplace.plugin.robinhood.description":
+    "Robinhood を使うと、エージェントは Robinhood 顧客の口座、ポジション、残高、取引履歴、ウォッチリストと市場データを読み取り、株式、オプション、暗号資産の注文を出せます。各ユーザーはブラウザで自分の Robinhood アカウントにサインインします。最初のサインイン時に、Robinhood は別の Agentic 口座を開くようユーザーに求めます。エージェントが取引できるのはその口座だけで、初期設定では注文ごとにユーザーの承認を求めずに発注します。",
+  "marketplace.plugin.robinhood.app":
+    "口座、ポジション、市場データ、取引。Robinhood の MCP サーバーとブラウザでのサインインを使います。",
+  "marketplace.plugin.robinhood.prompt.positions": "Robinhood のポジションと今日の値動きをまとめてください。",
+  "marketplace.plugin.robinhood.prompt.watchlist": "Robinhood のウォッチリストの各銘柄は今週どう動きましたか？",
+  "marketplace.plugin.robinhood.prompt.agenticCash": "Robinhood の Agentic 口座には現金がいくらありますか？",
   "marketplace.plugin.huggingface.tagline": "Hub のモデル、データセット、論文",
   "marketplace.plugin.huggingface.description":
     "Hugging Face を使うと、エージェントは Hugging Face Hub のモデル、データセット、Spaces、コレクション、論文を検索し、モデルカードやリポジトリのファイルを読み、データセットをプレビューし、Hugging Face のドキュメントを検索できます。公開されている Hub のデータを使うので、アカウントもキーも不要です。ツールは読み取り専用で、エージェントはリポジトリの作成やジョブの実行はできません。",

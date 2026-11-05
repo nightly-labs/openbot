@@ -54,6 +54,11 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
     shape: { text: z.string().min(1).max(INPUT_LIMITS.messageText) },
   },
   {
+    name: "channel_cancel",
+    description: `Cancel a run that you own when a person asks to drop that work. Give the taskId of its request message or of a subtask: the whole run ends, with its running and queued subtasks. Messages stay. Not for the run of your current task. ${PERSON_ONLY}`,
+    shape: { taskId: z.string().min(1).max(INPUT_LIMITS.identifier) },
+  },
+  {
     name: "channel_remember",
     description:
       "Save one short, durable fact about this channel that every member should keep. Save the same text again to correct it. This writes immediately.",

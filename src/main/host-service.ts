@@ -139,7 +139,7 @@ interface HostServiceOptions {
   appVersion: string;
   store: TeamStore;
   agents: ForwardedApiOptions["agents"] &
-    Pick<AgentService, "adoptConversationReads" | "branchTask" | "markTaskRead" | "readTask">;
+    Pick<AgentService, "adoptConversationReads" | "branchTask" | "listTaskReads" | "markTaskRead" | "readTask">;
   agentsReady: NonNullable<ForwardedApiOptions["agentsReady"]>;
   skills: NonNullable<ForwardedApiOptions["skills"]>;
   sidebarLayout: NonNullable<ForwardedApiOptions["sidebarLayout"]>;
@@ -1318,6 +1318,11 @@ export class HostService extends EventEmitter<HostEvents> {
     return remoteDecode(() => this.#currentAgentReaderId()).pipe(
       Effect.flatMap((readerId) => this.#options.agents.branchTask(input, readerId)),
     );
+  }
+
+  /** This computer's reader's mark of each open side thread of an agent. */
+  listAgentTaskReads(agentId: string): AgentTaskReadState[] {
+    return this.#options.agents.listTaskReads(agentId, this.#currentAgentReaderId());
   }
 
   /** Moves this computer's reader's mark of a side thread, the mark that the member's other devices read. */

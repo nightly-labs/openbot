@@ -85,7 +85,8 @@ comes from the change in each process's CPU time between two listings, so a comm
 and ends between two samples, such as a short tool run, is not counted. The main event loop uses
 `monitorEventLoopDelay`, less its 20 ms timer interval.
 Database time comes from `AgentDatabaseSupervisor`, from the send of a statement to its answer or to
-the end of the host; the host process is not changed. Renderer and child process exits other than a
+the end of the host. The supervisor sends a statement only after the host reports ready, so the
+start of the host process is not counted. Renderer and child process exits other than a
 clean exit are written to the trace as `crash` spans at once, and counted at the next sample. A
 utility process with the reason `killed` is neither: OpenBot stops these processes itself. An exit in
 the last minute before a quit is not counted: a stop signal can end the child processes before the
@@ -98,6 +99,20 @@ main log holds every line of the `main` logger, redacted, in two files of 1 MB. 
 keeps local crash dumps in `app.getPath("crashDumps")` and never uploads them. A process that ends
 with no `exit` span and no dump was stopped from outside OpenBot (#2675).
 
+`run-marker.ts` keeps `openbot-run-marker-v1.json` in the user data folder of the process that holds
+the single-instance lock. It writes `running` at the start, the time of the last sign of life once a
+minute and at sleep and wake, `quitting` with the reason in `recordExit`, `quit_timeout` before the
+shutdown deadline exit, and `clean` after `teardown.runAll()`. It adds no teardown step, so the
+ordinals do not change. The writes are synchronous, so a late write cannot replace a later state. At
+the next start, `RunMarker.start` reads the file before it writes the new one. A `running`,
+`quitting` or `quit_timeout` file is an unclean exit, except a quit for `update` or `session_end`
+and a run that saw the `powerMonitor` `shutdown` event. It counts the `.dmp` files in
+`crashDumps` with a time after that run's last sign of life, by name and time only, and compares
+that time with the boot time. `HostAnalytics` sends the result once as `system_unclean_exit` and
+keeps it in memory only. `scripts/unclean-exit-e2e.ts` kills the dev app's main process, quits
+it with SIGTERM, and checks the event and the marker on each start. `bun run dev:stop` sends SIGKILL
+to the process group after 3 s, so a dev stop can count as `quitting`.
+
 The pure part (`resource-summary.ts`) keeps each day as sparse histograms with two significant digits,
 peaks and counters, so p95 stays exact enough without a sample list. The summary file holds the
 current day and the last closed day; it is written at most every 15 minutes, at a day change and at
@@ -105,7 +120,21 @@ shutdown, and a damaged file starts a new day. `HostAnalytics.checkResources()` 
 as `system_resources` and marks it handled in the file before the send, so a crash cannot send it
 twice. The file keeps the handled day for the diagnostics export until a newer day replaces it.
 Nothing leaves the process with a PID, a command or a path: the summary keys are group names,
-provider ids and reason words, and the analytics allowlist checks each value again.
+provider ids and reason words, and the analytics allowlist checks each value again. The day also
+keeps the phase of the longest main-loop delay (`mainLoopPeak`, optional so older files still
+decode; the phase is any string in the file and the event drops a value outside its enum), and
+child exits by process type. A minute with a delay of 1 s or more writes a `stall` span to the
+trace.
+
+App windows (`src/renderer/src/renderer-timing.ts`) count long tasks and input delays with
+`PerformanceObserver` and send the counts at most once a minute over `app:report-renderer-timing`.
+The main handler decodes bounded counts only; `ResourceMonitor` buffers them and adds them to the day
+at the next sample. The same channel carries the main window's `workspaceReady` flag:
+`StartupTiming` (`src/main/startup-timing.ts`) reads the time on the main clock and sends one
+`system_startup` per main process from the `openbot:*` startup marks. It keeps the last start in
+`startup-history.json` to tell a cold start from a warm one. Turn timing comes from the drain
+scheduler and `TurnLifecycle`, which keep the queue pick, the provider start and the first output of
+each turn until `HostAnalytics` takes them at `turn-completed`.
 
 ## Agent usage analytics
 

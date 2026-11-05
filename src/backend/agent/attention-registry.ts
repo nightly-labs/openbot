@@ -38,8 +38,8 @@ import {
   validateUiBlockResponse,
 } from "@openbot/contracts/ui-blocks";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
-import { Deferred, Effect, Result, Schema } from "effect";
+import { createOpenBotLogger, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
+import { Deferred, Effect, Option, Result, Schema } from "effect";
 import { getDomain } from "tldts";
 import type { AgentApiKeys } from "../agent-api-keys";
 import type { AgentClient } from "../agent-client";
@@ -49,7 +49,7 @@ import type { BrowserCardVault } from "../browser-tool-actions";
 import { type BrowserToolArguments, parseBrowserToolCall } from "../browser-tools";
 import { causeHelpers } from "../effect-boundary";
 import { LINK_CARD_ID_PREFIX, type LinkWallet } from "../link-wallet";
-import type { PasswordVault, PasswordVaultError } from "../password-vault";
+import { type PasswordVault, type PasswordVaultError, websiteUrl } from "../password-vault";
 import {
   type AppServerRequest,
   type DynamicToolCallParams,
@@ -58,7 +58,7 @@ import {
   getString,
   type RequestId,
 } from "../protocol";
-import type { VaultAgentChange, VaultAgentResult, VaultEnteredItem, VaultItems } from "../vault-items";
+import type { VaultAgentChange, VaultAgentResult, VaultEnteredItem, VaultItems, VaultTypedLogin } from "../vault-items";
 import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION, shouldAutoApprove } from "./approval-automation";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { HostedSiteOperationFailed } from "./hosted-site-coordinator";
@@ -173,13 +173,19 @@ const MESSAGING_QUESTION_REFUSED =
 
 /** The agent reads these, not the user. */
 const VAULT_UNAVAILABLE = "No Vault is available on this computer. Ask the user.";
-const VAULT_LOGIN_ADD_REFUSED =
-  "You cannot add a login: a password comes only from the user. Call request_vault_item kind=login, or sign in with submit_secret, and the user can save the password from the card. In a Slack, Discord or Telegram chat, ask the user to add it in Server settings > Vault.";
+const VAULT_LOGIN_ADD_FIELDS =
+  "A new login needs website and password. When you do not have the password, call request_vault_item kind=login.";
+const VAULT_PASSWORD_EXTERNAL_REFUSED =
+  "You cannot save a password in an external chat. Ask the user to add it in Server settings > Vault.";
+const VAULT_PASSWORD_PERSON_ONLY =
+  "Only a person's message, in your OpenBot chat or a thread they opened, can save a password. Ask the user to add it in Server settings > Vault.";
+/** The password of a `save_vault_item` call whose other arguments can be wrong. */
+const decodePasswordArgument = Schema.decodeUnknownOption(Schema.Struct({ password: Schema.String }));
 const VAULT_CARD_ADD_REFUSED =
   "You cannot add a card: its number comes only from the user. Call request_vault_item kind=card. In a Slack, Discord or Telegram chat, ask the user to add it in Server settings > Vault.";
 const VAULT_FIELDS: Record<BrowserToolArguments<"save_vault_item">["kind"], readonly string[]> = {
   contact: ["label", "fullName", "address", "address2", "city", "region", "postalCode", "country", "phone", "email"],
-  login: ["username"],
+  login: ["website", "username", "password"],
   card: ["label", "nameOnCard", "expMonth", "expYear", "billingContactId"],
 };
 
@@ -207,15 +213,27 @@ function sameSite(address: string, merchant: string): boolean {
   return domain !== null && domain === getDomain(merchant, { allowPrivateDomains: true });
 }
 
-/** The change that `save_vault_item` asks for, or the text that tells the agent what is wrong. */
-function vaultChange(args: BrowserToolArguments<"save_vault_item">): VaultAgentChange | string {
+/** What `save_vault_item` saves: a change, or a new login, which `saveLogin` merges by site and username. */
+type VaultAgentSave = VaultAgentChange | { kind: "newLogin"; login: VaultTypedLogin };
+
+/** The save that `save_vault_item` asks for, or the text that tells the agent what is wrong. */
+function vaultChange(args: BrowserToolArguments<"save_vault_item">): VaultAgentSave | string {
   const allowed = VAULT_FIELDS[args.kind];
   const misplaced = Object.entries(args).find(
     ([key, value]) => value !== undefined && key !== "kind" && key !== "id" && !allowed.includes(key),
   );
   if (misplaced) return `${misplaced[0]} is not a field of a ${args.kind}. Its fields are: ${allowed.join(", ")}.`;
-  if (args.kind === "login")
-    return args.id ? { kind: "login", id: args.id, username: args.username } : VAULT_LOGIN_ADD_REFUSED;
+  if (args.kind === "login") {
+    if (args.id) {
+      if (args.website !== undefined)
+        return "A saved login keeps its website. Omit website, or omit id to add a login.";
+      return { kind: "login", id: args.id, username: args.username, password: args.password };
+    }
+    if (!args.website?.trim() || !args.password?.trim()) return VAULT_LOGIN_ADD_FIELDS;
+    const url = websiteUrl(args.website);
+    if (url?.protocol !== "https:" || !url.hostname) return "website must be an HTTPS website, such as example.com.";
+    return { kind: "newLogin", login: { origin: url.origin, username: args.username ?? "", password: args.password } };
+  }
   if (args.kind === "card")
     return args.id
       ? {
@@ -1314,25 +1332,42 @@ export class AttentionRegistry {
   }).bind(this);
 
   /**
-   * Answers `save_vault_item`: adds or changes contact info, or changes the fields of a login or a card
-   * that are not secret. The user does not approve it: the chat shows a note, and a new item keeps the
+   * Answers `save_vault_item`: adds or changes contact info or a login, or changes the fields of a card
+   * that are not secret. The agent gives a password that it already has, such as one that the user
+   * pasted in the chat. The user does not approve it: the chat shows a note, and a new item keeps the
    * agent's name.
    */
   readonly saveVaultItem = Effect.fn("AttentionRegistry.saveVaultItem")(function* (
     this: AttentionRegistry,
     params: DynamicToolCallParams,
+    requestedByPerson: () => boolean,
   ) {
+    // The password is redacted from the logs before anything can fail, also when the call is refused. A
+    // short password is redacted only when the Vault saves it: an unsaved short value would hide unrelated text.
+    const raw = decodePasswordArgument(params.arguments);
+    if (Option.isSome(raw)) registerSecretValue(raw.value.password);
     const call = yield* attentionStep(() => parseBrowserToolCall("save_vault_item", params.arguments));
     if (call.tool !== "save_vault_item")
       return yield* new AttentionOperationFailed({ cause: new Error("Invalid Vault save request.") });
+    if (call.args.password !== undefined) {
+      if (this.#messagingThread(params.threadId)) return browserTakeoverError(VAULT_PASSWORD_EXTERNAL_REFUSED);
+      // A team member, a routine, another agent or a web page must not set a saved password.
+      if (!requestedByPerson()) return browserTakeoverError(VAULT_PASSWORD_PERSON_ONLY);
+    }
     const vault = this.#vaultItems;
     const agentId = params.ownerAgentId;
     if (!vault || !agentId) return browserTakeoverError(VAULT_UNAVAILABLE);
     const change = vaultChange(call.args);
     if (typeof change === "string") return browserTakeoverError(change);
-    const saved = yield* Effect.result(vault.save(change, this.#agentName(agentId)));
+    const addedBy = this.#agentName(agentId);
+    const saved = yield* Effect.result(
+      change.kind === "newLogin" ? vault.saveLogin(change.login, addedBy) : vault.save(change, addedBy),
+    );
     if (Result.isFailure(saved)) return vaultFailure("save", saved.failure);
-    const { created, ...item } = saved.success;
+    const { created, id, kind, name } = saved.success;
+    const item = { id, kind, name };
+    // A saved login for the same site and username that had this password stays as it was.
+    if ("changed" in saved.success && !saved.success.changed) return vaultResult({ status: "unchanged", ...item });
     this.#noteVaultChange(
       agentId,
       params.threadId,

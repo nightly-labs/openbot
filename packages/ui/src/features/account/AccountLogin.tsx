@@ -102,6 +102,7 @@ export function AccountLogin(props: AccountLoginProps) {
   const loginStep = (): LoginStep => (companySignIn() ? "company" : codeSent() || verified() ? "code" : "email");
   const challenge = () => (props.state.status === "code_sent" ? props.state : undefined);
   const connecting = () => props.state.status === "loading";
+  const keyringChanged = () => props.state.status === "signed_out" && props.state.reason === "keyring_changed";
   const currentIssue = (): CentralAuthIssue | undefined => {
     if (props.state.status === "error") return props.state.issue;
     return props.state.status === "code_sent" || props.state.status === "company_sign_in"
@@ -440,7 +441,9 @@ export function AccountLogin(props: AccountLoginProps) {
                     ? t("account.login.connectingDescription")
                     : unavailable()
                       ? sourceText(currentIssue()?.message ?? t("account.login.unavailableDescription"))
-                      : t("account.login.signInDescription")
+                      : keyringChanged()
+                        ? t("account.login.keyringChangedDescription")
+                        : t("account.login.signInDescription")
                 }
               >
                 {verified() ? (

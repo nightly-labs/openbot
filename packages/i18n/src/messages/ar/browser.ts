@@ -73,7 +73,6 @@ export const messages = {
   "browser.liveView.copyFailed": "تعذّر نسخ النص. انقر الصفحة وحاول مرة أخرى.",
   "browser.previews.label": "معاينات المتصفح",
   "browser.previews.resize": "تغيير حجم اللوحة اليمنى",
-  "browser.previews.collapse": "طي معاينات المتصفح",
   "browser.previews.empty": "لا علامات تبويب",
   "browser.previews.openPage": "فتح صفحة",
   "browser.preview.pageFallback": "صفحة المتصفح",

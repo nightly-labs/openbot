@@ -173,3 +173,32 @@ export const THREAD_OPTIONS: MockOpenBotOptions = {
     ]),
   },
 };
+
+const COMPETITORS_DONE = thread("competitors", "Competitor scan", "2026-08-19T10:07:00.000Z");
+
+/**
+ * Chief has unread agent messages in three side threads. "Competitor scan" has finished, so Chief does
+ * not work and the sidebar shows the unread count. "Pricing FAQ" has no tab: only the menu shows its dot.
+ */
+export const UNREAD_OPTIONS: MockOpenBotOptions = {
+  ...THREAD_OPTIONS,
+  tasks: { [AGENT_ID]: THREADS.map((task) => (task.id === COMPETITORS_DONE.id ? COMPETITORS_DONE : task)) },
+  taskConversations: {
+    ...THREAD_OPTIONS.taskConversations,
+    competitors: snapshot(COMPETITORS_DONE, [
+      message(
+        "competitors-1",
+        "user",
+        "Compare the pricing pages of our three closest competitors.",
+        "2026-08-19T09:50:00.000Z",
+      ),
+      message(
+        "competitors-2",
+        "assistant",
+        "All three charge per seat. Only one has a free plan, and none keeps data on the computer. The table is in `competitors.md`.",
+        "2026-08-19T10:07:00.000Z",
+      ),
+    ]),
+  },
+  taskUnread: { pricing: 1, competitors: 1, "pricing-orphan": 2 },
+};

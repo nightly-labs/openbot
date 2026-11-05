@@ -76,10 +76,13 @@ voice prompts show an error. Use a newer distribution. The arm64 AppImage needs 
 
 On Linux, OpenBot uses the GPU until the GPU fails on your computer. If the GPU process crashes, or a
 start stops in its first 30 seconds, OpenBot writes `gpu-crash.json` or `gpu-start.json` in
-`~/.config/OpenBot`. While one of these files is there, OpenBot renders on the CPU. Dialogs and
-panels with a blurred background are then slower. An update with a new Chromium version tries the
-GPU again. A GPU process restart after a lost GPU context, for example after suspend, does not
-count. A server (`OPENBOT_SERVER=1` or a hosted server) always renders on the CPU.
+`~/.config/OpenBot`. While one of these files is there, OpenBot renders on the CPU. An update with a
+new Chromium version tries the GPU again. A GPU process restart after a lost GPU context, for example
+after suspend, does not count. A server (`OPENBOT_SERVER=1` or a hosted server) always renders on the
+CPU. Chromium also renders on the CPU when it blocks the GPU driver, for example in a remote desktop.
+
+When OpenBot renders on the CPU, dialogs and panels do not blur what is behind them, and agent
+avatars do not move. These two effects used the most CPU time.
 
 - To try the GPU again, for example after a driver update, remove the file. The log names it.
 - To always use the GPU, start OpenBot with `OPENBOT_DISABLE_GPU=0`.
@@ -197,6 +200,21 @@ On Windows, the same file is at `%APPDATA%\OpenBot\openbot.db`.
 
 Report the field the message names, together with the details below. The output holds your own file
 paths, so review it before you publish it.
+
+## OpenBot says a newer version saved your data
+
+An older OpenBot started after a newer one opened your data, for example from an old shortcut or a
+second installation. An older OpenBot cannot read data that a newer one updated, so it stops before
+it writes anything. Your data is intact.
+
+Do not follow the reset steps below, and do not move the folder. When in-app updates and automatic
+downloads are on, OpenBot installs the latest version and opens again. Otherwise, or when the
+update fails, install the latest version from [openbot.run/download](https://openbot.run/download).
+
+Then remove the older copy. On Windows, look for a second OpenBot in Settings → Apps, and pin the
+new OpenBot again if a taskbar or desktop shortcut opens the old one. Older versions show the
+message `OpenBot database version <n> is newer than this application supports (<m>).` The same
+steps apply.
 
 ## Routines do not run while the computer sleeps
 

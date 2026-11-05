@@ -220,6 +220,8 @@ export const messages = {
   "mobile.chat.message.copy": "نسخ الرسالة",
   "mobile.chat.message.readAloud": "قراءة بصوت عالٍ",
   "mobile.chat.message.stopReading": "إيقاف القراءة",
+  "mobile.chat.message.readAloudSpeed": "سرعة التشغيل: {speed}×",
+  "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "تعذّرت قراءة الرسالة بصوت عالٍ",
   "mobile.chat.message.selectText": "تحديد النص",
   "mobile.chat.message.text": "نص الرسالة",

@@ -104,6 +104,7 @@ export const messages = {
   "chat.awaiting.needsYou": "{name} te necesita",
   "chat.awaiting.limited": "{name} espera un límite de uso",
   "chat.awaiting.dismiss": "Ocultar esta lista",
+  "chat.awaiting.stop": "Detener",
   "chat.waits.label": "Esperas abiertas",
   "chat.waits.title": { one: "{count} espera abierta", other: "{count} esperas abiertas" },
   "chat.waits.active": "{state}: {note}",
@@ -434,4 +435,8 @@ export const messages = {
   "chat.compaction.failed": "No se pudo compactar el contexto",
   "chat.compaction.tokens": "{before} → {after} tokens",
   "chat.compaction.continues": "Los mensajes en cola continúan.",
+  "chat.reference.kind.tab": "Pestaña del navegador",
+  "chat.reference.kind.thread": "Hilo",
+  "chat.reference.open.tab": "Mostrar la pestaña del navegador {name}",
+  "chat.reference.open.thread": "Abrir el hilo {name}",
 } as const satisfies PartialTranslation<typeof source>;

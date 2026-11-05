@@ -16,6 +16,7 @@ export interface AppPort {
   onAppLanguagePreference: OpenBotDesktopApi["onAppLanguagePreference"];
   onAppLogoColorPreference: OpenBotDesktopApi["onAppLogoColorPreference"];
   openExternal: OpenBotDesktopApi["openExternal"];
+  reportRendererTiming: OpenBotDesktopApi["reportRendererTiming"];
   openUrl: OpenBotDesktopApi["openUrl"];
   openChatWindow: OpenBotDesktopApi["openChatWindow"];
   getChatWindows: OpenBotDesktopApi["getChatWindows"];

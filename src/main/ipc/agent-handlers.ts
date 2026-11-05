@@ -131,6 +131,7 @@ import {
   decodeRemoteAgentThreadBranches,
   decodeRemoteTaskConversation,
   decodeRemoteTaskReadState,
+  decodeRemoteTaskReadStates,
   decodeSidebarLayoutSnapshot,
   decodeSidebarPinsFromHost,
 } from "../remote-agent-decoding";
@@ -1016,7 +1017,20 @@ export function agentIpcHandlers({
         local: (parsed) => runCauseEffect(service.deleteTask(parsed)),
         remote: (parsed, serverId) => remoteThreadRequest(serverId, AGENT_THREADS_ROUTES.delete, agentTaskBody(parsed)),
       }),
-      // A joined server keeps the member's read marks through `agent-thread-reads-v1`.
+      // A joined server keeps the member's read marks through `agent-thread-reads-v1`. A server
+      // without it has no marks, so no thread shows as unread.
+      listTaskReads: scopedHandler(parseAgentId, {
+        local: (agentId) => host.listAgentTaskReads(agentId),
+        remote: (agentId, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_THREAD_READS_CAPABILITY)) return [];
+          return runCauseEffect(
+            remoteServers.request(serverId, AGENT_THREAD_READS_ROUTES.list, decodeRemoteTaskReadStates, {
+              method: "POST",
+              body: { agentId },
+            }),
+          );
+        },
+      }),
       markTaskRead: scopedHandler(parseMarkAgentTaskRead, {
         local: (parsed) => host.markAgentTaskRead(parsed),
         remote: (parsed, serverId) => {

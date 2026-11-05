@@ -96,7 +96,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
     activeServerSupportsCapability(AGENT_HIDDEN_CAPABILITY) && serverRoleCanAdminister(activeServer());
   const { activeTurns, subagentTurns, queues, failedTurns, usageLimits, pendingPrompts, pendingApprovals, approvals } =
     useTurns();
-  const { unreadReplies, recentReplies, markAllAgentMessagesRead } = useConversation();
+  const { unreadReplies, agentUnreadReplies, recentReplies, markAllAgentMessagesRead } = useConversation();
   const { directPeople, teamPresence } = usePresence();
   const { activeDirectMember, activeDirectMemberId, directThreads } = useDirectMessages();
   const { selectAgent, selectDirectMember, setGlobalSearchVisibility, chatHistory } = useNavigation();
@@ -225,7 +225,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       agentIds: agentList().map((agent) => agent.id),
       activeTurns: workingTurns(),
       queues: queues(),
-      unreadReplies: unreadReplies(),
+      unreadReplies: agentUnreadReplies(),
       recentReplies: recentReplies(),
       ...agentThreadAttention({ agents: agentList(), pendingPrompts: pendingPrompts(), approvals: approvals() }),
       failedTurns: failedTurns(),

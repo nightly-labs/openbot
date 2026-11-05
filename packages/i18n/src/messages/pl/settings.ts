@@ -551,7 +551,7 @@ export const messages = {
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Dla wielu agentów i intensywnej pracy w przeglądarce.",
   // The Voice tab: dictation models and the dictation language.
-  "settings.voice.models.title": "Model dyktowania",
+  "settings.voice.dictation.section": "Dyktowanie",
   "settings.voice.model.parakeet.description": "Szybki. Sam rozpoznaje język mowy, w 25 językach europejskich.",
   "settings.voice.model.bark.description":
     "Szybki. Tylko angielski. Pisze głównie małymi literami, z niewielką interpunkcją.",
@@ -568,7 +568,6 @@ export const messages = {
   "settings.voice.model.useLabel": "Użyj modelu {name} do dyktowania",
   "settings.voice.model.removeLabel": "Usuń model {name} z tego komputera",
   "settings.voice.language.section": "Język",
-  "settings.voice.language.title": "Język dyktowania",
   "settings.voice.language.description": "Język, w którym mówisz. Automatycznie rozpoznaje go z nagrania.",
   "settings.voice.language.modelDetects":
     "Parakeet sam rozpoznaje język mowy. Aby ustawić język, użyj Whisper lub ElevenLabs.",
@@ -595,6 +594,9 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "Czytaj odpowiedzi na głos",
   "settings.voice.speech.readReplies.description":
     "Gdy dyktujesz wiadomość, odpowiedź jest czytana na głos. Aby ją zatrzymać, zacznij dyktować ponownie.",
+  "settings.voice.speech.codexLive.title": "Głos na żywo Codex",
+  "settings.voice.speech.codexLive.description":
+    "Rozmowy głosowe z agentami Codex używają głosu na żywo OpenAI z Twoim logowaniem Codex. Twój głos trafia do OpenAI.",
   "settings.voice.speech.speed.title": "Szybkość",
   "settings.voice.speech.voice.title": "Głos",
   "settings.voice.speech.voice.female": "Głos żeński {number}",
@@ -603,6 +605,8 @@ export const messages = {
   "settings.voice.speech.voice.stop": "Zatrzymaj",
   "settings.voice.speech.sample": "Cześć. Tak będą brzmieć Twoje odpowiedzi.",
   "settings.voice.speech.listenFailed": "Nie udało się odtworzyć próbki.",
+  "settings.voice.live.section": "Głos na żywo",
+  "settings.voice.live.signIn": "Zaloguj się do Codex kontem ChatGPT, aby używać głosu na żywo.",
   "settings.transfer.title": "Przenieś ten serwer na inny komputer",
   "settings.transfer.lede": "Twoi agenci oraz ich umiejętności, rutyny, wspomnienia i pliki trafiają do jednego pliku.",
   "settings.transfer.flow.label": "Jak działa przeniesienie",
