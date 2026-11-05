@@ -271,6 +271,14 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "聞き取り",
   "mobile.settings.voice.tab.speaking": "読み上げ",
+  "mobile.settings.voice.pause.title": "送信までの間",
+  "mobile.settings.voice.pause.label": "新しい言葉を待つ時間",
+  "mobile.settings.voice.pause.footer":
+    "音声会話では、この長さだけ新しい言葉を認識しないと OpenBot が言葉を送信します。言葉のない雑音では聞き取りは続きません。ゆっくり話す場合や考えるために止まる場合は、長めの間を選んでください。",
+  "mobile.settings.voice.pause.seconds": "{seconds} 秒",
+  "mobile.settings.voice.speed.title": "返信の速度",
+  "mobile.settings.voice.speed.footer": "OpenBot が読み上げる返信の速度です。音声会話にも適用されます。",
+  "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot は 1 回限りのトークンで音声を ElevenLabs にストリーミングし、料金は ElevenLabs のアカウントに請求されます。キーはこの端末に保存されます。",
 } as const satisfies PartialTranslation<typeof source>;

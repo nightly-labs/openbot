@@ -37,11 +37,6 @@ const PARAKEET_THREADS = 4;
  * in about a second; ElevenLabs can take up to ten seconds for its last segment.
  */
 const STOP_TIMEOUT_MS = { parakeet: 8_000, elevenlabs: 12_000 } as const;
-/**
- * The level, the square of the loudness from 0 to 1, that holds a voice conversation's turn open: a
- * loudness of 0.5, where the meter's own speech starts at 0.3.
- */
-const TURN_SPEECH_LEVEL = 0.25;
 
 const SCRIBE_NOTICES: Record<ScribeFailure | ElevenLabsError["code"], DictationNotice> = {
   network: { title: "mobile.chat.dictation.stopped", message: "mobile.chat.liveVoice.networkNeeded" },
@@ -139,13 +134,11 @@ export function useModelDictation({
   engine,
   enabled,
   onDraft,
-  onSpeaking,
 }: {
   /** Null while the phone's recognizer is in use. */
   engine: ModelRecognition | null;
   enabled: boolean;
   onDraft: (text: string) => void;
-  onSpeaking?: () => void;
 }): VoiceDictation {
   const [id] = useState(() => Symbol("model-dictation"));
   const available = engine !== null && modelCaptureAvailable();
@@ -156,10 +149,8 @@ export function useModelDictation({
   const finished = useRef<(() => void)[]>([]);
   const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onDraftRef = useRef(onDraft);
-  const onSpeakingRef = useRef(onSpeaking);
   useEffect(() => {
     onDraftRef.current = onDraft;
-    onSpeakingRef.current = onSpeaking;
   });
 
   const update = useCallback((next: DictationPhase) => {
@@ -200,12 +191,9 @@ export function useModelDictation({
     const module = speechNative;
     if (!module || typeof module.startCapture !== "function") return;
     const subscriptions = [
-      module.addListener("onCaptureLevel", ({ level: value, speaking }) => {
+      module.addListener("onCaptureLevel", ({ level: value }) => {
         if (owner !== id || !session.current?.native) return;
         level.set(withTiming(Math.min(1, Math.max(0, value)), { duration: 100 }));
-        // The meter counts quieter sound as speech, for the segments. Only a voice near the phone holds
-        // a voice conversation's turn open, so the noise of a loud room or the street does not.
-        if (speaking && value >= TURN_SPEECH_LEVEL && phaseRef.current === "listening") onSpeakingRef.current?.();
       }),
       module.addListener("onCaptureAudio", ({ pcm }) => {
         if (owner === id && session.current?.native) session.current.scribe?.append(pcm);

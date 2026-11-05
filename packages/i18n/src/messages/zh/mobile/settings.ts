@@ -254,6 +254,14 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "聆听",
   "mobile.settings.voice.tab.speaking": "朗读",
+  "mobile.settings.voice.pause.title": "发送前的停顿",
+  "mobile.settings.voice.pause.label": "等待新词",
+  "mobile.settings.voice.pause.footer":
+    "在语音对话中，如果在这段时间内没有识别到新词，OpenBot 会发送你的话。没有词语的噪音不会让它继续聆听。如果你说话较慢或会停下来思考，请选择更长的停顿。",
+  "mobile.settings.voice.pause.seconds": "{seconds} 秒",
+  "mobile.settings.voice.speed.title": "回复速度",
+  "mobile.settings.voice.speed.footer": "OpenBot 朗读回复的速度，语音对话中也适用。",
+  "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot 使用一次性令牌将你的语音流式传输给 ElevenLabs，费用由 ElevenLabs 从你的账户扣除。密钥保存在此手机上。",
 } as const satisfies PartialTranslation<typeof source>;
