@@ -383,12 +383,16 @@ interface PeerState {
   answeredRequest: boolean;
   /** The close code of the last Signal socket, so a connection timeout can name it. */
   lastSignalClose: number | null;
-  /** For the support log: when the current socket opened, and when the last offer went out. */
+  /** For the support log: when the current socket opened, and when and why the last offer went out. */
   signalOpenedAt: number;
   offerSentAt: number | null;
-  /** For the support log: the candidate types of this connection, such as `host` or `relay`. Never an address. */
-  localCandidates: Map<string, number>;
-  remoteCandidates: Map<string, number>;
+  offerKind: "new connection" | "ICE restart" | null;
+  /**
+   * For the support log: the candidate lines of this connection, so a candidate that arrives twice
+   * counts once. The lines hold addresses; only their types and counts go into the log.
+   */
+  localCandidates: Set<string>;
+  remoteCandidates: Set<string>;
   hostProtocol: number | undefined;
   /** The compatibility read in flight. A request waits for it when the host protocol is not known. */
   hostProtocolRead?: Deferred.Deferred<void>;
@@ -1008,8 +1012,9 @@ export function createRemoteTeamPeer(
         lastSignalClose: null,
         signalOpenedAt: 0,
         offerSentAt: null,
-        localCandidates: new Map(),
-        remoteCandidates: new Map(),
+        offerKind: null,
+        localCandidates: new Set(),
+        remoteCandidates: new Set(),
         hostProtocol: hostProtocols.get(hostId),
       };
       peer = state;
@@ -1283,6 +1288,7 @@ export function createRemoteTeamPeer(
             }),
           );
           state.offerSentAt = Date.now();
+          state.offerKind = "new connection";
           yield* notify(
             diagnosticCall(state, "offer-sent", `new connection, made in ${state.offerSentAt - startedAt} ms`),
           );
@@ -1310,16 +1316,15 @@ export function createRemoteTeamPeer(
         }
         yield* peerCall(() => state.connection?.setRemoteDescription({ type: "answer", sdp: message.sdp }));
         // The answer can hold the host's candidates, such as after an ICE restart.
-        for (const type of sdpCandidateTypes(message.sdp)) countCandidate(state.remoteCandidates, type);
+        for (const line of sdpCandidateLines(message.sdp)) state.remoteCandidates.add(line);
         yield* notify(
           diagnosticCall(
             state,
             "answer",
-            `${state.offerSentAt === null ? "no offer time" : `${Date.now() - state.offerSentAt} ms after offer`}${previousFingerprint ? ", ICE restart" : ", new connection"}`,
+            `${state.offerSentAt === null ? "no offer time" : `${Date.now() - state.offerSentAt} ms after offer`}${state.offerKind ? `, ${state.offerKind}` : ""}`,
           ),
         );
       } else if (message.type === "ice-candidate") {
-        countCandidate(state.remoteCandidates, candidateType(message.candidate));
         yield* peerCall(() =>
           state.connection?.addIceCandidate({
             candidate: message.candidate,
@@ -1327,6 +1332,7 @@ export function createRemoteTeamPeer(
             sdpMLineIndex: message.sdpMLineIndex,
           }),
         );
+        state.remoteCandidates.add(message.candidate);
       } else {
         yield* restartIce(state);
       }
@@ -1338,7 +1344,7 @@ export function createRemoteTeamPeer(
     state.connection = connection;
     connection.onicecandidate = (event) => {
       if (event.candidate?.candidate && state.connection === connection)
-        countCandidate(state.localCandidates, candidateType(event.candidate.candidate));
+        state.localCandidates.add(event.candidate.candidate);
       // An empty candidate marks the end of gathering. Signal v1 accepts only candidates.
       if (!event.candidate?.candidate || !state.connectionId || !canSignal(state)) return;
       sendSignal(state, {
@@ -1962,6 +1968,7 @@ export function createRemoteTeamPeer(
         }),
       );
       state.offerSentAt = Date.now();
+      state.offerKind = "ICE restart";
       yield* notify(diagnosticCall(state, "offer-sent", `ICE restart, made in ${state.offerSentAt - startedAt} ms`));
     })();
   }
@@ -2268,17 +2275,18 @@ function candidateType(candidate: string): string {
   return `${type}/${protocol}`;
 }
 
-/** The candidate types in a session description. */
-function sdpCandidateTypes(sdp: string): string[] {
-  return [...sdp.matchAll(/^a=(candidate:[^\r\n]+)$/gmu)].map((match) => candidateType(match[1] ?? ""));
+/** The candidate lines in a session description, in the form that a trickled candidate has. */
+function sdpCandidateLines(sdp: string): string[] {
+  return [...sdp.matchAll(/^a=(candidate:[^\r\n]+)$/gmu)].map((match) => match[1] ?? "");
 }
 
-function countCandidate(counts: Map<string, number>, type: string): void {
-  counts.set(type, (counts.get(type) ?? 0) + 1);
-}
-
-/** Such as `host/udp:2 srflx/udp:1`, or `none`. */
-function candidateCounts(counts: Map<string, number>): string {
+/** The types and counts of candidate lines, such as `host/udp:2 srflx/udp:1`, or `none`. */
+function candidateCounts(candidates: Set<string>): string {
+  const counts = new Map<string, number>();
+  for (const line of candidates) {
+    const type = candidateType(line);
+    counts.set(type, (counts.get(type) ?? 0) + 1);
+  }
   return counts.size === 0 ? "none" : [...counts].map(([type, count]) => `${type}:${count}`).join(" ");
 }
 

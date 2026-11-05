@@ -15,7 +15,8 @@ export interface SupportLogEntry {
 /**
  * About three hours of use with a connected server, whose requests are most of the lines. 1,000 held
  * about 40 minutes: not enough for a problem that a user reports after the next return to the app.
- * The cache file is about 1 MB. A write appends only the new entries.
+ * The cache file is about 1 MB. A write appends the new entries; after 2,500 appended entries, and
+ * after an app update, one write replaces the file with the kept entries.
  */
 const MAX_ENTRIES = 5_000;
 /** The cache file is written again with only the kept entries after it has this many entry lines. */

@@ -19,8 +19,9 @@ const LEVEL_CLASS = {
   error: "text-danger-text",
 } as const satisfies Record<SupportLogLevel, string>;
 /**
- * Entries in one block. Blocks start at fixed places from the oldest entry, so new entries change
- * only the newest block, and the other blocks do not render again.
+ * Entries in one block. A block holds the entries whose IDs have the same quotient by this number,
+ * so its edges do not move when the log drops its oldest entries. New entries change only the newest
+ * block, and the other blocks do not render again.
  */
 const BLOCK_LINES = 50;
 /** The lines that the page shows at first, and that each "Show older events" adds. */
@@ -37,7 +38,11 @@ function logBlocks(entries: readonly SupportLogEntry[], shown: number): LogBlock
   const blocks: LogBlockProps[] = [];
   let lines = 0;
   for (let end = entries.length; end > 0 && lines < shown; ) {
-    const start = Math.floor((end - 1) / BLOCK_LINES) * BLOCK_LINES;
+    const bucket = Math.floor((entries[end - 1]?.id ?? 0) / BLOCK_LINES);
+    let start = end - 1;
+    // Restored entries get their IDs after the first entries of this launch, so a block ends where
+    // the quotient changes, not at a fixed index.
+    while (start > 0 && Math.floor((entries[start - 1]?.id ?? 0) / BLOCK_LINES) === bucket) start -= 1;
     blocks.push({ entries: entries.slice(start, end) });
     lines += end - start;
     end = start;
