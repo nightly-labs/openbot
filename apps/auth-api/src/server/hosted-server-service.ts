@@ -110,6 +110,14 @@ const HELD_RESUME_START_COMMAND =
   "if [ -e /run/openbot-pre-stop ]; then sudo -n rm -f /run/openbot-pre-stop && sudo -n systemctl start --no-block openbot.service && echo started; fi";
 const HELD_RESUME_START_TIMEOUT_SECONDS = 10;
 /**
+ * boat can cancel a stop after the pre-stop hook, for example when it cannot pause a Docker container
+ * that restarts. The machine then runs with the flag, and OpenBot stays stopped. This command starts
+ * OpenBot only for a flag older than 5 minutes: boat runs the hook again before each new try of the stop,
+ * so a newer flag can belong to a disk save that still runs. The hook also sets a timer that does the same.
+ */
+const FAILED_STOP_START_COMMAND =
+  "if find /run/openbot-pre-stop -mmin +5 2>/dev/null | grep -q .; then sudo -n rm -f /run/openbot-pre-stop && sudo -n systemctl start --no-block openbot.service && echo started; fi";
+/**
  * The cron starts an idle server this long before its next routine run: one cron interval (5 minutes)
  * and the time that the server takes to start. A server does not stop for no use in this time.
  */
@@ -839,7 +847,10 @@ export class HostedServerService {
       const current = yield* this.#requireRow(serverId);
       // A client asks for a start because it cannot reach the server. When the row says it runs, a lost
       // provider event can hide a stop, so the provider is asked.
-      if (current.observed_state === "running" && current.provider_sandbox_id) yield* this.#refresh(current);
+      if (current.observed_state === "running" && current.provider_sandbox_id) {
+        yield* this.#refresh(current);
+        yield* this.#startAfterFailedStop(yield* this.#requireRow(serverId));
+      }
       return summary(yield* this.#requireRow(serverId));
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -946,7 +957,10 @@ export class HostedServerService {
       yield* this.#startForUse(row);
       const current = yield* this.#requireRow(hostId);
       // As for a client: the host has no socket, and a lost provider event can hide a stop.
-      if (current.observed_state === "running" && current.provider_sandbox_id) yield* this.#refresh(current);
+      if (current.observed_state === "running" && current.provider_sandbox_id) {
+        yield* this.#refresh(current);
+        yield* this.#startAfterFailedStop(yield* this.#requireRow(hostId));
+      }
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -2158,6 +2172,22 @@ export class HostedServerService {
     }
   });
 
+  /**
+   * A client or a connector cannot reach a server that boat runs. A stop that boat cancelled after the
+   * pre-stop hook leaves OpenBot stopped there, so the Worker starts it (`FAILED_STOP_START_COMMAND`).
+   * The command runs after the reply, and on a server with no old flag it does nothing.
+   */
+  readonly #startAfterFailedStop = Effect.fn("HostedServerService.startAfterFailedStop")(function* (
+    this: HostedServerService,
+    row: HostedServerRow,
+  ): Effect.fn.Return<void, never, HostedServerDependencies> {
+    const dependencies = yield* HostedServerDependencies;
+    const boat = dependencies.boat;
+    const sandboxId = row.provider_sandbox_id;
+    if (!boat || !sandboxId || row.observed_state !== "running") return;
+    dependencies.schedule(startOpenBot(boat, row.server_id, sandboxId, "failed stop"));
+  });
+
   /** The row keeps the reason of a failed resume, so the client gets it in the summary, not as a 500. */
   readonly #wakeForClient = Effect.fn("HostedServerService.wakeForClient")(function* (
     this: HostedServerService,
@@ -2327,7 +2357,7 @@ export class HostedServerService {
       this.#track(row, { name: "hosted_server_action", action: "resized", plan: row.plan, size });
     }
     // After the reply: the client gives the wake request 15 seconds, and the resume can use all of them.
-    if (operationResult2.success) dependencies.schedule(startAfterHeldResume(boat, row.server_id, sandboxId));
+    if (operationResult2.success) dependencies.schedule(startOpenBot(boat, row.server_id, sandboxId, "held resume"));
   });
 
   readonly #observe = Effect.fn("HostedServerService.observe")(function* (
@@ -2686,24 +2716,27 @@ function rateLimitRetryAt(row: HostedServerRow): number {
   return row.updated_at + Math.min(RATE_LIMIT_RETRY_MAX_MS, Math.max(RATE_LIMIT_RETRY_MIN_MS, waited));
 }
 
-/** A failure does not change the wake. OpenBot then stays stopped until the next stop and resume. */
-const startAfterHeldResume = Effect.fn("HostedServerService.startAfterHeldResume")(function* (
+/**
+ * Runs a command that starts OpenBot when the pre-stop flag stopped it. A failure does not change the
+ * wake. OpenBot then stays stopped until the next stop and resume, or until the timer of the hook.
+ */
+const startOpenBot = Effect.fn("HostedServerService.startOpenBot")(function* (
   boat: BoatClient,
   serverId: string,
   sandboxId: string,
+  after: "held resume" | "failed stop",
 ) {
-  const result = yield* Effect.result(
-    boat.runCommand(sandboxId, HELD_RESUME_START_COMMAND, HELD_RESUME_START_TIMEOUT_SECONDS),
-  );
+  const command = after === "held resume" ? HELD_RESUME_START_COMMAND : FAILED_STOP_START_COMMAND;
+  const result = yield* Effect.result(boat.runCommand(sandboxId, command, HELD_RESUME_START_TIMEOUT_SECONDS));
   if (Result.isFailure(result)) {
-    console.warn("Hosted server start after a held resume failed.", {
+    console.warn(`Hosted server start after a ${after} failed.`, {
       serverId,
       error: safeErrorCode(result.failure),
     });
   } else if (result.success.exitCode !== 0) {
-    console.warn("Hosted server start after a held resume failed.", { serverId, exitCode: result.success.exitCode });
+    console.warn(`Hosted server start after a ${after} failed.`, { serverId, exitCode: result.success.exitCode });
   } else if (result.success.stdout.trim() === "started") {
-    console.info("Hosted server started after a held resume.", { serverId });
+    console.info(`Hosted server started after a ${after}.`, { serverId });
   }
 });
 
