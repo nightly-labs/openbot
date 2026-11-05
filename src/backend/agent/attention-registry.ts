@@ -1118,7 +1118,9 @@ export class AttentionRegistry {
     ) {
       return browserTakeoverError();
     }
-    if (this.#messagingRequestTurn(agentId, turnId)) return browserTakeoverError(MESSAGING_REQUEST_CARD_REFUSED);
+    // A secret can still come from the Vault, so that check comes after the fill.
+    if (params.tool === "request_takeover" && this.#messagingRequestTurn(agentId, turnId))
+      return browserTakeoverError(MESSAGING_REQUEST_CARD_REFUSED);
 
     const requestId = params.tool === "submit_secret" ? randomUUID() : request.id;
     const reason = getString(args, "reason");
@@ -1171,8 +1173,13 @@ export class AttentionRegistry {
           !(yield* this.#fillFromVault(requestId, pending)) &&
           this.#takeovers.get(requestId) === pending
         ) {
-          this.#routines.markNeedsAttention(turnId);
-          this.#emit({ type: "browser-takeover-requested", request: takeover });
+          if (this.#messagingRequestTurn(agentId, turnId)) {
+            resolve(browserTakeoverError(MESSAGING_REQUEST_CARD_REFUSED));
+            this.#resolveBrowserTakeover(requestId, pending, "cancel");
+          } else {
+            this.#routines.markNeedsAttention(turnId);
+            this.#emit({ type: "browser-takeover-requested", request: takeover });
+          }
         }
       } else {
         const error = prepared.failure.cause;

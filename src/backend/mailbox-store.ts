@@ -1732,12 +1732,16 @@ export class MailboxStore {
     return delivery ? this.#context(delivery) : null;
   }
 
-  /** Whether a turn of the agent answers a request that an agent sent from an external conversation. */
+  /**
+   * Whether a turn of the agent started to answer a request that an agent sent from an external
+   * conversation. A request steered into a running turn does not count: the user can watch that turn.
+   */
   answersMessagingRequest(agentId: string, turnId: string): boolean {
     return this.#state.deliveries.some(
       (delivery) =>
         delivery.recipientAgentId === agentId &&
         delivery.turnId === turnId &&
+        delivery.steeredAt === undefined &&
         (delivery.status === "starting" || delivery.status === "running") &&
         this.#state.messages.some((message) => message.id === delivery.messageId && message.messagingReturn),
     );
