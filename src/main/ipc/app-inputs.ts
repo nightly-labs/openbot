@@ -308,6 +308,26 @@ export function parseMacAutomationTargets(input: unknown): readonly MacAutomatio
   return [...new Set(input)];
 }
 
+const SOCIAL_DESTINATIONS = [
+  "threads",
+  "instagram",
+  "tiktok",
+  "facebook",
+  "linkedin",
+  "reddit",
+  "x-post",
+  "threads-post",
+  "linkedin-post",
+  "reddit-post",
+  "facebook-post",
+  "instagram-post",
+  "tiktok-post",
+] as const satisfies readonly ExternalDestination[];
+
+function isSocialDestination(input: unknown): input is (typeof SOCIAL_DESTINATIONS)[number] {
+  return SOCIAL_DESTINATIONS.some((destination) => destination === input);
+}
+
 export function parseExternalDestination(input: unknown): ExternalDestination {
   if (
     input !== "agent-setup" &&
@@ -322,6 +342,7 @@ export function parseExternalDestination(input: unknown): ExternalDestination {
     input !== "discord" &&
     input !== "github" &&
     input !== "x" &&
+    !isSocialDestination(input) &&
     input !== "grok-bot-export" &&
     input !== "hosted-server-contact" &&
     input !== "mac-screen-recording"

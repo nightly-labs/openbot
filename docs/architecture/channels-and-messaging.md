@@ -366,7 +366,7 @@ posted a `channel_result`: the result is the answer of that turn.
 | `channel_history` page | 24,000 characters (`HISTORY_PAGE_CHARACTERS`); a longer message is cut at 16,000 | `boundedHistoryPage` |
 | Handoff of an agent in the packet | 24,000 characters (`HANDOFF_INSTRUCTION_CHARACTERS`): 18,000 first and 6,000 last | `cutInstruction` |
 | Instruction of a task this task waits for | 500 characters (`DEPENDENCY_INSTRUCTION_CHARACTERS`) | `channel-history.ts` |
-| Compaction stops | after 2 compactions that leave 90% or more; a `context_compaction_ineffective` notice | `ContextCompaction` |
+| Compaction stops | after 2 compactions that leave 80% or more; a `context_compaction_ineffective` notice | `ContextCompaction` |
 | Retry notice | at the 3rd provider retry; at 50% or more, a compaction before the next turn | `TurnLifecycle` |
 
 - The packet starts with the current assignment. A short assignment comes again at the end, because

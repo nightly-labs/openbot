@@ -14,6 +14,7 @@ import {
   type RoutineResultDelivery,
   type RoutineResultDestination,
   type RoutineRunFields,
+  type RoutineRunPlace,
   type RoutineSchedule,
 } from "@openbot/contracts/ipc";
 import type { RoutineWebhookTriggerInput, WebhookTestResult } from "@openbot/contracts/ipc-events";
@@ -98,6 +99,7 @@ interface RoutineDraft {
   scheduleDraft: RoutineScheduleDraft;
   limitPolicy: RoutineLimitPolicy;
   missedPolicy: RoutineMissedPolicy;
+  runIn: RoutineRunPlace;
   triggerKind: "schedule" | "webhook";
   eventType: string;
   eventFilters: EventFilterDraft[];
@@ -342,6 +344,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
           current.missedPolicy === (base.missedPolicy ?? "skip")
             ? (routine.missedPolicy ?? "skip")
             : current.missedPolicy,
+        runIn: current.runIn === (base.runIn ?? "chat") ? (routine.runIn ?? "chat") : current.runIn,
         ...(triggerEdited || scheduleEdited || webhookEdited ? {} : triggerDraftOf(routine)),
       };
     });
@@ -360,6 +363,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       active: routine.active,
       limitPolicy: routine.limitPolicy ?? "wait",
       missedPolicy: routine.missedPolicy ?? "skip",
+      runIn: routine.runIn ?? "chat",
       ...triggerDraftOf(routine),
       destination: undefined,
     });
@@ -387,6 +391,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       scheduleDraft: NEW_ROUTINE_SCHEDULE,
       limitPolicy: "wait",
       missedPolicy: "skip",
+      runIn: "chat",
       triggerKind: "schedule",
       eventType: "",
       eventFilters: [],
@@ -524,6 +529,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         trigger: webhookTriggerOf(current) ?? { kind: "schedule", schedule: current.schedule },
         limitPolicy: current.limitPolicy,
         missedPolicy: current.missedPolicy,
+        ...(props.port.runIn ? { runIn: current.runIn } : {}),
       });
       const saved = result.routine;
       setRoutines((items) => {
@@ -666,8 +672,10 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       await props.port.test(current.id);
       trackRoutineAction(analytics, "test", current, startedAt, "succeeded");
       await loadRuns(current.id);
-      // The test run runs in the routine's own thread, so the chat shows it there.
-      if (props.onOpenThread) requestExit({ kind: "routine-thread", routineId: current.id });
+      // A test run of a routine that runs in its own thread runs there, so the chat shows it there. The saved
+      // place applies, not a change that the user did not save.
+      if (props.onOpenThread && draftBase?.runIn === "thread")
+        requestExit({ kind: "routine-thread", routineId: current.id });
     } catch (caught) {
       trackRoutineAction(analytics, "test", current, startedAt, "failed");
       setError(errorMessage(caught, t("routine.settings.testFailed")));
@@ -1126,6 +1134,16 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                     </SelectTrigger>
                     <SelectContent />
                   </Select>
+                </div>
+              </Show>
+
+              <Show when={props.port.runIn}>
+                <div class="settings-field agent-routine-run-in">
+                  <SwitchField
+                    label={t("routine.settings.runInThread")}
+                    checked={current().runIn === "thread"}
+                    onChange={(thread) => changeDraft((value) => ({ ...value, runIn: thread ? "thread" : "chat" }))}
+                  />
                 </div>
               </Show>
 

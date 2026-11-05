@@ -513,7 +513,9 @@
     "cuelume@0.2.8": "patches/cuelume@0.2.8.patch",
     "react-native-screens@4.30.0": "patches/react-native-screens@4.30.0.patch",
     "storybook-solidjs-vite@10.7.1": "patches/storybook-solidjs-vite@10.7.1.patch",
-    "react-native-reanimated@4.7.1": "patches/react-native-reanimated@4.7.1.patch"
+    "react-native-reanimated@4.7.1": "patches/react-native-reanimated@4.7.1.patch",
+    "expo-widgets@58.0.22": "patches/expo-widgets@58.0.22.patch",
+    "react-native-worklets@0.13.0": "patches/react-native-worklets@0.13.0.patch"
   },
   "trustedDependencies": [
     "electron-winstaller",

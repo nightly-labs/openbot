@@ -556,6 +556,16 @@ export interface ChatWindowTarget {
   agentId: string;
 }
 
+/**
+ * The messages that the user sent to agents on this computer, from the database. The social toast
+ * reads it, so a user who used OpenBot before the toast shipped gets it on time.
+ */
+export interface SentMessageStats {
+  /** When the first message was written, as ISO 8601 text, or null before the first message. */
+  firstSentAt: string | null;
+  sentCount: number;
+}
+
 export type ExternalDestination =
   | "opencode-install"
   | "opencode-auth"
@@ -571,8 +581,24 @@ export type ExternalDestination =
   | "discord"
   // The OpenBot repository, from the toast that asks for a GitHub star.
   | "github"
-  // The OpenBot account on X, from the community card of the sidebar.
+  // The OpenBot account on X, from the community card of the sidebar and the social toast.
   | "x"
+  // The OpenBot profiles and community that the social toast asks the user to follow or join.
+  | "threads"
+  | "instagram"
+  | "tiktok"
+  | "facebook"
+  | "linkedin"
+  | "reddit"
+  // The pages that start a post about OpenBot, from the social toast. Main writes the first post
+  // in the app language.
+  | "x-post"
+  | "threads-post"
+  | "linkedin-post"
+  | "reddit-post"
+  | "facebook-post"
+  | "instagram-post"
+  | "tiktok-post"
   // The x.ai marketplace listing of the Grok Bot agent that exports agents for OpenBot.
   | "grok-bot-export"
   // The email for a hosted server plan that the add server dialog does not have, such as a Mac.

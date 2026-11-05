@@ -765,7 +765,7 @@
   height: 20px;
   fill: none;
   stroke: currentColor;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .server-rail-tooltip {
@@ -1340,7 +1340,7 @@ textarea {
 .sidebar-marketplace-button > svg {
   width: 18px;
   height: 18px;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .sidebar-history-button > svg {
@@ -1366,7 +1366,7 @@ textarea {
 .sidebar-update-button > svg {
   width: 18px;
   height: 18px;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .sidebar-search-wrap {
@@ -2775,7 +2775,7 @@ textarea {
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .avatar-image-upload-preview .agent-avatar {
@@ -3537,6 +3537,7 @@ textarea {
 .reaction-picker-row button:focus-visible,
 .reaction-picker-row button[aria-checked="true"],
 .composer-button:hover,
+.composer-button[aria-expanded="true"],
 .composer-attachment > button:hover,
 .agent-context-menu button:hover,
 .agent-context-menu button:focus-visible {

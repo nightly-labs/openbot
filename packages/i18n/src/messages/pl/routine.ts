@@ -372,6 +372,7 @@ export const messages = {
   "routine.settings.missedPolicy": "Gdy OpenBot był zamknięty w zaplanowanym czasie",
   "routine.settings.missedPolicy.skip": "Pomiń to uruchomienie",
   "routine.settings.missedPolicy.runOnce": "Uruchom raz po otwarciu OpenBot",
+  "routine.settings.runInThread": "Uruchamiaj w osobnym wątku",
   "routine.settings.resultDestination": "Wysyłaj odpowiedzi do",
   "routine.settings.resultDestination.none": "Tylko ten czat",
   "routine.settings.resultDestination.place": "{connection} · {place}",

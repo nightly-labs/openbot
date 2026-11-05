@@ -87,6 +87,7 @@ import type {
   SaveMcpServerInput,
   SaveMcpSignInAppInput,
   SendMessageInput,
+  SentMessageStats,
   SetAgentHiddenInput,
   SetAgentMemoryInclusionInput,
   SetAgentSessionSettingInput,
@@ -982,6 +983,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         return agent !== undefined && workspaceAccessEnforced(agent);
       },
       messagingThread: (threadId) => this.messaging.store.linkForThread(threadId) !== null,
+      messagingRequestTurn: (agentId, turnId) => this.#mailbox.answersMessagingRequest(agentId, turnId),
       emit: (event) => this.#emit(event),
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
       emitRuntimeSnapshot: () => this.#emitRuntimeSnapshot(),
@@ -1107,6 +1109,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       sectionTeammates: (agentId) => this.sectionTeammates(agentId),
       channelThread: (threadId) => this.channels.store.channelForThread(threadId) !== null,
       branchThread: (threadId) => this.#tasks.isBranchThread(threadId),
+      routineThread: (threadId) => this.#tasks.isRoutineThreadId(threadId),
       hooks: {
         logRecovery: (agentId, provider, outcome) =>
           logger.warn("Recovered an unavailable provider session.", { agentId, provider, outcome }),
@@ -1556,7 +1559,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           const agent = this.#store.list().find((item) => item.id === agentId);
           const run = this.#routines.runForDelivery(deliveryId);
           if (!agent || !run) return Effect.void;
-          const routineThread = this.#tasks.threadOfRoutine(agentId, run.routineId);
+          // Only a run in the routine's own thread tells that thread's session. A run in the chat does not,
+          // also when an earlier run made the thread or the user changed the place during the run.
+          const thread = this.#tasks.threadOfRoutine(agentId, run.routineId);
+          const routineThread = thread && thread.taskId === this.#mailbox.taskIdForDelivery(deliveryId) ? thread : null;
           return this.#threads
             .addRoutineDigest(agent, run.routineName, answer, routineThread?.threadId)
             .pipe(
@@ -1574,10 +1580,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               ),
             ),
         taskForThread: (threadId) => this.#tasks.taskForThread(threadId),
-        isRoutineThread: (threadId) => {
-          const taskId = this.#tasks.taskForThread(threadId);
-          return taskId !== null && this.#tasks.isRoutineThread(taskId);
-        },
+        isRoutineThread: (threadId) => this.#tasks.isRoutineThreadId(threadId),
         taskOpen: (taskId) => this.#tasks.threadId(taskId) !== null,
         taskFailed: (taskId, message) => this.#tasks.failed(taskId, this.#mcp.redact(message)),
       },
@@ -4353,6 +4356,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   searchConversationFiles(query: string, cursor?: string, limit?: number): ConversationFileSearchPage {
     return this.#reader.searchFiles(query, cursor, limit);
+  }
+
+  readSentMessageStats(): SentMessageStats {
+    return this.#store.database.readSentMessageStats();
   }
 
   listConversationReads(

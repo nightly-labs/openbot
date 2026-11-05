@@ -53,6 +53,10 @@ LABEL org.opencontainers.image.title=OpenBot \
   org.opencontainers.image.version=${VERSION} \
   org.opencontainers.image.revision=${REVISION}
 ENV LANG=C.UTF-8 XDG_RUNTIME_DIR=/run/openbot
+# Only /data stays when an update replaces the container, so the tools that the user and agents
+# install go to ~/.local/bin, for example with uv or pipx. A login shell finds that folder only
+# through ~/.profile, which an empty bind mount does not have.
+ENV PATH=${PATH}:/data/.local/bin
 USER openbot
 WORKDIR /data
 VOLUME /data

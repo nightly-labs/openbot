@@ -1,6 +1,6 @@
 // Checks `routine_report_failure` (#2804): an agent marks its routine run failed when the task could
 // not be done. Runs the real agent service, tool router, routine flows and routine result store on a
-// temporary profile with a fake Codex app-server. The fake calls the OpenBot tools that a turn's input
+// temporary profile with a fake Codex app-server. The routines run in a separate thread. The fake calls the OpenBot tools that a turn's input
 // names in `<<CALLS[...]CALLS>>`, logs each result, and then answers. The check asserts that a called
 // run ends `failed` with the redacted reason while its delivery stays `completed` and its answer shows in its routine thread,
 // that a later queue change keeps it failed, that a run with no call succeeds, that a provider failure
@@ -304,6 +304,7 @@ function createRoutine(agentId: string, name: string, instruction: string) {
     active: false,
     timezone: "UTC",
     schedule: { kind: "daily", time: "09:00" },
+    runIn: "thread",
   });
 }
 

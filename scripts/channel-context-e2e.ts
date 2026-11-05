@@ -12,8 +12,8 @@
 //      The summary runs on the provider's smaller model, and the Lead's turns on its own model.
 //   5. A reply that continues a task marks its earlier turn superseded and keeps the channel summary,
 //      so the next turn does not summarize the channel again from the first message (#3761).
-//   6. Two compactions that leave a session at 95% of its window give one notice, and OpenBot asks
-//      for no more compactions of that session (#3905).
+//   6. Two compactions that leave a session at 84% of its window give one notice, and OpenBot asks
+//      for no more compactions of that session (#3905, #5150).
 //   7. A provider that retries a request three times gives one notice, and a session at 60% of its
 //      window then compacts before its next turn (#4374). When no usage came after that compaction,
 //      a turn that retries again does not compact the session again (#4819).
@@ -151,12 +151,12 @@ const answer = (message) => {
         : assignment.startsWith("MEASURE") ? ${JSON.stringify(MEASURE_REPLY)} : "Done.";
       const steps = [];
       if (assignment.startsWith("STUCK")) {
-        // Codex compacts by itself twice, and each time the session stays at 95% of its window.
+        // Codex compacts by itself twice, and each time the session stays at 84% of its window.
         for (let index = 0; index < 2; index++) {
           const item = { type: "contextCompaction", id: "compaction-" + turnId + "-" + index };
           steps.push(() => write({ method: "item/started", params: { threadId, turnId, item } }));
           steps.push(() => write({ method: "item/completed", params: { threadId, turnId, item } }));
-          steps.push(() => usage(threadId, turnId, 95000));
+          steps.push(() => usage(threadId, turnId, 84000));
         }
       }
       if (assignment.startsWith("USAGE")) steps.push(() => usage(threadId, turnId, 60000));
@@ -706,7 +706,7 @@ try {
     const ineffective = await waitFor("the notice about compactions that do not help", () =>
       events.find((event) => event.code === "context_compaction_ineffective" && event.agentId === tester.id),
     );
-    pass("The notice gives the share of the window", ineffective.message.includes("95%"), ineffective.message);
+    pass("The notice gives the share of the window", ineffective.message.includes("84%"), ineffective.message);
     pass("OpenBot asks for no compaction of the full session", compactions(stuckThread) === 0);
 
     // 7. Codex retries a request of the Lead three times while its session is at 60% of the window.

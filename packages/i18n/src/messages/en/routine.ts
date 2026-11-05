@@ -345,6 +345,7 @@ export const messages = defineMessages("routine", {
   "routine.settings.missedPolicy": "If OpenBot was closed at the scheduled time",
   "routine.settings.missedPolicy.skip": "Skip this run",
   "routine.settings.missedPolicy.runOnce": "Run once when OpenBot opens",
+  "routine.settings.runInThread": "Run in a separate thread",
   "routine.settings.resultDestination": "Send answers to",
   "routine.settings.resultDestination.none": "Only this chat",
   "routine.settings.resultDestination.place": "{connection} · {place}",

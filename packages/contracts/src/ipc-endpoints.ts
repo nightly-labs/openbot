@@ -170,6 +170,7 @@ import type {
   ProviderRuntimeSnapshot,
   RendererTimingReport,
   SaveSetupInput,
+  SentMessageStats,
   SetAnalyticsPreferenceInput,
   SetCompanySignInEnabledInput,
   TestCompanySignInInput,
@@ -770,6 +771,8 @@ export const IPC_ENDPOINTS = {
     // the check and its result.
     openUpdateSettings: event<undefined>()("app:open-update-settings"),
     openExternal: request<ExternalDestination, void>()("app:open-external"),
+    // Read only. The social toast asks for it to know how long and how much the user used OpenBot.
+    getSentMessageStats: request<undefined, SentMessageStats>()("app:get-sent-message-stats"),
     openUrl: request<string, void>()("app:open-url"),
     getExternalLinkPreference: request<undefined, ExternalLinkPreference>()("app:get-external-link-preference"),
     setExternalLinkPreference: request<ExternalLinkPreference, ExternalLinkPreference>()(

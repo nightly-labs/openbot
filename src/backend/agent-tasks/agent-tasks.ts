@@ -484,6 +484,11 @@ export class AgentTasks implements TaskLanes {
     return Boolean(this.#store.taskForThread(threadId)?.branch);
   }
 
+  /** Whether the thread takes the runs of a routine. One read, by thread id. */
+  isRoutineThreadId(threadId: string): boolean {
+    return (this.#store.taskForThread(threadId)?.routineId ?? null) !== null;
+  }
+
   taskForThread(threadId: string): string | null {
     return this.#store.taskForThread(threadId)?.taskId ?? null;
   }
