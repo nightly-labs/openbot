@@ -423,7 +423,7 @@ export class TeamApiServer {
   readonly #sessionUse = new Map<string, { memberId: string; at: number }>();
   /** When the focus period of each session started, and its last focus ping. Push notifications do not read it. */
   readonly #sessionFocus = new Map<string, { since: number; at: number }>();
-  #agentListener: ((event: AgentEvent) => void) | null = null;
+  #agentListener: ((event: AgentEvent, memberId?: string) => void) | null = null;
   #sidebarLayoutListener: ((layout: SidebarLayoutSnapshot) => void) | null = null;
   #stopAgentAccessListener: (() => void) | null = null;
   #stopMachineAlertListener: (() => void) | null = null;
@@ -518,7 +518,7 @@ export class TeamApiServer {
     });
     const port = yield* remoteCall(() => listenLoopback(server, () => new Error(sourceText("error.team.bindFailed"))));
     this.#port = port;
-    this.#agentListener = (event) => this.#broadcastAgentEvent(event);
+    this.#agentListener = (event, memberId) => this.#broadcastAgentEvent(event, memberId);
     this.#options.agents.on("event", this.#agentListener);
     this.#sidebarLayoutListener = (layout) => this.#broadcastAgentEvent({ type: "sidebar-layout-changed", layout });
     this.#options.sidebarLayout.on("changed", this.#sidebarLayoutListener);
@@ -1329,9 +1329,9 @@ export class TeamApiServer {
     return encodeTeamProtocolV1CurrentEvent(visible, options);
   }
 
-  #broadcastAgentEvent(event: AgentEvent): void {
+  #broadcastAgentEvent(event: AgentEvent, memberId?: string): void {
     if (event.type !== "conversation") {
-      this.#broadcastAgentEventToClients(event);
+      this.#broadcastAgentEventToClients(event, "all", memberId);
       if (event.type === "agents-changed") {
         this.#broadcastAgentColors();
         this.#broadcastChatColors();
@@ -1421,7 +1421,12 @@ export class TeamApiServer {
     Effect.runFork(materialize);
   }
 
-  #broadcastAgentEventToClients(broadcast: AgentEvent, audience: ConversationEventAudience = "all"): void {
+  /** With `memberId`, only the connections of that member get the event. */
+  #broadcastAgentEventToClients(
+    broadcast: AgentEvent,
+    audience: ConversationEventAudience = "all",
+    memberId?: string,
+  ): void {
     const filteredConversationPayloads = new Map<string, string>();
     // The roles give each connection of one member the same agents: read them once for each member.
     const access = new Map<string, { member: AccessMember; blocked: Set<string>; key: string }>();
@@ -1436,6 +1441,7 @@ export class TeamApiServer {
     };
 
     for (const [client, connection] of this.#eventClients) {
+      if (memberId !== undefined && connection.memberId !== memberId) continue;
       const event = this.#eventFor(connection, broadcast);
       // Only accounts after the first: a client reads an empty reading as no provider reporting.
       if (event !== broadcast && event.type === "usage-changed" && event.usage.limits.length === 0) continue;

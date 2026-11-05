@@ -93,6 +93,8 @@ interface WebConversation {
 
 /** The messages that a conversation keeps when it is not open, as on the desktop. */
 const LATEST_PAGE_SIZE = 50;
+/** The recently opened agents whose latest page a new page reads after the open one. */
+const PRELOADED_AGENTS = 3;
 
 /**
  * Releases the older pages of a conversation that is not open. Only the open conversation gets new
@@ -1133,6 +1135,7 @@ export function createWebWorkspace(
     const frame = savedFrame?.agents.length ? savedFrame : null;
     const frameSelected = frame?.agents.find((agent) => agent.id === frame.selectedAgentId) ?? frame?.agents[0];
     const previousSelected = (sameHost ? selectedId : null) ?? frameSelected?.id ?? null;
+    const recentAgentIds = frame?.recentAgentIds ?? [];
     hostId = host.hostId;
     writeWebServerSelection(props.accountId, host.hostId);
     if (!keepWorkspace) selectedId = null;
@@ -1301,6 +1304,10 @@ export function createWebWorkspace(
         markRemoteSync("conversation-ready");
       }
       if (disposed || current !== generation) return;
+      void preloadRecent(
+        recentAgentIds.filter((id) => id !== first?.id && agents.some((agent) => agent.id === id)),
+        current,
+      );
       // The other queues only give the sidebar its marks.
       for (const agent of agents) if (agent.id !== first?.id) loadQueue(agent.id);
     } catch (error) {
@@ -1600,6 +1607,25 @@ export function createWebWorkspace(
     } catch (error) {
       if (disposed || current !== generation) return;
       report(error);
+    }
+  }
+  /**
+   * Reads the latest page of recently opened agents, one at a time, so that the first switch to one
+   * shows its messages at once. An agent with a kept page is not read again. The page stays trimmed:
+   * a closed conversation gets no events, so the read on open replaces it with the host page.
+   */
+  async function preloadRecent(ids: readonly string[], current: number) {
+    for (const id of ids.slice(0, PRELOADED_AGENTS)) {
+      if (disposed || current !== generation) return;
+      if (state.conversations[id]) continue;
+      setState((draft) => {
+        draft.conversations[id] ??= { page: null, draft: "", attachments: [], loading: false, trimmed: true };
+      });
+      try {
+        await load(id);
+      } catch {
+        // A failed early read only costs the early page. The agent loads when it opens.
+      }
     }
   }
   async function resync() {
