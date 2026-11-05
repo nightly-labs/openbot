@@ -303,13 +303,41 @@ export const VoiceWhisperHungarian: Story = {
   ),
 };
 
+/** Cohere Transcribe offers only its own languages, so the saved Hungarian shows as English. */
+export const VoiceCohereLanguages: Story = {
+  render: () => (
+    <SettingsModalStory
+      initialOpen
+      initialTab="voice"
+      voice={{
+        voiceModelsReady: ["parakeet-tdt-0.6b-v3", "cohere-transcribe-03-2026"],
+        voiceSettings: { modelId: "cohere-transcribe-03-2026", language: "hu" },
+      }}
+    />
+  ),
+};
+
+/** Bark is retired, but it stays in the list while it is downloaded and in use. */
+export const VoiceRetiredBarkInUse: Story = {
+  render: () => (
+    <SettingsModalStory
+      initialOpen
+      initialTab="voice"
+      voice={{
+        voiceModelsReady: ["parakeet-tdt-0.6b-v3", "bark-3.0-plus"],
+        voiceSettings: { modelId: "bark-3.0-plus", language: "automatic" },
+      }}
+    />
+  ),
+};
+
 /** Downloaded models, and the speech model, each with Remove. */
 export const VoiceModelsDownloaded: Story = {
   render: () => (
     <SettingsModalStory
       initialOpen
       initialTab="voice"
-      voice={{ voiceModelsReady: ["parakeet-tdt-0.6b-v3", "bark-3.0-plus"], speechModelReady: true }}
+      voice={{ voiceModelsReady: ["parakeet-tdt-0.6b-v3", "parakeet-unified-en-0.6b"], speechModelReady: true }}
     />
   ),
 };

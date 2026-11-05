@@ -73,10 +73,14 @@ extraResources:
     to: licenses/onnxruntime-LICENSE
   - from: build/licenses/NVIDIA-Parakeet-TDT-0.6B-v3-LICENSE
     to: licenses/NVIDIA-Parakeet-TDT-0.6B-v3-LICENSE
+  - from: build/licenses/NVIDIA-Parakeet-Unified-EN-0.6B-LICENSE
+    to: licenses/NVIDIA-Parakeet-Unified-EN-0.6B-LICENSE
   - from: build/licenses/Underdog-Bark-3.0-Plus-LICENSE
     to: licenses/Underdog-Bark-3.0-Plus-LICENSE
   - from: build/licenses/OpenAI-Whisper-LICENSE
     to: licenses/OpenAI-Whisper-LICENSE
+  - from: build/licenses/Cohere-Transcribe-LICENSE
+    to: licenses/Cohere-Transcribe-LICENSE
   - from: build/licenses/Supertone-Supertonic-3-LICENSE
     to: licenses/Supertone-Supertonic-3-LICENSE
 # The voice runtime, the remote desktop runtime and each Computer Use driver are built for one

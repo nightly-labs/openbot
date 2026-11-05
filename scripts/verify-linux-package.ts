@@ -63,7 +63,13 @@ const executablePath = resolve(appPath, "openbot");
 const resourcesPath = resolve(appPath, "resources");
 const asarPath = resolve(resourcesPath, "app.asar");
 const voiceRuntimePath = resolve(resourcesPath, "voice/runtime");
-const voiceRuntimeFiles = ["sherpa-onnx.node", "libsherpa-onnx-c-api.so", "libonnxruntime.so"];
+const voiceRuntimeFiles = [
+  "sherpa-onnx.node",
+  "libsherpa-onnx-c-api.so",
+  "libonnxruntime.so",
+  // ONNX Runtime session settings that the voice hosts read.
+  "no-arena.cfg",
+];
 const voiceHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-transcription-host.js");
 const speechHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-speech-host.js");
 
@@ -111,8 +117,10 @@ for (const name of voiceRuntimeFiles) {
 await Promise.all(
   [
     "voice/model",
+    "voice/parakeet-unified-en-0.6b-int8",
     "voice/bark-3.0-plus-int8",
     "voice/whisper-turbo-int8",
+    "voice/cohere-transcribe-14-lang-int8",
     "voice/supertonic-3-int8",
     "voice/runtime/encoder.int8.onnx",
     "voice/runtime/turbo-encoder.int8.onnx",
