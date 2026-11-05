@@ -215,34 +215,6 @@ function ModelRow({
   );
 }
 
-/** A segmented choice with a title and a footer, as a settings section. */
-function SegmentSection<T extends string>({
-  title,
-  footer,
-  options,
-  value,
-  onChange,
-}: {
-  title: string;
-  footer: string;
-  options: readonly { value: T; label: string }[];
-  value: T;
-  onChange: (value: T) => void;
-}) {
-  const ready = useVoiceSettings((state) => state.ready);
-  return (
-    <View className="gap-2">
-      <Typography type="body-xs" className="px-4 text-grouped-secondary">
-        {title}
-      </Typography>
-      <UsageSegments options={options} value={value} disabled={!ready} accessibilityLabel={title} onChange={onChange} />
-      <Typography.Paragraph type="body-xs" className="px-4 text-grouped-secondary">
-        {footer}
-      </Typography.Paragraph>
-    </View>
-  );
-}
-
 /**
  * How long a voice conversation waits for new words before it sends the words. The slider moves in
  * half seconds, natively on iOS; the choice is saved when the finger lifts.
@@ -253,6 +225,8 @@ function TurnPauseSection({ onError }: { onError: (message: string) => void }) {
   const saved = useVoiceSettings((state) => state.turnPauseMs);
   const [dragged, setDragged] = useState<number | null>(null);
   const shown = dragged ?? saved;
+  // The slider can report more than one value before the next render: a step plays one tick.
+  const lastStep = useRef(shown);
   const seconds = (milliseconds: number) =>
     t("mobile.settings.voice.pause.seconds", { seconds: format.number(milliseconds / 1_000) });
   return (
@@ -271,11 +245,14 @@ function TurnPauseSection({ onError }: { onError: (message: string) => void }) {
           label={t("mobile.settings.voice.pause.label")}
           onChange={(value) => {
             const next = turnPauseMs(value);
-            if (next !== shown) void haptics.selection();
+            if (next === lastStep.current) return;
+            lastStep.current = next;
+            void haptics.selection();
             setDragged(next);
           }}
           onChangeEnd={(value) => {
             const next = turnPauseMs(value);
+            lastStep.current = next;
             setDragged(null);
             if (next === saved) return;
             void saveVoiceSettings({ turnPauseMs: next }).catch(() => onError(t("mobile.settings.saveFailed")));
@@ -289,22 +266,32 @@ function TurnPauseSection({ onError }: { onError: (message: string) => void }) {
 /** The speed of the replies that are read aloud, also in a voice conversation. */
 function ReplySpeedSection({ onError }: { onError: (message: string) => void }) {
   const { t, format } = useText();
+  const ready = useVoiceSettings((state) => state.ready);
   const speed = useVoiceSettings((state) => state.speed);
+  const title = t("mobile.settings.voice.speed.title");
   return (
-    <SegmentSection
-      title={t("mobile.settings.voice.speed.title")}
-      footer={t("mobile.settings.voice.speed.footer")}
-      options={SPEECH_SPEEDS.map((value) => ({
-        value: String(value),
-        label: t("mobile.settings.voice.speed.value", { speed: format.number(value) }),
-      }))}
-      value={String(speed)}
-      onChange={(next) => {
-        const chosen = SPEECH_SPEEDS.find((value) => String(value) === next);
-        if (chosen === undefined) return;
-        void saveVoiceSettings({ speed: chosen }).catch(() => onError(t("mobile.settings.saveFailed")));
-      }}
-    />
+    <View className="gap-2">
+      <Typography type="body-xs" className="px-4 text-grouped-secondary">
+        {title}
+      </Typography>
+      <UsageSegments
+        options={SPEECH_SPEEDS.map((value) => ({
+          value: String(value),
+          label: t("mobile.settings.voice.speed.value", { speed: format.number(value) }),
+        }))}
+        value={String(speed)}
+        disabled={!ready}
+        accessibilityLabel={title}
+        onChange={(next) => {
+          const chosen = SPEECH_SPEEDS.find((value) => String(value) === next);
+          if (chosen === undefined) return;
+          void saveVoiceSettings({ speed: chosen }).catch(() => onError(t("mobile.settings.saveFailed")));
+        }}
+      />
+      <Typography.Paragraph type="body-xs" className="px-4 text-grouped-secondary">
+        {t("mobile.settings.voice.speed.footer")}
+      </Typography.Paragraph>
+    </View>
   );
 }
 
