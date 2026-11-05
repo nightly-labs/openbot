@@ -160,6 +160,7 @@ export const messages = {
   "settings.soundTheme.play": "{name} sesini çal",
   "settings.notch.title": "Davranış",
   "settings.notch.show.title": "Durumu MacBook çentiğinde göster",
+  "settings.notch.show.titleTopOfScreen": "Durumu ekranın üst kısmında göster",
   "settings.notch.show.description": "Ajan etkinliğini ve dikkat gerektiren öğeleri her ekranın üst kısmında gösterin.",
   "settings.notch.idle.title": "Boştaki adayı göster",
   "settings.notch.idle.description": "Hiçbir durum etkin olmadığında OpenBot logosunu ve selamlamasını gösterin.",

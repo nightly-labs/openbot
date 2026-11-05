@@ -165,6 +165,7 @@ export const messages = defineMessages("settings", {
   "settings.soundTheme.play": "Play {name}",
   "settings.notch.title": "Behavior",
   "settings.notch.show.title": "Show status in the MacBook notch",
+  "settings.notch.show.titleTopOfScreen": "Show status at the top of the screen",
   "settings.notch.show.description": "Show agent activity and items that need attention at the top of each display.",
   "settings.notch.idle.title": "Show idle island",
   "settings.notch.idle.description": "Show the OpenBot logo and greeting when no status is active.",

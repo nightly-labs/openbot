@@ -163,6 +163,7 @@ export const messages = {
   "settings.soundTheme.play": "Riproduci {name}",
   "settings.notch.title": "Comportamento",
   "settings.notch.show.title": "Mostra lo stato nel notch del MacBook",
+  "settings.notch.show.titleTopOfScreen": "Mostra lo stato nella parte superiore dello schermo",
   "settings.notch.show.description":
     "Mostra l'attività degli agenti e gli elementi che richiedono attenzione nella parte alta di ogni schermo.",
   "settings.notch.idle.title": "Mostra l'isola a riposo",

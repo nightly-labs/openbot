@@ -4,6 +4,7 @@ import type { messages as source } from "../en/island";
 export const messages = {
   // The Dynamic Island window over the MacBook notch or on an external display.
   "island.surface.label": "OpenBot MacBook 刘海",
+  "island.surface.labelIsland": "OpenBot 灵动岛",
   "island.surface.interactionArea": "灵动岛交互区域",
   "island.label.idle": "打开 OpenBot",
   "island.label.working": "OpenBot 工作状态",

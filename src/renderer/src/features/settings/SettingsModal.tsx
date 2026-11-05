@@ -339,6 +339,7 @@ export function SettingsModal(props: SettingsModalProps) {
             <SettingsDynamicIslandTab
               value={props.value}
               variant={props.appInfo?.variant ?? "production"}
+              platform={props.appInfo?.platform}
               builtInDisplayGeometry={props.builtInDisplayGeometry}
               servers={props.servers ?? []}
               onUpdateSetting={updateSetting}
