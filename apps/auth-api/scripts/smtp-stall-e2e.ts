@@ -368,6 +368,14 @@ try {
   assert.equal(noFallbackInvalid.fallbackSends, 0);
   assert.deepEqual(noFallbackInvalid.events, ["email_sent:failed"]);
 
+  // Three SMTP timeouts spend the delivery budget of a sign-in code, so no time is left for Cloudflare.
+  const noFallbackAfterBudget = await runFallbackCase("no_fallback_after_budget", ["silent"], "accept");
+  report.cases.push(noFallbackAfterBudget);
+  assert.equal(noFallbackAfterBudget.result, "smtp_timeout");
+  assert.equal(noFallbackAfterBudget.connections, 3);
+  assert.equal(noFallbackAfterBudget.fallbackSends, 0);
+  assert.deepEqual(noFallbackAfterBudget.events, ["email_sent:failed"]);
+
   report.passed = true;
 } catch (error) {
   report.failure = error instanceof Error ? error.message : String(error);

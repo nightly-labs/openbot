@@ -3,6 +3,7 @@ import type { AccountAnalytics, EmailKind, EmailResult } from "./account-analyti
 import {
   AMBIGUOUS_DELIVERY_ERRORS,
   AUTOMATED_EMAIL_HEADERS,
+  EMAIL_CODE_DELIVERY_BUDGET_MS,
   type PreparedEmailMessage,
   prepareContactMessage,
   prepareEmailCode,
@@ -129,6 +130,9 @@ export function createLicenseEmailDelivery(
  * Sends through the SMTP mailbox, and through Cloudflare when SMTP surely did not send the message.
  * When both fail, the SMTP failure is the answer, so a sender limit keeps its countdown, unless the
  * Cloudflare send may have reached the recipient.
+ *
+ * The fallback uses only the time left in `EMAIL_CODE_DELIVERY_BUDGET_MS`: after it, a replay of the
+ * sign-in request takes a code that is still pending as sent.
  */
 const deliver = Effect.fn("EmailDelivery.deliver")(function* (
   analytics: AccountAnalytics,
@@ -142,41 +146,54 @@ const deliver = Effect.fn("EmailDelivery.deliver")(function* (
     return yield* prepared.failure;
   }
   const message = prepared.success;
+  const startedAt = Date.now();
   const smtp = yield* Effect.result(tracked(analytics, "email_sent", kind, sendPrivateEmail(senders.smtp, message)));
   if (Result.isSuccess(smtp)) return;
   if (!senders.fallback || !canFallBack(smtp.failure.message)) return yield* smtp.failure;
+  const remainingMs = EMAIL_CODE_DELIVERY_BUDGET_MS - (Date.now() - startedAt);
+  if (remainingMs < CLOUDFLARE_MIN_SEND_MS) return yield* smtp.failure;
   console.warn("Email delivery falls back to Cloudflare:", { kind, reason: smtp.failure.message });
   const fallback = yield* Effect.result(
     tracked(
       analytics,
       "email_fallback_sent",
       kind,
-      sendThroughCloudflare(senders.fallback, senders.smtp.from, message),
+      sendThroughCloudflare(
+        senders.fallback,
+        senders.smtp.from,
+        message,
+        Math.min(CLOUDFLARE_SEND_TIMEOUT_MS, remainingMs),
+      ),
     ),
   );
   if (Result.isSuccess(fallback)) return;
   return yield* AMBIGUOUS_DELIVERY_ERRORS.has(fallback.failure.message) ? fallback.failure : smtp.failure;
 });
 
-// After these SMTP failures the message surely did not leave: a sender limit, a refusal before the
-// message, or a connection that stopped before `DATA`. An unknown result may have reached the
-// recipient, so a second send could deliver it twice. Invalid input or a refused recipient fails on
-// any sender.
+// After these SMTP failures the message surely did not leave: a sender limit, a refusal of the
+// sender or the message, or a connection that stopped before `DATA`. An unknown result may have
+// reached the recipient, so a second send could deliver it twice. Invalid input or a refused
+// recipient fails on any sender, and a configuration error must show in the logs, not hide behind
+// the fallback.
 function canFallBack(message: string): boolean {
   return (
     !AMBIGUOUS_DELIVERY_ERRORS.has(message) &&
     !message.startsWith("smtp_invalid_") &&
+    message !== "smtp_port_must_be_465" &&
     message !== "smtp_recipient_failed"
   );
 }
 
 // The binding has no cancel signal. A send that passes this deadline may still reach the recipient.
 const CLOUDFLARE_SEND_TIMEOUT_MS = 10_000;
+// Below this, a send would end as unknown more often than it would succeed.
+const CLOUDFLARE_MIN_SEND_MS = 2_000;
 
 const sendThroughCloudflare = Effect.fn("EmailDelivery.cloudflare")(function* (
   binding: SendEmail,
   from: string,
   message: PreparedEmailMessage,
+  timeoutMs: number,
 ): Effect.fn.Return<void, EmailDeliveryError> {
   const { subject, text, html } = message.content;
   yield* Effect.tryPromise({
@@ -196,7 +213,7 @@ const sendThroughCloudflare = Effect.fn("EmailDelivery.cloudflare")(function* (
     },
   }).pipe(
     Effect.timeoutOrElse({
-      duration: CLOUDFLARE_SEND_TIMEOUT_MS,
+      duration: timeoutMs,
       orElse: () => Effect.fail(new EmailDeliveryError({ message: "email_delivery_unknown" })),
     }),
   );
