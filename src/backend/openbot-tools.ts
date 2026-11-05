@@ -626,7 +626,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "ask_user",
     description:
-      "Ask the user 1–3 short questions and wait for structured answers. Use this instead of asking questions in a normal assistant message whenever clarification or a choice is needed.",
+      "Ask the user 1–3 short questions and wait for structured answers. Use it, not a question in a normal message, when you need a clarification or a choice.",
     shape: {
       questions: z
         .array(
@@ -634,18 +634,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
             id: z.string().max(INPUT_LIMITS.identifier).optional(),
             header: z.string().max(INPUT_LIMITS.promptHeader).optional(),
             question: z.string().min(1).max(INPUT_LIMITS.promptQuestion),
-            detail: z
-              .string()
-              .max(INPUT_LIMITS.promptQuestion)
-              .optional()
-              .describe(
-                "One short line of context that shows under the question. Leave it out when the question is clear.",
-              ),
+            detail: z.string().max(INPUT_LIMITS.promptQuestion).optional(),
             isSecret: z
               .boolean()
               .optional()
               .describe(
-                "Masks a private answer, such as a one-time code. Never use it for an API key or a token: use request_api_key, which keeps the key out of your context.",
+                "Masks a private answer, such as a one-time code. Not for an API key or a token: use request_api_key.",
               ),
             options: z
               .array(
