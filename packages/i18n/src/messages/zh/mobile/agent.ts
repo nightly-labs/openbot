@@ -495,6 +495,7 @@ export const messages = {
   "mobile.agent.list.openPinned": "打开与 {name} 的置顶对话",
   "mobile.agent.list.openPinnedWithTitle": "打开与 {name} 的置顶对话，{title}",
   "mobile.agent.list.withState": "{label}。{state}",
+  "mobile.agent.list.unread": { other: "{count} 条未读消息" },
   "mobile.agent.list.waiting.title": "需要你",
   "mobile.agent.list.waiting.label": { one: "需要你，{count} 个助手", other: "需要你，{count} 个助手" },
   "mobile.agent.list.waiting.action.question": "回答",

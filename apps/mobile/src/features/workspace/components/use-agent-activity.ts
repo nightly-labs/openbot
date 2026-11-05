@@ -15,7 +15,7 @@ import { queryKeys } from "@/features/workspace/model/query-keys";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import { agentThreadWaitReason } from "@/features/workspace/model/thread-waits";
 import type { TurnStepLines } from "@/features/workspace/model/turn-step-lines";
-import { selectLiveState, useAgentUnread } from "./use-live-workspace";
+import { selectLiveState, useAgentUnread, useAgentUnreadCount } from "./use-live-workspace";
 
 export function useAgentActivity(agentId: string) {
   const liveState = useMobileWorkspaceSelector(selectLiveState);
@@ -85,14 +85,16 @@ export function useAgentListWaitReason(agentId: string) {
 }
 
 /**
- * True when the home list shows this agent as unread: its own chat or one of its side threads has a
- * message that the person did not read.
+ * The unread messages that the home list shows on this agent, as the desktop counts them: those of its
+ * own chat and of its side threads. 0 when the person read them all. An unread chat with no count from
+ * the host counts as one.
  */
-export function useAgentListUnread(agentId: string): boolean {
+export function useAgentListUnreadCount(agentId: string): number {
   const serverId = useMobileWorkspaceSelector((workspace) => workspace.activeServer.id);
   const own = useAgentUnread(agentId);
+  const ownCount = useAgentUnreadCount(agentId);
   const threads = useAgentThreadUnread(serverId, agentId);
-  return own || threads > 0;
+  return (own ? Math.max(1, ownCount) : 0) + threads;
 }
 
 /**

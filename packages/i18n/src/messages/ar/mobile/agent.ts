@@ -568,6 +568,14 @@ export const messages = {
   "mobile.agent.list.openPinned": "فتح الدردشة المثبّتة مع {name}",
   "mobile.agent.list.openPinnedWithTitle": "فتح الدردشة المثبّتة مع {name}، {title}",
   "mobile.agent.list.withState": "{label}. {state}",
+  "mobile.agent.list.unread": {
+    zero: "لا رسائل غير مقروءة",
+    one: "رسالة واحدة غير مقروءة",
+    two: "رسالتان غير مقروءتين",
+    few: "{count} رسائل غير مقروءة",
+    many: "{count} رسالة غير مقروءة",
+    other: "{count} رسالة غير مقروءة",
+  },
   "mobile.agent.list.waiting.title": "يحتاج إليك",
   "mobile.agent.list.waiting.label": {
     zero: "يحتاج إليك، لا وكلاء",

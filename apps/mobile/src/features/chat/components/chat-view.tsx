@@ -127,6 +127,13 @@ export interface ChatViewProps {
   deleteMessage?: (messageId: string) => Promise<void>;
   /** The reader can delete the messages of others too, not only the ones that they sent. */
   deletesAnyMessage?: boolean;
+  /** Marks an agent's host message and the messages after it unread. Absent where the host cannot. */
+  markUnread?: (messageId: string) => void;
+  /**
+   * The host messages from the one where the NEW line shows to the newest, in chat order. The line
+   * shows above the first of them that has a row. Null for a chat without the line.
+   */
+  unreadLineMessageIds?: ReadonlySet<string> | null;
   /**
    * The open channels that the text of a message can go to, in an agent's own chat. Keep the list
    * stable while it stays the same. Absent where a message cannot go to a channel.
@@ -243,6 +250,8 @@ export function ChatView({
   onBranch,
   deleteMessage,
   deletesAnyMessage = false,
+  markUnread,
+  unreadLineMessageIds = null,
   sendToChannel,
   questionForm,
   onSelectQuestion,
@@ -996,6 +1005,10 @@ export function ChatView({
     async (message: ChatBubbleMessage) => deleteMessage?.(hostMessageIds.get(message.id) ?? message.id),
     [deleteMessage, hostMessageIds],
   );
+  const markListMessageUnread = useCallback(
+    (message: ChatBubbleMessage) => markUnread?.(hostMessageIds.get(message.id) ?? message.id),
+    [markUnread, hostMessageIds],
+  );
   // Select text starts the selection, and a second tap on it ends the selection.
   const selectText = useCallback((message: ChatBubbleMessage) => {
     Keyboard.dismiss();
@@ -1105,6 +1118,8 @@ export function ChatView({
               onReact={canReact && !readOnly ? react : undefined}
               onDeleteMessage={deleteMessage && !readOnly ? deleteListMessage : undefined}
               deletesAnyMessage={deletesAnyMessage}
+              onMarkUnread={markUnread ? markListMessageUnread : undefined}
+              unreadLineMessageIds={unreadLineMessageIds}
               sendChannels={sendToChannel?.channels}
               onSendToChannel={sendToChannel && !readOnly ? sendMessageToChannel : undefined}
               selectingMessageId={selection?.message.id ?? null}
