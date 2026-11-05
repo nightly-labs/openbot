@@ -635,15 +635,18 @@ export class HostAnalytics {
     const properties: HostProperties = {
       outcome: summary.outcome,
       connection: summary.connection,
-      session_kind: summary.session,
+      ...(summary.session ? { session_kind: summary.session } : {}),
       last_phase: summary.lastPhase,
-      first_request: summary.firstRequest,
+      ...(summary.firstRequest ? { first_request: summary.firstRequest } : {}),
       total_ms: summary.totalMs,
       wait_ms: summary.waitMs,
-      hosted_start_wait_ms: summary.hostedStartWaitMs,
+      ...(summary.hostedStartWaitMs === undefined ? {} : { hosted_start_wait_ms: summary.hostedStartWaitMs }),
       failed_attempts: summary.failedAttempts,
     };
-    for (const [phase, property] of REMOTE_CONNECT_PHASE_PROPERTIES) properties[property] = summary.phases[phase];
+    for (const [phase, property] of REMOTE_CONNECT_PHASE_PROPERTIES) {
+      const ms = summary.phases[phase];
+      if (ms !== undefined) properties[property] = ms;
+    }
     this.#track("system_remote_connect", properties);
   }
 

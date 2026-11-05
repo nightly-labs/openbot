@@ -2503,7 +2503,7 @@ export class HostedServerService {
       action: "ready",
       plan: row.plan,
       size: row.size,
-      reason: row.last_wake_reason ?? undefined,
+      ...(row.last_wake_reason ? { reason: row.last_wake_reason } : {}),
       durationMs,
     });
   });
