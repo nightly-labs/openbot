@@ -626,6 +626,20 @@ export class ProviderRuntime implements ProviderPort {
             this.#refreshUsage(client, model, false).pipe(
               Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })),
             ),
+          // Read as the own sign-in's catalogue is. An account process never gets the saved key.
+          readModels: (client) =>
+            this.#modelCatalog.read(client, requireProviderDriver(client.provider).catalog).pipe(
+              Effect.map(({ models }) => models),
+              Effect.catch((failure) =>
+                Effect.sync(() => {
+                  logger.warn("A provider account did not list its models.", {
+                    provider: client.provider,
+                    timeout: isProviderTimeout(failure.cause),
+                  });
+                  return null;
+                }),
+              ),
+            ),
           resetCredits: (client) => this.#resetCredits.get(client),
           consumeUsageReset: (client) =>
             this.#consumeUsageReset(client).pipe(
@@ -1747,6 +1761,11 @@ export class ProviderRuntime implements ProviderPort {
   /** Gives a saved key its account and checks it again; see `ProviderAccounts.keyChanged`. */
   providerKeyChanged(provider: AgentProvider): Effect.Effect<AgentStatus> {
     return (this.#providerAccounts?.keyChanged(provider) ?? Effect.void).pipe(Effect.map(() => this.status()));
+  }
+
+  /** The models of an account after the first, from its last check. Empty for the own sign-in. */
+  accountModels(provider: AgentProvider, accountId: string | undefined): AgentModelOption[] {
+    return this.#providerAccounts?.models(provider, accountId) ?? [];
   }
 
   /** True when `accountId` names an account after the first that this computer holds. */

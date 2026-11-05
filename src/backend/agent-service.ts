@@ -644,7 +644,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       profileClients: this.#profileClients,
       listAgents: () => this.listAgents(),
       models: (agent) =>
-        this.#providers.ensureProvider(agent.provider).pipe(Effect.map(() => this.#endpoints.available())),
+        this.#providers.ensureProvider(agent.provider).pipe(Effect.map(() => this.#agentModels(agent))),
       createProfileClient: (agent) => this.#providers.createProfileClient(agent.provider, agent.providerAccountId),
       usageObserver: (agent, model) =>
         memoryReviewUsageObserver(this.#store.database.usage, agent.id, agent.provider, model.id),
@@ -1153,10 +1153,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         Effect.gen({ self: this }, function* () {
           const modelOf = (agent: AgentSummary) =>
             (background
-              ? backgroundModel(agent, this.#endpoints.available())
-              : this.#endpoints
-                  .available()
-                  .find((item) => item.provider === agent.provider && item.id === agent.model)) ?? undefined;
+              ? backgroundModel(agent, this.#agentModels(agent))
+              : this.#agentModels(agent).find((item) => item.provider === agent.provider && item.id === agent.model)) ??
+            undefined;
           const leadStarted = yield* Effect.result(this.#providers.ensureProvider(lead.provider));
           let selected = lead;
           let model = Result.isSuccess(leadStarted) ? modelOf(lead) : undefined;
@@ -2344,6 +2343,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
+   * The models one agent can run: the catalogue, and the models that only the agent's account after
+   * the first serves (#5217).
+   */
+  #agentModels(agent: Pick<AgentSummary, "provider" | "providerAccountId">): AgentModelOption[] {
+    const models = this.#endpoints.available();
+    const own = this.#providers
+      .accountModels(agent.provider, agent.providerAccountId)
+      .filter((option) => !models.some((model) => model.provider === option.provider && model.id === option.id));
+    return own.length ? [...models, ...own] : models;
+  }
+
+  /**
    * Tells the renderer and each joined client to read the model list again, after a change to the
    * models that the picker shows. The list reaches them by pull, refreshed on a status event.
    */
@@ -2364,7 +2375,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         });
       const provider = agent?.provider ?? this.#startingChoice()?.provider ?? this.#providers.preferredProvider();
       yield* this.#providers.ensureProvider(provider);
-      const models = this.#endpoints.available();
+      const models = agent ? this.#agentModels(agent) : this.#endpoints.available();
       const model = agent
         ? models.find((candidate) => candidate.id === agent.model && candidate.provider === provider)
         : startingModel(provider, models, this.#preference());
@@ -2395,9 +2406,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
       if (this.#profileClients.busy()) return yield* failed(sourceText("error.agent.sideQuestionBusy"));
       yield* this.#providers.ensureProvider(agent.provider);
-      const model = this.#endpoints
-        .available()
-        .find((candidate) => candidate.provider === agent.provider && candidate.id === agent.model);
+      const model = this.#agentModels(agent).find(
+        (candidate) => candidate.provider === agent.provider && candidate.id === agent.model,
+      );
       if (!model) return yield* failed(sourceText("error.provider.noModel"));
       if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
       if (this.#profileClients.busy()) return yield* failed(sourceText("error.agent.sideQuestionBusy"));
@@ -2927,18 +2938,29 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       () => {
         this.#conversation.requireKnownAgent(input.agentId);
         const previous = this.#store.list().find((agent) => agent.id === input.agentId);
+        const modelProvider = input.provider ?? (previous ? providerForAgent(previous) : undefined);
         const requestedModel = input.model
-          ? this.#endpoints
+          ? (this.#endpoints
               .available()
-              .find((model) => model.id === input.model && (!input.provider || model.provider === input.provider))
+              .find((model) => model.id === input.model && (!input.provider || model.provider === input.provider)) ??
+            // A model that only the agent's account after the first serves (#5217).
+            (modelProvider
+              ? this.#providers
+                  .accountModels(
+                    modelProvider,
+                    input.providerAccountId !== undefined
+                      ? (input.providerAccountId ?? undefined)
+                      : previous?.providerAccountId,
+                  )
+                  .find((model) => model.id === input.model)
+              : undefined))
           : undefined;
         if (input.model && !requestedModel) {
           // A change of model alone stays on the agent's provider, so that provider is the one to explain.
-          const provider = input.provider ?? (previous ? providerForAgent(previous) : undefined);
           throw new AgentSettingsRefused(
             modelUnavailableError(
               input.model,
-              provider,
+              modelProvider,
               this.#endpoints.available(),
               this.#providers.status().providers ?? [],
             ).message,
@@ -3427,7 +3449,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    */
   #appendModelSwitchMarker(agent: AgentSummary, reason: ModelSwitchReason): void {
     const model =
-      this.#endpoints.available().find((option) => option.provider === agent.provider && option.id === agent.model)
+      this.#agentModels(agent).find((option) => option.provider === agent.provider && option.id === agent.model)
         ?.name ?? agent.model;
     const text = sourceText(MODEL_SWITCH_TEXT[reason], { model });
     try {

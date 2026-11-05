@@ -617,6 +617,11 @@ own folder (`antigravityReadsGeminiHome` gates the rows, the sign-in, the checks
 the agent start), and `antigravityStatePaths` confines its process to that folder. Each new session
 leaves a conversation database in that folder, so a usage read of an account with no agent process
 starts no process: the account shows its reading from the sign-in check. The sandbox cannot create folders in a new account's home, so OpenBot makes them.
+A plan can serve models that the first account's does not, so the account check also reads the account's own
+`model/list` (`ModelCatalog.read`) after it marks the account connected, and the account row keeps that list as
+`models` (#5217). The model picker shows it on the account's entry, and `updateAgent` accepts a model of the
+agent's account. A failed list keeps the last one. `provider-accounts-v1` does not carry it, so a joined server
+still shows the provider's catalogue for each account.
 The account sign-in is the same ACP `authenticate` call as the first account's; a Reconnect calls
 `logout` first. So a Reconnect refuses while an agent on the account runs a turn, and it stops the
 account's idle agent processes, which keep the old token. A saved Gemini API key belongs to the

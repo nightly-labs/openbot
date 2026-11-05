@@ -55,7 +55,7 @@ import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack }
 import { formatUsageReset, usageWindowLabel } from "../features/account/account-usage-view";
 import { currentText, type TextValue, useText } from "../text";
 import { createScrollFades } from "./createScrollFades";
-import { providerAccountName } from "./provider-accounts";
+import { findModelOption, providerAccountName } from "./provider-accounts";
 import {
   customProviderIds,
   groupPickerModels,
@@ -231,9 +231,9 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     return id && railAccounts(props.provider).some((account) => account.id === id) ? id : null;
   };
   const customIds = createMemo(() => customProviderIds(props.customProviders ?? []));
-  const selectedModel = createMemo(() =>
-    props.modelOptions.find((option) => option.provider === props.provider && option.id === props.value),
-  );
+  const modelOption = (provider: string, id: string) =>
+    findModelOption(props.modelOptions, props.agentStatus?.providers, provider, id);
+  const selectedModel = createMemo(() => modelOption(props.provider, props.value));
   const selectedFixed = createMemo(() => fixedModelSettings(selectedModel()));
   /** The tab the current selection lives on: the Custom one for the user's endpoints and agents. */
   const activeProvider = (): RailId =>
@@ -308,6 +308,20 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     const index = accounts.findIndex((account) => account.id === id);
     const account = accounts[index];
     return account ? { account, number: index + 1, name: providerAccountName(t, accounts, id) } : null;
+  };
+  /**
+   * The models of a rail entry: the account's own list when its check read one, as a plan can serve
+   * other models than the provider's own sign-in (#5217). It folds older models as the provider's list does.
+   */
+  const entryModelOptions = (key: RailKey): ClientAgentModelOption[] => {
+    const rail = railOf(key);
+    const shared = railModelOptions(rail);
+    const own = entryAccount(key)?.account.models;
+    if (!own?.length) return shared;
+    return own.map((model) => {
+      const listing = shared.find((option) => option.id === model.id)?.listing;
+      return listing ? { ...model, listing } : model;
+    });
   };
   /** An account after the first that is not signed in cannot run its models, whatever the provider says. */
   const entryStatus = (key: RailKey): AgentProviderStatus => {
@@ -388,7 +402,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     const rail = railOf(key);
     if (rail === CUSTOM_RAIL || !props.accountUsage) return [];
     const accountId = key === rail ? null : key.slice(rail.length + 1);
-    return railModelOptions(rail).map((model) => spentWindow(rail, accountId, model.id));
+    return entryModelOptions(key).map((model) => spentWindow(rail, accountId, model.id));
   };
   /**
    * The spent window of a rail entry when one limits every model of the entry: the one that resets
@@ -773,11 +787,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                   return id && id !== DEFAULT_PROVIDER_ACCOUNT_ID ? id : null;
                 };
                 const status = () => entryStatus(key);
-                const models = createMemo(() => pickerModels(railModelOptions(provider)));
+                const models = createMemo(() => pickerModels(entryModelOptions(key)));
                 const [showOlder, setShowOlder] = createSignal(false);
                 const olderExpanded = () => (showOlder() ? "true" : "false");
                 // An endpoint and a custom agent can both list `goose/default`: match the provider too.
-                // Another account of the same provider lists the same models, but not this agent's.
+                // Another account of the same provider can list the same models, but not this agent's.
                 const selected = createMemo(() =>
                   accountId() !== currentAccount()
                     ? undefined
@@ -834,14 +848,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                         const model = item.rawValue;
                         const isSelected = () => selectedKey() === pickerModelKey(model);
                         const settings = () =>
-                          fixedModelSettingsText(
-                            fixedModelSettings(
-                              props.modelOptions.find(
-                                (option) => option.provider === model.provider && option.id === model.id,
-                              ),
-                            ),
-                            t,
-                          );
+                          fixedModelSettingsText(fixedModelSettings(modelOption(model.provider, model.id)), t);
                         const label = () =>
                           [displayModelName(model.name, model.id), settings()].filter(Boolean).join(", ");
                         return (
@@ -898,16 +905,15 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 const effortLocked = () => !available();
                 /** A spent window that limits every model of the tab: a chip beside the provider name. */
                 const headingSpent = createMemo(() => (available() ? entrySpentWindow(key) : undefined));
-                const modelOption = (model: PickerModel | undefined) =>
-                  model &&
-                  props.modelOptions.find((option) => option.provider === model.provider && option.id === model.id);
+                const pickerModelOption = (model: PickerModel | undefined) =>
+                  model && modelOption(model.provider, model.id);
                 /** The model the effort is for: the agent's model, or the one this tab starts on. */
                 const effortModel = createMemo(() => {
                   if (ownsSelection()) return selected();
                   const list = main().filter(modelEnabled);
                   return list.find((model) => model.id === railDefaultModel(provider)) ?? list[0];
                 });
-                const effortOption = () => (ownsSelection() ? selectedModel() : modelOption(effortModel()));
+                const effortOption = () => (ownsSelection() ? selectedModel() : pickerModelOption(effortModel()));
                 const effortOptions = createMemo(() => {
                   const variants = effortModel()?.variants ?? [];
                   if (variants.length) return variants;

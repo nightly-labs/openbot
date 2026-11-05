@@ -1,5 +1,6 @@
 import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
 import type { AgentModelId, AgentProviderId, AgentReasoningEffort, UpdateAgentInput } from "@openbot/contracts/ipc";
+import { findModelOption } from "@openbot/ui/components/provider-accounts";
 import type {
   AgentRuntimeSettings,
   AgentRuntimeSettingsPatch,
@@ -141,9 +142,7 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
     accountId?: string | null,
     preferredEffort?: AgentReasoningEffort,
   ): Promise<boolean> {
-    const option = deps.props.modelOptions.find(
-      (candidate) => candidate.provider === provider && candidate.id === model,
-    );
+    const option = findModelOption(deps.props.modelOptions, deps.props.agentStatus.providers, provider, model);
     if (!option) return false;
     const preferred = preferredEffort ?? deps.settingsReasoning();
     const reasoningEffort = option.supportedReasoningEfforts.includes(preferred)
@@ -172,8 +171,11 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
   }
 
   async function selectAndConfirmReasoning(effort: AgentReasoningEffort): Promise<void> {
-    const option = deps.props.modelOptions.find(
-      (candidate) => candidate.provider === deps.settingsProvider() && candidate.id === deps.settingsModel(),
+    const option = findModelOption(
+      deps.props.modelOptions,
+      deps.props.agentStatus.providers,
+      deps.settingsProvider(),
+      deps.settingsModel(),
     );
     if (!option?.supportedReasoningEfforts.includes(effort)) return;
     const settings = {
