@@ -105,7 +105,7 @@ function parseModels(providerId: string, value: unknown): CustomProviderModel[] 
     if (entry.reasoningEfforts !== undefined) {
       // The form sends a known list in order, so only a malformed payload fails here.
       if (!isCustomProviderReasoningEfforts(entry.reasoningEfforts))
-        throw new Error("Model reasoning efforts are not valid.");
+        throw new Error(sourceText("error.provider.reasoningEffortsInvalid"));
       model.reasoningEfforts = [...entry.reasoningEfforts];
     }
     models.push(model);

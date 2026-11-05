@@ -287,26 +287,29 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     setDraft((state) => {
       const model = state.models[index];
       if (!model) return;
-      const others = (model.reasoningEfforts ?? []).filter((item) => item !== effort);
-      model.reasoningEfforts = checked ? [...others, effort] : others;
+      // In place: the store tracks each item, so a new array would re-run every reader of the row.
+      model.reasoningEfforts ??= [];
+      const at = model.reasoningEfforts.indexOf(effort);
+      if (checked && at < 0) model.reasoningEfforts.push(effort);
+      if (!checked && at >= 0) model.reasoningEfforts.splice(at, 1);
     });
   }
 
   /** The efforts of one model row. None checked keeps the efforts of the provider that runs it. */
   const effortsId = createUniqueId();
-  const effortsRow = (row: ModelRow, index: number) => (
-    <fieldset class="custom-provider-efforts" aria-label={t("customProvider.model.efforts", { number: index + 1 })}>
+  const effortsRow = (row: ModelRow, index: () => number) => (
+    <fieldset class="custom-provider-efforts" aria-label={t("customProvider.model.efforts", { number: index() + 1 })}>
       <Text tone="muted" variant="caption" aria-hidden="true">
         {t("customProvider.model.effortsLabel")}
       </Text>
       <For each={CUSTOM_PROVIDER_REASONING_EFFORTS}>
         {(effort) => (
-          <label class="custom-provider-effort" for={`${effortsId}-${index}-${effort}`}>
+          <label class="custom-provider-effort" for={`${effortsId}-${index()}-${effort}`}>
             <Checkbox
-              id={`${effortsId}-${index}-${effort}`}
+              id={`${effortsId}-${index()}-${effort}`}
               checked={row.reasoningEfforts?.includes(effort) ?? false}
               disabled={busy()}
-              onChange={(event) => setEffort(index, effort, event.currentTarget.checked)}
+              onChange={(event) => setEffort(index(), effort, event.currentTarget.checked)}
             />
             <Text variant="body-sm">{t(REASONING_LABEL[effort])}</Text>
           </label>
@@ -366,7 +369,12 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
         return;
       }
       if (state.models.some((row) => row.id.trim() === model.id)) return;
-      const row = { id: model.id, name: model.name ?? model.id, contextWindow: model.contextWindow?.toString() ?? "" };
+      const row = {
+        id: model.id,
+        name: model.name ?? model.id,
+        contextWindow: model.contextWindow?.toString() ?? "",
+        ...(model.reasoningEfforts ? { reasoningEfforts: [...model.reasoningEfforts] } : {}),
+      };
       // The blank row that a new form opens with is a placeholder, not a model the user added.
       const blank = state.models.findIndex(blankModel);
       if (blank >= 0) state.models[blank] = row;
