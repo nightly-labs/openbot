@@ -29,7 +29,11 @@ import { agentDisplayEnvironment, hasSeparateAgentDisplay } from "./agent-displa
 import { type AgentFolders, createAgentFolders } from "./agent-folders";
 import { type AgentHostSettingsService, createAgentHostSettings } from "./agent-host-settings";
 import { type AgentInstructionsFiles, createAgentInstructionsFiles } from "./agent-instructions-files";
-import { type BrowserProfileService, createBrowserProfileService } from "./browser-profile-service";
+import {
+  type BrowserProfileService,
+  browserProxyConnection,
+  createBrowserProfileService,
+} from "./browser-profile-service";
 import { HostReleaseService, readInstallationMode } from "./host-release-service";
 import {
   CONTAINER_UPDATE_PATHS,
@@ -120,6 +124,7 @@ import { AgentLifecycleFailed, AgentService } from "../backend/agent-service";
 import { AgentStore } from "../backend/agent-store";
 import { BrowserHost } from "../backend/browser-host";
 import { BrowserProfileStore } from "../backend/browser-profiles/browser-profile-store";
+import { BrowserProxyStore } from "../backend/browser-profiles/browser-proxy-store";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { MailboxStore } from "../backend/mailbox-store";
 import { McpOAuth } from "../backend/mcp-oauth-provider";
@@ -166,6 +171,8 @@ import { managedBitwardenCli } from "./bitwarden-cli-installer";
 import { BitwardenConnectorService } from "./bitwarden-connector-service";
 import { BitwardenConnectorStore } from "./bitwarden-connector-store";
 import { BrowserDockOverlay } from "./browser-dock-overlay";
+import { BrowserEgressClient } from "./browser-egress-client";
+import { BrowserEgressHost } from "./browser-egress-host";
 import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { BrowserViewClient } from "./browser-view-client";
 import { BusyMessageModePreferenceStore } from "./busy-message-mode-preference-store";
@@ -1178,6 +1185,8 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.teamWebRtcBridge, "the team WebRTC bridge", () =>
     runCauseEffect(teamWebRtcBridge.stop()),
   );
+  // The computers of members that share their connection with this server, for computer proxies.
+  const browserEgress = new BrowserEgressHost(teamWebRtcBridge);
   // Only a hosted, self-hosted or container server: one unit or container holds OpenBot and every
   // agent process. The desktop app does not hold turns for memory.
   const hostMemory =
@@ -1203,6 +1212,10 @@ export async function createApplicationServices({
     teardown.push(TEARDOWN_ORDER.serverMemory, "the server memory reading", () => Effect.runPromise(hostMemory.stop()));
   }
   const browserProfileStore = new BrowserProfileStore(store.database);
+  const browserProxyStore = new BrowserProxyStore(store.database);
+  const browserProxyCipher = safeStorageCipher("error.app.secretStorageUnavailable");
+  // The agent service starts after the browser: a proxy failure before it has no open list to update.
+  let browserProxyStatusChanged = () => {};
   const browser = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE), {
     memoryLow: () => (hostMemory?.level() ?? "ok") !== "ok",
     browserProfile: (agentId) => {
@@ -1210,6 +1223,9 @@ export async function createApplicationServices({
       return agent ? agentBrowserProfile(agent) : { kind: "shared" };
     },
     profileExists: (profileId) => browserProfileStore.get(profileId) !== undefined,
+    profileProxy: (profileId) => browserProxyConnection(browserProxyStore, browserProxyCipher, profileId),
+    onProxyStatusChanged: () => browserProxyStatusChanged(),
+    computerExit: (memberId) => browserEgress.exit(memberId),
     quitShortcut: (input) => windows.handleQuitShortcut(mainWindow, input),
   });
   teardown.push(TEARDOWN_ORDER.browser, "the browser", () => runCauseEffect(browser.destroy()));
@@ -2477,10 +2493,20 @@ export async function createApplicationServices({
   const agentInstructions = createAgentInstructionsFiles(service);
   const browserProfiles = createBrowserProfileService({
     store: browserProfileStore,
+    proxies: browserProxyStore,
+    cipher: browserProxyCipher,
     agents: service,
     browser,
+    memberName: (memberId) => {
+      const member = teamStore.getMember(memberId);
+      return member ? (member.name ?? member.username) : null;
+    },
+    computerOnline: (memberId) => browserEgress.online(memberId),
     onChanged: () => service.notifyBrowserProfilesChanged(),
   });
+  browserProxyStatusChanged = () => service.notifyBrowserProfilesChanged();
+  // A computer that comes online or goes offline changes the proxy list.
+  browserEgress.on("changed", () => service.notifyBrowserProfilesChanged());
   const customProviderChanges = createCustomProviderChanges({ service, customProviders, providerRuntimes });
   const customAgentChanges = createCustomAgentChanges({ service, customAgents });
   const acpRegistry = createAcpRegistry({
@@ -2803,6 +2829,7 @@ export async function createApplicationServices({
       toolRuntimes: () => providerRuntimes.mcpToolRuntimes(),
     },
     teamWebRtcBridge,
+    peerMemberChanged: browserEgress.peerMemberChanged,
     privateNetwork: () => remoteNetworkRoute.get().route === "private",
     registerRemoteHost: (input) => centralAuth.registerRemoteHost(input).pipe(toRemoteWorkflowError),
     handOverRemoteHostKey: (hostId, handover) =>
@@ -3159,6 +3186,12 @@ export async function createApplicationServices({
   // account check and its coalescing; this only forwards the notice to it.
   teamWebRtcBridge.on("accountServersChanged", () => void Effect.runPromise(remoteServers.invalidateDirectory()));
   teardown.push(TEARDOWN_ORDER.remoteServers, "the remote servers", () => runCauseEffect(remoteServers.stop()));
+  // This computer's connection, for the computer proxies of the joined servers that the user shares it with.
+  const browserEgressClient = new BrowserEgressClient(teamWebRtcBridge, {
+    serverIds: () => remoteServers.list().map((server) => server.id),
+    browserEgressWanted: (serverId) => remoteServers.browserEgressWanted(serverId),
+  });
+  remoteServers.on("changed", browserEgressClient.reconcile);
   performance.mark("openbot:services.plugin-catalog");
   // Not on a server: a local server is a workspace of the desktop app.
   const localServers =

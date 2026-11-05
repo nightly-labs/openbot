@@ -229,6 +229,14 @@ import type {
   UpdateAgentBrowserProfileInput,
   UpdateBrowserProfileInput,
 } from "./ipc-browser-profiles";
+import type {
+  BrowserComputerSharing,
+  BrowserProxyList,
+  BrowserProxySummary,
+  DeleteBrowserProxyInput,
+  SaveBrowserProxyInput,
+  SetBrowserProfileProxyInput,
+} from "./ipc-browser-proxies";
 import type { LocalBrowserSecretResponse } from "./ipc-browser-secret";
 import type {
   ChannelMemory,
@@ -1927,6 +1935,18 @@ export const IPC_ENDPOINTS = {
     getAgentBrowserProfile: scopedRequest<string, AgentBrowserProfile>()("agent:admin:get-browser-profile"),
     updateAgentBrowserProfile: scopedRequest<UpdateAgentBrowserProfileInput, AgentBrowserProfile>()(
       "agent:admin:update-browser-profile",
+    ),
+    // Saved proxies of the named browser profiles: `browser-proxies-v1` on a joined server.
+    listBrowserProxies: scopedQuery<BrowserProxyList | null>()("agent:admin:list-browser-proxies"),
+    saveBrowserProxy: scopedRequest<SaveBrowserProxyInput, BrowserProxySummary>()("agent:admin:save-browser-proxy"),
+    deleteBrowserProxy: scopedRequest<DeleteBrowserProxyInput, void>()("agent:admin:delete-browser-proxy"),
+    setBrowserProfileProxy: scopedRequest<SetBrowserProfileProxyInput, void>()("agent:admin:set-browser-profile-proxy"),
+    // Whether this app shares its connection with a joined server (`browser-egress-v1`). Null for
+    // this computer's own server and for a host without the capability. Turning it on also adds this
+    // member's computer to the proxies of the host.
+    getBrowserComputerSharing: scopedQuery<BrowserComputerSharing | null>()("agent:admin:get-browser-computer-sharing"),
+    setBrowserComputerSharing: scopedRequest<BrowserComputerSharing, void>()(
+      "agent:admin:set-browser-computer-sharing",
     ),
     listBrowserTabProfiles: scopedQuery<BrowserTabProfile[]>()("agent:admin:list-browser-tab-profiles"),
     getAgentAdminSettings: scopedRequest<string, AgentAdminSettings>()("agent:admin:get-settings"),

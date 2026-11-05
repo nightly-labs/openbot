@@ -175,6 +175,7 @@ import { Effect } from "effect";
 import { SteerUnsupportedError } from "../src/backend/agent/queue-controls";
 import { AgentLifecycleFailed } from "../src/backend/agent-service";
 import { BrowserProfileStore } from "../src/backend/browser-profiles/browser-profile-store";
+import { BrowserProxyStore } from "../src/backend/browser-profiles/browser-proxy-store";
 import type { BrowserTabSession } from "../src/backend/browser-state";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { MessageDeleteRefused } from "../src/backend/message-delete";
@@ -1065,6 +1066,9 @@ try {
       : left.kind === "agent" && right.kind === "agent" && left.key === right.key;
   const browserProfiles = createBrowserProfileService({
     store: new BrowserProfileStore(database),
+    proxies: new BrowserProxyStore(database),
+    // The script saves no proxy password, so the cipher only has to exist.
+    cipher: { canPersist: () => true, encrypt: (value) => Buffer.from(value, "utf8") },
     agents: {
       listAgents: () => agents,
       updateAgent: (input) =>
@@ -1092,6 +1096,8 @@ try {
             1,
           );
         }),
+      proxyFailure: () => null,
+      forgetProxyFailure: () => undefined,
       clearTabSession: (tabSession) => Effect.sync(() => record("clearTabSession", tabSession)),
     },
   });

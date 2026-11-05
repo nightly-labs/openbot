@@ -185,6 +185,8 @@ interface HostServiceOptions {
   platform?: "darwin" | "win32" | "linux";
   unattended?: boolean;
   teamWebRtcBridge?: TeamWebRtcBridge;
+  /** A device signed in as a membership, or (`null`) its session ended. Computer proxies use it. */
+  peerMemberChanged?: (peerId: string, membershipId: string | null) => void;
   /** Whether devices may connect to this computer only over a private network, such as Tailscale. */
   privateNetwork?: () => boolean;
   registerRemoteHost?: (input: {
@@ -558,6 +560,7 @@ export class HostService extends EventEmitter<HostEvents> {
             }
           },
           unknownMemberConnected: (membershipId) => this.#dispatch(this.#learnConnectedMember(membershipId)),
+          ...(options.peerMemberChanged ? { peerMemberChanged: options.peerMemberChanged } : {}),
           ...(options.verifyRemoteSessionTicket ? { verifyClientTicket: options.verifyRemoteSessionTicket } : {}),
           ...(options.privateNetwork ? { privateNetwork: options.privateNetwork } : {}),
         })

@@ -25,7 +25,6 @@ import {
   agentPermissionLevels,
   agentPermissionUpdate,
   agentQuickAcknowledgementEnabled,
-  type BrowserProfileSummary,
   type BusyMessageMode,
   type ClientAgentModelOption,
   type CustomAgentSummary,
@@ -93,7 +92,11 @@ import {
 import type { AgentProfile } from "@openbot/ui/data";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { InstructionsLimit, instructionsTooLong } from "@openbot/ui/features/agents/InstructionsLimit";
-import { type BrowserProfileChoice, BrowserProfileSelect } from "@openbot/ui/features/browser/BrowserProfileSelect";
+import {
+  type BrowserProfileChoice,
+  BrowserProfileSelect,
+  type BrowserProfileSelectProfile,
+} from "@openbot/ui/features/browser/BrowserProfileSelect";
 import { errorReference } from "@openbot/user-errors";
 import type { JSX } from "@solidjs/web";
 import {
@@ -204,7 +207,7 @@ export interface AgentSettingsPanelProps {
 
 export interface AgentBrowserProfileOptions {
   /** The named profiles of the computer that runs the agent. Undefined while they load. */
-  profiles: readonly Pick<BrowserProfileSummary, "id" | "name" | "hue">[] | undefined;
+  profiles: readonly BrowserProfileSelectProfile[] | undefined;
   /**
    * The agent's choice, as its host gives it. The summary of an agent on a joined server does not
    * carry it; absent, the panel reads it from the agent.
