@@ -490,7 +490,14 @@ try {
         attachmentPaths.push(file.path);
       }
       const connection = service().database.connection;
+      const mailboxAttachmentRows = () =>
+        connection
+          .prepare(
+            "SELECT attachment_id FROM projection_attachments WHERE owner_kind = 'mailbox-message' AND attachment_id IN (?, ?, ?, ?)",
+          )
+          .all(...attachmentIds);
       assert.ok(archives(threadId).length > 0, "The thread must retain history before deletion.");
+      assert.ok(mailboxAttachmentRows().length > 0, "The mailbox must hold attachment references before deletion.");
       if (taskId) await runCauseEffect(service().agents.deleteTask({ agentId: agent.id, taskId }));
       else await runCauseEffect(service().agents.deleteAgent(agent.id));
       assert.deepEqual(archives(threadId), [], "Deleting the thread left its rewound history behind.");
@@ -507,6 +514,7 @@ try {
         [],
         "Deleting the thread left its attachment references behind.",
       );
+      assert.deepEqual(mailboxAttachmentRows(), [], "Deleting the thread left mailbox attachment references behind.");
       for (const id of attachmentIds) assert.equal(await runCauseEffect(service().mailbox.resolveAttachment(id)), null);
       for (const path of attachmentPaths)
         assert.equal(existsSync(path), false, "Deleting the thread left a file behind.");
@@ -622,6 +630,24 @@ try {
         .slice(logStart)
         .some((entry) => entry.text?.includes("RECOVERY-NEW-QUESTION")),
     );
+    await assert.rejects(
+      restart(({ database }) => {
+        database.rewindConversation = () => {
+          assert.equal(database.activeProviderSession(threadId, "codex"), null);
+          throw new Error("Injected recovery cut failure");
+        };
+      }),
+      /Injected recovery cut failure/,
+    );
+    assert.deepEqual(service().database.readConversation(agent.id, threadId), before);
+    assert.deepEqual(archives(threadId), [], "Failed recovery archived history without cutting it.");
+    assert.equal(service().database.activeProviderSession(threadId, "codex"), null);
+    assert.equal(service().mailbox.nextQueued(agent.id), null, "Failed recovery released the rewrite delivery.");
+    assert.ok(
+      service()
+        .mailbox.pendingRewrites()
+        .some((intent) => intent.deliveryId === id),
+    );
     let atFirstTurn: { sourceAbsent: boolean; archiveCount: number } | undefined;
     let sessionRetiredBeforeRewind = false;
     await restart(({ agents, database }) => {
@@ -682,6 +708,7 @@ try {
       removedIds: suffix,
       archiveCount: archive.length,
       atFirstTurn,
+      failedRecoveryHeldIntentUntilRetry: true,
     };
   });
 

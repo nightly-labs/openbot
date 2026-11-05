@@ -42,8 +42,9 @@ Repeatable checks:
 - `bun scripts/thread-rewind-e2e.ts` writes its report under `.openbot-build/thread-rewind-e2e/`.
 - `bun scripts/thread-rewrite-service-e2e.ts` restarts the complete service, database and a separate
   deterministic provider process, then verifies completed history imports, subsequent turns,
-  sender ownership, provider retirement before a recovery cut, and deletion of rewound main and
-  side-thread history, attachment references, and transferred files.
+  sender ownership, provider retirement before a recovery cut, a failed cut and its retry, and
+  deletion of rewound main and side-thread history, thread and mailbox attachment references,
+  and transferred files.
 - `bun scripts/thread-rewrite-ui-e2e.ts --allow-mutations` drives Edit, Cancel and Resend in main and
   side threads on this worktree's isolated desktop dev profile using a signed-in live Codex model.
   After stopping and starting that stack, `--verify-restart --allow-mutations` checks new provider
