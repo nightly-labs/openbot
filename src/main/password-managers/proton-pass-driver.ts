@@ -47,6 +47,8 @@ const READ_REASON = "OpenBot fills this login in its browser.";
 const AGENT_EXPIRATION = "1y";
 const AGENT_LIFETIME_MS = 365 * 24 * 60 * 60 * 1000;
 const COMMAND_MS = 60_000;
+/** The sign-out after a web sign-in. It runs also after a cancel or a quit, so it is short. */
+const SIGN_OUT_MS = 10_000;
 /** The CLI waits 10 minutes for the web sign-in. */
 const SIGN_IN_MS = 11 * 60_000;
 const INDEX_MS = 10 * 60_000;
@@ -602,9 +604,12 @@ export class ProtonPassDriver implements PasswordManagerDriver, PasswordVault {
       }).pipe(
         Effect.ensuring(
           Effect.gen({ self: this }, function* () {
-            // The user's own session ends on this host; only the agent access key stays.
-            const logout = yield* call(["logout"]).pipe(Effect.orElseSucceed(() => null));
-            if (logout?.code !== 0) yield* call(["logout", "--force"]).pipe(Effect.ignore);
+            // The user's own session ends on this host; only the agent access key stays. A cancel aborts
+            // `signal`, so the sign-out has its own signal: it must also end the session at Proton then.
+            const signOut = (args: string[]) =>
+              this.#call(executable, args, env, new AbortController().signal, SIGN_OUT_MS);
+            const logout = yield* signOut(["logout"]).pipe(Effect.orElseSucceed(() => null));
+            if (logout?.code !== 0) yield* signOut(["logout", "--force"]).pipe(Effect.ignore);
             yield* Effect.promise(() => pipe.close());
           }),
         ),
