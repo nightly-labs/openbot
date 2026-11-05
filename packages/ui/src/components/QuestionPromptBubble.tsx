@@ -461,7 +461,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
               </p>
             }
           >
-            <p class="question-prompt-sent sr-only" role="status">
+            <p class="sr-only" role="status">
               {statusTitle()}
             </p>
             <For each={props.questions}>
@@ -544,7 +544,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
                 <X aria-hidden="true" />
               </Questionnaire.Cancel>
             </Show>
-            <p class="question-prompt-announce sr-only" aria-live="polite">
+            <p class="sr-only" aria-live="polite">
               {resolved() ? "" : state.announced}
             </p>
             <div ref={stage} class="question-prompt-stage" tabindex="-1">

@@ -188,7 +188,7 @@ try {
     for (const channel of ["LinkedIn", "Product Hunt"]) {
       await choices.locator(`input[value="${channel}"]`).check();
     }
-    await app.getByRole("button", { name: "Done" }).click();
+    await app.getByRole("button", { name: "Done", exact: true }).click();
     const sent = app.getByRole("region", { name: "Answers sent" });
     for (const channel of ["LinkedIn", "Product Hunt"]) await sent.getByText(channel).waitFor();
 
@@ -283,7 +283,7 @@ try {
       .getByRole("group", { name: /^Reactions: / })
       .waitFor();
     await early.app.getByRole("region", { name: "Answers sent" }).getByText(AUTO_ANSWER).waitFor();
-    assert.equal(await early.app.getByRole("button", { name: "Done" }).count(), 0);
+    assert.equal(await early.app.getByRole("button", { name: "Done", exact: true }).count(), 0);
     assert.equal(await early.app.getByRole("button", { name: "Stop agent" }).count(), 0);
     await early.page.locator(".landing-app-preview").screenshot({ path: resolve(OUT, "desktop-left-mid-scene.png") });
     assert.deepEqual(early.errors, []);
@@ -324,7 +324,7 @@ try {
     const stillPlan = launchPlan(still.app);
     await stillPlan.getByRole("group", { name: /^Reactions: / }).waitFor();
     await still.app.getByRole("region", { name: "Answers sent" }).getByText(AUTO_ANSWER).waitFor();
-    assert.equal(await still.app.getByRole("button", { name: "Done" }).count(), 0);
+    assert.equal(await still.app.getByRole("button", { name: "Done", exact: true }).count(), 0);
     assert.equal(await still.app.getByRole("button", { name: "Stop agent" }).count(), 0);
     await still.page.locator(".landing-app-preview").screenshot({ path: resolve(OUT, "desktop-reduced-motion.png") });
     assert.deepEqual(still.errors, []);

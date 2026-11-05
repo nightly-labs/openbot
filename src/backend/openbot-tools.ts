@@ -634,6 +634,13 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
             id: z.string().max(INPUT_LIMITS.identifier).optional(),
             header: z.string().max(INPUT_LIMITS.promptHeader).optional(),
             question: z.string().min(1).max(INPUT_LIMITS.promptQuestion),
+            detail: z
+              .string()
+              .max(INPUT_LIMITS.promptQuestion)
+              .optional()
+              .describe(
+                "One short line of context that shows under the question. Leave it out when the question is clear.",
+              ),
             isSecret: z
               .boolean()
               .optional()

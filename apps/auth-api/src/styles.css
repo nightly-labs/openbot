@@ -5,6 +5,7 @@
 /* Only the web client at /app sets the attribute that turns it on. The public pages stay dark. */
 @import "@openbot/brand/tokens-light.css";
 @import "@openbot/ui/stagger.css";
+@import "@openbot/ui/styles/sr-only.css";
 
 /* Arial with the size and line metrics of Inter. Until Inter loads, the text takes the same space,
    so the hero does not move when the font changes. Inter is wider than the system font, and on a

@@ -132,18 +132,24 @@ function elicitationConsentQuestion(params: unknown, serverName: string | null):
   };
 }
 
-/** One question per requested field, so a plugin can collect an API key or any other value. */
-function elicitationFieldQuestions(params: unknown, subject: string): AgentPromptQuestion[] {
+/**
+ * One question per requested field, so a plugin can collect an API key or any other value. When a
+ * field has its own text, the request message goes under the first question, so it is not lost.
+ */
+export function elicitationFieldQuestions(params: unknown, subject: string): AgentPromptQuestion[] {
   const properties = getRecord(getRecord(params, "requestedSchema"), "properties") ?? {};
-  const message = getString(params, "message")?.trim();
-  return Object.entries(properties).flatMap(([id, property]) => {
+  const message = getString(params, "message")?.trim() || undefined;
+  return Object.entries(properties).flatMap(([id, property], index) => {
     if (!isRecord(property)) return [];
-    const question = getString(property, "description") ?? message ?? `${subject} needs more information.`;
+    const description = getString(property, "description");
+    const question = description ?? message ?? `${subject} needs more information.`;
+    const detail = index === 0 && description && message && message !== description ? message : undefined;
     return [
       {
         id,
         header: (getString(property, "title") ?? id).slice(0, INPUT_LIMITS.promptHeader),
         question: question.slice(0, INPUT_LIMITS.promptQuestion),
+        ...(detail ? { detail: detail.slice(0, INPUT_LIMITS.promptQuestion) } : {}),
         isSecret: secretElicitationField(id, property),
         options: elicitationOptions(property),
       },
