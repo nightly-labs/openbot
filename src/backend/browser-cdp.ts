@@ -27,6 +27,7 @@ import {
   CARD_SELECT_OPTION_FUNCTION,
   cardFieldAccepts,
   cardFieldText,
+  LOADED_FROM_NETWORK,
   parseCardFieldDescription,
 } from "./browser-card-fill";
 import {
@@ -394,7 +395,7 @@ export class BrowserCdpEngine {
             send,
             node.backendNodeId,
             `function() {
-              return { password: this.type === 'password', oneTimeCode: (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code'), network: performance.getEntriesByType('navigation')[0]?.workerStart === 0 };
+              return { password: this.type === 'password', oneTimeCode: (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code'), network: ${LOADED_FROM_NETWORK} };
             }`,
             [],
           );

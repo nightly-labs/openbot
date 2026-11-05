@@ -2000,7 +2000,7 @@ export class AttentionRegistry {
     if (pending.secret?.agentScriptedOrigin !== false)
       return skip(
         "agent-scripted-origin",
-        "a script that you ran with evaluate can still run in this page. Reload the page before submit_secret.",
+        "a script that you ran with evaluate can still run in this page or in another open page of this site. Reload this page, and close or navigate each other tab where you ran evaluate on this site, before submit_secret.",
       );
     if (pending.secret.vaultFillable !== true)
       return skip(

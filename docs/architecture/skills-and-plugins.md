@@ -95,12 +95,13 @@ site (id, title, username), and `AttentionRegistry` answers a `submit_secret` pa
 authenticator request for a saved login by filling it through the same `prepareSecret` path as the
 secure card, with no card. While agent code from `evaluate` can still run in the page,
 `BrowserHost` reports `agentScriptedOrigin` and the card opens instead, because that code could read
-the filled fields. The mark is per document: a scripted page, and a same-origin page of a connected
-popup or opener that it could reach, keep it until a main-frame navigation or a close. A script can
-also write Cache Storage that a service worker later serves as page code, so the origin stays tainted
-in that session. When a scripted page ends, and before the next fill, OpenBot clears the origin's
-Cache Storage and service workers. A page whose navigation a service worker handled must reload once;
-a worker that the page registers and claims later served nothing to it. Cookies, localStorage and
+the filled fields. The mark is per document, and it stays until a main-frame navigation or a close.
+A script can also write Cache Storage that a service worker serves as page code, also to a page that
+the worker claims after it loaded, so the origin stays tainted in that session. Thus, while a scripted
+page is open, no page of its origin in the same session fills. When it ends, a same-origin page of a
+connected popup or opener keeps that mark, each other open page of the origin must navigate before
+its own fill, and OpenBot clears the origin's Cache Storage and service workers. A fill waits for that purge, and runs it again when no other page of
+the origin is open. A page whose navigation a service worker handled must reload once. Cookies, localStorage and
 IndexedDB stay, because clearing them signs the user out and deletes offline data. So a site whose
 own code runs a stored value as code is not protected, as from any other script that the site
 loads. The same rules apply to `fill_card`. A login matches by 1Password's autofill rule, on the registrable domain

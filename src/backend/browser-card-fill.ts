@@ -58,6 +58,9 @@ export function parseCardFieldDescription(value: unknown): BrowserCardFieldDescr
  * Reads a field without its value. `ownerDocument === document` keeps the field in the frame whose
  * context runs the function: the main page, or a payment frame in its own process.
  */
+/** Page code: true when the frame's document came from the network, not from a service worker. */
+export const LOADED_FROM_NETWORK = "performance.getEntriesByType('navigation')[0]?.workerStart === 0";
+
 export const CARD_FIELD_DESCRIPTION_FUNCTION = `function() {
   const form = this.form;
   const sendsGet = (element) => element.hasAttribute('formmethod') && element.getAttribute('formmethod').trim().toLowerCase() === 'get';
@@ -72,7 +75,7 @@ export const CARD_FIELD_DESCRIPTION_FUNCTION = `function() {
     maxLength: typeof this.maxLength === 'number' ? this.maxLength : -1,
     placeholder: this.getAttribute('placeholder') ?? '',
     sendsGet: !!form && ((form.getAttribute('method') ?? '').trim().toLowerCase() === 'get' || [...form.elements].some(sendsGet)),
-    network: performance.getEntriesByType('navigation')[0]?.workerStart === 0,
+    network: ${LOADED_FROM_NETWORK},
   };
 }`;
 
