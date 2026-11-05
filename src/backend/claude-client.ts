@@ -25,7 +25,7 @@ import { type AgentContextCategoryUsage, defaultProviderModel } from "@openbot/c
 import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
+import { Deferred, Effect, Exit, Fiber, Option, Scope } from "effect";
 import {
   isTurnContextBlock,
   type MemoryContext,
@@ -65,6 +65,7 @@ import {
 } from "./agent-client";
 import { claudeContextCategories } from "./claude-context-categories";
 import { type ClaudeHistoryOptions, claudeHistoryFromMessages, claudeHistoryReader } from "./claude-history";
+import { readClaudeStoredSignIn } from "./claude-stored-sign-in";
 import {
   CLAUDE_WORKSPACE_MANAGED_SETTINGS,
   claudeExcludedWriteMessage,
@@ -759,15 +760,24 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * `claude auth status` exits 1 when signed out and still prints its status. Only a status says
-   * signed out: a timeout, a failed spawn or an exit 1 with unreadable output throws, so an account
-   * refresh keeps the working client instead of stopping it as signed out.
+   * The sign-in that the CLI stored comes first: `claude auth status` can spend its refresh token
+   * (`readClaudeStoredSignIn`). Without one, `auth status` has no token to spend. It exits 1 when
+   * signed out and still prints its status. Only a status says signed out: a timeout, a failed spawn
+   * or an exit 1 with unreadable output throws, so an account refresh keeps the working client
+   * instead of stopping it as signed out.
    */
 
   readonly #readAuthStatusEffect = Effect.fn("ClaudeAgentClient.readAuthStatus")(function* (
     this: ClaudeAgentClient,
     withApiKey: boolean,
   ): Effect.fn.Return<DynamicRecord, ProviderClientOperationError> {
+    if (!withApiKey) {
+      const stored = yield* readClaudeStoredSignIn({ ...claudeEnvironment(this.#cli), ...this.#environment(false) });
+      if (Option.isSome(stored)) {
+        lastAuthStatuses.set(this.#environment(false).CLAUDE_CONFIG_DIR ?? "", stored.value);
+        return stored.value;
+      }
+    }
     let stdout: unknown;
     let failure: unknown = null;
     const target = cliSpawnTarget(this.#cli.executable, ["auth", "status", "--json"]);
@@ -798,7 +808,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (isDynamicRecord(failure) && failure.killed === true)
       return yield* providerFailure(new RequestTimeoutError("Claude", "account/read"));
     if (failure !== null) return yield* providerFailure(failure);
-    // Exit 0 says signed in, also when the output is not a status (#4283). Another read would start
+    // Exit 0 says signed in, also when the output is not a status (#4283). Another read could start
     // one more token refresh that the CLI can leave unsaved (anthropics/claude-code#95822).
     queryLogger.warn("Claude exited signed in with an unreadable sign-in status.", {
       outputLength: isString(stdout) ? stdout.length : null,
