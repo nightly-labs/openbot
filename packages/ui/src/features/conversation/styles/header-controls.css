@@ -176,8 +176,10 @@
   }
 }
 
-/* The Fast chip gets its own room, so the model name keeps the width it has without it. */
-.provider-model-trigger:has(.provider-model-trigger-fast) {
+/* The Fast chip gets its own room, so the model name keeps the width it has without it. A form field
+   keeps the width of its row. `:where()` keeps the specificity low, so the narrow header rule below
+   still wins. */
+.provider-model-trigger:where(:not(.provider-model-trigger-field)):has(.provider-model-trigger-fast) {
   max-width: 296px;
 }
 
@@ -828,8 +830,9 @@
     max-width: 148px;
   }
 
-  /* A narrow header keeps the model name; the label and the title still name the effort. */
-  .provider-model-trigger-effort {
+  /* A narrow header keeps the model name; the label and the title still name the effort. A form
+     field has the room of its row. */
+  .provider-model-trigger:not(.provider-model-trigger-field) .provider-model-trigger-effort {
     display: none;
   }
 }

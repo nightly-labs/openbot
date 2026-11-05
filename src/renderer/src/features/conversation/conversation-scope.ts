@@ -12,6 +12,7 @@ import {
   relayableSignInLink,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
+import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { toast } from "@openbot/ui";
 import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/QuestionPromptBubble";
 import type { QuoteRequest } from "@openbot/ui/features/conversation/ComposerEditor";
@@ -32,6 +33,7 @@ import {
 import { actionToast } from "../../action-toast";
 import { createScopeGuard } from "../../scope-lifetime";
 import { appendVoiceTranscript } from "../../voice-recording";
+import { serverSupportsCapability } from "../servers/server-capabilities";
 import { createAttachmentImportSounds } from "./attachment-import-sounds";
 import type { ChatSearchMatch } from "./chat-search";
 import { useConversationController } from "./conversation-controller-context";
@@ -1121,6 +1123,15 @@ export function createConversationViewScope(props: ConversationProps) {
     const draft = fastModeDraft();
     return draft && draft.agentId === props.agent?.id ? draft.fastMode : props.agent?.fastMode === true;
   };
+  /**
+   * The Fast switch of the model pickers, in the chat header and in the agent settings. Codex only
+   * for now: on this computer, or on a joined server with `agent-fast-mode-v1`.
+   */
+  const fastModeChange = () =>
+    settingsProvider() === "codex" &&
+    (props.server?.kind === "local" || serverSupportsCapability(props.server, AGENT_FAST_MODE_CAPABILITY))
+      ? (next: boolean) => void changeFastMode(next)
+      : undefined;
   async function changeFastMode(next: boolean): Promise<void> {
     const agentId = props.agent?.id;
     if (!agentId) return;
@@ -2273,6 +2284,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setComposerError: setScopedComposerError,
     changeFastMode,
     fastMode,
+    fastModeChange,
     setComposerFocusRequest,
     setDropActive,
     setExpandedEmojiMessageId,

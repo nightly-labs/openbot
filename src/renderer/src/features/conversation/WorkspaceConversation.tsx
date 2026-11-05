@@ -187,6 +187,11 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   /** A joined host's workspace or open conversation is still loading, so the composer says "Connecting…". */
   const remoteLoading = () =>
     activeServer()?.kind === "remote" && (!serverScope.loaded() || !conversations[activeAgent()?.id ?? ""]?.loaded);
+  /**
+   * A named function, not a ternary in the prop: a ternary prop makes a memo on each read, and the Effort select
+   * of a model picker reads this status in an effect callback, where a new memo halts the renderer.
+   */
+  const panelAgentStatus = () => (remoteLoading() ? { ...agentStatus(), phase: "starting" as const } : agentStatus());
   const usage = useUsage();
   const windowPage = useWindowPage();
   // The composer never asks for usage itself. It reads the dock's reading, which is scoped to the
@@ -559,7 +564,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           serverSettingsTargetId() === activeServer()?.id && serverSettingsMcpSignIns()[mcpServerId]?.signedIn === true
         }
         onOpenUsage={(trigger) => usage.openUsage(activeServer()?.id ?? "local", trigger, activeAgent()?.id)}
-        agentStatus={remoteLoading() ? { ...agentStatus(), phase: "starting" } : agentStatus()}
+        agentStatus={panelAgentStatus()}
         agentsConnecting={agentListConnecting() || (remoteLoading() && activeServer()?.state === "online")}
         accountUsage={withHostAccountUsage(auth.accountUsage(), hostAccountLimits())}
         providerRuntimeStatuses={providerDownloads() ? providerRuntimeStatuses() : undefined}

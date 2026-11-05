@@ -142,10 +142,6 @@ export const messages = {
 
   "agentSettings.runtime.model": "エージェントのモデル",
   "agentSettings.runtime.modelUnavailable": "エージェント CLI が接続されると、モデルを選択できます。",
-  "agentSettings.runtime.reasoning": "推論",
-  "agentSettings.runtime.reasoningLabel": "エージェントの推論レベル",
-  "agentSettings.runtime.selectReasoning": "推論を選択",
-  "agentSettings.runtime.reasoningSetByProvider": "{provider} が設定",
   "agentSettings.runtime.access": "アクセス",
   "agentSettings.runtime.accessLabel": "エージェントのアクセス",
   "agentSettings.runtime.busyMessage": "作業中",
