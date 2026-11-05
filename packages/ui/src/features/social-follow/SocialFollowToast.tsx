@@ -1,4 +1,4 @@
-import { Button, IconButton, PlushMascot, type PlushMascotFace, X } from "@openbot/ui";
+import { Button, Heart, IconButton, PlushMascot, type PlushMascotFace, X } from "@openbot/ui";
 import { createSignal, createUniqueId, For, Match, Show, Switch } from "solid-js";
 import { currentText } from "../../text";
 import { SocialNetworkMark } from "./social-marks";
@@ -69,17 +69,7 @@ export function SocialFollowToast(props: SocialFollowToastProps) {
         <Show when={props.step.kind !== "ask"}>
           <span class="social-follow-hearts">
             <For each={[0, 1, 2]}>
-              {(index) => (
-                <svg
-                  class="social-follow-heart"
-                  data-index={index}
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
-                  <path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.1 0 3.6 1.1 5.3 3 1.7-1.9 3.2-3 5.3-3 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21Z" />
-                </svg>
-              )}
+              {(index) => <Heart class="social-follow-heart" data-index={index} aria-hidden="true" />}
             </For>
           </span>
         </Show>

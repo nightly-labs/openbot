@@ -165,6 +165,7 @@
 
 .social-follow-heart {
   position: absolute;
+  fill: currentColor;
   top: 0;
   left: 50%;
   width: var(--openbot-icon-sm);
