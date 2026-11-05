@@ -48,6 +48,9 @@ export function isChannelRoutineTool(tool: string): boolean {
 export const PERSON_REQUEST_REQUIRED =
   "Only a person's request in this channel can change its members, instructions or routines. This task started from a routine run or from an agent.";
 
+export const PERSON_CANCEL_REQUIRED =
+  "Only a person's request in this channel can cancel a run. This task started from a routine run or from an agent.";
+
 /** The schedule routines of the channels, as the channel settings change them. */
 export interface ChannelRoutineToolPort {
   list(channelId: string): ChannelRoutine[];
@@ -63,8 +66,9 @@ export type ChannelChangeNote = (agent: string, person: string) => string;
 
 /**
  * The person whose message started the work of `task`. A routine run is written as a member with a
- * `routine:` id (`ChannelService.apply`), so the id tells it from a person. A subtask that an agent
- * assigned counts as the person's request that its root task answers.
+ * `routine:` id, and a request that an agent sent from another conversation with an `agent:` id
+ * (`ChannelService.apply`), so the id tells them from a person. A subtask that an agent assigned
+ * counts as the person's request that its root task answers.
  */
 export function channelRequester(
   task: ChannelTask,
@@ -73,7 +77,12 @@ export function channelRequester(
 ): { id: string; name: string } | null {
   const root = tasks.find((item) => item.id === task.rootTaskId);
   const request = root ? message(root.requestMessageId) : null;
-  if (request?.author.kind !== "member" || request.author.id.startsWith("routine:")) return null;
+  if (
+    request?.author.kind !== "member" ||
+    request.author.id.startsWith("routine:") ||
+    request.author.id.startsWith("agent:")
+  )
+    return null;
   return { id: request.author.id, name: request.author.name };
 }
 

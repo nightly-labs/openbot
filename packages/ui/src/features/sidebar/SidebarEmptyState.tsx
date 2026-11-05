@@ -33,7 +33,12 @@ export function SidebarEmptyState() {
             onClick={action().onSelect}
           >
             <span class="agent-row-avatar">
-              <AgentAvatar seed={action().avatarSeed} hue={action().avatarHue} motion="hover" />
+              <AgentAvatar
+                seed={action().avatarSeed}
+                hue={action().avatarHue}
+                color={action().avatarColor}
+                motion="hover"
+              />
             </span>
             <span class="agent-row-copy">
               <span class="agent-row-heading">

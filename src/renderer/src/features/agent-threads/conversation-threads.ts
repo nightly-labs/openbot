@@ -67,6 +67,7 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
           : ofTaskThread(task, takeovers) !== undefined
             ? "takeover"
             : undefined,
+    unread: (task) => tasks.unreadCount(task),
   };
   const lists = threadLists({ ...listInput, open: tabs.openIds(agentId), draft: tabs.hasDraft(agentId) });
   const activeId = activeThreadId(lists.tabs, tabs.activeId(agentId));
@@ -87,7 +88,8 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
       task,
       conversation: tasks.conversation(task.id),
       approval: sideApproval,
-      onSend: (text, attachmentDraftIds) => tabs.send(agentId, task.id, text, attachmentDraftIds),
+      onSend: (text, attachmentDraftIds, replyToMessageId) =>
+        tabs.send(agentId, task.id, text, attachmentDraftIds, replyToMessageId),
       onStop: () => tasks.stopTask(agentId, task.id),
       onRead: (messageId) => tasks.markTaskRead(agentId, task.id, messageId),
       onRespondApproval: (decision, options) =>
@@ -150,13 +152,17 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
       onMove: (id, index) => tabs.moveSide(agentId, id, index),
     },
     open,
+    tasks: list,
     limit: snapshot?.limit ?? 1,
     running: list.filter(isAgentTaskActive).length,
     conversation: open ? tasks.conversation(open.id) : undefined,
     approval,
     acceptsFiles: tasks.filesAccepted(),
-    onSend: (text, attachmentDraftIds) =>
-      open ? tabs.send(agentId, open.id, text, attachmentDraftIds) : tabs.sendDraft(agentId, text, attachmentDraftIds),
+    acceptsReplies: tasks.repliable(),
+    onSend: (text, attachmentDraftIds, replyToMessageId) =>
+      open
+        ? tabs.send(agentId, open.id, text, attachmentDraftIds, replyToMessageId)
+        : tabs.sendDraft(agentId, text, attachmentDraftIds),
     onStop: () => {
       if (open) tasks.stopTask(agentId, open.id);
     },
@@ -174,9 +180,28 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
     onBranch: tasks.canBranch()
       ? (sourceTaskId, messageId) => tabs.branch(agentId, sourceTaskId, messageId)
       : undefined,
+    onDeleteMessage: tasks.canDeleteMessage()
+      ? (taskId, messageId) => tasks.deleteTaskMessage(agentId, taskId, messageId)
+      : undefined,
     branchSource,
+    routineThread: (routineId) => {
+      const task = routineTask(list, routineId);
+      return task ? () => tabs.open(agentId, task.id) : undefined;
+    },
+    onOpenRoutineThread: async (routineId) => {
+      const listed = () => routineTask(tasks.snapshot(agentId)?.tasks ?? [], routineId);
+      if (!listed()) await tasks.loadTasks(agentId);
+      const task = listed();
+      if (task) tabs.open(agentId, task.id);
+      return task !== undefined;
+    },
     focusMessage: focus && list.some((task) => task.id === focus.taskId) ? focus : null,
   };
+}
+
+/** The open side thread where the routine runs. */
+function routineTask(list: readonly AgentTask[], routineId: string): AgentTask | undefined {
+  return list.find((task) => task.routineId === routineId && task.state !== "closed");
 }
 
 type TaskThread = { agentId: string; threadId: string };

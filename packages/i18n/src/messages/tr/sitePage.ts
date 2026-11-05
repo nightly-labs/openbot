@@ -80,6 +80,9 @@ export const messages = {
   "sitePage.pricing.description":
     "Barındırılan sunucular ve ekipler için lisans. OpenBot, kendi bilgisayarınızda kişisel kullanım için ücretsizdir.",
   "sitePage.pricing.heading": "Fiyatlandırma",
+  "sitePage.pricing.personal.title": "Kişisel kullanım ücretsizdir",
+  "sitePage.pricing.personal.body":
+    "Tüm özellikler, kendi bilgisayarınızda, zaten ödediğiniz yapay zekâ planlarıyla. Sunucu ve lisans gerekmez.",
   "sitePage.pricing.enterprise.title": "Kurumsal",
   "sitePage.pricing.enterprise.body":
     "Daha büyük sunucular, {count} üyeden fazlası veya ihtiyacınız olan her şey. Kurumsal destekle.",

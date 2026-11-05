@@ -6,12 +6,13 @@ import {
   CHAT_VISUAL_TITLE_LIMIT,
 } from "@openbot/contracts/chat-visual";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { API_KEY_NAME_PATTERN, CONNECTOR_IDS } from "@openbot/contracts/ipc";
+import { API_KEY_NAME_PATTERN, CONNECTOR_IDS, VAULT_API_KEY_LIMIT, VAULT_NOTES_LIMIT } from "@openbot/contracts/ipc";
 import { isUiBlockId, UI_BLOCK_LIMITS } from "@openbot/contracts/ui-blocks";
 import { z } from "zod";
 import pluginCatalog from "../../resources/plugin-catalog/catalog.json";
 import { advertisedJsonSchema } from "./agent/advertised-json-schema";
 import { interruptAgentToolSchema } from "./agent/agent-interrupt-tool";
+import { createChannelToolSchema, listChannelsToolSchema, updateChannelToolSchema } from "./agent/channel-agent-tools";
 import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
 import { HISTORY_TOOL_DEFINITIONS } from "./agent/history-tools";
 import { MCP_SERVER_TOOL_DEFINITIONS } from "./agent/mcp-tools";
@@ -54,6 +55,7 @@ import {
   webhookEventTypeZodSchema,
   webhookFiltersZodSchema,
 } from "./routine-tool-schema";
+import { WORKFLOW_TOOL_DEFINITIONS } from "./workflows/workflow-tools";
 
 interface OpenBotToolDefinition {
   name: string;
@@ -282,6 +284,23 @@ export const requestApiKeyToolSchema = z.strictObject({
 
 export const removeApiKeyToolSchema = z.strictObject({ name: apiKeyNameSchema });
 
+export const saveApiKeyToolSchema = z.strictObject({
+  name: apiKeyNameSchema,
+  key: z.string().trim().min(1).max(VAULT_API_KEY_LIMIT).describe("The value, as you got it."),
+  notes: z
+    .string()
+    .max(VAULT_NOTES_LIMIT)
+    .optional()
+    .describe("What the key is for. Never a secret. Omit it to keep the saved notes."),
+});
+
+export const sendToChannelToolSchema = z.strictObject({
+  channelId: z.string().min(1).max(INPUT_LIMITS.identifier),
+  text: z.string().trim().min(1).max(INPUT_LIMITS.messageText),
+  recipientAgentIds: z.array(z.string().min(1).max(INPUT_LIMITS.identifier)).max(INPUT_LIMITS.agents).optional(),
+  paths: z.array(z.string().min(1).max(INPUT_LIMITS.path)).max(INPUT_LIMITS.attachments).optional(),
+});
+
 /** The Marketplace apps that the chat draws a card for: the bundled catalog plugins and the connectors. */
 export const MARKETPLACE_APP_IDS: readonly string[] = [
   ...pluginCatalog.plugins.map((plugin) => plugin.slug),
@@ -296,6 +315,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   ...DATA_TOOL_DEFINITIONS,
   ...LOCAL_SKILL_TOOL_DEFINITIONS,
   ...ROUTINE_FLOW_TOOL_DEFINITIONS,
+  ...WORKFLOW_TOOL_DEFINITIONS,
   ...MCP_SERVER_TOOL_DEFINITIONS,
   {
     name: "list_sites",
@@ -387,6 +407,30 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     shape: assignAgentSectionToolSchema.shape,
   },
   {
+    name: "list_channels",
+    description:
+      "List the open channels with their id, name, lead, and members. A sidebar section (folder) is not a channel.",
+    shape: listChannelsToolSchema.shape,
+  },
+  {
+    name: "send_to_channel",
+    description:
+      "Post a request into a channel when the user gives it work. Members do not see this conversation: write the whole brief. paths attaches local files. recipientAgentIds names members; without it, the lead chooses. No result comes back here. In a channel task, use channel_assign or channel_transfer.",
+    shape: sendToChannelToolSchema.shape,
+  },
+  {
+    name: "create_channel",
+    description:
+      "Create a channel: a shared chat where member agents take requests and work together, with an optional picture. Returns the channel.",
+    shape: createChannelToolSchema.shape,
+  },
+  {
+    name: "update_channel",
+    description:
+      "Change or archive a channel from openbot.list_channels, including its picture. Pass only the values to change. Returns the channel.",
+    shape: updateChannelToolSchema.shape,
+  },
+  {
     name: "list_agents",
     description:
       "List local OpenBot agents: name, title, description (first 300 characters; read_agent has all), progress: status (working, queued or ready), queuedMessages, turnStartedAt while working, lastActivityAt, and openWaits. To find the teammate for work outside your remit, match the work to titles and descriptions. OpenBot does not track which files an agent changed.",
@@ -443,7 +487,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "create_routine",
     description:
-      "Create a scheduled routine for this agent, or for another local agent when agentId is provided. It is active by default. Without a timezone, it uses the timezone of the person whose message this turn answers, or the server timezone when that is unknown. Interval, advanced-every, and custom schedules must not run more often than every 3 minutes. For a one-time reminder or task, use a once schedule: it runs one time and then pauses the routine. When watching a folder for new files and no interval was requested, use a 15 minute interval and keep the folder path plus handling instructions in the routine instruction.",
+      "Create a scheduled routine, one agent's instruction, for this agent or for another local agent when agentId is provided. For several steps in one graph, use edit_workflow. It is active by default. Without a timezone, it uses the timezone of the person whose message this turn answers, or the server timezone when that is unknown. Interval, advanced-every, and custom schedules must not run more often than every 3 minutes. For a one-time reminder or task, use a once schedule: it runs one time and then pauses the routine.",
     shape: {
       agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
       name: z.string().min(1).max(INPUT_LIMITS.routineName),
@@ -541,7 +585,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: AWAIT_EVENT_TOOL,
     description:
-      "Open a wait when you cannot finish the current request in this turn because you wait for something outside it: a build, a deploy, a later check. OpenBot shows the wait to the user until you close it. The next run of one of your routines wakes the wait, or a local script event that names its waitId. The run that wakes it repeats the request and your note. Give routineId to let only that routine wake it. After this call, tell the user what you wait for and end your turn.",
+      "Open a wait when the current request waits for something outside this turn that takes over about 15 minutes, such as a long build or a later check. OpenBot shows the wait to the user until you close it. The next run of one of your routines wakes the wait, or a local script event that names its waitId. The run that wakes it repeats the request and your note. Give routineId to let only that routine wake it. Then tell the user what you wait for and end your turn.",
     shape: awaitEventToolSchema.shape,
   },
   {
@@ -620,7 +664,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       "The card has your start button, an optional alternative and a cancel button. When nobody answers in 10 s, OpenBot presses start.",
       'The result is JSON {"status":"answered","actionId":…}: "start" means do the plan; "alternative" means do only the alternative; "cancel" means do not start and ask in one sentence what the user wants;',
       '"_text" with "text" means follow the user\'s words. {"status":"skipped"} or {"status":"expired"} means do not start; answer briefly.',
-      "Write in the user's language. It works only when the user turned it on in your settings, and not in a Slack, Discord or Telegram chat. In a channel, each member who reads the channel sees it.",
+      "Write in the user's language. It works only when the user turned it on in your settings, and not in an external chat. In a channel, each member who reads the channel sees it.",
     ].join(" "),
     shape: acknowledgeRequestToolSchema.shape,
   },
@@ -643,11 +687,11 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "request_api_key",
     description: [
-      "Ask the user for an API key or token that your task needs, such as for a script or a service, and wait for the answer.",
+      "Ask the user for an API key, token, or password that your task needs, such as for IMAP, and wait for the answer.",
       "The user enters it in a secure form in this conversation. OpenBot saves it in a private file outside your workspace for later turns; you never get the value.",
       'The result is JSON: {"status":"saved","name","path"} when the user saved it; {"status":"skipped"} when the user closed the form; or {"status":"expired"} when the turn ended first.',
       "Use the key only by reading the file in your command, and quote the path, which can hold spaces: OPENAI_API_KEY=\"$(cat '<path>')\" python script.py. Never print, echo, log or copy the value, and never write it into the workspace.",
-      "Call list_api_keys first: do not ask again for a key that is saved. A new answer replaces the saved key. Only the server owner or an admin can answer. It does not work in a Slack, Discord or Telegram chat.",
+      "Call list_api_keys first: do not ask again for a key that is saved. A new answer replaces the saved key. Only the server owner or an admin can answer. It does not work in an external chat.",
     ].join(" "),
     shape: requestApiKeyToolSchema.shape,
   },
@@ -656,6 +700,15 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     description:
       'List the API keys you can use, from request_api_key or the Vault ("source":"vault"): the name and the file path of each. Values are never shown.',
     shape: {},
+  },
+  {
+    name: "save_api_key",
+    description: [
+      "Save a key, token or password that you have, such as one the user pasted, in the OpenBot Vault for every agent; list_api_keys gives its path.",
+      "It replaces a Vault key with this name and deletes your own key with this name.",
+      'Returns {"status":"added"|"updated","name","path"}, never the key. Do not repeat the key. Only for a request of a person in your OpenBot chat.',
+    ].join(" "),
+    shape: saveApiKeyToolSchema.shape,
   },
   {
     name: "remove_api_key",

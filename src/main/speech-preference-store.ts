@@ -1,4 +1,10 @@
-import { DEFAULT_SPEECH_SETTINGS, isSpeechVoice, type SpeechSettings } from "@openbot/contracts/ipc";
+import {
+  DEFAULT_SPEECH_SETTINGS,
+  isCodexLiveVoice,
+  isSpeechSpeed,
+  isSpeechVoice,
+  type SpeechSettings,
+} from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect, Result, Semaphore } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
@@ -9,7 +15,9 @@ import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } f
  * `voice-preference.json`, so an earlier version that rewrites that file keeps this one.
  *
  * A file that is missing, unreadable as JSON or names an unknown voice reads as the default: replies
- * are not read aloud.
+ * are not read aloud. A file with no known speed, such as one from an earlier version, reads at normal
+ * speed. The speed is an extra field of version 1, so an earlier version still reads the file. Codex
+ * live voice is one more extra field, and a file without it reads as off.
  */
 export class SpeechPreferenceStore {
   readonly #path: string;
@@ -28,7 +36,13 @@ export class SpeechPreferenceStore {
           parsed.version === 1 &&
           typeof parsed.readReplies === "boolean" &&
           isSpeechVoice(parsed.voice)
-            ? { readReplies: parsed.readReplies, voice: parsed.voice }
+            ? {
+                readReplies: parsed.readReplies,
+                voice: parsed.voice,
+                speed: isSpeechSpeed(parsed.speed) ? parsed.speed : DEFAULT_SPEECH_SETTINGS.speed,
+                codexLive: parsed.codexLive === true,
+                codexLiveVoice: isCodexLiveVoice(parsed.codexLiveVoice) ? parsed.codexLiveVoice : null,
+              }
             : null,
         ),
       );
@@ -45,14 +59,14 @@ export class SpeechPreferenceStore {
 
   readonly set = Effect.fn("SpeechPreference.set")(function* (
     this: SpeechPreferenceStore,
-    { readReplies, voice }: SpeechSettings,
+    { readReplies, voice, speed, codexLive, codexLiveVoice }: SpeechSettings,
   ) {
     yield* this.#writes.withPermit(
       Effect.uninterruptible(
-        writePreferenceFile(this.#path, { version: 1, readReplies, voice }).pipe(
+        writePreferenceFile(this.#path, { version: 1, readReplies, voice, speed, codexLive, codexLiveVoice }).pipe(
           Effect.tap(() =>
             Effect.sync(() => {
-              this.#settings = { readReplies, voice };
+              this.#settings = { readReplies, voice, speed, codexLive, codexLiveVoice };
             }),
           ),
         ),

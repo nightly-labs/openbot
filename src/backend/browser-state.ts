@@ -24,6 +24,11 @@ export interface StoredBrowserTab {
    * also stores, so an older build opens it in a session of its own and never in the shared one.
    */
   profile?: string;
+  /**
+   * The side threads of the owner agent that a person gave this tab to by a tag in a message. The tab
+   * keeps its owner thread; these threads can also use it. An older build ignores the field.
+   */
+  sharedThreadIds?: string[];
 }
 
 /** The persistent session of a tab other than the shared one. Fixed for the life of the tab. */
@@ -203,6 +208,7 @@ function storedBrowserTab(value: unknown): StoredBrowserTab | null {
   if (value.agentSession !== undefined && !isAgentBrowserSessionKey(value.agentSession)) return null;
   if (value.profile !== undefined && !isBrowserProfileId(value.profile)) return null;
   const environment = browserEnvironment(value.environment);
+  const sharedThreadIds = storedSharedThreadIds(value.sharedThreadIds);
   return {
     id: value.id,
     url: value.url,
@@ -211,7 +217,18 @@ function storedBrowserTab(value: unknown): StoredBrowserTab | null {
     ...(environment === null ? {} : { environment }),
     ...(value.agentSession === undefined ? {} : { agentSession: value.agentSession }),
     ...(value.profile === undefined ? {} : { profile: value.profile }),
+    ...(sharedThreadIds.length === 0 ? {} : { sharedThreadIds }),
   };
+}
+
+/** The most threads one tab keeps. A tag shares a tab with one thread, so this is far above real use. */
+const SHARED_THREAD_LIMIT = 64;
+
+/** Saved shared threads. A value that is not a thread id is dropped, and the tab stays. */
+function storedSharedThreadIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const ids = value.filter((id): id is string => isString(id) && id.length > 0 && id.length <= INPUT_LIMITS.identifier);
+  return [...new Set(ids)].slice(0, SHARED_THREAD_LIMIT);
 }
 
 /** Enough of an agent to say which of two spellings of an id is the one it answers to now. */

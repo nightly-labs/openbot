@@ -64,6 +64,8 @@ export const messages = {
   "account.login.unavailableDescription": "Al momento OpenBot non riesce a raggiungere il servizio account.",
   "account.login.signInDescription":
     "Usa la tua email per accedere o creare un account. Ti invieremo un codice monouso.",
+  "account.login.keyringChangedDescription":
+    "Il portachiavi di sistema ha perso il tuo ultimo accesso. Ora OpenBot conserva gli accessi in un proprio file su questo computer. Accedi ancora una volta.",
   "account.login.codeAccepted": "Il codice è stato accettato.",
   "account.login.codeSent": "Abbiamo inviato un codice a {email}.",
   "account.login.connectingSecurely": "Connessione sicura…",

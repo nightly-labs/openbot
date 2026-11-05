@@ -84,10 +84,26 @@ export type AgentDatabaseResponse =
   | { id: number; ok: false; failure: AgentDatabaseFailure };
 
 /**
+ * The first message of a host: it has loaded and reads requests from now on. The supervisor sends
+ * nothing before it, so the start of the process is never counted against a statement.
+ */
+export interface AgentDatabaseHostReady {
+  kind: "ready";
+}
+
+export type AgentDatabaseHostMessage = AgentDatabaseResponse | AgentDatabaseHostReady;
+
+/**
  * `maxPageCount` times SQLite's 4 KB default page gives the 256 MB ceiling the shared database may
- * reach. One file holds every agent's tables, so the ceiling is the whole store's. The deadline is
- * what the supervisor arms before it sends a statement; every other number bounds a payload that
- * would otherwise be unbounded because a model chose it.
+ * reach. One file holds every agent's tables, so the ceiling is the whole store's. The statement
+ * deadline is what the supervisor arms before it sends a statement, and the start deadline what it
+ * arms when it starts a host; every other number bounds a payload that would otherwise be unbounded
+ * because a model chose it.
+ *
+ * The start deadline is shorter than the queue wait, so a request that comes while a host starts can
+ * still run once the host is ready. A request that already waited behind a stopped statement has
+ * less time left. The start deadline is long because a slow Windows computer, with a virus scan
+ * of the new process, can take several seconds to load the host.
  */
 export const AGENT_DATABASE_LIMITS = {
   maxSqlLength: 20_000,
@@ -98,6 +114,7 @@ export const AGENT_DATABASE_LIMITS = {
   maxCellChars: 2_000,
   maxPageCount: 65_536,
   statementDeadlineMs: 5_000,
+  hostStartDeadlineMs: 15_000,
   queueWaitMs: 20_000,
   busyTimeoutMs: 2_000,
 } as const;
@@ -116,7 +133,7 @@ export const AGENT_DATABASE_METADATA_TABLE = "openbot_metadata";
  */
 export interface AgentDatabaseHostProcess {
   send(request: AgentDatabaseRequest): void;
-  onResponse(listener: (response: AgentDatabaseResponse) => void): void;
+  onMessage(listener: (message: AgentDatabaseHostMessage) => void): void;
   /** The host ended without being asked to. */
   onExit(listener: () => void): void;
   /** End it now, whatever it is in the middle of. */

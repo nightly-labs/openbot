@@ -26,6 +26,10 @@ export const messages = {
   "error.workflow.outputPlaceMissing": "为该输出选择一个消息发送位置。",
   "error.workflow.discordNoMessage":
     "此输出作用于启动本次运行的 Discord 消息。请从 Discord 提及启动运行，或选择“在频道中发布”。",
+  "error.workflow.slackNoMessage":
+    "此输出作用于启动本次运行的 Slack 消息。请从 Slack 提及启动运行，或选择“在频道中发布”。",
+  "error.workflow.telegramNoMessage":
+    "此输出作用于启动本次运行的 Telegram 消息。请从 Telegram 提及启动运行，或选择“在聊天中发布”。",
   "error.workflow.outputConnectionOff": "该输出的消息连接已关闭或已移除，请重新选择位置。",
   "error.workflow.outputNotRunning": "该消息连接当前未运行，请在它运行时重试。",
   "error.workflow.outputRefused": "该位置拒绝了发布，请确认 OpenBot 可以在该处发布。",

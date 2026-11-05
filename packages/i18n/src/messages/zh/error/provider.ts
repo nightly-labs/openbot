@@ -9,6 +9,7 @@ export const messages = {
     "OpenBot 无法在 Codex 配置中注册 Computer Use。请确认 Codex 的 config.toml 有效且可写，然后重启 OpenBot。你可以在助手设置中关闭 Computer Use 以便继续。",
   "error.provider.codexUnresponsive": "Codex 停止响应，OpenBot 已结束其进程。",
   "error.provider.acpUnresponsive": "{provider} 未及时响应，OpenBot 已结束其进程。",
+  "error.provider.acpSignInLost": "{provider} 的登录已失效，OpenBot 已结束其进程。请重新发送消息。",
   "error.provider.acpMcpNotLoaded":
     "{provider} 没有加载 OpenBot 的工具，因此此智能体无法使用这些工具，也无法联系队友。{provider} 的团队策略可能会阻止本地 MCP 服务器。请让团队管理员允许它们，然后重试。",
   "error.provider.endpointsReadOnly":
@@ -156,6 +157,7 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider} 未返回已验证的账号。",
   "error.provider.signInExpired": "你的 {provider} 登录已过期，请重新登录以继续。",
   "error.provider.cliActivateFailed": "OpenBot 无法激活托管的 CLI。",
+  "error.provider.noMainlandChinaSignIn": "{provider} 没有中国大陆的登录方式。",
   "error.provider.cliNewVersionNotStarted": "新版本未能启动。",
   "error.provider.cliBusyReconnect": "{provider} CLI 正在处理对话，请等它结束后再重新连接。",
   "error.provider.cliBusySignOut": "{provider} CLI 正在处理一轮对话。请等待其完成，然后断开连接。",
@@ -187,6 +189,7 @@ export const messages = {
     "模型服务商一侧发生故障，不是你的网络问题。请稍后重试或改用其他模型。\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode 无法连接模型服务商。请检查运行 OpenBot 的电脑的网络连接后重试。\n{detail}",
+  "error.provider.codexStateBusy": "ChatGPT 仍在为上一次启动准备本地历史记录。请等几分钟，然后重试。",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode 无法打开它的数据库，因为较新的 OpenCode 版本已更改了数据库。请把 OpenCode 更新到版本 2 或更高，然后重试。",
   "error.provider.opencodeNoAnswer": "OpenCode 模型结束本轮对话时没有给出回答。请重试或改用其他模型。",
@@ -206,6 +209,8 @@ export const messages = {
   "error.provider.antigravityReleaseShape": "Gemini 发布包的结构异常。",
   "error.provider.antigravityMissing": "Gemini 尚未下载。请在 OpenBot 中下载后继续。",
   "error.provider.antigravityNotStarted": "找到了 Gemini 服务器，但无法读取其版本。",
+  "error.provider.antigravityOverrideInvalid":
+    "OPENBOT_ANTIGRAVITY_PATH 中的 Gemini 服务器不存在或不可执行。请更正路径或删除该变量，然后重启 OpenBot。",
   "error.provider.antigravityVersionUnreadable": "无法读取 Gemini 服务器版本。",
   "error.provider.antigravitySignIn": "请使用 Google 账号登录以使用 Gemini。",
   "error.provider.antigravityRateLimited":
@@ -238,6 +243,8 @@ export const messages = {
   "error.provider.kimiNotStarted": "Kimi 无法启动。请在终端中运行 `kimi --version`。",
   "error.provider.kimiVersionUnreadable": "无法读取 Kimi CLI 版本。",
   "error.provider.kimiSignIn": "请使用 Kimi Code 登录以使用 Kimi。",
+  "error.provider.devinSignIn": "请使用 Devin 登录以使用 Devin。",
+  "error.provider.copilotSignIn": "请使用 GitHub 登录，或设置 COPILOT_GITHUB_TOKEN 以使用 GitHub Copilot。",
   "error.provider.hermesMissing": "未安装 Hermes Agent。请安装后重试。",
   "error.provider.hermesNotStarted": "无法启动 Hermes Agent。请在终端中运行 `hermes --version`。",
   "error.provider.hermesVersionUnreadable": "无法读取 Hermes Agent 的版本。",
@@ -257,6 +264,8 @@ export const messages = {
   "error.provider.geminiBrowserOpenFailed": "Gemini 无法在浏览器中打开登录页面。请检查默认浏览器，然后重新连接。",
   "error.provider.acpSignInFailed": "登录未完成。",
   "error.provider.acpSignInFailedReason": "登录未完成：{reason}",
+  "error.provider.acpSignOutFailed": "退出登录未完成。",
+  "error.provider.acpSignOutFailedReason": "退出登录未完成：{reason}",
   "error.provider.acpSignInMethodMissing": "该服务商在这台电脑上不提供该登录方式。请更新服务商后重试。",
   "error.provider.httpsSignInLinkOnly": "只有 HTTPS 登录链接才能在浏览器中打开。",
   "error.provider.geminiKeyRefused": "Gemini 拒绝了已保存的 API 密钥。请在设置中更换或移除该密钥，然后重新连接。",
@@ -366,5 +375,7 @@ export const messages = {
   "error.provider.registryPrerequisite": "请先在主机上安装 {tool}，再安装该助手。",
   "error.provider.registryBindingChanged": "安装期间自定义助手发生了变更，请重试。",
   "error.provider.registryInstallFailed": "助手安装失败，之前的安装保持不变。",
+  "error.provider.hermesInstallFailed": "Hermes Agent 未能安装。请重试，或使用安装指南。",
+  "error.provider.hermesNeedsGitCurl": "Hermes Agent 需要 git 和 curl。请先安装它们，然后重试。",
   "error.provider.registryRemoveBusy": "请等待助手安装与正在进行的 ACP 工作结束，再移除它。",
 } as const satisfies PartialTranslation<typeof source>;

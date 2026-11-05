@@ -1,3 +1,4 @@
+import { Button, ChevronRight } from "@openbot/ui";
 import { cx, prefersReducedMotion } from "@openbot/ui/utils";
 import { type JSX, Portal } from "@solidjs/web";
 import { createEffect, createSignal, createUniqueId, onCleanup, Show, untrack } from "solid-js";
@@ -8,12 +9,40 @@ export interface SettingsPagePlacement {
   nav: HTMLElement;
   /** The element that holds the panel. */
   content: HTMLElement;
+  /** The element in the top row of the window that holds the title of the section, or the path to its open page. */
+  path: HTMLElement;
+  /**
+   * Gets the way back from the open detail page, or `null` when the section shows its list. Back in
+   * the top row of the window then goes to the list, before it goes to an earlier chat.
+   */
+  onBack?: (back: SettingsPageBack | null) => void;
+}
+
+/** A detail page that is open in a section, such as one provider in Providers. */
+export interface SettingsCrumb {
+  title: string;
+  /** Goes back to the section. */
+  back: () => void;
+}
+
+/** The way back from a detail page to the list of its section. */
+export interface SettingsPageBack {
+  /** The name of the section, such as `Providers`. */
+  name: string;
+  back: () => void;
 }
 
 interface SettingsDialogShellProps {
   open: boolean;
-  title: JSX.Element;
+  /** The title of the section. It goes in the top row of the window, as the title of a Usage page does. */
+  title: string;
+  /** Screen readers read it with the panel. */
   description: JSX.Element;
+  /**
+   * The detail page that is open in the section, or nothing. The top row then shows its path, such as
+   * `Providers › ChatGPT`, as the path of a Marketplace page does.
+   */
+  crumb?: SettingsCrumb | null | undefined;
   sidebar: JSX.Element;
   contentKey: string;
   children: JSX.Element;
@@ -112,6 +141,7 @@ export function SaveBarDock<T>(props: SaveBarDockProps<T>) {
 
 export function SettingsDialogShell(props: SettingsDialogShellProps) {
   const titleId = createUniqueId();
+  const descriptionId = createUniqueId();
   const [canScrollUp, setCanScrollUp] = createSignal(false);
   const [canScrollDown, setCanScrollDown] = createSignal(false);
   let shown = untrack(() => props.open);
@@ -170,6 +200,20 @@ export function SettingsDialogShell(props: SettingsDialogShellProps) {
     },
   );
 
+  // The window gets the way back while a detail page shows, and loses it when the page closes.
+  createEffect(
+    () => {
+      const page = props.open ? props.page : undefined;
+      const crumb = props.crumb;
+      return page ? { page, back: crumb ? { name: props.title, back: crumb.back } : null } : undefined;
+    },
+    (shown) => {
+      if (!shown) return;
+      shown.page.onBack?.(shown.back);
+      return () => shown.page.onBack?.(null);
+    },
+  );
+
   onCleanup(() => {
     scrollResizeObserver?.disconnect();
     if (restoreFrame !== undefined) window.cancelAnimationFrame(restoreFrame);
@@ -187,16 +231,36 @@ export function SettingsDialogShell(props: SettingsDialogShellProps) {
               ref={(element) => props.onContentElement?.(element)}
               class={cx("settings-modal settings-modal-page", props.class)}
               aria-labelledby={titleId}
+              aria-describedby={descriptionId}
             >
               <div class="settings-modal-main">
-                <header class="settings-modal-header">
-                  <div>
-                    <h2 id={titleId} class="settings-modal-title">
-                      {props.title}
+                {/* The heading names only the open page, as a Marketplace title does; the parent before it goes back. */}
+                <Portal mount={page().path}>
+                  <div class="settings-page-path">
+                    <Show when={props.crumb}>
+                      {(crumb) => (
+                        <>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="xs"
+                            class="settings-page-path-parent"
+                            onClick={() => crumb().back()}
+                          >
+                            {props.title}
+                          </Button>
+                          <ChevronRight class="settings-page-path-separator" aria-hidden="true" />
+                        </>
+                      )}
+                    </Show>
+                    <h2 id={titleId} class="settings-page-path-current">
+                      {props.crumb?.title ?? props.title}
                     </h2>
-                    <p class="settings-modal-description">{props.description}</p>
                   </div>
-                </header>
+                </Portal>
+                <p id={descriptionId} class="settings-page-description">
+                  {props.description}
+                </p>
                 <div
                   class="settings-modal-scroll-frame"
                   data-scroll-up={canScrollUp() ? "" : undefined}

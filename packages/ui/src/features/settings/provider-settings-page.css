@@ -61,3 +61,63 @@
 .provider-settings-progress {
   max-width: 320px;
 }
+
+/* Models: one compact row for each model, with a scroll for the long lists of OpenCode. */
+.provider-settings-models.settings-modal-card {
+  max-height: 360px;
+  padding: 0;
+  overflow-y: auto;
+}
+
+.provider-settings-models-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: var(--openbot-space-1) 0;
+  list-style: none;
+}
+
+.provider-settings-models-row {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  min-height: 32px;
+  padding: 0 var(--openbot-space-3);
+}
+
+.provider-settings-models-row:hover {
+  background: var(--openbot-bg-control-hover);
+}
+
+.provider-settings-models-name {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  gap: var(--openbot-space-2);
+  min-width: 0;
+}
+
+.provider-settings-models-name > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-settings-models-name > :first-child {
+  flex: none;
+  max-width: 70%;
+}
+
+.provider-settings-models-id {
+  min-width: 0;
+  font-family: var(--openbot-font-mono);
+}
+
+.provider-settings-models-empty {
+  display: block;
+  padding: var(--openbot-space-3);
+}
+
+.provider-settings-models-error {
+  color: var(--openbot-danger-text);
+}

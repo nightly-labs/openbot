@@ -33,6 +33,11 @@ declare class SpeechModule extends NativeModule<SpeechEvents> {
   /** Stops the part that plays and drops the parts that wait. */
   stop(): void;
   /**
+   * Plays every part at this speed, also the part that plays now. 1 is normal speed; the pitch stays
+   * the same. Optional: an app binary from before it does not have it.
+   */
+  setSpeed?(speed: number): void;
+  /**
    * Loads Parakeet from its model directory. The same directory keeps the loaded model. Optional: an
    * app binary from before speech recognition does not have it.
    */
@@ -44,6 +49,11 @@ declare class SpeechModule extends NativeModule<SpeechEvents> {
   finishCapture?(): void;
   /** Closes the microphone and drops the speech that was not sent. No event follows. */
   cancelCapture?(): void;
+  /**
+   * Lets haptics play while a microphone records; iOS silences them by default. Optional: an app binary
+   * from before it does not have it. No-op on Android.
+   */
+  allowHapticsWhileRecording?(): void;
 }
 
 /**

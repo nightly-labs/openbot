@@ -36,7 +36,7 @@
   flex-direction: column;
   gap: var(--openbot-space-1);
   /* The close button sits in the corner the title would otherwise run into. */
-  padding-right: var(--openbot-space-8);
+  padding-inline-end: var(--openbot-space-8);
 }
 
 .provider-code-login-title {
@@ -84,7 +84,7 @@
   flex-direction: column;
   gap: var(--openbot-space-1);
   margin: 0;
-  padding-left: var(--openbot-space-4);
+  padding-inline-start: var(--openbot-space-4);
   list-style: decimal;
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-md);
@@ -160,7 +160,7 @@
 .provider-code-login-close {
   position: absolute;
   top: var(--openbot-space-3);
-  right: var(--openbot-space-3);
+  inset-inline-end: var(--openbot-space-3);
 }
 
 @keyframes provider-code-login-dialog-in {

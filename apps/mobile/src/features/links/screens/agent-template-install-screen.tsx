@@ -27,6 +27,7 @@ import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { type MobileText, useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { AgentTemplateNotFoundError, loadAgentTemplate } from "../api/agent-templates";
 import { forgetIncomingLink, readIncomingLink } from "../model/incoming-links";
 
@@ -340,7 +341,7 @@ function EmbeddedSkill({ name, markdown }: { name: string; markdown: string }) {
             {t("mobile.link.template.skill.local")}
           </Typography.Paragraph>
         </View>
-        <Chevron size={18} color={muted} strokeWidth={1.5} />
+        <Chevron size={18} color={muted} strokeWidth={1.5} style={open ? undefined : MIRROR_IN_RTL} />
       </Pressable>
       {open ? (
         <Typography.Paragraph type="body-xs" className="px-4 pb-3 font-mono text-grouped-secondary">

@@ -13,6 +13,7 @@ export interface ConversationPort {
     | "setAgentSessionSetting"
     | "resetAgentSessionSetting"
     | "onScopedEvent"
+    | "deleteConversationMessage"
     | "deleteTable"
     | "listMemories"
     | "listRoutines"
@@ -45,6 +46,8 @@ export interface ConversationPort {
     | "setDirectTyping"
   >;
   storage: Pick<OpenBotDesktopApi["storage"], "openLocation">;
+  /** The reader's level for each agent of a joined server, which decides what Delete offers. */
+  hostAdmin: Pick<OpenBotDesktopApi["hostAdmin"], "getAgentAccess">;
   browserDock: Pick<OpenBotDesktopApi["browserDock"], "publishPresentation" | "onAction" | "onShown">;
 }
 

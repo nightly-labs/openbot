@@ -14,6 +14,7 @@ export const messages = {
   "mobile.channel.list.deleteFailedBody": "このチャンネルを削除できませんでした。もう一度お試しください。",
   "mobile.channel.list.open": "チャンネル {name} を開く",
   "mobile.channel.list.openWithTitle": "チャンネル {name} を開く、{title}",
+  "mobile.channel.avatar.more": "+{count}",
   "mobile.channel.list.unread": { other: "未読メッセージ {count} 件" },
   "mobile.channel.list.noMessages": "メッセージはまだありません",
   "mobile.channel.task.task": "タスク",

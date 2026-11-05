@@ -1,5 +1,6 @@
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
 import { ConfirmDialog } from "@openbot/ui";
+import { AgentUpdateDialog } from "@openbot/ui/features/marketplace/AgentUpdateDialog";
 import { Marketplace } from "@openbot/ui/features/marketplace/Marketplace";
 import type { MarketplaceApp } from "@openbot/ui/features/marketplace/marketplace-model";
 import { createMarketplaceNavigation } from "@openbot/ui/features/marketplace/marketplace-view";
@@ -144,7 +145,7 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
       untrack(() => startConnect(slug));
     },
   );
-  // Slack, Discord and Telegram change with no event from main, so each available connector is
+  // Slack, Discord, Telegram and WhatsApp change with no event from main, so each available connector is
   // followed while the window is open.
   createEffect(
     () => (props.open ? props.connectors?.available() : undefined),
@@ -192,6 +193,17 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
             tone={skillConfirmTone(confirm)}
             confirmLabel={skillConfirmLabel(confirm)}
             initialFocus="cancel"
+          />
+        )}
+      </Show>
+      <Show when={controller.agentUpdate()} keyed>
+        {(pending) => (
+          <AgentUpdateDialog
+            agentName={pending.agentName}
+            changed={pending.changed}
+            othersCount={pending.othersCount}
+            onCancel={() => pending.settle(null)}
+            onConfirm={(replaceSkillIds) => pending.settle(replaceSkillIds)}
           />
         )}
       </Show>

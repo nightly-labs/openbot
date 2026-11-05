@@ -65,6 +65,7 @@ export interface ServerModeOptions {
     CentralAuthManager,
     | "getState"
     | "requestEmailCode"
+    | "cancelCompanySignIn"
     | "verifyEmailCode"
     | "canPersistSession"
     | "redeemServerClaim"
@@ -270,6 +271,11 @@ export class ServerMode {
       .pipe(Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause })));
     if (state.status === "code_sent" && !state.issue) {
       return { status: 200, lines: { challenge: state.challengeId, expires_at: state.expiresAt } };
+    }
+    // A server has no browser for the company provider. The owner signs in with another email.
+    if (state.status === "company_sign_in") {
+      yield* this.#options.centralAuth.cancelCompanySignIn();
+      return failure(409, "company_sign_in_required");
     }
     return issueFailure(state);
   });

@@ -17,6 +17,8 @@ export const messages = {
   "status.agent.channelRoutineCreated": "{agent} ha creato la routine {routine}. Lo ha chiesto {person}.",
   "status.agent.channelRoutineUpdated": "{agent} ha modificato la routine {routine}. Lo ha chiesto {person}.",
   "status.agent.channelRoutineDeleted": "{agent} ha eliminato la routine {routine}. Lo ha chiesto {person}.",
+  "status.agent.channelTaskCancelled":
+    "{agent} ha annullato l’attività «{task}» e le sue sottoattività. Lo ha chiesto {person}.",
   "status.agent.screenCaptureScreen":
     "Acquisizione dello schermo principale e invio dell'immagine al modello dell'agente.",
   "status.agent.screenCaptureChannel":
@@ -27,6 +29,8 @@ export const messages = {
     "Acquisizione della finestra {name} e invio dell'immagine al modello dell'agente.",
   "status.agent.screenCaptureRegion":
     "Acquisizione dell'area dello schermo a {x}, {y}, {width} × {height} punti e invio dell'immagine al modello dell'agente.",
+  "status.agent.workflowDelete":
+    "Elimina il flusso di lavoro {title} con le sue esecuzioni e versioni. I suoi passaggi aperti si fermano.",
   "status.agent.screenCaptureProgress": "Richiesta di acquisizione dello schermo…",
   "status.agent.screenCaptureReviewing": "Analisi dell'acquisizione dello schermo…",
   "status.agent.browserOpening": "Apertura di una pagina web…",

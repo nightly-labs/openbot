@@ -220,6 +220,7 @@ function AgentChoice({
           agentId={agent.id}
           serverId={agent.serverId}
           hue={agent.avatarHue}
+          color={agent.avatarColor}
           seed={agent.avatarSeed}
           size={36}
           animateIdle={false}

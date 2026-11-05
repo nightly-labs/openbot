@@ -69,7 +69,6 @@ export const messages = {
   "browser.liveView.copyFailed": "无法复制文本，请点击页面后重试。",
   "browser.previews.label": "浏览器预览",
   "browser.previews.resize": "调整右侧面板宽度",
-  "browser.previews.collapse": "收起浏览器预览",
   "browser.previews.empty": "没有浏览器标签页",
   "browser.previews.openPage": "打开一个页面",
   "browser.preview.pageFallback": "浏览器页面",

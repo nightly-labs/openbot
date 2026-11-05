@@ -233,6 +233,17 @@ function AuthenticatedStack() {
           }}
         />
         <Stack.Screen
+          name="image-gallery/[galleryId]"
+          options={{
+            animation: pushAnimation,
+            contentStyle: { backgroundColor: background },
+            fullScreenGestureEnabled: true,
+            gestureEnabled: true,
+            // The screen draws the app's glass header, as the chat does.
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
           name="browser/[agentId]"
           options={{
             animation: pushAnimation,
@@ -490,6 +501,9 @@ function AuthenticatedStack() {
         <Stack.Screen name="server-workflows/workflow" options={largeTitlePage} />
         <Stack.Screen name="server-workflows/runs" options={largeTitlePage} />
         <Stack.Screen name="server-workflows/run" options={largeTitlePage} />
+        <Stack.Screen name="server-workflows/versions" options={largeTitlePage} />
+        <Stack.Screen name="server-workflows/version" options={largeTitlePage} />
+        <Stack.Screen name="server-workflows/github-events" options={largeTitlePage} />
         <Stack.Screen
           name="workflow-editor"
           // One sheet for the editor: its pages are in the stack of `workflow-editor/_layout.tsx`.
@@ -529,7 +543,30 @@ function AuthenticatedStack() {
           }}
         />
         <Stack.Screen
+          name="message-actions"
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.6],
+            sheetGrabberVisible: true,
+          }}
+        />
+        <Stack.Screen
           name="queued-messages"
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.85],
+            sheetGrabberVisible: true,
+          }}
+        />
+        <Stack.Screen
+          name="vault-request"
+          // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
           options={{
             contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,

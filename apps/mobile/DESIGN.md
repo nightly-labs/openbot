@@ -13,7 +13,7 @@ HeroUI Native is a component source, not a requirement to decorate every screen.
 Render product text through HeroUI Native `Typography`, including `Typography.Heading` and `Typography.Paragraph` for semantic roles. Screens and product components must not import React Native `Text` directly unless a third-party integration boundary requires the native primitive and the exception is documented.
 
 Chat message text is a documented exception. A long reply draws hundreds of text views, so the chat
-Markdown renderer draws React Native `Text` and `UITextView` with the plain styles in
+Markdown renderer draws React Native `Text` with the plain styles in
 `src/features/chat/components/chat-text-styles.ts`, not `Typography` and its class names. Every way
 of drawing a message, and the selection field over it, uses that one table. Body text is 16 points
 on a 22-point line, as in the composer.

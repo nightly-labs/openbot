@@ -73,6 +73,8 @@ const member = {
 
 const memberWithAvatar = { ...member, avatarUrl: "https://example.test/ada.png" } satisfies TeamMemberSummary;
 
+const memberWithChatColor = { ...member, chatColor: "#3a7bd5" } satisfies TeamMemberSummary;
+
 const presence = {
   serverId: null,
   members: [{ ...member, online: true, typingAgentId: null }],
@@ -209,6 +211,12 @@ describe("team decoders", () => {
     ["team member with an avatar", decodeTeamMember, memberWithAvatar],
     ["team member list", decodeTeamMembers, [member, memberWithAvatar]],
     ["team presence", decodeTeamPresenceSnapshot, presence],
+    ["team member with a chat colour", decodeTeamMember, memberWithChatColor],
+    [
+      "team presence with a chat colour",
+      decodeTeamPresenceSnapshot,
+      { ...presence, members: [{ ...memberWithChatColor, online: true, typingAgentId: null }] },
+    ],
     ["team session list", decodeTeamSessions, [session]],
     ["team invite list", decodeTeamInvites, [teamInvite]],
     ["created invite", decodeInviteSummary, invite],
@@ -278,6 +286,8 @@ describe("team decoders", () => {
     ["host status with an unknown phase", decodeHostStatus, { ...hostStatus, phase: "sleeping" }],
     ["team member with an unknown role", decodeTeamMember, { ...member, role: "guest" }],
     ["team member with a numeric avatar", decodeTeamMember, { ...member, avatarUrl: 1 }],
+    ["team member with an upper-case chat colour", decodeTeamMember, { ...member, chatColor: "#3A7BD5" }],
+    ["team member with a chat colour that is not hex", decodeTeamMember, { ...member, chatColor: "blue" }],
     ["team member list that is not an array", decodeTeamMembers, member],
     ["team presence without typing state", decodeTeamPresenceSnapshot, { ...presence, members: [member] }],
     ["team session without a member", decodeTeamSessions, [{ ...session, memberId: null }]],

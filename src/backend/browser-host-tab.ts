@@ -55,6 +55,8 @@ export interface BrowserHostTab {
   closing?: boolean;
   ownerThreadId: string | null;
   ownerAgentId: string | null;
+  /** Other threads of the owner agent that can use the tab: a person tagged it in their message. */
+  sharedThreadIds?: Set<string>;
   revision: number;
   /** The number of the queued operation that runs now or ran last. */
   operations?: number;

@@ -1,11 +1,13 @@
 /**
  * Settings > Providers: a short list, and one page for each provider. A list row shows one line, and
  * a badge only when the provider needs the user. The provider page has its accounts or its sign-in,
- * its key, its runtime and its use, each as a settings card with at most one button on a row.
+ * its key, its runtime, its use and its deletion, each as a settings card with at most one button on a row.
  */
 
 import { ProviderLogo } from "@openbot/brand";
+import { isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
 import {
+  type AgentModelId,
   type AgentProviderId,
   type AgentProviderStatus,
   agentProviderName,
@@ -16,6 +18,7 @@ import {
   PROMPT_CACHE_TTLS,
   type PromptCacheTtl,
   type ProviderAccountState,
+  type ProviderModelVisibility,
   type ProviderRuntimeDownload,
   type ProviderUsageResetOutcome,
   type ProviderUsageResets,
@@ -32,6 +35,7 @@ import {
   DropdownMenu,
   Ellipsis,
   Gauge,
+  Globe2,
   Input,
   Item,
   ItemActions,
@@ -60,6 +64,7 @@ import {
   Smartphone,
   Spinner,
   Switch,
+  Text,
   Trash2,
   UserRoundPlus,
   X,
@@ -81,10 +86,11 @@ import {
   showProviderInUse,
 } from "../../components/provider-row";
 import { useText } from "../../text";
+import { toast } from "../../toast";
 import { AccountUsageWindowList } from "../account/AccountUsageDetails";
 import type { AccountUsageProviderRow, AccountUsageWindowRow } from "../account/account-usage-view";
 import { providerUpdateAvailable } from "../provider-updates/provider-update";
-import { DetailHeader, type IntegrationStatus } from "./IntegrationLayout";
+import { DangerZone, DetailHeader, type IntegrationStatus } from "./IntegrationLayout";
 
 /** The provider page on screen. The settings window puts "Providers ›" before its title. */
 export interface ProviderSettingsDetail {
@@ -104,6 +110,17 @@ export interface ProviderPromptCache {
   onChange: (ttl: PromptCacheTtl) => void;
 }
 
+/** The models of one provider, and the ones the model picker shows. `list` is null until the host answers. */
+export interface ProviderModelVisibilityControl {
+  list: ProviderModelVisibility | null;
+  /** A load or a save that failed. */
+  error: string | null;
+  /** Shows the change at once and saves it. */
+  onChange: (shown: AgentModelId[]) => void;
+  /** Gives each model back the host's default. */
+  onReset: () => void;
+}
+
 export interface ProviderSettingsPageProps extends ProviderRowHost {
   options: ProviderPickerOption[];
   /** The default for new agents. A joined server has none: its default is not this computer's. */
@@ -118,7 +135,7 @@ export interface ProviderSettingsPageProps extends ProviderRowHost {
   onCancelProviderRestart?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   /** Turns a provider on or off. A provider that an agent uses stays on and names its agents. */
   onSetProviderOn?: ((provider: AgentProviderId, on: boolean) => void | Promise<void>) | undefined;
-  /** The downloaded CLI of a provider that is off, which `onRemoveProviderDownload` frees. */
+  /** What `onRemoveProviderDownload` frees now: nothing while the provider is on. */
   onMeasureProviderDownload?: ((provider: AgentProviderId) => Promise<ProviderRuntimeDownload>) | undefined;
   /** Removes the downloaded CLI of a provider that is off. This computer only. */
   onRemoveProviderDownload?: ((provider: AgentProviderId) => Promise<void>) | undefined;
@@ -145,6 +162,11 @@ export interface ProviderSettingsPageProps extends ProviderRowHost {
   onDetailChange?: ((detail: ProviderSettingsDetail | null) => void) | undefined;
   /** On the Claude page. Only for a host with `prompt-cache-ttl-v1` that this account administers. */
   promptCache?: ProviderPromptCache | undefined;
+  /**
+   * The model list of one provider page. Called once when the page opens, so the control lives as
+   * long as the page. Only for a host with `model-visibility-v1` that this account administers.
+   */
+  modelVisibility?: ((provider: AgentProviderId) => ProviderModelVisibilityControl) | undefined;
   /** Below the list: what the host found, and the other agents the user can add. */
   footer?: JSX.Element;
 }
@@ -503,6 +525,8 @@ function ProviderPage(props: PageProps) {
   const keyShown = () =>
     Boolean(props.onSignInProvider) &&
     (props.option.id === "opencode" || props.option.id === "muse" || row.apiKeyOffered());
+  // The source can arrive after the page opens, such as when the host's capabilities load.
+  const models = createMemo(() => props.modelVisibility?.(props.option.id));
   return (
     <>
       <DetailHeader
@@ -523,9 +547,10 @@ function ProviderPage(props: PageProps) {
         <Show when={props.option.id === "claude" && props.promptCache}>
           {(cache) => <PromptCacheSection cache={cache()} disabled={props.disabled} menuMount={props.menuMount} />}
         </Show>
+        <Show when={models()}>{(control) => <ModelsSection control={control()} />}</Show>
       </Show>
       <UseSection {...props} row={row} />
-      <DownloadSection {...props} row={row} />
+      <DeleteSection {...props} row={row} />
     </>
   );
 }
@@ -545,27 +570,48 @@ function MenuTrigger(props: { label: string; disabled?: boolean | undefined }) {
   );
 }
 
-/** The second way in, from a ⋯ menu: a code, or the address that the browser shows at its end. */
+/**
+ * The other ways in, from a ⋯ menu: a code, or the address that the browser shows at its end, and
+ * the provider's mainland China site.
+ */
 function AlternativeItem(props: { row: ProviderRow }) {
   const { t } = useText();
   return (
-    <Show when={props.row.alternative()}>
-      {(kind) => (
-        <DropdownMenu.Item onSelect={props.row.signInAlternative}>
-          <Show when={kind() === "address"} fallback={<Smartphone aria-hidden="true" />}>
-            <Link aria-hidden="true" />
-          </Show>
-          {t(kind() === "address" ? "provider.action.pasteAddress" : "provider.action.signInWithCode")}
-        </DropdownMenu.Item>
-      )}
-    </Show>
+    <>
+      <Show when={props.row.alternative()}>
+        {(kind) => (
+          <DropdownMenu.Item onSelect={props.row.signInAlternative}>
+            <Show when={kind() === "address"} fallback={<Smartphone aria-hidden="true" />}>
+              <Link aria-hidden="true" />
+            </Show>
+            {t(kind() === "address" ? "provider.action.pasteAddress" : "provider.action.signInWithCode")}
+          </DropdownMenu.Item>
+        )}
+      </Show>
+      <Show when={props.row.mainlandChinaSite()}>
+        {(site) => (
+          <DropdownMenu.Item onSelect={props.row.connectInMainlandChina}>
+            <Globe2 aria-hidden="true" />
+            {t("provider.action.signInMainlandChina", { site: site() })}
+          </DropdownMenu.Item>
+        )}
+      </Show>
+    </>
   );
 }
 
 /* ---------------------------------------------- Accounts */
 
 /** The providers whose CLI signs its own sign-in out (`signOut` in `src/backend/provider-drivers.ts`). */
-const SIGN_OUT_PROVIDERS: ReadonlySet<AgentProviderId> = new Set(["claude", "codex", "grok", "muse", "cursor"]);
+const SIGN_OUT_PROVIDERS: ReadonlySet<AgentProviderId> = new Set([
+  "claude",
+  "codex",
+  "grok",
+  "muse",
+  "cursor",
+  "devin",
+  "copilot",
+]);
 
 /** The confirmation text of a Disconnect of the provider's own sign-in. */
 function disconnectDescription(
@@ -1171,7 +1217,7 @@ function SignInSection(props: SectionProps & { keyShown: boolean }) {
                 {t("provider.action.signIn")}
               </Button>
             </Show>
-            <Show when={row().alternative() || disconnectOffered()}>
+            <Show when={row().alternative() || row().mainlandChinaSite() || disconnectOffered()}>
               <DropdownMenu.Root placement="bottom-end" gutter={4} modal={false}>
                 <MenuTrigger
                   label={t("provider.aria.moreActions", { name: props.option.name })}
@@ -1181,7 +1227,7 @@ function SignInSection(props: SectionProps & { keyShown: boolean }) {
                   <DropdownMenu.Content>
                     <AlternativeItem row={row()} />
                     <Show when={disconnectOffered()}>
-                      <Show when={row().alternative()}>
+                      <Show when={row().alternative() || row().mainlandChinaSite()}>
                         <DropdownMenu.Separator />
                       </Show>
                       <DropdownMenu.Item onSelect={() => setDisconnecting(true)}>
@@ -1487,6 +1533,114 @@ function PromptCacheSection(props: {
   );
 }
 
+/* ---------------------------------------------- Models */
+
+/**
+ * Every model of the provider, each with a switch for the model picker. The shown models come
+ * first, in the order of the first answer, and keep their place while the user changes them.
+ */
+function ModelsSection(props: { control: ProviderModelVisibilityControl }) {
+  const { t } = useText();
+  const [query, setQuery] = createSignal("");
+  const order = createMemo<readonly AgentModelId[]>((previous = []) => {
+    const list = props.control.list;
+    if (!list) return previous;
+    const listed = new Set(list.models.map((model) => model.id));
+    const kept = previous.filter((id) => listed.has(id));
+    const placed = new Set(kept);
+    const shown = new Set(list.shown);
+    const added = list.models.map((model) => model.id).filter((id) => !placed.has(id));
+    // Only the first answer, or models that came later, are sorted by their switch.
+    return [...kept, ...added.filter((id) => shown.has(id)), ...added.filter((id) => !shown.has(id))];
+  });
+  const names = createMemo(() => new Map((props.control.list?.models ?? []).map((model) => [model.id, model.name])));
+  const shown = createMemo(() => new Set(props.control.list?.shown ?? []));
+  const rows = createMemo(() => {
+    const needle = query().trim().toLowerCase();
+    return order()
+      .map((id) => ({ id, name: names().get(id) ?? id }))
+      .filter((model) => !needle || `${model.name} ${model.id}`.toLowerCase().includes(needle));
+  });
+  const total = () => props.control.list?.models.length ?? 0;
+  const set = (id: AgentModelId, on: boolean) => {
+    const next = order().filter((candidate) => (candidate === id ? on : shown().has(candidate)));
+    props.control.onChange(next);
+  };
+  return (
+    <Show when={total() > 0 || props.control.error}>
+      <SettingsSection
+        title={t("provider.settings.models")}
+        description={t("provider.settings.modelsDescription", { shown: shown().size, count: total() })}
+        actions={
+          <Show when={total() > 0}>
+            <Show when={props.control.list?.changed}>
+              <Button type="button" variant="ghost" size="xs" onClick={() => props.control.onReset()}>
+                {t("provider.settings.modelsReset")}
+              </Button>
+            </Show>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              onClick={() => props.control.onChange(shown().size === 0 ? [...order()] : [])}
+            >
+              {shown().size === 0 ? t("provider.settings.modelsShowAll") : t("provider.settings.modelsHideAll")}
+            </Button>
+          </Show>
+        }
+      >
+        <Show when={props.control.error}>
+          {(message) => (
+            <Text variant="body-sm" class="provider-settings-models-error" role="alert">
+              {message()}
+            </Text>
+          )}
+        </Show>
+        <Show when={total() > 0}>
+          <Input
+            aria-label={t("provider.settings.modelsSearch")}
+            placeholder={t("provider.settings.modelsSearch")}
+            value={query()}
+            onValueChange={setQuery}
+          />
+          <ItemGroup class="settings-modal-card provider-settings-models">
+            <Show
+              when={rows().length > 0}
+              fallback={
+                <Text variant="body-sm" tone="muted" class="provider-settings-models-empty" role="status">
+                  {t("provider.settings.modelsNoMatch")}
+                </Text>
+              }
+            >
+              <ul class="provider-settings-models-list">
+                <For each={rows()} keyed={(model) => model.id}>
+                  {(model) => (
+                    <li class="provider-settings-models-row">
+                      <span class="provider-settings-models-name">
+                        <Text as="span" variant="body-sm">
+                          {model().name}
+                        </Text>
+                        <Text as="span" variant="caption" tone="muted" class="provider-settings-models-id">
+                          {model().id}
+                        </Text>
+                      </span>
+                      <Switch
+                        checked={shown().has(model().id)}
+                        aria-label={t("provider.settings.modelShow", { name: model().name, id: model().id })}
+                        onChange={(on: boolean) => set(model().id, on)}
+                      />
+                    </li>
+                  )}
+                </For>
+              </ul>
+            </Show>
+          </ItemGroup>
+        </Show>
+      </SettingsSection>
+    </Show>
+  );
+}
+
 /* ---------------------------------------------- Use */
 
 /** The default and the switch, at the end of the page, as the other settings pages keep their switches. */
@@ -1589,163 +1743,98 @@ function UseSection(props: SectionProps) {
 }
 
 /**
- * The downloaded CLI of a provider that is off, with the action that removes it. The confirmation
- * stays in the card: a removal names its size there, and the provider downloads the CLI again later.
+ * The last section: turns the provider off and deletes the CLI that OpenBot downloaded for it.
+ * Accounts, sign-ins and agents stay, and turning the provider on downloads the CLI again. A provider
+ * that an agent uses stays, and the button names the agents. This computer only.
  */
-function DownloadSection(props: SectionProps) {
+function DeleteSection(props: SectionProps) {
   const { t, format, errorMessage } = useText();
-  const [download, setDownload] = createStore<{
-    bytes: number;
-    versions: number;
-    confirming: boolean;
-    removing: boolean;
-    /** Set by a removal on this page. An off provider can run a CLI the user installed instead. */
-    removed: boolean;
-    error: string | null;
-  }>({ bytes: 0, versions: 0, confirming: false, removing: false, removed: false, error: null });
+  const [state, setState] = createStore({ bytes: 0, busy: false });
+  const usedBy = () => props.option.usedBy ?? [];
+  const offered = () =>
+    Boolean(props.onSetProviderOn && props.onRemoveProviderDownload) && isManagedRuntimeProvider(props.option.id);
+  /**
+   * A provider that is on runs a CLI. Only one that OpenBot downloaded has a download to delete. Pi
+   * also runs the key-only providers, so the host can keep its CLI after Pi turns off; Pi offers
+   * Delete only when it is off and the host measured a download.
+   */
+  const onWithDownload = () =>
+    props.option.id !== "pi" &&
+    !props.row.off() &&
+    props.option.runtimeStatus?.phase === "ready" &&
+    props.option.cliSource !== "system";
   let reads = 0;
-  const measure = (provider: AgentProviderId, read: ProviderSettingsPageProps["onMeasureProviderDownload"]) => {
+  /** What a deletion frees. The host measures nothing while the provider is on. */
+  async function measure(provider: AgentProviderId, read = props.onMeasureProviderDownload): Promise<number> {
     const serial = ++reads;
-    const apply = (measured: ProviderRuntimeDownload) => {
-      if (serial === reads)
-        setDownload((state) => {
-          state.bytes = measured.bytes;
-          state.versions = measured.versions;
-        });
-    };
-    if (read) void read(provider).then(apply, () => apply({ bytes: 0, versions: 0 }));
-    else apply({ bytes: 0, versions: 0 });
-  };
-  const offered = () => props.row.off() && Boolean(props.onRemoveProviderDownload);
-  // Measured again when the provider is turned off. A provider that is off downloads nothing, and
-  // a removal measures again itself.
-  createEffect(
-    () => ({ provider: props.option.id, read: offered() ? props.onMeasureProviderDownload : undefined }),
-    ({ provider, read }) => {
-      setDownload((state) => {
-        state.removed = false;
+    const bytes = read
+      ? await read(provider).then(
+          (download) => download.bytes,
+          () => 0,
+        )
+      : 0;
+    if (serial === reads)
+      setState((draft) => {
+        draft.bytes = bytes;
       });
-      measure(provider, read);
+    return bytes;
+  }
+  createEffect(
+    () => ({ provider: props.option.id, off: offered() && props.row.off(), read: props.onMeasureProviderDownload }),
+    ({ provider, off, read }) => {
+      if (off) void measure(provider, read);
+      else
+        setState((draft) => {
+          draft.bytes = 0;
+        });
     },
   );
-  const detail = () => {
-    const values = { count: download.versions, size: format.fileSize(download.bytes) };
-    const version = props.option.runtimeStatus?.version;
-    return version
-      ? t("provider.settings.downloadDetail", { ...values, version })
-      : t("provider.settings.downloadVersions", values);
-  };
+  /**
+   * The size shows only once the host has measured it. While a provider that was on turns off, the
+   * measure has not returned yet, so the text still says what the deletion does.
+   */
+  const description = () =>
+    props.row.off() && state.bytes > 0
+      ? t("provider.settings.deleteOff", { name: props.option.name, size: format.fileSize(state.bytes) })
+      : t("provider.settings.deleteOn", { name: props.option.name });
   async function remove() {
-    setDownload((state) => {
-      state.removing = true;
-      state.error = null;
+    const provider = props.option.id;
+    setState((draft) => {
+      draft.busy = true;
     });
     try {
-      await props.onRemoveProviderDownload?.(props.option.id);
-      setDownload((state) => {
-        state.confirming = false;
-        state.removed = true;
-      });
+      if (!props.row.off()) await props.onSetProviderOn?.(provider, false);
     } catch (error) {
-      setDownload((state) => {
-        state.error = errorMessage(error, t("provider.settings.removeDownloadFailed"));
+      toast.error(errorMessage(error, t("error.provider.useChangeFailed")));
+      setState((draft) => {
+        draft.busy = false;
       });
-    } finally {
-      setDownload((state) => {
-        state.removing = false;
-      });
+      return;
     }
-    measure(props.option.id, props.onMeasureProviderDownload);
+    try {
+      // A provider that runs the user's own CLI has nothing to delete, and the host refuses it.
+      if ((await measure(provider)) > 0) await props.onRemoveProviderDownload?.(provider);
+    } catch (error) {
+      toast.error(errorMessage(error, t("provider.settings.removeDownloadFailed")));
+    }
+    await measure(provider);
+    setState((draft) => {
+      draft.busy = false;
+    });
   }
   return (
-    <Show when={offered() && (download.bytes > 0 || download.removed)}>
-      <SettingsSection title={t("provider.settings.download")}>
-        <ItemGroup class="settings-modal-card">
-          <Show
-            when={download.bytes > 0}
-            fallback={
-              <Item class="settings-modal-row">
-                <ItemContent>
-                  <ItemTitle>{t("provider.status.notDownloaded")}</ItemTitle>
-                  <ItemDescription>{t("provider.settings.downloadAgain", { name: props.option.name })}</ItemDescription>
-                </ItemContent>
-              </Item>
-            }
-          >
-            <Item class="settings-modal-row">
-              <ItemContent>
-                <ItemTitle>{t("provider.settings.downloadedCli", { name: props.option.name })}</ItemTitle>
-                <ItemDescription>{detail()}</ItemDescription>
-              </ItemContent>
-              <Show when={!download.confirming}>
-                <ItemActions>
-                  <Button
-                    type="button"
-                    variant="destructive-ghost"
-                    size="sm"
-                    disabled={props.disabled}
-                    onClick={() =>
-                      setDownload((state) => {
-                        state.error = null;
-                        state.confirming = true;
-                      })
-                    }
-                  >
-                    <Trash2 aria-hidden="true" />
-                    {t("provider.settings.removeDownload")}
-                  </Button>
-                </ItemActions>
-              </Show>
-            </Item>
-            <Show when={download.confirming}>
-              <Item class="settings-modal-row">
-                <ItemContent>
-                  <ItemTitle>
-                    {t("provider.settings.removeDownloadConfirm", { size: format.fileSize(download.bytes) })}
-                  </ItemTitle>
-                  <Show
-                    when={download.error}
-                    fallback={<ItemDescription>{t("provider.settings.removeDownloadKeeps")}</ItemDescription>}
-                  >
-                    {(message) => (
-                      <ItemDescription class="provider-settings-error" role="alert">
-                        {message()}
-                      </ItemDescription>
-                    )}
-                  </Show>
-                </ItemContent>
-                <ItemActions>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={download.removing}
-                    onClick={() =>
-                      setDownload((state) => {
-                        state.confirming = false;
-                        state.error = null;
-                      })
-                    }
-                  >
-                    {t("common.cancel")}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    loading={download.removing}
-                    loadingLabel={t("provider.settings.removingDownload")}
-                    disabled={props.disabled}
-                    onClick={() => void remove()}
-                  >
-                    {t("common.remove")}
-                  </Button>
-                </ItemActions>
-              </Item>
-            </Show>
-          </Show>
-        </ItemGroup>
-      </SettingsSection>
+    <Show when={offered() && !props.disabled && (state.busy || onWithDownload() || state.bytes > 0)}>
+      <DangerZone
+        title={t("provider.settings.deleteTitle", { name: props.option.name })}
+        description={description()}
+        action={t("common.delete")}
+        busy={state.busy}
+        confirm={usedBy().length === 0}
+        onAction={() => {
+          if (usedBy().length > 0) showProviderInUse(t, usedBy(), props.option.name);
+          else void remove();
+        }}
+      />
     </Show>
   );
 }

@@ -65,6 +65,11 @@ already has is left out. The desktop read-only Skills view reads the same route 
 info with their `~/.agents/skills/<slug>` location. The provider text of a `home:<slug>` tag names the skill's `SKILL.md`
 (`displayMessageReferences`); a person, and the released Team API adapters, see the name alone.
 
+In a channel, the `$` list holds the skills of each agent in the channel, one entry for each skill id
+(`src/renderer/src/features/conversation/stores/skills-store.ts`). A tag reaches each agent by its
+name, so an agent without that skill reads the name only. When the list of one agent fails, the list
+shows the skills that loaded and tries again after a reconnect.
+
 MCP servers do not use folders. `projection_mcp_servers` in SQLite is the source of truth for the
 whole computer. No shared MCP file format exists: Claude Code reads `.mcp.json` and
 `~/.claude.json`, Codex reads `config.toml`, OpenCode reads `opencode.json`, and Cursor, Cline and
@@ -121,6 +126,18 @@ and the path, and reads the file in its own command. Only the server owner or an
 value is registered for log redaction when it is saved and at startup, and the stored block keeps no
 secret field value. `list_api_keys` and `remove_api_key` are the reverse actions, and deleting the agent
 deletes its folder. The form is refused in Slack, Discord and Telegram chats.
+
+When the agent already has a secret, such as one that the user pasted in the chat, `openbot.save_api_key`
+saves it in the encrypted Vault as an `apiKey` item for every agent (`VaultItems.saveApiKey`), and
+`openbot_browser.save_vault_item kind=login` saves a website password (`VaultItems.saveLogin`). Both
+register a value of 8 or more characters for log redaction when the call arrives, before any check;
+the Vault registers a shorter value when it saves it. Both work only when a
+person's message in this computer's OpenBot chat started the turn, as for workflow changes: an
+external chat, a team member, a routine, another agent, or a web page cannot replace a key or a
+password. They return no secret. `save_api_key` replaces a Vault key with the same name and deletes
+the calling agent's own key with that name, because the agent's own key wins in `list_api_keys`.
+Another agent's own key with that name stays and still wins for that agent. The value is in the provider's
+transcript because the agent sent it; OpenBot keeps no tool arguments in its trace.
 
 `password-vault-router.ts` joins metadata from both managers and prefixes Bitwarden ids with
 `bitwarden:`. Existing 1Password ids stay unchanged. A failed list stops automatic account selection

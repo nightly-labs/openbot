@@ -19,6 +19,7 @@ import { AnalyticsOperationFailure, toAnalyticsOperationFailure } from "./analyt
 import { readPreferenceFile, writePreferenceFile } from "./preference-file";
 import {
   addCount,
+  type ChildType,
   COUNTER,
   type DeviceClass,
   decodeResourceSummaryFile,
@@ -26,7 +27,10 @@ import {
   emptyDay,
   type GoneReason,
   goneReason,
+  type LoopPhase,
   localDay,
+  loopPhase,
+  MAIN_LOOP_STALL_MS,
   METRIC,
   type ProcessGroup,
   type ProviderTreeUsage,
@@ -52,11 +56,14 @@ const PS_TIMEOUT_MS = 5_000;
 const PS_MAX_BUFFER = 8 * 1024 * 1024;
 const MAX_ACTIVE_TURNS = 1_000;
 const MAX_PENDING_GONE = 1_000;
+/** Bounds on the renderer reports between two samples. A window reports at most once a minute. */
+const MAX_PENDING_RENDERER_COUNT = 1_000_000;
+const MAX_PENDING_INPUT_DELAYS = 1_000;
 /** The histogram's timer interval. Each recorded delay includes it, so it is subtracted. */
 const LOOP_RESOLUTION_MS = 20;
 // The `serviceName` that `agent-database-host-process.ts` and the voice `*-host-process.ts` files
-// give `utilityProcess.fork`. Electron reports it as the metric's `name`.
-const UTILITY_GROUPS = new Map<string, ProcessGroup>([
+// give `utilityProcess.fork`. Electron reports it as the `name` of a metric and of a gone process.
+const UTILITY_GROUPS = new Map<string, ProcessGroup & ChildType>([
   ["OpenBot databases", "database_host"],
   ["OpenBot voice transcription", "voice_host"],
   ["OpenBot speech", "voice_host"],
@@ -76,7 +83,7 @@ interface ResourceSample {
   rssMb: Partial<Record<ProcessGroup | "total", number>>;
   cpuPct: Partial<Record<ProcessGroup | "total", number>>;
   providers: Partial<Record<ResourceProvider, { rssMb: number; cpuPct: number | null; processes: number }>>;
-  mainLoopMs: { p99: number; max: number } | null;
+  mainLoopMs: { p99: number; max: number; phase: LoopPhase } | null;
   database: { statements: number; maxMs: number };
   activeTurns: number;
   browserTabs: number;
@@ -110,7 +117,20 @@ export class ResourceMonitor implements AnalyticsResourceSource {
    * process starts its teardown, so an exit counts only when the app still runs at the next sample.
    * The trace gets each exit at once: a main process that stops within the minute would lose it.
    */
-  #gone: { kind: "renderer" | "child"; reason: GoneReason }[] = [];
+  #gone: { kind: "renderer" | "child"; reason: GoneReason; type: ChildType | null }[] = [];
+  /** Renderer reports since the last sample: long tasks, inputs, and the delays the browser timed. */
+  #rendererTiming: { longTasks: number; inputs: number; inputDelaysMs: number[] } = {
+    longTasks: 0,
+    inputs: 0,
+    inputDelaysMs: [],
+  };
+  /**
+   * The main-loop window that the next sample closes: when it started in `performance.now()` time
+   * (milliseconds after the process started), and whether a turn ran in it.
+   */
+  #loopWindowStartedAt = 0;
+  #turnInLoopWindow = false;
+  #resumedAt: number | null = null;
   #persistedAt = 0;
   #timer: NodeJS.Timeout | null = null;
   #sampling = false;
@@ -141,6 +161,7 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     powerMonitor.on("suspend", this.#suspend);
     powerMonitor.on("resume", this.#resume);
     this.#loop.enable();
+    this.#startLoopWindow();
     this.#fork(
       this.#load().pipe(
         Effect.andThen(
@@ -154,8 +175,21 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     );
   }
 
+  /** Counts from an app window since its last report. The next sample adds them to the day. */
+  observeRendererTiming(report: { longTasks: number; inputs: number; inputDelaysMs: readonly number[] }): void {
+    if (this.#closed) return;
+    const pending = this.#rendererTiming;
+    pending.longTasks = Math.min(MAX_PENDING_RENDERER_COUNT, pending.longTasks + report.longTasks);
+    const kept = report.inputDelaysMs.slice(0, Math.max(0, MAX_PENDING_INPUT_DELAYS - pending.inputDelaysMs.length));
+    pending.inputDelaysMs.push(...kept);
+    // An input whose delay is dropped is not counted, so it does not show as a 0 ms input in the p95.
+    const dropped = report.inputDelaysMs.length - kept.length;
+    pending.inputs = Math.min(MAX_PENDING_RENDERER_COUNT, pending.inputs + report.inputs - dropped);
+  }
+
   observeAgentEvent(event: AgentEvent): void {
     if (event.type === "turn-started") {
+      this.#turnInLoopWindow = true;
       if (this.#activeTurns.size < MAX_ACTIVE_TURNS) this.#activeTurns.add(event.turnId);
     } else if (event.type === "turn-completed") {
       this.#activeTurns.delete(event.turnId);
@@ -234,31 +268,49 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     this.#lastSampleAt = null;
     this.#previousCpuSeconds = null;
     this.#loop.reset();
+    this.#startLoopWindow();
+    this.#resumedAt = this.#loopWindowStartedAt;
     this.#schedule();
   };
 
+  #startLoopWindow(): void {
+    this.#loopWindowStartedAt = performance.now();
+    this.#turnInLoopWindow = this.#activeTurns.size > 0;
+  }
+
   readonly #rendererGone = (_event: Event, _contents: WebContents, details: RenderProcessGoneDetails) =>
-    this.#recordGone("renderer", details.reason);
+    this.#recordGone("renderer", details.reason, null);
   // OpenBot starts and stops its utility processes itself, such as the voice host after idle time.
   readonly #childGone = (_event: Event, details: Details) => {
     if (details.type === "Utility" && details.reason === "killed") return;
-    this.#recordGone("child", details.reason);
+    this.#recordGone("child", details.reason, childType(details));
   };
 
-  #recordGone(kind: "renderer" | "child", reason: string): void {
+  #recordGone(kind: "renderer" | "child", reason: string, type: ChildType | null): void {
     const known = goneReason(reason);
     if (!known) return;
-    this.#options.trace.record({ kind: "crash", name: `${kind}_gone`, durationMs: 0, outcome: known });
+    const name = type ? `child_gone:${type}` : `${kind}_gone`;
+    this.#options.trace.record({ kind: "crash", name, durationMs: 0, outcome: known });
     Effect.runFork(this.#options.trace.flush());
-    if (this.#gone.length < MAX_PENDING_GONE) this.#gone.push({ kind, reason: known });
+    if (this.#gone.length < MAX_PENDING_GONE) this.#gone.push({ kind, reason: known, type });
   }
 
   #countGone(day: ResourceDay): void {
-    for (const { kind, reason } of this.#gone) {
+    for (const { kind, reason, type } of this.#gone) {
       addCount(day, kind === "renderer" ? COUNTER.rendererGone : COUNTER.childGone);
+      if (type) addCount(day, COUNTER.childType(type));
       addCount(day, COUNTER.goneReason(reason));
     }
     this.#gone = [];
+  }
+
+  /** An input that the browser did not time took less than 16 ms to handle; it counts as no delay. */
+  #countRendererTiming(day: ResourceDay): void {
+    const { longTasks, inputs, inputDelaysMs } = this.#rendererTiming;
+    if (longTasks > 0) addCount(day, COUNTER.rendererLongTasks, longTasks);
+    for (const delay of inputDelaysMs) recordValue(day, METRIC.rendererInput, delay);
+    recordValue(day, METRIC.rendererInput, 0, inputs - inputDelaysMs.length);
+    this.#rendererTiming = { longTasks: 0, inputs: 0, inputDelaysMs: [] };
   }
 
   readonly #load = Effect.fn("ResourceMonitor.load")(function* (this: ResourceMonitor) {
@@ -360,11 +412,32 @@ export class ResourceMonitor implements AnalyticsResourceSource {
 
     // Each window's p99, so one long task shows in the peak and not in every percentile.
     const mainLoopMs =
-      this.#loop.count > 0 ? { p99: loopDelayMs(this.#loop.percentile(99)), max: loopDelayMs(this.#loop.max) } : null;
+      this.#loop.count > 0
+        ? {
+            p99: loopDelayMs(this.#loop.percentile(99)),
+            max: loopDelayMs(this.#loop.max),
+            phase: loopPhase(this.#loopWindowStartedAt, this.#resumedAt),
+          }
+        : null;
+    const turnInLoopWindow = this.#turnInLoopWindow;
     this.#loop.reset();
+    this.#startLoopWindow();
     if (mainLoopMs) {
+      if (mainLoopMs.max > (day.peaks[METRIC.mainLoop] ?? 0)) {
+        day.mainLoopPeak = { phase: mainLoopMs.phase, turnActive: turnInLoopWindow };
+      }
       recordValue(day, METRIC.mainLoop, mainLoopMs.p99);
       recordPeak(day, METRIC.mainLoop, mainLoopMs.max);
+      if (mainLoopMs.max >= MAIN_LOOP_STALL_MS) {
+        addCount(day, COUNTER.mainLoopStall);
+        // The line's time is the end of the minute that held the stall.
+        this.#options.trace.record({
+          kind: "stall",
+          name: "main_loop",
+          durationMs: mainLoopMs.max,
+          outcome: mainLoopMs.phase,
+        });
+      }
     }
 
     const statements = this.#options.statementTimings.drain();
@@ -373,6 +446,8 @@ export class ResourceMonitor implements AnalyticsResourceSource {
       addCount(day, COUNTER.databaseRequests, statements.length);
       addCount(day, COUNTER.databaseSlow, statements.filter((ms) => ms > SLOW_DATABASE_STATEMENT_MS).length);
     }
+
+    this.#countRendererTiming(day);
 
     const providerProcesses = sum(trees.map((tree) => tree.processCount));
     recordPeak(day, METRIC.activeTurns, this.#activeTurns.size);
@@ -395,7 +470,11 @@ export class ResourceMonitor implements AnalyticsResourceSource {
           },
         ]),
       ),
-      mainLoopMs: mainLoopMs && { p99: Math.round(mainLoopMs.p99), max: Math.round(mainLoopMs.max) },
+      mainLoopMs: mainLoopMs && {
+        p99: Math.round(mainLoopMs.p99),
+        max: Math.round(mainLoopMs.max),
+        phase: mainLoopMs.phase,
+      },
       database: { statements: statements.length, maxMs: Math.round(Math.max(0, ...statements)) },
       activeTurns: this.#activeTurns.size,
       browserTabs: tabPids.size,
@@ -425,11 +504,26 @@ function processGroup(metric: ProcessMetric, tabPids: ReadonlySet<number>): Proc
   }
 }
 
-/** All processes, for the provider trees. The output stays in memory: it holds executable paths. */
+function childType(details: Details): ChildType {
+  switch (details.type) {
+    case "GPU":
+      return "gpu";
+    case "Utility": {
+      const group = UTILITY_GROUPS.get(details.name ?? "");
+      if (group) return group;
+      const network = details.serviceName === "network.mojom.NetworkService" || details.name === "Network Service";
+      return network ? "network" : "utility_other";
+    }
+    default:
+      return "other";
+  }
+}
+
 function loopDelayMs(nanoseconds: number): number {
   return Math.max(0, nanoseconds / 1e6 - LOOP_RESOLUTION_MS);
 }
 
+/** All processes, for the provider trees. The output stays in memory: it holds executable paths. */
 const listProcesses = Effect.callback<{ text: string; pid: number | undefined }, AnalyticsOperationFailure>(
   (resume) => {
     const child = execFile(

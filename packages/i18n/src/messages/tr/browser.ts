@@ -69,7 +69,6 @@ export const messages = {
   "browser.liveView.copyFailed": "Metin kopyalanamadı. Sayfaya tıklayıp yeniden deneyin.",
   "browser.previews.label": "Tarayıcı önizlemeleri",
   "browser.previews.resize": "Sağ paneli yeniden boyutlandır",
-  "browser.previews.collapse": "Tarayıcı önizlemelerini daralt",
   "browser.previews.empty": "Tarayıcı sekmesi yok",
   "browser.previews.openPage": "Bir sayfa aç",
   "browser.preview.pageFallback": "Tarayıcı sayfası",

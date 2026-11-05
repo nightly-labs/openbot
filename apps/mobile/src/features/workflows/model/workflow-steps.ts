@@ -1,16 +1,33 @@
 import type {
+  WorkflowDiscordAction,
   WorkflowNode,
   WorkflowNodeKind,
   WorkflowRunStatus,
+  WorkflowSlackAction,
   WorkflowStep,
   WorkflowStepStatus,
+  WorkflowTelegramAction,
   WorkflowTriggerType,
+  WorkflowVersionKind,
 } from "@openbot/contracts/ipc";
-import { WORKFLOW_TRIGGER_TYPES } from "@openbot/contracts/ipc";
+import {
+  WORKFLOW_DISCORD_ACTIONS,
+  WORKFLOW_GITHUB_ACTIONS,
+  WORKFLOW_SLACK_ACTIONS,
+  WORKFLOW_TELEGRAM_ACTIONS,
+  WORKFLOW_TRIGGER_TYPES,
+} from "@openbot/contracts/ipc";
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import type { MobileTextKey, MobileTranslate } from "@openbot/i18n/mobile";
 import { type RoutineDraftKind, routineScheduleToDraft } from "@openbot/team-client/routine-schedule-draft";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import {
+  GITHUB_ACTION_LABEL,
+  GITHUB_EVENT_LABEL,
+  GITHUB_OUTPUT_DEFAULTS,
+  githubTrigger,
+  SAME_REPOSITORY,
+} from "./workflow-github";
 
 const KIND_LABEL = {
   trigger: "mobile.workflow.kind.trigger",
@@ -34,6 +51,8 @@ const TRIGGER_LABEL = {
   message: "mobile.workflow.trigger.message",
   github: "mobile.workflow.trigger.github",
   discord: "mobile.workflow.trigger.discord",
+  telegram: "mobile.workflow.trigger.telegram",
+  slack: "mobile.workflow.trigger.slack",
 } as const satisfies Record<WorkflowTriggerType, MobileTextKey>;
 
 export const RUN_STATUS_LABEL = {
@@ -71,11 +90,70 @@ const TRIGGER_TEXT = {
   message: "mobile.workflow.trigger.messageHint",
   github: "mobile.workflow.trigger.githubHint",
   discord: "mobile.workflow.trigger.discordHint",
+  telegram: "mobile.workflow.trigger.telegramHint",
+  slack: "mobile.workflow.trigger.slackHint",
 } as const satisfies Record<WorkflowTriggerType, MobileTextKey>;
 
-/** When a trigger starts the workflow: how often and at what time for a schedule, such as "Daily · 09:00". */
+/** Why the host kept a version, as the desktop version list says it. */
+export const VERSION_KIND_LABEL = {
+  auto: "mobile.workflow.version.auto",
+  restore: "mobile.workflow.version.restore",
+  run: "mobile.workflow.version.run",
+} as const satisfies Record<WorkflowVersionKind, MobileTextKey>;
+
+export const DISCORD_ACTION_LABEL = {
+  reply: "mobile.workflow.discord.action.reply",
+  post: "mobile.workflow.discord.action.post",
+  react: "mobile.workflow.discord.action.react",
+} as const satisfies Record<WorkflowDiscordAction, MobileTextKey>;
+
+/** The action of a Discord output, as the host reads it: a reply when it has none. */
+export function discordAction(node: WorkflowNode): WorkflowDiscordAction {
+  const value = node.fields.action;
+  return typeof value === "string" && isOneOf(WORKFLOW_DISCORD_ACTIONS, value) ? value : "reply";
+}
+
+export const TELEGRAM_ACTION_LABEL = {
+  reply: "mobile.workflow.telegram.action.reply",
+  post: "mobile.workflow.telegram.action.post",
+  react: "mobile.workflow.telegram.action.react",
+} as const satisfies Record<WorkflowTelegramAction, MobileTextKey>;
+
+/** The action of a Telegram output, as the host reads it: a reply when it has none. */
+export function telegramAction(node: WorkflowNode): WorkflowTelegramAction {
+  const value = node.fields.action;
+  return typeof value === "string" && isOneOf(WORKFLOW_TELEGRAM_ACTIONS, value) ? value : "reply";
+}
+
+const SLACK_ACTION_LABEL = {
+  reply: "mobile.workflow.slack.action.reply",
+  post: "mobile.workflow.discord.action.post",
+  react: "mobile.workflow.discord.action.react",
+} as const satisfies Record<WorkflowSlackAction, MobileTextKey>;
+
+/** The action of a Slack output, as the host reads it: a reply in the thread when it has none. */
+function slackAction(node: WorkflowNode): WorkflowSlackAction {
+  const value = node.fields.action;
+  return typeof value === "string" && isOneOf(WORKFLOW_SLACK_ACTIONS, value) ? value : "reply";
+}
+
+/**
+ * When a trigger starts the workflow: how often and at what time for a schedule, such as "Daily · 09:00",
+ * and the repository and the event of a GitHub trigger.
+ */
 function triggerText(node: WorkflowNode, t: MobileTranslate): string {
   const type = triggerType(node);
+  if (type === "github") {
+    const github = githubTrigger(node);
+    return github.repository
+      ? t("mobile.workflow.github.summary", {
+          repository: github.repository,
+          event: t(GITHUB_EVENT_LABEL[github.event]),
+        })
+      : t(TRIGGER_TEXT.github);
+  }
+  if (type === "discord" || type === "slack") return t("mobile.workflow.discord.event.mention");
+  if (type === "telegram") return t("mobile.workflow.telegram.event.mention");
   if (type !== "schedule" || !node.schedule) return t(TRIGGER_TEXT[type]);
   const draft = routineScheduleToDraft(node.schedule);
   const repeat = t(REPEAT_LABEL[draft.kind]);
@@ -116,6 +194,34 @@ export function stepLabel(node: WorkflowNode, agents: readonly MobileAgent[], t:
   return kindLabel(node.kind, t);
 }
 
+/** Where an output sends its result, and what a GitHub, Discord, Telegram or Slack output does there. */
+function outputText(node: WorkflowNode, t: MobileTranslate): string {
+  switch (text(node, "target")) {
+    case "channel":
+      return t("mobile.workflow.output.channel");
+    case "file":
+      return t("mobile.workflow.output.file");
+    case "github": {
+      const action = text(node, "action");
+      const label = t(
+        GITHUB_ACTION_LABEL[isOneOf(WORKFLOW_GITHUB_ACTIONS, action) ? action : GITHUB_OUTPUT_DEFAULTS.action],
+      );
+      const stored = text(node, "repository");
+      const repository =
+        stored && stored !== SAME_REPOSITORY ? stored : t("mobile.workflow.github.output.sameRepository");
+      return t("mobile.workflow.github.summary", { repository, event: label });
+    }
+    case "discord":
+      return t("mobile.workflow.discord.outputSummary", { action: t(DISCORD_ACTION_LABEL[discordAction(node)]) });
+    case "telegram":
+      return t("mobile.workflow.telegram.outputSummary", { action: t(TELEGRAM_ACTION_LABEL[telegramAction(node)]) });
+    case "slack":
+      return t("mobile.workflow.slack.outputSummary", { action: t(SLACK_ACTION_LABEL[slackAction(node)]) });
+    default:
+      return t("mobile.workflow.output.notify");
+  }
+}
+
 /** The second line of a step: what it does, or the default that the host uses when it is empty. */
 export function stepText(node: WorkflowNode, t: MobileTranslate): string {
   switch (node.kind) {
@@ -132,11 +238,7 @@ export function stepText(node: WorkflowNode, t: MobileTranslate): string {
     case "prompt":
       return text(node, "text") || t("mobile.workflow.step.textEmpty");
     case "output":
-      return text(node, "target") === "channel"
-        ? t("mobile.workflow.output.channel")
-        : text(node, "target") === "file"
-          ? t("mobile.workflow.output.file")
-          : t("mobile.workflow.output.notify");
+      return outputText(node, t);
     default:
       return t("mobile.workflow.step.computerOnly");
   }

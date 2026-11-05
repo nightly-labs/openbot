@@ -7,7 +7,7 @@ import { isDynamicRecord, isOneOf } from "./runtime-values";
 /** The most tasks of one agent that run a turn at the same time, next to the agent's own chat. */
 export const AGENT_TASK_LIMIT_MAX = 4;
 /** The task limit of an agent that has no limit of its own. */
-export const AGENT_TASK_LIMIT_DEFAULT = 2;
+export const AGENT_TASK_LIMIT_DEFAULT = 4;
 
 export function isAgentTaskLimit(value: unknown): value is number {
   return integerInRange(value, 1, AGENT_TASK_LIMIT_MAX);
@@ -90,6 +90,11 @@ export interface AgentTask {
    * Absent from a server that cannot branch, and never sent on the frozen `agent-tasks-v1` routes.
    */
   branch?: AgentTaskBranch | null;
+  /**
+   * Set when the thread takes the runs of one routine of the agent. Absent from an older server, and
+   * never sent on the frozen `agent-tasks-v1` routes.
+   */
+  routineId?: string | null;
 }
 
 /** Where a branch was copied from. */
@@ -203,7 +208,8 @@ export function isAgentTask(value: unknown): value is AgentTask {
     isBoundedString(value.createdAt, 160) &&
     isBoundedString(value.updatedAt, 160) &&
     (value.closedAt === null || isBoundedString(value.closedAt, 160)) &&
-    (value.branch === undefined || value.branch === null || isAgentTaskBranch(value.branch))
+    (value.branch === undefined || value.branch === null || isAgentTaskBranch(value.branch)) &&
+    (value.routineId === undefined || value.routineId === null || isIdentifier(value.routineId))
   );
 }
 

@@ -93,6 +93,7 @@ export const messages = {
   "error.remote.fileTransferFailed": "De WebRTC-bestandsoverdracht is mislukt.",
   "error.remote.fileResumeFailed": "De WebRTC-bestandsoverdracht kon niet op tijd worden hervat.",
   "error.remote.fileTransportStopped": "Het WebRTC-bestandstransport is gestopt.",
+  "error.remote.downloadStopped": "De download is gestopt.",
   "error.remote.fileResumeExpired": "De termijn om de WebRTC-bestandsoverdracht te hervatten is verlopen.",
   "error.remote.hostRequestFailed": "De host kon het verzoek niet voltooien.",
   "error.remote.responseTooLarge": "Het antwoord van de host is te groot om naar dit apparaat te sturen.",
@@ -199,4 +200,6 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "Werk deze desktopserver bij om kanalen te verwijderen.",
   "error.remote.historyRefreshFailed": "Het bericht is verstuurd, maar de chatgeschiedenis kon niet worden vernieuwd.",
   "error.remote.taskHistoryRefreshFailed": "De taak is gewijzigd, maar de chatgeschiedenis kon niet worden vernieuwd.",
+  "error.remote.localServerAccountRemovalFailed":
+    "De server is op zijn computer verwijderd, maar het account toont hem nog. Verwijder hem opnieuw om hem uit het account te halen.",
 } as const satisfies PartialTranslation<typeof source>;

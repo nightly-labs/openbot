@@ -66,7 +66,6 @@ export const messages = {
   "browser.liveView.copyFailed": "텍스트를 복사할 수 없어요. 페이지를 클릭한 후 다시 시도해 주세요.",
   "browser.previews.label": "브라우저 미리보기",
   "browser.previews.resize": "오른쪽 패널 크기 조절",
-  "browser.previews.collapse": "브라우저 미리보기 접기",
   "browser.previews.empty": "브라우저 탭 없음",
   "browser.previews.openPage": "페이지 열기",
   "browser.preview.pageFallback": "브라우저 페이지",

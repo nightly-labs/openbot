@@ -23,6 +23,7 @@ import { useColumnWidth } from "@/shared/components/adaptive-split";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
+import { END_X } from "@/shared/lib/text-direction";
 import { ChatCameraContent } from "./chat-camera-panel";
 import type { ChatAttachmentAnchor, ChatAttachments } from "./use-chat-attachments";
 
@@ -171,6 +172,8 @@ export function ChatAttachmentPanel({
   const insets = useSafeAreaInsets();
   // The camera centres between the side insets: the rail of iPhone Duo and the edges in landscape.
   const safeWidth = useColumnWidth() - insets.left - insets.right;
+  // The anchor and the card count from the start edge: the right in a right-to-left layout.
+  const startInset = END_X === 1 ? insets.left : insets.right;
   const { t } = useText();
   const [mode, setMode] = useState<"options" | "camera">("options");
   const [closing, setClosing] = useState(false);
@@ -193,10 +196,10 @@ export function ChatAttachmentPanel({
   const cameraHeight = Math.min(height * 0.58, height - insets.top - anchor.bottom - keyboardInset - CAMERA_TOP_GAP);
   // The card keeps the plus's left edge while it is the options list, and
   // centres itself once it is the camera.
-  const cameraShift = insets.left + (safeWidth - cameraWidth) / 2 - anchor.left;
+  const cameraShift = startInset + (safeWidth - cameraWidth) / 2 - anchor.left;
   const maxListWidth = Math.max(
     OPTIONS_MIN_WIDTH,
-    Math.min(cameraWidth, insets.left + safeWidth - anchor.left - OPTIONS_EDGE_GAP),
+    Math.min(cameraWidth, startInset + safeWidth - anchor.left - OPTIONS_EDGE_GAP),
   );
   const labels = {
     useSkill: t("mobile.chat.attachment.useSkill"),
@@ -265,7 +268,7 @@ export function ChatAttachmentPanel({
       // from nothing and never has to travel to reach its own corner.
       width: interpolate(presented, [0, 1], [anchor.size, openWidth]),
       height: interpolate(presented, [0, 1], [anchor.size, openHeight]),
-      transform: [{ translateX: interpolate(presented, [0, 1], [0, cameraShift * shape]) }],
+      transform: [{ translateX: END_X * interpolate(presented, [0, 1], [0, cameraShift * shape]) }],
     };
   });
   // The composer is lifted by the keyboard and this overlay is not, so the
@@ -373,8 +376,8 @@ export function ChatAttachmentPanel({
                 // Hidden until it has its width, so it is laid out only once.
                 display: listWidth === null ? "none" : "flex",
                 paddingVertical: OPTIONS_PADDING,
-                // The card grows from its own bottom-left, so the rows do too.
-                transformOrigin: "0% 100%",
+                // The card grows from its own bottom corner at the plus, so the rows do too.
+                transformOrigin: END_X === 1 ? "0% 100%" : "100% 100%",
               },
               optionsStyle,
             ]}

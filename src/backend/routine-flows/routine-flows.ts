@@ -36,6 +36,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { nextValidRoutineOccurrence, routineOnceInstant } from "@openbot/team-client/routine-schedule";
 import { Context, Effect, Exit, Layer, ManagedRuntime, Schema, Scope, Semaphore } from "effect";
+import { quietRoutineRun } from "../agent/routine-quiet-runs";
 import { coalescedPasses } from "../coalesced-passes";
 import { routineFlowDepths } from "./routine-flow-graph";
 import { RoutineFlowError, type RoutineFlowRun, type RoutineFlowStore } from "./routine-flow-store";
@@ -302,7 +303,12 @@ class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("o
             const sources = incoming.map((link) => ({ link, step: steps.get(link.fromAgentId) }));
             // Waits for every input: one that has not ended yet holds the agent back.
             if (sources.some(({ step }) => !step || step.status === "running")) continue;
-            const answered = sources.filter(({ step }) => step?.status === "succeeded");
+            // A quiet run's own agent with nothing to report hands nothing on, so the agents after it are skipped.
+            const answered = sources.filter(
+              ({ step }) =>
+                step?.status === "succeeded" &&
+                !(step.agentId === run.agentId && step.output === null && quietRoutineRun(run)),
+            );
             if (answered.length === 0) {
               const skipped = store.addStep({ runId: run.id, agentId, input: "", status: "skipped" });
               if (skipped) {

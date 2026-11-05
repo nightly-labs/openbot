@@ -7,6 +7,12 @@ import { imageGenerationFailure, isImageGenerationItem } from "./agent/image-gen
 import type { DeliveryContext } from "./mailbox-store";
 import type { ThreadItem } from "./protocol";
 
+/**
+ * How Codex live voice starts a turn of the agent: the voice model's request in a tag. The user's
+ * speech is already in the chat as its own message, so the request does not show again.
+ */
+const REALTIME_DELEGATION = "<realtime_delegation>";
+
 export interface ThreadTurnMessageContext {
   id: string;
   status?: string;
@@ -43,6 +49,7 @@ export function messagesFromThreadItems(
       if (!text) continue;
       const row = { id: item.id, turnId: turn.id, text, createdAt };
       if (delivery) messages.push(promptMessage(delivery, row));
+      else if (text.trimStart().startsWith(REALTIME_DELEGATION)) continue;
       else {
         /* The provider can keep a prompt under an ID that names no delivery. A teammate's message
            still names its sender and its mailbox message in the prompt, so it is not shown as one

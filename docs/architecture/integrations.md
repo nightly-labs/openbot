@@ -270,16 +270,24 @@ other places.
    `scripts/agent-runtime-lock.ts`, and `src/main/provider-runtime-descriptors.ts`,
    `provider-runtime-releases.ts` and `provider-runtime-manager.ts`.
 5. **Contracts and preload.** The `AgentAuthState` arm in `ipc-agent-status.ts`, then
-   `ipc-provider-admin.ts`, `src/preload/provider-runtime.ts` and `src/preload/agent-decoding.ts`.
+   `src/preload/agent-decoding.ts`. A managed runtime also needs its line in
+   `decodeProviderRuntimeSnapshot` (`ipc-provider-admin.ts`, with `decodeLaterRuntime`) and in
+   `src/preload/provider-runtime.ts`.
 6. **Renderer.** `SetupProviderPicker.tsx`, `ProviderSettingsSection.tsx`, `app-defaults.ts`, and
    the preview `mock-provider-runtimes.ts`.
 7. **Logo.** The `ProviderLogoVariant` union and its SVG in
    [`packages/brand/src/ProviderLogo.tsx`](../../packages/brand/src/ProviderLogo.tsx), and the color
    in `packages/brand/src/tokens.css`.
-8. **Team API.** The provider lists of a released capability are frozen. A new provider on a joined
-   server needs a new `providers-vN` capability (see "Protocol compatibility" in
-   [Providers](providers.md#protocol-compatibility)) and the peer rules in
-   [`provider-visibility.ts`](../../src/main/team-api/provider-visibility.ts).
+8. **Team API.** No edit. Team API v8 and `providers-v8` carry any provider id (see "Protocol
+   compatibility" in [Providers](providers.md#protocol-compatibility)). The host status row names
+   the provider, and the code sign-in, key and runtime routes take its id. The clients (desktop,
+   web and iPhone) read the rest from the descriptor: Connect from a `device` `localCodeSignIn`,
+   Download from `MANAGED_RUNTIME_PROVIDERS` and `INSTALLER_PROVIDERS`, and the key from
+   `KEY_ONLY_PROVIDERS`. A peer below v8 does not see the provider
+   ([`provider-visibility.ts`](../../src/main/team-api/provider-visibility.ts)), and a client that
+   does not know it shows it disabled with "Update OpenBot to use {name}". Do not edit the frozen
+   lists of a released capability. A `paste` or `link` code sign-in, or the sign-in relay, on a
+   joined server needs a new capability.
 9. **Text and docs.** Error keys in `error/provider.ts` and onboarding text in all languages
    ([docs/i18n.md](../i18n.md)). A section in [Providers](providers.md), and a
    `changelog.d/<branch>.md` file.
@@ -461,6 +469,17 @@ Signal (`listRoles`). The host keeps the list in `projection_messaging_allowed_r
 lets everyone. With a list, `MessagingService` ignores a mention from a member who has none of the
 roles, before it reacts or posts. Signal passes the author's role IDs with each mention; a mention
 from an older Signal has none, so a server with a list ignores it.
+
+The optional capability `whatsapp-connector-v1`
+([`whatsapp-connector-v1.ts`](../../packages/contracts/src/team-protocol/whatsapp-connector-v1.ts), host
+route [`route-whatsapp-connector.ts`](../../src/main/team-api/route-whatsapp-connector.ts)) carries the
+host's WhatsApp numbers. The host runs the WhatsApp session and keeps its keys. A link answers the QR
+code text or the pairing code that the host's session got, and the client shows it and reads
+`linkState` while it waits. The other routes read the numbers, the allowed contacts and groups, and the
+pairing requests, and set them, and add the WhatsApp Orchestrator on the host's default model. The
+client uses the same WhatsApp page through `hostWhatsAppPort`
+([`whatsapp-connector.ts`](../../src/renderer/src/features/connectors/whatsapp-connector.ts)). No route
+carries a stored key; the QR code text holds the one-use secret of its link.
 
 The optional capability `onepassword-connector-v1`
 ([`onepassword-connector-v1.ts`](../../packages/contracts/src/team-protocol/onepassword-connector-v1.ts),

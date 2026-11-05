@@ -8,6 +8,12 @@ export const messages = {
   "mobile.settings.language.system": "Sistem varsayılanı",
   "mobile.settings.language.footer":
     "Sistem varsayılanı, telefon ayarlarınızdaki ilk dili takip eder. Henüz çevrilmemiş metinler İngilizce gösterilir.",
+  "mobile.settings.language.restartTitle": "OpenBot yeniden başlatılsın mı?",
+  "mobile.settings.language.restartBody":
+    "Bu dil ters yönde okunur. Ekranlar, OpenBot yeniden başladığında yön değiştirir. Yeniden başlatmadan sonra ekranlar hâlâ yanlış görünüyorsa OpenBot'u uygulama değiştiricide kapatıp yeniden açın.",
+  "mobile.settings.language.restartNow": "Şimdi yeniden başlat",
+  "mobile.settings.language.restartFailed":
+    "OpenBot yeniden başlatılamadı. Ekranlar, OpenBot'u bir sonraki açışınızda yön değiştirir.",
   "mobile.settings.dictation.language": "Dikte dili",
   "mobile.settings.about.development": "Geliştirme",
   "mobile.settings.about.openFailed": "Bağlantı açılamadı. Tekrar deneyin.",
@@ -71,7 +77,7 @@ export const messages = {
   "mobile.settings.animations.all": "Animasyonlar",
   "mobile.settings.animations.agentFaces": "Hareketli ajan yüzleri",
   "mobile.settings.animations.agentFacesFooter":
-    "Ajanlar çalışırken ve dinlenirken avatarlarının yüzleri hareket eder. Kapalıyken yüzler sabit kalır.",
+    "Ajanlar çalışırken ve dinlenirken avatarlarının yüzleri hareket eder. Kapalıyken yüzler sabit kalır, karşılama ekranındaki ve boş ana ekrandaki karakterler de süzülmeyi bırakır.",
   "mobile.settings.animations.composerResize": "Kompakt mesaj alanı",
   "mobile.settings.animations.composerResizeFooter":
     "Klavye kapalıyken mesaj alanı küçük bir çubuğa dönüşür. Kapalıyken alan tam boyutunda kalır.",

@@ -6,6 +6,7 @@ import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { AUTOMATIC_DICTATION_LANGUAGE, useDictationLanguage } from "@/features/settings/model/dictation-language";
 import { parakeetSupported, useParakeetModel } from "@/features/voice/model/parakeet-model";
+import { speechNative } from "@/features/voice/model/speech-native";
 import { useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { haptics } from "@/shared/lib/haptics";
 import { phoneLanguages } from "@/shared/lib/phone-languages";
@@ -237,6 +238,8 @@ function useSystemDictation({
       speechRecognition.addListener("start", () => {
         if (owner !== id || !session.current?.native || phaseRef.current !== "starting") return;
         session.current.listeningAt ??= performance.now();
+        // The recognizer's session silences haptics, and the composer's controls tap while the user speaks.
+        speechNative?.allowHapticsWhileRecording?.();
         update("listening");
         void haptics.impact("light");
       }),

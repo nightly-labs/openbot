@@ -1,6 +1,6 @@
 import { Button, ChevronRight, FieldContext } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createUniqueId, onSettled, Show } from "solid-js";
+import { children, createUniqueId, onSettled, Show } from "solid-js";
 import { useText } from "../text";
 import { createScrollFades } from "./createScrollFades";
 import { PanelResizer } from "./PanelResizer";
@@ -61,7 +61,11 @@ export function SettingsBackIcon(): JSX.Element {
 
 export function SettingsForwardIcon(): JSX.Element {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 settings-forward-icon fill-none stroke-current">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      class="ui-glyph-20 settings-forward-icon fill-none stroke-current ui-rtl-mirror"
+    >
       <path d="m5.5 4 6 6-6 6m5-12 6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
     </svg>
   );
@@ -181,6 +185,9 @@ export interface SettingsLinkRowProps {
 
 /** One row of the group: what it opens on the left, where that stands on the right. */
 export function SettingsLinkRow(props: SettingsLinkRowProps): JSX.Element {
+  // Resolved once: each read of a JSX prop builds it again. Only plain text can end in an ellipsis;
+  // a value made of elements keeps the row's flex gap between them.
+  const value = children(() => props.value);
   return (
     <Button
       ref={(element) => props.ref?.(element)}
@@ -194,10 +201,12 @@ export function SettingsLinkRow(props: SettingsLinkRowProps): JSX.Element {
         <Show when={props.icon}>
           <span class="settings-link-icon">{props.icon}</span>
         </Show>
-        {props.label}
+        <span class="settings-link-text ui-text-truncate">{props.label}</span>
       </span>
       <span class="settings-link-value">
-        {props.value}
+        <Show when={typeof value() === "string"} fallback={value()}>
+          <span class="settings-link-text ui-text-truncate">{value()}</span>
+        </Show>
         <ChevronRight />
       </span>
     </Button>

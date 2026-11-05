@@ -17,6 +17,7 @@ import {
   CURRENT_MESSAGE_SEPARATOR,
   combinedPromptInput,
   deliveryPromptInput,
+  type TagReferenceSource,
 } from "./delivery-content";
 import type { DuplicationGate } from "./duplication-gate";
 import type { MailboxSync } from "./mailbox-sync";
@@ -34,6 +35,7 @@ import {
   providerForAgent,
 } from "./thread-items";
 import type { ThreadLifecycle } from "./thread-lifecycle";
+import type { DeliveryStart } from "./turn-lifecycle";
 import { TurnSlots } from "./turn-slots";
 import type { UsageLimitGate } from "./usage-limit-gate";
 import { checkAgentFolders, codexSandboxPolicy, workspaceWritableRoots } from "./workspace-sandbox";
@@ -63,13 +65,16 @@ export interface DrainHooks {
    * generic redaction: it does not know which values this machine's MCP servers were given.
    */
   redactMcp(text: string): string;
+  /** The tabs and threads of this agent, as the tags of a delivered message name them. */
+  /** `threadId` is the public thread that gets the prompt. */
+  tagReferences(agentId: string, threadId: string | null): TagReferenceSource;
   /**
    * Gives a channel task back to its channel after a spent plan refused it; false when it cannot go
    * back. `continueWork` keeps the assignment for a ready backup instead.
    */
   requeueChannelDelivery(deliveryId: string, continueWork?: boolean): Effect.Effect<boolean>;
-  /** Whether a ready automatic backup can take this agent's work after a usage limit. */
-  mayFailOver(agentId: string): boolean;
+  /** Whether a ready backup in the agent's order continues work that a usage limit stopped after it started. */
+  mayContinueOnBackup(agentId: string): boolean;
   /**
    * Starts the move of this agent to another model for a usage limit, if one is due: back to its own
    * model, or to a backup model during a hold. True when a move started; the move schedules the drain
@@ -80,6 +85,11 @@ export interface DrainHooks {
   turnEnded(turnId: string): boolean;
   /** Forgets the end of an earlier turn with this id: a requeued delivery starts again under the same turn id. */
   turnRestarting(turnId: string): void;
+  /**
+   * When the drain took these deliveries from the queue, and how long their provider process took to
+   * start (null when it was already running). Before `turn/start`, so the turn's start can read it.
+   */
+  deliveriesStarting(deliveryIds: readonly string[], start: DeliveryStart): void;
   /** Starts the new chat that the agent asked for, if it did. The agent's own chat has nothing to start. */
   startRequestedNewChat(agentId: string): Effect.Effect<void>;
   /** Drops that request: a turn in the agent's own chat starts first, so the agent's notes do not cover it. */
@@ -96,6 +106,8 @@ export interface TaskLanes {
   limit(agentId: string): number;
   /** Whether the agent's provider runs one turn at a time, across its own chat and its tasks. */
   oneTurnAtATime(agentId: string): boolean;
+  /** Whether this task is the side thread of a routine, whose runs each get their own session. */
+  isRoutineThread(taskId: string): boolean;
 }
 
 /**
@@ -183,6 +195,8 @@ export class DrainScheduler {
    */
   readonly #requeuedAtLimit = new Set<string>();
   readonly #settingsHolds = new Map<string, number>();
+  /** Agents with a live voice session: the voice model starts their turns, so queued messages wait. */
+  readonly #liveVoiceHolds = new Map<string, number>();
   /** The last hold `#reportHold` logged per lane, so a waiting queue logs once per reason. */
   readonly #reportedHolds = new Map<string, string>();
   /**
@@ -296,6 +310,7 @@ export class DrainScheduler {
     const { agentId, taskId } = lane;
     if (this.#hooks.isDeleting(agentId)) return "deleting";
     if (this.#settingsHolds.has(agentId)) return "session-settings";
+    if (this.#liveVoiceHolds.has(agentId)) return "live-voice";
     if (this.#laneTurnActive(lane)) return "active-turn";
     // The provider has one turn of the agent at a time, so each lane waits for the turn of any other.
     if (
@@ -432,11 +447,22 @@ export class DrainScheduler {
   }
 
   holdSessionSettings(agentId: string): () => void {
-    this.#settingsHolds.set(agentId, (this.#settingsHolds.get(agentId) ?? 0) + 1);
+    return this.#hold(this.#settingsHolds, agentId);
+  }
+
+  holdLiveVoice(agentId: string): () => void {
+    return this.#hold(this.#liveVoiceHolds, agentId);
+  }
+
+  #hold(holds: Map<string, number>, agentId: string): () => void {
+    holds.set(agentId, (holds.get(agentId) ?? 0) + 1);
+    let released = false;
     return () => {
-      const remaining = (this.#settingsHolds.get(agentId) ?? 1) - 1;
-      if (remaining > 0) this.#settingsHolds.set(agentId, remaining);
-      else this.#settingsHolds.delete(agentId);
+      if (released) return;
+      released = true;
+      const remaining = (holds.get(agentId) ?? 1) - 1;
+      if (remaining > 0) holds.set(agentId, remaining);
+      else holds.delete(agentId);
       this.scheduleDrain(agentId);
     };
   }
@@ -560,6 +586,7 @@ export class DrainScheduler {
           agent && publicThreadId && !this.#runsInOwnSession(context)
             ? this.#store.database.activeProviderSession(publicThreadId, agent.provider)
             : null;
+        if (session) this.#compaction.expectInput(session.externalSessionId, context.delivery.text.length);
         if (session && this.#compaction.reserve(agentId, session.externalSessionId)) {
           yield* this.#compaction.request(agentId, session.externalSessionId);
           return;
@@ -663,6 +690,7 @@ export class DrainScheduler {
     // The model this start asks for. The agent can move to another one while `turn/start` waits, and
     // a plan limit belongs to the model the provider refused.
     let requestedModel: string | null = null;
+    const pickedAt = Date.now();
     yield* Effect.gen({ self: this }, function* () {
       for (const item of batch) yield* this.#mailbox.markStarting(item.delivery.id).pipe(toDeliveryStartFailed);
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
@@ -698,7 +726,13 @@ export class DrainScheduler {
       yield* drainStep(requireServedModel);
       yield* this.#threads.applyPendingRuntimeRefresh(agent, new Set(batch.map((item) => item.delivery.id)));
       releaseRuntimeRefresh = this.#threads.holdRuntimeRefresh(agent.id, taskId !== null);
+      const providerRunning = this.#providers.agentClientRunning(agent);
+      const providerStartedAt = Date.now();
       const client = yield* this.#providers.ensureAgentClient(agent).pipe(toDeliveryStartFailed);
+      this.#hooks.deliveriesStarting(
+        batch.map((item) => item.delivery.id),
+        { pickedAt, providerStartMs: providerRunning ? null : Date.now() - providerStartedAt },
+      );
       const messaging = this.#messaging;
       const channels = this.#channels;
       const taskThreadId = taskId === null ? null : this.#tasks.threadId(taskId);
@@ -736,14 +770,18 @@ export class DrainScheduler {
       }
       if (taskThreadId) this.#conversation.registerTaskThread(agent.id, taskThreadId);
       if (ownSession) {
-        const publicThreadId = yield* this.#store.ensureThreadId(agent.id).pipe(toDeliveryStartFailed);
-        // Checked again below. Here, so a busy chat does not start a session for nothing.
+        // The routine's side thread, or the agent's own chat.
+        const publicThreadId =
+          execution?.threadId ?? (yield* this.#store.ensureThreadId(agent.id).pipe(toDeliveryStartFailed));
+        // Checked again below. Here, so a busy thread does not start a session for nothing.
         if (this.#conversation.ensureSnapshot(agent.id, publicThreadId).activeTurnId) {
           for (const item of batch) yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
           this.#mailboxSync.emitQueue(agent.id);
           return;
         }
-        routineThreadId = yield* this.#threads.startRoutineThread(agent, client).pipe(toDeliveryStartFailed);
+        routineThreadId = yield* this.#threads
+          .startRoutineThread(agent, client, execution?.threadId)
+          .pipe(toDeliveryStartFailed);
       }
       let threadId =
         routineThreadId ??
@@ -760,6 +798,8 @@ export class DrainScheduler {
       }
 
       const agentNames = agentNamesById(this.#store.list());
+      // `threadId` is the provider session; a tab owner is a public thread.
+      const tags = this.#hooks.tagReferences(agent.id, this.#conversation.publicThreadId(agent.id, threadId));
       const requestIds = new Set(
         batch.flatMap(({ delivery: item }) =>
           item.sender.kind === "agent" && item.replyToMessageId ? [item.replyToMessageId] : [],
@@ -779,6 +819,7 @@ export class DrainScheduler {
               routineRun:
                 item.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(item.delivery.id) : null,
               wokenWaits: item.delivery.sender.kind === "routine" ? this.#routines.wokenWaits(item.delivery.id) : [],
+              tags,
               ...(executionText === undefined ? {} : { executionText }),
             });
           }),
@@ -795,10 +836,13 @@ export class DrainScheduler {
       const shortened = channelDelivery ? channels : messagingDelivery ? messaging : undefined;
       const delta = shortened?.delta(delivery.id);
       const deltaInput = delta ? promptInput(delta.text) : null;
+      // The handoff that each start sent: the cleanup after the turn removes only that part.
+      const sentHandoffs = new Map<string, string>();
       const inputForThread = (providerThreadId: string) => {
         const input = deltaInput && shortened?.sendsDelta(delivery.id, providerThreadId) ? deltaInput : completeInput;
         const handoff = this.#threads.consumePendingHandoff(providerThreadId);
         if (!handoff) return input;
+        sentHandoffs.set(providerThreadId, handoff);
         return input.map((item, index) =>
           index === 0 && item.type === "text"
             ? { ...item, text: `${handoff}${CURRENT_MESSAGE_SEPARATOR}${item.text}` }
@@ -934,7 +978,7 @@ export class DrainScheduler {
           this.#conversation.emitConversation(snapshot);
         }
       }
-      yield* this.#threads.deletePendingHandoff(threadId).pipe(
+      yield* this.#threads.deletePendingHandoff(threadId, sentHandoffs.get(threadId)).pipe(
         Effect.catch((failure) =>
           Effect.sync(() => {
             this.#hooks.emitError("history_handoff_cleanup_failed", failure.cause, agent.id);
@@ -1006,7 +1050,7 @@ export class DrainScheduler {
             // A ready backup continues earlier work in the same assignment, so the work is not lost.
             if (
               context.resumeAfterUsageLimit &&
-              this.#hooks.mayFailOver(delivery.recipientAgentId) &&
+              this.#hooks.mayContinueOnBackup(delivery.recipientAgentId) &&
               (yield* this.#hooks.requeueChannelDelivery(delivery.id, true))
             ) {
               yield* this.#mailbox.restoreQueued(delivery.id).pipe(toDeliveryStartFailed);
@@ -1057,19 +1101,17 @@ export class DrainScheduler {
   }, Effect.uninterruptible);
 
   /**
-   * Whether this delivery is a routine run in the agent's own chat. It runs in a provider session
-   * of its own, which closes when the run ends: the chat session does not grow with each run, and a
-   * run does not read that whole session again. A routine run for a channel, an external
-   * conversation or a task runs in that thread's session.
+   * Whether this delivery is a routine run with its own provider session: in the agent's own chat, or
+   * in the routine's side thread. The session closes when the run ends, so the thread session does
+   * not grow with each run. A routine run in another task, a channel or a messaging thread runs in
+   * that thread's session.
    */
   #runsInOwnSession(context: DeliveryContext): boolean {
     const id = context.delivery.id;
-    return (
-      context.delivery.sender.kind === "routine" &&
-      this.#mailbox.taskIdForDelivery(id) === null &&
-      !this.#channels?.store.assignmentForDelivery(id) &&
-      !this.#messaging?.ownsDelivery(id)
-    );
+    if (context.delivery.sender.kind !== "routine") return false;
+    const taskId = this.#mailbox.taskIdForDelivery(id);
+    if (taskId !== null) return this.#tasks.isRoutineThread(taskId);
+    return !this.#channels?.store.assignmentForDelivery(id) && !this.#messaging?.ownsDelivery(id);
   }
 
   /**

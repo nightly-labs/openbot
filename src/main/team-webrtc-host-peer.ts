@@ -28,6 +28,11 @@ import {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   withUiBlockAutoAnswers,
 } from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
+import {
+  addUiBlockVaultRequests,
+  TEAM_UI_BLOCK_VAULT_CAPABILITY,
+  withUiBlockVaultRequests,
+} from "@openbot/contracts/team-protocol/ui-block-vault-v1";
 import { encodeTeamProtocolV1ClientEvent } from "@openbot/contracts/team-protocol/v1";
 import {
   decodeTeamProtocolV2AuthFrame,
@@ -110,6 +115,8 @@ export interface TeamWebRtcHostPeerOptions {
   closeSession?: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
   /** The path of the session failed or came back. The peer and the session stay open. */
   pathChanged?: (sessionId: string, lost: boolean) => void;
+  /** A session opened for a membership that this host has not read from the account directory yet. */
+  unknownMemberConnected?: (membershipId: string) => void;
   verifyClientTicket?:
     | ((ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>)
     | undefined;
@@ -144,6 +151,7 @@ export class TeamWebRtcHostPeer {
   readonly #files: TeamWebRtcFileTransfer;
   readonly #closeSession: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
   readonly #pathChanged: (sessionId: string, lost: boolean) => void;
+  readonly #unknownMemberConnected: (membershipId: string) => void;
   readonly #verifyClientTicket:
     | ((ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>)
     | null;
@@ -207,6 +215,7 @@ export class TeamWebRtcHostPeer {
     );
     this.#closeSession = options.closeSession ?? (() => Effect.void);
     this.#pathChanged = options.pathChanged ?? (() => undefined);
+    this.#unknownMemberConnected = options.unknownMemberConnected ?? (() => undefined);
     this.#verifyClientTicket = options.verifyClientTicket ?? null;
     this.#bridge.on("connected", this.#onConnected);
     this.#bridge.on("data", this.#onData);
@@ -321,6 +330,7 @@ export class TeamWebRtcHostPeer {
     this.#localSessionToken = session.sessionToken;
     this.#localSessionId = connection.sessionId;
     this.#scheduleSessionExpiration(expiresAt);
+    if (!this.#store.getMember(connection.membershipId)) this.#unknownMemberConnected(connection.membershipId);
   });
 
   #scheduleSessionExpiration(expiresAt: number): void {
@@ -761,11 +771,10 @@ export class TeamWebRtcHostPeer {
             subagents: peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
             promptMultiSelect: peerCapabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
           };
-          const autoAnswers = peerCapabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY);
           return yield* remoteDecode(() => ({
             status: response.status,
-            body: withAutoAnswers(
-              autoAnswers,
+            body: withBlockExtensions(
+              peerCapabilities,
               body,
               sideRoute
                 ? sideRoute.response(input.path, response.status, body, responseOptions)
@@ -859,6 +868,7 @@ export class TeamWebRtcHostPeer {
         );
         if (this.#peerCapabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY))
           frame = withUiBlockAutoAnswers(frame, event);
+        if (this.#peerCapabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)) frame = withUiBlockVaultRequests(frame, event);
       } catch {
         return;
       }
@@ -1194,8 +1204,16 @@ class GatewayError extends Error {
   }
 }
 
-/** A response body with the automatic answer of each block, for a peer with `ui-block-auto-answer-v1`. */
-function withAutoAnswers(enabled: boolean, source: unknown, encoded: TeamProtocolV2Json): TeamProtocolV2Json {
-  if (enabled) addUiBlockAutoAnswers(encoded, source);
+/**
+ * A response body with the automatic answer of each block, for a peer with `ui-block-auto-answer-v1`,
+ * and its Vault request, for a peer with `ui-block-vault-v1`.
+ */
+function withBlockExtensions(
+  capabilities: ReadonlySet<string>,
+  source: unknown,
+  encoded: TeamProtocolV2Json,
+): TeamProtocolV2Json {
+  if (capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)) addUiBlockAutoAnswers(encoded, source);
+  if (capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)) addUiBlockVaultRequests(encoded, source);
   return encoded;
 }

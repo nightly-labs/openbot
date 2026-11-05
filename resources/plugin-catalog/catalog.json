@@ -45,6 +45,12 @@
       "detailSha256": "5ead5bab31fb150bf62410b0f4f59106c1e0aa6b00c8449bd8a0d0557cfd48c5"
     },
     {
+      "slug": "ticktick",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "d78a41e454da4e0134d57a11d7da29b5b8c38accf4f5d4dfde2e28bf38601a93"
+    },
+    {
       "slug": "trello",
       "version": "1.0.0",
       "featured": false,
@@ -147,6 +153,12 @@
       "detailSha256": "1f73a94236d3a0be9a31ee48b56eaa2a2dca91e9e1a5fb476e38aa13f67b5846"
     },
     {
+      "slug": "revenuecat",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "3e0e70a7291ef90ef651bb5b88550e9ecd00ccc5090969aa586050aff8cf0f18"
+    },
+    {
       "slug": "posthog",
       "version": "1.0.0",
       "featured": false,
@@ -187,6 +199,18 @@
       "version": "1.0.0",
       "featured": false,
       "detailSha256": "5014d267e7627c50d84ea1823d04e4d6c6f18e7096319f3e1351972e656c4449"
+    },
+    {
+      "slug": "coinbase",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "acd33c814b13821ce8a0529dad8699f262529f978fe0d7865f200bfa7ac736d5"
+    },
+    {
+      "slug": "robinhood",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "de85730802e38802ee01f6695c0c4d3adba9381cf4b1665a52a228df00f01939"
     }
   ]
 }

@@ -139,13 +139,15 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
     persist = true,
     reportComposerError = false,
     accountId?: string | null,
+    preferredEffort?: AgentReasoningEffort,
   ): Promise<boolean> {
     const option = deps.props.modelOptions.find(
       (candidate) => candidate.provider === provider && candidate.id === model,
     );
     if (!option) return false;
-    const reasoningEffort = option.supportedReasoningEfforts.includes(deps.settingsReasoning())
-      ? deps.settingsReasoning()
+    const preferred = preferredEffort ?? deps.settingsReasoning();
+    const reasoningEffort = option.supportedReasoningEfforts.includes(preferred)
+      ? preferred
       : option.defaultReasoningEffort;
     deps.setSettingsProvider(provider);
     deps.setSettingsModel(model);
@@ -164,8 +166,9 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
     model: AgentModelId,
     provider: AgentProviderId,
     accountId?: string | null,
+    reasoningEffort?: AgentReasoningEffort,
   ): Promise<void> {
-    await selectModel(model, provider, true, true, accountId);
+    await selectModel(model, provider, true, true, accountId, reasoningEffort);
   }
 
   async function selectAndConfirmReasoning(effort: AgentReasoningEffort): Promise<void> {

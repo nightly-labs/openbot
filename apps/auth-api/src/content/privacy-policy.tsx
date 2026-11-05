@@ -510,6 +510,157 @@ export function PrivacyPolicy() {
       </p>
       <p>OpenBot does not sell or rent personal data to third parties.</p>
 
+      <h2>Google User Data</h2>
+      <p>
+        OpenBot allows users to connect their Google accounts and authorise AI agents to access Google services through
+        Google APIs. This section describes how OpenBot accesses, uses, stores, and shares information received from
+        Google APIs ("Google User Data") and supplements the other provisions of this Privacy Policy.
+      </p>
+
+      <h3>Google User Data We Access</h3>
+      <p>
+        OpenBot accesses Google User Data only after the user connects a Google account and grants the permissions
+        displayed on Google's consent screen. Depending on the permissions granted and the functionalities used, OpenBot
+        may access the following information:
+      </p>
+      <ul>
+        <li>
+          Gmail – email messages, attachments, labels, threads, and related metadata, including sender, recipient,
+          subject, and date information.
+        </li>
+        <li>
+          Google Drive – files and folders stored in the user's Google Drive, together with their names, types, and
+          related metadata.
+        </li>
+        <li>
+          Google Docs, Google Sheets, and Google Slides – the contents of documents, spreadsheets, and presentations,
+          including text, data, and comments.
+        </li>
+        <li>
+          Google Calendar – calendars, events, event descriptions, attendees, reminders, and availability information.
+        </li>
+        <li>
+          Google account information – the email address and name associated with the connected Google account, used to
+          identify the connection.
+        </li>
+      </ul>
+      <p>Users decide which Google services to connect and may use the Services without connecting a Google account.</p>
+
+      <h3>How We Use Google User Data</h3>
+      <p>OpenBot uses Google User Data solely to provide the functionalities requested by users, including:</p>
+      <ul>
+        <li>
+          to enable AI agents to read, search, summarise, and organise emails, files, documents, and calendar events at
+          the user's request;
+        </li>
+        <li>
+          to create and edit email drafts, documents, and calendar events, and to send messages, where the user
+          instructs an agent to do so;
+        </li>
+        <li>to perform routines and automations configured by the user;</li>
+        <li>to display Google User Data to the user within the application;</li>
+        <li>
+          to maintain the connection with Google services, ensure the security of the Services, and diagnose technical
+          issues.
+        </li>
+      </ul>
+      <p>OpenBot does not use Google User Data for advertising, marketing, or profiling purposes.</p>
+
+      <h3>Storage of Google User Data</h3>
+      <p>
+        Google User Data and the access tokens used to connect to Google services are stored on the computer or server
+        running the relevant OpenBot environment. Where users use hosted server services, this information is stored
+        within the infrastructure allocated to the relevant server.
+      </p>
+      <p>
+        OpenBot's central account service only relays the exchange of authorisation codes and access tokens between the
+        user's OpenBot environment and Google. It does not store access tokens, refresh tokens, or any other Google User
+        Data, and Google User Data is not stored in OpenBot's central account database.
+      </p>
+      <p>
+        Google User Data is not included in product analytics events or diagnostic reports. Access tokens are protected
+        in accordance with the measures described in the Data Security section.
+      </p>
+
+      <h3>Sharing of Google User Data</h3>
+      <p>
+        OpenBot does not sell or rent Google User Data and does not transfer it to advertising platforms, data brokers,
+        or information resellers.
+      </p>
+      <p>
+        Google User Data is transmitted to the third-party AI provider selected by the user only when an AI agent
+        performs a task that requires that information, and only to the extent necessary to complete that task. OpenBot
+        does not transmit Google User Data to AI providers in the background or for purposes unrelated to the requested
+        task. Such information is processed by the selected provider as described in the Use of Artificial Intelligence
+        section.
+      </p>
+      <p>
+        Where users enable collaboration or shared access, results of tasks performed using Google User Data may be
+        accessible to other authorised users in accordance with their assigned roles and permissions.
+      </p>
+      <p>
+        Google User Data may otherwise be disclosed only where necessary to comply with applicable law, protect the
+        security of the Services, or in connection with a corporate transaction described in the Data Sharing section,
+        subject to appropriate confidentiality and data protection safeguards.
+      </p>
+
+      <h3>Compliance with the Google API Services User Data Policy</h3>
+      <p>
+        OpenBot's use and transfer to any other app of information received from Google APIs will adhere to the{" "}
+        <a href="https://developers.google.com/terms/api-services-user-data-policy">
+          Google API Services User Data Policy
+        </a>
+        , including the Limited Use requirements.
+      </p>
+      <p>In particular, OpenBot:</p>
+      <ul>
+        <li>
+          uses Google User Data only to provide or improve user-facing features that are visible and prominent in the
+          application;
+        </li>
+        <li>
+          transfers Google User Data to third parties only where necessary to provide or improve those features, to
+          comply with applicable law, for security purposes, or in connection with a merger, acquisition, or sale of
+          assets;
+        </li>
+        <li>
+          does not use or transfer Google User Data for serving advertisements, including personalised, retargeted, or
+          interest-based advertising;
+        </li>
+        <li>
+          does not allow humans to read Google User Data, unless the user has given affirmative consent for specific
+          data, it is necessary for security purposes or to comply with applicable law, or the data has been aggregated
+          and anonymised for internal operations;
+        </li>
+        <li>does not use or transfer Google User Data to determine creditworthiness or for lending purposes; and</li>
+        <li>
+          does not use Google User Data to develop, improve, or train generalised artificial intelligence or machine
+          learning models.
+        </li>
+      </ul>
+
+      <h3>Retention and Deletion of Google User Data</h3>
+      <p>
+        Google User Data is retained in the user's OpenBot environment for as long as necessary to provide the requested
+        functionalities or until it is deleted by the user.
+      </p>
+      <p>
+        Users may disconnect a Google account in the application settings at any time. Disconnecting a Google account
+        deletes the associated access tokens and stops further access to Google User Data. Users may also revoke
+        OpenBot's access through their Google Account settings at{" "}
+        <a href="https://myaccount.google.com/permissions">https://myaccount.google.com/permissions</a>.
+      </p>
+      <p>
+        Revoking access does not automatically delete Google User Data previously retrieved and stored in the user's
+        OpenBot environment, including conversations, task histories, and agent memories containing such information.
+        Users can delete such information within the application or remove the relevant environment, as described in the
+        Account Deletion and Data Removal section.
+      </p>
+      <p>
+        Users may contact OpenBot at <PrivacyEmail /> to request information about the processing of Google User Data or
+        its deletion.
+      </p>
+
       <h2>Data Storage and Local Processing</h2>
       <p>
         OpenBot allows users to store and manage their conversations, files, and other content either on their own

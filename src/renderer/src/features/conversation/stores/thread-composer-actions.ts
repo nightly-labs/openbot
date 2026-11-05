@@ -9,7 +9,7 @@ import type { ComposerPasteResult, ComposerSelection } from "@openbot/ui/feature
 import { DRAFT_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { currentText } from "@openbot/ui/text";
 import { actionToast } from "../../../action-toast";
-import { EMPTY_DRAFT, insertAtSelection } from "../composer-draft";
+import { EMPTY_DRAFT, insertAtSelection, insertPastedText } from "../composer-draft";
 import { threadDraftKey } from "../conversation-keys";
 import { conversationRuntime } from "../conversation-runtime";
 import type { ComposerDraft, ConversationProps, ConversationThreads } from "../conversation-types";
@@ -75,7 +75,7 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
   function updateDraft(key: string, update: (draft: ComposerDraft) => ComposerDraft): void {
     deps.setThreadDrafts((current) => {
       const next = update(current[key] ?? EMPTY_DRAFT);
-      if (next.text || next.attachments.length > 0) return { ...current, [key]: next };
+      if (next.text || next.attachments.length > 0 || next.replyToMessageId) return { ...current, [key]: next };
       if (!(key in current)) return current;
       const { [key]: _removed, ...rest } = current;
       return rest;
@@ -87,7 +87,14 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
       void conversationRuntime(deps.props).agent.discardDraftAttachment(attachment.id, serverId);
   }
 
+  // Each file of a drop is its own import, and all of them start in one task: one toast is enough.
+  let refusedInTask = false;
   function refuseFiles(): void {
+    if (refusedInTask) return;
+    refusedInTask = true;
+    queueMicrotask(() => {
+      refusedInTask = false;
+    });
     actionToast.error(t("conversation.threads.error.files"));
   }
 
@@ -182,14 +189,34 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     return result;
   }
 
+  /** Puts a pasted text at the selection, or at the end when the text changed since `at.before`. */
+  function insertText(
+    key: string,
+    text: string,
+    at: { before: string; selection: ComposerSelection },
+  ): ComposerPasteResult | undefined {
+    const result = insertPastedText(draft(key).text, text, at);
+    if (result) updateDraft(key, (current) => ({ ...current, text: result.value }));
+    return result;
+  }
+
+  /**
+   * Imports pasted files and puts their references at the selection. `text` is the text of a long paste
+   * that `files` holds: when no file comes, that text goes at the selection, so the paste loses nothing.
+   */
   async function pasteFiles(
     files: ReadonlyArray<File | Promise<File>>,
     selection: ComposerSelection,
     key = openDraftKey(),
+    text?: string,
   ): Promise<ComposerPasteResult | undefined> {
     const target = currentConversationTarget(deps.props);
     if (!key || !target) return;
+    const fallback = (before: string) =>
+      text === undefined ? undefined : insertText(key, text, { before, selection });
     if (!deps.props.threads?.acceptsFiles) {
+      // A thread that takes no files still takes a long text.
+      if (text !== undefined) return fallback(draft(key).text);
       refuseFiles();
       return;
     }
@@ -205,9 +232,11 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
         (data) => conversationRuntime(deps.props).agent.importAttachmentData(data, target.serverId),
         previews.onAccepted,
       );
-      return addFiles(key, target.serverId, imported, { before, selection });
+      // The draft refused the files and shows why. The pasted text still comes.
+      return addFiles(key, target.serverId, imported, { before, selection }) ?? fallback(before);
     } catch (error) {
       actionToast.error(errorMessage(error, t("composer.error.keepAttachments")));
+      return fallback(before);
     } finally {
       previews.stop();
       releaseImport(requestId);
@@ -216,6 +245,11 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
 
   function setText(key: string | undefined, text: string): void {
     if (key) updateDraft(key, (current) => ({ ...current, text }));
+  }
+
+  /** The message of the thread that the draft replies to, or null for no reply. */
+  function setReply(key: string | undefined, replyToMessageId: string | null): void {
+    if (key) updateDraft(key, (current) => ({ ...current, replyToMessageId }));
   }
 
   /**
@@ -243,11 +277,14 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     const target = currentConversationTarget(deps.props);
     const before = key ? draft(key).text : "";
     const attachments = key ? draft(key).attachments : [];
+    // A server that lost the reply route takes the message without its reply.
+    const replyToMessageId = key && deps.props.threads?.acceptsReplies ? draft(key).replyToMessageId : null;
     const referenced = attachmentReferenceIds(text);
     for (const image of images) referenced.add(image.id);
     const sent = await threads.onSend(
       text,
       attachments.filter((attachment) => referenced.has(attachment.id)).map((attachment) => attachment.id),
+      replyToMessageId,
     );
     if (!sent || !key) return sent;
     const known = new Set(attachments.map((attachment) => attachment.id));
@@ -256,6 +293,8 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
       // A file that came during the send put its reference after the sent text.
       text: current.text.startsWith(before) ? current.text.slice(before.length).trimStart() : "",
       attachments: current.attachments.filter((attachment) => !known.has(attachment.id)),
+      // A reply that the user chose during the send stays for the next message.
+      replyToMessageId: current.replyToMessageId === replyToMessageId ? null : current.replyToMessageId,
     }));
     if (target)
       discard(
@@ -277,6 +316,7 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     claimImport,
     releaseImport,
     setText,
+    setReply,
     send,
   };
 }

@@ -1,11 +1,13 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
+import { access } from "node:fs/promises";
 import { homedir } from "node:os";
 import { delimiter, isAbsolute, join } from "node:path";
 import { promisify } from "node:util";
 import {
   type AgentProviderId,
   COMPUTER_USE_MCP_SERVER_ID,
+  COMPUTER_USE_MCP_SERVER_NAME,
   isReservedMcpServerName,
   type McpServerConfig,
   type McpTransport,
@@ -15,6 +17,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Schema } from "effect";
 import { isWindowsRunnable, runInLoginShell } from "./cli";
 import { causeHelpers } from "./effect-boundary";
+import { isMissingFileError } from "./file-errors";
 import type { McpOperationError } from "./mcp-effects";
 import { getRecord } from "./protocol";
 
@@ -298,7 +301,8 @@ function shellWord(value: string): string {
 /**
  * An absolute path for a command name, or `null` when the given `PATH` holds none. A command the
  * user already wrote as a path is taken as written, after `~` is expanded: it is their statement of
- * which build to run.
+ * which build to run. An absolute path that names no file is `null` too: the provider would fail to
+ * start it and say so only in its own log (#4845).
  *
  * `path` is the list to search, which is the list the server will be launched with. Without one the
  * login shell's own is used, because a packaged app starts with a restricted `PATH` - the same
@@ -310,7 +314,8 @@ const resolvedCommands = new Map<string, Deferred.Deferred<string | null, McpSha
 const resolveMcpCommand = Effect.fn("McpShape.resolveCommand")(function* (command: string, path: string | null = null) {
   const trimmed = expandHomePath(command);
   if (!trimmed) return null;
-  if (isAbsolute(trimmed) || trimmed.startsWith(".")) return trimmed;
+  if (isAbsolute(trimmed)) return (yield* isMissingCommandFile(trimmed)) ? null : trimmed;
+  if (trimmed.startsWith(".")) return trimmed;
   const key = `${path ?? ""}\u0000${trimmed}`;
   const cached = resolvedCommands.get(key);
   if (cached) return yield* Deferred.await(cached);
@@ -324,6 +329,31 @@ const resolveMcpCommand = Effect.fn("McpShape.resolveCommand")(function* (comman
     ),
     Effect.onExit((exit) => Deferred.done(pending, exit)),
     Effect.uninterruptible,
+  );
+});
+
+/** How long a hand-off waits for the file check. A slow answer keeps the path as written. */
+const COMMAND_FILE_CHECK_MS = 2_000;
+
+/**
+ * Whether an absolute command path names no file.
+ *
+ * Only a missing file counts. Any other answer, such as a folder this process cannot read, keeps the
+ * path as written, so the provider reports what it can actually start. The check has a deadline,
+ * because a privacy prompt for a protected folder or a dead network volume can hold the call, and the
+ * hand-off must not wait for it. On Windows, process creation adds an extension to a path without
+ * one, so only a path that has a `PATHEXT` extension is checked.
+ */
+const isMissingCommandFile = Effect.fn("McpShape.isMissingCommandFile")(function* (command: string) {
+  if (process.platform === "win32" && !isWindowsRunnable(command, process.env.PATHEXT)) return false;
+  return yield* mcpShapeIo(() => access(command)).pipe(
+    Effect.as(false),
+    Effect.catch(({ cause }) =>
+      Effect.succeed(
+        isMissingFileError(cause) || (cause instanceof Error && "code" in cause && cause.code === "ENOTDIR"),
+      ),
+    ),
+    Effect.timeoutOrElse({ duration: COMMAND_FILE_CHECK_MS, orElse: () => Effect.succeed(false) }),
   );
 });
 
@@ -424,7 +454,7 @@ export const needsManagedRuntime = Effect.fn("McpShape.needsManagedRuntime")(fun
   config: McpServerConfig,
   tools: McpToolRuntimes,
 ) {
-  if (config.transport !== "stdio") return false;
+  if (config.transport !== "stdio" || isAbsolute(expandHomePath(config.command))) return false;
   const resolved = yield* usableMcpServer(config, tools);
   return resolved.error !== undefined && resolved.reason === "command_not_found";
 });
@@ -686,18 +716,20 @@ export function codexThreadMcpServers(
 }
 
 /**
- * The namespace Codex gives the tools of each server OpenBot turns on. For a code-mode-only model,
- * such as GPT-6, Codex otherwise defers MCP tools into `exec` without naming them, and the model
- * does not find them. These join the direct-only list, so the request names the tools. The keys are
- * the ones `codexMcpServers` chose, renamed keys included; a name Codex's own files declare is turned
- * off and has no tools. Codex changes each character other than a letter, a digit or `_` to `_`, then
- * adds `mcp__` unless the name starts with it.
+ * The MCP namespaces that Codex declares in each request, beside OpenBot's own. Codex defers the
+ * tools of every other server: behind its `tool_search`, or, for a code-mode-only model such as GPT-6,
+ * into `exec`, where the developer instructions name the servers. A direct namespace sends the schema
+ * of each of its tools in each request (#4468). Computer Use stays direct: its results are
+ * screenshots, and from `exec` a model must forward each image with `image()`. Its key is never
+ * renamed, see `codexMcpServerKey`.
  */
-export function codexMcpNamespaces(servers: Readonly<Record<string, CodexMcpServer>>): string[] {
-  return Object.keys(servers).map((key) => {
-    const name = key.replace(/[^A-Za-z0-9_]/gu, "_");
-    return name.startsWith("mcp__") ? name : `mcp__${name}`;
-  });
+export function codexDirectMcpNamespaces(servers: Readonly<Record<string, CodexMcpServer>>): string[] {
+  return Object.hasOwn(servers, COMPUTER_USE_MCP_SERVER_NAME) ? [`mcp__${COMPUTER_USE_MCP_SERVER_NAME}`] : [];
+}
+
+/** The servers that are on and whose tools Codex defers: all except Computer Use, see `codexDirectMcpNamespaces`. */
+export function codexDeferredMcpServers(configs: readonly McpServerConfig[]): McpServerConfig[] {
+  return configs.filter((config) => config.enabled && config.id !== COMPUTER_USE_MCP_SERVER_ID);
 }
 
 export function codexMcpServers(

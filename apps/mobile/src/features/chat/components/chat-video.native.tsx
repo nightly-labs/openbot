@@ -16,6 +16,8 @@ import { useListSettled } from "./use-list-settled";
 import { useMediaFile } from "./use-media-file";
 import { VideoViewer } from "./video-viewer";
 
+const PLAY_OFFSET = { transform: [{ translateX: 1.5 }] };
+
 // The width reserved while the shape is still unknown: a screen recording from a desktop.
 const UNKNOWN_RATIO = 16 / 9;
 // A poster outlives its card, so a chat that scrolls back does not decode the video again.
@@ -232,8 +234,9 @@ export function ChatVideoAttachment({
               ) : null}
               <View pointerEvents="none" className="items-center justify-center" style={FILL}>
                 <View className="size-14 items-center justify-center rounded-full bg-black/50">
-                  {/* Moved right by its own weight, so the triangle looks centred in the circle. */}
-                  <Play size={26} color="white" fill="white" style={{ marginLeft: 3 }} />
+                  {/* Moved right by its own weight, so the triangle looks centred in the circle. A transform,
+                      because React Native moves a left margin to the right in a right-to-left layout. */}
+                  <Play size={26} color="white" fill="white" style={PLAY_OFFSET} />
                 </View>
               </View>
               {poster ? (

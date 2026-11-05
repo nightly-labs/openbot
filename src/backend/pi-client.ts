@@ -6,11 +6,13 @@ import { agentProviderName, type KeyOnlyProviderId } from "@openbot/contracts/ag
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
+import { type CauseCode, classifyFailure, httpStatusCause, structuredCause } from "@openbot/telemetry";
 import { Effect, Exit, Option, Schema, Scope, Semaphore } from "effect";
 import { secretElicitationField } from "./agent/prompts";
 import { type AgentClient, type DiagnosticOrigin, MissingPiSessionError, RequestTimeoutError } from "./agent-client";
 import { type AgentCliInfo, cliPathEnvironment, cliSpawnTarget } from "./cli";
 import { runCauseEffect } from "./effect-boundary";
+import { encodedModelId, providerModelValue } from "./encoded-model-id";
 import { isMissingFileError } from "./file-errors";
 import { type DynamicToolNamespace, LocalMcpBridge, type LocalMcpSession } from "./local-mcp-bridge";
 import {
@@ -120,6 +122,8 @@ interface PiTurn {
   items: Map<string, ThreadItem>;
   stopped: boolean;
   failure: string | null;
+  /** The cause of `failure`, read before the text became a sentence for the user. */
+  failureCause: CauseCode | null;
   finishing: boolean;
   lastActivityAt: number;
   /** Tool calls that started and did not end. The turn is not stalled while one is open. */
@@ -139,6 +143,8 @@ interface PiThread {
   mcp: LocalMcpSession;
   extension: PiMcpExtension;
   keyExtension: PiMcpExtension | null;
+  /** The user's MCP tools wait for Pi's `tool_search`. */
+  deferredMcp: boolean;
   turn: PiTurn | null;
   closed: boolean;
   gate: Semaphore.Semaphore;
@@ -185,6 +191,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       this.#running = true;
     }
   }
+  deferredMcpTools = (id: string): boolean => this.#threads.get(id)?.deferredMcp ?? false;
   canReleaseProcess = (): boolean => [...this.#threads.values()].every((thread) => thread.turn === null);
   notify(): void {
     /* Pi has no post-initialize notification. */
@@ -250,10 +257,14 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
 
   readonly releaseIdleThreads = Effect.fn("PiAgentClient.releaseIdleThreads")(function* (this: PiAgentClient) {
     for (const [id, thread] of this.#threads) {
-      if (thread.turn) continue;
-      if (thread.configured) this.#released.set(id, thread.params);
-      yield* this.#close(thread);
-      this.#threads.delete(id);
+      // A held gate is a turn that starts, before it sets `turn`, or a compaction. Out of the map
+      // before it closes, so a turn that starts during the close opens the thread again.
+      yield* Effect.gen({ self: this }, function* () {
+        if (thread.turn) return;
+        if (thread.configured) this.#released.set(id, thread.params);
+        this.#threads.delete(id);
+        yield* this.#close(thread);
+      }).pipe(thread.gate.withPermitsIfAvailable(1));
     }
   });
 
@@ -399,7 +410,9 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
             const preferred = thinkingLevel === "off" ? "none" : thinkingLevel;
             const defaultLevel = preferred && levels.includes(preferred) ? preferred : levels[0];
             models.push({
-              model: keyProvider ? id : `${provider}/${id}`,
+              // Pi takes any id, and Cloudflare Workers AI ids such as `@cf/moonshotai/kimi-k2.6`
+              // have an `@` that the contract charset refuses (#5079).
+              model: encodedModelId(keyProvider ? "" : `${provider}/`, id),
               displayName: getString(model, "name") ?? id,
               // A model without reasoning has no level. The catalog then gives it the `medium` of every
               // model that cannot change its effort.
@@ -521,7 +534,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       });
       rpc.on("exit", (error) => {
         if (thread?.closed) return;
-        if (thread?.turn) this.#background(this.#finish(thread, "failed", error.message));
+        if (thread?.turn) this.#background(this.#finish(thread, "failed", error.message, "provider_exited"));
         this.emit("exit", error);
       });
       // The key extension loads first, so that it removes the key from the environment before the
@@ -574,6 +587,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         mcp,
         extension,
         keyExtension,
+        deferredMcp: !this.options.profileGeneration && Object.keys(handoff.servers).length > 0,
         turn: null,
         closed: false,
         gate: Semaphore.makeUnsafe(1),
@@ -622,14 +636,14 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
   ) {
     const model = getString(params, "model");
     if (model && this.provider !== "pi") {
-      yield* thread.rpc.request({ type: "set_model", provider: this.provider, modelId: model });
+      yield* thread.rpc.request({ type: "set_model", provider: this.provider, modelId: providerModelValue(model) });
     } else if (model) {
       const separator = model.indexOf("/");
       if (separator < 1) return yield* providerFailure(new Error(sourceText("error.provider.piModelInvalid")));
       yield* thread.rpc.request({
         type: "set_model",
         provider: model.slice(0, separator),
-        modelId: model.slice(separator + 1),
+        modelId: providerModelValue(model.slice(separator + 1)),
       });
     }
     const effort = getString(params, "effort") ?? getString(params, "reasoningEffort");
@@ -651,6 +665,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       items: new Map(),
       stopped: false,
       failure: null,
+      failureCause: null,
       finishing: false,
       lastActivityAt: Date.now(),
       openTools: new Set(),
@@ -668,7 +683,9 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
           response.disposition === "handled" && thread.turn === turn ? this.#finish(thread, "completed") : Effect.void,
         ),
         Effect.catch((failure) =>
-          thread.turn === turn ? this.#finish(thread, "failed", this.#redact(String(failure.cause))) : Effect.void,
+          thread.turn === turn
+            ? this.#finish(thread, "failed", this.#redact(String(failure.cause)), classifyFailure(failure.cause))
+            : Effect.void,
         ),
       ),
       this.#scope,
@@ -698,7 +715,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       // `abort` when it is idle, after `agent_settled`, which then ends the turn as failed.
       yield* thread.rpc.request({ type: "clear_queue" }).pipe(Effect.ignore);
       yield* thread.rpc.request({ type: "abort" }).pipe(Effect.ignore);
-      yield* this.#finish(thread, "failed", failure);
+      yield* this.#finish(thread, "failed", failure, "stalled");
     }
   });
 
@@ -798,6 +815,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
           thread,
           turn.stalled || (!turn.stopped && failure) ? "failed" : turn.stopped ? "interrupted" : "completed",
           failure ?? undefined,
+          turn.stalled ? "stalled" : (turn.failureCause ?? undefined),
         ),
       );
     } else if (record.type === "compaction_start" || record.type === "compaction_end") {
@@ -829,6 +847,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       }
       const stop = getString(message, "stopReason");
       turn.failure = stop === "error" ? this.#failureText(getString(message, "errorMessage")) : null;
+      turn.failureCause = stop === "error" ? piFailureCause(getString(message, "errorMessage")) : null;
       if (stop === "aborted") turn.stopped = true;
     } else if (record.type === "tool_execution_start" || record.type === "tool_execution_end") {
       const id = getString(record, "toolCallId");
@@ -855,11 +874,17 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     thread: PiThread,
     status: string,
     failure?: string,
+    causeCode?: CauseCode,
   ) {
     const turn = thread.turn;
     if (!turn || turn.finishing) return;
     turn.finishing = true;
-    if (failure) this.#notify("error", thread, { error: { message: this.#redact(failure) }, willRetry: false });
+    if (failure)
+      this.#notify("error", thread, {
+        error: { message: this.#redact(failure) },
+        willRetry: false,
+        ...(causeCode ? { causeCode } : {}),
+      });
     // Native totals survive process release/resume. Per-message usage is not a cumulative counter.
     yield* thread.rpc.request({ type: "get_session_stats" }, 2_000).pipe(
       Effect.flatMap((stats) => {
@@ -1035,4 +1060,24 @@ function isToolResult(value: unknown): value is DynamicToolResult {
         ((item.type === "inputText" && isString(item.text)) || (item.type === "inputImage" && isString(item.imageUrl))),
     )
   );
+}
+
+/**
+ * Pi's stop texts for a stream that the provider ended with an error, with no HTTP status (Pi 1.5.0).
+ */
+const PI_PROVIDER_STOP =
+  /^(?:Provider finish_reason: error\b|Stream ended without finish_reason\b|Provider returned (?:an? )?error\b)/u;
+
+/**
+ * The cause of a Pi model request that failed. Pi 1.5.0 starts an HTTP error with its status:
+ * `402: {…}`, or `402 {…}` from the Anthropic SDK. An error inside the stream has no status.
+ */
+function piFailureCause(message: string | null): CauseCode {
+  if (!message) return "unknown";
+  const status = /^([1-5]\d\d):? /u.exec(message)?.[1];
+  const cause = structuredCause(
+    status === undefined ? null : httpStatusCause(Number(status)),
+    classifyFailure(message),
+  );
+  return cause === "unknown" && PI_PROVIDER_STOP.test(message) ? "provider_unavailable" : cause;
 }

@@ -78,6 +78,8 @@ export const messages = {
   "sitePage.pricing.title": "OpenBot 价格",
   "sitePage.pricing.description": "托管服务器和团队许可证。在你自己的电脑上个人使用 OpenBot 免费。",
   "sitePage.pricing.heading": "价格",
+  "sitePage.pricing.personal.title": "个人使用免费",
+  "sitePage.pricing.personal.body": "全部功能，在你自己的电脑上，使用你已付费的 AI 套餐。无需服务器，也无需许可证。",
   "sitePage.pricing.enterprise.title": "企业版",
   // {count} is the largest number of members that the page sells, such as 25.
   "sitePage.pricing.enterprise.body": "更大的服务器、超过 {count} 名成员，或你需要的其他任何内容，并提供企业级支持。",

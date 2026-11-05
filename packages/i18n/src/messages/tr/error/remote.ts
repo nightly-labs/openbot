@@ -91,6 +91,7 @@ export const messages = {
   "error.remote.fileTransferFailed": "WebRTC dosya aktarımı başarısız oldu.",
   "error.remote.fileResumeFailed": "WebRTC dosya aktarımı son tarihinden önce sürdürülemedi.",
   "error.remote.fileTransportStopped": "WebRTC dosya iletimi durdu.",
+  "error.remote.downloadStopped": "İndirme durduruldu.",
   "error.remote.fileResumeExpired": "WebRTC dosya aktarımı sürdürme süresi doldu.",
   "error.remote.hostRequestFailed": "Ana makine isteği tamamlayamadı.",
   "error.remote.responseTooLarge": "Ana makinenin yanıtı bu cihaza gönderilemeyecek kadar büyük.",
@@ -195,4 +196,6 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "Kanalları silmek için bu masaüstü sunucusunu güncelleyin.",
   "error.remote.historyRefreshFailed": "Mesaj gönderildi, ancak sohbet geçmişi yenilenemedi.",
   "error.remote.taskHistoryRefreshFailed": "Görev değiştirildi, ancak sohbet geçmişi yenilenemedi.",
+  "error.remote.localServerAccountRemovalFailed":
+    "Sunucu kendi bilgisayarında silindi ancak hesap onu hâlâ listeliyor. Hesaptan kaldırmak için yeniden silin.",
 } as const satisfies PartialTranslation<typeof source>;
