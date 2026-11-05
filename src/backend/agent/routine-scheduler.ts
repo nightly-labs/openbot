@@ -675,6 +675,7 @@ export class RoutineScheduler implements RoutineDueSource {
         timezone,
         ...webhookToolTrigger(args),
         ...(limitPolicy === undefined ? {} : { limitPolicy }),
+        ...routineToolRunPlace(args),
       });
       // Only the caller's own chat shows the card with the secret: the card needs the turn.
       const turnId = agentId === senderAgentId ? params.turnId : undefined;
@@ -724,6 +725,7 @@ export class RoutineScheduler implements RoutineDueSource {
         timezone: current.timezone,
         ...webhookToolTrigger(args, current.trigger),
         ...(limitPolicy === undefined ? {} : { limitPolicy }),
+        ...routineToolRunPlace(args),
       });
       const turnId = agentId === senderAgentId ? params.turnId : undefined;
       const recorded = this.#recordWebhookEvent(agentId, "updated", routine, turnId);
@@ -1010,12 +1012,9 @@ export class RoutineScheduler implements RoutineDueSource {
   ) {
     // A test or a script run that arrives while a spent plan holds the agent would wait for the
     // reset, and a routine set to skip has no use for a late result.
+    const record = yield* routineStep(() => this.#routines.getRecord(run.agentId, run.routineId));
     const skipped = yield* routineStep(() => {
-      if (
-        this.#routines.getRecord(run.agentId, run.routineId)?.limitPolicy !== "skip" ||
-        !this.#hooks.usageLimited(run.agentId)
-      )
-        return null;
+      if (record?.limitPolicy !== "skip" || !this.#hooks.usageLimited(run.agentId)) return null;
       const cancelled = this.#transitionRunWithConversation(run, "cancelled");
       this.stateChanged(run.agentId);
       return cancelled;
@@ -1029,9 +1028,7 @@ export class RoutineScheduler implements RoutineDueSource {
       // A routine runs in the agent's chat unless the user chose its own side thread. That thread is a
       // lane beside the chat and the other routines, so a run does not wait for them.
       const thread = yield* routineStep(() =>
-        this.#routines.getRecord(run.agentId, run.routineId)?.runIn === "thread"
-          ? this.#hooks.routineThread(agent.id, run.routineId, run.routineName)
-          : null,
+        record?.runIn === "thread" ? this.#hooks.routineThread(agent.id, run.routineId, run.routineName) : null,
       );
       const receipt = yield* this.#mailbox
         .enqueue({

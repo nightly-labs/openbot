@@ -521,6 +521,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       filters: webhookFiltersZodSchema.optional(),
       active: z.boolean().optional(),
       limitPolicy: routineLimitPolicyZodSchema.optional(),
+      runIn: routineRunPlaceZodSchema.optional(),
     },
   },
   {
@@ -536,6 +537,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       filters: webhookFiltersZodSchema.optional(),
       active: z.boolean().optional(),
       limitPolicy: routineLimitPolicyZodSchema.optional(),
+      runIn: routineRunPlaceZodSchema.optional(),
     },
   },
   {

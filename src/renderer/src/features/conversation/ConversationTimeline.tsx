@@ -495,10 +495,12 @@ export function ConversationTimeline() {
    * Opens the side thread of a routine's runs. A routine that now runs in the chat has no link, also when
    * an earlier run made a thread: its new runs are not there. A remote host does not send the place.
    */
-  const openRoutineThread = (routineId: string) =>
-    props.routines?.find((routine) => routine.id === routineId)?.runIn === "chat"
-      ? undefined
-      : props.threads?.routineThread(routineId);
+  const openRoutineThread = (routineId: string) => {
+    const routine =
+      props.routines?.find((candidate) => candidate.id === routineId) ??
+      webhookRoutines.state.routines.find((candidate) => candidate.id === routineId);
+    return routine?.runIn === "chat" ? undefined : props.threads?.routineThread(routineId);
+  };
   // The plain marker of a webhook routine opens it too: the host lists those routines on their own.
   const availableRoutineIds = createMemo(() =>
     props.availableRoutineIds
