@@ -35,6 +35,7 @@ import type { TurnModelUsage } from "../backend/database/agent-usage";
 import type { WorkflowRunEnd } from "../backend/workflows/workflows";
 import { type AnalyticsOperationFailure, analyticsIO, analyticsSync } from "./analytics-effects";
 import { PROVIDER_AUTH_KINDS, type ProviderAuthKind } from "./analytics-provider-auth";
+import { REMOTE_CONNECT_PHASES, type RemoteConnectPhase, type RemoteConnectSummary } from "./remote-connect-trace";
 import { localDay, RESOURCE_ENUMS, RESOURCE_PROPERTY_NAMES, type ResourceProperties } from "./resource-summary";
 import { UNCLEAN_EXIT_ENUMS, type UncleanExitProperties } from "./run-marker";
 import { SERVICE_STEPS, START_KINDS, type StartupProperties } from "./startup-timing";
@@ -68,6 +69,28 @@ const TURN_TIMING_PROPERTIES = [
 const MAX_QUEUE_WAIT_MS = 7 * ACTIVE_TURN_TTL_MS;
 /** The marks are times after the process started. A start that waits longer than a day is not one. */
 const MAX_STARTUP_MS = 24 * 60 * 60_000;
+/** One connection attempt has its own timeouts, so a phase that takes an hour is not one. */
+const MAX_REMOTE_CONNECT_PHASE_MS = 60 * 60_000;
+/** A host can stay away for a day of retries, or a hosted start can wait as long. */
+const MAX_REMOTE_CONNECT_WAIT_MS = 24 * 60 * 60_000;
+const REMOTE_CONNECT_PHASE_PROPERTIES = [
+  ["session", "session_ms"],
+  ["ticket", "ticket_ms"],
+  ["bridge", "bridge_ms"],
+  ["signal-socket", "signal_socket_ms"],
+  ["signal", "signal_ms"],
+  ["channels", "channels_ms"],
+  ["auth", "auth_ms"],
+  ["compatibility", "compatibility_ms"],
+  ["first-request", "first_request_ms"],
+] as const satisfies readonly (readonly [RemoteConnectPhase, string])[];
+const REMOTE_CONNECT_ENUMS = {
+  outcome: ["connected", "failed"],
+  connection: ["first", "reconnect"],
+  session_kind: ["new", "stored", "reused"],
+  last_phase: ["start", ...REMOTE_CONNECT_PHASES],
+  first_request: ["ok", "error"],
+} as const;
 const STARTUP_PROPERTY_NAMES = [
   "start_kind",
   "host_kind",
@@ -163,6 +186,7 @@ type HostEventName =
   | "system_resources"
   | "system_startup"
   | "system_unclean_exit"
+  | "system_remote_connect"
   | "hosted_site_action";
 /**
  * Events that go only when the user links analytics to their account: the sites they visit, the
@@ -337,6 +361,26 @@ const HOST_ALLOWLIST = {
     "ended_asleep",
     "os_restarted",
     "host_kind",
+  ],
+  system_remote_connect: [
+    "outcome",
+    "connection",
+    "session_kind",
+    "last_phase",
+    "first_request",
+    "session_ms",
+    "ticket_ms",
+    "bridge_ms",
+    "signal_socket_ms",
+    "signal_ms",
+    "channels_ms",
+    "auth_ms",
+    "compatibility_ms",
+    "first_request_ms",
+    "total_ms",
+    "wait_ms",
+    "hosted_start_wait_ms",
+    "failed_attempts",
   ],
   hosted_site_action: ["action", "entry_point", "result", "failure_code"],
 } as const satisfies Record<HostEventName, readonly string[]>;
@@ -583,6 +627,24 @@ export class HostAnalytics {
   handleStartup(properties: StartupProperties): void {
     if (this.#closed) return;
     this.#track("system_startup", properties);
+  }
+
+  /** One connection to a remote host: phase times and counts, never the host. */
+  handleRemoteConnect(summary: RemoteConnectSummary): void {
+    if (this.#closed) return;
+    const properties: HostProperties = {
+      outcome: summary.outcome,
+      connection: summary.connection,
+      session_kind: summary.session,
+      last_phase: summary.lastPhase,
+      first_request: summary.firstRequest,
+      total_ms: summary.totalMs,
+      wait_ms: summary.waitMs,
+      hosted_start_wait_ms: summary.hostedStartWaitMs,
+      failed_attempts: summary.failedAttempts,
+    };
+    for (const [phase, property] of REMOTE_CONNECT_PHASE_PROPERTIES) properties[property] = summary.phases[phase];
+    this.#track("system_remote_connect", properties);
   }
 
   /** Only the local service emits this signal. Remote clients never send host reports. */
@@ -1175,6 +1237,21 @@ function sanitizeHostProperty(name: HostEventName, key: string, value: unknown):
     if (key === "host_kind") return isOneOf(["desktop", "server"] as const, value) ? value : undefined;
     if (key === "slowest_service_step") return isOneOf(SERVICE_STEPS, value) ? value : undefined;
     return boundedCount(value, MAX_STARTUP_MS);
+  }
+  if (name === "system_remote_connect") {
+    if (
+      key === "outcome" ||
+      key === "connection" ||
+      key === "session_kind" ||
+      key === "last_phase" ||
+      key === "first_request"
+    ) {
+      const allowed: readonly string[] = REMOTE_CONNECT_ENUMS[key];
+      return isString(value) && allowed.includes(value) ? value : undefined;
+    }
+    if (key === "failed_attempts") return boundedCount(value, 100_000);
+    if (key === "wait_ms" || key === "hosted_start_wait_ms") return boundedCount(value, MAX_REMOTE_CONNECT_WAIT_MS);
+    return boundedCount(value, MAX_REMOTE_CONNECT_PHASE_MS);
   }
   if (name === "system_resources") {
     if (

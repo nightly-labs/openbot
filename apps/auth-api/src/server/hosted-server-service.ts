@@ -31,7 +31,12 @@ import type { RouteHostState } from "@openbot/contracts/signal-protocol/ingress-
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Effect, Layer, Result, Schema } from "effect";
 import { SOLD_OUT_PLANS } from "../lib/pricing-page";
-import { type AccountAnalytics, type AccountAnalyticsEvent, NO_ACCOUNT_ANALYTICS } from "./account-analytics";
+import {
+  type AccountAnalytics,
+  type AccountAnalyticsEvent,
+  MAX_HOSTED_START_MS,
+  NO_ACCOUNT_ANALYTICS,
+} from "./account-analytics";
 import { getServerEntitlement } from "./billing-entitlement";
 import { BillingError, type BillingReturnTarget, type BillingService, type SubscriptionSync } from "./billing-service";
 import {
@@ -204,6 +209,9 @@ interface HostedServerRow {
   last_active_at: number | null;
   lease_until: number | null;
   next_run_at: number | null;
+  last_wake_reason: Exclude<WakeReason, "retention"> | null;
+  /** When the Worker asked boat for the current start. NULL when no start waits. */
+  start_requested_at: number | null;
   created_at: number;
   updated_at: number;
   deletion_scheduled_at: number | null;
@@ -212,7 +220,8 @@ interface HostedServerRow {
 
 const ROW_COLUMNS = `server_id, owner_user_id, name, provider_sandbox_id, provider_template, size, pending_size, plan, billing_interval, currency,
   checkout_session_id, idempotency_key, desired_state, observed_state, observed_error, provider_event_at, auth_session_id,
-  last_active_at, lease_until, next_run_at, created_at, updated_at, deletion_scheduled_at, deletion_subscription_id`;
+  last_active_at, lease_until, next_run_at, last_wake_reason, start_requested_at, created_at, updated_at, deletion_scheduled_at,
+  deletion_subscription_id`;
 
 /** The billing calls that hosted servers use. */
 export type HostedServerBilling = Pick<
@@ -1627,7 +1636,7 @@ export class HostedServerService {
     const claimed = yield* hostedCall(() =>
       dependencies.database
         .prepare(
-          `UPDATE hosted_servers SET observed_state = 'creating', last_wake_reason = 'create',
+          `UPDATE hosted_servers SET observed_state = 'creating', last_wake_reason = 'create', start_requested_at = ?,
            claim_token_hash = CASE WHEN ${CLAIM_OPEN_SQL} THEN ? ELSE claim_token_hash END,
            claim_expires_at = CASE WHEN ${CLAIM_OPEN_SQL} THEN ? ELSE claim_expires_at END,
            claim_redeemed_at = CASE WHEN ${CLAIM_OPEN_SQL} THEN NULL ELSE claim_redeemed_at END,
@@ -1635,7 +1644,7 @@ export class HostedServerService {
            last_active_at = ?, lease_until = ?, updated_at = ?
          WHERE server_id = ? AND observed_state = 'awaiting_payment' AND desired_state = 'running'`,
         )
-        .bind(claimHash, now + CLAIM_TTL_MS, from, now, now, now + LEASE_TTL_SECONDS * 1000, now, row.server_id)
+        .bind(now, claimHash, now + CLAIM_TTL_MS, from, now, now, now + LEASE_TTL_SECONDS * 1000, now, row.server_id)
         .run(),
     );
     if (claimed.meta.changes !== 1) return;
@@ -1673,6 +1682,8 @@ export class HostedServerService {
         return;
       }
       this.#track(row, { name: "hosted_server_action", action: "provisioned", plan: row.plan, size: row.size });
+      if (stored.meta.changes === 1 && isUsable(sandbox.state))
+        yield* this.#recordReady({ ...row, last_wake_reason: "create", start_requested_at: now }, dependencies.now());
       yield* this.#rename(row, sandbox.id);
     }).pipe(
       Effect.catch((error) =>
@@ -2191,7 +2202,7 @@ export class HostedServerService {
           // the wake, which set the next delay. Its `updated_at` check lets only one caller send the retry.
           `UPDATE hosted_servers SET observed_state = 'waking', observed_error = ?,
            last_wake_reason = CASE WHEN ? = 1 THEN last_wake_reason ELSE ? END, provider_event_at = ?,
-           last_active_at = ?, lease_until = ?,
+           start_requested_at = CASE WHEN ? = 1 THEN start_requested_at ELSE ? END, last_active_at = ?, lease_until = ?,
            claim_token_hash = CASE WHEN ${CLAIM_OPEN_SQL} THEN ? ELSE claim_token_hash END,
            claim_expires_at = CASE WHEN ${CLAIM_OPEN_SQL} THEN ? ELSE claim_expires_at END,
            updated_at = ?
@@ -2202,6 +2213,8 @@ export class HostedServerService {
           rateLimited ? 1 : 0,
           reason === "retention" ? "schedule" : reason,
           rateLimited ? row.provider_event_at : now,
+          rateLimited ? 1 : 0,
+          now,
           now,
           now + LEASE_TTL_SECONDS * 1000,
           claimHash,
@@ -2351,7 +2364,9 @@ export class HostedServerService {
         .bind(observed, error, eventAt, dependencies.now(), row.server_id, eventAt)
         .run(),
     );
-    if (updated.meta.changes !== 1 || observed !== "stopped") return;
+    if (updated.meta.changes !== 1) return;
+    if (observed === "running") yield* this.#recordReady(row, eventAt);
+    if (observed !== "stopped") return;
     // The provider stops a server, for example for maintenance or at the end of its lease, and a resize
     // stops it. A server in use must run, so it starts again. An idle server stays stopped (`#wake`).
     yield* this.#wake(yield* this.#requireRow(row.server_id), "restart");
@@ -2450,6 +2465,36 @@ export class HostedServerService {
       Effect.mapError(hostedFailure),
     );
     return this.#claimSecret;
+  });
+
+  /**
+   * Sends the time of a start that boat reported as usable. Only the caller that clears the start time
+   * sends it, so a webhook and the cron that both see the start send one event.
+   */
+  readonly #recordReady = Effect.fn("HostedServerService.recordReady")(function* (
+    this: HostedServerService,
+    row: HostedServerRow,
+    readyAt: number,
+  ): Effect.fn.Return<void, HostedFailure, HostedServerDependencies> {
+    const dependencies = yield* HostedServerDependencies;
+    const requestedAt = row.start_requested_at;
+    if (typeof requestedAt !== "number") return;
+    const cleared = yield* hostedCall(() =>
+      dependencies.database
+        .prepare("UPDATE hosted_servers SET start_requested_at = NULL WHERE server_id = ? AND start_requested_at = ?")
+        .bind(row.server_id, requestedAt)
+        .run(),
+    );
+    const durationMs = Math.round(readyAt - requestedAt);
+    if (cleared.meta.changes !== 1 || durationMs < 0 || durationMs > MAX_HOSTED_START_MS) return;
+    this.#track(row, {
+      name: "hosted_server_action",
+      action: "ready",
+      plan: row.plan,
+      size: row.size,
+      reason: row.last_wake_reason ?? undefined,
+      durationMs,
+    });
   });
 
   #track(row: HostedServerRow, event: AccountAnalyticsEvent): void {
