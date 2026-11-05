@@ -123,8 +123,10 @@ opens the routine thread. The Team API adapters drop this event, so a remote cli
 notification for a run in a routine thread. The released `agent-tasks-v1` routes do not send
 `routineId`; only this computer's IPC list has it.
 
-A routine thread is a side thread, so its runs have no Computer Use: only the agent's own chat
-drives the screen. Its runs keep the tools of the chat that side threads do not have:
+A routine thread is a side thread, but its runs keep Computer Use when the agent has it on: a
+scheduled run that drives a desktop app has no person to continue the step in the chat. The
+routine thread and the chat of one agent can then drive the screen at the same time, as two agents
+can. Its runs also keep the tools of the chat that side threads do not have:
 `OpenBotToolRouter` does not count a routine thread as an execution thread, so a run can call
 `await_event` and `start_task`.
 

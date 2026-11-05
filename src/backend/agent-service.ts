@@ -1107,6 +1107,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       sectionTeammates: (agentId) => this.sectionTeammates(agentId),
       channelThread: (threadId) => this.channels.store.channelForThread(threadId) !== null,
       branchThread: (threadId) => this.#tasks.isBranchThread(threadId),
+      routineThread: (threadId) => {
+        const taskId = this.#tasks.taskForThread(threadId);
+        return taskId !== null && this.#tasks.isRoutineThread(taskId);
+      },
       hooks: {
         logRecovery: (agentId, provider, outcome) =>
           logger.warn("Recovered an unavailable provider session.", { agentId, provider, outcome }),
