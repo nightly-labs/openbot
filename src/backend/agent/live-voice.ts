@@ -292,7 +292,7 @@ export class LiveVoice {
           onFailure: (failure) =>
             this.#respond(session, request.id, {
               success: false,
-              text: this.#hooks.redact(failure.cause instanceof Error ? failure.cause.message : String(failure.cause)),
+              text: failure.cause instanceof Error ? failure.cause.message : String(failure.cause),
             }),
           onSuccess: (deliveryId) => {
             if (request.signal?.aborted || !this.#sessions.has(session.id)) return;
@@ -316,8 +316,10 @@ export class LiveVoice {
     }
   }
 
+  /** Each result goes to OpenAI, so it loses the configured secrets first. */
   #respond(session: LiveSession, requestId: AppServerRequest["id"], reply: LiveVoiceReply): void {
-    if (this.#sessions.has(session.id)) session.client.respond(requestId, toolResult(reply));
+    if (!this.#sessions.has(session.id)) return;
+    session.client.respond(requestId, toolResult({ ...reply, text: this.#hooks.redact(reply.text) }));
   }
 
   #startFailure(failure: LiveVoiceFailed): LiveVoiceFailed {
