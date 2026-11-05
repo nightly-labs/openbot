@@ -14,16 +14,16 @@ export interface SocksUpstream {
 }
 
 /** A site that the browser asks for: a DNS name or an IP address, and a port. */
-export interface RelayTarget {
+interface RelayTarget {
   host: string;
   port: number;
 }
 
 /** The SOCKS5 proxy refused the saved sign-in, or it does not take a sign-in. */
-export class ProxySignInRefused extends Error {}
+class ProxySignInRefused extends Error {}
 
 /** A connection to a site, and the bytes that came from the site before the relay joined it. */
-export interface RelayExitConnection {
+interface RelayExitConnection {
   stream: Duplex;
   early: Buffer;
 }

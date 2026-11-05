@@ -16,7 +16,7 @@ import {
 } from "@openbot/contracts/ipc";
 
 /** The saved proxies of one server, and the proxy of each named profile (`browser-proxies-v1`). */
-export interface BrowserProxyCalls {
+interface BrowserProxyCalls {
   /** Null: the server has no proxy routes. */
   list(): Promise<BrowserProxyList | null>;
   save(input: SaveBrowserProxyInput): Promise<BrowserProxySummary>;
@@ -29,7 +29,7 @@ export interface BrowserProxyCalls {
   computerSharing?: BrowserComputerSharingCalls;
 }
 
-export interface BrowserComputerSharingCalls {
+interface BrowserComputerSharingCalls {
   /** Null: the server cannot use the connection of this computer. */
   read(): Promise<BrowserComputerSharing | null>;
   /** On also adds the computer of this member to the proxies of the server. */
