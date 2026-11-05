@@ -122,7 +122,7 @@ const OPENING_ROWS_TO_USER = 12;
 const ROW_STYLE = { paddingBottom: CHAT_ROW_GAP };
 /** The side padding of the list. */
 const LIST_PADDING = 16;
-/** A user's message is at most this part of the list width, as `max-w-[92%]` on its row. */
+/** A user's text bubble is at most this part of the list width, as `max-w-[92%]` on its row. */
 const USER_BUBBLE_WIDTH = 0.92;
 
 /** The list keeps the sizes it measured by message, so rows that stay keep their place when the data changes. */
@@ -740,11 +740,17 @@ const MessageRow = memo(function MessageRow({
             animateSize={shared.textReveal}
             className={
               message.author === "user"
-                ? `self-end px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"} ${message.attachments?.length ? "max-w-[92%]" : "max-w-full"}`
+                ? `max-w-full self-end px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"}`
                 : `max-w-full self-start ${waiting ? "" : "px-4 py-3"}`
             }
             style={[
               { borderCurve: "circular", overflow: "hidden" },
+              // A row with files is as wide as the list, and its column takes the width of its widest
+              // child. A percentage would be of that column: the text wraps after the row has its
+              // height, and the bubble covers the next row. The width in points does not depend on it.
+              message.author === "user" && message.attachments?.length
+                ? { maxWidth: shared.listWidth * USER_BUBBLE_WIDTH }
+                : undefined,
               message.author === "user"
                 ? memberColor
                   ? { backgroundColor: `${memberColor}38` }
