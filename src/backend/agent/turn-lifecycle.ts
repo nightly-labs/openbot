@@ -65,6 +65,7 @@ import {
 } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
 import { isNoUpdateAnswer, settleQuietRoutineTurn } from "./routine-quiet-runs";
+import { type SkillLoad, skillLoads, skillLoadTokens } from "./skill-loads";
 import {
   foldCodexChildItem,
   foldCodexSubagentItem,
@@ -634,20 +635,10 @@ export class TurnLifecycle {
       agentId &&
       ["turn/started", "thread/tokenUsage/updated", "openbot/usage", "model/rerouted"].includes(notification.method)
     ) {
-      const agent = this.#store.list().find((entry) => entry.id === agentId);
-      // A task or other side thread keeps its provider sessions under its own thread, not the agent's.
-      // A routine run's own session is not saved, so its usage has its own session id.
-      const session = agent
-        ? (this.#store.database
-            .listProviderSessions(this.#conversation.publicThreadId(agentId, threadId))
-            .find((entry) => entry.externalSessionId === threadId && entry.provider === source.provider) ??
-          (this.#conversation.isRoutineSession(threadId)
-            ? { id: `routine:${threadId}`, provider: source.provider, createdAt: new Date().toISOString() }
-            : undefined))
-        : undefined;
-      if (agent && session) {
+      const usage = this.#usageSession(agentId, threadId, source);
+      if (usage) {
         try {
-          collectProviderUsage(this.#store.database.usage, agent, session, notification.method, params);
+          collectProviderUsage(this.#store.database.usage, usage.agent, usage.session, notification.method, params);
         } catch {
           this.#hooks.emitError("usage_collection_failed", new Error("Usage data could not be saved."), agentId);
         }
@@ -741,6 +732,17 @@ export class TurnLifecycle {
         }
         if (notification.method === "item/completed" && itemId) {
           this.#deltas.flush(`${threadId}:${turnId}:${itemId}`);
+          const loads = skillLoads(item, getArray(params, "filePaths"));
+          if (loads.length > 0)
+            yield* this.#recordSkillLoads(
+              agentId,
+              threadId,
+              turnId,
+              itemId,
+              getString(item, "cwd"),
+              loads,
+              source,
+            ).pipe(Effect.forkIn(this.#scope, { startImmediately: true }));
         }
         if (item.type === "collabAgentToolCall") this.#applyCodexSubagents(agentId, threadId, turnId, item);
         const threadItem = toThreadItem(item);
@@ -1760,6 +1762,69 @@ export class TurnLifecycle {
     this.#mailboxSync.emitQueue(recipientAgentId);
     this.#hooks.scheduleDrain(recipientAgentId);
   }, Effect.uninterruptible);
+
+  /** The agent and provider session that own the usage of a provider thread. */
+  #usageSession(agentId: string, threadId: string, source: AgentClient) {
+    const agent = this.#store.list().find((entry) => entry.id === agentId);
+    if (!agent) return undefined;
+    // A task or other side thread keeps its provider sessions under its own thread, not the agent's.
+    // A routine run's own session is not saved, so its usage has its own session id.
+    const session =
+      this.#store.database
+        .listProviderSessions(this.#conversation.publicThreadId(agentId, threadId))
+        .find((entry) => entry.externalSessionId === threadId && entry.provider === source.provider) ??
+      (this.#conversation.isRoutineSession(threadId)
+        ? { id: `routine:${threadId}`, provider: source.provider, createdAt: new Date().toISOString() }
+        : undefined);
+    return session ? { agent, session } : undefined;
+  }
+
+  /** Saves the skills that a finished tool step loaded, with the estimated tokens of each skill file. */
+  readonly #recordSkillLoads = Effect.fn("TurnLifecycle.recordSkillLoads")(function* (
+    this: TurnLifecycle,
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    itemId: string,
+    cwd: string | null,
+    loads: readonly SkillLoad[],
+    source: AgentClient,
+  ) {
+    const found = this.#usageSession(agentId, threadId, source);
+    if (!found) return;
+    const sizes: (number | null)[] = [];
+    for (const load of loads)
+      sizes.push(
+        yield* skillLoadTokens(load, {
+          cwd,
+          workspace: found.agent.workspacePath ?? null,
+          provider: found.session.provider,
+        }),
+      );
+    // The file reads wait, so the agent can be gone now. Find it again and save all loads at once.
+    const owner = this.#usageSession(agentId, threadId, source);
+    if (!owner) return;
+    const { agent, session } = owner;
+    const usage = this.#store.database.usage;
+    const model = usage.turnModel(agent.id, session.id, turnId) ?? agent.model;
+    const occurredAt = new Date().toISOString();
+    try {
+      for (const [index, load] of loads.entries())
+        usage.recordSkillLoad({
+          agentId: agent.id,
+          sessionId: session.id,
+          turnId,
+          itemId,
+          provider: session.provider,
+          model,
+          skill: load.skill,
+          tokens: sizes[index] ?? null,
+          occurredAt,
+        });
+    } catch {
+      this.#hooks.emitError("usage_collection_failed", new Error("Usage data could not be saved."), agentId);
+    }
+  });
 
   readonly #applyItem = Effect.fn("TurnLifecycle.applyItem")(function* (
     this: TurnLifecycle,
