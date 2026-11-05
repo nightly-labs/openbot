@@ -214,7 +214,12 @@ export class QueueControls {
     if (taskId !== undefined) {
       const thread = new Set(this.#mailbox.laneQueuedIds(input.agentId, taskId));
       const moved = new Set(input.deliveryIds);
-      if (input.deliveryIds.some((id) => !thread.has(id)))
+      // A stale order names a message that left the thread, or leaves out one that is not edited.
+      const left = [...thread].filter((id) => !moved.has(id));
+      if (
+        input.deliveryIds.some((id) => !thread.has(id)) ||
+        left.some((id) => !this.#mailbox.getDelivery(id)?.delivery.editing)
+      )
         return yield* new QueueOperationFailed({ cause: new Error(sourceText("error.backend.queueOrderStale")) });
       let next = 0;
       const order = this.#mailbox

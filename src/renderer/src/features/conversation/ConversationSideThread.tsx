@@ -93,7 +93,9 @@ export function ConversationSideThread(props: { threadId: string }) {
     const key = draftKey();
     if (!key) return Promise.resolve(false);
     // While a queued message is in the message box, Send saves it in its place.
-    return threadQueue.editOf(side.task.id) ? threadQueue.save(key) : threadComposer.send(side, text, key);
+    return threadQueue.editOf(side.task.id)
+      ? threadComposer.importsEnded(key).then(() => threadQueue.save(key))
+      : threadComposer.send(side, text, key);
   }
   /** The thread waits for an answer to a question or a takeover, which the chat tab of the thread shows. */
   const waitsForAnswer = () => {

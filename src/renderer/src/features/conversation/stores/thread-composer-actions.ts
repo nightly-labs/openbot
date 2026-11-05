@@ -58,6 +58,15 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     return entry?.key;
   }
 
+  /** Waits until each import to this draft ended, also an import that starts during the wait. */
+  async function importsEnded(key: string | undefined): Promise<void> {
+    for (;;) {
+      const pending = [...imports.values()].filter((entry) => entry.key === key).map((entry) => entry.ended);
+      if (!pending.length) return;
+      await Promise.all(pending);
+    }
+  }
+
   /** The draft of the open side thread, or of the new thread tab. Undefined while the agent's own chat is open. */
   function openDraftKey(): string | undefined {
     const target = currentConversationTarget(deps.props);
@@ -269,11 +278,7 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     // The first message of a new thread starts the thread and opens it, so the key is read before the send.
     key = openDraftKey(),
   ): Promise<boolean> {
-    for (;;) {
-      const pending = [...imports.values()].filter((entry) => entry.key === key).map((entry) => entry.ended);
-      if (!pending.length) break;
-      await Promise.all(pending);
-    }
+    await importsEnded(key);
     // An import that ended put its reference in the draft after the user pressed Send.
     const images = key ? rowImages(key) : [];
     const typedText = key ? draft(key).text.trim() : typed;
@@ -321,6 +326,7 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     pasteFiles,
     claimImport,
     releaseImport,
+    importsEnded,
     setText,
     setReply,
     send,

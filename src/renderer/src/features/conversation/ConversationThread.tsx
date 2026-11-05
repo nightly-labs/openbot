@@ -287,7 +287,7 @@ export function ConversationThread() {
               // While a queued message is in the message box, Send saves it in its place.
               const key = threadComposer.openDraftKey();
               return key && threadQueue.editOf(current().threads.open?.id)
-                ? threadQueue.save(key)
+                ? threadComposer.importsEnded(key).then(() => threadQueue.save(key))
                 : threadComposer.send(current().threads, text);
             }}
             onStop={() => current().threads.onStop()}

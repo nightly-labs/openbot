@@ -235,10 +235,15 @@ export function createStableConversationState(
     (edit) => {
       if (!edit || !persistDrafts) return;
       const persist = () => {
-        // A newer edit, or the end of this one, owns the record.
-        if (threadQueueEdit()?.editId !== edit.editId) return;
+        // A newer edit, or the end of this one, owns the record. Read fresh state: a pending Save set
+        // after this effect ran must not be overwritten by the previous snapshot without it.
+        const current = threadQueueEdit();
+        if (current?.editId !== edit.editId) return;
         try {
-          window.localStorage.setItem(THREAD_QUEUE_EDIT_STORAGE_KEY, JSON.stringify(edit));
+          window.localStorage.setItem(
+            THREAD_QUEUE_EDIT_STORAGE_KEY,
+            JSON.stringify({ ...current, draft: threadDrafts()[current.draftKey] ?? EMPTY_DRAFT }),
+          );
         } catch {
           actionToast.error(currentText().t("composer.error.saveEditLocally"));
         }

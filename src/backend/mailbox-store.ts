@@ -890,12 +890,12 @@ export class MailboxStore {
    * same deliveries as `queuedTaskMessages`, with their files and state, for the queue of the thread.
    */
   taskQueue(agentId: string, taskId: string): QueueDelivery[] {
+    const queued = this.#queuedFor(agentId).filter((delivery) => !waitsForPlanContinuation(delivery));
+    if (queued.length === 0) return [];
     const messages = this.#messagesById();
-    const deliveries = this.#queuedFor(agentId).filter(
-      (delivery) => !waitsForPlanContinuation(delivery) && this.#taskIdOf(delivery, messages) === taskId,
-    );
-    if (deliveries.length === 0) return [];
-    const positions = this.#queuedPositions();
+    const deliveries = queued.filter((delivery) => this.#taskIdOf(delivery, messages) === taskId);
+    // The position is in the queue of the thread, as the panel of the thread shows it.
+    const positions = new Map(deliveries.map((delivery, index) => [delivery.id, index + 1]));
     return deliveries.map((delivery) =>
       this.#publicDelivery(delivery, positions, this.#requireMessage(delivery.messageId, messages)),
     );
