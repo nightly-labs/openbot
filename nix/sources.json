@@ -1,21 +1,21 @@
 {
-  "version": "0.61.0",
+  "version": "0.62.0",
   "assets": {
     "x86_64-linux": {
-      "name": "OpenBot-0.61.0-x86_64.AppImage",
-      "hash": "sha256-Jt+/w49sOQN9H8k2Wv3TqXMDH2GX7y/hpnN0Bc2KO4U="
+      "name": "OpenBot-0.62.0-x86_64.AppImage",
+      "hash": "sha256-lr10XStTAILLkgSuJ1gnz6sQ7ZmO2/CbnME8K1BuGY0="
     },
     "aarch64-linux": {
-      "name": "OpenBot-0.61.0-arm64.AppImage",
-      "hash": "sha256-NYINNSCaWRK9Y/IoDlSZ8cF3SjsKlEaUo8GGvDUbxbE="
+      "name": "OpenBot-0.62.0-arm64.AppImage",
+      "hash": "sha256-DM5TbPbfeOrA9bltAn0O8UwOpT1CjMFpBCLvPPJo+vg="
     },
     "x86_64-darwin": {
-      "name": "OpenBot-0.61.0-x64.zip",
-      "hash": "sha256-WMTpSpgURsKdPiBXgR9KdBCkLYoEwIBTjZ7PGbae0ig="
+      "name": "OpenBot-0.62.0-x64.zip",
+      "hash": "sha256-q910+q/ho2U6D/rbIyTDPU5BK56ZMQum6M1m0I0MbV4="
     },
     "aarch64-darwin": {
-      "name": "OpenBot-0.61.0-arm64.zip",
-      "hash": "sha256-Cbn5pAcIPpIRZxF9HNtf2xBVs/6xW0IUHrrNRohnk34="
+      "name": "OpenBot-0.62.0-arm64.zip",
+      "hash": "sha256-LSplvTtczh8KNaLxfd6CO8VAO2hLufakcP3k8cHk3aE="
     }
   }
 }
