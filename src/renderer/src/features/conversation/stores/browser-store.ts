@@ -57,6 +57,8 @@ function canonicalBrowserUrl(url: string): string {
 interface BrowserPanels {
   activeRightPanel: () => RightPanelMode;
   setActiveRightPanel: (mode: RightPanelMode, agentId?: string) => void;
+  /** Closes the browser tab of the side panel, also from the full view or picture in picture. */
+  closeBrowserPane: () => void;
 }
 
 export interface BrowserStoreDeps {
@@ -243,14 +245,21 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     if (completed && latestMessageMarker() === resolution.messageMarker) setBrowserTakeoverResolution(resolution);
     return completed;
   };
-  let previousBrowserTabCount = 0;
+  // The browser pane closes with its last tab. A switch to an agent with no tabs closes nothing.
+  let previousBrowserTabs: { agentId: string | undefined; count: number } = { agentId: undefined, count: 0 };
   createEffect(
-    () => ({ count: browserTabs().length, open: screenOpen(), enabled: deps.props.browserEnabled !== false }),
-    ({ count, open, enabled }) => {
+    () => ({
+      agentId: deps.props.agent?.id,
+      count: browserTabs().length,
+      open: screenOpen(),
+      enabled: deps.props.browserEnabled !== false,
+    }),
+    ({ agentId, count, open, enabled }) => {
       if (!enabled) return;
-      const browserWasClosed = open && previousBrowserTabCount > 0 && count === 0;
-      previousBrowserTabCount = count;
-      if (browserWasClosed) deps.panels.setActiveRightPanel("browser");
+      const lastTabClosed =
+        open && previousBrowserTabs.agentId === agentId && previousBrowserTabs.count > 0 && count === 0;
+      previousBrowserTabs = { agentId, count };
+      if (lastTabClosed) deps.panels.closeBrowserPane();
     },
   );
 

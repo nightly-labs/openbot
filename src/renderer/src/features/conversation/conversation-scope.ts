@@ -454,7 +454,15 @@ export function createConversationViewScope(props: ConversationProps) {
     browserAddress,
     setBrowserAddress,
     setComposerError: setScopedComposerError,
-    panels: { activeRightPanel, setActiveRightPanel },
+    panels: {
+      activeRightPanel,
+      setActiveRightPanel,
+      closeBrowserPane: () => {
+        // The full view and picture in picture are outside the side panel, so the pane shows first.
+        setActiveRightPanel("browser");
+        closeSidePanelPane("browser");
+      },
+    },
   });
   const {
     browserSidebarOpen,
