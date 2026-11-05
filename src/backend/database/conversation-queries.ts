@@ -158,13 +158,14 @@ export class ConversationQueries {
 
   /**
    * The first time and the number of the messages that a person wrote to an agent on this computer.
-   * One scan of the table: the two columns come before the message JSON, so it reads no overflow page.
+   * A routine run is also a `user` message, with the `routine` item type; it does not count.
+   * One scan of the table: the columns come before the message JSON, so it reads no overflow page.
    */
   readSentMessageStats(): SentMessageStats {
     const row = databaseRow(
       this.#core.connection
         .prepare(
-          "SELECT MIN(created_at) AS first_sent_at, COUNT(*) AS sent_count FROM projection_thread_messages WHERE author = 'user'",
+          "SELECT MIN(created_at) AS first_sent_at, COUNT(*) AS sent_count FROM projection_thread_messages WHERE author = 'user' AND item_type IS NOT 'routine'",
         )
         .get(),
     );

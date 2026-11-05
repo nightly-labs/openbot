@@ -104,6 +104,17 @@ let sentThisSession = false;
 let checking = false;
 let lastStatsReadAt = 0;
 
+// A chat window counts its messages in the same storage, and only the main window shows the toast.
+// The event comes only from other windows.
+window.addEventListener("storage", (event) => {
+  if (event.key === STORAGE_KEY) sentThisSession = true;
+});
+
+/** The toast must not cover a dialog, or follow the GitHub star toast in the same session. */
+function blocked(): boolean {
+  return githubStarPromptShownThisSession() || dialogOpen();
+}
+
 /** Count one message that the user sent to an agent from this device. Blocked storage counts nothing. */
 export function noteSocialFollowMessageSent(): void {
   const now = Date.now();
@@ -121,8 +132,7 @@ export function noteSocialFollowMessageSent(): void {
  * over an open dialog.
  */
 export function noteSocialFollowReplyCompleted(): void {
-  if (!sentThisSession || checking || githubStarPromptShownThisSession()) return;
-  if (dialogOpen()) return;
+  if (!sentThisSession || checking || blocked()) return;
   let state: SocialFollowState;
   try {
     state = readState();
@@ -145,7 +155,8 @@ export function noteSocialFollowReplyCompleted(): void {
   appPort()
     .getSentMessageStats()
     .then((stats) => {
-      if (usedEnough(state, stats, Date.now())) showToast();
+      // A dialog can open while the database reads.
+      if (usedEnough(state, stats, Date.now()) && !blocked()) showToast();
     })
     .catch(() => undefined)
     .finally(() => {
@@ -188,8 +199,13 @@ function showToast(): void {
   const [step, setStep] = createSignal<SocialFollowStep>({ kind: "ask" });
   const finish = () => updateState((state) => ({ ...state, done: true }));
   const close = () => toast.dismiss(TOAST_ID);
+  // One post page and one follow page: the copy of a post takes time, and a second click can come.
+  let posting = false;
+  let following = false;
 
   const post = async (network: SocialNetwork) => {
+    if (posting) return;
+    posting = true;
     finish();
     // The copy comes before the page opens: it needs the focus of this window.
     const result = network.compose === "copy" ? await copyDraftPost() : network.compose;
@@ -197,6 +213,8 @@ function showToast(): void {
     void appPort().openExternal(POST_DESTINATIONS[network.id]);
   };
   const follow = (network: SocialNetwork) => {
+    if (following) return;
+    following = true;
     finish();
     setStep({ kind: "followed", network });
     void appPort().openExternal(network.id);
