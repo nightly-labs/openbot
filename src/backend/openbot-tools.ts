@@ -688,7 +688,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     name: "request_api_key",
     description: [
       "Ask the user for an API key, token, or password that your task needs, such as for IMAP, and wait for the answer.",
-      "The user enters it in a secure form in this conversation. OpenBot saves it in the Vault for every agent, or only for you when the user selects that, in a private file outside your workspace; you never get the value.",
+      "The user enters it in a secure form in this conversation. When this computer has a Vault, OpenBot saves it in the Vault for every agent, or only for you when the user selects that; without a Vault, only for you. The key is in a private file outside your workspace; you never get the value.",
       'The result is JSON: {"status":"saved","name","path"} when the user saved it, with "source":"vault" for a Vault key; {"status":"skipped"} when the user closed the form; or {"status":"expired"} when the turn ended first.',
       "Use the key only by reading the file in your command, and quote the path, which can hold spaces: OPENAI_API_KEY=\"$(cat '<path>')\" python script.py. Never print, echo, log or copy the value, and never write it into the workspace.",
       "Call list_api_keys first: do not ask again for a key that is saved. A new answer replaces the saved key. Only the server owner or an admin can answer. It does not work in an external chat.",
