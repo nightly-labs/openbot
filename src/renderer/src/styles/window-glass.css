@@ -59,7 +59,7 @@
   --surface: var(--openbot-bg-surface);
 }
 
-/* A popper, a menu or a tooltip covers the chat, so it stays solid where it opens in the window. */
+/* A popper, a menu, a tooltip or a drag preview covers the chat, so it stays solid in the window. */
 :root[data-openbot-window-glass]
   .app-window
   :is(
@@ -69,7 +69,10 @@
     [role="menu"],
     [role="listbox"],
     [role="tooltip"],
-    .ui-popover-menu-surface
+    .ui-popover-menu-surface,
+    .sidebar-agent-drag-preview,
+    .sidebar-person-drag-preview,
+    .sidebar-section-drag-preview
   ) {
   --openbot-bg-canvas: var(--window-solid-canvas);
   --openbot-bg-sidebar: var(--window-solid-sidebar);
@@ -195,13 +198,41 @@
   background: linear-gradient(to top, var(--window-glass-card) 28%, transparent 100%);
 }
 
+/* A sticky bar covers the rows that scroll under it. It keeps its clear tint and blurs the rows, so
+ * their text does not mix with its own. */
+:root[data-openbot-window-glass]
+  .app-window
+  :is(
+    .sidebar-folder > header,
+    .marketplace-skill-group-bar,
+    .agent-instructions-bar,
+    .trace-row[data-parent],
+    .trace-axis-row
+  ) {
+  backdrop-filter: blur(var(--openbot-space-4));
+}
+
+/* A workflow node covers the connections and the nodes under it, so the node cards stay solid on the
+ * clear canvas. */
+:root[data-openbot-window-glass] .app-window .wfn-stage {
+  --wfn-card: var(--window-solid-canvas);
+  --wfn-field: var(--window-solid-surface-raised);
+  --wfn-port: color-mix(in srgb, var(--openbot-text-primary) 10%, var(--window-solid-canvas));
+}
+
+:root[data-openbot-window-glass][data-openbot-color-scheme="light"] .app-window .wfn-stage {
+  --wfn-card: var(--window-solid-surface);
+  --wfn-field: var(--window-solid-control-hover);
+}
+
 /* The full-bleed browser covers the window with its own frame and card. */
 :root[data-openbot-window-glass] .browser-full-view {
   background: var(--window-glass-frame);
 }
 
-/* A chat colour mixes a solid colour into the bubble, which would make the bubble mostly solid. The
- * window mixes it into the solid surface, then makes the result as clear as the other bubbles. */
+/* A chat colour is solid, so a mix with the clear surface would make the bubble less clear than the
+ * others. The window mixes the colour into the solid surface, then gives the result the same alpha as
+ * the plain bubble of that kind. */
 :root[data-openbot-window-glass] .app-window .ui-bubble.message-bubble-member > .ui-bubble-content {
   background: color-mix(
     in srgb,
@@ -217,7 +248,7 @@
   > .ui-bubble-content {
   background: color-mix(
     in srgb,
-    color-mix(in srgb, var(--message-chat-color) 22%, var(--window-solid-surface)) 40%,
+    color-mix(in srgb, var(--message-chat-color) 22%, var(--window-solid-surface)) 35%,
     transparent
   );
 }
