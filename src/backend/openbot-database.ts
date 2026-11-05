@@ -10,6 +10,7 @@ import type {
   ConversationSearchPage,
   ConversationSnapshot,
   HostedSiteConversationEventStatus,
+  SentMessageStats,
 } from "@openbot/contracts/ipc";
 import { AgentHistoryQueries, type AgentHistorySelection } from "./database/agent-history-queries";
 import { type AgentModelChange, AgentRoster } from "./database/agent-roster";
@@ -17,6 +18,7 @@ import { AgentUsage } from "./database/agent-usage";
 import { type ConversationMarkerExclusions, ConversationQueries } from "./database/conversation-queries";
 import { ConversationWriter } from "./database/conversation-writer";
 import { DatabaseCore, type OrchestrationEventInput } from "./database/database-core";
+import { deletedThreadMessageIds } from "./database/deleted-thread-messages";
 import {
   type ActiveHostedSiteConversationEvent,
   HostedSiteEventLog,
@@ -184,8 +186,8 @@ export class OpenBotDatabase {
     return this.#conversations.readConversation(agentId, threadId);
   }
 
-  readTurnAssistantMessages(agentId: string, threadId: string, turnId: string): ConversationMessage[] {
-    return this.#conversations.readTurnAssistantMessages(agentId, threadId, turnId);
+  readTurnAssistantMessages(agentId: string, turnId: string): ConversationMessage[] {
+    return this.#conversations.readTurnAssistantMessages(agentId, turnId);
   }
 
   readActiveTurnId(agentId: string, threadId: string | null): string | null {
@@ -259,6 +261,10 @@ export class OpenBotDatabase {
     return this.#conversations.searchConversationFiles(query, cursor, requestedLimit);
   }
 
+  readSentMessageStats(): SentMessageStats {
+    return this.#conversations.readSentMessageStats();
+  }
+
   persistConversation(
     snapshot: ConversationSnapshot,
     eventType: string,
@@ -304,8 +310,15 @@ export class OpenBotDatabase {
     eventType: string;
     detail?: unknown;
     commandId?: string;
+    /** The shown messages that a person deletes. No later write or replay brings them back. */
+    deletedMessageIds?: readonly string[];
   }): number {
     return this.#conversationWrites.persistConversationChanges(input);
+  }
+
+  /** The ids of the messages that a person deleted from this thread. */
+  deletedConversationMessageIds(threadId: string): Set<string> {
+    return deletedThreadMessageIds(this.connection, threadId);
   }
 
   upsertProviderHistoryMessage(input: {

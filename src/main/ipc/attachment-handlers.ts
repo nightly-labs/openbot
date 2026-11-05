@@ -296,7 +296,9 @@ export function attachmentIpcHandlers({
       previewWorkspaceFile: scopedHandler(parsePreviewWorkspaceFile, {
         local: async (parsed) => {
           const generation = filePreviewPages.generation;
-          const workspaceFile = await runCauseEffect(service.resolveLocalWorkspaceFile(parsed.agentId, parsed.path));
+          const workspaceFile = await runCauseEffect(
+            service.resolveLocalWorkspaceFile(parsed.agentId, parsed.path, { exactPath: parsed.exactPath === true }),
+          );
           return runCauseEffect(
             localFilePreview(workspaceFile.path, workspaceFile.name, workspaceFile.size, generation, parsed.maxBytes),
           );

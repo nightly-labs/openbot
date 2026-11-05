@@ -6,6 +6,7 @@ import {
   type CustomProviderSummary,
   isManagedRuntimeProvider,
   type ProviderRuntimeSnapshot,
+  type ProviderRuntimeStatus,
   type ServerSummary,
   type UpdateCustomProviderInput,
 } from "@openbot/contracts/ipc";
@@ -18,6 +19,7 @@ import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { createProviderRuntimeStore } from "../src/features/provider-updates/provider-runtime-store";
 import { ServerSettingsModal } from "../src/features/servers/ServerSettingsModal";
+import type { HostProviderSettings } from "../src/features/settings/ProviderSettingsSection";
 import { STORY_HOST_STATUS, STORY_INVITES, STORY_PRESENCE, STORY_SERVERS } from "../src/preview/fixtures";
 import { createStoryDetection, STORY_DETECTED_PROVIDERS } from "./detected-providers-fixture";
 import { createMockOpenBot } from "./mock-openbot";
@@ -51,6 +53,8 @@ const providerRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   kimi: { phase: "not-downloaded", progress: null, message: null, version: null },
   pi: { phase: "not-downloaded", progress: null, message: null, version: null },
   muse: { phase: "not-downloaded", progress: null, message: null, version: null },
+  devin: { phase: "not-downloaded", progress: null, message: null, version: null },
+  copilot: { phase: "not-downloaded", progress: null, message: null, version: null },
 };
 
 /** Four connected runtimes, one of which has a newer version waiting. */
@@ -147,6 +151,8 @@ const providerUpdateRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   kimi: { phase: "ready", progress: 100, message: null, version: "1.52.0" },
   pi: { phase: "ready", progress: 100, message: null, version: "3.0.68" },
   muse: { phase: "ready", progress: 100, message: null, version: "3.0.68" },
+  devin: { phase: "ready", progress: 100, message: null, version: "3000.11.234" },
+  copilot: { phase: "ready", progress: 100, message: null, version: "1.0.105" },
 };
 
 /** The Providers section of Server settings, with the providers of this computer. */
@@ -170,8 +176,29 @@ function ServerProvidersStory(props: {
   providerUsers?: Partial<Record<AgentProviderId, readonly string[]>>;
   /** Codex accounts with usage reset credits: the account ⋯ menu offers Reset usage. */
   usageReset?: boolean;
+  /**
+   * The Hermes row: `null` is a host that sends no installer status, so the row opens the install
+   * guide. A status is the Download, its progress, or an installed Hermes that offers Connect.
+   */
+  hermes?: ProviderRuntimeStatus | null;
 }) {
   const usageResetAccounts = props.usageReset ? createUsageResetAccounts() : undefined;
+  const hermes = props.hermes;
+  const hermesAgentStatus: AgentStatus | undefined =
+    hermes === undefined
+      ? undefined
+      : {
+          ...providerAgentStatus,
+          providers: [
+            ...(providerAgentStatus.providers ?? []),
+            {
+              id: "hermes",
+              state: hermes?.phase === "ready" ? "sign-in-required" : "not-installed",
+              version: hermes?.phase === "ready" ? hermes.version : null,
+              message: null,
+            },
+          ],
+        };
   const previousApi = window.openbot;
   const mock = createMockOpenBot({
     ...(props.providerUpdate
@@ -248,6 +275,112 @@ function ServerProvidersStory(props: {
     return "restarted";
   }
 
+  // Named values, not ternary props: the modal reads its props in effect callbacks, where a
+  // compiled ternary prop cannot create its memo.
+  const switchToManageProviders = props.inactive ? fn() : undefined;
+  function storyServer(): ServerSummary {
+    return props.inactive ? { ...localServer, active: false } : localServer;
+  }
+
+  function providerOptions(): HostProviderSettings | undefined {
+    if (props.inactive) return undefined;
+    return {
+      get defaultProvider() {
+        return {
+          ...preference(),
+          save: async (provider: AgentProviderId, model?: string | null) => {
+            setPreference((current) => ({
+              completed: true,
+              preferredProvider: provider,
+              preferredModel:
+                model === undefined && current.preferredProvider === provider
+                  ? current.preferredModel
+                  : (model ?? null),
+            }));
+          },
+        };
+      },
+      get agentStatus() {
+        if (hermesAgentStatus) return hermesAgentStatus;
+        return props.usageReset
+          ? usageResetAgentStatus
+          : props.codeSignIn
+            ? codeSignInAgentStatus
+            : props.providerUpdate
+              ? providerUpdateAgentStatus
+              : props.openCodeInstalled
+                ? openCodeInstalledAgentStatus
+                : providerAgentStatus;
+      },
+      connection:
+        props.codeSignIn || hermes !== undefined
+          ? codeConnection
+          : props.providerDownloads || props.providerUpdate
+            ? browserConnection
+            : undefined,
+      get providerRuntimeStatuses() {
+        if (hermes !== undefined) return hermes ? { ...providerRuntimeStatuses, hermes } : providerRuntimeStatuses;
+        return props.providerUpdate
+          ? runtimes.providerRuntimeStatuses()
+          : props.providerDownloads
+            ? providerRuntimeStatuses
+            : undefined;
+      },
+      get providerAvailableVersions() {
+        return props.providerUpdate ? runtimes.providerAvailableVersions() : undefined;
+      },
+      onUpdateProvider: props.providerUpdate ? runtimes.downloadProviderRuntime : undefined,
+      onDownloadProvider: props.providerUpdate
+        ? runtimes.downloadProviderRuntime
+        : props.providerDownloads || hermes !== undefined
+          ? fn()
+          : undefined,
+      onCancelProviderDownload: props.providerUpdate
+        ? runtimes.cancelProviderRuntimeDownload
+        : props.providerDownloads || hermes !== undefined
+          ? fn()
+          : undefined,
+      accountActions: usageResetAccounts,
+      onAddCustomProvider: addCustomProvider,
+      onDeleteCustomProvider: deleteCustomProvider,
+      onUpdateCustomProvider: updateCustomProvider,
+      get customProviders() {
+        return customProviders();
+      },
+      get providerDetection() {
+        return detection?.detection();
+      },
+      detectedProviderApi: detection?.api,
+      get detectionSettings() {
+        return detectionSettings();
+      },
+      onDetectionSettingsChange: setDetectionSettings,
+      get offProviders() {
+        return offProviders();
+      },
+      providerUsers: props.providerUsers,
+      onSetProviderOn: props.offProviders
+        ? (provider: AgentProviderId, on: boolean) => {
+            setOffProviders((current = []) => (on ? current.filter((id) => id !== provider) : [...current, provider]));
+          }
+        : undefined,
+      onMeasureProviderDownload:
+        props.offProviders && props.providerUpdate
+          ? async (provider: AgentProviderId) =>
+              isManagedRuntimeProvider(provider)
+                ? await mock.api.providerRuntimes.measureDownload(provider)
+                : { bytes: 0, versions: 0 }
+          : undefined,
+      onRemoveProviderDownload:
+        props.offProviders && props.providerUpdate
+          ? async (provider: AgentProviderId) => {
+              if (!isManagedRuntimeProvider(provider)) return;
+              runtimes.applyProviderRuntimeSnapshot(await mock.api.providerRuntimes.removeDownload(provider));
+            }
+          : undefined,
+    };
+  }
+
   return (
     <>
       <SettingsPageStory title="Server settings" onEscape={() => setOpen(false)}>
@@ -256,7 +389,7 @@ function ServerProvidersStory(props: {
             page={page()}
             open={open()}
             platform="darwin"
-            server={props.inactive ? { ...localServer, active: false } : localServer}
+            server={storyServer()}
             hostStatus={STORY_HOST_STATUS}
             members={STORY_PRESENCE.members}
             invites={STORY_INVITES}
@@ -274,107 +407,8 @@ function ServerProvidersStory(props: {
             initialSection="providers"
             hostPromptCacheTtl={{}}
             hostModelVisibility={{}}
-            onSwitchToManageProviders={props.inactive ? fn() : undefined}
-            providers={
-              props.inactive
-                ? undefined
-                : {
-                    get defaultProvider() {
-                      return {
-                        ...preference(),
-                        save: async (provider: AgentProviderId, model?: string | null) => {
-                          setPreference((current) => ({
-                            completed: true,
-                            preferredProvider: provider,
-                            preferredModel:
-                              model === undefined && current.preferredProvider === provider
-                                ? current.preferredModel
-                                : (model ?? null),
-                          }));
-                        },
-                      };
-                    },
-                    get agentStatus() {
-                      return props.usageReset
-                        ? usageResetAgentStatus
-                        : props.codeSignIn
-                          ? codeSignInAgentStatus
-                          : props.providerUpdate
-                            ? providerUpdateAgentStatus
-                            : props.openCodeInstalled
-                              ? openCodeInstalledAgentStatus
-                              : providerAgentStatus;
-                    },
-                    connection: props.codeSignIn
-                      ? codeConnection
-                      : props.providerDownloads || props.providerUpdate
-                        ? browserConnection
-                        : undefined,
-                    get providerRuntimeStatuses() {
-                      return props.providerUpdate
-                        ? runtimes.providerRuntimeStatuses()
-                        : props.providerDownloads
-                          ? providerRuntimeStatuses
-                          : undefined;
-                    },
-                    get providerAvailableVersions() {
-                      return props.providerUpdate ? runtimes.providerAvailableVersions() : undefined;
-                    },
-                    onUpdateProvider: props.providerUpdate ? runtimes.downloadProviderRuntime : undefined,
-                    onDownloadProvider: props.providerUpdate
-                      ? runtimes.downloadProviderRuntime
-                      : props.providerDownloads
-                        ? fn()
-                        : undefined,
-                    onCancelProviderDownload: props.providerUpdate
-                      ? runtimes.cancelProviderRuntimeDownload
-                      : props.providerDownloads
-                        ? fn()
-                        : undefined,
-                    accountActions: usageResetAccounts,
-                    onAddCustomProvider: addCustomProvider,
-                    onDeleteCustomProvider: deleteCustomProvider,
-                    onUpdateCustomProvider: updateCustomProvider,
-                    get customProviders() {
-                      return customProviders();
-                    },
-                    get providerDetection() {
-                      return detection?.detection();
-                    },
-                    detectedProviderApi: detection?.api,
-                    get detectionSettings() {
-                      return detectionSettings();
-                    },
-                    onDetectionSettingsChange: setDetectionSettings,
-                    get offProviders() {
-                      return offProviders();
-                    },
-                    providerUsers: props.providerUsers,
-                    onSetProviderOn: props.offProviders
-                      ? (provider: AgentProviderId, on: boolean) => {
-                          setOffProviders((current = []) =>
-                            on ? current.filter((id) => id !== provider) : [...current, provider],
-                          );
-                        }
-                      : undefined,
-                    onMeasureProviderDownload:
-                      props.offProviders && props.providerUpdate
-                        ? async (provider: AgentProviderId) =>
-                            isManagedRuntimeProvider(provider)
-                              ? await mock.api.providerRuntimes.measureDownload(provider)
-                              : { bytes: 0, versions: 0 }
-                        : undefined,
-                    onRemoveProviderDownload:
-                      props.offProviders && props.providerUpdate
-                        ? async (provider: AgentProviderId) => {
-                            if (!isManagedRuntimeProvider(provider)) return;
-                            runtimes.applyProviderRuntimeSnapshot(
-                              await mock.api.providerRuntimes.removeDownload(provider),
-                            );
-                          }
-                        : undefined,
-                  }
-            }
+            onSwitchToManageProviders={switchToManageProviders}
+            providers={providerOptions()}
           />
         )}
       </SettingsPageStory>
@@ -503,8 +537,8 @@ export const ProviderUpdateRetry: Story = {
 
 /**
  * Cursor, Antigravity and Cline are installed for other work, so the user turned them off. Agents use
- * Codex and Claude, so those switches stay on. Open Cursor: its Download section offers Remove download,
- * and after it the list reads "Off · Not downloaded".
+ * Codex and Claude, so those switches stay on. Open Cursor: its Danger zone offers Delete, and after
+ * it the list reads "Off · Not downloaded".
  */
 export const ProvidersOff: Story = {
   render: () => (
@@ -522,6 +556,28 @@ export const ProvidersOff: Story = {
  */
 export const CodexUsageReset: Story = {
   render: () => <ServerProvidersStory usageReset />,
+};
+
+/** A host that sends no Hermes installer status, such as a Windows host: the row opens the install guide. */
+export const HermesInstallGuide: Story = {
+  render: () => <ServerProvidersStory hermes={null} />,
+};
+
+/** The host can run the Hermes installer: the row offers Download. */
+export const HermesDownload: Story = {
+  render: () => (
+    <ServerProvidersStory hermes={{ phase: "not-downloaded", progress: null, message: null, version: null }} />
+  ),
+};
+
+/** The installer runs one stage at a time, and each stage moves the bar. Cancel stops it. */
+export const HermesInstalling: Story = {
+  render: () => <ServerProvidersStory hermes={{ phase: "downloading", progress: 25, message: null, version: null }} />,
+};
+
+/** Hermes is installed: the row offers Connect, which signs in with the Nous Portal code. */
+export const HermesConnect: Story = {
+  render: () => <ServerProvidersStory hermes={{ phase: "ready", progress: 100, message: null, version: "0.22.7" }} />,
 };
 
 /** A server that the window has not selected. Its providers are managed after a switch to it. */

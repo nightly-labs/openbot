@@ -62,7 +62,7 @@ const STRANGER = "48600100400";
 const LID_FRIEND = "48600100500";
 const GROUP = "120363000000000001@g.us";
 const OTHER_GROUP = "120363000000000002@g.us";
-const PAIRING_CODE = "ABCD1234";
+const PAIRING_CODE: string = "ABCD1234";
 const lidDirectId = "IN-LID-DIRECT";
 
 interface Step {
@@ -339,6 +339,9 @@ const browser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 
 function memoryCredentials(): MessagingCredentials {

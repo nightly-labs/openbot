@@ -109,6 +109,7 @@ export const messages = {
   "error.provider.contextWindowInvalid":
     "モデルのコンテキストウィンドウは {min} から {max} までの整数のトークン数にしてください。",
   "error.provider.maxOutputInvalid": "モデルの最大出力は {min} から {max} までの整数のトークン数にしてください。",
+  "error.provider.reasoningEffortsInvalid": "モデルの推論の強さが無効です。",
   "error.provider.headersTooMany": "ヘッダーが多すぎます。",
   "error.provider.headerNameCharacter": "ヘッダー名に HTTP で使用できない文字が含まれています。",
   "error.provider.headerNameTooLong": "ヘッダー名が長すぎます。",
@@ -218,6 +219,10 @@ export const messages = {
     "モデルプロバイダー側で障害が発生しました。お使いの接続は原因ではありません。後でもう一度試すか、別のモデルを選んでください。\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode がモデルプロバイダーに接続できませんでした。OpenBot を実行しているコンピューターのネットワーク接続を確認してから、もう一度お試しください。\n{detail}",
+  "error.provider.codexStateBusy":
+    "ChatGPT は前回の起動後、まだローカル履歴を準備しています。数分待ってから、もう一度お試しください。",
+  "error.provider.realtimeLimitZero":
+    "OpenBot のリアルタイム CPU 制限が 0 のため、Linux がプロバイダーを停止しました。この制限はシステムから来ています。rtkit をインストールして起動し (`rtkit-daemon`)、`systemctl --user restart xdg-desktop-portal` を実行してから OpenBot を再起動してください。rtkit がない間は、xdg-desktop-portal を再起動するだけでは解決しません。",
   "error.provider.opencodeDatabaseNewer":
     "新しいバージョンの OpenCode がデータベースを変更したため、OpenCode はデータベースを開けませんでした。OpenCode をバージョン 2 以降に更新してから、もう一度お試しください。",
   "error.provider.opencodeNoAnswer":
@@ -240,6 +245,8 @@ export const messages = {
   "error.provider.antigravityMissing":
     "Gemini はダウンロードされていません。続けるには OpenBot でダウンロードしてください。",
   "error.provider.antigravityNotStarted": "Gemini サーバーは見つかりましたが、バージョンを読み取れません。",
+  "error.provider.antigravityOverrideInvalid":
+    "OPENBOT_ANTIGRAVITY_PATH の Gemini サーバーが見つからないか、実行できません。パスを修正するか変数を削除してから、OpenBot を再起動してください。",
   "error.provider.antigravityVersionUnreadable": "Gemini サーバーのバージョンを読み取れません。",
   "error.provider.antigravitySignIn": "Gemini を使うには Google でサインインしてください。",
   "error.provider.antigravityRateLimited":
@@ -275,6 +282,9 @@ export const messages = {
   "error.provider.kimiNotStarted": "Kimi を起動できませんでした。ターミナルで `kimi --version` を実行してください。",
   "error.provider.kimiVersionUnreadable": "Kimi CLI のバージョンを読み取れません。",
   "error.provider.kimiSignIn": "Kimi を使うには Kimi Code でサインインしてください。",
+  "error.provider.devinSignIn": "Devin を使うには Devin でサインインしてください。",
+  "error.provider.copilotSignIn":
+    "GitHub Copilot を使うには GitHub でサインインするか、COPILOT_GITHUB_TOKEN を設定してください。",
   "error.provider.hermesMissing":
     "Hermes Agent がインストールされていません。インストールしてから、もう一度お試しください。",
   "error.provider.hermesNotStarted":
@@ -298,6 +308,8 @@ export const messages = {
     "Gemini はブラウザーでサインインページを開けませんでした。既定のブラウザーを確認してから、もう一度接続してください。",
   "error.provider.acpSignInFailed": "サインインが完了しませんでした。",
   "error.provider.acpSignInFailedReason": "サインインが完了しませんでした: {reason}",
+  "error.provider.acpSignOutFailed": "サインアウトが完了しませんでした。",
+  "error.provider.acpSignOutFailedReason": "サインアウトが完了しませんでした: {reason}",
   "error.provider.acpSignInMethodMissing":
     "このプロバイダーはこのコンピューターでこのサインイン方法を提供していません。プロバイダーを更新してから、もう一度お試しください。",
   "error.provider.httpsSignInLinkOnly": "ブラウザーで開けるのは HTTPS のサインインリンクだけです。",
@@ -436,6 +448,10 @@ export const messages = {
     "インストール中にカスタムエージェントが変更されました。もう一度お試しください。",
   "error.provider.registryInstallFailed":
     "エージェントのインストールに失敗しました。以前のインストールは変更されていません。",
+  "error.provider.hermesInstallFailed":
+    "Hermes Agent をインストールできませんでした。もう一度試すか、インストールガイドを使ってください。",
+  "error.provider.hermesNeedsGitCurl":
+    "Hermes Agent には git と curl が必要です。インストールしてから、もう一度試してください。",
   "error.provider.registryRemoveBusy":
     "削除する前に、エージェントのインストールと実行中の ACP の作業が終わるまでお待ちください。",
 } as const satisfies PartialTranslation<typeof source>;

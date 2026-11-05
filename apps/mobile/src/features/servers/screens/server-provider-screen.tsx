@@ -1,6 +1,7 @@
 import {
   type AgentProviderId,
   isAgentProvider,
+  isInstallerProvider,
   isKeyOnlyProvider,
   type ProviderAccountStatus,
 } from "@openbot/contracts/ipc";
@@ -94,7 +95,8 @@ export function ServerProviderScreen() {
   const busy = pending !== null;
   const runtime = row.runtime;
   // A download can be cancelled; the setup step after it cannot. An update downloads the newer version.
-  // An installed runtime with no update offers a check, as the row menu of the desktop tab does.
+  // An installed runtime with no update offers a check, as the row menu of the desktop tab does. An
+  // installer provider has no update.
   const runtimeAction =
     runtime?.phase === "downloading"
       ? "cancel"
@@ -106,7 +108,9 @@ export function ServerProviderScreen() {
             ? "retry"
             : runtime.phase === "not-downloaded"
               ? "download"
-              : "check";
+              : isInstallerProvider(runtime.provider)
+                ? null
+                : "check";
   // A provider whose CLI is not on the host yet downloads before it signs in.
   // As on desktop, a connected provider offers Reconnect: the same sign-in, for another account or
   // a sign-in that the provider no longer accepts.

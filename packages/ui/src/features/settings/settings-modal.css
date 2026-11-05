@@ -75,12 +75,29 @@
   }
 }
 
+/* The leading icon of a section is muted at rest, as in menus and on the page rail. It takes the primary text
+ * color with the label on hover, on keyboard focus and on the open section. The line does not change. Other
+ * icons in the row, such as the warning of a marketplace app, keep their own colors. */
+.settings-modal-nav-item > svg:first-child {
+  color: var(--openbot-text-muted);
+}
+
+.settings-modal-nav-item:is([aria-current], [data-selected], :focus-visible) > svg:first-child {
+  color: var(--openbot-text-primary);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .settings-modal-nav-item:hover > svg:first-child {
+    color: var(--openbot-text-primary);
+  }
+}
+
 .settings-modal-main {
   position: relative;
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto;
   background: var(--openbot-bg-canvas);
 }
 
@@ -88,27 +105,80 @@
   display: contents;
 }
 
-.settings-modal-header {
+/*
+ * The path to an open detail page, such as `Providers › ChatGPT`. It looks as the path of a Marketplace page
+ * does. The parent goes back to the section: it is plain text until the pointer is on it, and the margins cancel
+ * the padding and border of its chip, so the text stays on the inset.
+ */
+.settings-page-path {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--openbot-space-4);
-  padding: var(--openbot-space-6) var(--openbot-space-6) var(--openbot-space-4);
-}
-
-.settings-modal-title {
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
   margin: 0;
-  font-size: var(--openbot-text-2xl);
-  font-weight: var(--openbot-weight-semibold);
-  line-height: var(--openbot-leading-2xl);
-  letter-spacing: var(--openbot-tracking-tight);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-md);
+  white-space: nowrap;
 }
 
-.settings-modal-description {
-  margin: var(--openbot-space-1) 0 0;
+.settings-page-path .settings-page-path-parent {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-inline: calc(-1 * var(--openbot-space-2) - 1px) calc(-1 * var(--openbot-space-1));
+  overflow: hidden;
+  border-color: transparent;
+  background: transparent;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-md);
-  line-height: var(--openbot-leading-md);
+  font-weight: var(--openbot-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-page-path .settings-page-path-parent:focus-visible {
+  border-color: var(--openbot-border);
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-primary);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .settings-page-path .settings-page-path-parent:hover:not(:disabled) {
+    border-color: var(--openbot-border);
+    background: var(--openbot-bg-control);
+    color: var(--openbot-text-primary);
+  }
+}
+
+.settings-page-path-separator {
+  flex: 0 0 auto;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  color: var(--openbot-text-muted);
+}
+
+/* The separator points to the reading direction. */
+.settings-page-path-separator:dir(rtl) {
+  transform: scaleX(-1);
+}
+
+.settings-page-path-current {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font: inherit;
+  text-overflow: ellipsis;
+}
+
+/* The top row has no room for the description of the section, so only screen readers read it. */
+.settings-page-description {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .settings-modal-scroll-frame {
@@ -168,8 +238,8 @@
   gap: var(--openbot-space-6);
   overflow-y: auto;
   /*
-   * The inline padding stays a plain token so the panel text keeps the same left edge as the header
-   * title. A gutter subtracted from the padding only lines up when the platform draws a classic
+   * The inline padding stays a plain token so the panel text keeps the same left edge as the section
+   * title above the panel, when the window does not put that title in its top row. A gutter subtracted from the padding only lines up when the platform draws a classic
    * scrollbar; with overlay scrollbars it moved the whole panel inward.
    */
   padding: 0 var(--openbot-space-6) calc(var(--openbot-space-6) + var(--settings-modal-floating-space, 0px));
@@ -330,22 +400,6 @@
   background: var(--openbot-bg-control-hover);
   color: var(--openbot-text-primary);
   font-weight: var(--openbot-weight-medium);
-}
-
-:is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-header {
-  align-items: center;
-  padding-block: var(--openbot-space-4) var(--openbot-space-6);
-  padding-inline: var(--openbot-space-8) var(--openbot-space-4);
-}
-
-:is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-description {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  clip-path: inset(50%);
-  white-space: nowrap;
 }
 
 :is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-content {
@@ -706,10 +760,6 @@
     flex: 0 0 auto;
   }
 
-  .settings-modal-header {
-    padding: var(--openbot-space-4);
-  }
-
   .settings-modal-content {
     gap: var(--openbot-space-4);
     padding: 0 var(--openbot-space-4) calc(var(--openbot-space-4) + var(--settings-modal-floating-space, 0px));
@@ -720,10 +770,6 @@
     height: calc(100dvh - 24px);
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
-  }
-
-  :is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-header {
-    padding: var(--openbot-space-4);
   }
 
   :is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-content,
@@ -834,4 +880,12 @@
 /* Back and Continue of the phone dialog follow the reading direction. */
 .settings-mobile-dialog-footer svg:is([class~="lucide-arrow-left"], [class~="lucide-arrow-right"]):dir(rtl) {
   transform: scaleX(-1);
+}
+
+/*
+ * The title of a settings page is in the top row of the window, so the panel itself keeps the space
+ * above its first row. The rule is last because it must outweigh every padding rule of the panel above.
+ */
+.settings-modal-page > .settings-modal-main > .settings-modal-scroll-frame > .settings-modal-content {
+  padding-top: var(--openbot-space-6);
 }

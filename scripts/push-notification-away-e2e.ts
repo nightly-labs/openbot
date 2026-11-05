@@ -121,6 +121,9 @@ const agents = {
   off: (_name: "event", listener: (event: AgentEvent) => void) => events.off("event", listener),
   listAgents: () => [agentSummary(AGENT_A), agentSummary(AGENT_B)],
   readConversationPageFor: () => Effect.die(new Error("Previews are off in this check.")),
+  readTask: () => {
+    throw new Error("Previews are off in this check.");
+  },
   getRuntimeSnapshot: snapshot,
   listConversationReads: reads,
 };

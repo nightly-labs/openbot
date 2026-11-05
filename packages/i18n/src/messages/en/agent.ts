@@ -76,4 +76,11 @@ export const messages = defineMessages("agent", {
   "agent.color.indigo": "Indigo",
   "agent.color.violet": "Violet",
   "agent.color.magenta": "Magenta",
+  "agent.color.grey": "Gray",
+  "agent.color.pink": "Pink",
+  "agent.color.sky": "Sky blue",
+  "agent.color.navy": "Navy",
+  "agent.color.wine": "Wine",
+  "agent.color.brown": "Brown",
+  "agent.color.sand": "Sand",
 });

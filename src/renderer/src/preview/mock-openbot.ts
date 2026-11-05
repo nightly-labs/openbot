@@ -55,7 +55,9 @@ import {
   agentTaskLimit,
   type BackgroundProcess,
   type BrowserProfileSummary,
+  type BrowserProxySummary,
   type BusyMessageModePreference,
+  browserProxyAddressText,
   type CentralAuthState,
   type ClientAgentModelOption,
   type ClientAgentSummary,
@@ -125,6 +127,7 @@ import {
   type ProviderDetectionSettings,
   type ProviderModelVisibility,
   parseAgentAccessChange,
+  parseBrowserProxyAddress,
   parseProviderModelVisibilityChange,
   type QueueDelivery,
   type QueuedMessageReceipt,
@@ -210,6 +213,7 @@ import { createMockLicense } from "./mock-license";
 import { createMockLinkAccount } from "./mock-link-account";
 import { createMockMessaging } from "./mock-messaging";
 import { createMockOnePasswordConnector } from "./mock-onepassword-connector";
+import { createMockPasswordManagers } from "./mock-password-managers";
 import { createMockProviderRuntimes, type MockProviderRuntimeOptions } from "./mock-provider-runtimes";
 import { mockRoutineCalendar } from "./mock-routine-calendar";
 import { createMockRoutineFeed } from "./mock-routine-feed";
@@ -250,6 +254,8 @@ export interface MockOpenBotOptions
   tasks?: Record<string, AgentTask[]>;
   /** The conversation of each task, keyed by task id. */
   taskConversations?: Record<string, ConversationSnapshot>;
+  /** The agent messages of each task that the user has not read, keyed by task id. A task without one is read. */
+  taskUnread?: Record<string, number>;
   updateStatus?: UpdateStatus;
   memories?: Record<string, AgentMemory[]>;
   tables?: SharedTable[];
@@ -323,14 +329,19 @@ function mockTurnTrace(turnId: string, endedAt: Date): ConversationTurnTrace {
 
 /** Custom models compose as `<provider>/<model>`; preview builds `listModels()` from these. */
 function mockCustomProviderModels(provider: CustomProviderSummary): ClientAgentModelOption[] {
-  return provider.models.map((model) => ({
-    provider: provider.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
-    id: composedCustomModelId(provider.id, model.id),
-    name: `${provider.name}/${model.name}`,
-    description: `Served by ${provider.baseUrl}.`,
-    defaultReasoningEffort: "medium",
-    supportedReasoningEfforts: ["low", "medium", "high"],
-  }));
+  const harness = provider.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS;
+  return provider.models.map((model) => {
+    // As the harnesses do: saved efforts replace OpenCode's Low, Medium and High, and Pi has none without them.
+    const efforts = model.reasoningEfforts ?? (harness === "pi" ? [] : (["low", "medium", "high"] as const));
+    return {
+      provider: harness,
+      id: composedCustomModelId(provider.id, model.id),
+      name: `${provider.name}/${model.name}`,
+      description: `Served by ${provider.baseUrl}.`,
+      defaultReasoningEffort: efforts.includes("medium") ? "medium" : (efforts[0] ?? "medium"),
+      supportedReasoningEfforts: [...efforts],
+    };
+  });
 }
 
 export interface MockOpenBotControls {
@@ -551,6 +562,24 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       browserProfiles.some((profile) => profile.id !== profileId && profile.name.toLowerCase() === name.toLowerCase())
     )
       throw new Error(sourceText("error.backend.browserProfileNameTaken"));
+  };
+  // One saved proxy that "Client A" uses, so the menu shows a choice.
+  let browserProxies: BrowserProxySummary[] = [
+    {
+      id: "1b2c3d4e5f60718293a4b5c6d7e8f90a",
+      scheme: "socks5",
+      host: "proxy.example.net",
+      port: 1080,
+      username: null,
+      hasPassword: false,
+      profileIds: ["0a1b2c3d4e5f60718293a4b5c6d7e8f9"],
+      failure: null,
+    },
+  ];
+  const requireBrowserProxy = (proxyId: string) => {
+    const proxy = browserProxies.find((candidate) => candidate.id === proxyId);
+    if (!proxy) throw new Error(sourceText("error.backend.browserProxyNotFound"));
+    return proxy;
   };
   const sessionSettings = new Map<string, AgentSessionSettings>();
   function previewSessionSettings(agentId: string): AgentSessionSettings {
@@ -842,6 +871,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const taskConversations = new Map<string, ConversationSnapshot>(
     Object.entries(clone(options.taskConversations ?? {})),
   );
+  const taskUnread = new Map<string, number>(Object.entries(options.taskUnread ?? {}));
   /** The branch of each `branchTask` request id, so a retry returns the same branch. */
   const branches = new Map<string, AgentTask>();
 
@@ -921,6 +951,27 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       closedAt: null,
     };
     tasks.set(agentId, [task, ...(tasks.get(agentId) ?? [])]);
+    return task;
+  }
+
+  /** The side thread where a routine runs, made on its first run, as the host does. */
+  function routineTask(agentId: string, routine: { id: string; name: string }): AgentTask {
+    const listed = tasks.get(agentId) ?? [];
+    const existing = listed.find((task) => task.routineId === routine.id);
+    if (existing && !existing.closedAt) return existing;
+    const now = new Date().toISOString();
+    if (existing) {
+      Object.assign(existing, { state: "idle", closedAt: null, updatedAt: now });
+      emitTasks(agentId);
+      return existing;
+    }
+    const task: AgentTask = {
+      ...createTask(agentId, routine.name),
+      origin: "agent",
+      routineId: routine.id,
+    };
+    tasks.set(agentId, [task, ...listed]);
+    emitTasks(agentId);
     return task;
   }
 
@@ -1071,6 +1122,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     schedule: RoutineSchedule;
     limitPolicy?: Routine["limitPolicy"];
     missedPolicy?: Routine["missedPolicy"];
+    runIn?: Routine["runIn"];
   }): Routine {
     const now = new Date().toISOString();
     const routineId = crypto.randomUUID();
@@ -1083,6 +1135,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       timezone: input.timezone,
       limitPolicy: input.limitPolicy ?? "wait",
       missedPolicy: input.missedPolicy ?? "skip",
+      runIn: input.runIn ?? "chat",
       trigger: {
         id: crypto.randomUUID(),
         routineId,
@@ -1131,6 +1184,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       return clone(analyticsPreference);
     },
     onAnalyticsPreference: () => () => undefined,
+    reportRendererTiming: async () => undefined,
     getApprovalAutomation: async () => clone(approvalAutomation),
     onApprovalAutomation: (listener) => {
       approvalAutomationListeners.add(listener);
@@ -1290,6 +1344,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       onHighlightPlacement: () => () => undefined,
     },
     openExternal: async () => undefined,
+    // A preview user who has used OpenBot for a while, so the social toast can show.
+    getSentMessageStats: async () => ({ firstSentAt: "2026-10-01T09:00:00.000Z", sentCount: 40 }),
     connectProvider: async () => clone(agentStatus),
     connectProviderInMainlandChina: async () => clone(agentStatus),
     updateProviderCli: async () => clone(agentStatus),
@@ -1499,6 +1555,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     linkAccount: createMockLinkAccount(),
     onePasswordConnector: createMockOnePasswordConnector(),
     bitwardenConnector: createMockBitwardenConnector(),
+    passwordManagers: createMockPasswordManagers(),
     vault: createMockVault(),
     billing: createMockBilling(billingPlans),
     license: createMockLicense(),
@@ -1685,6 +1742,15 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       removeAccount: async (input) => {
         await api.removeProviderAccount(input);
+      },
+      // The preview host's default is the one of this computer.
+      hostDefaultProvider: async () => ({
+        preferredProvider: setupState.preferredProvider,
+        preferredModel: setupState.preferredModel,
+      }),
+      setHostDefaultProvider: async (input) => {
+        const { preferredProvider, preferredModel } = await api.saveSetup(input);
+        return { preferredProvider, preferredModel };
       },
       usageResets: (provider) => api.providerUsageResets(provider),
       resetUsage: (input) => api.resetProviderUsage(input),
@@ -2155,6 +2221,57 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         emitAgentEvent({ type: "browser-profiles-changed" });
         return api.agent.getAgentBrowserProfile(agentId);
       },
+      // The preview has no joined server, so no member shares a computer with it.
+      listBrowserProxies: async () => ({ proxies: browserProxies, computers: [] }),
+      getBrowserComputerSharing: async () => null,
+      setBrowserComputerSharing: async () => {
+        throw new Error(sourceText("error.team.agentSettingsUnsupported"));
+      },
+      saveBrowserProxy: async ({ proxyId, previousAddress, keepPassword, address }) => {
+        const parsed = parseBrowserProxyAddress(address);
+        if (parsed === null) throw new Error(sourceText("error.backend.browserProxyAddressInvalid"));
+        const { scheme, host, port, username, password } = parsed;
+        const existing = proxyId === undefined ? undefined : requireBrowserProxy(proxyId);
+        if (existing && browserProxyAddressText(existing) !== previousAddress)
+          throw new Error(sourceText("error.backend.browserProxyChanged"));
+        const saved: BrowserProxySummary = {
+          id: existing?.id ?? crypto.randomUUID().replaceAll("-", ""),
+          scheme,
+          host,
+          port,
+          username,
+          hasPassword: password !== null || (existing?.hasPassword === true && keepPassword === true),
+          profileIds: existing?.profileIds ?? [],
+          failure: null,
+        };
+        browserProxies = existing
+          ? browserProxies.map((proxy) => (proxy.id === saved.id ? saved : proxy))
+          : [...browserProxies, saved];
+        emitAgentEvent({ type: "browser-profiles-changed" });
+        return saved;
+      },
+      deleteBrowserProxy: async ({ proxyId, profileIds }) => {
+        const existing = requireBrowserProxy(proxyId);
+        if (
+          existing.profileIds.length !== profileIds.length ||
+          existing.profileIds.some((id) => !profileIds.includes(id))
+        )
+          throw new Error(sourceText("error.backend.browserProxyChanged"));
+        browserProxies = browserProxies.filter((proxy) => proxy.id !== proxyId);
+        emitAgentEvent({ type: "browser-profiles-changed" });
+      },
+      setBrowserProfileProxy: async ({ profileId, proxyId }) => {
+        requireBrowserProfile(profileId);
+        if (proxyId !== null) requireBrowserProxy(proxyId);
+        browserProxies = browserProxies.map((proxy) => ({
+          ...proxy,
+          profileIds: [
+            ...proxy.profileIds.filter((id) => id !== profileId),
+            ...(proxy.id === proxyId ? [profileId] : []),
+          ],
+        }));
+        emitAgentEvent({ type: "browser-profiles-changed" });
+      },
       listBrowserTabProfiles: async () => [],
       updateAgentAdminSettings: async ({ agentId, access, autoApprove }) => {
         const agent = agents.find((candidate) => candidate.id === agentId);
@@ -2406,6 +2523,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           allowAutomation,
           allowNewChat,
           quickAcknowledgement,
+          chatColor,
           ...updates
         } = input;
         const updated: ClientAgentSummary = { ...current, ...updates };
@@ -2425,6 +2543,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         else if (busyMessageMode) updated.busyMessageMode = busyMessageMode;
         if (taskLimit === null) delete updated.taskLimit;
         else if (taskLimit) updated.taskLimit = taskLimit;
+        if (chatColor === null) delete updated.chatColor;
+        else if (chatColor) updated.chatColor = chatColor;
         agents = agents.map((agent) => (agent.id === updated.id ? updated : agent));
         emitAgentEvent({ type: "agents-changed", agents });
         emitTasks(updated.id);
@@ -2563,6 +2683,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           ...(input.active === undefined ? {} : { active: input.active }),
           ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
           ...(input.missedPolicy === undefined ? {} : { missedPolicy: input.missedPolicy }),
+          ...(input.runIn === undefined ? {} : { runIn: input.runIn }),
           ...(input.schedule === undefined
             ? {}
             : {
@@ -2589,6 +2710,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           input.agentId,
           (routines.get(input.agentId) ?? []).filter((routine) => routine.id !== input.routineId),
         );
+        const thread = tasks.get(input.agentId)?.find((task) => task.routineId === input.routineId);
+        if (thread && !thread.closedAt) {
+          Object.assign(thread, { state: "closed", closedAt: new Date().toISOString() });
+          emitTasks(input.agentId);
+        }
         emitAgentEvent({ type: "routines-changed", agentId: input.agentId });
       },
       testRoutine: async (input) => {
@@ -2611,6 +2737,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           updatedAt: now,
         };
         routineRuns.set(routine.id, [run, ...(routineRuns.get(routine.id) ?? [])]);
+        routineTask(input.agentId, routine);
         emitAgentEvent({ type: "routines-changed", agentId: input.agentId });
         return clone(run);
       },
@@ -2690,6 +2817,23 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         conversationReads.set(input.agentId, { unreadCount: 0, firstUnreadMessageId: null, throughMessageId });
         emitAgentEvent({ type: "conversation-invalidated", agentId: input.agentId, revision });
         return clone(conversationReadState(input.agentId));
+      },
+      deleteConversationMessage: async (input) => {
+        if (input.taskId !== undefined) {
+          const task = findTask(input.agentId, input.taskId);
+          const conversation = taskConversation(task);
+          if (!conversation.messages.some((message) => message.id === input.messageId))
+            throw new Error(sourceText("error.backend.messageDeleteNotFound"));
+          conversation.messages = conversation.messages.filter((message) => message.id !== input.messageId);
+          conversation.revision += 1;
+          emitAgentEvent({ type: "agent-task-conversation", taskId: task.id, snapshot: clone(conversation) });
+          return;
+        }
+        if (!getSnapshot(input.agentId).messages.some((message) => message.id === input.messageId))
+          throw new Error(sourceText("error.backend.messageDeleteNotFound"));
+        updateSnapshot(input.agentId, (snapshot) => {
+          snapshot.messages = snapshot.messages.filter((message) => message.id !== input.messageId);
+        });
       },
       chooseAttachments: async (_input) => [],
       importAttachmentData: async (data) =>
@@ -3011,8 +3155,18 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         taskConversations.delete(input.taskId);
         emitTasks(input.agentId);
       },
+      listTaskReads: async (agentId) =>
+        (tasks.get(agentId) ?? [])
+          .filter((task) => task.state !== "closed")
+          .map((task) => ({
+            taskId: task.id,
+            unreadCount: taskUnread.get(task.id) ?? 0,
+            firstUnreadMessageId: null,
+            throughMessageId: null,
+          })),
       markTaskRead: async (input) => {
         findTask(input.agentId, input.taskId);
+        taskUnread.delete(input.taskId);
         return {
           taskId: input.taskId,
           unreadCount: 0,

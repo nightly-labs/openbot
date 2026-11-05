@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "O banco de dados do OpenBot falhou na verificação de integridade.",
   "error.backend.webhookRouteLimit": "Um computador anfitrião pode ter no máximo {limit} rotinas de webhook.",
   "error.backend.webhookSettingsInvalid": "Verifique as configurações do webhook e tente de novo.",
+  "error.backend.webhookSenderSecretInvalid":
+    "Cole o segredo de assinatura completo do remetente. Ele tem de 16 a 1024 caracteres e nenhum espaço.",
   "error.backend.webhookRouteUnavailable":
     "A rota pública do webhook não está pronta. Verifique a conexão do computador anfitrião e tente de novo.",
   "error.backend.browserViewRemoteOnly":
@@ -208,6 +210,11 @@ export const messages = {
   "error.backend.agentWaitRemoteUnsupported": "As esperas abertas só estão disponíveis para agentes neste computador.",
   "error.backend.markUnreadRemoteUnsupported":
     "Marcar uma mensagem como não lida só está disponível para agentes neste computador.",
+  "error.backend.messageDeleteUnsupported": "Este servidor não permite excluir mensagens.",
+  "error.backend.messageDeleteNotFound": "Esta mensagem não está no chat.",
+  "error.backend.messageDeleteBusy":
+    "Esta mensagem faz parte de um turno em andamento. Exclua-a quando o turno terminar.",
+  "error.backend.messageDeleteForbidden": "Você só pode excluir as mensagens que enviou.",
   "error.backend.routineFlowHandoffFailed": "A rotina não conseguiu passar o trabalho para este agente.",
   "error.backend.mcpServerLimit": "O OpenBot mantém até {limit} servidores MCP.",
   "error.backend.mcpServerNameTaken": "Já existe um servidor MCP chamado {name}.",
@@ -308,6 +315,17 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "Já existe um perfil de navegador com este nome.",
   "error.backend.browserSessionInUse": "Uma aba ainda usa esta sessão do navegador. Tente novamente.",
   "error.backend.browserProfileLimit": "Você pode ter até {limit} perfis de navegador.",
+  "error.backend.browserProxyNotFound": "Este proxy não existe mais.",
+  "error.backend.browserProxyAddressInvalid":
+    "Digite um endereço de proxy, como socks5://host:1080 ou http://user:password@host:3128.",
+  "error.backend.browserProxyLimit": "Você pode ter até {limit} proxies.",
+  "error.backend.browserProxyTaken": "Já existe um proxy com este endereço.",
+  "error.backend.browserProxyChanged":
+    "Este proxy mudou depois que você o abriu. Verifique-o novamente e tente de novo.",
+  "error.backend.browserProxyUnreachable": "O proxy {name} não responde, por isso a página não abriu.",
+  "error.backend.browserProxySignInRefused": "O proxy {name} recusou o início de sessão, por isso a página não abriu.",
+  "error.backend.browserProxyComputerUnreachable":
+    "O computador que este perfil usa não responde, por isso a página não abriu.",
   "error.backend.browserLowMemory":
     "Este servidor está com pouca memória, por isso o navegador não pode abrir outra aba. Feche uma aba ou aguarde os outros agentes terminarem.",
   "error.backend.browserOpenFailed": "Não foi possível abrir {url}: {reason}",

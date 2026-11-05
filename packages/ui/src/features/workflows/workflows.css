@@ -52,14 +52,6 @@
   position: relative;
 }
 
-/* On a screen with one device pixel for each CSS pixel, a line of 1.5 in a 24px icon that shows at 14px or 16px is
- * thinner than a pixel, so it shows faint and soft. A line of 2 fills whole pixels. */
-@media (max-resolution: 1.5dppx) {
-  .wfn-stage {
-    --openbot-icon-stroke: 2;
-  }
-}
-
 /* --------------------------------------------------------------- Canvas */
 
 .wfn-stage.wfn-canvas {
@@ -221,17 +213,6 @@
 .wfn-stage .wfn-hud .wfn-hud-tool[aria-pressed="true"] {
   background: var(--wfn-hover);
   color: var(--openbot-text-primary);
-}
-
-/* The icon of a pressed tool is full. Most icons have lines inside, which a full fill hides, so they take a part fill.
- * The Select arrow is one closed shape, so it fills whole. */
-.wfn-stage .wfn-hud .wfn-hud-tool[aria-pressed="true"] svg.lucide {
-  fill: currentcolor;
-  fill-opacity: 0.35;
-}
-
-.wfn-stage .wfn-hud .wfn-hud-tool[aria-pressed="true"] svg.wfn-hud-arrow {
-  fill-opacity: 1;
 }
 
 .wfn-stage .wfn-hud .wfn-hud-tool svg {
@@ -518,11 +499,13 @@
 .wfn-stage .wfn-hud-tools .wfn-hud-tool svg {
   width: var(--openbot-icon-lg);
   height: var(--openbot-icon-lg);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .wfn-stage .wfn-hud-tools .wfn-hud-add-button svg {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 /*
@@ -1364,11 +1347,6 @@
 .wfs-menu .ui-menu-trailing {
   flex: none;
   font-variant-numeric: tabular-nums;
-}
-
-/* The history clock has no closed shape, so it stays an outline on the highlighted row. */
-.wfs-menu.ui-action-menu [class~="lucide-rotate-ccw-clock"] > * {
-  fill: none;
 }
 
 /* Back to the live canvas follows the reading direction. */

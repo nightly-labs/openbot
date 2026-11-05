@@ -25,6 +25,7 @@ import { usePlatform } from "../../platform";
 import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
 import { useTurns } from "../../turns";
+import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { useAgentReadTracking } from "../agents/agent-read-tracking";
 import { appendLatestRuntimeMessages, attentionKey } from "../agents/agent-runtime-snapshot";
 import { useAgents } from "../agents/agents-context";
@@ -53,6 +54,7 @@ import {
 import type { SendMessageResult } from "./conversation-types";
 import { useDirectMessages } from "./direct-messages-context";
 import { noteAgentMessageSent } from "./github-star-prompt";
+import { noteSocialFollowMessageSent } from "./social-follow-prompt";
 
 const LATEST_PAGE_SIZE = 50;
 /**
@@ -116,6 +118,7 @@ const Conversation = createSimpleContext({
     const { activeServerId, activeServer } = useServers();
     const { agentChatsToMarkRead, agentChatsToRetryRead, autoReadAgentMessages } = useAgentReadTracking();
     const scopeIsCurrent = createScopeGuard();
+    const agentTasks = useAgentTasks();
     const { activeDirectMemberId } = useDirectMessages();
     const channels = useChannels();
     const {
@@ -160,6 +163,12 @@ const Conversation = createSimpleContext({
         Object.entries(conversations).map(([id, conversation]) => [id, conversation.read?.unreadCount ?? 0]),
       ),
     );
+    /** The unread replies of each agent's own chat and of its open side threads. */
+    const agentUnreadReplies = createMemo(() => {
+      const counts = { ...unreadReplies() };
+      for (const [id, count] of Object.entries(agentTasks.unreadTotals())) counts[id] = (counts[id] ?? 0) + count;
+      return counts;
+    });
     const recentReplies = createMemo(() =>
       Object.fromEntries(
         Object.entries(conversations).map(([id, conversation]) => [id, conversation.recentReply === true]),
@@ -284,11 +293,12 @@ const Conversation = createSimpleContext({
         const currentMessages = Object.fromEntries(
           Object.entries(current).map(([id, conversation]) => [id, conversation.messages]),
         );
+        const next = appendLatestRuntimeMessages(currentMessages, messages);
         for (const message of messages) {
           if (currentMessages[message.agentId]?.some((candidate) => candidate.id === message.id)) continue;
+          if (!next[message.agentId]?.some((candidate) => candidate.id === message.id)) continue;
           rawAgentMessageBodies.set(agentMessageKey(message.agentId, message.id), "");
         }
-        const next = appendLatestRuntimeMessages(currentMessages, messages);
         for (const agentId of agentIds) {
           current[agentId] ??= { messages: [] };
           current[agentId].messages = next[agentId] ?? [];
@@ -660,7 +670,14 @@ const Conversation = createSimpleContext({
             updateStored(stored, stored.animate === undefined ? message : { ...message, animate: stored.animate });
           return stored;
         });
-        conversation.messages = mergeConversationPage(currentMessages, pageMessages, merge);
+        // A delta that came before this page can show a commentary item as its own message. The page
+        // groups that item under its turn's thinking message, so the loaded copy goes.
+        const pageItemIds = new Set(page.messages.map((message) => message.id));
+        conversation.messages = mergeConversationPage(
+          currentMessages.filter((message) => !pageItemIds.has(message.id)),
+          pageMessages,
+          merge,
+        );
         conversation.references = {
           ...(merge === "replace" ? {} : conversation.references),
           ...Object.fromEntries(
@@ -853,6 +870,7 @@ const Conversation = createSimpleContext({
           delivery_count: receipt.deliveries.length,
         });
         noteAgentMessageSent();
+        noteSocialFollowMessageSent();
         const messageId = receipt.deliveries[0]?.id ?? receipt.messageId;
         // The pending message does not wait for read state: it is the user's own message.
         markAgentMessagesRead(agentId, messageId, serverId).catch((error: unknown) => {
@@ -886,8 +904,10 @@ const Conversation = createSimpleContext({
       heldUnreadAgentChats.delete(requestKey);
       const conversationAtStart = conversations[agentId];
       const visibleMessageIdAtStart = latestVisibleAgentMessageId(conversations[agentId]?.messages);
+      // The same boundary as an automatic read. A chat with no message the host counts reads through its newest message.
       const boundary =
         throughMessageId ??
+        visibleMessageIdAtStart ??
         conversations[agentId]?.messages
           ?.filter((message) => !message.id.startsWith("thinking:") && !message.id.startsWith("ui-"))
           .at(-1)?.id ??
@@ -977,6 +997,33 @@ const Conversation = createSimpleContext({
       }
     }
 
+    /**
+     * Deletes a message of an agent's chat, or of one of its side threads with `taskId`. The host
+     * publishes the change, but a merge of the latest page keeps the loaded messages that the page
+     * does not hold, so the chat removes the message itself. A reply that quotes it shows the original
+     * as deleted. A failure throws to the dialog that asked.
+     */
+    async function deleteAgentMessage(
+      agentId: string,
+      messageId: string,
+      taskId?: string,
+      serverId = activeServerId(),
+    ): Promise<void> {
+      await conversationPort().agent.deleteConversationMessage(
+        taskId === undefined ? { agentId, messageId } : { agentId, messageId, taskId },
+        serverId,
+      );
+      if (taskId !== undefined || !scopeIsCurrent() || !conversations[agentId]) return;
+      rawAgentMessageBodies.delete(agentMessageKey(agentId, messageId));
+      updateConversation(agentId, (conversation) => {
+        conversation.messages = conversation.messages.filter((message) => message.id !== messageId);
+        conversation.references = Object.fromEntries(
+          Object.entries(conversation.references ?? {}).filter(([id]) => id !== messageId),
+        );
+        conversation.missingReferences = { ...conversation.missingReferences, [messageId]: true };
+      });
+    }
+
     /** Marks each unread agent chat read through its newest message, which may not be loaded yet. */
     async function markAllAgentMessagesRead(): Promise<void> {
       const serverId = activeServerId();
@@ -1033,6 +1080,7 @@ const Conversation = createSimpleContext({
       conversations,
       retryConversation: () => setAgentChatOpenRevision((current) => current + 1),
       unreadReplies,
+      agentUnreadReplies,
       recentReplies,
       activeMessages,
       agentChatsToRetryRead,
@@ -1058,6 +1106,7 @@ const Conversation = createSimpleContext({
       sendMessage,
       markAgentMessagesRead,
       markAgentMessagesUnread,
+      deleteAgentMessage,
       markAllAgentMessagesRead,
       presentPromptResolution,
       // See `AppProviders`: a chat window sends no typing state.

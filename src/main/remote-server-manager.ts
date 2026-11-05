@@ -40,6 +40,8 @@ import type {
   SendDirectMessageInput,
   ServerNotificationLevel,
   ServerSummary,
+  SetAgentChatColorInput,
+  SetAgentColorInput,
   SetAgentNotificationLevelInput,
   SetTeamTypingInput,
   TeamInviteSummary,
@@ -51,6 +53,8 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   type AgentNotificationLevelsSnapshot,
+  type BrowserComputerSharing,
+  decodeBrowserProxyComputer,
   decodeRemoteAgentImportPreview,
   decodeRemoteInstanceTransferPreview,
   EMPTY_AGENT_NOTIFICATION_LEVELS,
@@ -60,12 +64,16 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_COLORS_CAPABILITY, AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/agent-import-v1";
 import {
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import { BROWSER_EGRESS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-egress-v1";
+import { BROWSER_PROXIES_ROUTES } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { decodeBrowserViewSessionResponse } from "@openbot/contracts/team-protocol/browser-view-v1";
+import { CHAT_COLORS_CAPABILITY, CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import {
   COMPUTER_ACTIVITY_CAPABILITY,
   COMPUTER_ACTIVITY_ROUTES,
@@ -97,6 +105,8 @@ import {
   decodeAgentSummary,
   decodeDraftAttachment,
   decodeDuplicateAgentResultFromHost,
+  decodeRemoteAgentColors,
+  decodeRemoteChatColors,
 } from "./remote-agent-decoding";
 import { AttachmentDownloadStopped, type RemoteAttachment, RemoteAttachmentCache } from "./remote-attachment-cache";
 import type { RemoteConnectTrace } from "./remote-connect-trace";
@@ -302,6 +312,10 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   #keyChangedAt = new Map<string, number>();
   /** The local servers that this app runs as its child processes. See `local-servers/`. */
   #thisComputerServers: ReadonlySet<string> = new Set();
+  /** The servers on this computer that are registered for the signed-in account. */
+  #registeredThisComputerServers: ReadonlySet<string> = new Set();
+  /** Gives a server on this computer its new members after a change here. */
+  #thisComputerMembersChanged: (serverId: string) => void = () => undefined;
   readonly #hostedServers: HostedServerWakeHooks | null;
   /** When each hosted server that starts after a wake request started. */
   readonly #hostedStartAt = new Map<string, number>();
@@ -404,6 +418,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#refresh = new RemoteEventRefresh({
       request: (serverId, path, decoder, init) => this.#client.request(serverId, path, decoder, init),
       hasServer: (serverId) => this.#store.has(serverId),
+      onMemberChatColors: (serverId) => {
+        if (this.#presence.has(serverId)) this.emit("presence", serverId, this.getPresence(serverId));
+      },
       emit: (serverId, event, bufferedLive) => {
         // Another device of the user changed their levels: the server list shows the new server level.
         if (event.type === "agent-notification-levels-changed")
@@ -414,12 +431,15 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     });
     this.#presence = new RemotePresenceCache({
       fetchSnapshot: (serverId) => this.request(serverId, TEAM_API_ROUTES.team.presence, decodeTeamPresenceSnapshot),
-      onSnapshot: (serverId, snapshot) => this.emit("presence", serverId, snapshot),
+      onSnapshot: (serverId, snapshot) =>
+        this.emit("presence", serverId, this.#withMemberChatColors(serverId, snapshot)),
     });
     this.#team = new RemoteTeamDirectory({
       servers: this.#store,
       request: (serverId, path, decoder, init) => this.#client.request(serverId, path, decoder, init),
       transport: this.#webrtcTransport,
+      isRegisteredThisComputer: (serverId) => this.#registeredThisComputerServers.has(serverId),
+      allowLocalDevelopmentApiUrl: this.#allowLocalDevelopmentInvites,
       sendInviteEmail: (input) => {
         if (!this.#centralAccount.sendTeamInviteEmail)
           throw new Error(sourceText("error.remote.emailDeliveryUnavailable"));
@@ -728,6 +748,71 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     return snapshot;
   }).bind(this);
 
+  /**
+   * The agents with the last colours and chat colours of the server. A server without `agent-colors-v1`
+   * or `chat-colors-v1` has none.
+   */
+  withAgentColors(serverId: string, agents: ClientAgentSummary[]): ClientAgentSummary[] {
+    return this.#refresh.withAgentColors(serverId, agents);
+  }
+
+  /** One agent with the last colour and chat colour of the server. */
+  agentWithColor(serverId: string, agent: ClientAgentSummary): ClientAgentSummary {
+    return this.#refresh.agentWithColor(serverId, agent);
+  }
+
+  /** Reads the colours of a server with `agent-colors-v1`. A server without it has none to read. */
+  readonly readAgentColors = Effect.fn("RemoteManager.readAgentColors")(function* (
+    this: RemoteServerManager,
+    serverId: string,
+  ) {
+    if (!this.supportsCapability(serverId, AGENT_COLORS_CAPABILITY)) return;
+    const colors = yield* this.request(serverId, AGENT_COLORS_ROUTES.read, decodeRemoteAgentColors, {
+      method: "POST",
+      body: {},
+    });
+    this.#refresh.rememberAgentColors(serverId, colors);
+  }).bind(this);
+
+  /** Sets or removes the colour of one agent. The caller checks `agent-colors-v1` first. */
+  readonly setAgentColor = Effect.fn("RemoteManager.setAgentColor")(function* (
+    this: RemoteServerManager,
+    serverId: string,
+    input: SetAgentColorInput,
+  ) {
+    const colors = yield* this.request(serverId, AGENT_COLORS_ROUTES.set, decodeRemoteAgentColors, {
+      method: "POST",
+      body: { agentId: input.agentId, color: input.color },
+    });
+    this.#refresh.rememberAgentColors(serverId, colors);
+  }).bind(this);
+
+  /** Reads the chat colours of a server with `chat-colors-v1`. A server without it has none to read. */
+  readonly readChatColors = Effect.fn("RemoteManager.readChatColors")(function* (
+    this: RemoteServerManager,
+    serverId: string,
+  ) {
+    if (!this.supportsCapability(serverId, CHAT_COLORS_CAPABILITY)) return;
+    const colors = yield* this.request(serverId, CHAT_COLORS_ROUTES.read, decodeRemoteChatColors, {
+      method: "POST",
+      body: {},
+    });
+    this.#refresh.rememberChatColors(serverId, colors);
+  }).bind(this);
+
+  /** Sets or removes the chat colour of one agent. The caller checks `chat-colors-v1` first. */
+  readonly setAgentChatColor = Effect.fn("RemoteManager.setAgentChatColor")(function* (
+    this: RemoteServerManager,
+    serverId: string,
+    input: SetAgentChatColorInput,
+  ) {
+    const colors = yield* this.request(serverId, CHAT_COLORS_ROUTES.set, decodeRemoteChatColors, {
+      method: "POST",
+      body: { agentId: input.agentId, color: input.color },
+    });
+    this.#refresh.rememberChatColors(serverId, colors);
+  }).bind(this);
+
   #levelsUnsupported() {
     return new RemoteWorkflowError({ cause: new Error(sourceText("error.team.agentNotificationLevelsUnsupported")) });
   }
@@ -799,6 +884,45 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean {
     return this.#connections.compatibilityFor(serverId)?.capabilities.includes(capability) ?? false;
   }
+
+  /**
+   * Whether this computer shares its connection with a joined server (`browser-egress-v1`). Null when
+   * it cannot: this computer's own server, a server over HTTPS, or a host without the capability.
+   */
+  browserComputerSharing(serverId: string): BrowserComputerSharing | null {
+    if (serverId === LOCAL_SERVER_ID || this.#store.find(serverId)?.transport !== "webrtc-v2") return null;
+    if (!this.supportsCapability(serverId, BROWSER_EGRESS_CAPABILITY)) return null;
+    return { sharing: this.#store.sharesBrowserEgress(serverId) };
+  }
+
+  /** Whether the egress channel to a server must be open now: sharing is on and the server is connected. */
+  browserEgressWanted(serverId: string): boolean {
+    return (
+      this.browserComputerSharing(serverId)?.sharing === true && this.#webrtcTransport?.isConnected(serverId) === true
+    );
+  }
+
+  /** Turning sharing on also adds this member's computer to the proxies of the host. */
+  readonly setBrowserComputerSharing = Effect.fn("RemoteManager.setBrowserComputerSharing")(
+    function* (
+      this: RemoteServerManager,
+      serverId: string,
+      sharing: boolean,
+    ): Effect.fn.Return<void, RemoteWorkflowError, RemoteRequest> {
+      if (this.browserComputerSharing(serverId) === null)
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.team.agentSettingsUnsupported")) });
+      if (sharing)
+        yield* RemoteRequest.use((service) =>
+          service.request(serverId, BROWSER_PROXIES_ROUTES.computer, decodeBrowserProxyComputer, {
+            method: "POST",
+            body: {},
+          }),
+        );
+      yield* this.#store.setBrowserEgress(serverId, sharing);
+      this.#emitChanged();
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
 
   readonly startEventConnections = Effect.fn("RemoteManager.startEventConnections")(function* (
     this: RemoteServerManager,
@@ -1068,6 +1192,28 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   setThisComputerServers(serverIds: Iterable<string>): void {
     this.#thisComputerServers = new Set(serverIds);
     this.#emitChanged();
+  }
+
+  /**
+   * Before a server is registered, or while the app is signed out, its members and invitations stay
+   * with the server's own Team API, which lists its owner without an account.
+   */
+  setRegisteredThisComputerServers(serverIds: Iterable<string>): void {
+    this.#registeredThisComputerServers = new Set(serverIds);
+  }
+
+  setThisComputerMembersListener(listener: (serverId: string) => void): void {
+    this.#thisComputerMembersChanged = listener;
+  }
+
+  /**
+   * The child cannot read the account directory, so a change made here must reach it. Also after a
+   * failure: the account service can have changed the member before a later step failed.
+   */
+  #membersChanged(serverId: string): Effect.Effect<void> {
+    return Effect.sync(() => {
+      if (this.#thisComputerServers.has(serverId)) this.#thisComputerMembersChanged(serverId);
+    });
   }
 
   /**
@@ -1686,11 +1832,18 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   }
 
   getPresence(serverId = this.#store.activeServerId): TeamPresenceSnapshot {
-    return this.#presence.get(serverId);
+    return this.#withMemberChatColors(serverId, this.#presence.get(serverId));
   }
 
   getPresenceFor(serverId: string): Effect.Effect<TeamPresenceSnapshot, RemoteWorkflowError> {
-    return this.#owned(this.#presence.refresh(serverId));
+    return this.#owned(this.#presence.refresh(serverId)).pipe(
+      Effect.map((snapshot) => this.#withMemberChatColors(serverId, snapshot)),
+    );
+  }
+
+  /** The presence with the last member chat colours of the server. The released presence has none. */
+  #withMemberChatColors(serverId: string, snapshot: TeamPresenceSnapshot): TeamPresenceSnapshot {
+    return { ...snapshot, members: this.#refresh.withMemberChatColors(serverId, snapshot.members) };
   }
 
   readonly refreshIdentity = Effect.fn("RemoteManager.refreshIdentity")(
@@ -1720,15 +1873,21 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   ).bind(this);
 
   listMembers(serverId: string): Effect.Effect<TeamMemberSummary[], RemoteWorkflowError> {
-    return this.#owned(this.#team.listMembers(serverId));
+    return this.#owned(this.#team.listMembers(serverId)).pipe(
+      Effect.map((members) => this.#refresh.withMemberChatColors(serverId, members)),
+    );
   }
 
   updateMember(serverId: string, input: UpdateTeamMemberInput): Effect.Effect<TeamMemberSummary, RemoteWorkflowError> {
-    return this.#owned(this.#team.updateMember(serverId, input));
+    return this.#owned(
+      this.#team.updateMember(serverId, input).pipe(Effect.ensuring(this.#membersChanged(serverId))),
+    ).pipe(Effect.map((member) => this.#refresh.withMemberChatColors(serverId, [member])[0] ?? member));
   }
 
   removeMember(serverId: string, memberId: string): Effect.Effect<void, RemoteWorkflowError> {
-    return this.#owned(this.#team.removeMember(serverId, memberId));
+    return this.#owned(
+      this.#team.removeMember(serverId, memberId).pipe(Effect.ensuring(this.#membersChanged(serverId))),
+    );
   }
 
   listInvites(serverId: string): Effect.Effect<TeamInviteSummary[], RemoteWorkflowError> {
@@ -2097,7 +2256,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       const value = yield* remoteDecode(() =>
         decodeTeamProtocolV1CurrentHttpResponse(image ? "PUT" : "DELETE", url.pathname, response.status, json),
       );
-      return addRemotePreviewUrls(yield* remoteDecode(() => decodeAgentSummary(value)), server.id);
+      const agent = addRemotePreviewUrls(yield* remoteDecode(() => decodeAgentSummary(value)), server.id);
+      return this.#refresh.agentWithColor(server.id, agent);
     },
     (operation) => this.#owned(operation),
   ).bind(this);

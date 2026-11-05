@@ -102,6 +102,7 @@ export const messages = {
   "error.provider.modelIdDuplicate": "يوجد نموذجان بالمعرّف نفسه.",
   "error.provider.contextWindowInvalid": "يجب أن تكون نافذة سياق النموذج عددًا صحيحًا من الرموز من {min} إلى {max}.",
   "error.provider.maxOutputInvalid": "يجب أن يكون الحد الأقصى لمخرجات النموذج عددًا صحيحًا من الرموز من {min} إلى {max}.",
+  "error.provider.reasoningEffortsInvalid": "مستويات جهد التفكير للنموذج غير صالحة.",
   "error.provider.headersTooMany": "عدد الترويسات كبير جدًا.",
   "error.provider.headerNameCharacter": "يحتوي اسم ترويسة على حرف لا يسمح به HTTP.",
   "error.provider.headerNameTooLong": "اسم الترويسة طويل جدًا.",
@@ -198,6 +199,9 @@ export const messages = {
     "فشل مزوّد النموذج من جهته. اتصالك ليس السبب. أعد المحاولة لاحقًا أو اختر نموذجًا آخر.\n{detail}",
   "error.provider.opencodeNetwork":
     "تعذّر على OpenCode الاتصال بمزوّد النموذج. تحقق من اتصال الشبكة للحاسوب الذي يشغّل OpenBot، ثم أعد المحاولة.\n{detail}",
+  "error.provider.codexStateBusy": "لا يزال ChatGPT يجهّز سجله المحلي بعد تشغيل سابق. انتظر بضع دقائق، ثم أعد المحاولة.",
+  "error.provider.realtimeLimitZero":
+    "أوقف Linux المزوّد لأن حد وقت المعالج في الوقت الحقيقي لدى OpenBot هو 0. يأتي هذا الحد من نظامك. ثبّت rtkit وشغّله (`rtkit-daemon`)، ثم نفّذ `systemctl --user restart xdg-desktop-portal`، ثم أعد تشغيل OpenBot. إعادة تشغيل xdg-desktop-portal وحدها لا تكفي ما دام rtkit غير مثبّت.",
   "error.provider.opencodeDatabaseNewer":
     "تعذّر على OpenCode فتح قاعدة بياناته لأن إصدارًا أحدث من OpenCode غيّرها. حدّث OpenCode إلى الإصدار 2 أو أحدث، ثم أعد المحاولة.",
   "error.provider.opencodeNoAnswer": "أنهى نموذج OpenCode الدور بدون إجابة. أعد المحاولة، أو اختر نموذجًا آخر.",
@@ -217,6 +221,8 @@ export const messages = {
   "error.provider.antigravityReleaseShape": "إصدار Gemini بتنسيق غير متوقع.",
   "error.provider.antigravityMissing": "لم يُنزَّل Gemini. نزّله في OpenBot للمتابعة.",
   "error.provider.antigravityNotStarted": "عُثر على خادم Gemini، لكن تتعذّر قراءة إصداره.",
+  "error.provider.antigravityOverrideInvalid":
+    "خادم Gemini في OPENBOT_ANTIGRAVITY_PATH غير موجود أو غير قابل للتنفيذ. صحّح المسار أو احذف المتغير، ثم أعد تشغيل OpenBot.",
   "error.provider.antigravityVersionUnreadable": "تتعذّر قراءة إصدار خادم Gemini.",
   "error.provider.antigravitySignIn": "سجّل الدخول باستخدام Google لاستخدام Gemini.",
   "error.provider.antigravityRateLimited":
@@ -251,6 +257,8 @@ export const messages = {
   "error.provider.kimiNotStarted": "تعذّر تشغيل Kimi. شغّل `kimi --version` في نافذة طرفية.",
   "error.provider.kimiVersionUnreadable": "تتعذّر قراءة إصدار Kimi CLI.",
   "error.provider.kimiSignIn": "سجّل الدخول باستخدام Kimi Code لاستخدام Kimi.",
+  "error.provider.devinSignIn": "سجّل الدخول باستخدام Devin لاستخدام Devin.",
+  "error.provider.copilotSignIn": "سجّل الدخول باستخدام GitHub أو عيّن COPILOT_GITHUB_TOKEN لاستخدام GitHub Copilot.",
   "error.provider.hermesMissing": "Hermes Agent غير مثبت. ثبّته، ثم أعد المحاولة.",
   "error.provider.hermesNotStarted": "تعذّر تشغيل Hermes Agent. شغّل `hermes --version` في نافذة طرفية.",
   "error.provider.hermesVersionUnreadable": "تتعذّر قراءة إصدار Hermes Agent.",
@@ -272,6 +280,8 @@ export const messages = {
     "تعذّر على Gemini فتح صفحة تسجيل الدخول في متصفحك. تحقق من متصفحك الافتراضي، ثم اتصل مرة أخرى.",
   "error.provider.acpSignInFailed": "لم يكتمل تسجيل الدخول.",
   "error.provider.acpSignInFailedReason": "لم يكتمل تسجيل الدخول: {reason}",
+  "error.provider.acpSignOutFailed": "لم يكتمل تسجيل الخروج.",
+  "error.provider.acpSignOutFailedReason": "لم يكتمل تسجيل الخروج: {reason}",
   "error.provider.acpSignInMethodMissing":
     "لا يوفر هذا المزوّد طريقة تسجيل الدخول هذه على هذا الحاسوب. حدّث المزوّد، ثم أعد المحاولة.",
   "error.provider.httpsSignInLinkOnly": "لا يمكن فتح سوى روابط تسجيل الدخول HTTPS في المتصفح.",
@@ -391,5 +401,7 @@ export const messages = {
   "error.provider.registryPrerequisite": "ثبّت {tool} على المضيف قبل تثبيت هذا الوكيل.",
   "error.provider.registryBindingChanged": "تغيّر الوكيل المخصص أثناء التثبيت. أعد المحاولة.",
   "error.provider.registryInstallFailed": "فشل تثبيت الوكيل. التثبيت السابق لم يتغير.",
+  "error.provider.hermesInstallFailed": "لم يُثبَّت Hermes Agent. حاول مرة أخرى، أو استخدم دليل التثبيت.",
+  "error.provider.hermesNeedsGitCurl": "يحتاج Hermes Agent إلى git وcurl. ثبّتهما، ثم حاول مرة أخرى.",
   "error.provider.registryRemoveBusy": "انتظر حتى ينتهي تثبيت الوكيل وعمل ACP النشط قبل إزالته.",
 } as const satisfies PartialTranslation<typeof source>;

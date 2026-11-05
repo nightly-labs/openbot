@@ -21,6 +21,7 @@ import { useCSSVariable } from "uniwind";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { isIOS } from "@/shared/lib/platform";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import type { VoiceMode } from "./use-voice-mode";
 
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
@@ -181,7 +182,7 @@ function VoiceTranscript({
     >
       {reply ? (
         <View className="mb-4 flex-row items-center gap-2">
-          <Reply color={String(muted)} size={16} />
+          <Reply color={String(muted)} size={16} style={MIRROR_IN_RTL} />
           <Typography.Paragraph numberOfLines={1} type="body-sm" className="flex-1 text-muted">
             {reply}
           </Typography.Paragraph>

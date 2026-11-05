@@ -4,8 +4,6 @@ import type { messages as source } from "../en/uiBlock";
 export const messages = {
   "uiBlock.status.pending": "بانتظار إجابتك",
   "uiBlock.status.answered": "تمت الإجابة",
-  "uiBlock.status.expired": "منتهي الصلاحية",
-  "uiBlock.status.closed": "مغلق",
   "uiBlock.outcome.expired": "لم تُقدَّم إجابة في الوقت المحدد",
   "uiBlock.outcome.closed": "أُغلق دون إجابة",
   "uiBlock.outcome.autoAnswered": "{outcome} (لم يُجب أحد في الوقت المحدد)",

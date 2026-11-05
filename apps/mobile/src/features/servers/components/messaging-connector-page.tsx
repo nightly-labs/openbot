@@ -129,7 +129,7 @@ async function openHostPage(
 }
 
 /**
- * Server settings › Connectors › Slack, Discord or Telegram of a joined server. A Slack workspace or a
+ * Marketplace › Apps › Slack, Discord or Telegram of a joined server. A Slack workspace or a
  * Discord server installs the one OpenBot app, and its orchestrator agent receives every request.
  * Every Telegram chat adds the one OpenBot bot and shares one orchestrator. No token reaches the phone.
  */
@@ -397,6 +397,7 @@ export function MessagingConnectorPage({
                   agentId={agent.id}
                   serverId={agent.serverId}
                   hue={agent.avatarHue}
+                  color={agent.avatarColor}
                   seed={agent.avatarSeed}
                   size={AVATAR_SIZE}
                 />

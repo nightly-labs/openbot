@@ -82,6 +82,12 @@ export const messages = defineMessages("customProvider", {
   "customProvider.model.contextWindowPlaceholder": "Tokens",
   "customProvider.model.maxOutput": "Model {number} max output",
   "customProvider.model.maxOutputPlaceholder": "Tokens",
+  "customProvider.model.efforts": "Model {number} efforts",
+  "customProvider.model.effortsLabel": "Efforts",
+  "customProvider.model.effortsHintOpenCode":
+    "Select the efforts that each model accepts. With none selected, OpenCode offers Low, Medium and High.",
+  "customProvider.model.effortsHintPi":
+    "Select the efforts that each model accepts. With none selected, the model does not reason.",
   "customProvider.model.remove": "Remove model {number}",
   "customProvider.model.add": "Add model",
   "customProvider.headers": "Headers",

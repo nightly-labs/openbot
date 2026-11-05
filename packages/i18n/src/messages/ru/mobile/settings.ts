@@ -8,6 +8,12 @@ export const messages = {
   "mobile.settings.language.system": "Как в системе",
   "mobile.settings.language.footer":
     "Вариант «Как в системе» берёт первый язык из настроек телефона. Непереведённый текст показывается на английском.",
+  "mobile.settings.language.restartTitle": "Перезапустить OpenBot?",
+  "mobile.settings.language.restartBody":
+    "Этот язык читается в другом направлении. Экраны сменят направление при следующем запуске OpenBot. Если после перезапуска экраны выглядят неправильно, закройте OpenBot в переключателе приложений и откройте его снова.",
+  "mobile.settings.language.restartNow": "Перезапустить сейчас",
+  "mobile.settings.language.restartFailed":
+    "Не удалось перезапустить OpenBot. Экраны сменят направление, когда вы снова откроете OpenBot.",
   "mobile.settings.dictation.language": "Язык диктовки",
   "mobile.settings.about.development": "Разработка",
   "mobile.settings.about.openFailed": "Не удалось открыть ссылку. Повторите попытку.",
@@ -20,11 +26,14 @@ export const messages = {
   "mobile.settings.home.support": "Поддержка",
   "mobile.settings.home.supportHint": "Помощь и сохранение журнала поддержки",
   "mobile.settings.support.help": "Получить помощь",
+  "mobile.settings.support.discord": "Открыть тикет в Discord",
+  "mobile.settings.support.discordHint": "Самый быстрый способ получить помощь",
   "mobile.settings.support.message": "Написать нам в X",
   "mobile.settings.support.issues": "Сообщить о проблеме на GitHub",
   "mobile.settings.support.helpFooter":
-    "Расскажите, что произошло и когда. Приложите файл журнала поддержки к обращению на GitHub.",
+    "Расскажите, что произошло и когда. Приложите файл журнала поддержки к тикету в Discord или к обращению на GitHub.",
   "mobile.settings.support.log": "Журнал поддержки",
+  "mobile.settings.support.show": "Показать журнал",
   "mobile.settings.support.save": "Сохранить файл журнала",
   "mobile.settings.support.events": {
     one: "{count} событие",
@@ -39,8 +48,8 @@ export const messages = {
     "Журнал хранится на этом телефоне, OpenBot его не отправляет. В нём записаны шаги подключения, запросы и ошибки, но не сообщения и файлы; пароли и токены скрыты. Прочитайте файл, прежде чем делиться им.",
   "mobile.settings.support.saveFailed": "Не удалось сохранить файл журнала. Повторите попытку.",
   "mobile.settings.support.sharingUnavailable": "На этом телефоне нельзя поделиться файлом.",
-  "mobile.settings.support.recent": "Последние события",
-  "mobile.settings.support.recentFooter": "Сначала новые. В сохранённом файле все события.",
+  "mobile.settings.support.newestFirst": "Сначала новые.",
+  "mobile.settings.support.showOlder": "Показать более ранние события",
   "mobile.settings.support.empty": "Событий пока нет.",
   "mobile.settings.sessions.kindDesktop": "компьютер",
   "mobile.settings.sessions.kindMobile": "телефон",
@@ -76,7 +85,7 @@ export const messages = {
   "mobile.settings.animations.all": "Анимации",
   "mobile.settings.animations.agentFaces": "Живые лица агентов",
   "mobile.settings.animations.agentFacesFooter":
-    "Аватары агентов двигаются, пока агенты работают и отдыхают. Если выключить, лица останутся неподвижными.",
+    "Аватары агентов двигаются, пока агенты работают и отдыхают. Если выключить, лица останутся неподвижными, а персонажи на экране приветствия и на пустом главном экране перестанут парить.",
   "mobile.settings.animations.composerResize": "Компактное поле сообщения",
   "mobile.settings.animations.composerResizeFooter":
     "Пока клавиатура закрыта, поле сообщения превращается в узкую полоску. Если выключить, поле остаётся полного размера.",
@@ -263,6 +272,14 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "Слушание",
   "mobile.settings.voice.tab.speaking": "Озвучивание",
+  "mobile.settings.voice.pause.title": "Пауза перед отправкой",
+  "mobile.settings.voice.pause.label": "Ждать новые слова",
+  "mobile.settings.voice.pause.footer":
+    "В голосовом разговоре OpenBot отправляет ваши слова, когда столько времени не распознаёт новых слов. Шум без слов не продлевает прослушивание. Выберите паузу длиннее, если говорите медленно или останавливаетесь подумать.",
+  "mobile.settings.voice.pause.seconds": "{seconds} с",
+  "mobile.settings.voice.speed.title": "Скорость ответов",
+  "mobile.settings.voice.speed.footer": "Скорость ответов, которые OpenBot читает вслух, также в голосовом разговоре.",
+  "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot передаёт вашу речь в ElevenLabs с одноразовым токеном, и ElevenLabs списывает оплату с вашего аккаунта. Ключ остаётся на этом телефоне.",
 } as const satisfies PartialTranslation<typeof source>;

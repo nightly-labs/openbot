@@ -5,6 +5,7 @@ import type { ArticleBody } from "../body";
 import { AgenticAIDefinition } from "./agentic-ai-definition";
 import { AIAgentsExamples } from "./ai-agents-examples";
 import { AIAgentsVsAgenticAI } from "./ai-agents-vs-agentic-ai";
+import { AIWorkspaceVsChat } from "./ai-workspace-vs-chat";
 import { ImportGrokBotAgents } from "./import-grok-bot-agents";
 import { ImportHermesAgents } from "./import-hermes-agents";
 import { InstallOpenBotVPS } from "./install-openbot-vps";
@@ -15,6 +16,7 @@ import { WhatAreAIAgents } from "./what-are-ai-agents";
 import { WtfIsOpenBot } from "./wtf-is-openbot";
 
 export const GUIDE_BODIES: Readonly<Record<string, ArticleBody>> = {
+  "ai-workspace-vs-chat": AIWorkspaceVsChat,
   "install-openbot-vps": InstallOpenBotVPS,
   "import-hermes-agents": ImportHermesAgents,
   "import-grok-bot-agents": ImportGrokBotAgents,

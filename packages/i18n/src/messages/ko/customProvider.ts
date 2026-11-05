@@ -83,6 +83,12 @@ export const messages = {
   "customProvider.model.contextWindowPlaceholder": "토큰",
   "customProvider.model.maxOutput": "모델 {number} 최대 출력",
   "customProvider.model.maxOutputPlaceholder": "토큰",
+  "customProvider.model.efforts": "모델 {number} 추론 강도",
+  "customProvider.model.effortsLabel": "추론 강도",
+  "customProvider.model.effortsHintOpenCode":
+    "각 모델이 받는 추론 강도를 선택하세요. 선택하지 않으면 OpenCode가 낮음, 보통, 높음을 제공합니다.",
+  "customProvider.model.effortsHintPi":
+    "각 모델이 받는 추론 강도를 선택하세요. 선택하지 않으면 모델이 추론하지 않습니다.",
   "customProvider.model.remove": "모델 {number} 제거",
   "customProvider.model.add": "모델 추가",
   "customProvider.headers": "헤더",

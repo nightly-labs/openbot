@@ -71,7 +71,7 @@ const TURN_TIMEOUT_MS = 300_000;
 export async function runTurn(
   client: AgentClient,
   thread: string,
-  options: { model?: string; text?: string; timeoutMs?: number } = {},
+  options: { model?: string; effort?: string; text?: string; timeoutMs?: number } = {},
 ): Promise<TurnResult> {
   const result: TurnResult = { reply: "", error: null, status: null };
   let finished = false;
@@ -104,7 +104,12 @@ export async function runTurn(
     await runCauseEffect(
       client.request(
         "turn/start",
-        { threadId: thread, ...(options.model ? { model: options.model } : {}), input },
+        {
+          threadId: thread,
+          ...(options.model ? { model: options.model } : {}),
+          ...(options.effort ? { effort: options.effort } : {}),
+          input,
+        },
         (value) => value,
       ),
     );

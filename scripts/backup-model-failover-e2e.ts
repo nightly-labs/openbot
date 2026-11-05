@@ -379,6 +379,9 @@ const browser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 
 /** Waits for a state of the service or of its database. */
@@ -778,28 +781,39 @@ try {
     });
   }
 
-  for (const automatic of [false, true]) {
-    await check(
-      automatic
-        ? "without a backup, partial work fails without replay"
-        : "automatic fallback off leaves partial work stopped",
-      async () => {
-        await restart();
-        const agent = await createCodex(`No fallback ${automatic}`, {
-          automatic,
-          order: automatic ? [] : automaticBackups.order,
-        });
-        const before = turns().length;
-        const beforeCodex = readLog<CodexTurn>(codexLog).length;
-        const outcome = await send(agent.id, "usage-partial case:stopped");
-        assert.equal(outcome.status, "failed");
-        assert.equal(turns().length, before, "No backup runs.");
-        assert.equal(readLog<CodexTurn>(codexLog).length, beforeCodex + 1, "The original action is not replayed.");
-        assert.equal(agentOf(agent.id).provider, "codex");
-        return outcome;
-      },
+  await check("without a backup, partial work fails without replay", async () => {
+    await restart();
+    const agent = await createCodex("No fallback", { automatic: true, order: [] });
+    const before = turns().length;
+    const beforeCodex = readLog<CodexTurn>(codexLog).length;
+    const outcome = await send(agent.id, "usage-partial case:stopped");
+    assert.equal(outcome.status, "failed");
+    assert.equal(turns().length, before, "No backup runs.");
+    assert.equal(readLog<CodexTurn>(codexLog).length, beforeCodex + 1, "The original action is not replayed.");
+    assert.equal(agentOf(agent.id).provider, "codex");
+    return outcome;
+  });
+
+  await check("ask before switching continues partial work on the saved backup", async () => {
+    await restart();
+    const agent = await createCodex("Ask fallback", { automatic: false, order: automaticBackups.order });
+    const since = events.length;
+    const beforeClaude = turns().length;
+    const beforeCodex = readLog<CodexTurn>(codexLog).length;
+    const outcome = await send(agent.id, "usage-partial case:ask");
+    assert.equal(outcome.status, "completed", `The work completes on its backup: ${outcome.error}`);
+    assert.equal(readLog<CodexTurn>(codexLog).length, beforeCodex + 1, "The spent provider is not run again.");
+    const backups = turns().slice(beforeClaude);
+    assert.deepEqual(
+      backups.map((turn) => turn.model),
+      [PRIMARY],
     );
-  }
+    assert.ok(backups[0]?.input.includes("Continue the unfinished task"), "The backup gets a continuation request.");
+    assert.equal(agentOf(agent.id).provider, "claude");
+    assert.equal(agentOf(agent.id).usageLimitReturn?.provider, "codex", "The agent goes back at the reset.");
+    assert.deepEqual(errorsFor(agent.id, since), []);
+    return { outcome, backups: backups.map((turn) => turn.model) };
+  });
 
   await check("an exhausted backup chain ends without cycling", async () => {
     await restart();

@@ -12,16 +12,19 @@
 //      The summary runs on the provider's smaller model, and the Lead's turns on its own model.
 //   5. A reply that continues a task marks its earlier turn superseded and keeps the channel summary,
 //      so the next turn does not summarize the channel again from the first message (#3761).
-//   6. Two compactions that leave a session at 95% of its window give one notice, and OpenBot asks
-//      for no more compactions of that session (#3905).
+//   6. Two compactions that leave a session at 84% of its window give one notice, and OpenBot asks
+//      for no more compactions of that session (#3905, #5150).
 //   7. A provider that retries a request three times gives one notice, and a session at 60% of its
-//      window then compacts before its next turn (#4374).
+//      window then compacts before its next turn (#4374). When no usage came after that compaction,
+//      a turn that retries again does not compact the session again (#4819).
 //   8. A channel_history page stays near 24,000 characters. It cuts a long message, and a read by
 //      messageId and offset gives the rest of it. It cuts a long task instruction. A long request is
 //      in the packet once, and a long handoff of an agent is cut with a pointer to the rest.
 //   9. A session at 60% of its window compacts before a turn whose input fills it over 80% (#4374).
 //  10. In an isolated channel, openbot.remember saves a channel memory and the agent keeps none of
 //      it. The packet says when isolation is on and when it is off (#4332).
+//  11. A reply that quotes a member's message and only mentions another member gives the quote in
+//      the assignment. The quote continues its task, and the packet does not show it superseded (#4841).
 // `bun scripts/channel-context-e2e.ts`. Writes .openbot-build/channel-context-e2e/report.json.
 // `CHANNEL_CONTEXT_MEASURE=<label> bun scripts/channel-context-e2e.ts` runs no checks. It sends
 // MEASURE_TURNS requests to three members in turn, with long replies, and writes the size of each
@@ -95,6 +98,7 @@ let buffer = "";
 let threads = 0;
 let turns = 0;
 let calls = 0;
+const quietCompactions = new Set();
 // The tool calls that wait for the answer of OpenBot, by request id.
 const waiting = new Map();
 process.stdout.on("error", (error) => {
@@ -147,17 +151,19 @@ const answer = (message) => {
         : assignment.startsWith("MEASURE") ? ${JSON.stringify(MEASURE_REPLY)} : "Done.";
       const steps = [];
       if (assignment.startsWith("STUCK")) {
-        // Codex compacts by itself twice, and each time the session stays at 95% of its window.
+        // Codex compacts by itself twice, and each time the session stays at 84% of its window.
         for (let index = 0; index < 2; index++) {
           const item = { type: "contextCompaction", id: "compaction-" + turnId + "-" + index };
           steps.push(() => write({ method: "item/started", params: { threadId, turnId, item } }));
           steps.push(() => write({ method: "item/completed", params: { threadId, turnId, item } }));
-          steps.push(() => usage(threadId, turnId, 95000));
+          steps.push(() => usage(threadId, turnId, 84000));
         }
       }
       if (assignment.startsWith("USAGE")) steps.push(() => usage(threadId, turnId, 60000));
       if (assignment.startsWith("RETRY")) {
-        steps.push(() => usage(threadId, turnId, 60000));
+        // As in #4819, a compaction of this session and a turn that fails after retries report no usage.
+        quietCompactions.add(threadId);
+        if (!assignment.startsWith("RETRY AGAIN")) steps.push(() => usage(threadId, turnId, 60000));
         for (let index = 0; index < 3; index++)
           steps.push(() => write({ method: "error", params: { threadId, turnId, willRetry: true, error: { message: "stream disconnected before completion" } } }));
       }
@@ -200,7 +206,7 @@ const answer = (message) => {
         () => write({ method: "item/started", params: { threadId, turnId, item } }),
         () => write({ method: "item/completed", params: { threadId, turnId, item } }),
         () => write({ method: "turn/completed", params: { threadId, turn: { id: turnId, status: "completed" } } }),
-        () => usage(threadId, turnId, 10000),
+        ...(quietCompactions.has(threadId) ? [] : [() => usage(threadId, turnId, 10000)]),
       ]);
     }
     case "turn/interrupt": {
@@ -283,6 +289,9 @@ const browser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 
 /** Waits for a state of the service or the fake's log. */
@@ -574,6 +583,11 @@ try {
       rows(referenced(reply)).some((row) => row.id === request.id),
       referenced(reply),
     );
+    pass(
+      "A reply to the request that made the task does not quote it again",
+      !reply.includes("The request replies to message"),
+      blocks(reply).slice(1, 3).join("\n\n"),
+    );
     pass("The delta does not give the channel rules again", !reply.includes(CHANNEL_RULE));
     pass(
       "The delta has no channel facts while the channel is the same",
@@ -692,7 +706,7 @@ try {
     const ineffective = await waitFor("the notice about compactions that do not help", () =>
       events.find((event) => event.code === "context_compaction_ineffective" && event.agentId === tester.id),
     );
-    pass("The notice gives the share of the window", ineffective.message.includes("95%"), ineffective.message);
+    pass("The notice gives the share of the window", ineffective.message.includes("84%"), ineffective.message);
     pass("OpenBot asks for no compaction of the full session", compactions(stuckThread) === 0);
 
     // 7. Codex retries a request of the Lead three times while its session is at 60% of the window.
@@ -710,6 +724,14 @@ try {
     );
     await waitFor("the compaction after the retries", () => compactions(retryThread) > 0);
     pass("The session compacts after a turn that the provider retried", compactions(retryThread) === 1);
+    // The compaction reported no usage, so nothing tells whether it helped. Each turn compacted again (#4819).
+    await send(channelId, lead.id, "RETRY AGAIN: run the release check.");
+    // A compaction at the end of that turn would start before the next turn of the session.
+    await send(channelId, lead.id, "Say one word.");
+    pass(
+      "A retried turn with no usage since the last compaction does not compact again",
+      compactions(retryThread) === 1,
+    );
 
     // 8. A person posts a message longer than one history part. The Tester then reads the history
     // during an open turn.
@@ -890,6 +912,27 @@ try {
       facts(sharedPacket).channel?.isolated === undefined &&
         sharedPacket.includes("no longer isolated") &&
         !sharedPacket.includes("openbot.remember saves a channel memory here"),
+    );
+
+    // 11. The person quotes the Tester's answer and only mentions the Lead.
+    const answer = messages(channelId)
+      .filter((message) => message.author.id === tester.id && message.message.text === "Done.")
+      .at(-1);
+    assert.ok(answer, "The Tester's answer is not stored.");
+    const quoted = await send(channelId, lead.id, `@[Lead](agent:${lead.id}) `, answer.id);
+    record("Lead", quoted);
+    pass(
+      "The assignment gives the quoted message",
+      quoted.includes(`The request replies to message ${answer.id} from Tester:\nDone.`),
+      blocks(quoted).slice(1, 3).join("\n\n"),
+    );
+    const quotedLine = quoted.split("\n").find((line) => line.startsWith(`{"id":${JSON.stringify(answer.id)},`));
+    const quotedRow: { superseded?: boolean } | undefined = quotedLine ? JSON.parse(quotedLine) : undefined;
+    pass(
+      "The packet does not show the quoted message superseded",
+      quotedRow?.superseded === false &&
+        messages(channelId).find((message) => message.id === answer.id)?.superseded === true,
+      JSON.stringify(quotedRow),
     );
   }
   report.passed = true;

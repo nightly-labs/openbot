@@ -33,6 +33,25 @@ export const messages = {
   "settings.logoColor.beige": "Beige",
   "settings.logoColor.gray": "Gris",
   "settings.logoColor.white": "Blanc",
+  "settings.chatColor.title": "Couleur du chat",
+  "settings.chatColor.description": "Teinte les bulles de vos messages. Les personnes de vos serveurs la voient aussi.",
+  "settings.chatColor.yours": "Votre couleur de chat",
+  "settings.chatColor.agentLabel": "Couleur de chat de {name}",
+  "settings.chatColor.none": "Aucune",
+  "settings.chatColor.noColor": "Aucune couleur",
+  "settings.chatColor.area": "Saturation et luminosité",
+  "settings.chatColor.areaValue": "Saturation {saturation} %, luminosité {brightness} %",
+  "settings.chatColor.hue": "Teinte",
+  "settings.chatColor.hueValue": "{degrees} degrés",
+  "settings.chatColor.eyeDropper": "Choisir une couleur à l’écran",
+  "settings.chatColor.hex": "Couleur hexadécimale",
+  "settings.chatColor.format": "Format {format}, passer à {next}",
+  "settings.chatColor.presets": "Couleurs prédéfinies",
+  "settings.chatColor.saturation": "Saturation",
+  "settings.chatColor.lightness": "Luminance",
+  "settings.chatColor.red": "Rouge",
+  "settings.chatColor.green": "Vert",
+  "settings.chatColor.blue": "Bleu",
   // The Settings window, General tab.
   "settings.appBehavior.title": "Comportement de l’application",
   "settings.conversations.title": "Conversations",
@@ -76,6 +95,23 @@ export const messages = {
   "settings.busyMessage.title": "Orienter les agents pendant leur travail",
   "settings.busyMessage.description":
     "Les nouveaux messages rejoignent le travail en cours de l’agent, pas la file. Fonctionne avec ChatGPT et Claude.",
+  "settings.agentDefaults.title": "Valeurs par défaut",
+  "settings.agentDefaults.description": "Les agents suivent ces valeurs, sauf si vous les modifiez pour un agent.",
+  "settings.agentDefaults.value": "Par défaut : {value}",
+  "settings.agentDefaults.on": "Activé",
+  "settings.agentDefaults.off": "Désactivé",
+  "settings.agentDefaults.followDefault": "Par défaut ({value})",
+  "settings.agentDefaults.count": "Activé pour {on} sur {total}",
+  "settings.agentDefaults.open": "Ouvrir {name}",
+  "settings.agentDefaults.agentList": "Activé pour {names}",
+  "settings.agentDefaults.defaultTitle": "Par défaut",
+  "settings.agentDefaults.defaultDescription":
+    "Les nouveaux agents l’utilisent. Les agents réglés sur Par défaut le suivent.",
+  "settings.agentDefaults.agents": "Agents",
+  "settings.agentDefaults.setAll": "Tout régler",
+  "settings.agentDefaults.setAllLabel": "Régler {setting} pour tous les agents",
+  "settings.agentDefaults.agentLabel": "{setting} pour {agent}",
+  "settings.agentDefaults.loadFailed": "Impossible de lire les agents.",
   "settings.backgroundProcesses.title": "Processus en arrière-plan",
   "settings.backgroundProcesses.description":
     "Programmes que les agents ont lancés et laissés en marche, comme des serveurs de développement. Ils continuent après la fin du chat et quand vous quittez OpenBot.",
@@ -162,6 +198,9 @@ export const messages = {
   // The Settings window shell: its tab list, headers and save bar.
   "settings.tab.general.title": "Général",
   "settings.tab.general.description": "Contrôler le comportement d’OpenBot sur cet ordinateur.",
+  "settings.tab.agents.title": "Agents",
+  "settings.tab.agents.description":
+    "Choisir ce que les agents de cet ordinateur peuvent faire quand vous ne le réglez pas pour un agent.",
   "settings.tab.notifications.title": "Notifications",
   "settings.tab.notifications.description": "Choisir comment OpenBot vous alerte.",
   "settings.tab.voice.title": "Voix",
@@ -499,11 +538,15 @@ export const messages = {
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Pour de nombreux agents et un usage intensif du navigateur.",
   // The Voice tab: dictation models and the dictation language.
-  "settings.voice.models.title": "Modèle de dictée",
+  "settings.voice.dictation.section": "Dictée",
   "settings.voice.model.parakeet.description": "Rapide. Détecte seul la langue parlée, parmi 25 langues européennes.",
+  "settings.voice.model.parakeetUnified.description":
+    "Rapide. Anglais uniquement. Met la ponctuation, avec moins d’erreurs que Parakeet TDT.",
   "settings.voice.model.bark.description":
     "Rapide. Anglais uniquement. Écrit surtout en minuscules, avec peu de ponctuation.",
   "settings.voice.model.whisper.description": "Plus lent. Environ 100 langues, et vous pouvez fixer la langue parlée.",
+  "settings.voice.model.cohere.description":
+    "Plus lent. 14 langues. Vous fixez la langue parlée. Utilise environ 4 Go de mémoire.",
   "settings.voice.model.size": "Taille du téléchargement : {size}",
   "settings.voice.model.downloading": "Téléchargement · {received} sur {total}",
   "settings.voice.model.failed": "Le téléchargement s’est arrêté. Vérifiez la connexion et réessayez.",
@@ -516,13 +559,16 @@ export const messages = {
   "settings.voice.model.useLabel": "Utiliser {name} pour la dictée",
   "settings.voice.model.removeLabel": "Retirer {name} de cet ordinateur",
   "settings.voice.language.section": "Langue",
-  "settings.voice.language.title": "Langue de la dictée",
   "settings.voice.language.description":
     "La langue que vous parlez. « Automatique » la détecte à partir de l’enregistrement.",
+  "settings.voice.language.modelLanguages":
+    "La langue que vous parlez. Ce modèle ne connaît que ces langues et ne détecte pas la langue lui-même.",
   "settings.voice.language.modelDetects":
-    "Parakeet détecte seul la langue parlée. Pour fixer une langue, utilisez Whisper ou ElevenLabs.",
+    "Parakeet détecte seul la langue parlée. Pour fixer une langue, utilisez Whisper, Cohere ou ElevenLabs.",
   "settings.voice.language.englishOnly":
-    "Bark reconnaît uniquement l’anglais. Pour fixer une langue, utilisez Whisper ou ElevenLabs.",
+    "Bark reconnaît uniquement l’anglais. Pour fixer une langue, utilisez Whisper, Cohere ou ElevenLabs.",
+  "settings.voice.language.parakeetUnifiedEnglishOnly":
+    "Parakeet Unified reconnaît uniquement l’anglais. Pour fixer une langue, utilisez Whisper, Cohere ou ElevenLabs.",
   "settings.voice.language.automatic": "Automatique",
   "settings.voice.loadFailed": "Impossible de lire les modèles vocaux.",
   "settings.voice.saveFailed": "Impossible d’enregistrer le réglage vocal. Réessayez.",
@@ -544,6 +590,10 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "Lire les réponses à voix haute",
   "settings.voice.speech.readReplies.description":
     "Quand vous dictez un message, la réponse est lue à voix haute. Dictez à nouveau pour l’arrêter.",
+  "settings.voice.speech.codexLive.title": "Voix en direct Codex",
+  "settings.voice.speech.codexLive.description":
+    "Les conversations vocales avec les agents Codex utilisent la voix en direct d’OpenAI avec votre connexion Codex. Votre voix est envoyée à OpenAI.",
+  "settings.voice.speech.speed.title": "Vitesse",
   "settings.voice.speech.voice.title": "Voix",
   "settings.voice.speech.voice.female": "Voix féminine {number}",
   "settings.voice.speech.voice.male": "Voix masculine {number}",
@@ -551,6 +601,8 @@ export const messages = {
   "settings.voice.speech.voice.stop": "Arrêter",
   "settings.voice.speech.sample": "Bonjour. Voici comment vos réponses sonneront.",
   "settings.voice.speech.listenFailed": "Impossible de lire l’extrait.",
+  "settings.voice.live.section": "Voix en direct",
+  "settings.voice.live.signIn": "Connectez-vous à Codex avec votre compte ChatGPT pour utiliser la voix en direct.",
   "settings.transfer.title": "Déplacer ce serveur vers un autre ordinateur",
   "settings.transfer.lede":
     "Vos agents, leurs compétences, routines, souvenirs et fichiers sont réunis dans un seul fichier.",

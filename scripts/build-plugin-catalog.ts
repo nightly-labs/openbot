@@ -555,7 +555,9 @@ function printLiteral(value: unknown, indent: string, mode: LiteralMode, prefixW
   if (Array.isArray(value)) {
     if (value.length === 0) return "[]";
     const child = `${indent}  `;
-    return `[\n${value.map((item) => `${child}${printLiteral(item, child, mode)}`).join(",\n")}${closer}${indent}]`;
+    // The formatter counts the comma after an item in the line width.
+    const commaWidth = (index: number) => (mode === "ts" || index < value.length - 1 ? 1 : 0);
+    return `[\n${value.map((item, index) => `${child}${printLiteral(item, child, mode, commaWidth(index))}`).join(",\n")}${closer}${indent}]`;
   }
   if (isDynamicRecord(value)) {
     const entries = Object.entries(value);

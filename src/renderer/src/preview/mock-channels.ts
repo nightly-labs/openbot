@@ -24,6 +24,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { channelRoutingConversationEventItemType } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
+import { sourceText } from "@openbot/i18n/source";
 import { avatarImageDataUrl } from "@openbot/ui/avatar-image";
 
 /** A save keeps the picture, as the host does: the draft carries the icon only when it changes. */
@@ -237,6 +238,17 @@ export function createMockChannels(
       channels.set(channel.id, structuredClone(channel));
       changed(channel.id, channel.revision);
       return structuredClone(channel);
+    },
+    deleteChannelMessage: async (input: { channelId: string; messageId: string }): Promise<void> => {
+      const channel = requireChannel(input.channelId);
+      const list = messages.get(input.channelId) ?? [];
+      if (!list.some((entry) => entry.id === input.messageId))
+        throw new Error(sourceText("error.backend.messageDeleteNotFound"));
+      messages.set(
+        input.channelId,
+        list.filter((entry) => entry.id !== input.messageId),
+      );
+      changed(channel.id, channel.revision);
     },
     deleteChannel: async (channelId: string): Promise<void> => {
       requireChannel(channelId);

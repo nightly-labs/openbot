@@ -106,6 +106,7 @@ export const messages = {
   "error.provider.modelIdDuplicate": "Dwa modele mają to samo ID.",
   "error.provider.contextWindowInvalid": "Okno kontekstu modelu musi być liczbą całkowitą tokenów od {min} do {max}.",
   "error.provider.maxOutputInvalid": "Maksymalne wyjście modelu musi być liczbą całkowitą tokenów od {min} do {max}.",
+  "error.provider.reasoningEffortsInvalid": "Poziomy wysiłku modelu są nieprawidłowe.",
   "error.provider.headersTooMany": "Jest za dużo nagłówków.",
   "error.provider.headerNameCharacter": "Nazwa nagłówka zawiera znak niedozwolony w HTTP.",
   "error.provider.headerNameTooLong": "Nazwa nagłówka jest za długa.",
@@ -208,6 +209,10 @@ export const messages = {
     "Wystąpił błąd po stronie dostawcy modelu. Twoje połączenie nie jest przyczyną. Spróbuj ponownie później lub wybierz inny model.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode nie połączył się z dostawcą modelu. Sprawdź połączenie sieciowe komputera, na którym działa OpenBot, a potem spróbuj ponownie.\n{detail}",
+  "error.provider.codexStateBusy":
+    "ChatGPT nadal przygotowuje swoją lokalną historię po wcześniejszym uruchomieniu. Poczekaj kilka minut, a potem spróbuj ponownie.",
+  "error.provider.realtimeLimitZero":
+    "Linux zatrzymał dostawcę, ponieważ OpenBot ma limit czasu procesora w czasie rzeczywistym równy 0. Ten limit pochodzi z Twojego systemu. Zainstaluj i uruchom rtkit (`rtkit-daemon`), uruchom `systemctl --user restart xdg-desktop-portal`, a potem uruchom ponownie OpenBot. Sam restart xdg-desktop-portal nie pomoże, dopóki brakuje rtkit.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode nie może otworzyć swojej bazy danych, ponieważ zmieniła ją nowsza wersja OpenCode. Zaktualizuj OpenCode do wersji 2 lub nowszej, a potem spróbuj ponownie.",
   "error.provider.opencodeNoAnswer":
@@ -229,6 +234,8 @@ export const messages = {
   "error.provider.antigravityReleaseShape": "Wydanie Gemini ma nieoczekiwaną strukturę.",
   "error.provider.antigravityMissing": "Gemini nie jest pobrany. Pobierz go w OpenBot, aby kontynuować.",
   "error.provider.antigravityNotStarted": "Znaleziono serwer Gemini, ale nie można odczytać jego wersji.",
+  "error.provider.antigravityOverrideInvalid":
+    "Serwer Gemini z OPENBOT_ANTIGRAVITY_PATH nie istnieje lub nie jest wykonywalny. Popraw ścieżkę lub usuń zmienną, a potem uruchom ponownie OpenBot.",
   "error.provider.antigravityVersionUnreadable": "Nie można odczytać wersji serwera Gemini.",
   "error.provider.antigravitySignIn": "Zaloguj się przez Google, aby używać Gemini.",
   "error.provider.antigravityRateLimited":
@@ -263,6 +270,8 @@ export const messages = {
   "error.provider.kimiNotStarted": "Nie udało się uruchomić Kimi. Uruchom `kimi --version` w terminalu.",
   "error.provider.kimiVersionUnreadable": "Nie można odczytać wersji Kimi CLI.",
   "error.provider.kimiSignIn": "Zaloguj się przez Kimi Code, aby używać Kimi.",
+  "error.provider.devinSignIn": "Zaloguj się do Devin, aby z niego korzystać.",
+  "error.provider.copilotSignIn": "Zaloguj się przez GitHub lub ustaw COPILOT_GITHUB_TOKEN, aby używać GitHub Copilot.",
   "error.provider.hermesMissing": "Hermes Agent nie jest zainstalowany. Zainstaluj go i spróbuj ponownie.",
   "error.provider.hermesNotStarted": "Nie udało się uruchomić Hermes Agent. Uruchom `hermes --version` w terminalu.",
   "error.provider.hermesVersionUnreadable": "Nie można odczytać wersji Hermes Agent.",
@@ -284,6 +293,8 @@ export const messages = {
     "Gemini nie otworzył strony logowania w przeglądarce. Sprawdź domyślną przeglądarkę, a potem połącz się ponownie.",
   "error.provider.acpSignInFailed": "Logowanie nie zostało ukończone.",
   "error.provider.acpSignInFailedReason": "Logowanie nie zostało ukończone: {reason}",
+  "error.provider.acpSignOutFailed": "Wylogowanie nie zostało ukończone.",
+  "error.provider.acpSignOutFailedReason": "Wylogowanie nie zostało ukończone: {reason}",
   "error.provider.acpSignInMethodMissing":
     "Ten dostawca nie oferuje tego logowania na tym komputerze. Zaktualizuj dostawcę i spróbuj ponownie.",
   "error.provider.httpsSignInLinkOnly": "W przeglądarce można otworzyć tylko linki logowania HTTPS.",
@@ -414,6 +425,9 @@ export const messages = {
   "error.provider.registryBindingChanged": "Własny agent zmienił się podczas instalacji. Spróbuj ponownie.",
   "error.provider.registryInstallFailed":
     "Instalacja agenta nie powiodła się. Poprzednia instalacja pozostała bez zmian.",
+  "error.provider.hermesInstallFailed":
+    "Nie udało się zainstalować Hermes Agent. Spróbuj ponownie albo użyj przewodnika instalacji.",
+  "error.provider.hermesNeedsGitCurl": "Hermes Agent wymaga git i curl. Zainstaluj je, a potem spróbuj ponownie.",
   "error.provider.registryRemoveBusy":
     "Zaczekaj na zakończenie instalacji agenta i aktywnej pracy ACP, zanim go usuniesz.",
 } as const satisfies PartialTranslation<typeof source>;

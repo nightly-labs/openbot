@@ -8,6 +8,12 @@ export const messages = {
   "mobile.settings.language.system": "Sistem varsayılanı",
   "mobile.settings.language.footer":
     "Sistem varsayılanı, telefon ayarlarınızdaki ilk dili takip eder. Henüz çevrilmemiş metinler İngilizce gösterilir.",
+  "mobile.settings.language.restartTitle": "OpenBot yeniden başlatılsın mı?",
+  "mobile.settings.language.restartBody":
+    "Bu dil ters yönde okunur. Ekranlar, OpenBot yeniden başladığında yön değiştirir. Yeniden başlatmadan sonra ekranlar hâlâ yanlış görünüyorsa OpenBot'u uygulama değiştiricide kapatıp yeniden açın.",
+  "mobile.settings.language.restartNow": "Şimdi yeniden başlat",
+  "mobile.settings.language.restartFailed":
+    "OpenBot yeniden başlatılamadı. Ekranlar, OpenBot'u bir sonraki açışınızda yön değiştirir.",
   "mobile.settings.dictation.language": "Dikte dili",
   "mobile.settings.about.development": "Geliştirme",
   "mobile.settings.about.openFailed": "Bağlantı açılamadı. Tekrar deneyin.",
@@ -20,11 +26,14 @@ export const messages = {
   "mobile.settings.home.support": "Destek",
   "mobile.settings.home.supportHint": "Yardım alın ve destek günlüğünü kaydedin",
   "mobile.settings.support.help": "Yardım alın",
+  "mobile.settings.support.discord": "Discord'da destek talebi aç",
+  "mobile.settings.support.discordHint": "Yardım almanın en hızlı yolu",
   "mobile.settings.support.message": "Bize X üzerinden yazın",
   "mobile.settings.support.issues": "GitHub'da sorun bildirin",
   "mobile.settings.support.helpFooter":
-    "Ne olduğunu ve ne zaman olduğunu bize anlatın. Destek günlüğü dosyasını GitHub'da açtığınız sorun kaydına ekleyin.",
+    "Ne olduğunu ve ne zaman olduğunu bize anlatın. Destek günlüğü dosyasını Discord'daki destek talebinize veya GitHub'daki sorun kaydınıza ekleyin.",
   "mobile.settings.support.log": "Destek günlüğü",
+  "mobile.settings.support.show": "Günlüğü göster",
   "mobile.settings.support.save": "Günlük dosyasını kaydet",
   "mobile.settings.support.events": { one: "{count} olay", other: "{count} olay" },
   "mobile.settings.support.clear": "Günlüğü temizle",
@@ -34,8 +43,8 @@ export const messages = {
     "Günlük bu telefonda kalır ve OpenBot onu göndermez. Bağlantı adımlarını, istekleri ve hataları kaydeder. Mesajları ve dosyaları kaydetmez; parolaları ve belirteçleri gizler. Paylaşmadan önce dosyayı okuyun.",
   "mobile.settings.support.saveFailed": "Günlük dosyası kaydedilemedi. Tekrar deneyin.",
   "mobile.settings.support.sharingUnavailable": "Bu telefonda paylaşım kullanılamıyor.",
-  "mobile.settings.support.recent": "Son olaylar",
-  "mobile.settings.support.recentFooter": "En yeniler önce gösterilir. Kaydedilen dosya tüm olayları içerir.",
+  "mobile.settings.support.newestFirst": "En yeniler önce gösterilir.",
+  "mobile.settings.support.showOlder": "Eski olayları göster",
   "mobile.settings.support.empty": "Henüz olay yok.",
   "mobile.settings.sessions.kindDesktop": "masaüstü",
   "mobile.settings.sessions.kindMobile": "mobil",
@@ -71,7 +80,7 @@ export const messages = {
   "mobile.settings.animations.all": "Animasyonlar",
   "mobile.settings.animations.agentFaces": "Hareketli ajan yüzleri",
   "mobile.settings.animations.agentFacesFooter":
-    "Ajanlar çalışırken ve dinlenirken avatarlarının yüzleri hareket eder. Kapalıyken yüzler sabit kalır.",
+    "Ajanlar çalışırken ve dinlenirken avatarlarının yüzleri hareket eder. Kapalıyken yüzler sabit kalır, karşılama ekranındaki ve boş ana ekrandaki karakterler de süzülmeyi bırakır.",
   "mobile.settings.animations.composerResize": "Kompakt mesaj alanı",
   "mobile.settings.animations.composerResizeFooter":
     "Klavye kapalıyken mesaj alanı küçük bir çubuğa dönüşür. Kapalıyken alan tam boyutunda kalır.",
@@ -255,6 +264,14 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "Dinleme",
   "mobile.settings.voice.tab.speaking": "Konuşma",
+  "mobile.settings.voice.pause.title": "Göndermeden önce duraklama",
+  "mobile.settings.voice.pause.label": "Yeni kelimeleri bekle",
+  "mobile.settings.voice.pause.footer":
+    "Sesli konuşmada, bu kadar süre yeni kelime tanımadığında OpenBot sözlerinizi gönderir. Kelimesiz gürültü dinlemeyi uzatmaz. Yavaş konuşuyorsanız veya düşünmek için duruyorsanız daha uzun bir duraklama seçin.",
+  "mobile.settings.voice.pause.seconds": "{seconds} sn",
+  "mobile.settings.voice.speed.title": "Yanıt hızı",
+  "mobile.settings.voice.speed.footer": "OpenBot'un sesli okuduğu yanıtların hızı, sesli konuşmada da.",
+  "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot sesini tek kullanımlık bir belirteçle ElevenLabs'e aktarır ve ElevenLabs bunu hesabından ücretlendirir. Anahtar bu telefonda kalır.",
 } as const satisfies PartialTranslation<typeof source>;

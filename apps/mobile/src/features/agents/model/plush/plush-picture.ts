@@ -1,8 +1,9 @@
+import { avatarHeadColor, avatarStyleForSeed } from "@openbot/brand/bloub-avatar";
 import type { AvatarMood } from "@openbot/brand/bloub-avatar-motion";
-import type { AvatarHue } from "@openbot/contracts/ipc";
+import type { AvatarColor, AvatarHue } from "@openbot/contracts/ipc";
 import { ImageFormat, Skia } from "@shopify/react-native-skia";
 import { Directory, File, Paths } from "expo-file-system";
-import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
+import { drawFlat, flatGeometryKey, flatRestFrame } from "./flat-draw";
 import { loadPlushArt } from "./plush-assets";
 import { drawPlush } from "./plush-draw";
 import { plushGeometry, plushRestFrame } from "./plush-frames";
@@ -11,7 +12,7 @@ import { plushGeometry, plushRestFrame } from "./plush-frames";
  * The style of the drawn pictures. Change it when the drawing changes, so that saved pictures are
  * drawn again: the file names and the Live Activity pictures carry it.
  */
-export const PLUSH_STYLE = "plush-1";
+export const PLUSH_STYLE = "plush-2";
 /**
  * Still plush pictures, kept between launches, so a list shows its avatars without drawing them
  * again. `Paths.cache` is `Library/Caches` on iOS, and the system can delete it.
@@ -24,6 +25,8 @@ const EVICT_EVERY = 50;
 export interface PlushPictureSpec {
   seed: string;
   hue: AvatarHue | null;
+  /** The agent's `avatarColor`. It wins over `hue`. */
+  color: AvatarColor | null;
   mood: AvatarMood;
   /** The width of the picture in pixels. */
   pixels: number;
@@ -38,20 +41,31 @@ export function nameHash(value: string): string {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
-/** The name of a picture. It changes with the face, the colour, the size and the style. */
+/**
+ * The name of a picture. It changes with the face, the colour, the size and the style. A seed of the
+ * flat style draws the flat face, as on the desktop.
+ */
 export function plushPictureName(spec: PlushPictureSpec): string {
-  const geometry = plushGeometry(spec.seed, spec.mood);
-  const color = getBloubAvatarColor(spec.seed, spec.hue);
-  return `${nameHash(`${PLUSH_STYLE}|${geometry.key}|${color}|${spec.pixels}|${spec.saturation}`)}.png`;
+  const key =
+    avatarStyleForSeed(spec.seed) === "flat"
+      ? flatGeometryKey(spec.seed, spec.mood)
+      : plushGeometry(spec.seed, spec.mood).key;
+  const color = avatarHeadColor(spec.seed, spec.hue, spec.color);
+  return `${nameHash(`${PLUSH_STYLE}|${key}|${color}|${spec.pixels}|${spec.saturation}`)}.png`;
 }
 
-/** Draws the still plush of `spec` as base64 PNG data. */
+/** Draws the still plush, or the flat face of a flat seed, of `spec` as base64 PNG data. */
 export async function renderPlushPicture(spec: PlushPictureSpec): Promise<string> {
-  const geometry = plushGeometry(spec.seed, spec.mood);
-  const art = await loadPlushArt(geometry.shape, getBloubAvatarColor(spec.seed, spec.hue), spec.pixels);
+  const color = avatarHeadColor(spec.seed, spec.hue, spec.color);
   const surface = Skia.Surface.Make(spec.pixels, spec.pixels);
   if (!surface) throw new Error("The plush surface is unavailable.");
-  drawPlush(surface.getCanvas(), plushRestFrame(geometry), art, spec.pixels, spec.saturation);
+  if (avatarStyleForSeed(spec.seed) === "flat") {
+    drawFlat(surface.getCanvas(), flatRestFrame(spec.seed, spec.mood), color, spec.pixels, spec.saturation);
+  } else {
+    const geometry = plushGeometry(spec.seed, spec.mood);
+    const art = await loadPlushArt(geometry.shape, color, spec.pixels);
+    drawPlush(surface.getCanvas(), plushRestFrame(geometry), art, spec.pixels, spec.saturation);
+  }
   surface.flush();
   return surface.makeImageSnapshot().encodeToBase64(ImageFormat.PNG);
 }

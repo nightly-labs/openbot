@@ -438,11 +438,28 @@
 .global-search-empty,
 .global-search-results:not(:has(.global-search-result)) .global-search-status {
   /* With no rows, "Searching…" and "No results" have one height, so the dialog does not jump. */
-  min-height: 96px;
+  min-height: 148px;
 }
 
+/* "No results" is under the plush. */
 .global-search-empty {
+  flex-direction: column;
+  padding-block: var(--openbot-space-3);
   animation: global-search-fade-in var(--openbot-duration-normal) var(--openbot-ease-out) both;
+}
+
+/* The plush tilts on its bottom edge. Its eyes follow the caret, -1 to 1 on each axis. */
+.global-search-plush {
+  --ui-plush-size: 56px;
+  display: block;
+  transform-origin: 50% 100%;
+}
+
+.global-search-plush[data-gaze="follow"] .ui-plush-eyes {
+  animation: none;
+  translate: calc(var(--global-search-gaze-x) * var(--ui-plush-size) * 0.07)
+    calc(var(--global-search-gaze-y) * var(--ui-plush-size) * 0.05);
+  transition: translate var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
 @keyframes global-search-fade-in {
@@ -748,7 +765,7 @@
   height: 20px;
   fill: none;
   stroke: currentColor;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .server-rail-tooltip {
@@ -1004,8 +1021,7 @@ textarea {
   /* A side panel's header continues the top row at the chat header's height, so the lines meet. The
    * window card draws the line. */
   .app-frame-edge .settings-panel-header,
-  .app-frame-edge .file-preview-header,
-  .app-frame-edge .browser-preview-header {
+  .app-frame-edge .file-preview-header {
     height: var(--left-header-height);
     border-bottom: 0;
     background: transparent;
@@ -1324,7 +1340,7 @@ textarea {
 .sidebar-marketplace-button > svg {
   width: 18px;
   height: 18px;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .sidebar-history-button > svg {
@@ -1350,7 +1366,7 @@ textarea {
 .sidebar-update-button > svg {
   width: 18px;
   height: 18px;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .sidebar-search-wrap {
@@ -2240,24 +2256,6 @@ textarea {
   height: 34px;
 }
 
-.person-unread-badge {
-  position: absolute;
-  z-index: 2;
-  inset-inline-end: -4px;
-  bottom: -3px;
-  display: grid;
-  min-width: 17px;
-  height: 17px;
-  place-items: center;
-  border: 2px solid var(--openbot-bg-sidebar);
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-text-primary);
-  padding: 0 3px;
-  color: var(--openbot-bg-sidebar);
-  font-size: var(--openbot-text-sm);
-  font-weight: 680;
-}
-
 .agent-row {
   --agent-row-avatar-size: 46px;
 
@@ -2331,13 +2329,10 @@ textarea {
   border-color: var(--openbot-bg-control);
 }
 
-.agent-row-agent-status-working {
-  width: 24px;
-  height: 16px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-bg-surface);
-  color: var(--openbot-text-secondary);
-}
+/* The working badge, with its felt balls, is in `@openbot/ui/features/sidebar/sidebar-working-badge.css`. */
+
+/* The unread count and the failed routine mark are felt too, with their transitions, in
+   `@openbot/ui/features/sidebar/sidebar-felt-badges.css`. */
 
 .agent-row-thinking-dots {
   display: inline-flex;
@@ -2380,18 +2375,6 @@ textarea {
   stroke-linejoin: round;
 }
 
-.agent-row-agent-status-unread {
-  min-width: 16px;
-  height: 16px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-text-primary);
-  padding: 0 3px;
-  color: var(--openbot-bg-sidebar);
-  font-size: var(--openbot-text-sm);
-  font-weight: 650;
-  line-height: 12px;
-}
-
 .agent-row-agent-status-routine,
 .agent-row-agent-status-limited {
   width: 16px;
@@ -2405,10 +2388,6 @@ textarea {
 .agent-row-agent-status-limited svg {
   width: 10px;
   height: 10px;
-}
-
-.agent-row-agent-status-routine-failed {
-  color: var(--openbot-danger);
 }
 
 /* An agent that waits for the user: amber, and a little larger than the routine marks, so it is
@@ -2572,8 +2551,9 @@ textarea {
 }
 
 /* The plush body is a picture, not a path, so the same ring follows its edge as four offset shadows
-   in the surface colour. They sit on the whole drawing, in pixels, so the width matches the stroke. */
-.bloub-avatar-svg:has(> g > image) {
+   in the surface colour. They sit on the whole drawing, in pixels, so the width matches the stroke.
+   Bloub nests the body in groups whose depth changes between versions, so any image selects it. */
+.bloub-avatar-svg:has(image) {
   --agent-avatar-ring-color: var(--agent-avatar-outline, transparent);
   --agent-avatar-ring-width: var(--agent-avatar-outline-width, 1.5px);
 
@@ -2694,6 +2674,18 @@ textarea {
   white-space: nowrap;
 }
 
+.avatar-editor-heading-end {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+/* The heading is upper case. The style tabs keep the case of other tabs. */
+.avatar-style-tabs {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
 .avatar-editor-actions {
   display: flex;
   align-items: center;
@@ -2783,7 +2775,7 @@ textarea {
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .avatar-image-upload-preview .agent-avatar {
@@ -2894,10 +2886,12 @@ textarea {
   padding: 4px 10px 12px;
 }
 
-/* Automatic and the eight colours fit one row. */
+/* Automatic and the 17 colours fill two rows of nine. A column is narrower than the button
+   padding, so the tile has none; with it, each tile overflowed onto the next one's ring. */
 .avatar-color-choice {
   width: 100%;
   height: 32px;
+  padding: 0;
 }
 
 .avatar-color-swatch {
@@ -3543,6 +3537,7 @@ textarea {
 .reaction-picker-row button:focus-visible,
 .reaction-picker-row button[aria-checked="true"],
 .composer-button:hover,
+.composer-button[aria-expanded="true"],
 .composer-attachment > button:hover,
 .agent-context-menu button:hover,
 .agent-context-menu button:focus-visible {
@@ -3563,6 +3558,14 @@ textarea {
   --agent-avatar-outline: var(--openbot-bg-control);
 
   background: var(--openbot-bg-control);
+}
+
+/* A row is a ghost button. With a fine pointer, the ghost hover fill wins over the row fill
+   (`primitives.css`), so the avatar ring takes that fill too. */
+@media (hover: hover) and (pointer: fine) and (min-width: 601px) {
+  .agent-row:hover {
+    --agent-avatar-outline: var(--openbot-bg-control-hover);
+  }
 }
 
 .agent-list[data-sidebar-dragging] .agent-row:hover {

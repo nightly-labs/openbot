@@ -7,7 +7,8 @@
 // secret from a member, clip step texts, drop the step of an agent that is hidden now and refuse its
 // retry, hide a
 // workflow of a local-only provider, refuse a workflow too large for one frame, and tell the member's
-// event socket about a change. The codec carries kinds and statuses that this app does not know, and
+// event socket about a change. With routine results, the host advertises `workflows-chats-v1` to a
+// protocol 9 peer, and only an owner or admin adds a Telegram trigger or a Slack output. The codec carries kinds and statuses that this app does not know, and
 // the client shows a workflow with such a node read-only; a member reads the graph of an old version.
 // Agent steps answer through stand-ins, so no provider CLI starts and no model turn is sent.
 // Run: `bun scripts/workflow-team-api-e2e.ts`.
@@ -29,6 +30,8 @@ import {
 import { AGENT_ACCESS_CODECS, AGENT_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
 import { TEAM_PROTOCOL_V7 } from "@openbot/contracts/team-protocol/v7";
+import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
 import {
   WORKFLOW_STEP_TEXT_LIMIT,
   WORKFLOWS_CAPABILITY,
@@ -182,6 +185,9 @@ const agentBrowser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 const teamBrowser: TeamApiBrowser = {
   listTabs: () => [],
@@ -298,6 +304,14 @@ async function startHost(): Promise<Host> {
         ),
       rotateWorkflowSecret: () => Effect.succeed({ secret: SECRET }),
     },
+    // The chats of Telegram and Slack nodes (`workflows-chats-v1`); no messaging driver runs here.
+    admin: {
+      routineResults: {
+        options: () => Effect.succeed([]),
+        destination: () => Effect.succeed(null),
+        setDestination: () => Effect.succeed(null),
+      },
+    },
   });
   const port = await Effect.runPromise(server.start());
   return { database, agents, workflows, server, team, port };
@@ -322,13 +336,14 @@ function current(): Host {
 async function call(
   method: string,
   path: string,
-  input: { token?: string; body?: unknown; capabilities?: readonly string[] } = {},
+  input: { token?: string; body?: unknown; capabilities?: readonly string[]; protocol?: number } = {},
 ): Promise<{ status: number; body: unknown }> {
+  const protocol = input.protocol ?? TEAM_PROTOCOL_V7;
   const headers: Record<string, string> = {
     Accept: "application/json",
-    [TEAM_PROTOCOL_VERSION_HEADER]: String(TEAM_PROTOCOL_V7),
+    [TEAM_PROTOCOL_VERSION_HEADER]: String(protocol),
     [TEAM_APP_VERSION_HEADER]: HOST_VERSION,
-    [TEAM_CAPABILITIES_HEADER]: (input.capabilities ?? teamCapabilitiesForProtocol(TEAM_PROTOCOL_V7)).join(","),
+    [TEAM_CAPABILITIES_HEADER]: (input.capabilities ?? teamCapabilitiesForProtocol(protocol)).join(","),
   };
   if (input.body !== undefined) headers["Content-Type"] = "application/json";
   if (input.token) headers.Authorization = `Bearer ${input.token}`;
@@ -715,6 +730,55 @@ try {
     });
     assert.equal(saved.ok, true);
     return { denied, owner: 200, moved, kept: 200 };
+  });
+
+  await step("chats: workflows-chats-v1 goes to protocol 9; only an owner adds Telegram and Slack nodes", async () => {
+    const capabilities = async (protocol: number) =>
+      list(
+        record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+        "capabilities",
+      );
+    assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_CHATS_CAPABILITY));
+    assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_CHATS_CAPABILITY));
+    const before = Number((await ok(WORKFLOWS_ROUTES.get, member, { workflowId: ids.open })).revision);
+    const base = agentGraph(open);
+    const chats: WorkflowGraph = withOutput(
+      {
+        ...base,
+        nodes: [
+          ...base.nodes,
+          {
+            id: "telegram-trigger",
+            kind: "trigger",
+            at: at(-300),
+            fields: { trigger: "telegram", event: "mention", connectionId: "telegram-chat", text: "deploy" },
+          },
+        ],
+      },
+      {
+        id: "slack-output",
+        kind: "output",
+        at: at(600),
+        fields: { target: "slack", connectionId: "slack-workspace", action: "post", placeId: "C-slack" },
+      },
+    );
+    const denied = await refused(
+      WORKFLOWS_ROUTES.saveGraph,
+      member,
+      { workflowId: ids.open, baseRevision: before, graph: chats },
+      403,
+      "error.team.adminRequired",
+    );
+    const owner = await ok(WORKFLOWS_ROUTES.saveGraph, ownerToken, {
+      workflowId: ids.open,
+      baseRevision: before,
+      graph: chats,
+    });
+    assert.equal(owner.ok, true);
+    const saved = await ok(WORKFLOWS_ROUTES.get, ownerToken, { workflowId: ids.open });
+    const nodes = JSON.stringify(record(saved.graph, "graph").nodes);
+    assert.ok(nodes.includes("telegram-chat") && nodes.includes("C-slack"), nodes);
+    return { denied, owner: 200, capability: WORKFLOWS_CHATS_CAPABILITY };
   });
 
   await step("restore: a version that names the closed agent answers as missing", async () => {

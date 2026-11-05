@@ -91,6 +91,7 @@ export const messages = {
   "marketplace.app.telegramTagline": "Telegram 그룹 및 다이렉트 채팅",
   "marketplace.app.whatsappTagline": "WhatsApp의 내 채팅 및 허용한 사람",
   "marketplace.app.bitwardenTagline": "공유 폴더의 로그인 정보로 사이트에 로그인",
+  "marketplace.app.protonPassTagline": "공유 보관함의 로그인 정보로 사이트에 로그인",
   "marketplace.app.onePasswordCategory": "로그인 및 자격 증명 관리",
   "marketplace.app.yourApps": "내 앱",
   "marketplace.app.addCustom": "사용자 지정 추가",
@@ -193,6 +194,15 @@ export const messages = {
     "선택한 Paper 프레임을 우리 코드 컨벤션에 맞게 이 코드베이스에 구현해 줘.",
   "marketplace.plugin.paper.prompt.codeToDesign": "이 저장소의 스타일을 사용해서 Paper에서 설정 페이지를 디자인해 줘.",
   "marketplace.plugin.paper.prompt.tokens": "열려 있는 Paper 파일의 디자인 토큰을 나열하고 우리 테마와 비교해 줘.",
+  "marketplace.plugin.higgsfield.tagline": "AI 이미지, 동영상, 오디오",
+  "marketplace.plugin.higgsfield.description":
+    "Higgsfield를 사용하면 에이전트가 Seedance, Kling, Veo, MiniMax Hailuo 같은 Higgsfield 모델로 이미지, 동영상, 캐릭터, 오디오를 생성하고, 크레딧 잔액을 확인하고, Asset Library를 둘러볼 수 있습니다. 결과는 사용자의 Higgsfield Assets에 저장됩니다. 각 사용자는 브라우저에서 자신의 Higgsfield 계정에 로그인합니다. 모든 생성은 무제한 요금제에서도 그 계정의 크레딧을 표준 요금으로 사용합니다.",
+  "marketplace.plugin.higgsfield.app":
+    "Higgsfield MCP 서버를 통한 이미지·동영상·오디오 생성, 캐릭터, 크레딧, 에셋. 브라우저에서 로그인합니다.",
+  "marketplace.plugin.higgsfield.prompt.credits": "Higgsfield 크레딧이 얼마나 남았어?",
+  "marketplace.plugin.higgsfield.prompt.productShot":
+    "Higgsfield로 나무 테이블 위 세라믹 머그잔의 제품 사진을 만들어 줘.",
+  "marketplace.plugin.higgsfield.prompt.clip": "Higgsfield로 해 질 녘 파도의 5초 동영상을 만들어 줘.",
   "marketplace.plugin.appleApps.tagline": "Mac의 Mail, 캘린더 등",
   "marketplace.plugin.appleApps.description":
     "Apple apps를 사용하면 에이전트가 이 Mac의 Mail, 캘린더, 연락처, 미리 알림, 메모, 메시지, Safari를 사용할 수 있어요. macOS에서만 작동해요. OpenBot은 mcp-icloud를 시작해요. Apple이나 OpenBot이 만들지 않은 커뮤니티 서버예요. 서버는 이 컴퓨터에서 AppleScript로 앱을 제어하며, 계정이나 키가 필요 없어요. 설치할 때 OpenBot이 이 모든 앱에 대한 접근을 macOS에 한 번에 요청할 수 있어요. 앱마다 확인 창이 하나씩 떠요. 요청하지 않으면 에이전트가 앱을 처음 사용할 때 macOS가 물어요. 나중에 바꾸려면 시스템 설정 › 개인정보 보호 및 보안 › 자동화를 여세요. 에이전트는 이메일과 iMessage를 보내고 이벤트, 연락처, 미리 알림을 변경하거나 삭제할 수 있으니, 승인하기 전에 각 쓰기를 확인하세요. 이메일 본문처럼 도구가 읽은 내용은 에이전트의 모델 제공자에게 전송돼요.",
@@ -248,6 +258,17 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "이 결제를 조회하고 왜 실패했는지 설명해 줘.",
   "marketplace.plugin.stripe.prompt.customer": "이 고객의 청구서와 미납 잔액을 요약해 줘.",
   "marketplace.plugin.stripe.prompt.link": "Pro 요금제의 월 49 결제 링크 초안을 작성해 줘.",
+  "marketplace.plugin.revenuecat.tagline": "구독, 상품, 페이월",
+  "marketplace.plugin.revenuecat.description":
+    "RevenueCat을 사용하면 에이전트가 인앱 구독 설정을 읽고 변경할 수 있습니다. 대상은 앱, 상품, 엔타이틀먼트, 오퍼링, 패키지, 페이월, 실험입니다. 에이전트는 고객과 구매 내역을 조회하고 차트와 지표를 읽을 수도 있습니다. RevenueCat 비밀 API 키는 하나의 Authorization 헤더에 들어갑니다. 키는 하나의 프로젝트에 접근합니다. 읽기 전용 키로는 에이전트가 읽기만 할 수 있습니다. 쓰기 키로는 에이전트가 상품을 App Store 심사에 제출하고, 고객에게 엔타이틀먼트를 부여하고, 패키지, 타기팅 규칙, 웹훅을 삭제할 수 있습니다.",
+  "marketplace.plugin.revenuecat.app":
+    "RevenueCat의 MCP 서버와 비밀 API 키로 사용하는 상품, 엔타이틀먼트, 오퍼링, 페이월, 지표.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "내 RevenueCat 프로젝트에는 어떤 오퍼링과 패키지가 있나요?",
+  "marketplace.plugin.revenuecat.prompt.revenue": "이번 달 RevenueCat 매출과 활성 구독은 어떻게 바뀌었나요?",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "이 RevenueCat 고객에게는 어떤 엔타이틀먼트가 있고, 언제 만료되나요?",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "RevenueCat 대시보드에서 프로젝트의 API keys를 열고 비밀 API 키를 만드세요. 데이터를 보기만 하려면 읽기 전용 키로 충분합니다.",
   "marketplace.plugin.posthog.tagline": "제품 분석 및 플래그",
   "marketplace.plugin.posthog.description":
     "PostHog를 사용하면 에이전트가 이벤트와 퍼널을 쿼리하고, 기능 플래그를 살펴보고, 릴리스 후 무엇이 바뀌었는지 요약할 수 있어요. 프로젝트 설정의 개인 API 키를 Authorization 헤더 하나에 넣어요.",
@@ -356,6 +377,14 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "오늘 마감인 Todoist 작업은 뭐야?",
   "marketplace.plugin.todoist.prompt.capture": "이 실행 항목들을 내 Todoist 관리함에 추가해 줘.",
   "marketplace.plugin.todoist.prompt.overdue": "기한이 지난 Todoist 작업을 내일로 옮겨 줘.",
+  "marketplace.plugin.ticktick.tagline": "작업, 목록, 습관, 집중",
+  "marketplace.plugin.ticktick.description":
+    "TickTick을 사용하면 에이전트가 작업을 검색하고 필터링하고, 작업을 추가하고 변경하며, 목록, 섹션, 폴더, 태그, 댓글을 관리할 수 있습니다. 에이전트는 습관과 집중 기록을 읽고 변경할 수 있으며, TickTick에 연결된 캘린더의 일정도 읽을 수 있습니다. 각 사용자는 브라우저에서 자신의 TickTick 계정에 로그인합니다. 에이전트는 읽기 및 쓰기 권한을 받아 작업을 완료, 이동, 삭제하고 태그와 집중 기록을 삭제할 수 있습니다.",
+  "marketplace.plugin.ticktick.app":
+    "작업, 목록, 습관, 집중 기록을 브라우저 로그인으로 TickTick의 MCP 서버를 통해 다룹니다.",
+  "marketplace.plugin.ticktick.prompt.today": "오늘 마감인 TickTick 작업은 뭐야?",
+  "marketplace.plugin.ticktick.prompt.capture": "이 실행 항목들을 내 TickTick 받은편지함에 추가해 줘.",
+  "marketplace.plugin.ticktick.prompt.week": "지난주에 완료한 TickTick 작업은 뭐야?",
   "marketplace.plugin.trello.tagline": "보드, 리스트, 카드",
   "marketplace.plugin.trello.description":
     "Trello를 사용하면 에이전트가 보드, 리스트, 카드, 체크리스트, 댓글을 검색하고 읽으며, 보드와 카드를 만들고, 리스트와 카드를 옮기고, 카드를 완료로 표시하고, 체크리스트, 댓글, 라벨을 추가할 수 있어요. 또한 사용자의 Trello 받은 편지함에서 카드를 읽고 추가하며, 연결된 Google 또는 Outlook 캘린더에서 올 수 있는 Planner 일정을 읽을 수 있어요. 사용자는 각자 브라우저에서 자신의 Trello 계정으로 로그인하고 동의 화면에서 워크스페이스를 선택해요. 에이전트는 그 워크스페이스에서 사용자와 같은 권한을 가져요. 카드와 리스트를 보관할 수 있지만, 서버는 어떤 것도 영구 삭제할 수 없어요.",
@@ -372,6 +401,23 @@ export const messages = {
   "marketplace.plugin.clickup.prompt.createTask": "이 실행 항목들로 ClickUp 작업을 만들고 나에게 할당해 줘.",
   "marketplace.plugin.clickup.prompt.summarizeDoc":
     "ClickUp에서 최신 프로젝트 업데이트를 찾아 미해결 질문을 요약해 줘.",
+  "marketplace.plugin.coinbase.tagline": "암호화폐 시세, 포트폴리오, 거래",
+  "marketplace.plugin.coinbase.description":
+    "Coinbase를 사용하면 에이전트가 Coinbase Advanced Trade의 시세, 잔액, 포트폴리오, 주문, 수수료를 읽고, 주문을 미리 보고 넣고, 자산 간에 전환하고, 포트폴리오 간에 자금을 옮길 수 있습니다. 각 사용자는 브라우저에서 자신의 Coinbase 계정으로 로그인합니다. 에이전트는 사용자와 같은 권한을 가집니다. 주문과 전환에는 실제 자금이 쓰이며, 에이전트는 USDC 잔액으로 x402 요청 비용을 낼 수 있습니다.",
+  "marketplace.plugin.coinbase.app":
+    "시세, 잔액, 포트폴리오, 주문, 전환. Coinbase의 MCP 서버와 브라우저 로그인을 사용합니다.",
+  "marketplace.plugin.coinbase.prompt.balances": "포트폴리오별 내 Coinbase 잔액은 얼마인가요?",
+  "marketplace.plugin.coinbase.prompt.price": "Coinbase의 BTC-USD 시세와 이번 주 움직임을 보여 주세요.",
+  "marketplace.plugin.coinbase.prompt.previewOrder":
+    "Coinbase에서 ETH 50 USD 시장가 매수를 미리 보여 주세요. 주문은 넣지 마세요.",
+  "marketplace.plugin.robinhood.tagline": "증권 계좌와 에이전트 거래",
+  "marketplace.plugin.robinhood.description":
+    "Robinhood를 사용하면 에이전트가 Robinhood 고객의 계좌, 포지션, 잔액, 거래 내역, 관심 종목과 시장 데이터를 읽고 주식, 옵션, 암호화폐 주문을 넣을 수 있습니다. 각 사용자는 브라우저에서 자신의 Robinhood 계정으로 로그인합니다. 처음 로그인할 때 Robinhood는 별도의 Agentic 계좌를 열도록 요청합니다. 에이전트는 그 계좌에서만 거래할 수 있으며, 기본 설정에서는 주문마다 사용자 승인을 받지 않고 주문합니다.",
+  "marketplace.plugin.robinhood.app":
+    "계좌, 포지션, 시장 데이터, 거래. Robinhood의 MCP 서버와 브라우저 로그인을 사용합니다.",
+  "marketplace.plugin.robinhood.prompt.positions": "내 Robinhood 포지션과 오늘의 움직임을 요약해 주세요.",
+  "marketplace.plugin.robinhood.prompt.watchlist": "내 Robinhood 관심 종목은 이번 주에 각각 어떻게 움직였나요?",
+  "marketplace.plugin.robinhood.prompt.agenticCash": "내 Robinhood Agentic 계좌에 현금이 얼마 있나요?",
   "marketplace.plugin.huggingface.tagline": "Hub의 모델, 데이터셋, 논문",
   "marketplace.plugin.huggingface.description":
     "Hugging Face를 사용하면 에이전트가 Hugging Face Hub에서 모델, 데이터셋, Spaces, 컬렉션, 논문을 검색하고, 모델 카드와 저장소 파일을 읽고, 데이터셋을 미리 보고, Hugging Face 문서를 검색할 수 있어요. 공개 Hub 데이터를 사용하므로 계정도 키도 필요 없어요. 도구는 읽기만 해요. 에이전트는 저장소를 만들거나 작업(Jobs)을 실행할 수 없어요.",

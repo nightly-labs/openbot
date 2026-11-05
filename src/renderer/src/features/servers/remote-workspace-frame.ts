@@ -30,11 +30,15 @@ export interface RemoteWorkspaceFrame {
   channels: ChannelSummary[];
   /** The agent that was open, on the web. The desktop app keeps its own selection. */
   selectedAgentId: string | null;
+  /** The agents opened last on the web, the newest first. A new page reads their latest page early. */
+  recentAgentIds: string[];
 }
 
 type FrameStorage = Pick<Storage, "getItem" | "setItem" | "removeItem" | "key" | "length">;
 
 const FRAME_KEY_PREFIX = "openbot:remote-frame:v1:";
+/** The agents that `recentAgentIds` keeps: the open one and the 3 before it. */
+const RECENT_AGENTS = 4;
 /** An older frame shows a workspace that has changed too much to be useful. */
 const FRAME_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -70,6 +74,7 @@ function decodeFrame(frame: unknown): RemoteWorkspaceFrame | null {
     hiddenAgents: Array.isArray(frame.hiddenAgents) ? frame.hiddenAgents.filter(isHiddenAgent) : [],
     channels: Array.isArray(frame.channels) ? frame.channels.filter(isChannel).map(frameChannel) : [],
     selectedAgentId: isString(frame.selectedAgentId) ? frame.selectedAgentId : null,
+    recentAgentIds: Array.isArray(frame.recentAgentIds) ? frame.recentAgentIds.filter(isString) : [],
   };
 }
 
@@ -94,11 +99,14 @@ export function readRemoteWorkspaceFrame(
 export function saveRemoteWorkspaceFrame(
   accountId: string,
   serverId: string,
-  update: Partial<RemoteWorkspaceFrame>,
+  // The recent agents follow `selectedAgentId`, so a caller does not write them.
+  update: Partial<Omit<RemoteWorkspaceFrame, "recentAgentIds">>,
   storage: FrameStorage = window.localStorage,
 ): void {
   const current = readRemoteWorkspaceFrame(accountId, serverId, storage);
   const agents = update.agents ?? current?.agents ?? [];
+  const recent = current?.recentAgentIds ?? [];
+  const selected = update.selectedAgentId;
   const frame = {
     savedAt: Date.now(),
     agents: agents.map((agent) => ({ ...agent, preview: "" })),
@@ -107,6 +115,7 @@ export function saveRemoteWorkspaceFrame(
     hiddenAgents: update.hiddenAgents ?? current?.hiddenAgents ?? [],
     channels: (update.channels ?? current?.channels ?? []).map(frameChannel),
     selectedAgentId: update.selectedAgentId !== undefined ? update.selectedAgentId : (current?.selectedAgentId ?? null),
+    recentAgentIds: selected ? [selected, ...recent.filter((id) => id !== selected)].slice(0, RECENT_AGENTS) : recent,
   };
   try {
     storage.setItem(frameKey(accountId, serverId), JSON.stringify(frame));

@@ -71,6 +71,8 @@ export const messages = {
   "error.team.sharedDataUnsupported": "I dati condivisi non sono supportati da questa connessione.",
   "error.team.agentInstallUnsupported": "L'aggiunta di agenti non è supportata da questa connessione.",
   "error.team.agentHideUnsupported": "Nascondere gli agenti non è supportato da questa connessione.",
+  "error.team.agentColorsUnsupported": "I colori degli agenti non sono supportati da questa connessione.",
+  "error.team.chatColorsUnsupported": "I colori della chat non sono supportati da questa connessione.",
   "error.team.sidebarFoldersUnsupported": "Le cartelle nelle cartelle non sono supportate da questa connessione.",
   "error.team.agentNotificationLevelsUnsupported":
     "Questo server non può salvare il tuo livello di notifiche per ogni agente. Aggiorna OpenBot sul computer che lo esegue.",
@@ -82,6 +84,7 @@ export const messages = {
   "error.team.agentUpdateUnsupported": "L'aggiornamento degli agenti non è supportato da questa connessione.",
   "error.team.contextResetUnsupported": "L'avvio di una nuova chat non è supportato da questa connessione.",
   "error.team.contextCompactUnsupported": "Questa connessione non supporta la compattazione del contesto.",
+  "error.team.messageDeleteUnsupported": "Questa connessione non supporta l’eliminazione dei messaggi.",
   "error.team.workspaceDirectoryUnsupported":
     "La visualizzazione delle cartelle non è supportata da questa connessione.",
   "error.team.conversationFileSearchUnsupported": "Questa connessione non supporta la ricerca nei file.",

@@ -328,6 +328,8 @@ export const messages = {
   "connector.whatsapp.title": "WhatsApp",
   "connector.whatsapp.description":
     "Vincule um número do WhatsApp a este computador. O Orquestrador do WhatsApp consulta o agente certo e responde.",
+  "connector.whatsapp.descriptionHost":
+    "Vincule um número do WhatsApp a este servidor. O Orquestrador do WhatsApp consulta o agente certo e responde.",
   "connector.whatsapp.statusConnected": "Conectado",
   "connector.whatsapp.statusAttention": "Precisa de atenção",
   "connector.whatsapp.summaryConnected": {
@@ -354,6 +356,8 @@ export const messages = {
     "As pessoas que você permitir falam com o OpenBot. Outras pessoas recebem um código para passar a você.",
   "connector.whatsapp.helpLoggedOut":
     "O WhatsApp removeu este computador dos dispositivos conectados. Vincule o número novamente.",
+  "connector.whatsapp.helpLoggedOutHost":
+    "O WhatsApp removeu este servidor dos dispositivos conectados. Vincule o número novamente.",
   "connector.whatsapp.helpError":
     "O OpenBot não consegue acessar o WhatsApp neste número. Reconecte ou desconecte o número.",
   "connector.whatsapp.retryAt": "O WhatsApp pediu para o OpenBot aguardar. Ele tentará novamente às {time}.",
@@ -384,6 +388,8 @@ export const messages = {
   "connector.whatsapp.connectTitle": "Vincular WhatsApp",
   "connector.whatsapp.connectDescription":
     "Selecione o número e depois vincule este computador pelo WhatsApp no seu celular.",
+  "connector.whatsapp.connectDescriptionHost":
+    "Selecione o número e depois vincule este servidor pelo WhatsApp no seu celular.",
   "connector.whatsapp.kindLabel": "Número",
   "connector.whatsapp.kindPersonal": "Meu número pessoal",
   "connector.whatsapp.kindPersonalDescription":
@@ -558,4 +564,73 @@ export const messages = {
   "connector.bitwarden.clientSecret": "client_secret da chave de API",
   "connector.bitwarden.masterPassword": "Senha mestra",
   "connector.bitwarden.connecting": "Conectando",
+  "connector.protonPass.title": "Proton Pass",
+  "connector.protonPass.description":
+    "Os agentes entram em sites com os logins de um cofre compartilhado do Proton Pass.",
+  "connector.protonPass.descriptionHost":
+    "Os agentes em {host} entram em sites com os logins de um cofre compartilhado do Proton Pass.",
+  "connector.protonPass.connect": "Conectar",
+  "connector.protonPass.moreWays": "Outras formas de conectar",
+  "connector.protonPass.useKey": "Usar uma chave de acesso",
+  "connector.protonPass.keyLabel": "Chave de acesso",
+  "connector.protonPass.keyPlaceholder": "pst_…",
+  "connector.protonPass.setupTitle": "Configurar",
+  "connector.protonPass.setupDescription":
+    "Conectar abre o login do Proton no seu navegador. Depois, o OpenBot cria o cofre compartilhado e guarda só uma chave somente leitura.",
+  "connector.protonPass.setupDescriptionHost":
+    "Conectar abre o login do Proton no seu navegador. Depois, {host} cria o cofre compartilhado e guarda só uma chave somente leitura.",
+  "connector.protonPass.vaultName": "Shared with OpenBot",
+  "connector.protonPass.vaultSetup":
+    "O OpenBot cria este cofre quando você conecta. Mova logins para ele para compartilhá-los.",
+  "connector.protonPass.showSteps": "Ver etapas",
+  "connector.protonPass.stepsLabel": "Etapas da conexão",
+  "connector.protonPass.stepSignIn": "Entrar",
+  "connector.protonPass.stepVault": "Criar o cofre compartilhado",
+  "connector.protonPass.stepDone": "Pronto",
+  "connector.protonPass.signInTitle": "Entre no Proton",
+  "connector.protonPass.signInStarting": "O OpenBot inicia o login. A página do Proton abre no seu navegador.",
+  "connector.protonPass.signInDescription":
+    "O login está aberto no seu navegador. O Proton pede sua senha e seu segundo fator.",
+  "connector.protonPass.signInDescriptionHost":
+    "O login para {host} está aberto no seu navegador. O Proton pede sua senha e seu segundo fator.",
+  "connector.protonPass.extraPasswordDescription": "O Proton Pass pede sua senha extra.",
+  "connector.protonPass.extraPasswordWrong": "A senha extra não está correta. Digite-a de novo.",
+  "connector.protonPass.extraPasswordLabel": "Senha extra",
+  "connector.protonPass.continue": "Continuar",
+  "connector.protonPass.setupStepTitle": "Criando o cofre compartilhado",
+  "connector.protonPass.setupStepDescription":
+    "O OpenBot cria o cofre “{vault}” e uma chave somente leitura para ele. Depois, encerra sua sessão do Proton.",
+  "connector.protonPass.doneTitle": "O Proton Pass está conectado",
+  "connector.protonPass.doneDescription": "Mova logins para “{vault}” para que os agentes entrem com eles.",
+  "connector.protonPass.failedTitle": "O Proton Pass não conectou",
+  "connector.protonPass.copyLink": "Copiar link",
+  "connector.protonPass.linkCopied": "Copiado",
+  "connector.protonPass.openAgain": "Abrir de novo",
+  "connector.protonPass.done": "Pronto",
+  "connector.protonPass.close": "Fechar",
+  "connector.protonPass.statusConnecting": "Conectando",
+  "connector.protonPass.statusConnected": "Conectado",
+  "connector.protonPass.statusExpired": "Chave expirada",
+  "connector.protonPass.expiredTitle": "A chave do Proton Pass expirou",
+  "connector.protonPass.expiredDescription":
+    "Os agentes não podem entrar com seus logins compartilhados até você entrar de novo.",
+  "connector.protonPass.reconnect": "Reconectar",
+  "connector.protonPass.planTitle": "O Proton Pass precisa de um plano pago",
+  "connector.protonPass.planDescription":
+    "A CLI do Proton Pass só funciona com um plano pago do Proton. Mude seu plano e conecte de novo.",
+  "connector.protonPass.vaultTitle": "Cofre compartilhado",
+  "connector.protonPass.vaultDescription":
+    "Os agentes podem entrar com os logins deste cofre. Mova um login para ele para compartilhá-lo.",
+  "connector.protonPass.loginCount": { one: "{count} login", other: "{count} logins" },
+  "connector.protonPass.loginsLoading": "Contando logins…",
+  "connector.protonPass.keyExpires": "Somente leitura. Expira em {date}.",
+  "connector.protonPass.keyExpired": "Somente leitura. Expirou em {date}.",
+  "connector.protonPass.keyNoExpiry": "Somente leitura. Não expira.",
+  "connector.protonPass.disconnectTitle": "Desconectar o Proton Pass",
+  "connector.protonPass.disconnectSummary":
+    "O OpenBot exclui a chave de acesso dele neste computador. O cofre e os logins dele ficam na sua conta Proton.",
+  "connector.protonPass.disconnectSummaryHost":
+    "O OpenBot exclui a chave de acesso dele em {host}. O cofre e os logins dele ficam na sua conta Proton.",
+  "connector.protonPass.disconnect": "Desconectar",
+  "connector.protonPass.actionFailed": "O OpenBot não conseguiu alterar a conexão do Proton Pass.",
 } as const satisfies PartialTranslation<typeof source>;

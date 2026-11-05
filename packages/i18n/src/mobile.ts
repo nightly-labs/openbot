@@ -9,7 +9,7 @@ import { mobileCatalog } from "./mobile-catalogs";
  */
 export { APP_LANGUAGES, type AppLanguage, DEFAULT_APP_LANGUAGE, isAppLanguage } from "@openbot/contracts/app-language";
 export { type AppFormat, createFormat } from "./format";
-export { formatLocale, resolveLocale, TRANSLATED_LOCALES, type TranslatedLocale } from "./locale";
+export { formatLocale, localeDirection, resolveLocale, TRANSLATED_LOCALES, type TranslatedLocale } from "./locale";
 export { localizeSourceText, sourceText } from "./source-text";
 export type { AppMobileMessages };
 

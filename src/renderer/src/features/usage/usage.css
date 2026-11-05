@@ -126,33 +126,6 @@
     gap: calc(var(--openbot-space-6) * 2);
   }
 }
-/* The drop order is the reading order reversed: message counts go before token
-   categories, and the processed total is the one entry that always stays. */
-@container (max-width: 1000px) {
-  .agent-usage-totals > div:nth-child(n + 7) {
-    display: none;
-  }
-}
-@container (max-width: 820px) {
-  .agent-usage-totals > div:nth-child(n + 6) {
-    display: none;
-  }
-}
-@container (max-width: 660px) {
-  .agent-usage-totals > div:nth-child(n + 5) {
-    display: none;
-  }
-}
-@container (max-width: 540px) {
-  .agent-usage-totals > div:nth-child(n + 4) {
-    display: none;
-  }
-}
-@container (max-width: 400px) {
-  .agent-usage-totals > div:nth-child(n + 3) {
-    display: none;
-  }
-}
 @container (max-width: 480px) {
   .agent-usage-hero {
     font-size: var(--openbot-text-display);
@@ -207,4 +180,9 @@
 .server-connection-content > * {
   min-height: 0;
   flex: 1;
+}
+/* The first load covers the whole window: the page rail, the server rail and the sidebar too. The frame
+ * is a size container, so the screen is a child of the window and not of the frame. */
+.app-window > .app-loading {
+  position: fixed;
 }

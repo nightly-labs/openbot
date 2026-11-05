@@ -17,7 +17,9 @@ import {
   type CreateRoutineInput,
   type DeleteAgentMemoryInput,
   type DeleteChannelMemoryInput,
+  type DeleteChannelMessageInput,
   type DeleteChannelRoutineInput,
+  type DeleteConversationMessageInput,
   type DeleteRoutineInput,
   type DownloadAttachmentsInput,
   type EditQueuedMessageInput,
@@ -29,6 +31,7 @@ import {
   isAgentModel,
   isAgentProvider,
   isAgentTaskLimit,
+  isAvatarColor,
   isAvatarHue,
   isAvatarSeed,
   isBusyMessageMode,
@@ -57,9 +60,11 @@ import {
   type RespondToPromptInput,
   ROUTINE_LIMIT_POLICIES,
   ROUTINE_MISSED_POLICIES,
+  ROUTINE_RUN_PLACES,
   type RoutineCalendarInput,
   type RoutineLimitPolicy,
   type RoutineMissedPolicy,
+  type RoutineRunPlace,
   type RunQueuedMessageAsTaskInput,
   type SearchConversationFilesInput,
   type SearchConversationMessagesInput,
@@ -223,11 +228,16 @@ export function parseCreateAgent(value: unknown): CreateAgentInput {
   const avatarHue = value.avatarHue;
   if (!isAvatarSeed(value.avatarSeed)) throw new Error("Invalid avatar seed.");
   if (avatarHue !== null && !isAvatarHue(avatarHue)) throw new Error("Invalid avatar hue.");
+  const avatarColor = value.avatarColor;
+  if (avatarColor !== undefined && avatarColor !== null && !isAvatarColor(avatarColor)) {
+    throw new Error("Invalid avatar color.");
+  }
   const result: CreateAgentInput = {
     name: requireString(value.name, "name", INPUT_LIMITS.agentName),
     description: requireString(value.description, "description", INPUT_LIMITS.agentDescription),
     avatarSeed: value.avatarSeed,
     avatarHue,
+    ...(avatarColor === undefined ? {} : { avatarColor }),
     initialMessage: requireString(value.initialMessage, "initialMessage", INPUT_LIMITS.messageText),
   };
   if (value.provider !== undefined) {
@@ -282,6 +292,7 @@ export function parseCreateRoutine(value: unknown): CreateRoutineInput {
     schedule: parseRoutineSchedule(value.schedule),
     ...optionalLimitPolicy(value.limitPolicy),
     ...optionalMissedPolicy(value.missedPolicy),
+    ...optionalRunPlace(value.runIn),
   };
 }
 
@@ -300,7 +311,12 @@ export function parseUpdateRoutine(value: unknown): UpdateRoutineInput {
     parsed.active = value.active;
   }
   if (value.schedule !== undefined) parsed.schedule = parseRoutineSchedule(value.schedule);
-  Object.assign(parsed, optionalLimitPolicy(value.limitPolicy), optionalMissedPolicy(value.missedPolicy));
+  Object.assign(
+    parsed,
+    optionalLimitPolicy(value.limitPolicy),
+    optionalMissedPolicy(value.missedPolicy),
+    optionalRunPlace(value.runIn),
+  );
   if (Object.keys(parsed).length === 2) throw new Error("A routine update is required.");
   return parsed;
 }
@@ -315,6 +331,12 @@ function optionalMissedPolicy(value: unknown): { missedPolicy?: RoutineMissedPol
   if (value === undefined) return {};
   if (!isOneOf(ROUTINE_MISSED_POLICIES, value)) throw new Error("Invalid routine missed-run policy.");
   return { missedPolicy: value };
+}
+
+function optionalRunPlace(value: unknown): { runIn?: RoutineRunPlace } {
+  if (value === undefined) return {};
+  if (!isOneOf(ROUTINE_RUN_PLACES, value)) throw new Error("Invalid routine run place.");
+  return { runIn: value };
 }
 
 export function parseDeleteRoutine(value: unknown): DeleteRoutineInput {
@@ -656,6 +678,23 @@ export function parseMarkConversationUnread(value: unknown): MarkConversationUnr
   };
 }
 
+export function parseDeleteConversationMessage(value: unknown): DeleteConversationMessageInput {
+  if (!isObject(value)) throw new Error("Invalid message delete request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
+    ...(value.taskId === undefined ? {} : { taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier) }),
+  };
+}
+
+export function parseDeleteChannelMessage(value: unknown): DeleteChannelMessageInput {
+  if (!isObject(value)) throw new Error("Invalid message delete request.");
+  return {
+    channelId: requireString(value.channelId, "channelId", INPUT_LIMITS.identifier),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
+  };
+}
+
 export function parseUpdateAgent(value: unknown): UpdateAgentInput {
   if (!isObject(value)) throw new Error("Invalid agent update request.");
   if (value.role !== undefined) throw new Error("Invalid role.");
@@ -759,6 +798,14 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
       throw new Error("Invalid avatar hue.");
     }
     result.avatarHue = value.avatarHue;
+  }
+  if (value.avatarColor !== undefined) {
+    if (value.avatarColor !== null && !isAvatarColor(value.avatarColor)) throw new Error("Invalid avatar color.");
+    result.avatarColor = value.avatarColor;
+  }
+  if (value.chatColor !== undefined) {
+    if (value.chatColor !== null && !isAvatarColor(value.chatColor)) throw new Error("Invalid chat color.");
+    result.chatColor = value.chatColor;
   }
   return result;
 }
@@ -888,7 +935,11 @@ export function parsePreviewSharedFile(value: unknown): PreviewSharedFileInput {
 
 export function parsePreviewWorkspaceFile(value: unknown): PreviewWorkspaceFileInput {
   if (!isObject(value)) throw new Error("Invalid workspace file request.");
-  return { ...parseOpenWorkspaceFile(value), ...optionalPreviewByteLimit(value.maxBytes) };
+  return {
+    ...parseOpenWorkspaceFile(value),
+    ...optionalPreviewByteLimit(value.maxBytes),
+    ...(value.exactPath === true ? { exactPath: true } : {}),
+  };
 }
 
 function optionalPreviewByteLimit(value: unknown): { maxBytes?: number } {
@@ -955,6 +1006,7 @@ export function parseReorderQueue(value: unknown): ReorderQueueInput {
   return {
     agentId: requireString(value.agentId, "agentId"),
     deliveryIds: parseIdentifierList(value.deliveryIds, "delivery ids", INPUT_LIMITS.queueReorder),
+    ...(value.taskId === undefined ? {} : { taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier) }),
   };
 }
 

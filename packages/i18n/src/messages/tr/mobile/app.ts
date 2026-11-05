@@ -13,6 +13,7 @@ export const messages = {
   "mobile.app.route.accountSessions": "Hesap oturumları",
   "mobile.app.route.about": "Hakkında",
   "mobile.app.route.support": "Destek",
+  "mobile.app.route.supportLog": "Destek günlüğü",
   "mobile.app.route.hiddenChats": "Gizli sohbetler",
   "mobile.app.route.share": "Paylaş",
   "mobile.app.route.deletedChannels": "Silinen kanallar",

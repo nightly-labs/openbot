@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "OpenBot 데이터베이스가 무결성 검사에 실패했어요.",
   "error.backend.webhookRouteLimit": "호스트 하나에는 웹훅 루틴을 최대 {limit}개까지 둘 수 있어요.",
   "error.backend.webhookSettingsInvalid": "웹훅 설정을 확인한 후 다시 시도해 주세요.",
+  "error.backend.webhookSenderSecretInvalid":
+    "보낸 쪽의 서명 시크릿 전체를 붙여 넣으세요. 16~1024자이며 공백이 없습니다.",
   "error.backend.webhookRouteUnavailable":
     "공개 웹훅 경로가 아직 준비되지 않았어요. 호스트 연결을 확인한 후 다시 시도해 주세요.",
   "error.backend.webhookTestUnavailable":
@@ -193,6 +195,10 @@ export const messages = {
   "error.backend.agentWaitRemoteUnsupported": "열린 대기는 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
   "error.backend.markUnreadRemoteUnsupported":
     "메시지를 읽지 않음으로 표시하는 기능은 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
+  "error.backend.messageDeleteUnsupported": "이 서버는 메시지 삭제를 지원하지 않아요.",
+  "error.backend.messageDeleteNotFound": "이 메시지는 채팅에 없어요.",
+  "error.backend.messageDeleteBusy": "이 메시지는 실행 중인 턴의 일부예요. 턴이 끝나면 삭제하세요.",
+  "error.backend.messageDeleteForbidden": "내가 보낸 메시지만 삭제할 수 있어요.",
   "error.backend.routineFlowHandoffFailed": "루틴이 이 에이전트에게 작업을 넘기지 못했어요.",
   "error.backend.mcpServerLimit": "OpenBot은 MCP 서버를 최대 {limit}개까지 유지해요.",
   "error.backend.mcpServerNameTaken": "{name}(이)라는 MCP 서버가 이미 있어요.",
@@ -291,6 +297,16 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "같은 이름의 브라우저 프로필이 이미 있어요.",
   "error.backend.browserSessionInUse": "탭 하나가 아직 이 브라우저 세션을 사용 중이에요. 다시 시도해 주세요.",
   "error.backend.browserProfileLimit": "브라우저 프로필은 최대 {limit}개까지 만들 수 있어요.",
+  "error.backend.browserProxyNotFound": "이 프록시는 더 이상 없어요.",
+  "error.backend.browserProxyAddressInvalid":
+    "socks5://host:1080 또는 http://user:password@host:3128 같은 프록시 주소를 입력하세요.",
+  "error.backend.browserProxyLimit": "프록시는 최대 {limit}개까지 만들 수 있어요.",
+  "error.backend.browserProxyTaken": "이 주소를 사용하는 프록시가 이미 있어요.",
+  "error.backend.browserProxyChanged": "이 프록시를 연 뒤에 변경되었어요. 다시 확인한 다음 다시 시도해 주세요.",
+  "error.backend.browserProxyUnreachable": "프록시 {name}이(가) 응답하지 않아 페이지를 열지 못했어요.",
+  "error.backend.browserProxySignInRefused": "프록시 {name}이(가) 로그인을 거부해 페이지를 열지 못했어요.",
+  "error.backend.browserProxyComputerUnreachable":
+    "이 프로필이 사용하는 컴퓨터가 응답하지 않아 페이지를 열지 못했어요.",
   "error.backend.browserLowMemory":
     "이 서버의 메모리가 부족해서 브라우저에서 탭을 더 열 수 없어요. 탭을 닫거나 다른 에이전트가 끝날 때까지 기다리세요.",
   "error.backend.browserOpenFailed": "{url}을(를) 열 수 없어요: {reason}",

@@ -337,6 +337,8 @@ export const messages = {
   "connector.whatsapp.title": "WhatsApp",
   "connector.whatsapp.description":
     "Vincula un número de WhatsApp a este equipo. El Orquestador de WhatsApp consulta al agente adecuado y responde.",
+  "connector.whatsapp.descriptionHost":
+    "Vincula un número de WhatsApp a este servidor. El Orquestador de WhatsApp consulta al agente adecuado y responde.",
   "connector.whatsapp.statusConnected": "Conectado",
   "connector.whatsapp.statusAttention": "Requiere atención",
   "connector.whatsapp.summaryConnected": {
@@ -363,6 +365,8 @@ export const messages = {
     "Las personas que permitas pueden contactar con OpenBot. Las demás reciben un código para dártelo.",
   "connector.whatsapp.helpLoggedOut":
     "WhatsApp quitó este equipo de los dispositivos vinculados. Vuelve a vincular el número.",
+  "connector.whatsapp.helpLoggedOutHost":
+    "WhatsApp quitó este servidor de los dispositivos vinculados. Vuelve a vincular el número.",
   "connector.whatsapp.helpError":
     "OpenBot no puede acceder a WhatsApp en este número. Vuelve a conectar o desconecta el número.",
   "connector.whatsapp.retryAt": "WhatsApp pidió a OpenBot que esperara. Lo intentará de nuevo a las {time}.",
@@ -393,6 +397,8 @@ export const messages = {
   "connector.whatsapp.connectTitle": "Vincular WhatsApp",
   "connector.whatsapp.connectDescription":
     "Selecciona el número y luego vincula este equipo desde WhatsApp en tu teléfono.",
+  "connector.whatsapp.connectDescriptionHost":
+    "Selecciona el número y luego vincula este servidor desde WhatsApp en tu teléfono.",
   "connector.whatsapp.kindLabel": "Número",
   "connector.whatsapp.kindPersonal": "Mi número personal",
   "connector.whatsapp.kindPersonalDescription":
@@ -569,4 +575,75 @@ export const messages = {
   "connector.bitwarden.clientSecret": "client_secret de la clave de API",
   "connector.bitwarden.masterPassword": "Contraseña maestra",
   "connector.bitwarden.connecting": "Conectando",
+  "connector.protonPass.title": "Proton Pass",
+  "connector.protonPass.description":
+    "Permite que los agentes inicien sesión en sitios con las credenciales de una bóveda compartida de Proton Pass.",
+  "connector.protonPass.descriptionHost":
+    "Permite que los agentes de {host} inicien sesión en sitios con las credenciales de una bóveda compartida de Proton Pass.",
+  "connector.protonPass.connect": "Conectar",
+  "connector.protonPass.moreWays": "Más formas de conectar",
+  "connector.protonPass.useKey": "Usar una clave de acceso",
+  "connector.protonPass.keyLabel": "Clave de acceso",
+  "connector.protonPass.keyPlaceholder": "pst_…",
+  "connector.protonPass.setupTitle": "Configurar",
+  "connector.protonPass.setupDescription":
+    "Conectar abre el inicio de sesión de Proton en tu navegador. Después, OpenBot crea la bóveda compartida y solo guarda una clave de solo lectura para ella.",
+  "connector.protonPass.setupDescriptionHost":
+    "Conectar abre el inicio de sesión de Proton en tu navegador. Después, {host} crea la bóveda compartida y solo guarda una clave de solo lectura para ella.",
+  "connector.protonPass.vaultName": "Shared with OpenBot",
+  "connector.protonPass.vaultSetup":
+    "OpenBot crea esta bóveda al conectar. Mueve credenciales a ella para compartirlas.",
+  "connector.protonPass.showSteps": "Ver pasos",
+  "connector.protonPass.stepsLabel": "Pasos de conexión",
+  "connector.protonPass.stepSignIn": "Iniciar sesión",
+  "connector.protonPass.stepVault": "Crear la bóveda compartida",
+  "connector.protonPass.stepDone": "Listo",
+  "connector.protonPass.signInTitle": "Inicia sesión en Proton",
+  "connector.protonPass.signInStarting":
+    "OpenBot inicia el inicio de sesión. La página de Proton se abre en tu navegador.",
+  "connector.protonPass.signInDescription":
+    "El inicio de sesión está abierto en tu navegador. Proton pide tu contraseña y tu segundo factor.",
+  "connector.protonPass.signInDescriptionHost":
+    "El inicio de sesión para {host} está abierto en tu navegador. Proton pide tu contraseña y tu segundo factor.",
+  "connector.protonPass.extraPasswordDescription": "Proton Pass pide tu contraseña adicional.",
+  "connector.protonPass.extraPasswordWrong": "La contraseña adicional no es correcta. Escríbela de nuevo.",
+  "connector.protonPass.extraPasswordLabel": "Contraseña adicional",
+  "connector.protonPass.continue": "Continuar",
+  "connector.protonPass.setupStepTitle": "Creando la bóveda compartida",
+  "connector.protonPass.setupStepDescription":
+    "OpenBot crea la bóveda «{vault}» y una clave de solo lectura para ella. Después cierra tu sesión de Proton.",
+  "connector.protonPass.doneTitle": "Proton Pass está conectado",
+  "connector.protonPass.doneDescription":
+    "Mueve credenciales a «{vault}» para que los agentes inicien sesión con ellas.",
+  "connector.protonPass.failedTitle": "Proton Pass no se conectó",
+  "connector.protonPass.copyLink": "Copiar enlace",
+  "connector.protonPass.linkCopied": "Copiado",
+  "connector.protonPass.openAgain": "Abrir de nuevo",
+  "connector.protonPass.done": "Listo",
+  "connector.protonPass.close": "Cerrar",
+  "connector.protonPass.statusConnecting": "Conectando",
+  "connector.protonPass.statusConnected": "Conectado",
+  "connector.protonPass.statusExpired": "Clave caducada",
+  "connector.protonPass.expiredTitle": "La clave de Proton Pass caducó",
+  "connector.protonPass.expiredDescription":
+    "Los agentes no pueden iniciar sesión con tus credenciales compartidas hasta que vuelvas a iniciar sesión.",
+  "connector.protonPass.reconnect": "Reconectar",
+  "connector.protonPass.planTitle": "Proton Pass necesita un plan de pago",
+  "connector.protonPass.planDescription":
+    "La CLI de Proton Pass solo funciona con un plan de pago de Proton. Cambia tu plan y vuelve a conectar.",
+  "connector.protonPass.vaultTitle": "Bóveda compartida",
+  "connector.protonPass.vaultDescription":
+    "Los agentes pueden iniciar sesión con las credenciales de esta bóveda. Mueve una credencial a ella para compartirla.",
+  "connector.protonPass.loginCount": { one: "{count} inicio de sesión", other: "{count} inicios de sesión" },
+  "connector.protonPass.loginsLoading": "Contando credenciales…",
+  "connector.protonPass.keyExpires": "Solo lectura. Caduca el {date}.",
+  "connector.protonPass.keyExpired": "Solo lectura. Caducó el {date}.",
+  "connector.protonPass.keyNoExpiry": "Solo lectura. No caduca.",
+  "connector.protonPass.disconnectTitle": "Desconectar Proton Pass",
+  "connector.protonPass.disconnectSummary":
+    "OpenBot elimina su clave de acceso en este equipo. La bóveda y sus credenciales se quedan en tu cuenta de Proton.",
+  "connector.protonPass.disconnectSummaryHost":
+    "OpenBot elimina su clave de acceso en {host}. La bóveda y sus credenciales se quedan en tu cuenta de Proton.",
+  "connector.protonPass.disconnect": "Desconectar",
+  "connector.protonPass.actionFailed": "OpenBot no pudo cambiar la conexión de Proton Pass.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -28,7 +28,7 @@ import {
   mcpAgentParam,
   usableMcpServers,
 } from "./mcp-provider-shapes";
-import { mcpSecretValues, redactMcpValues } from "./mcp-redaction";
+import { isInheritedProfileValue, mcpSecretValues, redactMcpValues } from "./mcp-redaction";
 import {
   MuseApproval,
   MuseItem,
@@ -523,7 +523,9 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
       for (const secret of mcpSecretValues(resolved.map((server) => server.config))) this.#secrets.add(secret);
       const handoff = acpMcpServers(resolved);
       for (const server of [...handoff.servers, ...bridge.servers]) {
-        for (const entry of "headers" in server ? server.headers : server.env) this.#secrets.add(entry.value);
+        for (const entry of "headers" in server ? server.headers : server.env) {
+          if (!isInheritedProfileValue(entry.name, entry.value)) this.#secrets.add(entry.value);
+        }
       }
       this.#options.reportMcpDrops?.(this.provider, handoff.dropped);
       const mcpServers = Object.fromEntries(

@@ -43,6 +43,8 @@ export const messages = {
   "onboarding.provider.cursorPlan": "Plan de Cursor o clave de API",
   "onboarding.provider.clineAccount": "Modelos gratuitos con una cuenta de Cline",
   "onboarding.provider.kimiAccount": "Modelos de Kimi con una cuenta de Kimi Code",
+  "onboarding.provider.devinAccount": "Muchos modelos con una cuenta de Devin",
+  "onboarding.provider.copilotAccount": "Muchos modelos con un plan de Copilot",
   "onboarding.provider.hermesNous": "Plan de Nous Portal o tu configuración de Hermes",
   "onboarding.provider.inceptionKey": "Modelos Mercury con una clave de API de Inception",
   "onboarding.provider.deepseekKey": "Modelos de DeepSeek con una clave de API de DeepSeek",

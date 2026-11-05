@@ -365,7 +365,7 @@
   stroke: currentcolor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .initial-setup-eyebrow {
@@ -450,7 +450,7 @@
   stroke: currentcolor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .setup-route-icon i {
@@ -723,7 +723,7 @@
   height: 18px;
   grid-column: 2;
   color: var(--openbot-text-secondary);
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .provider-picker-option-unavailable .provider-picker-logo,
@@ -1203,7 +1203,8 @@
     animation-delay: 18ms;
   }
 
-  .account-login[data-transition="forward"] .account-login-form[data-auth-panel="code"] {
+  .account-login[data-transition="forward"]
+    .account-login-form:is([data-auth-panel="code"], [data-auth-panel="company"]) {
     animation: account-login-panel-forward var(--openbot-duration-overlay) 32ms var(--openbot-ease-out) both;
   }
 

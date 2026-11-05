@@ -814,14 +814,13 @@
   color: var(--openbot-text-muted);
 }
 
-/* The divider under the field shows where typing goes, so the shared outline goes. */
+/*
+ * The field takes the focus each time the menu opens, so a focus colour on the divider would always
+ * show. The caret shows where typing goes, as in the shared search select.
+ */
 .wfn-picker .wfn-picker-field:focus-visible {
   outline: none;
   box-shadow: none;
-}
-
-.wfn-picker-search:has(.wfn-picker-field:focus-visible) {
-  border-bottom-color: var(--openbot-border-focus);
 }
 
 .wfn-picker-list {
@@ -2461,6 +2460,11 @@ fieldset.wfn-picker-group {
   justify-content: flex-start;
 }
 
+/* The model of a condition starts its row, and the effort ends it, as in an LLM step. */
+.wfn-block-field > .wfn-condition-foot {
+  justify-content: space-between;
+}
+
 .wfn-block-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2665,6 +2669,9 @@ fieldset.wfn-picker-group {
 .wfn-tag {
   display: inline-flex;
   align-items: center;
+  gap: var(--openbot-space-1);
+  min-width: 0;
+  max-width: 100%;
   height: 22px;
   padding: 0 var(--openbot-space-2);
   border-radius: var(--openbot-radius-pill);
@@ -2673,6 +2680,23 @@ fieldset.wfn-picker-group {
   font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-medium);
   white-space: nowrap;
+}
+
+/* A long name ends with "…" inside its tag, so the tag stays in the value column. */
+.wfn-tag-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wfn-tag > svg {
+  flex: none;
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+/* A repository that sends no events. */
+.wfn-tag[data-warning] {
+  color: var(--openbot-warning-text);
 }
 
 .wfn-tag[data-tone] {
@@ -3119,8 +3143,41 @@ svg.wfn-shape-surface {
   pointer-events: none;
   transform-origin: 0 0;
   scale: calc(1 / var(--wfn-scale, 1));
-  transition: translate var(--wfn-peer-feed) linear;
+  transition:
+    translate var(--wfn-peer-feed) var(--wfn-peer-ease, linear),
+    opacity var(--openbot-duration-normal) var(--openbot-ease-out);
   animation: wfn-fade-in var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+/* The cursor of an agent glides from node to node and fades out when the play of its change ends. */
+.wfn-peer-cursor[data-leaving] {
+  opacity: 0;
+}
+
+/*
+ * While the canvas plays an agent's change, a node or connection that the agent has not reached yet
+ * is hidden. It keeps its size, so the view fits the whole change. One that just showed grows in.
+ */
+.wfn-slot[data-build="unbuilt"],
+.wfn-edge[data-build="unbuilt"],
+.wfn-edge-label[data-build="unbuilt"] {
+  visibility: hidden;
+}
+
+.wfn-slot[data-build="arrived"] {
+  animation: wfn-build-arrive var(--openbot-duration-slow) var(--openbot-ease-out);
+}
+
+.wfn-edge[data-build="arrived"],
+.wfn-edge-label[data-build="arrived"] {
+  animation: wfn-fade-in var(--openbot-duration-slow) var(--openbot-ease-out);
+}
+
+@keyframes wfn-build-arrive {
+  from {
+    opacity: 0;
+    scale: 0.94;
+  }
 }
 
 /* The ring is the stroke under the fill, so half of it shows outside the arrow. */
@@ -3251,7 +3308,10 @@ svg.wfn-shape-surface {
 
   .wfn-peer-cursor,
   .wfn-peer-tag,
-  .wfn-follow-frame {
+  .wfn-follow-frame,
+  .wfn-slot[data-build],
+  .wfn-edge[data-build],
+  .wfn-edge-label[data-build] {
     animation: none;
   }
 }

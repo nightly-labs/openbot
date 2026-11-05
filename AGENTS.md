@@ -41,9 +41,9 @@ adding a module or moving ownership between workspaces.
 
 - Workspaces, conversations, attachments, browser data, and team data stay on the computer that
   runs OpenBot. Providers, visited pages, and plugins can use the network. Exception: a signed-in
-  phone keeps an encrypted, read-only copy of the agents, sections, recent chats and drawer values of
-  its servers (`apps/mobile/src/features/workspace/model/workspace-cache.ts`). The copy stays on that phone,
-  the host stays the source of truth, and sign-out, session expiry and server removal delete it.
+  phone keeps an encrypted, read-only copy of the agents, sections, recent chats, channels and drawer
+  values of its servers (`apps/mobile/src/features/workspace/model/workspace-cache.ts`). The copy stays
+  on that phone, the host stays the source of truth, and sign-out, session expiry and server removal delete it.
 - Cloudflare holds accounts, avatars, host configuration, memberships, invitations, and logical
   sessions; it does not hold chats, files, or commands.
 - The user's SQLite database is the source of truth, not a remote cache.
@@ -263,10 +263,9 @@ They describe the enforced syntax, fixture behavior, and reasons for removed rul
 ## Pull requests
 
 - Open a PR only when asked.
-- Write the PR body from `.github/PULL_REQUEST_TEMPLATE.md`. Do not add the Contributor Assignment
-  Agreement box: organization members and users with write access do not sign. The `CLA` workflow
-  adds the box only for an author who must sign. Only the human author can sign it: tick that box
-  only after their explicit approval in this conversation.
+- Write the PR body from `.github/PULL_REQUEST_TEMPLATE.md`. Organization members and users with
+  write access do not sign the Contributor License Agreement. An author who must sign sends a signed
+  PDF by email. Never sign, fill in, or send the agreement for the author.
 - For UI changes, show before and after. State the model and harness in the PR body.
   Do not commit screenshots or other PR review image assets to the repository.
 - Do not run wider checks locally before a PR. Report focused checks and leave broad checks to CI.

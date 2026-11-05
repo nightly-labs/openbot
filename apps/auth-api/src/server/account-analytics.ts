@@ -28,8 +28,9 @@ const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
  * (`product`, `users`, `direction`), `entry_point` on `checkout_started`, and the license totals of
  * `billing_snapshot`. A billing event without `product` is from a server plan. No generation 10
  * property changes. Generation 12 adds `email_sent`. Generation 13 adds the `license` kind of `email_sent`.
+ * Generation 14 adds `email_fallback_sent`.
  */
-export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 13;
+export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 14;
 const SEND_TIMEOUT_MS = 5_000;
 const ACCOUNT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 
@@ -99,7 +100,7 @@ export type AccountSurface = (typeof ACCOUNT_SURFACES)[number];
 const ATTRIBUTION_SOURCES = ["sign_in", "checkout"] as const;
 export type AttributionSource = (typeof ATTRIBUTION_SOURCES)[number];
 
-/** The kinds of email that the Worker sends through the shared SMTP mailbox. */
+/** The kinds of email that the Worker sends through the shared SMTP mailbox, and through Cloudflare when it cannot. */
 const EMAIL_KINDS = ["sign_in_code", "team_invite", "contact", "welcome", "license"] as const;
 export type EmailKind = (typeof EMAIL_KINDS)[number];
 /** `unknown`: the server got the message but did not confirm it, so it can count against the quota. */
@@ -141,7 +142,7 @@ export type AccountAnalyticsEvent =
       reason?: (typeof WAKE_REASONS)[number];
       error?: HostedServerError | null;
     }
-  | { name: "email_sent"; kind: EmailKind; result: EmailResult };
+  | { name: "email_sent" | "email_fallback_sent"; kind: EmailKind; result: EmailResult };
 
 /** Account events that only the Worker sees: new accounts, payments, hosted servers and email sends. */
 export interface AccountAnalytics {
@@ -288,7 +289,7 @@ function accountEventProperties(event: AccountAnalyticsEvent): AnalyticsProperti
     if (!isOneOf(ATTRIBUTION_SOURCES, event.via) || !touch.first_touch_source) return null;
     return { ...properties, recorded_via: event.via, ...touch };
   }
-  if (event.name === "email_sent") {
+  if (event.name === "email_sent" || event.name === "email_fallback_sent") {
     if (!isOneOf(EMAIL_KINDS, event.kind) || !isOneOf(EMAIL_RESULTS, event.result)) return null;
     return { ...properties, kind: event.kind, result: event.result };
   }

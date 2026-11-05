@@ -51,6 +51,36 @@ export const ServerRailView: Story = {
   render: () => <SidebarStatePlayground compact={false} serverView="rail" />,
 };
 
+const SLOW_REMOTE_LOAD_MS = 15_000;
+
+/** The agents of the remote server arrive late: its first load stays on screen past the 10 s toast. */
+function SlowRemotePlayground() {
+  useStoredLayoutValue(LEFT_PANEL_COLLAPSED_STORAGE_KEY, "false");
+  useStoredLayoutValue(SERVER_VIEW_STORAGE_KEY, "rail");
+  return (
+    <OpenBotPlayground
+      dependencies={{
+        createMock: (options) => {
+          const mock = createMockOpenBot(options);
+          const listAgents = mock.api.agent.listAgents;
+          mock.api.agent.listAgents = async (serverId) => {
+            if (serverId === storyRemoteServer?.id)
+              await new Promise((resolve) => setTimeout(resolve, SLOW_REMOTE_LOAD_MS));
+            return listAgents(serverId);
+          };
+          return mock;
+        },
+        renderApp: () => <App />,
+      }}
+    />
+  );
+}
+
+/** Select the remote server in the rail: its first load covers the whole window. */
+export const SlowRemoteServer: Story = {
+  render: () => <SlowRemotePlayground />,
+};
+
 export const CompactSidebar: Story = {
   render: () => <SidebarStatePlayground compact={true} />,
 };

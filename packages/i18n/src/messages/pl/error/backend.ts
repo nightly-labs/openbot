@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "Baza danych OpenBot nie przeszła kontroli integralności.",
   "error.backend.webhookRouteLimit": "Host może mieć maksymalnie {limit} rutyn typu webhook.",
   "error.backend.webhookSettingsInvalid": "Sprawdź ustawienia webhooka i spróbuj ponownie.",
+  "error.backend.webhookSenderSecretInvalid":
+    "Wklej pełny sekret podpisu od nadawcy. Ma od 16 do 1024 znaków i nie zawiera spacji.",
   "error.backend.webhookRouteUnavailable":
     "Publiczna trasa webhooka nie jest gotowa. Sprawdź połączenie z hostem i spróbuj ponownie.",
   "error.backend.browserViewRemoteOnly": "Podgląd przeglądarki na żywo jest tylko dla zdalnego hosta.",
@@ -201,6 +203,10 @@ export const messages = {
   "error.backend.agentWaitRemoteUnsupported": "Otwarte oczekiwania są dostępne tylko dla agentów na tym komputerze.",
   "error.backend.markUnreadRemoteUnsupported":
     "Oznaczanie wiadomości jako nieprzeczytanej jest dostępne tylko dla agentów na tym komputerze.",
+  "error.backend.messageDeleteUnsupported": "Ten serwer nie obsługuje usuwania wiadomości.",
+  "error.backend.messageDeleteNotFound": "Tej wiadomości nie ma w czacie.",
+  "error.backend.messageDeleteBusy": "Ta wiadomość należy do trwającej tury. Usuń ją po zakończeniu tury.",
+  "error.backend.messageDeleteForbidden": "Możesz usuwać tylko wiadomości, które wysłałeś.",
   "error.backend.routineFlowHandoffFailed": "Rutyna nie mogła przekazać pracy temu agentowi.",
   "error.backend.mcpServerLimit": "OpenBot przechowuje maksymalnie {limit} serwerów MCP.",
   "error.backend.mcpServerNameTaken": "Serwer MCP o nazwie {name} już istnieje.",
@@ -302,6 +308,17 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "Profil przeglądarki o tej nazwie już istnieje.",
   "error.backend.browserSessionInUse": "Karta nadal używa tej sesji przeglądarki. Spróbuj ponownie.",
   "error.backend.browserProfileLimit": "Możesz mieć maksymalnie {limit} profili przeglądarki.",
+  "error.backend.browserProxyNotFound": "Ten serwer proxy już nie istnieje.",
+  "error.backend.browserProxyAddressInvalid":
+    "Wpisz adres serwera proxy, np. socks5://host:1080 lub http://user:password@host:3128.",
+  "error.backend.browserProxyLimit": "Możesz mieć maksymalnie {limit} serwerów proxy.",
+  "error.backend.browserProxyTaken": "Serwer proxy z tym adresem już istnieje.",
+  "error.backend.browserProxyChanged":
+    "Ten serwer proxy zmienił się po jego otwarciu. Sprawdź go ponownie i spróbuj jeszcze raz.",
+  "error.backend.browserProxyUnreachable": "Proxy {name} nie odpowiada, więc strona się nie otworzyła.",
+  "error.backend.browserProxySignInRefused": "Proxy {name} odrzuciło logowanie, więc strona się nie otworzyła.",
+  "error.backend.browserProxyComputerUnreachable":
+    "Komputer, którego używa ten profil, nie odpowiada, więc strona się nie otworzyła.",
   "error.backend.browserLowMemory":
     "Na tym serwerze brakuje pamięci, więc przeglądarka nie może otworzyć kolejnej karty. Zamknij kartę lub poczekaj, aż inni agenci skończą.",
   "error.backend.browserOpenFailed": "Nie można otworzyć {url}: {reason}",

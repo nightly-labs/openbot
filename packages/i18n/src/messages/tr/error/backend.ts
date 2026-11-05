@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "OpenBot veritabanı bütünlük denetiminden geçemedi.",
   "error.backend.webhookRouteLimit": "Bir ana makinede en fazla {limit} webhook rutini olabilir.",
   "error.backend.webhookSettingsInvalid": "Webhook ayarlarını kontrol edin ve tekrar deneyin.",
+  "error.backend.webhookSenderSecretInvalid":
+    "Gönderenin tam imza gizli anahtarını yapıştırın. 16 ile 1024 karakter arasıdır ve boşluk içermez.",
   "error.backend.webhookRouteUnavailable":
     "Herkese açık webhook yolu hazır değil. Ana makine bağlantısını kontrol edin ve tekrar deneyin.",
   // Errors that the backend services send: channels, messages, routines, memories, MCP, browser and remote desktop.
@@ -195,6 +197,10 @@ export const messages = {
   "error.backend.agentWaitRemoteUnsupported": "Açık beklemeler yalnızca bu bilgisayardaki ajanlar için kullanılabilir.",
   "error.backend.markUnreadRemoteUnsupported":
     "Bir mesajı okunmadı olarak işaretleme yalnızca bu bilgisayardaki ajanlar için kullanılabilir.",
+  "error.backend.messageDeleteUnsupported": "Bu sunucu mesaj silmeyi desteklemiyor.",
+  "error.backend.messageDeleteNotFound": "Bu mesaj sohbette yok.",
+  "error.backend.messageDeleteBusy": "Bu mesaj devam eden bir turun parçası. Tur bitince silin.",
+  "error.backend.messageDeleteForbidden": "Yalnızca gönderdiğiniz mesajları silebilirsiniz.",
   "error.backend.routineFlowHandoffFailed": "Rutin işi bu ajana aktaramadı.",
   "error.backend.mcpServerLimit": "OpenBot en fazla {limit} MCP sunucusu tutar.",
   "error.backend.mcpServerNameTaken": "{name} adında bir MCP sunucusu zaten mevcut.",
@@ -293,6 +299,16 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "Bu adla bir tarayıcı profili zaten var.",
   "error.backend.browserSessionInUse": "Bir sekme bu tarayıcı oturumunu hâlâ kullanıyor. Yeniden deneyin.",
   "error.backend.browserProfileLimit": "En fazla {limit} tarayıcı profiliniz olabilir.",
+  "error.backend.browserProxyNotFound": "Bu proxy artık yok.",
+  "error.backend.browserProxyAddressInvalid":
+    "socks5://host:1080 veya http://user:password@host:3128 gibi bir proxy adresi yazın.",
+  "error.backend.browserProxyLimit": "En fazla {limit} proxy'niz olabilir.",
+  "error.backend.browserProxyTaken": "Bu adrese sahip bir proxy zaten var.",
+  "error.backend.browserProxyChanged": "Bu proxy siz açtıktan sonra değişti. Yeniden kontrol edip tekrar deneyin.",
+  "error.backend.browserProxyUnreachable": "{name} proxy'si yanıt vermiyor, bu yüzden sayfa açılmadı.",
+  "error.backend.browserProxySignInRefused": "{name} proxy'si oturum açmayı reddetti, bu yüzden sayfa açılmadı.",
+  "error.backend.browserProxyComputerUnreachable":
+    "Bu profilin kullandığı bilgisayar yanıt vermiyor, bu yüzden sayfa açılmadı.",
   "error.backend.browserLowMemory":
     "Bu sunucunun belleği azaldı, bu nedenle tarayıcı başka bir sekme açamıyor. Bir sekmeyi kapatın veya diğer ajanların bitmesini bekleyin.",
   "error.backend.browserOpenFailed": "{url} açılamadı: {reason}",

@@ -1,16 +1,19 @@
-import { type ExpressionId, POSES } from "@norbert_bodziony/bloub";
+import { BloubBot, type ExpressionId, POSES } from "@norbert_bodziony/bloub";
 import { PlushBot, type PlushState, type PlushTransition } from "@norbert_bodziony/bloub/plush";
-import type { AvatarMood } from "@openbot/brand/bloub-avatar-motion";
-import type { AvatarHue } from "@openbot/contracts/ipc";
+import { type AvatarMood, avatarMoodPresentation, type ShapeSafeStateId } from "@openbot/brand/bloub-avatar-motion";
+import type { AvatarColor, AvatarHue } from "@openbot/contracts/ipc";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
 import {
   AVATAR_EXPRESSIONS,
   type AvatarMotion,
+  avatarStyleForSeed,
   bloubAvatarProfile,
   type SupportedAvatarSilhouetteId,
 } from "../../bloub-avatar";
 import type { AgentProfile } from "../../data";
+import { documentFocused } from "../../document-focus";
+import { documentSoftwareRendering } from "../../document-rendering";
 
 // Cap avatar animation at 30fps: uncapped bloub clocks measured 30% renderer / 24% GPU
 // for two visible avatars. The shape is 24-40px, so the eye cannot see the difference.
@@ -92,9 +95,11 @@ const STATIC_MOTIONS: ReadonlySet<AvatarMotion> = new Set(["hover", "idle"]);
 const HOVER_GROUP = "[data-avatar-hover], button, a, [role='button'], [role='link'], [role='menuitem']";
 
 interface AgentAvatarProps {
-  agent?: Pick<AgentProfile, "avatarSeed" | "avatarHue" | "avatarUrl"> | undefined;
+  agent?: Pick<AgentProfile, "avatarSeed" | "avatarHue" | "avatarColor" | "avatarUrl"> | undefined;
   seed?: string | undefined;
   hue?: AvatarHue | null;
+  /** The exact colour, which wins over `hue`. With `hue` set, the agent's colour is not used. */
+  color?: AvatarColor | null | undefined;
   url?: string | null | undefined;
   motion?: AvatarMotion;
   /** What the agent is doing. It chooses the face, never the silhouette. */
@@ -130,6 +135,8 @@ interface AgentAvatarProps {
 export function AgentAvatar(props: AgentAvatarProps) {
   const seed = () => props.seed ?? props.agent?.avatarSeed ?? "agent";
   const hue = () => (props.hue !== undefined ? props.hue : (props.agent?.avatarHue ?? null));
+  const color = () =>
+    props.color !== undefined || props.hue !== undefined ? (props.color ?? null) : (props.agent?.avatarColor ?? null);
   const motion = () => props.motion ?? "hover";
   const url = () => (props.url !== undefined ? props.url : (props.agent?.avatarUrl ?? null));
   const mood = (): AvatarMood => props.mood ?? "idle";
@@ -156,6 +163,7 @@ export function AgentAvatar(props: AgentAvatarProps) {
         <GeneratedAvatar
           seed={seed()}
           hue={hue()}
+          color={color()}
           motion={motion()}
           mood={mood()}
           animationOffset={props.animationOffset}
@@ -191,6 +199,7 @@ function AvatarImage(props: { url: string | null; onFailed: () => void }) {
 function GeneratedAvatar(props: {
   seed: string;
   hue: AvatarHue | null;
+  color: AvatarColor | null;
   motion: AvatarMotion;
   mood: AvatarMood;
   animationOffset?: number | undefined;
@@ -205,7 +214,10 @@ function GeneratedAvatar(props: {
 }) {
   let element: HTMLSpanElement | undefined;
   const [interacting, setInteracting] = createSignal(false);
-  const [reducedMotion, setReducedMotion] = createSignal(prefersReducedMotion());
+  const [prefersReduced, setPrefersReduced] = createSignal(prefersReducedMotion());
+  // On the CPU, six moving avatars took a third of a core. A window drawn there shows the still
+  // avatars of reduced motion, which run no animation loop.
+  const reducedMotion = () => prefersReduced() || documentSoftwareRendering();
   const cyclesFaces = () => props.workingFaces && props.mood === "working";
   const [workingFace, setWorkingFace] = createSignal<ExpressionId>(nextWorkingFace(null));
   const plushMood = createMemo(
@@ -214,7 +226,7 @@ function GeneratedAvatar(props: {
         ? { state: "idle", expression: reducedMotion() ? "attentif" : workingFace(), busy: true }
         : PLUSH_MOODS[props.mood],
   );
-  const profile = createMemo(() => bloubAvatarProfile(props.seed, props.hue));
+  const profile = createMemo(() => bloubAvatarProfile(props.seed, props.hue, props.color));
   const restingExpression = () => props.expression ?? profile().expression;
   // A preview of a chosen shape or eyes keeps the face it shows, so the choice stays visible on hover.
   const hovered = () =>
@@ -235,9 +247,39 @@ function GeneratedAvatar(props: {
       state: hover?.state ?? plushMood().state,
     };
   });
+  // A seed that `avatarSeedForFace` made for the flat style draws the Bloub that agents had before the
+  // plush. It shows each mood with the flat faces, and a busy one breathes. It has no orbit rings, as
+  // the plush has none.
+  const flat = createMemo(() => avatarStyleForSeed(props.seed) === "flat");
+  const flatAppearance = createMemo(() => {
+    const presentation = avatarMoodPresentation(props.mood);
+    const hover = hovered() ? hoverFace() : null;
+    const working = cyclesFaces() ? plushMood().expression : null;
+    const state: ShapeSafeStateId = hover?.state === "wink" ? "wink" : presentation.state;
+    return {
+      shape: props.shape ?? profile().shape,
+      color: profile().color,
+      expression: working ?? presentation.expression ?? hover?.expression ?? restingExpression(),
+      state,
+    };
+  });
+  const flatBreathe = () => {
+    const amount = flat() && !cyclesFaces() ? avatarMoodPresentation(props.mood).breathe : 0;
+    return amount > 0 ? String(amount) : undefined;
+  };
+  const spanStyle = () => {
+    const amount = flatBreathe();
+    return amount ? { ...props.style, "--agent-avatar-breathe": amount } : props.style;
+  };
   // A mood that carries its own motion has to be seen without being pointed at, and so do eyes that
   // follow the pointer; the resting moods keep the hover gating that the perf note above is about.
-  const animated = () => props.followPointer || plushMood().busy || !STATIC_MOTIONS.has(props.motion) || interacting();
+  // An avatar that moves only as decoration rests while another app has the focus: the empty chat
+  // kept the loop running for as long as the window stayed open.
+  const animated = () =>
+    props.followPointer ||
+    plushMood().busy ||
+    (!STATIC_MOTIONS.has(props.motion) && documentFocused()) ||
+    interacting();
 
   // Reduced motion keeps one face: it is a frozen plush, and a frozen plush cannot morph between faces.
   createEffect(
@@ -261,7 +303,7 @@ function GeneratedAvatar(props: {
 
   onSettled(() => {
     const media = window.matchMedia?.("(prefers-reduced-motion: reduce)");
-    const syncReducedMotion = () => setReducedMotion(media?.matches ?? false);
+    const syncReducedMotion = () => setPrefersReduced(media?.matches ?? false);
     syncReducedMotion();
     media?.addEventListener?.("change", syncReducedMotion);
 
@@ -326,42 +368,86 @@ function GeneratedAvatar(props: {
     />
   );
 
-  return (
-    <span
-      ref={element}
-      class={`${props.class} agent-avatar-bloub`}
-      style={props.style}
-      data-avatar="generated"
-      data-mood={props.mood}
-      aria-hidden="true"
-    >
-      <Show
-        when={!reducedMotion()}
-        fallback={
-          /* With reduced motion nothing moves, so the bot is frozen. A frozen Bloub frame cannot
+  const flatAvatar = () => (
+    <BloubBot
+      size={100}
+      shape={flatAppearance().shape}
+      color={flatAppearance().color}
+      expression={flatAppearance().expression}
+      state={flatAppearance().state}
+      paused={!animated()}
+      fps={AVATAR_FPS}
+      autoPause
+      initialPhase={props.animationOffset ?? avatarAnimationPhase(props.seed)}
+      follow={props.followPointer}
+      ariaLabel=""
+      class="bloub-avatar-svg"
+    />
+  );
+
+  const plushAvatar = () => (
+    <Show
+      when={!reducedMotion()}
+      fallback={
+        /* With reduced motion nothing moves, so the bot is frozen. A frozen Bloub frame cannot
              finish a morph, and the engine reads `state` only when it is built, so a mood change
              has to rebuild the bot. Keying on the appearance, state included, does both:
              `frozenAt` alone would sample the seeded idle face. A frozen plush shows a new body
              at once, with no transition. */
-          <Show when={appearance()} keyed>
-            {(frozen) => (
-              <PlushBot
-                size={100}
-                shape={frozen.shape}
-                color={frozen.color}
-                expression={frozen.expression}
-                state={frozen.state}
-                frozenAt={frozenPose(frozen.state)}
-                eyeScale={props.eyeScale ?? 1}
-                ariaLabel=""
-                class="bloub-avatar-svg"
-                style={PLUSH_BODY_STYLE}
-              />
-            )}
-          </Show>
-        }
-      >
-        {avatar()}
+        <Show when={appearance()} keyed>
+          {(frozen) => (
+            <PlushBot
+              size={100}
+              shape={frozen.shape}
+              color={frozen.color}
+              expression={frozen.expression}
+              state={frozen.state}
+              frozenAt={frozenPose(frozen.state)}
+              eyeScale={props.eyeScale ?? 1}
+              ariaLabel=""
+              class="bloub-avatar-svg"
+              style={PLUSH_BODY_STYLE}
+            />
+          )}
+        </Show>
+      }
+    >
+      {avatar()}
+    </Show>
+  );
+
+  return (
+    <span
+      ref={element}
+      class={`${props.class} agent-avatar-bloub`}
+      style={spanStyle()}
+      data-avatar="generated"
+      data-mood={props.mood}
+      data-breathe={flatBreathe()}
+      aria-hidden="true"
+    >
+      <Show when={flat()} fallback={plushAvatar()}>
+        <Show
+          when={!reducedMotion()}
+          fallback={
+            <Show when={flatAppearance()} keyed>
+              {(frozen) => (
+                <BloubBot
+                  size={100}
+                  shape={frozen.shape}
+                  color={frozen.color}
+                  expression={frozen.expression}
+                  state={frozen.state}
+                  frozenAt={POSES[frozen.state]}
+                  ariaLabel=""
+                  class="bloub-avatar-svg"
+                />
+              )}
+            </Show>
+          }
+        >
+          {flatAvatar()}
+        </Show>
       </Show>
     </span>
   );

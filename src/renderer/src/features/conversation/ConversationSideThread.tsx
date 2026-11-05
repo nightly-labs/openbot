@@ -15,6 +15,7 @@ import { usePlatform } from "../../platform";
 import { latestVisibleAgentMessageId } from "./conversation-read-state";
 import { useConversationViewScope } from "./conversation-scope";
 import type { SideThread } from "./conversation-types";
+import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { createTurnSteps } from "./turn-steps";
 
 /**
@@ -32,7 +33,11 @@ export function ConversationSideThread(props: { threadId: string }) {
     installedSkills,
     installedSkillsLoadFailed,
     mcpServers,
+    taggableBrowserTabs,
+    taggableThreads,
+    openTaggedReference,
     threadComposer,
+    threadQueue,
     movePanelThreadToChat,
     copyMessage,
     copiedMessageId,
@@ -89,7 +94,11 @@ export function ConversationSideThread(props: { threadId: string }) {
   /** Sends the draft of this thread. Without its key, a send would take the draft of the chat's thread. */
   function sendSide(side: SideThread, text: string): Promise<boolean> {
     const key = draftKey();
-    return key ? threadComposer.send(side, text, key) : Promise.resolve(false);
+    if (!key) return Promise.resolve(false);
+    // While a queued message is in the message box, Send saves it in its place.
+    return threadQueue.editOf(side.task.id)
+      ? threadComposer.importsEnded(key).then(() => threadQueue.save(key))
+      : threadComposer.send(side, text, key);
   }
   /** The thread waits for an answer to a question or a takeover, which the chat tab of the thread shows. */
   const waitsForAnswer = () => {
@@ -100,10 +109,19 @@ export function ConversationSideThread(props: { threadId: string }) {
     waitsForAnswer() ? (
       <TaskAnswerCard agentName={view.agent?.name ?? ""} onAnswer={() => movePanelThreadToChat(props.threadId)} />
     ) : undefined;
+  /** Continue on a sign-in card goes to this thread, as the person's next message there. */
+  const mcpSignInCard = useThreadMcpSignInCard((body) => thread()?.onSend(body, [], null) ?? Promise.resolve(false));
   /** Branches this thread through an answer. The branch opens as a chat tab. */
   const branch = () => {
     if (!view.threads?.onBranch) return undefined;
     return (messageId: string) => void branchThread(props.threadId, messageId);
+  };
+  /** Deletes a message of this thread. A host without `message-delete-v1` has no Delete item. */
+  const deleteMessage = () => {
+    const remove = view.threads?.onDeleteMessage;
+    const taskId = thread()?.task.id;
+    if (!remove || !taskId) return undefined;
+    return (messageId: string) => remove(taskId, messageId);
   };
   /** Replies to a message of this thread. */
   const reply = () => {
@@ -145,12 +163,15 @@ export function ConversationSideThread(props: { threadId: string }) {
             skills={installedSkills()}
             skillsLoadFailed={installedSkillsLoadFailed()}
             mcpServers={mcpServers()}
+            browserTabs={taggableBrowserTabs()}
+            threads={taggableThreads()}
+            onOpenTag={openTaggedReference}
             draft={draft()?.text ?? ""}
             draftAttachments={draft()?.attachments}
             rowAttachments={rowImages()}
             pendingImages={threadComposer.pendingImages(draftKey())}
             onRemoveAttachment={(attachment) => threadComposer.removeAttachment(draftKey(), attachment.id)}
-            onPasteFiles={(files, selection) => threadComposer.pasteFiles(files, selection, draftKey())}
+            onPasteFiles={(files, selection, text) => threadComposer.pasteFiles(files, selection, draftKey(), text)}
             onDraftChange={(text) => threadComposer.setText(draftKey(), text)}
             onOpenDraftAttachment={(attachment) =>
               canPreviewAttachment(attachment)
@@ -172,6 +193,7 @@ export function ConversationSideThread(props: { threadId: string }) {
             onCompactContext={current().thread.onCompactContext}
             waitsForAnswer={waitsForAnswer()}
             attention={answerCard()}
+            messageCard={mcpSignInCard}
             stepsAbove={turnSteps.stepsAbove}
             factsAbove={turnSteps.factsAbove}
             activeSteps={turnSteps.activeSteps()}
@@ -179,10 +201,13 @@ export function ConversationSideThread(props: { threadId: string }) {
             onCopyMessage={(message) => void copyMessage(message)}
             copiedMessageId={copiedMessageId()}
             onBranch={branch()}
+            onDeleteMessage={deleteMessage()}
+            canDeleteMessage={view.canDeleteMessage}
             branchSource={branchSource(current().thread, current().agent.name)}
             onReply={reply()}
             replyTo={replyTo()}
             onCancelReply={() => threadComposer.setReply(draftKey(), null)}
+            queue={threadQueue.view(current().thread.task, draftKey())}
           />
         )}
       </Show>

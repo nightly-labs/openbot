@@ -9,7 +9,7 @@ import type { ComposerPasteResult, ComposerSelection } from "@openbot/ui/feature
 import { DRAFT_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { currentText } from "@openbot/ui/text";
 import { actionToast } from "../../../action-toast";
-import { EMPTY_DRAFT, insertAtSelection } from "../composer-draft";
+import { EMPTY_DRAFT, insertAtSelection, insertPastedText } from "../composer-draft";
 import { threadDraftKey } from "../conversation-keys";
 import { conversationRuntime } from "../conversation-runtime";
 import type { ComposerDraft, ConversationProps, ConversationThreads } from "../conversation-types";
@@ -27,6 +27,10 @@ export interface ThreadComposerActionsDeps {
   setThreadDrafts: (update: (current: Drafts) => Drafts) => void;
   pastePreviews: () => readonly PastePreview[];
   setPastePreviews: (update: (current: readonly PastePreview[]) => readonly PastePreview[]) => void;
+  /** A pending Save of a queue edit owns the draft, so the draft does not change. */
+  draftLocked?: ((key: string) => boolean) | undefined;
+  /** A file that a queue edit still needs, such as one of the queued message. It is not deleted. */
+  keepsAttachment?: ((id: string) => boolean) | undefined;
 }
 
 /**
@@ -54,6 +58,15 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     return entry?.key;
   }
 
+  /** Waits until each import to this draft ended, also an import that starts during the wait. */
+  async function importsEnded(key: string | undefined): Promise<void> {
+    for (;;) {
+      const pending = [...imports.values()].filter((entry) => entry.key === key).map((entry) => entry.ended);
+      if (!pending.length) return;
+      await Promise.all(pending);
+    }
+  }
+
   /** The draft of the open side thread, or of the new thread tab. Undefined while the agent's own chat is open. */
   function openDraftKey(): string | undefined {
     const target = currentConversationTarget(deps.props);
@@ -73,6 +86,7 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
 
   /** An empty draft leaves the list, so the stored drafts keep only the boxes with content. */
   function updateDraft(key: string, update: (draft: ComposerDraft) => ComposerDraft): void {
+    if (deps.draftLocked?.(key)) return;
     deps.setThreadDrafts((current) => {
       const next = update(current[key] ?? EMPTY_DRAFT);
       if (next.text || next.attachments.length > 0 || next.replyToMessageId) return { ...current, [key]: next };
@@ -84,7 +98,8 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
 
   function discard(attachments: readonly DraftAttachment[], serverId: string): void {
     for (const attachment of attachments)
-      void conversationRuntime(deps.props).agent.discardDraftAttachment(attachment.id, serverId);
+      if (!deps.keepsAttachment?.(attachment.id))
+        void conversationRuntime(deps.props).agent.discardDraftAttachment(attachment.id, serverId);
   }
 
   // Each file of a drop is its own import, and all of them start in one task: one toast is enough.
@@ -189,14 +204,34 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     return result;
   }
 
+  /** Puts a pasted text at the selection, or at the end when the text changed since `at.before`. */
+  function insertText(
+    key: string,
+    text: string,
+    at: { before: string; selection: ComposerSelection },
+  ): ComposerPasteResult | undefined {
+    const result = insertPastedText(draft(key).text, text, at);
+    if (result) updateDraft(key, (current) => ({ ...current, text: result.value }));
+    return result;
+  }
+
+  /**
+   * Imports pasted files and puts their references at the selection. `text` is the text of a long paste
+   * that `files` holds: when no file comes, that text goes at the selection, so the paste loses nothing.
+   */
   async function pasteFiles(
     files: ReadonlyArray<File | Promise<File>>,
     selection: ComposerSelection,
     key = openDraftKey(),
+    text?: string,
   ): Promise<ComposerPasteResult | undefined> {
     const target = currentConversationTarget(deps.props);
     if (!key || !target) return;
+    const fallback = (before: string) =>
+      text === undefined ? undefined : insertText(key, text, { before, selection });
     if (!deps.props.threads?.acceptsFiles) {
+      // A thread that takes no files still takes a long text.
+      if (text !== undefined) return fallback(draft(key).text);
       refuseFiles();
       return;
     }
@@ -212,9 +247,11 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
         (data) => conversationRuntime(deps.props).agent.importAttachmentData(data, target.serverId),
         previews.onAccepted,
       );
-      return addFiles(key, target.serverId, imported, { before, selection });
+      // The draft refused the files and shows why. The pasted text still comes.
+      return addFiles(key, target.serverId, imported, { before, selection }) ?? fallback(before);
     } catch (error) {
       actionToast.error(errorMessage(error, t("composer.error.keepAttachments")));
+      return fallback(before);
     } finally {
       previews.stop();
       releaseImport(requestId);
@@ -241,11 +278,7 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     // The first message of a new thread starts the thread and opens it, so the key is read before the send.
     key = openDraftKey(),
   ): Promise<boolean> {
-    for (;;) {
-      const pending = [...imports.values()].filter((entry) => entry.key === key).map((entry) => entry.ended);
-      if (!pending.length) break;
-      await Promise.all(pending);
-    }
+    await importsEnded(key);
     // An import that ended put its reference in the draft after the user pressed Send.
     const images = key ? rowImages(key) : [];
     const typedText = key ? draft(key).text.trim() : typed;
@@ -293,6 +326,7 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     pasteFiles,
     claimImport,
     releaseImport,
+    importsEnded,
     setText,
     setReply,
     send,

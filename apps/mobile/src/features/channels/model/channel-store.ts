@@ -160,9 +160,39 @@ export class MobileChannelStore {
       supported,
       canDelete: capabilities.includes(CHANNEL_DELETE_CAPABILITY),
       canCancelTasks: capabilities.includes(CHANNEL_TASK_CANCEL_CAPABILITY),
-      // A host without channels has its whole list already: none.
-      ...(supported ? {} : { listed: true }),
+      // A host without channels has its whole list already: none. A kept copy goes.
+      ...(supported ? {} : { listed: true, channels: [], pages: new Map() }),
     });
+  }
+  /**
+   * Shows the channels that the phone kept, before the host connects. A list that the host already
+   * gave stays. The state stays not `listed`, so a wait for the host list still waits for it.
+   */
+  restore(serverId: string, capabilities: readonly string[], channels: ChannelSummary[], pages: ChannelPage[]) {
+    const entry = this.entry(serverId);
+    if (entry.state.listed || entry.state.channels.length || !capabilities.includes(CHANNEL_CHATS_CAPABILITY)) return;
+    const ids = new Set(channels.map((channel) => channel.id));
+    this.publish(entry, {
+      supported: true,
+      canDelete: capabilities.includes(CHANNEL_DELETE_CAPABILITY),
+      canCancelTasks: capabilities.includes(CHANNEL_TASK_CANCEL_CAPABILITY),
+      channels,
+      pages: new Map(pages.filter((page) => ids.has(page.channel.id)).map((page) => [page.channel.id, page])),
+    });
+  }
+  /** The channels as the phone keeps them: the list, and the last 50 messages of each loaded history. */
+  cachedChannels(serverId: string): { channels: ChannelSummary[]; pages: ChannelPage[] } | null {
+    const state = this.entries.get(serverId)?.state;
+    // Before the first host list, a phone with no kept channels has nothing to keep.
+    if (!state?.supported || (!state.listed && !state.channels.length)) return null;
+    return {
+      channels: state.channels,
+      pages: [...state.pages.values()].map((page) => {
+        if (page.messages.length <= 50) return page;
+        const messages = page.messages.slice(-50);
+        return { ...page, messages, olderCursor: messages[0]?.sequence ?? page.olderCursor };
+      }),
+    };
   }
   remove(serverId: string) {
     const entry = this.entries.get(serverId);
@@ -321,6 +351,18 @@ export class MobileChannelStore {
         () => finish(false),
       );
     });
+  }
+  /**
+   * Takes a message that a member deleted out of the loaded page. A latest page keeps the older
+   * loaded messages, so the host's change event alone leaves it shown.
+   */
+  removeMessage(serverId: string, channelId: string, messageId: string) {
+    const entry = this.entry(serverId);
+    const page = entry.state.pages.get(channelId);
+    if (!page?.messages.some((message) => message.id === messageId)) return;
+    const pages = new Map(entry.state.pages);
+    pages.set(channelId, { ...page, messages: page.messages.filter((message) => message.id !== messageId) });
+    this.publish(entry, { pages });
   }
   async older(serverId: string, channelId: string) {
     const entry = this.entry(serverId);

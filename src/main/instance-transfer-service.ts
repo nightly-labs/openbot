@@ -40,9 +40,11 @@ import {
   type InstanceTransferResult,
   type InstanceTransferSummary,
   isAgentImportKey,
+  isAvatarColor,
   isCustomProviderContextWindow,
   isCustomProviderHarness,
   isCustomProviderMaxOutput,
+  isCustomProviderReasoningEfforts,
   type McpServerConfig,
   type Routine,
   type RoutineFlowLink,
@@ -310,6 +312,7 @@ export class InstanceTransferService {
           schedule: routine.trigger.schedule,
           ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
           ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
+          ...(routine.runIn ? { runIn: routine.runIn } : {}),
         }));
       const oneTimeRoutines = routines.filter((routine) => routine.schedule.kind === "once");
 
@@ -326,6 +329,8 @@ export class InstanceTransferService {
         description: agent.description,
         avatarSeed: agent.avatarSeed,
         avatarHue: agent.avatarHue,
+        ...(agent.avatarColor ? { avatarColor: agent.avatarColor } : {}),
+        ...(agent.chatColor ? { chatColor: agent.chatColor } : {}),
         avatar,
         provider: agent.provider,
         model: agent.model,
@@ -692,11 +697,12 @@ export class InstanceTransferService {
           name: provider.name,
           baseUrl: provider.baseUrl,
           apiKey: null,
-          models: provider.models.map(({ id, name, contextWindow, maxOutput }) => ({
+          models: provider.models.map(({ id, name, contextWindow, maxOutput, reasoningEfforts }) => ({
             id,
             name,
             ...(isCustomProviderContextWindow(contextWindow) ? { contextWindow } : {}),
             ...(isCustomProviderMaxOutput(maxOutput) ? { maxOutput } : {}),
+            ...(isCustomProviderReasoningEfforts(reasoningEfforts) ? { reasoningEfforts: [...reasoningEfforts] } : {}),
           })),
           headers: [],
           ...(isCustomProviderHarness(provider.harness) ? { harness: provider.harness } : {}),
@@ -849,6 +855,7 @@ export class InstanceTransferService {
           description: source.description,
           avatarSeed: AVATAR_SEED_PATTERN.test(source.avatarSeed) ? source.avatarSeed : `${source.key}-${randomUUID()}`,
           avatarHue: source.avatarHue,
+          ...(isAvatarColor(source.avatarColor) ? { avatarColor: source.avatarColor } : {}),
           ...(useModel
             ? { provider: source.provider, model: source.model, reasoningEffort: source.reasoningEffort }
             : {}),
@@ -906,6 +913,7 @@ export class InstanceTransferService {
                   schedule: routine.schedule,
                   ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
                   ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
+                  ...(routine.runIn ? { runIn: routine.runIn } : {}),
                 },
                 { recordConversationEvent: false },
               ),
@@ -954,6 +962,7 @@ export class InstanceTransferService {
               notifications: source.notifications,
               ...(source.busyMessageMode ? { busyMessageMode: source.busyMessageMode } : {}),
               ...(source.taskLimit === undefined ? {} : { taskLimit: source.taskLimit }),
+              ...(isAvatarColor(source.chatColor) ? { chatColor: source.chatColor } : {}),
             })
             .pipe(Effect.mapError(failure));
           completed = true;

@@ -27,6 +27,8 @@ export const messages = {
   "error.workflow.outputPlaceMissing": "이 출력의 메시징 위치를 선택하세요.",
   "error.workflow.discordNoMessage":
     "이 출력은 실행을 시작한 Discord 메시지에 작동합니다. Discord 멘션으로 실행을 시작하거나 채널에 게시를 선택하세요.",
+  "error.workflow.slackNoMessage":
+    "이 출력은 실행을 시작한 Slack 메시지에 작동합니다. Slack 멘션으로 실행을 시작하거나 채널에 게시를 선택하세요.",
   "error.workflow.telegramNoMessage":
     "이 출력은 실행을 시작한 Telegram 메시지에 작동합니다. Telegram 멘션으로 실행을 시작하거나 채팅에 게시를 선택하세요.",
   "error.workflow.outputConnectionOff": "이 출력의 메시징 연결이 꺼져 있거나 삭제됐어요. 위치를 다시 선택하세요.",

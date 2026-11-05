@@ -36,8 +36,10 @@ import type {
   AgentTasksSnapshot,
   AgentTemplatePreview,
   AgentTemplatePublication,
+  AnswerWhatsAppRequestInput,
   ApplyAgentImportInput,
   ApplyInstanceTransferInput,
+  AvatarColor,
   AvatarHue,
   AvatarImageInput,
   BitwardenConnectorStatus,
@@ -84,11 +86,16 @@ import type {
   McpSignInState,
   McpTestResult,
   MessagingOverview,
+  MessagingWorkspaceInput,
   OnePasswordConnectorStatus,
+  PasswordManagerConnectInput,
+  PasswordManagerId,
+  PasswordManagerStatus,
   QueuedMessageReceipt,
   QueueSnapshot,
   RemoteAgentImportResult,
   RemoteInstanceTransferResult,
+  RemoveWhatsAppSenderInput,
   RenameWorkflowInput,
   ResetAgentSessionSettingInput,
   RespondToApprovalInput,
@@ -110,12 +117,15 @@ import type {
   SetAgentProviderAccountInput,
   SetAgentSessionSettingInput,
   SetEnabledSkillInput,
+  SetMessagingEnabledInput,
   SetRoutineResultDestinationInput,
+  SetWhatsAppOwnNumberInput,
   SharedTable,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
   SidebarPin,
   SignInRelayStatus,
+  StartWhatsAppLinkInput,
   StorageUsage,
   UninstallSkillInput,
   UpdateAgentAdminSettingsInput,
@@ -133,6 +143,10 @@ import type {
   VaultHostImportResult,
   VaultSaveInput,
   VaultState,
+  WhatsAppGroupList,
+  WhatsAppLinkState,
+  WhatsAppOverview,
+  WhatsAppSenderInput,
   WorkflowDetail,
   WorkflowGitHubCatalog,
   WorkflowGitHubHistory,
@@ -175,6 +189,11 @@ import type { MobileConversationStore } from "./conversation-store";
 import type { LiveWorkspaceStore } from "./live-workspace-store";
 
 type MobileServerKind = "local" | "remote";
+/** The message that `message-delete-v1` deletes. */
+type MessageDeleteTarget =
+  | { kind: "agent"; agentId: string; taskId?: string; messageId: string }
+  | { kind: "channel"; channelId: string; messageId: string };
+
 /** The route set that reaches a host's OpenBot update: the admin set or the member set. */
 export type ServerUpdateAccess = "admin" | "member";
 
@@ -231,6 +250,11 @@ export interface MobileAgent {
   avatarUrl?: string | null;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
+  /**
+   * The exact colour, which wins over `avatarHue`. Only a host with `agent-colors-v1` gives it, through
+   * its own route; else it is null.
+   */
+  avatarColor: AvatarColor | null;
   /** The Marketplace listing the agent was added from, and the listing version it has. */
   marketplaceSource?: { listingId: string; version: number } | undefined;
 }
@@ -297,6 +321,10 @@ export interface MobileWorkspaceContextValue {
   canEditQueue: (serverId: string) => boolean;
   /** True when the host advertises `message-client-id-v1`: a repeat of a message is stored once. */
   canRetryMessage: (serverId: string) => boolean;
+  /** True when the host advertises `message-delete-v1`. */
+  canDeleteMessages: (serverId: string) => boolean;
+  /** True when the host advertises `conversation-unread-from-v1`: a message of an agent chat can be marked unread. */
+  canMarkUnreadFrom: (serverId: string) => boolean;
   /** The files this host accepts beyond the base list, as the desktop picker reads them. */
   attachmentSupport: (serverId: string) => AttachmentSupport;
   changeQueue: (
@@ -308,6 +336,11 @@ export interface MobileWorkspaceContextValue {
   editQueue: (agentId: string, serverId: string, input: QueueEditRequest) => Promise<QueueSnapshot>;
   /** Sets the reader's reaction on a message of an agent chat. `null` removes it. */
   setMessageReaction: (agentId: string, serverId: string, messageId: string, emoji: string | null) => Promise<void>;
+  /**
+   * Deletes one message for everyone, with `message-delete-v1`: from an agent chat, from one task of
+   * the agent (`taskId`), or from a channel. The host refuses a message that the reader may not delete.
+   */
+  deleteMessage: (serverId: string, target: MessageDeleteTarget) => Promise<void>;
   interruptTurn: (agentId: string, turnId: string, serverId?: string) => Promise<void>;
   channelStore: MobileChannelStore;
   /** The servers in the order saved on this device. The app opens on the first one. */
@@ -451,6 +484,10 @@ export interface MobileWorkspaceContextValue {
   canManageOnePasswordConnector: (serverId: string) => boolean;
   /** The same for the host's Bitwarden connection (`bitwarden-connector-v1`). */
   canManageBitwardenConnector: (serverId: string) => boolean;
+  /** The same for the host's WhatsApp numbers (`whatsapp-connector-v1`). */
+  canManageWhatsAppConnector: (serverId: string) => boolean;
+  /** The same for the host's password managers, such as Proton Pass (`password-managers-v1`). */
+  canManagePasswordManagers: (serverId: string) => boolean;
   /** True for an owner or admin of a host that serves its Vault to other devices (`vault-v1`). */
   canManageVault: (serverId: string) => boolean;
   /** The same for a CSV import from this phone (`vault-import-v1`). */
@@ -485,6 +522,17 @@ export interface MobileWorkspaceContextValue {
   connectBitwarden: (input: BitwardenHostConnectInput, serverId: string) => Promise<BitwardenConnectorStatus>;
   /** Also stops a sign-in that has not ended. */
   disconnectBitwarden: (serverId: string) => Promise<BitwardenConnectorStatus>;
+  /** The managers that the host can connect, each with its status. */
+  loadPasswordManagers: (serverId: string) => Promise<PasswordManagerStatus[]>;
+  /**
+   * Starts a sign-in on the host, connects with an access key, or sends the extra password that the
+   * sign-in asks for. The key and the password go to the host once. No answer carries them.
+   */
+  connectPasswordManager: (input: PasswordManagerConnectInput, serverId: string) => Promise<PasswordManagerStatus>;
+  /** Stops a sign-in that has not ended. */
+  cancelPasswordManager: (manager: PasswordManagerId, serverId: string) => Promise<PasswordManagerStatus>;
+  /** The host deletes its access key. The vault stays in the manager. */
+  disconnectPasswordManager: (manager: PasswordManagerId, serverId: string) => Promise<PasswordManagerStatus>;
   /** The host's Vault. No answer carries a password, a card number or a security code. */
   loadVault: (serverId: string) => Promise<VaultState>;
   /** A new secret goes to the host once; a null secret keeps the saved one. */
@@ -542,6 +590,25 @@ export interface MobileWorkspaceContextValue {
     input: HostAddMessagingOrchestratorInput,
     serverId: string,
   ) => Promise<AddMessagingOrchestratorResult>;
+  /** The host's WhatsApp numbers and the settings of each. */
+  loadWhatsAppConnector: (serverId: string) => Promise<WhatsAppOverview>;
+  /** The host's WhatsApp session asks WhatsApp for a pairing code or a QR code, and answers it. */
+  startWhatsAppLink: (input: StartWhatsAppLinkInput, serverId: string) => Promise<WhatsAppLinkState>;
+  /** The link that runs now on the host. */
+  loadWhatsAppLinkState: (serverId: string) => Promise<WhatsAppLinkState>;
+  /** Stops a link that did not end, so the phone cannot use its code. */
+  cancelWhatsAppLink: (serverId: string) => Promise<void>;
+  disconnectWhatsAppNumber: (input: MessagingWorkspaceInput, serverId: string) => Promise<void>;
+  reconnectWhatsAppNumber: (input: MessagingWorkspaceInput, serverId: string) => Promise<void>;
+  setWhatsAppEnabled: (input: SetMessagingEnabledInput, serverId: string) => Promise<void>;
+  /** Creates the WhatsApp Orchestrator on the host's default provider and model. */
+  addWhatsAppOrchestrator: (serverId: string) => Promise<AddMessagingOrchestratorResult>;
+  /** The groups of a linked number, to choose from. */
+  loadWhatsAppGroups: (input: MessagingWorkspaceInput, serverId: string) => Promise<WhatsAppGroupList>;
+  addWhatsAppSender: (input: WhatsAppSenderInput, serverId: string) => Promise<void>;
+  removeWhatsAppSender: (input: RemoveWhatsAppSenderInput, serverId: string) => Promise<void>;
+  answerWhatsAppRequest: (input: AnswerWhatsAppRequestInput, serverId: string) => Promise<void>;
+  setWhatsAppOwnNumber: (input: SetWhatsAppOwnNumberInput, serverId: string) => Promise<void>;
   /**
    * How this user reaches the OpenBot update of an online host: an owner or admin through
    * `host-update-v1`, any member through `host-member-update-v1`. Null when neither applies.
@@ -598,6 +665,10 @@ export interface MobileWorkspaceContextValue {
   addRemoteServer: (input: AddRemoteServerInput) => Promise<string>;
   /** Creates an agent on the active server and returns its id. */
   createAgent: (input: CreateAgentInput) => Promise<string>;
+  /**
+   * Changes an agent. A host with `agent-colors-v1` gets `avatarColor` through its colour route, and
+   * sets the hue itself. An older host gets only `avatarHue`, the nearest hue of the colour.
+   */
   updateAgent: (input: UpdateAgentInput, serverId?: string) => Promise<void>;
   setAgentAvatar: (agentId: string, image: RemoteFileUpload | null, serverId: string) => Promise<void>;
   loadAgentAvatar: (agentId: string, avatarUrl: string, serverId: string) => Promise<string>;
@@ -863,6 +934,11 @@ export interface MobileWorkspaceContextValue {
   restoreWorkflowVersion: (input: WorkflowVersionInput, serverId: string) => Promise<WorkflowDetail>;
   /** True when the host advertises `workflows-github-v1`: it runs GitHub triggers and outputs. */
   canUseWorkflowGitHub: (serverId: string) => boolean;
+  /**
+   * True when the host advertises `workflows-chats-v1` and `routine-results-v1`: an owner or admin adds
+   * and changes Telegram and Slack triggers and outputs, with the chats of the routine-results options.
+   */
+  canUseWorkflowChats: (serverId: string) => boolean;
   /** The repositories of the host's GitHub connection. Only an owner or admin reads them. */
   loadWorkflowGitHubCatalog: (serverId: string) => Promise<WorkflowGitHubCatalog>;
   /** The labels and people of one repository. Only an owner or admin reads them. */
@@ -945,6 +1021,11 @@ export interface MobileWorkspaceContextValue {
   unhideAgent: (agentId: string) => void;
   markAgentRead: (agentId: string, throughMessageId?: string, serverId?: string) => void;
   markAgentUnread: (agentId: string) => void;
+  /**
+   * Marks a message of an agent chat and the messages after it unread. It rejects when the host
+   * refuses it. Only a host with `canMarkUnreadFrom` takes it.
+   */
+  markAgentUnreadFrom: (agentId: string, fromMessageId: string, serverId: string) => Promise<void>;
   /** Marks every unread chat of the active server read. It rejects when a chat stays unread. */
   markAllRead: () => Promise<void>;
   toggleAgentPin: (agentId: string) => ToggleAgentPinResult;
@@ -968,6 +1049,8 @@ export type MobileWorkspaceCapabilityCheck =
   | "browserViewSupport"
   | "canEditQueue"
   | "canRetryMessage"
+  | "canDeleteMessages"
+  | "canMarkUnreadFrom"
   | "attachmentSupport"
   | "canStartNewChat"
   | "canCompactContext"
@@ -981,6 +1064,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canBranchThreads"
   | "canUseWorkflows"
   | "canUseWorkflowGitHub"
+  | "canUseWorkflowChats"
   | "canReadServerStorage"
   | "canSetAgentNotificationLevel";
 
@@ -1013,6 +1097,8 @@ type MobileWorkspaceStateKey =
   | "canManageConnectors"
   | "canManageOnePasswordConnector"
   | "canManageBitwardenConnector"
+  | "canManageWhatsAppConnector"
+  | "canManagePasswordManagers"
   | "canManageVault"
   | "canImportVault"
   | "canImportAgents"

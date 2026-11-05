@@ -132,6 +132,7 @@ export const messages = {
   "marketplace.app.telegramTagline": "المجموعات والدردشات المباشرة في Telegram",
   "marketplace.app.whatsappTagline": "دردشتك الخاصة والأشخاص الذين تسمح لهم في WhatsApp",
   "marketplace.app.bitwardenTagline": "سجّل الدخول إلى المواقع ببيانات دخول من مجلد مشترك",
+  "marketplace.app.protonPassTagline": "سجّل الدخول إلى المواقع ببيانات دخول من خزنة مشتركة",
   "marketplace.app.onePasswordCategory": "إدارة بيانات الدخول والاعتماد",
   "marketplace.app.yourApps": "تطبيقاتك",
   "marketplace.app.addCustom": "إضافة مخصص",
@@ -230,6 +231,14 @@ export const messages = {
   "marketplace.plugin.paper.prompt.implement": "نفّذ إطار Paper المحدد في قاعدة الشيفرة هذه، وفق أعراف الشيفرة لدينا.",
   "marketplace.plugin.paper.prompt.codeToDesign": "استخدم الأنماط في هذا المستودع وصمّم صفحة إعدادات في Paper.",
   "marketplace.plugin.paper.prompt.tokens": "اعرض رموز التصميم في ملف Paper المفتوح وقارنها بسمتنا.",
+  "marketplace.plugin.higgsfield.tagline": "صور وفيديو وصوت بالذكاء الاصطناعي",
+  "marketplace.plugin.higgsfield.description":
+    "يتيح Higgsfield للوكلاء إنشاء الصور والفيديو والشخصيات والصوت بنماذج Higgsfield مثل Seedance وKling وVeo وMiniMax Hailuo، والتحقق من رصيد الأرصدة، وتصفح Asset Library. تُحفظ النتائج في Assets الخاصة بالمستخدم في Higgsfield. يسجّل كل مستخدم الدخول إلى حسابه في Higgsfield عبر المتصفح. كل عملية إنشاء تستهلك أرصدة ذلك الحساب بالسعر القياسي، حتى في الخطة غير المحدودة.",
+  "marketplace.plugin.higgsfield.app":
+    "إنشاء الصور والفيديو والصوت، والشخصيات، والأرصدة والأصول، عبر خادم MCP الخاص بـ Higgsfield مع تسجيل الدخول في المتصفح.",
+  "marketplace.plugin.higgsfield.prompt.credits": "كم لديّ من أرصدة Higgsfield؟",
+  "marketplace.plugin.higgsfield.prompt.productShot": "أنشئ في Higgsfield صورة منتج لكوب خزفي على طاولة خشبية.",
+  "marketplace.plugin.higgsfield.prompt.clip": "أنشئ في Higgsfield فيديو مدته 5 ثوانٍ لأمواج عند الغروب.",
   "marketplace.plugin.appleApps.tagline": "البريد والتقويم والمزيد على جهاز Mac",
   "marketplace.plugin.appleApps.description":
     "تتيح Apple apps للوكلاء استخدام البريد والتقويم وجهات الاتصال والتذكيرات والملاحظات والرسائل وSafari على جهاز Mac هذا. تعمل على macOS فقط. يشغّل OpenBot mcp-icloud، وهو خادم مجتمعي لم تصنعه Apple ولا OpenBot. يتحكم الخادم في التطبيقات عبر AppleScript على هذا الحاسوب، ولا يحتاج إلى حساب ولا مفتاح. عند تثبيته، يمكن لـ OpenBot أن يطلب من macOS الوصول إلى كل هذه التطبيقات دفعة واحدة، مع طلب واحد لكل تطبيق. وإن لم تفعل، يسأل macOS في أول مرة يستخدم فيها وكيل أحد التطبيقات. لتغيير ذلك لاحقًا، افتح إعدادات النظام › الخصوصية والأمن › الأتمتة. يمكن للوكلاء إرسال البريد الإلكتروني ورسائل iMessage، وتغيير الأحداث وجهات الاتصال والتذكيرات أو حذفها، لذا راجع كل عملية كتابة قبل الموافقة عليها. ما تقرؤه الأدوات، مثل نص البريد الإلكتروني، يذهب إلى مزوّد نموذج الوكيل.",
@@ -286,6 +295,16 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "ابحث عن هذه الدفعة واشرح سبب فشلها.",
   "marketplace.plugin.stripe.prompt.customer": "لخّص فواتير هذا العميل ورصيده المستحق.",
   "marketplace.plugin.stripe.prompt.link": "صُغ رابط دفع لخطة Pro بسعر 49 شهريًا.",
+  "marketplace.plugin.revenuecat.tagline": "الاشتراكات والمنتجات وجدران الدفع",
+  "marketplace.plugin.revenuecat.description":
+    "يتيح RevenueCat للوكلاء قراءة إعداد اشتراكاتك داخل التطبيق وتغييره: التطبيقات والمنتجات والاستحقاقات والعروض والحزم وجدران الدفع والتجارب. ويمكن للوكلاء أيضًا البحث عن العملاء ومشترياتهم، وقراءة الرسوم البيانية والمقاييس. يوضع مفتاح API سري من RevenueCat في ترويسة Authorization واحدة. يصل المفتاح إلى مشروع واحد. بمفتاح للقراءة فقط، يمكن للوكلاء القراءة فقط. وبمفتاح كتابة، يمكن للوكلاء إرسال المنتجات إلى مراجعة App Store، ومنح العملاء استحقاقات، وحذف الحزم وقواعد الاستهداف وخطافات الويب.",
+  "marketplace.plugin.revenuecat.app":
+    "المنتجات والاستحقاقات والعروض وجدران الدفع والمقاييس، عبر خادم MCP الخاص بـ RevenueCat بمفتاح API سري.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "ما العروض والحزم الموجودة في مشروعي على RevenueCat؟",
+  "marketplace.plugin.revenuecat.prompt.revenue": "كيف تغيرت إيراداتي واشتراكاتي النشطة في RevenueCat هذا الشهر؟",
+  "marketplace.plugin.revenuecat.prompt.customer": "ما الاستحقاقات التي يملكها عميل RevenueCat هذا، ومتى تنتهي؟",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "في لوحة تحكم RevenueCat، افتح API keys في مشروعك وأنشئ مفتاح API سريًا. يكفي مفتاح للقراءة فقط لعرض البيانات.",
   "marketplace.plugin.posthog.tagline": "تحليلات المنتج والأعلام",
   "marketplace.plugin.posthog.description":
     "يتيح PostHog للوكلاء الاستعلام عن الأحداث ومسارات التحويل، وفحص أعلام الميزات، وتلخيص ما تغيّر بعد الإصدار. يوضع مفتاح API شخصي من إعدادات المشروع في ترويسة Authorization واحدة.",
@@ -399,6 +418,14 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "ما مهام Todoist المستحقة اليوم؟",
   "marketplace.plugin.todoist.prompt.capture": "أضف بنود العمل هذه إلى Inbox في Todoist.",
   "marketplace.plugin.todoist.prompt.overdue": "انقل مهامي المتأخرة في Todoist إلى الغد.",
+  "marketplace.plugin.ticktick.tagline": "المهام والقوائم والعادات والتركيز",
+  "marketplace.plugin.ticktick.description":
+    "يتيح TickTick للوكلاء البحث عن المهام وتصفيتها، وإضافة المهام وتعديلها، وإدارة القوائم والأقسام والمجلدات والوسوم والتعليقات. ويمكن للوكلاء أيضًا قراءة العادات وسجلات التركيز وتعديلها، وقراءة الأحداث من التقويمات المتصلة بـ TickTick. يسجّل كل مستخدم الدخول إلى حسابه في TickTick من المتصفح. يحصل الوكلاء على صلاحية القراءة والكتابة: يمكنهم إكمال المهام ونقلها وحذفها، وحذف الوسوم وسجلات التركيز.",
+  "marketplace.plugin.ticktick.app":
+    "المهام والقوائم والعادات وسجلات التركيز، عبر خادم MCP من TickTick مع تسجيل الدخول في المتصفح.",
+  "marketplace.plugin.ticktick.prompt.today": "ما مهام TickTick المستحقة اليوم؟",
+  "marketplace.plugin.ticktick.prompt.capture": "أضف بنود العمل هذه إلى صندوق الوارد في TickTick.",
+  "marketplace.plugin.ticktick.prompt.week": "ما مهام TickTick التي أكملتها الأسبوع الماضي؟",
   "marketplace.plugin.trello.tagline": "اللوحات والقوائم والبطاقات",
   "marketplace.plugin.trello.description":
     "يتيح Trello للوكلاء البحث في اللوحات والقوائم والبطاقات وقوائم التحقق والتعليقات وقراءتها، وإنشاء اللوحات والبطاقات، ونقل القوائم والبطاقات، ووضع علامة «منجز» على البطاقات، وإضافة قوائم التحقق والتعليقات والتصنيفات. ويمكن للوكلاء أيضًا قراءة البطاقات وإضافتها في Inbox الخاص بالمستخدم في Trello، وقراءة أحداث Planner، التي قد تأتي من تقويم Google أو Outlook مرتبط. يسجّل كل مستخدم الدخول إلى حساب Trello الخاص به عبر المتصفح ويختار مساحات العمل في شاشة الموافقة. يحصل الوكلاء على أذونات المستخدم نفسها في مساحات العمل تلك. يمكنهم أرشفة البطاقات والقوائم، لكن الخادم لا يستطيع حذف أي شيء نهائيًا.",
@@ -415,6 +442,23 @@ export const messages = {
   "marketplace.plugin.clickup.prompt.findTasks": "ابحث عن مهامي المفتوحة في ClickUp المستحقة هذا الأسبوع.",
   "marketplace.plugin.clickup.prompt.createTask": "أنشئ مهمة في ClickUp لبنود العمل هذه وعيّنها لي.",
   "marketplace.plugin.clickup.prompt.summarizeDoc": "ابحث عن آخر تحديث للمشروع في ClickUp ولخّص الأسئلة المفتوحة.",
+  "marketplace.plugin.coinbase.tagline": "أسعار العملات المشفرة والمحافظ والتداول",
+  "marketplace.plugin.coinbase.description":
+    "يتيح Coinbase للوكلاء قراءة الأسعار والأرصدة والمحافظ والأوامر والرسوم في Coinbase Advanced Trade، ومعاينة الأوامر وتنفيذها، والتحويل بين الأصول، ونقل الأموال بين المحافظ. يسجّل كل مستخدم الدخول إلى حسابه في Coinbase عبر المتصفح. يحصل الوكلاء على صلاحيات المستخدم نفسها. تستخدم الأوامر والتحويلات أموالًا حقيقية، ويمكن للوكلاء دفع طلبات x402 من رصيد USDC.",
+  "marketplace.plugin.coinbase.app":
+    "الأسعار والأرصدة والمحافظ والأوامر والتحويلات، عبر خادم MCP الخاص بـ Coinbase مع تسجيل الدخول في المتصفح.",
+  "marketplace.plugin.coinbase.prompt.balances": "ما أرصدتي في Coinbase في كل محفظة؟",
+  "marketplace.plugin.coinbase.prompt.price": "اعرض سعر BTC-USD على Coinbase وكيف تحرّك هذا الأسبوع.",
+  "marketplace.plugin.coinbase.prompt.previewOrder":
+    "اعرض معاينة لشراء ETH بسعر السوق بقيمة 50 USD على Coinbase. لا تنفّذ الأمر.",
+  "marketplace.plugin.robinhood.tagline": "حسابات الوساطة والتداول عبر الوكلاء",
+  "marketplace.plugin.robinhood.description":
+    "يتيح Robinhood للوكلاء قراءة حسابات عميل Robinhood ومراكزه وأرصدته وسجل معاملاته وقوائم المتابعة، وقراءة بيانات السوق، وتنفيذ أوامر الأسهم والخيارات والعملات المشفرة. يسجّل كل مستخدم الدخول إلى حسابه في Robinhood عبر المتصفح. عند أول تسجيل دخول، يطلب Robinhood من المستخدم فتح حساب Agentic منفصل. لا يمكن للوكلاء التداول إلا في ذلك الحساب، وهم افتراضيًا ينفّذون الأوامر دون طلب موافقة المستخدم على كل أمر.",
+  "marketplace.plugin.robinhood.app":
+    "الحسابات والمراكز وبيانات السوق والصفقات، عبر خادم MCP الخاص بـ Robinhood مع تسجيل الدخول في المتصفح.",
+  "marketplace.plugin.robinhood.prompt.positions": "لخّص مراكزي في Robinhood وكيف تحرّكت اليوم.",
+  "marketplace.plugin.robinhood.prompt.watchlist": "كيف تحرّك كل سهم في قائمة متابعتي في Robinhood هذا الأسبوع؟",
+  "marketplace.plugin.robinhood.prompt.agenticCash": "كم من النقد في حساب Agentic الخاص بي في Robinhood؟",
   "marketplace.plugin.huggingface.tagline": "النماذج ومجموعات البيانات والأوراق البحثية على Hub",
   "marketplace.plugin.huggingface.description":
     "يتيح Hugging Face للوكلاء البحث في النماذج ومجموعات البيانات وSpaces والمجموعات والأوراق البحثية على Hugging Face Hub، وقراءة بطاقات النماذج وملفات المستودعات، ومعاينة مجموعات البيانات، والبحث في وثائق Hugging Face. يستخدم بيانات Hub العامة ولا يحتاج إلى حساب ولا مفتاح. الأدوات للقراءة فقط: لا يمكن للوكلاء إنشاء مستودعات أو تشغيل مهام.",

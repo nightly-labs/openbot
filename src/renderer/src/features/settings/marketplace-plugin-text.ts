@@ -105,6 +105,18 @@ const PLUGIN_TEXT = {
       "prompt-tokens": "marketplace.plugin.paper.prompt.tokens",
     },
   },
+  higgsfield: {
+    tagline: "marketplace.plugin.higgsfield.tagline",
+    description: "marketplace.plugin.higgsfield.description",
+    apps: {
+      "app-higgsfield-mcp": "marketplace.plugin.higgsfield.app",
+    },
+    prompts: {
+      "prompt-credits": "marketplace.plugin.higgsfield.prompt.credits",
+      "prompt-product-shot": "marketplace.plugin.higgsfield.prompt.productShot",
+      "prompt-clip": "marketplace.plugin.higgsfield.prompt.clip",
+    },
+  },
   "apple-apps": {
     tagline: "marketplace.plugin.appleApps.tagline",
     description: "marketplace.plugin.appleApps.description",
@@ -187,6 +199,18 @@ const PLUGIN_TEXT = {
       "prompt-payment": "marketplace.plugin.stripe.prompt.payment",
       "prompt-customer": "marketplace.plugin.stripe.prompt.customer",
       "prompt-link": "marketplace.plugin.stripe.prompt.link",
+    },
+  },
+  revenuecat: {
+    tagline: "marketplace.plugin.revenuecat.tagline",
+    description: "marketplace.plugin.revenuecat.description",
+    apps: {
+      "app-revenuecat-mcp": "marketplace.plugin.revenuecat.app",
+    },
+    prompts: {
+      "prompt-offerings": "marketplace.plugin.revenuecat.prompt.offerings",
+      "prompt-revenue": "marketplace.plugin.revenuecat.prompt.revenue",
+      "prompt-customer": "marketplace.plugin.revenuecat.prompt.customer",
     },
   },
   posthog: {
@@ -357,6 +381,18 @@ const PLUGIN_TEXT = {
       "prompt-overdue": "marketplace.plugin.todoist.prompt.overdue",
     },
   },
+  ticktick: {
+    tagline: "marketplace.plugin.ticktick.tagline",
+    description: "marketplace.plugin.ticktick.description",
+    apps: {
+      "app-ticktick-mcp": "marketplace.plugin.ticktick.app",
+    },
+    prompts: {
+      "prompt-today": "marketplace.plugin.ticktick.prompt.today",
+      "prompt-capture": "marketplace.plugin.ticktick.prompt.capture",
+      "prompt-week": "marketplace.plugin.ticktick.prompt.week",
+    },
+  },
   trello: {
     tagline: "marketplace.plugin.trello.tagline",
     description: "marketplace.plugin.trello.description",
@@ -379,6 +415,30 @@ const PLUGIN_TEXT = {
       "prompt-find-tasks": "marketplace.plugin.clickup.prompt.findTasks",
       "prompt-create-task": "marketplace.plugin.clickup.prompt.createTask",
       "prompt-summarize-doc": "marketplace.plugin.clickup.prompt.summarizeDoc",
+    },
+  },
+  coinbase: {
+    tagline: "marketplace.plugin.coinbase.tagline",
+    description: "marketplace.plugin.coinbase.description",
+    apps: {
+      "app-coinbase-mcp": "marketplace.plugin.coinbase.app",
+    },
+    prompts: {
+      "prompt-balances": "marketplace.plugin.coinbase.prompt.balances",
+      "prompt-price": "marketplace.plugin.coinbase.prompt.price",
+      "prompt-preview-order": "marketplace.plugin.coinbase.prompt.previewOrder",
+    },
+  },
+  robinhood: {
+    tagline: "marketplace.plugin.robinhood.tagline",
+    description: "marketplace.plugin.robinhood.description",
+    apps: {
+      "app-robinhood-mcp": "marketplace.plugin.robinhood.app",
+    },
+    prompts: {
+      "prompt-positions": "marketplace.plugin.robinhood.prompt.positions",
+      "prompt-watchlist": "marketplace.plugin.robinhood.prompt.watchlist",
+      "prompt-agentic-cash": "marketplace.plugin.robinhood.prompt.agenticCash",
     },
   },
   huggingface: {
@@ -407,6 +467,8 @@ const AUTH_TEXT: Readonly<Record<string, AppTextKey>> = {
   "Create a key": "marketplace.auth.createKey",
   "The URL of an MCP server in your Composio account": "marketplace.plugin.composio.hint.url",
   "Find it in your Composio account, in Settings > Sessions & API Key.": "marketplace.plugin.composio.hint.apiKey",
+  "In the RevenueCat dashboard, open API keys in your project and create a secret API key. A read-only key is enough to view data.":
+    "marketplace.plugin.revenuecat.hint.apiKey",
   'In Obsidian, open Settings > Local REST API. Copy the API key and turn on "Enable non-encrypted (HTTP) server".':
     "marketplace.plugin.obsidian.hint.apiKey",
 };

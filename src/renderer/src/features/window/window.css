@@ -129,7 +129,7 @@
   .app-window
     > .app-frame-edge
     :is(.settings-panel, .browser-panel)
-    > :is(.settings-panel-header, .file-preview-header, .browser-preview-header)::before {
+    > :is(.settings-panel-header, .file-preview-header)::before {
     position: absolute;
     top: 50%;
     width: 1px;
@@ -161,14 +161,14 @@
   .app-window
     > .app-frame-edge
     :is(.settings-panel, .browser-panel)
-    > :is(.settings-panel-header, .file-preview-header, .browser-preview-header) {
+    > :is(.settings-panel-header, .file-preview-header) {
     position: relative;
   }
 
   .app-window
     > .app-frame-edge
     :is(.settings-panel, .browser-panel)
-    > :is(.settings-panel-header, .file-preview-header, .browser-preview-header)::before {
+    > :is(.settings-panel-header, .file-preview-header)::before {
     inset-inline-start: 0;
   }
 
@@ -182,7 +182,7 @@
     > .app-frame-edge
     .side-panel-docked
     > :is(.settings-panel, .browser-panel)
-    > :is(.settings-panel-header, .file-preview-header, .browser-preview-header)::before {
+    > :is(.settings-panel-header, .file-preview-header)::before {
     content: none;
   }
 
@@ -484,12 +484,46 @@
     inset-inline: 1px 0;
   }
 
-  /* The settings page starts below the top row. The schedule, usage and Marketplace titles go in the
+  /* The schedule, usage and Marketplace titles, and the path to an open settings detail page, go in the
    * top row, after the server menu, and the rest of the top row lets clicks through to that menu. The
-   * rail is the way back, so these titles have no Back button and no server name. */
+   * rail is the way back, so these titles have no Back button and no server name. The section list and
+   * the panel of a settings page start below the top row. */
   .app-frame-edge[data-window-page-kind="settings"] > .window-page {
-    top: var(--left-header-height);
+    pointer-events: none;
+  }
+
+  .app-frame-edge[data-window-page-kind="settings"] > .window-page > .settings-page {
+    grid-template-rows: var(--left-header-height) minmax(0, 1fr);
+  }
+
+  .app-frame-edge[data-window-page-kind="settings"] > .window-page > .settings-page > .settings-page-nav {
+    grid-row: 2;
+  }
+
+  .app-frame-edge[data-window-page-kind="settings"]
+    > .window-page
+    > .settings-page
+    :is(.settings-page-nav, .settings-page-content, .settings-page-path) {
+    pointer-events: auto;
     -webkit-app-region: no-drag;
+  }
+
+  .app-frame-edge[data-window-page-kind="settings"] > .window-page > .settings-page > .settings-page-path-row {
+    padding: 0 var(--openbot-space-3);
+    -webkit-app-region: drag;
+  }
+
+  .app-frame-edge[data-window-page-kind="settings"]
+    > .window-page
+    > .settings-page
+    > .settings-page-path-row
+    > .settings-page-path {
+    /* Only the path text stops the drag, so the rest of the top row still moves the window. */
+    width: auto;
+    flex: 0 1 auto;
+    max-width: none;
+    margin-inline: 0;
+    padding-inline: 0;
   }
 
   /* The hidden chat header no longer moves the window, so the empty top row of the settings page does. */
@@ -578,17 +612,40 @@
   }
 }
 
-/* The settings page: the nav at the width of the sidebar. */
+/* The settings page: the nav at the width of the sidebar, and the path to an open detail page above the panel. */
 .settings-page {
   display: grid;
   width: 100%;
   height: 100%;
   min-height: 0;
   grid-template-columns: max(var(--left-panel-width, 280px), 220px) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.settings-page-path-row {
+  display: flex;
+  min-width: 0;
+  grid-column: 2;
+  grid-row: 1;
+  align-items: center;
+  padding: var(--openbot-space-4) 0 0;
+}
+
+.settings-page-path-row:empty {
+  display: none;
+}
+
+/* Below the top row, the path takes the column and the inline padding of the panel, so both start on one edge. */
+.settings-page-path-row > .settings-page-path {
+  width: 100%;
+  max-width: 784px;
+  margin-inline: auto;
+  padding-inline: var(--openbot-space-8);
 }
 
 .settings-page-nav {
   display: flex;
+  grid-row: 1 / -1;
   min-width: 0;
   min-height: 0;
   flex-direction: column;
@@ -735,6 +792,8 @@
 
 .settings-page-content {
   position: relative;
+  grid-column: 2;
+  grid-row: 2;
   min-width: 0;
   min-height: 0;
 }
@@ -756,7 +815,7 @@
   background: transparent;
 }
 
-.settings-page-content > .settings-modal-page :is(.settings-modal-header, .settings-modal-content) {
+.settings-page-content > .settings-modal-page .settings-modal-content {
   width: 100%;
   max-width: 784px;
   margin-inline: auto;
@@ -772,10 +831,27 @@
 @media (max-width: 720px) {
   .settings-page {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+
+  /* The path of an open detail page is between the sections and the panel. */
+  .settings-page-path-row {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .settings-page-path-row > .settings-page-path {
+    padding-inline: var(--openbot-space-4);
+  }
+
+  .settings-page-content {
+    grid-column: 1;
+    grid-row: 3;
   }
 
   .settings-page-nav {
+    grid-column: 1;
+    grid-row: 1;
     border-inline-end: 0;
     border-bottom: 1px solid var(--openbot-border);
     padding: var(--openbot-space-3) var(--openbot-space-3) 0;

@@ -72,4 +72,6 @@ export const messages = {
   "usage.panel.unsupported":
     "Cet hôte ne prend pas en charge les analyses des agents. Mettez l’hôte à jour pour utiliser cette vue.",
   "usage.panel.loadFailed": "Impossible de charger l’utilisation. Vérifiez la connexion et la période.",
+  "usage.machine.label": "Utilisation de la machine. CPU : {cpu}, mémoire : {memory}",
+  "usage.machine.openStorage": "Ouvrir Stockage. Disque : {percent}, {detail}",
 } as const satisfies PartialTranslation<typeof source>;

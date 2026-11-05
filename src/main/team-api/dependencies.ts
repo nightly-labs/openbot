@@ -78,6 +78,7 @@ import type { McpToolRuntimePreparation } from "../ipc/mcp-server-handlers";
 import type { LiveActivityPushService } from "../live-activity-push";
 import type { McpHostSignIns } from "../mcp-host-sign-ins";
 import type { OnePasswordConnectorService } from "../onepassword-connector-service";
+import type { PasswordManagersService } from "../password-managers/password-managers-service";
 import type { ProviderAccountsHost } from "../provider-accounts-host";
 import type { ProviderHostSignIns } from "../provider-host-sign-ins";
 import type { PushNotificationService } from "../push-notifications";
@@ -150,6 +151,7 @@ type TeamApiAgentMethods = Pick<
   | "listQueue"
   | "acknowledgeFailedTurn"
   | "setMessageReaction"
+  | "deleteConversationMessage"
   | "cancelQueuedMessage"
   | "steerQueuedMessage"
   | "updateQueuedMessage"
@@ -167,8 +169,9 @@ type TeamApiAgentMethods = Pick<
 >;
 
 export type TeamApiAgents = TeamApiAgentMethods & {
-  on: (event: "event", listener: (event: AgentEvent) => void) => void;
-  off: (event: "event", listener: (event: AgentEvent) => void) => void;
+  /** With `memberId`, the event is only for the connections of that member. */
+  on: (event: "event", listener: (event: AgentEvent, memberId?: string) => void) => void;
+  off: (event: "event", listener: (event: AgentEvent, memberId?: string) => void) => void;
 };
 
 /**
@@ -186,7 +189,10 @@ export type TeamApiMcpSignIns = Pick<
   "start" | "status" | "cancel" | "signOut" | "list" | "app" | "saveApp" | "removeApp"
 >;
 
-/** `connectors-v1`: the GitHub connection and the messaging connections of this host. */
+/**
+ * `connectors-v1`: the GitHub connection and the messaging connections of this host. The WhatsApp
+ * methods serve `whatsapp-connector-v1`.
+ */
 export interface TeamApiConnectors {
   github: Pick<GitHubConnectorService, "status" | "pages" | "connect" | "cancel" | "disconnect" | "repositories">;
   messaging: Pick<
@@ -209,6 +215,17 @@ export interface TeamApiConnectors {
     | "discordAccess"
     | "listDiscordRoles"
     | "setDiscordAccess"
+    | "whatsappOverview"
+    | "whatsappLinkState"
+    | "startWhatsAppLink"
+    | "cancelWhatsAppLink"
+    | "disconnectWhatsAppNumber"
+    | "addWhatsAppOrchestrator"
+    | "listWhatsAppGroups"
+    | "addWhatsAppSender"
+    | "removeWhatsAppSender"
+    | "answerWhatsAppRequest"
+    | "setWhatsAppOwnNumber"
   >;
 }
 
@@ -569,6 +586,12 @@ export type TeamApiOnePasswordConnector = Pick<
 /** `bitwarden-connector-v1`: the Bitwarden connection of this host, by an API key and the master password. */
 export type TeamApiBitwardenConnector = Pick<BitwardenConnectorService, "status" | "connectWithApiKey" | "disconnect">;
 
+/** `password-managers-v1`: the password managers of this host, such as Proton Pass. */
+export type TeamApiPasswordManagers = Pick<
+  PasswordManagersService,
+  "list" | "refusal" | "connect" | "cancel" | "disconnect"
+>;
+
 /** `vault-v1`: the Vault of this host, for an owner or admin. The route uses no CSV import. */
 export type TeamApiVault = VaultService;
 
@@ -585,6 +608,7 @@ export interface TeamApiOptions {
   connectors?: TeamApiConnectors | undefined;
   onePasswordConnector?: TeamApiOnePasswordConnector | undefined;
   bitwardenConnector?: TeamApiBitwardenConnector | undefined;
+  passwordManagers?: TeamApiPasswordManagers | undefined;
   vault?: TeamApiVault | undefined;
   providerHostSignIns?: TeamApiProviderHostSignIns | undefined;
   providerAccounts?: TeamApiProviderAccounts | undefined;

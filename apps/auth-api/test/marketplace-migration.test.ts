@@ -70,7 +70,14 @@ describe("marketplace presentation migration", () => {
   it("stores the publisher's category and keeps consent when an older client submits a new version", async () => {
     const database = presentationDatabase();
     const agents = new AgentMarketplace({ DB: d1(database), SKILLS: unusedBucket() });
-    const user = { id: "user-1", name: "Owner", email: "owner@example.com", avatarUrl: null, analyticsEnabled: null };
+    const user = {
+      id: "user-1",
+      name: "Owner",
+      email: "owner@example.com",
+      avatarUrl: null,
+      analyticsEnabled: null,
+      chatColor: null,
+    };
     const snapshot = {
       botId: "local",
       name: "Writer",

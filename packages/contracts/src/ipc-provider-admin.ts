@@ -164,6 +164,13 @@ function decodeProviderRuntimeStatus(value: unknown): ProviderRuntimeStatus {
   };
 }
 
+/** A managed runtime that `providers-v1` did not send. */
+function decodeLaterRuntime(value: unknown): ProviderRuntimeStatus {
+  return value === undefined
+    ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
+    : decodeProviderRuntimeStatus(value);
+}
+
 export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSnapshot {
   if (
     !isDynamicRecord(value) ||
@@ -174,41 +181,27 @@ export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSn
     throw new Error("Invalid provider runtimes.");
   }
   const { providers, toolRuntimes } = value;
+  // `providers-v1` sends Codex, Claude, Grok and OpenCode. A runtime that a later route set added
+  // reads as not downloaded where the host sends none: this client cannot download it there. The
+  // record is closed, so a runtime added to `ManagedProviderId` without a line here does not compile.
   return {
     revision: value.revision,
     providers: {
-      pi:
-        providers.pi === undefined
-          ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
-          : decodeProviderRuntimeStatus(providers.pi),
-      muse:
-        providers.muse === undefined
-          ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
-          : decodeProviderRuntimeStatus(providers.muse),
       codex: decodeProviderRuntimeStatus(providers.codex),
       claude: decodeProviderRuntimeStatus(providers.claude),
       grok: decodeProviderRuntimeStatus(providers.grok),
       opencode: decodeProviderRuntimeStatus(providers.opencode),
-      // `providers-v1` has no Gemini entry, and this client cannot download Gemini on that host, so
-      // the status is "not downloaded". `providers-v2` has one.
-      antigravity:
-        providers.antigravity === undefined
-          ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
-          : decodeProviderRuntimeStatus(providers.antigravity),
-      // Only `providers-v4` carries Cursor and Cline; on an older host this client cannot download them.
-      cursor:
-        providers.cursor === undefined
-          ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
-          : decodeProviderRuntimeStatus(providers.cursor),
-      cline:
-        providers.cline === undefined
-          ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
-          : decodeProviderRuntimeStatus(providers.cline),
-      // A host before Kimi sends no Kimi row; this client cannot download Kimi there.
-      kimi:
-        providers.kimi === undefined
-          ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
-          : decodeProviderRuntimeStatus(providers.kimi),
+      antigravity: decodeLaterRuntime(providers.antigravity),
+      cursor: decodeLaterRuntime(providers.cursor),
+      cline: decodeLaterRuntime(providers.cline),
+      kimi: decodeLaterRuntime(providers.kimi),
+      devin: decodeLaterRuntime(providers.devin),
+      copilot: decodeLaterRuntime(providers.copilot),
+      pi: decodeLaterRuntime(providers.pi),
+      muse: decodeLaterRuntime(providers.muse),
+      // Only a `providers-v8` host that can install Hermes sends a Hermes row. Without one the row
+      // shows the install guide, as it does for a host before the Hermes installer.
+      ...(providers.hermes === undefined ? {} : { hermes: decodeProviderRuntimeStatus(providers.hermes) }),
     },
     toolRuntimes: { bun: decodeProviderRuntimeStatus(toolRuntimes.bun) },
   };

@@ -100,6 +100,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "Empezando el inicio de sesión de {name} en {host}…",
   "provider.codeLogin.pageOpening": "Abriendo la página de inicio de sesión de {name} en {host}…",
   "provider.codeLogin.linkStep": "Inicia sesión en {name}. OpenBot continúa automáticamente.",
+  "provider.codeLogin.chatgptDeviceSetting":
+    "En ChatGPT en un ordenador, abre la configuración de seguridad y activa el inicio de sesión con código de dispositivo para Codex. En una cuenta de trabajo, lo activa el administrador del espacio de trabajo.",
   "provider.useApp.title": "Conecta {name} en la app de OpenBot",
   "provider.useApp.description":
     "El inicio de sesión de {name} vuelve al equipo que lo inició, y una pestaña del navegador no puede recibirlo. Conecta {name} en la app de OpenBot. La app termina el inicio de sesión sola.",
@@ -123,7 +125,14 @@ export const messages = {
   "provider.picker.noModels": "No hay modelos disponibles de {name}.",
   "provider.picker.customEmpty":
     "Añade un endpoint compatible con OpenAI: un servidor de modelos en este equipo o cualquier servicio con una URL base y una clave.",
+  "provider.picker.customPending":
+    "Los modelos de tus endpoints aún no están cargados. El proveedor los lee cuando termina su tarea actual.",
   "provider.picker.defaultModelLabel": "{name}, predeterminado",
+  "provider.picker.usageLimit": "Límite de uso alcanzado",
+  "provider.picker.usageLimitWindow": "Límite ({window})",
+  "provider.picker.usageLimitResets": "{limit} · Se restablece el {time}",
+  "provider.picker.usageLimitLabel": "{name}, límite de uso alcanzado",
+  "provider.picker.usageLimitResetsLabel": "{name}, límite de uso alcanzado, se restablece el {time}",
   "provider.picker.effort": "Esfuerzo",
   "provider.picker.effortLabel": "Esfuerzo de razonamiento del agente",
   "provider.picker.effortFixed": "{effort}, fijado por {provider}",
@@ -237,17 +246,10 @@ export const messages = {
   "provider.settings.modelShow": "Mostrar {name} ({id}) en el selector de modelos",
   "provider.settings.modelsNoMatch": "Ningún modelo coincide con la búsqueda.",
   "provider.settings.modelsLoadFailed": "No se pudieron cargar los modelos de este servidor.",
-  "provider.settings.download": "Descarga",
-  "provider.settings.downloadedCli": "CLI de {name}",
-  "provider.settings.downloadDetail": {
-    one: "{version} · 1 versión · {size}",
-    other: "{version} · {count} versiones · {size}",
-  },
-  "provider.settings.downloadVersions": { one: "1 versión · {size}", other: "{count} versiones · {size}" },
-  "provider.settings.downloadAgain": "Al activar {name}, OpenBot descarga su CLI de nuevo.",
-  "provider.settings.removeDownloadConfirm": "¿Quitar {size}?",
-  "provider.settings.removeDownloadKeeps": "Las cuentas, los inicios de sesión y los agentes se mantienen.",
-  "provider.settings.removeDownload": "Quitar descarga",
-  "provider.settings.removingDownload": "Quitando…",
+  "provider.settings.deleteTitle": "Eliminar {name}",
+  "provider.settings.deleteOn":
+    "Desactiva {name} y elimina la CLI que descargó OpenBot. Las cuentas, los inicios de sesión y los agentes se mantienen.",
+  "provider.settings.deleteOff":
+    "Elimina la CLI que OpenBot descargó para {name} ({size}). Las cuentas, los inicios de sesión y los agentes se mantienen.",
   "provider.settings.removeDownloadFailed": "No se pudo quitar la descarga.",
 } as const satisfies PartialTranslation<typeof source>;

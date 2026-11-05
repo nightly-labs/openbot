@@ -57,6 +57,7 @@ const TRIGGER_ICON: Record<WorkflowTriggerType, LucideIcon> = {
   github: GitPullRequest,
   discord: AtSign,
   telegram: Send,
+  slack: AtSign,
 };
 
 /** The icon of a step on its colour, as the desktop canvas marks each kind. */

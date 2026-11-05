@@ -45,6 +45,28 @@
   gap: var(--openbot-space-2);
 }
 
+/* The proxy of the profile, after its name. */
+.browser-profile-select-proxy {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+}
+
+.browser-profile-select-proxy svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+}
+
+.browser-profile-select-proxy span {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* The column of the profile colors and the "New profile" plus. */
 .browser-profile-select-mark {
   display: inline-flex;
@@ -95,4 +117,45 @@
 
 .browser-profile-select-form .ui-text {
   padding-inline: var(--openbot-space-2);
+}
+
+/* With proxies, the panel has two sections: the proxies, then the profiles. */
+.browser-profiles-panel:has(> .ui-settings-section) {
+  gap: var(--openbot-space-6);
+}
+
+.browser-profiles-panel > .ui-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-3);
+}
+
+.browser-profiles-panel > .ui-settings-section .browser-profiles-row {
+  flex: none;
+}
+
+/* The proxy of a named profile, before its menu. */
+.browser-proxy-badge svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+/* The proxy icon takes the place of the color button of a profile row. */
+.browser-proxy-icon {
+  display: inline-flex;
+  width: var(--openbot-control-md);
+  height: var(--openbot-control-md);
+  align-items: center;
+  justify-content: center;
+  color: var(--openbot-text-muted);
+}
+
+.browser-proxy-icon svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.browser-proxy-submenu-chevron {
+  margin-inline-start: auto;
+  color: var(--openbot-text-muted);
 }

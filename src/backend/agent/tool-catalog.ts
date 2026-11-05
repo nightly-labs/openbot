@@ -19,6 +19,7 @@ export const BUILTIN_TOOL_CATALOG = [OPENBOT_DYNAMIC_TOOLS, ...BROWSER_DYNAMIC_T
 
 const DIRECT_NAMES = new Set([
   "ask_user",
+  "ask_ui",
   "attach_files_to_response",
   "list_agents",
   "send_message",
@@ -47,21 +48,27 @@ const searchShape = {
 // Models often send one name, and a rejected call costs a model step, so describe accepts `name` as well as `names`.
 const describeShape = { names: z.array(qualifiedName).min(1).max(10).optional(), name: qualifiedName.optional() };
 // Claude's bundled schema converter does not support the current Zod record processor, and Muse
-// rejects recursive schemas. Arguments arrive as JSON, and the target tool validates them.
-const callShape = { name: qualifiedName, arguments: z.object({}).catchall(z.unknown()) };
+// rejects recursive schemas. Arguments arrive as JSON, and the target tool validates them. Models
+// sometimes send the qualified name as `tool`, and a rejected call costs a model step. The catalog
+// lookup checks the alias, so its schema stays short.
+const callShape = {
+  name: qualifiedName.optional(),
+  tool: z.string().optional(),
+  arguments: z.object({}).catchall(z.unknown()),
+};
 const searchSchema = z
   .strictObject(searchShape)
   .refine((input) => input.queries !== undefined || input.query !== undefined);
 const describeSchema = z
   .strictObject(describeShape)
   .refine((input) => input.names !== undefined || input.name !== undefined);
-const callSchema = z.strictObject(callShape);
+const callSchema = z.strictObject(callShape).refine((input) => input.name !== undefined || input.tool !== undefined);
 
 export const VISIBLE_TOOL_DEFINITIONS = [
   ...OPENBOT_TOOL_DEFINITIONS.filter((tool) => DIRECT_NAMES.has(tool.name)),
   {
     name: "tool_search",
-    description: `Find built-in tools by keywords or qualified name. Pass queries (an array) or query (one string). Returns names and short descriptions, default 5, maximum 10. The strongest matches also include inputSchema and guidance, ready for tool_call. Describe other results before first use. Catalog: ${INITIAL_TOOL_CATALOG}`,
+    description: `Find built-in tools by keywords or qualified name: queries (array) or query. Returns short descriptions, default 5, max 10; the best matches also give inputSchema and guidance. Run found tools with tool_call, not directly. Describe others before use. Catalog: ${INITIAL_TOOL_CATALOG}`,
     shape: searchShape,
   },
   {
@@ -96,11 +103,24 @@ export const VISIBLE_DYNAMIC_TOOLS = [
  * calls, in the form Claude gives a direct tool. A name outside the catalog is model text and stays out.
  */
 export function claudeBridgedToolName(name: string, input: unknown): string {
-  if (name !== "mcp__openbot__tool_call" || typeof input !== "object" || input === null || !("name" in input))
-    return name;
-  const entry = BUILTIN_TOOL_CATALOG.find((tool) => tool.name === input.name);
+  if (name !== "mcp__openbot__tool_call") return name;
+  const called = bridgedName(input);
+  const entry = called ? BUILTIN_TOOL_CATALOG.find((tool) => tool.name === called) : undefined;
   return entry ? `mcp__${entry.namespace}__${entry.tool}` : name;
 }
+
+/** The qualified name in the arguments of a `tool_call`, from `name` or its alias `tool`. */
+function bridgedName(input: unknown): string | null {
+  if (typeof input !== "object" || input === null) return null;
+  const name = "name" in input ? input.name : "tool" in input ? input.tool : null;
+  return typeof name === "string" ? name : null;
+}
+
+/**
+ * Claude loads its own deferred tools with a search and then calls them directly. After a search here,
+ * it called openbot.list_workflows as mcp__openbot__list_workflows, and each refused name cost a model step.
+ */
+const CALL_NOTE = "These are not direct tools: run each with tool_call {name, arguments}.";
 
 /**
  * Search matches whole words, so a query that names a web service, such as "gmail" or "read mail",
@@ -116,6 +136,13 @@ const BROWSER_SEARCH_NOTE =
 export const DEFERRED_MCP_NOTE =
   "The tools of the MCP servers in <mcp_servers> are not in this catalog. Load them with the separate tool named exactly tool_search, then call them directly by their mcp__ names.";
 
+/**
+ * Codex defers the tools of the user's MCP servers, except Computer Use (#4468): behind its own
+ * `tool_search`, or, for a code-mode-only model, into `ALL_TOOLS` in `exec`.
+ */
+export const CODEX_DEFERRED_MCP_NOTE =
+  "The tools of your MCP servers are not in this catalog. Find them with the separate tool named exactly tool_search. When you have exec instead, read ALL_TOOLS in an exec cell, where MCP tool names start with mcp__, and call the tool on tools.";
+
 function words(text: string): string[] {
   return text
     .toLowerCase()
@@ -125,6 +152,17 @@ function words(text: string): string[] {
 
 /** Each step to describe a tool sends the full context again, so search includes the schemas of its best matches. */
 const READY_SEARCH_RESULTS = 3;
+
+/**
+ * A search that names a workflow makes every workflow tool ready, and only them: an agent that builds
+ * a workflow also edits, runs, reads and deletes it. A routine is not a workflow step, so a query
+ * such as "create workflow routine" does not also load the routine schemas and guidance.
+ */
+const WORKFLOW_WORDS = new Set(["workflow", "workflows"]);
+const WORKFLOW_TOOLS = BUILTIN_TOOL_CATALOG.filter(
+  (entry) =>
+    entry.namespace === OPENBOT_DYNAMIC_TOOLS.name && words(entry.tool).some((word) => WORKFLOW_WORDS.has(word)),
+);
 
 function requireTool(name: string) {
   const tool = BUILTIN_TOOL_CATALOG.find((entry) => entry.name === name);
@@ -136,7 +174,8 @@ function requireTool(name: string) {
 export function resolveDeferredTool(params: DynamicToolCallParams): DynamicToolCallParams | null {
   const parsed = callSchema.safeParse(params.arguments);
   if (!parsed.success) return null;
-  const entry = BUILTIN_TOOL_CATALOG.find((tool) => tool.name === parsed.data.name);
+  const name = parsed.data.name ?? parsed.data.tool;
+  const entry = BUILTIN_TOOL_CATALOG.find((tool) => tool.name === name);
   if (!entry) return null;
   return { ...params, namespace: entry.namespace, tool: entry.tool, arguments: parsed.data.arguments };
 }
@@ -192,6 +231,16 @@ export function discoverTools(params: DynamicToolCallParams) {
         .slice(0, READY_SEARCH_RESULTS)
         .map(({ entry }) => entry),
     );
+    const workflowSearch = [...terms].some((term) => WORKFLOW_WORDS.has(term));
+    if (workflowSearch) {
+      // A tool that a query names exactly keeps its schema; other ready results, such as routines, go.
+      for (const entry of ready)
+        if (!matches.some((match) => match.entry === entry && match.exact)) ready.delete(entry);
+      for (const entry of WORKFLOW_TOOLS) {
+        if (!found.some((result) => result.entry === entry)) found.push({ entry, strong: true });
+        ready.add(entry);
+      }
+    }
     // Agents search for the single actions that they know, such as click and navigate, and then use
     // one model turn per action. A browser result therefore always brings the multi-step tool.
     if ([...ready].some((entry) => entry.namespace === OPENBOT_BROWSER_NAMESPACE)) {
@@ -205,8 +254,13 @@ export function discoverTools(params: DynamicToolCallParams) {
         : { name: entry.name, description: entry.description.slice(0, 180) },
     );
     const guidance = toolGuidanceFor([...ready]);
-    const result = guidance.length > 0 ? { tools, guidance } : { tools };
-    return found.some(({ entry }) => entry.namespace === OPENBOT_BROWSER_NAMESPACE)
+    const result = {
+      ...(ready.size > 0 ? { call: CALL_NOTE } : {}),
+      tools,
+      ...(guidance.length > 0 ? { guidance } : {}),
+    };
+    // A workflow search asks for OpenBot's own workflows, not for a website.
+    return workflowSearch || found.some(({ entry }) => entry.namespace === OPENBOT_BROWSER_NAMESPACE)
       ? result
       : { ...result, note: BROWSER_SEARCH_NOTE };
   }
@@ -215,6 +269,7 @@ export function discoverTools(params: DynamicToolCallParams) {
   const names = [...(parsed.data.names ?? []), ...(parsed.data.name ? [parsed.data.name] : [])];
   const entries = [...new Set(names)].map(requireTool);
   return {
+    call: CALL_NOTE,
     tools: entries.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })),
     guidance: toolGuidanceFor(entries),
   };

@@ -76,6 +76,37 @@ export function isGitHubRepositoryName(value: unknown): value is string {
   return isString(value) && GITHUB_REPOSITORY_NAME_PATTERN.test(value);
 }
 
+/**
+ * The repositories of a GitHub trigger, without repeats. `repositories` holds the list, one name a line,
+ * and `repository` holds its first name, so hosts and phones that know one repository keep working. When
+ * the first line of `repositories` is not `repository`, such a client changed `repository` last, and that
+ * one repository is the list.
+ */
+export function workflowGitHubTriggerRepositories(fields: {
+  readonly repository?: unknown;
+  readonly repositories?: unknown;
+}): string[] {
+  const first = fields.repository;
+  if (!isGitHubRepositoryName(first)) return [];
+  const list = workflowListField(fields.repositories);
+  if (list[0] !== first) return [first];
+  const seen = new Set<string>();
+  return list.filter((name) => {
+    const key = name.toLowerCase();
+    if (!isGitHubRepositoryName(name) || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/** The fields that keep `repositories` as the trigger's list. Read them with `workflowGitHubTriggerRepositories`. */
+export function workflowGitHubTriggerRepositoryFields(repositories: readonly string[]): {
+  repository: string;
+  repositories: string;
+} {
+  return { repository: repositories[0] ?? "", repositories: repositories.join("\n") };
+}
+
 /** An issue or a pull request. */
 export interface WorkflowGitHubItem {
   repository: string;

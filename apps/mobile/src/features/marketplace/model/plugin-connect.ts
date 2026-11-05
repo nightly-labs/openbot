@@ -91,6 +91,11 @@ export function pluginServerId(plugin: MobilePlugin, servers: readonly McpServer
   return (app && servers.find((config) => isPluginAppConfig(config, app))?.id) || null;
 }
 
+/** The host's row is an app of this plugin, so the plugin's listing shows it. */
+export function claimedByPlugin(config: McpServerConfig, plugin: MobilePlugin): boolean {
+  return plugin.apps.some((app) => isPluginAppConfig(config, app));
+}
+
 /** Every app of the plugin is a server on the host. */
 export function pluginInstalled(plugin: MobilePlugin, servers: readonly McpServerConfig[]): boolean {
   return plugin.apps.every((app) => servers.some((config) => isPluginAppConfig(config, app)));

@@ -73,13 +73,46 @@ A hosted site belongs to the server that published it (`hosted_sites.server_id`,
 stays the accountable owner, for abuse reports, blocks and account deletion. The desktop sends
 `OpenBot-Host-Id` and `OpenBot-Host-Token` (the machine token of `/v2/remote/hosts/register`) on each
 `/v1/sites` request when it is a registered server. The Worker checks the hash and that the host owner
-is the request user; a wrong token is refused with 401, never counted as unlinked. The active-site
-limit comes from the server's plan (`siteLimitForPlan`: none 1, Starter 3, Standard 10, Pro 50). A
-request with no server headers creates only into the account's unlinked bucket (limit 1,
-`server_id IS NULL`); with no `?scope=unlinked`, it still lists and deletes every site of the account,
+is the request user; a wrong token is refused with 401, never counted as unlinked. A server with a
+custom limit (see below) or an entitled plan (`siteLimitForPlan`: Starter 3, Standard 10, Pro 50) has its
+own active-site limit. The other servers of the account share one pool: 3 sites for each user of an
+entitled license (`LICENSE_SITES_PER_USER`), else 1 (`HOSTED_SITE_SHARED_FREE_LIMIT`). The pool is for
+the account, not for each server, so more self-hosted servers do not give more sites. An account has at
+most 300 active sites on its pool and plan servers (`HOSTED_SITE_LIMITS.accountSites`); sites on a
+custom-limit server do not count, so staff can lift the cap for one customer with a custom row. A
+license that lapses gives the free pool again and deletes nothing. A request with no server headers creates only into the account's
+unlinked bucket (limit 1, `server_id IS NULL`); with no `?scope=unlinked`, it still lists and deletes every site of the account,
 the released meaning of `/v1/sites`. Replace and delete in a server scope refuse a site of another
-bucket with 409 `site_other_server`. A downgrade deletes nothing: a server above its limit cannot
+bucket with 409 `site_other_server`. Every slot count is one SQL condition (`bucketHasRoomSql`,
+`holdsSiteSlotSql`) inside the insert or update that creates or activates the site, so two requests
+cannot take the same last slot, and each count reads the `hosted_sites_owner_status` index. A server's
+list returns its own sites as `used`, and as `limit` the sites it can have now: its own sites plus the
+free slots of its bucket and of the account cap. This keeps the meaning of the frozen `hosted-sites-v1`
+list. The optional `limitReason` tells why that limit can be lower than the bucket's own limit:
+`shared` for a server in the shared pool, `account` when the account cap is full. The desktop uses it
+only for the text of a `site_limit` error; the Team API list does not send it. A server that adopts unlinked sites at registration takes only the free slots of its bucket.
+A downgrade deletes nothing: a server above its limit cannot
 create a site, but it can replace one, and the extra sites end at their expiry. Removing a server moves its sites to the owner's unlinked bucket, so the owner's desktop can still delete them. A registered server updates a site that it published before registration in the unlinked scope.
+
+A row in the D1 table `server_site_limits` (`0048`) replaces the plan's site limit for one server, such
+as an enterprise customer's, from 1 to 1000. It has the rules of `server_member_limits` (see
+[hosted servers](../hosted-servers.md)): the row names the owner account and applies only while that
+account owns the server, it stays when the owner registers the host again, and it stops when the
+account is deleted. The unlinked bucket has no custom limit. No route writes the row; add, change or
+delete it by hand (`openbot-auth-test` for the test Worker):
+
+```sh
+bunx wrangler d1 execute openbot-auth --cwd apps/auth-api --remote --command \
+  "INSERT INTO server_site_limits(server_id, owner_user_id, site_limit, created_at, updated_at)
+   SELECT host_id, owner_user_id, 200, unixepoch() * 1000, unixepoch() * 1000
+     FROM remote_hosts WHERE host_id = '<server id>'
+   ON CONFLICT(server_id) DO UPDATE SET owner_user_id = excluded.owner_user_id,
+     site_limit = excluded.site_limit, updated_at = excluded.updated_at"
+```
+
+For a hosted server that has not published its host, read the owner from `hosted_servers`. Delete the
+row to go back to the plan's limit. A lower limit deletes no site, as a downgrade does. Clients see the
+new limit in the next `GET /v1/sites`.
 
 `hostedSites.list` and `hostedSites.delete` IPC are server-scoped; publish and replace stay local. The
 optional `hosted-sites-v1` capability exposes `POST /v1/hosted-sites/list` for every member and
@@ -256,9 +289,12 @@ account and server (`pinnedWorkflows`); the host does not know them.
 The phone also uses the version, single-step and stop-step routes, and `workflows-github-v1`, as a
 joined desktop does. An owner or admin adds and changes a GitHub trigger or output there
 (`apps/mobile/src/features/workflows/model/workflow-github.ts` reads and writes the same fields as
-the desktop cards); a member reads them, the event history and the item of a run. Discord triggers
-and outputs show read-only on the phone, because only the computer that runs OpenBot has the Discord
-servers, channels and roles.
+the desktop cards); a member reads them, the event history and the item of a run. With
+`workflows-chats-v1` and `routine-results-v1`, an owner or admin also adds and changes Telegram and
+Slack triggers and outputs (`apps/mobile/src/features/workflows/components/workflow-chat-fields.tsx`).
+The chats, workspaces and channels come from the routine-results options, so the fields are the same
+as on the desktop cards. Discord triggers and outputs show read-only on the phone, because no route
+sends the Discord roles.
 
 ### History extent
 
@@ -513,6 +549,8 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `agent-folders-v1` | The folders that an agent can change besides its workspace, and the folders in them that it must not change: read, add, remove, exclude, include. Lists the folders in one host folder (no files, no hidden folders, at most 500), with the home folder and at most 32 disks, so that a phone or the desktop app of a member can pick one. The host checks each folder as the desktop folder picker does (`src/main/agent-folders.ts`). Protocol 9 only | `agentFolders` |
 | `agent-instructions-v1` | Read and save the instruction file at the root of an agent's workspace (`AGENTS.md`, or `CLAUDE.md` in an older workspace). A save sends the text that the edit started from; the host refuses it with 409 when the file changed. The workspace path does not cross the wire, and a client cannot show the file in its file manager. Protocol 9 only | `agentInstructions` |
 | `browser-profiles-v1` | Named browser profiles of the host: list, create, rename, recolor, clear, delete, and the profile of each agent. One route, `/v1/browser/tab-profiles`, also answers a member: the profile label of each tab that the member can see. Cookies and site data stay on the host. Advertised when the host has `browserProfiles` | `agentAdmin` |
+| `browser-proxies-v1` | Saved proxies of the host's named browser profiles: list, save, delete, and the proxy of each named profile (`/v1/admin/browser-proxies`, `/save`, `/delete`, `/v1/admin/browser-profiles/proxy`). The list also has the computers of members, and `/computer` adds the computer of the member who sends it; no member can add the computer of another. A password goes to the host only in a save request and never comes back. Advertised when the host has `browserProfiles` | `agentAdmin` |
+| `browser-egress-v1` | The data channel `openbot.browser-egress.v1`, which a desktop client opens only while its member shares the internet connection of that computer with the server. Only the host opens streams: each is one TCP connection of a browser profile with that member's computer as its proxy. The client connects only to a public internet address that it resolved itself, on any port. At most 256 streams, 256 KiB of credit for each stream. A lost egress channel never closes the connection. Advertised when the host has `browserProfiles` | the member's own computer |
 | `browser-profiles-events-v1` | One event with no data, `browser-profiles-changed`, after each change of the named browser profiles or of an agent's profile. A client reads the `browser-profiles-v1` routes again. Advertised when the host has `browserProfiles` | `browserProfiles` |
 | `skills-admin-v1` | List, install, remove, enable skills by marketplace id | `agentAdmin` |
 | `shared-tables-v1` | List and delete shared tables | `sharedTables` |
@@ -548,6 +586,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `routine-recovery-v1` | Read and set a routine's missed-run policy; read its runs with the missed occurrences | `events` |
 | `routine-results-v1` | List the messaging connections and their places; read and set where an agent routine sends its answers. Deliveries stay on the host | none: only the mobile app sends it |
 | `webhook-tests-v1` | Send one signed test event to a webhook routine | `events` |
+| `webhook-sender-secret-v1` | Set a webhook routine's signing secret to a secret that the sender made | `events` |
 | `vault-v1` | The host's Vault: list, add, change and delete logins, cards and contact info; show one saved password, card number or security code; reset a Vault that the host cannot read. No CSV import. A change sends `vault-changed` with no data, so a client reads the list again | `vault` |
 | `vault-v2` | All of `vault-v1`, under `/v1/admin/vault/v2/`, and API keys as a fourth item kind: list each key's variable name and notes, add, change and delete keys, and show one saved key. The host leaves API keys out of every `vault-v1` answer, and `vault-v1` cannot delete or show one, so an older client keeps a valid list. It uses the `vault-changed` event of `vault-v1` | `vault` |
 | `vault-import-v1` | A CSV password export that an owner or admin sends as text, at most 256 KiB, below the JSON body limit. The host adds its logins as from its own file dialog and answers only the counts. The iPhone app uses it; the phone never calls the `vault-v1` reveal or reset | none: only the mobile app sends it |
@@ -831,6 +870,79 @@ over the Team API (`getHostAuditLog`) each time it opens, and keeps no copy.
 Known limits: a host with no account directory records no join from a local-store invite, and the log
 has no page or date filter.
 
+### Company sign-in
+
+Company sign-in connects one server to the company's OpenID Connect provider (Entra ID, Okta, Google
+Workspace or another one). The account service does all provider work
+(`apps/auth-api/src/server/company-sign-in.ts`); the host and the clients see only OpenBot sessions.
+Migration `0047_company_sign_in.sql` adds the tables. SAML is not supported.
+
+Setup is desktop only: Server settings → Members → Company sign-in (`ServerCompanySignInSection.tsx`),
+for the owner. The owner routes are `/v2/remote/hosts/:hostId/company-sign-in`, `.../test` and
+`.../scim-token`. The dialog sends the issuer, the client ID, the client secret and the domains, and
+starts a test sign-in at the provider. Only a test that passes saves the values. The rules:
+
+- A domain belongs to the first server whose test passes with it. Public mail domains (`gmail.com`
+  and others) are refused.
+- A production account service also needs the TXT record `_openbot.<domain>` with the value of the
+  server. A development API does not check DNS.
+- The issuer field also accepts the metadata URL (the issuer with `/.well-known/openid-configuration`)
+  and an Entra ID tenant domain. The discovery document can give an issuer on the same origin, such as
+  the tenant ID form; that issuer is saved and checked in tokens. Entra ID `common` and
+  `organizations` are refused, because their issuer is a placeholder that no token has.
+- All Google accounts have the issuer `https://accounts.google.com`. For it, the token must also have
+  an `hd` claim (the Workspace domain) that is one of the domains. A personal Google account with a
+  company email has no `hd`, and is refused.
+- The client secret is encrypted with `COMPANY_SIGN_IN_SECRET` (32 bytes or more). Never change this
+  value: it makes the saved secrets unreadable. Without it, the routes answer 503
+  `company_sign_in_not_configured`, and everyone signs in with an email code.
+- When the connection is on, an email code for its domains answers 409 `company_sign_in_required`,
+  and the client goes to company sign-in.
+
+Sign-in routes are `/v1/auth/company/start`, `/callback` and `/exchange`. The flow uses PKCE twice:
+once between the account service and the provider, and once between the app and the account service.
+
+- Desktop (`src/main/company-sign-in-browser.ts`): the main process opens a loopback listener on
+  `127.0.0.1`, opens the provider page in the user's browser, and gets a one-time code (2 minutes)
+  at the listener. It exchanges the code and its verifier for an account session.
+- Web `/app`: `POST /api/browser/company/start` keeps the state and the verifier in the HttpOnly
+  `__Host-openbot-company` cookie (10 minutes) and opens the provider in the same tab.
+  `GET /api/browser/company/return` exchanges the code, sets the `__Host-openbot-web` session cookie,
+  and answers 303 to `/app`. The cookie stops a login CSRF.
+
+The provider's subject is linked to an account (`company_sign_in_identities`). A first sign-in uses
+the account with the same email, or makes a new one. When the ID token has no `email`, the service
+uses `preferred_username` (Entra ID). A claim `email_verified: false` is refused.
+
+A person who finishes company sign-in joins the server as `member` with no invitation
+(`RemoteControlPlane.joinByCompanySignIn`). The join uses the same seat checks as an invitation: the
+member limit of the server and the license users of the owner. The rules:
+
+- A revoked membership (the owner removed the person, or the person left) stays revoked at sign-in.
+- With no free seat, the sign-in still gives a session, the join does not occur, and the Worker logs
+  a warning with the host ID.
+- A join ends the earlier remote sessions of the person on that server and sends
+  `account-servers-changed`, so the clients of the person show the server.
+
+SCIM 2.0 (`/scim/v2/Users`, `company-sign-in-scim.ts`) supports what Entra ID and Okta send: list
+with the filter `userName eq "…"`, create, read, and PATCH, PUT and DELETE of `active`. The bearer
+token starts with `obscim_`, shows once, and D1 keeps only its hash. Other attributes belong to the
+OpenBot account and do not change. `active` accepts the strings `"True"` and `"False"`. Off, and
+DELETE, end every session of the account, spend its open email and company sign-in codes, and revoke the membership. A
+create for a person who exists sets `active` as a PATCH does. Off → on joins the person again,
+also after that revocation. A repeated on does not change a membership that the owner revoked.
+
+The daily retention task removes flows after 10 minutes, and codes after they expire or are used.
+
+Known limits:
+
+- The local development host reads its members from its team file, not from D1, so the desktop
+  Members list in `bun run dev` does not show a company sign-in join. Check D1 or the
+  `/v2/remote/hosts` list of the person.
+- The mobile app has no company sign-in.
+- No full sign-in with a real Entra ID tenant has been made. Discovery, the authorize parameters and
+  the token request were checked against the live Microsoft endpoints with a fake application.
+
 ### Webhook routines
 
 A webhook belongs to its routine. The host keeps the trigger, the encrypted secret, and receipts in
@@ -1026,23 +1138,36 @@ the server as a joined server with `thisComputer: true`. `kind` stays `"remote"`
 - **Connection entry.** The server is an HTTPS entry in `openbot-remote-servers-v1.json`. The
   directory sync keeps it. While the child is stopped, the entry has the address
   `http://127.0.0.1:0` and no token, so a client never reaches an old port.
-- **Lifetime.** The child ends when its stdin closes. Teardown step 57 stops all children before
-  the joined-server connections close (step 60). The sibling scan before an update leaves out the
-  child PIDs. After an unexpected exit, the desktop starts the child again after 5 seconds, at most
-  3 times in 10 minutes. The owner password is registered for redaction and is never logged.
+- **Lifetime.** The child ends when its control pipe closes: stdin, or fd 3 on Windows, where
+  Electron replaces `process.stdin` with a stream that only ends (#4868). Teardown step 57 stops
+  all children before the joined-server connections close (step 60). The sibling scan before an
+  update leaves out the child PIDs. After an unexpected exit, the desktop starts the child again
+  after 5 seconds, at most 3 times in 10 minutes. The owner password is registered for redaction
+  and is never logged.
 - **Delete.** The desktop stops the child, removes the entry, and moves both folders to the trash
   with `shell.trashItem`. It never deletes them.
-- **Rename.** The `host-admin` identity route, as on any joined server that the user owns.
+- **Rename.** The `host-admin` identity route, as on any joined server that the user owns. The child has
+  no account session, so it skips the account owner check and the account steps (`passwordOwner`) (#5092).
 - **Account.** While the desktop app is signed in, `LocalServers` registers each running server for
   the account (`centralAuth.registerRemoteHost`), with the child's key, its name, and its owner member
   as the owner membership. The ready line carries that member id. The desktop app keeps the machine
-  token with its session and writes it to the child's standard input, one JSON line
+  token with its session and writes it to the child's control pipe, one JSON line
   (`local-server-child.ts`). The child keeps it in memory only (`CentralAuthManager.useHostCredential`)
   and calls `HostService.publishLocalServer`: it gets Signal tickets, meets devices, and sends push
   notifications and Live Activity updates with that token, as a published host does. Its Team API
   stays on loopback for the desktop app. A device ticket names the child's owner member, so the
   owner's phone acts as the owner. A sign-out or another account sends `unpublish`. A sign-in, and
   each start, registers again. A start on this computer does not wait for the account service.
+- **Members and invitations.** The child has no account session, so the desktop app sends the member
+  and invitation calls of a registered server to the account service with its own session
+  (`RemoteTeamDirectory`, `isRegisteredThisComputer`), as for a WebRTC server. Before the
+  registration, they go to the child's Team API, which lists its owner. Invited people join over WebRTC.
+  The child reads its members through the desktop app: it writes the line
+  `OPENBOT_LOCAL_SERVER_REQUEST members` to stdout, and the desktop app answers on the control pipe
+  with `members` (the account directory) or `members-unavailable` (not registered, or the read
+  failed). After the desktop app changes or removes a member, it writes `members` without a request,
+  and the child syncs it and closes the sessions that the directory no longer allows. The sync keeps
+  the child's owner row (`passwordOwner`), because the desktop app logs in with its username.
 - **Directory.** The account then lists the server. `reconcileWebRtcHosts` leaves out every server
   that `setThisComputerServers` names, so the desktop app keeps its loopback entry. Other computers
   and phones of the account list it as a WebRTC server.
@@ -1066,12 +1191,11 @@ Limits:
   they type a name.
 - A child server is reached as a joined server. Features behind `kind === "local"`, such as
   Computer Use, voice and the local browser dock, work only as far as the Team API carries them.
-- While the desktop app is signed out, only this computer can connect.
-- Only the owner connects from other devices. The account service accepts invitations for the
-  server, but the child does not sync members from the account directory. Not confirmed: how a
-  member that joins with an invitation is shown.
+- While the desktop app is signed out or closed, only this computer can connect: members reach the
+  server only while the desktop app runs and is signed in.
 - The child has no account session, so an owner that ends a device's session from the child's Server
-  settings does not end it on the account service. The account has the name of the child's last start.
+  settings does not end it on the account service. The account has the name of the child's last start,
+  and no logo of the child.
 - The provider CLI sign-ins in the home folder (`~/.codex`, `~/.claude`) and `~/.agents/skills` are
   shared with the other servers.
 - Not confirmed: the memory of each child, the agent browser in a child with no window, and which
@@ -1227,7 +1351,8 @@ A client that comes back to a joined server shows the workspace of its last load
 and replaces it when the host answers (`src/renderer/src/features/servers/remote-workspace-frame.ts`).
 
 - The frame holds the agent summaries, the model options, the sidebar layout, the hidden agents, the
-  channel rows and, on the web, the agent that was open. It holds no message text: the `preview` of
+  channel rows and, on the web, the agent that was open and the ids of the 4 agents opened last. It
+  holds no message text: the `preview` of
   each agent is removed before the write, and a channel keeps its name, title, members and lead
   agent, with no last message, instructions or counts. It does not hold capabilities, status,
   queues or conversations. The channel rows stop the agents below them from moving down when the
@@ -1252,7 +1377,9 @@ and replaces it when the host answers (`src/renderer/src/features/servers/remote
 - Both clients write the frame after the workspace read and after the panels read, and again when
   the user hides, restores or moves an agent, and when the channel rows change. The web also writes
   the open agent when it changes. An agent that the user opens during the frame stays open after
-  the load.
+  the load. After the open agent loads, the web reads the latest page of up to 3 of the agents opened
+  last, one at a time, so that the first switch to one shows its messages at once. It does not read
+  an agent that already has a kept page.
 - While the frame shows, the composer says that the client connects, and the setup prompts wait
   for the host's status, so a frame does not show "Complete provider setup".
 - The host answers `GET /v1/agents` when its agents are loaded (`AgentInitializationGate.awaitRoster`).

@@ -8,6 +8,12 @@ export const messages = {
   "mobile.settings.language.system": "Systeemstandaard",
   "mobile.settings.language.footer":
     "Systeemstandaard volgt de eerste taal in de instellingen van je telefoon. Tekst die nog niet is vertaald, wordt in het Engels getoond.",
+  "mobile.settings.language.restartTitle": "OpenBot opnieuw starten?",
+  "mobile.settings.language.restartBody":
+    "Deze taal lees je in de andere richting. De schermen draaien om wanneer OpenBot opnieuw start. Zien de schermen er na de herstart nog verkeerd uit, sluit OpenBot dan in de appkiezer en open het opnieuw.",
+  "mobile.settings.language.restartNow": "Nu opnieuw starten",
+  "mobile.settings.language.restartFailed":
+    "OpenBot kon niet opnieuw starten. De schermen draaien om wanneer je OpenBot de volgende keer opent.",
   "mobile.settings.dictation.language": "Dicteertaal",
   "mobile.settings.about.development": "Ontwikkeling",
   "mobile.settings.about.openFailed": "Kan de link niet openen. Probeer het opnieuw.",
@@ -20,11 +26,14 @@ export const messages = {
   "mobile.settings.home.support": "Ondersteuning",
   "mobile.settings.home.supportHint": "Krijg hulp en sla een ondersteuningslog op",
   "mobile.settings.support.help": "Hulp krijgen",
+  "mobile.settings.support.discord": "Open een ticket op Discord",
+  "mobile.settings.support.discordHint": "De snelste weg naar hulp",
   "mobile.settings.support.message": "Stuur ons een bericht op X",
   "mobile.settings.support.issues": "Meld een probleem op GitHub",
   "mobile.settings.support.helpFooter":
-    "Vertel ons wat er gebeurde en wanneer. Voeg het ondersteuningslogbestand toe aan je GitHub-issue.",
+    "Vertel ons wat er gebeurde en wanneer. Voeg het ondersteuningslogbestand toe aan je Discord-ticket of GitHub-issue.",
   "mobile.settings.support.log": "Ondersteuningslog",
+  "mobile.settings.support.show": "Log tonen",
   "mobile.settings.support.save": "Logbestand opslaan",
   "mobile.settings.support.events": { one: "{count} gebeurtenis", other: "{count} gebeurtenissen" },
   "mobile.settings.support.clear": "Log wissen",
@@ -34,8 +43,8 @@ export const messages = {
     "Het log blijft op deze telefoon en OpenBot verstuurt het niet. Het legt verbindingsstappen, verzoeken en fouten vast. Het legt geen berichten of bestanden vast en het maskeert wachtwoorden en tokens. Lees het bestand voordat je het deelt.",
   "mobile.settings.support.saveFailed": "Kan het logbestand niet opslaan. Probeer het opnieuw.",
   "mobile.settings.support.sharingUnavailable": "Delen is niet beschikbaar op deze telefoon.",
-  "mobile.settings.support.recent": "Recente gebeurtenissen",
-  "mobile.settings.support.recentFooter": "Nieuwste eerst. Het opgeslagen bestand bevat alle gebeurtenissen.",
+  "mobile.settings.support.newestFirst": "Nieuwste eerst.",
+  "mobile.settings.support.showOlder": "Oudere gebeurtenissen tonen",
   "mobile.settings.support.empty": "Nog geen gebeurtenissen.",
   "mobile.settings.sessions.kindDesktop": "desktop",
   "mobile.settings.sessions.kindMobile": "mobiel",
@@ -71,7 +80,7 @@ export const messages = {
   "mobile.settings.animations.all": "Animaties",
   "mobile.settings.animations.agentFaces": "Geanimeerde agentgezichten",
   "mobile.settings.animations.agentFacesFooter":
-    "Agentavatars bewegen hun gezicht terwijl de agents werken en rusten. Als dit uitstaat, blijven de gezichten stil.",
+    "Agentavatars bewegen hun gezicht terwijl de agents werken en rusten. Als dit uitstaat, blijven de gezichten stil en zweven de figuren op het welkomstscherm en het lege startscherm niet meer.",
   "mobile.settings.animations.composerResize": "Compact berichtveld",
   "mobile.settings.animations.composerResizeFooter":
     "Het berichtveld wordt een kleine balk zolang het toetsenbord dicht is. Als dit uitstaat, blijft het veld op volledige grootte.",
@@ -180,6 +189,14 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "Luisteren",
   "mobile.settings.voice.tab.speaking": "Spreken",
+  "mobile.settings.voice.pause.title": "Pauze voor verzenden",
+  "mobile.settings.voice.pause.label": "Wachten op nieuwe woorden",
+  "mobile.settings.voice.pause.footer":
+    "In een spraakgesprek verstuurt OpenBot je woorden als het zo lang geen nieuwe woorden herkent. Geluid zonder woorden houdt het luisteren niet open. Kies een langere pauze als je langzaam spreekt of stopt om na te denken.",
+  "mobile.settings.voice.pause.seconds": "{seconds} s",
+  "mobile.settings.voice.speed.title": "Snelheid antwoorden",
+  "mobile.settings.voice.speed.footer": "De snelheid van antwoorden die OpenBot voorleest, ook in een spraakgesprek.",
+  "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot streamt je spraak met een eenmalige token naar ElevenLabs, en ElevenLabs brengt het in rekening op je account. De sleutel blijft op deze telefoon.",
 } as const satisfies PartialTranslation<typeof source>;

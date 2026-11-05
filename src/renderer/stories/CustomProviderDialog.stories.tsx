@@ -38,14 +38,19 @@ export const DialogFilled: Story = {
   args: { draft: localEndpoint, onBack: fn() },
 };
 
-/** An endpoint on this computer: each model can set its context window. */
+/** An endpoint on this computer: each model can set its context window, max output and efforts. */
 export const DialogContextWindows: Story = {
   args: {
     contextWindows: true,
     draft: {
       ...localEndpoint,
       models: [
-        { id: "qwen3-coder:30b", name: "Qwen3 Coder 30B", contextWindow: "262144" },
+        {
+          id: "qwen3-coder:30b",
+          name: "Qwen3 Coder 30B",
+          contextWindow: "262144",
+          reasoningEfforts: ["low", "high", "max"],
+        },
         { id: "gpt-oss:120b", name: "GPT-OSS 120B", contextWindow: "" },
       ],
     },

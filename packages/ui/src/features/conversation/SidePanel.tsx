@@ -127,6 +127,8 @@ export interface SidePanelHeaderProps {
   onClose: (pane: SidePanelPane) => void;
   onToggleMaximized: () => void;
   onCollapse: () => void;
+  /** Opens a new browser tab. While the Browser pane is open, Add lists it first. */
+  onNewBrowserTab?: (() => void) | undefined;
   /** The threads of the agent that show beside the chat. Missing when the chat has no threads. */
   threads?: SidePanelThreads | undefined;
   /** The open files. Missing when the chat cannot open files. */
@@ -202,7 +204,8 @@ type TabGroup = keyof typeof TAB_GROUPS;
  * The top row of the side panel: a tab for each open pane, each thread that shows beside the chat and
  * each open file, then Add and Maximize. A file tab shows the file-type badge of a file link. The tab
  * icon is also the close button of the tab; hover or focus shows its X.
- * Add lists only the panes that are not open, and goes away when all of them are.
+ * Add lists the panes that are not open. While the Browser pane is open, Add lists New tab first, so the
+ * pane needs no row of its own. Add goes away when it has nothing to list.
  *
  * The tabs are one tab stop. The arrow keys, Home and End select a tab; Delete closes it. The close
  * button is for the pointer only, so the tab list holds only tabs. The panes are labeled regions of
@@ -220,6 +223,8 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
   const threads = () => props.threads?.items ?? [];
   const files = () => props.files?.items ?? [];
   const hasTabs = () => props.panes.length + threads().length + files().length > 0;
+  const newBrowserTab = () =>
+    props.panes.includes("browser") && props.available.includes("browser") ? props.onNewBrowserTab : undefined;
   const paneLabel = (pane: SidePanelPane) =>
     pane === "settings" && props.settingsLabel !== undefined ? props.settingsLabel : t(PANE_LABELS[pane]);
   const selectedValue = () => {
@@ -480,7 +485,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
                     onClick={close}
                   >
                     <span class="side-panel-tab-icon">
-                      <ThreadTabIcon status={thread().status} />
+                      <ThreadTabIcon status={thread().status} unread={thread().unread} />
                     </span>
                     <X class="side-panel-tab-x" aria-hidden="true" />
                   </Button>
@@ -499,7 +504,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
                     onKeyDown={(event) => onTabKeyDown(event, value(), close)}
                   >
                     <span class="side-panel-tab-label">{thread().title}</span>
-                    <ThreadStatusText status={thread().status} />
+                    <ThreadStatusText status={thread().status} unread={thread().unread} />
                   </Tabs.Trigger>
                 </div>
               );
@@ -563,7 +568,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
           </For>
         </Tabs.List>
         <div class="side-panel-actions no-drag">
-          <Show when={hasTabs() && closedPanes().length > 0}>
+          <Show when={hasTabs() && (newBrowserTab() !== undefined || closedPanes().length > 0)}>
             <DropdownMenu.Root placement="bottom-end" gutter={4}>
               <DropdownMenu.Trigger
                 class={buttonVariants({ variant: "ghost", size: "icon-sm" })}
@@ -574,6 +579,15 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
               </DropdownMenu.Trigger>
               <DropdownMenu.Portal>
                 <DropdownMenu.Content>
+                  <Show when={newBrowserTab() !== undefined}>
+                    <DropdownMenu.Item class="side-panel-menu-item" onSelectAfterClose={() => newBrowserTab()?.()}>
+                      <Plus aria-hidden="true" />
+                      {t("browser.newTab")}
+                    </DropdownMenu.Item>
+                    <Show when={closedPanes().length > 0}>
+                      <DropdownMenu.Separator />
+                    </Show>
+                  </Show>
                   <For each={closedPanes()}>
                     {(pane) => (
                       <DropdownMenu.Item class="side-panel-menu-item" onSelectAfterClose={() => props.onSelect(pane)}>

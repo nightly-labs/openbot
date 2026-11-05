@@ -1,5 +1,6 @@
 import { attachmentReferenceIds } from "@openbot/contracts/attachment-references";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type DraftAttachment,
   isAttachmentSummary,
@@ -130,6 +131,45 @@ function decodeStoredQueueEdit(value: unknown): StoredQueueEdit | null {
   };
 }
 
+export const THREAD_QUEUE_EDIT_STORAGE_KEY = "openbot:thread-queue-edit";
+/**
+ * A queue edit in the message box of a side thread. It has its own record, so it does not take the
+ * place of an edit in the agent's own chat. `draftKey` is the thread's `threadDraftKey`.
+ */
+export interface StoredThreadQueueEdit extends StoredQueueEdit {
+  taskId: string;
+  draftKey: string;
+}
+
+export function readStoredThreadQueueEdit(): StoredThreadQueueEdit | null {
+  try {
+    return decodeStoredThreadQueueEdit(
+      JSON.parse(window.localStorage.getItem(THREAD_QUEUE_EDIT_STORAGE_KEY) ?? "null"),
+    );
+  } catch {
+    return null;
+  }
+}
+
+function decodeStoredThreadQueueEdit(value: unknown): StoredThreadQueueEdit | null {
+  const edit = decodeStoredQueueEdit(value);
+  if (!edit || !isDynamicRecord(value) || !isString(value.taskId) || !isString(value.draftKey)) return null;
+  return { ...edit, taskId: value.taskId, draftKey: value.draftKey };
+}
+
+/** Throws when storage is full or unavailable: an edit that cannot be stored must not start. */
+export function storeThreadQueueEdit(edit: StoredThreadQueueEdit): void {
+  window.localStorage.setItem(THREAD_QUEUE_EDIT_STORAGE_KEY, JSON.stringify(edit));
+}
+
+export function clearStoredThreadQueueEdit(): void {
+  try {
+    window.localStorage.removeItem(THREAD_QUEUE_EDIT_STORAGE_KEY);
+  } catch {
+    // Storage is unavailable, so nothing was stored.
+  }
+}
+
 /** The thumbnail row of a message box: each image, also one that the text names, and each other file that the text does not name. */
 export function rowAttachments(text: string, attachments: readonly DraftAttachment[]): DraftAttachment[] {
   const referencedIds = attachmentReferenceIds(text);
@@ -152,4 +192,22 @@ export function insertAtSelection(
   }
   const value = `${current.slice(0, selection.start)}${inserted}${current.slice(selection.end)}`;
   return { value, caret: selection.start + inserted.length };
+}
+
+/**
+ * Puts a pasted text in as `insertAtSelection` does. The end of the text that does not fit the message
+ * limit is cut, as for a text paste in the editor. Undefined when no part of the text fits.
+ */
+export function insertPastedText(
+  current: string,
+  text: string,
+  at: { before: string; selection: ComposerSelection } | undefined,
+): { value: string; caret: number } | undefined {
+  const result = insertAtSelection(current, text, at);
+  const over = result.value.length - INPUT_LIMITS.messageText;
+  if (over <= 0) return result;
+  let end = text.length - over;
+  // Do not keep half of a character that has two UTF-16 units, such as an emoji.
+  if (end > 0 && /[\uD800-\uDBFF]/u.test(text.charAt(end - 1))) end -= 1;
+  return end > 0 ? insertAtSelection(current, text.slice(0, end), at) : undefined;
 }

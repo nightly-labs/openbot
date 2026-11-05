@@ -105,6 +105,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.contextWindowInvalid":
     "A model's context window must be a whole number of tokens from {min} to {max}.",
   "error.provider.maxOutputInvalid": "A model's max output must be a whole number of tokens from {min} to {max}.",
+  "error.provider.reasoningEffortsInvalid": "A model's reasoning efforts are not valid.",
   "error.provider.headersTooMany": "There are too many headers.",
   "error.provider.headerNameCharacter": "A header name has a character HTTP does not allow.",
   "error.provider.headerNameTooLong": "A header name is too long.",
@@ -205,6 +206,10 @@ export const messages = defineMessages("error.provider", {
     "The model provider failed on its side. Your connection is not the cause. Try again later or choose another model.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode could not connect to the model provider. Check the network connection of the computer that runs OpenBot, then try again.\n{detail}",
+  "error.provider.codexStateBusy":
+    "ChatGPT is still preparing its local history after an earlier start. Wait a few minutes, then try again.",
+  "error.provider.realtimeLimitZero":
+    "Linux stopped the provider because OpenBot has a real-time CPU limit of 0. The limit comes from your system. Install and start rtkit (`rtkit-daemon`), run `systemctl --user restart xdg-desktop-portal`, then restart OpenBot. Restarting xdg-desktop-portal alone does not help while rtkit is missing.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode could not open its database because a newer OpenCode version changed it. Update OpenCode to version 2 or later, then try again.",
   "error.provider.opencodeNoAnswer":
@@ -225,6 +230,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.antigravityReleaseShape": "The Gemini release has an unexpected shape.",
   "error.provider.antigravityMissing": "Gemini is not downloaded. Download it in OpenBot to continue.",
   "error.provider.antigravityNotStarted": "The Gemini server was found, but its version cannot be read.",
+  "error.provider.antigravityOverrideInvalid":
+    "The Gemini server in OPENBOT_ANTIGRAVITY_PATH is missing or is not executable. Correct the path or remove the variable, then restart OpenBot.",
   "error.provider.antigravityVersionUnreadable": "Unable to read the Gemini server version.",
   "error.provider.antigravitySignIn": "Sign in with Google to use Gemini.",
   "error.provider.antigravityRateLimited":
@@ -259,6 +266,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.kimiNotStarted": "Kimi could not start. Run `kimi --version` in a terminal.",
   "error.provider.kimiVersionUnreadable": "Unable to read the Kimi CLI version.",
   "error.provider.kimiSignIn": "Sign in with Kimi Code to use Kimi.",
+  "error.provider.devinSignIn": "Sign in with Devin to use Devin.",
+  "error.provider.copilotSignIn": "Sign in with GitHub or set COPILOT_GITHUB_TOKEN to use GitHub Copilot.",
   "error.provider.hermesMissing": "Hermes Agent is not installed. Install it, then try again.",
   "error.provider.hermesNotStarted": "Hermes Agent could not start. Run `hermes --version` in a terminal.",
   "error.provider.hermesVersionUnreadable": "Unable to read the Hermes Agent version.",
@@ -279,6 +288,8 @@ export const messages = defineMessages("error.provider", {
     "Gemini could not open the sign-in page in your browser. Check your default browser, then connect again.",
   "error.provider.acpSignInFailed": "The sign-in did not complete.",
   "error.provider.acpSignInFailedReason": "The sign-in did not complete: {reason}",
+  "error.provider.acpSignOutFailed": "The sign-out did not complete.",
+  "error.provider.acpSignOutFailedReason": "The sign-out did not complete: {reason}",
   "error.provider.acpSignInMethodMissing":
     "This provider does not offer this sign-in on this computer. Update the provider, then try again.",
   "error.provider.httpsSignInLinkOnly": "Only HTTPS sign-in links can open in the browser.",
@@ -403,6 +414,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.registryPrerequisite": "Install {tool} on the host before you install this agent.",
   "error.provider.registryBindingChanged": "The custom agent changed during installation. Try again.",
   "error.provider.registryInstallFailed": "The agent installation failed. The previous installation is unchanged.",
+  "error.provider.hermesInstallFailed": "Hermes Agent did not install. Try again, or use the install guide.",
+  "error.provider.hermesNeedsGitCurl": "Hermes Agent needs git and curl. Install them, then try again.",
   "error.provider.registryRemoveBusy":
     "Wait for the agent installation and active ACP work to finish before you remove it.",
 });

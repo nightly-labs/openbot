@@ -153,6 +153,13 @@ export const ROUTINE_MISSED_POLICIES = ["skip", "run-once"] as const;
 export type RoutineMissedPolicy = (typeof ROUTINE_MISSED_POLICIES)[number];
 
 /**
+ * Where the runs of an agent routine run: `chat` in the agent's own chat, `thread` in the routine's
+ * own side thread, beside the chat. A channel routine runs in its channel and has no such place.
+ */
+export const ROUTINE_RUN_PLACES = ["chat", "thread"] as const;
+export type RoutineRunPlace = (typeof ROUTINE_RUN_PLACES)[number];
+
+/**
  * The part of a routine that does not name its owner. One store and one settings panel serve both
  * an agent and a channel; `Routine` and `ChannelRoutine` only add the owner id and keep their own
  * shapes exactly.
@@ -168,6 +175,11 @@ export interface RoutineFields {
   limitPolicy?: RoutineLimitPolicy;
   /** Absent from a host that does not store it, for the same reason as `limitPolicy`. */
   missedPolicy?: RoutineMissedPolicy;
+  /**
+   * Set only on an agent routine of this computer's host. A channel routine and the released Team
+   * API leave it out.
+   */
+  runIn?: RoutineRunPlace;
   createdAt: string;
   updatedAt: string;
 }
@@ -187,6 +199,7 @@ export function isRoutineFields(value: unknown): value is RoutineFields {
     isRoutineTrigger(value.trigger) &&
     (value.limitPolicy === undefined || isOneOf(ROUTINE_LIMIT_POLICIES, value.limitPolicy)) &&
     (value.missedPolicy === undefined || isOneOf(ROUTINE_MISSED_POLICIES, value.missedPolicy)) &&
+    (value.runIn === undefined || isOneOf(ROUTINE_RUN_PLACES, value.runIn)) &&
     isString(value.createdAt) &&
     isString(value.updatedAt)
   );
@@ -299,6 +312,8 @@ export interface CreateRoutineInput {
   limitPolicy?: RoutineLimitPolicy;
   /** `skip` when absent. */
   missedPolicy?: RoutineMissedPolicy;
+  /** `chat` when absent. */
+  runIn?: RoutineRunPlace;
 }
 
 export interface UpdateRoutineInput {
@@ -310,6 +325,7 @@ export interface UpdateRoutineInput {
   schedule?: RoutineSchedule;
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
+  runIn?: RoutineRunPlace;
 }
 
 export interface DeleteRoutineInput {

@@ -176,8 +176,10 @@
   }
 }
 
-/* The Fast chip gets its own room, so the model name keeps the width it has without it. */
-.provider-model-trigger:has(.provider-model-trigger-fast) {
+/* The Fast chip gets its own room, so the model name keeps the width it has without it. A form field
+   keeps the width of its row. `:where()` keeps the specificity low, so the narrow header rule below
+   still wins. */
+.provider-model-trigger:where(:not(.provider-model-trigger-field)):has(.provider-model-trigger-fast) {
   max-width: 296px;
 }
 
@@ -567,6 +569,31 @@
   white-space: nowrap;
 }
 
+/* A spent plan window: the chip shares the first line with the provider name, and the version stays
+ * on the second. The chip shortens with an ellipsis, so the heading keeps its height. */
+.provider-model-heading-limited {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--openbot-space-1-5);
+}
+
+.provider-model-heading-limited > span {
+  grid-column: 1 / -1;
+}
+
+/* A Badge, at the height of the row tags (default, Free, New) so the heading keeps its height. */
+.provider-model-limit {
+  display: block;
+  justify-self: start;
+  max-width: 100%;
+  height: auto;
+  padding: 1px var(--openbot-space-1-5);
+  color: var(--openbot-danger-text);
+  line-height: 15px;
+  text-overflow: ellipsis;
+}
+
 /* The runtime status: a filled block with no border, as the search field. */
 .provider-model-empty {
   display: grid;
@@ -803,8 +830,9 @@
     max-width: 148px;
   }
 
-  /* A narrow header keeps the model name; the label and the title still name the effort. */
-  .provider-model-trigger-effort {
+  /* A narrow header keeps the model name; the label and the title still name the effort. A form
+     field has the room of its row. */
+  .provider-model-trigger:not(.provider-model-trigger-field) .provider-model-trigger-effort {
     display: none;
   }
 }

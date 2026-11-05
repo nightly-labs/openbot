@@ -14,6 +14,11 @@ export interface AgentTasksPort
     | "startTask"
     | "stopTask"
   > {
+  /**
+   * The person's read mark of each open thread of an agent. Missing where the client does not read the
+   * marks: no thread then shows as unread.
+   */
+  listTaskReads?: OpenBotDesktopApi["agent"]["listTaskReads"];
   /** Steers the thread's running turn, or queues the message in the thread. */
   sendToTask(
     input: AgentTaskInput & {
@@ -27,6 +32,13 @@ export interface AgentTasksPort
   runQueuedMessageAsTask?: OpenBotDesktopApi["agent"]["runQueuedMessageAsTask"];
   /** Missing where the server cannot branch a conversation. The branch actions then do not show. */
   branchTask?: OpenBotDesktopApi["agent"]["branchTask"];
+  /** Deletes one message of a thread. Missing where the server cannot delete messages. */
+  deleteTaskMessage?: ((input: { agentId: string; taskId: string; messageId: string }) => Promise<void>) | undefined;
+  /**
+   * The actions of a thread's queue. Missing where the server sends no queue of a thread: only this
+   * computer does, `agent-tasks-v1` sends the start of each message alone.
+   */
+  queue?: Pick<OpenBotDesktopApi["agent"], "cancelQueuedMessage" | "steerQueuedMessage" | "reorderQueue"> | undefined;
 }
 
 /**
@@ -48,6 +60,13 @@ export function agentTasksPort(): AgentTasksPort {
     reopenTask: (input, serverId) => agent.reopenTask(input, serverId),
     renameTask: (input) => agent.renameTask(input),
     deleteTask: (input, serverId) => agent.deleteTask(input, serverId),
+    deleteTaskMessage: (input) => agent.deleteConversationMessage(input),
+    listTaskReads: (agentId) => agent.listTaskReads(agentId),
     markTaskRead: (input) => agent.markTaskRead(input),
+    queue: {
+      cancelQueuedMessage: (input) => agent.cancelQueuedMessage(input),
+      steerQueuedMessage: (input) => agent.steerQueuedMessage(input),
+      reorderQueue: (input) => agent.reorderQueue(input),
+    },
   };
 }

@@ -478,6 +478,13 @@
   color: var(--openbot-accent-text);
 }
 
+/* Every Lucide icon takes the shared line. Without this rule, an icon outside a `.ui-button` and without a
+ * feature rule keeps the Lucide line of 2 and looks heavier than the icons beside it. The rule has no
+ * specificity, so a feature rule that sets a different line still wins. */
+:where(svg.lucide) {
+  stroke-width: var(--openbot-icon-stroke);
+}
+
 /* The hand-drawn SVGs, which are on a 20-unit viewBox where lucide's is 24. Feeding them
  * --openbot-icon-stroke raw would paint them 20% heavier than every lucide icon beside
  * them, so it is scaled to the smaller grid instead. These carried 1.35 to 1.6 by hand
@@ -1275,6 +1282,14 @@ html.ui-textarea-resizing {
 
 .ui-item-media {
   color: var(--openbot-text-muted);
+}
+
+/* An icon in the media slot stands beside a title and a description, so it is a large icon with the line of
+ * the large icons. The selector is weak, so a feature can set a different size and line. */
+:where(.ui-item-media) > svg {
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .ui-item-content {
@@ -2400,6 +2415,15 @@ html.ui-textarea-resizing {
     animation: none;
   }
 }
+/* A window that Chromium draws on the CPU (no GPU, a blocked GPU or a failed one) has this root
+ * attribute. There a backdrop blur repaints all that is under it on each frame: an open dialog
+ * dropped frames of more than 100 ms. So no surface blurs its backdrop. The rule wins over each
+ * blur, `-webkit-backdrop-filter` included, because that name is an alias in Chromium. */
+:root[data-openbot-software-rendering] *,
+:root[data-openbot-software-rendering] *::before,
+:root[data-openbot-software-rendering] *::after {
+  backdrop-filter: none !important;
+}
 /* The one dialog overlay. Each Dialog.Overlay and AlertDialog.Overlay has this class. It covers the
  * window on the dialog layer, centers the dialog that it holds, and fades in. A dialog changes only
  * what is different for it, such as a nested layer. */
@@ -2494,7 +2518,7 @@ html.ui-textarea-resizing {
 .ui-confirm-dialog-icon svg {
   width: var(--openbot-icon-lg);
   height: var(--openbot-icon-lg);
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .ui-confirm-dialog[data-tone="destructive"] .ui-confirm-dialog-icon {

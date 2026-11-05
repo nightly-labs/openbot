@@ -1,3 +1,4 @@
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { ConversationMessage } from "@openbot/contracts/ipc";
 import { isConversationMessage, isConversationTurnTrace } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -20,6 +21,9 @@ import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contrac
  * Released builds also stored an agent's `replyToMessageId: ""` on the message and its `exchange`. The
  * guard rejects an empty id, so it fails the read in the same way. It refers to no message and reads as
  * `null`.
+ *
+ * Released builds also stored a workflow handoff with the workflow title as `routine.name`. A title can
+ * be longer than the routine name that the guard accepts, so it fails the read in the same way.
  */
 const LEGACY_MESSAGE_KEYS: Readonly<Record<string, string>> = {
   botId: "agentId",
@@ -34,7 +38,7 @@ export function currentConversationMessage(value: unknown): ConversationMessage 
   // the one released key the guard accepts as it stands -- as an unknown extra -- so it is asked for by
   // name; every other one already fails the guard and takes the branch below.
   if (isDynamicRecord(value) && value.senderBotId === undefined && isConversationMessage(value)) return value;
-  const current = withoutInvalidTrace(withoutEmptyReplyIds(toCurrentKeys(value)));
+  const current = withoutInvalidTrace(withRoutineNameInLimit(withoutEmptyReplyIds(toCurrentKeys(value))));
   return isConversationMessage(current) ? current : null;
 }
 
@@ -58,6 +62,22 @@ function withoutEmptyReplyIds(value: JsonValue): JsonValue {
       ? { exchange: { ...exchange, replyToMessageId: null } }
       : {}),
   };
+}
+
+function withRoutineNameInLimit(value: JsonValue): JsonValue {
+  if (!isDynamicRecord(value) || !isDynamicRecord(value.routine) || !isString(value.routine.name)) return value;
+  return { ...value, routine: { ...value.routine, name: routineNameInLimit(value.routine.name) } };
+}
+
+/**
+ * The start of `name` that fits `INPUT_LIMITS.routineName`. A workflow handoff uses the workflow title as
+ * its routine name, and a title can be longer. The cut does not split a surrogate pair.
+ */
+export function routineNameInLimit(name: string): string {
+  if (name.length <= INPUT_LIMITS.routineName) return name;
+  const start = name.slice(0, INPUT_LIMITS.routineName);
+  const last = start.charCodeAt(start.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? start.slice(0, -1) : start;
 }
 
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };

@@ -284,6 +284,62 @@ with `browser-profiles-events-v1` sends `browser-profiles-changed` after each ch
 list and agent setting reads the profiles again. The phone shows the same operations in Server
 settings > Browser profiles and in Agent info > Advanced > Browser profile.
 
+A named profile can use a saved proxy (migration 56: `browser_proxies` and `browser_profile_proxies`).
+Without one it is "Automatic": `{ mode: "system" }`, the proxy settings of the computer that runs
+OpenBot. The shared profile and "Only this agent" are always Automatic. A proxy is one address,
+`scheme://[user[:password]@]host[:port]` with socks5, http or https (`parseBrowserProxyAddress`).
+Without a scheme it is http and needs a port: `user:password@host:port` or the
+`host:port:user:password` form of proxy sellers. The password can contain a raw `/`, `#` or `@`.
+Chromium does not sign in to SOCKS5, so a SOCKS5 proxy with a sign-in goes through a relay in main
+(`browser-proxy-relay.ts`): an HTTP proxy on a random port of 127.0.0.1 with a random sign-in, which
+the `login` handler gives. The relay signs in to the SOCKS5 proxy (RFC 1929), sends the site name
+for the proxy to resolve, and opens one SOCKS5 connection for each browser connection. A plain http
+request closes its connection after the answer. When the SOCKS5 proxy refuses or does not answer,
+the relay answers 502. A proxy change, a session clear and the host shutdown stop the relay and its
+connections, also when the new proxy fails to apply. The password goes to
+`SecretStorageCipher` before it is saved, is decrypted only in main when a tab needs it, and never
+goes back to a client or a log. The Edit dialog shows a saved password as a mask; a save that keeps
+the mask sends `keepPassword`, and the host keeps the password. Without it, an address with no
+password removes the password. A save that does not change the address sends nothing, so it closes
+no tabs. At most 50 proxies. The clients name a proxy by its host; when two saved proxies have the
+same host, the name adds the port, then the user name, then the scheme (`browserProxyName`). The
+page error of the host names the host only. Chromium's implicit bypass rules stay: `localhost` and
+loopback addresses go direct on the host, not through the proxy. Before a tab opens, `BrowserHost.#applyProfileProxy` sets the proxy on the partition, closes
+its open connections and clears its auth cache. When that fails the tab does not open: there is no
+direct fallback. A tab with a proxy uses the WebRTC policy `disable_non_proxied_udp`, so WebRTC does
+not show the real address. The `login` handler answers a proxy sign-in at most 8 times for each page.
+A main-frame connection error marks the proxy `unreachable`. A 407, a SOCKS5 refusal of the
+sign-in that the relay records, or an HTTP proxy sign-in that the `login` handler stops answering,
+marks it `signIn`; Chromium reports that last one as a failed tunnel. The next page that loads
+clears the mark. The page error takes the mark that the network error recorded, and it reads the
+Chromium code when a failed load gives no error name. A page error names the proxy (`browserProxyUnreachable`, `browserProxySignInRefused`,
+`browserProxyComputerUnreachable`); each change sends `browser-profiles-changed`. A change of a profile's proxy, or of a
+proxy that profiles use, closes their tabs; the settings ask first when tabs are open. A delete moves the profiles to Automatic (foreign key
+`ON DELETE CASCADE`). Changes run one at a time. Two admins can still change one proxy: a save sends
+the address that the dialog opened with, and a delete sends the profiles that the question showed.
+The host refuses either one when the proxy is different now (`browserProxyChanged`), so a profile
+never changes to Automatic without an admin seeing it. Server settings > Browser profiles shows a
+Proxies section and a Proxy submenu in each named profile's menu when the host has
+`browser-proxies-v1`; the phone does not show proxies yet. For an owner or an admin, the agent's
+profile select and the toolbar label of a tab also show the proxy. The renderer matches the tab
+profile to the proxy list by name, so `BrowserTabProfile` of `browser-profiles-v1` does not change.
+
+A proxy can also be the computer of a member (`kind = 'computer'`, one row for each `member_id`).
+The member selects "Use your computer…" in the Proxy submenu, or Share in the Proxies section, of a
+joined server. The desktop app then stores the server id in `browserEgressServerIds`
+(`remote-server-store.ts`), calls `/v1/admin/browser-proxies/computer`, and opens the
+`openbot.browser-egress.v1` data channel while it is connected (`BrowserEgressClient`). The host binds
+the channel to the membership that signed in on that peer (`BrowserEgressHost.peerMemberChanged`);
+the newest open peer of a member carries its connections. A tab of a profile with a computer proxy
+uses the same loopback relay, with `BrowserEgressHost.exit` as its exit: each browser connection
+becomes one stream of the channel (`browser-egress-mux.ts`). The client resolves the name itself
+and connects only to a public address (`isPublicAddress`), on any port; it refuses loopback,
+private, link-local, carrier-grade NAT, multicast and reserved addresses, so the server cannot reach
+the member's network. When the member's app is closed or stops sharing, the computer is offline:
+its connections fail with 502, there is no direct fallback, and the list shows it offline. Stop
+sharing closes the channel; the row stays until an admin deletes it. Neither end logs a target or
+a byte. Only an owner or an admin can share, because the routes are `browser-proxies-v1` admin routes.
+
 ### Tab lifetime
 
 The agent decides when a tab closes. Nothing closes a tab when a turn ends: `close_tab` is the only

@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "La base de données OpenBot a échoué à la vérification d’intégrité.",
   "error.backend.webhookRouteLimit": "Un hôte peut avoir au plus {limit} routines webhook.",
   "error.backend.webhookSettingsInvalid": "Vérifiez les réglages du webhook et réessayez.",
+  "error.backend.webhookSenderSecretInvalid":
+    "Collez le secret de signature complet de l’expéditeur. Il compte de 16 à 1024 caractères, sans espace.",
   "error.backend.webhookRouteUnavailable":
     "La route publique du webhook n’est pas prête. Vérifiez la connexion à l’hôte et réessayez.",
   "error.backend.browserViewRemoteOnly": "Une vue de navigateur en direct est réservée à un hôte distant.",
@@ -213,6 +215,10 @@ export const messages = {
     "Les attentes ouvertes ne sont disponibles que pour les agents de cet ordinateur.",
   "error.backend.markUnreadRemoteUnsupported":
     "Marquer un message comme non lu n’est disponible que pour les agents de cet ordinateur.",
+  "error.backend.messageDeleteUnsupported": "Ce serveur ne permet pas de supprimer des messages.",
+  "error.backend.messageDeleteNotFound": "Ce message n’est pas dans le chat.",
+  "error.backend.messageDeleteBusy": "Ce message fait partie d’un tour en cours. Supprimez-le à la fin du tour.",
+  "error.backend.messageDeleteForbidden": "Vous ne pouvez supprimer que les messages que vous avez envoyés.",
   "error.backend.routineFlowHandoffFailed": "La routine n’a pas pu transmettre le travail à cet agent.",
   "error.backend.mcpServerLimit": "OpenBot garde jusqu’à {limit} serveurs MCP.",
   "error.backend.mcpServerNameTaken": "Un serveur MCP nommé {name} existe déjà.",
@@ -319,6 +325,17 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "Un profil de navigateur porte déjà ce nom.",
   "error.backend.browserSessionInUse": "Un onglet utilise encore cette session de navigateur. Réessayez.",
   "error.backend.browserProfileLimit": "Vous pouvez avoir jusqu’à {limit} profils de navigateur.",
+  "error.backend.browserProxyNotFound": "Ce proxy n’existe plus.",
+  "error.backend.browserProxyAddressInvalid":
+    "Saisissez une adresse de proxy, par exemple socks5://host:1080 ou http://user:password@host:3128.",
+  "error.backend.browserProxyLimit": "Vous pouvez avoir jusqu’à {limit} proxys.",
+  "error.backend.browserProxyTaken": "Un proxy avec cette adresse existe déjà.",
+  "error.backend.browserProxyChanged": "Ce proxy a changé après son ouverture. Vérifiez-le à nouveau, puis réessayez.",
+  "error.backend.browserProxyUnreachable": "Le proxy {name} ne répond pas, la page ne s’est donc pas ouverte.",
+  "error.backend.browserProxySignInRefused":
+    "Le proxy {name} a refusé l’identification, la page ne s’est donc pas ouverte.",
+  "error.backend.browserProxyComputerUnreachable":
+    "L’ordinateur de ce profil ne répond pas, la page ne s’est donc pas ouverte.",
   "error.backend.browserLowMemory":
     "Ce serveur manque de mémoire : le navigateur ne peut pas ouvrir un autre onglet. Fermez un onglet, ou attendez la fin du travail des autres agents.",
   "error.backend.browserOpenFailed": "Impossible d’ouvrir {url} : {reason}",

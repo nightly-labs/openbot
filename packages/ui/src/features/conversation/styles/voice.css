@@ -186,6 +186,12 @@
     color var(--openbot-duration-fast) ease;
 }
 
+/* The speed is text: the size of the player time, and the same width of each digit. */
+.voice-panel-speed {
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .speaking-bar,
   .voice-panel-presence[data-phase="thinking"]::before {
@@ -245,5 +251,14 @@
   min-width: 3ch;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A pill of fixed width, so that it does not move when its speed changes. */
+.voice-player-speed {
+  flex: none;
+  width: calc(var(--openbot-space-6) * 2);
+  padding-inline: 0;
+  border-radius: var(--openbot-radius-pill);
   font-variant-numeric: tabular-nums;
 }

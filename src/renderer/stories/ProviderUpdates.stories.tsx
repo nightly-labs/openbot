@@ -24,6 +24,8 @@ const PROVIDERS = [
   "kimi",
   "pi",
   "muse",
+  "devin",
+  "copilot",
 ] as const;
 const NAMES: Record<ManagedProviderId, string> = {
   codex: "ChatGPT",
@@ -36,6 +38,8 @@ const NAMES: Record<ManagedProviderId, string> = {
   kimi: "Kimi",
   pi: "Pi",
   muse: "Muse",
+  devin: "Devin",
+  copilot: "GitHub Copilot",
 };
 const INSTALLED: Record<ManagedProviderId, string> = {
   codex: "0.149.1",
@@ -48,6 +52,8 @@ const INSTALLED: Record<ManagedProviderId, string> = {
   kimi: "1.52.0",
   pi: "1.1.0",
   muse: "1.4.4-R5419.1",
+  devin: "3000.11.234",
+  copilot: "1.0.105",
 };
 
 /** Only Claude has a newer runtime: the quiet rows are half of what the flow has to show. */
@@ -62,6 +68,8 @@ const AVAILABLE: Record<ManagedProviderId, string | null> = {
   kimi: null,
   pi: null,
   muse: null,
+  devin: null,
+  copilot: null,
 };
 
 /** Fast enough to finish in a couple of seconds, slow enough to read. */
@@ -81,6 +89,8 @@ function readyRuntimes(): Record<ManagedProviderId, ProviderRuntimeStatus> {
     kimi: { phase: "ready", progress: 100, message: null, version: INSTALLED.kimi },
     pi: { phase: "ready", progress: 100, message: null, version: INSTALLED.pi },
     muse: { phase: "ready", progress: 100, message: null, version: INSTALLED.muse },
+    devin: { phase: "ready", progress: 100, message: null, version: INSTALLED.devin },
+    copilot: { phase: "ready", progress: 100, message: null, version: INSTALLED.copilot },
   };
 }
 

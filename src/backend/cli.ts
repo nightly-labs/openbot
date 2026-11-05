@@ -67,9 +67,10 @@ export interface KimiCliInfo extends ResolvedCli {
 }
 
 /**
- * OpenBot never installs Hermes: the user's own `hermes` runs, with the user's own `~/.hermes`, and
- * `resolveHermesCli` gives only `system`. The type keeps `managed`, as each other CLI does, so a
- * `managed` test value does not narrow `AgentCliInfo`.
+ * The user's own `hermes` runs, with the user's own `~/.hermes`, and `resolveHermesCli` gives only
+ * `system`. The Download of `HermesInstaller` runs the official installer, which puts Hermes where a
+ * terminal install does, so OpenBot finds it as the user's CLI. The type keeps `managed`, as each
+ * other CLI does, so a `managed` test value does not narrow `AgentCliInfo`.
  */
 export interface HermesCliInfo extends ResolvedCli {
   source?: "system" | "managed";
@@ -374,6 +375,10 @@ export const resolveAntigravityCli: (input?: {
 
       /* Try the remaining candidates. */
     }
+    // Only the managed copy is downloadable, so a path the user set that cannot run must not say
+    // "not downloaded": Download is refused while the override is set (#4978).
+    if (!found && override.length > 0)
+      throw new CodexCliError(sourceText("error.provider.antigravityOverrideInvalid"), "invalid");
     throw new CodexCliError(
       found ? sourceText("error.provider.antigravityNotStarted") : sourceText("error.provider.antigravityMissing"),
       found ? "invalid" : "missing",
@@ -775,9 +780,9 @@ function isMinimumVersion(version: string, minimum: readonly number[]): boolean 
   return true;
 }
 
-/** Resolves native RPC providers through the same explicit/managed/system precedence. */
+/** Resolves the native providers through the same explicit/managed/system precedence. */
 const resolveNativeCli = Effect.fn("Cli.resolveNativeCli")(function* (
-  provider: "pi" | "muse",
+  provider: NativeCliProvider,
   input: { systemCandidates?: string[]; bundledExecutable?: string | null | undefined } = {},
 ): Effect.fn.Return<AgentCliInfo, ProviderClientOperationError> {
   const candidates = yield* cliCandidates(provider, input.systemCandidates, input.bundledExecutable ?? null);
@@ -789,7 +794,7 @@ const resolveNativeCli = Effect.fn("Cli.resolveNativeCli")(function* (
     const attempt = yield* Effect.result(
       Effect.gen(function* () {
         const { stdout, launch } = yield* readCliVersion(candidate, provider);
-        const version = provider === "pi" ? parsePiVersion(stdout) : parseMuseVersion(stdout);
+        const version = NATIVE_VERSION_PARSERS[provider](stdout);
         if (provider === "pi" && !isMinimumVersion(version, [1, 1, 0]))
           throw new CodexCliError(sourceText("error.provider.piOutdated", { version }), "outdated");
         return { executable: candidate.executable, version, source: candidate.source, ...launch };
@@ -819,19 +824,57 @@ export const resolveMuseCli = (input?: {
   systemCandidates?: string[];
   bundledExecutable?: string | null | undefined;
 }) => resolveNativeCli("muse", input);
+export const resolveDevinCli = (input?: {
+  systemCandidates?: string[];
+  bundledExecutable?: string | null | undefined;
+}) => resolveNativeCli("devin", input);
+export const resolveCopilotCli = (input?: {
+  systemCandidates?: string[];
+  bundledExecutable?: string | null | undefined;
+}) => resolveNativeCli("copilot", input);
 
-export function parsePiVersion(output: string): string {
+function parsePiVersion(output: string): string {
   const match = output.trim().match(/(?:^|\s)v?(\d+\.\d+\.\d+)(?:[-+][\w.-]+)?(?:\s|$)/u);
   if (!match?.[1])
     throw new CodexCliError(sourceText("error.provider.nativeVersionUnreadable", { provider: "Pi" }), "invalid");
   return match[1];
 }
-export function parseMuseVersion(output: string): string {
+function parseMuseVersion(output: string): string {
   const match = output.match(/\b\d+\.\d+\.\d+-R\d+(?:\.\d+)?\b/u) ?? output.match(/\b\d+\.\d+\.\d+\b/u);
   if (!match)
     throw new CodexCliError(sourceText("error.provider.nativeVersionUnreadable", { provider: "Muse" }), "invalid");
   return match[0];
 }
+
+/** Devin CLI 3000.11.234 prints `devin 3000.11.234 (92c83011d113)`. */
+function parseDevinVersion(output: string): string {
+  const match = output.match(/\bdevin[ \t]+v?(\d+\.\d+\.\d+)\b/iu) ?? output.match(/\b\d+\.\d+\.\d+\b/u);
+  if (!match)
+    throw new CodexCliError(sourceText("error.provider.nativeVersionUnreadable", { provider: "Devin" }), "invalid");
+  return match[1] ?? match[0];
+}
+
+/** GitHub Copilot CLI 1.0.105 prints `GitHub Copilot CLI 1.0.105.` and a line about updates. */
+function parseCopilotVersion(output: string): string {
+  const match = output.match(/\bCopilot CLI[ \t]+v?(\d+\.\d+\.\d+)\b/iu) ?? output.match(/\b\d+\.\d+\.\d+\b/u);
+  if (!match)
+    throw new CodexCliError(
+      sourceText("error.provider.nativeVersionUnreadable", { provider: "GitHub Copilot" }),
+      "invalid",
+    );
+  return match[1] ?? match[0];
+}
+
+/** The providers whose CLI is one native program that OpenBot can download. */
+type NativeCliProvider = "pi" | "muse" | "devin" | "copilot";
+
+/** The version parser of each native provider CLI. */
+export const NATIVE_VERSION_PARSERS: Readonly<Record<NativeCliProvider, (output: string) => string>> = {
+  pi: parsePiVersion,
+  muse: parseMuseVersion,
+  devin: parseDevinVersion,
+  copilot: parseCopilotVersion,
+};
 
 export function isVersion(value: string): boolean {
   return /^\d+\.\d+\.\d+(?:(?:-\d{2}-\d{2}-\d{2})?-[0-9a-f]{7,40})?$/u.test(value);
@@ -1311,7 +1354,7 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
 });
 
 /** `X_OK` also passes for a folder, and a login-shell `PATH` folder can hold one with the CLI's name. */
-const isExecutable = Effect.fn("Cli.isExecutable")((path: string) =>
+export const isExecutable = Effect.fn("Cli.isExecutable")((path: string) =>
   providerCall(async () => {
     await access(path, process.platform === "win32" ? constants.F_OK : constants.X_OK);
     return (await stat(path)).isFile();

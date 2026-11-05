@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "OpenBot のデータベースが整合性チェックに失敗しました。",
   "error.backend.webhookRouteLimit": "1 つのホストの Webhook ルーティンは最大 {limit} 個です。",
   "error.backend.webhookSettingsInvalid": "Webhook の設定を確認して、もう一度お試しください。",
+  "error.backend.webhookSenderSecretInvalid":
+    "送信元の署名シークレットをすべて貼り付けてください。16〜1024 文字で、空白は含みません。",
   "error.backend.webhookRouteUnavailable":
     "公開 Webhook ルートの準備ができていません。ホストの接続を確認して、もう一度お試しください。",
   "error.backend.browserViewRemoteOnly": "ライブブラウザービューはリモートホスト専用です。",
@@ -209,6 +211,10 @@ export const messages = {
     "開いている待機は、このコンピューター上のエージェントでのみ使用できます。",
   "error.backend.markUnreadRemoteUnsupported":
     "メッセージを未読にする操作は、このコンピューター上のエージェントでのみ使用できます。",
+  "error.backend.messageDeleteUnsupported": "このサーバーはメッセージの削除に対応していません。",
+  "error.backend.messageDeleteNotFound": "このメッセージはチャットにありません。",
+  "error.backend.messageDeleteBusy": "このメッセージは実行中のターンの一部です。ターンが終わってから削除してください。",
+  "error.backend.messageDeleteForbidden": "削除できるのは自分が送信したメッセージだけです。",
   "error.backend.routineFlowHandoffFailed": "ルーティンはこのエージェントに作業を渡せませんでした。",
   "error.backend.mcpServerLimit": "OpenBot に保存できる MCP サーバーは {limit} 個までです。",
   "error.backend.mcpServerNameTaken": "{name} という名前の MCP サーバーはすでに存在します。",
@@ -311,6 +317,17 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "この名前のブラウザープロファイルはすでにあります。",
   "error.backend.browserSessionInUse": "このブラウザーセッションはまだタブで使われています。もう一度お試しください。",
   "error.backend.browserProfileLimit": "ブラウザープロファイルは {limit} 個まで作成できます。",
+  "error.backend.browserProxyNotFound": "このプロキシはもう存在しません。",
+  "error.backend.browserProxyAddressInvalid":
+    "socks5://host:1080 や http://user:password@host:3128 のようなプロキシアドレスを入力してください。",
+  "error.backend.browserProxyLimit": "プロキシは {limit} 個まで作成できます。",
+  "error.backend.browserProxyTaken": "このアドレスのプロキシはすでに存在します。",
+  "error.backend.browserProxyChanged":
+    "このプロキシは開いた後に変更されました。もう一度確認してから、やり直してください。",
+  "error.backend.browserProxyUnreachable": "プロキシ {name} が応答しないため、ページを開けませんでした。",
+  "error.backend.browserProxySignInRefused": "プロキシ {name} がサインインを拒否したため、ページを開けませんでした。",
+  "error.backend.browserProxyComputerUnreachable":
+    "このプロファイルが使うコンピューターが応答しないため、ページを開けませんでした。",
   "error.backend.browserLowMemory":
     "このサーバーはメモリーが不足しているため、ブラウザーで新しいタブを開けません。タブを閉じるか、ほかのエージェントの作業が終わるまでお待ちください。",
   "error.backend.browserOpenFailed": "{url} を開けません: {reason}",
