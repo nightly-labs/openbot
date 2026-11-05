@@ -2068,8 +2068,22 @@ export class OpenBotToolRouter {
           .replace(/^"(.*)"$/s, "$1")
           .trim() || null;
       // An answer to a request from a side thread runs in that thread. When the thread is archived, the
-      // answer goes to the recipient's own chat, so it is not lost.
-      const answerTaskId = replyTo ? this.#mailbox.answerTaskId(senderAgentId, replyTo, recipientValues) : null;
+      // answer goes to the recipient's own chat, so it is not lost. A message without replyToMessageId,
+      // such as a question back, goes to the thread of the requests from its recipient that this turn
+      // works on, when they all came from that one thread (#5093). Otherwise it goes to the own chat,
+      // and the automatic result does not follow, so the thread would wait without an answer.
+      // `answerTaskId` routes a message to one recipient only.
+      const answeredRequestIds = replyTo
+        ? [replyTo]
+        : turnDeliveries
+            .filter(
+              ({ delivery }) => delivery.sender.kind === "agent" && delivery.sender.agentId === recipientValues[0],
+            )
+            .map(({ delivery }) => delivery.messageId);
+      const answerTaskIds = new Set(
+        answeredRequestIds.map((requestId) => this.#mailbox.answerTaskId(senderAgentId, requestId, recipientValues)),
+      );
+      const [answerTaskId = null] = answerTaskIds.size === 1 ? answerTaskIds : [];
       const taskId = answerTaskId && this.#tasks.threadId(answerTaskId) !== null ? answerTaskId : undefined;
       const text = params.arguments.text;
       const receipt = yield* this.#mailbox
