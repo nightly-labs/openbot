@@ -128,7 +128,7 @@
     },
     "apps/mobile": {
       "name": "@openbot/mobile",
-      "version": "1.4.6",
+      "version": "1.4.7",
       "dependencies": {
         "@expo/metro-runtime": "~58.0.15",
         "@expo/ui": "~58.0.22",
