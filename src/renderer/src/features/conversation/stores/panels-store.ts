@@ -448,8 +448,12 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
           },
           () => {
             if (!scopeActive() || generation !== deps.currentFilePreviewGeneration()) return;
-            if (attachment && canPreviewAttachment(attachment)) void previewAttachment(attachment, place);
-            else deps.setComposerError(filePreviewError(error, path), target);
+            if (!attachment || !canPreviewAttachment(attachment)) {
+              deps.setComposerError(filePreviewError(error, path), target);
+              return;
+            }
+            // The attachment is of the conversation that was open at the click.
+            if (current()) void previewAttachment(attachment, place);
           },
         ),
     );
