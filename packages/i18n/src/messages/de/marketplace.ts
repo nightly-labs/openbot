@@ -220,6 +220,16 @@ export const messages = {
     "Verwende die Stile in diesem Repository und gestalte eine Einstellungsseite in Paper.",
   "marketplace.plugin.paper.prompt.tokens":
     "Liste die Design-Tokens in der geöffneten Paper-Datei auf und vergleiche sie mit unserem Theme.",
+  "marketplace.plugin.higgsfield.tagline": "KI-Bilder, -Videos und -Audio",
+  "marketplace.plugin.higgsfield.description":
+    "Higgsfield lässt Agenten Bilder, Videos, Charaktere und Audio mit Higgsfield-Modellen wie Seedance, Kling, Veo und MiniMax Hailuo erzeugen, das Guthaben an Credits prüfen und die Asset Library durchsuchen. Ergebnisse werden in den Higgsfield Assets des Nutzers gespeichert. Jeder Nutzer meldet sich im Browser bei seinem eigenen Higgsfield-Konto an. Jede Generierung verbraucht Credits dieses Kontos zum Standardpreis, auch mit einem Unlimited-Tarif.",
+  "marketplace.plugin.higgsfield.app":
+    "Bild-, Video- und Audiogenerierung, Charaktere, Credits und Assets über den MCP-Server von Higgsfield mit Anmeldung im Browser.",
+  "marketplace.plugin.higgsfield.prompt.credits": "Wie viele Higgsfield-Credits habe ich?",
+  "marketplace.plugin.higgsfield.prompt.productShot":
+    "Erstelle mit Higgsfield ein Produktfoto einer Keramiktasse auf einem Holztisch.",
+  "marketplace.plugin.higgsfield.prompt.clip":
+    "Erstelle mit Higgsfield ein 5-Sekunden-Video von Wellen bei Sonnenuntergang.",
   "marketplace.plugin.appleApps.tagline": "Mail, Kalender und mehr auf deinem Mac",
   "marketplace.plugin.appleApps.description":
     "Mit Apple apps nutzen Agenten Mail, Kalender, Kontakte, Erinnerungen, Notizen, Nachrichten und Safari auf diesem Mac. Es funktioniert nur unter macOS. OpenBot startet mcp-icloud, einen Community-Server, der nicht von Apple oder OpenBot stammt. Der Server steuert die Apps über AppleScript auf diesem Computer und braucht kein Konto und keinen Schlüssel. Bei der Installation kann OpenBot macOS auf einmal um Zugriff auf alle diese Apps bitten, mit einer Abfrage pro App. Sonst fragt macOS, wenn ein Agent eine App zum ersten Mal nutzt. Um das später zu ändern, öffne Systemeinstellungen › Datenschutz & Sicherheit › Automation. Agenten können E-Mails und iMessages senden und Termine, Kontakte und Erinnerungen ändern oder löschen, prüfe also jeden Schreibvorgang, bevor du ihn genehmigst. Was die Werkzeuge lesen, etwa E-Mail-Text, geht an den Modellanbieter des Agenten.",

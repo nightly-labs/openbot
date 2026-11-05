@@ -218,6 +218,15 @@ export const messages = {
     "Usa los estilos de este repositorio y diseña una página de ajustes en Paper.",
   "marketplace.plugin.paper.prompt.tokens":
     "Lista los tokens de diseño del archivo abierto de Paper y compáralos con nuestro tema.",
+  "marketplace.plugin.higgsfield.tagline": "Imágenes, vídeos y audio con IA",
+  "marketplace.plugin.higgsfield.description":
+    "Higgsfield permite a los agentes generar imágenes, vídeos, personajes y audio con modelos de Higgsfield como Seedance, Kling, Veo y MiniMax Hailuo, consultar el saldo de créditos y explorar la Asset Library. Los resultados se guardan en los Assets de Higgsfield del usuario. Cada usuario inicia sesión en su propia cuenta de Higgsfield en el navegador. Cada generación usa créditos de esa cuenta a la tarifa estándar, también con un plan ilimitado.",
+  "marketplace.plugin.higgsfield.app":
+    "Generación de imágenes, vídeos y audio, personajes, créditos y assets, mediante el servidor MCP de Higgsfield con inicio de sesión en el navegador.",
+  "marketplace.plugin.higgsfield.prompt.credits": "¿Cuántos créditos de Higgsfield tengo?",
+  "marketplace.plugin.higgsfield.prompt.productShot":
+    "Haz con Higgsfield una foto de producto de una taza de cerámica sobre una mesa de madera.",
+  "marketplace.plugin.higgsfield.prompt.clip": "Haz con Higgsfield un vídeo de 5 segundos de olas al atardecer.",
   "marketplace.plugin.appleApps.tagline": "Mail, Calendario y más en tu Mac",
   "marketplace.plugin.appleApps.description":
     "Apple apps permite a los agentes usar Mail, Calendario, Contactos, Recordatorios, Notas, Mensajes y Safari en este Mac. Solo funciona en macOS. OpenBot inicia mcp-icloud, un servidor de la comunidad que no es de Apple ni de OpenBot. El servidor controla las apps con AppleScript, en este equipo, y no necesita cuenta ni clave. Al instalarla, OpenBot puede pedir a macOS acceso a todas estas apps a la vez, con un aviso por app. Si no lo haces, macOS pregunta la primera vez que un agente usa una app. Para cambiarlo después, abre Ajustes del Sistema › Privacidad y seguridad › Automatización. Los agentes pueden enviar correos e iMessages, y cambiar o eliminar eventos, contactos y recordatorios, así que revisa cada escritura antes de aprobarla. Lo que leen las herramientas, como el texto de los correos, va al proveedor del modelo del agente.",

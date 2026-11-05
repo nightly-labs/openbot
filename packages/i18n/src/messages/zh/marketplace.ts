@@ -202,6 +202,14 @@ export const messages = {
   "marketplace.plugin.paper.prompt.implement": "按我们的代码规范，在这个代码库里实现选中的 Paper 画框。",
   "marketplace.plugin.paper.prompt.codeToDesign": "用这个仓库里的样式，在 Paper 中设计一个设置页面。",
   "marketplace.plugin.paper.prompt.tokens": "列出打开的 Paper 文件中的设计 token，并与我们的主题对比。",
+  "marketplace.plugin.higgsfield.tagline": "AI 图片、视频和音频",
+  "marketplace.plugin.higgsfield.description":
+    "Higgsfield 让助手使用 Seedance、Kling、Veo 和 MiniMax Hailuo 等 Higgsfield 模型生成图片、视频、角色和音频，查看积分余额，并浏览 Asset Library。结果保存到用户的 Higgsfield Assets。每个用户在浏览器中登录自己的 Higgsfield 账户。每次生成都按标准费率消耗该账户的积分，无限套餐也一样。",
+  "marketplace.plugin.higgsfield.app":
+    "通过 Higgsfield 的 MCP 服务器生成图片、视频和音频，管理角色、积分和素材，在浏览器中登录。",
+  "marketplace.plugin.higgsfield.prompt.credits": "我还有多少 Higgsfield 积分？",
+  "marketplace.plugin.higgsfield.prompt.productShot": "用 Higgsfield 生成一张陶瓷马克杯放在木桌上的产品照。",
+  "marketplace.plugin.higgsfield.prompt.clip": "用 Higgsfield 生成一段 5 秒的日落海浪视频。",
   "marketplace.plugin.appleApps.tagline": "Mac 上的邮件、日历等",
   "marketplace.plugin.appleApps.description":
     "Apple apps 让助手使用这台 Mac 上的邮件、日历、通讯录、提醒事项、备忘录、信息和 Safari。它仅适用于 macOS。OpenBot 会启动 mcp-icloud，这是一个社区服务器，不是 Apple 或 OpenBot 制作的。该服务器在这台电脑上通过 AppleScript 控制这些应用，不需要账号和密钥。安装时，OpenBot 可以一次性向 macOS 请求访问所有这些应用，每个应用显示一次提示。如果不这样做，macOS 会在助手第一次使用某个应用时询问。如需之后更改，打开系统设置 › 隐私与安全性 › 自动化。助手可以发送邮件和 iMessage，并修改或删除日程、联系人和提醒事项，因此请在批准前检查每次写入。工具读取的内容（例如邮件正文）会发送给助手的模型提供商。",

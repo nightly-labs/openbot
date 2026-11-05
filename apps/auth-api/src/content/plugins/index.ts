@@ -10,6 +10,7 @@ import { COMPOSIO_PLUGIN_GUIDE } from "./composio";
 import { CONTEXT7_PLUGIN_GUIDE } from "./context7";
 import { FIGMA_PLUGIN_GUIDE } from "./figma";
 import { FIRECRAWL_PLUGIN_GUIDE } from "./firecrawl";
+import { HIGGSFIELD_PLUGIN_GUIDE } from "./higgsfield";
 import { HUGGINGFACE_PLUGIN_GUIDE } from "./huggingface";
 import { LINEAR_PLUGIN_GUIDE } from "./linear";
 import { NEON_PLUGIN_GUIDE } from "./neon";
@@ -47,6 +48,7 @@ const PLUGIN_GUIDES: Readonly<Record<string, PluginGuide>> = {
   linear: LINEAR_PLUGIN_GUIDE,
   notion: NOTION_PLUGIN_GUIDE,
   paper: PAPER_PLUGIN_GUIDE,
+  higgsfield: HIGGSFIELD_PLUGIN_GUIDE,
   posthog: POSTHOG_PLUGIN_GUIDE,
   resend: RESEND_PLUGIN_GUIDE,
   sentry: SENTRY_PLUGIN_GUIDE,

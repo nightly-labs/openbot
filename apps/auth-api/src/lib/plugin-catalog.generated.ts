@@ -91,6 +91,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "d15a140eec6ab0a0a6e79e354ccaba88d035435112bdb7a044528b2a4c7a1548",
     },
     {
+      slug: "higgsfield",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "d527206a8519ea548c3438fa2ee3c4c158a33c85557a650fc62686b257236271",
+    },
+    {
       slug: "apple-apps",
       version: "1.1.0",
       featured: false,
@@ -706,6 +712,41 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://paper.design",
     privacyPolicyUrl: "https://paper.design/legal/privacy",
     termsUrl: "https://paper.design/legal/tos",
+    skills: [],
+  },
+  higgsfield: {
+    slug: "higgsfield",
+    name: "Higgsfield",
+    tagline: "AI images, videos and audio",
+    description:
+      "Higgsfield lets agents generate images, videos, characters and audio with Higgsfield models such as Seedance, Kling, Veo and MiniMax Hailuo, check the credit balance, and browse the Asset Library. Results are saved to the user's Higgsfield Assets. Each user signs in to their own Higgsfield account through the browser. Every generation uses credits of that account at standard rates, also on an unlimited plan.",
+    category: "design",
+    creatorName: "Higgsfield",
+    iconUrl: "https://higgsfield.ai/apple-touch-icon.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-credits", text: "How many Higgsfield credits do I have?" },
+      { id: "prompt-product-shot", text: "Make a Higgsfield product photo of a ceramic mug on a wooden table." },
+      { id: "prompt-clip", text: "Make a 5-second Higgsfield video of waves at sunset." },
+    ],
+    apps: [
+      {
+        id: "app-higgsfield-mcp",
+        name: "Higgsfield",
+        description:
+          "Image, video and audio generation, characters, credits and assets, over Higgsfield's MCP server with browser sign-in.",
+        iconUrl: "https://higgsfield.ai/apple-touch-icon.png",
+        server: {
+          name: "higgsfield",
+          transport: "http",
+          url: "https://mcp.higgsfield.ai/mcp",
+          auth: [{ id: "higgsfield-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://higgsfield.ai",
+    privacyPolicyUrl: "https://higgsfield.ai/privacy-policy",
+    termsUrl: "https://higgsfield.ai/terms-of-use-agreement",
     skills: [],
   },
   "apple-apps": {
