@@ -109,9 +109,11 @@ CLI output. Disconnect cancels active calls, and a late call cannot return a cre
 old session. Eight hours without a successful vault call ends the connection.
 
 Connect requires exactly one folder named `Shared with OpenBot`. Its id scopes later reads.
-Each fill syncs and checks the current item, its folder, its saved HTTPS origin, its deleted state,
-and its master-password prompt setting. Default, domain, and host URI rules use exact HTTPS origin
-matching. Other URI rules are not supported; those logins use the manual secret card.
+Each fill syncs and checks the current item, its folder, its saved URI, its deleted state,
+and its master-password prompt setting. Only an HTTPS saved URI and an HTTPS page match; a URI with
+no scheme counts as HTTPS. The default and base domain URI rules compare the registrable domain, as
+Bitwarden does, so `myaccount.google.com` also fills on `accounts.google.com`. The host rule needs
+the same host and port. Other URI rules are not supported; those logins use the manual secret card.
 The session key can decrypt the wider vault; the folder limit is enforced by OpenBot, not Bitwarden.
 All local agents share this grant. Prompt injection can still use an approved account on its own
 site; this feature does not authorize or constrain actions after sign-in.
