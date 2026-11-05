@@ -109,7 +109,7 @@ CLI output. Disconnect cancels active calls, and a late call cannot return a cre
 old session. Eight hours without a successful vault call ends the connection.
 
 Connect requires exactly one folder named `Shared with OpenBot`. Its id scopes later reads.
-Each fill syncs and checks the current item, its folder, its saved HTTPS origin, its deleted state,
+Each fill syncs and checks the current item, its folder, its saved URI, its deleted state,
 and its master-password prompt setting. Only an HTTPS saved URI and an HTTPS page match; a URI with
 no scheme counts as HTTPS. The default and base domain URI rules compare the registrable domain, as
 Bitwarden does, so `myaccount.google.com` also fills on `accounts.google.com`. The host rule needs
