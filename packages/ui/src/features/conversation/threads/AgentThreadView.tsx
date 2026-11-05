@@ -1,3 +1,4 @@
+import { limitedQuoteText } from "@openbot/contracts/chat-tag-references";
 import type {
   AgentApproval,
   AgentTask,
@@ -37,6 +38,7 @@ import {
   ComposerEditor,
   type ComposerPasteResult,
   type ComposerSelection,
+  type QuoteRequest,
 } from "@openbot/ui/features/conversation/ComposerEditor";
 import { ComposerNotice } from "@openbot/ui/features/conversation/ComposerNotice";
 import { ComposerReplyPreview } from "@openbot/ui/features/conversation/ComposerReplyPreview";
@@ -45,6 +47,10 @@ import { ContextUsageMeter, type ContextUsageView } from "@openbot/ui/features/c
 import { ApprovalCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import { DeleteMessageDialog, MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
 import { QueuePanel } from "@openbot/ui/features/conversation/QueuePanel";
+import {
+  MessageSelectionActions,
+  type QuoteShortcutModifier,
+} from "@openbot/ui/features/conversation/SelectionActions";
 import type { SendShortcut } from "@openbot/ui/features/conversation/send-shortcut";
 import { ComposerVoiceControls, type VoicePhase } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { type TextValue, useText } from "@openbot/ui/text";
@@ -240,6 +246,17 @@ export interface AgentThreadViewProps {
    * start of each queued message: a joined server sends no more on `agent-tasks-v1`.
    */
   queue?: AgentThreadQueue | undefined;
+  /**
+   * The actions for text selected in the thread. Quote puts the text in this message box, and a send
+   * goes to this thread. Without it, selected text has no actions.
+   */
+  selectionActions?: AgentThreadSelectionActions | undefined;
+}
+
+export interface AgentThreadSelectionActions {
+  /** Sends the instruction about a selected passage of a message to this thread. */
+  onSend: (messageId: string, body: string) => Promise<boolean>;
+  quoteShortcut: QuoteShortcutModifier;
 }
 
 /**
@@ -254,6 +271,11 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   const [sending, setSending] = createSignal(false);
   const [addMenuOpen, setAddMenuOpen] = createSignal(false);
   const [skillPickerRequest, setSkillPickerRequest] = createSignal(0);
+  const [selectionScope, setSelectionScope] = createSignal<HTMLElement>();
+  const [quoteRequest, setQuoteRequest] = createSignal<QuoteRequest>();
+  const quoteSelection = (messageId: string, text: string) =>
+    // A passage past the message limit would make the editor drop it with the text after it.
+    setQuoteRequest((current) => ({ id: (current?.id ?? 0) + 1, messageId, text: limitedQuoteText(text) }));
   /* A thread does not tag itself. */
   const otherThreads = createMemo(() => props.threads?.filter((thread) => thread.id !== props.task?.id));
   let scroller: HTMLElement | undefined;
@@ -518,13 +540,28 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   );
   return (
     <>
+      <Show when={props.selectionActions}>
+        {(actions) => (
+          <MessageSelectionActions
+            scope={selectionScope()}
+            contextKey={props.task?.id}
+            // As the message box: a quote waits in a locked box, and could go to the next thread.
+            disabled={!props.task || sending() || voicePhase() === "transcribing"}
+            onSend={(messageId, body) => actions().onSend(messageId, body)}
+            onQuote={quoteSelection}
+            quoteShortcut={actions().quoteShortcut}
+          />
+        )}
+      </Show>
       <section
         ref={(element: HTMLElement) => {
           scroller = element;
+          setSelectionScope(element);
           fades.bind(element);
           props.scrollRef?.(element);
         }}
         class={["conversation-scroll agent-thread-scroll", fades.classes()]}
+        data-selection-scope=""
         aria-label={t("conversation.threads.view.label", { title: title() })}
         onScroll={fades.measure}
       >
@@ -733,6 +770,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
               placeholder={props.replyTo ? t("composer.placeholder.reply") : placeholder()}
               ariaLabel={placeholder()}
               focusRequest={(props.focusRequest ?? 0) + replyFocus()}
+              quoteRequest={quoteRequest()}
               skillPickerRequest={skillPickerRequest()}
               dictation={{ text: props.voice?.liveText ?? "", final: voicePhase() === "transcribing" }}
               disabled={sending() || voicePhase() === "transcribing"}
