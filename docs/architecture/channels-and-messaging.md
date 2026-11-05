@@ -267,6 +267,33 @@ channel controls still accepts only a stopped or failed run. On desktop, each ro
 waiting-for-subtasks list above the composer has Stop, which sends the `stop` command for that
 subtask. Its stopped-task card then offers Continue, Reassign and Cancel.
 
+Members can reply to each other (#4847). `channel_reply` takes the id of a message of another member
+and a short text (`CHANNEL_REPLY_CHARACTERS`). It posts the text in the shared chat as a reply to
+that message (`replyToMessageId`), and gives the author of that message one turn to answer: a child
+task of the caller's task, with the reply as its request and instruction. The caller waits for it
+as for `channel_assign`: the child is in `dependencies`, so the caller's turn ends `waiting` and the
+caller continues with the answer. Without the wait, a member that had to agree on something answered
+the person before the other member answered it. The answer of that turn shows as a reply to the
+reply message (`capture`, and `channel_result`). Text that the caller writes after its reply in the
+same turn folds into the steps of that turn, as text after `channel_result` does: models wrote "I
+will report back" there, and the note showed after the answer. `channel-replies.ts`
+finds a reply task by its request id prefix (`channel-reply-`), so the change adds no stored field,
+no migration and no Team API field. A person's message that resumes a reply task gives it a new
+request, so it becomes an ordinary task with the default expected result and answers that person. A
+request allows `CHANNEL_REPLY_LIMIT` (2) member replies, counted from the reply tasks of each root
+task of that request, whoever writes them: one message to two members shares one limit. A reply
+task that fails lets the caller continue without the answer (`settled`), because a short question
+must not hold the request until a person acts. `channel_result` is refused while a reply of the
+task waits for its answer. `channel_reply` refuses, with
+`accepted: false`, a reply after the caller's `channel_result`, in a run that ended, to a message of
+a person or of the caller, to a streaming message, to a member that takes no work, and over the
+limit. Each refusal tells the model not to mention it, because a model wrote one in the chat. The
+reply text is agent text that reaches another agent, so its assignment starts with a line that
+names the sender and says it is not the user, and a reply turn only answers: it cannot use
+`channel_reply`, `channel_assign`, `channel_transfer`, `channel_cancel`, the channel memory tools or
+the channel management tools. The commentary of a turn that posted a reply is left out of the
+transcript that models read, as for a turn that posted a result.
+
 The channel controls stop and cancel a run with no message that a model reads, and a change note is
 not in the packet. So each packet has `stoppedTasks`: the `paused` and `cancelled` tasks of the
 recent messages that the member owns, or that run under work it owns (`channelWorkOwners`). Without
