@@ -1790,18 +1790,26 @@ export class TurnLifecycle {
     loads: readonly SkillLoad[],
     source: AgentClient,
   ) {
+    const found = this.#usageSession(agentId, threadId, source);
+    if (!found) return;
+    const sizes: (number | null)[] = [];
+    for (const load of loads)
+      sizes.push(
+        yield* skillLoadTokens(load, {
+          cwd,
+          workspace: found.agent.workspacePath ?? null,
+          provider: found.session.provider,
+        }),
+      );
+    // The file reads wait, so the agent can be gone now. Find it again and save all loads at once.
     const owner = this.#usageSession(agentId, threadId, source);
     if (!owner) return;
     const { agent, session } = owner;
     const usage = this.#store.database.usage;
     const model = usage.turnModel(agent.id, session.id, turnId) ?? agent.model;
-    for (const load of loads) {
-      const tokens = yield* skillLoadTokens(load, {
-        cwd,
-        workspace: agent.workspacePath ?? null,
-        provider: session.provider,
-      });
-      try {
+    const occurredAt = new Date().toISOString();
+    try {
+      for (const [index, load] of loads.entries())
         usage.recordSkillLoad({
           agentId: agent.id,
           sessionId: session.id,
@@ -1810,13 +1818,11 @@ export class TurnLifecycle {
           provider: session.provider,
           model,
           skill: load.skill,
-          tokens,
-          occurredAt: new Date().toISOString(),
+          tokens: sizes[index] ?? null,
+          occurredAt,
         });
-      } catch {
-        this.#hooks.emitError("usage_collection_failed", new Error("Usage data could not be saved."), agentId);
-        return;
-      }
+    } catch {
+      this.#hooks.emitError("usage_collection_failed", new Error("Usage data could not be saved."), agentId);
     }
   });
 

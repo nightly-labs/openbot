@@ -23,7 +23,7 @@ export interface HostAnalytics extends Omit<AgentAnalytics, "agentId"> {
   agents: AnalyticsAgent[];
   providerDaily: AnalyticsProviderDay[];
   /**
-   * The skills the agents loaded in the range, most loads first. Only the local host sends it: the
+   * The skills the agents loaded in the range, most tokens first. Only the local host sends it: the
    * frozen Team API host analytics wire has no skills, so a remote report has none.
    */
   skills?: AnalyticsSkill[] | undefined;

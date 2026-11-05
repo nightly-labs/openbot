@@ -16,10 +16,21 @@ export interface SkillLoad {
 
 /** A folder name that can name a skill: no path, no glob and no shell variable. */
 const SKILL_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
-/** A path to a `SKILL.md` in a `skills` folder. The first group is the skill's folder name. */
-const SKILL_FILE = /(?:[^\s'"`;|&<>()]*[\\/])?skills[\\/]([^\\/\s'"`;|&<>()]+)[\\/]SKILL\.md(?![\w.])/gu;
+/** A skill of another Claude plugin, `<plugin>:<skill>`. Its folder is not known, so it has no size. */
+const PLUGIN_SKILL_NAME = /^(?=.{1,128}$)[A-Za-z0-9][A-Za-z0-9._-]*:[A-Za-z0-9][A-Za-z0-9._-]*$/u;
+/** The plugins through which OpenBot gives Claude the workspace skills and the user's own skills. */
+const OPENBOT_SKILL_PLUGINS = /^(?:openbot|agents):/u;
+/** A whole path to a `SKILL.md` in a `skills` folder. The first group is the skill's folder name. */
+const SKILL_PATH = /^(?:.*[\\/])?skills[\\/]([^\\/]+)[\\/]SKILL\.md$/u;
+/** A path to a `SKILL.md` in a shell command. It starts after a separator, so `myskills/` is not a match. */
+const SKILL_FILE_IN_COMMAND =
+  /(?<![^\s'"`;|&<>()=])(?:[^\s'"`;|&<>()]*[\\/])?skills[\\/]([^\\/\s'"`;|&<>()]+)[\\/]SKILL\.md(?![\w.])/gu;
 /** A shell command that shows a file. A command that only lists or searches skill files loads none. */
-const READ_COMMAND = /(?:^|[\s;&|(])(?:cat|sed|head|tail|nl|bat|less|more|awk|type|Get-Content|gc)\s/u;
+const READ_COMMAND = /(?:^|[\s;&|('"])(?:cat|sed|head|tail|nl|bat|less|more|awk|type|Get-Content|gc)\s/u;
+/** A `sed` that edits the file in place, which shows nothing. */
+const SED_IN_PLACE = /(?:^|[\s;&|('"])sed\s(?:.*\s)?-(?:[A-Za-z]*i|-in-place)/u;
+/** The separators of the commands in one shell line. */
+const COMMAND_SEPARATOR = /&&|\|\||[;|\n]/u;
 /** About four bytes of English text make one token. */
 const BYTES_PER_TOKEN = 4;
 
@@ -27,37 +38,45 @@ const BYTES_PER_TOKEN = 4;
  * The skills that a finished tool step loaded. Each CLI loads a skill by itself, so the step is the
  * only record of it: a Claude `Skill` call names the skill, and every other CLI reads the skill's
  * `SKILL.md` with a read tool (`filePaths`, or the arguments of an ACP read) or a shell command. A
- * failed step loaded nothing.
+ * failed step loaded nothing, and a step that writes or edits the file loads nothing.
  */
 export function skillLoads(item: unknown, filePaths: readonly unknown[]): SkillLoad[] {
   if (!isRecord(item)) return [];
   const status = getString(item, "status");
   if (status === "failed" || status === "declined") return [];
-  if (item.type === "toolCall" && getString(item, "name") === "Skill") {
-    // A plugin skill is `<plugin>:<skill>`; the folder name is the last part.
-    const skill = getString(item, "skill")?.split(":").at(-1) ?? "";
-    return SKILL_NAME.test(skill) ? [{ skill, path: null }] : [];
-  }
-  const texts: string[] = [];
-  if (item.type === "commandExecution" || (item.type === "toolCall" && getString(item, "name") === "Bash")) {
-    const command = getString(item, "command");
-    if (command && READ_COMMAND.test(command)) texts.push(command);
-  } else if (item.type === "toolCall") {
-    for (const path of filePaths) if (typeof path === "string") texts.push(path);
-    // An ACP read names its file in the arguments when it sends no location.
-    if (getString(item, "toolKind") === "read") {
-      for (const value of Object.values(getRecord(item, "arguments") ?? {}))
-        if (typeof value === "string") texts.push(value);
-    }
+  const name = item.type === "toolCall" ? getString(item, "name") : null;
+  if (name === "Skill") {
+    const skill = (getString(item, "skill") ?? "").replace(OPENBOT_SKILL_PLUGINS, "");
+    return SKILL_NAME.test(skill) || PLUGIN_SKILL_NAME.test(skill) ? [{ skill, path: null }] : [];
   }
   const loads = new Map<string, SkillLoad>();
-  for (const text of texts) {
-    for (const match of text.matchAll(SKILL_FILE)) {
-      const skill = match[1] ?? "";
-      if (SKILL_NAME.test(skill) && !loads.has(skill)) loads.set(skill, { skill, path: match[0] });
+  const add = (skill: string, path: string) => {
+    if (SKILL_NAME.test(skill) && !loads.has(skill)) loads.set(skill, { skill, path });
+  };
+  if (item.type === "commandExecution" || name === "Bash") {
+    for (const command of shownFileCommands(getString(item, "command") ?? ""))
+      for (const match of command.matchAll(SKILL_FILE_IN_COMMAND)) add(match[1] ?? "", match[0]);
+  } else if (name === "Read" || (item.type === "toolCall" && getString(item, "toolKind") === "read")) {
+    // An ACP read names its file in the arguments when it sends no location.
+    const paths = [...filePaths, ...Object.values(getRecord(item, "arguments") ?? {})];
+    for (const path of paths) {
+      if (typeof path !== "string") continue;
+      const match = SKILL_PATH.exec(path);
+      if (match) add(match[1] ?? "", path);
     }
   }
   return [...loads.values()];
+}
+
+/**
+ * The commands of a shell line that show a file, each cut before its first output redirection, so a
+ * file that a command writes is not a load.
+ */
+function shownFileCommands(line: string): string[] {
+  return line
+    .split(COMMAND_SEPARATOR)
+    .filter((command) => READ_COMMAND.test(command) && !SED_IN_PLACE.test(command))
+    .map((command) => command.split(">", 1)[0] ?? "");
 }
 
 class SkillFileUnreadable extends Schema.TaggedError<SkillFileUnreadable>()("SkillFileUnreadable", {
@@ -94,6 +113,8 @@ function skillFileCandidates(load: SkillLoad, place: SkillLoadPlace): string[] {
     const base = place.cwd ?? place.workspace;
     return base ? [join(base, path)] : [];
   }
+  // A skill of another plugin is in that plugin's folder, which OpenBot does not know.
+  if (load.skill.includes(":")) return [];
   const folders = isAgentProvider(place.provider) ? agentProviderDescriptor(place.provider).skillFolders : [];
   return [
     ...(place.workspace ? folders.map((folder) => join(place.workspace ?? "", folder, load.skill, "SKILL.md")) : []),
