@@ -40,6 +40,7 @@ export function SidebarNav() {
       ref={setAgentListElement}
       aria-label={t("sidebar.nav.label")}
       class={["agent-list", scrollFades.classes()]}
+      style={{ "--agent-list-stuck-height": `${scrollFades.stuckHeight()}px` }}
       data-sidebar-dragging={draggingKind()}
       onDragOver={updateSidebarNativeDrag}
       onDragLeave={handleListDragLeave}
