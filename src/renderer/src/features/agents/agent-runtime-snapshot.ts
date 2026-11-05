@@ -164,6 +164,9 @@ export function reconcileAttentionApprovals(
  *
  * An appended message is only the start of the reply, so it is a stored message: the conversation
  * snapshot, delta or page that follows must be able to replace its body.
+ *
+ * A message older than the last loaded one is in the history that is not loaded, for example when
+ * routine runs come after the latest reply. It is not added, because at the end it is out of order.
  */
 export function appendLatestRuntimeMessages(
   current: Record<string, AgentMessage[]>,
@@ -173,6 +176,7 @@ export function appendLatestRuntimeMessages(
   for (const message of latestMessages) {
     const messages = next[message.agentId] ?? [];
     if (messages.some((candidate) => candidate.id === message.id)) continue;
+    if (Date.parse(message.createdAt) < Date.parse(messages.at(-1)?.createdAt ?? "")) continue;
     next[message.agentId] = [
       ...messages,
       createStoredMessage({
