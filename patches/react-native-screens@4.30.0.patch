@@ -1,3 +1,105 @@
+diff --git a/android/src/main/java/com/swmansion/rnscreens/ScreenContainer.kt b/android/src/main/java/com/swmansion/rnscreens/ScreenContainer.kt
+index 6f935c145068b68e0233faa668cc70f8c411169f..92bac93af01568938b1f276ebcba908c464e1e1a 100644
+--- a/android/src/main/java/com/swmansion/rnscreens/ScreenContainer.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/ScreenContainer.kt
+@@ -2,6 +2,8 @@ package com.swmansion.rnscreens
+ 
+ import android.content.Context
+ import android.content.ContextWrapper
++import android.os.Handler
++import android.os.Looper
+ import android.view.Choreographer
+ import android.view.View
+ import android.view.ViewGroup
+@@ -44,6 +46,9 @@ open class ScreenContainer(
+         }
+     private var parentScreenWrapper: ScreenFragmentWrapper? = null
+ 
++    // The fragment manager whose removal of this container's fragments waits for its transaction to end.
++    private var deferredFragmentRemoval: FragmentManager? = null
++
+     override fun shouldDelayChildPressedState(): Boolean = false
+ 
+     override fun onLayout(
+@@ -278,6 +283,8 @@ open class ScreenContainer(
+     override fun onAttachedToWindow() {
+         super.onAttachedToWindow()
+         isAttached = true
++        // Fragments that are still added would not get their views back, so remove them first.
++        runDeferredFragmentRemoval()
+         setupFragmentManager()
+     }
+ 
+@@ -315,8 +322,7 @@ open class ScreenContainer(
+         // attempt to reattach previously registered fragments that are not removed
+         fragmentManager?.let {
+             if (!it.isDestroyed) {
+-                removeMyFragments(it)
+-                it.executePendingTransactions()
++                removeMyFragmentsOrDefer(it)
+             }
+         }
+ 
+@@ -342,6 +348,36 @@ open class ScreenContainer(
+         }
+     }
+ 
++    /**
++     * Reanimated can mount a Fabric removal from an event that a view sends while the fragment
++     * manager executes a transaction, for example when a fragment view attaches. A nested transaction
++     * then throws, so remove the fragments after the current transaction instead.
++     */
++    private fun removeMyFragmentsOrDefer(fragmentManager: FragmentManager) {
++        try {
++            removeMyFragments(fragmentManager)
++            fragmentManager.executePendingTransactions()
++        } catch (e: IllegalStateException) {
++            // FragmentManager throws this before it changes state, so the removal can run again.
++            if (e.message != FRAGMENT_MANAGER_EXECUTING_MESSAGE) {
++                throw e
++            }
++            deferredFragmentRemoval = fragmentManager
++            Handler(Looper.getMainLooper()).post {
++                runDeferredFragmentRemoval()
++                performUpdates()
++            }
++        }
++    }
++
++    private fun runDeferredFragmentRemoval() {
++        val fragmentManager = deferredFragmentRemoval ?: return
++        deferredFragmentRemoval = null
++        if (!fragmentManager.isDestroyed) {
++            removeMyFragmentsOrDefer(fragmentManager)
++        }
++    }
++
+     override fun onMeasure(
+         widthMeasureSpec: Int,
+         heightMeasureSpec: Int,
+@@ -380,7 +416,12 @@ open class ScreenContainer(
+     }
+ 
+     fun performUpdates() {
+-        if (!needsUpdate || !isAttached || fragmentManager == null || fragmentManager?.isDestroyed == true) {
++        if (!needsUpdate ||
++            !isAttached ||
++            deferredFragmentRemoval != null ||
++            fragmentManager == null ||
++            fragmentManager?.isDestroyed == true
++        ) {
+             return
+         }
+         needsUpdate = false
+@@ -456,4 +497,8 @@ open class ScreenContainer(
+     protected open fun notifyContainerUpdate() {
+         topScreen?.fragmentWrapper?.onContainerUpdate()
+     }
++
++    private companion object {
++        const val FRAGMENT_MANAGER_EXECUTING_MESSAGE = "FragmentManager is already executing transactions"
++    }
+ }
 diff --git a/ios/RNSScreenStack.mm b/ios/RNSScreenStack.mm
 index 5da11964f5932cb44e1131c44a2480803c0a62b5..a04b4678830bb5ea16984486072eacadd1430adf 100644
 --- a/ios/RNSScreenStack.mm

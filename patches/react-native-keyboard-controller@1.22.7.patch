@@ -1,3 +1,44 @@
+diff --git a/android/src/main/java/com/reactnativekeyboardcontroller/interactive/KeyboardAnimationController.kt b/android/src/main/java/com/reactnativekeyboardcontroller/interactive/KeyboardAnimationController.kt
+index ff483614f48c538275e449a29544394fbc11efa0..476f87ea8c0abbaf13d29550115443e0ea943ba4 100644
+--- a/android/src/main/java/com/reactnativekeyboardcontroller/interactive/KeyboardAnimationController.kt
++++ b/android/src/main/java/com/reactnativekeyboardcontroller/interactive/KeyboardAnimationController.kt
+@@ -362,10 +362,20 @@ internal class KeyboardAnimationController {
+       insetsAnimationController
+         ?: throw IllegalStateException("Controller should not be null")
+ 
++    // A gesture can end while the spring of the previous gesture still runs. Stop that spring:
++    // otherwise it moves the IME after the controller is reset and `insetTo` throws.
++    currentSpringAnimation?.let { previous ->
++      currentSpringAnimation = null
++      previous.cancel()
++    }
++
+     currentSpringAnimation =
+       springAnimationOf(
+         setter = {
+-          insetTo(it.roundToInt())
++          // The system can finish or cancel the controller before the spring ends.
++          if (insetsAnimationController === controller) {
++            insetTo(it.roundToInt())
++          }
+         },
+         getter = { controller.currentInsets.bottom.toFloat() },
+         finalPosition =
+@@ -385,11 +395,12 @@ internal class KeyboardAnimationController {
+           setStartVelocity(velocityY)
+         }
+         addEndListener { anim, _, _, _ ->
++          // A replaced spring must not finish the controller of the spring that replaced it.
+           if (anim == currentSpringAnimation) {
+             currentSpringAnimation = null
++            // Once the animation has ended, finish the controller
++            finish()
+           }
+-          // Once the animation has ended, finish the controller
+-          finish()
+         }
+       }.also { it.start() }
+   }
 diff --git a/lib/commonjs/components/KeyboardAwareScrollView/index.js b/lib/commonjs/components/KeyboardAwareScrollView/index.js
 index 07e7294cf395103e39c55d9b3f230c1bfa72ec4c..15edd0a2ab8865906ac2ae9906f83fd0e414f994 100644
 --- a/lib/commonjs/components/KeyboardAwareScrollView/index.js
