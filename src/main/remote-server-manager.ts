@@ -53,6 +53,8 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   type AgentNotificationLevelsSnapshot,
+  type BrowserComputerSharing,
+  decodeBrowserProxyComputer,
   decodeRemoteAgentImportPreview,
   decodeRemoteInstanceTransferPreview,
   EMPTY_AGENT_NOTIFICATION_LEVELS,
@@ -68,6 +70,8 @@ import {
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import { BROWSER_EGRESS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-egress-v1";
+import { BROWSER_PROXIES_ROUTES } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { decodeBrowserViewSessionResponse } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { CHAT_COLORS_CAPABILITY, CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import {
@@ -880,6 +884,45 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean {
     return this.#connections.compatibilityFor(serverId)?.capabilities.includes(capability) ?? false;
   }
+
+  /**
+   * Whether this computer shares its connection with a joined server (`browser-egress-v1`). Null when
+   * it cannot: this computer's own server, a server over HTTPS, or a host without the capability.
+   */
+  browserComputerSharing(serverId: string): BrowserComputerSharing | null {
+    if (serverId === LOCAL_SERVER_ID || this.#store.find(serverId)?.transport !== "webrtc-v2") return null;
+    if (!this.supportsCapability(serverId, BROWSER_EGRESS_CAPABILITY)) return null;
+    return { sharing: this.#store.sharesBrowserEgress(serverId) };
+  }
+
+  /** Whether the egress channel to a server must be open now: sharing is on and the server is connected. */
+  browserEgressWanted(serverId: string): boolean {
+    return (
+      this.browserComputerSharing(serverId)?.sharing === true && this.#webrtcTransport?.isConnected(serverId) === true
+    );
+  }
+
+  /** Turning sharing on also adds this member's computer to the proxies of the host. */
+  readonly setBrowserComputerSharing = Effect.fn("RemoteManager.setBrowserComputerSharing")(
+    function* (
+      this: RemoteServerManager,
+      serverId: string,
+      sharing: boolean,
+    ): Effect.fn.Return<void, RemoteWorkflowError, RemoteRequest> {
+      if (this.browserComputerSharing(serverId) === null)
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.team.agentSettingsUnsupported")) });
+      if (sharing)
+        yield* RemoteRequest.use((service) =>
+          service.request(serverId, BROWSER_PROXIES_ROUTES.computer, decodeBrowserProxyComputer, {
+            method: "POST",
+            body: {},
+          }),
+        );
+      yield* this.#store.setBrowserEgress(serverId, sharing);
+      this.#emitChanged();
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
 
   readonly startEventConnections = Effect.fn("RemoteManager.startEventConnections")(function* (
     this: RemoteServerManager,

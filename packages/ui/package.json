@@ -466,6 +466,7 @@
     "./features/browser/BrowserLocalSignInDialog": "./src/features/browser/BrowserLocalSignInDialog.tsx",
     "./features/browser/BrowserProfileSelect": "./src/features/browser/BrowserProfileSelect.tsx",
     "./features/browser/BrowserProfilesPanel": "./src/features/browser/BrowserProfilesPanel.tsx",
+    "./features/browser/BrowserProxies": "./src/features/browser/BrowserProxies.tsx",
     "./features/browser/browser-profiles.css": "./src/features/browser/browser-profiles.css",
     "./features/browser/browser-suggestions": "./src/features/browser/browser-suggestions.ts",
     "./features/browser/browser-view-shortcuts": "./src/features/browser/browser-view-shortcuts.ts",

@@ -31,10 +31,12 @@ import { AGENT_THREAD_REPLIES_CAPABILITY } from "./agent-thread-replies-v1";
 import { AGENT_THREADS_CAPABILITY } from "./agent-threads-v1";
 import { AGENT_UPDATE_CAPABILITY } from "./agent-update-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "./bitwarden-connector-v1";
+import { BROWSER_EGRESS_CAPABILITY } from "./browser-egress-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "./browser-navigation-v1";
 import { BROWSER_PAGE_STATE_CAPABILITY } from "./browser-page-state-v1";
 import { BROWSER_PROFILES_EVENTS_CAPABILITY } from "./browser-profiles-events-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "./browser-profiles-v1";
+import { BROWSER_PROXIES_CAPABILITY } from "./browser-proxies-v1";
 import { BROWSER_SECRET_VAULT_CAPABILITY } from "./browser-secret-vault-v1";
 import { BROWSER_SIGN_IN_CAPABILITY } from "./browser-sign-in-v1";
 import { BROWSER_USER_CONTROL_CAPABILITY } from "./browser-user-control-v1";
@@ -201,9 +203,11 @@ export {
   AGENT_UPDATE_CAPABILITY,
   ANDROID_PUSH_NOTIFICATIONS_CAPABILITY,
   BITWARDEN_CONNECTOR_CAPABILITY,
+  BROWSER_EGRESS_CAPABILITY,
   BROWSER_PAGE_STATE_CAPABILITY,
   BROWSER_PROFILES_CAPABILITY,
   BROWSER_PROFILES_EVENTS_CAPABILITY,
+  BROWSER_PROXIES_CAPABILITY,
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SIGN_IN_CAPABILITY,
   BROWSER_USER_CONTROL_CAPABILITY,
@@ -446,6 +450,8 @@ export const TEAM_CURRENT_CAPABILITIES = [
   CONVERSATION_UNREAD_FROM_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
   PASSWORD_MANAGERS_CAPABILITY,
+  BROWSER_PROXIES_CAPABILITY,
+  BROWSER_EGRESS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -611,7 +617,9 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== MESSAGE_DELETE_CAPABILITY &&
     capability !== CONVERSATION_UNREAD_FROM_CAPABILITY &&
     capability !== WORKFLOWS_CHATS_CAPABILITY &&
-    capability !== PASSWORD_MANAGERS_CAPABILITY,
+    capability !== PASSWORD_MANAGERS_CAPABILITY &&
+    capability !== BROWSER_PROXIES_CAPABILITY &&
+    capability !== BROWSER_EGRESS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -653,6 +661,8 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   CONVERSATION_UNREAD_FROM_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
   PASSWORD_MANAGERS_CAPABILITY,
+  BROWSER_PROXIES_CAPABILITY,
+  BROWSER_EGRESS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -777,6 +787,8 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== MESSAGE_DELETE_CAPABILITY &&
       capability !== CONVERSATION_UNREAD_FROM_CAPABILITY &&
       capability !== WORKFLOWS_CHATS_CAPABILITY &&
-      capability !== PASSWORD_MANAGERS_CAPABILITY,
+      capability !== PASSWORD_MANAGERS_CAPABILITY &&
+      capability !== BROWSER_PROXIES_CAPABILITY &&
+      capability !== BROWSER_EGRESS_CAPABILITY,
   );
 }
