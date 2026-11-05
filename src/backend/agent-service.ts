@@ -5410,7 +5410,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // carry that endpoint's API key or a header value.
     const message = this.#mcp.redact(error instanceof Error ? error.message : String(error));
     // The renderer shows a general sentence for an empty, long or technical text, so this line is
-    // the only record of the cause (#5222). A missing `turnId` is an error after its turn ended.
+    // the only record of the cause (#5222).
     errorLogger.warn("An agent error was reported.", {
       code,
       agentId: agentId ?? null,
