@@ -320,6 +320,10 @@ export class MobileConversationStore {
 
   enqueue(delta: Delta) {
     if (!this.get(delta.agentId)) return;
+    // A closed chat that missed changes reads its latest page when it opens. A delta would add the end
+    // of a message to its old window, and the phone's copy would keep that part message.
+    if (!this.isObserved(delta.agentId) && !this.#upToDate.has(delta.agentId) && !this.#loads.has(delta.agentId))
+      return;
     const pending = this.#deltas.get(delta.agentId) ?? [];
     pending.push(delta);
     this.#deltas.set(delta.agentId, pending);

@@ -1202,7 +1202,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       void (async () => {
         for (const agent of open) {
           if (!context.isCurrent()) return;
-          if (!conversationStore.get(agent.id)) continue;
+          // A chat that the user closed during the loop loads when it opens again.
+          if (!conversationStore.get(agent.id) || !conversationStore.isObserved(agent.id)) continue;
           await conversationStore
             .loadLatest(
               agent.id,
