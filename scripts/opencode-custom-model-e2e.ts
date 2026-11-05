@@ -7,6 +7,8 @@
 // Three more models carry #4234's shapes: a saved output cap must reach the request verbatim, a
 // blank cap on a 128K window (the corrected repro) must get the 16,384 guess rather than OpenCode's
 // 32,000, and a small window must get half the window.
+// One more model saves its efforts (#4154): OpenCode must list exactly those efforts, and a turn at
+// `max` must send `reasoning_effort: "max"`. A model with no saved efforts keeps OpenCode's own set.
 // `OPENCODE_CLI=<opencode> bun run test:opencode-custom-model`.
 // Writes .openbot-build/opencode-custom-model/report.json.
 import assert from "node:assert/strict";
@@ -39,6 +41,9 @@ const CAPPED_MODEL = "capped-model";
 const WIDE_MODEL = "wide-model";
 /** #4234 as first filed: a 16K window, where half the window is the only budget that fits. */
 const GUESSED_MODEL = "guessed-model";
+/** #4154: an endpoint that accepts Low, High and Max for this model, and no other effort. */
+const EFFORT_MODEL = "effort-model";
+const SAVED_EFFORTS = ["low", "high", "max"] as const;
 
 interface Request {
   path: string;
@@ -48,12 +53,16 @@ interface Request {
   auth?: "key" | "other" | "none";
   /** The output budget OpenCode asked for; absent when the endpoint protocol has no such field. */
   maxCompletionTokens: number | null;
+  /** The `reasoning_effort` that the request sent, or null. */
+  reasoningEffort: string | null;
 }
 
 interface Report {
   passed: boolean;
   openCodeVersion?: string;
   models?: string[];
+  /** The efforts that OpenBot listed for each model. */
+  efforts?: Record<string, string[]>;
   requests: Request[];
   turns: { reply: string; error: string | null; status: string | null }[];
   error?: string;
@@ -75,6 +84,7 @@ async function readRequest(request: IncomingMessage): Promise<Omit<Request, "pat
     model: getString(value, "model"),
     stream: isRecord(value) && value.stream === true,
     maxCompletionTokens: typeof budget === "number" ? budget : null,
+    reasoningEffort: getString(value, "reasoning_effort"),
   };
 }
 
@@ -88,13 +98,14 @@ function chunk(model: string, content: string | null): string {
 
 const server = createServer((request: IncomingMessage, response: ServerResponse) => {
   void (async () => {
-    const { model, stream, maxCompletionTokens } = await readRequest(request);
+    const read = await readRequest(request);
+    const { model, stream } = read;
     const path = request.url ?? "";
-    if (!path.startsWith(KEYED_PATH)) report.requests.push({ path, model, stream, maxCompletionTokens });
+    if (!path.startsWith(KEYED_PATH)) report.requests.push({ path, ...read });
     else {
       const header = request.headers.authorization;
       const auth = header === `Bearer ${KEY}` ? "key" : header ? "other" : "none";
-      report.requests.push({ path, model, stream, maxCompletionTokens, auth });
+      report.requests.push({ path, ...read, auth });
       if (auth !== "key") {
         // TokenMe's answer to a missing or refused key, which OpenCode 2.2.5 reports as `-32000`.
         response.writeHead(401, { "content-type": "application/json" });
@@ -185,6 +196,7 @@ try {
       { id: CAPPED_MODEL, name: "Capped model", contextWindow: 131_072, maxOutput: 16_384 },
       { id: WIDE_MODEL, name: "Wide model", contextWindow: 131_072 },
       { id: GUESSED_MODEL, name: "Guessed model", contextWindow: 16_384 },
+      { id: EFFORT_MODEL, name: "Effort model", reasoningEfforts: [...SAVED_EFFORTS] },
     ],
   };
 
@@ -205,6 +217,22 @@ try {
   const listed = await runCauseEffect(client.request("model/list", {}, (value) => value));
   report.models = getArray(listed, "data").flatMap((model) => getString(model, "model") ?? []);
   assert.ok(report.models.includes(`${ENDPOINT}/${AGENT_MODEL}`), "OpenCode must list the agent's model.");
+  report.efforts = Object.fromEntries(
+    getArray(listed, "data").map((model) => [
+      getString(model, "model") ?? "",
+      getArray(model, "supportedReasoningEfforts").flatMap((effort) => getString(effort, "reasoningEffort") ?? []),
+    ]),
+  );
+  assert.deepEqual(
+    report.efforts[`${ENDPOINT}/${EFFORT_MODEL}`],
+    [...SAVED_EFFORTS],
+    "A model with saved efforts must list exactly those efforts.",
+  );
+  assert.deepEqual(
+    report.efforts[`${ENDPOINT}/${AGENT_MODEL}`],
+    ["low", "medium", "high"],
+    "A model with no saved efforts must keep OpenCode's own efforts.",
+  );
 
   const thread = await startThread(client, { cwd: workspace, model: `${ENDPOINT}/${AGENT_MODEL}` });
   for (const text of ["Say one word.", "Say another word."]) {
@@ -228,8 +256,18 @@ try {
     assert.equal(turn.error, null, `The turn on ${model} failed: ${turn.error}`);
   }
 
+  const effortThread = await startThread(client, { cwd: workspace, model: `${ENDPOINT}/${EFFORT_MODEL}` });
+  const effortTurn = await runTurn(client, effortThread, { effort: "max", text: "Say one word.", timeoutMs: 120_000 });
+  report.turns.push(effortTurn);
+  assert.equal(effortTurn.error, null, `The turn on ${EFFORT_MODEL} failed: ${effortTurn.error}`);
+  const effortRequests = report.requests.filter((request) => request.model === EFFORT_MODEL);
+  assert.ok(effortRequests.length > 0, `The endpoint got no request for ${EFFORT_MODEL}.`);
+  for (const request of effortRequests) {
+    assert.equal(request.reasoningEffort, "max", `${EFFORT_MODEL} must send the effort of the turn.`);
+  }
+
   assert.ok(report.requests.length > 0, "The endpoint got no request.");
-  const known = new Set([AGENT_MODEL, ...budgets.map(([model]) => model)]);
+  const known = new Set([AGENT_MODEL, EFFORT_MODEL, ...budgets.map(([model]) => model)]);
   const others = report.requests.filter(
     (request) => request.auth === undefined && request.model !== null && !known.has(request.model),
   );

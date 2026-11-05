@@ -109,6 +109,8 @@ const Settings = Schema.Struct({
           contextWindow: Schema.optionalKey(Schema.Number),
           /** Added after `contextWindow`, with the same rules. */
           maxOutput: Schema.optionalKey(Schema.Number),
+          /** Added after `maxOutput`. The import drops a list with an unknown or repeated effort. */
+          reasoningEfforts: Schema.optionalKey(Schema.Array(Schema.String).check(Schema.isMaxLength(16))),
         }),
       ).check(Schema.isMaxLength(256)),
       /** The provider had a saved key. The key itself is never in the file. */

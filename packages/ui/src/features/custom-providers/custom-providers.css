@@ -130,6 +130,25 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(9ch, 0.8fr) minmax(9ch, 0.8fr) auto;
 }
 
+/* The efforts of one model, under its fields. They wrap on a narrow dialog. */
+.custom-provider-efforts {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--openbot-space-1) var(--openbot-space-2);
+}
+
+.custom-provider-effort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  cursor: pointer;
+}
+
 .custom-provider-rows-error,
 .custom-provider-row-error,
 .custom-provider-submit-error {

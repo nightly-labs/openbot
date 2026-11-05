@@ -325,14 +325,19 @@ function mockTurnTrace(turnId: string, endedAt: Date): ConversationTurnTrace {
 
 /** Custom models compose as `<provider>/<model>`; preview builds `listModels()` from these. */
 function mockCustomProviderModels(provider: CustomProviderSummary): ClientAgentModelOption[] {
-  return provider.models.map((model) => ({
-    provider: provider.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
-    id: composedCustomModelId(provider.id, model.id),
-    name: `${provider.name}/${model.name}`,
-    description: `Served by ${provider.baseUrl}.`,
-    defaultReasoningEffort: "medium",
-    supportedReasoningEfforts: ["low", "medium", "high"],
-  }));
+  const harness = provider.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS;
+  return provider.models.map((model) => {
+    // As the harnesses do: saved efforts replace OpenCode's Low, Medium and High, and Pi has none without them.
+    const efforts = model.reasoningEfforts ?? (harness === "pi" ? [] : (["low", "medium", "high"] as const));
+    return {
+      provider: harness,
+      id: composedCustomModelId(provider.id, model.id),
+      name: `${provider.name}/${model.name}`,
+      description: `Served by ${provider.baseUrl}.`,
+      defaultReasoningEffort: efforts.includes("medium") ? "medium" : (efforts[0] ?? "medium"),
+      supportedReasoningEfforts: [...efforts],
+    };
+  });
 }
 
 export interface MockOpenBotControls {

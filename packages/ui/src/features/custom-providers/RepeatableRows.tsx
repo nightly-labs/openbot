@@ -46,6 +46,8 @@ interface RepeatableRowsProps<T> {
   action?: JSX.Element;
   /** Content between the label and the rows, such as the models that an endpoint reports. */
   children?: JSX.Element;
+  /** Controls under the fields of one row, such as the efforts of a model. */
+  rowDetails?: ((row: T, index: () => number) => JSX.Element) | undefined;
 }
 
 /**
@@ -104,6 +106,7 @@ export function RepeatableRows<T>(props: RepeatableRowsProps<T>) {
                 <Trash2 />
               </IconButton>
             </div>
+            {props.rowDetails?.(row, index)}
             <Show when={props.rowError(index())}>
               {(message) => (
                 <Text class="custom-provider-row-error" tone="danger" variant="caption" role="alert">

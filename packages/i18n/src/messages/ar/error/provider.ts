@@ -102,6 +102,7 @@ export const messages = {
   "error.provider.modelIdDuplicate": "يوجد نموذجان بالمعرّف نفسه.",
   "error.provider.contextWindowInvalid": "يجب أن تكون نافذة سياق النموذج عددًا صحيحًا من الرموز من {min} إلى {max}.",
   "error.provider.maxOutputInvalid": "يجب أن يكون الحد الأقصى لمخرجات النموذج عددًا صحيحًا من الرموز من {min} إلى {max}.",
+  "error.provider.reasoningEffortsInvalid": "مستويات جهد التفكير للنموذج غير صالحة.",
   "error.provider.headersTooMany": "عدد الترويسات كبير جدًا.",
   "error.provider.headerNameCharacter": "يحتوي اسم ترويسة على حرف لا يسمح به HTTP.",
   "error.provider.headerNameTooLong": "اسم الترويسة طويل جدًا.",
