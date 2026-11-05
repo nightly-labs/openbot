@@ -1189,7 +1189,8 @@ Limits:
 - While the desktop app is signed out or closed, only this computer can connect: members reach the
   server only while the desktop app runs and is signed in.
 - The child has no account session, so an owner that ends a device's session from the child's Server
-  settings does not end it on the account service. The account has the name of the child's last start.
+  settings does not end it on the account service. The account has the name of the child's last start,
+  and no logo of the child.
 - The provider CLI sign-ins in the home folder (`~/.codex`, `~/.claude`) and `~/.agents/skills` are
   shared with the other servers.
 - Not confirmed: the memory of each child, the agent browser in a child with no window, and which

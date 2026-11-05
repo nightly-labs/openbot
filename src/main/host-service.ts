@@ -153,7 +153,8 @@ interface HostServiceOptions {
   localDevelopmentHost?: boolean;
   /**
    * A server on this computer: its owner is a password member that the desktop app logs in as, so a
-   * directory sync keeps the owner's row.
+   * directory sync keeps the owner's row. It has no account session, so a name or logo change skips
+   * the account owner check and the account steps.
    */
   passwordOwner?: boolean;
   logDirectory?: string;
@@ -820,8 +821,8 @@ export class HostService extends EventEmitter<HostEvents> {
       if (!passwordOwner)
         yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
       const identity = yield* this.#options.store.updateIdentity(input);
-      // Before anything is published: the store checked the account before it resolved, and a
-      // switch landing in this gap would show the previous account's name and logo.
+      // Before anything is published: the account was checked before the store resolved (except for
+      // a password owner), and a switch landing in this gap would show the previous account's name and logo.
       if (!this.#isActiveHost(identity.serverId)) return this.getStatus();
       this.#setStatus({
         serverName: identity.serverName,
