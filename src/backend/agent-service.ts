@@ -2346,7 +2346,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * The models one agent can run: the catalogue, and the models that only the agent's account after
    * the first serves (#5217).
    */
-  #agentModels(agent: Pick<AgentSummary, "provider" | "providerAccountId">): AgentModelOption[] {
+  #agentModels(agent: { provider: AgentProvider; providerAccountId?: string | undefined }): AgentModelOption[] {
     const models = this.#endpoints.available();
     const own = this.#providers
       .accountModels(agent.provider, agent.providerAccountId)
