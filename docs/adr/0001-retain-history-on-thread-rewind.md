@@ -24,19 +24,26 @@ retention behavior.
 The cut uses conversation order, not enqueue timestamps: a queued question can be stored before
 the preceding answer finishes. All mailbox producers share the same enqueue lock while a rewrite
 rechecks its source, queues the replacement, and ends the old context. Restart recovery finishes
-a committed replacement's cut before providers can drain it. Provider-history imports keep their
+a committed replacement's cut before providers can drain it. Recovery first deactivates the old
+provider session, then cuts the active history. If the cut fails, the queued rewrite stays held
+and the next startup retries; an intent for an absent agent is also checked on each startup, while
+normal agent deletion removes its mailbox records. Provider-history imports keep their
 raw records but exclude archived message IDs and removed turns from the active conversation.
 
 A missing sender in a conversation projection can be recovered only from the host-stamped mailbox
-delivery for that agent and conversation lane. If both records lack a sender, remote authorship
-cannot be proved; those messages remain editable on the local host. This is an outstanding scope
-exception for remote clients, not an inference that the current member owns old messages.
+delivery for that agent and conversation lane. A known owner must match the current sender even
+on the local host when it is signed out. If both records lack a sender, remote authorship cannot
+be proved; remote members cannot edit the message. The local host can edit these legacy messages,
+including in side threads, because anyone with local host access can already control its private
+database. This is a host privilege, not proof that the current operator wrote the old message.
 
 Repeatable checks:
 
 - `bun scripts/thread-rewind-e2e.ts` writes its report under `.openbot-build/thread-rewind-e2e/`.
 - `bun scripts/thread-rewrite-service-e2e.ts` restarts the complete service, database and a separate
-  deterministic provider process, then verifies completed history imports and subsequent turns.
+  deterministic provider process, then verifies completed history imports, subsequent turns,
+  sender ownership, provider retirement before a recovery cut, and deletion of rewound main and
+  side-thread history, attachment references, and transferred files.
 - `bun scripts/thread-rewrite-ui-e2e.ts --allow-mutations` drives Edit, Cancel and Resend in main and
   side threads on this worktree's isolated desktop dev profile using a signed-in live Codex model.
   After stopping and starting that stack, `--verify-restart --allow-mutations` checks new provider

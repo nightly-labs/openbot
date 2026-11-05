@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import { revokeRoutineWebhooks } from "../webhook-route-store";
-import { type DatabaseCore, deleteReceiptsOf } from "./database-core";
+import { type DatabaseCore, deleteReceiptsOf, deleteThreadAttachments } from "./database-core";
 import { databaseRow, databaseRows, requiredStringColumn } from "./database-rows";
 
 type AgentRuntime = Pick<AgentSummary, "provider" | "model" | "reasoningEffort">;
@@ -259,6 +259,7 @@ export class AgentRoster {
         db.prepare("DELETE FROM projection_deliveries WHERE recipient_agent_id = ?").run(agentId);
         db.prepare("DELETE FROM projection_queue_state WHERE agent_id = ?").run(agentId);
         if (threadId) {
+          deleteThreadAttachments(db, threadId);
           db.prepare("DELETE FROM projection_threads WHERE thread_id = ?").run(threadId);
         }
         return null;

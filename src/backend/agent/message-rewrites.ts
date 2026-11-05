@@ -48,9 +48,10 @@ export class MessageRewrites {
   recover(): void {
     for (const intent of this.#mailbox.pendingRewrites()) {
       if (!this.#store.list().some((agent) => agent.id === intent.agentId)) continue;
+      // A restart can stop between these writes. Retire the old session before making the cut visible.
+      this.#store.database.deactivateProviderSessions(intent.threadId);
       if (this.#store.database.readConversationMessages(intent.agentId, intent.threadId, [intent.messageId]).length)
         this.#store.database.rewindConversation(intent.agentId, intent.threadId, intent.messageId);
-      this.#store.database.deactivateProviderSessions(intent.threadId);
     }
   }
 
@@ -70,8 +71,9 @@ export class MessageRewrites {
     if (message?.author !== "user" || (message.source && message.source !== "user") || message.status !== "completed")
       throw new Error(sourceText("error.backend.rewriteMessageMissing"));
     const owner = message.senderMember ?? this.#mailbox.messageSender(agent.id, input.taskId, message.id);
-    // The host may edit a pre-membership message with no recorded owner. A remote member must prove ownership.
-    if (sender && owner?.id !== sender.id && (source === "member" || owner !== undefined))
+    // The local host may edit an unattributed legacy message, but a known owner must match even
+    // when the host has no signed-in sender. Remote members always need positive attribution.
+    if (owner ? owner.id !== sender?.id : source !== "host")
       throw new Error(sourceText("error.backend.rewriteOtherMember"));
     return { agent, task, threadId, message };
   }

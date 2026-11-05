@@ -360,7 +360,7 @@ try {
   await runCauseEffect(current.agents.initialize());
 
   for (const lane of ["main", "side"])
-    await check(`${lane}: rewrite, copied files, retry, full restart`, async () => {
+    await check(`${lane}: rewrite, copied files, retry, full restart, deletion`, async () => {
       const agent = await createAgent(`Rewrite ${lane}`);
       let taskId: string | null = null;
       if (lane === "side") {
@@ -414,8 +414,8 @@ try {
       const oldSession = sessionFor(threadId);
       const request = rewriteInput(agent.id, sourceId, `NEW-${lane}-QUESTION`, taskId);
       const [receipt, retry] = await Promise.all([
-        runCauseEffect(service().agents.rewriteMessage(request)),
-        runCauseEffect(service().agents.rewriteMessage(request)),
+        runCauseEffect(service().agents.rewriteMessage(request, undefined, "host")),
+        runCauseEffect(service().agents.rewriteMessage(request, undefined, "host")),
       ]);
       assert.deepEqual(retry, receipt);
       const newId = receipt.deliveries[0]?.id;
@@ -457,7 +457,7 @@ try {
       await restart();
       assertAbsent(agent.id, threadId, suffixIds, suffixTurns);
       assert.deepEqual(archives(threadId), archive);
-      const restoredRetry = await runCauseEffect(service().agents.rewriteMessage(request));
+      const restoredRetry = await runCauseEffect(service().agents.rewriteMessage(request, undefined, "host"));
       assert.equal(restoredRetry.messageId, receipt.messageId);
       assert.deepEqual(
         restoredRetry.deliveries.map((delivery) => delivery.id),
@@ -477,6 +477,39 @@ try {
       );
       assert.deepEqual(await bytes(rewritten.attachments[0].id), sourceAttachment);
       assert.deepEqual(await bytes(rewritten.voiceRecording.id), sourceVoice);
+      const attachmentIds = [
+        source.attachments[0].id,
+        source.voiceRecording.id,
+        rewritten.attachments[0].id,
+        rewritten.voiceRecording.id,
+      ];
+      const attachmentPaths: string[] = [];
+      for (const id of attachmentIds) {
+        const file = await runCauseEffect(service().mailbox.resolveAttachment(id));
+        assert.ok(file && existsSync(file.path));
+        attachmentPaths.push(file.path);
+      }
+      const connection = service().database.connection;
+      assert.ok(archives(threadId).length > 0, "The thread must retain history before deletion.");
+      if (taskId) await runCauseEffect(service().agents.deleteTask({ agentId: agent.id, taskId }));
+      else await runCauseEffect(service().agents.deleteAgent(agent.id));
+      assert.deepEqual(archives(threadId), [], "Deleting the thread left its rewound history behind.");
+      assert.deepEqual(
+        connection.prepare("SELECT message_id FROM projection_thread_messages WHERE thread_id = ?").all(threadId),
+        [],
+      );
+      assert.deepEqual(
+        connection
+          .prepare(
+            "SELECT attachment_id FROM projection_attachments WHERE owner_kind = 'thread-message' AND owner_id >= ? AND owner_id < ?",
+          )
+          .all(`${threadId}:`, `${threadId};`),
+        [],
+        "Deleting the thread left its attachment references behind.",
+      );
+      for (const id of attachmentIds) assert.equal(await runCauseEffect(service().mailbox.resolveAttachment(id)), null);
+      for (const path of attachmentPaths)
+        assert.equal(existsSync(path), false, "Deleting the thread left a file behind.");
       return {
         threadId,
         oldSession,
@@ -488,6 +521,7 @@ try {
         voiceBytes: sourceVoice.length,
         idempotentDelivery: newId,
         followedUpAfterCompletedBackfill: true,
+        retainedHistoryAndAttachmentReferencesDeleted: true,
       };
     });
 
@@ -589,7 +623,19 @@ try {
         .some((entry) => entry.text?.includes("RECOVERY-NEW-QUESTION")),
     );
     let atFirstTurn: { sourceAbsent: boolean; archiveCount: number } | undefined;
+    let sessionRetiredBeforeRewind = false;
     await restart(({ agents, database }) => {
+      const rewind = database.rewindConversation.bind(database);
+      database.rewindConversation = (...args) => {
+        database.rewindConversation = rewind;
+        assert.equal(
+          database.activeProviderSession(threadId, "codex"),
+          null,
+          "Recovery cut active history before retiring the old provider session.",
+        );
+        sessionRetiredBeforeRewind = true;
+        return rewind(...args);
+      };
       agents.on("event", (event) => {
         if (event.type !== "turn-started" || event.agentId !== agent.id) return;
         atFirstTurn = {
@@ -606,6 +652,7 @@ try {
     });
     // Recovery must have cut the suffix when initialize returns, even if the new turn has not run yet.
     assertAbsent(agent.id, threadId, suffix);
+    assert.equal(sessionRetiredBeforeRewind, true);
     const archive = archives(threadId);
     assert.equal(archive.length, 1);
     for (const message of before.messages) assert.ok(archive[0]?.includes(message.id));
@@ -678,7 +725,7 @@ try {
     const logStart = entries().length;
     control({ holdUnsubscribeThread: oldSession });
     const rewrite = runCauseEffect(
-      service().agents.rewriteMessage(rewriteInput(agent.id, source, "RACE-NEW-QUESTION")),
+      service().agents.rewriteMessage(rewriteInput(agent.id, source, "RACE-NEW-QUESTION"), undefined, "host"),
     );
     rewrite.catch(() => {});
     let routineRun: Promise<Awaited<ReturnType<typeof runRoutine>>> | undefined;
@@ -767,6 +814,12 @@ try {
         rewriteInput(agent.id, source, "HOST-MUST-NOT-REWRITE-ANOTHER-MEMBER", taskId),
         /own|member|sender|person|author|自己的|成员/i,
         other,
+        "host",
+      );
+      await rejected(
+        rewriteInput(agent.id, source, "SIGNED-OUT-HOST-MUST-NOT-REWRITE-ANOTHER-MEMBER", taskId),
+        /own|member|sender|person|author|自己的|成员/i,
+        undefined,
         "host",
       );
       const receipt = await runCauseEffect(
