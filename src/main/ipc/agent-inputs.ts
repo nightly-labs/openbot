@@ -988,6 +988,7 @@ export function parseReorderQueue(value: unknown): ReorderQueueInput {
   return {
     agentId: requireString(value.agentId, "agentId"),
     deliveryIds: parseIdentifierList(value.deliveryIds, "delivery ids", INPUT_LIMITS.queueReorder),
+    ...(value.taskId === undefined ? {} : { taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier) }),
   };
 }
 

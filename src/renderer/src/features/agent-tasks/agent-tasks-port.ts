@@ -29,6 +29,11 @@ export interface AgentTasksPort
   branchTask?: OpenBotDesktopApi["agent"]["branchTask"];
   /** Deletes one message of a thread. Missing where the server cannot delete messages. */
   deleteTaskMessage?: ((input: { agentId: string; taskId: string; messageId: string }) => Promise<void>) | undefined;
+  /**
+   * The actions of a thread's queue. Missing where the server sends no queue of a thread: only this
+   * computer does, `agent-tasks-v1` sends the start of each message alone.
+   */
+  queue?: Pick<OpenBotDesktopApi["agent"], "cancelQueuedMessage" | "steerQueuedMessage" | "reorderQueue"> | undefined;
 }
 
 /**
@@ -52,5 +57,10 @@ export function agentTasksPort(): AgentTasksPort {
     deleteTask: (input, serverId) => agent.deleteTask(input, serverId),
     deleteTaskMessage: (input) => agent.deleteConversationMessage(input),
     markTaskRead: (input) => agent.markTaskRead(input),
+    queue: {
+      cancelQueuedMessage: (input) => agent.cancelQueuedMessage(input),
+      steerQueuedMessage: (input) => agent.steerQueuedMessage(input),
+      reorderQueue: (input) => agent.reorderQueue(input),
+    },
   };
 }

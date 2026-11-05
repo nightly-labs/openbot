@@ -207,6 +207,23 @@ export class QueueControls {
       return yield* new QueueOperationFailed({
         cause: new Error(sourceText("error.backend.useChannelTaskControlsWork")),
       });
+    // A side thread orders only its own messages. They take the places that they hold now in the
+    // whole queued order, so the other work of the agent does not move. A message that an editor
+    // holds is not in the order the panel sends, and keeps its place.
+    const { taskId } = input;
+    if (taskId !== undefined) {
+      const thread = new Set(this.#mailbox.laneQueuedIds(input.agentId, taskId));
+      const moved = new Set(input.deliveryIds);
+      if (input.deliveryIds.some((id) => !thread.has(id)))
+        return yield* new QueueOperationFailed({ cause: new Error(sourceText("error.backend.queueOrderStale")) });
+      let next = 0;
+      const order = this.#mailbox
+        .queuedDeliveryIds(input.agentId)
+        .map((id) => (moved.has(id) ? (input.deliveryIds[next++] ?? id) : id));
+      yield* this.#mailbox.reorderQueue(input.agentId, order).pipe(toQueueOperationFailed);
+      this.#mailboxSync.emitQueue(input.agentId);
+      return;
+    }
     // The queue the user reads holds no channel or messaging work, so the order it sends names the
     // normal messages alone, and the mailbox reads the whole queued order. That work stays at the
     // head: it reserved the agent before these messages arrived.

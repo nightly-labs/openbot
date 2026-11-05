@@ -47,6 +47,7 @@ export function ConversationThread() {
     installedSkillsLoadFailed,
     mcpServers,
     threadComposer,
+    threadQueue,
     threadFocusRequest,
     threadVoiceLiveText,
     threadVoiceOwned,
@@ -282,7 +283,13 @@ export function ConversationThread() {
             onSideQuestion={askSideQuestion()}
             voice={voice()}
             focusRequest={focusRequest()}
-            onSend={(text) => threadComposer.send(current().threads, text)}
+            onSend={(text) => {
+              // While a queued message is in the message box, Send saves it in its place.
+              const key = threadComposer.openDraftKey();
+              return key && threadQueue.editOf(current().threads.open?.id)
+                ? threadQueue.save(key)
+                : threadComposer.send(current().threads, text);
+            }}
             onStop={() => current().threads.onStop()}
             onOpenLink={(url) => void openExternalMessageUrl(url)}
             onPreview={(attachment) => void previewAttachment(attachment)}
@@ -314,6 +321,7 @@ export function ConversationThread() {
             onReply={reply(current().threads)}
             replyTo={replyTo()}
             onCancelReply={() => threadComposer.setReply(threadComposer.openDraftKey(), null)}
+            queue={threadQueue.view(current().threads.open, threadComposer.openDraftKey())}
           />
         </>
       )}

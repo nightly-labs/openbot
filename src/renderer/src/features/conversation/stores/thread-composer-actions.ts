@@ -27,6 +27,10 @@ export interface ThreadComposerActionsDeps {
   setThreadDrafts: (update: (current: Drafts) => Drafts) => void;
   pastePreviews: () => readonly PastePreview[];
   setPastePreviews: (update: (current: readonly PastePreview[]) => readonly PastePreview[]) => void;
+  /** A pending Save of a queue edit owns the draft, so the draft does not change. */
+  draftLocked?: ((key: string) => boolean) | undefined;
+  /** A file that a queue edit still needs, such as one of the queued message. It is not deleted. */
+  keepsAttachment?: ((id: string) => boolean) | undefined;
 }
 
 /**
@@ -73,6 +77,7 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
 
   /** An empty draft leaves the list, so the stored drafts keep only the boxes with content. */
   function updateDraft(key: string, update: (draft: ComposerDraft) => ComposerDraft): void {
+    if (deps.draftLocked?.(key)) return;
     deps.setThreadDrafts((current) => {
       const next = update(current[key] ?? EMPTY_DRAFT);
       if (next.text || next.attachments.length > 0 || next.replyToMessageId) return { ...current, [key]: next };
@@ -84,7 +89,8 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
 
   function discard(attachments: readonly DraftAttachment[], serverId: string): void {
     for (const attachment of attachments)
-      void conversationRuntime(deps.props).agent.discardDraftAttachment(attachment.id, serverId);
+      if (!deps.keepsAttachment?.(attachment.id))
+        void conversationRuntime(deps.props).agent.discardDraftAttachment(attachment.id, serverId);
   }
 
   // Each file of a drop is its own import, and all of them start in one task: one toast is enough.
