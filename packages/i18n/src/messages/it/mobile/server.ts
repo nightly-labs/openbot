@@ -880,6 +880,8 @@ export const messages = {
   "mobile.server.providers.copy": "Copia",
   "mobile.server.providers.copyCode": "Copia codice",
   "mobile.server.providers.paste": "Incolla",
+  "mobile.server.providers.codeStepChatgpt":
+    "In ChatGPT su un computer, apri le impostazioni di sicurezza e attiva l’accesso con codice dispositivo per Codex. Per un account di lavoro, lo attiva l’amministratore del workspace.",
   "mobile.server.providers.codeStepCopy": "Copia il codice.",
   "mobile.server.providers.codeStepEnter": "Apri la pagina di accesso e inserisci il codice.",
   "mobile.server.providers.codeStepReturn": "Torna su OpenBot. L'accesso termina da solo.",

@@ -1002,6 +1002,8 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.providers.copy": "Copy",
   "mobile.server.providers.copyCode": "Copy code",
   "mobile.server.providers.paste": "Paste",
+  "mobile.server.providers.codeStepChatgpt":
+    "In ChatGPT on a computer, open the security settings and turn on device code sign-in for Codex. For a work account, your workspace admin turns it on.",
   "mobile.server.providers.codeStepCopy": "Copy the code.",
   "mobile.server.providers.codeStepEnter": "Open the sign-in page and enter the code.",
   "mobile.server.providers.codeStepReturn": "Come back to OpenBot. The sign-in finishes by itself.",
