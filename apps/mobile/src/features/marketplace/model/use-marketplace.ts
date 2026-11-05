@@ -89,9 +89,11 @@ export function useMarketplaceCatalog({
     ...(category ? { category } : {}),
   };
   // A page at a time, as the desktop: the next page loads only when the user asks for more.
+  const showAgents = filter.kind === null || filter.kind === "agent";
+  const showSkills = filter.kind === null || filter.kind === "skill";
   const agents = useInfiniteQuery({
     queryKey: queryKeys.marketplace(apiUrl, "agents", search, category),
-    enabled: apiUrl !== null && (filter.kind === null || filter.kind === "agent"),
+    enabled: apiUrl !== null && showAgents,
     staleTime: CATALOG_FRESH_MS,
     initialPageParam: "",
     queryFn: ({ pageParam, signal }) =>
@@ -100,7 +102,7 @@ export function useMarketplaceCatalog({
   });
   const skills = useInfiniteQuery({
     queryKey: queryKeys.marketplace(apiUrl, "skills", search, category),
-    enabled: apiUrl !== null && (filter.kind === null || filter.kind === "skill"),
+    enabled: apiUrl !== null && showSkills,
     staleTime: CATALOG_FRESH_MS,
     initialPageParam: "",
     queryFn: ({ pageParam, signal }) =>
@@ -119,8 +121,9 @@ export function useMarketplaceCatalog({
     (agents.isPending && agents.fetchStatus !== "idle") || (skills.isPending && skills.fetchStatus !== "idle");
   const { fetchNextPage: moreAgents } = agents;
   const { fetchNextPage: moreSkills } = skills;
-  const agentsMore = agents.hasNextPage && filter.kind !== "skill";
-  const skillsMore = skills.hasNextPage && filter.kind !== "agent";
+  // A disabled query keeps its cached pages, so the Apps list must not offer them.
+  const agentsMore = showAgents && agents.hasNextPage;
+  const skillsMore = showSkills && skills.hasNextPage;
   return {
     listings,
     /** The debounced search, which the listings match. */
@@ -136,7 +139,7 @@ export function useMarketplaceCatalog({
     hasMore: agentsMore || skillsMore,
     loadingMore: agents.isFetchingNextPage || skills.isFetchingNextPage,
     /** The last "Load more" failed. The listings keep the pages read before it. */
-    loadMoreFailed: agents.isFetchNextPageError || skills.isFetchNextPageError,
+    loadMoreFailed: (showAgents && agents.isFetchNextPageError) || (showSkills && skills.isFetchNextPageError),
     loadMore: () => Promise.all([agentsMore ? moreAgents() : null, skillsMore ? moreSkills() : null]),
   };
 }
