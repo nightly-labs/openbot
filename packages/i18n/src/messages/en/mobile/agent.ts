@@ -509,6 +509,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.list.openPinned": "Open pinned chat with {name}",
   "mobile.agent.list.openPinnedWithTitle": "Open pinned chat with {name}, {title}",
   "mobile.agent.list.withState": "{label}. {state}",
+  "mobile.agent.list.unread": { one: "{count} unread message", other: "{count} unread messages" },
   "mobile.agent.list.waiting.title": "Needs you",
   "mobile.agent.list.waiting.label": { one: "Needs you, {count} agent", other: "Needs you, {count} agents" },
   "mobile.agent.list.waiting.action.question": "Answer",

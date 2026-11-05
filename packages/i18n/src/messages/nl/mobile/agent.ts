@@ -521,6 +521,7 @@ export const messages = {
   "mobile.agent.list.openPinned": "Open vastgezette chat met {name}",
   "mobile.agent.list.openPinnedWithTitle": "Open vastgezette chat met {name}, {title}",
   "mobile.agent.list.withState": "{label}. {state}",
+  "mobile.agent.list.unread": { one: "{count} ongelezen bericht", other: "{count} ongelezen berichten" },
   "mobile.agent.list.waiting.title": "Wacht op jou",
   "mobile.agent.list.waiting.label": {
     one: "Wacht op jou, {count} agent",

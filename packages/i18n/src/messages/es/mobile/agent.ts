@@ -519,6 +519,7 @@ export const messages = {
   "mobile.agent.list.openPinned": "Abrir el chat fijado con {name}",
   "mobile.agent.list.openPinnedWithTitle": "Abrir el chat fijado con {name}, {title}",
   "mobile.agent.list.withState": "{label}. {state}",
+  "mobile.agent.list.unread": { one: "{count} mensaje sin leer", other: "{count} mensajes sin leer" },
   "mobile.agent.list.waiting.title": "Te necesita",
   "mobile.agent.list.waiting.label": { one: "Te necesita, {count} agente", other: "Te necesitan, {count} agentes" },
   "mobile.agent.list.waiting.action.question": "Responder",

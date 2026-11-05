@@ -513,6 +513,7 @@ export const messages = {
   "mobile.agent.list.openPinned": "{name}과(와) 고정된 채팅 열기",
   "mobile.agent.list.openPinnedWithTitle": "{name}과(와) 고정된 채팅 열기, {title}",
   "mobile.agent.list.withState": "{label}. {state}",
+  "mobile.agent.list.unread": { other: "읽지 않은 메시지 {count}개" },
   "mobile.agent.list.waiting.title": "확인 필요",
   "mobile.agent.list.waiting.label": { other: "확인 필요, 에이전트 {count}개" },
   "mobile.agent.list.waiting.action.question": "답변",

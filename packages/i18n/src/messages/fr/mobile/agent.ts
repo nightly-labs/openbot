@@ -532,6 +532,7 @@ export const messages = {
   "mobile.agent.list.openPinned": "Ouvrir la discussion épinglée avec {name}",
   "mobile.agent.list.openPinnedWithTitle": "Ouvrir la discussion épinglée avec {name}, {title}",
   "mobile.agent.list.withState": "{label}. {state}",
+  "mobile.agent.list.unread": { one: "{count} message non lu", other: "{count} messages non lus" },
   "mobile.agent.list.waiting.title": "Besoin de vous",
   "mobile.agent.list.waiting.label": { one: "Besoin de vous, {count} agent", other: "Besoin de vous, {count} agents" },
   "mobile.agent.list.waiting.action.question": "Répondre",

@@ -15,6 +15,8 @@ export interface LiveWorkspaceState {
   unreadAgentIds: string[];
   /** The unread message count of each agent, from the host read state. `unreadAgentIds` decides which count. */
   unreadCounts: Record<string, number>;
+  /** The first unread message of each agent chat, from the host read state. */
+  firstUnreadMessageIds: Record<string, string | null>;
   browserRequests: Record<string, BrowserTakeoverRequest[]>;
   /** The host's browser tabs, by server. Absent for a host that serves no live view. */
   browserTabs: Record<string, MobileBrowserTabs>;
@@ -32,6 +34,7 @@ export class LiveWorkspaceStore {
     turnLinesByServer: {},
     unreadAgentIds: [],
     unreadCounts: {},
+    firstUnreadMessageIds: {},
     browserRequests: {},
     browserTabs: {},
     approvalRequests: {},
