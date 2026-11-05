@@ -246,20 +246,22 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     return completed;
   };
   // The browser pane closes with its last tab. A switch to an agent with no tabs closes nothing.
-  let previousBrowserTabs: { agentId: string | undefined; count: number } = { agentId: undefined, count: 0 };
+  let previousBrowserTabs: { owner: string; count: number } = { owner: "", count: 0 };
   createEffect(
     () => ({
-      agentId: deps.props.agent?.id,
+      owner: `${deps.props.server?.id ?? "local"}:${deps.props.agent?.id ?? ""}`,
       count: browserTabs().length,
       enabled: deps.props.browserEnabled !== false,
     }),
-    ({ agentId, count, enabled }) => {
-      if (!enabled) return;
+    ({ owner, count, enabled }) => {
+      const previous = previousBrowserTabs;
+      previousBrowserTabs = { owner, count };
+      if (!enabled || previous.owner !== owner || previous.count === 0 || count > 0) return;
       // Untracked: the close reads the side panel and writes the panel mode, which must not run this effect again.
-      const lastTabClosed =
-        untrack(screenOpen) && previousBrowserTabs.agentId === agentId && previousBrowserTabs.count > 0 && count === 0;
-      previousBrowserTabs = { agentId, count };
-      if (lastTabClosed) untrack(deps.panels.closeBrowserPane);
+      // The mode, not `screenOpen`: a tab can close while a dialog suspends the browser view.
+      const mode = untrack(deps.panels.activeRightPanel);
+      if (mode === "browser" || mode === "browser-expanded" || mode === "browser-pip")
+        untrack(deps.panels.closeBrowserPane);
     },
   );
 
