@@ -12,6 +12,7 @@ import { secretElicitationField } from "./agent/prompts";
 import { type AgentClient, type DiagnosticOrigin, MissingPiSessionError, RequestTimeoutError } from "./agent-client";
 import { type AgentCliInfo, cliPathEnvironment, cliSpawnTarget } from "./cli";
 import { runCauseEffect } from "./effect-boundary";
+import { encodedModelId, providerModelValue } from "./encoded-model-id";
 import { isMissingFileError } from "./file-errors";
 import { type DynamicToolNamespace, LocalMcpBridge, type LocalMcpSession } from "./local-mcp-bridge";
 import {
@@ -409,7 +410,9 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
             const preferred = thinkingLevel === "off" ? "none" : thinkingLevel;
             const defaultLevel = preferred && levels.includes(preferred) ? preferred : levels[0];
             models.push({
-              model: keyProvider ? id : `${provider}/${id}`,
+              // Pi takes any id, and Cloudflare Workers AI ids such as `@cf/moonshotai/kimi-k2.6`
+              // have an `@` that the contract charset refuses (#5079).
+              model: encodedModelId(keyProvider ? "" : `${provider}/`, id),
               displayName: getString(model, "name") ?? id,
               // A model without reasoning has no level. The catalog then gives it the `medium` of every
               // model that cannot change its effort.
@@ -633,14 +636,14 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
   ) {
     const model = getString(params, "model");
     if (model && this.provider !== "pi") {
-      yield* thread.rpc.request({ type: "set_model", provider: this.provider, modelId: model });
+      yield* thread.rpc.request({ type: "set_model", provider: this.provider, modelId: providerModelValue(model) });
     } else if (model) {
       const separator = model.indexOf("/");
       if (separator < 1) return yield* providerFailure(new Error(sourceText("error.provider.piModelInvalid")));
       yield* thread.rpc.request({
         type: "set_model",
         provider: model.slice(0, separator),
-        modelId: model.slice(separator + 1),
+        modelId: providerModelValue(model.slice(separator + 1)),
       });
     }
     const effort = getString(params, "effort") ?? getString(params, "reasoningEffort");
