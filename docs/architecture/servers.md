@@ -1141,7 +1141,8 @@ the server as a joined server with `thisComputer: true`. `kind` stays `"remote"`
   and is never logged.
 - **Delete.** The desktop stops the child, removes the entry, and moves both folders to the trash
   with `shell.trashItem`. It never deletes them.
-- **Rename.** The `host-admin` identity route, as on any joined server that the user owns.
+- **Rename.** The `host-admin` identity route, as on any joined server that the user owns. The child has
+  no account session, so it skips the account owner check and the account steps (`passwordOwner`) (#5092).
 - **Account.** While the desktop app is signed in, `LocalServers` registers each running server for
   the account (`centralAuth.registerRemoteHost`), with the child's key, its name, and its owner member
   as the owner membership. The ready line carries that member id. The desktop app keeps the machine

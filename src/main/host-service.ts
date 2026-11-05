@@ -814,7 +814,11 @@ export class HostService extends EventEmitter<HostEvents> {
     function* (this: HostService, input: UpdateHostIdentityInput): Effect.fn.Return<HostStatus, RemoteWorkflowError> {
       const optionalRegisterRemoteHost = this.#options.registerRemoteHost;
       const optionalUpdateRemoteHostLogo = this.#options.updateRemoteHostLogo;
-      yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
+      // A server on this computer has no account session (#5092). Only the desktop app knows its
+      // owner password, and the Team API route already required an admin.
+      const passwordOwner = this.#options.passwordOwner === true;
+      if (!passwordOwner)
+        yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
       const identity = yield* this.#options.store.updateIdentity(input);
       // Before anything is published: the store checked the account before it resolved, and a
       // switch landing in this gap would show the previous account's name and logo.
@@ -825,6 +829,8 @@ export class HostService extends EventEmitter<HostEvents> {
         message: sourceText("status.host.identityUpdated"),
       });
       this.#api.refreshIdentity();
+      // The desktop app registers it for the account at each start, with the name of that start.
+      if (passwordOwner) return this.getStatus();
       const ownerMembershipId = yield* remoteDecode(() => this.#requiredOwnerMemberId());
       if (optionalRegisterRemoteHost) yield* this.#registerRemoteHost(optionalRegisterRemoteHost, ownerMembershipId);
       if (input.logo !== undefined && this.#isActiveHost(identity.serverId)) {
