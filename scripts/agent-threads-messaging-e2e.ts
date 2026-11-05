@@ -714,7 +714,9 @@ try {
   await step("question back without replyToMessageId", async (details) => {
     const word = `M14${run}`;
     const question = (m: ConversationMessage) => m.senderAgentId === to && m.text.includes(`Q14${run}`);
-    const answer = (m: ConversationMessage) => m.senderAgentId === to && m.text.includes("11");
+    // The run id can hold "11", so the answer is a message from B without the question's marker.
+    const answer = (m: ConversationMessage) =>
+      m.senderAgentId === to && !question(m) && m.text.replaceAll(run, "").includes("11");
     const questionsBefore = count(await bridge.main(from), question);
     const answersBefore = count(await bridge.main(from), answer);
     const side = await bridge.startTask(
@@ -729,13 +731,16 @@ try {
       ].join("\n"),
     );
     details.taskId = side.id;
-    await waitFor(
+    const asked = await waitFor(
       page,
       "the question comes to the side thread",
       () => bridge.side(from, side.id),
       (s) => has(s, question),
       TURN_MS,
     );
+    // With a reply id, the old path routes the question, and the step would not check the fix.
+    details.questionReplyTo = asked.messages.find(question)?.replyToMessageId ?? null;
+    assert.equal(details.questionReplyTo, null, "B sent the question with replyToMessageId.");
     await waitFor(
       page,
       "the answer comes to the side thread",

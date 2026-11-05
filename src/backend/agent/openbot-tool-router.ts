@@ -2072,15 +2072,14 @@ export class OpenBotToolRouter {
       // such as a question back, goes to the thread of the requests from its recipient that this turn
       // works on, when they all came from that one thread (#5093). Otherwise it goes to the own chat,
       // and the automatic result does not follow, so the thread would wait without an answer.
+      // `answerTaskId` routes a message to one recipient only.
       const answeredRequestIds = replyTo
         ? [replyTo]
-        : recipientValues.length === 1
-          ? turnDeliveries
-              .filter(
-                ({ delivery }) => delivery.sender.kind === "agent" && delivery.sender.agentId === recipientValues[0],
-              )
-              .map(({ delivery }) => delivery.messageId)
-          : [];
+        : turnDeliveries
+            .filter(
+              ({ delivery }) => delivery.sender.kind === "agent" && delivery.sender.agentId === recipientValues[0],
+            )
+            .map(({ delivery }) => delivery.messageId);
       const answerTaskIds = new Set(
         answeredRequestIds.map((requestId) => this.#mailbox.answerTaskId(senderAgentId, requestId, recipientValues)),
       );
