@@ -328,6 +328,7 @@ export const messages = {
   "routine.settings.missedPolicy": "Si OpenBot était fermé à l’heure prévue",
   "routine.settings.missedPolicy.skip": "Ignorer cette exécution",
   "routine.settings.missedPolicy.runOnce": "Exécuter une fois à l’ouverture d’OpenBot",
+  "routine.settings.runInThread": "Exécuter dans un fil séparé",
   "routine.settings.resultDestination": "Envoyer les réponses à",
   "routine.settings.resultDestination.none": "Seulement cette discussion",
   "routine.settings.resultDestination.place": "{connection} · {place}",

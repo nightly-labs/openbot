@@ -18,6 +18,7 @@ import {
   isRoutineSchedule,
   ROUTINE_LIMIT_POLICIES,
   ROUTINE_MISSED_POLICIES,
+  ROUTINE_RUN_PLACES,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Result, Schema } from "effect";
@@ -45,6 +46,7 @@ const Routine = Schema.Struct({
   schedule: guarded(isRoutineSchedule),
   limitPolicy: Schema.optionalKey(Schema.Literals(ROUTINE_LIMIT_POLICIES)),
   missedPolicy: Schema.optionalKey(Schema.Literals(ROUTINE_MISSED_POLICIES)),
+  runIn: Schema.optionalKey(Schema.Literals(ROUTINE_RUN_PLACES)),
 });
 
 const Memory = Schema.Struct({

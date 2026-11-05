@@ -1,5 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { ROUTINE_LIMIT_POLICIES, ROUTINE_MISSED_POLICIES } from "@openbot/contracts/ipc";
+import { ROUTINE_LIMIT_POLICIES, ROUTINE_MISSED_POLICIES, ROUTINE_RUN_PLACES } from "@openbot/contracts/ipc";
 import { z } from "zod";
 import { WEBHOOK_EVENT_TYPE_MAX_LENGTH, WEBHOOK_FILTERS_LIMIT } from "./webhook-trigger";
 
@@ -85,6 +85,12 @@ export const routineMissedPolicyZodSchema = z
   .enum(ROUTINE_MISSED_POLICIES)
   .describe(
     "What the routine does with occurrences that came due while OpenBot or its server was off: skip records and drops them, run-once runs the newest one when OpenBot starts and records the others. When a routine is created with no value, a one-time schedule uses run-once and other schedules use skip. An update with no value keeps the saved policy.",
+  );
+
+export const routineRunPlaceZodSchema = z
+  .enum(ROUTINE_RUN_PLACES)
+  .describe(
+    "Where each run posts its work: chat is the agent's own chat, thread is the routine's own side thread, which the user opens from the run message. New routines use chat. Use thread only when the user asks to keep the runs out of the chat. An update with no value keeps the saved place.",
   );
 
 export const webhookEventTypeZodSchema = z

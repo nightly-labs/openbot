@@ -426,6 +426,11 @@ const V33_ROUTINE_RUN_MISSED_COLUMNS_SQL = [
 // the migration 33 columns, before the UNIQUE constraint.
 const V35_ROUTINE_RUN_SOURCE_COLUMN_SQL = `run_source TEXT CHECK(run_source IS NULL OR run_source IN ('test', 'script', 'webhook'))`;
 
+// Migration 56 adds where the runs of an agent routine run: in the agent's chat, or in the routine's own
+// thread. Frozen with the migration. Every existing routine gets 'chat', as before 0.61. Channel routines
+// run in their channel and have no such column. ADD COLUMN puts it after the migration 33 column.
+const V56_AGENT_ROUTINE_RUN_IN_COLUMN_SQL = `run_in TEXT NOT NULL DEFAULT 'chat' CHECK(run_in IN ('chat', 'thread'))`;
+
 // Migration 40 stores the shown-order keys of each thread message, so a page reads an index range rather
 // than sorting the whole thread (#2226). Frozen with the migration; `database/thread-message-order.ts`
 // keeps them current, and every write to the table must call it. No default: a key of 0 or '' would look
@@ -586,7 +591,7 @@ const LATEST_SCHEMA_SQL =
         V28_PROVIDER_SESSIONS_COLUMN_SQL,
       ),
       BASELINE_AGENT_ROUTINES_END_SQL,
-      withRoutinePolicies(BASELINE_AGENT_ROUTINES_END_SQL),
+      withAgentRoutineRunPlace(withRoutinePolicies(BASELINE_AGENT_ROUTINES_END_SQL)),
     ),
     BASELINE_ROUTINE_RUNS_END_SQL,
     withRunAddedColumns(BASELINE_ROUTINE_RUNS_END_SQL),
@@ -637,6 +642,14 @@ function withRoutinePolicies(tableEnd: string): string {
   return tableEnd.replace(
     "last_event_sequence INTEGER NOT NULL\n",
     `last_event_sequence INTEGER NOT NULL,\n    ${V27_ROUTINE_LIMIT_POLICY_COLUMN_SQL},\n    ${V33_ROUTINE_MISSED_POLICY_COLUMN_SQL}\n`,
+  );
+}
+
+/** The end of the agent routine table with the migration 56 column after the migration 33 one. */
+function withAgentRoutineRunPlace(tableEnd: string): string {
+  return tableEnd.replace(
+    `${V33_ROUTINE_MISSED_POLICY_COLUMN_SQL}\n`,
+    `${V33_ROUTINE_MISSED_POLICY_COLUMN_SQL},\n    ${V56_AGENT_ROUTINE_RUN_IN_COLUMN_SQL}\n`,
   );
 }
 
@@ -944,6 +957,12 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     // Only creates a table, so no foreign-key pause and no vacuum. No message was deleted before it,
     // so the table starts empty and no thread loses a message.
     up: (db) => db.exec(DELETED_THREAD_MESSAGES_SCHEMA_SQL),
+  },
+  {
+    version: 56,
+    // Adds one column with a constant default: no rebuild, so no foreign-key pause and no vacuum. Every
+    // existing agent routine gets 'chat', so its runs go back to the agent's chat, as before 0.61.
+    up: addAgentRoutineRunPlace,
   },
 ];
 
@@ -1351,6 +1370,14 @@ function addAgentThreadRoutine(db: DatabaseSync): void {
   if (!columns.some((existing) => isDynamicRecord(existing) && existing.name === "routine_id"))
     db.exec(`ALTER TABLE projection_agent_threads ADD COLUMN ${V54_AGENT_THREAD_ROUTINE_COLUMN_SQL}`);
   db.exec(V54_AGENT_THREAD_ROUTINE_INDEX_SQL);
+}
+
+// Migration 56 adds where the runs of an agent routine run.
+function addAgentRoutineRunPlace(db: DatabaseSync): void {
+  // A development profile that ran this version before it shipped has the column already.
+  const columns = db.prepare("PRAGMA table_info(projection_agent_routines)").all();
+  if (columns.some((existing) => isDynamicRecord(existing) && existing.name === "run_in")) return;
+  db.exec(`ALTER TABLE projection_agent_routines ADD COLUMN ${V56_AGENT_ROUTINE_RUN_IN_COLUMN_SQL}`);
 }
 
 // Migration 28 removes the provider CHECK. It rebuilds the table with no guard: every shipped table has the

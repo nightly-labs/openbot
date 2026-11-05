@@ -51,6 +51,7 @@ import {
   routineInstructionZodSchema,
   routineLimitPolicyZodSchema,
   routineMissedPolicyZodSchema,
+  routineRunPlaceZodSchema,
   routineScheduleZodSchema,
   webhookEventTypeZodSchema,
   webhookFiltersZodSchema,
@@ -499,6 +500,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       timezone: z.string().min(1).max(128).describe("IANA timezone such as Europe/Warsaw.").optional(),
       limitPolicy: routineLimitPolicyZodSchema.optional(),
       missedPolicy: routineMissedPolicyZodSchema.optional(),
+      runIn: routineRunPlaceZodSchema.optional(),
     },
   },
   {
@@ -551,6 +553,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       active: z.boolean().optional(),
       limitPolicy: routineLimitPolicyZodSchema.optional(),
       missedPolicy: routineMissedPolicyZodSchema.optional(),
+      runIn: routineRunPlaceZodSchema.optional(),
     },
   },
   {
