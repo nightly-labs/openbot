@@ -169,7 +169,8 @@
      under border-box sizing and stretches the circle into a pill. */
   padding: 0;
   background: var(--openbot-hover);
-  color: var(--openbot-text-secondary);
+  /* Muted at rest, as the other icon buttons. The send button sets its own color. */
+  color: var(--openbot-text-muted);
   transition:
     background-color var(--openbot-duration-hover) var(--openbot-ease-out),
     color var(--openbot-duration-hover) var(--openbot-ease-out),

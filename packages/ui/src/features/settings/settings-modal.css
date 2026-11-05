@@ -75,6 +75,22 @@
   }
 }
 
+/* The icon of a section is muted at rest, as in menus and on the page rail. It takes the primary text color
+ * with the label on hover and on the open section. The line does not change. */
+.settings-modal-nav-item > svg {
+  color: var(--openbot-text-muted);
+}
+
+.settings-modal-nav-item:is([aria-current], [data-selected]) > svg {
+  color: var(--openbot-text-primary);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .settings-modal-nav-item:hover > svg {
+    color: var(--openbot-text-primary);
+  }
+}
+
 .settings-modal-main {
   position: relative;
   min-width: 0;

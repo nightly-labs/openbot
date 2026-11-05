@@ -228,7 +228,7 @@
   height: var(--openbot-icon-lg);
   flex: 0 0 auto;
   color: var(--openbot-text-secondary);
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .agent-import-picker-copy {
