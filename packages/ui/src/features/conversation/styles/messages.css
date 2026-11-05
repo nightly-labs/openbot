@@ -397,12 +397,13 @@
 
 /*
  * A file icon tile is a clear tint of the file colour. On a chat color that tint would mix with the
- * chat color, so the tile lays it on the plain control and keeps its own colour.
+ * chat color, so the tile lays it on the plain control and keeps its own colour. An audio or video
+ * card keeps its neutral control tile, which takes the tint of the bubble as the other cards do.
  */
 :is(
   .message-entry-user .ui-bubble.message-bubble-colored > .ui-bubble-content,
   .message-entry-agent .ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content
-) :is(.attachment-file-visual, .attachment-reference-visual) {
+) :is(.attachment-file-visual, .attachment-reference-visual):not(.message-attachment[data-media] *) {
   background: linear-gradient(var(--file-reference-soft) 0 0), var(--message-plain-control);
 }
 
