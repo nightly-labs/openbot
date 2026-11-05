@@ -44,12 +44,11 @@ import type {
 } from "../src/main/voice-speech-protocol";
 import { VoiceSpeechService } from "../src/main/voice-speech-service";
 import type {
-  VoiceTranscriptionEngine,
   VoiceTranscriptionHostProcess,
   VoiceTranscriptionRequest,
   VoiceTranscriptionResponse,
 } from "../src/main/voice-transcription-protocol";
-import { VoiceTranscriptionService } from "../src/main/voice-transcription-service";
+import { MODEL_ENGINES, VoiceTranscriptionService } from "../src/main/voice-transcription-service";
 
 const RESOURCES_ROOT = resolve(".openbot-build/voice");
 const RUNTIME = join(RESOURCES_ROOT, "runtime");
@@ -63,13 +62,6 @@ const MODEL_DIRECTORIES: Record<LocalVoiceModelId, string> = {
   "bark-3.0-plus": join(RESOURCES_ROOT, BARK_PLUS_MODEL_DIRECTORY),
   "whisper-turbo": join(RESOURCES_ROOT, WHISPER_TURBO_MODEL_DIRECTORY),
   "cohere-transcribe-03-2026": join(RESOURCES_ROOT, COHERE_TRANSCRIBE_MODEL_DIRECTORY),
-};
-const ENGINES: Record<LocalVoiceModelId, VoiceTranscriptionEngine> = {
-  "parakeet-tdt-0.6b-v3": "nemo-transducer",
-  "parakeet-unified-en-0.6b": "nemo-transducer",
-  "bark-3.0-plus": "nemo-transducer",
-  "whisper-turbo": "whisper",
-  "cohere-transcribe-03-2026": "cohere-transcribe",
 };
 const PCM_FROM_JSON = `data:text/javascript,process.prependListener("message",(m)=>{if(m&&typeof m==="object"&&Array.isArray(m.pcm))m.pcm=Uint8Array.from(m.pcm)});`;
 /** The services stop an idle host after 60 s; the check fails when it waits longer than this. */
@@ -214,7 +206,7 @@ async function benchTranscription(
       id: id++,
       addonPath: join(RUNTIME, VOICE_RUNTIME_ADDON),
       modelDirectory: MODEL_DIRECTORIES[modelId],
-      engine: ENGINES[modelId],
+      engine: MODEL_ENGINES[modelId],
       language: "",
       leadingSilenceSamples: 0,
       numThreads,
@@ -326,7 +318,7 @@ function exitAfterReply(exit: Promise<void>): Promise<number> {
 }
 
 /** Uses the real services: each must stop its host when no request comes for its idle time. */
-async function checkIdleStop(temporary: string, clip: Uint8Array, speech: boolean) {
+async function checkIdleStop(modelId: LocalVoiceModelId, temporary: string, clip: Uint8Array, speech: boolean) {
   const exits: { transcription?: Promise<void>; speech?: Promise<void> } = {};
   const transcriptionService = new VoiceTranscriptionService({
     resourcesRoot: RESOURCES_ROOT,
@@ -377,9 +369,7 @@ async function checkIdleStop(temporary: string, clip: Uint8Array, speech: boolea
     },
   });
   try {
-    await Effect.runPromise(
-      transcriptionService.setSettings({ modelId: "parakeet-tdt-0.6b-v3", language: "automatic" }),
-    );
+    await Effect.runPromise(transcriptionService.setSettings({ modelId, language: "automatic" }));
     const { text } = await Effect.runPromise(transcriptionService.transcribe(wav(clip)));
     if (!exits.transcription) throw new Error("The transcription service started no host.");
     const checks = [exitAfterReply(exits.transcription)];
@@ -403,13 +393,18 @@ async function main(): Promise<void> {
   if (!threads.every((count) => Number.isInteger(count) && count >= 1 && count <= 64))
     throw new Error("--threads takes whole numbers from 1 to 64.");
   const runs = Number(option("runs") ?? "5");
+  if (!Number.isInteger(runs) || runs < 1) throw new Error("--runs takes a whole number of 1 or more.");
   const modelIds = (option("models") ?? "parakeet-tdt-0.6b-v3").split(",");
   const unknown = modelIds.find((modelId) => !isLocalVoiceModelId(modelId));
   if (unknown) throw new Error(`Not a local dictation model: ${unknown}`);
-  const configs = option("configs")
+  const configNames = option("configs")
     ?.split(",")
-    .map((name) => (name === "default" ? "" : name))
-    .filter((name): name is VoiceSessionConfig => name === "" || name in VOICE_SESSION_CONFIGS);
+    .map((name) => (name === "default" ? "" : name));
+  const unknownConfig = configNames?.find((name) => name !== "" && !(name in VOICE_SESSION_CONFIGS));
+  if (unknownConfig !== undefined) throw new Error(`Not a session settings file: ${unknownConfig}`);
+  const configs = configNames?.filter(
+    (name): name is VoiceSessionConfig => name === "" || name in VOICE_SESSION_CONFIGS,
+  );
   const configsFor = (chosen: VoiceSessionConfig): VoiceSessionConfig[] =>
     configs ?? [...new Set<VoiceSessionConfig>(["", chosen])];
   const speech = !process.argv.includes("--no-speech");
@@ -478,7 +473,9 @@ async function main(): Promise<void> {
     let idleStop: Awaited<ReturnType<typeof checkIdleStop>> | null = null;
     if (idle) {
       logger.info("Waiting for the services to stop the idle hosts…");
-      idleStop = await checkIdleStop(temporary, clips.get("short") ?? new Uint8Array(0), speech);
+      // The first requested model is already downloaded, so the check downloads nothing more.
+      const idleModel = modelIds.find(isLocalVoiceModelId) ?? "parakeet-tdt-0.6b-v3";
+      idleStop = await checkIdleStop(idleModel, temporary, clips.get("short") ?? new Uint8Array(0), speech);
       logger.info(`Idle stop: transcription ${idleStop.transcriptionStopMs} ms, speech ${idleStop.speechStopMs} ms`);
     }
 

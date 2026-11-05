@@ -225,8 +225,8 @@ async function main(): Promise<void> {
   const results: unknown[] = [];
   let failed = false;
   try {
+    // A sample is spoken only when a requested model uses it, so an English run needs no German or Polish voice.
     const audio = new Map<string, Uint8Array>();
-    for (const sample of SAMPLES) audio.set(sample.name, await spokenWav(sample.text, sample.voice, temporary));
     for (const modelId of modelIds.filter(isLocalVoiceModelId)) {
       const supportsLanguage = VOICE_MODELS.find((model) => model.id === modelId)?.supportsLanguage === true;
       const samples = SAMPLES.filter((sample) => supportsLanguage || sample.language === AUTOMATIC_VOICE_LANGUAGE);
@@ -235,8 +235,8 @@ async function main(): Promise<void> {
       if (status.phase !== "ready") throw new Error(`${modelId} is not ready: ${status.phase} ${status.message ?? ""}`);
       const downloadMs = Date.now() - downloadStartedAt;
       for (const sample of samples) {
-        const wavBytes = audio.get(sample.name);
-        if (!wavBytes) throw new Error(`No audio for ${sample.name}.`);
+        const wavBytes = audio.get(sample.name) ?? (await spokenWav(sample.text, sample.voice, temporary));
+        audio.set(sample.name, wavBytes);
         await Effect.runPromise(voice.setSettings({ modelId, language: sample.language }));
         const startedAt = Date.now();
         const { text } = await Effect.runPromise(voice.transcribe(wavBytes));

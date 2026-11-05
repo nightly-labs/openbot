@@ -301,7 +301,7 @@ async function decode(
 ): Promise<string> {
   try {
     const stream = addon.createOfflineStream(recognizer);
-    if (engine === "cohere-transcribe") addon.offlineStreamSetOption(stream, "language", language);
+    if (engine === "cohere-transcribe") addon.offlineStreamSetOption(stream, "language", language || "en");
     addon.acceptWaveformOffline(stream, { samples, sampleRate: SAMPLE_RATE });
     await addon.decodeOfflineStreamAsync(recognizer, stream);
     return resultText(JSON.parse(addon.getOfflineStreamResultAsJson(stream))).trim();

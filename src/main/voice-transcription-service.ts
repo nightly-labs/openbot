@@ -49,7 +49,8 @@ import type {
 const logger = createOpenBotLogger("voice-transcription-service");
 
 const TRANSCRIPTION_TIMEOUT_MS = 180_000;
-const MODEL_ENGINES: Record<LocalVoiceModelId, VoiceTranscriptionEngine> = {
+/** The sherpa-onnx engine of each local model. The bench and smoke scripts use it too. */
+export const MODEL_ENGINES: Record<LocalVoiceModelId, VoiceTranscriptionEngine> = {
   "parakeet-tdt-0.6b-v3": "nemo-transducer",
   "parakeet-unified-en-0.6b": "nemo-transducer",
   "bark-3.0-plus": "nemo-transducer",
