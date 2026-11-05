@@ -550,9 +550,9 @@ export const messages = {
   "settings.voice.language.modelLanguages":
     "Konuştuğunuz dil. Bu model yalnızca bu dilleri bilir ve dili kendisi bulmaz.",
   "settings.voice.language.modelDetects":
-    "Parakeet konuşulan dili kendisi bulur. Bir dil belirlemek için Whisper'ı veya ElevenLabs'i kullanın.",
+    "Parakeet konuşulan dili kendisi bulur. Bir dil belirlemek için Whisper, Cohere veya ElevenLabs kullanın.",
   "settings.voice.language.englishOnly":
-    "Bark yalnızca İngilizceyi tanır. Bir dil belirlemek için Whisper'ı veya ElevenLabs'i kullanın.",
+    "Bark yalnızca İngilizceyi tanır. Bir dil belirlemek için Whisper, Cohere veya ElevenLabs kullanın.",
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "Parakeet Unified yalnızca İngilizceyi tanır. Bir dil belirlemek için Whisper, Cohere veya ElevenLabs kullanın.",
   "settings.voice.language.automatic": "Otomatik",

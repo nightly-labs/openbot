@@ -542,9 +542,9 @@ export const messages = {
   "settings.voice.language.modelLanguages":
     "話す言語です。このモデルはこれらの言語のみに対応し、言語を自動で判別しません。",
   "settings.voice.language.modelDetects":
-    "Parakeet は話している言語を自動で判別します。言語を指定するには Whisper または ElevenLabs を使用してください。",
+    "Parakeet は話している言語を自動で判別します。言語を指定するには Whisper、Cohere または ElevenLabs を使用してください。",
   "settings.voice.language.englishOnly":
-    "Bark は英語のみ認識します。言語を指定するには Whisper または ElevenLabs を使用してください。",
+    "Bark は英語のみ認識します。言語を指定するには Whisper、Cohere または ElevenLabs を使用してください。",
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "Parakeet Unified は英語のみ認識します。言語を指定するには Whisper、Cohere または ElevenLabs を使用してください。",
   "settings.voice.language.automatic": "自動",

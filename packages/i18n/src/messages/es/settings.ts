@@ -556,8 +556,9 @@ export const messages = {
   "settings.voice.language.modelLanguages":
     "El idioma que hablas. Este modelo solo conoce estos idiomas y no detecta el idioma por sí mismo.",
   "settings.voice.language.modelDetects":
-    "Parakeet detecta el idioma hablado por sí mismo. Para fijar un idioma, usa Whisper o ElevenLabs.",
-  "settings.voice.language.englishOnly": "Bark solo reconoce inglés. Para fijar un idioma, usa Whisper o ElevenLabs.",
+    "Parakeet detecta el idioma hablado por sí mismo. Para fijar un idioma, usa Whisper, Cohere o ElevenLabs.",
+  "settings.voice.language.englishOnly":
+    "Bark solo reconoce inglés. Para fijar un idioma, usa Whisper, Cohere o ElevenLabs.",
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "Parakeet Unified solo reconoce inglés. Para fijar un idioma, usa Whisper, Cohere o ElevenLabs.",
   "settings.voice.language.automatic": "Automático",

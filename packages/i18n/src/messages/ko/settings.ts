@@ -530,9 +530,9 @@ export const messages = {
   "settings.voice.language.description": "말하는 언어예요. 자동을 선택하면 녹음에서 언어를 찾아내요.",
   "settings.voice.language.modelLanguages": "말하는 언어예요. 이 모델은 이 언어들만 알고, 언어를 스스로 찾지 않아요.",
   "settings.voice.language.modelDetects":
-    "Parakeet는 말하는 언어를 스스로 찾아내요. 언어를 지정하려면 Whisper나 ElevenLabs를 사용해 주세요.",
+    "Parakeet는 말하는 언어를 스스로 찾아내요. 언어를 지정하려면 Whisper, Cohere 또는 ElevenLabs를 사용해 주세요.",
   "settings.voice.language.englishOnly":
-    "Bark는 영어만 인식해요. 언어를 지정하려면 Whisper나 ElevenLabs를 사용해 주세요.",
+    "Bark는 영어만 인식해요. 언어를 지정하려면 Whisper, Cohere 또는 ElevenLabs를 사용해 주세요.",
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "Parakeet Unified는 영어만 인식해요. 언어를 지정하려면 Whisper, Cohere 또는 ElevenLabs를 사용해 주세요.",
   "settings.voice.language.automatic": "자동",

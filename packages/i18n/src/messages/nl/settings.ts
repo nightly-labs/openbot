@@ -541,9 +541,9 @@ export const messages = {
   "settings.voice.language.modelLanguages":
     "De taal die je spreekt. Dit model kent alleen deze talen en herkent de taal niet zelf.",
   "settings.voice.language.modelDetects":
-    "Parakeet herkent zelf de gesproken taal. Gebruik Whisper of ElevenLabs om een taal in te stellen.",
+    "Parakeet herkent zelf de gesproken taal. Gebruik Whisper, Cohere of ElevenLabs om een taal in te stellen.",
   "settings.voice.language.englishOnly":
-    "Bark herkent alleen Engels. Gebruik Whisper of ElevenLabs om een taal in te stellen.",
+    "Bark herkent alleen Engels. Gebruik Whisper, Cohere of ElevenLabs om een taal in te stellen.",
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "Parakeet Unified herkent alleen Engels. Gebruik Whisper, Cohere of ElevenLabs om een taal in te stellen.",
   "settings.voice.language.automatic": "Automatisch",

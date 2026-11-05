@@ -532,8 +532,9 @@ export const messages = {
   "settings.voice.language.section": "语言",
   "settings.voice.language.description": "你所说的语言。选择自动会从录音中识别。",
   "settings.voice.language.modelLanguages": "你说的语言。此模型只支持这些语言，不会自动识别语言。",
-  "settings.voice.language.modelDetects": "Parakeet 会自动识别语言。若需指定语言，请使用 Whisper 或 ElevenLabs。",
-  "settings.voice.language.englishOnly": "Bark 只能识别英语。要指定语言，请使用 Whisper 或 ElevenLabs。",
+  "settings.voice.language.modelDetects":
+    "Parakeet 会自动识别语言。若需指定语言，请使用 Whisper、Cohere 或 ElevenLabs。",
+  "settings.voice.language.englishOnly": "Bark 只能识别英语。要指定语言，请使用 Whisper、Cohere 或 ElevenLabs。",
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "Parakeet Unified 只能识别英语。要指定语言，请使用 Whisper、Cohere 或 ElevenLabs。",
   "settings.voice.language.automatic": "自动",
