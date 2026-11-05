@@ -21,7 +21,7 @@ export function createAvatarCandidates(seed: string, previous?: AvatarCandidates
   return { namespace, batch, seeds: avatarCandidateSeeds(namespace, seed, batch) };
 }
 
-type AvatarFace = { shape: SupportedAvatarSilhouetteId; expression: ExpressionId };
+export type AvatarFace = { shape: SupportedAvatarSilhouetteId; expression: ExpressionId };
 
 /**
  * The seed that draws `face` in `style`, made as the desktop makes it. The agent's own plush face is

@@ -12,7 +12,7 @@ import { plushGeometry, plushRestFrame } from "./plush-frames";
  * The style of the drawn pictures. Change it when the drawing changes, so that saved pictures are
  * drawn again: the file names and the Live Activity pictures carry it.
  */
-export const PLUSH_STYLE = "plush-1";
+export const PLUSH_STYLE = "plush-2";
 /**
  * Still plush pictures, kept between launches, so a list shows its avatars without drawing them
  * again. `Paths.cache` is `Library/Caches` on iOS, and the system can delete it.

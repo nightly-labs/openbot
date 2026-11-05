@@ -26,7 +26,7 @@ export function SheetFormField({
       <View
         className={
           trailing
-            ? `flex-row items-center rounded-2xl bg-grouped ${appearance === "soft" ? "" : "border border-border"}`
+            ? `flex-row items-center rounded-2xl bg-grouped ${error ? "border border-danger" : appearance === "soft" ? "" : "border border-border"}`
             : "flex-row items-center"
         }
       >

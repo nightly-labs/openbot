@@ -25,8 +25,9 @@ import { Pressable, View } from "react-native";
 import { AgentColorGlow } from "@/features/agents/components/agent-color-glow";
 import { AvatarThumbnail, BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
 import { UsageSegments } from "@/features/agents/components/usage-segments";
-import { avatarSeedForStyledFace, randomAvatarFace } from "@/features/agents/model/avatar-candidates";
+import { type AvatarFace, avatarSeedForStyledFace, randomAvatarFace } from "@/features/agents/model/avatar-candidates";
 import { haptics } from "@/shared/lib/haptics";
+import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import type { AgentPhotoProps } from "./agent-photo";
 
@@ -83,8 +84,6 @@ interface AgentAppearancePickerProps extends AgentPhotoProps {
   onSeedChange: (seed: string) => void;
   onColorChange: (value: AgentColorValue) => void;
 }
-
-type AvatarFace = { shape: SupportedAvatarSilhouetteId; expression: ExpressionId };
 
 /** Columns of each grid, so that the rows are full: 10 shapes, 16 eyes, and 17 colours with Automatic. */
 const SHAPE_COLUMNS = 5;
@@ -146,6 +145,13 @@ export function AgentAppearancePicker({
     },
     [expression, faceKey, selectSeed, shape, style],
   );
+  // Stable handlers let the memoized groups skip the renders of a name change.
+  const selectStyle = useCallback((next: AvatarStyle) => selectFace({ style: next }), [selectFace]);
+  const resetFace = useCallback(() => selectSeed(resetSeed), [resetSeed, selectSeed]);
+  const shuffleFace = useCallback(
+    () => selectFace(randomAvatarFace({ shape, expression })),
+    [expression, selectFace, shape],
+  );
 
   return (
     <View className="gap-5">
@@ -176,7 +182,7 @@ export function AgentAppearancePicker({
       ) : null}
       {showFaces ? (
         <>
-          <AvatarStyleOptions style={style} disabled={disabled} onStyleChange={(next) => selectFace({ style: next })} />
+          <AvatarStyleOptions style={style} disabled={disabled} onStyleChange={selectStyle} />
           <AvatarShapeOptions
             faceKey={faceKey}
             style={style}
@@ -187,24 +193,9 @@ export function AgentAppearancePicker({
             shownColor={targetColor}
             disabled={disabled}
             onSelect={selectFace}
-            actions={
-              <>
-                {seed === resetSeed ? null : (
-                  <HeadingAction
-                    label={t("mobile.agent.appearance.resetFace")}
-                    disabled={disabled}
-                    icon="reset"
-                    onPress={() => selectSeed(resetSeed)}
-                  />
-                )}
-                <HeadingAction
-                  label={t("mobile.agent.appearance.randomFace")}
-                  disabled={disabled}
-                  icon="shuffle"
-                  onPress={() => selectFace(randomAvatarFace({ shape, expression }))}
-                />
-              </>
-            }
+            canReset={seed !== resetSeed}
+            onReset={resetFace}
+            onShuffle={shuffleFace}
           />
           <AvatarEyesOptions
             faceKey={faceKey}
@@ -382,9 +373,29 @@ const AvatarShapeOptions = memo(function AvatarShapeOptions({
   shownColor,
   disabled,
   onSelect,
-  actions,
-}: FaceOptionsProps & { actions: ReactNode }) {
+  canReset,
+  onReset,
+  onShuffle,
+}: FaceOptionsProps & { canReset: boolean; onReset: () => void; onShuffle: () => void }) {
   const { t } = useText();
+  const actions = (
+    <>
+      {canReset ? (
+        <HeadingAction
+          label={t("mobile.agent.appearance.resetFace")}
+          disabled={disabled}
+          icon="reset"
+          onPress={onReset}
+        />
+      ) : null}
+      <HeadingAction
+        label={t("mobile.agent.appearance.randomFace")}
+        disabled={disabled}
+        icon="shuffle"
+        onPress={onShuffle}
+      />
+    </>
+  );
   const seeds = useMemo(
     () =>
       SUPPORTED_AVATAR_SILHOUETTES.map((option) =>
@@ -409,7 +420,14 @@ const AvatarShapeOptions = memo(function AvatarShapeOptions({
             disabled={disabled}
             onPress={() => onSelect({ shape: option })}
           >
-            <AvatarThumbnail seed={seeds[index] ?? faceKey} hue={thumbnailHue} color={color} size={40} />
+            {/* Android redraws each picture in software on every frame of a colour fade. */}
+            <AvatarThumbnail
+              seed={seeds[index] ?? faceKey}
+              hue={thumbnailHue}
+              color={color}
+              size={40}
+              animateColor={!isAndroid}
+            />
           </ChoiceCell>
         ))}
       </View>
@@ -450,7 +468,13 @@ const AvatarEyesOptions = memo(function AvatarEyesOptions({
             disabled={disabled}
             onPress={() => onSelect({ expression: option })}
           >
-            <AvatarThumbnail seed={seeds[index] ?? faceKey} hue={thumbnailHue} color={color} size={30} />
+            <AvatarThumbnail
+              seed={seeds[index] ?? faceKey}
+              hue={thumbnailHue}
+              color={color}
+              size={30}
+              animateColor={!isAndroid}
+            />
           </ChoiceCell>
         ))}
       </View>
