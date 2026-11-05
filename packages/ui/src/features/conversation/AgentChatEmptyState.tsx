@@ -82,9 +82,10 @@ function SampleTurnLoop(props: { agent: AgentProfile; prompt: string; skillName:
   ]);
   const turnLength = () => 2 + steps().length + HOLD_STEPS + 1;
   const [step, setStep] = createSignal(0);
-  // The turn stands where it is while another app has the focus, and plays on when the user is back.
+  // While another app has the focus, the showing plays to its end and the turn then rests until the
+  // user is back. A frame that stops in the showing keeps the working avatar, and it moves all the time.
   createEffect(
-    () => !props.still && documentFocused(),
+    () => !props.still && (documentFocused() || step() % turnLength() !== 0),
     (playing) => {
       if (!playing) return;
       const timer = window.setInterval(() => setStep((value) => value + 1), STEP_MS);

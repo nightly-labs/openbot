@@ -2210,9 +2210,13 @@ export async function createApplicationServices({
   });
   // The rim follows the daemon: it can show nothing while the agents hold no tools, and polling a
   // socket nothing answers would only log failures.
+  /** The rim shows only where the agents share the user's display and the daemon gives them tools. */
+  const startComputerUseHighlight = () => {
+    if (drawsComputerUseHighlight && cuaDriver.mcpServerForProviders()) computerUseHighlight.start();
+  };
   cuaDriver.onMcpServerChanged(() => {
     if (cuaDriver.mcpServerForProviders()) {
-      if (drawsComputerUseHighlight) computerUseHighlight.start();
+      startComputerUseHighlight();
     } else {
       computerUseHighlight.stop();
       // The daemon this connection was opened to is gone, so the socket behind it is too.
@@ -2231,19 +2235,13 @@ export async function createApplicationServices({
   // whether it worked or not.
   const computerUseWarmUp = Effect.runFork(
     cuaDriver.warmUp().pipe(
-      Effect.tap(() =>
-        Effect.sync(() => {
-          if (drawsComputerUseHighlight && cuaDriver.mcpServerForProviders()) computerUseHighlight.start();
-        }),
-      ),
+      Effect.tap(() => Effect.sync(startComputerUseHighlight)),
       Effect.exit,
     ),
   );
   // The poll rests while no turn runs, so each turn wakes it.
   service.on("event", (event) => {
-    if (event.type === "turn-started" && drawsComputerUseHighlight && cuaDriver.mcpServerForProviders()) {
-      computerUseHighlight.start();
-    }
+    if (event.type === "turn-started") startComputerUseHighlight();
   });
   /*
    * Where the decision put the download: onboarding, which is the screen this start is about to
@@ -2983,6 +2981,7 @@ export async function createApplicationServices({
     trace,
     statementTimings,
     tabProcessIds: () => browser.tabProcessIds(),
+    turnRunning: () => service.earliestRunningTurnStartedAt() !== null,
   });
   teardown.push(TEARDOWN_ORDER.resourceMonitor, "the resource monitor", () =>
     Effect.runPromise(resourceMonitor.close()),

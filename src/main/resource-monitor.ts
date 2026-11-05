@@ -76,6 +76,11 @@ export interface ResourceMonitorOptions {
   trace: TraceFile;
   statementTimings: StatementTimings;
   tabProcessIds: () => number[];
+  /**
+   * Whether a turn runs now. The turn count of the samples can keep a turn that ended with no
+   * completion event, so the loop rest asks the turns themselves.
+   */
+  turnRunning: () => boolean;
 }
 
 /** One sample as `resources.ndjson` and the diagnostics export hold it. Group and provider names only. */
@@ -289,9 +294,13 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     if (!this.#closed && this.#loop.enable()) this.#loop.reset();
   };
 
-  /** Stops the histogram at a sample, after its window is read, when nobody uses the app. */
+  /**
+   * Stops the histogram at a sample, after its window is read, when nobody uses the app. A server
+   * has no window and runs on mains power, and its remote clients feel each stall, so it never rests.
+   */
   #restLoop(): void {
-    if (this.#activeTurns.size === 0 && BrowserWindow.getFocusedWindow() === null) this.#loop.disable();
+    if (this.#options.server || this.#options.turnRunning() || BrowserWindow.getFocusedWindow() !== null) return;
+    this.#loop.disable();
   }
 
   #startLoopWindow(): void {
