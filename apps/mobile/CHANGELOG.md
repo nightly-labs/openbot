@@ -57,7 +57,7 @@ the [root changelog](../../CHANGELOG.md).
   servers that you added. Owners and admins see them; a tap opens the settings of the connector or
   the server.
 - You can select the Plush or Flat avatar style when you create or edit an agent. A flat agent shows the flat face of the desktop app in the agent list, chats and Live Activities, and breathes while it works. The face and colour stay the same when you change the style.
-- Connect a server to Proton Pass from Server settings › Connectors. Sign in to Proton on the phone, or
+- Connect a server to Proton Pass from Marketplace › Apps. Sign in to Proton on the phone, or
   paste an access key. Agents on the server can then sign in to sites with the logins of one shared
   vault. The Proton Pass CLI needs a paid Proton plan.
 - Settings > Voice has a "Pause before sending" slider, from 1 to 10 seconds. A voice conversation sends your words when it recognizes no new words for this long. The default is 1.5 seconds. (#5006)
