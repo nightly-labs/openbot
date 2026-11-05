@@ -310,18 +310,13 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     return account ? { account, number: index + 1, name: providerAccountName(t, accounts, id) } : null;
   };
   /**
-   * The models of a rail entry: the account's own list when its check read one, as a plan can serve
-   * other models than the provider's own sign-in (#5217). It folds older models as the provider's list does.
+   * The models of a rail entry: the provider's list, and then the models that only the entry's
+   * account serves, as a plan can serve more than the provider's own sign-in (#5217).
    */
   const entryModelOptions = (key: RailKey): ClientAgentModelOption[] => {
-    const rail = railOf(key);
-    const shared = railModelOptions(rail);
-    const own = entryAccount(key)?.account.models;
-    if (!own?.length) return shared;
-    return own.map((model) => {
-      const listing = shared.find((option) => option.id === model.id)?.listing;
-      return listing ? { ...model, listing } : model;
-    });
+    const shared = railModelOptions(railOf(key));
+    const own = entryAccount(key)?.account.models ?? [];
+    return own.length ? [...shared, ...own] : shared;
   };
   /** An account after the first that is not signed in cannot run its models, whatever the provider says. */
   const entryStatus = (key: RailKey): AgentProviderStatus => {

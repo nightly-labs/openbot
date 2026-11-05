@@ -110,9 +110,9 @@ export interface ProviderAccountStatus {
   state: ProviderAccountState;
   message: string | null;
   /**
-   * The models that an account after the first serves, from its last check. A plan can serve models
-   * that the provider's own sign-in does not. Absent before a check listed them, and on the own sign-in,
-   * whose models are the provider's catalogue.
+   * The models that an account after the first serves and the provider's catalogue does not, from its
+   * last check: a plan can serve more than the provider's own sign-in. Absent before a check listed
+   * them, and on the own sign-in.
    */
   models?: AgentModelOption[];
 }

@@ -264,7 +264,8 @@ try {
   assert.equal(await readFile(join(defaultHome, "antigravity-acp", "acp_token.json"), "utf8"), defaultToken);
 
   // The account check reads the account's own models: its plan serves one that the first account's
-  // does not, and the catalogue of the first account stays as it was (#5217).
+  // does not, and the catalogue of the first account stays as it was. The row carries only that one;
+  // the picker adds it to the catalogue, which keeps the models an admin turned off out (#5217).
   report.models = {
     firstAccount: runtime
       .listModels()
@@ -272,11 +273,11 @@ try {
       .map((model) => model.id),
     account: accountRows(runtime)?.[1]?.models?.map((model) => model.id) ?? [],
   };
-  assert.ok(report.models.account.includes("gemini-fake-pro"), "the account lists its own model");
+  assert.deepEqual(report.models.account, ["gemini-fake-pro"], "the row carries only the account's own model");
   assert.ok(!report.models.firstAccount.includes("gemini-fake-pro"), "the first account does not list it");
   assert.deepEqual(
     runtime.accountModels("antigravity", account.id).map((model) => model.id),
-    report.models.account,
+    ["gemini-fake", "gemini-fake-pro"],
   );
 
   // 3. The first account keeps the saved key. Every process of the new account runs in its folder,
