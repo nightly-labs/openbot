@@ -1,5 +1,5 @@
 diff --git a/android/src/main/java/com/reactnativekeyboardcontroller/interactive/KeyboardAnimationController.kt b/android/src/main/java/com/reactnativekeyboardcontroller/interactive/KeyboardAnimationController.kt
-index ff483614f48c538275e449a29544394fbc11efa0..0223ae5d8fd91b4041ab0ffc8f5550b35455da4d 100644
+index ff483614f48c538275e449a29544394fbc11efa0..d1b44931a2237bd2a1a8f07013631392140070ea 100644
 --- a/android/src/main/java/com/reactnativekeyboardcontroller/interactive/KeyboardAnimationController.kt
 +++ b/android/src/main/java/com/reactnativekeyboardcontroller/interactive/KeyboardAnimationController.kt
 @@ -139,6 +139,8 @@ internal class KeyboardAnimationController {
@@ -35,7 +35,17 @@ index ff483614f48c538275e449a29544394fbc11efa0..0223ae5d8fd91b4041ab0ffc8f5550b3
  
      reset()
    }
-@@ -345,6 +353,15 @@ internal class KeyboardAnimationController {
+@@ -333,8 +341,7 @@ internal class KeyboardAnimationController {
+ 
+     isImeShownAtStart = false
+ 
+-    currentSpringAnimation?.cancel()
+-    currentSpringAnimation = null
++    stopSpringAnimation()
+ 
+     pendingRequestOnReady = null
+ 
+@@ -345,6 +352,15 @@ internal class KeyboardAnimationController {
      InteractiveKeyboardProvider.isInteractive = false
    }
  
@@ -51,7 +61,7 @@ index ff483614f48c538275e449a29544394fbc11efa0..0223ae5d8fd91b4041ab0ffc8f5550b3
    /**
     * Animate the IME to a given visibility.
     *
-@@ -362,10 +379,17 @@ internal class KeyboardAnimationController {
+@@ -362,6 +378,10 @@ internal class KeyboardAnimationController {
        insetsAnimationController
          ?: throw IllegalStateException("Controller should not be null")
  
@@ -62,15 +72,7 @@ index ff483614f48c538275e449a29544394fbc11efa0..0223ae5d8fd91b4041ab0ffc8f5550b3
      currentSpringAnimation =
        springAnimationOf(
          setter = {
--          insetTo(it.roundToInt())
-+          // The system can finish or cancel the controller before the spring ends.
-+          if (insetsAnimationController === controller) {
-+            insetTo(it.roundToInt())
-+          }
-         },
-         getter = { controller.currentInsets.bottom.toFloat() },
-         finalPosition =
-@@ -385,11 +409,12 @@ internal class KeyboardAnimationController {
+@@ -385,11 +405,12 @@ internal class KeyboardAnimationController {
            setStartVelocity(velocityY)
          }
          addEndListener { anim, _, _, _ ->
