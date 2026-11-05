@@ -334,8 +334,9 @@ const BROWSER_WEB_PREFERENCES = {
 export interface PreparedBrowserSecret {
   request: BrowserSecretRequest;
   /**
-   * True when an agent ran its own script on a page of this origin during this app session. That
-   * script can still listen to the fields, so only the user may decide to fill them.
+   * True when agent code from `evaluate` can still run in the page or in a page of its origin in
+   * the same session, or a service worker served the page after such a script. That code can
+   * listen to the fields, so only the user may decide to fill them.
    */
   agentScriptedOrigin: boolean;
   /**
@@ -373,6 +374,21 @@ function runBrowserTool<Name extends BrowserToolName>(
   hooks: BrowserDynamicToolHooks,
 ): Effect.Effect<DynamicToolResult, BrowserOperationError> {
   return handlers[tool](call, params, hooks);
+}
+
+const AGENT_CODE_CARD_FILL =
+  "Card fill is unavailable while a script from evaluate can still run in this page or in another open page of this site. Reload this page, close or navigate each other tab where you ran evaluate on this site, take a fresh snapshot, and call fill_card again, or use request_takeover.";
+
+function markScriptedOrigin(tab: BrowserHostTab, origin: string): void {
+  const origins = tab.scriptedOrigins ?? new Set<string>();
+  origins.add(origin);
+  tab.scriptedOrigins = origins;
+}
+
+function markWorkerExposedOrigin(tab: BrowserHostTab, origin: string): void {
+  const origins = tab.workerExposedOrigins ?? new Set<string>();
+  origins.add(origin);
+  tab.workerExposedOrigins = origins;
 }
 
 function urlOrigin(value: string): string | null {
@@ -471,10 +487,13 @@ export class BrowserHost {
   /** The agent tool calls that wait for the release of a tab. */
   readonly #userControlWaiters = new Map<string, Set<Deferred.Deferred<void>>>();
   /**
-   * The origins where an agent ran `evaluate`. Kept by origin, not by document: a same-origin popup,
-   * opener or service worker carries the script past one document.
+   * The origins, per session, whose Cache Storage an agent script could write since the last purge.
+   * A service worker can serve those entries to a later document as page code. Each tab's
+   * `scriptedOrigins` follows the agent code that runs in its document.
    */
-  readonly #agentScriptedOrigins = new Set<string>();
+  readonly #cacheTaintedOrigins = new WeakMap<Session, Set<string>>();
+  /** The last purge of each tainted origin, per session. False when it failed. A fill waits for it. */
+  readonly #originPurges = new WeakMap<Session, Map<string, Promise<boolean>>>();
   #persistLock = Semaphore.makeUnsafe(1);
   readonly #scope = Scope.makeUnsafe();
   #destroying: Deferred.Deferred<void, BrowserOperationError> | null = null;
@@ -1096,6 +1115,7 @@ export class BrowserHost {
     const closedIndex = tabIds.indexOf(tabId);
     const browserHadFocus = tab.focusedAtPageClose === true || this.#tabHasFocus();
     this.#unmountView(tab.view);
+    this.#releaseScriptedDocument(tab);
     this.#tabs.delete(tabId);
     // A popup that a private page opened without an opener is not its child, but it holds the same sign-in.
     const signInSession = tab.popup ? undefined : tab.privateSession;
@@ -1338,7 +1358,7 @@ export class BrowserHost {
       return {
         // Password cards do not use digits; keep public metadata within its released bounds.
         request: { method: args.method, origin: url.origin, digits: args.method === "password" ? 6 : args.digits },
-        agentScriptedOrigin: this.#agentScriptedOrigins.has(url.origin),
+        agentScriptedOrigin: yield* this.#agentCodeCanRead(tab, [url.origin], entry.servedByWorker),
         vaultFillable:
           args.method === "password"
             ? entry.fields.password
@@ -1502,6 +1522,127 @@ export class BrowserHost {
   #requireNoFilledCard(tab: BrowserHostTab, action: string): void {
     if (tab.filledCard)
       throw new Error(`${action} is unavailable while the page shows a filled card. Use snapshots until it navigates.`);
+  }
+
+  #cacheTainted(target: Session): Set<string> {
+    const origins = this.#cacheTaintedOrigins.get(target) ?? new Set<string>();
+    this.#cacheTaintedOrigins.set(target, origins);
+    return origins;
+  }
+
+  /**
+   * The tab's document is going away, and agent code in it stops. Until now, that code could put code
+   * in a same-origin page of a connected tab, so such a page keeps the mark until it navigates. It
+   * could also write Cache Storage that a service worker serves to any page of the origin in the
+   * session, also after the page loaded. So each other open page of the origin must navigate before
+   * a fill, and a tainted origin is cleared again.
+   */
+  #releaseScriptedDocument(tab: BrowserHostTab): void {
+    const scripted = tab.scriptedOrigins;
+    const exposed = tab.workerExposedOrigins;
+    if (!scripted && !exposed) return;
+    delete tab.scriptedOrigins;
+    delete tab.workerExposedOrigins;
+    // A tab that closed itself has no `contents.session`.
+    const target = this.#tabSession(tab);
+    // The next fill on the origin reads the result from `#originPurges`.
+    for (const origin of new Set([...(scripted ?? []), ...(exposed ?? [])]))
+      if (this.#cacheTaintedOrigins.get(target)?.has(origin)) void this.#purgeOrigin(target, origin);
+    if (!scripted) return;
+    const connected = this.#connectedTabs(tab);
+    for (const other of this.#sessionTabs(target)) {
+      if (other === tab || other.contents.isDestroyed()) continue;
+      const frameOrigins = new Set(other.contents.mainFrame.framesInSubtree.map((frame) => frame.origin));
+      for (const origin of scripted) {
+        if (!frameOrigins.has(origin)) continue;
+        if (connected.has(other)) markScriptedOrigin(other, origin);
+        else markWorkerExposedOrigin(other, origin);
+      }
+    }
+  }
+
+  /** The tabs of one browser session. Popups use the session of their opener. */
+  #sessionTabs(target: Session): BrowserHostTab[] {
+    return [...this.#tabs.values()].filter((other) => this.#tabSession(other) === target);
+  }
+
+  /**
+   * Whether agent code can run in the tab's page of one of these origins: a script runs in a page of
+   * the origin in the tab's session, or the tab's page was open while one ran. A connected page can
+   * reach the tab, and any page can write the Cache Storage that a service worker serves to the tab.
+   */
+  #agentCodeReaches(tab: BrowserHostTab, origins: string[]): boolean {
+    const others = this.#sessionTabs(this.#tabSession(tab));
+    return origins.some(
+      (origin) =>
+        tab.workerExposedOrigins?.has(origin) || others.some((candidate) => candidate.scriptedOrigins?.has(origin)),
+    );
+  }
+
+  /**
+   * Whether agent code can read what OpenBot fills into the tab's fields of these origins. A page that
+   * a service worker served could run code that a script put in Cache Storage, so that page must
+   * reload after OpenBot clears the origin's Cache Storage and service workers. When no other page of
+   * the origin is open in the session, nothing can write that cache again and the origin is clean.
+   */
+  readonly #agentCodeCanRead = Effect.fn("BrowserHost.agentCodeCanRead")(function* (
+    this: BrowserHost,
+    tab: BrowserHostTab,
+    origins: string[],
+    servedByWorker: boolean,
+  ): Effect.fn.Return<boolean> {
+    if (this.#agentCodeReaches(tab, origins)) return true;
+    const target = this.#tabSession(tab);
+    const tainted = this.#cacheTaintedOrigins.get(target);
+    const dirty = origins.filter((origin) => tainted?.has(origin));
+    if (!tainted || dirty.length === 0) return false;
+    const clean = servedByWorker ? [] : dirty.filter((origin) => !this.#originOpenElsewhere(target, origin, tab));
+    const purges = dirty.map((origin) =>
+      servedByWorker || clean.includes(origin)
+        ? this.#purgeOrigin(target, origin)
+        : (this.#originPurges.get(target)?.get(origin) ?? Promise.resolve(true)),
+    );
+    // A purge that fails leaves the cache as it was, so the user decides.
+    if (!(yield* Effect.promise(() => Promise.all(purges))).every(Boolean)) return true;
+    // A page of the origin can open, and run a script, while the purge runs.
+    if (this.#agentCodeReaches(tab, origins)) return true;
+    if (!servedByWorker) {
+      for (const origin of clean) if (!this.#originOpenElsewhere(target, origin, tab)) tainted.delete(origin);
+      return false;
+    }
+    for (const origin of dirty) markWorkerExposedOrigin(tab, origin);
+    return true;
+  });
+
+  /**
+   * Clears the origin's Cache Storage and service workers after the purge that already runs for it.
+   * A later purge that succeeds clears what an earlier one that failed left.
+   */
+  #purgeOrigin(target: Session, origin: string): Promise<boolean> {
+    const purges = this.#originPurges.get(target) ?? new Map<string, Promise<boolean>>();
+    this.#originPurges.set(target, purges);
+    const purge = (purges.get(origin) ?? Promise.resolve(true)).then(() =>
+      target.clearStorageData({ origin, storages: ["cachestorage", "serviceworkers"] }).then(
+        () => true,
+        (error: unknown) => {
+          logger.warn("Unable to clear a site's caches", { origin, error: toLogValue(error) });
+          return false;
+        },
+      ),
+    );
+    purges.set(origin, purge);
+    return purge;
+  }
+
+  /** Whether a page of the origin other than the tab's own is open in the session. */
+  #originOpenElsewhere(target: Session, origin: string, tab: BrowserHostTab): boolean {
+    return [...this.#tabs.values()].some(
+      (other) =>
+        other !== tab &&
+        !other.contents.isDestroyed() &&
+        this.#tabSession(other) === target &&
+        other.contents.mainFrame.framesInSubtree.some((frame) => frame.origin === origin),
+    );
   }
 
   #connectedTabs(tab: BrowserHostTab): Set<BrowserHostTab> {
@@ -2251,26 +2392,31 @@ export class BrowserHost {
           if (!topOrigin?.startsWith("https://"))
             return yield* browserFailure(new Error("Card fill needs an HTTPS page. Use request_takeover."));
           const frames = new Set<string>();
+          let servedByWorker = false;
           result = yield* current.engine.fillCard(
             args.targets,
             card,
             {
-              checkOrigin: (origin) => {
+              checkOrigin: (origin, frameServedByWorker) => {
                 // A script the agent ran on the page or the payment frame's site can read the fields.
-                if (this.#agentScriptedOrigins.has(origin) || this.#agentScriptedOrigins.has(topOrigin))
-                  throw new Error("Card fill is unavailable on a site where you ran evaluate. Use request_takeover.");
+                if (this.#agentCodeReaches(current, [origin, topOrigin])) throw new Error(AGENT_CODE_CARD_FILL);
                 this.#requireIsolatedFromConnectedTabs(current, topOrigin);
                 if (origin !== topOrigin) this.#requireIsolatedFromConnectedTabs(current, origin);
                 frames.add(origin);
+                servedByWorker ||= frameServedByWorker;
               },
-              allowFill: () => {
-                if (!vault.approved(args.cardId, topOrigin, [...frames])) {
-                  outcome.approval = { page: topOrigin, frames: [...frames] };
-                  return Effect.succeed(false);
-                }
-                // A recording would keep the frames that show the card. A fill that waits keeps it.
-                return this.#recorder.discard(args.tabId, "requested").pipe(Effect.as(true));
-              },
+              allowFill: () =>
+                Effect.gen({ self: this }, function* () {
+                  if (yield* this.#agentCodeCanRead(current, [...frames], servedByWorker))
+                    return yield* browserFailure(new Error(AGENT_CODE_CARD_FILL));
+                  if (!vault.approved(args.cardId, topOrigin, [...frames])) {
+                    outcome.approval = { page: topOrigin, frames: [...frames] };
+                    return false;
+                  }
+                  // A recording would keep the frames that show the card. A fill that waits keeps it.
+                  yield* this.#recorder.discard(args.tabId, "requested");
+                  return true;
+                }),
               onFill: () => {
                 markDispatched();
                 current.filledCard = true;
@@ -3216,6 +3362,7 @@ export class BrowserHost {
     });
     contents.on("did-navigate", (_event, url) => {
       tab.documents += 1;
+      this.#releaseScriptedDocument(tab);
       if (tab.secretDocument) {
         tab.secretDocument = false;
         contents.navigationHistory.clear();
@@ -3647,7 +3794,9 @@ export class BrowserHost {
     // navigation queued before it, or one that commits while it runs, decides where it ran.
     const markScripted = () => {
       const origin = urlOrigin(currentTabUrl(tab));
-      if (origin) this.#agentScriptedOrigins.add(origin);
+      if (!origin) return;
+      markScriptedOrigin(tab, origin);
+      this.#cacheTainted(this.#tabSession(tab)).add(origin);
     };
     return yield* runTabEvaluation(
       tab,
