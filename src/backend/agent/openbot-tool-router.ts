@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { basename } from "node:path";
+import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import { chatVisualItemType } from "@openbot/contracts/chat-visual";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -960,7 +962,21 @@ export class OpenBotToolRouter {
     const executionThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
     // Any agent can post on its own initiative, such as a routine that reports to a Discord channel.
     if (MESSAGING_OUTBOUND_TOOLS.has(params.tool))
-      return yield* this.#messaging.outboundTool(params.tool, params.arguments);
+      return yield* this.#messaging.outboundTool(params.tool, params.arguments, (paths) =>
+        // The attachment path rules: the agent's workspace, its folders, or the OpenBot shared directory,
+        // which holds the files the user attached.
+        Effect.acquireRelease(
+          this.#attachments.openSources(senderAgentId, paths, { allowAnyReadablePath: false }),
+          (sources) => Effect.promise(() => Promise.allSettled(sources.map((source) => source.handle.close()))),
+        ).pipe(
+          Effect.map((sources) =>
+            sources.map((source) => {
+              const name = basename(source.path);
+              return { name, path: source.path, mimeType: attachmentMimeTypeForName(name) };
+            }),
+          ),
+        ),
+      );
     if (params.tool.startsWith("messaging_")) {
       // Only the agent that answers a platform conversation, in that conversation's own thread.
       const link = this.#messaging.store.linkForThread(executionThreadId);

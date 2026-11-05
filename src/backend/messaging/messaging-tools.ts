@@ -24,6 +24,7 @@ const postShape = {
   place: z.string().min(1).max(INPUT_LIMITS.identifier),
   replyTo: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
   text: z.string().trim().min(1).max(POST_CHARACTERS),
+  files: z.array(z.string().max(INPUT_LIMITS.path)).max(INPUT_LIMITS.attachments).optional(),
 };
 
 /** The tools that post on the agent's own initiative. They work in any turn, and they name the place. */
@@ -61,7 +62,7 @@ export const MESSAGING_TOOL_DEFINITIONS: readonly { name: string; description: s
   {
     name: "messaging_post",
     description:
-      "Post markdown text as OpenBot to a place of a connected Slack workspace, Discord server or Telegram chat, such as a report from a routine. Get connection and place ids from messaging_list_places. replyTo puts the post in a thread: a Slack thread ts, a Discord message id, or a Telegram message id, or t<topic id> for a Telegram forum topic. Everyone in the place sees the post. A Discord post pings nobody; a Telegram @username notifies that person. Your final answer still goes only to the conversation you answer. Works in any turn.",
+      "Post markdown text as OpenBot to a place of a connected Slack workspace, Discord server, Telegram or WhatsApp chat, such as a report from a routine. Get connection and place ids from messaging_list_places. files: local files from your workspace or the OpenBot shared directory, such as an image the user attached, sent after the text. replyTo puts the post in a thread: a Slack thread ts, a Discord or Telegram message id, or t<topic id> for a Telegram forum topic. Everyone in the place sees the post. A Discord post pings nobody; a Telegram @username notifies that person. Your final answer still goes only to the conversation you answer. Works in any turn.",
     shape: postShape,
   },
 ];
@@ -73,7 +74,14 @@ export type MessagingToolCall =
 
 export type MessagingOutboundToolCall =
   | { tool: "messaging_list_places"; connection: string | undefined }
-  | { tool: "messaging_post"; connection: string; place: string; replyTo: string | null; text: string };
+  | {
+      tool: "messaging_post";
+      connection: string;
+      place: string;
+      replyTo: string | null;
+      text: string;
+      files: string[];
+    };
 
 /** The arguments of one outbound tool call, or the reason they are wrong. */
 export function parseMessagingOutboundTool(tool: string, args: unknown): MessagingOutboundToolCall | { error: string } {
@@ -91,6 +99,7 @@ export function parseMessagingOutboundTool(tool: string, args: unknown): Messagi
             place: parsed.data.place,
             replyTo: parsed.data.replyTo ?? null,
             text: parsed.data.text,
+            files: parsed.data.files ?? [],
           }
         : invalid(parsed.error, "unknown argument.");
     }

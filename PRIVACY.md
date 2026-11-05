@@ -1194,8 +1194,9 @@ message. The answers go from the computer to the Slack Web API directly.
 - **Sent to Slack.** The agents' answers and the files they attach, short status posts ("Working on
   it…"), reactions, and approval requests with the command, folder and
   reason the provider gave, redacted. A failed request posts a fixed sentence, never the provider's
-  error. Any agent, also in the user's own chat or a routine run, can post text, redacted, to a
-  channel that OpenBot is a member of, and list those channels' names.
+  error. Any agent, also in the user's own chat or a routine run, can post text, redacted, and
+  files from its workspace or the OpenBot shared directory to a channel that OpenBot is a member of,
+  and list those channels' names.
 
 Anyone who can post in the Slack workspace, guests and Slack Connect members included, can give the
 agents work. The agents run on the host with the access the user gave them. A hosted server that sleeps starts for a message that addresses OpenBot. Until it connects,
@@ -1244,7 +1245,8 @@ passes nothing on.
 - **Given to the Discord Orchestrator.** As for Slack.
 - **Sent to Discord.** As for Slack: the answers, attached files of at most 10 MB, status posts,
   reactions, and redacted approval requests. A post never pings anyone. As for Slack, any agent can
-  post redacted text to a channel or thread of the server, and list their names through Signal.
+  post redacted text and files from its workspace or the OpenBot shared directory to a channel or
+  thread of the server, and list their names through Signal.
 
 Anyone who can post in a channel that OpenBot can view can give the agents work, unless the user
 chose roles: then only members with one of those roles can, and OpenBot ignores the others. The agents run on the
@@ -1296,7 +1298,8 @@ short-lived signed addresses, in transit only.
 - **Sent to Telegram.** The agents' answers and the files they attach, short status posts ("Working on
   it…"), reactions, and approval requests with the command, folder and reason the provider gave,
   redacted. A failed request posts a fixed sentence, never the provider's error. As for Slack, any
-  agent can post redacted text to a linked chat.
+  agent can post redacted text and files from its workspace or the OpenBot shared directory to a
+  linked chat.
 
 Anyone who can post in a linked chat can give the agents work. The agents run on the host with the
 access the user gave them. A hosted server that sleeps starts for a message that addresses OpenBot. Until it connects,
@@ -1352,7 +1355,7 @@ restrict or block a number that it sees as automated.
   and approval requests with the command, folder and reason the provider gave, redacted. On a number
   used only by OpenBot, a person whom the owner did not allow gets one message with a pairing code.
   On the owner's personal number, OpenBot never writes to anyone else first. Any agent can post
-  redacted text to the allowed chats.
+  redacted text and files from its workspace or the OpenBot shared directory to the allowed chats.
 
 Anyone whom the owner allowed can give the agents work. The agents run on the host with the access
 the user gave them. A hosted server that sleeps does not start for a WhatsApp message; WhatsApp keeps
