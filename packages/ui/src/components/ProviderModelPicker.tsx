@@ -516,9 +516,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
       props.onChange(variant?.id ?? option.id, option.provider, account);
       return;
     }
-    const effort = props.modelOptions
-      .find((model) => model.provider === option.provider && model.id === option.id)
-      ?.supportedReasoningEfforts.includes(queued.effort)
+    const effort = modelOption(option.provider, option.id)?.supportedReasoningEfforts.includes(queued.effort)
       ? queued.effort
       : undefined;
     props.onChange(option.id, option.provider, account, effort);
