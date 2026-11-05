@@ -1,6 +1,7 @@
 import { win32 } from "node:path";
 import type { LoadSessionResponse, NewSessionRequest, PromptResponse, RequestError } from "@agentclientprotocol/sdk";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
+import type { CauseCode } from "@openbot/telemetry";
 import { enableCursorMcpServers } from "./cursor-mcp-disabled";
 import { isRecord } from "./protocol";
 
@@ -37,6 +38,12 @@ export interface AcpFlavor {
     model: string | null,
     endpoint: AcpCustomEndpoint | null,
   ): string;
+  /**
+   * The cause of a turn's failure that the agent names in a structured field, such as an error name
+   * in the error's data or a stop reason that means another thing for this agent. `null` gives the
+   * decision to the protocol's rules. It is a fixed code; it never carries the error's text.
+   */
+  failureCause?(error: unknown): CauseCode | null;
   /** The message of a turn that ended with no answer text. Absent: such a turn succeeds. */
   emptyAnswerFailure?(reasoned: boolean): string;
   /**

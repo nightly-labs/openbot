@@ -17,6 +17,8 @@ export const messages = {
   "status.agent.channelRoutineCreated": "{agent} ha creato la routine {routine}. Lo ha chiesto {person}.",
   "status.agent.channelRoutineUpdated": "{agent} ha modificato la routine {routine}. Lo ha chiesto {person}.",
   "status.agent.channelRoutineDeleted": "{agent} ha eliminato la routine {routine}. Lo ha chiesto {person}.",
+  "status.agent.channelTaskCancelled":
+    "{agent} ha annullato l’attività «{task}» e le sue sottoattività. Lo ha chiesto {person}.",
   "status.agent.screenCaptureScreen":
     "Acquisizione dello schermo principale e invio dell'immagine al modello dell'agente.",
   "status.agent.screenCaptureChannel":

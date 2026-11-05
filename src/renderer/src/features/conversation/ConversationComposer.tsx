@@ -89,6 +89,9 @@ export function ConversationComposer() {
     props,
     quoteRequest,
     openQuote,
+    taggableBrowserTabs,
+    taggableThreads,
+    openTaggedReference,
     queuePanelVisible,
     releaseCutAttachments,
     removeAttachment,
@@ -419,6 +422,7 @@ export function ConversationComposer() {
                   onOpenAgent={props.onSelectAgent}
                   // A channel's rows are its sub-tasks, not queued replies.
                   onSteer={props.activeTurnId && !channel && steers() ? props.onSteerQueuedMessage : undefined}
+                  onStop={channel && !channel.readOnly() ? channel.stopAwaitingReply : undefined}
                 />
               </Show>
               <Show when={waitsVisible() && props.onCancelWait}>
@@ -664,6 +668,9 @@ export function ConversationComposer() {
               skillPickerRequest={skillPickerRequest()}
               quoteRequest={quoteRequest()}
               onOpenQuote={openQuote}
+              browserTabs={taggableBrowserTabs()}
+              threads={taggableThreads()}
+              onOpenTag={openTaggedReference}
               onValueChange={(text) => {
                 updateCurrentDraft({ text });
                 updateTeamTyping(text);

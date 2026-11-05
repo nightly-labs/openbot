@@ -28,8 +28,9 @@ import {
   type CodexMcpServer,
   type CodexOwnServers,
   type CodexOwnTransports,
+  codexDeferredMcpServers,
+  codexDirectMcpNamespaces,
   codexDisabledServers,
-  codexMcpNamespaces,
   codexMcpServerKey,
   codexMcpServers,
   codexThreadMcpServers,
@@ -95,6 +96,9 @@ const logger = createOpenBotLogger("thread-lifecycle");
  * server names in the form Codex accepts. Version 7 keeps approvals for custom MCP servers. Version 8
  * is the MCP namespaces in `features.code_mode.direct_only_tool_namespaces`: Codex 0.164 does not
  * add them on resume to a thread started without them, so a code-mode-only model saw no MCP tools.
+ * Since #4468 only Computer Use stays in that list. No new version: a session started before keeps
+ * its MCP namespaces direct on resume and keeps working, and a new version would replace each Codex
+ * session with a handoff. Such a session defers the tools from its next new session.
  * Version 9 adds `image_gen` to those namespaces. Version 10 gives a stdio server its working
  * directory as `cwd`; before, Codex did not get such a server.
  */
@@ -147,10 +151,10 @@ const CODEX_MCP_STARTUP_GRACE_MS = 10_000;
  * In code mode the model calls tools from an `exec` cell, and `exec` gives control back to the model
  * after its yield time while `ask_user` still waits. A model that then ends its turn expires the
  * question within seconds. Direct calls keep the turn waiting for the answer. It goes in as one
- * dotted key, as the agent environment does, so it does not turn code mode on or off. Each thread
- * adds the namespaces of its MCP servers, see `codexMcpNamespaces`. `image_gen` is direct because
- * from `exec` a model often reads `result.content` instead of `generatedImage(result)`: it then sees
- * no image and tells the user that the image failed, although the chat shows it.
+ * dotted key, as the agent environment does, so it does not turn code mode on or off. A thread adds
+ * Computer Use, see `codexDirectMcpNamespaces`; Codex defers the other MCP servers. `image_gen` is
+ * direct because from `exec` a model often reads `result.content` instead of `generatedImage(result)`:
+ * it then sees no image and tells the user that the image failed, although the chat shows it.
  */
 const CODEX_DIRECT_ONLY_NAMESPACES = [...VISIBLE_DYNAMIC_TOOLS.map((namespace) => namespace.name), "image_gen"];
 
@@ -897,7 +901,7 @@ export class ThreadLifecycle {
         mcp_optional_startup_grace_ms: CODEX_MCP_STARTUP_GRACE_MS,
         "features.code_mode.direct_only_tool_namespaces": [
           ...CODEX_DIRECT_ONLY_NAMESPACES,
-          ...codexMcpNamespaces(servers),
+          ...codexDirectMcpNamespaces(servers),
         ],
         ...codexSandboxConfig(agent, this.#store.sharedRoot),
         ...Object.fromEntries(
@@ -1195,6 +1199,8 @@ export class ThreadLifecycle {
       sectionTeammates: section,
       homeSkills,
       httpMcpServers: mcpServers.some((config) => config.transport === "http"),
+      deferredMcpServers:
+        client.provider === "codex" ? codexDeferredMcpServers(mcpServers).map((config) => config.name) : [],
       instructionsFileName: instructionsFile.fileName,
       instructionsFile: instructionsFile.file,
     };

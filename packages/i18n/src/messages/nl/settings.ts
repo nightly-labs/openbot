@@ -516,7 +516,7 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Voor een klein team met dagelijkse routines.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Voor veel agents en zwaar browserwerk.",
-  "settings.voice.models.title": "Dicteermodel",
+  "settings.voice.dictation.section": "Dicteren",
   "settings.voice.model.parakeet.description": "Snel. Herkent zelf de gesproken taal, in 25 Europese talen.",
   "settings.voice.model.bark.description":
     "Snel. Alleen Engels. Schrijft meestal in kleine letters, met weinig leestekens.",
@@ -533,7 +533,6 @@ export const messages = {
   "settings.voice.model.useLabel": "Gebruik {name} voor dicteren",
   "settings.voice.model.removeLabel": "Verwijder {name} van deze computer",
   "settings.voice.language.section": "Taal",
-  "settings.voice.language.title": "Dicteertaal",
   "settings.voice.language.description": "De taal die je spreekt. Automatisch herkent hem uit de opname.",
   "settings.voice.language.modelDetects":
     "Parakeet herkent zelf de gesproken taal. Gebruik Whisper of ElevenLabs om een taal in te stellen.",
@@ -560,6 +559,9 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "Lees antwoorden voor",
   "settings.voice.speech.readReplies.description":
     "Als je een bericht dicteert, wordt het antwoord voorgelezen. Dicteer opnieuw om het te stoppen.",
+  "settings.voice.speech.codexLive.title": "Codex live spraak",
+  "settings.voice.speech.codexLive.description":
+    "Spraakgesprekken met Codex-agents gebruiken live spraak van OpenAI met je Codex-aanmelding. Je stem gaat naar OpenAI.",
   "settings.voice.speech.speed.title": "Snelheid",
   "settings.voice.speech.voice.title": "Stem",
   "settings.voice.speech.voice.female": "Vrouwenstem {number}",
@@ -568,6 +570,8 @@ export const messages = {
   "settings.voice.speech.voice.stop": "Stoppen",
   "settings.voice.speech.sample": "Hallo. Zo klinken je antwoorden.",
   "settings.voice.speech.listenFailed": "Kan het voorbeeld niet afspelen.",
+  "settings.voice.live.section": "Live spraak",
+  "settings.voice.live.signIn": "Meld je met je ChatGPT-account aan bij Codex om live spraak te gebruiken.",
   "settings.transfer.title": "Verplaats deze server naar een andere computer",
   "settings.transfer.lede": "Je agents, hun vaardigheden, routines, herinneringen en bestanden gaan in één bestand.",
   "settings.transfer.flow.label": "Hoe een overdracht werkt",

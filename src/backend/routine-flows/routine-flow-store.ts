@@ -8,10 +8,12 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   ROUTINE_FLOW_STEP_STATUSES,
+  ROUTINE_RUN_SOURCES,
   type RoutineFlowLink,
   type RoutineFlowPosition,
   type RoutineFlowStep,
   type RoutineFlowStepStatus,
+  type RoutineRun,
   type RoutineRunStatus,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
@@ -24,7 +26,7 @@ import { routineFlowConnectProblem, routineFlowDepths } from "./routine-flow-gra
 export class RoutineFlowError extends Error {}
 
 /** The parts of a routine run the runtime reads to continue its flow. */
-export interface RoutineFlowRun {
+export interface RoutineFlowRun extends Pick<RoutineRun, "kind" | "source"> {
   id: string;
   routineId: string;
   agentId: string;
@@ -392,6 +394,8 @@ function toRun(row: DynamicRecord): RoutineFlowRun {
     id: String(row.run_id),
     routineId: String(row.routine_id),
     agentId: String(row.agent_id),
+    kind: row.run_kind === "scheduled" ? "scheduled" : "manual",
+    ...(isOneOf(ROUTINE_RUN_SOURCES, row.run_source) ? { source: row.run_source } : {}),
     routineName: String(row.routine_name),
     scheduledFor: String(row.scheduled_for),
     instruction: String(row.instruction),

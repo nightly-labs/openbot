@@ -32,6 +32,7 @@ import type {
   ChannelMemory,
   ChannelRoutine,
   ChannelRoutineRun,
+  CodexLiveVoice,
   ConversationFileSearchPage,
   ConversationMessage,
   ConversationMessageSender,
@@ -106,6 +107,9 @@ import type {
   UpdateChannelRoutineInput,
   UpdateQueuedMessageInput,
   UpdateRoutineInput,
+  VoiceLiveEvent,
+  VoiceLiveSession,
+  VoiceLiveStart,
 } from "@openbot/contracts/ipc";
 import {
   type AgentDefaults,
@@ -157,7 +161,7 @@ import { ContextCompaction } from "./agent/context-compaction";
 import { ConversationReader } from "./agent/conversation-reader";
 import { ConversationRuntime } from "./agent/conversation-runtime";
 import { CustomEndpoints, toEndpointChangeFailed } from "./agent/custom-endpoints";
-import { agentNamesById, displayMessageReferences } from "./agent/delivery-content";
+import { agentNamesById, displayMessageReferences, type TagReferenceSource } from "./agent/delivery-content";
 import { DeltaBuffer } from "./agent/delta-buffer";
 import type { SectionTeammates } from "./agent/developer-instructions";
 import { DrainScheduler } from "./agent/drain-scheduler";
@@ -166,6 +170,7 @@ import type { FailureContext, FailureSignal } from "./agent/failure-signal";
 import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-site-coordinator";
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import { InstructionsChanges } from "./agent/instructions-changes";
+import { LiveVoice } from "./agent/live-voice";
 import { MailboxSync } from "./agent/mailbox-sync";
 import { type GitHubConnectorSource, McpGateway, type TestMcpServerOptions } from "./agent/mcp-gateway";
 import { type MarketplaceAppServer, mcpServersFromGateway } from "./agent/mcp-tools";
@@ -246,7 +251,7 @@ import { McpServerStore } from "./mcp-server-store";
 import type { MessageDeleteAccess, MessageDeleteRefused } from "./message-delete";
 import { MessagingThreads, toMessagingThreadFailed } from "./messaging/messaging-threads";
 import type { PasswordVault } from "./password-vault";
-import { decodeRecordResponse, getString } from "./protocol";
+import { type AppServerNotification, decodeRecordResponse, getString, isRecord } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext } from "./provider-drivers";
 import { providerHistoryPersistence } from "./provider-history-persistence";
 import { recordAgentRestartActivity } from "./restart-activity";
@@ -287,6 +292,8 @@ interface AgentServiceEvents {
   toolUsage: [usage: ToolUsageSignal];
   /** A workflow run ended, for the local host's product analytics. Never forwarded to a client. */
   workflowRun: [end: WorkflowRunEnd];
+  /** A Codex live voice transcript or end, for the window that runs the session. */
+  liveVoice: [event: VoiceLiveEvent];
 }
 
 export interface AgentServiceOptions {
@@ -476,6 +483,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #usageLimits: UsageLimitGate;
   readonly #drain: DrainScheduler;
   readonly #sessionSettings: SessionSettings;
+  readonly #liveVoice: LiveVoice;
   readonly #queue: QueueControls;
   readonly #attachments: AttachmentGateway;
   readonly #browserUploads: BrowserUploads;
@@ -739,7 +747,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       hooks: {
         bindClient: (client) => {
-          client.on("notification", (notification) => {
+          client.on("notification", (incoming) => {
+            if (incoming.method.startsWith("thread/realtime/")) {
+              this.#liveVoice.handleNotification(incoming, client);
+              return;
+            }
+            const notification = this.#liveVoiceTurn(incoming);
             if (notification.method === "openbot/sessionSettings/updated") {
               const threadId = getString(notification.params, "threadId");
               const agentId = threadId ? this.#conversation.agentForThread(threadId) : undefined;
@@ -868,7 +881,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         },
       },
       emit: (event) => this.#emit(event),
-      emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+      emitError: (code, error, agentId, context) => this.#emitError(code, error, agentId, context),
       requestTimeoutMs,
       preferredProvider,
       preferredModel,
@@ -1393,6 +1406,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hooks: {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         redactMcp: (text) => this.#mcp.redact(text),
+        tagReferences: (agentId, threadId) => this.#tagReferences(agentId, threadId),
         isStopping: () => this.#stopping,
         isDeleting: (agentId) => this.#removal.deleting().has(agentId),
         servesModel: (model, provider) => this.#endpoints.serves(model, provider),
@@ -1400,6 +1414,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         mayContinueOnBackup: (agentId) => this.#usageLimitBackup(agentId, true) !== undefined,
         turnEnded: (turnId) => this.#turn.hasEnded(turnId),
         turnRestarting: (turnId) => this.#turn.forgetEnded(turnId),
+        deliveriesStarting: (deliveryIds, start) => this.#turn.deliveriesStarting(deliveryIds, start),
         startRequestedNewChat: (agentId) => this.#startRequestedNewChat(agentId),
         dropRequestedNewChat: (agentId) => {
           if (this.#requestedNewChats.delete(agentId))
@@ -1460,6 +1475,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       exclusive: (run) => this.#endpoints.runExclusive(run),
       changed: (agentId) => this.#emit({ type: "agent-session-settings-changed", agentId }),
     });
+    this.#liveVoice = new LiveVoice({
+      agent: (agentId) => {
+        const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+        if (!agent) throw new Error(sourceText("error.agent.selectedGone"));
+        return agent;
+      },
+      // OpenBot stops an idle provider CLI; a typed message starts it again, and so does live voice.
+      client: (agent) => this.#providers.ensureAgentClient(agent),
+      ensureThread: (agent, client) => this.#threads.ensureThread(agent, client),
+      holdDrain: (agentId) => this.#drain.holdLiveVoice(agentId),
+      awaitDrain: (agentId) => this.#drain.taskFor(agentId)?.pipe(Effect.ignore) ?? Effect.void,
+      addSpeech: (agentId, providerThreadId, role, text) => this.#addSpeech(agentId, providerThreadId, role, text),
+      emit: (event) => this.emit("liveVoice", event),
+      redact: (text) => this.#mcp.redact(text),
+    });
     this.#browser.onControlChanged((state) => {
       this.#emit({ type: "browser-control-changed", state });
     });
@@ -1479,6 +1509,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           if (this.#tasks.deliveryTaskGone(deliveryId)) throw new Error(sourceText("error.backend.threadNotFound"));
           return this.#tasks.threadForDelivery(deliveryId);
         },
+        tagReferences: (agentId, threadId) => this.#tagReferences(agentId, threadId),
       },
     });
     this.#turn = new TurnLifecycle({
@@ -1617,6 +1648,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       mcpServers: mcpServersFromGateway(this.#mcp, options.prepareMcpTest),
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
       apiKeys: options.agentApiKeys ?? null,
+      vaultItems: options.vaultItems ?? null,
       hooks: {
         listAgents: () => this.listAgents(),
         listModels: () => this.listModels(),
@@ -1685,6 +1717,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** The provider-reported token counts of one turn by provider and model, for host analytics. */
   getTurnUsage(agentId: string, turnId: string, since: string) {
     return this.#store.database.usage.readTurn(agentId, turnId, since);
+  }
+
+  /** Where the time of a finished turn went, for host analytics. Once per turn. */
+  takeTurnTiming(turnId: string) {
+    return this.#turn.takeTurnTiming(turnId);
   }
 
   readonly getUsage = Effect.fn("AgentService.getUsage")(function* (this: AgentService, agentId?: string) {
@@ -4213,6 +4250,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       { startImmediately: true },
     );
     this.#initialized = false;
+    this.#liveVoice.dispose();
     this.#routineTimer.dispose();
     yield* this.#memoryHold.dispose();
     this.#hostedSites.dispose();
@@ -4374,6 +4412,54 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           (failure) => new AgentLifecycleFailed({ operation: "prepareImportedAttachments", cause: failure.cause }),
         ),
       );
+  }
+
+  /** Starts Codex live voice in the agent's chat and answers the renderer's WebRTC offer. */
+  startLiveVoice(
+    input: VoiceLiveStart,
+    voice: CodexLiveVoice | null,
+  ): Effect.Effect<VoiceLiveSession, AgentLifecycleFailed> {
+    return this.#liveVoice
+      .start(input, voice)
+      .pipe(
+        Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "startLiveVoice", cause: failure.cause })),
+      );
+  }
+
+  stopLiveVoice(sessionId: string): Effect.Effect<void> {
+    return this.#liveVoice.stop(sessionId);
+  }
+
+  /**
+   * The voice model of a live session starts its turns itself. A delivery that starts at the same
+   * time must not take such a turn, so the lifecycle reads it as a turn that no delivery started.
+   */
+  #liveVoiceTurn(notification: AppServerNotification): AppServerNotification {
+    if (notification.method !== "turn/started" || !isRecord(notification.params)) return notification;
+    const threadId = getString(notification.params, "threadId");
+    if (!threadId || !this.#liveVoice.isLiveThread(threadId)) return notification;
+    return { ...notification, params: { ...notification.params, unprompted: true } };
+  }
+
+  /** What the user or the voice said in a live voice session, as a message in the chat of that thread. */
+  #addSpeech(agentId: string, providerThreadId: string, role: "user" | "assistant", text: string): void {
+    try {
+      const snapshot = this.#conversation.ensureSnapshot(
+        agentId,
+        this.#conversation.publicThreadId(agentId, providerThreadId),
+      );
+      snapshot.messages.push({
+        id: randomUUID(),
+        author: role,
+        source: role,
+        text,
+        createdAt: new Date().toISOString(),
+        status: "completed",
+      });
+      this.#conversation.emitConversation(snapshot);
+    } catch (error) {
+      this.#emitError("live_voice_message_failed", error, agentId);
+    }
   }
 
   /** Keeps the Opus/WebM recording of a spoken message as a draft, for the message to replay. */
@@ -4658,6 +4744,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         throw new Error(sourceText("error.backend.threadStillRunning"));
       this.#tasks.delete(task);
     });
+    this.#browser.unshareThread(task.threadId);
     this.#drain.scheduleDrain(task.agentId);
   }).bind(this);
 
@@ -4899,7 +4986,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       });
     }
     if (timezone !== undefined) this.#routines.noteDeliveryTimezone(delivery.delivery.id, timezone);
-    const snapshot = this.#conversation.ensureSnapshot(agent.id, task?.threadId ?? agent.threadId);
+    const targetThreadId = task?.threadId ?? agent.threadId;
+    const snapshot = this.#conversation.ensureSnapshot(agent.id, targetThreadId);
     // A task message shows in the task's row until its turn starts, not in the agent's own chat.
     if (!task) this.#mailboxSync.syncMailboxMessages(snapshot);
     if (!task)
@@ -4930,6 +5018,36 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#drain.scheduleDrain(agent.id);
     return receipt;
   }, Effect.uninterruptible).bind(this);
+
+  /**
+   * The current state of the tabs and threads that a message to this agent tags. Each is read only
+   * when the prompt names it, and only for this agent: a tag of another agent's tab or thread reads
+   * as closed or deleted. A tagged tab becomes usable in `threadId`, the thread that gets the prompt.
+   * The share happens here, not when the message is queued, because a queued message can move to a
+   * new task or be edited before it runs. The browser host checks the owner, so a tag that names
+   * another agent's tab shares nothing.
+   */
+  #tagReferences(agentId: string, threadId: string | null): TagReferenceSource {
+    return {
+      tab: (tabId) => {
+        if (threadId) this.#browser.shareTab(tabId, { agentId, threadId });
+        return this.#browser.agentTab(tabId, agentId);
+      },
+      thread: (taskId) => {
+        if (!this.#tasks.has(agentId, taskId)) return null;
+        const task = this.#tasks.publicTask(this.#tasks.require(agentId, taskId));
+        const redact = (text: string | null | undefined) => (text ? this.#mcp.redact(text) : null);
+        if (task.state === "running") return { title: task.title, state: "working", detail: redact(task.progress) };
+        if (task.state === "queued") return { title: task.title, state: "queued", detail: null };
+        if (task.outcome === "failed") return { title: task.title, state: "failed", detail: redact(task.error) };
+        if (task.outcome === null) return { title: task.title, state: "idle", detail: null };
+        // The start of the last answer says what the thread found; history_read gives the rest.
+        const answer = this.#store.database.readAgentHistory(agentId, task.threadId, { author: "assistant", limit: 1 })
+          .messages[0]?.message.text;
+        return { title: task.title, state: task.outcome === "completed" ? "done" : "stopped", detail: redact(answer) };
+      },
+    };
+  }
 
   /** The turn that the user stopped last in a lane: the agent's own chat, or one task. */
   #stoppedTurn(agentId: string, taskId: string | null): string | null {

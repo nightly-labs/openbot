@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 import {
   type AgentProviderId,
   COMPUTER_USE_MCP_SERVER_ID,
+  COMPUTER_USE_MCP_SERVER_NAME,
   isReservedMcpServerName,
   type McpServerConfig,
   type McpTransport,
@@ -715,18 +716,20 @@ export function codexThreadMcpServers(
 }
 
 /**
- * The namespace Codex gives the tools of each server OpenBot turns on. For a code-mode-only model,
- * such as GPT-6, Codex otherwise defers MCP tools into `exec` without naming them, and the model
- * does not find them. These join the direct-only list, so the request names the tools. The keys are
- * the ones `codexMcpServers` chose, renamed keys included; a name Codex's own files declare is turned
- * off and has no tools. Codex changes each character other than a letter, a digit or `_` to `_`, then
- * adds `mcp__` unless the name starts with it.
+ * The MCP namespaces that Codex declares in each request, beside OpenBot's own. Codex defers the
+ * tools of every other server: behind its `tool_search`, or, for a code-mode-only model such as GPT-6,
+ * into `exec`, where the developer instructions name the servers. A direct namespace sends the schema
+ * of each of its tools in each request (#4468). Computer Use stays direct: its results are
+ * screenshots, and from `exec` a model must forward each image with `image()`. Its key is never
+ * renamed, see `codexMcpServerKey`.
  */
-export function codexMcpNamespaces(servers: Readonly<Record<string, CodexMcpServer>>): string[] {
-  return Object.keys(servers).map((key) => {
-    const name = key.replace(/[^A-Za-z0-9_]/gu, "_");
-    return name.startsWith("mcp__") ? name : `mcp__${name}`;
-  });
+export function codexDirectMcpNamespaces(servers: Readonly<Record<string, CodexMcpServer>>): string[] {
+  return Object.hasOwn(servers, COMPUTER_USE_MCP_SERVER_NAME) ? [`mcp__${COMPUTER_USE_MCP_SERVER_NAME}`] : [];
+}
+
+/** The servers that are on and whose tools Codex defers: all except Computer Use, see `codexDirectMcpNamespaces`. */
+export function codexDeferredMcpServers(configs: readonly McpServerConfig[]): McpServerConfig[] {
+  return configs.filter((config) => config.enabled && config.id !== COMPUTER_USE_MCP_SERVER_ID);
 }
 
 export function codexMcpServers(

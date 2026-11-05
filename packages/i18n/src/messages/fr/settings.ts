@@ -538,7 +538,7 @@ export const messages = {
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Pour de nombreux agents et un usage intensif du navigateur.",
   // The Voice tab: dictation models and the dictation language.
-  "settings.voice.models.title": "Modèle de dictée",
+  "settings.voice.dictation.section": "Dictée",
   "settings.voice.model.parakeet.description": "Rapide. Détecte seul la langue parlée, parmi 25 langues européennes.",
   "settings.voice.model.bark.description":
     "Rapide. Anglais uniquement. Écrit surtout en minuscules, avec peu de ponctuation.",
@@ -555,7 +555,6 @@ export const messages = {
   "settings.voice.model.useLabel": "Utiliser {name} pour la dictée",
   "settings.voice.model.removeLabel": "Retirer {name} de cet ordinateur",
   "settings.voice.language.section": "Langue",
-  "settings.voice.language.title": "Langue de la dictée",
   "settings.voice.language.description":
     "La langue que vous parlez. « Automatique » la détecte à partir de l’enregistrement.",
   "settings.voice.language.modelDetects":
@@ -583,6 +582,9 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "Lire les réponses à voix haute",
   "settings.voice.speech.readReplies.description":
     "Quand vous dictez un message, la réponse est lue à voix haute. Dictez à nouveau pour l’arrêter.",
+  "settings.voice.speech.codexLive.title": "Voix en direct Codex",
+  "settings.voice.speech.codexLive.description":
+    "Les conversations vocales avec les agents Codex utilisent la voix en direct d’OpenAI avec votre connexion Codex. Votre voix est envoyée à OpenAI.",
   "settings.voice.speech.speed.title": "Vitesse",
   "settings.voice.speech.voice.title": "Voix",
   "settings.voice.speech.voice.female": "Voix féminine {number}",
@@ -591,6 +593,8 @@ export const messages = {
   "settings.voice.speech.voice.stop": "Arrêter",
   "settings.voice.speech.sample": "Bonjour. Voici comment vos réponses sonneront.",
   "settings.voice.speech.listenFailed": "Impossible de lire l’extrait.",
+  "settings.voice.live.section": "Voix en direct",
+  "settings.voice.live.signIn": "Connectez-vous à Codex avec votre compte ChatGPT pour utiliser la voix en direct.",
   "settings.transfer.title": "Déplacer ce serveur vers un autre ordinateur",
   "settings.transfer.lede":
     "Vos agents, leurs compétences, routines, souvenirs et fichiers sont réunis dans un seul fichier.",

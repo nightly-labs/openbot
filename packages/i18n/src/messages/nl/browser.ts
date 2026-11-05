@@ -69,7 +69,6 @@ export const messages = {
   "browser.liveView.copyFailed": "Kan de tekst niet kopiëren. Klik op de pagina en probeer het opnieuw.",
   "browser.previews.label": "Browservoorbeelden",
   "browser.previews.resize": "Grootte van rechterpaneel wijzigen",
-  "browser.previews.collapse": "Browservoorbeelden samenvouwen",
   "browser.previews.empty": "Geen browsertabbladen",
   "browser.previews.openPage": "Open een pagina",
   "browser.preview.pageFallback": "Browserpagina",

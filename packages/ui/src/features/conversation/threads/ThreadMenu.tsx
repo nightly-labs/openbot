@@ -33,7 +33,7 @@ function ThreadMenuList(props: ThreadHeaderProps) {
               )}
             </Show>
             <ThreadTitle class="agent-threads-menu-title" title={thread.title} />
-            <ThreadStatusMark status={thread.status} />
+            <ThreadStatusMark status={thread.status} unread={thread.unread} />
             <span class="agent-threads-menu-time ui-menu-trailing">{sidebarMessageTime(thread.updatedAt, format)}</span>
           </DropdownMenu.Item>
         )}

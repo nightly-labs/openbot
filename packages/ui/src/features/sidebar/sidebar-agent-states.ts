@@ -198,3 +198,11 @@ export function sidebarChannelWaits(input: SidebarChannelWaitsInput): Record<str
 function threadKey(agentId: string, threadId: string): string {
   return `${agentId}\n${threadId}`;
 }
+
+/**
+ * The badge of a channel or a person: a wait first, then the unread count, which shows as the felt
+ * count of an agent row. The count stops at 99.
+ */
+export function sidebarUnreadBadge(unreadCount: number, wait?: SidebarAgentState): SidebarAgentState | undefined {
+  return wait ?? (unreadCount > 0 ? { kind: "unread", count: Math.min(unreadCount, 99) } : undefined);
+}

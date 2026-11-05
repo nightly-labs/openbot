@@ -552,7 +552,7 @@ export const messages = {
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Для многих агентов и интенсивной работы в браузере.",
   // The Voice tab: dictation models and the dictation language.
-  "settings.voice.models.title": "Модель диктовки",
+  "settings.voice.dictation.section": "Диктовка",
   "settings.voice.model.parakeet.description": "Быстрая. Сама определяет язык речи, 25 европейских языков.",
   "settings.voice.model.bark.description":
     "Быстрая. Только английский. Пишет в основном строчными буквами, почти без знаков препинания.",
@@ -569,7 +569,6 @@ export const messages = {
   "settings.voice.model.useLabel": "Использовать {name} для диктовки",
   "settings.voice.model.removeLabel": "Удалить {name} с этого компьютера",
   "settings.voice.language.section": "Язык",
-  "settings.voice.language.title": "Язык диктовки",
   "settings.voice.language.description": "Язык, на котором вы говорите. «Автоматически» определяет его по записи.",
   "settings.voice.language.modelDetects":
     "Parakeet сам определяет язык речи. Чтобы задать язык, используйте Whisper или ElevenLabs.",
@@ -596,6 +595,9 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "Читать ответы вслух",
   "settings.voice.speech.readReplies.description":
     "Когда вы диктуете сообщение, ответ читается вслух. Чтобы остановить его, начните диктовать снова.",
+  "settings.voice.speech.codexLive.title": "Живой голос Codex",
+  "settings.voice.speech.codexLive.description":
+    "Голосовые разговоры с агентами Codex используют живой голос OpenAI с вашим входом в Codex. Ваш голос передаётся в OpenAI.",
   "settings.voice.speech.speed.title": "Скорость",
   "settings.voice.speech.voice.title": "Голос",
   "settings.voice.speech.voice.female": "Женский голос {number}",
@@ -604,6 +606,8 @@ export const messages = {
   "settings.voice.speech.voice.stop": "Остановить",
   "settings.voice.speech.sample": "Здравствуйте. Так будут звучать ваши ответы.",
   "settings.voice.speech.listenFailed": "Не удалось воспроизвести образец.",
+  "settings.voice.live.section": "Живой голос",
+  "settings.voice.live.signIn": "Войдите в Codex с аккаунтом ChatGPT, чтобы использовать живой голос.",
   "settings.transfer.title": "Перенос сервера на другой компьютер",
   "settings.transfer.lede": "Ваши агенты, их навыки, регулярные задачи, память и файлы сохраняются в один файл.",
   "settings.transfer.flow.label": "Как проходит перенос",

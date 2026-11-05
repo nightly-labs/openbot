@@ -278,6 +278,24 @@ writes a `channel-change` note in the same commit, with the agent as author and 
 names the agent, the change and the person. Clients show it as an activity row, and it is not
 unread and not in the model packet.
 
+`channel_cancel` lets a member cancel a run that it owns when a person asks, for example when a
+newer request replaces it (`ChannelService.cancelOwnRun`). The `taskId` names the root task or one
+of its subtasks, and the whole run ends: each task of the run that has not ended becomes
+`cancelled`, running turns stop and queued deliveries are cancelled. Other runs, messages and files
+stay. It has the same person-request rule as the tools above (`PERSON_CANCEL_REQUIRED`). It refuses,
+with `accepted: false`, a run of another owner, the run of the caller's own task, a run that ended,
+and a run that a task of another open run depends on, which would then wait for ever. A person can
+stop those runs with the channel controls. The cancel goes through the command queue, keeps a
+receipt for a retried call and writes one `channel-change` note. The `cancel` command of the
+channel controls still accepts only a stopped or failed run. On desktop, each row of the
+waiting-for-subtasks list above the composer has Stop, which sends the `stop` command for that
+subtask. Its stopped-task card then offers Continue, Reassign and Cancel.
+
+The channel controls stop and cancel a run with no message that a model reads, and a change note is
+not in the packet. So each packet has `stoppedTasks`: the `paused` and `cancelled` tasks of the
+recent messages that the member owns, or that run under work it owns (`channelWorkOwners`). Without
+it, a lead said that it still waited for a subtask that a person had cancelled.
+
 From its own chats, an agent can make and change channels: `create_channel` and `update_channel`
 (`agent/channel-agent-tools.ts`). They set the name, title, instructions, members, lead, isolated
 memory and picture (an icon on a hue, or an image file that `loadAvatarFile` reads before any

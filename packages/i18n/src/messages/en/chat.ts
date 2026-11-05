@@ -103,6 +103,7 @@ export const messages = defineMessages("chat", {
   "chat.awaiting.needsYou": "{name} needs you",
   "chat.awaiting.limited": "{name} waits for a usage limit",
   "chat.awaiting.dismiss": "Hide this list",
+  "chat.awaiting.stop": "Stop",
   "chat.waits.label": "Open waits",
   "chat.waits.title": { one: "{count} open wait", other: "{count} open waits" },
   "chat.waits.active": "{state}: {note}",
@@ -419,4 +420,8 @@ export const messages = defineMessages("chat", {
   "chat.compaction.failed": "Could not compact context",
   "chat.compaction.tokens": "{before} → {after} tokens",
   "chat.compaction.continues": "Queued messages continue.",
+  "chat.reference.kind.tab": "Browser tab",
+  "chat.reference.kind.thread": "Thread",
+  "chat.reference.open.tab": "Show browser tab {name}",
+  "chat.reference.open.thread": "Open thread {name}",
 });

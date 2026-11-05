@@ -1,4 +1,4 @@
-import { isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
+import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
 import { ANALYTICS_GENERATIONS, openPanelTransport, ReportQueue } from "@openbot/telemetry";
 import { fileReportStorage } from "@openbot/telemetry/node";
 import { makeWASocket } from "@openbot/whatsapp/baileys";
@@ -108,7 +108,6 @@ import {
   Notification,
   nativeImage,
   powerMonitor,
-  safeStorage,
   screen,
   shell,
   systemPreferences,
@@ -215,6 +214,7 @@ import { GitHubConnectorStore } from "./github-connector-store";
 import { GitHubRelay, receiveGitHubDelivery } from "./github-relay";
 import { createGitHubRest, type WorkflowGitHubDirectory, workflowGitHubDirectory } from "./github-rest";
 import { HermesImportService } from "./hermes-import-service";
+import { HermesInstaller } from "./hermes-installer";
 import { HostEventsRuntime } from "./host-events-runtime";
 import { agentWebhookRoutineWriter, HostEventsService } from "./host-events-service";
 import { HostService } from "./host-service";
@@ -314,7 +314,14 @@ import { ResourceMonitor } from "./resource-monitor";
 import { StatementTimings } from "./resource-summary";
 import { RoutineFeedServer } from "./routine-feed-server";
 import { clearRoutineHold, ROUTINE_HOLD_FILE, takeRoutineHold, writeRoutineHold } from "./routine-hold-file";
+import type { UncleanExitProperties } from "./run-marker";
 import { ScreenCapturer } from "./screen-capture";
+import {
+  createSecretStorage,
+  SECRET_STORAGE_KEY_FILE,
+  type SecretStorage,
+  type SecretStorageCipher,
+} from "./secret-storage-cipher";
 import { SERVER_AUDIT_FILE, ServerAuditStore, serverAuditNames } from "./server-audit-store";
 import { AGENT_PROCESS_VARIABLE, agentProcessEnvironment, ServerMemory } from "./server-memory";
 import { ServerMode, type ServerModeEnvironment } from "./server-mode";
@@ -332,18 +339,21 @@ import { SignalIngress } from "./signal-ingress";
 import { SkillMarketplaceService } from "./skill-marketplace-service";
 import { SLACK_DEV_CALLBACK_PATH, startSlackDevCallbackServer } from "./slack-dev-callback-server";
 import { SpeechPreferenceStore } from "./speech-preference-store";
+import { StartupTiming } from "./startup-timing";
 import { TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
 import type { TeardownRegistry } from "./teardown-registry";
 import { THEME_PALETTE_DIRECTORY } from "./theme-palette-files";
 import { TraceFile } from "./trace-file";
-import { readUpdatePreference, writeUpdatePreference } from "./update-preference-store";
+import { readUpdatePreference, UPDATE_PREFERENCE_FILE, writeUpdatePreference } from "./update-preference-store";
 import { checkRestartReadiness, type RestartReadiness } from "./update-readiness";
 import {
   createDisabledUpdateAdapter,
+  electronUpdaterCacheDirectory,
   isNixStoreInstall,
   isValidSemver,
+  loadElectronUpdater,
   supportsInstalledUpdates,
   type UpdateAdapter,
   UpdateService,
@@ -381,7 +391,6 @@ const LANGUAGE_PREFERENCE_FILE = "openbot-language-preference-v1.json";
 const LOGO_COLOR_PREFERENCE_FILE = "openbot-logo-color-preference-v1.json";
 const APPEARANCE_PREFERENCE_FILE = "openbot-appearance-preference-v1.json";
 const INTERFACE_SIZE_PREFERENCE_FILE = "openbot-interface-size-preference-v1.json";
-const UPDATE_PREFERENCE_FILE = "openbot-update-preference-v1.json";
 const NOTIFICATION_PREFERENCE_FILE = "openbot-notification-preference-v1.json";
 const PUSH_NOTIFICATION_FILE = "openbot-push-notifications-v1.json";
 const BUSY_MESSAGE_MODE_PREFERENCE_FILE = "openbot-busy-message-mode-v1.json";
@@ -446,6 +455,7 @@ const DEVELOPMENT_BUNDLE_IDENTIFIER = "com.github.Electron";
 const TEARDOWN_ORDER = {
   // First, so a process that the teardown ends does not count as a crash.
   resourceMonitor: 9,
+  startupTiming: 9.5,
   updater: 10,
   idleRestart: 11,
   hostUpdateCoordinator: 12,
@@ -545,6 +555,8 @@ export interface ApplicationServiceContext {
   localServerChild: LocalServerChildEnvironment | null;
   /** The control pipe of a local server: the commands of the desktop app. */
   localServerControl: Readable | null;
+  /** How the previous run ended when it did not quit cleanly (`run-marker.ts`). */
+  previousUncleanExit: UncleanExitProperties | null;
   macHapticFeedback: MacHapticFeedback;
   teardown: TeardownRegistry;
   forwardCentralAuth: (state: CentralAuthState) => void;
@@ -676,8 +688,12 @@ export interface ApplicationServices {
   computerUseHighlight: ComputerUseHighlightController;
   computerUsePermissionHelp: ComputerUsePermissionHelpWindowController;
   analytics: HostAnalytics;
+  /** Starts the shared agent database host early. The entry point runs it after the first window loads. */
+  prewarmAgentDatabase: Effect.Effect<void>;
   trace: TraceFile;
   resourceMonitor: ResourceMonitor;
+  /** Null for a local server child: its parent desktop reports the start. */
+  startup: StartupTiming | null;
   machineAlerts: MachineAlertMonitor;
   teamStore: TeamStore;
   /**
@@ -690,37 +706,33 @@ export interface ApplicationServices {
   centralAuthInitialization: Effect.Effect<CentralAuthState, RemoteWorkflowError>;
 }
 
-/** How the driver's own state reads as the capability the Team API projects. */
-/** The Electron secret storage cipher that every encrypted file in userData uses. */
-function safeStorageCipher(
-  unavailableKey: "error.app.secretStorageUnavailable" | "error.app.macSecureStorageUnavailable",
-) {
-  return {
-    canPersist: () => safeStorage.isEncryptionAvailable(),
-    encrypt: (value: string) => {
-      if (!safeStorage.isEncryptionAvailable()) throw new Error(sourceText(unavailableKey));
-      return safeStorage.encryptString(value);
-    },
-    decrypt: (value: Buffer) => safeStorage.decryptString(value),
-  };
+let userDataSecretStorage: SecretStorage | null = null;
+
+/** The secret storage of userData. Made at first use, when userData has its final path. */
+function secretStorage(): SecretStorage {
+  userDataSecretStorage ??= createSecretStorage({
+    keyPath: join(app.getPath("userData"), SECRET_STORAGE_KEY_FILE),
+  });
+  return userDataSecretStorage;
 }
 
+/** The cipher that every encrypted file in userData uses: `safeStorage`, or the Linux key file. */
+function safeStorageCipher(
+  unavailableKey: "error.app.secretStorageUnavailable" | "error.app.macSecureStorageUnavailable",
+): SecretStorageCipher {
+  return secretStorage().cipher(() => sourceText(unavailableKey));
+}
+
+/** How the driver's own state reads as the capability the Team API projects. */
 function computerUseCapability(state: ComputerUseState): CapabilityState {
   if (state.status === "ready") return "ready";
   if (state.status === "permissions-required") return "setup-required";
   return "unavailable";
 }
 
-/** The base cache path of electron-updater 6.8.9 (`getAppCacheDir`), which differs from Electron's. */
-function electronUpdaterCacheRoot(): string {
-  if (process.platform === "win32") return process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local");
-  if (process.platform === "darwin") return join(homedir(), "Library", "Caches");
-  return process.env.XDG_CACHE_HOME || join(homedir(), ".cache");
-}
-
 interface MessagingServicesContext {
   teardown: TeardownRegistry;
-  secretCipher: ReturnType<typeof safeStorageCipher>;
+  secretCipher: SecretStorageCipher;
   centralAuth: CentralAuthManager;
   service: AgentService;
   sidebarLayout: SidebarLayoutStore;
@@ -944,6 +956,7 @@ export async function createApplicationServices({
   hostingDeveloperKey,
   localServerChild,
   localServerControl,
+  previousUncleanExit,
   macHapticFeedback,
   teardown,
   forwardCentralAuth,
@@ -957,6 +970,8 @@ export async function createApplicationServices({
   prepareForUpdateInstall,
   quitting,
 }: ApplicationServiceContext): Promise<ApplicationServices> {
+  // The start of the first `openbot:services.*` step, for the `system_startup` summary.
+  performance.mark("openbot:services.start");
   // First, so the provider lines of the whole startup reach the file.
   teardown.push(
     TEARDOWN_ORDER.providerLog,
@@ -1023,6 +1038,7 @@ export async function createApplicationServices({
     mobileConnectApiUrl: readMobileConnectApiUrl(process.env.OPENBOT_MOBILE_AUTH_API_URL, centralAuthApiUrl),
     storagePath: join(app.getPath("userData"), CENTRAL_AUTH_FILE),
     ...safeStorageCipher("error.app.macSecureStorageUnavailable"),
+    keyringChanged: () => secretStorage().madeKeyFile(),
     // The system browser, where the user is signed in to the company. The language loads below.
     companySignInBrowser: { open: (url) => shell.openExternal(url), language: () => language },
   });
@@ -1370,10 +1386,17 @@ export async function createApplicationServices({
       appData: app.getPath("appData"),
       userDataOverride: app.commandLine.getSwitchValue("user-data-dir"),
     });
+  const providerDownloads = join(app.getPath("userData"), "provider-runtimes", ".downloads");
+  const hermesInstaller = new HermesInstaller({
+    downloadRoot: providerDownloads,
+    // `service` exists before the first install can end: the row offers Download from its status.
+    refreshProvider: () => service.refreshProvider("hermes"),
+  });
   const providerRuntimes = new ProviderRuntimeManager({
     isProviderOn: (provider) => !providerUse.off().includes(provider),
     root: providerRuntimesRoot,
-    downloadRoot: join(app.getPath("userData"), "provider-runtimes", ".downloads"),
+    downloadRoot: providerDownloads,
+    hermesInstaller,
     updateRuntime: (runtime, install, signal, onWait) => {
       if (isManagedToolRuntime(runtime)) return install().pipe(Effect.asVoid);
       return service
@@ -2192,15 +2215,34 @@ export async function createApplicationServices({
    * latest upstream release. It knows the copies it downloaded itself; a CLI the user installed is
    * only ever reported in the agent status, so it is passed on from here. Its update offer installs
    * a managed copy and leaves the system installation untouched.
+   *
+   * A hosted server's image installs its own Claude and Codex CLIs, and updates them at boot. That
+   * update can fail with no error, and the user cannot install a CLI on the server. When the CLI is
+   * too old, the server downloads the managed copy itself, once per start: the provider showed as too
+   * old, which the user read as uninstalled (#4995). A too-old row has no `cliSource`, as the
+   * resolution failed; the download does nothing when the copy in the store is already the newest.
+   * A failed download shows its error, and the user can retry it.
    */
+  const replacedOutdatedSystemClis = new Set<ManagedProviderId>();
   const trackSystemCliVersions = (status: AgentStatus): void => {
     let copyInUse = false;
     for (const provider of status.providers ?? []) {
+      if (!isManagedRuntimeProvider(provider.id)) continue;
       const version = provider.cliSource === "system" ? (provider.version ?? null) : null;
-      if (isManagedRuntimeProvider(provider.id) && providerRuntimes.setSystemVersion(provider.id, version))
-        copyInUse = true;
+      if (providerRuntimes.setSystemVersion(provider.id, version)) copyInUse = true;
+      if (
+        hostedServer !== null &&
+        provider.state === "outdated" &&
+        !replacedOutdatedSystemClis.has(provider.id) &&
+        !providerUse.off().includes(provider.id)
+      ) {
+        replacedOutdatedSystemClis.add(provider.id);
+        Effect.runFork(providerRuntimes.download(provider.id).pipe(Effect.ignore));
+      }
     }
     if (copyInUse) Effect.runFork(providerRuntimes.providerUseChanged());
+    // Hermes has a Download only while the agent status finds no Hermes.
+    hermesInstaller.setProvider(status.providers?.find((provider) => provider.id === "hermes"));
   };
   trackSystemCliVersions(service.getStatus());
   service.on("event", (event) => {
@@ -2804,7 +2846,7 @@ export async function createApplicationServices({
     remoteDesktopStateDirectory: join(app.getPath("userData"), "remote-desktop-runtime"),
     getRemoteDesktopRuntimeCredentials: () =>
       Effect.suspend(() => {
-        if (!safeStorage.isEncryptionAvailable())
+        if (!secretCipher.canPersist())
           return Effect.fail(
             new RemoteWorkflowError({ cause: new Error(sourceText("error.app.secretStorageUnavailable")) }),
           );
@@ -2930,6 +2972,7 @@ export async function createApplicationServices({
         envKey: (name) => Boolean(process.env[name]?.trim()),
       }),
     resolveTurnUsage: (agentId, turnId, since) => service.getTurnUsage(agentId, turnId, since),
+    resolveTurnTiming: (turnId) => service.takeTurnTiming(turnId),
     resolveMcpServer: (name) => {
       const configs = service.listMcpServers().filter((server) => isReportedMcpServerName(server.name, name));
       if (configs.length === 0) return null;
@@ -2955,6 +2998,7 @@ export async function createApplicationServices({
       }),
     inventoryDay: analyticsInventoryDayStore(join(app.getPath("userData"), ANALYTICS_INVENTORY_FILE)),
     resources: resourceMonitor,
+    uncleanExit: previousUncleanExit,
   });
   teardown.push(TEARDOWN_ORDER.analytics, "host analytics", () => Effect.runPromise(analytics.close()));
   const analyticsPreferences = new AnalyticsPreferenceService({
@@ -2971,6 +3015,19 @@ export async function createApplicationServices({
   analytics.flushPending();
   service.on("failure", (failure) => analytics.handleFailure(failure));
   resourceMonitor.start(() => analytics.checkResources());
+  const startup = localServerChild
+    ? null
+    : new StartupTiming({
+        userDataPath: app.getPath("userData"),
+        appVersion: app.getVersion(),
+        server: hostedServer !== null || serverModeEnvironment !== null,
+        send: (properties) => analytics.handleStartup(properties),
+      });
+  if (startup) {
+    // Not awaited: the summary goes much later, and a start not read by then gives `unknown`.
+    Effect.runFork(startup.recordStart());
+    teardown.push(TEARDOWN_ORDER.startupTiming, "the startup timing", () => startup.dispose());
+  }
   const connectTrace = new RemoteConnectTrace((span) => trace.record(span));
   // Development only: a network round trip added to the WebRTC client, for `bun run perf:remote`.
   const developmentRoundTripMs = app.isPackaged ? 0 : Math.max(0, Number(process.env.OPENBOT_DEV_RTT_MS) || 0);
@@ -3304,19 +3361,12 @@ export async function createApplicationServices({
       ...(containerInstaller ? { paths: CONTAINER_UPDATE_PATHS } : {}),
     });
   } else if (updatesEnabled) {
-    try {
-      const updaterModule = await import("electron-updater");
-      const realAdapter = updaterModule.autoUpdater ?? updaterModule.default?.autoUpdater ?? updaterModule.default;
-      if (realAdapter) {
-        updateAdapter = realAdapter;
-        updaterCacheDirectory = join(electronUpdaterCacheRoot(), "openbot-updater");
-      } else {
-        updaterEnabled = false;
-        logger.warn("OpenBot updates are disabled: electron-updater did not export autoUpdater");
-      }
-    } catch {
+    const realAdapter = await loadElectronUpdater();
+    if (realAdapter) {
+      updateAdapter = realAdapter;
+      updaterCacheDirectory = electronUpdaterCacheDirectory();
+    } else {
       updaterEnabled = false;
-      logger.warn("OpenBot updates are disabled: electron-updater failed to load");
     }
   }
   const updater = new UpdateService(updateAdapter, {
@@ -3658,8 +3708,10 @@ export async function createApplicationServices({
     computerUseHighlight,
     computerUsePermissionHelp,
     analytics,
+    prewarmAgentDatabase: tables.prewarm(),
     trace,
     resourceMonitor,
+    startup,
     machineAlerts,
     teamStore,
     appliedAccount: signedInState,

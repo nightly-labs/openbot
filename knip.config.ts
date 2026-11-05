@@ -52,6 +52,8 @@ const config: KnipConfig = {
     "browser-harness",
     // Reads the memory that programs can still use on macOS, for the machine part of Storage.
     "vm_stat",
+    // Starts a D-Bus session with a test keyring in the Linux secret storage E2E script.
+    "dbus-run-session",
   ],
   workspaces: {
     ".": {

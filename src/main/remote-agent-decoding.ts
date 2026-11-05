@@ -30,6 +30,7 @@ import type {
   AgentNewChatSettings,
   AgentStatus,
   AgentSummary,
+  AgentTaskReadState,
   ClientAgentModelOption,
   ClientAgentSummary,
   DraftAttachment,
@@ -83,6 +84,10 @@ export const decodeRemoteAgentTask = guardedDecoder(isAgentTask, "remote agent t
 export const decodeRemoteAgentThreadBranches = guardedDecoder(isAgentThreadBranchLinks, "remote thread branches");
 export const decodeRemoteTaskConversation = guardedDecoder(isConversationSnapshot, "remote task conversation");
 export const decodeRemoteTaskReadState = guardedDecoder(isAgentTaskReadState, "remote thread read state");
+const decodeTaskReadStates = guardedListDecoder(isAgentTaskReadState, "remote thread read states");
+export function decodeRemoteTaskReadStates(value: unknown): AgentTaskReadState[] {
+  return decodeTaskReadStates(decodeRecord(value, "remote thread reads").reads);
+}
 
 export function decodeDraftAttachment(value: unknown): DraftAttachment {
   if (!isAttachmentSummary(value)) throw new Error("Invalid attachment.");

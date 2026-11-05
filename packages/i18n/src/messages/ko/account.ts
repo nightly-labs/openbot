@@ -63,6 +63,8 @@ export const messages = {
   "account.login.connectingDescription": "계정 서비스를 시작하는 중이에요. 잠시만 기다려 주세요.",
   "account.login.unavailableDescription": "지금은 OpenBot이 계정 서비스에 연결할 수 없어요.",
   "account.login.signInDescription": "이메일로 로그인하거나 계정을 만들어 보세요. 일회용 코드를 보내 드려요.",
+  "account.login.keyringChangedDescription":
+    "시스템 키링이 마지막 로그인을 잃어버렸어요. 이제 OpenBot은 이 컴퓨터의 자체 파일에 로그인을 보관해요. 한 번 더 로그인해 주세요.",
   "account.login.codeAccepted": "코드가 확인됐어요.",
   "account.login.codeSent": "{email}(으)로 코드를 보냈어요.",
   "account.login.connectingSecurely": "안전하게 연결하는 중…",

@@ -220,6 +220,25 @@ export function isGlogBelowErrorDiagnostic(message: string): boolean {
 }
 
 /**
+ * A Rust log record whose own level is below error, as in
+ * `2026-11-04T23:00:00.123456Z  INFO devin::acp: request failed, will retry` (`tracing`) or
+ * `[2026-11-04T23:00:00Z INFO  devin::acp] …` (`env_logger`).
+ *
+ * ACP gives stderr to the agent for its logs; a failure reaches OpenBot as an answer or as the exit.
+ * Devin CLI 3000.11.234 writes its info records to stderr, and a word such as "failed" in one let it
+ * through as a provider error (#5064). The level of the record decides instead.
+ *
+ * Only a record that opens with the level, after an optional timestamp, counts. An `ERROR` record,
+ * or text without a level - a Rust panic included - stays visible.
+ */
+const RUST_LOG_RECORD =
+  /^\[?(?:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\s+)?(?:TRACE|DEBUG|INFO|WARN)\s/u;
+
+export function isRustLogBelowErrorDiagnostic(message: string): boolean {
+  return RUST_LOG_RECORD.test(message);
+}
+
+/**
  * The timestamp a CLI's log formatter writes before a record, as in
  * `2026-09-23T06:57:23.278161Z ERROR …`. It is removed from what the renderer shows: it is not
  * something to act on, and it makes every repeat of one failure a new message.

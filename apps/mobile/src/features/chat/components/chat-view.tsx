@@ -12,7 +12,7 @@ import { type ParamListBase, useNavigation } from "expo-router/react-navigation"
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowDown from "lucide-react-native/icons/arrow-down";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, type SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Keyboard, useColorScheme, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { KeyboardGestureArea } from "react-native-keyboard-controller";
@@ -64,6 +64,7 @@ import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import { useReducedTransparency } from "@/shared/lib/use-reduced-transparency";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
+import { getComposerDraft, useComposerDraft } from "../model/composer-drafts";
 import {
   deleteComposerFiles,
   takeComposerFocus,
@@ -320,7 +321,28 @@ export function ChatView({
   const [selection, setSelection] = useState<{ message: ChatBubbleMessage; selected: string } | null>(null);
   const selectionQuote = selection ? selection.selected.trim() || markdownPlainText(selection.message.body) : "";
   const [replyFocusVersion, setReplyFocusVersion] = useState(0);
-  const [draft, setDraft] = useState("");
+  // Each chat keeps its own unsent text, so a look at another chat does not lose it.
+  const draftChat = useMemo(
+    () => ({ kind: target.kind, serverId: target.serverId, id: target.id }),
+    [target.kind, target.serverId, target.id],
+  );
+  const [sharedDraft, setSharedDraft] = useComposerDraft(draftChat);
+  // The messages whose text and files are in the composer. The send replaces them. The outbox keeps
+  // them until the send, and they come back stopped when the chat closes.
+  const editedMessages = useRef(new Set<string>());
+  // While this screen holds an Edit, its text stays on this screen, with the files and reply of the
+  // edited messages. Another screen of the chat shows the text from before the first Edit, so it
+  // cannot send the edited text without its files, and a close leaves that text.
+  const [editDraft, setEditDraft] = useState<string | null>(null);
+  const draftBeforeEdit = useRef("");
+  const draft = editDraft ?? sharedDraft;
+  const setDraft = useCallback(
+    (value: SetStateAction<string>) => {
+      if (!editedMessages.current.size) return setSharedDraft(value);
+      setEditDraft((current) => (typeof value === "function" ? value(current ?? "") : value));
+    },
+    [setSharedDraft],
+  );
   const [sendError, setSendError] = useState<{
     agentId: string;
     message: string;
@@ -529,7 +551,7 @@ export function ChatView({
     void composerAttachments
       .addShared(request.text, files, (text) => setDraft((current) => (current ? `${current}\n${text}` : text)))
       .finally(() => deleteComposerFiles(files));
-  }, [isFocused, composerRequest, target.kind, target.serverId, target.id, composerAttachments.addShared]);
+  }, [isFocused, composerRequest, target.kind, target.serverId, target.id, composerAttachments.addShared, setDraft]);
   const composerFocus = useComposerRequest((state) => state.focus);
   const [handoffFocusVersion, setHandoffFocusVersion] = useState(0);
   useEffect(() => {
@@ -811,7 +833,13 @@ export function ChatView({
   /** The composer sends what Edit gave it: the messages it came from are replaced. */
   function takeEditedMessages(): string[] {
     const ids = [...editedMessages.current];
+    if (!ids.length) return ids;
     editedMessages.current.clear();
+    setEditDraft(null);
+    // The sent text held the draft from before the first Edit. Text that another screen of the chat
+    // wrote since then stays.
+    const before = draftBeforeEdit.current;
+    setSharedDraft((current) => (current === before ? "" : current));
     return ids;
   }
 
@@ -855,9 +883,6 @@ export function ChatView({
     deliver(serializeSelectionInstruction(instruction, selectionQuote), hostMessageId(selection.message.id), []);
   }
 
-  // The messages whose text and files are in the composer. The composer draft is not saved, so the
-  // outbox keeps them until it sends, and they come back stopped when the chat closes.
-  const editedMessages = useRef(new Set<string>());
   const mounted = useRef(false);
   useEffect(() => {
     mounted.current = true;
@@ -865,6 +890,7 @@ export function ChatView({
     return () => {
       mounted.current = false;
       outbox.stopEditing(edited);
+      edited.clear();
     };
   }, [outbox]);
   /**
@@ -892,9 +918,13 @@ export function ChatView({
       outbox.stopEditing([clientMessageId]);
       return;
     }
-    editedMessages.current.add(clientMessageId);
     const { text: body, replyToMessageId, files } = restored;
-    if (body) setDraft((current) => (current ? `${body}\n${current}` : body));
+    if (!editedMessages.current.size) draftBeforeEdit.current = getComposerDraft(draftChat);
+    editedMessages.current.add(clientMessageId);
+    setEditDraft((current) => {
+      const base = current ?? draftBeforeEdit.current;
+      return body ? (base ? `${body}\n${base}` : body) : base;
+    });
     const reply = projectedMessages.find(
       (message): message is ChatBubbleMessage => message.kind === "message" && message.id === replyToMessageId,
     );
@@ -908,12 +938,14 @@ export function ChatView({
   });
   // A stopped upload is the person's own choice: the text and files go back to the composer, and no
   // error is needed to explain it.
+  // Only the chat in front takes them, so that one screen of a chat holds the edit.
   useEffect(() => {
+    if (!isFocused) return;
     const returned = outboxMessages.filter((message) => message.returned);
     if (!returned.length) return;
     cancelSend.current();
     for (const message of returned) void editOutboxMessage.current(message.clientMessageId);
-  }, [outboxMessages]);
+  }, [outboxMessages, isFocused]);
   const outboxStatuses = useMemo(() => {
     const statuses = new Map<string, OutboxRowStatus>();
     // The waiting messages share one status line, under the last of them.
