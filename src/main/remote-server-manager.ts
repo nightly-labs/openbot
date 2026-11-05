@@ -473,6 +473,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#webrtcTransport?.on("connected", (serverId) => {
       this.#events.clearReconnectBackoff(serverId);
       this.#hostRestartAway.delete(serverId);
+      const hostedStartAt = this.#hostedStartAt.get(serverId);
+      if (hostedStartAt !== undefined)
+        this.#connectTrace?.hostedStart(serverId, Math.max(0, Date.now() - hostedStartAt));
       this.#clearHostedStart(serverId);
       this.#hostedStartExpired.delete(serverId);
       this.#connections.markConnected(serverId);

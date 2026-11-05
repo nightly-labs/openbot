@@ -73,14 +73,14 @@ self-hosted OpenPanel service for product analytics. Development builds, preview
 The production account service also sends OpenPanel an event when a paid plan or a hosted server
 changes: a Checkout starts or expires, a plan starts, changes, is cancelled or ends, a payment
 succeeds or fails, a payment is refunded or disputed, the Customer Portal opens, or a hosted server is set up, fails to set up, stops
-after no use, starts, changes its machine, stops at the end of its plan, is renewed or is deleted.
+after no use, starts, becomes ready after a start, changes its machine, stops at the end of its plan, is renewed or is deleted.
 It also sends these events for a license: a Checkout starts, the license starts, its number of
 users goes up or down, its renewal is cancelled or resumed, it ends, or its payment succeeds, fails,
 is refunded or is disputed.
 Each event has your account ID and only fixed values: the action, whether it is a server plan or a
 license, the plan, the number of license users, the billing period, the currency, the amount that
-Stripe reports, the place in the app where the plans were opened, the server size, the start reason
-and an error code. It has
+Stripe reports, the place in the app where the plans were opened, the server size, the start reason,
+how long a start took, and an error code. It has
 no email, name, Stripe ID or server ID. The desktop analytics setting does not stop these events,
 because the account service sends them and not your computer.
 When you pay for a plan or a license (it starts, each payment succeeds, it changes, or its renewal
@@ -325,6 +325,12 @@ when there is no install ID.
   slowest startup step from a fixed list; and whether it was the first start since the computer
   booted, a later one, or the first start of a new version. To know this, the app keeps the time and
   version of its last start in a local file that is not sent. Paths and names are not sent.
+- **Connection time.** When this computer connects to a remote server, the host sends how long the
+  connection took, rounded, and how long each fixed step of it took; whether it was the first
+  connection to that server since the app started; whether the session was new or saved; how many
+  attempts failed before it; and, for a hosted server, how long the server took to start. The first
+  attempt that fails after a connection also sends the last step that finished. The server ID,
+  address, session, ticket and keys are not sent.
 - **Turn times.** When a turn completes, the host sends how long the message waited in the queue, how
   long the provider took to start the turn and, when it had to start, its process, and how long until
   the first output. These are times only; the messages are not sent.
