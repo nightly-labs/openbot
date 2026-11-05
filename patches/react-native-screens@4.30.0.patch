@@ -1,17 +1,16 @@
 diff --git a/android/src/main/java/com/swmansion/rnscreens/ScreenContainer.kt b/android/src/main/java/com/swmansion/rnscreens/ScreenContainer.kt
-index 6f935c145068b68e0233faa668cc70f8c411169f..92bac93af01568938b1f276ebcba908c464e1e1a 100644
+index 6f935c145068b68e0233faa668cc70f8c411169f..7e01fc6ddfc89dad6a2b98dd775ba1c7a782bf9e 100644
 --- a/android/src/main/java/com/swmansion/rnscreens/ScreenContainer.kt
 +++ b/android/src/main/java/com/swmansion/rnscreens/ScreenContainer.kt
-@@ -2,6 +2,8 @@ package com.swmansion.rnscreens
- 
- import android.content.Context
- import android.content.ContextWrapper
-+import android.os.Handler
-+import android.os.Looper
- import android.view.Choreographer
- import android.view.View
- import android.view.ViewGroup
-@@ -44,6 +46,9 @@ open class ScreenContainer(
+@@ -13,6 +13,7 @@ import androidx.fragment.app.FragmentManager
+ import androidx.fragment.app.FragmentTransaction
+ import com.facebook.react.ReactRootView
+ import com.facebook.react.bridge.ReactContext
++import com.facebook.react.bridge.UiThreadUtil
+ import com.facebook.react.modules.core.ReactChoreographer
+ import com.facebook.react.uimanager.ThemedReactContext
+ import com.facebook.react.uimanager.UIManagerHelper
+@@ -44,6 +45,9 @@ open class ScreenContainer(
          }
      private var parentScreenWrapper: ScreenFragmentWrapper? = null
  
@@ -21,7 +20,7 @@ index 6f935c145068b68e0233faa668cc70f8c411169f..92bac93af01568938b1f276ebcba908c
      override fun shouldDelayChildPressedState(): Boolean = false
  
      override fun onLayout(
-@@ -278,6 +283,8 @@ open class ScreenContainer(
+@@ -278,6 +282,8 @@ open class ScreenContainer(
      override fun onAttachedToWindow() {
          super.onAttachedToWindow()
          isAttached = true
@@ -30,7 +29,7 @@ index 6f935c145068b68e0233faa668cc70f8c411169f..92bac93af01568938b1f276ebcba908c
          setupFragmentManager()
      }
  
-@@ -315,8 +322,7 @@ open class ScreenContainer(
+@@ -315,8 +321,7 @@ open class ScreenContainer(
          // attempt to reattach previously registered fragments that are not removed
          fragmentManager?.let {
              if (!it.isDestroyed) {
@@ -40,7 +39,7 @@ index 6f935c145068b68e0233faa668cc70f8c411169f..92bac93af01568938b1f276ebcba908c
              }
          }
  
-@@ -342,6 +348,36 @@ open class ScreenContainer(
+@@ -342,6 +347,37 @@ open class ScreenContainer(
          }
      }
  
@@ -54,12 +53,13 @@ index 6f935c145068b68e0233faa668cc70f8c411169f..92bac93af01568938b1f276ebcba908c
 +            removeMyFragments(fragmentManager)
 +            fragmentManager.executePendingTransactions()
 +        } catch (e: IllegalStateException) {
-+            // FragmentManager throws this before it changes state, so the removal can run again.
++            // `commitNow` and `executePendingTransactions` throw this before they change state, and a
++            // second removal skips fragments that are already removed, so the removal can run again.
 +            if (e.message != FRAGMENT_MANAGER_EXECUTING_MESSAGE) {
 +                throw e
 +            }
 +            deferredFragmentRemoval = fragmentManager
-+            Handler(Looper.getMainLooper()).post {
++            UiThreadUtil.runOnUiThread {
 +                runDeferredFragmentRemoval()
 +                performUpdates()
 +            }
