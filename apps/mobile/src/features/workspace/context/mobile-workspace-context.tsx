@@ -1194,16 +1194,17 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         sections,
       ]);
       if (!context.isCurrent()) return;
-      // The server is usable now, so the reconnect status does not wait for every cached chat. They
-      // load again after it, the open chat first. A lost connection stops them, and the next attempt
-      // loads them again; a chat that does not load here loads when it opens.
-      const ordered = [...summaries].sort(
-        (a, b) => Number(conversationStore.isObserved(b.id)) - Number(conversationStore.isObserved(a.id)),
-      );
+      // The server is usable now, so the reconnect status does not wait for the open chats. They load
+      // again after it. A lost connection stops them, and the next attempt loads them again. A closed
+      // chat loads when it opens: it is not up to date after `markStale`. The phone's copy can hold
+      // every chat that the user opened, and a read of each one on each connect held the replies to
+      // the user's own requests on the ordered rpc channel for tens of seconds (#5091).
+      const open = summaries.filter((agent) => conversationStore.isObserved(agent.id));
       void (async () => {
-        for (const agent of ordered) {
+        for (const agent of open) {
           if (!context.isCurrent()) return;
-          if (!conversationStore.get(agent.id)) continue;
+          // A chat that the user closed during the loop loads when it opens again.
+          if (!conversationStore.get(agent.id) || !conversationStore.isObserved(agent.id)) continue;
           await conversationStore
             .loadLatest(
               agent.id,
