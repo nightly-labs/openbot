@@ -187,7 +187,8 @@ export class UsageLimitGate {
       accountId,
       model: turnModel,
       endsAt,
-      spent,
+      // A later error of another kind does not end a spent balance that is still held.
+      spent: spent || previous?.spent === true,
       timer: this.#armFailure(key, endsAt),
     });
   }
