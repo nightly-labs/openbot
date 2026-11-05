@@ -91,6 +91,7 @@ import { memoryIpcHandlers } from "./ipc/memory-handlers";
 import { messagingIpcHandlers } from "./ipc/messaging-handlers";
 import { notificationIpcHandlers } from "./ipc/notification-handlers";
 import { onePasswordConnectorIpcHandlers } from "./ipc/onepassword-connector-handlers";
+import { passwordManagersIpcHandlers } from "./ipc/password-managers-handlers";
 import { pluginIpcHandlers } from "./ipc/plugin-handlers";
 import { providerAdminIpcHandlers } from "./ipc/provider-admin-handlers";
 import { providerDetectionIpcHandlers } from "./ipc/provider-detection-handlers";
@@ -468,6 +469,7 @@ const {
   forwardLinkAccountStatus,
   forwardOnePasswordConnectorStatus,
   forwardBitwardenConnectorStatus,
+  forwardPasswordManagerStatus,
   forwardVaultState,
   forwardHostStatus,
   forwardRemoteDesktopSessions,
@@ -690,6 +692,7 @@ function registerIpcHandlers({
   linkAccount,
   onePasswordConnector,
   bitwardenConnector,
+  passwordManagers,
   vault,
   billing,
   license,
@@ -801,6 +804,7 @@ function registerIpcHandlers({
     ...linkAccountIpcHandlers({ linkAccount }),
     ...onePasswordConnectorIpcHandlers({ onePasswordConnector, remoteServers }),
     ...bitwardenConnectorIpcHandlers({ bitwardenConnector, remoteServers }),
+    ...passwordManagersIpcHandlers({ passwordManagers, remoteServers, openExternal: openLink }),
     ...vaultIpcHandlers({ vault, getMainWindow: getDialogParent, translate: language.translate, remoteServers }),
     ...billingIpcHandlers({ billing }),
     ...licenseIpcHandlers({ license }),
@@ -1429,6 +1433,7 @@ if (!hasSingleInstanceLock) {
       built.linkAccount.onChanged(forwardLinkAccountStatus);
       built.onePasswordConnector.onChanged(forwardOnePasswordConnectorStatus);
       built.bitwardenConnector.onChanged(forwardBitwardenConnectorStatus);
+      built.passwordManagers.onChanged(forwardPasswordManagerStatus);
       built.vault.onChanged(forwardVaultState);
       remoteServers.on("changed", forwardServers);
       remoteServers.on("agent", (serverId, event, bufferedLive) => {

@@ -23,6 +23,7 @@ export const messages = {
   "mobile.marketplace.app.githubTagline": "Repozytoria, zgłoszenia i pull requesty",
   "mobile.marketplace.app.onePasswordTagline": "Loguj się do witryn danymi logowania, które udostępniasz",
   "mobile.marketplace.app.bitwardenTagline": "Loguj się do witryn danymi logowania z udostępnionego folderu",
+  "mobile.marketplace.app.protonPassTagline": "Loguj się do witryn danymi logowania z udostępnionego sejfu",
   "mobile.marketplace.search.placeholder": "Szukaj w Marketplace",
   "mobile.marketplace.search.clear": "Wyczyść wyszukiwanie",
   "mobile.marketplace.search.close": "Zamknij wyszukiwanie",

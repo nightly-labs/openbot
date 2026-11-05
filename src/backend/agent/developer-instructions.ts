@@ -15,6 +15,7 @@ import {
 import { redactText } from "@openbot/logging";
 import { automationRunCommand } from "../automation-command";
 import type { HomeSkill } from "../home-skills";
+import { PASSWORD_MANAGER_BRAND_NAMES } from "../password-vault";
 import type { PromptInstructionsFile } from "./workspace-instructions";
 import { existingAgentFolders, workspaceExcludedFolders } from "./workspace-sandbox";
 
@@ -287,7 +288,7 @@ export function developerInstructions(
       : []),
     ...(options.passwordVault
       ? [
-          "The user shares saved logins with OpenBot, from 1Password, Bitwarden, or the OpenBot Vault: before a username, password, or authenticator-app step, call openbot_browser.list_logins for the tab and follow the browser guidance.",
+          `The user shares saved logins with OpenBot, from ${PASSWORD_MANAGER_BRAND_NAMES.join(", ")}, or the OpenBot Vault: before a username, password, or authenticator-app step, call openbot_browser.list_logins for the tab and follow the browser guidance.`,
           ROUTINE_SIGN_IN_RULE,
         ]
       : []),

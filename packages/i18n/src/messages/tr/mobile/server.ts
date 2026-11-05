@@ -572,6 +572,49 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectTitle": "1Password bağlantısı kesilsin mi?",
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host} belirteci unutur. Kasa ve hizmet hesabı 1Password'de kalır; artık gerekmiyorsa onları orada kaldırın.",
+  "mobile.server.connectors.protonPass.title": "Proton Pass",
+  "mobile.server.connectors.protonPass.description":
+    "{host} üzerindeki OpenBot ile bir Proton Pass kasası paylaşın; böylece {host} üzerindeki ajanlar onun tarayıcısında sitelere giriş yapabilir.",
+  "mobile.server.connectors.protonPass.keyHelp":
+    "Proton Pass'te yalnızca OpenBot ile paylaştığınız kasayı okuyabilen bir erişim anahtarı oluşturun ve buraya yapıştırın. Anahtarı {host} saklar; bu telefon saklamaz.",
+  "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.passwordManager.unavailable": "{name} bu sunucuda kullanılamıyor.",
+  "mobile.server.connectors.passwordManager.howItWorks":
+    "Bu telefonda {name} hesabınıza giriş yapın. Ardından {host} paylaşılan bir kasa ve onun için salt okunur bir erişim anahtarı oluşturur ve yalnızca bu anahtarı saklar. Ajanlar hiçbir zaman parola görmez.",
+  "mobile.server.connectors.passwordManager.connect": "{name} hesabını bağla",
+  "mobile.server.connectors.passwordManager.connecting": "Bağlanıyor…",
+  "mobile.server.connectors.passwordManager.useKey": "Erişim anahtarı kullan",
+  "mobile.server.connectors.passwordManager.key": "Erişim anahtarı",
+  "mobile.server.connectors.passwordManager.connectWithKey": "Anahtarla bağlan",
+  "mobile.server.connectors.passwordManager.signInTitle": "{name} hesabına giriş yapın",
+  "mobile.server.connectors.passwordManager.signInFooter":
+    "{name} sayfasında giriş yapın. Giriş yaptığınızda bu sayfa değişir.",
+  "mobile.server.connectors.passwordManager.signInWaiting": "{host} giriş sayfasını alıyor…",
+  "mobile.server.connectors.passwordManager.openSignIn": "Giriş sayfasını aç",
+  "mobile.server.connectors.passwordManager.copyLink": "Bağlantıyı kopyala",
+  "mobile.server.connectors.passwordManager.extraPassword": "Ek parola",
+  "mobile.server.connectors.passwordManager.extraPasswordHint":
+    "{name} ek parolanızı istiyor. Parola bir kez {host} sunucusuna gider; bu telefon onu saklamaz.",
+  "mobile.server.connectors.passwordManager.extraPasswordWrong": "Ek parola doğru değil. Tekrar deneyin.",
+  "mobile.server.connectors.passwordManager.continue": "Devam",
+  "mobile.server.connectors.passwordManager.setupBody": "{host} paylaşılan kasayı oluşturuyor…",
+  "mobile.server.connectors.passwordManager.vaultTitle": "Paylaşılan kasa",
+  "mobile.server.connectors.passwordManager.vaultFooter":
+    "Ajanların bir girişle oturum açabilmesi için {name} içinde o girişi bu kasaya taşıyın. Durdurmak için kaldırın.",
+  "mobile.server.connectors.passwordManager.loginCount": { one: "{count} giriş", other: "{count} giriş" },
+  "mobile.server.connectors.passwordManager.keyTitle": "Erişim anahtarı",
+  "mobile.server.connectors.passwordManager.keyReadOnly": "Salt okunur",
+  "mobile.server.connectors.passwordManager.keyExpires": "Salt okunur. Süresi {date} tarihinde dolar.",
+  "mobile.server.connectors.passwordManager.keyExpired": "Süresi {date} tarihinde doldu",
+  "mobile.server.connectors.passwordManager.plan":
+    "{name} komut satırı aracı ücretli bir plan gerektirir. Hesabınızın planını değiştirin, ardından yeniden bağlanın.",
+  "mobile.server.connectors.passwordManager.expiredTitle": "{name} anahtarının süresi doldu",
+  "mobile.server.connectors.passwordManager.expiredBody":
+    "Yeniden bağlanana kadar {host} üzerindeki ajanlar paylaşılan girişlerinizle oturum açamaz.",
+  "mobile.server.connectors.passwordManager.disconnect": "{name} bağlantısını kes",
+  "mobile.server.connectors.passwordManager.disconnectTitle": "{name} bağlantısı kesilsin mi?",
+  "mobile.server.connectors.passwordManager.disconnectBody":
+    "{host} kendi erişim anahtarını siler. Kasa ve içindeki girişler {name} hesabınızda kalır.",
   "mobile.server.connectors.slack.title": "Slack",
   "mobile.server.connectors.slack.description":
     "Kullanıcılar Slack'te @OpenBot'tan bahseder veya doğrudan mesaj gönderir. Slack Düzenleyicisi doğru ajana sorar ve yanıtlar.",

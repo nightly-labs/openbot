@@ -70,6 +70,7 @@ export * from "./ipc-messaging";
 export * from "./ipc-model-visibility";
 export * from "./ipc-notifications";
 export * from "./ipc-onepassword-connector";
+export * from "./ipc-password-managers";
 export * from "./ipc-prompt-cache";
 export * from "./ipc-provider-admin";
 export * from "./ipc-provider-detection";

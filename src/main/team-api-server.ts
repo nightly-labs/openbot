@@ -92,6 +92,7 @@ import {
   MEMORY_REVIEW_CAPABILITY,
   MODEL_VISIBILITY_CAPABILITY,
   ONEPASSWORD_CONNECTOR_CAPABILITY,
+  PASSWORD_MANAGERS_CAPABILITY,
   PROMPT_CACHE_TTL_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY,
@@ -290,6 +291,7 @@ import { routeMemoryReview } from "./team-api/route-memory-review";
 import { routeMessageDelete } from "./team-api/route-message-delete";
 import { routeModelVisibility } from "./team-api/route-model-visibility";
 import { routeOnePasswordConnector } from "./team-api/route-onepassword-connector";
+import { routePasswordManagers } from "./team-api/route-password-managers";
 import { routePromptCacheTtl } from "./team-api/route-prompt-cache-ttl";
 import { routeProviderAccounts } from "./team-api/route-provider-accounts";
 import { routeProviderDefault } from "./team-api/route-provider-default";
@@ -1022,6 +1024,7 @@ export class TeamApiServer {
       if ((await routeWhatsAppConnector(context, this.#options.connectors)) === "handled") return;
       if ((await routeOnePasswordConnector(context, this.#options.onePasswordConnector)) === "handled") return;
       if ((await routeBitwardenConnector(context, this.#options.bitwardenConnector)) === "handled") return;
+      if ((await routePasswordManagers(context, this.#options.passwordManagers)) === "handled") return;
       if ((await routeVault(context, this.#options.vault)) === "handled") return;
       if ((await routeVaultImport(context, this.#options.vault)) === "handled") return;
       if ((await routeProviderHostSignIn(context, this.#options.providerHostSignIns)) === "handled") return;
@@ -2258,6 +2261,7 @@ export class TeamApiServer {
           if (capability === WHATSAPP_CONNECTOR_CAPABILITY) return this.#options.connectors !== undefined;
           if (capability === ONEPASSWORD_CONNECTOR_CAPABILITY) return this.#options.onePasswordConnector !== undefined;
           if (capability === BITWARDEN_CONNECTOR_CAPABILITY) return this.#options.bitwardenConnector !== undefined;
+          if (capability === PASSWORD_MANAGERS_CAPABILITY) return this.#options.passwordManagers !== undefined;
           if (capability === VAULT_CAPABILITY) return this.#options.vault !== undefined;
           if (capability === BROWSER_SECRET_VAULT_CAPABILITY) return this.#options.vault !== undefined;
           if (capability === VAULT_IMPORT_CAPABILITY) return this.#options.vault !== undefined;

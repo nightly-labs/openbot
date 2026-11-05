@@ -23,6 +23,7 @@ export const messages = {
   "mobile.marketplace.app.githubTagline": "저장소, 이슈, 풀 리퀘스트",
   "mobile.marketplace.app.onePasswordTagline": "공유한 로그인 정보로 사이트에 로그인",
   "mobile.marketplace.app.bitwardenTagline": "공유 폴더의 로그인 정보로 사이트에 로그인",
+  "mobile.marketplace.app.protonPassTagline": "공유 보관함의 로그인 정보로 사이트에 로그인",
   "mobile.marketplace.search.placeholder": "마켓플레이스 검색",
   "mobile.marketplace.search.clear": "검색어 지우기",
   "mobile.marketplace.search.close": "검색 닫기",

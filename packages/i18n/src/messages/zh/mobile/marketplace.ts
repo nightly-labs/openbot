@@ -23,6 +23,7 @@ export const messages = {
   "mobile.marketplace.app.githubTagline": "仓库、Issue 与拉取请求",
   "mobile.marketplace.app.onePasswordTagline": "用你共享的登录信息登录网站",
   "mobile.marketplace.app.bitwardenTagline": "用共享文件夹中的登录信息登录网站",
+  "mobile.marketplace.app.protonPassTagline": "用共享保管库中的登录信息登录网站",
   "mobile.marketplace.search.placeholder": "搜索市场",
   "mobile.marketplace.search.clear": "清除搜索",
   "mobile.marketplace.search.close": "关闭搜索",

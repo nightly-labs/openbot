@@ -23,6 +23,7 @@ export const messages = {
   "mobile.marketplace.app.githubTagline": "Repository, issue e pull request",
   "mobile.marketplace.app.onePasswordTagline": "Accedi ai siti con le credenziali che condividi",
   "mobile.marketplace.app.bitwardenTagline": "Accedi ai siti con le credenziali di una cartella condivisa",
+  "mobile.marketplace.app.protonPassTagline": "Accedi ai siti con le credenziali di una cassaforte condivisa",
   "mobile.marketplace.search.placeholder": "Cerca nel Marketplace",
   "mobile.marketplace.search.clear": "Cancella ricerca",
   "mobile.marketplace.search.close": "Chiudi ricerca",

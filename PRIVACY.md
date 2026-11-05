@@ -810,6 +810,23 @@ server can change it.
   service account token for that server in Marketplace › Apps › 1Password. The token goes once, over the
   encrypted connection, to the server, which keeps it in the same file on its own disk. The
   computer that sent it does not keep it, and no answer from the server carries it.
+- The Proton Pass connection (Marketplace › Apps › Proton Pass) runs Proton's `pass-cli`, which
+  OpenBot downloads from proton.me and checks against a pinned SHA-256. The computer or server talks
+  to Proton directly. A sign-in on Proton's web page makes an agent access key that reads only the
+  vault `Shared with OpenBot`; you can also paste an agent access key that you made. OpenBot keeps
+  only that access key, in `openbot-protonpass-connector-v1.json` in its application data folder,
+  encrypted by the operating system's secret storage, and the CLI's session in
+  `provider-state/protonpass-host` in the same folder. An extra password goes to the CLI once,
+  through a pipe, and is not saved. OpenBot keeps the list of logins (titles, user names and web
+  addresses) in memory, never on disk. Each time it reads a login, the CLI sends Proton the reason
+  "OpenBot fills this login in its browser." A password or a one-time code goes only to the browser
+  page that it fills, never to an agent, a provider, a log or a team member. The access key, the
+  extra password and each filled value are redacted from logs, exports and diagnostics. An owner or
+  admin of a joined server connects that server's Proton Pass from their own computer or phone: the
+  sign-in page opens there, and the access key or the extra password goes once, over the encrypted
+  connection, to the server. No answer from the server carries it. Disconnect deletes the file and
+  the session; the agent access key stays on your Proton account until it ends after one year or
+  you remove it in Proton Pass.
 - The Vault (Server settings › Vault) is kept in
   `~/Library/Application Support/OpenBot/openbot-vault-v1.json`, encrypted by the operating system's
   secret storage. It holds the logins, payment cards (number, expiry, security code, name), contact

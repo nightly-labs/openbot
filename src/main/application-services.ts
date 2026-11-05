@@ -3,7 +3,7 @@ import { ANALYTICS_GENERATIONS, openPanelTransport, ReportQueue } from "@openbot
 import { fileReportStorage } from "@openbot/telemetry/node";
 import { makeWASocket } from "@openbot/whatsapp/baileys";
 import { makeOpenBotSignalRepository } from "@openbot/whatsapp/signal-repository";
-import { Effect, Fiber } from "effect";
+import { Effect, Fiber, Schema } from "effect";
 import { toAgentRemovalFailed } from "../backend/agent/agent-removal";
 import { toHostedSiteOperationFailed } from "../backend/agent/hosted-site-coordinator";
 import { AgentApiKeys } from "../backend/agent-api-keys";
@@ -278,6 +278,10 @@ import { ModelReleaseCatalog, ModelVisibility } from "./model-visibility";
 import { NotificationPreferenceStore } from "./notification-preference-store";
 import { OnePasswordConnectorService } from "./onepassword-connector-service";
 import { OnePasswordConnectorStore } from "./onepassword-connector-store";
+import { EncryptedRecordStore } from "./password-managers/encrypted-record-store";
+import { PasswordManagersService } from "./password-managers/password-managers-service";
+import { managedProtonPassCli } from "./password-managers/proton-pass-cli-installer";
+import { ProtonPassDriver, protonPassRecordSchema } from "./password-managers/proton-pass-driver";
 import { PromptCacheTtlPreferenceStore } from "./prompt-cache-ttl-preference-store";
 import { ProviderAccountsHost } from "./provider-accounts-host";
 import { createProviderCliAppVersionStore } from "./provider-cli-app-version-store";
@@ -434,6 +438,8 @@ const LINK_ACCOUNT_FILE = "openbot-link-account-v1.json";
 const ONEPASSWORD_CONNECTOR_FILE = "openbot-onepassword-connector-v1.json";
 /** The Bitwarden API key and master password of a host connection (`bitwarden-connector-v1`), with the same cipher. */
 const BITWARDEN_CONNECTOR_FILE = "openbot-bitwarden-connector-v1.json";
+/** The Proton Pass agent access key of this computer or host, with the same cipher. */
+const PROTONPASS_CONNECTOR_FILE = "openbot-protonpass-connector-v1.json";
 /** The logins, payment cards and contact info of the Vault in Server settings, with the same cipher. */
 const VAULT_FILE = "openbot-vault-v1.json";
 /** Which agent each imported Hermes profile made, so a second import updates that agent. */
@@ -509,6 +515,8 @@ const TEARDOWN_ORDER = {
   // Before the agent service. It holds no file an agent reads; only a CLI run that waits is stopped.
   onePasswordConnector: 106,
   bitwardenConnector: 106.5,
+  // Before the agent service. It holds no file an agent reads; only a CLI run that waits is stopped.
+  passwordManagers: 106.75,
   // Before the agent service, so no agent is handed a token file that is being removed.
   githubConnector: 107,
   // Before the agent service, so no payment wait outlives the agents that asked for it.
@@ -599,6 +607,7 @@ export interface ApplicationServices {
   linkAccount: LinkAccountService;
   onePasswordConnector: OnePasswordConnectorService;
   bitwardenConnector: BitwardenConnectorService;
+  passwordManagers: PasswordManagersService;
   vault: VaultService;
   mailbox: MailboxStore;
   storageUsage: StorageUsageService;
@@ -1627,6 +1636,36 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.onePasswordConnector, "the 1Password connection", () =>
     runCauseEffect(onePasswordConnector.dispose()),
   );
+  /*
+   * The password-manager engine. 1Password and Bitwarden keep their own services, panels and
+   * teardown, and the browser reads their logins directly. The Proton Pass CLI data and OpenBot's
+   * copy of `pass-cli` stay outside every root an agent can write.
+   */
+  const protonPassCliTarget = runtimeTarget(process.platform, process.arch);
+  const passwordManagers = new PasswordManagersService([
+    new ProtonPassDriver({
+      store: new EncryptedRecordStore({
+        path: join(app.getPath("userData"), PROTONPASS_CONNECTOR_FILE),
+        cipher: secretCipher,
+        decode: Schema.decodeUnknownSync(protonPassRecordSchema),
+        unreadable: sourceText("error.connector.protonPassFileUnreadable"),
+      }),
+      dataDirectory: join(app.getPath("userData"), "provider-state", "protonpass-host"),
+      hostName: hostname(),
+      installCli: protonPassCliTarget
+        ? (signal) =>
+            managedProtonPassCli({
+              directory: join(app.getPath("userData"), "provider-state", "protonpass-cli"),
+              target: protonPassCliTarget,
+              signal,
+            })
+        : null,
+    }),
+  ]);
+  await runCauseEffect(passwordManagers.load());
+  teardown.push(TEARDOWN_ORDER.passwordManagers, "the password managers", () =>
+    runCauseEffect(passwordManagers.dispose()),
+  );
   // Read by the resource monitor, which starts after the analytics that needs the services.
   const statementTimings = new StatementTimings();
   const tables = new AgentTables({
@@ -1893,6 +1932,7 @@ export async function createApplicationServices({
     passwordVault: passwordVaultRouter([
       { prefix: "", vault: onePasswordConnector },
       { prefix: "bitwarden:", vault: bitwardenConnector },
+      ...passwordManagers.routes(),
       { prefix: "openbot:", vault: vault.logins },
     ]),
     vaultItems: vault.items,
@@ -2611,6 +2651,9 @@ export async function createApplicationServices({
     // Present, so the host advertises `bitwarden-connector-v1`. An owner or admin connects it with an
     // API key and the master password: a session key from their computer cannot open this vault.
     bitwardenConnector,
+    // Present, so the host advertises `password-managers-v1`. An owner or admin connects Proton Pass
+    // with a sign-in on the host or with an agent access key. The routes are admin-only.
+    passwordManagers,
     // Present, so the host advertises `vault-v1`. The routes are admin-only.
     vault,
     // Present on Linux, so the host advertises `provider-host-sign-in-v1`. The routes are admin-only.
@@ -3627,6 +3670,7 @@ export async function createApplicationServices({
     linkAccount,
     onePasswordConnector,
     bitwardenConnector,
+    passwordManagers,
     vault,
     mailbox,
     storageUsage,

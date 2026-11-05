@@ -110,6 +110,7 @@ interface HostServiceOptions {
   connectors?: ForwardedApiOptions["connectors"];
   onePasswordConnector?: ForwardedApiOptions["onePasswordConnector"];
   bitwardenConnector?: ForwardedApiOptions["bitwardenConnector"];
+  passwordManagers?: ForwardedApiOptions["passwordManagers"];
   vault?: ForwardedApiOptions["vault"];
   providerHostSignIns?: ForwardedApiOptions["providerHostSignIns"];
   providerAccounts?: ForwardedApiOptions["providerAccounts"];
@@ -449,6 +450,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.connectors === undefined ? {} : { connectors: options.connectors }),
       ...(options.onePasswordConnector === undefined ? {} : { onePasswordConnector: options.onePasswordConnector }),
       ...(options.bitwardenConnector === undefined ? {} : { bitwardenConnector: options.bitwardenConnector }),
+      ...(options.passwordManagers === undefined ? {} : { passwordManagers: options.passwordManagers }),
       ...(options.vault === undefined ? {} : { vault: options.vault }),
       ...(options.providerHostSignIns === undefined ? {} : { providerHostSignIns: options.providerHostSignIns }),
       ...(options.providerAccounts === undefined ? {} : { providerAccounts: options.providerAccounts }),

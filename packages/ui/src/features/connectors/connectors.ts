@@ -3,6 +3,7 @@ import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
+import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 
 export { CONNECTOR_IDS, type ConnectorId } from "@openbot/contracts/ipc";
@@ -24,6 +25,7 @@ export const CONNECTORS: Readonly<Record<ConnectorId, ConnectorDefinition>> = {
   github: { server: CONNECTORS_CAPABILITY },
   onepassword: { server: ONEPASSWORD_CONNECTOR_CAPABILITY },
   bitwarden: { server: BITWARDEN_CONNECTOR_CAPABILITY },
+  protonpass: { server: PASSWORD_MANAGERS_CAPABILITY },
 };
 
 const CONNECTOR_ID_SET = new Set<string>(CONNECTOR_IDS);

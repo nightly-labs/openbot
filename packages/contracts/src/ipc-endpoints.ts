@@ -412,6 +412,7 @@ import type {
   OnePasswordConnectorStatus,
   OnePasswordHostConnectInput,
 } from "./ipc-onepassword-connector";
+import type { PasswordManagerConnectInput, PasswordManagerId, PasswordManagerStatus } from "./ipc-password-managers";
 import type { PromptCacheTtl, PromptCacheTtlSetting } from "./ipc-prompt-cache";
 import type {
   DetectedModelServer,
@@ -1321,6 +1322,28 @@ export const IPC_ENDPOINTS = {
     ),
     hostDisconnect: scopedQuery<BitwardenConnectorStatus, "required">()("bitwarden-connector:host-disconnect"),
   },
+  // The password managers of this computer, through one engine: each has a driver in main. Access
+  // keys and passwords go from the renderer to main once, in `connect`; every answer is the status
+  // only. `openSignIn` opens the page of a `browser` connection in the user's browser; main opens
+  // only a page of the manager's own sign-in site. The `host*` endpoints do the same for a joined
+  // server (`password-managers-v1`): the host runs the sign-in, and this computer opens its page.
+  passwordManagers: {
+    list: request<undefined, PasswordManagerStatus[]>()("password-managers:list"),
+    connect: request<PasswordManagerConnectInput, PasswordManagerStatus>()("password-managers:connect"),
+    cancel: request<PasswordManagerId, PasswordManagerStatus>()("password-managers:cancel"),
+    disconnect: request<PasswordManagerId, PasswordManagerStatus>()("password-managers:disconnect"),
+    openSignIn: request<PasswordManagerId, void>()("password-managers:open-sign-in"),
+    changed: event<PasswordManagerStatus>()("password-managers:changed"),
+    hostList: scopedQuery<PasswordManagerStatus[], "required">()("password-managers:host-list"),
+    hostConnect: scopedRequest<PasswordManagerConnectInput, PasswordManagerStatus, "required">()(
+      "password-managers:host-connect",
+    ),
+    hostCancel: scopedRequest<PasswordManagerId, PasswordManagerStatus, "required">()("password-managers:host-cancel"),
+    hostDisconnect: scopedRequest<PasswordManagerId, PasswordManagerStatus, "required">()(
+      "password-managers:host-disconnect",
+    ),
+    hostOpenSignIn: scopedRequest<PasswordManagerId, void, "required">()("password-managers:host-open-sign-in"),
+  },
   // The Link account of this computer, for agent payments. The tokens stay in main; every answer is the
   // status only. A joined server has no Link account: the Team API does not carry one.
   linkAccount: {
@@ -2112,6 +2135,7 @@ export const IPC_GROUP_PATHS = {
   githubConnector: "githubConnector",
   onePasswordConnector: "onePasswordConnector",
   bitwardenConnector: "bitwardenConnector",
+  passwordManagers: "passwordManagers",
   linkAccount: "linkAccount",
   vault: "vault",
   hostedSites: "hostedSites",

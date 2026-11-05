@@ -640,6 +640,54 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectTitle": "Отключить 1Password?",
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host} забудет токен. Хранилище и сервисный аккаунт останутся в 1Password; если они больше не нужны, удалите их там.",
+  "mobile.server.connectors.protonPass.title": "Proton Pass",
+  "mobile.server.connectors.protonPass.description":
+    "Откройте OpenBot на {host} доступ к одному хранилищу Proton Pass, чтобы агенты на {host} могли входить на сайты в его браузере.",
+  "mobile.server.connectors.protonPass.keyHelp":
+    "Создайте в Proton Pass ключ доступа, который может читать только хранилище, открытое для OpenBot, и вставьте его сюда. {host} хранит ключ; этот телефон — нет.",
+  "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.passwordManager.unavailable": "{name} недоступен на этом сервере.",
+  "mobile.server.connectors.passwordManager.howItWorks":
+    "Войдите в {name} на этом телефоне. Затем {host} создаст общее хранилище и ключ доступа только для чтения к нему и будет хранить только этот ключ. Агенты никогда не видят пароль.",
+  "mobile.server.connectors.passwordManager.connect": "Подключить {name}",
+  "mobile.server.connectors.passwordManager.connecting": "Подключение…",
+  "mobile.server.connectors.passwordManager.useKey": "Использовать ключ доступа",
+  "mobile.server.connectors.passwordManager.key": "Ключ доступа",
+  "mobile.server.connectors.passwordManager.connectWithKey": "Подключить по ключу",
+  "mobile.server.connectors.passwordManager.signInTitle": "Вход в {name}",
+  "mobile.server.connectors.passwordManager.signInFooter":
+    "Войдите на странице {name}. Эта страница изменится, когда вы войдёте.",
+  "mobile.server.connectors.passwordManager.signInWaiting": "{host} получает страницу входа…",
+  "mobile.server.connectors.passwordManager.openSignIn": "Открыть страницу входа",
+  "mobile.server.connectors.passwordManager.copyLink": "Скопировать ссылку",
+  "mobile.server.connectors.passwordManager.extraPassword": "Дополнительный пароль",
+  "mobile.server.connectors.passwordManager.extraPasswordHint":
+    "{name} запрашивает ваш дополнительный пароль. Он один раз передаётся на {host}; этот телефон его не хранит.",
+  "mobile.server.connectors.passwordManager.extraPasswordWrong": "Дополнительный пароль неверен. Попробуйте ещё раз.",
+  "mobile.server.connectors.passwordManager.continue": "Продолжить",
+  "mobile.server.connectors.passwordManager.setupBody": "{host} создаёт общее хранилище…",
+  "mobile.server.connectors.passwordManager.vaultTitle": "Общее хранилище",
+  "mobile.server.connectors.passwordManager.vaultFooter":
+    "Переместите логин в это хранилище в {name}, чтобы агенты могли входить с ним. Удалите его, чтобы прекратить.",
+  "mobile.server.connectors.passwordManager.loginCount": {
+    one: "{count} логин",
+    few: "{count} логина",
+    many: "{count} логинов",
+    other: "{count} логина",
+  },
+  "mobile.server.connectors.passwordManager.keyTitle": "Ключ доступа",
+  "mobile.server.connectors.passwordManager.keyReadOnly": "Только чтение",
+  "mobile.server.connectors.passwordManager.keyExpires": "Только чтение. Истекает {date}.",
+  "mobile.server.connectors.passwordManager.keyExpired": "Истёк {date}",
+  "mobile.server.connectors.passwordManager.plan":
+    "Для инструмента командной строки {name} нужен платный тариф. Измените тариф аккаунта, затем подключитесь снова.",
+  "mobile.server.connectors.passwordManager.expiredTitle": "Срок действия ключа {name} истёк",
+  "mobile.server.connectors.passwordManager.expiredBody":
+    "Агенты на {host} не смогут входить с вашими общими логинами, пока вы не подключитесь снова.",
+  "mobile.server.connectors.passwordManager.disconnect": "Отключить {name}",
+  "mobile.server.connectors.passwordManager.disconnectTitle": "Отключить {name}?",
+  "mobile.server.connectors.passwordManager.disconnectBody":
+    "{host} удалит свой ключ доступа. Хранилище и его логины останутся в вашем аккаунте {name}.",
   "mobile.server.connectors.slack.title": "Slack",
   "mobile.server.connectors.slack.description":
     "Люди упоминают @OpenBot в Slack или пишут ему личным сообщением. Оркестратор Slack спрашивает нужного агента и отвечает.",

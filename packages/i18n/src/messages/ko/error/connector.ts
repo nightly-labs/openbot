@@ -36,4 +36,20 @@ export const messages = {
   "error.connector.bitwardenCliInstallFailed":
     "이 서버에 Bitwarden CLI를 설치하지 못했어요. 서버의 네트워크 연결을 확인한 후 다시 연결해 주세요.",
   "error.connector.bitwardenFileUnreadable": "Bitwarden 연결 파일을 읽을 수 없어요.",
+  "error.connector.passwordManagerUnknown": "OpenBot에서 이 비밀번호 관리자를 지원하지 않습니다.",
+  "error.connector.passwordManagerMethod": "이 비밀번호 관리자는 이 방법으로 연결할 수 없습니다.",
+  "error.connector.passwordManagerNoSignIn": "열린 로그인 페이지가 없습니다. 다시 연결하세요.",
+  "error.connector.protonPassFailed": "Proton Pass를 연결하지 못했습니다. 다시 연결하세요.",
+  "error.connector.protonPassCliInstallFailed":
+    "Proton Pass CLI를 설치하지 못했습니다. 네트워크 연결을 확인한 후 다시 연결하세요.",
+  "error.connector.protonPassPlan":
+    "사용 중인 Proton 요금제에서는 Proton Pass CLI를 사용할 수 없습니다. 요금제를 변경한 후 다시 연결하세요.",
+  "error.connector.protonPassExpired": "Proton Pass 액세스가 종료되었습니다. 다시 연결하세요.",
+  "error.connector.protonPassKeyInvalid": "pst_로 시작하는 Proton Pass 액세스 키를 입력하세요.",
+  "error.connector.protonPassExtraPassword": "추가 비밀번호가 올바르지 않습니다. 다시 입력하세요.",
+  "error.connector.protonPassExtraPasswordNotAsked": "Proton Pass가 추가 비밀번호를 요청하지 않았습니다.",
+  "error.connector.protonPassFileUnreadable": "Proton Pass 연결 파일을 읽을 수 없습니다.",
+  "error.connector.protonPassSignInTimeout": "Proton 로그인이 너무 오래 걸렸습니다. 다시 연결하세요.",
+  "error.connector.protonPassSetupFailed":
+    "Proton Pass에서 Shared with OpenBot 보관함이나 해당 액세스 키를 만들지 못했습니다. 다시 연결하세요.",
 } as const satisfies PartialTranslation<typeof source>;

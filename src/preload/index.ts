@@ -265,6 +265,11 @@ import {
   decodeWhatsAppLinkStateReply,
   decodeWhatsAppOverviewReply,
 } from "./messaging-decoding";
+import {
+  decodePasswordManagerChange,
+  decodePasswordManagerResponse,
+  decodePasswordManagerResponses,
+} from "./password-manager-decoding";
 import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
 import { decodeRoutineFlowCanvas, decodeRoutineFlowLink } from "./routine-flow-decoding";
 import {
@@ -973,6 +978,21 @@ const openbotApi: OpenBotDesktopApi = {
     cancel: decodeLinkAccountStatus,
     disconnect: decodeLinkAccountStatus,
     changed: decodeLinkAccountStatus,
+  }),
+  // A status never holds a key or a password. A `changed` event for a manager that this build does
+  // not know is dropped.
+  passwordManagers: bridgeGroup(IPC_ENDPOINTS.passwordManagers, {
+    list: decodePasswordManagerResponses,
+    connect: decodePasswordManagerResponse,
+    cancel: decodePasswordManagerResponse,
+    disconnect: decodePasswordManagerResponse,
+    openSignIn: decodeVoid,
+    changed: dropInvalid(decodePasswordManagerChange),
+    hostList: decodePasswordManagerResponses,
+    hostConnect: decodePasswordManagerResponse,
+    hostCancel: decodePasswordManagerResponse,
+    hostDisconnect: decodePasswordManagerResponse,
+    hostOpenSignIn: decodeVoid,
   }),
   bitwardenConnector: bridgeGroup(IPC_ENDPOINTS.bitwardenConnector, {
     status: decodeBitwardenConnectorStatus,

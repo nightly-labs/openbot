@@ -561,6 +561,50 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectTitle": "1Password を切断しますか？",
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host} はトークンを削除します。保管庫とサービスアカウントは 1Password に残ります。不要になった場合は 1Password で削除してください。",
+  "mobile.server.connectors.protonPass.title": "Proton Pass",
+  "mobile.server.connectors.protonPass.description":
+    "Proton Pass の保管庫を 1 つ {host} の OpenBot と共有すると、{host} のエージェントがそのブラウザでサイトにサインインできます。",
+  "mobile.server.connectors.protonPass.keyHelp":
+    "Proton Pass で、OpenBot と共有する保管庫だけを読み取れるアクセスキーを作成し、ここに貼り付けてください。キーは {host} が保持し、この電話には保存されません。",
+  "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.passwordManager.unavailable": "{name} はこのサーバーでは利用できません。",
+  "mobile.server.connectors.passwordManager.howItWorks":
+    "この電話で {name} にサインインしてください。その後 {host} が共有保管庫とその読み取り専用アクセスキーを作成し、そのキーだけを保持します。エージェントがパスワードを見ることはありません。",
+  "mobile.server.connectors.passwordManager.connect": "{name} を接続",
+  "mobile.server.connectors.passwordManager.connecting": "接続中…",
+  "mobile.server.connectors.passwordManager.useKey": "アクセスキーを使用",
+  "mobile.server.connectors.passwordManager.key": "アクセスキー",
+  "mobile.server.connectors.passwordManager.connectWithKey": "キーで接続",
+  "mobile.server.connectors.passwordManager.signInTitle": "{name} にサインイン",
+  "mobile.server.connectors.passwordManager.signInFooter":
+    "{name} のページでサインインしてください。サインインが完了すると、このページが変わります。",
+  "mobile.server.connectors.passwordManager.signInWaiting": "{host} がサインインページを取得しています…",
+  "mobile.server.connectors.passwordManager.openSignIn": "サインインページを開く",
+  "mobile.server.connectors.passwordManager.copyLink": "リンクをコピー",
+  "mobile.server.connectors.passwordManager.extraPassword": "追加パスワード",
+  "mobile.server.connectors.passwordManager.extraPasswordHint":
+    "{name} が追加パスワードを求めています。パスワードは一度だけ {host} に送られ、この電話には保存されません。",
+  "mobile.server.connectors.passwordManager.extraPasswordWrong":
+    "追加パスワードが正しくありません。もう一度お試しください。",
+  "mobile.server.connectors.passwordManager.continue": "続ける",
+  "mobile.server.connectors.passwordManager.setupBody": "{host} が共有保管庫を作成しています…",
+  "mobile.server.connectors.passwordManager.vaultTitle": "共有保管庫",
+  "mobile.server.connectors.passwordManager.vaultFooter":
+    "{name} でログインをこの保管庫に移動すると、エージェントがそのログインでサインインできます。やめるには削除してください。",
+  "mobile.server.connectors.passwordManager.loginCount": { other: "ログイン情報 {count} 件" },
+  "mobile.server.connectors.passwordManager.keyTitle": "アクセスキー",
+  "mobile.server.connectors.passwordManager.keyReadOnly": "読み取り専用",
+  "mobile.server.connectors.passwordManager.keyExpires": "読み取り専用。{date} に期限切れになります。",
+  "mobile.server.connectors.passwordManager.keyExpired": "{date} に期限切れ",
+  "mobile.server.connectors.passwordManager.plan":
+    "{name} のコマンドラインツールには有料プランが必要です。アカウントのプランを変更してから、もう一度接続してください。",
+  "mobile.server.connectors.passwordManager.expiredTitle": "{name} のキーの期限が切れました",
+  "mobile.server.connectors.passwordManager.expiredBody":
+    "再接続するまで、{host} のエージェントは共有ログインでサインインできません。",
+  "mobile.server.connectors.passwordManager.disconnect": "{name} を切断",
+  "mobile.server.connectors.passwordManager.disconnectTitle": "{name} を切断しますか？",
+  "mobile.server.connectors.passwordManager.disconnectBody":
+    "{host} はアクセスキーを削除します。保管庫とそのログインは {name} アカウントに残ります。",
   "mobile.server.connectors.slack.title": "Slack",
   "mobile.server.connectors.slack.description":
     "Slack で @OpenBot をメンションするか、ダイレクトメッセージを送ります。Slack Orchestrator が適切なエージェントに依頼して回答します。",

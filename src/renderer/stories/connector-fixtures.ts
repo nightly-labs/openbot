@@ -1,6 +1,7 @@
 import {
   DISCONNECTED_BITWARDEN_CONNECTOR,
   DISCONNECTED_ONEPASSWORD_CONNECTOR,
+  disconnectedPasswordManager,
   type MessagingConnection,
 } from "@openbot/contracts/ipc";
 import type { ConnectorDetail } from "@openbot/ui/features/connectors/ConnectorDetailPanel";
@@ -22,7 +23,7 @@ const workspace = {
   onAddOrchestrator: fn(),
 };
 
-/** GitHub is connected; Slack, Discord, Telegram, WhatsApp, 1Password and Bitwarden are not set up. */
+/** GitHub is connected; Slack, Discord, Telegram, WhatsApp, 1Password, Bitwarden and Proton Pass are not set up. */
 export const STORY_CONNECTOR_DETAILS: readonly ConnectorDetail[] = [
   { id: "slack", props: { ...workspace, platform: "slack" } },
   { id: "discord", props: { ...workspace, platform: "discord" } },
@@ -112,6 +113,19 @@ export const STORY_CONNECTOR_DETAILS: readonly ConnectorDetail[] = [
     id: "bitwarden",
     props: { status: DISCONNECTED_BITWARDEN_CONNECTOR, busy: false, onConnect: fn(), onDisconnect: fn() },
   },
+  {
+    id: "protonpass",
+    props: {
+      status: disconnectedPasswordManager("protonpass", ["browser", "key"]),
+      busy: false,
+      onConnect: fn(),
+      onConnectWithKey: fn(),
+      onSubmitExtraPassword: fn(),
+      onCancel: fn(),
+      onDisconnect: fn(),
+      onOpenSignIn: fn(),
+    },
+  },
 ];
 
 const ORCHESTRATOR: SlackIntegrationAgent = {
@@ -140,7 +154,7 @@ function channel(update: Partial<MessagingConnection> & Pick<MessagingConnection
 
 /**
  * Every connector is set up: a Slack workspace, a Discord server, two Telegram chats, a WhatsApp
- * number, both vaults.
+ * number, the three password managers.
  */
 export const CONNECTED_CONNECTOR_DETAILS: readonly ConnectorDetail[] = STORY_CONNECTOR_DETAILS.map((detail) => {
   switch (detail.id) {
@@ -190,6 +204,20 @@ export const CONNECTED_CONNECTOR_DETAILS: readonly ConnectorDetail[] = STORY_CON
       };
     case "bitwarden":
       return { ...detail, props: { ...detail.props, status: { ...detail.props.status, connected: true } } };
+    case "protonpass":
+      return {
+        ...detail,
+        props: {
+          ...detail.props,
+          status: {
+            ...detail.props.status,
+            state: "connected",
+            vaultNames: ["Shared with OpenBot"],
+            loginCount: 12,
+            expiresAt: Date.UTC(2027, 10, 5),
+          },
+        },
+      };
     default:
       return detail;
   }
@@ -204,7 +232,7 @@ function storyConnector(detail: ConnectorDetail): ConnectorController {
     busy: () => false,
     detail,
     connect:
-      detail.id === "github"
+      detail.id === "github" || detail.id === "protonpass"
         ? detail.props.onConnect
         : detail.id === "slack" || detail.id === "discord"
           ? detail.props.onConnectWorkspace
