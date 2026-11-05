@@ -286,6 +286,11 @@ export const messages = {
   "provider.settings.turnOnFirst": "Zet eerst {name} aan.",
   "provider.settings.makeDefault": "Als standaard",
   "provider.settings.useTitle": "{name} gebruiken",
+  "provider.settings.deleteTitle": "{name} verwijderen",
+  "provider.settings.deleteOn":
+    "Zet {name} uit en verwijdert de CLI die OpenBot heeft gedownload. Accounts, aanmeldingen en agents blijven.",
+  "provider.settings.deleteOff":
+    "Verwijdert de CLI die OpenBot voor {name} heeft gedownload ({size}). Accounts, aanmeldingen en agents blijven.",
   "provider.settings.endpoints": "Endpoints",
   "provider.settings.noEndpoints": "Geen endpoints.",
   "provider.settings.endpointModels": { one: "{url} · 1 model", other: "{url} · {count} modellen" },

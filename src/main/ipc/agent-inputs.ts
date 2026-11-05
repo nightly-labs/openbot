@@ -921,7 +921,11 @@ export function parsePreviewSharedFile(value: unknown): PreviewSharedFileInput {
 
 export function parsePreviewWorkspaceFile(value: unknown): PreviewWorkspaceFileInput {
   if (!isObject(value)) throw new Error("Invalid workspace file request.");
-  return { ...parseOpenWorkspaceFile(value), ...optionalPreviewByteLimit(value.maxBytes) };
+  return {
+    ...parseOpenWorkspaceFile(value),
+    ...optionalPreviewByteLimit(value.maxBytes),
+    ...(value.exactPath === true ? { exactPath: true } : {}),
+  };
 }
 
 function optionalPreviewByteLimit(value: unknown): { maxBytes?: number } {

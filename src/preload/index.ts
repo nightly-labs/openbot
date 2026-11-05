@@ -229,6 +229,7 @@ import {
 import {
   decodeAgentTask,
   decodeAgentTaskReadState,
+  decodeAgentTaskReadStates,
   decodeAgentTasks,
   decodeAttachment,
   decodeAttachmentDownloadProgress,
@@ -629,6 +630,7 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   reopenTask: decodeVoid,
   renameTask: decodeVoid,
   deleteTask: decodeVoid,
+  listTaskReads: decodeAgentTaskReadStates,
   markTaskRead: decodeAgentTaskReadState,
   acknowledgeFailedTurn: decodeVoid,
   cancelQueuedMessage: decodeVoid,
@@ -711,6 +713,7 @@ const openbotApi: OpenBotDesktopApi = {
     getAnalyticsDefault: decodeAnalyticsPreference,
     analyticsPreference: decodeAnalyticsPreference,
     setAnalyticsPreference: decodeAnalyticsPreference,
+    reportRendererTiming: decodeVoid,
     getApprovalAutomation: decodeApprovalAutomationPreference,
     approvalAutomation: decodeApprovalAutomationPreference,
     getBusyMessageModePreference: decodeBusyMessageModePreference,

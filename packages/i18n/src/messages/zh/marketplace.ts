@@ -365,6 +365,13 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "今天到期的 Todoist 任务有哪些？",
   "marketplace.plugin.todoist.prompt.capture": "把这些待办事项添加到我的 Todoist 收件箱。",
   "marketplace.plugin.todoist.prompt.overdue": "把我逾期的 Todoist 任务改到明天。",
+  "marketplace.plugin.ticktick.tagline": "任务、清单、习惯和专注",
+  "marketplace.plugin.ticktick.description":
+    "TickTick 让助手搜索和筛选任务，添加和修改任务，并管理清单、分组、文件夹、标签和评论。助手还可以读取和修改习惯与专注记录，并读取与 TickTick 关联的日历中的日程。每位用户在浏览器中登录自己的 TickTick 账号。助手获得读写权限：可以完成、移动和删除任务，以及删除标签和专注记录。",
+  "marketplace.plugin.ticktick.app": "通过 TickTick 的 MCP 服务器以浏览器登录处理任务、清单、习惯和专注记录。",
+  "marketplace.plugin.ticktick.prompt.today": "今天有哪些 TickTick 任务到期？",
+  "marketplace.plugin.ticktick.prompt.capture": "把这些待办事项添加到我的 TickTick 收集箱。",
+  "marketplace.plugin.ticktick.prompt.week": "我上周完成了哪些 TickTick 任务？",
   "marketplace.plugin.trello.tagline": "看板、列表和卡片",
   "marketplace.plugin.trello.description":
     "Trello 让助手搜索和读取看板、列表、卡片、清单和评论，创建看板和卡片，移动列表和卡片，将卡片标记为完成，并添加清单、评论和标签。助手还可以读取和添加用户 Trello 收件箱中的卡片，并读取 Planner 中的日程，这些日程可能来自已连接的 Google 或 Outlook 日历。每位用户通过浏览器登录自己的 Trello 账号，并在授权页面上选择工作区。助手在这些工作区中拥有与用户相同的权限。助手可以归档卡片和列表，但服务器无法永久删除任何内容。",

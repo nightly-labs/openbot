@@ -561,6 +561,12 @@ export const messages = {
   "mobile.agent.list.openPinned": "Otwórz przypięty czat: {name}",
   "mobile.agent.list.openPinnedWithTitle": "Otwórz przypięty czat: {name}, {title}",
   "mobile.agent.list.withState": "{label}. {state}",
+  "mobile.agent.list.unread": {
+    one: "{count} nieprzeczytana wiadomość",
+    few: "{count} nieprzeczytane wiadomości",
+    many: "{count} nieprzeczytanych wiadomości",
+    other: "{count} nieprzeczytanej wiadomości",
+  },
   "mobile.agent.list.waiting.title": "Czeka na ciebie",
   "mobile.agent.list.waiting.label": {
     one: "Czeka na ciebie: {count} agent",

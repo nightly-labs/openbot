@@ -211,6 +211,8 @@ export const messages = {
     "모델 제공자 쪽에서 오류가 났어요. 회원님의 연결 문제가 아니에요. 나중에 다시 시도하거나 다른 모델을 선택하세요.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode가 모델 제공자에 연결할 수 없었어요. OpenBot을 실행하는 컴퓨터의 네트워크 연결을 확인한 후 다시 시도해 주세요.\n{detail}",
+  "error.provider.codexStateBusy":
+    "ChatGPT가 이전 시작 후 아직 로컬 기록을 준비하고 있어요. 몇 분 기다린 후 다시 시도해 주세요.",
   "error.provider.opencodeDatabaseNewer":
     "더 새로운 OpenCode 버전이 데이터베이스를 변경해서 OpenCode가 데이터베이스를 열 수 없었어요. OpenCode를 버전 2 이상으로 업데이트한 후 다시 시도해 주세요.",
   "error.provider.opencodeNoAnswer": "OpenCode 모델이 답변 없이 턴을 끝냈어요. 다시 시도하거나 다른 모델을 선택하세요.",
@@ -416,6 +418,9 @@ export const messages = {
   "error.provider.registryPrerequisite": "이 에이전트를 설치하기 전에 호스트에 {tool}을(를) 설치하세요.",
   "error.provider.registryBindingChanged": "설치 중에 사용자 지정 에이전트가 변경되었어요. 다시 시도해 주세요.",
   "error.provider.registryInstallFailed": "에이전트 설치에 실패했어요. 이전 설치는 변경되지 않았어요.",
+  "error.provider.hermesInstallFailed":
+    "Hermes Agent를 설치하지 못했어요. 다시 시도하거나 설치 가이드를 이용해 주세요.",
+  "error.provider.hermesNeedsGitCurl": "Hermes Agent에는 git과 curl이 필요해요. 설치한 뒤 다시 시도해 주세요.",
   "error.provider.registryRemoveBusy":
     "에이전트를 제거하기 전에 에이전트 설치와 진행 중인 ACP 작업이 끝날 때까지 기다려 주세요.",
 } as const satisfies PartialTranslation<typeof source>;

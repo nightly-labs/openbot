@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it } from "vitest";
-import { decodeAgentTask, decodeFilePreview } from "./conversation-decoding";
+import { decodeAgentTask, decodeAgentTaskReadStates, decodeFilePreview } from "./conversation-decoding";
 
 const preview = {
   name: "report.html",
@@ -75,6 +75,21 @@ describe("side thread queue decoding", () => {
   it("rejects a queue that is not a list of queued messages", () => {
     for (const queue of [null, queued, [{ ...queued, status: "waiting" }], [{ ...queued, text: 1 }]]) {
       expect(() => decodeAgentTask({ ...task, queue })).toThrow("Invalid task response.");
+    }
+  });
+});
+
+describe("thread read state decoding", () => {
+  const read = { taskId: "pricing", unreadCount: 2, firstUnreadMessageId: "m1", throughMessageId: "m0" };
+
+  it("keeps a list of read states", () => {
+    expect(decodeAgentTaskReadStates([read])).toEqual([read]);
+    expect(decodeAgentTaskReadStates([])).toEqual([]);
+  });
+
+  it("rejects a value that is not a list of read states", () => {
+    for (const value of [null, read, [{ ...read, taskId: "" }], [{ ...read, unreadCount: "2" }]]) {
+      expect(() => decodeAgentTaskReadStates(value)).toThrow("Invalid thread read states.");
     }
   });
 });

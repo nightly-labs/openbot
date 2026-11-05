@@ -20,7 +20,13 @@ export interface VoiceTranscriptionResult {
 }
 
 /** The local speech recognition models. Saved in `voice-preference.json`; never rename one. */
-export const LOCAL_VOICE_MODEL_IDS = ["parakeet-tdt-0.6b-v3", "bark-3.0-plus", "whisper-turbo"] as const;
+export const LOCAL_VOICE_MODEL_IDS = [
+  "parakeet-tdt-0.6b-v3",
+  "parakeet-unified-en-0.6b",
+  "bark-3.0-plus",
+  "whisper-turbo",
+  "cohere-transcribe-03-2026",
+] as const;
 export type LocalVoiceModelId = (typeof LOCAL_VOICE_MODEL_IDS)[number];
 
 /**
@@ -38,10 +44,15 @@ interface VoiceModelCapabilities {
   /** The product name. It is not translated. */
   name: string;
   /**
-   * True when the model takes a fixed language. Parakeet always finds the language itself, and Bark
-   * recognizes English only.
+   * True when the model takes a fixed language. Parakeet TDT always finds the language itself, and
+   * Parakeet Unified and Bark recognize English only.
    */
   supportsLanguage: boolean;
+  /**
+   * The only languages the model takes, when it cannot find the language itself. Without this
+   * list, a model that `supportsLanguage` takes every Whisper language and automatic.
+   */
+  languages?: readonly WhisperLanguage[];
   /**
    * True when the composer shows text while you speak. Whisper reads 30 s for each pass, so it
    * transcribes only after Stop.
@@ -55,6 +66,11 @@ export interface LocalVoiceModelInfo extends VoiceModelCapabilities {
   id: LocalVoiceModelId;
   /** The download size of all files. */
   bytes: number;
+  /**
+   * Not offered any more. A saved choice still works, and the settings show the model only while it
+   * is in use or downloaded, so that the user can remove its files.
+   */
+  retired?: true;
 }
 
 /** A model that runs at a provider. It is ready when its API key is saved. */
@@ -64,6 +80,24 @@ export interface CloudVoiceModelInfo extends VoiceModelCapabilities {
 }
 
 export type VoiceModelInfo = LocalVoiceModelInfo | CloudVoiceModelInfo;
+
+/** The languages of Cohere Transcribe. It does not find the language itself. */
+const COHERE_TRANSCRIBE_LANGUAGES = [
+  "ar",
+  "de",
+  "el",
+  "en",
+  "es",
+  "fr",
+  "it",
+  "ja",
+  "ko",
+  "nl",
+  "pl",
+  "pt",
+  "vi",
+  "zh",
+] as const satisfies readonly WhisperLanguage[];
 
 export const VOICE_MODELS: readonly VoiceModelInfo[] = [
   {
@@ -76,11 +110,21 @@ export const VOICE_MODELS: readonly VoiceModelInfo[] = [
   },
   {
     kind: "local",
+    id: "parakeet-unified-en-0.6b",
+    name: "Parakeet Unified EN 0.6B",
+    bytes: 663_043_117,
+    supportsLanguage: false,
+    livePreview: true,
+  },
+  {
+    kind: "local",
     id: "bark-3.0-plus",
     name: "Underdog Bark 3.0 Plus",
     bytes: 684_624_267,
     supportsLanguage: false,
     livePreview: true,
+    // Parakeet Unified EN is as fast, with punctuation and fewer errors.
+    retired: true,
   },
   {
     kind: "local",
@@ -88,6 +132,16 @@ export const VOICE_MODELS: readonly VoiceModelInfo[] = [
     name: "Whisper large-v3 turbo",
     bytes: 1_036_613_791,
     supportsLanguage: true,
+    livePreview: false,
+  },
+  {
+    kind: "local",
+    id: "cohere-transcribe-03-2026",
+    name: "Cohere Transcribe",
+    bytes: 2_888_052_036,
+    supportsLanguage: true,
+    languages: COHERE_TRANSCRIBE_LANGUAGES,
+    // A decode takes about three times as long as Parakeet, too long to repeat while you speak.
     livePreview: false,
   },
   {
@@ -254,6 +308,16 @@ export function isLocalVoiceModelId(value: unknown): value is LocalVoiceModelId 
 
 export function isVoiceLanguage(value: unknown): value is VoiceLanguage {
   return value === AUTOMATIC_VOICE_LANGUAGE || isOneOf(WHISPER_LANGUAGES, value);
+}
+
+/**
+ * The language that a model with its own `languages` uses: the saved language when the model
+ * takes it, else English. A model without the list uses the saved language.
+ */
+export function modelLanguage(model: VoiceModelInfo, language: VoiceLanguage): VoiceLanguage {
+  const languages = model.languages;
+  if (!languages) return language;
+  return languages.find((candidate) => candidate === language) ?? "en";
 }
 
 /**

@@ -116,6 +116,7 @@ import { trackWorkspaceActions } from "@/features/analytics/workspace-actions";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { decodeMobileBrowserTabs } from "@/features/browser/model/browser-tabs";
 import { MobileChannelStore } from "@/features/channels/model/channel-store";
+import { deleteServerDrafts } from "@/features/chat/model/composer-drafts";
 import { useLiveActivity } from "@/features/live-activity/use-live-activity";
 import { NotificationAvatarSync } from "@/features/push-notifications/notification-avatar-sync";
 import { usePushNotifications } from "@/features/push-notifications/use-push-notifications";
@@ -198,9 +199,10 @@ import {
   showsOnline,
 } from "@/features/workspace/model/server-status";
 import { moveSidebarChat } from "@/features/workspace/model/sidebar-layout";
-import { taskThreadMessages, withoutTaskTurns } from "@/features/workspace/model/task-cache";
+import { taskThreadCheck, taskThreadMessages, withoutTaskTurns } from "@/features/workspace/model/task-cache";
 import { applyBrowserEvent, syncEventQueries } from "@/features/workspace/model/team-events";
 import { runTeamRequest } from "@/features/workspace/model/team-request";
+import { reduceThreadWaits } from "@/features/workspace/model/thread-waits";
 import { trustedHostKeys } from "@/features/workspace/model/trusted-host-keys";
 import { appendTurnStepLine, latestThoughtId } from "@/features/workspace/model/turn-step-lines";
 import { createWorkspaceCache } from "@/features/workspace/model/workspace-cache";
@@ -521,6 +523,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const dropServerState = useCallback(
     (serverIds: ReadonlySet<string>) => {
       if (!serverIds.size) return;
+      deleteServerDrafts(serverIds);
       const removedAgentIds = new Set<string>();
       for (const serverId of serverIds) {
         removedServers.current.add(serverId);
@@ -550,7 +553,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       for (const id of removedAgentIds) conversationStore.remove(id);
       liveState.update("unreadAgentIds", (current) => current.filter((id) => !removedAgentIds.has(id)));
       liveState.update("unreadCounts", (current) => withoutKeys(current, removedAgentIds));
+      liveState.update("firstUnreadMessageIds", (current) => withoutKeys(current, removedAgentIds));
       liveState.update("activityByServer", (current) => withoutKeys(current, serverIds));
+      liveState.update("threadWaitsByServer", (current) => withoutKeys(current, serverIds));
       liveState.update("turnLinesByServer", (current) => withoutKeys(current, serverIds));
       liveState.update("approvalRequests", (current) => withoutKeys(current, serverIds));
       liveState.update("browserRequests", (current) => withoutKeys(current, serverIds));
@@ -1057,18 +1062,19 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [request, conversationStore],
   );
 
-  const { applyConversationReads, refreshConversationReads, markAgentRead, markAllRead } = useConversationReads({
-    liveState,
-    readRefresh,
-    request,
-    loadConversation,
-    conversationStore,
-    loadGeneration,
-    removedServers,
-    capabilities: serverCapabilities.current,
-    activeServerId: activeServerIdRef,
-    agents: agentsRef,
-  });
+  const { applyConversationReads, refreshConversationReads, markAgentRead, markAgentUnreadFrom, markAllRead } =
+    useConversationReads({
+      liveState,
+      readRefresh,
+      request,
+      loadConversation,
+      conversationStore,
+      loadGeneration,
+      removedServers,
+      capabilities: serverCapabilities.current,
+      activeServerId: activeServerIdRef,
+      agents: agentsRef,
+    });
 
   const loadServer = useCallback(
     async (serverId: string, publicKey: string, client: RemoteTeamTransportRef, context: ServerLoadContext) => {
@@ -1481,6 +1487,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           return next === previous ? current : { ...current, [serverId]: next };
         });
       }
+      // What the chat leaves out: the waits of the side threads, which the home list shows on the agent.
+      liveState.update("threadWaitsByServer", (current) => {
+        const previous = current[serverId] ?? [];
+        const next = reduceThreadWaits(previous, event, taskThreadCheck(queryClient, queryScope, serverId));
+        return next === previous ? current : { ...current, [serverId]: next };
+      });
       // The lines of a task turn too: the thread's thinking sheet shows them. Turn ids are unique, so
       // the agent's chat shows none of them.
       if (event.type === "turn-progress") {
@@ -2099,6 +2111,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       markAgentUnread: (agentId) => {
         markAgentRead(agentId, null);
       },
+      markAgentUnreadFrom,
       hideChannel: (id, serverId) =>
         Boolean(updatePreferences(serverId, (current) => setChannelHidden(current, id, true))),
       unhideChannel: (id, serverId) =>
@@ -2195,6 +2208,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     loadLatestMessages,
     loadOlderMessages,
     markAgentRead,
+    markAgentUnreadFrom,
     markAllRead,
     updatePreferences,
     changeHostHidden,

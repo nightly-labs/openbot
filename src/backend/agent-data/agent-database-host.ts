@@ -15,6 +15,7 @@ import { constants, DatabaseSync, type StatementSync } from "node:sqlite";
 import { Context, Effect, Layer, ManagedRuntime, Result, Schema } from "effect";
 import type {
   AgentDatabaseFailure,
+  AgentDatabaseHostReady,
   AgentDatabaseLimits,
   AgentDatabaseMode,
   AgentDatabaseParameter,
@@ -400,9 +401,17 @@ function closeEverything(): void {
   for (const key of [...open.keys()]) closeKey(key);
 }
 
+/**
+ * Sent once, after every import above has loaded and the transport listens. The supervisor arms a
+ * statement deadline only after this, so a slow start of the process is not reported as a slow
+ * statement or ended as a runaway one.
+ */
+const READY: AgentDatabaseHostReady = { kind: "ready" };
+
 if (parentPort) {
   parentPort.on("message", (message) => accept(message.data, (response) => parentPort.postMessage(response)));
   parentPort.start();
+  parentPort.postMessage(READY);
 } else {
   const lines = createInterface({ input: process.stdin });
   lines.on("line", (line) => {
@@ -419,4 +428,5 @@ if (parentPort) {
     Effect.runSync(runtime.disposeEffect);
     process.exit(0);
   });
+  process.stdout.write(`${JSON.stringify(READY)}\n`);
 }

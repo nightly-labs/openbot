@@ -44,7 +44,12 @@
   color: var(--openbot-text-primary);
 }
 
-/* The gap after the name tab is the gap between two tabs, with the same divider in it. */
+/* The gap after the name tab is the gap between two tabs, with the same divider in it: this margin and
+   the padding of the tab list. The gap of the heading group does not apply. */
+.conversation-heading-group:has(> .conversation-title[data-tab] + .agent-threads-header) {
+  gap: 0;
+}
+
 .conversation-heading-group:has(.conversation-title[data-tab]) .agent-threads-header {
   margin-inline-start: 1px;
 }
@@ -470,6 +475,14 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--openbot-radius-pill);
+}
+
+/* Agent messages that the user has not read: a dot in the color of the "new messages" mark of the
+   timeline. A state badge outranks it. */
+.agent-threads-unread {
+  width: 8px;
+  height: 8px;
+  background: var(--openbot-unread-surface);
 }
 
 /* The pill of the sidebar badge, with the dots while the agent works. */

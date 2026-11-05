@@ -10,6 +10,7 @@ import {
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
+import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { hasVisibleToasts } from "@openbot/ui";
 import type { AgentMessage } from "@openbot/ui/data";
@@ -645,9 +646,9 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         onSetAgentAvatar={setAgentAvatar}
         onSendMessage={sendMessage}
         onMarkRead={() => markAgentMessagesRead()}
-        // The Team API unread route marks a whole chat, so only an agent on this computer has the item.
+        // A joined server marks one message unread only through `conversation-unread-from-v1`.
         onMarkUnread={
-          activeServer()?.kind === "local"
+          activeServerSupportsCapability(CONVERSATION_UNREAD_FROM_CAPABILITY)
             ? (messageId) => {
                 const agentId = activeAgent()?.id;
                 return agentId ? markAgentMessagesUnread(agentId, messageId) : Promise.resolve();

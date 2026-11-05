@@ -1,24 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { CHAT_VISUAL_ITEM_TYPE_PREFIX } from "@openbot/contracts/chat-visual";
 import {
-  AGENT_EXCHANGE_ITEM_TYPE,
-  AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
-  type AgentSummary,
-  CONTEXT_RESET_ITEM_TYPE,
-  CONVERSATION_MEMORY_CHANGES_ITEM_TYPE,
-  CONVERSATION_PLAN_ITEM_TYPE,
-  CONVERSATION_SUBAGENTS_ITEM_TYPE,
-  type ConversationReadState,
-  type ConversationSnapshot,
-  HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
-  MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
-  MODEL_SWITCH_ITEM_TYPE_PREFIX,
-  PLAN_CONTINUATION_ITEM_TYPE,
-  ROUTINE_EVENT_ITEM_TYPE_PREFIX,
-  ROUTINE_QUIET_ANSWER_ITEM_TYPE,
-  ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
-  SKILL_EVENT_ITEM_TYPE_PREFIX,
-} from "@openbot/contracts/ipc";
+  itemTypeCountsAsUnread,
+  READ_EXCLUDED_ITEM_TYPE_PREFIXES,
+  READ_EXCLUDED_ITEM_TYPES,
+} from "@openbot/contracts/conversation-read";
+import type { AgentSummary, ConversationReadState, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import {
@@ -30,6 +16,13 @@ import {
 import type { OpenBotDatabase } from "./openbot-database";
 
 export type { ConversationMarkerExclusions } from "./database/conversation-queries";
+
+/** The rows that make a chat unread, by the rule that the apps use to move the read mark. */
+const UNREAD_FILTER = [
+  "author != 'user'",
+  ...READ_EXCLUDED_ITEM_TYPES.map((itemType) => `COALESCE(item_type, '') != '${itemType}'`),
+  ...READ_EXCLUDED_ITEM_TYPE_PREFIXES.map((prefix) => `COALESCE(item_type, '') NOT LIKE '${prefix}%'`),
+].join(" AND ");
 
 export class ConversationReadStore {
   constructor(readonly database: OpenBotDatabase) {}
@@ -168,13 +161,15 @@ export class ConversationReadStore {
     memberId: string,
     threadId: string | null,
     fromMessageId: string | null = null,
+    options: ConversationMarkerExclusions = {},
   ): ConversationReadState {
     if (!threadId) return emptyReadState();
     const fromKey = fromMessageId ? this.#messageOrderKey(threadId, fromMessageId) : undefined;
     if (fromMessageId && !fromKey) throw new Error(sourceText("error.backend.readBoundaryUnavailable"));
     const throughMessageId = fromKey ? this.#messageBefore(threadId, fromKey) : null;
     this.#saveCursor(threadId, memberId, throughMessageId, "marked");
-    return this.#stateFromDatabase(threadId, throughMessageId);
+    // The answer names a mark that the reader's client holds, as a read does.
+    return this.#withSupportedCursor(threadId, this.#stateFromDatabase(threadId, throughMessageId), options);
   }
 
   #withSupportedCursor(
@@ -286,29 +281,12 @@ export class ConversationReadStore {
     const boundaryKey = throughMessageId ? this.#messageOrderKey(threadId, throughMessageId) : undefined;
     const afterBoundary = boundaryKey ? `AND (${ORDER_KEY_COLUMNS}) > (?, ?, ?, ?, ?, ?, ?)` : "";
     const parameters = boundaryKey ? [threadId, ...boundaryKey] : [threadId];
-    const unreadFilter = `author != 'user'
-      AND COALESCE(item_type, '') != 'commentary'
-      AND COALESCE(item_type, '') != 'plan'
-      AND COALESCE(item_type, '') != 'subagents'
-      AND COALESCE(item_type, '') != '${CONVERSATION_MEMORY_CHANGES_ITEM_TYPE}'
-      AND COALESCE(item_type, '') != '${PLAN_CONTINUATION_ITEM_TYPE}'
-      AND COALESCE(item_type, '') != '${AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE}'
-      AND COALESCE(item_type, '') != '${ROUTINE_QUIET_ANSWER_ITEM_TYPE}'
-      AND COALESCE(item_type, '') != 'agent_attachment'
-      AND COALESCE(item_type, '') NOT LIKE '${CHAT_VISUAL_ITEM_TYPE_PREFIX}%'
-      AND COALESCE(item_type, '') != '${AGENT_EXCHANGE_ITEM_TYPE}'
-      AND COALESCE(item_type, '') NOT LIKE '${SKILL_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%'
-      AND COALESCE(item_type, '') NOT LIKE '${ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX}%'
-      AND COALESCE(item_type, '') NOT LIKE '${HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX}%'
-      AND COALESCE(item_type, '') NOT LIKE '${MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX}%'
-      AND COALESCE(item_type, '') NOT LIKE '${MODEL_SWITCH_ITEM_TYPE_PREFIX}%'
-      AND COALESCE(item_type, '') != '${CONTEXT_RESET_ITEM_TYPE}'`;
     // One pass over the ordered thread: the first unread row carries the count of all of them.
     const firstRow = this.database.connection
       .prepare(
         `${ORDERED_THREAD_MESSAGES}
          SELECT message_id, COUNT(*) OVER () AS unread_count FROM ordered
-         WHERE 1 = 1 ${afterBoundary} AND ${unreadFilter}
+         WHERE 1 = 1 ${afterBoundary} AND ${UNREAD_FILTER}
          ORDER BY ${ORDER_KEY_COLUMNS} LIMIT 1`,
       )
       .get(...parameters);
@@ -391,27 +369,7 @@ function stateFromSnapshot(snapshot: ConversationSnapshot, throughMessageId: str
     : -1;
   const unread = snapshot.messages
     .slice(throughIndex + 1)
-    .filter(
-      (message) =>
-        message.author !== "user" &&
-        message.itemType !== "commentary" &&
-        message.itemType !== CONVERSATION_PLAN_ITEM_TYPE &&
-        message.itemType !== CONVERSATION_SUBAGENTS_ITEM_TYPE &&
-        message.itemType !== CONVERSATION_MEMORY_CHANGES_ITEM_TYPE &&
-        message.itemType !== PLAN_CONTINUATION_ITEM_TYPE &&
-        message.itemType !== AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE &&
-        message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE &&
-        message.itemType !== "agent_attachment" &&
-        !message.itemType?.startsWith(CHAT_VISUAL_ITEM_TYPE_PREFIX) &&
-        message.itemType !== AGENT_EXCHANGE_ITEM_TYPE &&
-        !message.itemType?.startsWith(SKILL_EVENT_ITEM_TYPE_PREFIX) &&
-        !message.itemType?.startsWith(ROUTINE_EVENT_ITEM_TYPE_PREFIX) &&
-        !message.itemType?.startsWith(ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX) &&
-        !message.itemType?.startsWith(HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX) &&
-        !message.itemType?.startsWith(MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX) &&
-        !message.itemType?.startsWith(MODEL_SWITCH_ITEM_TYPE_PREFIX) &&
-        message.itemType !== CONTEXT_RESET_ITEM_TYPE,
-    );
+    .filter((message) => message.author !== "user" && itemTypeCountsAsUnread(message.itemType));
   return {
     unreadCount: unread.length,
     firstUnreadMessageId: unread[0]?.id ?? null,

@@ -5,7 +5,6 @@ import {
   BubbleReactions,
   Button,
   ContextMenu,
-  Message,
   MessageAvatar,
   MessageContent,
   MessageHeader,
@@ -87,6 +86,7 @@ export interface ChatMessageRowProps {
   onOpenSharedFile?: (path: string) => void;
   onOpenWorkspaceFile?: ((path: string) => void) | undefined;
   onOpenQuote?: ((messageId: string, text: string) => void) | undefined;
+  onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
   /** Loads the images and media of a client that gets no `previewUrl`. */
   mediaSource?: AttachmentMediaSource | undefined;
@@ -209,6 +209,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
       onOpenSharedFile={props.onOpenSharedFile}
       onOpenWorkspaceFile={props.onOpenWorkspaceFile}
       onOpenQuote={props.onOpenQuote}
+      onOpenTag={props.onOpenTag}
       onDownload={props.onDownload}
       mediaSource={props.mediaSource}
       downloads={props.downloads}
@@ -351,58 +352,47 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
       </MessageContent>
     </>
   );
+  // One element with or without a menu. A sent message gets its menu when the host stores it, and a
+  // new element would draw its images again and blink. Without a menu, the trigger is disabled and
+  // the native menu opens.
   return (
-    <Show
-      when={props.menu}
-      fallback={
-        <Message
-          role="article"
-          align={person() ? "end" : "start"}
-          aria-label={t("chat.row.label", { name: props.author.name })}
-          data-author={person() ? "user" : "assistant"}
-          data-chat-search-message={props["data-chat-search-message"]}
-          style={authorStyle()}
-          class={rowClass()}
-        >
-          {body()}
-        </Message>
-      }
-    >
-      {(menu) => (
-        <ContextMenu.Root modal={false}>
-          <ContextMenu.Trigger
-            as="div"
-            ref={keepNativeMenu}
-            aria-keyshortcuts="Shift+F10"
-            onKeyDown={(event: KeyboardEvent & { currentTarget: HTMLElement }) => {
-              if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
-              event.preventDefault();
-              const bounds = event.currentTarget.getBoundingClientRect();
-              event.currentTarget.dispatchEvent(
-                new MouseEvent("contextmenu", {
-                  bubbles: true,
-                  cancelable: true,
-                  clientX: bounds.left,
-                  clientY: bounds.top,
-                }),
-              );
-            }}
-            role="article"
-            // The trigger is the row, so it draws the `Message` primitive's element itself:
-            // `as={Message}` would spread Kobalte's own props onto the DOM.
-            data-slot="message"
-            data-align={person() ? "end" : "start"}
-            aria-label={t("chat.row.label", { name: props.author.name })}
-            data-author={person() ? "user" : "assistant"}
-            data-chat-search-message={props["data-chat-search-message"]}
-            style={authorStyle() ?? ""}
-            class={["ui-message", ...rowClass()]}
-          >
-            {body()}
-          </ContextMenu.Trigger>
-          <ContextMenu.Portal>{menu()()}</ContextMenu.Portal>
-        </ContextMenu.Root>
-      )}
-    </Show>
+    <ContextMenu.Root modal={false}>
+      <ContextMenu.Trigger
+        as="div"
+        disabled={!props.menu}
+        ref={keepNativeMenu}
+        aria-keyshortcuts={props.menu ? "Shift+F10" : undefined}
+        onKeyDown={(event: KeyboardEvent & { currentTarget: HTMLElement }) => {
+          if (!props.menu) return;
+          if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
+          event.preventDefault();
+          const bounds = event.currentTarget.getBoundingClientRect();
+          event.currentTarget.dispatchEvent(
+            new MouseEvent("contextmenu", {
+              bubbles: true,
+              cancelable: true,
+              clientX: bounds.left,
+              clientY: bounds.top,
+            }),
+          );
+        }}
+        role="article"
+        // The trigger is the row, so it draws the `Message` primitive's element itself:
+        // `as={Message}` would spread Kobalte's own props onto the DOM.
+        data-slot="message"
+        data-align={person() ? "end" : "start"}
+        aria-label={t("chat.row.label", { name: props.author.name })}
+        data-author={person() ? "user" : "assistant"}
+        data-chat-search-message={props["data-chat-search-message"]}
+        // The trigger turns off the long-press callout. A row with no menu keeps it, as before.
+        style={[authorStyle(), props.menu ? undefined : "-webkit-touch-callout: default"]
+          .filter((style) => style !== undefined)
+          .join("; ")}
+        class={["ui-message", ...rowClass()]}
+      >
+        {body()}
+      </ContextMenu.Trigger>
+      <Show when={props.menu}>{(menu) => <ContextMenu.Portal>{menu()()}</ContextMenu.Portal>}</Show>
+    </ContextMenu.Root>
   );
 }

@@ -1,4 +1,4 @@
-import { CHAT_VISUAL_ITEM_TYPE_PREFIX } from "@openbot/contracts/chat-visual";
+import { itemTypeCountsAsUnread } from "@openbot/contracts/conversation-read";
 import type {
   ConversationMessageAuthor,
   ConversationReadState,
@@ -6,17 +6,11 @@ import type {
   DirectMessage,
 } from "@openbot/contracts/ipc";
 import {
-  AGENT_EXCHANGE_ITEM_TYPE,
-  AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
   CONTEXT_RESET_ITEM_TYPE,
-  CONVERSATION_MEMORY_CHANGES_ITEM_TYPE,
-  CONVERSATION_SUBAGENTS_ITEM_TYPE,
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
   MODEL_SWITCH_ITEM_TYPE_PREFIX,
-  PLAN_CONTINUATION_ITEM_TYPE,
   ROUTINE_EVENT_ITEM_TYPE_PREFIX,
-  ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
   SKILL_EVENT_ITEM_TYPE_PREFIX,
 } from "@openbot/contracts/ipc";
@@ -60,20 +54,7 @@ export function isRoutineEventItem(message: { itemType?: string | undefined }): 
  * enough to accept both and silently take either spelling.
  */
 function isIncoming(message: { itemType?: string | undefined }, fromUser: boolean): boolean {
-  return (
-    !fromUser &&
-    message.itemType !== "commentary" &&
-    message.itemType !== "agent_attachment" &&
-    !message.itemType?.startsWith(CHAT_VISUAL_ITEM_TYPE_PREFIX) &&
-    message.itemType !== AGENT_EXCHANGE_ITEM_TYPE &&
-    message.itemType !== "plan" &&
-    message.itemType !== CONVERSATION_SUBAGENTS_ITEM_TYPE &&
-    message.itemType !== CONVERSATION_MEMORY_CHANGES_ITEM_TYPE &&
-    message.itemType !== PLAN_CONTINUATION_ITEM_TYPE &&
-    message.itemType !== AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE &&
-    message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE &&
-    !isRoutineEventItem(message)
-  );
+  return !fromUser && itemTypeCountsAsUnread(message.itemType);
 }
 
 /** The rule for a message as main sends it. */

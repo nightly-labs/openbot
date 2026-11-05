@@ -485,7 +485,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
                     onClick={close}
                   >
                     <span class="side-panel-tab-icon">
-                      <ThreadTabIcon status={thread().status} />
+                      <ThreadTabIcon status={thread().status} unread={thread().unread} />
                     </span>
                     <X class="side-panel-tab-x" aria-hidden="true" />
                   </Button>
@@ -504,7 +504,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
                     onKeyDown={(event) => onTabKeyDown(event, value(), close)}
                   >
                     <span class="side-panel-tab-label">{thread().title}</span>
-                    <ThreadStatusText status={thread().status} />
+                    <ThreadStatusText status={thread().status} unread={thread().unread} />
                   </Tabs.Trigger>
                 </div>
               );

@@ -11,12 +11,16 @@ const id = z.string().min(1).max(512);
 const cursorText = z.string().min(1).max(4096);
 /** Messages one search call reads before it returns a cursor, whether or not they match. */
 const SEARCH_SCAN_ROWS = 200;
+/** A side thread of the calling agent, in place of the current conversation. The router checks the owner. */
+const taskId = id.optional();
 const searchShape = {
+  taskId,
   query: z.string().trim().min(1).max(200),
   cursor: cursorText.optional(),
   limit: z.number().int().min(1).max(10).optional(),
 };
 const readShape = {
+  taskId,
   messageId: id.optional(),
   before: cursorText.optional(),
   offset: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
@@ -45,13 +49,13 @@ export const HISTORY_TOOL_DEFINITIONS = [
   {
     name: "history_search",
     description:
-      "Search messages in this conversation after its latest context reset. Returns bounded excerpts and a cursor; use history_read for omitted text. Does not search other chats or channels.",
+      "Search this conversation, or your thread by taskId, after its latest reset. Returns bounded excerpts and a cursor; history_read gives omitted text. No other chats or channels.",
     shape: searchShape,
   },
   {
     name: "history_read",
     description:
-      "Read current-conversation history after its latest reset. Read a messageId with offset for large text, or use before from an earlier response for older messages. Optional captured work steps contain no raw reasoning; continue them with workStepsOffset from nextWorkStepsOffset. Channels use channel_history.",
+      "Read this chat, or your thread by taskId, after its latest reset. Read a messageId with offset for large text, or use before from an earlier response for older messages. Optional captured work steps contain no raw reasoning; continue them with workStepsOffset from nextWorkStepsOffset. Channels use channel_history.",
     shape: readShape,
   },
 ];

@@ -314,18 +314,11 @@ export const messages = defineMessages("provider", {
   "provider.settings.turnOnFirst": "Turn {name} on first.",
   "provider.settings.makeDefault": "Make default",
   "provider.settings.useTitle": "Use {name}",
-  "provider.settings.download": "Download",
-  "provider.settings.downloadedCli": "{name} CLI",
-  "provider.settings.downloadDetail": {
-    one: "{version} · 1 version · {size}",
-    other: "{version} · {count} versions · {size}",
-  },
-  "provider.settings.downloadVersions": { one: "1 version · {size}", other: "{count} versions · {size}" },
-  "provider.settings.downloadAgain": "When you turn {name} on, OpenBot downloads its CLI again.",
-  "provider.settings.removeDownloadConfirm": "Remove {size}?",
-  "provider.settings.removeDownloadKeeps": "Accounts, sign-ins and agents stay.",
-  "provider.settings.removeDownload": "Remove download",
-  "provider.settings.removingDownload": "Removing…",
+  "provider.settings.deleteTitle": "Delete {name}",
+  "provider.settings.deleteOn":
+    "Turns {name} off and deletes the CLI that OpenBot downloaded. Accounts, sign-ins and agents stay.",
+  "provider.settings.deleteOff":
+    "Deletes the CLI that OpenBot downloaded for {name} ({size}). Accounts, sign-ins and agents stay.",
   "provider.settings.removeDownloadFailed": "Could not remove the download.",
   "provider.settings.endpoints": "Endpoints",
   "provider.settings.noEndpoints": "No endpoints.",

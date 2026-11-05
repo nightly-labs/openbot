@@ -33,8 +33,10 @@ interface SettingsVoiceState {
 
 const EMPTY_STATUSES: SettingsVoiceState["statuses"] = {
   "parakeet-tdt-0.6b-v3": null,
+  "parakeet-unified-en-0.6b": null,
   "bark-3.0-plus": null,
   "whisper-turbo": null,
+  "cohere-transcribe-03-2026": null,
   [ELEVENLABS_VOICE_MODEL_ID]: null,
 };
 

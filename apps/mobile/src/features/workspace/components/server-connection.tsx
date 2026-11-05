@@ -9,6 +9,7 @@ import {
   remoteConnectionFailureDetails,
 } from "@openbot/team-client";
 import { REMOTE_PEER_LOST_AFTER_MS, type RemoteTeamConnectionUpdate } from "@openbot/team-client/remote-peer";
+import { errorReference } from "@openbot/user-errors/reference";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { MobileConnectionAnalytics } from "@/features/analytics/connection";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
@@ -135,7 +136,7 @@ export const ServerConnection = memo(function ServerConnection({
       supportLog.add(
         update.state === "offline" ? "warn" : "info",
         "connection",
-        `${hostId} ${update.state}${update.code ? ` (${update.code})` : ""}${update.message ? `: ${update.message}` : ""}${update.resync ? ", resync" : ""}`,
+        `${hostId} ${update.state}${update.code ? ` (${update.code})` : ""}${update.message ? `: ${update.message}` : ""}${update.reference ? ` [${update.reference}]` : ""}${update.hostOffline ? ", host not on Signal" : ""}${update.resync ? ", resync" : ""}`,
       );
       if (update.hostOffline && activeRef.current) onUnavailableRef.current?.(hostId);
       if (update.state === "offline") {
@@ -180,10 +181,11 @@ export const ServerConnection = memo(function ServerConnection({
               finish("failed", initiatingContext.stage);
               onUnavailableRef.current?.(hostId);
             }
+            const reference = errorReference(error);
             supportLog.add(
               "warn",
               "connection",
-              `${hostId} attempt ${attempt} failed at ${initiatingContext.stage} (${Date.now() - started} ms): ${supportLogValue(error)}`,
+              `${hostId} attempt ${attempt} failed at ${initiatingContext.stage} (${Date.now() - started} ms): ${supportLogValue(error)}${reference ? ` [${reference}]` : ""}`,
             );
             throw error;
           },

@@ -98,6 +98,10 @@ import {
   ContextCompactRefusedError,
 } from "@openbot/contracts/team-protocol/context-compact-v1";
 import {
+  CONVERSATION_UNREAD_FROM_CAPABILITY,
+  CONVERSATION_UNREAD_FROM_ROUTE,
+} from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
+import {
   CUSTOM_AGENTS_CAPABILITY,
   CUSTOM_AGENTS_CODECS,
   CUSTOM_AGENTS_ROUTES,
@@ -552,11 +556,43 @@ const fakeAgents: TeamApiAgents = {
   resolveAvatar: unused("resolveAvatar"),
   readConversation: unused("readConversation"),
   readConversationFor: unused("readConversationFor"),
-  readConversationPageFor: unused("readConversationPageFor"),
+  // The chat of each agent shows every message but `message-gone`. A page around a message starts with it.
+  readConversationPageFor: (agentId, memberId, anchor, limit, options) => {
+    record("readConversationPageFor", agentId, memberId, anchor, limit, options);
+    const shown = anchor?.type === "around" && anchor.messageId !== "message-gone";
+    return Effect.succeed({
+      agentId,
+      threadId: `thread-${agentId}`,
+      activeTurnId: null,
+      revision: 1,
+      messages:
+        shown && anchor?.type === "around"
+          ? [
+              {
+                id: anchor.messageId,
+                author: "assistant",
+                text: "Reply",
+                createdAt: "2026-11-05T08:00:00.000Z",
+                status: "completed",
+              },
+            ]
+          : [],
+      references: {},
+      pageInfo: { hasOlder: false, olderCursor: null },
+    });
+  },
   searchConversationMessages: unused("searchConversationMessages"),
   searchConversationFiles: unused("searchConversationFiles"),
   markConversationRead: unused("markConversationRead"),
-  markConversationUnread: unused("markConversationUnread"),
+  // The mark moves to the message shown before `fromMessageId`, which this fake names `before-<id>`.
+  markConversationUnread: (agentId, memberId, fromMessageId, options) => {
+    record("markConversationUnread", agentId, memberId, fromMessageId, options);
+    return Effect.succeed({
+      unreadCount: 2,
+      firstUnreadMessageId: fromMessageId ?? null,
+      throughMessageId: fromMessageId ? `before-${fromMessageId}` : null,
+    });
+  },
   listWorkspaceDirectory: unused("listWorkspaceDirectory"),
   sendMessage: unused("sendMessage"),
   setMessageReaction: unused("setMessageReaction"),
@@ -1765,64 +1801,28 @@ try {
     // Each frozen list is the released vocabulary of its protocol. Protocol 8 and later hide none.
     const hiddenBy = (protocol: number) =>
       AGENT_PROVIDERS.filter((provider) => isPeerHiddenProvider(provider, protocol));
-    const expectedHidden: Record<number, readonly string[]> = {
-      1: [
-        "opencode",
-        "antigravity",
-        "acp",
-        "cursor",
-        "cline",
-        "pi",
-        "muse",
-        "inception",
-        "deepseek",
-        "openrouter",
-        "kimi",
-        "devin",
-        "copilot",
-        "hermes",
-      ],
-      3: [
-        "opencode",
-        "antigravity",
-        "acp",
-        "cursor",
-        "cline",
-        "pi",
-        "muse",
-        "inception",
-        "deepseek",
-        "openrouter",
-        "kimi",
-        "devin",
-        "copilot",
-        "hermes",
-      ],
-      4: [
-        "antigravity",
-        "acp",
-        "cursor",
-        "cline",
-        "pi",
-        "muse",
-        "inception",
-        "deepseek",
-        "openrouter",
-        "kimi",
-        "devin",
-        "copilot",
-        "hermes",
-      ],
-      5: ["cursor", "cline", "pi", "muse", "inception", "deepseek", "openrouter", "kimi", "devin", "copilot", "hermes"],
-      6: ["pi", "muse", "inception", "deepseek", "openrouter", "kimi", "devin", "copilot", "hermes"],
-      7: ["inception", "deepseek", "openrouter", "kimi", "devin", "copilot", "hermes"],
-      8: [],
-      9: [],
+    // The released vocabulary of each protocol, written out again here so that a change to the host
+    // copy fails this check. A provider added later is hidden below protocol 8 with no edit here.
+    const known1 = ["codex", "claude", "grok"];
+    const known4 = [...known1, "opencode"];
+    const known5 = [...known4, "antigravity", "acp"];
+    const known6 = [...known5, "cursor", "cline"];
+    const known7 = [...known6, "pi", "muse"];
+    const known: Record<number, readonly string[] | null> = {
+      1: known1,
+      2: known1,
+      3: known1,
+      4: known4,
+      5: known5,
+      6: known6,
+      7: known7,
+      8: null,
+      9: null,
     };
-    const hiddenRows = Object.entries(expectedHidden).map(([protocol, expected]) => ({
+    const hiddenRows = Object.entries(known).map(([protocol, names]) => ({
       protocol: Number(protocol),
       hidden: hiddenBy(Number(protocol)),
-      expected: AGENT_PROVIDERS.filter((provider) => expected.includes(provider)),
+      expected: names === null ? [] : AGENT_PROVIDERS.filter((provider) => !names.includes(provider)),
     }));
     check(
       "the frozen provider lists hide each provider that a protocol below 8 does not know, and protocol 8 hides none",
@@ -3234,6 +3234,94 @@ try {
       "the channel delete route on a host without channels gets 400 channelsUnsupported",
       errorIs(channel, 400, sourceText("error.team.channelsUnsupported")),
       summary(channel),
+    );
+  }
+
+  // ---- Mark unread from a message (conversation-unread-from-v1) ----
+  {
+    const unreadCapabilities = [AGENT_HIDDEN_CAPABILITY, CONVERSATION_UNREAD_FROM_CAPABILITY];
+    const marks = () => callsOf("markConversationUnread");
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises conversation-unread-from-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(CONVERSATION_UNREAD_FROM_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(CONVERSATION_UNREAD_FROM_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", CONVERSATION_UNREAD_FROM_ROUTE, {
+      token: bobToken,
+      json: { agentId: "agent-ada", fromMessageId: "message-1" },
+    });
+    check(
+      "the route without the capability gets 400 markUnreadUnsupported, and marks nothing",
+      errorIs(unsupported, 400, sourceText("error.team.markUnreadUnsupported")) && marks().length === 0,
+      summary(unsupported),
+    );
+    accessLevels = { revision: 4, everyone: { "agent-ada": "view" }, roles: [] };
+    const viewer = await call("POST", CONVERSATION_UNREAD_FROM_ROUTE, {
+      token: bobToken,
+      json: { agentId: "agent-ada", fromMessageId: "message-1" },
+      capabilities: unreadCapabilities,
+    });
+    accessLevels = { revision: 5, everyone: {}, roles: [] };
+    check(
+      "a member who can view the agent marks a message unread for themselves and gets the new read state, with the markers that their client does not show",
+      viewer.status === 200 &&
+        isDeepStrictEqual(viewer.body, {
+          unreadCount: 2,
+          firstUnreadMessageId: "message-1",
+          throughMessageId: "before-message-1",
+        }) &&
+        isDeepStrictEqual(marks(), [
+          [
+            "agent-ada",
+            bobId,
+            "message-1",
+            {
+              excludeRoutineEvents: true,
+              excludeRoutineRunEvents: true,
+              excludeHostedSiteEvents: true,
+              excludeRoutineQuietAnswers: true,
+            },
+          ],
+        ]),
+      [summary(viewer), marks()],
+    );
+    const gone = await call("POST", CONVERSATION_UNREAD_FROM_ROUTE, {
+      token: bobToken,
+      json: { agentId: "agent-ada", fromMessageId: "message-gone" },
+      capabilities: unreadCapabilities,
+    });
+    const missing = await call("POST", CONVERSATION_UNREAD_FROM_ROUTE, {
+      token: bobToken,
+      json: { agentId: "agent-none", fromMessageId: "message-1" },
+      capabilities: unreadCapabilities,
+    });
+    const hiddenAgent = await call("POST", CONVERSATION_UNREAD_FROM_ROUTE, {
+      token: bobToken,
+      json: { agentId: "agent-pi", fromMessageId: "message-1" },
+      capabilities: unreadCapabilities,
+      protocol: 6,
+    });
+    check(
+      "a message the chat does not show, an unknown agent, and a hidden agent get 404 and mark nothing",
+      errorIs(gone, 404, sourceText("error.backend.readBoundaryUnavailable")) &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
+        marks().length === 1,
+      [summary(gone), summary(missing), summary(hiddenAgent)],
+    );
+    const malformed = await call("POST", CONVERSATION_UNREAD_FROM_ROUTE, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities: unreadCapabilities,
+    });
+    check(
+      "a body without fromMessageId fails the wire codec and marks nothing",
+      malformed.status === 400 && marks().length === 1,
+      summary(malformed),
     );
   }
 

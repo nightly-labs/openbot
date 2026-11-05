@@ -218,6 +218,8 @@ export const messages = {
     "モデルプロバイダー側で障害が発生しました。お使いの接続は原因ではありません。後でもう一度試すか、別のモデルを選んでください。\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode がモデルプロバイダーに接続できませんでした。OpenBot を実行しているコンピューターのネットワーク接続を確認してから、もう一度お試しください。\n{detail}",
+  "error.provider.codexStateBusy":
+    "ChatGPT は前回の起動後、まだローカル履歴を準備しています。数分待ってから、もう一度お試しください。",
   "error.provider.opencodeDatabaseNewer":
     "新しいバージョンの OpenCode がデータベースを変更したため、OpenCode はデータベースを開けませんでした。OpenCode をバージョン 2 以降に更新してから、もう一度お試しください。",
   "error.provider.opencodeNoAnswer":
@@ -443,6 +445,10 @@ export const messages = {
     "インストール中にカスタムエージェントが変更されました。もう一度お試しください。",
   "error.provider.registryInstallFailed":
     "エージェントのインストールに失敗しました。以前のインストールは変更されていません。",
+  "error.provider.hermesInstallFailed":
+    "Hermes Agent をインストールできませんでした。もう一度試すか、インストールガイドを使ってください。",
+  "error.provider.hermesNeedsGitCurl":
+    "Hermes Agent には git と curl が必要です。インストールしてから、もう一度試してください。",
   "error.provider.registryRemoveBusy":
     "削除する前に、エージェントのインストールと実行中の ACP の作業が終わるまでお待ちください。",
 } as const satisfies PartialTranslation<typeof source>;

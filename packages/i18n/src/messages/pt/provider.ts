@@ -235,17 +235,10 @@ export const messages = {
   "provider.settings.modelShow": "Mostrar {name} ({id}) no seletor de modelos",
   "provider.settings.modelsNoMatch": "Nenhum modelo corresponde à busca.",
   "provider.settings.modelsLoadFailed": "Não foi possível carregar os modelos deste servidor.",
-  "provider.settings.download": "Download",
-  "provider.settings.downloadedCli": "CLI do {name}",
-  "provider.settings.downloadDetail": {
-    one: "{version} · 1 versão · {size}",
-    other: "{version} · {count} versões · {size}",
-  },
-  "provider.settings.downloadVersions": { one: "1 versão · {size}", other: "{count} versões · {size}" },
-  "provider.settings.downloadAgain": "Quando você ativar {name}, o OpenBot baixa a CLI de novo.",
-  "provider.settings.removeDownloadConfirm": "Remover {size}?",
-  "provider.settings.removeDownloadKeeps": "Contas, logins e agentes continuam.",
-  "provider.settings.removeDownload": "Remover download",
-  "provider.settings.removingDownload": "Removendo…",
+  "provider.settings.deleteTitle": "Excluir {name}",
+  "provider.settings.deleteOn":
+    "Desativa {name} e exclui a CLI que o OpenBot baixou. Contas, logins e agentes continuam.",
+  "provider.settings.deleteOff":
+    "Exclui a CLI que o OpenBot baixou para {name} ({size}). Contas, logins e agentes continuam.",
   "provider.settings.removeDownloadFailed": "Não foi possível remover o download.",
 } as const satisfies PartialTranslation<typeof source>;

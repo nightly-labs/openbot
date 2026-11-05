@@ -14,6 +14,11 @@ export interface AgentTasksPort
     | "startTask"
     | "stopTask"
   > {
+  /**
+   * The person's read mark of each open thread of an agent. Missing where the client does not read the
+   * marks: no thread then shows as unread.
+   */
+  listTaskReads?: OpenBotDesktopApi["agent"]["listTaskReads"];
   /** Steers the thread's running turn, or queues the message in the thread. */
   sendToTask(
     input: AgentTaskInput & {
@@ -56,6 +61,7 @@ export function agentTasksPort(): AgentTasksPort {
     renameTask: (input) => agent.renameTask(input),
     deleteTask: (input, serverId) => agent.deleteTask(input, serverId),
     deleteTaskMessage: (input) => agent.deleteConversationMessage(input),
+    listTaskReads: (agentId) => agent.listTaskReads(agentId),
     markTaskRead: (input) => agent.markTaskRead(input),
     queue: {
       cancelQueuedMessage: (input) => agent.cancelQueuedMessage(input),

@@ -543,8 +543,12 @@ export const messages = defineMessages("settings", {
   // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Dictation",
   "settings.voice.model.parakeet.description": "Fast. Finds the spoken language itself, in 25 European languages.",
+  "settings.voice.model.parakeetUnified.description":
+    "Fast. English only. Writes punctuation, with fewer errors than Parakeet TDT.",
   "settings.voice.model.bark.description": "Fast. English only. Writes mostly lowercase, with little punctuation.",
   "settings.voice.model.whisper.description": "Slower. About 100 languages, and you can set the spoken language.",
+  "settings.voice.model.cohere.description":
+    "Slower. 14 languages. You set the spoken language. Uses about 4 GB of memory.",
   "settings.voice.model.size": "Download size: {size}",
   "settings.voice.model.downloading": "Downloading · {received} of {total}",
   "settings.voice.model.failed": "The download stopped. Check the connection and try again.",
@@ -558,9 +562,14 @@ export const messages = defineMessages("settings", {
   "settings.voice.model.removeLabel": "Remove {name} from this computer",
   "settings.voice.language.section": "Language",
   "settings.voice.language.description": "The language that you speak. Automatic finds it from the recording.",
+  "settings.voice.language.modelLanguages":
+    "The language that you speak. This model knows only these languages and does not find the language itself.",
   "settings.voice.language.modelDetects":
-    "Parakeet finds the spoken language itself. To set a language, use Whisper or ElevenLabs.",
-  "settings.voice.language.englishOnly": "Bark recognizes English only. To set a language, use Whisper or ElevenLabs.",
+    "Parakeet finds the spoken language itself. To set a language, use Whisper, Cohere or ElevenLabs.",
+  "settings.voice.language.englishOnly":
+    "Bark recognizes English only. To set a language, use Whisper, Cohere or ElevenLabs.",
+  "settings.voice.language.parakeetUnifiedEnglishOnly":
+    "Parakeet Unified recognizes English only. To set a language, use Whisper, Cohere or ElevenLabs.",
   "settings.voice.language.automatic": "Automatic",
   "settings.voice.loadFailed": "Could not read the voice models.",
   "settings.voice.saveFailed": "Could not save the voice setting. Try again.",

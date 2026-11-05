@@ -409,6 +409,14 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "今日が期限の Todoist タスクはどれですか？",
   "marketplace.plugin.todoist.prompt.capture": "これらのアクション項目を Todoist のインボックスに追加してください。",
   "marketplace.plugin.todoist.prompt.overdue": "期限切れの Todoist タスクを明日に移してください。",
+  "marketplace.plugin.ticktick.tagline": "タスク、リスト、習慣、集中",
+  "marketplace.plugin.ticktick.description":
+    "TickTick を使うと、エージェントはタスクを検索・絞り込み、タスクを追加・変更し、リスト、セクション、フォルダー、タグ、コメントを管理できます。習慣と集中記録の読み取りと変更、TickTick に接続したカレンダーの予定の読み取りもできます。各ユーザーはブラウザーで自分の TickTick アカウントにサインインします。エージェントには読み取りと書き込みのアクセス権があり、タスクの完了、移動、削除、タグと集中記録の削除ができます。",
+  "marketplace.plugin.ticktick.app":
+    "タスク、リスト、習慣、集中記録を、ブラウザーでのサインインで TickTick の MCP サーバー経由で扱います。",
+  "marketplace.plugin.ticktick.prompt.today": "今日が期限の TickTick タスクはどれですか？",
+  "marketplace.plugin.ticktick.prompt.capture": "これらのアクション項目を TickTick の受信箱に追加してください。",
+  "marketplace.plugin.ticktick.prompt.week": "先週完了した TickTick タスクはどれですか？",
   "marketplace.plugin.trello.tagline": "ボード、リスト、カード",
   "marketplace.plugin.trello.description":
     "Trello を使うと、エージェントはボード、リスト、カード、チェックリスト、コメントを検索して読み、ボードとカードを作成し、リストとカードを移動し、カードを完了にし、チェックリスト、コメント、ラベルを追加できます。また、ユーザーの Trello インボックスのカードを読んで追加し、Planner の予定を読むこともできます。予定は、接続された Google または Outlook のカレンダーから来ることがあります。各ユーザーはブラウザーで自分の Trello アカウントにサインインし、同意画面でワークスペースを選びます。エージェントには、それらのワークスペースでユーザーと同じ権限があります。カードとリストをアーカイブできますが、サーバーは何も完全には削除できません。",

@@ -773,6 +773,27 @@ export function customAgentIdOfModel(model: string): string | null {
 }
 
 /**
+ * The providers that publish no release archive, so OpenBot installs each with the provider's own
+ * pinned installer. The runtime snapshot gives one a status where its CLI is found (`ready`) or
+ * where this computer can run that installer, so a reader that finds no status shows the install
+ * guide instead. Not in `MANAGED_RUNTIME_PROVIDERS`: OpenBot does not pin, verify, update or remove
+ * the installed files, and the user's own CLI is the one that runs.
+ */
+export const INSTALLER_PROVIDERS = ["hermes"] as const satisfies readonly AgentProviderId[];
+export type InstallerProviderId = (typeof INSTALLER_PROVIDERS)[number];
+
+/** A provider whose row can offer Download: a managed runtime, or a provider with its own installer. */
+export type DownloadableProviderId = ManagedProviderId | InstallerProviderId;
+
+export function isInstallerProvider(provider: AgentProviderId): provider is InstallerProviderId {
+  return isOneOf(INSTALLER_PROVIDERS, provider);
+}
+
+export function isDownloadableProvider(provider: AgentProviderId): provider is DownloadableProviderId {
+  return isManagedRuntimeProvider(provider) || isInstallerProvider(provider);
+}
+
+/**
  * The tools OpenBot downloads for the MCP servers rather than for an agent: a JavaScript runtime,
  * so that `npx some-server` starts on a machine that has never had Node.
  *

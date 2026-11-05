@@ -6,6 +6,7 @@ import Copy from "lucide-react-native/icons/copy";
 import SmilePlus from "lucide-react-native/icons/face-slightly-smiling-plus";
 import GitFork from "lucide-react-native/icons/git-fork";
 import Hash from "lucide-react-native/icons/hash";
+import MailDot from "lucide-react-native/icons/mail-dot";
 import Reply from "lucide-react-native/icons/reply";
 import Square from "lucide-react-native/icons/square";
 import TextCursor from "lucide-react-native/icons/text-cursor";
@@ -46,8 +47,8 @@ function emojiRows(all: boolean): string[][] {
 }
 
 /**
- * The sheet that a touch and hold on a message opens: the reactions on top, then Reply, Branch and
- * Send to channel, then the actions on the text, and Delete last. Each action closes the sheet.
+ * The sheet that a touch and hold on a message opens: the reactions on top, then Reply, Branch, Mark
+ * unread and Send to channel, then the actions on the text, and Delete last. Each action closes the sheet.
  */
 export function MessageActionsScreen() {
   const { t, format } = useText();
@@ -140,7 +141,7 @@ export function MessageActionsScreen() {
         </View>
       ) : null}
 
-      {request.onReply || request.onBranch || sendToChannel ? (
+      {request.onReply || request.onBranch || request.onMarkUnread || sendToChannel ? (
         <SettingsSection>
           {request.onReply ? (
             <SettingsRow
@@ -158,6 +159,15 @@ export function MessageActionsScreen() {
               onPress={() => run(() => request.onBranch?.())}
             >
               <Typography>{t("mobile.chat.message.branch")}</Typography>
+            </SettingsRow>
+          ) : null}
+          {request.onMarkUnread ? (
+            <SettingsRow
+              leading={<MailDot size={ICON_SIZE} color={icon} />}
+              disclosure={false}
+              onPress={() => run(() => request.onMarkUnread?.())}
+            >
+              <Typography>{t("mobile.chat.message.markUnread")}</Typography>
             </SettingsRow>
           ) : null}
           {sendToChannel ? (

@@ -1,4 +1,4 @@
-import type { ManagedProviderId, ManagedToolRuntimeId } from "./agent-providers";
+import type { InstallerProviderId, ManagedProviderId, ManagedToolRuntimeId } from "./agent-providers";
 import type { AgentModelId, AvatarColor } from "./ipc-agent-identity";
 import type { AgentProviderId } from "./ipc-agent-status";
 import { integerInRange, isFiniteNumber, isIdentifier } from "./ipc-bounded-values";
@@ -169,7 +169,7 @@ export interface ProviderRuntimeSnapshot {
    * managed runtime is absent from `ManagedProviderId`, so it needs no fake entry here, and every
    * provider that is in the tuple has a real status.
    */
-  providers: Record<ManagedProviderId, ProviderRuntimeStatus>;
+  providers: Record<ManagedProviderId, ProviderRuntimeStatus> & InstallerRuntimeStatuses;
   /**
    * The tool runtimes, in a field of their own rather than mixed in above.
    *
@@ -179,6 +179,14 @@ export interface ProviderRuntimeSnapshot {
    */
   toolRuntimes: Record<ManagedToolRuntimeId, ProviderRuntimeStatus>;
 }
+
+/**
+ * The status of a provider that OpenBot installs with the provider's own installer: `ready` where
+ * its CLI is found, so that a server's row offers Connect. Absent where the CLI is missing and this
+ * computer cannot run the installer, and on a host before the installer: the row then shows the
+ * install guide, not Download.
+ */
+export type InstallerRuntimeStatuses = { [Provider in InstallerProviderId]?: ProviderRuntimeStatus };
 
 export interface ExportResult {
   saved: boolean;
@@ -208,6 +216,30 @@ export type HostDefaultProvider = Pick<AppSetupState, "preferredProvider" | "pre
 
 export interface AnalyticsPreference {
   enabled: boolean;
+}
+
+/**
+ * Renderer timing for host analytics: counts and milliseconds only. The renderer sends it at most
+ * once a minute, and once when the main window's workspace finished its first load.
+ */
+/** The bounds of one renderer timing report. The renderer keeps to them and main rejects a report outside them. */
+export const RENDERER_TIMING_LIMITS = {
+  longTasks: 10_000,
+  inputs: 100_000,
+  /** Timed inputs in one report. Inputs past this count are left out of `inputs` too. */
+  inputDelays: 64,
+  inputDelayMs: 600_000,
+} as const;
+
+export interface RendererTimingReport {
+  /** The main window's workspace finished its first load. Main times it on its own clock. */
+  workspaceReady?: true;
+  /** Renderer tasks of more than 200 ms since the last report. */
+  longTasks: number;
+  /** Key presses and pointer presses since the last report. */
+  inputs: number;
+  /** The input delay of each of those inputs that the browser timed (16 ms or more of handling), in ms. */
+  inputDelaysMs: number[];
 }
 
 export interface SetAnalyticsPreferenceInput {

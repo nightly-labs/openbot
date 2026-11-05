@@ -562,6 +562,12 @@ export const messages = {
   "mobile.agent.list.openPinned": "Открыть закреплённый чат с {name}",
   "mobile.agent.list.openPinnedWithTitle": "Открыть закреплённый чат с {name}, {title}",
   "mobile.agent.list.withState": "{label}. {state}",
+  "mobile.agent.list.unread": {
+    one: "{count} непрочитанное сообщение",
+    few: "{count} непрочитанных сообщения",
+    many: "{count} непрочитанных сообщений",
+    other: "{count} непрочитанных сообщения",
+  },
   "mobile.agent.list.waiting.title": "Нужны вы",
   "mobile.agent.list.waiting.label": {
     one: "Нужны вы: {count} агент",

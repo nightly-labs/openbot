@@ -748,6 +748,23 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
   text-align: center;
 }
 
+/* The fishing plush of the "no match" state. */
+.marketplace-empty-plush {
+  display: block;
+  width: 160px;
+  aspect-ratio: 1;
+  pointer-events: none;
+  user-select: none;
+}
+
+.marketplace-empty-plush > img,
+.marketplace-empty-plush > video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .marketplace-empty > p {
   max-width: 440px;
   margin: 0;

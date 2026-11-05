@@ -422,6 +422,14 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "Bugün hangi Todoist görevlerinin süresi doluyor?",
   "marketplace.plugin.todoist.prompt.capture": "Bu yapılacak maddeleri Todoist Gelen Kutuma ekle.",
   "marketplace.plugin.todoist.prompt.overdue": "Geciken Todoist görevlerimi yarına taşı.",
+  "marketplace.plugin.ticktick.tagline": "Görevler, listeler, alışkanlıklar ve odak",
+  "marketplace.plugin.ticktick.description":
+    "TickTick, ajanların görevleri aramasını ve filtrelemesini, görev ekleyip değiştirmesini ve listeleri, bölümleri, klasörleri, etiketleri ve yorumları yönetmesini sağlar. Ajanlar alışkanlıkları ve odak kayıtlarını da okuyup değiştirebilir ve TickTick'e bağlı takvimlerdeki etkinlikleri okuyabilir. Her kullanıcı tarayıcıda kendi TickTick hesabına giriş yapar. Ajanlar okuma ve yazma erişimi alır: görevleri tamamlayabilir, taşıyabilir ve silebilir, etiketleri ve odak kayıtlarını silebilir.",
+  "marketplace.plugin.ticktick.app":
+    "Görevler, listeler, alışkanlıklar ve odak kayıtları, tarayıcıda girişle TickTick'in MCP sunucusu üzerinden.",
+  "marketplace.plugin.ticktick.prompt.today": "Bugün hangi TickTick görevlerinin süresi doluyor?",
+  "marketplace.plugin.ticktick.prompt.capture": "Bu eylem maddelerini TickTick Gelen Kutuma ekle.",
+  "marketplace.plugin.ticktick.prompt.week": "Geçen hafta hangi TickTick görevlerini tamamladım?",
   "marketplace.plugin.trello.tagline": "Panolar, listeler ve kartlar",
   "marketplace.plugin.trello.description":
     "Trello ile ajanlar panoları, listeleri, kartları, kontrol listelerini ve yorumları arayıp okur, pano ve kart oluşturur, listeleri ve kartları taşır, kartları tamamlandı olarak işaretler ve kontrol listesi, yorum ve etiket ekler. Ajanlar ayrıca kullanıcının Trello Gelen Kutusu'ndaki kartları okuyup kart ekleyebilir ve bağlı bir Google veya Outlook takviminden gelebilen Planner etkinliklerini okuyabilir. Her kullanıcı tarayıcıda kendi Trello hesabına giriş yapar ve bir onay ekranında çalışma alanlarını seçer. Ajanlar bu çalışma alanlarında kullanıcıyla aynı izinlere sahiptir. Kartları ve listeleri arşivleyebilirler, ancak sunucu hiçbir şeyi kalıcı olarak silemez.",

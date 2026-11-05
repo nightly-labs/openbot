@@ -92,6 +92,10 @@ import {
   CONTEXT_COMPACT_ROUTES,
 } from "@openbot/contracts/team-protocol/context-compact-v1";
 import { CONTEXT_RESET_CAPABILITY, CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
+import {
+  CONVERSATION_UNREAD_FROM_CAPABILITY,
+  CONVERSATION_UNREAD_FROM_ROUTE,
+} from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
   PROVIDER_ACCOUNTS_CAPABILITY,
@@ -131,9 +135,11 @@ import {
   decodeRemoteAgentThreadBranches,
   decodeRemoteTaskConversation,
   decodeRemoteTaskReadState,
+  decodeRemoteTaskReadStates,
   decodeSidebarLayoutSnapshot,
   decodeSidebarPinsFromHost,
 } from "../remote-agent-decoding";
+import { decodeConversationReadState } from "../remote-conversation-decoding";
 import { acceptEmpty, decodeVoid, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
 import { OWNER_PIN_KEY, type SidebarPinStore } from "../sidebar-pin-store";
@@ -832,8 +838,16 @@ export function agentIpcHandlers({
       }),
       markConversationUnread: scopedHandler(parseMarkConversationUnread, {
         local: (parsed) => runCauseEffect(host.markAgentConversationUnread(parsed)),
-        remote: () => {
-          throw new Error(sourceText("error.backend.markUnreadRemoteUnsupported"));
+        // A joined server marks one message unread through `conversation-unread-from-v1`.
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, CONVERSATION_UNREAD_FROM_CAPABILITY))
+            throw new Error(sourceText("error.backend.markUnreadRemoteUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, CONVERSATION_UNREAD_FROM_ROUTE, decodeConversationReadState, {
+              method: "POST",
+              body: { agentId: parsed.agentId, fromMessageId: parsed.fromMessageId },
+            }),
+          );
         },
       }),
       // The user of this computer can delete any message of a local agent.
@@ -1016,7 +1030,20 @@ export function agentIpcHandlers({
         local: (parsed) => runCauseEffect(service.deleteTask(parsed)),
         remote: (parsed, serverId) => remoteThreadRequest(serverId, AGENT_THREADS_ROUTES.delete, agentTaskBody(parsed)),
       }),
-      // A joined server keeps the member's read marks through `agent-thread-reads-v1`.
+      // A joined server keeps the member's read marks through `agent-thread-reads-v1`. A server
+      // without it has no marks, so no thread shows as unread.
+      listTaskReads: scopedHandler(parseAgentId, {
+        local: (agentId) => host.listAgentTaskReads(agentId),
+        remote: (agentId, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_THREAD_READS_CAPABILITY)) return [];
+          return runCauseEffect(
+            remoteServers.request(serverId, AGENT_THREAD_READS_ROUTES.list, decodeRemoteTaskReadStates, {
+              method: "POST",
+              body: { agentId },
+            }),
+          );
+        },
+      }),
       markTaskRead: scopedHandler(parseMarkAgentTaskRead, {
         local: (parsed) => host.markAgentTaskRead(parsed),
         remote: (parsed, serverId) => {

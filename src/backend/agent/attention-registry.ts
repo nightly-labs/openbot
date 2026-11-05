@@ -41,7 +41,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Option, Result, Schema } from "effect";
 import { getDomain } from "tldts";
-import type { AgentApiKeys } from "../agent-api-keys";
+import type { AgentApiKeys, SavedApiKey } from "../agent-api-keys";
 import type { AgentClient } from "../agent-client";
 import { type BrowserOperationError, browserFailure } from "../browser-effects";
 import type { PreparedBrowserSecret } from "../browser-host";
@@ -71,6 +71,8 @@ import type { HostedSiteMutationTool } from "./hosted-site-events";
 import { ForbiddenAttentionAnswer, InactiveAttentionRequest } from "./inactive-attention-request";
 import {
   API_KEY_FIELD_ID,
+  API_KEY_SCOPE_AGENT,
+  API_KEY_SCOPE_FIELD_ID,
   apiKeyPromptResult,
   approvalPermissions,
   browserTakeoverError,
@@ -116,13 +118,14 @@ interface PendingPrompt {
 
 /**
  * An `ask_ui` block, or the form of `request_api_key` or `request_vault_item`. With `apiKey`, the value
- * of its secret field `API_KEY_FIELD_ID` is saved for the agent under that name, and the agent gets the
- * file path only. With `vault`, the answer is saved as a new Vault item, and the agent gets its name only.
+ * of its secret field `API_KEY_FIELD_ID` is saved under that name, and the agent gets the file path only:
+ * with `apiKey.vault`, in the Vault unless the user chose the agent only, else for the agent. With
+ * `vault`, the answer is saved as a new Vault item, and the agent gets its name only.
  */
 export interface SurfacedUiBlock {
   blockId: string;
   spec: UiBlockSpec;
-  apiKey?: { name: string };
+  apiKey?: { name: string; vault?: boolean };
   vault?: { kind: UiVaultRequestKind };
 }
 
@@ -651,6 +654,10 @@ export class AttentionRegistry {
             state.outcome = sourceText("status.agent.vaultAdded", {
               name: savedItem.item.name || (pending.uiBlock.spec.title ?? ""),
             }).slice(0, UI_BLOCK_LIMITS.outcome);
+          else if (saved && saved.created !== null)
+            state.outcome = sourceText(saved.created ? "status.agent.vaultAdded" : "status.agent.vaultUpdated", {
+              name: saved.key.name,
+            }).slice(0, UI_BLOCK_LIMITS.outcome);
           this.#resolvePersistedPrompt(
             pending,
             frozenResponse ? promptResolution(pending.questions, input.answers) : { status: "cancelled" },
@@ -681,7 +688,8 @@ export class AttentionRegistry {
       const apiKey = pending?.uiBlock?.apiKey;
       if (!pending?.uiBlock || !apiKey) return null;
       if (pending.saving) throw new Error(sourceText("error.backend.apiKeySaving"));
-      const answered = uiBlockAnswer(pending.uiBlock.spec, input.answers, responder)?.values?.[API_KEY_FIELD_ID];
+      const values = uiBlockAnswer(pending.uiBlock.spec, input.answers, responder)?.values;
+      const answered = values?.[API_KEY_FIELD_ID];
       // A pasted key often brings a space or a line break, which the service would refuse.
       const value = typeof answered === "string" ? answered.trim() : "";
       // A skip saves nothing, so a member may give it: the turn must not wait for an owner.
@@ -690,19 +698,47 @@ export class AttentionRegistry {
       if (responder && !responder.privileged)
         throw new ForbiddenAttentionAnswer(sourceText("error.backend.apiKeyNotAllowed"));
       if (!this.#apiKeys) throw new Error(sourceText("error.backend.apiKeySaveFailed"));
+      // The form selects the Vault when it opens; only the agent option keeps the key private.
+      const toVault = apiKey.vault === true && values?.[API_KEY_SCOPE_FIELD_ID] !== API_KEY_SCOPE_AGENT;
+      if (toVault && !this.#vaultItems) throw new Error(sourceText("error.vault.unavailable"));
       pending.saving = true;
-      return { pending, apiKeys: this.#apiKeys, name: apiKey.name, value };
+      return {
+        pending,
+        apiKeys: this.#apiKeys,
+        vaultItems: toVault ? this.#vaultItems : null,
+        name: apiKey.name,
+        value,
+      };
     });
     if (!answer) return null;
-    const key = yield* answer.apiKeys.save(answer.pending.agentId, answer.name, answer.value).pipe(
-      toAttentionOperationFailed,
+    const { pending, apiKeys, vaultItems, name, value } = answer;
+    const save: Effect.Effect<{ key: SavedApiKey; created: boolean | null }, AttentionOperationFailed> = vaultItems
+      ? Effect.gen({ self: this }, function* () {
+          const saved = yield* vaultItems
+            .saveApiKey({ name, key: value }, this.#agentName(pending.agentId))
+            .pipe(toAttentionOperationFailed);
+          // The agent's own key of this name wins over the Vault key, so the older value goes.
+          yield* apiKeys.remove(pending.agentId, name).pipe(toAttentionOperationFailed);
+          const keys = yield* apiKeys.list(pending.agentId).pipe(toAttentionOperationFailed);
+          const key = keys.find((entry) => entry.name === name && entry.source === "vault");
+          if (!key)
+            return yield* new AttentionOperationFailed({
+              cause: new Error(sourceText("error.backend.apiKeySaveFailed")),
+            });
+          return { key, created: saved.created };
+        })
+      : apiKeys.save(pending.agentId, name, value).pipe(
+          toAttentionOperationFailed,
+          Effect.map((key) => ({ key, created: null })),
+        );
+    const saved = yield* save.pipe(
       Effect.ensuring(
         Effect.sync(() => {
-          answer.pending.saving = false;
+          pending.saving = false;
         }),
       ),
     );
-    return { pending: answer.pending, key };
+    return { pending, ...saved };
   });
 
   /**
