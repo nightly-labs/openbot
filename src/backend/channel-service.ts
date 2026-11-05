@@ -55,6 +55,7 @@ import {
   PERSON_REQUEST_REQUIRED,
 } from "./channel-management";
 import { ChannelMemoryStore } from "./channel-memory-store";
+import { CHANNEL_REPLY_ID_PREFIX, channelReplyExpectedResult, checkChannelReply, isReplyTask } from "./channel-replies";
 import { type ChannelAssignment, type ChannelContext, ChannelStore } from "./channel-store";
 import type { DeliveryContext, MailboxStore } from "./mailbox-store";
 import { type MessageDeleteAccess, MessageDeleteRefused } from "./message-delete";
@@ -2583,6 +2584,15 @@ export class ChannelService {
           : activeAssignment(assignment))
       )
         message = { ...message, itemType: "commentary" };
+      // The answer to a member reply shows as a reply to it, so the thread reads as an exchange.
+      if (
+        task &&
+        isReplyTask(task) &&
+        message.author === "assistant" &&
+        !message.replyToMessageId &&
+        message.itemType !== "commentary"
+      )
+        message = { ...message, replyToMessageId: task.requestMessageId };
       const messageId =
         original?.superseded && task?.revision === assignment.taskRevision
           ? `${message.id}-revision-${task.revision}`
@@ -2949,13 +2959,17 @@ export class ChannelService {
     if (!task || task.revision !== assignment.taskRevision || task.state !== "running")
       return yield* channelFailure(new Error("The channel task has changed."));
     if (!isDynamicRecord(args)) return yield* channelFailure(new Error("Provide channel tool arguments."));
+    // The turn that a member reply started reads another agent's words, so it cannot change the
+    // channel, whoever made the request of its run.
+    const requester = () =>
+      isReplyTask(task) ? null : channelRequester(task, tasks, (messageId) => this.store.message(channelId, messageId));
     if (tool === "channel_cancel") {
-      const person = channelRequester(task, tasks, (messageId) => this.store.message(channelId, messageId));
+      const person = requester();
       if (!person) return yield* channelFailure(new Error(PERSON_CANCEL_REQUIRED));
       return yield* this.#cancelOwnRun(channelId, task, agentId, `tool:${turnId}:${callId}`, person, args);
     }
     if (CHANNEL_MANAGEMENT_TOOLS.has(tool)) {
-      const person = channelRequester(task, tasks, (messageId) => this.store.message(channelId, messageId));
+      const person = requester();
       if (!person) return yield* channelFailure(new Error(PERSON_REQUEST_REQUIRED));
       return yield* this.#manage(channelId, task.id, agentId, `tool:${turnId}:${callId}`, person, tool, args);
     }
@@ -3022,6 +3036,46 @@ export class ChannelService {
       yield* channelSync(() => this.store.update(channel, { messages: [message] }, operationId));
       this.publish(channelId);
       return { accepted: true, instruction: "The result is in the shared chat. End your turn now with no more text." };
+    }
+    if (tool === "channel_reply") {
+      const root = tasks.find((item) => item.id === task.rootTaskId);
+      if (!root) return yield* channelFailure(new Error("The root task is unavailable."));
+      const eligible = new Set(this.eligibleMembers(channel));
+      const check = checkChannelReply({
+        args,
+        agentId,
+        root,
+        tasks,
+        messages: yield* channelSync(() => this.store.messages(channelId)),
+        resultPosted:
+          (yield* channelSync(() =>
+            this.store.message(channelId, `channel-result-${assignment.id}-revision-${assignment.taskRevision}`),
+          )) !== null,
+        available: (id) => eligible.has(id),
+      });
+      if (!check.accepted) {
+        logger.warn("A channel reply was refused.", { channelId, agentId });
+        return check;
+      }
+      const sender = { kind: "agent" as const, id: agentId, name: this.memberName(agentId) };
+      const reply = this.message(channelId, task.id, sender, check.text, `${CHANNEL_REPLY_ID_PREFIX}${randomUUID()}`);
+      reply.message.author = "assistant";
+      reply.message.turnId = turnId;
+      reply.message.replyToMessageId = check.target.id;
+      const answer: ChannelTask = {
+        ...this.newTask(channelId, reply.id, check.text, check.target.author.id),
+        parentTaskId: task.id,
+        rootTaskId: task.rootTaskId,
+        expectedResult: channelReplyExpectedResult(sender, reply.id),
+      };
+      yield* channelSync(() => this.store.update(channel, { tasks: [answer], messages: [reply] }, operationId));
+      this.publish(channelId);
+      yield* this.wake(channelId);
+      return {
+        accepted: true,
+        messageId: reply.id,
+        instruction: `The reply is in the shared chat. ${check.target.author.name} gets one turn to answer it. Do not wait for the answer: go on with your task.`,
+      };
     }
     /**
      * The two memory tools commit at call time, unlike an agent's `remember`, which stages into the

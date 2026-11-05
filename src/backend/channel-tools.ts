@@ -1,5 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { z } from "zod";
+import { CHANNEL_REPLY_CHARACTERS, CHANNEL_REPLY_LIMIT } from "./channel-replies";
 import {
   routineInstructionZodSchema,
   routineLimitPolicyZodSchema,
@@ -52,6 +53,14 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
     description:
       "Publish the requested task result once in the shared chat when answering an assigned or transferred task. End your turn without repeating it.",
     shape: { text: z.string().min(1).max(INPUT_LIMITS.messageText) },
+  },
+  {
+    name: "channel_reply",
+    description: `Reply in the shared chat to a message of another channel member, in a short message, when you must agree on something with it or ask it a question. That member gets one turn to answer. It is not a task: do not wait for the answer, and use channel_assign for work. A request allows ${CHANNEL_REPLY_LIMIT} member replies, and none after your result. Do not reply only to thank or acknowledge.`,
+    shape: {
+      messageId: z.string().min(1).max(INPUT_LIMITS.identifier),
+      text: z.string().min(1).max(CHANNEL_REPLY_CHARACTERS),
+    },
   },
   {
     name: "channel_cancel",

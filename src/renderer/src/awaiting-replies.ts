@@ -100,7 +100,8 @@ export function channelAwaitingReplies(input: ChannelAwaitingInput): AwaitingRep
   const waiting = new Map(input.tasks.filter((task) => task.state === "waiting").map((task) => [task.id, task]));
   return input.tasks.flatMap((task) => {
     const parent = task.parentTaskId ? waiting.get(task.parentTaskId) : undefined;
-    if (!parent) return [];
+    // The turn that a member reply gives its addressee is a child that the parent does not wait for.
+    if (!parent?.dependencies.includes(task.id)) return [];
     const state = channelTaskState(task.state);
     if (!state) return [];
     return [

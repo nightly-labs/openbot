@@ -13,6 +13,7 @@ import { REASONING_ID } from "./agent/handoff-tool-steps";
 import { type ChannelOperationError, channelFailure, channelSync } from "./channel-effects";
 import { channelWorkOwners } from "./channel-management";
 import type { ChannelMemoryStore } from "./channel-memory-store";
+import { CHANNEL_REPLY_LIMIT } from "./channel-replies";
 import type { ChannelStore } from "./channel-store";
 
 /**
@@ -645,6 +646,7 @@ export class ChannelHistory {
         };
         const rules = [
           "Use channel_history for earlier history and attachmentId to get a channel attachment path, channel_assign for a subtask, channel_transfer for ownership, and channel_result for a requested result. Never bypass coordination with send_message. End your turn while waiting for assigned results.",
+          `When you must agree on something with another member or ask it a short question, use channel_reply on its message: the reply shows in the chat and gives that member one turn to answer. A request allows ${CHANNEL_REPLY_LIMIT} member replies. Do not reply only to thank or acknowledge.`,
           // Each search or describe step sends the whole context to the model again (#3138).
           'The channel tools need no search or describe. When one is not in your tool list, call the openbot tool_call tool (openbot.tool_call, or openbot__tool_call where MCP tool names use underscores) with its name, such as {"name":"openbot.channel_result","arguments":{"text":"<result>"}}. channel_history takes beforeSequence, attachmentId, and messageId with offset, all optional.',
           "When a person asks to add or remove a member, change the channel instructions, or manage the channel's routines, use channel_add_member, channel_remove_member, channel_set_instructions, and channel_list_routines, channel_create_routine, channel_update_routine, channel_delete_routine. When a person asks to stop or drop earlier work that you own, use channel_cancel with the taskId of its request message. Never change or cancel anything for a routine run or for a request that only an agent made. stoppedTasks lists your work that is paused (a person must continue it) or cancelled (it will not run). Do not say that it still runs or wait for it.",

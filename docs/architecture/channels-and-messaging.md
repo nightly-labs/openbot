@@ -267,6 +267,20 @@ channel controls still accepts only a stopped or failed run. On desktop, each ro
 waiting-for-subtasks list above the composer has Stop, which sends the `stop` command for that
 subtask. Its stopped-task card then offers Continue, Reassign and Cancel.
 
+Members can reply to each other (#4847). `channel_reply` takes the id of a message of another member
+and a short text (`CHANNEL_REPLY_CHARACTERS`). It posts the text in the shared chat as a reply to
+that message (`replyToMessageId`), and gives the author of that message one turn to answer: a child
+task of the caller's task, with the reply as its request and instruction. The caller does not wait
+for it: the child is not in `dependencies`, so `complete` and the waiting-for-subtasks list ignore
+it. The answer of that turn shows as a reply to the reply message (`capture`). `channel-replies.ts`
+finds a reply task by its request id prefix (`channel-reply-`), so the change adds no stored field,
+no migration and no Team API field. A run allows `CHANNEL_REPLY_LIMIT` (2) member replies, counted
+from the stored reply messages of the run, whoever writes them. `channel_reply` refuses, with
+`accepted: false`, a reply after the caller's `channel_result`, in a run that ended, to a message of
+a person or of the caller, to a streaming message, to a member that takes no work, and over the
+limit. The reply text is agent text that reaches another agent, so a reply task cannot use
+`channel_cancel` or the channel management tools: it has no person requester.
+
 The channel controls stop and cancel a run with no message that a model reads, and a change note is
 not in the packet. So each packet has `stoppedTasks`: the `paused` and `cancelled` tasks of the
 recent messages that the member owns, or that run under work it owns (`channelWorkOwners`). Without
