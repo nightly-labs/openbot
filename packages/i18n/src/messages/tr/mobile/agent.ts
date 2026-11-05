@@ -362,7 +362,7 @@ export const messages = {
   "mobile.agent.backupModels.intro":
     "{model}, {name} yazmaya başlamadan önce kullanım sınırına ulaşırsa {name} hangi modelin kullanılacağını size sorar.",
   "mobile.agent.backupModels.introAutomatic":
-    "{model}, {name} yazmaya başlamadan önce kullanım sınırına ulaşırsa veya bir sağlayıcı hatasıyla başarısız olursa {name} sıradaki ilk uygun modele geçer.",
+    "{model} kullanım sınırına ulaşırsa {name} sıradaki ilk uygun modele geçer. {name} yazmaya başlamadan önce {model} bir sağlayıcı hatasıyla başarısız olursa da {name} geçiş yapar.",
   "mobile.agent.backupModels.ask": "Değiştirmeden önce sor",
   "mobile.agent.backupModels.order": "Sıra",
   "mobile.agent.backupModels.empty": "Sıra ayarlanmadı. {name} uygun her modeli sunar.",

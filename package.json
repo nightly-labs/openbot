@@ -269,6 +269,7 @@
     "test:discord-github-files": "bun scripts/discord-github-files-e2e.ts",
     "test:antigravity-accounts": "bun scripts/antigravity-accounts-e2e.ts",
     "test:antigravity-usage-metering": "bun scripts/antigravity-usage-metering-e2e.ts",
+    "test:antigravity-quota-failover": "bun scripts/antigravity-quota-failover-e2e.ts",
     "test:opencode-usage-metering": "bun scripts/opencode-usage-metering-e2e.ts",
     "test:opencode-anthropic-cache": "bun scripts/opencode-anthropic-cache-e2e.ts",
     "test:opencode-custom-model": "bun scripts/opencode-custom-model-e2e.ts",
