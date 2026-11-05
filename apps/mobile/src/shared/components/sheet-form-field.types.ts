@@ -7,6 +7,8 @@ export interface SheetFormFieldProps {
   autoFocus?: boolean;
   editable?: boolean;
   hint?: string;
+  /** A problem with the value. It shows under the field, and the field has the danger border. */
+  error?: string;
   trailing?: ReactNode;
   inputMode?: TextInputProps["inputMode"];
   isRequired?: boolean;

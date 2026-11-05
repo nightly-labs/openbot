@@ -16,6 +16,7 @@ export function SheetFormField({
   autoFocus,
   editable,
   hint,
+  error,
   trailing,
   inputMode,
   isRequired = false,
@@ -32,7 +33,7 @@ export function SheetFormField({
   secureTextEntry,
   value,
 }: SheetFormFieldProps) {
-  const [foreground, muted, border] = useThemeColor(["foreground", "muted", "border"]);
+  const [foreground, muted, border, danger] = useThemeColor(["foreground", "muted", "border", "danger"]);
   const nativeValue = useNativeState(value);
   useEffect(() => {
     nativeValue.set(value);
@@ -50,10 +51,10 @@ export function SheetFormField({
       <View
         className="bg-grouped"
         style={{
-          borderColor: border,
+          borderColor: error ? danger : border,
           borderCurve: "continuous",
           borderRadius: 16,
-          borderWidth: appearance === "soft" ? 0 : 1,
+          borderWidth: appearance === "soft" && !error ? 0 : 1,
           height,
           overflow: "hidden",
           flexDirection: "row",
@@ -88,6 +89,13 @@ export function SheetFormField({
         </Host>
         {trailing}
       </View>
+      {error ? (
+        <View className="px-4">
+          <Typography.Paragraph type="body-xs" accessibilityRole="alert" className="text-danger-text">
+            {error}
+          </Typography.Paragraph>
+        </View>
+      ) : null}
       {hint ? (
         <View className="px-1">
           <Typography.Paragraph type="body-xs" className="text-text-secondary">
