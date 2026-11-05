@@ -609,15 +609,21 @@ export class TurnLifecycle {
 
   /** Shows a provider error that was held for a failover that did not happen, as it shows with no backup. */
   #showFailoverError(agentId: string, threadId: string, failover: HeldProviderError): void {
-    if (failover.quiet) {
-      this.#hooks.emitFailure?.({ code: "agent_error", agentId, ...failover.context });
+    const taskId = this.#taskForThread(agentId, threadId);
+    if (taskId === null && !failover.quiet) {
+      this.#hooks.emitError("agent_error", failover.message, agentId, failover.context);
       return;
     }
-    const taskId = this.#taskForThread(agentId, threadId);
-    if (taskId !== null) {
-      this.#hooks.emitFailure?.({ code: "agent_error", agentId, ...failover.context });
-      this.#hooks.taskFailed(taskId, failover.message);
-    } else this.#hooks.emitError("agent_error", failover.message, agentId, failover.context);
+    this.#hooks.emitFailure?.({ code: "agent_error", agentId, ...failover.context });
+    // A thread shows no usage notice, so its failed turn keeps the provider's text (#5220).
+    if (taskId !== null) this.#hooks.taskFailed(taskId, failover.message);
+  }
+
+  /** Passes over the model that a held provider error failed. A spent balance names no reset (#5220). */
+  #markFailed(agentId: string, model: string | null, failover: HeldProviderError): void {
+    const resetDelayMs = providerResetDelayMs(failover.message);
+    const spent = failover.quiet === true && resetDelayMs === null && isBalanceDiagnostic(failover.message);
+    this.#usageLimits.failed(agentId, model, resetDelayMs, spent);
   }
 
   readonly handleNotification = Effect.fn("TurnLifecycle.handleNotification")(function* (
@@ -989,6 +995,14 @@ export class TurnLifecycle {
             return;
           }
           this.#hooks.emitFailure?.({ code: "agent_error", ...(agentId !== undefined ? { agentId } : {}), ...context });
+          // A thread shows no usage notice, so its failed turn keeps the provider's text (#5220). A turn
+          // that a plan limit holds waits in the queue for the reset, so it has not failed.
+          const held = planLimit || (errorTurnId !== null && this.#limitedTurns.has(errorTurnId));
+          const taskId =
+            !held && notification.method === "error" && agentId && threadId
+              ? this.#taskForThread(agentId, threadId)
+              : null;
+          if (taskId !== null) this.#hooks.taskFailed(taskId, message);
           return;
         }
         const context = {
@@ -1279,10 +1293,13 @@ export class TurnLifecycle {
           this.#failoverRetries.set(delivery.id, failed.add(failedKey));
         }
         yield* this.#requeueTurn(agentId, threadId, turnId, snapshot, deliveries);
-        this.#usageLimits.failed(agentId, model, providerResetDelayMs(failover.message));
+        this.#markFailed(agentId, model, failover);
         this.#hooks.scheduleDrain(agentId);
         return;
       }
+      // A thread turn does not run again, but the agent leaves the failing model before its next turn (#5220).
+      if (failover && mayRunAgain && taskTurn && failedKey !== null && this.#hooks.mayFailOver(agentId))
+        this.#markFailed(agentId, model, failover);
       // The turn did work, or nothing waits to run again: the error shows as it does with no backup.
       if (failover) this.#showFailoverError(agentId, threadId, failover);
       if (limited) yield* this.#usageLimits.reached(agentId, resetsAt, model);

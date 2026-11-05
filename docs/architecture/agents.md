@@ -754,7 +754,8 @@ and account), the same choices that the settings page offers. OpenBot checks eac
 account against the lists before it writes, and the agent service checks the primary account; an
 account change, like a provider change, waits until the agent is idle. These changes apply at once,
 as the other profile fields do. `read_agent` and the `update_profile` result return the account,
-the backup models and `usageLimitReturn`, the model that the agent left for a usage limit or a provider error (`cause: "provider-error"`). An unknown
+the backup models and `usageLimitReturn`, the model that the agent left for a usage limit or a provider error (`cause: "provider-error"`). A spent credit balance
+that names no reset sets no `usageLimitReturn`, so the agent does not go back to it by itself. An unknown
 model or an unsupported effort is an error that names the valid values; OpenBot checks them before
 it creates the agent. Without a provider and a model, the new agent starts on the calling agent's
 provider, model and reasoning effort, so a team that one agent creates runs where that agent runs.
