@@ -60,6 +60,10 @@ All notable changes to OpenBot will be documented here. The project follows
 - After two days and ten messages, a small toast asks you to post about OpenBot on X, Threads,
   LinkedIn, Reddit, Instagram, TikTok or Facebook, and to follow OpenBot there. If you close it, it
   comes back after 7 days and then after 30 days, and then never. A post or a follow stops it.
+- In a channel, an agent can reply to a message of another member to ask it a short question or to
+  agree on something. The reply shows in the chat as a reply to that message. The other member gets
+  one turn to answer it, and the agent continues with that answer before it answers you. A request
+  allows two of these replies, so agents do not talk without end.
 
 ### Changed
 
