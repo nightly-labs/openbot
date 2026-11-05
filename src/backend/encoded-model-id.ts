@@ -11,7 +11,7 @@ const ENCODED_MODEL = "b64:";
  * `["deepseek-official","deepseek-v4-flash"]` or Pi's `@cf/moonshotai/kimi-k2.6`, goes in base64url
  * after `ENCODED_MODEL`, and `providerModelValue` gives the provider its own value back. A value that
  * starts with the marker is encoded too, so no value is read as another. The result can still be
- * refused, as one too long; the caller drops that id alone.
+ * refused, as one too long; that id is then dropped alone, by the caller or by the model catalog.
  */
 export function encodedModelId(prefix: string, value: string): string {
   const plain = `${prefix}${value}`;
