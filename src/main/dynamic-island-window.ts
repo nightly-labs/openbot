@@ -360,9 +360,11 @@ export class DynamicIslandWindowController {
       if (this.#windows.get(display.id) !== window || window.isDestroyed()) return;
       const current = this.#options.getDisplays().find((candidate) => candidate.id === display.id);
       if (!current) return;
-      const expected = dynamicIslandWindowBounds(current);
+      const bounds = dynamicIslandWindowBounds(current);
       const { x, y } = window.getBounds();
-      if (x !== expected.x || y !== expected.y) Effect.runFork(this.reconcileWindow());
+      if (x === bounds.x && y === bounds.y) return;
+      const interactive = this.#interactiveDisplays.has(display.id) || this.#collapseTimers.has(display.id);
+      window.setBounds(this.#windowBounds(current, bounds, interactive), false);
     });
     window.on("closed", () => {
       if (this.#windows.get(display.id) === window) {
