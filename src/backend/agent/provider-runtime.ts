@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { readFileSync, statSync } from "node:fs";
+import { statSync } from "node:fs";
 import { basename } from "node:path";
 import type {
   AccountUsage,
@@ -110,6 +110,7 @@ import {
   updateProviderStatus,
   waitForSuccessfulProcess,
 } from "./provider-status";
+import { hasZeroRealtimeLimit } from "./realtime-limit";
 import { providerForAgent, providerLabel } from "./thread-items";
 import { UsageReadGate } from "./usage-read-gate";
 import { checkAgentFolders, workspaceExcludedFolders, workspaceWritableRoots } from "./workspace-sandbox";
@@ -189,21 +190,6 @@ const OPENCODE_NEWER_DATABASE = /\bDatabase is not empty and has no session tabl
 const CODEX_STATE_BUSY = /\btimed out waiting for state db backfill\b/u;
 /** An ACP provider CLI that the system stopped, not one that ended by itself. */
 const KILLED_BY_SYSTEM = /\(signal SIGKILL\)/u;
-
-/**
- * Whether this process has a hard `RLIMIT_RTTIME` of 0. Linux then stops each thread with a CPU-time
- * timer, such as the threads of the Gemini server, at its first tick. The provider processes get the
- * limit, and no process can increase it. PipeWire sets it in its client when xdg-desktop-portal has no
- * rtkit to read the real-time limit from (#4848).
- */
-function hasZeroRealtimeLimit(): boolean {
-  if (process.platform !== "linux") return false;
-  try {
-    return /^Max realtime timeout\s+\S+\s+0\s/mu.test(readFileSync("/proc/self/limits", "utf8"));
-  } catch {
-    return false;
-  }
-}
 /**
  * The providers whose shared process reads the agent environment only when it starts. Claude reads
  * it at each session start, and Codex with each thread's config.
