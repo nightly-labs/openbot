@@ -427,6 +427,11 @@ export interface CreateAgentInput {
   provider?: AgentProviderId;
   model?: AgentModelId;
   reasoningEffort?: AgentReasoningEffort;
+  /**
+   * The provider account the agent starts on. It applies only with `provider` and `model`. Absent
+   * means the provider's own sign-in. Local-only: the released Team API create route does not carry it.
+   */
+  providerAccountId?: string;
 }
 
 export interface UpdateAgentInput {
