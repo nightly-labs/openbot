@@ -235,6 +235,15 @@ export const messages = {
     "Bu depodaki stilleri kullan ve Paper'da bir ayarlar sayfası tasarla.",
   "marketplace.plugin.paper.prompt.tokens":
     "Açık Paper dosyasındaki tasarım token'larını listele ve temamızla karşılaştır.",
+  "marketplace.plugin.higgsfield.tagline": "Yapay zekâ ile görsel, video ve ses",
+  "marketplace.plugin.higgsfield.description":
+    "Higgsfield, ajanların Seedance, Kling, Veo ve MiniMax Hailuo gibi Higgsfield modelleriyle görsel, video, karakter ve ses üretmesini, kredi bakiyesini kontrol etmesini ve Asset Library'ye göz atmasını sağlar. Sonuçlar kullanıcının Higgsfield Assets alanına kaydedilir. Her kullanıcı tarayıcıda kendi Higgsfield hesabına giriş yapar. Her üretim, sınırsız planda da o hesabın kredilerini standart ücretle kullanır.",
+  "marketplace.plugin.higgsfield.app":
+    "Higgsfield MCP sunucusu üzerinden, tarayıcıda girişle görsel, video ve ses üretimi, karakterler, krediler ve varlıklar.",
+  "marketplace.plugin.higgsfield.prompt.credits": "Kaç Higgsfield kredim var?",
+  "marketplace.plugin.higgsfield.prompt.productShot":
+    "Higgsfield ile ahşap masa üzerinde seramik bir kupanın ürün fotoğrafını yap.",
+  "marketplace.plugin.higgsfield.prompt.clip": "Higgsfield ile gün batımında dalgaların 5 saniyelik bir videosunu yap.",
   "marketplace.plugin.appleApps.tagline": "Mac'inizde Mail, Takvim ve daha fazlası",
   "marketplace.plugin.appleApps.description":
     "Apple apps, ajanların bu Mac'te Mail, Takvim, Kişiler, Anımsatıcılar, Notlar, Mesajlar ve Safari'yi kullanmasını sağlar. Yalnızca macOS'te çalışır. OpenBot, Apple veya OpenBot tarafından yapılmamış bir topluluk sunucusu olan mcp-icloud'u başlatır. Sunucu uygulamaları bu bilgisayarda AppleScript ile kontrol eder ve hesap ya da anahtar gerektirmez. Yükleme sırasında OpenBot, macOS'ten bu uygulamaların tümüne tek seferde erişim isteyebilir; her uygulama için bir istem gösterilir. İstemezseniz, bir ajan bir uygulamayı ilk kez kullandığında macOS sorar. Bunu daha sonra değiştirmek için Sistem Ayarları › Gizlilik ve Güvenlik › Otomasyon'u açın. Ajanlar e-posta ve iMessage gönderebilir, etkinlikleri, kişileri ve anımsatıcıları değiştirebilir veya silebilir; bu yüzden her yazma işlemini onaylamadan önce gözden geçirin. Araçların okuduğu içerik, örneğin e-posta metni, ajanın model sağlayıcısına gider.",

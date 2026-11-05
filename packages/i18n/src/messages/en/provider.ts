@@ -105,6 +105,8 @@ export const messages = defineMessages("provider", {
   "provider.codeLogin.relayStarting": "Starting the {name} sign-in on {host}…",
   "provider.codeLogin.pageOpening": "Opening the {name} sign-in page on {host}…",
   "provider.codeLogin.linkStep": "Log in to {name}. OpenBot continues by itself.",
+  "provider.codeLogin.chatgptDeviceSetting":
+    "In ChatGPT on a computer, open the security settings and turn on device code sign-in for Codex. For a work account, your workspace admin turns it on.",
 
   // A provider that only the OpenBot app can sign in, from a browser tab.
   "provider.useApp.title": "Connect {name} in the OpenBot app",

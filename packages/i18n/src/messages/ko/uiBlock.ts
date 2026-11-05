@@ -11,6 +11,7 @@ export const messages = {
   "uiBlock.confirm.prompt": "{action}을(를) 확인할까요?",
   "uiBlock.confirm.accept": "확인",
   "uiBlock.confirm.autoActionLabel": "{action} · {seconds}초",
+  "uiBlock.confirm.autoActionClock": "{action} · {time}",
   "uiBlock.confirm.previewLabel": "미리 보기",
   "uiBlock.confirm.showFullPreview": "모두 보기",
   "uiBlock.confirm.hideFullPreview": "간단히 보기",

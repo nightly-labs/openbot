@@ -272,6 +272,14 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "Слушание",
   "mobile.settings.voice.tab.speaking": "Озвучивание",
+  "mobile.settings.voice.pause.title": "Пауза перед отправкой",
+  "mobile.settings.voice.pause.label": "Ждать новые слова",
+  "mobile.settings.voice.pause.footer":
+    "В голосовом разговоре OpenBot отправляет ваши слова, когда столько времени не распознаёт новых слов. Шум без слов не продлевает прослушивание. Выберите паузу длиннее, если говорите медленно или останавливаетесь подумать.",
+  "mobile.settings.voice.pause.seconds": "{seconds} с",
+  "mobile.settings.voice.speed.title": "Скорость ответов",
+  "mobile.settings.voice.speed.footer": "Скорость ответов, которые OpenBot читает вслух, также в голосовом разговоре.",
+  "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot передаёт вашу речь в ElevenLabs с одноразовым токеном, и ElevenLabs списывает оплату с вашего аккаунта. Ключ остаётся на этом телефоне.",
 } as const satisfies PartialTranslation<typeof source>;

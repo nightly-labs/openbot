@@ -1759,6 +1759,8 @@ export async function createApplicationServices({
     loadWindow: loadComputerUseHighlightRenderer,
     place: sendComputerUseHighlightPlacement,
     displays: computerUseDisplays,
+    // `service` is built below; the controller starts only after it.
+    idle: () => service.earliestRunningTurnStartedAt() === null,
     // The driver's own cursor on one screen, OpenBot's inside this overlay on more than one. The
     // runtime answers `null` for the screen it draws itself, so only one cursor is ever drawn.
     readPointer: () => {
@@ -2227,9 +2229,13 @@ export async function createApplicationServices({
   });
   // The rim follows the daemon: it can show nothing while the agents hold no tools, and polling a
   // socket nothing answers would only log failures.
+  /** The rim shows only where the agents share the user's display and the daemon gives them tools. */
+  const startComputerUseHighlight = () => {
+    if (drawsComputerUseHighlight && cuaDriver.mcpServerForProviders()) computerUseHighlight.start();
+  };
   cuaDriver.onMcpServerChanged(() => {
     if (cuaDriver.mcpServerForProviders()) {
-      if (drawsComputerUseHighlight) computerUseHighlight.start();
+      startComputerUseHighlight();
     } else {
       computerUseHighlight.stop();
       // The daemon this connection was opened to is gone, so the socket behind it is too.
@@ -2248,14 +2254,14 @@ export async function createApplicationServices({
   // whether it worked or not.
   const computerUseWarmUp = Effect.runFork(
     cuaDriver.warmUp().pipe(
-      Effect.tap(() =>
-        Effect.sync(() => {
-          if (drawsComputerUseHighlight && cuaDriver.mcpServerForProviders()) computerUseHighlight.start();
-        }),
-      ),
+      Effect.tap(() => Effect.sync(startComputerUseHighlight)),
       Effect.exit,
     ),
   );
+  // The poll rests while no turn runs, so each turn wakes it.
+  service.on("event", (event) => {
+    if (event.type === "turn-started") startComputerUseHighlight();
+  });
   /*
    * Where the decision put the download: onboarding, which is the screen this start is about to
    * show. A user who finished onboarding before OpenBot downloaded a runtime at all is asked for
@@ -3005,6 +3011,7 @@ export async function createApplicationServices({
     trace,
     statementTimings,
     tabProcessIds: () => browser.tabProcessIds(),
+    turnRunning: () => service.earliestRunningTurnStartedAt() !== null,
   });
   teardown.push(TEARDOWN_ORDER.resourceMonitor, "the resource monitor", () =>
     Effect.runPromise(resourceMonitor.close()),
@@ -3095,7 +3102,10 @@ export async function createApplicationServices({
     Effect.runFork(startup.recordStart());
     teardown.push(TEARDOWN_ORDER.startupTiming, "the startup timing", () => startup.dispose());
   }
-  const connectTrace = new RemoteConnectTrace((span) => trace.record(span));
+  const connectTrace = new RemoteConnectTrace(
+    (span) => trace.record(span),
+    (summary) => analytics.handleRemoteConnect(summary),
+  );
   // Development only: a network round trip added to the WebRTC client, for `bun run perf:remote`.
   const developmentRoundTripMs = app.isPackaged ? 0 : Math.max(0, Number(process.env.OPENBOT_DEV_RTT_MS) || 0);
   installRemoteSyncProfileSink(

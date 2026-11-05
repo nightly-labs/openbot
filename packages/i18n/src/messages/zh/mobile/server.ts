@@ -817,6 +817,8 @@ export const messages = {
   "mobile.server.providers.copy": "复制",
   "mobile.server.providers.copyCode": "复制验证码",
   "mobile.server.providers.paste": "粘贴",
+  "mobile.server.providers.codeStepChatgpt":
+    "在电脑上的 ChatGPT 中打开安全设置，为 Codex 开启设备代码登录。工作账号由工作区管理员开启。",
   "mobile.server.providers.codeStepCopy": "复制代码。",
   "mobile.server.providers.codeStepEnter": "打开登录页面并输入代码。",
   "mobile.server.providers.codeStepReturn": "回到 OpenBot。登录会自动完成。",

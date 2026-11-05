@@ -853,6 +853,8 @@ export const messages = {
   "mobile.server.providers.copy": "Kopiëren",
   "mobile.server.providers.copyCode": "Kopieer code",
   "mobile.server.providers.paste": "Plakken",
+  "mobile.server.providers.codeStepChatgpt":
+    "Open in ChatGPT op een computer de beveiligingsinstellingen en zet inloggen met apparaatcode voor Codex aan. Bij een werkaccount zet de beheerder van je workspace dit aan.",
   "mobile.server.providers.codeStepCopy": "Kopieer de code.",
   "mobile.server.providers.codeStepEnter": "Open de aanmeldpagina en voer de code in.",
   "mobile.server.providers.codeStepReturn": "Ga terug naar OpenBot. De aanmelding rondt zichzelf af.",

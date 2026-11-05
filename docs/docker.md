@@ -111,7 +111,13 @@ that user and keep everything there:
 | `/data/.config/OpenBot` | The database `openbot.db`, logs, the downloaded provider runtimes and the browser data. |
 | `/data/OpenBot` | The agent workspaces (`Agents`), `Shared` and `Downloads`. |
 | `/data/.local/share/keyrings`, `/data/.config/openbot-container` | The keyring and its password. The keyring has the key of the encrypted data in `/data`. |
+| `/data/.local/bin` | Programs that you or agents install, for example with `uv` or `pipx`. The image puts this folder on `PATH`. |
 | Other files in `/data` | Provider sign-ins and the files of agent tools, for example `~/.codex` and `~/.claude`. |
+
+An update makes a new container from the new image, so a package that you install outside `/data`,
+for example with `apt-get`, goes away. Install tools as the user `openbot` into `~/.local`. For
+example, `curl -LsSf https://astral.sh/uv/install.sh | sh`, then `~/.local/bin/uv python install`,
+gives agents a Python that stays after updates.
 
 Keep `/data` as one unit. The encrypted data cannot open without the keyring, and the keyring cannot
 open without its password file. Use one volume for one container at a time.

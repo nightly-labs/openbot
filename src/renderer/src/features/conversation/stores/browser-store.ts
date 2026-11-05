@@ -57,6 +57,8 @@ function canonicalBrowserUrl(url: string): string {
 interface BrowserPanels {
   activeRightPanel: () => RightPanelMode;
   setActiveRightPanel: (mode: RightPanelMode, agentId?: string) => void;
+  /** Closes the Browser tab of the side panel, also from the full view or picture in picture. */
+  closeBrowserPane: () => void;
 }
 
 export interface BrowserStoreDeps {
@@ -243,14 +245,23 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     if (completed && latestMessageMarker() === resolution.messageMarker) setBrowserTakeoverResolution(resolution);
     return completed;
   };
-  let previousBrowserTabCount = 0;
+  // The browser pane closes with its last tab. A switch to an agent with no tabs closes nothing.
+  let previousBrowserTabs: { owner: string; count: number } = { owner: "", count: 0 };
   createEffect(
-    () => ({ count: browserTabs().length, open: screenOpen(), enabled: deps.props.browserEnabled !== false }),
-    ({ count, open, enabled }) => {
-      if (!enabled) return;
-      const browserWasClosed = open && previousBrowserTabCount > 0 && count === 0;
-      previousBrowserTabCount = count;
-      if (browserWasClosed) deps.panels.setActiveRightPanel("browser");
+    () => ({
+      owner: `${deps.props.server?.id ?? "local"}:${deps.props.agent?.id ?? ""}`,
+      count: browserTabs().length,
+      enabled: deps.props.browserEnabled !== false,
+    }),
+    ({ owner, count, enabled }) => {
+      const previous = previousBrowserTabs;
+      previousBrowserTabs = { owner, count };
+      if (!enabled || previous.owner !== owner || previous.count === 0 || count > 0) return;
+      // Untracked: the close reads the side panel and writes the panel mode, which must not run this effect again.
+      // The mode, not `screenOpen`: a tab can close while a dialog suspends the browser view.
+      const mode = untrack(deps.panels.activeRightPanel);
+      if (mode === "browser" || mode === "browser-expanded" || mode === "browser-pip")
+        untrack(deps.panels.closeBrowserPane);
     },
   );
 

@@ -972,6 +972,8 @@ export const messages = {
   "mobile.server.providers.copy": "Копировать",
   "mobile.server.providers.copyCode": "Копировать код",
   "mobile.server.providers.paste": "Вставить",
+  "mobile.server.providers.codeStepChatgpt":
+    "В ChatGPT на компьютере откройте настройки безопасности и включите вход по коду устройства для Codex. Для рабочего аккаунта его включает администратор рабочего пространства.",
   "mobile.server.providers.codeStepCopy": "Скопируйте код.",
   "mobile.server.providers.codeStepEnter": "Откройте страницу входа и введите код.",
   "mobile.server.providers.codeStepReturn": "Вернитесь в OpenBot. Вход завершится сам.",

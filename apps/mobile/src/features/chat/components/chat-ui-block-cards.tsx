@@ -40,6 +40,14 @@ const BUTTON_VARIANT = {
   danger: "danger",
 } as const satisfies Record<UiActionStyle, "primary" | "tertiary" | "ghost" | "danger">;
 
+/** A countdown of a minute or more, as m:ss or h:mm:ss. */
+function countdownClock(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = String(totalSeconds % 60).padStart(2, "0");
+  return hours > 0 ? `${hours}:${String(minutes).padStart(2, "0")}:${seconds}` : `${minutes}:${seconds}`;
+}
+
 function actionStyle(action: UiAction): UiActionStyle {
   return action.style ?? "secondary";
 }
@@ -415,9 +423,14 @@ export function ChatConfirmPrompt({
                   }}
                 >
                   <Button.Label className="font-sans font-semibold">
-                    {autoAnswer?.actionId === action.id && secondsLeft > 0
-                      ? t("mobile.chat.question.autoAction", { action: action.label, seconds: secondsLeft })
-                      : action.label}
+                    {autoAnswer?.actionId !== action.id || secondsLeft <= 0
+                      ? action.label
+                      : secondsLeft < 60
+                        ? t("mobile.chat.question.autoAction", { action: action.label, seconds: secondsLeft })
+                        : t("mobile.chat.question.autoActionClock", {
+                            action: action.label,
+                            time: countdownClock(secondsLeft),
+                          })}
                   </Button.Label>
                 </Button>
               );

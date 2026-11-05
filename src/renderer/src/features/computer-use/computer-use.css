@@ -20,6 +20,8 @@
 .computer-use-permission-icon svg {
   width: 16px;
   height: 16px;
+  /* A 16px icon in an item row keeps the line of the small icons. */
+  stroke-width: var(--openbot-icon-stroke);
   color: var(--openbot-accent-text);
 }
 

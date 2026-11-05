@@ -37,7 +37,7 @@
   width: var(--openbot-icon-lg);
   height: var(--openbot-icon-lg);
   color: var(--openbot-text-muted);
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .browser-preview-list > .browser-empty-state > svg {

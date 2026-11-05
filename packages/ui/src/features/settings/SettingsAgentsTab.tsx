@@ -29,6 +29,7 @@ import {
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import { PlanStartRow } from "./PlanStartRow";
 
 /** A setting of the Agents tab: the three account defaults, and "Steer agents while they work". */
 export type AgentDefaultSetting = AgentDefaultKey | "busyMessageMode";
@@ -131,6 +132,8 @@ export interface SettingsAgentsTabProps {
   menuMount: HTMLElement | undefined;
   onOpen: (setting: AgentDefaultSetting) => void;
   onDefaultChange: (setting: AgentDefaultSetting, on: boolean) => void;
+  /** Sets when the plan card starts the work by itself; `null` waits for Start. */
+  onPlanStartChange: (value: number | null) => void;
   /** Gives `choice` to each agent of `agentIds`. */
   onChoiceChange: (agentIds: readonly string[], setting: AgentDefaultSetting, choice: AgentDefaultChoice) => void;
 }
@@ -234,6 +237,13 @@ export function SettingsAgentsTab(props: SettingsAgentsTabProps) {
               label={title()}
               description={description()}
             />
+            <Show when={setting === "quickAcknowledgement"}>
+              <PlanStartRow
+                value={props.defaults.planStartAfterMs}
+                menuMount={props.menuMount}
+                onChange={props.onPlanStartChange}
+              />
+            </Show>
           </ItemGroup>
         </SettingsSection>
         <Show when={props.agents.length > 0}>

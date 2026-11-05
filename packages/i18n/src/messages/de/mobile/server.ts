@@ -906,6 +906,8 @@ export const messages = {
   "mobile.server.providers.copy": "Kopieren",
   "mobile.server.providers.copyCode": "Code kopieren",
   "mobile.server.providers.paste": "Einfügen",
+  "mobile.server.providers.codeStepChatgpt":
+    "Öffne ChatGPT auf einem Computer, gehe zu den Sicherheitseinstellungen und aktiviere die Anmeldung per Gerätecode für Codex. Bei einem Arbeitskonto aktiviert sie der Admin deines Workspace.",
   "mobile.server.providers.codeStepCopy": "Kopiere den Code.",
   "mobile.server.providers.codeStepEnter": "Öffne die Anmeldeseite und gib den Code ein.",
   "mobile.server.providers.codeStepReturn": "Komm zurück zu OpenBot. Die Anmeldung wird allein abgeschlossen.",

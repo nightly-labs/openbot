@@ -334,6 +334,7 @@ export const messages = {
   "routine.settings.missedPolicy": "到点时 OpenBot 已关闭时",
   "routine.settings.missedPolicy.skip": "跳过本次运行",
   "routine.settings.missedPolicy.runOnce": "OpenBot 启动后运行一次",
+  "routine.settings.runInThread": "在单独的话题中运行",
   "routine.settings.resultDestination": "回答发送到",
   "routine.settings.resultDestination.none": "仅该对话",
   "routine.settings.resultDestination.place": "{connection} · {place}",

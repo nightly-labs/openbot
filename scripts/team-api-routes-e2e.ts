@@ -419,7 +419,7 @@ const NO_STATUS: AgentStatus = {
 let hidden: HiddenAgentsSnapshot = { agents: [{ agentId: "agent-pi", hiddenAt: new Date(0).toISOString() }] };
 
 // The host's agent event listener. Only a chat colour change (`chat-colors-v1`) sends an event in this run.
-const agentEventListeners = new Set<(event: AgentEvent) => void>();
+const agentEventListeners = new Set<(event: AgentEvent, memberId?: string) => void>();
 // The roles of this host. Empty roles give every member `manage`, as a host without roles does; the
 // message delete checks set "everyone" to a lower level for one agent.
 let accessLevels: AgentAccessState = { revision: 0, everyone: {}, roles: [] };
@@ -4218,6 +4218,69 @@ try {
         // Ada's own change is her first event: an event of bob would have come before it on her socket.
         adaLists.some((items) => isDeepStrictEqual(adaEvent.items, items)),
       [bobEvent, adaEvent],
+    );
+  }
+
+  // ---- A read mark change goes to the connections of its member only ----
+  {
+    const openInvalidationSocket = async (token: string) => {
+      const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+        TEAM_PROTOCOL_V1_WEBSOCKET,
+        `openbot-token.${token}`,
+      ]);
+      const revisions: number[] = [];
+      const waiters = new Set<() => void>();
+      socket.addEventListener("message", (message) => {
+        const value = JSON.parse(String(message.data));
+        if (isDynamicRecord(value) && value.type === "conversation-invalidated" && typeof value.revision === "number") {
+          revisions.push(value.revision);
+          for (const wake of waiters) wake();
+        }
+      });
+      await new Promise<void>((resolveOpen, reject) => {
+        socket.addEventListener("open", () => resolveOpen(), { once: true });
+        socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+      });
+      /** Whether the socket has the revision before the deadline. */
+      const arrived = (revision: number) =>
+        new Promise<boolean>((resolveArrived) => {
+          if (revisions.includes(revision)) return resolveArrived(true);
+          const timer = setTimeout(() => {
+            waiters.delete(wake);
+            resolveArrived(false);
+          }, 5_000);
+          const wake = () => {
+            if (!revisions.includes(revision)) return;
+            clearTimeout(timer);
+            waiters.delete(wake);
+            resolveArrived(true);
+          };
+          waiters.add(wake);
+        });
+      return { socket, revisions, arrived };
+    };
+    const emit = (revision: number, memberId?: string) => {
+      for (const listener of agentEventListeners)
+        listener({ type: "conversation-invalidated", agentId: "agent-ada", revision }, memberId);
+    };
+    const adaDevice = await openInvalidationSocket(adaToken);
+    const bobDevice = await openInvalidationSocket(bobToken);
+    // The host adds a socket to its clients after the upgrade, so an event to all members shows when both are in.
+    emit(90_500);
+    const ready = (await adaDevice.arrived(90_500)) && (await bobDevice.arrived(90_500));
+    emit(90_501, adaId);
+    // An event to all members after it: bob's socket would have the member event before this one.
+    emit(90_502);
+    const after = (await adaDevice.arrived(90_502)) && (await bobDevice.arrived(90_502));
+    adaDevice.socket.close();
+    bobDevice.socket.close();
+    check(
+      "an invalidation for one member reaches the connections of that member, and no other member",
+      ready &&
+        after &&
+        isDeepStrictEqual(adaDevice.revisions, [90_500, 90_501, 90_502]) &&
+        isDeepStrictEqual(bobDevice.revisions, [90_500, 90_502]),
+      { ada: adaDevice.revisions, bob: bobDevice.revisions },
     );
   }
 

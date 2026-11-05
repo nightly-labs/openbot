@@ -104,8 +104,9 @@ links from email invitations. Email mode creates an address-bound invitation and
 the same delivery endpoint as desktop; failed delivery attempts revoke the new invitation. Released restore endpoints
 remain compatible with older clients. Member and invitation lists refresh after changes or on explicit request.
 Conversation read cursors belong to a team member and are shared across that member's devices.
-Advancing a cursor emits a conversation invalidation without the reader's identity or cursor;
-clients reload their own read state even when the conversation content revision is unchanged.
+Moving a cursor emits a conversation invalidation without the reader's identity or cursor, only to the
+connections of that member; other members get no event, because their read state did not change. The
+member's clients reload their own read state even when the conversation content revision is unchanged.
 Mobile acknowledges rendered replies only in the foreground, focused chat at the latest messages.
 Mobile attachments use the shared desktop filename allowlist in `packages/contracts/src/attachment-files.ts`.
 The native document and photo pickers and the in-chat camera panel prepare local drafts. The existing Team file protocol

@@ -640,7 +640,8 @@ export function agentIpcHandlers({
         local: (parsed) => runCauseEffect(service.createAgent(parsed, undefined, undefined, host.conversationSender())),
         remote: async (parsed, serverId) => {
           // The released route keeps the nearest hue. The exact colour goes on `agent-colors-v1` after it.
-          const { avatarColor, ...input } = parsed;
+          // The released route does not carry the account, so a remote agent starts on the provider's own sign-in.
+          const { avatarColor, providerAccountId: _localOnly, ...input } = parsed;
           const agent = await runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummary, {
               method: "POST",

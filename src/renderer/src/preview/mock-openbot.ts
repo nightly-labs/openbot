@@ -1122,6 +1122,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     schedule: RoutineSchedule;
     limitPolicy?: Routine["limitPolicy"];
     missedPolicy?: Routine["missedPolicy"];
+    runIn?: Routine["runIn"];
   }): Routine {
     const now = new Date().toISOString();
     const routineId = crypto.randomUUID();
@@ -1134,6 +1135,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       timezone: input.timezone,
       limitPolicy: input.limitPolicy ?? "wait",
       missedPolicy: input.missedPolicy ?? "skip",
+      runIn: input.runIn ?? "chat",
       trigger: {
         id: crypto.randomUUID(),
         routineId,
@@ -1342,6 +1344,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       onHighlightPlacement: () => () => undefined,
     },
     openExternal: async () => undefined,
+    // A preview user who has used OpenBot for a while, so the social toast can show.
+    getSentMessageStats: async () => ({ firstSentAt: "2026-10-01T09:00:00.000Z", sentCount: 40 }),
     connectProvider: async () => clone(agentStatus),
     connectProviderInMainlandChina: async () => clone(agentStatus),
     updateProviderCli: async () => clone(agentStatus),
@@ -2429,6 +2433,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           ...(input.model === undefined ? {} : { model: input.model }),
           ...(input.reasoningEffort === undefined ? {} : { reasoningEffort: input.reasoningEffort }),
         });
+        if (input.provider && input.model && input.providerAccountId) agent.providerAccountId = input.providerAccountId;
         agents = [...agents, agent];
         queues.set(agent.id, emptyQueue(agent.id));
         emitAgentEvent({ type: "agents-changed", agents });
@@ -2679,6 +2684,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           ...(input.active === undefined ? {} : { active: input.active }),
           ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
           ...(input.missedPolicy === undefined ? {} : { missedPolicy: input.missedPolicy }),
+          ...(input.runIn === undefined ? {} : { runIn: input.runIn }),
           ...(input.schedule === undefined
             ? {}
             : {

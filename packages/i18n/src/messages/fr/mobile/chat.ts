@@ -79,6 +79,7 @@ export const messages = {
   "mobile.chat.question.answerForm": "Répondre au formulaire",
   "mobile.chat.question.answersSent": "Réponses envoyées",
   "mobile.chat.question.autoAction": "{action} · {seconds} s",
+  "mobile.chat.question.autoActionClock": "{action} · {time}",
   "mobile.chat.question.autoAnswered": "{outcome} (personne n’a répondu à temps)",
   "mobile.chat.question.formCancelled": "Formulaire annulé",
   "mobile.chat.question.formExpired": "Formulaire expiré",
@@ -397,13 +398,10 @@ export const messages = {
   "mobile.chat.queue.editEnded": "La modification de la file d’attente est terminée.",
   "mobile.chat.queue.loadFailed": "Impossible de charger la file d’attente.",
   "mobile.chat.queue.storageUnavailable": "Le stockage des pièces jointes n’est pas disponible.",
-  "mobile.chat.queue.buttonFailed":
-    "Les messages en file d’attente n’ont pas été chargés. Afficher les messages en file d’attente",
   "mobile.chat.queue.buttonLabel": {
     one: "{count} message en file d’attente. Afficher les messages en file d’attente",
     other: "{count} messages en file d’attente. Afficher les messages en file d’attente",
   },
-  "mobile.chat.queue.unavailable": "File d’attente non disponible",
   "mobile.chat.queue.uploading": "Envoi {progress} sur {total}",
   "mobile.chat.queue.cancelUpload": "Annuler l’envoi en file d’attente",
   "mobile.chat.queue.waitingTitle": "En attente de l’agent",

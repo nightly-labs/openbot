@@ -173,6 +173,9 @@ const TOOL_APPROVAL_METHOD = "openbot/tool-approval";
 /** The agent reads this, not the user: it says how to ask in an external chat turn (Slack, Discord, Telegram, WhatsApp). */
 const MESSAGING_QUESTION_REFUSED =
   "This conversation is in an external chat, where nobody can answer a question card. Ask the question in your answer: the person replies in the conversation.";
+/** The agent reads this, not the user: it says what to do in a turn that answers another agent's request from an external chat. */
+const MESSAGING_REQUEST_CARD_REFUSED =
+  "This request came from an external chat (Slack, Discord, Telegram or WhatsApp) through another agent, and nobody can answer a card here. Decide on your own and continue. When only the OpenBot user can unblock you, such as a sign-in, a key or a password, stop and say in your answer exactly what the OpenBot user must do in OpenBot.";
 
 /** The agent reads these, not the user. */
 const VAULT_UNAVAILABLE = "No Vault is available on this computer. Ask the user.";
@@ -418,6 +421,11 @@ export interface AttentionRegistryOptions {
    * the agent waits behind it.
    */
   messagingThread?(threadId: string): boolean;
+  /**
+   * Whether this turn answers a request that another agent sent from an external chat. Its answer goes
+   * to that chat, and nobody watches the agent's own chat, so a card would wait with no limit.
+   */
+  messagingRequestTurn?(agentId: string, turnId: string): boolean;
   emit(event: AgentEvent): void;
   emitError(code: string, error: unknown, agentId?: string): void;
   emitRuntimeSnapshot(): void;
@@ -467,6 +475,7 @@ export class AttentionRegistry {
   readonly #approvalAutomation: ApprovalAutomationPolicy;
   readonly #workspaceSandboxed: (agentId: string) => boolean;
   readonly #messagingThread: (threadId: string) => boolean;
+  readonly #messagingRequestTurn: (agentId: string, turnId: string) => boolean;
   readonly #emit: (event: AgentEvent) => void;
   readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
   readonly #emitRuntimeSnapshot: () => void;
@@ -488,6 +497,7 @@ export class AttentionRegistry {
     this.#approvalAutomation = options.approvalAutomation ?? NO_APPROVAL_AUTOMATION;
     this.#workspaceSandboxed = options.workspaceSandboxed ?? (() => false);
     this.#messagingThread = options.messagingThread ?? (() => false);
+    this.#messagingRequestTurn = options.messagingRequestTurn ?? (() => false);
     this.#emit = options.emit;
     this.#emitError = options.emitError;
     this.#emitRuntimeSnapshot = options.emitRuntimeSnapshot;
@@ -1108,6 +1118,9 @@ export class AttentionRegistry {
     ) {
       return browserTakeoverError();
     }
+    // A secret can still come from the Vault, so that check comes after the fill.
+    if (params.tool === "request_takeover" && this.#messagingRequestTurn(agentId, turnId))
+      return browserTakeoverError(MESSAGING_REQUEST_CARD_REFUSED);
 
     const requestId = params.tool === "submit_secret" ? randomUUID() : request.id;
     const reason = getString(args, "reason");
@@ -1160,8 +1173,13 @@ export class AttentionRegistry {
           !(yield* this.#fillFromVault(requestId, pending)) &&
           this.#takeovers.get(requestId) === pending
         ) {
-          this.#routines.markNeedsAttention(turnId);
-          this.#emit({ type: "browser-takeover-requested", request: takeover });
+          if (this.#messagingRequestTurn(agentId, turnId)) {
+            resolve(browserTakeoverError(MESSAGING_REQUEST_CARD_REFUSED));
+            this.#resolveBrowserTakeover(requestId, pending, "cancel");
+          } else {
+            this.#routines.markNeedsAttention(turnId);
+            this.#emit({ type: "browser-takeover-requested", request: takeover });
+          }
         }
       } else {
         const error = prepared.failure.cause;
@@ -1556,6 +1574,13 @@ export class AttentionRegistry {
       });
       return;
     }
+    if (this.#messagingRequestTurn(agentId, turnId)) {
+      client.respond(request.id, {
+        success: false,
+        contentItems: [{ type: "inputText", text: MESSAGING_REQUEST_CARD_REFUSED }],
+      });
+      return;
+    }
 
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
     this.#prompts.set(request.id, {
@@ -1613,6 +1638,14 @@ export class AttentionRegistry {
       client.respond(request.id, {
         success: false,
         contentItems: [{ type: "inputText", text: "OpenBot could not show this block." }],
+      });
+      return;
+    }
+    // A block with an automatic answer does not wait for the user.
+    if (!auto && this.#messagingRequestTurn(agentId, turnId)) {
+      client.respond(request.id, {
+        success: false,
+        contentItems: [{ type: "inputText", text: MESSAGING_REQUEST_CARD_REFUSED }],
       });
       return;
     }
@@ -1679,7 +1712,7 @@ export class AttentionRegistry {
     }
     const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
     // No answers is what the provider gets for a question that nobody answered.
-    if (this.#messagingThread(publicThreadId)) {
+    if (this.#messagingThread(publicThreadId) || this.#messagingRequestTurn(agentId, turnId)) {
       client.respond(request.id, { answers: {} });
       return;
     }
@@ -1742,7 +1775,7 @@ export class AttentionRegistry {
       return;
     }
     if (this.#answerMcpToolConsentWithoutAsking(client, request, agentId)) return;
-    if (this.#messagingThread(publicThreadId)) {
+    if (this.#messagingThread(publicThreadId) || this.#messagingRequestTurn(agentId, turnId)) {
       client.respond(request.id, { action: "cancel", content: null, _meta: null });
       return;
     }
@@ -1962,10 +1995,13 @@ export class AttentionRegistry {
       pending.vaultSkipped = `OpenBot did not fill a saved login: ${note}`;
       return false;
     };
-    // A script the agent ran on this site can read what is filled, and a field built for something
-    // else can carry the value into a URL. In both cases the card lets the user decide.
+    // A script the agent ran that still runs in the page can read what is filled, and a field built
+    // for something else can carry the value into a URL. In both cases the card lets the user decide.
     if (pending.secret?.agentScriptedOrigin !== false)
-      return skip("agent-scripted-origin", "you ran a script on this site since OpenBot started.");
+      return skip(
+        "agent-scripted-origin",
+        "a script that you ran with evaluate can still run in this page or in another open page of this site. Reload this page, and close or navigate each other tab where you ran evaluate on this site, before submit_secret.",
+      );
     if (pending.secret.vaultFillable !== true)
       return skip(
         "field-kind",

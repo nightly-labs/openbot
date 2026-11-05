@@ -269,6 +269,15 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "Ouvir",
   "mobile.settings.voice.tab.speaking": "Falar",
+  "mobile.settings.voice.pause.title": "Pausa antes de enviar",
+  "mobile.settings.voice.pause.label": "Esperar novas palavras",
+  "mobile.settings.voice.pause.footer":
+    "Em uma conversa por voz, o OpenBot envia suas palavras quando não reconhece novas palavras por esse tempo. Ruído sem palavras não o mantém ouvindo. Escolha uma pausa maior se você fala devagar ou para para pensar.",
+  "mobile.settings.voice.pause.seconds": "{seconds} s",
+  "mobile.settings.voice.speed.title": "Velocidade das respostas",
+  "mobile.settings.voice.speed.footer":
+    "A velocidade das respostas que o OpenBot lê em voz alta, também em uma conversa por voz.",
+  "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "O OpenBot transmite sua fala para a ElevenLabs com um token de uso único, e a ElevenLabs cobra na sua conta. A chave fica neste celular.",
 } as const satisfies PartialTranslation<typeof source>;

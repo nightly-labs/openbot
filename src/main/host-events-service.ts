@@ -571,6 +571,7 @@ export class HostEventsService implements HostEventsApi {
           trigger: recordTrigger,
           ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
           ...(input.missedPolicy === undefined ? {} : { missedPolicy: input.missedPolicy }),
+          ...(input.runIn === undefined ? {} : { runIn: input.runIn }),
         }),
       );
       return { saved, secret };

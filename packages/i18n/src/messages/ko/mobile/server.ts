@@ -840,6 +840,8 @@ export const messages = {
   "mobile.server.providers.copy": "복사",
   "mobile.server.providers.copyCode": "코드 복사",
   "mobile.server.providers.paste": "붙여넣기",
+  "mobile.server.providers.codeStepChatgpt":
+    "컴퓨터의 ChatGPT에서 보안 설정을 열고 Codex용 기기 코드 로그인을 켜세요. 회사 계정은 워크스페이스 관리자가 켜요.",
   "mobile.server.providers.codeStepCopy": "코드를 복사합니다.",
   "mobile.server.providers.codeStepEnter": "로그인 페이지를 열고 코드를 입력합니다.",
   "mobile.server.providers.codeStepReturn": "OpenBot으로 돌아옵니다. 로그인은 자동으로 완료됩니다.",
