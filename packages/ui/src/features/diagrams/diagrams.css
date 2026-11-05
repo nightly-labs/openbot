@@ -1594,13 +1594,28 @@
   font-size-adjust: 0.62;
   font-weight: var(--openbot-weight-semibold);
   line-height: 1;
-  clip-path: inset(-0.4em 100% -0.4em -0.2em);
+  white-space: nowrap;
+  background-image: linear-gradient(90deg, transparent 0 50%, currentColor 50% 100%);
+  background-size: 200% 100%;
+  background-position: 0% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
   animation: diagram-empty-write 520ms linear 500ms forwards;
 }
 
 @keyframes diagram-empty-write {
   to {
-    clip-path: inset(-0.4em -0.2em -0.4em -0.2em);
+    background-position: 100% 0;
+  }
+}
+
+/* Forced colors drops background images, so the word needs a real text fill there. */
+@media (forced-colors: active) {
+  .diagram-empty-title .diagram-empty-hand {
+    background: none;
+    color: var(--openbot-accent-text);
+    -webkit-text-fill-color: currentColor;
   }
 }
 
@@ -1640,6 +1655,12 @@
   animation: none;
   transition: none;
   clip-path: none;
+}
+
+/* The wipe is done, so the word shows in full. */
+.diagram-empty[data-still] .diagram-empty-hand {
+  animation: none;
+  background-position: 100% 0;
 }
 
 .diagram-empty[data-still] .diagram-empty-pulse {
