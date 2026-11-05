@@ -103,8 +103,9 @@ and do not open issues from it. Run it locally without `--discord` to see the ta
 The scheduled run sends only when a status changed, and on Monday (UTC). A manual run
 (`workflow_dispatch`) passes `--always`. The last sent statuses are an HMAC, keyed by the webhook URL,
 in the GitHub Actions cache `release-regression-state-*`. Pull requests can read that cache, so do
-not put other data in it. A failed run clears the state, so the next good run sends. When the tunnel
-does not open, a separate workflow step posts a notice with no detail.
+not put other data in it. A failed run clears the state, so the next good run sends. When a run stops
+before the script can do that (the tunnel, a timeout, a cancel), a workflow step clears the state and
+posts a notice with no detail.
 
 The secrets are in the `analytics` GitHub environment, which only protected branches can use:
 `RELEASE_REGRESSION_SSH_KEY`, `RELEASE_REGRESSION_SSH_KNOWN_HOSTS`, `RELEASE_REGRESSION_SSH_HOST`,
