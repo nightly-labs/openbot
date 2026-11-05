@@ -213,6 +213,8 @@ function createdAccessKey(output: string): string | null {
   return match ? protonPassAccessKey(match[0]) : null;
 }
 
+const vaultListSchema = Schema.Struct({ vaults: Schema.Array(Schema.Struct({ share_id: Schema.String })) });
+
 const itemListSchema = Schema.Struct({
   items: Schema.Array(
     Schema.Struct({
@@ -764,13 +766,33 @@ export class ProtonPassDriver implements PasswordManagerDriver, PasswordVault {
       Effect.gen({ self: this }, function* () {
         const current = this.#index;
         if (current && this.#now() - current.readAt < INDEX_MS) return current.logins;
-        const output = yield* this.#agentCall(["item", "list", "--filter-type", "login", "--output", "json"]);
-        const listed = yield* Effect.try({
-          try: () => Schema.decodeUnknownSync(itemListSchema)(JSON.parse(output)),
+        // `item list` reads one vault, and no default vault is set: each vault that the key reads is listed.
+        const vaultOutput = yield* this.#agentCall(["vault", "list", "--output", "json"]);
+        const shareIds = yield* Effect.try({
+          try: () => Schema.decodeUnknownSync(vaultListSchema)(JSON.parse(vaultOutput)).vaults.map((v) => v.share_id),
           catch: () => fail(sourceText("error.connector.protonPassFailed")),
         });
+        const pages: (typeof itemListSchema.Type)[] = [];
+        for (const shareId of shareIds) {
+          if (!PROTON_ID.test(shareId)) continue;
+          const output = yield* this.#agentCall([
+            "item",
+            "list",
+            "--share-id",
+            shareId,
+            "--filter-type",
+            "login",
+            "--output",
+            "json",
+          ]);
+          const page = yield* Effect.try({
+            try: () => Schema.decodeUnknownSync(itemListSchema)(JSON.parse(output)),
+            catch: () => fail(sourceText("error.connector.protonPassFailed")),
+          });
+          pages.push(page);
+        }
         const logins = new Map<string, IndexedLogin>();
-        for (const item of listed.items) {
+        for (const item of pages.flatMap((page) => page.items)) {
           if (logins.size >= MAX_LOGINS) break;
           if (!isActive(item.state) || !PROTON_ID.test(item.id) || !PROTON_ID.test(item.share_id)) continue;
           const id = `${item.share_id}:${item.id}`;
