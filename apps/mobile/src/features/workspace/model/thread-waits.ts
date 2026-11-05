@@ -1,5 +1,4 @@
 import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
-import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 import { type MobileAgentWaitReason, WAIT_RANK } from "./agent-activity";
 
 /**
@@ -47,12 +46,17 @@ export function reduceThreadWaits(
   switch (event.type) {
     case "runtime-snapshot": {
       const { snapshot } = event;
-      const waits = [
+      const all = [
         ...snapshot.pendingApprovals.map((request) => threadWait(request, "approval")),
         ...snapshot.pendingBrowserTakeovers.map((request) => threadWait(request, "takeover")),
         ...snapshot.pendingPrompts.map((request) => threadWait(request, "question")),
-      ].filter((wait) => isTaskThread(wait.agentId, wait.threadId));
-      const next = reconcilePendingRequests(current, waits, snapshot.attentionComplete);
+      ];
+      const waits = all.filter((wait) => isTaskThread(wait.agentId, wait.threadId));
+      // A partial snapshot is whole for each agent that it names, also through a wait of its own chat.
+      const named = new Set(all.map((wait) => wait.agentId));
+      const next = snapshot.attentionComplete
+        ? waits
+        : [...current.filter((wait) => !named.has(wait.agentId)), ...waits];
       return next.length === current.length && next.every((wait, index) => wait === current[index]) ? current : next;
     }
     case "prompt":

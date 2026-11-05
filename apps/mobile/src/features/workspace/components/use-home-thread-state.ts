@@ -1,7 +1,8 @@
 import type { AgentTasksSnapshot } from "@openbot/contracts/ipc";
-import { useQueries, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
+import { useAgentThreadUnreadCounts } from "@/features/chat/components/use-agent-thread-reads";
 import {
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
@@ -23,29 +24,11 @@ export function useHomeThreadState(serverId: string, agentIds: readonly string[]
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
   const workspace = useMobileWorkspaceReader();
-  const readsEnabled = useMobileWorkspaceSelector(
-    (current) => isOnline(current.servers, serverId) && current.canReadThreads(serverId),
-  );
   const tasksEnabled = useMobileWorkspaceSelector(
     (current) => isOnline(current.servers, serverId) && current.canUseTasks(serverId),
   );
 
-  // The counts become a string first, so a read that changes no count does not change the map.
-  const unreadKey = useQueries({
-    queries: agentIds.map((agentId) => ({
-      queryKey: queryKeys.agentThreadReads(queryScope, serverId, agentId),
-      enabled: readsEnabled,
-      retry: false,
-      queryFn: () => workspace().loadAgentThreadReads(agentId, serverId),
-    })),
-    combine: (results) =>
-      JSON.stringify(
-        results.flatMap((result, index) => {
-          const count = (result.data ?? []).reduce((sum, read) => sum + read.unreadCount, 0);
-          return readsEnabled && count > 0 ? [[agentIds[index], count]] : [];
-        }),
-      ),
-  });
+  const unread = useAgentThreadUnreadCounts(serverId, agentIds);
 
   // A running thread can end while the server is away, and the list would show its agent at work.
   useEffect(() => {
@@ -66,5 +49,5 @@ export function useHomeThreadState(serverId: string, agentIds: readonly string[]
     }
   }, [tasksEnabled, serverId, queryScope, queryClient, workspace]);
 
-  return useMemo(() => new Map<string, number>(JSON.parse(unreadKey)), [unreadKey]);
+  return unread;
 }

@@ -1,8 +1,11 @@
-import type { AgentTaskReadState, AgentTasksSnapshot } from "@openbot/contracts/ipc";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
-import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
+import { useAgentThreadUnread } from "@/features/chat/components/use-agent-thread-reads";
+import {
+  useMobileWorkspaceReader,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import type {
   MobileAgentActivities,
   MobileAgentActivity,
@@ -12,7 +15,7 @@ import { queryKeys } from "@/features/workspace/model/query-keys";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import { agentThreadWaitReason } from "@/features/workspace/model/thread-waits";
 import type { TurnStepLines } from "@/features/workspace/model/turn-step-lines";
-import { selectLiveState } from "./use-live-workspace";
+import { selectLiveState, useAgentUnread } from "./use-live-workspace";
 
 export function useAgentActivity(agentId: string) {
   const liveState = useMobileWorkspaceSelector(selectLiveState);
@@ -23,12 +26,6 @@ export function useAgentActivity(agentId: string) {
     [liveState, online, serverId, agentId],
   );
   return useSyncExternalStore(liveState.subscribe, select);
-}
-
-/** What this agent waits on from the user, or undefined. Re-renders only when that changes. */
-export function useAgentWaitReason(agentId: string) {
-  const activity = useAgentActivity(agentId);
-  return activity?.phase === "waiting" ? activity.reason : undefined;
 }
 
 /** What the side threads of this agent wait on from the user, or undefined. */
@@ -50,11 +47,16 @@ function useAgentThreadWaitReason(agentId: string) {
  */
 function useAgentThreadRunning(agentId: string) {
   const queryScope = useQueryScope();
-  const online = useMobileWorkspaceSelector((workspace) => showsOnline(workspace.activeServer));
-  const serverId = useMobileWorkspaceSelector((workspace) => workspace.activeServer.id);
-  const running = useQuery<AgentTasksSnapshot, Error, boolean>({
+  const workspace = useMobileWorkspaceReader();
+  const online = useMobileWorkspaceSelector((current) => showsOnline(current.activeServer));
+  const serverId = useMobileWorkspaceSelector((current) => current.activeServer.id);
+  // Disabled with the real query function, not `skipToken`: each observer writes its options into
+  // the shared query, and the thread list's later invalidation of the key fetches with them.
+  const running = useQuery({
     queryKey: queryKeys.agentTasks(queryScope, serverId, agentId),
-    queryFn: skipToken,
+    enabled: false,
+    retry: false,
+    queryFn: () => workspace().loadAgentTasks(agentId, serverId),
     select: (snapshot) => snapshot.tasks.some((task) => task.state === "running"),
   }).data;
   return online && running === true;
@@ -83,19 +85,14 @@ export function useAgentListWaitReason(agentId: string) {
 }
 
 /**
- * The unread agent messages of this agent's open side threads on the active server, from the read
- * marks that the home list loads. Opening the agent's own chat does not change it.
+ * True when the home list shows this agent as unread: its own chat or one of its side threads has a
+ * message that the person did not read.
  */
-export function useAgentThreadUnread(agentId: string): number {
-  const queryScope = useQueryScope();
-  const online = useMobileWorkspaceSelector((workspace) => showsOnline(workspace.activeServer));
+export function useAgentListUnread(agentId: string): boolean {
   const serverId = useMobileWorkspaceSelector((workspace) => workspace.activeServer.id);
-  const unread = useQuery<AgentTaskReadState[], Error, number>({
-    queryKey: queryKeys.agentThreadReads(queryScope, serverId, agentId),
-    queryFn: skipToken,
-    select: (reads) => reads.reduce((sum, read) => sum + read.unreadCount, 0),
-  }).data;
-  return online ? (unread ?? 0) : 0;
+  const own = useAgentUnread(agentId);
+  const threads = useAgentThreadUnread(serverId, agentId);
+  return own || threads > 0;
 }
 
 /**
