@@ -1,5 +1,5 @@
 import type { InstalledSkill } from "@openbot/contracts/ipc";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueries } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { agentSkillsQuery } from "@/features/agents/model/agent-skills-query";
 import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
@@ -12,7 +12,7 @@ import {
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { useText } from "@/shared/lib/text";
-import { listAllMarketplaceAgents, listAllMarketplaceSkills, MARKETPLACE_PAGE_SIZE } from "../api/marketplace-catalog";
+import { listMarketplaceAgents, listMarketplaceSkills, MARKETPLACE_PAGE_SIZE } from "../api/marketplace-catalog";
 import {
   agentListing,
   appListings,
@@ -88,28 +88,39 @@ export function useMarketplaceCatalog({
     ...(search ? { query: search } : {}),
     ...(category ? { category } : {}),
   };
-  const agents = useQuery({
+  // A page at a time, as the desktop: the next page loads only when the user asks for more.
+  const agents = useInfiniteQuery({
     queryKey: queryKeys.marketplace(apiUrl, "agents", search, category),
     enabled: apiUrl !== null && (filter.kind === null || filter.kind === "agent"),
     staleTime: CATALOG_FRESH_MS,
-    queryFn: ({ signal }) => listAllMarketplaceAgents(apiUrl ?? "", listQuery, signal),
+    initialPageParam: "",
+    queryFn: ({ pageParam, signal }) =>
+      listMarketplaceAgents(apiUrl ?? "", { ...listQuery, cursor: pageParam || undefined }, signal),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
   });
-  const skills = useQuery({
+  const skills = useInfiniteQuery({
     queryKey: queryKeys.marketplace(apiUrl, "skills", search, category),
     enabled: apiUrl !== null && (filter.kind === null || filter.kind === "skill"),
     staleTime: CATALOG_FRESH_MS,
-    queryFn: ({ signal }) => listAllMarketplaceSkills(apiUrl ?? "", listQuery, signal),
+    initialPageParam: "",
+    queryFn: ({ pageParam, signal }) =>
+      listMarketplaceSkills(apiUrl ?? "", { ...listQuery, cursor: pageParam || undefined }, signal),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
   });
   const listings = useMemo(() => {
     if (!apiUrl) return [];
     return [
-      ...(agents.data ?? []).map((agent) => agentListing(apiUrl, agent)),
+      ...(agents.data?.pages ?? []).flatMap((page) => page.agents.map((agent) => agentListing(apiUrl, agent))),
       ...[...serverApps, ...appListings(apiUrl)].filter((app) => matchesQuery(app, search)),
-      ...(skills.data ?? []).map((skill) => skillListing(apiUrl, skill)),
+      ...(skills.data?.pages ?? []).flatMap((page) => page.skills.map((skill) => skillListing(apiUrl, skill))),
     ];
   }, [apiUrl, agents.data, skills.data, search, serverApps]);
   const pending =
     (agents.isPending && agents.fetchStatus !== "idle") || (skills.isPending && skills.fetchStatus !== "idle");
+  const { fetchNextPage: moreAgents } = agents;
+  const { fetchNextPage: moreSkills } = skills;
+  const agentsMore = agents.hasNextPage && filter.kind !== "skill";
+  const skillsMore = skills.hasNextPage && filter.kind !== "agent";
   return {
     listings,
     /** The debounced search, which the listings match. */
@@ -121,6 +132,12 @@ export function useMarketplaceCatalog({
      */
     failed: (agents.isError && !agents.data) || (skills.isError && !skills.data),
     refetch: () => Promise.all([agents.refetch(), skills.refetch()]),
+    /** The catalog has more agents or skills than the listings show. */
+    hasMore: agentsMore || skillsMore,
+    loadingMore: agents.isFetchingNextPage || skills.isFetchingNextPage,
+    /** The last "Load more" failed. The listings keep the pages read before it. */
+    loadMoreFailed: agents.isFetchNextPageError || skills.isFetchNextPageError,
+    loadMore: () => Promise.all([agentsMore ? moreAgents() : null, skillsMore ? moreSkills() : null]),
   };
 }
 
@@ -180,4 +197,5 @@ export function useMarketplaceInstalled(serverId: string) {
   }, [agents, skillsByAgent, mcpServers.data]);
 }
 
+export type MarketplaceCatalog = ReturnType<typeof useMarketplaceCatalog>;
 export type MarketplaceInstalled = ReturnType<typeof useMarketplaceInstalled>;

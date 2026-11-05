@@ -46,6 +46,7 @@ export const messages = defineMessages("mobile.marketplace", {
   "mobile.marketplace.row.installed": "{name}, installed",
   "mobile.marketplace.empty": "Nothing matches. Clear the filter or change the search.",
   "mobile.marketplace.loadFailed": "The Marketplace did not load.",
+  "mobile.marketplace.loadMore": "Load more",
   "mobile.marketplace.installFailed": "The install did not complete.",
   "mobile.marketplace.listing.notFound": "This listing is not in the Marketplace now.",
   "mobile.marketplace.listing.creator": "By {name}",

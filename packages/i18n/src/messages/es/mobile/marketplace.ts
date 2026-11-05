@@ -47,6 +47,7 @@ export const messages = {
   "mobile.marketplace.row.installed": "{name}, instalado",
   "mobile.marketplace.empty": "No hay resultados. Borra el filtro o cambia la búsqueda.",
   "mobile.marketplace.loadFailed": "No se pudo cargar el marketplace.",
+  "mobile.marketplace.loadMore": "Cargar más",
   "mobile.marketplace.installFailed": "La instalación no se completó.",
   "mobile.marketplace.listing.notFound": "Este elemento ya no está en el marketplace.",
   "mobile.marketplace.listing.creator": "De {name}",

@@ -2,11 +2,9 @@ import type {
   MarketplaceAgentDetail,
   MarketplaceAgentPage,
   MarketplaceAgentQuery,
-  MarketplaceAgentSummary,
   MarketplaceSkillDetail,
   MarketplaceSkillPage,
   MarketplaceSkillQuery,
-  MarketplaceSkillSummary,
 } from "@openbot/contracts/ipc";
 import { runTeamEffect } from "@openbot/team-client";
 import { createMarketplaceCatalog, type MarketplaceCatalog } from "@openbot/team-client/marketplace-catalog";
@@ -16,8 +14,6 @@ const CATALOG_REQUEST_TIMEOUT_MS = 10_000;
 
 /** The listings each Marketplace read asks for. The desktop overview asks for the same page size. */
 export const MARKETPLACE_PAGE_SIZE = 50;
-/** The most pages that one list reads, so a catalog that never ends cannot hold the phone. */
-const MARKETPLACE_PAGE_LIMIT = 20;
 
 /**
  * The public catalog of the account service at `apiUrl`. These reads need no account, so no
@@ -65,7 +61,7 @@ export function pluginIconUrl(apiUrl: string, slug: string, appId: string): stri
   return url.toString();
 }
 
-function listMarketplaceAgents(
+export function listMarketplaceAgents(
   apiUrl: string,
   query: MarketplaceAgentQuery,
   signal?: AbortSignal,
@@ -73,68 +69,12 @@ function listMarketplaceAgents(
   return runTeamEffect(catalogFor(apiUrl).agents.list(query), signal);
 }
 
-function listMarketplaceSkills(
+export function listMarketplaceSkills(
   apiUrl: string,
   query: MarketplaceSkillQuery,
   signal?: AbortSignal,
 ): Promise<MarketplaceSkillPage> {
   return runTeamEffect(catalogFor(apiUrl).skills.list(query), signal);
-}
-
-/**
- * Every page of a list, in order, as the desktop reads the next page with the cursor of the last one. Only
- * a failed first page fails the list: when a later page fails, the pages already read stay.
- */
-async function allPages<Item>(
-  read: (cursor: string | undefined) => Promise<{ items: Item[]; nextCursor: string | null | undefined }>,
-  signal?: AbortSignal,
-): Promise<Item[]> {
-  const first = await read(undefined);
-  const items = [...first.items];
-  let cursor = first.nextCursor;
-  for (let page = 1; cursor && page < MARKETPLACE_PAGE_LIMIT; page += 1) {
-    try {
-      const next = await read(cursor);
-      items.push(...next.items);
-      cursor = next.nextCursor;
-    } catch (error) {
-      if (signal?.aborted) throw error;
-      break;
-    }
-  }
-  return items;
-}
-
-/** Every agent listing that matches `query`, from all its pages. */
-export function listAllMarketplaceAgents(
-  apiUrl: string,
-  query: MarketplaceAgentQuery,
-  signal?: AbortSignal,
-): Promise<MarketplaceAgentSummary[]> {
-  return allPages(
-    (cursor) =>
-      listMarketplaceAgents(apiUrl, { ...query, cursor }, signal).then((page) => ({
-        items: page.agents,
-        nextCursor: page.nextCursor,
-      })),
-    signal,
-  );
-}
-
-/** Every skill that matches `query`, from all its pages. */
-export function listAllMarketplaceSkills(
-  apiUrl: string,
-  query: MarketplaceSkillQuery,
-  signal?: AbortSignal,
-): Promise<MarketplaceSkillSummary[]> {
-  return allPages(
-    (cursor) =>
-      listMarketplaceSkills(apiUrl, { ...query, cursor }, signal).then((page) => ({
-        items: page.skills,
-        nextCursor: page.nextCursor,
-      })),
-    signal,
-  );
 }
 
 export function loadMarketplaceAgent(

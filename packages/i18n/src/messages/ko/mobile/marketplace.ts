@@ -47,6 +47,7 @@ export const messages = {
   "mobile.marketplace.row.installed": "{name}, 설치됨",
   "mobile.marketplace.empty": "일치하는 항목이 없어요. 필터를 지우거나 검색어를 바꿔 보세요.",
   "mobile.marketplace.loadFailed": "마켓플레이스를 불러오지 못했어요.",
+  "mobile.marketplace.loadMore": "더 보기",
   "mobile.marketplace.installFailed": "설치를 완료하지 못했어요.",
   "mobile.marketplace.listing.notFound": "이 항목은 지금 마켓플레이스에 없어요.",
   "mobile.marketplace.listing.creator": "{name} 제작",

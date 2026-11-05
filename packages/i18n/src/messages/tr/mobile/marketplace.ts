@@ -47,6 +47,7 @@ export const messages = {
   "mobile.marketplace.row.installed": "{name}, kurulu",
   "mobile.marketplace.empty": "Eşleşen sonuç yok. Filtreyi temizleyin veya aramayı değiştirin.",
   "mobile.marketplace.loadFailed": "Pazaryeri yüklenemedi.",
+  "mobile.marketplace.loadMore": "Daha fazla yükle",
   "mobile.marketplace.installFailed": "Kurulum tamamlanmadı.",
   "mobile.marketplace.listing.notFound": "Bu öğe artık pazaryerinde değil.",
   "mobile.marketplace.listing.creator": "{name} tarafından",

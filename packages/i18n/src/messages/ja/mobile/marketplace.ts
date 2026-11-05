@@ -47,6 +47,7 @@ export const messages = {
   "mobile.marketplace.row.installed": "{name}、インストール済み",
   "mobile.marketplace.empty": "一致するものがありません。フィルターをクリアするか、検索を変更してください。",
   "mobile.marketplace.loadFailed": "マーケットプレイスを読み込めませんでした。",
+  "mobile.marketplace.loadMore": "さらに読み込む",
   "mobile.marketplace.installFailed": "インストールが完了しませんでした。",
   "mobile.marketplace.listing.notFound": "この項目は現在マーケットプレイスにありません。",
   "mobile.marketplace.listing.creator": "作成者: {name}",

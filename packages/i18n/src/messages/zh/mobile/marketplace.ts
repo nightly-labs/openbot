@@ -47,6 +47,7 @@ export const messages = {
   "mobile.marketplace.row.installed": "{name}，已安装",
   "mobile.marketplace.empty": "没有匹配的内容。请清除筛选或更换搜索词。",
   "mobile.marketplace.loadFailed": "无法加载市场。",
+  "mobile.marketplace.loadMore": "加载更多",
   "mobile.marketplace.installFailed": "安装未完成。",
   "mobile.marketplace.listing.notFound": "市场中现在没有该内容。",
   "mobile.marketplace.listing.creator": "作者 {name}",

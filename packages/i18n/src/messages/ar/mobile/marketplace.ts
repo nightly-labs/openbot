@@ -47,6 +47,7 @@ export const messages = {
   "mobile.marketplace.row.installed": "{name}، مثبّت",
   "mobile.marketplace.empty": "لا توجد نتائج مطابقة. امسح عامل التصفية أو غيّر البحث.",
   "mobile.marketplace.loadFailed": "لم يُحمَّل المتجر.",
+  "mobile.marketplace.loadMore": "تحميل المزيد",
   "mobile.marketplace.installFailed": "لم يكتمل التثبيت.",
   "mobile.marketplace.listing.notFound": "هذا العنصر غير موجود في المتجر الآن.",
   "mobile.marketplace.listing.creator": "من {name}",

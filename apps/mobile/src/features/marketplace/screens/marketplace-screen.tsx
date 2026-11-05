@@ -24,7 +24,12 @@ import {
   matchesFilter,
   NO_MARKETPLACE_FILTER,
 } from "../model/marketplace-listings";
-import { type MarketplaceInstalled, useMarketplaceCatalog, useMarketplaceInstalled } from "../model/use-marketplace";
+import {
+  type MarketplaceCatalog,
+  type MarketplaceInstalled,
+  useMarketplaceCatalog,
+  useMarketplaceInstalled,
+} from "../model/use-marketplace";
 
 /** The agents of the shelf and the skills of the list on the overview. */
 const OVERVIEW_ROWS = 8;
@@ -90,6 +95,7 @@ export function MarketplaceScreen() {
         listings={catalog.listings.filter((item) => matchesFilter(item, filter, installed.installed))}
         filter={filter}
         pending={catalog.pending}
+        more={catalog}
         installed={installed}
         onOpen={listing}
         onClear={() => {
@@ -262,6 +268,7 @@ function FilteredList({
   listings,
   filter,
   pending,
+  more,
   installed,
   onOpen,
   onClear,
@@ -269,6 +276,8 @@ function FilteredList({
   listings: MarketplaceListing[];
   filter: MarketplaceFilter;
   pending: boolean;
+  /** The next catalog page, as the desktop "Load more". */
+  more: Pick<MarketplaceCatalog, "hasMore" | "loadingMore" | "loadMoreFailed" | "loadMore">;
   installed: MarketplaceInstalled;
   onOpen: (listing: MarketplaceListing) => void;
   onClear: () => void;
@@ -314,6 +323,17 @@ function FilteredList({
       ) : (
         <SettingsNote>{t("mobile.marketplace.empty")}</SettingsNote>
       )}
+      {more.loadMoreFailed ? <SettingsNote>{t("mobile.marketplace.loadFailed")}</SettingsNote> : null}
+      {more.hasMore ? (
+        <Button
+          variant="secondary"
+          className="self-center"
+          isDisabled={more.loadingMore}
+          onPress={() => void more.loadMore()}
+        >
+          <Button.Label>{t("mobile.marketplace.loadMore")}</Button.Label>
+        </Button>
+      ) : null}
     </View>
   );
 }

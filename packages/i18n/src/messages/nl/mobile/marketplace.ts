@@ -47,6 +47,7 @@ export const messages = {
   "mobile.marketplace.row.installed": "{name}, geïnstalleerd",
   "mobile.marketplace.empty": "Niets gevonden. Wis het filter of wijzig de zoekopdracht.",
   "mobile.marketplace.loadFailed": "De marktplaats is niet geladen.",
+  "mobile.marketplace.loadMore": "Meer laden",
   "mobile.marketplace.installFailed": "De installatie is niet voltooid.",
   "mobile.marketplace.listing.notFound": "Dit item staat nu niet in de marktplaats.",
   "mobile.marketplace.listing.creator": "Door {name}",
