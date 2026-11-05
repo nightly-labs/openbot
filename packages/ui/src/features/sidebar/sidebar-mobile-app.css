@@ -38,7 +38,7 @@
 }
 
 .sidebar-mobile-app-dismiss {
-  margin-right: calc(var(--openbot-space-1) * -1);
+  margin-inline-end: calc(var(--openbot-space-1) * -1);
   color: var(--openbot-text-muted);
 }
 

@@ -2,7 +2,15 @@ import type { SkillCategory } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { Lock } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { DiscordMark, GitHubMark, OnePasswordMark, SlackMark, TelegramMark } from "../settings/brand-marks";
+import {
+  DiscordMark,
+  GitHubMark,
+  OnePasswordMark,
+  ProtonPassMark,
+  SlackMark,
+  TelegramMark,
+  WhatsAppMark,
+} from "../settings/brand-marks";
 import type { ConnectorId } from "./connectors";
 
 export interface ConnectorListing {
@@ -35,6 +43,12 @@ export const CONNECTOR_LISTINGS: Readonly<Record<ConnectorId, ConnectorListing>>
     category: "productivity",
     Mark: () => <TelegramMark />,
   },
+  whatsapp: {
+    title: "connector.whatsapp.title",
+    tagline: "marketplace.app.whatsappTagline",
+    category: "productivity",
+    Mark: () => <WhatsAppMark />,
+  },
   github: {
     title: "connector.github.title",
     tagline: "marketplace.app.githubTagline",
@@ -52,5 +66,11 @@ export const CONNECTOR_LISTINGS: Readonly<Record<ConnectorId, ConnectorListing>>
     tagline: "marketplace.app.bitwardenTagline",
     category: "productivity",
     Mark: () => <Lock aria-hidden="true" />,
+  },
+  protonpass: {
+    title: "connector.protonPass.title",
+    tagline: "marketplace.app.protonPassTagline",
+    category: "productivity",
+    Mark: () => <ProtonPassMark />,
   },
 };

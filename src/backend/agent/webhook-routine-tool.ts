@@ -1,4 +1,4 @@
-import type { RoutineLimitPolicy } from "@openbot/contracts/ipc";
+import type { RoutineLimitPolicy, RoutineRunPlace } from "@openbot/contracts/ipc";
 import { type EventFilter, type EventRoutine, isEventFilter } from "@openbot/contracts/ipc-events";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { WEBHOOK_DELIVERY_BODY_BYTES_LIMIT } from "@openbot/contracts/signal-protocol/messages";
@@ -22,6 +22,7 @@ export const CREATE_WEBHOOK_ROUTINE_ARGUMENTS = [
   "filters",
   "active",
   "limitPolicy",
+  "runIn",
 ] as const;
 
 export const UPDATE_WEBHOOK_ROUTINE_TOOL = "update_webhook_routine";
@@ -35,6 +36,7 @@ export const UPDATE_WEBHOOK_ROUTINE_ARGUMENTS = [
   "filters",
   "active",
   "limitPolicy",
+  "runIn",
 ] as const;
 
 /** What a sender must send, as `docs/webhooks.md` describes it. The agent passes it on to the user. */
@@ -59,6 +61,8 @@ const WEBHOOK_REQUEST_FORMAT = {
     "413": "the body is too large",
     "503": "the host is offline or busy; retry later",
   },
+  standardWebhooks:
+    "The URL also accepts Standard Webhooks requests, such as Composio and Svix send: webhook-id, webhook-timestamp and webhook-signature headers, and a JSON object body with a type field. The whole body becomes data, so filters can read /metadata/trigger_slug. The person pastes the sender's signing secret in the routine's settings.",
 };
 
 /**
@@ -77,6 +81,8 @@ export interface WebhookRoutineWriter {
     eventType: string | null;
     filters: EventFilter[];
     limitPolicy?: RoutineLimitPolicy;
+    /** Left out, a save keeps the saved place, and a new routine runs in the chat. */
+    runIn?: RoutineRunPlace;
   }): Effect.Effect<EventRoutine, RoutineOperationFailed>;
   /** Deletes the routine as Routines settings do. The sync after the change revokes its route. */
   delete(input: { agentId: string; routineId: string }): Effect.Effect<void, RoutineOperationFailed>;

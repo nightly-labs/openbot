@@ -233,6 +233,17 @@ function AuthenticatedStack() {
           }}
         />
         <Stack.Screen
+          name="image-gallery/[galleryId]"
+          options={{
+            animation: pushAnimation,
+            contentStyle: { backgroundColor: background },
+            fullScreenGestureEnabled: true,
+            gestureEnabled: true,
+            // The screen draws the app's glass header, as the chat does.
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
           name="browser/[agentId]"
           options={{
             animation: pushAnimation,
@@ -528,6 +539,17 @@ function AuthenticatedStack() {
             scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: [0.85],
+            sheetGrabberVisible: true,
+          }}
+        />
+        <Stack.Screen
+          name="message-actions"
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.6],
             sheetGrabberVisible: true,
           }}
         />

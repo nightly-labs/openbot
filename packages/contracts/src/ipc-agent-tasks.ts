@@ -2,12 +2,13 @@ import { type AgentProviderId, agentProviderDescriptor } from "./agent-providers
 import { INPUT_LIMITS } from "./input-limits";
 import { integerInRange, isBoundedString, isIdentifier, isNullableBoundedString } from "./ipc-bounded-values";
 import { type ConversationReadState, isConversationReadState } from "./ipc-conversations";
+import { isQueueDelivery, type QueueDelivery } from "./ipc-queue";
 import { isDynamicRecord, isOneOf } from "./runtime-values";
 
 /** The most tasks of one agent that run a turn at the same time, next to the agent's own chat. */
 export const AGENT_TASK_LIMIT_MAX = 4;
 /** The task limit of an agent that has no limit of its own. */
-export const AGENT_TASK_LIMIT_DEFAULT = 2;
+export const AGENT_TASK_LIMIT_DEFAULT = 4;
 
 export function isAgentTaskLimit(value: unknown): value is number {
   return integerInRange(value, 1, AGENT_TASK_LIMIT_MAX);
@@ -82,6 +83,11 @@ export interface AgentTask {
   error: string | null;
   /** The messages that wait to start in this task, oldest first. */
   queuedMessages: AgentTaskQueuedMessage[];
+  /**
+   * The same messages in full, with their files and state, for the queue of the thread. Only this
+   * computer sends it: the frozen `agent-tasks-v1` routes carry `queuedMessages` alone.
+   */
+  queue?: QueueDelivery[];
   createdAt: string;
   updatedAt: string;
   closedAt: string | null;
@@ -90,6 +96,11 @@ export interface AgentTask {
    * Absent from a server that cannot branch, and never sent on the frozen `agent-tasks-v1` routes.
    */
   branch?: AgentTaskBranch | null;
+  /**
+   * Set when the thread takes the runs of one routine of the agent. Absent from an older server, and
+   * never sent on the frozen `agent-tasks-v1` routes.
+   */
+  routineId?: string | null;
 }
 
 /** Where a branch was copied from. */
@@ -200,10 +211,12 @@ export function isAgentTask(value: unknown): value is AgentTask {
     (value.error === null || isBoundedString(value.error, INPUT_LIMITS.agentTaskError)) &&
     Array.isArray(value.queuedMessages) &&
     value.queuedMessages.every(isAgentTaskQueuedMessage) &&
+    (value.queue === undefined || (Array.isArray(value.queue) && value.queue.every(isQueueDelivery))) &&
     isBoundedString(value.createdAt, 160) &&
     isBoundedString(value.updatedAt, 160) &&
     (value.closedAt === null || isBoundedString(value.closedAt, 160)) &&
-    (value.branch === undefined || value.branch === null || isAgentTaskBranch(value.branch))
+    (value.branch === undefined || value.branch === null || isAgentTaskBranch(value.branch)) &&
+    (value.routineId === undefined || value.routineId === null || isIdentifier(value.routineId))
   );
 }
 

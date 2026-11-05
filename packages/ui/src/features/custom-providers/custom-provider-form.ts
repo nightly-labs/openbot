@@ -5,6 +5,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   CustomProviderHarness,
+  CustomProviderReasoningEffort,
   CustomProviderSummary,
   SaveCustomProviderInput,
   UpdateCustomProviderInput,
@@ -13,6 +14,7 @@ import {
   AGENT_PROVIDERS,
   CUSTOM_PROVIDER_ID_PATTERN,
   CUSTOM_PROVIDER_LIMITS,
+  CUSTOM_PROVIDER_REASONING_EFFORTS,
   composedCustomModelId,
   isAgentModel,
   isCustomProviderContextWindow,
@@ -29,6 +31,8 @@ export interface CustomModelDraft {
   contextWindow?: string;
   /** The largest completion, as typed. Blank keeps the guess from the context window. */
   maxOutput?: string;
+  /** The checked efforts, in any order. None keeps the harness's own efforts. */
+  reasoningEfforts?: CustomProviderReasoningEffort[];
 }
 
 export interface CustomHeaderDraft {
@@ -96,6 +100,7 @@ export function savedCustomProviderDraft(provider: CustomProviderSummary): Custo
             name: model.name,
             contextWindow: model.contextWindow?.toString() ?? "",
             maxOutput: model.maxOutput?.toString() ?? "",
+            ...(model.reasoningEfforts ? { reasoningEfforts: [...model.reasoningEfforts] } : {}),
           }))
         : [{ id: "", name: "" }],
     headers: savedHeaderDrafts(provider.headerNames),
@@ -105,7 +110,13 @@ export function savedCustomProviderDraft(provider: CustomProviderSummary): Custo
 
 /** A row the user has not filled in yet: carried by the form, ignored by validation and submit. */
 export function blankModel(model: CustomModelDraft): boolean {
-  return !model.id.trim() && !model.name.trim() && !model.contextWindow?.trim() && !model.maxOutput?.trim();
+  return (
+    !model.id.trim() &&
+    !model.name.trim() &&
+    !model.contextWindow?.trim() &&
+    !model.maxOutput?.trim() &&
+    !model.reasoningEfforts?.length
+  );
 }
 
 /**
@@ -307,11 +318,16 @@ export function customProviderValue(draft: CustomProviderDraft): SaveCustomProvi
       const name = model.name.trim() || id;
       const contextWindow = contextWindowValue(model);
       const maxOutput = maxOutputValue(model);
+      // The contract wants each effort one time, in its own order.
+      const reasoningEfforts = CUSTOM_PROVIDER_REASONING_EFFORTS.filter((effort) =>
+        model.reasoningEfforts?.includes(effort),
+      );
       return {
         id,
         name,
         ...(typeof contextWindow === "number" ? { contextWindow } : {}),
         ...(typeof maxOutput === "number" ? { maxOutput } : {}),
+        ...(reasoningEfforts.length > 0 ? { reasoningEfforts } : {}),
       };
     });
   return {
@@ -363,6 +379,8 @@ export interface DiscoveredModel {
   contextWindow?: number;
   /** For a saved model: the max output the user set, which Edit must keep. */
   maxOutput?: number;
+  /** For a saved model: the efforts the user set, which Edit must keep. */
+  reasoningEfforts?: CustomProviderReasoningEffort[];
 }
 
 /** The state of one `GET {baseUrl}/models` request, owned by the host that makes it. */

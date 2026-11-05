@@ -6,6 +6,7 @@ import type { OptionalRouteCodec } from "./admin-wire";
 import { AGENT_ACCESS_CODECS } from "./agent-access-v1";
 import { AGENT_ADMIN_CODECS } from "./agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CODECS } from "./agent-backup-models-v1";
+import { AGENT_COLORS_CODECS } from "./agent-colors-v1";
 import { AGENT_FAST_MODE_CODECS } from "./agent-fast-mode-v1";
 import { AGENT_FOLDERS_CODECS } from "./agent-folders-v1";
 import { AGENT_HIDDEN_CODECS } from "./agent-hidden-v1";
@@ -25,18 +26,23 @@ import { AGENT_TASKS_CODECS } from "./agent-tasks-v1";
 import { AGENT_THREAD_BRANCHES_CODECS } from "./agent-thread-branches-v1";
 import { AGENT_THREAD_FILES_CODECS } from "./agent-thread-files-v1";
 import { AGENT_THREAD_READS_CODECS } from "./agent-thread-reads-v1";
+import { AGENT_THREAD_REPLIES_CODECS } from "./agent-thread-replies-v1";
 import { AGENT_THREADS_CODECS } from "./agent-threads-v1";
 import { AGENT_UPDATE_CODECS } from "./agent-update-v1";
 import { BITWARDEN_CONNECTOR_CODECS } from "./bitwarden-connector-v1";
 import { BROWSER_PAGE_STATE_CODECS } from "./browser-page-state-v1";
 import { BROWSER_PROFILES_CODECS } from "./browser-profiles-v1";
+import { BROWSER_PROXIES_CODECS } from "./browser-proxies-v1";
 import { BROWSER_SECRET_VAULT_CODECS } from "./browser-secret-vault-v1";
 import { BROWSER_SIGN_IN_CODECS } from "./browser-sign-in-v1";
 import { BROWSER_USER_CONTROL_CODECS } from "./browser-user-control-v1";
+import { CHAT_COLORS_CODECS } from "./chat-colors-v1";
+import { COMPUTER_ACTIVITY_CODECS } from "./computer-activity-v1";
 import { CONNECTORS_CODECS } from "./connectors-v1";
 import { CONTEXT_COMPACT_CODECS } from "./context-compact-v1";
 import { CONTEXT_RESET_CODECS } from "./context-reset-v1";
 import { CONVERSATION_FILE_SEARCH_CODECS } from "./conversation-file-search-v1";
+import { CONVERSATION_UNREAD_FROM_CODECS } from "./conversation-unread-from-v1";
 import { CUSTOM_AGENTS_CODECS } from "./custom-agents-v1";
 import { CUSTOM_PROVIDER_HARNESS_CODECS } from "./custom-provider-harness-v1";
 import { DISCORD_ACCESS_CODECS } from "./discord-access-v1";
@@ -56,7 +62,10 @@ import { MACHINE_RESOURCES_CODECS } from "./machine-resources-v1";
 import { MCP_SIGN_IN_APP_CODECS } from "./mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_CODECS } from "./mcp-sign-in-v1";
 import { MEMORY_REVIEW_CODECS } from "./memory-review-v1";
+import { MESSAGE_DELETE_CODECS } from "./message-delete-v1";
+import { MODEL_VISIBILITY_CODECS } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CODECS } from "./onepassword-connector-v1";
+import { PASSWORD_MANAGERS_CODECS } from "./password-managers-v1";
 import { PROMPT_CACHE_TTL_CODECS } from "./prompt-cache-ttl-v1";
 import { PROVIDER_ACCOUNT_RELAY_CODECS } from "./provider-account-relay-v1";
 import { PROVIDER_ACCOUNT_RELAY_V2_CODECS } from "./provider-account-relay-v2";
@@ -87,7 +96,9 @@ import { STORAGE_DISK_CODECS } from "./storage-disk-v1";
 import { VAULT_IMPORT_CODECS } from "./vault-import-v1";
 import { VAULT_CODECS } from "./vault-v1";
 import { VAULT_V2_CODECS } from "./vault-v2";
+import { WEBHOOK_SENDER_SECRET_CODECS } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CODECS } from "./webhook-tests-v1";
+import { WHATSAPP_CONNECTOR_CODECS } from "./whatsapp-connector-v1";
 import { WORKFLOWS_GITHUB_CODECS } from "./workflows-github-v1";
 import { WORKFLOWS_CODECS } from "./workflows-v1";
 import { WORKSPACE_DIRECTORY_CODECS } from "./workspace-directory-v1";
@@ -119,6 +130,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_MEMORY_LIMIT_CODECS,
   ...MEMORY_REVIEW_CODECS,
   ...PROMPT_CACHE_TTL_CODECS,
+  ...MODEL_VISIBILITY_CODECS,
   ...SERVER_AUDIT_CODECS,
   ...PROVIDER_DEFAULT_CODECS,
   ...DISCORD_ACCESS_CODECS,
@@ -147,12 +159,14 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...MCP_SIGN_IN_APP_CODECS,
   ...SIGN_IN_RELAY_CODECS,
   ...FOCUS_USE_CODECS,
+  ...COMPUTER_ACTIVITY_CODECS,
   ...CONNECTORS_CODECS,
   ...CONVERSATION_FILE_SEARCH_CODECS,
   ...ROUTINE_FLOWS_CODECS,
   ...ROUTINE_RECOVERY_CODECS,
   ...ROUTINE_RESULTS_CODECS,
   ...WEBHOOK_TESTS_CODECS,
+  ...WEBHOOK_SENDER_SECRET_CODECS,
   ...STORAGE_DISK_CODECS,
   ...MACHINE_RESOURCES_CODECS,
   ...PROVIDER_ACCOUNTS_CODECS,
@@ -164,6 +178,13 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...BITWARDEN_CONNECTOR_CODECS,
   ...AGENT_ACCESS_CODECS,
   ...AGENT_HIDDEN_CODECS,
+  ...AGENT_COLORS_CODECS,
+  ...CHAT_COLORS_CODECS,
+  ...WHATSAPP_CONNECTOR_CODECS,
+  ...MESSAGE_DELETE_CODECS,
+  ...CONVERSATION_UNREAD_FROM_CODECS,
+  ...PASSWORD_MANAGERS_CODECS,
+  ...BROWSER_PROXIES_CODECS,
   ...AGENT_NOTIFICATION_LEVELS_CODECS,
   ...SIDEBAR_PINS_CODECS,
   ...AGENT_PLAN_CARD_CODECS,
@@ -174,6 +195,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_THREADS_CODECS,
   ...AGENT_THREAD_READS_CODECS,
   ...AGENT_THREAD_FILES_CODECS,
+  ...AGENT_THREAD_REPLIES_CODECS,
   ...AGENT_THREAD_BRANCHES_CODECS,
   ...SIDE_QUESTION_CODECS,
   ...BROWSER_PROFILES_CODECS,

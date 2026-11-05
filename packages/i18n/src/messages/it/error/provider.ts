@@ -107,6 +107,7 @@ export const messages = {
     "La finestra di contesto di un modello deve essere un numero intero di token tra {min} e {max}.",
   "error.provider.maxOutputInvalid":
     "L’output massimo di un modello deve essere un numero intero di token tra {min} e {max}.",
+  "error.provider.reasoningEffortsInvalid": "I livelli di impegno di un modello non sono validi.",
   "error.provider.headersTooMany": "Ci sono troppi header.",
   "error.provider.headerNameCharacter": "Il nome di un header contiene un carattere non consentito da HTTP.",
   "error.provider.headerNameTooLong": "Il nome di un header è troppo lungo.",
@@ -215,6 +216,10 @@ export const messages = {
     "Il provider del modello è andato in errore dal suo lato. La tua connessione non c'entra. Riprova più tardi o scegli un altro modello.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode non è riuscito a connettersi al provider del modello. Controlla la connessione di rete del computer che esegue OpenBot, poi riprova.\n{detail}",
+  "error.provider.codexStateBusy":
+    "ChatGPT sta ancora preparando la cronologia locale dopo un avvio precedente. Attendi qualche minuto, poi riprova.",
+  "error.provider.realtimeLimitZero":
+    "Linux ha fermato il provider perché OpenBot ha un limite di CPU in tempo reale pari a 0. Il limite viene dal tuo sistema. Installa e avvia rtkit (`rtkit-daemon`), esegui `systemctl --user restart xdg-desktop-portal`, poi riavvia OpenBot. Riavviare solo xdg-desktop-portal non basta finché manca rtkit.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode non è riuscito ad aprire il suo database perché una versione più recente di OpenCode lo ha modificato. Aggiorna OpenCode alla versione 2 o successiva, poi riprova.",
   "error.provider.opencodeNoAnswer":
@@ -236,6 +241,8 @@ export const messages = {
   "error.provider.antigravityMissing": "Gemini non è scaricato. Scaricalo in OpenBot per continuare.",
   "error.provider.antigravityNotStarted":
     "Il server di Gemini è stato trovato, ma non è possibile leggerne la versione.",
+  "error.provider.antigravityOverrideInvalid":
+    "Il server di Gemini in OPENBOT_ANTIGRAVITY_PATH non esiste o non è eseguibile. Correggi il percorso o rimuovi la variabile, poi riavvia OpenBot.",
   "error.provider.antigravityVersionUnreadable": "Impossibile leggere la versione del server di Gemini.",
   "error.provider.antigravitySignIn": "Accedi con Google per usare Gemini.",
   "error.provider.antigravityRateLimited":
@@ -272,6 +279,8 @@ export const messages = {
   "error.provider.kimiNotStarted": "Impossibile avviare Kimi. Esegui `kimi --version` in un terminale.",
   "error.provider.kimiVersionUnreadable": "Impossibile leggere la versione della CLI di Kimi.",
   "error.provider.kimiSignIn": "Accedi con Kimi Code per usare Kimi.",
+  "error.provider.devinSignIn": "Accedi con Devin per usare Devin.",
+  "error.provider.copilotSignIn": "Accedi con GitHub o imposta COPILOT_GITHUB_TOKEN per usare GitHub Copilot.",
   "error.provider.hermesMissing": "Hermes Agent non è installato. Installalo e riprova.",
   "error.provider.hermesNotStarted": "Impossibile avviare Hermes Agent. Esegui `hermes --version` in un terminale.",
   "error.provider.hermesVersionUnreadable": "Impossibile leggere la versione di Hermes Agent.",
@@ -292,6 +301,8 @@ export const messages = {
     "Gemini non è riuscito ad aprire la pagina di accesso nel browser. Controlla il browser predefinito, poi connettiti di nuovo.",
   "error.provider.acpSignInFailed": "L'accesso non è stato completato.",
   "error.provider.acpSignInFailedReason": "L'accesso non è stato completato: {reason}",
+  "error.provider.acpSignOutFailed": "La disconnessione non è stata completata.",
+  "error.provider.acpSignOutFailedReason": "La disconnessione non è stata completata: {reason}",
   "error.provider.acpSignInMethodMissing":
     "Questo provider non offre questo metodo di accesso su questo computer. Aggiorna il provider, poi riprova.",
   "error.provider.httpsSignInLinkOnly": "Solo i link di accesso HTTPS possono aprirsi nel browser.",
@@ -422,6 +433,9 @@ export const messages = {
   "error.provider.registryBindingChanged": "L'agente personalizzato è cambiato durante l'installazione. Riprova.",
   "error.provider.registryInstallFailed":
     "Installazione dell'agente non riuscita. L'installazione precedente è invariata.",
+  "error.provider.hermesInstallFailed":
+    "Hermes Agent non è stato installato. Riprova o usa la guida all'installazione.",
+  "error.provider.hermesNeedsGitCurl": "Hermes Agent richiede git e curl. Installali, poi riprova.",
   "error.provider.registryRemoveBusy":
     "Attendi che l'installazione dell'agente e il lavoro ACP attivo finiscano prima di rimuoverlo.",
 } as const satisfies PartialTranslation<typeof source>;

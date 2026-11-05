@@ -31,6 +31,7 @@ export interface ChannelRoutineHost {
   routineRecovery: () => boolean;
   /** Whether the `eventsServerId` host sends a test event to a webhook routine. */
   webhookTests: () => boolean;
+  webhookSenderSecret: () => boolean;
 }
 
 function useOpenChannel(channelId: string) {
@@ -75,7 +76,12 @@ export function ChannelHeaderTitle(props: { channelId: string; onOpenSettings: (
           onClick={props.onOpenSettings}
           disabled={current().channel.archived}
         >
-          <ChannelAvatar members={current().channel.members} agents={channels.agents()} />
+          <ChannelAvatar
+            members={current().channel.members}
+            agents={channels.agents()}
+            icon={current().channel.icon}
+            imageUrl={current().channel.imageUrl}
+          />
           <span class="channel-header-copy">
             <h1>{current().channel.name}</h1>
             <Show when={current().channel.title.trim()}>
@@ -95,7 +101,12 @@ export function ChannelEmptyState(props: { channelId: string }) {
     <Show when={page()}>
       {(current) => (
         <div class="channel-empty">
-          <ChannelAvatar members={current().channel.members} agents={channels.agents()} />
+          <ChannelAvatar
+            members={current().channel.members}
+            agents={channels.agents()}
+            icon={current().channel.icon}
+            imageUrl={current().channel.imageUrl}
+          />
           <h2>{current().channel.name}</h2>
           <Show when={current().channel.title}>
             <p class="channel-empty-title">{current().channel.title}</p>
@@ -189,7 +200,12 @@ export function ChannelSettingsPane(
     const eventApi =
       runtime().eventRoutines ??
       (serverId
-        ? desktopEventRoutinesApi(serverId, props.routines.routineRecovery(), props.routines.webhookTests())
+        ? desktopEventRoutinesApi(
+            serverId,
+            props.routines.routineRecovery(),
+            props.routines.webhookTests(),
+            props.routines.webhookSenderSecret(),
+          )
         : undefined);
     return eventApi ? eventRoutinesPort({ kind: "channel", id: props.channelId }, eventApi, legacy) : legacy;
   });

@@ -4,8 +4,6 @@ import type { messages as source } from "../en/uiBlock";
 export const messages = {
   "uiBlock.status.pending": "Wacht op je antwoord",
   "uiBlock.status.answered": "Beantwoord",
-  "uiBlock.status.expired": "Verlopen",
-  "uiBlock.status.closed": "Gesloten",
   "uiBlock.outcome.expired": "Er is niet op tijd geantwoord",
   "uiBlock.outcome.closed": "Gesloten zonder antwoord",
   "uiBlock.outcome.autoAnswered": "{outcome} (niemand antwoordde op tijd)",
@@ -31,6 +29,7 @@ export const messages = {
   "uiBlock.form.choose": "Kies een optie",
   "uiBlock.form.notSet": "Niet ingesteld",
   "uiBlock.form.invalid": "Sommige antwoorden kloppen niet. Controleer ze en probeer het opnieuw.",
+  "uiBlock.form.hiddenValue": "Verborgen",
   "uiBlock.skip": "Overslaan",
   "uiBlock.error.answerFailed": "Kan je antwoord niet versturen. Probeer het opnieuw.",
 } as const satisfies PartialTranslation<typeof source>;

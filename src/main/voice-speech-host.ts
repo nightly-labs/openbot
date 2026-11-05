@@ -8,7 +8,8 @@
 // the path in the request, and the protocol is type-only, so this process cannot load Electron,
 // the application database, or any module of the main bundle.
 
-import { join } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
 import type { VoiceSpeechFailure, VoiceSpeechRequest, VoiceSpeechResponse } from "./voice-speech-protocol";
 
 /**
@@ -17,6 +18,10 @@ import type { VoiceSpeechFailure, VoiceSpeechRequest, VoiceSpeechResponse } from
  * phone uses. This host imports only `node:*` at runtime, so the number is repeated here.
  */
 const DENOISING_STEPS = 8;
+/** The most ONNX Runtime threads a request can ask for. */
+const MAXIMUM_THREADS = 64;
+/** A settings file is a plain name in the runtime directory; empty is the default settings. */
+const SESSION_CONFIG_PATTERN = /^(?:[a-z0-9-]+\.cfg)?$/u;
 
 /** The part of the sherpa-onnx offline TTS configuration that OpenBot sets. */
 interface TtsConfig {
@@ -31,7 +36,8 @@ interface TtsConfig {
       voiceStyle: string;
     };
     numThreads: number;
-    provider: "cpu";
+    /** `cpu`, or `cpu:<file>` with ONNX Runtime session settings. */
+    provider: string;
     debug: number;
   };
   maxNumSentences: number;
@@ -97,8 +103,25 @@ function loadAddon(path: string): SherpaOnnxAddon {
   return module.exports;
 }
 
-function ttsConfig(modelDirectory: string): TtsConfig {
-  const file = (name: string) => join(modelDirectory, name);
+/**
+ * The provider string. sherpa-onnx opens a settings file with a narrow path and ends the process
+ * when the file is missing, so the path is relative to the runtime directory, and a missing file
+ * gives the default settings.
+ */
+function providerFor(addonPath: string, sessionConfig: string): string {
+  if (sessionConfig === "") return "cpu";
+  const directory = dirname(addonPath);
+  if (!existsSync(join(directory, sessionConfig))) return "cpu";
+  try {
+    process.chdir(directory);
+  } catch {
+    return "cpu";
+  }
+  return `cpu:${sessionConfig}`;
+}
+
+function ttsConfig(request: VoiceSpeechRequest): TtsConfig {
+  const file = (name: string) => join(request.modelDirectory, name);
   return {
     model: {
       supertonic: {
@@ -110,8 +133,8 @@ function ttsConfig(modelDirectory: string): TtsConfig {
         unicodeIndexer: file("unicode_indexer.bin"),
         voiceStyle: file("voice.bin"),
       },
-      numThreads: 4,
-      provider: "cpu",
+      numThreads: request.numThreads,
+      provider: providerFor(request.addonPath, request.sessionConfig),
       debug: 0,
     },
     maxNumSentences: 1,
@@ -121,7 +144,7 @@ function ttsConfig(modelDirectory: string): TtsConfig {
 async function createTts(request: VoiceSpeechRequest, key: string): Promise<LoadedTts> {
   const addon = loadAddon(request.addonPath);
   try {
-    return { key, addon, tts: await addon.createOfflineTtsAsync(ttsConfig(request.modelDirectory)) };
+    return { key, addon, tts: await addon.createOfflineTtsAsync(ttsConfig(request)) };
   } catch {
     throw new HostFailure("model-load-failed");
   }
@@ -129,7 +152,7 @@ async function createTts(request: VoiceSpeechRequest, key: string): Promise<Load
 
 /** A failed load is not kept, so the next request tries again. */
 function ttsFor(request: VoiceSpeechRequest): Promise<LoadedTts> {
-  const key = `${request.addonPath}\n${request.modelDirectory}`;
+  const key = [request.addonPath, request.modelDirectory, request.numThreads, request.sessionConfig].join("\n");
   if (loading?.key === key) return loading.promise;
   const promise = createTts(request, key);
   loading = { key, promise };
@@ -185,7 +208,15 @@ function isRequest(value: unknown): value is VoiceSpeechRequest {
     "speakerId" in value &&
     typeof value.speakerId === "number" &&
     "loadOnly" in value &&
-    typeof value.loadOnly === "boolean"
+    typeof value.loadOnly === "boolean" &&
+    "numThreads" in value &&
+    typeof value.numThreads === "number" &&
+    Number.isInteger(value.numThreads) &&
+    value.numThreads >= 1 &&
+    value.numThreads <= MAXIMUM_THREADS &&
+    "sessionConfig" in value &&
+    typeof value.sessionConfig === "string" &&
+    SESSION_CONFIG_PATTERN.test(value.sessionConfig)
   );
 }
 

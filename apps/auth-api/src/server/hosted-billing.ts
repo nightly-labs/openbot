@@ -2,7 +2,12 @@ import { Effect } from "effect";
 import { createAccountAnalytics } from "./account-analytics";
 import { BillingSales } from "./billing-sales";
 import { BillingService } from "./billing-service";
-import { createLicenseEmailDelivery, createWelcomeEmailDelivery, type EmailDeliveryBindings } from "./email-delivery";
+import {
+  createLicenseEmailDelivery,
+  createWelcomeEmailDelivery,
+  type EmailDeliveryBindings,
+  type EmailDeliveryError,
+} from "./email-delivery";
 import type { LicenseEmailInput } from "./email-templates";
 import {
   type HostedServerBindings,
@@ -101,7 +106,7 @@ export function createHostedBilling(
  */
 function sendBillingEmail<Message>(
   name: "welcome email" | `license email ${LicenseEmailInput["kind"]}`,
-  createDelivery: () => { send(message: Message): Effect.Effect<void, SmtpFailure> } | null,
+  createDelivery: () => { send(message: Message): Effect.Effect<void, EmailDeliveryError | SmtpFailure> } | null,
   message: Message,
 ): Effect.Effect<void> {
   return Effect.try({

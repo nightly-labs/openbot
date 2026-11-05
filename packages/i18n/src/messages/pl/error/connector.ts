@@ -34,4 +34,20 @@ export const messages = {
   "error.connector.bitwardenCliInstallFailed":
     "Nie udało się zainstalować Bitwarden CLI na tym serwerze. Sprawdź jego połączenie sieciowe, a następnie połącz ponownie.",
   "error.connector.bitwardenFileUnreadable": "Nie można odczytać pliku połączenia Bitwarden.",
+  "error.connector.passwordManagerUnknown": "OpenBot nie zna tego menedżera haseł.",
+  "error.connector.passwordManagerMethod": "Tego menedżera haseł nie można połączyć w ten sposób.",
+  "error.connector.passwordManagerNoSignIn": "Żadna strona logowania nie jest otwarta. Połącz ponownie.",
+  "error.connector.protonPassFailed": "Nie udało się połączyć Proton Pass. Połącz ponownie.",
+  "error.connector.protonPassCliInstallFailed":
+    "Nie udało się zainstalować Proton Pass CLI. Sprawdź połączenie sieciowe, a potem połącz ponownie.",
+  "error.connector.protonPassPlan":
+    "Twój plan Proton nie pozwala na Proton Pass CLI. Zmień plan, a potem połącz ponownie.",
+  "error.connector.protonPassExpired": "Dostęp do Proton Pass wygasł. Połącz ponownie.",
+  "error.connector.protonPassKeyInvalid": "Wpisz klucz dostępu Proton Pass, który zaczyna się od pst_.",
+  "error.connector.protonPassExtraPassword": "Dodatkowe hasło jest nieprawidłowe. Wpisz je ponownie.",
+  "error.connector.protonPassExtraPasswordNotAsked": "Proton Pass nie poprosił o dodatkowe hasło.",
+  "error.connector.protonPassFileUnreadable": "Nie można odczytać pliku połączenia Proton Pass.",
+  "error.connector.protonPassSignInTimeout": "Logowanie do Proton trwało zbyt długo. Połącz ponownie.",
+  "error.connector.protonPassSetupFailed":
+    "Nie udało się utworzyć sejfu Shared with OpenBot ani jego klucza dostępu w Proton Pass. Połącz ponownie.",
 } as const satisfies PartialTranslation<typeof source>;

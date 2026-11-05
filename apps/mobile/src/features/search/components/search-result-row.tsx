@@ -27,6 +27,7 @@ import { Pressable, View } from "react-native";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { openChatFromPane, useChatListPane } from "@/features/agents/components/chat-list-pane-context";
 import { ChannelAvatar } from "@/features/channels/components/channel-avatar";
+import { showsAsImage } from "@/features/chat/components/attachment-preview";
 import {
   type MobileSearchResult,
   type MobileSearchSettingId,
@@ -123,6 +124,7 @@ function AgentAvatar({ agent }: { agent: MobileAgent }) {
       agentId={agent.id}
       serverId={agent.serverId}
       hue={agent.avatarHue}
+      color={agent.avatarColor}
       seed={agent.avatarSeed}
       size={AVATAR_SIZE}
       animateIdle={false}
@@ -191,7 +193,7 @@ function openSetting(id: MobileSearchSettingId, serverId: string) {
 }
 
 function fileIcon(file: Extract<MobileSearchResult, { kind: "file" }>["file"]): LucideIcon {
-  if (file.attachment.kind === "image") return FileImage;
+  if (showsAsImage(file.attachment)) return FileImage;
   return file.attachment.previewKind === "pdf" || file.attachment.previewKind === "text" ? FileText : FileIcon;
 }
 

@@ -9,12 +9,13 @@
  */
 
 import { Badge, buttonVariants, ContextMenu } from "@openbot/ui";
-import { For, Match, Show, Switch } from "solid-js";
+import { createMemo, For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
 import { SidebarAgentContextMenu } from "./SidebarAgentContextMenu";
 import { SidebarAgentIndicator, SidebarPinnedAvatar } from "./SidebarAgentIndicator";
 import { SidebarChannelContextMenu } from "./SidebarChannelContextMenu";
+import { sidebarUnreadBadge } from "./sidebar-agent-states";
 import { sidebarAgentStateLabel } from "./sidebar-filtering";
 import { sidebarPinnedItemKey } from "./sidebar-pins";
 import { useSidebarScope } from "./sidebar-scope";
@@ -64,6 +65,12 @@ export function SidebarPinnedGroup() {
               const active = () => chatIsActive(item.chat);
               // A pinned chat that waits stays in its tile, so the tile says what it waits for.
               const channelWait = () => (item.chat.kind === "channel" ? props.channelWaits?.[item.chat.id] : undefined);
+              /* A pinned channel shows its unread count as a pinned agent does. */
+              const channelBadge = createMemo(() =>
+                item.chat.kind === "channel"
+                  ? sidebarUnreadBadge(item.chat.channel.unreadCount, channelWait())
+                  : undefined,
+              );
               const stateLabel = () => {
                 const state = item.chat.kind === "agent" ? props.agentStates[item.chat.id] : channelWait();
                 return state?.kind === "routine" || state?.kind === "waiting" || state?.kind === "limited"
@@ -157,8 +164,14 @@ export function SidebarPinnedGroup() {
                           {(channel) => (
                             <>
                               <span class="agent-row-avatar sidebar-pinned-avatar">
-                                <ChannelAvatar members={channel().members} agents={props.agents} layout="cluster" />
-                                <SidebarAgentIndicator state={channelWait} />
+                                <ChannelAvatar
+                                  members={channel().members}
+                                  agents={props.agents}
+                                  layout="cluster"
+                                  icon={channel().icon}
+                                  imageUrl={channel().imageUrl}
+                                />
+                                <SidebarAgentIndicator state={channelBadge} />
                               </span>
                               <span class="agent-row-copy sidebar-pinned-copy">
                                 <strong class="sidebar-pinned-name" title={name()}>

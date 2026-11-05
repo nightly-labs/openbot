@@ -313,7 +313,7 @@
       "licenseSha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
       "patch": {
         "path": "vendor/remote-desktop/patches/sunshine-v2026.516.143833-openbot.patch",
-        "sha256": "9528d0c45829e33c509ec150da98d3165bba157ea44c3fb7765b275694a8c212"
+        "sha256": "276f66e66b4599d89f514071855f49aa4c0b48c8fd8b68fd6f0496d7765b4cb4"
       },
       "overrides": [],
       "submodules": {
@@ -369,27 +369,27 @@
     "releaseArtifacts": {
       "darwin-arm64": {
         "asset": "remote-desktop-runtime-darwin-arm64.tar.gz",
-        "sha256": "6bb12e809946b14242f3554826ceb29906de4e4dc5df2f860f5440f566d09466"
+        "sha256": "3c426c035c4562f8427968ff1630458a47f77487fc16adbb4f2cb97563c31a43"
       },
       "darwin-x64": {
         "asset": "remote-desktop-runtime-darwin-x64.tar.gz",
-        "sha256": "d68b12a10f230ffcade41a235a9e04650f906d3a06b4fc905dd77f1ac261ca32"
+        "sha256": "16f09e003fc12dc0e9066b5a98ebfe7eb61f66c78c18e2d6796b441472489806"
       },
       "win32-x64": {
         "asset": "remote-desktop-runtime-win32-x64.tar.gz",
-        "sha256": "8009b33abdb7f97cc7f9f05ae1f943e131f567666d74bc1e34b639dbe648dbd6"
+        "sha256": "ec1c3a9741025cf63bc10ae89248584bf0d82b9024bb5c11ef9fc25609532dad"
       },
       "linux-x64": {
         "asset": "remote-desktop-runtime-linux-x64.tar.gz",
-        "sha256": "ea2f9a5f1c8bea1a5917989dfdf23260ba461a94c648d029e25043a0ae0e7010"
+        "sha256": "e149dbc3bbbdf5d86c279e7743125aa7027f5fd0e9e144ae3458073e5bf1ab8a"
       }
     },
     "artifactRelease": {
       "repository": "nightly-labs/openbot",
-      "tag": "remote-desktop-runtime-ec62decaa9803abc6e1bd5fd9fddebae0aa5cac4540348d0d62229d1a37b3bb0",
-      "inputDigest": "ec62decaa9803abc6e1bd5fd9fddebae0aa5cac4540348d0d62229d1a37b3bb0",
+      "tag": "remote-desktop-runtime-fbe06961a9b2fa374c077a56c3354f1f7ab6a18dd672b9d4586cf1b5636f6d7b",
+      "inputDigest": "fbe06961a9b2fa374c077a56c3354f1f7ab6a18dd672b9d4586cf1b5636f6d7b",
       "manifestAsset": "remote-desktop-runtime-manifest.json",
-      "manifestSha256": "c6225c056cc3956e5ef192361bf866eb7d558ee9229db95cd0a473c19e9d5b4f"
+      "manifestSha256": "03c143862a2027a325011ea73407f2535778ae48f667d6d2a848213147b387da"
     }
   },
   "bun": {
@@ -1894,6 +1894,120 @@
           "kimi.exe": "4a2aff3980d941ce90ac6d7a8062a255059929d011418c63952bfb2680699e99",
           "_internal/base_library.zip": "308de2cc818eeb94415a4534a2bcfb3391c8b231197935405a1baa9405dcfd01",
           "_internal/python314.dll": "0f9857ffdfe010fe6b99328d58c2e3c7472ce75f336bf9c2ad9bd5bca3bce700"
+        }
+      }
+    }
+  },
+  "devin": {
+    "version": "3000.11.234",
+    "license": "Proprietary",
+    "licenseUrl": "https://cognition.com/legal/platform-terms-of-service",
+    "artifacts": {
+      "darwin-arm64": {
+        "url": "https://static.devin.ai/cli/3000.11.234/devin-3000.11.234-aarch64-apple-darwin.tar.gz",
+        "assetSha256": "35f17a21e53a49435e42fb9627731726aa8ef7fa63e5c3d9d43d0cc5ca43edaf",
+        "downloadBytes": 66339270,
+        "installedBytes": 195170062,
+        "executable": "devin",
+        "files": {
+          "bin/devin": "cd6a8c9d7d95d8a46fb3fb5504e29ffbf3f392fbc772a25e619091cbd64124a2"
+        }
+      },
+      "darwin-x64": {
+        "url": "https://static.devin.ai/cli/3000.11.234/devin-3000.11.234-x86_64-apple-darwin.tar.gz",
+        "assetSha256": "55ef4f2d2b2c82b5258b7516eb1126549e6f10d6b418035676237bcc18e93e46",
+        "downloadBytes": 72567510,
+        "installedBytes": 206371518,
+        "executable": "devin",
+        "files": {
+          "bin/devin": "0cb525bdcfe811f36f198e672f48e03182c4c9d3fe6f6d6aa747c68dee8fa449"
+        }
+      },
+      "linux-x64": {
+        "url": "https://static.devin.ai/cli/3000.11.234/devin-3000.11.234-x86_64-unknown-linux.tar.gz",
+        "assetSha256": "201370cddd2924294e3ca6b46fd8ece49b5763953b644a1dd823fce5490cb41a",
+        "downloadBytes": 73715879,
+        "installedBytes": 218112262,
+        "executable": "devin",
+        "files": {
+          "bin/devin": "9be67fc1ec19bc29e95f7329b21dc3b678ddc595bc943fd11ee05d0cd94d2d82"
+        }
+      },
+      "linux-arm64": {
+        "url": "https://static.devin.ai/cli/3000.11.234/devin-3000.11.234-aarch64-unknown-linux.tar.gz",
+        "assetSha256": "438ca7f8280b3ef0747afc406e827d9e182156000277a1660358ac4fbd04156e",
+        "downloadBytes": 68561126,
+        "installedBytes": 195837886,
+        "executable": "devin",
+        "files": {
+          "bin/devin": "e8bf5931b36843ddc11ec8b818afc8f913299d66a78468c10e46d41c596753ef"
+        }
+      },
+      "win32-x64": {
+        "url": "https://static.devin.ai/cli/3000.11.234/devin-3000.11.234-x86_64-pc-windows.zip",
+        "assetSha256": "de01a37364c3c09389e20b699e993962296e5b8e1bea60aa48c95cc57dd228e3",
+        "downloadBytes": 72549950,
+        "installedBytes": 214219358,
+        "executable": "devin.exe",
+        "files": {
+          "bin/devin.exe": "7b05e174855313e31a4f48fc97b71f383821bb34eb563d5769515092ecef3b8e"
+        }
+      }
+    }
+  },
+  "copilot": {
+    "version": "1.0.105",
+    "license": "GitHub Copilot CLI License",
+    "licenseUrl": "https://github.com/github/copilot-cli/blob/main/LICENSE.md",
+    "artifacts": {
+      "darwin-arm64": {
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.105/copilot-darwin-arm64.tar.gz",
+        "assetSha256": "34aacd03fb478d47e4b3cfc5ca045c37278c5d8d86239466521a16ea54ac84aa",
+        "downloadBytes": 119263282,
+        "installedBytes": 181873376,
+        "executable": "copilot",
+        "files": {
+          "bin/copilot": "5fd7d15ff02deb08a58593b1b488015bb52c1686014b80b5509e28263cb3ad70"
+        }
+      },
+      "darwin-x64": {
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.105/copilot-darwin-x64.tar.gz",
+        "assetSha256": "de5684eeb118ad1e54f9a01f4535cf74e121b8226d26473550b01a7565ce54f5",
+        "downloadBytes": 126087256,
+        "installedBytes": 190321008,
+        "executable": "copilot",
+        "files": {
+          "bin/copilot": "83e8dfacc3e79e55e4ab723edaf5b9a38d83aec85e9e115a131b973c98265801"
+        }
+      },
+      "linux-x64": {
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.105/copilot-linux-x64.tar.gz",
+        "assetSha256": "aba1f06f27bc0447656647f76e0a4cf58b4b2a341c75ff04a750982b6aeb6bd2",
+        "downloadBytes": 129108148,
+        "installedBytes": 198511424,
+        "executable": "copilot",
+        "files": {
+          "bin/copilot": "3bd8bdc75670d7b4ec445725f6a5b9af66ee7ec49e6194646e4a40a0bc09091c"
+        }
+      },
+      "linux-arm64": {
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.105/copilot-linux-arm64.tar.gz",
+        "assetSha256": "e7b488cc04ac3e2ed800e1bf0aace33ada42dcf167529b3d2f48a61e1535a847",
+        "downloadBytes": 130063152,
+        "installedBytes": 194644736,
+        "executable": "copilot",
+        "files": {
+          "bin/copilot": "0e0bde8da81405c2e2bf76d072160c6ec74121721e0be5bbd08784af494d9a22"
+        }
+      },
+      "win32-x64": {
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.105/copilot-win32-x64.zip",
+        "assetSha256": "34e16e9cf47de0e1534920171d6f39fa246638bddbb6ece820870b382bcc061a",
+        "downloadBytes": 112637935,
+        "installedBytes": 172637984,
+        "executable": "copilot.exe",
+        "files": {
+          "bin/copilot.exe": "ab6d710d551c137c766a6c8ef6ee2e7779c106870c96b9a91a91fa17b9748624"
         }
       }
     }

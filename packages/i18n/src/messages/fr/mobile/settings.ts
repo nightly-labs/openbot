@@ -8,6 +8,12 @@ export const messages = {
   "mobile.settings.language.system": "Langue du système",
   "mobile.settings.language.footer":
     "« Langue du système » suit la première langue des réglages du téléphone. Le texte pas encore traduit s’affiche en anglais.",
+  "mobile.settings.language.restartTitle": "Redémarrer OpenBot ?",
+  "mobile.settings.language.restartBody":
+    "Cette langue se lit dans l’autre sens. Les écrans changent de sens au prochain démarrage d’OpenBot. Si les écrans restent incorrects après le redémarrage, fermez OpenBot dans le sélecteur d’apps et rouvrez-le.",
+  "mobile.settings.language.restartNow": "Redémarrer maintenant",
+  "mobile.settings.language.restartFailed":
+    "OpenBot n’a pas pu redémarrer. Les écrans changeront de sens à la prochaine ouverture d’OpenBot.",
   "mobile.settings.dictation.language": "Langue de dictée",
   "mobile.settings.about.development": "Développement",
   "mobile.settings.about.openFailed": "Impossible d’ouvrir le lien. Réessayez.",
@@ -20,11 +26,14 @@ export const messages = {
   "mobile.settings.home.support": "Assistance",
   "mobile.settings.home.supportHint": "Obtenir de l’aide et enregistrer un journal d’assistance",
   "mobile.settings.support.help": "Obtenir de l’aide",
+  "mobile.settings.support.discord": "Ouvrir un ticket sur Discord",
+  "mobile.settings.support.discordHint": "Le moyen le plus rapide d’obtenir de l’aide",
   "mobile.settings.support.message": "Nous écrire sur X",
   "mobile.settings.support.issues": "Signaler un problème sur GitHub",
   "mobile.settings.support.helpFooter":
-    "Dites-nous ce qui s’est passé et quand. Joignez le fichier du journal d’assistance à votre ticket GitHub.",
+    "Dites-nous ce qui s’est passé et quand. Joignez le fichier du journal d’assistance à votre ticket Discord ou GitHub.",
   "mobile.settings.support.log": "Journal d’assistance",
+  "mobile.settings.support.show": "Afficher le journal",
   "mobile.settings.support.save": "Enregistrer le fichier du journal",
   "mobile.settings.support.events": { one: "{count} événement", other: "{count} événements" },
   "mobile.settings.support.clear": "Effacer le journal",
@@ -34,9 +43,8 @@ export const messages = {
     "Le journal reste sur ce téléphone et OpenBot ne l’envoie pas. Il enregistre les étapes de connexion, les requêtes et les erreurs. Il n’enregistre ni les messages ni les fichiers, et il masque les mots de passe et les jetons. Lisez le fichier avant de le partager.",
   "mobile.settings.support.saveFailed": "Impossible d’enregistrer le fichier du journal. Réessayez.",
   "mobile.settings.support.sharingUnavailable": "Le partage n’est pas disponible sur ce téléphone.",
-  "mobile.settings.support.recent": "Événements récents",
-  "mobile.settings.support.recentFooter":
-    "Les plus récents en premier. Le fichier enregistré contient tous les événements.",
+  "mobile.settings.support.newestFirst": "Les plus récents en premier.",
+  "mobile.settings.support.showOlder": "Afficher les événements plus anciens",
   "mobile.settings.support.empty": "Aucun événement pour l’instant.",
   "mobile.settings.sessions.kindDesktop": "ordinateur",
   "mobile.settings.sessions.kindMobile": "mobile",
@@ -73,7 +81,7 @@ export const messages = {
   "mobile.settings.animations.all": "Animations",
   "mobile.settings.animations.agentFaces": "Visages animés des agents",
   "mobile.settings.animations.agentFacesFooter":
-    "Les avatars des agents bougent leur visage pendant que les agents travaillent et se reposent. Désactivé, les visages restent immobiles.",
+    "Les avatars des agents bougent leur visage pendant que les agents travaillent et se reposent. Désactivé, les visages restent immobiles et les personnages de l’écran d’accueil et de l’accueil vide ne flottent plus.",
   "mobile.settings.animations.composerResize": "Champ de message compact",
   "mobile.settings.animations.composerResizeFooter":
     "Le champ de message devient une petite barre quand le clavier est fermé. Désactivé, le champ garde sa taille complète.",
@@ -265,6 +273,15 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "Écoute",
   "mobile.settings.voice.tab.speaking": "Parole",
+  "mobile.settings.voice.pause.title": "Pause avant l’envoi",
+  "mobile.settings.voice.pause.label": "Attendre de nouveaux mots",
+  "mobile.settings.voice.pause.footer":
+    "Dans une conversation vocale, OpenBot envoie vos mots quand il ne reconnaît aucun nouveau mot pendant cette durée. Le bruit sans mots ne le fait pas continuer à écouter. Choisissez une pause plus longue si vous parlez lentement ou vous arrêtez pour réfléchir.",
+  "mobile.settings.voice.pause.seconds": "{seconds} s",
+  "mobile.settings.voice.speed.title": "Vitesse des réponses",
+  "mobile.settings.voice.speed.footer":
+    "La vitesse des réponses qu’OpenBot lit à voix haute, aussi dans une conversation vocale.",
+  "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot envoie votre voix en continu à ElevenLabs avec un jeton à usage unique, et ElevenLabs le facture sur votre compte. La clé reste sur ce téléphone.",
 } as const satisfies PartialTranslation<typeof source>;

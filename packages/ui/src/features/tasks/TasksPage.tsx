@@ -92,9 +92,9 @@ interface TasksPageProps {
   /** The pasted images that still import, with their local previews. */
   pendingImages?: readonly ComposerPendingImage[] | undefined;
   onRemoveFile?: ((attachment: DraftAttachment) => void) | undefined;
-  /** Receives pasted files. Without it, a file paste does nothing here. */
+  /** Receives pasted files and long text pastes, as `ComposerEditor` says. Without it, a file paste does nothing here. */
   onPasteFiles?:
-    | ((files: File[], selection: ComposerSelection) => Promise<ComposerPasteResult | undefined>)
+    | ((files: File[], selection: ComposerSelection, text?: string) => Promise<ComposerPasteResult | undefined>)
     | undefined;
   /** Each change moves the focus to the composer. */
   focusRequest: number;

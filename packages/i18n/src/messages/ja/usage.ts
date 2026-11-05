@@ -72,4 +72,6 @@ export const messages = {
   "usage.panel.unsupported":
     "このホストはエージェントの分析に対応していません。このビューを使うにはホストをアップデートしてください。",
   "usage.panel.loadFailed": "使用量を読み込めませんでした。接続と期間を確認してください。",
+  "usage.machine.label": "マシンの使用状況。CPU: {cpu}、メモリ: {memory}",
+  "usage.machine.openStorage": "ストレージを開く。ディスク: {percent}、{detail}",
 } as const satisfies PartialTranslation<typeof source>;

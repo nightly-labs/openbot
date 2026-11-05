@@ -50,7 +50,11 @@ const SCROLL_SLOP = 6;
 const DRAG_SLOP = 8;
 /** The band at the top and bottom of the list where a drag scrolls it. */
 const EDGE = 72;
-const MAX_SCROLL_STEP = 14;
+/** The fastest edge scroll, in points per millisecond: 14 points in a 60 Hz frame. */
+const MAX_SCROLL_SPEED = 14 / (1000 / 60);
+/** The first frame of an edge scroll, and the longest step after a late frame, in milliseconds. */
+const SCROLL_FRAME_MS = 1000 / 60;
+const MAX_SCROLL_FRAME_MS = 50;
 export const DRAG_AVATAR_SIZE = 40;
 
 type ViewRef = ViewInstance;
@@ -157,6 +161,7 @@ export function ChatDragProvider({ screen, children }: PropsWithChildren<{ scree
   screenRef.current = screen;
   const session = useRef<DragSession | null>(null);
   const frame = useRef<number | null>(null);
+  const lastTick = useRef<number | null>(null);
   const activeKey = useSharedValue("");
   const fingerX = useSharedValue(0);
   const fingerY = useSharedValue(0);
@@ -214,24 +219,35 @@ export function ChatDragProvider({ screen, children }: PropsWithChildren<{ scree
     setMark((previous) => (sameMark(previous, shifted) ? previous : shifted));
   }, []);
 
-  const tick = useCallback(() => {
-    frame.current = null;
-    const current = session.current;
-    if (!current) return;
-    const { scrollInsets, scrollBy } = screenRef.current;
-    const area = measure(root.current ?? undefined);
-    let step = 0;
-    if (area) {
-      const top = area.y + scrollInsets.top;
-      const bottom = area.y + area.height - scrollInsets.bottom;
-      if (current.y < top + EDGE) step = -MAX_SCROLL_STEP * Math.min(1, (top + EDGE - current.y) / EDGE);
-      else if (current.y > bottom - EDGE) step = MAX_SCROLL_STEP * Math.min(1, (current.y - (bottom - EDGE)) / EDGE);
-    }
-    const scrolled = step !== 0 && scrollBy(step);
-    update();
-    // The list scrolls while the finger rests in a band, so the loop runs again without a move.
-    if (scrolled) frame.current = requestAnimationFrame(tick);
-  }, [update]);
+  const tick = useCallback(
+    (time: number) => {
+      frame.current = null;
+      // The scroll moves by the time since the last frame, so it has one speed at 60 and 120 Hz.
+      const elapsed =
+        lastTick.current === null ? SCROLL_FRAME_MS : Math.min(time - lastTick.current, MAX_SCROLL_FRAME_MS);
+      lastTick.current = null;
+      const current = session.current;
+      if (!current) return;
+      const { scrollInsets, scrollBy } = screenRef.current;
+      const area = measure(root.current ?? undefined);
+      const reach = MAX_SCROLL_SPEED * Math.max(0, elapsed);
+      let step = 0;
+      if (area) {
+        const top = area.y + scrollInsets.top;
+        const bottom = area.y + area.height - scrollInsets.bottom;
+        if (current.y < top + EDGE) step = -reach * Math.min(1, (top + EDGE - current.y) / EDGE);
+        else if (current.y > bottom - EDGE) step = reach * Math.min(1, (current.y - (bottom - EDGE)) / EDGE);
+      }
+      const scrolled = step !== 0 && scrollBy(step);
+      update();
+      // The list scrolls while the finger rests in a band, so the loop runs again without a move.
+      if (scrolled) {
+        lastTick.current = time;
+        frame.current = requestAnimationFrame(tick);
+      }
+    },
+    [update],
+  );
 
   const schedule = useCallback(() => {
     if (frame.current === null) frame.current = requestAnimationFrame(tick);
@@ -274,6 +290,7 @@ export function ChatDragProvider({ screen, children }: PropsWithChildren<{ scree
       session.current = null;
       if (frame.current !== null) cancelAnimationFrame(frame.current);
       frame.current = null;
+      lastTick.current = null;
       activeKey.set("");
       setGhost(null);
       setMark(null);
@@ -518,6 +535,7 @@ export function AgentDragPreview({ agent }: { agent: MobileAgent }) {
       agentId={agent.id}
       serverId={agent.serverId}
       hue={agent.avatarHue}
+      color={agent.avatarColor}
       seed={agent.avatarSeed}
       size={DRAG_AVATAR_SIZE}
       animateIdle={false}

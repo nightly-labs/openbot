@@ -189,6 +189,11 @@ export class ConversationRuntime {
   readonly #evictedSnapshots = new Map<string, EvictedSnapshot>();
   #evictionTimer: NodeJS.Timeout | null = null;
   readonly #conversationSignatures = new Map<string, string>();
+  /**
+   * The messages that a person deleted, by thread, read from SQLite at the first publish of the
+   * thread. A provider read or a sync can bring such a message back into a snapshot; it never shows.
+   */
+  readonly #deletedMessageIds = new Map<string, Set<string>>();
   readonly #unstoredSends = new Map<string, { since: number; sends: number }>();
   readonly #threadToAgent = new Map<string, string>();
   readonly #loadedThreads = new Map<string, AgentClient>();
@@ -648,6 +653,7 @@ export class ConversationRuntime {
     replacedMessageId?: string,
   ): void {
     if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
+    this.#dropDeletedMessages(snapshot);
     sortConversationMessages(snapshot.messages);
     const signature = conversationContentSignature(snapshot);
     if (this.#conversationSignatures.get(snapshot.threadId ?? snapshot.agentId) === signature) {
@@ -756,8 +762,10 @@ export class ConversationRuntime {
     );
   }
 
-  publishConversation(snapshot: ConversationSnapshot, signature = conversationContentSignature(snapshot)): void {
+  publishConversation(snapshot: ConversationSnapshot, signature?: string): void {
     if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
+    if (this.#dropDeletedMessages(snapshot) || signature === undefined)
+      signature = conversationContentSignature(snapshot);
     this.#conversationSignatures.set(snapshot.threadId ?? snapshot.agentId, signature);
     this.#emit({ type: "conversation", snapshot: structuredClone(snapshot) });
   }
@@ -844,7 +852,10 @@ export class ConversationRuntime {
     return open;
   }
 
-  /** Marks this provider session as the one routine run of the agent. Its items show in the agent's own chat. */
+  /**
+   * Marks this provider session as the session of one routine run of the agent. Its items show in the
+   * thread that it is bound to: the routine's own side thread, or the agent's own chat.
+   */
   registerRoutineSession(agentId: string, externalThreadId: string): void {
     this.#routineSessions.set(externalThreadId, agentId);
   }
@@ -853,11 +864,21 @@ export class ConversationRuntime {
     this.#routineSessions.delete(externalThreadId);
   }
 
-  /** The newest open routine session of this agent. Its chat runs one turn at a time. */
-  routineSession(agentId: string): string | undefined {
+  /**
+   * The newest open routine session of this agent in one thread: the agent's own chat or a routine's
+   * side thread. Each thread runs one turn at a time.
+   */
+  routineSession(agentId: string, publicThreadId: string): string | undefined {
     let newest: string | undefined;
-    for (const [externalThreadId, owner] of this.#routineSessions) if (owner === agentId) newest = externalThreadId;
+    for (const [externalThreadId, owner] of this.#routineSessions)
+      if (owner === agentId && this.#publicThreads.get(externalThreadId) === publicThreadId) newest = externalThreadId;
     return newest;
+  }
+
+  /** Whether any routine run of this agent has an open session, in any thread. */
+  hasRoutineSession(agentId: string): boolean {
+    for (const owner of this.#routineSessions.values()) if (owner === agentId) return true;
+    return false;
   }
 
   isRoutineSession(externalThreadId: string): boolean {
@@ -871,6 +892,61 @@ export class ConversationRuntime {
     this.#dropCachedExecutionSnapshot(threadId);
     this.#conversationSignatures.delete(threadId);
     this.#unstoredSends.delete(threadId);
+    this.#deletedMessageIds.delete(threadId);
+  }
+
+  /** Removes from the snapshot each message that a person deleted. True when one was there. */
+  #dropDeletedMessages(snapshot: ConversationSnapshot): boolean {
+    if (!snapshot.threadId) return false;
+    let deleted = this.#deletedMessageIds.get(snapshot.threadId);
+    if (!deleted) {
+      deleted = this.#store.database.deletedConversationMessageIds(snapshot.threadId);
+      this.#deletedMessageIds.set(snapshot.threadId, deleted);
+    }
+    if (deleted.size === 0) return false;
+    const before = snapshot.messages.length;
+    for (let index = before - 1; index >= 0; index--) {
+      const message = snapshot.messages[index];
+      if (message && deleted.has(message.id)) snapshot.messages.splice(index, 1);
+    }
+    return snapshot.messages.length !== before;
+  }
+
+  /**
+   * Removes a message that a person deleted from each chat in memory that holds it, after the delete
+   * is stored. The cache of each such chat is built again, so no later write sees the message as
+   * removed again or as trimmed. Returns the chat to publish, with the stored revision, or undefined
+   * when main holds no chat of the thread.
+   */
+  forgetDeletedMessage(
+    agentId: string,
+    threadId: string,
+    messageId: string,
+    revision: number,
+  ): ConversationSnapshot | undefined {
+    const remove = (snapshot: ConversationSnapshot): void => {
+      const index = snapshot.messages.findIndex((message) => message.id === messageId);
+      if (index !== -1) snapshot.messages.splice(index, 1);
+      snapshot.revision = Math.max(snapshot.revision, revision);
+    };
+    const deleted = this.#deletedMessageIds.get(threadId);
+    if (deleted) deleted.add(messageId);
+    else this.#deletedMessageIds.set(threadId, this.#store.database.deletedConversationMessageIds(threadId));
+    const execution = this.#executionSnapshots.get(threadId);
+    if (execution) {
+      remove(execution);
+      this.#setExecutionSnapshot(threadId, execution);
+      return this.#executionSnapshots.get(threadId);
+    }
+    // A caller can still hold an idle snapshot across an `await`, so it loses the message too.
+    const evicted = this.#evictedSnapshots.get(agentId);
+    const retained = evicted?.threadId === threadId ? evicted.snapshot.deref() : undefined;
+    if (retained) remove(retained);
+    const live = this.#snapshots.get(agentId);
+    if (live?.threadId !== threadId) return undefined;
+    remove(live);
+    this.#keepSnapshot(agentId, live);
+    return this.#snapshots.get(agentId);
   }
 
   clearLoadedThreads(): void {
@@ -886,11 +962,13 @@ export class ConversationRuntime {
       this.#dropCachedExecutionSnapshot(id);
       this.#conversationSignatures.delete(id);
       this.#unstoredSends.delete(id);
+      this.#deletedMessageIds.delete(id);
     }
     const threadId = (this.#snapshots.get(agentId) ?? this.#evictedSnapshots.get(agentId))?.threadId;
     if (threadId) {
       this.#conversationSignatures.delete(threadId);
       this.#unstoredSends.delete(threadId);
+      this.#deletedMessageIds.delete(threadId);
     }
     this.#snapshots.delete(agentId);
     for (const [externalThreadId, owner] of this.#routineSessions)

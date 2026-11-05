@@ -34,7 +34,10 @@ export interface BillingPlan {
   storageGb: number;
   /** The number of active members of a server with this plan. The account server enforces it. */
   memberLimit: number;
-  /** The number of active hosted sites of a server with this plan. The account server enforces it. */
+  /**
+   * The number of active hosted sites of a server with this plan. The account server enforces it. A
+   * custom limit of one server (`server_site_limits`) replaces it.
+   */
   siteLimit: number;
   /** The speed of the plan's machine, where Starter is 1. */
   relativeSpeed: number;

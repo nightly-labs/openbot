@@ -61,6 +61,8 @@ export function toAgentProfile(stored: ClientAgentSummary): AgentProfile {
     workspacePath: stored.workspacePath,
     avatarSeed: stored.avatarSeed,
     avatarHue: stored.avatarHue,
+    ...(stored.avatarColor == null ? {} : { avatarColor: stored.avatarColor }),
+    ...(stored.chatColor === undefined ? {} : { chatColor: stored.chatColor }),
     avatarUrl: stored.avatarUrl,
     ...(stored.marketplaceSource === undefined ? {} : { marketplaceSource: stored.marketplaceSource }),
     updatedAt: stored.updatedAt,
@@ -250,6 +252,8 @@ export function agentProfilesEqual(left: AgentProfile, right: AgentProfile): boo
     left.threadId === right.threadId &&
     left.avatarSeed === right.avatarSeed &&
     left.avatarHue === right.avatarHue &&
+    (left.avatarColor ?? null) === (right.avatarColor ?? null) &&
+    left.chatColor === right.chatColor &&
     left.avatarUrl === right.avatarUrl &&
     marketplaceSourcesEqual(left.marketplaceSource, right.marketplaceSource) &&
     left.updatedAt === right.updatedAt &&

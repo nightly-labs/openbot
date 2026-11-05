@@ -2,6 +2,7 @@ import {
   type AddAgentFolderInput,
   type AgentAccessChange,
   type AgentAccessSnapshot,
+  type AgentColors,
   type AgentExclusionChange,
   type AgentFolderBrowse,
   type AgentFolderChange,
@@ -9,7 +10,9 @@ import {
   type AgentFolderList,
   type AgentNotificationLevelsSnapshot,
   type AgentSessionSettings,
+  type AnswerWhatsAppRequestInput,
   type BrowseAgentFoldersInput,
+  type ChatColors,
   type DiscordAccess,
   type DiscordRoleList,
   decodeAgentAccessSnapshot,
@@ -17,31 +20,49 @@ import {
   decodeAgentFolderBrowse,
   decodeAgentFolderChangeFromMain,
   decodeAgentFolderListFromMain,
+  decodeHostWhatsAppLinkState,
+  decodeHostWhatsAppOverview,
   decodeServerAuditLog,
   type HiddenAgentsSnapshot,
   type HostDiscordAccessInput,
   type HostSetDiscordAccessInput,
+  isAgentColors,
   isAgentNotificationLevelsSnapshot,
   isAgentSessionSettings,
+  isChatColors,
   isDiscordAccess,
   isDiscordRoleList,
   isHiddenAgentsSnapshot,
   isSidebarPinsSnapshot,
+  isWhatsAppGroupList,
+  type MessagingWorkspaceInput,
+  type RemoveWhatsAppSenderInput,
   type ResetAgentSessionSettingInput,
   type ServerAuditLog,
+  type SetAgentChatColorInput,
+  type SetAgentColorInput,
   type SetAgentHiddenInput,
   type SetAgentNotificationLevelInput,
   type SetAgentSessionSettingInput,
+  type SetMessagingEnabledInput,
   type SetOwnServerNotificationLevelInput,
+  type SetWhatsAppOwnNumberInput,
   type SidebarPin,
   type SidebarPinsSnapshot,
+  type StartWhatsAppLinkInput,
+  type WhatsAppGroupList,
+  type WhatsAppLinkState,
+  type WhatsAppOverview,
+  type WhatsAppSenderInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/agent-access-v1";
+import { AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
 import { AGENT_MEMORY_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
 import { AGENT_NOTIFICATION_LEVELS_ROUTES } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { AGENT_SESSION_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
+import { CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { CUSTOM_AGENTS_ROUTES } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import type { CUSTOM_PROVIDER_HARNESS_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { DISCORD_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/discord-access-v1";
@@ -51,11 +72,13 @@ import { HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-relea
 import { HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { LOCAL_SERVERS_ROUTES } from "@openbot/contracts/team-protocol/local-servers-v1";
 import { MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
+import { MODEL_VISIBILITY_ROUTES } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PROMPT_CACHE_TTL_ROUTES } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
 import { PROVIDER_DEFAULT_ROUTES } from "@openbot/contracts/team-protocol/provider-default-v1";
 import type { PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 import { PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
 import { SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
+import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 // Admin requests to one host: agent settings and skills, shared tables, agent share links, the server name and logo,
 // the server timezone, the browser profiles, the server key, the agent memory limit, the memory review, the prompt cache time, the default provider, the Discord roles that can use OpenBot, the app update, MCP servers, storage, hosted sites and providers.
 //
@@ -63,7 +86,11 @@ import { SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pi
 // them through their own transport, so the path, body and decoding of each request are here once.
 // The host answers only an owner or admin; a member gets a refusal, which the transport rejects.
 
-import { type AgentProviderRef, isAgentProviderRef, type ManagedProviderId } from "@openbot/contracts/agent-providers";
+import {
+  type AgentProviderRef,
+  type DownloadableProviderId,
+  isAgentProviderRef,
+} from "@openbot/contracts/agent-providers";
 import { parseHostedSiteList } from "@openbot/contracts/hosted-sites";
 import {
   type AccountUsage,
@@ -109,6 +136,8 @@ import {
   decodeHostMemoryReview,
   decodeHostMessagingOverview,
   decodeHostOnePasswordConnectorStatus,
+  decodeHostPasswordManagerList,
+  decodeHostPasswordManagerStatus,
   decodeHostProviderAccounts,
   decodeHostProviderAccountUsage,
   decodeHostReleaseStatus,
@@ -126,6 +155,7 @@ import {
   decodeProviderApiKeyStatus,
   decodeProviderCodeLoginStart,
   decodeProviderHostSignInStatus,
+  decodeProviderModelVisibility,
   decodeProviderRuntimeSnapshot,
   decodeProviderRuntimeSnapshotV8,
   decodeProviderUsageResetOutcome,
@@ -168,10 +198,15 @@ import {
   type MessagingOverview,
   type OnePasswordConnectorStatus,
   type OnePasswordHostConnectInput,
+  type PasswordManagerConnectInput,
+  type PasswordManagerId,
+  type PasswordManagerStatus,
   type PromptCacheTtl,
   type PromptCacheTtlSetting,
   type ProviderCodeLoginStart,
   type ProviderHostSignInStatus,
+  type ProviderModelVisibility,
+  type ProviderModelVisibilityChange,
   type ProviderRuntimeSnapshot,
   type ProviderUsageResetOutcome,
   type ProviderUsageResets,
@@ -232,6 +267,7 @@ import {
   type ListEventRoutinesInput,
   type SaveEventRoutineInput,
   type SaveEventRoutineResult,
+  type SetWebhookSecretInput,
   type WebhookSecret,
   type WebhookTestResult,
 } from "@openbot/contracts/ipc-events";
@@ -251,6 +287,7 @@ import { MCP_SIGN_IN_APP_ROUTES } from "@openbot/contracts/team-protocol/mcp-sig
 import { MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
 import { ONEPASSWORD_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
+import { PASSWORD_MANAGERS_ROUTES } from "@openbot/contracts/team-protocol/password-managers-v1";
 import type {
   ProviderAccountRelay,
   ProviderAccountRelayProvider,
@@ -274,6 +311,7 @@ import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { VAULT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
+import { WEBHOOK_SENDER_SECRET_ROUTES } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_ROUTES } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { Effect, Schema } from "effect";
 import { bytesToBase64 } from "./base64";
@@ -495,6 +533,14 @@ export function rotateEventRoutineSecret(
   input: EventRoutineRef,
 ): Effect.Effect<WebhookSecret, TeamAdminRequestError> {
   return adminCall(() => request("POST", EVENTS_ROUTES.rotateSecret, decodeWebhookSecret, eventBody(input)));
+}
+
+/** Gives the routine a secret that the sender made. Only a host with `webhook-sender-secret-v1` answers it. */
+export function setEventRoutineSecret(
+  request: TeamApiRequest,
+  input: SetWebhookSecretInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WEBHOOK_SENDER_SECRET_ROUTES.set, ignoreResponse, eventBody(input)));
 }
 
 /** Asks the host to send one signed test event to the routine. Only a host with `webhook-tests-v1` answers it. */
@@ -758,6 +804,28 @@ export function setHostPromptCacheTtl(
   ttl: PromptCacheTtl,
 ): Effect.Effect<PromptCacheTtlSetting, TeamAdminRequestError> {
   return adminCall(() => request("POST", PROMPT_CACHE_TTL_ROUTES.update, decodePromptCacheTtlSetting, { ttl }));
+}
+
+/** `model-visibility-v1`: every model of one provider of the host, and the ones its model picker shows. */
+export function getHostModelVisibility(
+  request: TeamApiRequest,
+  provider: AgentProviderRef,
+): Effect.Effect<ProviderModelVisibility, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", MODEL_VISIBILITY_ROUTES.settings, decodeProviderModelVisibility, { provider }),
+  );
+}
+
+export function setHostModelVisibility(
+  request: TeamApiRequest,
+  change: ProviderModelVisibilityChange,
+): Effect.Effect<ProviderModelVisibility, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", MODEL_VISIBILITY_ROUTES.update, decodeProviderModelVisibility, {
+      provider: change.provider,
+      shown: change.shown,
+    }),
+  );
 }
 
 /** `provider-default-v1`: the provider that a new agent of the host starts on. A newer host can name a provider this build does not know. */
@@ -1225,7 +1293,7 @@ export function getProviderRuntimes(
 
 export function downloadProviderRuntime(
   request: TeamApiRequest,
-  provider: ManagedProviderId,
+  provider: DownloadableProviderId,
   routes: ProviderRuntimeRoutes = PROVIDERS_ADMIN_ROUTES,
 ): Effect.Effect<ProviderRuntimeSnapshot, TeamAdminRequestError> {
   return adminCall(() => request("POST", routes.runtimesDownload, runtimeDecoder(routes), { provider }));
@@ -1233,7 +1301,7 @@ export function downloadProviderRuntime(
 
 export function cancelProviderRuntime(
   request: TeamApiRequest,
-  provider: ManagedProviderId,
+  provider: DownloadableProviderId,
   routes: ProviderRuntimeRoutes = PROVIDERS_ADMIN_ROUTES,
 ): Effect.Effect<ProviderRuntimeSnapshot, TeamAdminRequestError> {
   return adminCall(() => request("POST", routes.runtimesCancel, runtimeDecoder(routes), { provider }));
@@ -1403,6 +1471,43 @@ export function setAgentHidden(
   );
 }
 
+function decodeAgentColors(value: unknown): AgentColors {
+  if (!isAgentColors(value)) throw new Error("Invalid agent colors response.");
+  return value;
+}
+/** Any member reads the colours of a host that advertises `agent-colors-v1`. A change needs manage access. */
+export function readAgentColors(request: TeamApiRequest): Effect.Effect<AgentColors, TeamAdminRequestError> {
+  return adminCall(() => request("POST", AGENT_COLORS_ROUTES.read, decodeAgentColors, {}));
+}
+export function setAgentColor(
+  request: TeamApiRequest,
+  input: SetAgentColorInput,
+): Effect.Effect<AgentColors, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", AGENT_COLORS_ROUTES.set, decodeAgentColors, { agentId: input.agentId, color: input.color }),
+  );
+}
+
+function decodeChatColors(value: unknown): ChatColors {
+  if (!isChatColors(value)) throw new Error("Invalid chat colors response.");
+  return value;
+}
+/**
+ * Any member reads the agent and member chat colours of a host that advertises `chat-colors-v1`. A change
+ * of an agent's chat colour needs manage access.
+ */
+export function readChatColors(request: TeamApiRequest): Effect.Effect<ChatColors, TeamAdminRequestError> {
+  return adminCall(() => request("POST", CHAT_COLORS_ROUTES.read, decodeChatColors, {}));
+}
+export function setAgentChatColor(
+  request: TeamApiRequest,
+  input: SetAgentChatColorInput,
+): Effect.Effect<ChatColors, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", CHAT_COLORS_ROUTES.set, decodeChatColors, { agentId: input.agentId, color: input.color }),
+  );
+}
+
 function decodeAgentNotificationLevels(value: unknown): AgentNotificationLevelsSnapshot {
   if (!isAgentNotificationLevelsSnapshot(value)) throw new Error("Invalid agent notification levels response.");
   return value;
@@ -1512,6 +1617,43 @@ export function bitwardenConnectorRequest(
 ): Effect.Effect<BitwardenConnectorStatus, TeamAdminRequestError> {
   return adminCall(() =>
     request("POST", BITWARDEN_CONNECTOR_ROUTES[route], decodeHostBitwardenConnectorStatus, { ...body }),
+  );
+}
+
+/**
+ * The password managers of the host (`password-managers-v1`), such as Proton Pass. The host lists
+ * only the managers that it can connect. No answer carries an access key or a password.
+ */
+export function listPasswordManagers(
+  request: TeamApiRequest,
+): Effect.Effect<PasswordManagerStatus[], TeamAdminRequestError> {
+  return adminCall(() => request("POST", PASSWORD_MANAGERS_ROUTES.list, decodeHostPasswordManagerList, {}));
+}
+
+/**
+ * Starts a connection of one manager, or sends the extra password that a `browser` connection asks
+ * for. The host answers the status at once; the client reads it again until the state changes.
+ */
+export function connectPasswordManager(
+  request: TeamApiRequest,
+  input: PasswordManagerConnectInput,
+): Effect.Effect<PasswordManagerStatus, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", PASSWORD_MANAGERS_ROUTES.connect, decodeHostPasswordManagerStatus, {
+      manager: input.manager,
+      method: { ...input.method },
+    }),
+  );
+}
+
+/** Stops a connection that has not ended (`cancel`), or removes the host's access (`disconnect`). */
+export function passwordManagerRequest(
+  request: TeamApiRequest,
+  route: "cancel" | "disconnect",
+  manager: PasswordManagerId,
+): Effect.Effect<PasswordManagerStatus, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", PASSWORD_MANAGERS_ROUTES[route], decodeHostPasswordManagerStatus, { manager }),
   );
 }
 
@@ -1734,4 +1876,109 @@ export function setDiscordAccess(
       allowedRoles: input.allowedRoles.map((role) => ({ id: role.id, name: role.name })),
     }),
   );
+}
+
+/** The host's WhatsApp numbers and the settings of each (`whatsapp-connector-v1`). */
+export function whatsappConnectorOverview(
+  request: TeamApiRequest,
+): Effect.Effect<WhatsAppOverview, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_CONNECTOR_ROUTES.overview, decodeHostWhatsAppOverview, {}));
+}
+
+/** Starts a link on the host. The answer holds the QR code or the pairing code that the phone uses. */
+export function whatsappConnectorStartLink(
+  request: TeamApiRequest,
+  input: StartWhatsAppLinkInput,
+): Effect.Effect<WhatsAppLinkState, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", WHATSAPP_CONNECTOR_ROUTES.linkStart, decodeHostWhatsAppLinkState, { ...input }),
+  );
+}
+
+export function whatsappConnectorLinkState(
+  request: TeamApiRequest,
+): Effect.Effect<WhatsAppLinkState, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_CONNECTOR_ROUTES.linkState, decodeHostWhatsAppLinkState, {}));
+}
+
+export function whatsappConnectorCancelLink(request: TeamApiRequest): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_CONNECTOR_ROUTES.linkCancel, ignoreResponse, {}));
+}
+
+export function whatsappConnectorDisconnect(
+  request: TeamApiRequest,
+  input: MessagingWorkspaceInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_CONNECTOR_ROUTES.disconnect, ignoreResponse, { ...input }));
+}
+
+export function whatsappConnectorReconnect(
+  request: TeamApiRequest,
+  input: MessagingWorkspaceInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_CONNECTOR_ROUTES.reconnect, ignoreResponse, { ...input }));
+}
+
+export function whatsappConnectorSetEnabled(
+  request: TeamApiRequest,
+  input: SetMessagingEnabledInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_CONNECTOR_ROUTES.enabled, ignoreResponse, { ...input }));
+}
+
+/** The orchestrator starts on the host's default provider and model. */
+export function whatsappConnectorAddOrchestrator(
+  request: TeamApiRequest,
+): Effect.Effect<AddMessagingOrchestratorResult, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_CONNECTOR_ROUTES.orchestrator, decodeMessagingOrchestrator, {}));
+}
+
+export function whatsappConnectorGroups(
+  request: TeamApiRequest,
+  input: MessagingWorkspaceInput,
+): Effect.Effect<WhatsAppGroupList, TeamAdminRequestError> {
+  return adminCall(() =>
+    request(
+      "POST",
+      WHATSAPP_CONNECTOR_ROUTES.groups,
+      (value) => {
+        if (!isWhatsAppGroupList(value)) throw new Error("Invalid WhatsApp groups response.");
+        return value;
+      },
+      { ...input },
+    ),
+  );
+}
+
+export function whatsappConnectorAddSender(
+  request: TeamApiRequest,
+  input: WhatsAppSenderInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", WHATSAPP_CONNECTOR_ROUTES.senderAdd, ignoreResponse, {
+      workspaceId: input.workspaceId,
+      sender: { id: input.sender.id, kind: input.sender.kind, name: input.sender.name },
+    }),
+  );
+}
+
+export function whatsappConnectorRemoveSender(
+  request: TeamApiRequest,
+  input: RemoveWhatsAppSenderInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_CONNECTOR_ROUTES.senderRemove, ignoreResponse, { ...input }));
+}
+
+export function whatsappConnectorAnswerRequest(
+  request: TeamApiRequest,
+  input: AnswerWhatsAppRequestInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_CONNECTOR_ROUTES.requestAnswer, ignoreResponse, { ...input }));
+}
+
+export function whatsappConnectorSetOwnNumber(
+  request: TeamApiRequest,
+  input: SetWhatsAppOwnNumberInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_CONNECTOR_ROUTES.ownNumber, ignoreResponse, { ...input }));
 }

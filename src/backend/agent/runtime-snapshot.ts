@@ -27,6 +27,7 @@ export function compactRuntimeQuestion(
     id: question.id,
     header: question.header.slice(0, AGENT_RUNTIME_QUESTION_HEADER_LIMIT),
     question: question.question.slice(0, AGENT_RUNTIME_TEXT_LIMIT),
+    ...(question.detail ? { detail: question.detail.slice(0, AGENT_RUNTIME_TEXT_LIMIT) } : {}),
     isSecret: question.isSecret,
     options:
       question.options?.map((option) => ({
@@ -149,7 +150,7 @@ export interface RuntimeSnapshotSources {
   conversation: Pick<ConversationRuntime, "loadedSnapshot">;
   database: Pick<OpenBotDatabase, "readConversationRuntime">;
   mailbox: Pick<MailboxStore, "listRuntimeWork">;
-  turn: Pick<TurnLifecycle, "failedTurns">;
+  turn: Pick<TurnLifecycle, "failedTurns" | "subagentTurns">;
   attention: Pick<AttentionRegistry, "runtimeAttention">;
   usageLimits: Pick<UsageLimitGate, "limitedAgents" | "limitedModels">;
 }
@@ -223,6 +224,7 @@ export function buildRuntimeSnapshot({
     failedTurns: [...turn.failedTurns()].map(([agentId, turnId]) => ({ agentId, turnId })),
     usageLimits: usageLimits.limitedAgents(),
     usageLimitedModels: usageLimits.limitedModels(),
+    subagentTurns: turn.subagentTurns(new Set(agents.map((agent) => agent.id))),
     ...(contextStates ? { contextStates } : {}),
     ...(threadContextStates ? { threadContextStates } : {}),
   });

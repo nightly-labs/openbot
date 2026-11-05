@@ -45,6 +45,8 @@ export const messages = {
     "{name} zainstalowano przed śledzeniem dokładnych wersji. Zaktualizuj lub napraw tę umiejętność przed publikacją.",
   "error.skill.tooManySkills": "Agent może mieć maksymalnie {limit} umiejętności.",
   "error.skill.unmanagedExists": "Niezarządzana umiejętność już istnieje w {path}.",
+  "error.skill.managedSlug":
+    "OpenBot daje każdemu agentowi własną umiejętność {slug}. Nadaj tej umiejętności inną nazwę.",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md jest większy niż 64 KB. Skróć go przed publikacją.",
   "error.skill.localNoRevisions": "Lokalna umiejętność nie ma opublikowanych wersji.",
   "error.skill.localNameTaken": "Lokalna umiejętność o tej nazwie już istnieje. Zamiast tego ją zmień.",

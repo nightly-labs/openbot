@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.media.PlaybackParams
 import android.net.Uri
 import com.k2fsa.sherpa.onnx.GenerationConfig
 import com.k2fsa.sherpa.onnx.OfflineTts
@@ -48,6 +49,8 @@ class SpeechModule : Module() {
   private var tts: OfflineTts? = null
   private var loadedDirectory: String? = null
   @Volatile private var track: AudioTrack? = null
+  /** The speed of every part. 1 is normal speed; the pitch stays the same. */
+  @Volatile private var speed = 1f
   private var playback: Thread? = null
   /** Only the recognition executor reads and writes it. */
   private var recognizer: ParakeetRecognizer? = null
@@ -228,6 +231,16 @@ class SpeechModule : Module() {
       parts.put(SpeechPart(id, samples, sampleRate, generation.get()))
     }
 
+    /** Plays every part at this speed, also the part that plays now. */
+    Function("setSpeed") { value: Double ->
+      speed = value.toFloat()
+      try {
+        track?.let { applySpeed(it) }
+      } catch (error: IllegalStateException) {
+        // The playback thread released the track; the next track takes the speed.
+      }
+    }
+
     /** Stops the part that plays and drops the parts that wait. */
     Function("stop") {
       generation.incrementAndGet()
@@ -295,8 +308,8 @@ class SpeechModule : Module() {
       offset += count
     }
     // The track plays what was written after `write` returns: wait for its head to reach the end,
-    // and no longer than the part lasts and a little more, in case the track stalls.
-    val deadline = System.nanoTime() + (part.samples.size * 1_000_000_000L / part.sampleRate) + 2_000_000_000L
+    // and no longer than the part lasts at the slowest speed and a little more, in case the track stalls.
+    val deadline = System.nanoTime() + (part.samples.size * 1_000_000_000L / part.sampleRate * 4 / 3) + 2_000_000_000L
     while (!stale() && offset == part.samples.size && head() < end) {
       if (System.nanoTime() > deadline) break
       Thread.sleep(20)
@@ -328,8 +341,13 @@ class SpeechModule : Module() {
       .setBufferSizeInBytes(minimum * 4)
       .setTransferMode(AudioTrack.MODE_STREAM)
       .build()
+    applySpeed(created)
     track = created
     trackRate = sampleRate
     return created
+  }
+
+  private fun applySpeed(audio: AudioTrack) {
+    audio.playbackParams = PlaybackParams().setSpeed(speed).setPitch(1f)
   }
 }

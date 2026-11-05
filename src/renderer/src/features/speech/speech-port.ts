@@ -8,6 +8,7 @@ export interface SpeechPort {
   voice: Pick<
     OpenBotDesktopApi["voice"],
     | "getSpeechSettings"
+    | "setSpeechSettings"
     | "getSpeechModelStatus"
     | "downloadSpeechModel"
     | "onSpeechModelStatus"

@@ -1,0 +1,262 @@
+/* Sonner gives an unstyled toast no width, so the host takes the toaster width. */
+.social-follow-toast-host {
+  width: var(--width);
+}
+
+/* The raised toast surface with the 1px ring only, as the GitHub star toast. */
+.social-follow-toast {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: var(--openbot-space-3);
+  padding: var(--openbot-space-4);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface-raised);
+  box-shadow: 0 0 0 1px var(--openbot-border);
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-sans);
+}
+
+.social-follow-toast-close {
+  position: absolute;
+  top: var(--openbot-space-2);
+  inset-inline-end: var(--openbot-space-2);
+  color: var(--openbot-text-muted);
+}
+
+/* The plush hops in after the card, leans toward a network under the pointer, and bounces on thanks. */
+.social-follow-toast-plush {
+  position: relative;
+  display: inline-flex;
+  animation: social-follow-plush-hop 560ms var(--openbot-ease-out) 120ms both;
+}
+
+.social-follow-plush {
+  --ui-plush-size: 56px;
+  display: inline-flex;
+  flex: none;
+  transition:
+    rotate var(--openbot-duration-normal) var(--openbot-ease-out),
+    translate var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.social-follow-toast-plush[data-face="wide"] .social-follow-plush {
+  rotate: 6deg;
+  translate: 2px -2px;
+}
+
+.social-follow-toast-plush[data-face="happy"] .social-follow-plush {
+  animation: social-follow-plush-bounce 520ms var(--openbot-ease-out);
+}
+
+.social-follow-toast-main {
+  display: grid;
+  gap: var(--openbot-space-3);
+  min-width: 0;
+}
+
+.social-follow-toast-copy {
+  display: grid;
+  gap: var(--openbot-space-0-5);
+  /* The close button sits in the top corner. */
+  padding-inline-end: var(--openbot-space-6);
+}
+
+.social-follow-toast-copy strong {
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.social-follow-toast-copy p {
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  text-wrap: pretty;
+}
+
+.social-follow-toast-copy[data-thanks] {
+  animation: social-follow-rise var(--openbot-duration-overlay) var(--openbot-ease-out) both;
+}
+
+/* The network row: filled round chips, aligned with the text. Seven chips fit in the text column. */
+.social-follow-networks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.social-follow-networks li {
+  animation: social-follow-rise var(--openbot-duration-overlay) var(--openbot-ease-out) both;
+}
+
+.social-follow-networks li:nth-child(1) {
+  animation-delay: 160ms;
+}
+
+.social-follow-networks li:nth-child(2) {
+  animation-delay: 190ms;
+}
+
+.social-follow-networks li:nth-child(3) {
+  animation-delay: 220ms;
+}
+
+.social-follow-networks li:nth-child(4) {
+  animation-delay: 250ms;
+}
+
+.social-follow-networks li:nth-child(5) {
+  animation-delay: 280ms;
+}
+
+.social-follow-networks li:nth-child(6) {
+  animation-delay: 310ms;
+}
+
+.social-follow-networks li:nth-child(7) {
+  animation-delay: 340ms;
+}
+
+/* The follow request: one outline button with the network mark, below the thanks. */
+.social-follow-toast-follow {
+  display: flex;
+  animation: social-follow-rise var(--openbot-duration-overlay) var(--openbot-ease-out) 120ms both;
+}
+
+.social-follow-toast .social-follow-network {
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-secondary);
+  transition:
+    background var(--openbot-duration-fast) var(--openbot-ease-out),
+    color var(--openbot-duration-fast) var(--openbot-ease-out),
+    translate var(--openbot-duration-normal) var(--openbot-ease-out),
+    scale var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.social-follow-toast .social-follow-network:hover {
+  background: var(--openbot-bg-control-hover);
+  color: var(--openbot-text-primary);
+  translate: 0 -2px;
+}
+
+.social-follow-toast .social-follow-network:active {
+  scale: 0.92;
+}
+
+.social-follow-mark {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  flex: none;
+}
+
+/* Thanks: three hearts float up from the plush once. */
+.social-follow-hearts {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.social-follow-heart {
+  position: absolute;
+  fill: currentColor;
+  top: 0;
+  left: 50%;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  color: var(--openbot-beam-pink);
+  opacity: 0;
+  animation: social-follow-heart 1100ms var(--openbot-ease-out) forwards;
+}
+
+.social-follow-heart[data-index="0"] {
+  --social-follow-heart-x: -18px;
+  animation-delay: 80ms;
+}
+
+.social-follow-heart[data-index="1"] {
+  --social-follow-heart-x: 2px;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+}
+
+.social-follow-heart[data-index="2"] {
+  --social-follow-heart-x: 18px;
+  animation-delay: 180ms;
+}
+
+@keyframes social-follow-plush-hop {
+  0% {
+    opacity: 0;
+    translate: 0 10px;
+    scale: 0.7;
+    rotate: -10deg;
+  }
+  60% {
+    opacity: 1;
+    translate: 0 -3px;
+    scale: 1.04;
+    rotate: 3deg;
+  }
+}
+
+@keyframes social-follow-plush-bounce {
+  30% {
+    translate: 0 -5px;
+    scale: 1.06 0.96;
+  }
+  60% {
+    translate: 0 0;
+    scale: 0.97 1.03;
+  }
+}
+
+@keyframes social-follow-rise {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+}
+
+@keyframes social-follow-heart {
+  0% {
+    opacity: 0;
+    translate: -50% 8px;
+    scale: 0.4;
+  }
+  25% {
+    opacity: 1;
+    scale: 1;
+  }
+  100% {
+    opacity: 0;
+    translate: calc(-50% + var(--social-follow-heart-x)) -30px;
+    scale: 0.9;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .social-follow-toast-plush,
+  .social-follow-toast-plush[data-face="happy"] .social-follow-plush,
+  .social-follow-toast-copy[data-thanks],
+  .social-follow-toast-follow,
+  .social-follow-networks li {
+    animation: none;
+  }
+
+  .social-follow-toast-plush[data-face="wide"] .social-follow-plush,
+  .social-follow-toast .social-follow-network:hover {
+    rotate: none;
+    translate: none;
+  }
+
+  .social-follow-heart {
+    display: none;
+  }
+}

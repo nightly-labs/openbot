@@ -22,14 +22,13 @@ import { scheduleOnRN } from "react-native-worklets";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { REPLY_VOICE_FAILURE_TEXT, type ReplyReading, streamReply } from "@/features/voice/model/reply-voice";
 import { speechNative } from "@/features/voice/model/speech-native";
+import { useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText } from "@/shared/lib/text";
 import { type LiveConversationPhase, liveReplyTurn } from "../model/live-conversation";
 import type { OutboxMessage } from "../model/outbox";
 import { useVoiceDictation, type VoiceDictation } from "./use-voice-dictation";
 
-/** The pause after the last recognized words that ends the user's turn. */
-const TURN_END_SILENCE_MS = 1_300;
 /**
  * The agent's turn ended, or has not shown as running yet, and its answer is not in the
  * conversation: the read that the end starts brings it. After this long the conversation listens again.
@@ -141,7 +140,6 @@ export function useLiveConversation(input: LiveConversationInput): LiveConversat
   const dictation = useVoiceDictation({
     enabled: input.enabled && input.online && state.open && !state.exit,
     onDraft: controller.hear,
-    onSpeaking: controller.speaking,
   });
   dictationRef.current = dictation;
   const { conversation, channel, deliveries, outboxMessages } = input;
@@ -250,6 +248,12 @@ function createController({
     update({ muted: next });
   };
   const setCaption = (caption: string) => update({ caption });
+
+  /**
+   * The time with no new words that ends the user's turn, from Settings > Voice. Only words count:
+   * the sound of a loud room or the street does not hold the turn open.
+   */
+  const turnEndSilence = () => useVoiceSettings.getState().turnPauseMs;
 
   function clearTimers(): void {
     if (pauseTimer) clearTimeout(pauseTimer);
@@ -506,20 +510,13 @@ function createController({
     hear(text: string): void {
       // The final text of the turn can come after the pause ended it, while `finish` waits for it.
       if (!open || (phase !== "listening" && phase !== "sending")) return;
+      // In noise a recognizer can send the same words again and again. Only new words hold the turn.
+      const changed = text.trim() !== heard.trim();
       heard = text;
       update({ caption: text });
-      if (phase === "sending") return;
+      if (phase === "sending" || !changed) return;
       if (pauseTimer) clearTimeout(pauseTimer);
-      pauseTimer = text.trim() ? setTimeout(endTurn, TURN_END_SILENCE_MS) : null;
-    },
-    /**
-     * The user speaks now. Parakeet and ElevenLabs send text a while after the words, so the pause
-     * that ends the turn counts from the last speech, not from the last text.
-     */
-    speaking(): void {
-      if (!open || phase !== "listening" || !heard.trim()) return;
-      if (pauseTimer) clearTimeout(pauseTimer);
-      pauseTimer = setTimeout(endTurn, TURN_END_SILENCE_MS);
+      pauseTimer = text.trim() ? setTimeout(endTurn, turnEndSilence()) : null;
     },
     followReply,
     recognizerPhase,

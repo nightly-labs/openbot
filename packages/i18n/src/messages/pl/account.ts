@@ -69,6 +69,8 @@ export const messages = {
   "account.login.unavailableDescription": "OpenBot nie może teraz połączyć się z usługą kont.",
   "account.login.signInDescription":
     "Użyj adresu e-mail, aby się zalogować lub utworzyć konto. Wyślemy ci kod jednorazowy.",
+  "account.login.keyringChangedDescription":
+    "Pęk kluczy systemu utracił twoje ostatnie logowanie. OpenBot zapisuje teraz logowania we własnym pliku na tym komputerze. Zaloguj się jeszcze raz.",
   "account.login.codeAccepted": "Kod został zaakceptowany.",
   "account.login.codeSent": "Wysłaliśmy kod na adres {email}.",
   "account.login.connectingSecurely": "Bezpieczne łączenie…",

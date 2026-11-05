@@ -32,6 +32,7 @@ import {
   decodeNotificationPreference,
   decodePendingMarketplaceListing,
   decodeProviderDetectionSettings,
+  decodeSentMessageStats,
   decodeUpdatePreference,
   decodeUpdateStatus,
   decodeVoiceServerProbe,
@@ -136,6 +137,19 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     } satisfies AppInfo,
   ],
   [
+    "app info drawn on the CPU",
+    decodeAppInfo,
+    {
+      name: "OpenBot",
+      version: "1.0.0",
+      platform: "linux",
+      variant: "production",
+      softwareRendering: true,
+    } satisfies AppInfo,
+  ],
+  ["sent message stats", decodeSentMessageStats, { firstSentAt: "2026-11-01T09:30:00.000Z", sentCount: 12 }],
+  ["sent message stats before the first message", decodeSentMessageStats, { firstSentAt: null, sentCount: 0 }],
+  [
     "setup state",
     decodeAppSetupState,
     { completed: true, preferredProvider: "codex", preferredModel: null } satisfies AppSetupState,
@@ -161,6 +175,11 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     { appearance: "dark", transparentWindow: false, palette: "omarchy", palettes: [omarchyPalette] },
   ],
   ["signed out", decodeCentralAuthState, { status: "signed_out" } satisfies CentralAuthState],
+  [
+    "signed out after a keyring change",
+    decodeCentralAuthState,
+    { status: "signed_out", reason: "keyring_changed" } satisfies CentralAuthState,
+  ],
   ["code sent", decodeCentralAuthState, codeSent],
   [
     "code sent with every option",
@@ -185,6 +204,22 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     {
       status: "signed_in",
       user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, analyticsEnabled: true },
+    } satisfies CentralAuthState,
+  ],
+  [
+    "signed in with a chat color",
+    decodeCentralAuthState,
+    {
+      status: "signed_in",
+      user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, chatColor: "#3b82f6" },
+    } satisfies CentralAuthState,
+  ],
+  [
+    "signed in with no chat color",
+    decodeCentralAuthState,
+    {
+      status: "signed_in",
+      user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, chatColor: null },
     } satisfies CentralAuthState,
   ],
   [
@@ -244,10 +279,16 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
 ];
 
 const malformed: [string, (value: unknown) => unknown, unknown][] = [
+  ["sent message stats with a negative count", decodeSentMessageStats, { firstSentAt: null, sentCount: -1 }],
   [
     "app info with an install ID that is not text",
     decodeAppInfo,
     { name: "OpenBot", version: "1.0.0", platform: "darwin", variant: "production", analyticsInstallId: 1 },
+  ],
+  [
+    "app info with a software rendering flag that is not a boolean",
+    decodeAppInfo,
+    { name: "OpenBot", version: "1.0.0", platform: "linux", variant: "production", softwareRendering: "yes" },
   ],
   // The key never comes back to the renderer, so a record that carries one fails closed.
   ["a voice server with its key", decodeVoiceServerSettings, { ...voiceServer, apiKey: "sk-secret" }],
@@ -317,6 +358,7 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
     },
   ],
   ["an unknown account status", decodeCentralAuthState, { status: "banned" }],
+  ["signed out with an unknown reason", decodeCentralAuthState, { status: "signed_out", reason: "expired" }],
   ["signed in without a user", decodeCentralAuthState, { status: "signed_in" }],
   ["code sent with a text expiry", decodeCentralAuthState, { ...codeSent, expiresAt: "soon" }],
   ["Mobile Connect ticket without data", decodeMobileConnectTicket, { expiresAt: 1 }],
@@ -350,6 +392,22 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
     {
       status: "signed_in",
       user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, analyticsEnabled: "yes" },
+    },
+  ],
+  [
+    "an account chat color that is not a lower-case hex color",
+    decodeCentralAuthState,
+    {
+      status: "signed_in",
+      user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, chatColor: "#3B82F6" },
+    },
+  ],
+  [
+    "an account chat color that is a CSS expression",
+    decodeCentralAuthState,
+    {
+      status: "signed_in",
+      user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, chatColor: "red;x:url(a)" },
     },
   ],
   ["a model list with an empty id", decodeDiscoverModelsResult, { models: [{ id: "" }] }],

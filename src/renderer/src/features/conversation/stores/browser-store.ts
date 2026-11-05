@@ -79,8 +79,11 @@ export interface BrowserStoreDeps {
 }
 
 export function createBrowserStore(deps: BrowserStoreDeps) {
-  const browserInteractionAvailable = () =>
-    deps.props.browserEnabled !== false && !deps.props.browserVisibilitySuspended;
+  // A memo of the store: `browserEnabled` can be a compiled memo, and an effect callback that calls
+  // `activateBrowserTab` must not create one.
+  const browserInteractionAvailable = createMemo(
+    () => deps.props.browserEnabled !== false && !deps.props.browserVisibilitySuspended,
+  );
   const browserSidebarOpen = () => browserInteractionAvailable() && deps.panels.activeRightPanel() === "browser";
   const browserExpandedOpen = () =>
     browserInteractionAvailable() && deps.panels.activeRightPanel() === "browser-expanded";
@@ -447,7 +450,9 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       try {
         await conversationRuntime(deps.props).browser.navigate({ tabId: currentTab.id, url });
       } catch (error) {
-        deps.setComposerError(currentText().t("browser.error.openAddress"), target, error);
+        // A proxy that stopped the page load has its own message, with its name.
+        const text = currentText();
+        deps.setComposerError(text.errorMessage(error, text.t("browser.error.openAddress")), target, error);
       }
       return;
     }
@@ -468,13 +473,15 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
         deps.setBrowserAddress(tab.url);
         analytics.track("browser_action", { action: "open", result: "succeeded" });
         return tab;
-      } catch {
+      } catch (error) {
         deps.setBrowserAddress(url);
         analytics.track("browser_action", {
           action: "open",
           result: "failed",
           failure_code: "browser_open_failed",
         });
+        const text = currentText();
+        deps.setComposerError(text.errorMessage(error, text.t("browser.error.openAddress")), target, error);
         return undefined;
       }
     })();

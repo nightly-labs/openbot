@@ -1,4 +1,5 @@
 import {
+  type CodexLiveVoice,
   ELEVENLABS_VOICE_MODEL_ID,
   isSpeechLanguage,
   type SpeechModelStatus,
@@ -17,6 +18,7 @@ import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { readAloud, stopSpeech } from "../speech/speech-playback";
+import { changeSpeechSpeed, speechSpeed, updateSpeechSettings } from "../speech/speech-speed";
 import { voicePort } from "./voice-port";
 
 interface SettingsVoiceState {
@@ -31,8 +33,10 @@ interface SettingsVoiceState {
 
 const EMPTY_STATUSES: SettingsVoiceState["statuses"] = {
   "parakeet-tdt-0.6b-v3": null,
+  "parakeet-unified-en-0.6b": null,
   "bark-3.0-plus": null,
   "whisper-turbo": null,
+  "cohere-transcribe-03-2026": null,
   [ELEVENLABS_VOICE_MODEL_ID]: null,
 };
 
@@ -215,8 +219,8 @@ export function createSettingsVoiceStore(active: () => boolean) {
     setState((draft) => {
       draft.speech.settings = next;
     });
-    return voicePort()
-      .voice.setSpeechSettings(next)
+    // In series with the speed saves of the voice panel and the players, so that no save loses another.
+    return updateSpeechSettings(voicePort().voice, patch)
       .then((saved) => {
         setState((draft) => {
           draft.speech.settings = saved;
@@ -257,6 +261,15 @@ export function createSettingsVoiceStore(active: () => boolean) {
     const server = state.server;
     if (server?.routes.dictation)
       void saveServer({ address: server.address, apiKey: null, routes: { ...server.routes, dictation: false } });
+  }
+
+  /** Voice conversations with Codex agents use Codex live voice. Nothing is downloaded for it. */
+  function setCodexLive(codexLive: boolean): void {
+    void saveSpeech({ codexLive });
+  }
+
+  function setCodexLiveVoice(codexLiveVoice: CodexLiveVoice | null): void {
+    void saveSpeech({ codexLiveVoice });
   }
 
   /** Turning it on downloads the model, as the first dictation does, unless the server reads replies. */
@@ -307,6 +320,8 @@ export function createSettingsVoiceStore(active: () => boolean) {
     cancelSpeech,
     removeSpeech,
     setReadReplies,
+    setCodexLive,
+    setCodexLiveVoice,
     setSpeechVoice: (voice: SpeechVoice) =>
       void saveSpeech({ voice }).then((saved) =>
         desktopAnalytics.track("speech_settings_action", {
@@ -316,6 +331,9 @@ export function createSettingsVoiceStore(active: () => boolean) {
           ...(saved ? {} : { failure_code: "update_failed" }),
         }),
       ),
+    /** The speed of replies, shared with the voice panel and the players of spoken replies. */
+    speechSpeed,
+    setSpeechSpeed: changeSpeechSpeed,
     listen,
     probeServer: (connection: VoiceServerConnection) => voicePort().voice.probeServer(connection),
     saveServer,

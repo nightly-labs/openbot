@@ -40,7 +40,7 @@ import { useShowAgentSteps } from "../../agent-steps-preference";
 import { toAgentMessages } from "../../app-message-projection";
 import { usePlatform } from "../../platform";
 import { readAgentSelection, writeAgentSelection } from "../agents/agent-selection";
-import { insertAtSelection, rowAttachments } from "../conversation/composer-draft";
+import { insertAtSelection, insertPastedText, rowAttachments } from "../conversation/composer-draft";
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
 import { importPastedFiles, type PastePreview, pastePreviewTracker } from "../conversation/stores/composer-actions";
 import { createTurnSteps } from "../conversation/turn-steps";
@@ -188,16 +188,24 @@ export function TasksView(props: TasksViewProps) {
 
   /**
    * Imports pasted files into a message box, and puts their references at the selection, or at the end
-   * when the text changed. The files go to the server of the paste only.
+   * when the text changed. The files go to the server of the paste only. `text` is the text of a long
+   * paste that `files` holds: when no file comes, that text goes at the selection instead.
    */
   async function pasteFiles(
     key: string,
     files: ReadonlyArray<File | Promise<File>>,
     selection: ComposerSelection,
+    text?: string,
   ): Promise<ComposerPasteResult | undefined> {
-    const port = props.files;
-    if (!port || !filesAccepted()) return;
     const before = textOf(key);
+    const fallback = (): ComposerPasteResult | undefined => {
+      if (text === undefined) return;
+      const result = insertPastedText(textOf(key), text, { before, selection });
+      if (result) setText(key, result.value);
+      return result;
+    };
+    const port = props.files;
+    if (!port || !filesAccepted()) return fallback();
     const current = generation;
     const serverId = untrack(() => props.serverId);
     const previews = pastePreviewTracker(key, setPastePreviews);
@@ -217,7 +225,7 @@ export function TasksView(props: TasksViewProps) {
       discardFiles(imported.slice(accepted.length), serverId);
       if (accepted.length < imported.length)
         actionToast.error(currentText().t("composer.error.attachmentLimit", { limit: INPUT_LIMITS.attachments }));
-      if (!accepted.length) return;
+      if (!accepted.length) return fallback();
       setState((draft) => {
         draft.files[key] = [...(draft.files[key] ?? []), ...accepted];
       });
@@ -228,7 +236,9 @@ export function TasksView(props: TasksViewProps) {
       setText(key, result.value);
       return result;
     } catch (error) {
-      if (current === generation) toastError(error, "composer.error.keepAttachments");
+      if (current !== generation) return;
+      toastError(error, "composer.error.keepAttachments");
+      return fallback();
     } finally {
       previews.stop();
     }
@@ -743,7 +753,9 @@ export function TasksView(props: TasksViewProps) {
               rowAttachments={rowFilesOf(taskId)}
               pendingImages={pendingImagesOf(taskId)}
               onRemoveAttachment={filesAccepted() ? (attachment) => removeFile(taskId, attachment) : undefined}
-              onPasteFiles={filesAccepted() ? (files, selection) => pasteFiles(taskId, files, selection) : undefined}
+              onPasteFiles={
+                filesAccepted() ? (files, selection, text) => pasteFiles(taskId, files, selection, text) : undefined
+              }
               onDraftChange={(text) =>
                 setState((draft) => {
                   draft.drafts[taskId] = text;
@@ -809,7 +821,9 @@ export function TasksView(props: TasksViewProps) {
       rowFiles={rowFilesOf(START_FILES)}
       pendingImages={pendingImagesOf(START_FILES)}
       onRemoveFile={(attachment) => removeFile(START_FILES, attachment)}
-      onPasteFiles={filesAccepted() ? (files, selection) => pasteFiles(START_FILES, files, selection) : undefined}
+      onPasteFiles={
+        filesAccepted() ? (files, selection, text) => pasteFiles(START_FILES, files, selection, text) : undefined
+      }
       focusRequest={state.focusRequest}
       startError={state.startError}
       onDismissStartError={() =>

@@ -1,4 +1,4 @@
-const { copyFileSync, mkdirSync } = require("node:fs");
+const { copyFileSync, mkdirSync, writeFileSync } = require("node:fs");
 const { basename, join, parse, resolve } = require("node:path");
 const { withDangerousMod, withXcodeProject } = require("expo/config-plugins");
 const { setNotificationSounds } = require("expo-notifications/plugin/build/withNotificationsIOS");
@@ -25,10 +25,19 @@ module.exports = (config, { sounds }) => {
       const { projectRoot, platformProjectRoot } = config.modRequest;
       const raw = join(platformProjectRoot, "app", "src", "main", "res", "raw");
       mkdirSync(raw, { recursive: true });
+      const resources = [];
       for (const sound of sounds) {
         const { name, ext } = parse(basename(sound));
-        copyFileSync(resolve(projectRoot, sound), join(raw, `${name.replaceAll("-", "_")}${ext}`));
+        const resource = name.replaceAll("-", "_");
+        copyFileSync(resolve(projectRoot, sound), join(raw, `${resource}${ext}`));
+        resources.push(`@raw/${resource}`);
       }
+      // `expo-notifications` finds a sound by its name only, so the resource shrinker of a release
+      // build removed the files, and each channel got the Android notification sound.
+      writeFileSync(
+        join(raw, "keep_openbot_notification_sounds.xml"),
+        `<?xml version="1.0" encoding="utf-8"?>\n<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="${resources.join(",")}" />\n`,
+      );
       return config;
     },
   ]);

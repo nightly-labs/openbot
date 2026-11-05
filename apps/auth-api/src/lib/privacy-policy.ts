@@ -5,7 +5,7 @@
 export const PRIVACY_POLICY_ROUTE = "/privacy-policy";
 
 /** The "Last updated" date on the page and in the sitemap. Change it when the text changes. */
-export const PRIVACY_POLICY_UPDATED_AT = "2026-10-29";
+export const PRIVACY_POLICY_UPDATED_AT = "2026-11-04";
 
 export const PRIVACY_POLICY_META = {
   title: "OpenBot Privacy Policy",

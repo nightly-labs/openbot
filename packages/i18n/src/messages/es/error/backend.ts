@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "La base de datos de OpenBot no superó la comprobación de integridad.",
   "error.backend.webhookRouteLimit": "Un host puede tener un máximo de {limit} rutinas de webhook.",
   "error.backend.webhookSettingsInvalid": "Comprueba los ajustes del webhook e inténtalo de nuevo.",
+  "error.backend.webhookSenderSecretInvalid":
+    "Pega el secreto de firma completo del remitente. Tiene de 16 a 1024 caracteres y ningún espacio.",
   "error.backend.webhookRouteUnavailable":
     "La ruta pública del webhook no está lista. Comprueba la conexión del host e inténtalo de nuevo.",
   "error.backend.browserViewRemoteOnly": "La vista del navegador en directo solo está disponible para un host remoto.",
@@ -57,6 +59,12 @@ export const messages = {
   "error.backend.sunshineNotReady": "Sunshine no llegó a estar listo.",
   "error.backend.sunshineNotReadyReason": "Sunshine no llegó a estar listo. {reason}",
   "error.backend.channelLeadModelUnavailable": "El modelo del coordinador del canal no está disponible.",
+  "error.backend.contextCompactionIneffective":
+    "La compactación no reduce este chat: tras dos compactaciones aún usa el {percent}% de la ventana de contexto del modelo, así que OpenBot deja de compactarlo. Las herramientas y las instrucciones usan la mayor parte de la ventana. Desactiva los servidores MCP o el uso del ordenador que este agente no necesita, o elige un modelo con una ventana mayor. Después, inicia un chat nuevo.",
+  "error.backend.providerRetrying":
+    "El proveedor falló esta solicitud {attempts} veces y lo vuelve a intentar. Si el agente no continúa, detén el turno.",
+  "error.backend.providerRetryingLargeContext":
+    "El proveedor falló esta solicitud {attempts} veces y lo vuelve a intentar. Este chat usa el {percent}% de la ventana de contexto del modelo. Si el agente no continúa, detén el turno: OpenBot compactará el chat antes del siguiente mensaje.",
   "error.backend.sharedDataUnavailable": "Los datos compartidos no están disponibles.",
   "error.backend.shuttingDown": "OpenBot se está cerrando.",
   "error.backend.channelUnconfirmedStart":
@@ -109,8 +117,8 @@ export const messages = {
     "Tienes {saved} de {limit} recuerdos. Para hacer sitio, actualiza un recuerdo por su memoryId con el texto combinado de dos recuerdos relacionados y olvida el otro, u olvida un recuerdo que ya no sea cierto. Luego vuelve a intentarlo.",
   "error.backend.agentMemoryLimitExceeded":
     "Tienes {saved} recuerdos y el límite es {limit}. El usuario fijó el límite por debajo del número de recuerdos guardados. No olvides recuerdos para hacer sitio. Dile al usuario que este recuerdo no se guardó.",
-  "error.backend.channelHistoryLeadRequired": "Elige un coordinador de canal para preparar el historial compartido.",
   "error.backend.channelHistoryArriving": "Aún se está recibiendo un mensaje compartido. Reanuda cuando esté completo.",
+  "error.backend.channelHistoryLeadRequired": "Elige un coordinador de canal para preparar el historial compartido.",
   "error.backend.channelHistoryInvalid": "El resumen del historial no es válido. Reanuda para intentarlo de nuevo.",
   "error.backend.channelContextTooLong":
     "Esta asignación supera el límite de contexto compartido. Envía una solicitud más corta o vuelve a asignarla.",
@@ -201,6 +209,11 @@ export const messages = {
     "Las esperas abiertas solo están disponibles para agentes en este equipo.",
   "error.backend.markUnreadRemoteUnsupported":
     "Marcar un mensaje como no leído solo está disponible para agentes en este equipo.",
+  "error.backend.messageDeleteUnsupported": "Este servidor no permite eliminar mensajes.",
+  "error.backend.messageDeleteNotFound": "Este mensaje no está en el chat.",
+  "error.backend.messageDeleteBusy":
+    "Este mensaje forma parte de un turno en curso. Elimínalo cuando termine el turno.",
+  "error.backend.messageDeleteForbidden": "Solo puedes eliminar los mensajes que enviaste.",
   "error.backend.routineFlowHandoffFailed": "La rutina no pudo pasar el trabajo a este agente.",
   "error.backend.mcpServerLimit": "OpenBot mantiene hasta {limit} servidores MCP.",
   "error.backend.mcpServerNameTaken": "Ya existe un servidor MCP llamado {name}.",
@@ -303,6 +316,18 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "Ya existe un perfil de navegador con este nombre.",
   "error.backend.browserSessionInUse": "Una pestaña todavía usa esta sesión del navegador. Inténtalo de nuevo.",
   "error.backend.browserProfileLimit": "Puedes tener hasta {limit} perfiles de navegador.",
+  "error.backend.browserProxyNotFound": "Este proxy ya no existe.",
+  "error.backend.browserProxyAddressInvalid":
+    "Escribe una dirección de proxy, como socks5://host:1080 o http://user:password@host:3128.",
+  "error.backend.browserProxyLimit": "Puedes tener hasta {limit} proxies.",
+  "error.backend.browserProxyTaken": "Ya existe un proxy con esta dirección.",
+  "error.backend.browserProxyChanged":
+    "Este proxy cambió después de que lo abrieras. Revísalo de nuevo y vuelve a intentarlo.",
+  "error.backend.browserProxyUnreachable": "El proxy {name} no responde, así que la página no se abrió.",
+  "error.backend.browserProxySignInRefused":
+    "El proxy {name} rechazó el inicio de sesión, así que la página no se abrió.",
+  "error.backend.browserProxyComputerUnreachable":
+    "El ordenador que usa este perfil no responde, así que la página no se abrió.",
   "error.backend.browserLowMemory":
     "Este servidor tiene poca memoria disponible, por lo que el navegador no puede abrir otra pestaña. Cierra una pestaña o espera a que terminen otros agentes.",
   "error.backend.browserOpenFailed": "No se pudo abrir {url}: {reason}",

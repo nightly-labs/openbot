@@ -30,6 +30,26 @@ export const messages = {
   "settings.logoColor.beige": "Beige",
   "settings.logoColor.gray": "Grau",
   "settings.logoColor.white": "Weiß",
+  "settings.chatColor.title": "Chatfarbe",
+  "settings.chatColor.description":
+    "Färbt die Blasen deiner Nachrichten ein. Personen auf deinen Servern sehen sie auch.",
+  "settings.chatColor.yours": "Deine Chatfarbe",
+  "settings.chatColor.agentLabel": "Chatfarbe von {name}",
+  "settings.chatColor.none": "Keine",
+  "settings.chatColor.noColor": "Keine Farbe",
+  "settings.chatColor.area": "Sättigung und Helligkeit",
+  "settings.chatColor.areaValue": "Sättigung {saturation} %, Helligkeit {brightness} %",
+  "settings.chatColor.hue": "Farbton",
+  "settings.chatColor.hueValue": "{degrees} Grad",
+  "settings.chatColor.eyeDropper": "Farbe vom Bildschirm aufnehmen",
+  "settings.chatColor.hex": "Hex-Farbe",
+  "settings.chatColor.format": "Format {format}, zu {next} wechseln",
+  "settings.chatColor.presets": "Vorgaben",
+  "settings.chatColor.saturation": "Sättigung",
+  "settings.chatColor.lightness": "Helligkeit",
+  "settings.chatColor.red": "Rot",
+  "settings.chatColor.green": "Grün",
+  "settings.chatColor.blue": "Blau",
   "settings.appBehavior.title": "App-Verhalten",
   "settings.conversations.title": "Unterhaltungen",
   "settings.launchAtLogin.title": "OpenBot bei der Anmeldung starten",
@@ -69,6 +89,22 @@ export const messages = {
   "settings.busyMessage.title": "Agenten während der Arbeit steuern",
   "settings.busyMessage.description":
     "Neue Nachrichten fließen in die aktuelle Arbeit des Agenten ein, nicht in die Warteschlange. Funktioniert mit ChatGPT und Claude.",
+  "settings.agentDefaults.title": "Standardwerte",
+  "settings.agentDefaults.description": "Agenten folgen diesen Standardwerten, außer du änderst sie für einen Agenten.",
+  "settings.agentDefaults.value": "Standard: {value}",
+  "settings.agentDefaults.on": "An",
+  "settings.agentDefaults.off": "Aus",
+  "settings.agentDefaults.followDefault": "Standard ({value})",
+  "settings.agentDefaults.count": "{on} von {total} an",
+  "settings.agentDefaults.open": "{name} öffnen",
+  "settings.agentDefaults.agentList": "An für {names}",
+  "settings.agentDefaults.defaultTitle": "Standard",
+  "settings.agentDefaults.defaultDescription": "Neue Agenten nutzen ihn. Agenten auf Standard folgen ihm.",
+  "settings.agentDefaults.agents": "Agenten",
+  "settings.agentDefaults.setAll": "Alle festlegen",
+  "settings.agentDefaults.setAllLabel": "{setting} für alle Agenten festlegen",
+  "settings.agentDefaults.agentLabel": "{setting} für {agent}",
+  "settings.agentDefaults.loadFailed": "Die Agenten konnten nicht gelesen werden.",
   "settings.backgroundProcesses.title": "Hintergrundprozesse",
   "settings.backgroundProcesses.description":
     "Programme, die Agenten gestartet und laufen gelassen haben, etwa Dev-Server. Sie laufen weiter, wenn der Chat endet und wenn du OpenBot beendest.",
@@ -154,6 +190,9 @@ export const messages = {
     "An: Nutzungs- und Zuverlässigkeitsmetadaten gehen mit deiner Konto-ID und E-Mail-Adresse an das von OpenBot selbst betriebene Analysesystem. Aus: Dieselben Metadaten gehen nur mit einer zufälligen Installations-ID. Chats, Dateien und Prompts werden nie gesendet. Diese Einstellung gilt für diesen Browser.",
   "settings.tab.general.title": "Allgemein",
   "settings.tab.general.description": "Lege fest, wie sich OpenBot auf diesem Computer verhält.",
+  "settings.tab.agents.title": "Agenten",
+  "settings.tab.agents.description":
+    "Lege fest, was die Agenten auf diesem Computer tun dürfen, wenn du es nicht für einen Agenten festlegst.",
   "settings.tab.notifications.title": "Mitteilungen",
   "settings.tab.notifications.description": "Lege fest, wie OpenBot dich benachrichtigt.",
   "settings.tab.voice.title": "Diktat",
@@ -498,12 +537,16 @@ export const messages = {
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Für viele Agenten und intensive Browserarbeit.",
   // The Voice tab: dictation models and the dictation language.
-  "settings.voice.models.title": "Diktiermodell",
+  "settings.voice.dictation.section": "Diktieren",
   "settings.voice.model.parakeet.description":
     "Schnell. Erkennt die gesprochene Sprache selbst, in 25 europäischen Sprachen.",
+  "settings.voice.model.parakeetUnified.description":
+    "Schnell. Nur Englisch. Setzt Satzzeichen, mit weniger Fehlern als Parakeet TDT.",
   "settings.voice.model.bark.description": "Schnell. Nur Englisch. Schreibt meist klein, mit wenigen Satzzeichen.",
   "settings.voice.model.whisper.description":
     "Langsamer. Etwa 100 Sprachen, und du kannst die gesprochene Sprache festlegen.",
+  "settings.voice.model.cohere.description":
+    "Langsamer. 14 Sprachen. Du legst die gesprochene Sprache fest. Braucht etwa 4 GB Arbeitsspeicher.",
   "settings.voice.model.size": "Downloadgröße: {size}",
   "settings.voice.model.downloading": "Wird geladen · {received} von {total}",
   "settings.voice.model.failed": "Der Download wurde unterbrochen. Prüfe die Verbindung und versuche es erneut.",
@@ -516,12 +559,15 @@ export const messages = {
   "settings.voice.model.useLabel": "{name} für das Diktat verwenden",
   "settings.voice.model.removeLabel": "{name} von diesem Computer entfernen",
   "settings.voice.language.section": "Sprache",
-  "settings.voice.language.title": "Diktiersprache",
   "settings.voice.language.description": "Die Sprache, die du sprichst. Automatisch erkennt sie aus der Aufnahme.",
+  "settings.voice.language.modelLanguages":
+    "Die Sprache, die du sprichst. Dieses Modell kennt nur diese Sprachen und erkennt die Sprache nicht selbst.",
   "settings.voice.language.modelDetects":
-    "Parakeet erkennt die gesprochene Sprache selbst. Um eine Sprache festzulegen, verwende Whisper oder ElevenLabs.",
+    "Parakeet erkennt die gesprochene Sprache selbst. Um eine Sprache festzulegen, verwende Whisper, Cohere oder ElevenLabs.",
   "settings.voice.language.englishOnly":
-    "Bark erkennt nur Englisch. Um eine Sprache festzulegen, verwende Whisper oder ElevenLabs.",
+    "Bark erkennt nur Englisch. Um eine Sprache festzulegen, verwende Whisper, Cohere oder ElevenLabs.",
+  "settings.voice.language.parakeetUnifiedEnglishOnly":
+    "Parakeet Unified erkennt nur Englisch. Um eine Sprache festzulegen, verwende Whisper, Cohere oder ElevenLabs.",
   "settings.voice.language.automatic": "Automatisch",
   "settings.voice.loadFailed": "Die Sprachmodelle konnten nicht gelesen werden.",
   "settings.voice.saveFailed": "Die Spracheinstellung konnte nicht gespeichert werden. Versuche es erneut.",
@@ -543,6 +589,10 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "Antworten vorlesen",
   "settings.voice.speech.readReplies.description":
     "Wenn du eine Nachricht diktierst, wird die Antwort vorgelesen. Diktiere erneut, um sie zu stoppen.",
+  "settings.voice.speech.codexLive.title": "Codex-Live-Sprache",
+  "settings.voice.speech.codexLive.description":
+    "Sprachgespräche mit Codex-Agenten nutzen OpenAI-Live-Sprache mit deiner Codex-Anmeldung. Deine Stimme geht an OpenAI.",
+  "settings.voice.speech.speed.title": "Geschwindigkeit",
   "settings.voice.speech.voice.title": "Stimme",
   "settings.voice.speech.voice.female": "Weibliche Stimme {number}",
   "settings.voice.speech.voice.male": "Männliche Stimme {number}",
@@ -550,6 +600,8 @@ export const messages = {
   "settings.voice.speech.voice.stop": "Stoppen",
   "settings.voice.speech.sample": "Hallo. So klingen deine Antworten.",
   "settings.voice.speech.listenFailed": "Die Probe konnte nicht abgespielt werden.",
+  "settings.voice.live.section": "Live-Sprache",
+  "settings.voice.live.signIn": "Melde dich mit deinem ChatGPT-Konto bei Codex an, um Live-Sprache zu nutzen.",
   "settings.transfer.title": "Diesen Server auf einen anderen Computer umziehen",
   "settings.transfer.lede":
     "Deine Agenten mit ihren Fähigkeiten, Routinen, Erinnerungen und Dateien kommen in eine Datei.",

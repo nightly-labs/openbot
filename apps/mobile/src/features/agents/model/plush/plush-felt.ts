@@ -11,7 +11,7 @@ import {
 import type { AvatarMood } from "@openbot/brand/bloub-avatar-motion";
 
 /*
- * The felt plush of `@norbert_bodziony/bloub/plush` 0.6.1 (MIT), for the phone. That entry renders
+ * The felt plush of `@norbert_bodziony/bloub/plush` 0.6.3 (MIT), for the phone. That entry renders
  * with Solid and the DOM, and names its pictures with `import.meta.url`, so Metro cannot load it.
  * This file keeps the pure parts it needs, with the same numbers: the tint ramp, the eye pads cut
  * into felt pieces, the eyelids of a blink, and the felt decor of each state. The phone draws them
@@ -244,7 +244,7 @@ function padExtent(pieces: readonly PlushPiece[]) {
 export type Matrix = readonly [number, number, number, number, number, number];
 
 /** The six numbers of a `matrix(a,b,c,d,e,f)` string. */
-function matrixOf(transform: string): Matrix {
+export function matrixOf(transform: string): Matrix {
   const [a = 1, b = 0, c = 0, d = 1, e = 0, f = 0] = (transform.match(/-?[\d.]+(?:e-?\d+)?/g) ?? []).map(Number);
   return [a, b, c, d, e, f];
 }

@@ -4,8 +4,6 @@ import type { messages as source } from "../en/uiBlock";
 export const messages = {
   "uiBlock.status.pending": "Нужен ваш ответ",
   "uiBlock.status.answered": "Отвечено",
-  "uiBlock.status.expired": "Время вышло",
-  "uiBlock.status.closed": "Закрыто",
   "uiBlock.outcome.expired": "Ответ не пришёл вовремя",
   "uiBlock.outcome.closed": "Закрыто без ответа",
   "uiBlock.outcome.autoAnswered": "{outcome} (никто не ответил вовремя)",
@@ -35,6 +33,7 @@ export const messages = {
   "uiBlock.form.choose": "Выберите вариант",
   "uiBlock.form.notSet": "Не указано",
   "uiBlock.form.invalid": "Некоторые ответы указаны неверно. Проверьте их и попробуйте снова.",
+  "uiBlock.form.hiddenValue": "Скрыто",
   "uiBlock.skip": "Пропустить",
   "uiBlock.error.answerFailed": "Не удалось отправить ответ. Попробуйте ещё раз.",
 } as const satisfies PartialTranslation<typeof source>;

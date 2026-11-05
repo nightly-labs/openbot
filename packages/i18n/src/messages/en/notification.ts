@@ -13,6 +13,9 @@ export const messages = defineMessages("notification", {
   // A workflow output step that tells the user its result.
   "notification.workflowOutput": "A workflow has a new result.",
   "notification.failed": "Stopped with an error.",
+  // A subagent of a turn failed. {task} is the task that the subagent card shows.
+  "notification.subagentFailed": "A subagent stopped with an error.",
+  "notification.subagentFailedFor": "A subagent stopped with an error: {task}",
   // The title of a notification about an agent in a channel: the agent and the channel name.
   "notification.channelTitle": "{agent} in {channel}",
   // The body of a channel reply notification when the preview of agent words is off.

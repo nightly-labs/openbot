@@ -26,7 +26,7 @@ computer of the user who signs in. A sign-in uses one of these kinds:
 | CLI-owned browser login | Claude (`auth login`), Codex, Gemini (`acp-authenticate`) | The provider's CLI opens the browser and takes its own callback. | The relay (`provider/start`): the host captures the page, and the client sends the callback query to the CLI's listener on the host. Grok, Cursor and Cline: a code kind. |
 | Deep link | Slack, Discord (`openbot://slack-workspace`, `openbot://discord-guild`), MCP fallback (`openbot://mcp-auth`) | A hosted page ends in an `openbot://` link, which reaches only the computer that opened it. | Slack and Discord: `connectors-v1`. The client sends the sealed grant on to the host that started the install. The browser client gets the grant from a return page of its own origin (`web-messaging-install.ts`). |
 | Terminal | Pi | OpenBot opens the CLI in a terminal on the host ([`provider-terminal-login.ts`](../../src/backend/provider-terminal-login.ts)). | Sign in on the host. |
-| Key or local session | API keys, 1Password, Bitwarden | The user types a key or gives a CLI session. | Keys go to the host over the encrypted channel. Vault approval stays on the host. A Bitwarden session key works only on the computer that made it; a joined server gets an API key and the master password. |
+| Key or local session | API keys, 1Password, Bitwarden, Proton Pass | The user types a key or gives a CLI session. Proton Pass also signs in on Proton's web page. | Keys go to the host over the encrypted channel. Vault approval stays on the host. A Bitwarden session key works only on the computer that made it; a joined server gets an API key and the master password. Proton Pass: `password-managers-v1`; the client opens the host's sign-in page. |
 
 The sign-in kinds of providers are in `ProviderSignIn` and `ProviderCodeSignIn` in
 [`provider-drivers.ts`](../../src/backend/provider-drivers.ts). The kinds of applications are the
@@ -270,16 +270,24 @@ other places.
    `scripts/agent-runtime-lock.ts`, and `src/main/provider-runtime-descriptors.ts`,
    `provider-runtime-releases.ts` and `provider-runtime-manager.ts`.
 5. **Contracts and preload.** The `AgentAuthState` arm in `ipc-agent-status.ts`, then
-   `ipc-provider-admin.ts`, `src/preload/provider-runtime.ts` and `src/preload/agent-decoding.ts`.
+   `src/preload/agent-decoding.ts`. A managed runtime also needs its line in
+   `decodeProviderRuntimeSnapshot` (`ipc-provider-admin.ts`, with `decodeLaterRuntime`) and in
+   `src/preload/provider-runtime.ts`.
 6. **Renderer.** `SetupProviderPicker.tsx`, `ProviderSettingsSection.tsx`, `app-defaults.ts`, and
    the preview `mock-provider-runtimes.ts`.
 7. **Logo.** The `ProviderLogoVariant` union and its SVG in
    [`packages/brand/src/ProviderLogo.tsx`](../../packages/brand/src/ProviderLogo.tsx), and the color
    in `packages/brand/src/tokens.css`.
-8. **Team API.** The provider lists of a released capability are frozen. A new provider on a joined
-   server needs a new `providers-vN` capability (see "Protocol compatibility" in
-   [Providers](providers.md#protocol-compatibility)) and the peer rules in
-   [`provider-visibility.ts`](../../src/main/team-api/provider-visibility.ts).
+8. **Team API.** No edit. Team API v8 and `providers-v8` carry any provider id (see "Protocol
+   compatibility" in [Providers](providers.md#protocol-compatibility)). The host status row names
+   the provider, and the code sign-in, key and runtime routes take its id. The clients (desktop,
+   web and iPhone) read the rest from the descriptor: Connect from a `device` `localCodeSignIn`,
+   Download from `MANAGED_RUNTIME_PROVIDERS` and `INSTALLER_PROVIDERS`, and the key from
+   `KEY_ONLY_PROVIDERS`. A peer below v8 does not see the provider
+   ([`provider-visibility.ts`](../../src/main/team-api/provider-visibility.ts)), and a client that
+   does not know it shows it disabled with "Update OpenBot to use {name}". Do not edit the frozen
+   lists of a released capability. A `paste` or `link` code sign-in, or the sign-in relay, on a
+   joined server needs a new capability.
 9. **Text and docs.** Error keys in `error/provider.ts` and onboarding text in all languages
    ([docs/i18n.md](../i18n.md)). A section in [Providers](providers.md), and a
    `changelog.d/<branch>.md` file.
@@ -399,6 +407,7 @@ state on each of them.
 | Telegram | `src/backend/messaging/telegram/` | A one-use link code in a `t.me` link. No OAuth | `telegram-app.ts`, `ipc-messaging.ts` |
 | 1Password | [`onepassword-connector-service.ts`](../../src/main/onepassword-connector-service.ts) | The user's `op` session creates a read-only service account, or the user pastes a token | `ipc-onepassword-connector.ts`; joined server: `onepassword-connector-v1` (token only) |
 | Bitwarden | [`bitwarden-connector-service.ts`](../../src/main/bitwarden-connector-service.ts) | A `bw` session key, kept in memory only; a joined server signs in with an API key and the master password | `ipc-bitwarden-connector.ts`; joined server: `bitwarden-connector-v1` |
+| Proton Pass | [`proton-pass-driver.ts`](../../src/main/password-managers/proton-pass-driver.ts) | A web sign-in in a temporary `pass-cli` session makes an agent access key, or the user pastes one | `ipc-password-managers.ts`; joined server: `password-managers-v1` |
 
 To add a connector:
 
@@ -462,6 +471,24 @@ lets everyone. With a list, `MessagingService` ignores a mention from a member w
 roles, before it reacts or posts. Signal passes the author's role IDs with each mention; a mention
 from an older Signal has none, so a server with a list ignores it.
 
+The optional capability `whatsapp-connector-v1`
+([`whatsapp-connector-v1.ts`](../../packages/contracts/src/team-protocol/whatsapp-connector-v1.ts), host
+route [`route-whatsapp-connector.ts`](../../src/main/team-api/route-whatsapp-connector.ts)) carries the
+host's WhatsApp numbers. The host runs the WhatsApp session and keeps its keys. A link answers the QR
+code text or the pairing code that the host's session got, and the client shows it and reads
+`linkState` while it waits. The other routes read the numbers, the allowed contacts and groups, and the
+pairing requests, and set them, and add the WhatsApp Orchestrator on the host's default model. The
+client uses the same WhatsApp page through `hostWhatsAppPort`
+([`whatsapp-connector.ts`](../../src/renderer/src/features/connectors/whatsapp-connector.ts)). No route
+carries a stored key; the QR code text holds the one-use secret of its link.
+
+The phone uses the same routes in Marketplace › Apps › WhatsApp
+(`apps/mobile/src/features/servers/components/whatsapp-connector-page.tsx`). It links only with a
+pairing code, because the WhatsApp app on the same phone cannot scan a QR code on its own screen. The
+link page reads `linkState` every second while it waits, and cancels the link when the person leaves
+the page before `linked`. The phone adds the WhatsApp Orchestrator with no model choice, so the host
+uses its default provider and model. A host older than this capability shows no WhatsApp row.
+
 The optional capability `onepassword-connector-v1`
 ([`onepassword-connector-v1.ts`](../../packages/contracts/src/team-protocol/onepassword-connector-v1.ts),
 host route [`route-onepassword-connector.ts`](../../src/main/team-api/route-onepassword-connector.ts))
@@ -486,11 +513,47 @@ restart. The host must reach the server address over HTTPS; the instance firewal
 [several instances on one host](../docker.md#several-instances-on-one-host) blocks private
 addresses. A host older than this capability hides Bitwarden.
 
-The phone uses the same routes in Server settings › Connectors › Bitwarden
+The phone uses the same routes in Marketplace › Apps › Bitwarden
 (`apps/mobile/src/features/servers/components/bitwarden-connector-page.tsx`). It reads `status`
 every 3 seconds while the page shows, as for the other connectors, and keeps no copy of the API key
 or the master password. For a host older than this capability, the phone shows Bitwarden as
 "Desktop app only", with no action.
+
+### Password managers on a joined server
+
+The password-manager engine
+([`password-managers-service.ts`](../../src/main/password-managers/password-managers-service.ts))
+keeps one driver for each manager
+([`driver.ts`](../../src/main/password-managers/driver.ts)). A driver owns the sign-in, the stored
+access, the CLI and the logins of its manager. The engine owns the list, the checks that every
+manager shares, and the login sources of `password-vault-router.ts`. Proton Pass is its only
+driver: 1Password and Bitwarden keep their own services, panels and capabilities, and the router
+reads their logins directly. A new manager needs a driver, an id in `PASSWORD_MANAGER_IDS` and a
+Marketplace descriptor; no new IPC group or route.
+
+The optional capability `password-managers-v1`
+([`password-managers-v1.ts`](../../packages/contracts/src/team-protocol/password-managers-v1.ts),
+host route [`route-password-managers.ts`](../../src/main/team-api/route-password-managers.ts),
+protocol 9) carries `list`, `connect`, `cancel` and `disconnect` for every manager of the host. All
+routes are for an owner or admin. An access key or an extra password goes to the host once, in
+`connect`; no answer carries it. The host refuses a manager that it does not know and a method that
+the manager's status does not list.
+
+Proton Pass has two methods. With `browser`, the host runs `pass-cli login` in a temporary session
+and reports Proton's sign-in page in `signInUrl`. The client opens that page on its own computer
+only when it is an `https:` page on `account.proton.me`
+([`password-managers-handlers.ts`](../../src/main/ipc/password-managers-handlers.ts)); the renderer
+never names a URL. When the account has an extra password, the status step is `extra-password`, and
+the client sends it with `connect`. The CLI reads it from a FIFO (a named pipe on Windows), never
+from an argument or a file on disk. The host then finds or makes the vault `Shared with OpenBot`,
+makes an agent access key that reads only that vault and ends after one year, and signs the
+temporary session out. With `key`, the user pastes an agent access key that they made. The host
+keeps only the access key, in `openbot-protonpass-connector-v1.json`, and the CLI session in
+`<userData>/provider-state/protonpass-host`. It installs the `pass-cli` release that
+[`proton-pass-cli-installer.ts`](../../src/main/password-managers/proton-pass-cli-installer.ts)
+pins, with a SHA-256 per target, into `<userData>/provider-state/protonpass-cli`. Disconnect removes
+the record and the session; the agent access key stays on the Proton account until it ends or the
+user removes it there.
 
 ## Add a Team API capability
 
@@ -549,7 +612,7 @@ Use `bun run dev:automation` for snapshots and screenshots. Do not drive another
 | --- | --- |
 | A sign-in that returns to a public `https:` address of the provider | The provider finishes it by itself. The host only waits. Nothing comes back to a loopback port. |
 | A sign-in that opens an app on the host, such as Pi, which opens Terminal | The step happens on the host's screen. There is no page address to open somewhere else. |
-| A vault that approves in its desktop app, such as 1Password or Bitwarden | The approval is in the vault app on the host. A relay cannot approve for it. 1Password on a joined server uses a service account token (`onepassword-connector-v1`); Bitwarden uses an API key and the master password (`bitwarden-connector-v1`). |
+| A vault that approves in its desktop app, such as 1Password or Bitwarden | The approval is in the vault app on the host. A relay cannot approve for it. 1Password on a joined server uses a service account token (`onepassword-connector-v1`); Bitwarden uses an API key and the master password (`bitwarden-connector-v1`). Proton Pass signs in on the host and the client opens Proton's page (`password-managers-v1`). |
 | The Slack development return address (`returnUrl`) | Development builds only. It returns to `http://127.0.0.1:<port>/...` on the host, and the relay does not carry it. Use the hosted install. |
 | An agent link for a member who is not an admin | The relay routes are admin only. The link opens as it is, and its callback cannot reach the host. |
 | An agent link in a command, tool output or commentary | The host relays only a link that the text of an agent message holds. |

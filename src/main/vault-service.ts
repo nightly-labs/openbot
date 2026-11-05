@@ -1,8 +1,9 @@
 // The Vault of this computer: logins, payment cards, contact info and API keys that the user saves in
 // Server settings. Agents fill logins through the `PasswordVault` port (`openbot:` IDs) and cards and
 // contact info through `VaultItems`; neither port gives an agent a password, a card number or a security
-// code. Agents can also add and change items through `VaultItems`, but cannot set a secret. API keys
-// reach an agent only as files that `AgentApiKeys` writes; agents cannot see or change them as items.
+// code. Agents can also add and change items through `VaultItems`, and save a password or an API key
+// that they have, but never read one back or set a card number. API keys reach an agent only as files
+// that `AgentApiKeys` writes.
 
 import { randomUUID } from "node:crypto";
 import {
@@ -24,6 +25,7 @@ import { registerSecretValues } from "@openbot/logging";
 import { Effect } from "effect";
 import { type PasswordVault, PasswordVaultError, websiteMatchesOrigin, websiteUrl } from "../backend/password-vault";
 import type {
+  VaultAgentApiKey,
   VaultAgentChange,
   VaultAgentResult,
   VaultCardSecret,
@@ -146,7 +148,7 @@ function agentSaveInput(record: VaultRecord, change: VaultAgentChange): VaultSav
         website: existing.website,
         username: change.username ?? existing.username,
         notes: existing.notes,
-        password: null,
+        password: change.password ?? null,
       });
     }
     case "card": {
@@ -474,6 +476,32 @@ export class VaultService {
     return outcome.saved ?? (yield* vaultError("error.vault.itemMissing"));
   });
 
+  readonly #saveApiKey = Effect.fn("VaultService.saveApiKey")(function* (
+    this: VaultService,
+    apiKey: VaultAgentApiKey,
+    addedBy: string | undefined,
+  ) {
+    const outcome: { saved: (VaultAgentResult & { created: boolean }) | null } = { saved: null };
+    yield* this.#change((record) => {
+      const existing = record.apiKeys.find((item) => item.name === apiKey.name);
+      const next = this.#put(
+        record,
+        decodeVaultSaveInput({
+          kind: "apiKey",
+          id: existing?.id ?? null,
+          name: apiKey.name,
+          notes: apiKey.notes ?? existing?.notes ?? "",
+          key: apiKey.key,
+        }),
+        addedBy,
+      );
+      const named = itemName(next.record, next.id);
+      outcome.saved = named && { ...named, created: !existing };
+      return next.record;
+    });
+    return outcome.saved ?? (yield* vaultError("error.vault.itemMissing"));
+  });
+
   readonly #addEntered = Effect.fn("VaultService.addEntered")(function* (
     this: VaultService,
     item: VaultEnteredItem,
@@ -545,6 +573,7 @@ export class VaultService {
     save: (change, addedBy) => this.#agentSave(change, addedBy),
     delete: (id) => this.#agentDelete(id),
     saveLogin: (login, addedBy) => this.#saveTypedLogin(login, addedBy),
+    saveApiKey: (apiKey, addedBy) => this.#saveApiKey(apiKey, addedBy),
     addEntered: (item, addedBy) => this.#addEntered(item, addedBy),
   };
 

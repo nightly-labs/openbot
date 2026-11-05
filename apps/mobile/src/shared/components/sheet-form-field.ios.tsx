@@ -8,6 +8,7 @@ import { View } from "react-native";
 
 import type { SheetFormFieldProps } from "@/shared/components/sheet-form-field.types";
 import { APP_FONT } from "@/shared/lib/app-font";
+import { layoutDirection, textDirection } from "@/shared/lib/text-direction";
 
 export function SheetFormField({
   autoCapitalize,
@@ -15,6 +16,7 @@ export function SheetFormField({
   autoFocus,
   editable,
   hint,
+  error,
   trailing,
   inputMode,
   isRequired = false,
@@ -31,7 +33,7 @@ export function SheetFormField({
   secureTextEntry,
   value,
 }: SheetFormFieldProps) {
-  const [foreground, muted, border] = useThemeColor(["foreground", "muted", "border"]);
+  const [foreground, muted, border, danger] = useThemeColor(["foreground", "muted", "border", "danger"]);
   const nativeValue = useNativeState(value);
   useEffect(() => {
     nativeValue.set(value);
@@ -49,10 +51,10 @@ export function SheetFormField({
       <View
         className="bg-grouped"
         style={{
-          borderColor: border,
+          borderColor: error ? danger : border,
           borderCurve: "continuous",
           borderRadius: 16,
-          borderWidth: appearance === "soft" ? 0 : 1,
+          borderWidth: appearance === "soft" && !error ? 0 : 1,
           height,
           overflow: "hidden",
           flexDirection: "row",
@@ -64,7 +66,9 @@ export function SheetFormField({
             modifiers={[accessibilityLabel(label)]}
             multiline={multiline}
             numberOfLines={multiline ? 4 : 1}
-            textAlign={textAlign}
+            // SwiftUI aligns to the leading or trailing side of the layout. Text in the other
+            // direction than the layout goes to the trailing side.
+            textAlign={textAlign ?? (textDirection(value, layoutDirection()) === layoutDirection() ? "left" : "right")}
             autoCapitalize={autoCapitalize}
             autoCorrect={autoCorrect}
             autoFocus={autoFocus}
@@ -85,6 +89,13 @@ export function SheetFormField({
         </Host>
         {trailing}
       </View>
+      {error ? (
+        <View className="px-4">
+          <Typography.Paragraph type="body-xs" accessibilityRole="alert" className="text-danger-text">
+            {error}
+          </Typography.Paragraph>
+        </View>
+      ) : null}
       {hint ? (
         <View className="px-1">
           <Typography.Paragraph type="body-xs" className="text-text-secondary">

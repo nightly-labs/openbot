@@ -2,7 +2,7 @@
 // user data directory and agent root (`local-server-child.ts`). The desktop app reaches each one
 // over the loopback Team API, as it reaches a joined server, and logs in as its owner at each start.
 //
-// A child ends when its standard input closes, so it stops also when this process is killed. The
+// A child ends when its control pipe closes, so it stops also when this process is killed. The
 // supervisor starts a child again after it stops on its own, a few times only, so a child that cannot
 // start does not use the computer's power in a loop.
 //
@@ -11,23 +11,31 @@
 //
 // While the desktop app is signed in, each running server is registered for its account, with the
 // child's key and owner member. The machine token of the registration goes to the child on its
-// standard input, so the child meets the owner's devices on Signal and sends their notifications. A
+// control pipe, so the child meets the owner's devices on Signal and sends their notifications. A
 // sign-out tells each child to stop that. A deleted server is removed from the account; until the
 // account service confirms it, the registry keeps its id, so the directory sync does not list it.
+//
+// The child has no account session, so it cannot read its members from the account directory. It
+// asks on stdout, and this process writes the list to its control pipe. After this app changes a
+// member of the server, it writes the new list without a request.
 
 import { type ChildProcess, type SpawnOptions, spawn as spawnProcess } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
+import { Readable, Writable } from "node:stream";
 import { LOCAL_SERVER_LIMIT, type ServerSummary } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
 import { Deferred, Duration, Effect, Exit, Schema, Scope, Semaphore } from "effect";
 import { causeHelpers } from "../../backend/effect-boundary";
+import type { RemoteMemberRecord } from "../central-auth-records";
 import {
   formatLocalServerCommand,
+  LOCAL_SERVER_CONTROL_FD,
   LOCAL_SERVER_ENVIRONMENT,
+  LOCAL_SERVER_MEMBERS_REQUEST,
   LOCAL_SERVER_OWNER_USERNAME,
   LOCAL_SERVER_READY_PREFIX,
   type LocalServerCommand,
@@ -48,7 +56,7 @@ const { io: localIO, sync: localSync, rewrap: toLocalServerFailure } = causeHelp
 
 /** A first start makes the database and the identity keys, so it can take longer than a later one. */
 const READY_TIMEOUT = Duration.seconds(90);
-/** The child quits on its own when its standard input closes. After this it is killed. */
+/** The child quits on its own when its control pipe closes. After this it is killed. */
 const STOP_GRACE_MS = 6_000;
 const RESTART_DELAY = Duration.seconds(5);
 const RESTART_WINDOW_MS = 10 * 60_000;
@@ -102,6 +110,12 @@ function parseReadyLine(line: string): LocalServerReady | null {
   }
 }
 
+/** The parent's end of the child's control pipe: `LOCAL_SERVER_CONTROL_FD` on Windows, else standard input. */
+function controlPipe(child: ChildProcess, platform: NodeJS.Platform): Writable | null {
+  const stream = platform === "win32" ? child.stdio[LOCAL_SERVER_CONTROL_FD] : child.stdin;
+  return stream instanceof Writable ? stream : null;
+}
+
 function startFailure(): LocalServerFailure {
   return new LocalServerFailure({ cause: new Error(sourceText("error.remote.localServerStartFailed")) });
 }
@@ -124,6 +138,8 @@ interface LocalServerAccount {
   }): Effect.Effect<void, RemoteWorkflowError>;
   /** The machine token of a registered server. Never logged. */
   credential(hostId: string): string | null;
+  /** The members of a registered server, from the account directory. */
+  listMembers(hostId: string): Effect.Effect<RemoteMemberRecord[], RemoteWorkflowError>;
   /** Removes a deleted server. A server that the account service refuses for good counts as removed. */
   remove(hostId: string): Effect.Effect<void, RemoteWorkflowError>;
 }
@@ -145,7 +161,10 @@ export interface LocalServersOptions {
   /** The provider CLI store of this app. A child has its own user data, but not its own copy of each CLI. */
   runtimeRoot: string;
   cipher: TokenCipher;
-  remoteServers: Pick<RemoteServerManager, "setThisComputerServers" | "attachLocalServer" | "detachLocalServer">;
+  remoteServers: Pick<
+    RemoteServerManager,
+    "setThisComputerServers" | "setRegisteredThisComputerServers" | "attachLocalServer" | "detachLocalServer"
+  >;
   account: LocalServerAccount;
   /** This executable, and the app path when it is not packaged. */
   command: { executable: string; args: readonly string[] };
@@ -171,6 +190,11 @@ export class LocalServers {
   /** The registry ids of the children that have a machine token, and the account it belongs to. */
   readonly #published = new Set<string>();
   #publishedAccountId: string | null = null;
+  /**
+   * The registry ids of the children whose account directory is being read, one read at a time each.
+   * `true`: a request or a change came while it ran, so another read follows, as the list can be old.
+   */
+  readonly #memberReads = new Map<string, boolean>();
   /** One account step at a time, so a publish cannot reach a child after the unpublish of a sign-out. */
   readonly #accountSteps = Semaphore.makeUnsafe(1);
   #stopped = false;
@@ -218,6 +242,7 @@ export class LocalServers {
         for (const id of this.#published) this.#send(id, { type: "unpublish" });
         this.#published.clear();
         this.#publishedAccountId = null;
+        this.#announcePublished();
       }
       if (accountId === null) return;
       yield* this.#removeDeletedHosts();
@@ -354,11 +379,74 @@ export class LocalServers {
     ]);
   }
 
-  /** Writes one command to the child's standard input. A child that is gone gets nothing. */
+  /** The servers registered for the signed-in account: their members and invitations go to the account service. */
+  #announcePublished(): void {
+    this.#options.remoteServers.setRegisteredThisComputerServers(
+      this.#registry.servers.flatMap((entry) =>
+        entry.serverId && this.#published.has(entry.id) ? [entry.serverId] : [],
+      ),
+    );
+  }
+
+  /** Writes the account directory of a server to its child, after this app changed one of its members. */
+  sendMembers(serverId: string): void {
+    const entry = this.#registry.findByServerId(serverId);
+    if (entry) this.#readMembers(entry.id);
+  }
+
+  /**
+   * Reads the account directory of a server and writes it to the child. A child that is not registered
+   * for the signed-in account, or a read that fails, gets `members-unavailable`, so it does not wait.
+   * A request or a change while a read runs gets one more read after it.
+   */
+  #readMembers(id: string): void {
+    if (this.#memberReads.has(id)) {
+      this.#memberReads.set(id, true);
+      return;
+    }
+    const ready = this.#ready.get(id);
+    const running = this.#running.get(id);
+    if (!ready || !running || !this.#published.has(id)) {
+      this.#send(id, { type: "members-unavailable" });
+      return;
+    }
+    this.#memberReads.set(id, false);
+    Effect.runFork(
+      Effect.forkIn(
+        this.#options.account.listMembers(ready.serverId).pipe(
+          Effect.map((members): LocalServerCommand => ({ type: "members", members })),
+          Effect.catch(({ cause }) =>
+            Effect.sync((): LocalServerCommand => {
+              this.#options.log.warn("The members of a server on this computer did not load.", cause);
+              return { type: "members-unavailable" };
+            }),
+          ),
+          Effect.flatMap((command) =>
+            Effect.sync(() => {
+              // A child that started again meanwhile asks again.
+              if (this.#running.get(id) === running) this.#send(id, command);
+            }),
+          ),
+          Effect.ensuring(
+            Effect.sync(() => {
+              const again = this.#memberReads.get(id) === true;
+              this.#memberReads.delete(id);
+              if (again) this.#readMembers(id);
+            }),
+          ),
+        ),
+        this.#scope,
+        { startImmediately: true },
+      ),
+    );
+  }
+
+  /** Writes one command to the child's control pipe. A child that is gone gets nothing. */
   #send(id: string, command: LocalServerCommand): void {
     const running = this.#running.get(id);
-    if (!running || running.stopping || !running.child.stdin?.writable) return;
-    running.child.stdin.write(formatLocalServerCommand(command));
+    const control = running && !running.stopping ? controlPipe(running.child, this.#options.platform) : null;
+    if (!control?.writable) return;
+    control.write(formatLocalServerCommand(command));
   }
 
   /** Registers a running server for the signed-in account and gives the child its machine token. */
@@ -392,6 +480,7 @@ export class LocalServers {
             this.#send(entry.id, { type: "publish", machineToken });
             this.#published.add(entry.id);
             this.#publishedAccountId = accountId;
+            this.#announcePublished();
           }),
         ),
         Effect.catch(({ cause }) =>
@@ -457,8 +546,9 @@ export class LocalServers {
         [...this.#options.command.args, `--user-data-dir=${paths.userData}`],
         {
           env: childEnvironment(entry, paths.agentRoot, this.#options.runtimeRoot, secret),
-          // Standard input carries only the account commands, and it closes when OpenBot ends.
-          stdio: ["pipe", "pipe", "pipe"],
+          // The control pipe carries only the account commands, and it closes when OpenBot ends. On
+          // Windows it is fd 3: Electron gives the child a `process.stdin` that only ends (#4868).
+          stdio: this.#options.platform === "win32" ? ["ignore", "pipe", "pipe", "pipe"] : ["pipe", "pipe", "pipe"],
           windowsHide: true,
         },
       ),
@@ -470,13 +560,20 @@ export class LocalServers {
     // read and dropped so that a full pipe cannot stop the child.
     if (child.stdout)
       createInterface({ input: child.stdout }).on("line", (line) => {
+        if (line === LOCAL_SERVER_MEMBERS_REQUEST) {
+          this.#readMembers(entry.id);
+          return;
+        }
         const value = parseReadyLine(line);
         if (value) Deferred.doneUnsafe(ready, Exit.succeed(value));
       });
     child.stderr?.resume();
     // A command can reach a child that stopped before its exit event: the closed pipe then fails the
     // write. The exit handler deals with the child, so the write error is dropped.
-    child.stdin?.on("error", () => undefined);
+    const control = controlPipe(child, this.#options.platform);
+    control?.on("error", () => undefined);
+    // The parent's end of fd 3 is also readable. Reading it to its end closes it when the child exits.
+    if (control instanceof Readable && control.readable) control.resume();
     child.once("error", (error: Error) => {
       Deferred.doneUnsafe(ready, Exit.fail(new LocalServerFailure({ cause: error })));
     });
@@ -539,6 +636,7 @@ export class LocalServers {
       this.#running.delete(entry.id);
       // The next child gets its machine token again when it starts.
       this.#published.delete(entry.id);
+      this.#announcePublished();
     }
     if (running.stopping || this.#stopped) return;
     this.#options.log.warn(`A server on this computer stopped (code ${code ?? "none"}, signal ${signal ?? "none"}).`);
@@ -591,7 +689,7 @@ export class LocalServers {
   });
 
   /**
-   * Ends the child: its standard input closes, then a kill after the grace time. A failed start names
+   * Ends the child: its control pipe closes, then a kill after the grace time. A failed start names
    * its own child in `only`: a restart can already have stopped it, or started a newer child that now
    * holds the entry.
    */
@@ -608,6 +706,7 @@ export class LocalServers {
       if (this.#running.get(entry.id) === running) {
         this.#running.delete(entry.id);
         this.#published.delete(entry.id);
+        this.#announcePublished();
       }
     }
     if (only && this.#running.has(entry.id)) return;
@@ -659,8 +758,10 @@ function terminate(child: ChildProcess, platform: NodeJS.Platform): Effect.Effec
       clearTimeout(timer);
       resume(Effect.void);
     });
-    child.stdin?.end();
-    // On Windows a signal ends the process at once, so the closed input is the only request there.
+    // On Windows, `end()` leaves a pipe that is also readable open, so the child would not see its end.
+    const control = controlPipe(child, platform);
+    control?.end(() => control.destroy());
+    // On Windows a signal ends the process at once, so the closed pipe is the only request there.
     if (platform !== "win32") child.kill("SIGTERM");
   });
 }

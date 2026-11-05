@@ -49,6 +49,7 @@ import { StoredStateFailure, storedIO, storedSync, toStoredStateFailure } from "
 export type { ExportedAttachmentFile, GeneratedAttachmentSource } from "./attachment-files";
 
 import { isEmptyStoredFile, parseStoredJson } from "./atomic-json-file";
+import { routineNameInLimit } from "./database/legacy-conversation-message";
 import { mailboxReactionRowKey } from "./database/mailbox-projection";
 import { MailboxDeliveryGate } from "./mailbox-delivery-gate";
 import { OpenBotDatabase } from "./openbot-database";
@@ -56,6 +57,8 @@ import { isRecord } from "./protocol";
 import { recordRestartActivity } from "./restart-activity";
 
 const MAX_ATTACHMENTS = INPUT_LIMITS.attachments;
+/** How much of a delivery's error the note for a failed request quotes. */
+const FAILED_REQUEST_REASON_LIMIT = 2_000;
 /**
  * The external conversation a message came from. Such a message runs in the execution thread of
  * that conversation, so the queue and the public chat do not show it, like channel work.
@@ -588,7 +591,7 @@ export class MailboxStore {
         ...(input.taskId ? { taskId: input.taskId } : {}),
         ...(input.senderTaskId ? { senderTaskId: input.senderTaskId } : {}),
         id: messageId,
-        sender: input.sender,
+        sender: storedSender(input.sender),
         ...(input.sender.kind === "user" && input.senderMember ? { senderMember: input.senderMember } : {}),
         text: rewriteAttachmentReferences(text, (reference) => {
           const attachment = committedByDraftId.get(reference.attachmentId);
@@ -799,6 +802,23 @@ export class MailboxStore {
       .map((delivery) => delivery.id);
   }
 
+  /**
+   * The routine deliveries of this agent's side threads. `listQueue` hides them, so the routine
+   * scheduler reads them here to follow the status of a run in a routine thread.
+   */
+  taskRoutineDeliveries(agentId: string): QueueDelivery[] {
+    const messages = this.#messagesById();
+    const deliveries = this.#state.deliveries.filter((delivery) => {
+      const message = messages.get(delivery.messageId);
+      return delivery.recipientAgentId === agentId && message?.taskId && message.sender.kind === "routine";
+    });
+    if (deliveries.length === 0) return [];
+    const positions = this.#queuedPositions();
+    return deliveries.map((delivery) =>
+      this.#publicDelivery(delivery, positions, this.#requireMessage(delivery.messageId, messages)),
+    );
+  }
+
   /** Indexed once for a whole read: a queue holds one delivery for each message the agent has. */
   #executionMessageIds(): Set<string> {
     const ids = new Set<string>();
@@ -865,6 +885,22 @@ export class MailboxStore {
         return [];
       return [{ deliveryId: delivery.id, text: message.text, createdAt: message.createdAt }];
     });
+  }
+
+  /**
+   * The queued deliveries of one task, in queue order, as the agent's own chat lists its queue. The
+   * same deliveries as `queuedTaskMessages`, with their files and state, for the queue of the thread.
+   */
+  taskQueue(agentId: string, taskId: string): QueueDelivery[] {
+    const queued = this.#queuedFor(agentId).filter((delivery) => !waitsForPlanContinuation(delivery));
+    if (queued.length === 0) return [];
+    const messages = this.#messagesById();
+    const deliveries = queued.filter((delivery) => this.#taskIdOf(delivery, messages) === taskId);
+    // The position is in the queue of the thread, as the panel of the thread shows it.
+    const positions = new Map(deliveries.map((delivery, index) => [delivery.id, index + 1]));
+    return deliveries.map((delivery) =>
+      this.#publicDelivery(delivery, positions, this.#requireMessage(delivery.messageId, messages)),
+    );
   }
 
   /** Whether a delivery of this lane is starting or running: the agent's own chat when `taskId` is null. */
@@ -958,6 +994,168 @@ export class MailboxStore {
       }
       try {
         this.#persist("mailbox.thread-deleted", `mailbox:thread-deleted:${taskId}:${randomUUID()}`, deletions);
+      } catch (error) {
+        this.#state = previous;
+        throw error;
+      }
+      yield* this.#drainFileDeletionOutboxEffect();
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
+
+  /**
+   * Removes the mailbox copy of one message that a person deleted from an agent's chat or side thread,
+   * and the agent's reactions on it. `shownMessageId` is the id that the chat shows: a delivery shows
+   * under its own id. A person's message loses its delivery to the agent; when no other delivery
+   * remains, the message goes too, with its reactions, idempotency keys and the files that no other
+   * record uses. A teammate's message and a routine's message stay: the teammate's chat and the run
+   * still use them, and the deleted-message record hides them in this chat. An active delivery stops
+   * the removal, and the state stays as it was.
+   */
+  deleteShownMessage = Effect.fn("MailboxStore.deleteShownMessage")(function* (
+    this: MailboxStore,
+    agentId: string,
+    shownMessageId: string,
+  ): Effect.fn.Return<"busy" | "deleted", StoredStateFailure> {
+    try {
+      const found = () => {
+        const delivery = this.#state.deliveries.find(
+          (candidate) => candidate.id === shownMessageId && candidate.recipientAgentId === agentId,
+        );
+        const message = delivery
+          ? this.#state.messages.find((candidate) => candidate.id === delivery.messageId)
+          : undefined;
+        const personal = delivery && message?.sender.kind === "user" ? { delivery, message } : undefined;
+        const lastDelivery =
+          personal !== undefined &&
+          !this.#state.deliveries.some(
+            (candidate) => candidate.messageId === personal.message.id && candidate.id !== personal.delivery.id,
+          );
+        return { delivery, personal, lastDelivery };
+      };
+      const before = found();
+      if (before.delivery && isActiveDelivery(before.delivery)) return "busy";
+      // The path checks wait, so they run before the state changes, as in `deleteStoredFile`.
+      const managedPaths = new Map<string, string | null>();
+      if (before.personal && before.lastDelivery) {
+        for (const file of messageFiles(before.personal.message)) {
+          if (file.deletedAt || managedPaths.has(file.path)) continue;
+          managedPaths.set(file.path, yield* this.#files.managedTransferFile(file.path).pipe(toStoredStateFailure));
+        }
+      }
+      const { delivery, personal, lastDelivery } = found();
+      if (delivery && isActiveDelivery(delivery)) return "busy";
+      const reactions = this.#state.reactions.filter(
+        (reaction) =>
+          (reaction.agentId === agentId && reaction.messageId === shownMessageId) ||
+          (lastDelivery && reaction.messageId === personal?.message.id),
+      );
+      if (!personal && reactions.length === 0) return "deleted";
+      const previous = structuredClone(this.#state);
+      const deletions: string[] = [];
+      if (personal) {
+        this.#state.deliveries = this.#state.deliveries.filter((candidate) => candidate.id !== personal.delivery.id);
+        this.#changes.deliveryIds.add(personal.delivery.id);
+        if (lastDelivery) {
+          const messageId = personal.message.id;
+          this.#state.messages = this.#state.messages.filter((candidate) => candidate.id !== messageId);
+          this.#changes.messageIds.add(messageId);
+          for (const [key, keyMessageId] of Object.entries(this.#state.idempotency))
+            if (keyMessageId === messageId) delete this.#state.idempotency[key];
+          const inUse = new Set(
+            this.#fileRecords()
+              .filter((record) => !record.deletedAt)
+              .map((record) => record.path),
+          );
+          for (const path of new Set(
+            messageFiles(personal.message)
+              .filter((file) => !file.deletedAt)
+              .map((file) => file.path),
+          )) {
+            const managed = inUse.has(path) ? null : managedPaths.get(path);
+            if (managed) deletions.push(managed);
+          }
+        }
+      }
+      this.#state.reactions = this.#state.reactions.filter((reaction) => !reactions.includes(reaction));
+      for (const reaction of reactions)
+        this.#changes.reactionKeys.add(mailboxReactionRowKey(reaction.agentId, reaction.messageId, reaction.actor));
+      try {
+        this.#persist(
+          "mailbox.message-deleted",
+          `mailbox:message-deleted:${agentId}:${shownMessageId}:${randomUUID()}`,
+          deletions,
+        );
+      } catch (error) {
+        this.#state = previous;
+        throw error;
+      }
+      yield* this.#drainFileDeletionOutboxEffect();
+      return "deleted";
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
+
+  /**
+   * Removes the channel-owned copy that `commitChannelAttachments` made of one channel message that a
+   * person deleted, with its reactions, idempotency keys and the files that no other record uses. The
+   * assignment messages that already went to members stay: their turns used them. A copy that a
+   * delivery still uses stays too.
+   */
+  deleteChannelMessageCopy = Effect.fn("MailboxStore.deleteChannelMessageCopy")(function* (
+    this: MailboxStore,
+    channelId: string,
+    messageId: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      const find = () =>
+        this.#state.messages.find(
+          (candidate) =>
+            candidate.id === messageId &&
+            candidate.channelId === channelId &&
+            !this.#state.deliveries.some((delivery) => delivery.messageId === messageId),
+        );
+      const before = find();
+      if (!before) return;
+      // The path checks wait, so they run before the state changes, as in `deleteShownMessage`.
+      const managedPaths = new Map<string, string | null>();
+      for (const file of messageFiles(before)) {
+        if (file.deletedAt || managedPaths.has(file.path)) continue;
+        managedPaths.set(file.path, yield* this.#files.managedTransferFile(file.path).pipe(toStoredStateFailure));
+      }
+      const message = find();
+      if (!message) return;
+      const previous = structuredClone(this.#state);
+      this.#state.messages = this.#state.messages.filter((candidate) => candidate !== message);
+      this.#changes.messageIds.add(message.id);
+      const reactions = this.#state.reactions.filter((reaction) => reaction.messageId === message.id);
+      this.#state.reactions = this.#state.reactions.filter((reaction) => !reactions.includes(reaction));
+      for (const reaction of reactions)
+        this.#changes.reactionKeys.add(mailboxReactionRowKey(reaction.agentId, reaction.messageId, reaction.actor));
+      for (const [key, keyMessageId] of Object.entries(this.#state.idempotency))
+        if (keyMessageId === message.id) delete this.#state.idempotency[key];
+      const inUse = new Set(
+        this.#fileRecords()
+          .filter((record) => !record.deletedAt)
+          .map((record) => record.path),
+      );
+      const deletions: string[] = [];
+      for (const path of new Set(
+        messageFiles(message)
+          .filter((file) => !file.deletedAt)
+          .map((file) => file.path),
+      )) {
+        const managed = inUse.has(path) ? null : managedPaths.get(path);
+        if (managed) deletions.push(managed);
+      }
+      try {
+        this.#persist(
+          "mailbox.channel-message-deleted",
+          `mailbox:channel-message-deleted:${channelId}:${messageId}:${randomUUID()}`,
+          deletions,
+        );
       } catch (error) {
         this.#state = previous;
         throw error;
@@ -1550,6 +1748,21 @@ export class MailboxStore {
     return delivery ? this.#context(delivery) : null;
   }
 
+  /**
+   * Whether a turn of the agent started to answer a request that an agent sent from an external
+   * conversation. A request steered into a running turn does not count: the user can watch that turn.
+   */
+  answersMessagingRequest(agentId: string, turnId: string): boolean {
+    return this.#state.deliveries.some(
+      (delivery) =>
+        delivery.recipientAgentId === agentId &&
+        delivery.turnId === turnId &&
+        delivery.steeredAt === undefined &&
+        (delivery.status === "starting" || delivery.status === "running") &&
+        this.#state.messages.some((message) => message.id === delivery.messageId && message.messagingReturn),
+    );
+  }
+
   findDeliveriesByTurn(agentId: string, turnId: string): DeliveryContext[] {
     return this.#contexts(
       this.#state.deliveries.filter(
@@ -1730,12 +1943,61 @@ export class MailboxStore {
     return this.#state.messages.find((message) => message.id === messageId)?.expectsReply !== false;
   }
 
+  /** The person who wrote the user message; undefined for older messages and other senders. */
+  senderMember(messageId: string): ConversationMessageSender | undefined {
+    return this.#state.messages.find((message) => message.id === messageId)?.senderMember;
+  }
+
   hasReplyFrom(agentId: string, messageId: string): boolean {
     return this.#state.messages.some(
       (message) =>
         message.sender.kind === "agent" && message.sender.agentId === agentId && message.replyToMessageId === messageId,
     );
   }
+
+  /**
+   * Answers a teammate request whose delivery failed, so the agent that asked does not wait for a
+   * result that never comes (#5055). The note goes where a result would go, as a reply from the
+   * teammate in the reply format, and the key sends it once. The text is the delivery's error, which
+   * `markTerminal` redacted. Returns the agent to wake, or null when no note is due.
+   */
+  answerFailedRequest = Effect.fn("MailboxStore.answerFailedRequest")(function* (
+    this: MailboxStore,
+    deliveryId: string,
+    taskOpen: (taskId: string) => boolean,
+  ): Effect.fn.Return<string | null, StoredStateFailure> {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    const request = delivery && this.#state.messages.find((message) => message.id === delivery.messageId);
+    if (delivery?.status !== "failed" || request?.sender.kind !== "agent" || request.channelId) return null;
+    const teammateId = delivery.recipientAgentId;
+    const requesterId = request.sender.agentId;
+    const originAgentId = this.chainOriginAgentId(request.id);
+    if (
+      requesterId === teammateId ||
+      !originAgentId ||
+      originAgentId === teammateId ||
+      request.expectsReply === false ||
+      this.hasReplyFrom(teammateId, request.id)
+    )
+      return null;
+    const answerTaskId = this.answerTaskId(teammateId, request.id, [requesterId]);
+    const taskId = answerTaskId && taskOpen(answerTaskId) ? answerTaskId : undefined;
+    yield* this.enqueue({
+      sender: { kind: "agent", agentId: teammateId },
+      recipientAgentIds: [requesterId],
+      text: [
+        "Status: blocked",
+        `Result: OpenBot note, not written by this teammate: the request failed before the teammate answered. ${(delivery.error ?? "The provider gave no reason.").slice(0, FAILED_REQUEST_REASON_LIMIT)}`,
+        "Evidence: none",
+        "Unblock: The user must fix the cause, then ask for the request again.",
+      ].join("\n"),
+      replyToMessageId: request.id,
+      ...(taskId ? { taskId } : {}),
+      expectsReply: false,
+      idempotencyKey: `failed-request:${deliveryId}`,
+    });
+    return requesterId;
+  }, Effect.uninterruptible).bind(this);
 
   hasAgentMessageFromTurnTo(agentId: string, turnId: string, recipientAgentId: string): boolean {
     const turnIds = this.#sourceTurnIds();
@@ -3017,12 +3279,26 @@ function toCurrentMailboxMessage(value: unknown): DynamicRecord | null {
   // mailbox from loading.
   return {
     ...message,
-    sender: toCurrentMailboxActor(value.sender),
+    sender: withRoutineNameInLimit(toCurrentMailboxActor(value.sender)),
     ...(isConversationMessageSender(senderMember) ? { senderMember } : {}),
     // Released builds kept an agent's `replyToMessageId: ""`, which refers to no message, and every
     // conversation that showed the message then failed to read.
     ...(message.replyToMessageId === "" ? { replyToMessageId: null } : {}),
   };
+}
+
+/**
+ * A workflow handoff uses the workflow title as its routine name, and a title can be longer than the
+ * routine name that every reader accepts. A longer name made each read of the message fail.
+ */
+function storedSender(sender: StoredMessage["sender"]): StoredMessage["sender"] {
+  return sender.kind === "routine" ? { ...sender, routineName: routineNameInLimit(sender.routineName) } : sender;
+}
+
+function withRoutineNameInLimit(sender: DynamicRecord | null): DynamicRecord | null {
+  return sender?.kind === "routine" && isString(sender.routineName)
+    ? { ...sender, routineName: routineNameInLimit(sender.routineName) }
+    : sender;
 }
 
 function toCurrentMailboxReaction(value: unknown): DynamicRecord | null {

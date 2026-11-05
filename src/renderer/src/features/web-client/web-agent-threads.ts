@@ -6,7 +6,9 @@ import {
 } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
 import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
+import { AGENT_THREAD_REPLIES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
+import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   agentTaskControl,
@@ -71,6 +73,10 @@ function webAgentTasksPort(request: () => TeamApiRequest, branchable: () => bool
     deleteTask: (input) => run((host) => deleteAgentThread(host, input)),
     markTaskRead: (input) => run((host) => markAgentThreadRead(host, input)),
     branchTask: (input) => run((host) => branchAgentThread(host, input)),
+    // The response is empty.
+    deleteTaskMessage: async ({ agentId, taskId, messageId }) => {
+      await request()("POST", MESSAGE_DELETE_ROUTES.task, () => undefined, { agentId, taskId, messageId });
+    },
   };
 }
 
@@ -96,6 +102,8 @@ export function createWebAgentThreads(options: {
     readable: () => workspace.state.capabilities.includes(AGENT_THREAD_READS_CAPABILITY),
     branchable,
     filesAccepted: () => workspace.state.capabilities.includes(AGENT_THREAD_FILES_CAPABILITY),
+    repliable: () => workspace.state.capabilities.includes(AGENT_THREAD_REPLIES_CAPABILITY),
+    messageDeletable: () => workspace.state.capabilities.includes(MESSAGE_DELETE_CAPABILITY),
     // A reconnect sends a runtime snapshot, which reads the threads again.
     reloadKey: () => null,
   });

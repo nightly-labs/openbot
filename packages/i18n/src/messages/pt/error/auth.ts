@@ -8,6 +8,8 @@ export const messages = {
     "Um firewall ou proxy desta rede impediu o OpenBot de acessar {host}. Peça ao administrador da rede para permitir {host} e tente novamente.",
   "error.auth.signInFirst": "Entre no OpenBot primeiro.",
   "error.auth.signInRequired": "É necessário entrar.",
+  "error.auth.chatColorUnavailable":
+    "O serviço de contas ainda não oferece suporte a cores de chat. Tente de novo mais tarde.",
   "error.auth.accountChangedDuringRegister": "A conta conectada mudou durante o registro deste servidor.",
   "error.auth.hostCredentialUnavailable":
     "A credencial do computador anfitrião remoto está indisponível. Registre o computador anfitrião novamente.",

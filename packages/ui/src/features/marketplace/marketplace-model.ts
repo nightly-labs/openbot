@@ -110,8 +110,10 @@ const CONNECTOR_SETUP = {
   slack: "channel",
   discord: "channel",
   telegram: "channel",
+  whatsapp: "channel",
   onepassword: "vault",
   bitwarden: "vault",
+  protonpass: "vault",
   github: "account",
 } as const satisfies Record<ConnectorId, AppSetup>;
 

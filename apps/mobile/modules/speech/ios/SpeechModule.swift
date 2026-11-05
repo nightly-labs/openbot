@@ -226,16 +226,19 @@ private final class SpeechCapture {
     let own = session
     // A reply that plays, or a new route, changes the session between two captures, and the input
     // node can still report the format of the route before. A tap with a format that differs from
-    // the hardware raises an Objective-C exception, which Swift cannot catch, and the app stops. So
-    // the tap takes the format of the node itself, and the converter follows the buffers it gets.
+    // the hardware raises an Objective-C exception. So the tap takes the format of the node itself,
+    // and the converter follows the buffers it gets. A route that changes during the start can
+    // still make the tap raise; caught, the start fails and the app continues.
     var converter: AVAudioConverter?
-    input.installTap(onBus: 0, bufferSize: 4_096, format: nil) { [weak self] buffer, _ in
-      guard let self else { return }
-      if converter?.inputFormat != buffer.format { converter = AVAudioConverter(from: buffer.format, to: self.target) }
-      guard let converter, let samples = self.convert(buffer, with: converter) else { return }
-      self.queue.async {
-        guard own == self.session else { return }
-        self.receive(samples)
+    try EXUtilities.catchException {
+      input.installTap(onBus: 0, bufferSize: 4_096, format: nil) { [weak self] buffer, _ in
+        guard let self else { return }
+        if converter?.inputFormat != buffer.format { converter = AVAudioConverter(from: buffer.format, to: self.target) }
+        guard let converter, let samples = self.convert(buffer, with: converter) else { return }
+        self.queue.async {
+          guard own == self.session else { return }
+          self.receive(samples)
+        }
       }
     }
     engine.prepare()
@@ -416,6 +419,8 @@ private enum CaptureError: Error {
 private final class SpeechPlayer {
   private let engine = AVAudioEngine()
   private let node = AVAudioPlayerNode()
+  /// Changes the speed of the parts and keeps their pitch.
+  private let timePitch = AVAudioUnitTimePitch()
   private var format: AVAudioFormat?
   /// The parts that are scheduled, in order. The first one plays.
   private var scheduled: [String] = []
@@ -427,6 +432,12 @@ private final class SpeechPlayer {
     self.onStart = onStart
     self.onDone = onDone
     engine.attach(node)
+    engine.attach(timePitch)
+  }
+
+  /// Runs on `queue`. Applies at once, also to the part that plays now.
+  func setSpeed(_ speed: Float) {
+    timePitch.rate = speed
   }
 
   /// Runs on `queue`. A part of a stopped reply is dropped by its caller.
@@ -473,14 +484,19 @@ private final class SpeechPlayer {
       // A new sample rate, such as a reply of the other voice engine, needs a new connection.
       node.stop()
       engine.disconnectNodeOutput(node)
-      engine.connect(node, to: engine.mainMixerNode, format: format)
+      engine.disconnectNodeOutput(timePitch)
+      engine.connect(node, to: timePitch, format: format)
+      engine.connect(timePitch, to: engine.mainMixerNode, format: format)
       self.format = format
     }
     if !engine.isRunning {
       engine.prepare()
       try engine.start()
     }
-    if !node.isPlaying { node.play() }
+    // A session change, such as a capture that starts during a voice conversation, can stop the
+    // engine after the check above. The play then raises an Objective-C exception, which stops the
+    // app; caught, it fails only this part.
+    if !node.isPlaying { try EXUtilities.catchException { self.node.play() } }
   }
 }
 
@@ -689,6 +705,12 @@ public class SpeechModule: Module {
         }
       }
       self.enqueue(SpeechPart(id: id, samples: samples, sampleRate: Double(sampleRate)), generation: own)
+    }
+
+    /// Plays every part at this speed, also the part that plays now. 1 is normal speed.
+    Function("setSpeed") { (speed: Double) in
+      let player = self.player
+      player.queue.async { player.setSpeed(Float(speed)) }
     }
 
     /// Stops the part that plays and drops the parts that wait.

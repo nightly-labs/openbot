@@ -82,6 +82,11 @@ export interface ComputerUseHighlightControllerOptions<W extends HighlightOverla
    * the desktop would leave the rim and the cursor invisible on every other display.
    */
   displays: () => readonly HighlightDisplay[];
+  /**
+   * Whether no turn runs, so no agent can take the desktop. The poll then stops once the rim is down
+   * and its overlays are closed, and the next `start()` wakes it. With no answer it never stops.
+   */
+  idle?: () => boolean;
   cornerRadius?: number;
   pollIntervalMs?: number;
   logger?: Logger;
@@ -207,6 +212,12 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
     }
     if (!target) {
       this.#hide();
+      // A poll every 33 ms over a desktop that no turn can take wakes the process for nothing. The
+      // generation stays, because this run is not over: the next turn starts it again.
+      if (this.#overlays.size === 0 && this.#options.idle?.() && this.#timer) {
+        clearInterval(this.#timer);
+        this.#timer = null;
+      }
       return;
     }
     const displays = this.#options.displays();

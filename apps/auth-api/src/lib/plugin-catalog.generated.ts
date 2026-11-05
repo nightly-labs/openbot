@@ -61,6 +61,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "5ead5bab31fb150bf62410b0f4f59106c1e0aa6b00c8449bd8a0d0557cfd48c5",
     },
     {
+      slug: "ticktick",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "d78a41e454da4e0134d57a11d7da29b5b8c38accf4f5d4dfde2e28bf38601a93",
+    },
+    {
       slug: "trello",
       version: "1.0.0",
       featured: false,
@@ -83,6 +89,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       version: "1.0.1",
       featured: false,
       detailSha256: "d15a140eec6ab0a0a6e79e354ccaba88d035435112bdb7a044528b2a4c7a1548",
+    },
+    {
+      slug: "higgsfield",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "d527206a8519ea548c3438fa2ee3c4c158a33c85557a650fc62686b257236271",
     },
     {
       slug: "apple-apps",
@@ -163,6 +175,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "1f73a94236d3a0be9a31ee48b56eaa2a2dca91e9e1a5fb476e38aa13f67b5846",
     },
     {
+      slug: "revenuecat",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "3e0e70a7291ef90ef651bb5b88550e9ecd00ccc5090969aa586050aff8cf0f18",
+    },
+    {
       slug: "posthog",
       version: "1.0.0",
       featured: false,
@@ -203,6 +221,18 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       version: "1.0.0",
       featured: false,
       detailSha256: "5014d267e7627c50d84ea1823d04e4d6c6f18e7096319f3e1351972e656c4449",
+    },
+    {
+      slug: "coinbase",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "acd33c814b13821ce8a0529dad8699f262529f978fe0d7865f200bfa7ac736d5",
+    },
+    {
+      slug: "robinhood",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "de85730802e38802ee01f6695c0c4d3adba9381cf4b1665a52a228df00f01939",
     },
   ],
 };
@@ -500,6 +530,40 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     termsUrl: "https://www.todoist.com/terms-of-service",
     skills: [],
   },
+  ticktick: {
+    slug: "ticktick",
+    name: "TickTick",
+    tagline: "Tasks, lists, habits and focus",
+    description:
+      "TickTick lets agents search and filter tasks, add and update tasks, and manage lists, sections, folders, tags and comments. Agents can also read and change habits and focus records, and read events from the calendars connected to TickTick. Each user signs in to their own TickTick account through the browser. Agents get read and write access: they can complete, move and delete tasks, and delete tags and focus records.",
+    category: "productivity",
+    creatorName: "TickTick",
+    iconUrl: "https://ticktick.com/static/img/apple-touch-icon.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-today", text: "Which TickTick tasks are due today?" },
+      { id: "prompt-capture", text: "Add these action items to my TickTick Inbox." },
+      { id: "prompt-week", text: "Which TickTick tasks did I complete last week?" },
+    ],
+    apps: [
+      {
+        id: "app-ticktick-mcp",
+        name: "TickTick",
+        description: "Tasks, lists, habits and focus records, over TickTick's MCP server with browser sign-in.",
+        iconUrl: "https://ticktick.com/static/img/apple-touch-icon.png",
+        server: {
+          name: "ticktick",
+          transport: "http",
+          url: "https://mcp.ticktick.com",
+          auth: [{ id: "ticktick-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://ticktick.com",
+    privacyPolicyUrl: "https://ticktick.com/privacy",
+    termsUrl: "https://ticktick.com/tos",
+    skills: [],
+  },
   trello: {
     slug: "trello",
     name: "Trello",
@@ -648,6 +712,41 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://paper.design",
     privacyPolicyUrl: "https://paper.design/legal/privacy",
     termsUrl: "https://paper.design/legal/tos",
+    skills: [],
+  },
+  higgsfield: {
+    slug: "higgsfield",
+    name: "Higgsfield",
+    tagline: "AI images, videos and audio",
+    description:
+      "Higgsfield lets agents generate images, videos, characters and audio with Higgsfield models such as Seedance, Kling, Veo and MiniMax Hailuo, check the credit balance, and browse the Asset Library. Results are saved to the user's Higgsfield Assets. Each user signs in to their own Higgsfield account through the browser. Every generation uses credits of that account at standard rates, also on an unlimited plan.",
+    category: "design",
+    creatorName: "Higgsfield",
+    iconUrl: "https://higgsfield.ai/apple-touch-icon.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-credits", text: "How many Higgsfield credits do I have?" },
+      { id: "prompt-product-shot", text: "Make a Higgsfield product photo of a ceramic mug on a wooden table." },
+      { id: "prompt-clip", text: "Make a 5-second Higgsfield video of waves at sunset." },
+    ],
+    apps: [
+      {
+        id: "app-higgsfield-mcp",
+        name: "Higgsfield",
+        description:
+          "Image, video and audio generation, characters, credits and assets, over Higgsfield's MCP server with browser sign-in.",
+        iconUrl: "https://higgsfield.ai/apple-touch-icon.png",
+        server: {
+          name: "higgsfield",
+          transport: "http",
+          url: "https://mcp.higgsfield.ai/mcp",
+          auth: [{ id: "higgsfield-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://higgsfield.ai",
+    privacyPolicyUrl: "https://higgsfield.ai/privacy-policy",
+    termsUrl: "https://higgsfield.ai/terms-of-use-agreement",
     skills: [],
   },
   "apple-apps": {
@@ -1106,6 +1205,62 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     termsUrl: "https://stripe.com/ssa",
     skills: [],
   },
+  revenuecat: {
+    slug: "revenuecat",
+    name: "RevenueCat",
+    tagline: "Subscriptions, products and paywalls",
+    description:
+      "RevenueCat lets agents read and change the setup of your in-app subscriptions: apps, products, entitlements, offerings, packages, paywalls and experiments. Agents can also look up customers and their purchases, and read charts and metrics. A RevenueCat secret API key goes into one Authorization header. The key reaches one project. With a read-only key, agents can only read. With a write key, agents can submit products to the App Store for review, grant entitlements to customers, and delete packages, targeting rules and webhooks.",
+    category: "other",
+    creatorName: "RevenueCat",
+    iconUrl: "https://www.revenuecat.com/favicon/favicon-192x192.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-offerings", text: "Which offerings and packages does my RevenueCat project have?" },
+      { id: "prompt-revenue", text: "How did my RevenueCat revenue and active subscriptions change this month?" },
+      {
+        id: "prompt-customer",
+        text: "Which entitlements does this RevenueCat customer have, and when do they expire?",
+      },
+    ],
+    apps: [
+      {
+        id: "app-revenuecat-mcp",
+        name: "RevenueCat",
+        description:
+          "Products, entitlements, offerings, paywalls and metrics, over RevenueCat's MCP server with a secret API key.",
+        iconUrl: "https://www.revenuecat.com/favicon/favicon-192x192.png",
+        server: {
+          name: "revenuecat",
+          transport: "http",
+          url: "https://mcp.revenuecat.ai/mcp",
+          auth: [
+            {
+              id: "revenuecat-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "token",
+                  label: "API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  placeholder: "sk_…",
+                  hint: "In the RevenueCat dashboard, open API keys in your project and create a secret API key. A read-only key is enough to view data.",
+                },
+              ],
+              docsUrl: "https://www.revenuecat.com/docs/projects/authentication#finding-api-keys",
+              docsLabel: "Create a key",
+            },
+          ],
+        },
+      },
+    ],
+    websiteUrl: "https://www.revenuecat.com",
+    privacyPolicyUrl: "https://www.revenuecat.com/privacy",
+    termsUrl: "https://www.revenuecat.com/terms",
+    skills: [],
+  },
   posthog: {
     slug: "posthog",
     name: "PostHog",
@@ -1445,6 +1600,75 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://clickup.com",
     privacyPolicyUrl: "https://clickup.com/terms/privacy",
     termsUrl: "https://clickup.com/terms",
+    skills: [],
+  },
+  coinbase: {
+    slug: "coinbase",
+    name: "Coinbase",
+    tagline: "Crypto prices, portfolios and trading",
+    description:
+      "Coinbase lets agents read prices, balances, portfolios, orders and fees in Coinbase Advanced Trade, preview and place orders, convert between assets, and move funds between portfolios. Each user signs in to their own Coinbase account through the browser. Agents get the same permissions as the user. Orders and conversions use real funds, and agents can pay for x402 requests from the USDC balance.",
+    category: "data-analytics",
+    creatorName: "Coinbase",
+    iconUrl: "https://www.coinbase.com/apple-touch-icon.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-balances", text: "What are my Coinbase balances in each portfolio?" },
+      { id: "prompt-price", text: "Show the BTC-USD price on Coinbase and how it moved this week." },
+      { id: "prompt-preview-order", text: "Preview a 50 USD market buy of ETH on Coinbase. Do not place the order." },
+    ],
+    apps: [
+      {
+        id: "app-coinbase-mcp",
+        name: "Coinbase",
+        description:
+          "Prices, balances, portfolios, orders and conversions, over Coinbase's MCP server with browser sign-in.",
+        iconUrl: "https://www.coinbase.com/apple-touch-icon.png",
+        server: {
+          name: "coinbase",
+          transport: "http",
+          url: "https://agents.coinbase.com/mcp",
+          auth: [{ id: "coinbase-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://www.coinbase.com",
+    privacyPolicyUrl: "https://www.coinbase.com/legal/privacy",
+    termsUrl: "https://www.coinbase.com/legal/user_agreement",
+    skills: [],
+  },
+  robinhood: {
+    slug: "robinhood",
+    name: "Robinhood",
+    tagline: "Brokerage accounts and agentic trading",
+    description:
+      "Robinhood lets agents read the accounts, positions, balances, transaction history and watchlists of a Robinhood customer, read market data, and place stock, options and crypto orders. Each user signs in to their own Robinhood account through the browser. At the first sign-in, Robinhood asks the user to open a separate Agentic account. Agents can trade only in that account, and by default they place orders without asking the user to approve each one.",
+    category: "data-analytics",
+    creatorName: "Robinhood",
+    iconUrl: "https://robinhood.com/favicon.ico",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-positions", text: "Summarize my Robinhood positions and how they moved today." },
+      { id: "prompt-watchlist", text: "How did each stock on my Robinhood watchlist move this week?" },
+      { id: "prompt-agentic-cash", text: "How much cash is in my Robinhood Agentic account?" },
+    ],
+    apps: [
+      {
+        id: "app-robinhood-mcp",
+        name: "Robinhood",
+        description: "Accounts, positions, market data and trades, over Robinhood's MCP server with browser sign-in.",
+        iconUrl: "https://robinhood.com/favicon.ico",
+        server: {
+          name: "robinhood",
+          transport: "http",
+          url: "https://agent.robinhood.com/mcp/trading",
+          auth: [{ id: "robinhood-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://robinhood.com",
+    privacyPolicyUrl: "https://robinhood.com/us/en/support/articles/privacy-policy/",
+    termsUrl: "https://robinhood.com/us/en/about/legal/",
     skills: [],
   },
 };

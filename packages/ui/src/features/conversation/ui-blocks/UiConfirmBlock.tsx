@@ -28,10 +28,10 @@ function actionStyle(action: UiAction): UiActionStyle {
 }
 
 /**
- * A long draft stops at a fixed height and scrolls. A button under it opens the rest, because a
- * scroll bar that the system hides does not show that more text is there. The button is there only
- * when the text is cut off. Whether it is is a measurement, made again when the text or the width
- * changes.
+ * A long draft stops at a fixed height and fades out. It does not scroll, so the chat is the only
+ * part that scrolls. A button under it opens the rest in the card. The button and the fade are there
+ * only when the text is cut off. Whether it is is a measurement, made again when the text or the
+ * width changes. A draft that is not cut off keeps its sideways scroll and its keyboard focus.
  */
 function UiConfirmPreview(props: { children: JSX.Element }) {
   const { t } = useText();
@@ -54,6 +54,12 @@ function UiConfirmPreview(props: { children: JSX.Element }) {
     measure();
   }
 
+  // A link that the box hides can get keyboard focus. The box then opens, so the focus stays in sight.
+  function revealFocus(event: FocusEvent): void {
+    if (!preview || expanded() || !clamped() || !(event.target instanceof Element)) return;
+    if (event.target.getBoundingClientRect().bottom > preview.getBoundingClientRect().bottom) toggle();
+  }
+
   onSettled(() => {
     if (!preview || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(measure);
@@ -70,8 +76,10 @@ function UiConfirmPreview(props: { children: JSX.Element }) {
         id={previewId}
         class="ui-block-preview"
         data-expanded={expanded() ? "true" : undefined}
+        data-clamped={clamped() && !expanded() ? "true" : undefined}
         aria-label={t("uiBlock.confirm.previewLabel")}
-        tabindex="0"
+        tabindex={clamped() && !expanded() ? undefined : "0"}
+        onFocusIn={revealFocus}
       >
         {props.children}
       </section>

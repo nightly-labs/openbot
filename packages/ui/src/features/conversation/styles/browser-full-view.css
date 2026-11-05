@@ -66,6 +66,8 @@ body:has(.browser-full-view) .app-frame {
  * On macOS the window is `titleBarStyle: "hidden"` and the traffic lights are drawn over the view.
  * `trafficLightPosition: { x: 12, y: 13 }` (`src/main/main-window.ts`) puts the group at x 12..71, so
  * the first control starts at x 82, where the top row of the app frame starts beside those dots.
+ * In a right-to-left language the group is at the top right (`src/main/window-buttons.ts`), so
+ * the inset is at the inline start.
  */
 .browser-full-view-mac-controls .browser-full-top {
   padding-inline-start: calc(82px - var(--browser-full-edge));
@@ -156,6 +158,9 @@ body:has(.browser-full-view) .app-frame {
   min-width: 0;
   flex: 0 1 auto;
   overflow-x: auto;
+  /* The fades, the drag and the scroll into view measure `scrollLeft` from the left edge
+     (`BrowserTabStrip.tsx`), so the row keeps the left-to-right order in every language. */
+  direction: ltr;
   padding: var(--openbot-space-0-5);
   scrollbar-width: none;
 }

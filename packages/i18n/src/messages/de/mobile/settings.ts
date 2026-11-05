@@ -8,6 +8,12 @@ export const messages = {
   "mobile.settings.language.system": "Systemstandard",
   "mobile.settings.language.footer":
     "Systemstandard verwendet die erste Sprache in den Telefoneinstellungen. Noch nicht übersetzter Text erscheint auf Englisch.",
+  "mobile.settings.language.restartTitle": "OpenBot neu starten?",
+  "mobile.settings.language.restartBody":
+    "Diese Sprache liest sich in die andere Richtung. Die Ansichten wechseln die Richtung, wenn OpenBot neu startet. Wenn die Ansichten nach dem Neustart noch falsch aussehen, schließe OpenBot im App-Umschalter und öffne es erneut.",
+  "mobile.settings.language.restartNow": "Jetzt neu starten",
+  "mobile.settings.language.restartFailed":
+    "OpenBot konnte nicht neu starten. Die Ansichten wechseln die Richtung, wenn du OpenBot das nächste Mal öffnest.",
   "mobile.settings.dictation.language": "Diktiersprache",
   "mobile.settings.about.development": "Entwicklung",
   "mobile.settings.about.openFailed": "Der Link konnte nicht geöffnet werden. Versuche es erneut.",
@@ -20,11 +26,14 @@ export const messages = {
   "mobile.settings.home.support": "Support",
   "mobile.settings.home.supportHint": "Hilfe erhalten und ein Supportprotokoll speichern",
   "mobile.settings.support.help": "Hilfe erhalten",
+  "mobile.settings.support.discord": "Ticket auf Discord öffnen",
+  "mobile.settings.support.discordHint": "Der schnellste Weg zu Hilfe",
   "mobile.settings.support.message": "Schreib uns auf X",
   "mobile.settings.support.issues": "Problem auf GitHub melden",
   "mobile.settings.support.helpFooter":
-    "Beschreibe, was wann passiert ist. Hänge die Supportprotokolldatei an dein GitHub-Issue an.",
+    "Beschreibe, was wann passiert ist. Hänge die Supportprotokolldatei an dein Discord-Ticket oder dein GitHub-Issue an.",
   "mobile.settings.support.log": "Supportprotokoll",
+  "mobile.settings.support.show": "Protokoll anzeigen",
   "mobile.settings.support.save": "Protokolldatei speichern",
   "mobile.settings.support.events": {
     one: "{count} Ereignis",
@@ -37,8 +46,8 @@ export const messages = {
     "Das Protokoll bleibt auf diesem Telefon und wird von OpenBot nicht gesendet. Es erfasst Verbindungsschritte, Anfragen und Fehler. Es erfasst keine Nachrichten oder Dateien und maskiert Passwörter und Tokens. Lies die Datei, bevor du sie teilst.",
   "mobile.settings.support.saveFailed": "Die Protokolldatei konnte nicht gespeichert werden. Versuche es erneut.",
   "mobile.settings.support.sharingUnavailable": "Teilen ist auf diesem Telefon nicht verfügbar.",
-  "mobile.settings.support.recent": "Letzte Ereignisse",
-  "mobile.settings.support.recentFooter": "Neueste zuerst. Die gespeicherte Datei enthält alle Ereignisse.",
+  "mobile.settings.support.newestFirst": "Neueste zuerst.",
+  "mobile.settings.support.showOlder": "Ältere Ereignisse anzeigen",
   "mobile.settings.support.empty": "Noch keine Ereignisse.",
   "mobile.settings.sessions.kindDesktop": "Desktop",
   "mobile.settings.sessions.kindMobile": "Mobil",
@@ -75,7 +84,7 @@ export const messages = {
   "mobile.settings.animations.all": "Animationen",
   "mobile.settings.animations.agentFaces": "Animierte Agentengesichter",
   "mobile.settings.animations.agentFacesFooter":
-    "Die Gesichter der Agenten-Avatare bewegen sich, während die Agenten arbeiten und ruhen. Wenn dies aus ist, bleiben die Gesichter still.",
+    "Die Gesichter der Agenten-Avatare bewegen sich, während die Agenten arbeiten und ruhen. Wenn dies aus ist, bleiben die Gesichter still, und die Figuren auf dem Willkommensbildschirm und dem leeren Startbildschirm schweben nicht mehr.",
   "mobile.settings.animations.composerResize": "Kompaktes Nachrichtenfeld",
   "mobile.settings.animations.composerResizeFooter":
     "Das Nachrichtenfeld wird zu einer kleinen Leiste, solange die Tastatur geschlossen ist. Wenn dies aus ist, bleibt das Feld in voller Größe.",
@@ -268,6 +277,14 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "Zuhören",
   "mobile.settings.voice.tab.speaking": "Sprechen",
+  "mobile.settings.voice.pause.title": "Pause vor dem Senden",
+  "mobile.settings.voice.pause.label": "Auf neue Wörter warten",
+  "mobile.settings.voice.pause.footer":
+    "In einem Sprachgespräch sendet OpenBot deine Worte, wenn es so lange keine neuen Wörter erkennt. Lärm ohne Wörter hält das Zuhören nicht offen. Wähle eine längere Pause, wenn du langsam sprichst oder zum Nachdenken innehältst.",
+  "mobile.settings.voice.pause.seconds": "{seconds} s",
+  "mobile.settings.voice.speed.title": "Antworttempo",
+  "mobile.settings.voice.speed.footer": "Das Tempo der Antworten, die OpenBot vorliest, auch in einem Sprachgespräch.",
+  "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot streamt deine Sprache mit einem Einmal-Token an ElevenLabs, und ElevenLabs rechnet über dein Konto ab. Der Schlüssel bleibt auf diesem Telefon.",
 } as const satisfies PartialTranslation<typeof source>;

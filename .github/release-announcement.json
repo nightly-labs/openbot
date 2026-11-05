@@ -1,10 +1,10 @@
 {
-  "version": "0.59.0",
+  "version": "0.62.0",
   "highlights": [
-    "Kimi is a new provider, and you can use Hermes Agent from Nous Research with your own memories and skills.",
-    "Start a workflow when someone mentions OpenBot in Discord, and send its result back to Discord.",
-    "Sidebar folders can now hold folders, up to three levels.",
-    "Pinned agents and channels stay the same on each device that connects to a server.",
-    "On a Mac, OpenBot has a menu bar icon and keeps your tasks running after you close the window. Hold ⌘Q or press it twice to quit."
+    "Give each browser profile its own proxy, or send its pages out through your own computer.",
+    "Connect Proton Pass in the Marketplace, and the browser fills the logins of its shared vault.",
+    "Type @ in a chat to give the agent one of its browser tabs or side threads.",
+    "Settings → Voice has two new local dictation models: Parakeet Unified EN and Cohere Transcribe.",
+    "Routines run in the agent's chat again. A new switch keeps a routine in its own thread."
   ]
 }

@@ -3,6 +3,7 @@ import { Button, X } from "@openbot/ui";
 import { createEffect, createSignal, Show } from "solid-js";
 import { useText } from "../../text";
 import { DownloadIcon } from "./ConversationIcons";
+import { createSteadyImageUrl } from "./steady-image-url";
 
 export type ImageGenerationStatus = "generating" | "completed" | "failed" | "interrupted";
 
@@ -22,12 +23,23 @@ export interface ImageGenerationProps {
 export function ImageGeneration(props: ImageGenerationProps) {
   const { t, errorMessage } = useText();
   const [previewError, setPreviewError] = createSignal(false);
+  // The ratio stays when the URL changes: a sent image gets the URL of its stored copy, and the
+  // image keeps its size and pixels until that copy loads.
   const [imageRatio, setImageRatio] = createSignal<string | null>(null);
+  const imageUrl = createSteadyImageUrl(() => props.attachment?.previewUrl);
+  let image: HTMLImageElement | undefined;
+  const readRatio = (element: HTMLImageElement) => {
+    const { naturalHeight, naturalWidth } = element;
+    if (naturalWidth > 0 && naturalHeight > 0) setImageRatio(`${naturalWidth} / ${naturalHeight}`);
+  };
+  // Keyed by the drawn URL: a URL that failed is not tried again while the new one loads.
   createEffect(
-    () => `${props.attachment?.id ?? ""}:${props.attachment?.previewUrl ?? ""}`,
+    () => imageUrl(),
     () => {
       setPreviewError(false);
-      setImageRatio(null);
+      // An image in the memory cache, such as one the composer showed, is complete at once. A lazy
+      // image fires `load` frames later, and the box would be square until then.
+      if (image?.complete) readRatio(image);
     },
   );
 
@@ -115,14 +127,14 @@ export function ImageGeneration(props: ImageGenerationProps) {
             }}
           >
             <img
-              src={props.attachment?.previewUrl ?? ""}
+              src={imageUrl() ?? ""}
               alt={props.prompt ?? t("chat.image.generated")}
               loading="lazy"
               decoding="async"
-              onLoad={(event) => {
-                const { naturalHeight, naturalWidth } = event.currentTarget;
-                if (naturalWidth > 0 && naturalHeight > 0) setImageRatio(`${naturalWidth} / ${naturalHeight}`);
+              ref={(element) => {
+                image = element;
               }}
+              onLoad={(event) => readRatio(event.currentTarget)}
               onError={() => setPreviewError(true)}
             />
           </Button>

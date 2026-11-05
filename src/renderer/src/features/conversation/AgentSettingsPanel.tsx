@@ -3,6 +3,9 @@ import {
   agentAutomationAllowed,
   agentNotificationLevelMap,
   assignedSkillCount,
+  type BrowserProfileSummary,
+  type BrowserProxyComputer,
+  type BrowserProxySummary,
   DEFAULT_AGENT_DEFAULTS,
   type FilePreview,
   type ServerNotificationLevel,
@@ -10,6 +13,8 @@ import {
 import { BookMarked, CalendarClock, FileText, Folder, Gauge, Puzzle, Table2, Upload } from "@openbot/ui";
 import { SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/SettingsPanel";
 import type { AgentProfile } from "@openbot/ui/data";
+import type { BrowserProfileSelectProfile } from "@openbot/ui/features/browser/BrowserProfileSelect";
+import { browserProfileProxyNames } from "@openbot/ui/features/browser/BrowserProxies";
 import {
   type AgentInstructionsCalls,
   AgentInstructionsView,
@@ -67,6 +72,8 @@ interface AgentSettingsPanelProps
   routineSelectionRequest?: RoutineSelectionRequest | null | undefined;
   onRoutineSelectionRequestHandled?: ((nonce: number) => void) | undefined;
   onOpenRoutineRun?: ((messageId: string) => void) | undefined;
+  /** Opens the side thread where a routine runs. Resolves false when the routine has no thread. */
+  onOpenRoutineThread?: ((routineId: string) => Promise<boolean>) | undefined;
   skillsMode?: AgentSkillsMode | undefined;
   /** The joined server that runs the agent, for the `host` skills mode. */
   skillsServerId?: string | undefined;
@@ -101,6 +108,19 @@ interface AgentSettingsPanelProps
 }
 
 export type { AgentSkillsMode };
+
+/** Each named profile with the name of its proxy, as the server settings show it. */
+function profilesWithProxies(
+  state: {
+    profiles: readonly BrowserProfileSummary[] | undefined;
+    proxies: readonly BrowserProxySummary[] | undefined;
+    computers: readonly BrowserProxyComputer[] | undefined;
+  },
+  t: ReturnType<typeof useText>["t"],
+): BrowserProfileSelectProfile[] | undefined {
+  const names = browserProfileProxyNames(state.proxies ?? [], state.computers ?? [], t);
+  return state.profiles?.map((profile) => ({ ...profile, proxy: names.get(profile.id) }));
+}
 
 export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const { t, errorMessage } = useText();
@@ -180,7 +200,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     const current = hostChoice();
     if (!store || !manage || (!props.localHost && !current)) return undefined;
     return {
-      profiles: store.state.profiles,
+      profiles: profilesWithProxies(store.state, t),
       current,
       onChange: async (agentId, profile) => {
         const saved = await store.assign(agentId, profile);
@@ -598,6 +618,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
             selectionRequest={props.routineSelectionRequest}
             onSelectionRequestHandled={props.onRoutineSelectionRequestHandled}
             onOpenRun={props.onOpenRoutineRun}
+            onOpenThread={props.onOpenRoutineThread}
           />
         </div>
       </Show>

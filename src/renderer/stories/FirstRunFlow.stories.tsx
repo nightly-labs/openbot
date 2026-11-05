@@ -7,7 +7,7 @@ import { FakeProviderDownloads, lazyProviderAgentStatus, MockedOnboardingApi } f
 const setupState: AppSetupState = { completed: false, preferredProvider: null, preferredModel: null };
 
 /**
- * A new computer: nothing is downloaded. OpenCode downloads when first run opens, and "Start free"
+ * A new computer: nothing is downloaded. OpenCode downloads when first run opens, and "Use free models"
  * starts it while the user reads the next step. A plan provider downloads and then opens its
  * sign-in. The computer step asks for both permissions.
  */
@@ -64,7 +64,7 @@ export const ChoiceNarrow: Story = {
 };
 
 /**
- * Not macOS, so there is no computer step. "Start free" waits on the first screen until OpenCode
+ * Not macOS, so there is no computer step. "Use free models" waits on the first screen until OpenCode
  * is ready, then opens the app.
  */
 export const ChoiceWithoutComputerStep: Story = {
@@ -73,14 +73,14 @@ export const ChoiceWithoutComputerStep: Story = {
 
 /**
  * "Use your … plan": ChatGPT, Claude and Grok are downloaded, so the plan step only connects.
- * OpenCode is not in the list; "Start free instead" leaves the plan step.
+ * OpenCode is not in the list; "Use free models instead" leaves the plan step.
  */
 export const SubscriptionPath: Story = {
   render: (storyArgs) => <NewComputerFirstRun args={storyArgs} downloaded />,
 };
 
 /**
- * OpenCode downloads slowly. Press "Start free", then "Open OpenBot" at once: the button waits,
+ * OpenCode downloads slowly. Press "Use free models", then "Open OpenBot" at once: the button waits,
  * says why, and opens the app when OpenCode is ready.
  */
 export const FreeStillDownloading: Story = {

@@ -1,3 +1,4 @@
+import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import type { AgentEvent, DynamicIslandAgentIdentity, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
@@ -23,7 +24,6 @@ import {
 import { encodeLiveActivityBytes } from "@openbot/team-client/live-activity-seal";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert } from "react-native";
-import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { useLiveActivitiesPreference } from "@/features/settings/model/live-activities";
@@ -259,7 +259,7 @@ export function useLiveActivity({
       const servers = new Set(shownOrder);
       const props = liveActivityView(presentation, {
         t: currentText().t,
-        agentColor: getBloubAvatarColor,
+        agentColor: avatarHeadColor,
         avatar,
         unreadAgents: agentsRef.current
           // An agent with its notifications off is not in the island, so it is not in the list.
