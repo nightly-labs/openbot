@@ -252,6 +252,7 @@ import { McpServerStore } from "./mcp-server-store";
 import type { MessageDeleteAccess, MessageDeleteRefused } from "./message-delete";
 import { MessagingThreads, toMessagingThreadFailed } from "./messaging/messaging-threads";
 import type { PasswordVault } from "./password-vault";
+import { canConfineProcesses } from "./process-confinement";
 import { type AppServerNotification, decodeRecordResponse, getString, isRecord } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext } from "./provider-drivers";
 import { providerHistoryPersistence } from "./provider-history-persistence";
@@ -2933,6 +2934,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const requestedProvider = input.provider ?? requestedModel?.provider ?? previous?.provider;
         if (input.provider && requestedModel && requestedModel.provider !== input.provider) {
           throw new AgentSettingsRefused(sourceText("error.agent.modelProviderMismatch"));
+        }
+        // Refuse Workspace only now, not at the next turn, when this computer cannot confine the
+        // provider's own process: the agent then could not start until the user gives it more access.
+        const confinedProvider = requestedProvider ?? (previous ? providerForAgent(previous) : undefined);
+        if (
+          input.access === "workspace" &&
+          confinedProvider !== undefined &&
+          agentProviderDescriptor(confinedProvider).workspaceEnforcement === "confined-process" &&
+          !canConfineProcesses()
+        ) {
+          throw new AgentSettingsRefused(sourceText("error.agent.workspaceOnlyMacOnly"));
         }
         if (requestedProvider && previous && requestedProvider !== providerForAgent(previous)) {
           if (!input.model || !input.provider) {
