@@ -17,13 +17,6 @@ export const PASSWORD_MANAGER_BRANDS = {
 
 export const PASSWORD_MANAGER_BRAND_NAMES: readonly string[] = Object.values(PASSWORD_MANAGER_BRANDS);
 
-/** The brands as one phrase for agent text, such as "A, B or C". */
-export function passwordManagerBrandList(conjunction: "and" | "or"): string {
-  const last = PASSWORD_MANAGER_BRAND_NAMES.at(-1) ?? "";
-  const rest = PASSWORD_MANAGER_BRAND_NAMES.slice(0, -1);
-  return rest.length ? `${rest.join(", ")} ${conjunction} ${last}` : last;
-}
-
 /**
  * Where a saved website may be filled, as 1Password's autofill behavior says:
  * - `anywhere`: every page of the same site, subdomains included.
