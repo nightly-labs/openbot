@@ -579,7 +579,7 @@ export const messages = {
   "settings.voice.speech.readReplies.description": "你用听写发送消息时，会朗读回复。再次听写即可停止朗读。",
   "settings.voice.speech.codexLive.title": "Codex 实时语音",
   "settings.voice.speech.codexLive.description":
-    "与 Codex 智能体的语音对话会通过你的 Codex 登录使用 OpenAI 实时语音。你的语音会发送给 OpenAI。",
+    "与任何智能体的语音对话都会通过你的 Codex 登录使用 OpenAI 实时语音。你的语音、你的请求和智能体的回复会发送给 OpenAI。",
   "settings.voice.speech.speed.title": "语速",
   "settings.voice.speech.voice.title": "声音",
   "settings.voice.speech.voice.female": "女声 {number}",

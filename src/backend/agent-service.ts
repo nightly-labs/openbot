@@ -171,7 +171,7 @@ import type { FailureContext, FailureSignal } from "./agent/failure-signal";
 import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-site-coordinator";
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import { InstructionsChanges } from "./agent/instructions-changes";
-import { LiveVoice } from "./agent/live-voice";
+import { LiveVoice, type LiveVoiceReply } from "./agent/live-voice";
 import { MailboxSync } from "./agent/mailbox-sync";
 import { type GitHubConnectorSource, McpGateway, type TestMcpServerOptions } from "./agent/mcp-gateway";
 import { type MarketplaceAppServer, mcpServersFromGateway } from "./agent/mcp-tools";
@@ -250,10 +250,10 @@ import { toMcpOperationError } from "./mcp-effects";
 import type { McpSignInOpener } from "./mcp-oauth-provider";
 import { McpServerStore } from "./mcp-server-store";
 import type { MessageDeleteAccess, MessageDeleteRefused } from "./message-delete";
-import { MessagingThreads, toMessagingThreadFailed } from "./messaging/messaging-threads";
+import { isAnswer, MessagingThreads, toMessagingThreadFailed } from "./messaging/messaging-threads";
 import type { PasswordVault } from "./password-vault";
 import { canConfineProcesses } from "./process-confinement";
-import { type AppServerNotification, decodeRecordResponse, getString, isRecord } from "./protocol";
+import { decodeRecordResponse, getString } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext } from "./provider-drivers";
 import { providerHistoryPersistence } from "./provider-history-persistence";
 import { recordAgentRestartActivity } from "./restart-activity";
@@ -753,12 +753,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       hooks: {
         bindClient: (client) => {
-          client.on("notification", (incoming) => {
-            if (incoming.method.startsWith("thread/realtime/")) {
-              this.#liveVoice.handleNotification(incoming, client);
-              return;
-            }
-            const notification = this.#liveVoiceTurn(incoming);
+          client.on("notification", (notification) => {
             if (notification.method === "openbot/sessionSettings/updated") {
               const threadId = getString(notification.params, "threadId");
               const agentId = threadId ? this.#conversation.agentForThread(threadId) : undefined;
@@ -1488,12 +1483,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         if (!agent) throw new Error(sourceText("error.agent.selectedGone"));
         return agent;
       },
-      // OpenBot stops an idle provider CLI; a typed message starts it again, and so does live voice.
-      client: (agent) => this.#providers.ensureAgentClient(agent),
-      ensureThread: (agent, client) => this.#threads.ensureThread(agent, client),
-      holdDrain: (agentId) => this.#drain.holdLiveVoice(agentId),
-      awaitDrain: (agentId) => this.#drain.taskFor(agentId)?.pipe(Effect.ignore) ?? Effect.void,
-      addSpeech: (agentId, providerThreadId, role, text) => this.#addSpeech(agentId, providerThreadId, role, text),
+      relay: (agent) => this.#liveVoiceRelay(agent),
+      send: (agentId, text) =>
+        this.sendMessage({ agentId, text }).pipe(
+          Effect.flatMap((receipt) => {
+            const deliveryId = receipt.deliveries[0]?.id;
+            return deliveryId
+              ? Effect.succeed(deliveryId)
+              : Effect.fail({ cause: new Error(sourceText("error.voice.live.disconnected")) });
+          }),
+        ),
+      reply: (agentId, deliveryId) => this.#liveVoiceReply(agentId, deliveryId),
       emit: (event) => this.emit("liveVoice", event),
       redact: (text) => this.#mcp.redact(text),
     });
@@ -4364,7 +4364,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       { startImmediately: true },
     );
     this.#initialized = false;
-    this.#liveVoice.dispose();
+    yield* this.#liveVoice.dispose();
     this.#routineTimer.dispose();
     yield* this.#memoryHold.dispose();
     this.#hostedSites.dispose();
@@ -4533,7 +4533,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
-  /** Starts Codex live voice in the agent's chat and answers the renderer's WebRTC offer. */
+  /** Starts live voice for the agent and answers the renderer's WebRTC offer. */
   startLiveVoice(
     input: VoiceLiveStart,
     voice: CodexLiveVoice | null,
@@ -4550,34 +4550,60 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
-   * The voice model of a live session starts its turns itself. A delivery that starts at the same
-   * time must not take such a turn, so the lifecycle reads it as a turn that no delivery started.
+   * The Codex process of a live voice session. An agent on Codex lends its own Codex account; any other
+   * agent uses the Codex sign-in of this computer. The relay model only passes requests on, so it is
+   * the small default model, with low effort.
    */
-  #liveVoiceTurn(notification: AppServerNotification): AppServerNotification {
-    if (notification.method !== "turn/started" || !isRecord(notification.params)) return notification;
-    const threadId = getString(notification.params, "threadId");
-    if (!threadId || !this.#liveVoice.isLiveThread(threadId)) return notification;
-    return { ...notification, params: { ...notification.params, unprompted: true } };
-  }
+  readonly #liveVoiceRelay = Effect.fn("AgentService.liveVoiceRelay")(function* (
+    this: AgentService,
+    agent: AgentSummary,
+  ) {
+    const signIn = () => ({ cause: new Error(sourceText("error.voice.live.signIn")) });
+    yield* this.#providers.ensureProvider("codex").pipe(Effect.mapError(signIn));
+    const models = this.#endpoints.available().filter((model) => model.provider === "codex");
+    const model =
+      models.find((candidate) => candidate.id === agentProviderDescriptor("codex").defaultModel) ?? models[0];
+    if (!model) return yield* Effect.fail({ cause: new Error(sourceText("error.provider.noModel")) });
+    const client = yield* Effect.try({
+      try: () =>
+        this.#providers.createProfileClient("codex", agent.provider === "codex" ? agent.providerAccountId : undefined),
+      catch: signIn,
+    });
+    const effort: AgentReasoningEffort = model.supportedReasoningEfforts.includes("low")
+      ? "low"
+      : model.defaultReasoningEffort;
+    return { client, model: model.id, effort };
+  }).bind(this);
 
-  /** What the user or the voice said in a live voice session, as a message in the chat of that thread. */
-  #addSpeech(agentId: string, providerThreadId: string, role: "user" | "assistant", text: string): void {
-    try {
-      const snapshot = this.#conversation.ensureSnapshot(
-        agentId,
-        this.#conversation.publicThreadId(agentId, providerThreadId),
-      );
-      snapshot.messages.push({
-        id: randomUUID(),
-        author: role,
-        source: role,
-        text,
-        createdAt: new Date().toISOString(),
-        status: "completed",
-      });
-      this.#conversation.emitConversation(snapshot);
-    } catch (error) {
-      this.#emitError("live_voice_message_failed", error, agentId);
+  /**
+   * The end of a request that live voice gave to the agent: the answer of the delivery's last turn,
+   * or why it has none. The text goes to the voice model, which says it in the user's language.
+   */
+  #liveVoiceReply(agentId: string, deliveryId: string): LiveVoiceReply | null {
+    const delivery = this.#mailbox.getDelivery(deliveryId)?.delivery;
+    if (!delivery) return { success: false, text: "The user removed the request." };
+    switch (delivery.status) {
+      case "queued":
+      case "starting":
+      case "running":
+        return null;
+      case "cancelled":
+        return { success: false, text: "The user cancelled the request." };
+      case "interrupted":
+        return { success: false, text: "The user stopped the agent before it finished." };
+      case "failed":
+        return { success: false, text: delivery.error ?? "The agent could not finish the request." };
+      case "completed": {
+        const turnId = delivery.turnId;
+        const ofTurn = (messages: readonly ConversationMessage[]) =>
+          messages.filter((message) => message.turnId === turnId);
+        const loaded = ofTurn(this.#conversation.loadedSnapshot(agentId)?.messages ?? []);
+        const threadId = this.#store.list().find((agent) => agent.id === agentId)?.threadId ?? null;
+        const messages =
+          loaded.length > 0 ? loaded : ofTurn(this.#store.database.readConversation(agentId, threadId).messages);
+        const answer = turnId ? messages.findLast(isAnswer)?.text : undefined;
+        return { success: true, text: answer ?? "The agent finished and gave no answer." };
+      }
     }
   }
 
@@ -5518,6 +5544,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   #emit(event: AgentEvent, memberId?: string): void {
     recordAgentRestartActivity(event);
+    this.#liveVoice?.observe(event);
     if (this.channels?.event(event) || this.messaging?.event(event, this.#scope) || this.#tasks?.event(event)) return;
     this.emit("event", event, memberId);
   }

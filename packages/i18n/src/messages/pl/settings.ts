@@ -625,7 +625,7 @@ export const messages = {
     "Gdy dyktujesz wiadomość, odpowiedź jest czytana na głos. Aby ją zatrzymać, zacznij dyktować ponownie.",
   "settings.voice.speech.codexLive.title": "Głos na żywo Codex",
   "settings.voice.speech.codexLive.description":
-    "Rozmowy głosowe z agentami Codex używają głosu na żywo OpenAI z Twoim logowaniem Codex. Twój głos trafia do OpenAI.",
+    "Rozmowy głosowe z każdym agentem używają głosu na żywo OpenAI z Twoim logowaniem Codex. Twój głos, Twoje prośby i odpowiedzi agenta trafiają do OpenAI.",
   "settings.voice.speech.speed.title": "Szybkość",
   "settings.voice.speech.voice.title": "Głos",
   "settings.voice.speech.voice.female": "Głos żeński {number}",

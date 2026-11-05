@@ -615,7 +615,7 @@ export const messages = defineMessages("settings", {
     "When you dictate a message, the reply is read aloud. Dictate again to stop it.",
   "settings.voice.speech.codexLive.title": "Codex live voice",
   "settings.voice.speech.codexLive.description":
-    "Voice conversations with Codex agents use OpenAI live voice with your Codex sign-in. Your voice goes to OpenAI.",
+    "Voice conversations with any agent use OpenAI live voice with your Codex sign-in. Your voice, your requests and the agent's replies go to OpenAI.",
   "settings.voice.speech.speed.title": "Speed",
   "settings.voice.speech.voice.title": "Voice",
   "settings.voice.speech.voice.female": "Female voice {number}",

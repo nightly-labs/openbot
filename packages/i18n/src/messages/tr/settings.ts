@@ -599,7 +599,7 @@ export const messages = {
     "Bir mesajı dikte ettiğinizde yanıt sesli okunur. Durdurmak için yeniden dikte edin.",
   "settings.voice.speech.codexLive.title": "Codex canlı ses",
   "settings.voice.speech.codexLive.description":
-    "Codex ajanlarıyla sesli konuşmalar, Codex oturumunla OpenAI canlı sesini kullanır. Sesin OpenAI'ye gider.",
+    "Herhangi bir ajanla sesli konuşmalar, Codex oturumunla OpenAI canlı sesini kullanır. Sesin, isteklerin ve ajanın yanıtları OpenAI'ye gider.",
   "settings.voice.speech.speed.title": "Hız",
   "settings.voice.speech.voice.title": "Ses",
   "settings.voice.speech.voice.female": "Kadın sesi {number}",

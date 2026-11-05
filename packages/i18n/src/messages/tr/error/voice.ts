@@ -28,7 +28,6 @@ export const messages = {
   "error.voice.speech.timedOut": "Yanıtı sesli okuma zaman aşımına uğradı.",
   "error.voice.speech.failed": "OpenBot yanıtı sesli okuyamadı.",
   "error.voice.recordingNotKept": "OpenBot ses kaydını saklayamadı.",
-  "error.voice.live.codexOnly": "Canlı ses yalnızca Codex ajanlarıyla çalışır.",
   "error.voice.live.timedOut": "Codex canlı ses zamanında başlamadı. Tekrar dene.",
   "error.voice.live.failed": "Canlı ses durdu: {reason}",
   "error.voice.live.disconnected": "Canlı ses bağlantısı kesildi.",

@@ -579,7 +579,7 @@ export const messages = {
     "음성으로 메시지를 입력하면 답변을 소리 내어 읽어줘요. 다시 음성 입력을 하면 멈춰요.",
   "settings.voice.speech.codexLive.title": "Codex 라이브 음성",
   "settings.voice.speech.codexLive.description":
-    "Codex 에이전트와의 음성 대화는 Codex 로그인으로 OpenAI 라이브 음성을 사용해요. 음성은 OpenAI로 전송돼요.",
+    "모든 에이전트와의 음성 대화는 Codex 로그인으로 OpenAI 라이브 음성을 사용해요. 음성, 요청, 에이전트의 답변은 OpenAI로 전송돼요.",
   "settings.voice.speech.speed.title": "속도",
   "settings.voice.speech.voice.title": "음성",
   "settings.voice.speech.voice.female": "여성 음성 {number}",

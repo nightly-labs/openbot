@@ -28,7 +28,6 @@ export const messages = {
   "error.voice.speech.timedOut": "Het voorlezen van het antwoord duurde te lang.",
   "error.voice.speech.failed": "OpenBot kon het antwoord niet voorlezen.",
   "error.voice.recordingNotKept": "OpenBot kon de spraakopname niet bewaren.",
-  "error.voice.live.codexOnly": "Live spraak werkt alleen met Codex-agents.",
   "error.voice.live.timedOut": "Codex live spraak is niet op tijd gestart. Probeer het opnieuw.",
   "error.voice.live.failed": "Live spraak is gestopt: {reason}",
   "error.voice.live.disconnected": "Live spraak is verbroken.",
