@@ -993,9 +993,11 @@ export class TurnLifecycle {
             return;
           }
           this.#hooks.emitFailure?.({ code: "agent_error", ...(agentId !== undefined ? { agentId } : {}), ...context });
-          // A thread shows no usage notice, so its failed turn keeps the provider's text (#5220).
+          // A thread shows no usage notice, so its failed turn keeps the provider's text (#5220). A turn
+          // that a plan limit holds waits in the queue for the reset, so it has not failed.
+          const held = planLimit || (errorTurnId !== null && this.#limitedTurns.has(errorTurnId));
           const taskId =
-            !planLimit && notification.method === "error" && agentId && threadId
+            !held && notification.method === "error" && agentId && threadId
               ? this.#taskForThread(agentId, threadId)
               : null;
           if (taskId !== null) this.#hooks.taskFailed(taskId, message);
