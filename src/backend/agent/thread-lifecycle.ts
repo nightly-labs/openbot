@@ -28,8 +28,9 @@ import {
   type CodexMcpServer,
   type CodexOwnServers,
   type CodexOwnTransports,
+  codexDeferredMcpServers,
+  codexDirectMcpNamespaces,
   codexDisabledServers,
-  codexMcpNamespaces,
   codexMcpServerKey,
   codexMcpServers,
   codexThreadMcpServers,
@@ -95,6 +96,9 @@ const logger = createOpenBotLogger("thread-lifecycle");
  * server names in the form Codex accepts. Version 7 keeps approvals for custom MCP servers. Version 8
  * is the MCP namespaces in `features.code_mode.direct_only_tool_namespaces`: Codex 0.164 does not
  * add them on resume to a thread started without them, so a code-mode-only model saw no MCP tools.
+ * Since #4468 only Computer Use stays in that list. No new version: a session started before keeps
+ * its MCP namespaces direct on resume and keeps working, and a new version would replace each Codex
+ * session with a handoff. Such a session defers the tools from its next new session.
  * Version 9 adds `image_gen` to those namespaces. Version 10 gives a stdio server its working
  * directory as `cwd`; before, Codex did not get such a server.
  */
@@ -147,10 +151,10 @@ const CODEX_MCP_STARTUP_GRACE_MS = 10_000;
  * In code mode the model calls tools from an `exec` cell, and `exec` gives control back to the model
  * after its yield time while `ask_user` still waits. A model that then ends its turn expires the
  * question within seconds. Direct calls keep the turn waiting for the answer. It goes in as one
- * dotted key, as the agent environment does, so it does not turn code mode on or off. Each thread
- * adds the namespaces of its MCP servers, see `codexMcpNamespaces`. `image_gen` is direct because
- * from `exec` a model often reads `result.content` instead of `generatedImage(result)`: it then sees
- * no image and tells the user that the image failed, although the chat shows it.
+ * dotted key, as the agent environment does, so it does not turn code mode on or off. A thread adds
+ * Computer Use, see `codexDirectMcpNamespaces`; Codex defers the other MCP servers. `image_gen` is
+ * direct because from `exec` a model often reads `result.content` instead of `generatedImage(result)`:
+ * it then sees no image and tells the user that the image failed, although the chat shows it.
  */
 const CODEX_DIRECT_ONLY_NAMESPACES = [...VISIBLE_DYNAMIC_TOOLS.map((namespace) => namespace.name), "image_gen"];
 
@@ -201,6 +205,8 @@ export interface ThreadLifecycleOptions {
   channelThread?: (threadId: string) => boolean;
   /** Whether a side thread is a branch: a copy of another conversation, which its first session must receive. */
   branchThread?: (threadId: string) => boolean;
+  /** Whether a side thread takes the runs of a routine. */
+  routineThread?: (threadId: string) => boolean;
 }
 
 /**
@@ -234,6 +240,7 @@ export class ThreadLifecycle {
   readonly #sectionTeammates: (agentId: string) => SectionTeammates | null;
   readonly #channelThread: (threadId: string) => boolean;
   readonly #branchThread: (threadId: string) => boolean;
+  readonly #routineThread: (threadId: string) => boolean;
   readonly #pendingHandoffs = new Map<string, string>();
   /**
    * Routine digests and the cleanup after a turn change a handoff one at a time. A routine thread
@@ -271,6 +278,7 @@ export class ThreadLifecycle {
     this.#sectionTeammates = options.sectionTeammates ?? (() => null);
     this.#channelThread = options.channelThread ?? (() => false);
     this.#branchThread = options.branchThread ?? (() => false);
+    this.#routineThread = options.routineThread ?? (() => false);
   }
 
   /**
@@ -897,7 +905,7 @@ export class ThreadLifecycle {
         mcp_optional_startup_grace_ms: CODEX_MCP_STARTUP_GRACE_MS,
         "features.code_mode.direct_only_tool_namespaces": [
           ...CODEX_DIRECT_ONLY_NAMESPACES,
-          ...codexMcpNamespaces(servers),
+          ...codexDirectMcpNamespaces(servers),
         ],
         ...codexSandboxConfig(agent, this.#store.sharedRoot),
         ...Object.fromEntries(
@@ -1072,14 +1080,19 @@ export class ThreadLifecycle {
   /**
    * The settings that one session of the agent runs with. A task runs without Computer Use: the
    * agent's own chat keeps the one screen of this computer, so two conversations of the agent never
-   * drive it at the same time.
+   * drive it at the same time. A routine thread keeps it: a scheduled run that sends a message
+   * through a desktop app has no person to continue the step in the chat.
    */
   #sessionAgent(agent: AgentSummary, publicThreadId: string): AgentSummary {
     return this.#computerUseInOwnChat(agent, publicThreadId) ? { ...agent, computerUse: false } : agent;
   }
 
   #computerUseInOwnChat(agent: AgentSummary, publicThreadId: string): boolean {
-    return this.#conversation.isTaskThread(publicThreadId) && agentComputerUseEnabled(agent);
+    return (
+      this.#conversation.isTaskThread(publicThreadId) &&
+      !this.#routineThread(publicThreadId) &&
+      agentComputerUseEnabled(agent)
+    );
   }
 
   /** The enabled servers this agent is given. Without Computer Use the fingerprint changes, so Codex replaces the session. */
@@ -1195,6 +1208,8 @@ export class ThreadLifecycle {
       sectionTeammates: section,
       homeSkills,
       httpMcpServers: mcpServers.some((config) => config.transport === "http"),
+      deferredMcpServers:
+        client.provider === "codex" ? codexDeferredMcpServers(mcpServers).map((config) => config.name) : [],
       instructionsFileName: instructionsFile.fileName,
       instructionsFile: instructionsFile.file,
     };

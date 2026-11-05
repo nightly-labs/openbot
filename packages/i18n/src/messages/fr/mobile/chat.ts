@@ -212,6 +212,9 @@ export const messages = {
   "mobile.chat.message.reply": "Répondre",
   "mobile.chat.message.branch": "Dériver d’ici",
   "mobile.chat.message.branchFailed": "Impossible de dériver le chat.",
+  "mobile.chat.message.markUnread": "Marquer comme non lu",
+  "mobile.chat.unread.line": "NOUVEAU",
+  "mobile.chat.unread.lineLabel": "Nouveaux messages",
   "mobile.chat.message.actions": "Actions sur le message",
   "mobile.chat.message.copy": "Copier le message",
   "mobile.chat.message.readAloud": "Lire à voix haute",
@@ -394,13 +397,10 @@ export const messages = {
   "mobile.chat.queue.editEnded": "La modification de la file d’attente est terminée.",
   "mobile.chat.queue.loadFailed": "Impossible de charger la file d’attente.",
   "mobile.chat.queue.storageUnavailable": "Le stockage des pièces jointes n’est pas disponible.",
-  "mobile.chat.queue.buttonFailed":
-    "Les messages en file d’attente n’ont pas été chargés. Afficher les messages en file d’attente",
   "mobile.chat.queue.buttonLabel": {
     one: "{count} message en file d’attente. Afficher les messages en file d’attente",
     other: "{count} messages en file d’attente. Afficher les messages en file d’attente",
   },
-  "mobile.chat.queue.unavailable": "File d’attente non disponible",
   "mobile.chat.queue.uploading": "Envoi {progress} sur {total}",
   "mobile.chat.queue.cancelUpload": "Annuler l’envoi en file d’attente",
   "mobile.chat.queue.waitingTitle": "En attente de l’agent",

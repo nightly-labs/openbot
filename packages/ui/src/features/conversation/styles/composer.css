@@ -169,7 +169,8 @@
      under border-box sizing and stretches the circle into a pill. */
   padding: 0;
   background: var(--openbot-hover);
-  color: var(--openbot-text-secondary);
+  /* Muted at rest, as the other icon buttons. The send button sets its own color. */
+  color: var(--openbot-text-muted);
   transition:
     background-color var(--openbot-duration-hover) var(--openbot-ease-out),
     color var(--openbot-duration-hover) var(--openbot-ease-out),
@@ -541,6 +542,16 @@
   padding: 4px 0;
 }
 
+/*
+ * A chip is 24px and the editor line is 20px, so the first chip made the one-line composer 4px
+ * taller. With a chip, the line is as tall as the chip and the padding is 2px less on each side, so
+ * the composer keeps its height and the text stays in place.
+ */
+.composer[data-compact] .composer-editor-surface:has(.composer-mention-token) {
+  padding-block: 2px;
+  line-height: 24px;
+}
+
 .composer[data-compact] .composer-editor-placeholder {
   top: 4px;
   inset-inline-start: 0;
@@ -753,15 +764,27 @@
  * panel border and background whole. The scrollbar stays hidden: the fade carries the same news.
  */
 .mention-picker-list {
+  --mention-picker-title-height: 24px;
+  --mention-picker-section-gap: var(--openbot-space-1);
+
+  position: relative;
   display: grid;
   /* A plain auto track grows to the widest row, which would push the badges out of view. */
   grid-template-columns: minmax(0, 1fr);
   /*
-   * Every row is the same height, so the list can state the height its rows need instead of
-   * leaving it to the content. A length on both sides of the change is what lets the panel
-   * travel to its new size while the query narrows, rather than jump to it.
+   * Every row and section title has a fixed height, so the list states the height it needs and
+   * the panel has its full height in the first frame, also while the query narrows it.
    */
-  height: calc(var(--mention-picker-rows, 0) * var(--mention-picker-row-height) + 2 * var(--mention-picker-gutter));
+  height: calc(
+    var(--mention-picker-rows, 0) *
+    var(--mention-picker-row-height) +
+    var(--mention-picker-sections, 0) *
+    var(--mention-picker-title-height) +
+    max(var(--mention-picker-sections, 0) - 1, 0) *
+    var(--mention-picker-section-gap) +
+    2 *
+    var(--mention-picker-gutter)
+  );
   max-height: calc(
     var(--mention-picker-visible-rows) *
     var(--mention-picker-row-height) +
@@ -773,8 +796,51 @@
   padding: var(--mention-picker-gutter);
   overscroll-behavior: contain;
   scrollbar-width: none;
-  transition: height var(--openbot-duration-normal) var(--openbot-ease-out);
-  will-change: height;
+  /* A key press scrolls the active row clear of the scroll fade. */
+  scroll-padding-block: var(--openbot-space-4);
+  /*
+   * The panel stands on the composer, so a height that travels moves its top edge and every row
+   * slides with it. The list takes its new height in one frame; only the rows that come back fade in.
+   */
+  transition: none;
+}
+
+/* The title of a section of the `@` list, with its count. A list with one section has no title. */
+.mention-picker-section {
+  display: flex;
+  height: var(--mention-picker-title-height);
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 8px 4px;
+  color: var(--openbot-queue-action);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.mention-picker-section-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.mention-picker-option + .mention-picker-section {
+  margin-top: var(--mention-picker-section-gap);
+}
+
+/* One highlight slides under the active row (see `trackPickerHighlight`), so a row has no background of its own. */
+.mention-picker-highlight {
+  position: absolute;
+  top: 0;
+  right: var(--mention-picker-gutter);
+  left: var(--mention-picker-gutter);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-hover);
+  pointer-events: none;
+  transition:
+    transform var(--openbot-duration-fast) var(--openbot-ease-out),
+    height var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.mention-picker-highlight[data-instant] {
+  transition: none;
 }
 
 .mention-picker-list::-webkit-scrollbar {
@@ -797,6 +863,8 @@
   display: flex;
   width: 100%;
   /* The list computes its own height from this one, so the two must not drift apart. */
+  position: relative;
+  z-index: 1;
   height: var(--mention-picker-row-height);
   align-items: center;
   gap: 7px;
@@ -813,9 +881,15 @@
   height: 20px;
 }
 
-.mention-picker-option:hover,
-.mention-picker-option-active {
-  background: var(--openbot-hover);
+/* A row that the query brings back fades in; the rows that stay do not move. */
+.mention-picker-option[data-entering] {
+  animation: mention-picker-row-in var(--openbot-duration-fast) var(--openbot-ease-out) both;
+}
+
+@keyframes mention-picker-row-in {
+  from {
+    opacity: 0;
+  }
 }
 
 .mention-picker-option .agent-avatar {
@@ -841,6 +915,9 @@
 
 .mention-picker-option > strong {
   min-width: 0;
+  /* Unset outside a filter, so the name keeps the row color. */
+  color: var(--mention-picker-name-color);
+  max-width: 50%;
   flex: 0 1 auto;
   overflow: hidden;
   font-size: var(--openbot-text-lg);
@@ -882,10 +959,26 @@
   line-height: 18px;
 }
 
+/* While the user filters, the matched text stands out from the rest, as in the search dialog. */
+.mention-picker-option[data-filtering] {
+  --mention-picker-name-color: var(--openbot-queue-action);
+}
+
+.mention-picker-match {
+  background: transparent;
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-medium);
+}
+
 .mention-picker-badge {
   margin-inline-start: auto;
   flex: 0 0 auto;
   color: var(--openbot-queue-action);
+}
+
+.mention-picker-badge > svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
 }
 
 .composer-attachments {

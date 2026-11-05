@@ -33,7 +33,11 @@ export function ConversationSideThread(props: { threadId: string }) {
     installedSkills,
     installedSkillsLoadFailed,
     mcpServers,
+    taggableBrowserTabs,
+    taggableThreads,
+    openTaggedReference,
     threadComposer,
+    threadQueue,
     movePanelThreadToChat,
     copyMessage,
     copiedMessageId,
@@ -90,7 +94,11 @@ export function ConversationSideThread(props: { threadId: string }) {
   /** Sends the draft of this thread. Without its key, a send would take the draft of the chat's thread. */
   function sendSide(side: SideThread, text: string): Promise<boolean> {
     const key = draftKey();
-    return key ? threadComposer.send(side, text, key) : Promise.resolve(false);
+    if (!key) return Promise.resolve(false);
+    // While a queued message is in the message box, Send saves it in its place.
+    return threadQueue.editOf(side.task.id)
+      ? threadComposer.importsEnded(key).then(() => threadQueue.save(key))
+      : threadComposer.send(side, text, key);
   }
   /** The thread waits for an answer to a question or a takeover, which the chat tab of the thread shows. */
   const waitsForAnswer = () => {
@@ -155,6 +163,9 @@ export function ConversationSideThread(props: { threadId: string }) {
             skills={installedSkills()}
             skillsLoadFailed={installedSkillsLoadFailed()}
             mcpServers={mcpServers()}
+            browserTabs={taggableBrowserTabs()}
+            threads={taggableThreads()}
+            onOpenTag={openTaggedReference}
             draft={draft()?.text ?? ""}
             draftAttachments={draft()?.attachments}
             rowAttachments={rowImages()}
@@ -196,6 +207,7 @@ export function ConversationSideThread(props: { threadId: string }) {
             onReply={reply()}
             replyTo={replyTo()}
             onCancelReply={() => threadComposer.setReply(draftKey(), null)}
+            queue={threadQueue.view(current().thread.task, draftKey())}
           />
         )}
       </Show>

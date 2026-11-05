@@ -17,6 +17,8 @@ export const messages = {
   "status.agent.channelRoutineCreated": "{agent} heeft de routine {routine} gemaakt. {person} vroeg erom.",
   "status.agent.channelRoutineUpdated": "{agent} heeft de routine {routine} gewijzigd. {person} vroeg erom.",
   "status.agent.channelRoutineDeleted": "{agent} heeft de routine {routine} verwijderd. {person} vroeg erom.",
+  "status.agent.channelTaskCancelled":
+    "{agent} heeft de taak ‘{task}’ en de subtaken geannuleerd. {person} vroeg erom.",
   "status.agent.screenCaptureScreen": "Het hoofdscherm vastleggen en de afbeelding naar het model van de agent sturen.",
   "status.agent.screenCaptureChannel":
     "De afbeelding verschijnt in het kanaal {channel}, en elk lid van deze server dat het kanaal leest, kan haar zien.",
@@ -75,6 +77,9 @@ export const messages = {
   "status.agent.vaultUpdated": "Gewijzigd in de Kluis: {name}",
   "status.agent.vaultDeleted": "Verwijderd uit de Kluis: {name}",
   "status.agent.vaultSave": "Opslaan in de Kluis",
+  "status.agent.apiKeyScope.label": "Opslaan voor",
+  "status.agent.apiKeyScope.vault": "Alle agents (Kluis)",
+  "status.agent.apiKeyScope.agent": "Alleen deze agent",
   "status.agent.vaultExpiryHint": "MM/JJ",
   "status.agent.vaultField.website": "Website",
   "status.agent.vaultField.username": "Gebruikersnaam of e-mail",

@@ -1,6 +1,8 @@
 import {
   type AgentProviderId,
   agentProviderName,
+  INSTALLER_PROVIDERS,
+  isInstallerProvider,
   isManagedRuntimeProvider,
   MANAGED_RUNTIME_PROVIDERS,
   type ProviderRuntimeSnapshot,
@@ -52,6 +54,8 @@ const DOWNLOAD_FAILURE_CODES: Readonly<Record<string, string>> = {
   "error.provider.cliSigningIn": "cli_signing_in",
   "error.provider.off": "provider_off",
   "status.provider.downloadStopped": "download_stopped",
+  "error.provider.hermesInstallFailed": "hermes_install_failed",
+  "error.provider.hermesNeedsGitCurl": "hermes_prerequisites",
 };
 
 /** The status message holds catalog text only, so its key names the reason without a path or a secret. */
@@ -212,6 +216,23 @@ export function createProviderRuntimeStore(
         });
       }
     }
+    // An installer provider's install ends in "ready" when the agent status finds the CLI, or in an
+    // error that stays on its row.
+    for (const provider of INSTALLER_PROVIDERS) {
+      const previousPhase = current.providers[provider]?.phase;
+      if (previousPhase !== "downloading" && previousPhase !== "finishing") continue;
+      const next = snapshot.providers[provider];
+      // No status: the host no longer offers the install, which is not its end.
+      if (!next || next.phase === "downloading" || next.phase === "finishing" || next.phase === "not-downloaded")
+        continue;
+      desktopAnalytics.scope().track("provider_action", {
+        provider,
+        action: "download_completed",
+        ...(next.phase === "download-error"
+          ? { result: "failed", failure_code: downloadFailureCode(next.message) }
+          : { result: "succeeded" }),
+      });
+    }
     setProviderRuntimeSnapshot(snapshot);
     // Main updates the managed CLIs on its own after an app upgrade, with no notification. Only
     // its failure is shown, with a Retry. A first install has no version and shows its own failure.
@@ -255,12 +276,14 @@ export function createProviderRuntimeStore(
 
   async function downloadProviderRuntime(provider: AgentProviderId): Promise<void> {
     // A custom agent is the user's own command: OpenBot downloads nothing for it.
-    if (!isManagedRuntimeProvider(provider)) return;
+    if (!isManagedRuntimeProvider(provider) && !isInstallerProvider(provider)) return;
     const source = api();
     if (!source) throw new Error(currentText().t("update.provider.downloadsUnavailable"));
-    const update = providerUpdate(provider);
-    const isUpdate = update.availableVersion !== null;
-    if (isUpdate) {
+    // A provider that its own installer installs has no version and no update, so it shows its
+    // progress and error on its row only.
+    const update = isManagedRuntimeProvider(provider) ? providerUpdate(provider) : null;
+    const isUpdate = update !== null && update.availableVersion !== null;
+    if (update && isUpdate) {
       updating.add(provider);
       failed.delete(provider);
       showProviderUpdateToast(
@@ -279,7 +302,7 @@ export function createProviderRuntimeStore(
         result: "failed",
         failure_code: "download_failed",
       });
-      if (isUpdate) {
+      if (update && isUpdate) {
         updating.delete(provider);
         if (!disposed)
           reportProviderUpdateToast(
@@ -302,7 +325,7 @@ export function createProviderRuntimeStore(
 
   async function cancelProviderRuntimeDownload(provider: AgentProviderId): Promise<void> {
     // A custom agent is the user's own command: OpenBot downloads nothing for it.
-    if (!isManagedRuntimeProvider(provider)) return;
+    if (!isManagedRuntimeProvider(provider) && !isInstallerProvider(provider)) return;
     const source = api();
     if (!source) throw new Error(currentText().t("update.provider.downloadsUnavailable"));
     const snapshot = await source.cancel(provider);

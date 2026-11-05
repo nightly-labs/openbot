@@ -13,6 +13,7 @@ export const messages = {
   "mobile.app.route.accountSessions": "계정 세션",
   "mobile.app.route.about": "정보",
   "mobile.app.route.support": "지원",
+  "mobile.app.route.supportLog": "지원 로그",
   "mobile.app.route.hiddenChats": "숨긴 채팅",
   "mobile.app.route.share": "공유",
   "mobile.app.route.deletedChannels": "삭제된 채널",

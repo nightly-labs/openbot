@@ -111,6 +111,7 @@ export const messages = {
     "La ventana de contexto de un modelo debe ser un número entero de tokens entre {min} y {max}.",
   "error.provider.maxOutputInvalid":
     "La salida máxima de un modelo debe ser un número entero de tokens entre {min} y {max}.",
+  "error.provider.reasoningEffortsInvalid": "Los niveles de esfuerzo de un modelo no son válidos.",
   "error.provider.headersTooMany": "Hay demasiadas cabeceras.",
   "error.provider.headerNameCharacter": "El nombre de una cabecera contiene un carácter que HTTP no permite.",
   "error.provider.headerNameTooLong": "El nombre de una cabecera es demasiado largo.",
@@ -220,6 +221,8 @@ export const messages = {
     "El proveedor del modelo tuvo un fallo interno. Tu conexión no es la causa. Inténtalo más tarde o elige otro modelo.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode no pudo conectarse al proveedor del modelo. Comprueba la conexión de red del equipo que ejecuta OpenBot e inténtalo de nuevo.\n{detail}",
+  "error.provider.codexStateBusy":
+    "ChatGPT todavía está preparando su historial local después de un inicio anterior. Espera unos minutos y vuelve a intentarlo.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode no pudo abrir su base de datos porque una versión más reciente de OpenCode la cambió. Actualiza OpenCode a la versión 2 o posterior y vuelve a intentarlo.",
   "error.provider.opencodeNoAnswer":
@@ -242,6 +245,8 @@ export const messages = {
   "error.provider.antigravityReleaseShape": "La versión de Gemini tiene una estructura inesperada.",
   "error.provider.antigravityMissing": "Gemini no está descargado. Descárgalo en OpenBot para continuar.",
   "error.provider.antigravityNotStarted": "Se encontró el servidor de Gemini, pero no se puede leer su versión.",
+  "error.provider.antigravityOverrideInvalid":
+    "El servidor de Gemini de OPENBOT_ANTIGRAVITY_PATH no existe o no es ejecutable. Corrige la ruta o elimina la variable y reinicia OpenBot.",
   "error.provider.antigravityVersionUnreadable": "No se pudo leer la versión del servidor de Gemini.",
   "error.provider.antigravitySignIn": "Inicia sesión con Google para usar Gemini.",
   "error.provider.antigravityRateLimited":
@@ -432,6 +437,8 @@ export const messages = {
   "error.provider.registryPrerequisite": "Instala {tool} en el host antes de instalar este agente.",
   "error.provider.registryBindingChanged": "El agente personalizado cambió durante la instalación. Inténtalo de nuevo.",
   "error.provider.registryInstallFailed": "Falló la instalación del agente. La instalación anterior no cambió.",
+  "error.provider.hermesInstallFailed": "Hermes Agent no se instaló. Inténtalo de nuevo o usa la guía de instalación.",
+  "error.provider.hermesNeedsGitCurl": "Hermes Agent necesita git y curl. Instálalos e inténtalo de nuevo.",
   "error.provider.registryRemoveBusy":
     "Espera a que terminen la instalación del agente y el trabajo ACP activo antes de quitarlo.",
 } as const satisfies PartialTranslation<typeof source>;

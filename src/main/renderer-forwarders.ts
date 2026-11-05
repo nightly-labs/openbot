@@ -593,6 +593,9 @@ export function createRendererForwarders({
   function forwardBitwardenConnectorStatus(status: import("@openbot/contracts/ipc").BitwardenConnectorStatus): void {
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.bitwardenConnector.changed, status);
   }
+  function forwardPasswordManagerStatus(status: import("@openbot/contracts/ipc").PasswordManagerStatus): void {
+    for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.passwordManagers.changed, status);
+  }
 
   function forwardVaultState(state: import("@openbot/contracts/ipc").VaultState): void {
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.vault.changed, state);
@@ -674,6 +677,7 @@ export function createRendererForwarders({
     forwardLinkAccountStatus,
     forwardOnePasswordConnectorStatus,
     forwardBitwardenConnectorStatus,
+    forwardPasswordManagerStatus,
     forwardVaultState,
     forwardHostStatus,
     forwardRemoteDesktopSessions,

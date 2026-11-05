@@ -171,7 +171,7 @@ const RUNTIME_ACTION_LABEL = {
   Download: "common.download",
 } as const satisfies Record<string, AppTextKey>;
 
-const REASONING_LABEL = {
+export const REASONING_LABEL = {
   none: "provider.effort.none",
   minimal: "provider.effort.minimal",
   low: "provider.effort.low",

@@ -16,6 +16,7 @@ export const messages = defineMessages("status.agent", {
   "status.agent.channelRoutineCreated": "{agent} created the routine {routine}. {person} asked for it.",
   "status.agent.channelRoutineUpdated": "{agent} changed the routine {routine}. {person} asked for it.",
   "status.agent.channelRoutineDeleted": "{agent} deleted the routine {routine}. {person} asked for it.",
+  "status.agent.channelTaskCancelled": "{agent} cancelled the task “{task}” and its subtasks. {person} asked for it.",
   "status.agent.screenCaptureScreen": "Capture the main screen and send the image to the agent's model.",
   "status.agent.screenCaptureChannel":
     "The image shows in the channel {channel}, and each member of this server who reads the channel can see it.",
@@ -73,6 +74,9 @@ export const messages = defineMessages("status.agent", {
   "status.agent.vaultUpdated": "Changed in Vault: {name}",
   "status.agent.vaultDeleted": "Deleted from Vault: {name}",
   "status.agent.vaultSave": "Save to Vault",
+  "status.agent.apiKeyScope.label": "Save for",
+  "status.agent.apiKeyScope.vault": "All agents (Vault)",
+  "status.agent.apiKeyScope.agent": "Only this agent",
   "status.agent.vaultExpiryHint": "MM/YY",
   "status.agent.vaultField.website": "Website",
   "status.agent.vaultField.username": "Username or email",

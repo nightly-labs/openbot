@@ -92,6 +92,7 @@ export const messages = {
   "marketplace.app.telegramTagline": "Grupos e conversas diretas no Telegram",
   "marketplace.app.whatsappTagline": "Seu próprio chat e as pessoas que você permitir no WhatsApp",
   "marketplace.app.bitwardenTagline": "Entre em sites com logins de uma pasta compartilhada",
+  "marketplace.app.protonPassTagline": "Entre em sites com logins de um cofre compartilhado",
   "marketplace.app.onePasswordCategory": "Gerenciamento de logins e credenciais",
   "marketplace.app.yourApps": "Seus apps",
   "marketplace.app.addCustom": "Adicionar personalizado",
@@ -202,6 +203,15 @@ export const messages = {
   "marketplace.plugin.paper.prompt.codeToDesign":
     "Use os estilos deste repositório e desenhe uma página de configurações no Paper.",
   "marketplace.plugin.paper.prompt.tokens": "Liste os design tokens do arquivo Paper aberto e compare com nosso tema.",
+  "marketplace.plugin.higgsfield.tagline": "Imagens, vídeos e áudio com IA",
+  "marketplace.plugin.higgsfield.description":
+    "O Higgsfield permite que agentes gerem imagens, vídeos, personagens e áudio com modelos do Higgsfield como Seedance, Kling, Veo e MiniMax Hailuo, consultem o saldo de créditos e naveguem pela Asset Library. Os resultados são salvos nos Assets do Higgsfield do usuário. Cada usuário entra na própria conta do Higgsfield pelo navegador. Cada geração usa créditos dessa conta na tarifa padrão, também em um plano ilimitado.",
+  "marketplace.plugin.higgsfield.app":
+    "Geração de imagens, vídeos e áudio, personagens, créditos e assets, pelo servidor MCP do Higgsfield com login no navegador.",
+  "marketplace.plugin.higgsfield.prompt.credits": "Quantos créditos do Higgsfield eu tenho?",
+  "marketplace.plugin.higgsfield.prompt.productShot":
+    "Faça no Higgsfield uma foto de produto de uma caneca de cerâmica sobre uma mesa de madeira.",
+  "marketplace.plugin.higgsfield.prompt.clip": "Faça no Higgsfield um vídeo de 5 segundos de ondas ao pôr do sol.",
   "marketplace.plugin.appleApps.tagline": "Mail, Calendário e mais no seu Mac",
   "marketplace.plugin.appleApps.description":
     "Apple apps permite que agentes usem Mail, Calendário, Contatos, Lembretes, Notas, Mensagens e Safari neste Mac. Funciona somente no macOS. O OpenBot inicia o mcp-icloud, um servidor da comunidade que não é feito pela Apple nem pelo OpenBot. O servidor controla os apps com AppleScript, neste computador, e não precisa de conta nem de chave. Na instalação, o OpenBot pode pedir ao macOS acesso a todos esses apps de uma vez, com um pedido para cada app. Se você não fizer isso, o macOS pergunta na primeira vez que um agente usa um app. Para mudar isso depois, abra Ajustes do Sistema › Privacidade e Segurança › Automação. Os agentes podem enviar e-mails e iMessages, e alterar ou excluir eventos, contatos e lembretes, então revise cada gravação antes de aprová-la. O que as ferramentas leem, como o texto dos e-mails, vai para o provedor do modelo do agente.",
@@ -259,6 +269,18 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "Consulte este pagamento e explique por que ele falhou.",
   "marketplace.plugin.stripe.prompt.customer": "Resuma as faturas deste cliente e o saldo em aberto.",
   "marketplace.plugin.stripe.prompt.link": "Rascunhe um link de pagamento para o plano Pro a 49 por mês.",
+  "marketplace.plugin.revenuecat.tagline": "Assinaturas, produtos e paywalls",
+  "marketplace.plugin.revenuecat.description":
+    "O RevenueCat permite que os agentes leiam e alterem a configuração das suas assinaturas no app: apps, produtos, entitlements, offerings, pacotes, paywalls e experimentos. Os agentes também podem consultar clientes e suas compras, e ler gráficos e métricas. Uma chave de API secreta do RevenueCat vai em um cabeçalho Authorization. A chave dá acesso a um projeto. Com uma chave somente leitura, os agentes só podem ler. Com uma chave de escrita, os agentes podem enviar produtos para revisão na App Store, conceder entitlements a clientes e excluir pacotes, regras de segmentação e webhooks.",
+  "marketplace.plugin.revenuecat.app":
+    "Produtos, entitlements, offerings, paywalls e métricas, pelo servidor MCP do RevenueCat com uma chave de API secreta.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "Quais offerings e pacotes meu projeto do RevenueCat tem?",
+  "marketplace.plugin.revenuecat.prompt.revenue":
+    "Como minha receita e minhas assinaturas ativas no RevenueCat mudaram este mês?",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "Quais entitlements este cliente do RevenueCat tem, e quando eles expiram?",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "No painel do RevenueCat, abra API keys no seu projeto e crie uma chave de API secreta. Uma chave somente leitura basta para ver os dados.",
   "marketplace.plugin.posthog.tagline": "Analytics de produto e flags",
   "marketplace.plugin.posthog.description":
     "O PostHog permite que agentes consultem eventos e funis, inspecionem feature flags e resumam o que mudou depois de um release. Uma chave de API pessoal das configurações do projeto vai em um header Authorization.",
@@ -381,6 +403,14 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "Quais tarefas do Todoist vencem hoje?",
   "marketplace.plugin.todoist.prompt.capture": "Adicione estes itens de ação à minha Caixa de Entrada do Todoist.",
   "marketplace.plugin.todoist.prompt.overdue": "Mova minhas tarefas atrasadas do Todoist para amanhã.",
+  "marketplace.plugin.ticktick.tagline": "Tarefas, listas, hábitos e foco",
+  "marketplace.plugin.ticktick.description":
+    "O TickTick permite que agentes pesquisem e filtrem tarefas, adicionem e alterem tarefas, e gerenciem listas, seções, pastas, etiquetas e comentários. Os agentes também podem ler e alterar hábitos e registros de foco, e ler eventos dos calendários conectados ao TickTick. Cada usuário entra na própria conta do TickTick pelo navegador. Os agentes recebem acesso de leitura e escrita: podem concluir, mover e excluir tarefas, e excluir etiquetas e registros de foco.",
+  "marketplace.plugin.ticktick.app":
+    "Tarefas, listas, hábitos e registros de foco, pelo servidor MCP do TickTick com login no navegador.",
+  "marketplace.plugin.ticktick.prompt.today": "Quais tarefas do TickTick vencem hoje?",
+  "marketplace.plugin.ticktick.prompt.capture": "Adicione estes itens de ação à minha Caixa de entrada do TickTick.",
+  "marketplace.plugin.ticktick.prompt.week": "Quais tarefas do TickTick eu concluí na semana passada?",
   "marketplace.plugin.trello.tagline": "Quadros, listas e cartões",
   "marketplace.plugin.trello.description":
     "O Trello permite que os agentes pesquisem e leiam quadros, listas, cartões, checklists e comentários, criem quadros e cartões, movam listas e cartões, marquem cartões como concluídos e adicionem checklists, comentários e etiquetas. Os agentes também podem ler e adicionar cartões na Caixa de Entrada do Trello do usuário e ler eventos do Planner, que podem vir de um calendário Google ou Outlook conectado. Cada usuário entra na própria conta do Trello pelo navegador e escolhe as áreas de trabalho em uma tela de consentimento. Os agentes têm as mesmas permissões que o usuário nessas áreas de trabalho. Eles podem arquivar cartões e listas, mas o servidor não pode excluir nada de forma permanente.",
@@ -398,6 +428,24 @@ export const messages = {
     "Crie uma tarefa do ClickUp com estes itens de ação e atribua-a a mim.",
   "marketplace.plugin.clickup.prompt.summarizeDoc":
     "Encontre a atualização mais recente do projeto no ClickUp e resuma as perguntas em aberto.",
+  "marketplace.plugin.coinbase.tagline": "Preços de cripto, carteiras e negociação",
+  "marketplace.plugin.coinbase.description":
+    "A Coinbase permite que agentes leiam preços, saldos, carteiras, ordens e taxas no Coinbase Advanced Trade, visualizem e enviem ordens, convertam entre ativos e movam fundos entre carteiras. Cada usuário entra na própria conta Coinbase pelo navegador. Os agentes têm as mesmas permissões do usuário. Ordens e conversões usam fundos reais, e os agentes podem pagar solicitações x402 com o saldo em USDC.",
+  "marketplace.plugin.coinbase.app":
+    "Preços, saldos, carteiras, ordens e conversões, pelo servidor MCP da Coinbase com login no navegador.",
+  "marketplace.plugin.coinbase.prompt.balances": "Quais são meus saldos na Coinbase em cada carteira?",
+  "marketplace.plugin.coinbase.prompt.price": "Mostre o preço de BTC-USD na Coinbase e como ele variou nesta semana.",
+  "marketplace.plugin.coinbase.prompt.previewOrder":
+    "Visualize uma compra a mercado de 50 USD em ETH na Coinbase. Não envie a ordem.",
+  "marketplace.plugin.robinhood.tagline": "Contas de corretagem e negociação por agentes",
+  "marketplace.plugin.robinhood.description":
+    "A Robinhood permite que agentes leiam as contas, posições, saldos, histórico de transações e listas de observação de um cliente Robinhood, leiam dados de mercado e enviem ordens de ações, opções e cripto. Cada usuário entra na própria conta Robinhood pelo navegador. No primeiro login, a Robinhood pede ao usuário que abra uma conta Agentic separada. Os agentes só podem negociar nessa conta e, por padrão, enviam ordens sem pedir ao usuário que aprove cada uma.",
+  "marketplace.plugin.robinhood.app":
+    "Contas, posições, dados de mercado e negociações, pelo servidor MCP da Robinhood com login no navegador.",
+  "marketplace.plugin.robinhood.prompt.positions": "Resuma minhas posições na Robinhood e como elas variaram hoje.",
+  "marketplace.plugin.robinhood.prompt.watchlist":
+    "Como cada ação da minha lista de observação na Robinhood variou nesta semana?",
+  "marketplace.plugin.robinhood.prompt.agenticCash": "Quanto dinheiro há na minha conta Agentic da Robinhood?",
   "marketplace.plugin.huggingface.tagline": "Modelos, datasets e artigos no Hub",
   "marketplace.plugin.huggingface.description":
     "O Hugging Face permite que agentes pesquisem modelos, datasets, Spaces, coleções e artigos no Hugging Face Hub, leiam model cards e arquivos de repositórios, vejam uma prévia de datasets e pesquisem na documentação do Hugging Face. Ele usa dados públicos do Hub e não precisa de conta nem de chave. As ferramentas apenas leem: os agentes não podem criar repositórios nem executar jobs.",

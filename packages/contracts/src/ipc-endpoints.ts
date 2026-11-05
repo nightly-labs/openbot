@@ -27,7 +27,7 @@ import type { ServerAuditLog } from "./ipc-server-audit";
 // change on one side is a type error on the other. The types are phantom members: they exist only
 // for the checker, and the runtime value is still `{ kind, channel }`.
 
-import type { AgentProviderRef, ManagedProviderId } from "./agent-providers";
+import type { AgentProviderRef, DownloadableProviderId, ManagedProviderId } from "./agent-providers";
 import type { AppAppearancePreference, SetAppAppearancePreferenceInput } from "./app-appearance";
 import type { AppInterfaceSizePreference, SetAppInterfaceSizePreferenceInput } from "./app-interface-size";
 import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app-language";
@@ -168,7 +168,9 @@ import type {
   MacAutomationTarget,
   MacPermissionId,
   ProviderRuntimeSnapshot,
+  RendererTimingReport,
   SaveSetupInput,
+  SentMessageStats,
   SetAnalyticsPreferenceInput,
   SetCompanySignInEnabledInput,
   TestCompanySignInInput,
@@ -228,6 +230,14 @@ import type {
   UpdateAgentBrowserProfileInput,
   UpdateBrowserProfileInput,
 } from "./ipc-browser-profiles";
+import type {
+  BrowserComputerSharing,
+  BrowserProxyList,
+  BrowserProxySummary,
+  DeleteBrowserProxyInput,
+  SaveBrowserProxyInput,
+  SetBrowserProfileProxyInput,
+} from "./ipc-browser-proxies";
 import type { LocalBrowserSecretResponse } from "./ipc-browser-secret";
 import type {
   ChannelMemory,
@@ -411,6 +421,7 @@ import type {
   OnePasswordConnectorStatus,
   OnePasswordHostConnectInput,
 } from "./ipc-onepassword-connector";
+import type { PasswordManagerConnectInput, PasswordManagerId, PasswordManagerStatus } from "./ipc-password-managers";
 import type { PromptCacheTtl, PromptCacheTtlSetting } from "./ipc-prompt-cache";
 import type {
   DetectedModelServer,
@@ -694,6 +705,8 @@ export const IPC_ENDPOINTS = {
     // Main follows the account's answer from another device, so it tells the window.
     analyticsPreference: event<AnalyticsPreference>()("app:analytics-preference"),
     setAnalyticsPreference: request<SetAnalyticsPreferenceInput, AnalyticsPreference>()("app:set-analytics-preference"),
+    // Host analytics only: `system_startup` and the renderer part of `system_resources`.
+    reportRendererTiming: request<RendererTimingReport, void>()("app:report-renderer-timing"),
     getApprovalAutomation: request<undefined, ApprovalAutomationPreference>()("app:get-approval-automation"),
     // A remote owner or admin can change a grant from a phone or the web client, so main tells the
     // window instead of the window only reading the value at start.
@@ -758,6 +771,8 @@ export const IPC_ENDPOINTS = {
     // the check and its result.
     openUpdateSettings: event<undefined>()("app:open-update-settings"),
     openExternal: request<ExternalDestination, void>()("app:open-external"),
+    // Read only. The social toast asks for it to know how long and how much the user used OpenBot.
+    getSentMessageStats: request<undefined, SentMessageStats>()("app:get-sent-message-stats"),
     openUrl: request<string, void>()("app:open-url"),
     getExternalLinkPreference: request<undefined, ExternalLinkPreference>()("app:get-external-link-preference"),
     setExternalLinkPreference: request<ExternalLinkPreference, ExternalLinkPreference>()(
@@ -853,8 +868,8 @@ export const IPC_ENDPOINTS = {
   },
   providerRuntimes: {
     getStatus: request<undefined, ProviderRuntimeSnapshot>()("provider-runtimes:get-status"),
-    download: request<ManagedProviderId, ProviderRuntimeSnapshot>()("provider-runtimes:download"),
-    cancel: request<ManagedProviderId, ProviderRuntimeSnapshot>()("provider-runtimes:cancel"),
+    download: request<DownloadableProviderId, ProviderRuntimeSnapshot>()("provider-runtimes:download"),
+    cancel: request<DownloadableProviderId, ProviderRuntimeSnapshot>()("provider-runtimes:cancel"),
     /** What `removeDownload` frees now: nothing while the provider is on. */
     measureDownload: request<ManagedProviderId, ProviderRuntimeDownload>()("provider-runtimes:measure-download"),
     /** Removes the downloaded CLI of a provider that is off. Rejects while it is on or downloading. */
@@ -1112,10 +1127,10 @@ export const IPC_ENDPOINTS = {
     setApiKey: scopedRequest<SetProviderApiKeyInput, AgentStatus, "required">()("provider-admin:set-api-key"),
     clearApiKey: scopedRequest<AgentProviderId, AgentStatus, "required">()("provider-admin:clear-api-key"),
     getRuntimes: scopedQuery<ProviderRuntimeSnapshot, "required">()("provider-admin:get-runtimes"),
-    downloadRuntime: scopedRequest<ManagedProviderId, ProviderRuntimeSnapshot, "required">()(
+    downloadRuntime: scopedRequest<DownloadableProviderId, ProviderRuntimeSnapshot, "required">()(
       "provider-admin:download-runtime",
     ),
-    cancelRuntime: scopedRequest<ManagedProviderId, ProviderRuntimeSnapshot, "required">()(
+    cancelRuntime: scopedRequest<DownloadableProviderId, ProviderRuntimeSnapshot, "required">()(
       "provider-admin:cancel-runtime",
     ),
     checkRuntimeUpdates: scopedQuery<ProviderRuntimeSnapshot, "required">()("provider-admin:check-runtime-updates"),
@@ -1317,6 +1332,28 @@ export const IPC_ENDPOINTS = {
       "bitwarden-connector:host-connect",
     ),
     hostDisconnect: scopedQuery<BitwardenConnectorStatus, "required">()("bitwarden-connector:host-disconnect"),
+  },
+  // The password managers of this computer, through one engine: each has a driver in main. Access
+  // keys and passwords go from the renderer to main once, in `connect`; every answer is the status
+  // only. `openSignIn` opens the page of a `browser` connection in the user's browser; main opens
+  // only a page of the manager's own sign-in site. The `host*` endpoints do the same for a joined
+  // server (`password-managers-v1`): the host runs the sign-in, and this computer opens its page.
+  passwordManagers: {
+    list: request<undefined, PasswordManagerStatus[]>()("password-managers:list"),
+    connect: request<PasswordManagerConnectInput, PasswordManagerStatus>()("password-managers:connect"),
+    cancel: request<PasswordManagerId, PasswordManagerStatus>()("password-managers:cancel"),
+    disconnect: request<PasswordManagerId, PasswordManagerStatus>()("password-managers:disconnect"),
+    openSignIn: request<PasswordManagerId, void>()("password-managers:open-sign-in"),
+    changed: event<PasswordManagerStatus>()("password-managers:changed"),
+    hostList: scopedQuery<PasswordManagerStatus[], "required">()("password-managers:host-list"),
+    hostConnect: scopedRequest<PasswordManagerConnectInput, PasswordManagerStatus, "required">()(
+      "password-managers:host-connect",
+    ),
+    hostCancel: scopedRequest<PasswordManagerId, PasswordManagerStatus, "required">()("password-managers:host-cancel"),
+    hostDisconnect: scopedRequest<PasswordManagerId, PasswordManagerStatus, "required">()(
+      "password-managers:host-disconnect",
+    ),
+    hostOpenSignIn: scopedRequest<PasswordManagerId, void, "required">()("password-managers:host-open-sign-in"),
   },
   // The Link account of this computer, for agent payments. The tokens stay in main; every answer is the
   // status only. A joined server has no Link account: the Team API does not carry one.
@@ -1596,7 +1633,8 @@ export const IPC_ENDPOINTS = {
     // A joined server takes these through `agent-threads-v1`.
     renameTask: scopedRequest<RenameAgentTaskInput, void>()("agent:tasks:rename"),
     deleteTask: scopedRequest<AgentTaskInput, void>()("agent:tasks:delete"),
-    // A joined server takes this through `agent-thread-reads-v1`.
+    // A joined server takes these through `agent-thread-reads-v1`.
+    listTaskReads: scopedRequest<string, AgentTaskReadState[]>()("agent:tasks:reads"),
     markTaskRead: scopedRequest<MarkAgentTaskReadInput, AgentTaskReadState>()("agent:tasks:mark-read"),
     acknowledgeFailedTurn: scopedRequest<AcknowledgeFailedTurnInput, void>()("agent:acknowledge-failed-turn"),
     cancelQueuedMessage: scopedRequest<CancelQueuedMessageInput, void>()("agent:cancel-queued-message"),
@@ -1901,6 +1939,18 @@ export const IPC_ENDPOINTS = {
     updateAgentBrowserProfile: scopedRequest<UpdateAgentBrowserProfileInput, AgentBrowserProfile>()(
       "agent:admin:update-browser-profile",
     ),
+    // Saved proxies of the named browser profiles: `browser-proxies-v1` on a joined server.
+    listBrowserProxies: scopedQuery<BrowserProxyList | null>()("agent:admin:list-browser-proxies"),
+    saveBrowserProxy: scopedRequest<SaveBrowserProxyInput, BrowserProxySummary>()("agent:admin:save-browser-proxy"),
+    deleteBrowserProxy: scopedRequest<DeleteBrowserProxyInput, void>()("agent:admin:delete-browser-proxy"),
+    setBrowserProfileProxy: scopedRequest<SetBrowserProfileProxyInput, void>()("agent:admin:set-browser-profile-proxy"),
+    // Whether this app shares its connection with a joined server (`browser-egress-v1`). Null for
+    // this computer's own server and for a host without the capability. Turning it on also adds this
+    // member's computer to the proxies of the host.
+    getBrowserComputerSharing: scopedQuery<BrowserComputerSharing | null>()("agent:admin:get-browser-computer-sharing"),
+    setBrowserComputerSharing: scopedRequest<BrowserComputerSharing, void>()(
+      "agent:admin:set-browser-computer-sharing",
+    ),
     listBrowserTabProfiles: scopedQuery<BrowserTabProfile[]>()("agent:admin:list-browser-tab-profiles"),
     getAgentAdminSettings: scopedRequest<string, AgentAdminSettings>()("agent:admin:get-settings"),
     updateAgentAdminSettings: scopedRequest<UpdateAgentAdminSettingsInput, AgentAdminSettings>()(
@@ -2108,6 +2158,7 @@ export const IPC_GROUP_PATHS = {
   githubConnector: "githubConnector",
   onePasswordConnector: "onePasswordConnector",
   bitwardenConnector: "bitwardenConnector",
+  passwordManagers: "passwordManagers",
   linkAccount: "linkAccount",
   vault: "vault",
   hostedSites: "hostedSites",

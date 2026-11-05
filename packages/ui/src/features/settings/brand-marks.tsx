@@ -4,6 +4,7 @@ import {
   DISCORD_MARK_PATH,
   GITHUB_MARK_PATH,
   ONEPASSWORD_MARK_PATH,
+  PROTON_MARK_PATH,
   SLACK_MARK_PATH,
   TELEGRAM_MARK_PATH,
   WHATSAPP_MARK_PATH,
@@ -59,6 +60,15 @@ export function OnePasswordMark(props: { class?: string | undefined }) {
   return (
     <svg class={props.class} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d={ONEPASSWORD_MARK_PATH} />
+    </svg>
+  );
+}
+
+/** Proton's mark, for Proton Pass, for the same reason. */
+export function ProtonPassMark(props: { class?: string | undefined }) {
+  return (
+    <svg class={props.class} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d={PROTON_MARK_PATH} />
     </svg>
   );
 }

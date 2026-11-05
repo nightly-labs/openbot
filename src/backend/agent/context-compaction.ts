@@ -35,9 +35,11 @@ const CONTEXT_COMPACTION_THRESHOLD = 0.8;
 /**
  * A session that a compaction leaves at this share of its window holds mostly what no compaction
  * removes: tool schemas, instructions, and the newest messages. Codex compacted such a session five
- * times in five minutes, and each tool result was cut off (#3905).
+ * times in five minutes, and each tool result was cut off (#3905). A session left at the threshold or
+ * above compacts again after a small growth or a retry, so a share between the threshold and 90%
+ * compacted it without end (#5150).
  */
-const INEFFECTIVE_COMPACTION_SHARE = 0.9;
+const INEFFECTIVE_COMPACTION_SHARE = CONTEXT_COMPACTION_THRESHOLD;
 /** After this many such compactions in a row, OpenBot stops asking for more and tells the user. */
 const INEFFECTIVE_COMPACTION_LIMIT = 2;
 /**
@@ -117,8 +119,11 @@ export class ContextCompaction {
   readonly #rotatesSession: ContextCompactionOptions["rotatesSession"];
   readonly #isStopping: () => boolean;
   readonly #budgets = new Map<string, ThreadContextBudget>();
-  /** The agent of each provider thread that compacts, and the client that runs it once `request` sends it. */
-  readonly #compacting = new Map<string, { agentId: string; client: AgentClient | null }>();
+  /**
+   * The agent of each provider thread that compacts, and the client that runs it once `request` sends it.
+   * `turnId`: the turn whose end made the `reserve` hold, until `request` takes the hold.
+   */
+  readonly #compacting = new Map<string, { agentId: string; client: AgentClient | null; turnId: string | null }>();
   readonly #refusals = new Map<string, RefusalHold>();
   readonly #timeoutMs: number;
   /** How long a started compaction runs before OpenBot stops it. */
@@ -409,8 +414,11 @@ export class ContextCompaction {
     return budget && budget.contextWindow > 1 ? Math.min(120_000, Math.floor(budget.contextWindow * 2)) : 120_000;
   }
 
-  /** `manual`: the user asked, so the thread compacts below the threshold too. */
-  reserve(agentId: string, threadId: string, manual = false): boolean {
+  /**
+   * `manual`: the user asked, so the thread compacts below the threshold too.
+   * `turnId`: the turn whose end reserves, so that only that turn can drop the hold.
+   */
+  reserve(agentId: string, threadId: string, manual = false, turnId: string | null = null): boolean {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     const mode = agent ? this.#providers.clientForAgent(agent)?.contextCompaction : undefined;
     if (!agent || !compactsOnRequest(mode)) return false;
@@ -420,9 +428,18 @@ export class ContextCompaction {
       return false;
     }
     budget.phase = "requested";
-    this.#compacting.set(threadId, { agentId, client: null });
+    this.#compacting.set(threadId, { agentId, client: null, turnId });
     this.observeCompaction(threadId, "running");
     return true;
+  }
+
+  /**
+   * Ends a hold that `reserve` made at the end of this turn and that `request` did not take: the work
+   * between them failed. Only `request` arms a deadline, so the hold stayed until a restart (#4960).
+   */
+  dropReservation(agentId: string, threadId: string, turnId: string): void {
+    const compaction = this.#compacting.get(threadId);
+    if (compaction?.turnId === turnId && compaction.agentId === agentId) this.#abandon(agentId, threadId);
   }
 
   readonly request = Effect.fn("ContextCompaction.request")(function* (
@@ -430,6 +447,8 @@ export class ContextCompaction {
     agentId: string,
     threadId: string,
   ) {
+    const reservation = this.#compacting.get(threadId);
+    if (reservation) reservation.turnId = null;
     const budget = this.#budgets.get(threadId);
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     const client = agent ? this.#providers.clientForAgent(agent) : null;
@@ -448,7 +467,7 @@ export class ContextCompaction {
       return;
     }
 
-    this.#compacting.set(threadId, { agentId, client });
+    this.#compacting.set(threadId, { agentId, client, turnId: null });
     // A `request` compaction runs inside the request, so it starts now and the request waits as long.
     const runsInRequest = client.contextCompaction === "request";
     this.#armDeadline(agentId, threadId, client, runsInRequest ? this.#runTimeoutMs : this.#timeoutMs);

@@ -211,6 +211,8 @@ export const messages = {
   "mobile.workflow.output.discord": "Discord",
   "mobile.workflow.output.slack": "Slack",
   "mobile.workflow.output.telegram": "Telegram",
+  "mobile.workflow.output.telegramHint": "연결된 Telegram 채팅에서 답장하거나 게시하거나 반응을 추가합니다.",
+  "mobile.workflow.output.slackHint": "Slack 채널에서 답장하거나 게시하거나 반응을 추가합니다.",
   "mobile.workflow.run.stopStep": "단계 중지",
   "mobile.workflow.run.stopStepFailed": "단계를 중지할 수 없어요",
   "mobile.workflow.version.history": "버전 기록",
@@ -350,7 +352,6 @@ export const messages = {
   "mobile.workflow.slack.action.reply": "스레드에 답글",
   "mobile.workflow.telegram.hostOnly":
     "Telegram 채팅은 OpenBot을 실행하는 컴퓨터에만 있어요. 이 단계는 그 컴퓨터의 OpenBot에서 변경하세요.",
-  "mobile.workflow.telegram.triggerComputerOnly": "이 트리거는 그것을 실행하는 컴퓨터의 OpenBot에서 변경하세요.",
   "mobile.workflow.telegram.outputSummary": "Telegram · {action}",
   "mobile.workflow.telegram.chat": "채팅",
   "mobile.workflow.telegram.anyChat": "연결된 모든 채팅",
@@ -367,4 +368,14 @@ export const messages = {
   "mobile.workflow.telegram.action.post": "채팅에 게시",
   "mobile.workflow.telegram.action.react": "반응 추가",
   "mobile.workflow.telegram.emoji": "이모지",
+  "mobile.workflow.chats.adminOnly": "소유자 또는 관리자만 이 단계를 변경할 수 있습니다.",
+  "mobile.workflow.chats.loadFailed": "이 서버의 채팅을 불러오지 못했습니다. 나중에 다시 시도하세요.",
+  "mobile.workflow.slack.hostOnly":
+    "Slack 워크스페이스는 OpenBot을 실행하는 컴퓨터에만 있습니다. 그 컴퓨터의 OpenBot에서 이 단계를 변경하세요.",
+  "mobile.workflow.slack.workspace": "워크스페이스",
+  "mobile.workflow.slack.chooseWorkspace": "워크스페이스 선택",
+  "mobile.workflow.slack.oneWorkspace": "워크스페이스 하나",
+  "mobile.workflow.slack.chooseChannel": "채널 선택",
+  "mobile.workflow.slack.needsWorkspace": "워크스페이스를 선택하세요. 선택하지 않으면 트리거가 시작되지 않습니다.",
+  "mobile.workflow.slack.needsChannel": "게시할 워크스페이스와 채널을 선택하세요.",
 } as const satisfies PartialTranslation<typeof source>;

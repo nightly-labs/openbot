@@ -289,9 +289,12 @@ account and server (`pinnedWorkflows`); the host does not know them.
 The phone also uses the version, single-step and stop-step routes, and `workflows-github-v1`, as a
 joined desktop does. An owner or admin adds and changes a GitHub trigger or output there
 (`apps/mobile/src/features/workflows/model/workflow-github.ts` reads and writes the same fields as
-the desktop cards); a member reads them, the event history and the item of a run. Discord triggers
-and outputs show read-only on the phone, because only the computer that runs OpenBot has the Discord
-servers, channels and roles.
+the desktop cards); a member reads them, the event history and the item of a run. With
+`workflows-chats-v1` and `routine-results-v1`, an owner or admin also adds and changes Telegram and
+Slack triggers and outputs (`apps/mobile/src/features/workflows/components/workflow-chat-fields.tsx`).
+The chats, workspaces and channels come from the routine-results options, so the fields are the same
+as on the desktop cards. Discord triggers and outputs show read-only on the phone, because no route
+sends the Discord roles.
 
 ### History extent
 
@@ -546,6 +549,8 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `agent-folders-v1` | The folders that an agent can change besides its workspace, and the folders in them that it must not change: read, add, remove, exclude, include. Lists the folders in one host folder (no files, no hidden folders, at most 500), with the home folder and at most 32 disks, so that a phone or the desktop app of a member can pick one. The host checks each folder as the desktop folder picker does (`src/main/agent-folders.ts`). Protocol 9 only | `agentFolders` |
 | `agent-instructions-v1` | Read and save the instruction file at the root of an agent's workspace (`AGENTS.md`, or `CLAUDE.md` in an older workspace). A save sends the text that the edit started from; the host refuses it with 409 when the file changed. The workspace path does not cross the wire, and a client cannot show the file in its file manager. Protocol 9 only | `agentInstructions` |
 | `browser-profiles-v1` | Named browser profiles of the host: list, create, rename, recolor, clear, delete, and the profile of each agent. One route, `/v1/browser/tab-profiles`, also answers a member: the profile label of each tab that the member can see. Cookies and site data stay on the host. Advertised when the host has `browserProfiles` | `agentAdmin` |
+| `browser-proxies-v1` | Saved proxies of the host's named browser profiles: list, save, delete, and the proxy of each named profile (`/v1/admin/browser-proxies`, `/save`, `/delete`, `/v1/admin/browser-profiles/proxy`). The list also has the computers of members, and `/computer` adds the computer of the member who sends it; no member can add the computer of another. A password goes to the host only in a save request and never comes back. Advertised when the host has `browserProfiles` | `agentAdmin` |
+| `browser-egress-v1` | The data channel `openbot.browser-egress.v1`, which a desktop client opens only while its member shares the internet connection of that computer with the server. Only the host opens streams: each is one TCP connection of a browser profile with that member's computer as its proxy. The client connects only to a public internet address that it resolved itself, on any port. At most 256 streams, 256 KiB of credit for each stream. A lost egress channel never closes the connection. Advertised when the host has `browserProfiles` | the member's own computer |
 | `browser-profiles-events-v1` | One event with no data, `browser-profiles-changed`, after each change of the named browser profiles or of an agent's profile. A client reads the `browser-profiles-v1` routes again. Advertised when the host has `browserProfiles` | `browserProfiles` |
 | `skills-admin-v1` | List, install, remove, enable skills by marketplace id | `agentAdmin` |
 | `shared-tables-v1` | List and delete shared tables | `sharedTables` |
@@ -1141,7 +1146,8 @@ the server as a joined server with `thisComputer: true`. `kind` stays `"remote"`
   and is never logged.
 - **Delete.** The desktop stops the child, removes the entry, and moves both folders to the trash
   with `shell.trashItem`. It never deletes them.
-- **Rename.** The `host-admin` identity route, as on any joined server that the user owns.
+- **Rename.** The `host-admin` identity route, as on any joined server that the user owns. The child has
+  no account session, so it skips the account owner check and the account steps (`passwordOwner`) (#5092).
 - **Account.** While the desktop app is signed in, `LocalServers` registers each running server for
   the account (`centralAuth.registerRemoteHost`), with the child's key, its name, and its owner member
   as the owner membership. The ready line carries that member id. The desktop app keeps the machine
@@ -1188,7 +1194,8 @@ Limits:
 - While the desktop app is signed out or closed, only this computer can connect: members reach the
   server only while the desktop app runs and is signed in.
 - The child has no account session, so an owner that ends a device's session from the child's Server
-  settings does not end it on the account service. The account has the name of the child's last start.
+  settings does not end it on the account service. The account has the name of the child's last start,
+  and no logo of the child.
 - The provider CLI sign-ins in the home folder (`~/.codex`, `~/.claude`) and `~/.agents/skills` are
   shared with the other servers.
 - Not confirmed: the memory of each child, the agent browser in a child with no window, and which

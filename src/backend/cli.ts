@@ -67,9 +67,10 @@ export interface KimiCliInfo extends ResolvedCli {
 }
 
 /**
- * OpenBot never installs Hermes: the user's own `hermes` runs, with the user's own `~/.hermes`, and
- * `resolveHermesCli` gives only `system`. The type keeps `managed`, as each other CLI does, so a
- * `managed` test value does not narrow `AgentCliInfo`.
+ * The user's own `hermes` runs, with the user's own `~/.hermes`, and `resolveHermesCli` gives only
+ * `system`. The Download of `HermesInstaller` runs the official installer, which puts Hermes where a
+ * terminal install does, so OpenBot finds it as the user's CLI. The type keeps `managed`, as each
+ * other CLI does, so a `managed` test value does not narrow `AgentCliInfo`.
  */
 export interface HermesCliInfo extends ResolvedCli {
   source?: "system" | "managed";
@@ -374,6 +375,10 @@ export const resolveAntigravityCli: (input?: {
 
       /* Try the remaining candidates. */
     }
+    // Only the managed copy is downloadable, so a path the user set that cannot run must not say
+    // "not downloaded": Download is refused while the override is set (#4978).
+    if (!found && override.length > 0)
+      throw new CodexCliError(sourceText("error.provider.antigravityOverrideInvalid"), "invalid");
     throw new CodexCliError(
       found ? sourceText("error.provider.antigravityNotStarted") : sourceText("error.provider.antigravityMissing"),
       found ? "invalid" : "missing",
@@ -1349,7 +1354,7 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
 });
 
 /** `X_OK` also passes for a folder, and a login-shell `PATH` folder can hold one with the CLI's name. */
-const isExecutable = Effect.fn("Cli.isExecutable")((path: string) =>
+export const isExecutable = Effect.fn("Cli.isExecutable")((path: string) =>
   providerCall(async () => {
     await access(path, process.platform === "win32" ? constants.F_OK : constants.X_OK);
     return (await stat(path)).isFile();

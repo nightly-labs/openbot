@@ -17,6 +17,8 @@ const CHIP_KIND_LABELS = {
   plugin: "chat.reference.kind.plugin",
   quote: "chat.reference.kind.quote",
   skill: "chat.reference.kind.skill",
+  tab: "chat.reference.kind.tab",
+  thread: "chat.reference.kind.thread",
 } as const satisfies Record<ReferenceChipKind, AppTextKey>;
 
 const CHIP_OPEN_LABELS = {
@@ -25,9 +27,11 @@ const CHIP_OPEN_LABELS = {
   plugin: "chat.reference.open.plugin",
   quote: "chat.reference.open.quote",
   skill: "chat.reference.open.skill",
+  tab: "chat.reference.open.tab",
+  thread: "chat.reference.open.thread",
 } as const satisfies Record<ReferenceChipKind, string>;
 
-export type ReferenceChipKind = "agent" | "mcp" | "plugin" | "quote" | "skill";
+export type ReferenceChipKind = "agent" | "mcp" | "plugin" | "quote" | "skill" | "tab" | "thread";
 
 /** Shared appearance for rendered references and contenteditable tokens. */
 export function ReferenceChip(props: {

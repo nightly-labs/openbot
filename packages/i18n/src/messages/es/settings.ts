@@ -533,9 +533,13 @@ export const messages = {
   "settings.voice.dictation.section": "Dictado",
   "settings.voice.model.parakeet.description":
     "Rápido. Detecta el idioma hablado por sí mismo, en 25 idiomas europeos.",
+  "settings.voice.model.parakeetUnified.description":
+    "Rápido. Solo inglés. Pone puntuación, con menos errores que Parakeet TDT.",
   "settings.voice.model.bark.description":
     "Rápido. Solo inglés. Escribe casi todo en minúsculas y con poca puntuación.",
   "settings.voice.model.whisper.description": "Más lento. Unos 100 idiomas, y puedes fijar el idioma hablado.",
+  "settings.voice.model.cohere.description":
+    "Más lento. 14 idiomas. Tú fijas el idioma hablado. Usa unos 4 GB de memoria.",
   "settings.voice.model.size": "Tamaño de la descarga: {size}",
   "settings.voice.model.downloading": "Descargando · {received} de {total}",
   "settings.voice.model.failed": "La descarga se detuvo. Comprueba la conexión e inténtalo de nuevo.",
@@ -549,9 +553,14 @@ export const messages = {
   "settings.voice.model.removeLabel": "Quitar {name} de este equipo",
   "settings.voice.language.section": "Idioma",
   "settings.voice.language.description": "El idioma que hablas. Automático lo detecta a partir de la grabación.",
+  "settings.voice.language.modelLanguages":
+    "El idioma que hablas. Este modelo solo conoce estos idiomas y no detecta el idioma por sí mismo.",
   "settings.voice.language.modelDetects":
-    "Parakeet detecta el idioma hablado por sí mismo. Para fijar un idioma, usa Whisper o ElevenLabs.",
-  "settings.voice.language.englishOnly": "Bark solo reconoce inglés. Para fijar un idioma, usa Whisper o ElevenLabs.",
+    "Parakeet detecta el idioma hablado por sí mismo. Para fijar un idioma, usa Whisper, Cohere o ElevenLabs.",
+  "settings.voice.language.englishOnly":
+    "Bark solo reconoce inglés. Para fijar un idioma, usa Whisper, Cohere o ElevenLabs.",
+  "settings.voice.language.parakeetUnifiedEnglishOnly":
+    "Parakeet Unified solo reconoce inglés. Para fijar un idioma, usa Whisper, Cohere o ElevenLabs.",
   "settings.voice.language.automatic": "Automático",
   "settings.voice.loadFailed": "No se pudieron leer los modelos de voz.",
   "settings.voice.saveFailed": "No se pudo guardar el ajuste de voz. Inténtalo de nuevo.",

@@ -240,6 +240,8 @@ export const messages = {
   "mobile.workflow.output.discord": "Discord",
   "mobile.workflow.output.slack": "Slack",
   "mobile.workflow.output.telegram": "Telegram",
+  "mobile.workflow.output.telegramHint": "يرد أو ينشر أو يضيف تفاعلًا في محادثة Telegram مرتبطة.",
+  "mobile.workflow.output.slackHint": "يرد أو ينشر أو يضيف تفاعلًا في قناة Slack.",
   "mobile.workflow.run.stopStep": "إيقاف الخطوة",
   "mobile.workflow.run.stopStepFailed": "تعذّر إيقاف الخطوة",
   "mobile.workflow.version.history": "سجل الإصدارات",
@@ -384,7 +386,6 @@ export const messages = {
   "mobile.workflow.slack.action.reply": "رد في السلسلة",
   "mobile.workflow.telegram.hostOnly":
     "الحاسوب الذي يشغّل OpenBot وحده لديه محادثات Telegram. غيّر هذه الخطوة في OpenBot على ذلك الحاسوب.",
-  "mobile.workflow.telegram.triggerComputerOnly": "غيّر هذا المشغّل في OpenBot على الحاسوب الذي يشغّله.",
   "mobile.workflow.telegram.outputSummary": "Telegram · {action}",
   "mobile.workflow.telegram.chat": "المحادثة",
   "mobile.workflow.telegram.anyChat": "أي محادثة مرتبطة",
@@ -401,4 +402,14 @@ export const messages = {
   "mobile.workflow.telegram.action.post": "نشر في المحادثة",
   "mobile.workflow.telegram.action.react": "إضافة تفاعل",
   "mobile.workflow.telegram.emoji": "رمز تعبيري",
+  "mobile.workflow.chats.adminOnly": "لا يغيّر هذه الخطوة إلا المالك أو المشرف.",
+  "mobile.workflow.chats.loadFailed": "لم تُحمَّل محادثات هذا الخادم. حاول مرة أخرى لاحقًا.",
+  "mobile.workflow.slack.hostOnly":
+    "الحاسوب الذي يشغّل OpenBot وحده لديه مساحات عمل Slack. غيّر هذه الخطوة في OpenBot على ذلك الحاسوب.",
+  "mobile.workflow.slack.workspace": "مساحة العمل",
+  "mobile.workflow.slack.chooseWorkspace": "اختر مساحة عمل",
+  "mobile.workflow.slack.oneWorkspace": "مساحة عمل واحدة",
+  "mobile.workflow.slack.chooseChannel": "اختر قناة",
+  "mobile.workflow.slack.needsWorkspace": "اختر مساحة عمل. بدونها لا يبدأ المشغّل.",
+  "mobile.workflow.slack.needsChannel": "اختر مساحة عمل وقناة للنشر فيها.",
 } as const satisfies PartialTranslation<typeof source>;

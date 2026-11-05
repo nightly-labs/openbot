@@ -42,4 +42,19 @@ export const messages = {
   "error.connector.bitwardenCliInstallFailed":
     "تعذّر تثبيت Bitwarden CLI على هذا الخادم. تحقق من اتصاله بالشبكة، ثم اتصل مرة أخرى.",
   "error.connector.bitwardenFileUnreadable": "ملف اتصال Bitwarden غير قابل للقراءة.",
+  "error.connector.passwordManagerUnknown": "لا يعرف OpenBot مدير كلمات المرور هذا.",
+  "error.connector.passwordManagerMethod": "لا يمكن توصيل مدير كلمات المرور هذا بهذه الطريقة.",
+  "error.connector.passwordManagerNoSignIn": "لا توجد صفحة تسجيل دخول مفتوحة. اتصل مرة أخرى.",
+  "error.connector.protonPassFailed": "تعذّر توصيل Proton Pass. اتصل مرة أخرى.",
+  "error.connector.protonPassCliInstallFailed": "تعذّر تثبيت Proton Pass CLI. تحقق من اتصال الشبكة، ثم اتصل مرة أخرى.",
+  "error.connector.protonPassPlan":
+    "لا تسمح خطة Proton الخاصة بك باستخدام Proton Pass CLI. غيّر الخطة، ثم اتصل مرة أخرى.",
+  "error.connector.protonPassExpired": "انتهى الوصول إلى Proton Pass. اتصل مرة أخرى.",
+  "error.connector.protonPassKeyInvalid": "أدخل مفتاح وصول Proton Pass يبدأ بـ pst_.",
+  "error.connector.protonPassExtraPassword": "كلمة المرور الإضافية غير صحيحة. أدخلها مرة أخرى.",
+  "error.connector.protonPassExtraPasswordNotAsked": "لم يطلب Proton Pass كلمة مرور إضافية.",
+  "error.connector.protonPassFileUnreadable": "ملف اتصال Proton Pass غير قابل للقراءة.",
+  "error.connector.protonPassSignInTimeout": "استغرق تسجيل الدخول إلى Proton وقتًا طويلاً. اتصل مرة أخرى.",
+  "error.connector.protonPassSetupFailed":
+    "تعذّر إنشاء الخزنة Shared with OpenBot أو مفتاح الوصول الخاص بها في Proton Pass. اتصل مرة أخرى.",
 } as const satisfies PartialTranslation<typeof source>;

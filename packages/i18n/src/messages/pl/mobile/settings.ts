@@ -26,11 +26,14 @@ export const messages = {
   "mobile.settings.home.support": "Pomoc",
   "mobile.settings.home.supportHint": "Uzyskaj pomoc i zapisz dziennik pomocy",
   "mobile.settings.support.help": "Uzyskaj pomoc",
+  "mobile.settings.support.discord": "Otwórz zgłoszenie na Discordzie",
+  "mobile.settings.support.discordHint": "Najszybszy sposób na pomoc",
   "mobile.settings.support.message": "Napisz do nas na X",
   "mobile.settings.support.issues": "Zgłoś problem na GitHubie",
   "mobile.settings.support.helpFooter":
-    "Opisz, co się stało i kiedy. Dołącz plik dziennika pomocy do zgłoszenia na GitHubie.",
+    "Opisz, co się stało i kiedy. Dołącz plik dziennika pomocy do zgłoszenia na Discordzie lub GitHubie.",
   "mobile.settings.support.log": "Dziennik pomocy",
+  "mobile.settings.support.show": "Pokaż dziennik",
   "mobile.settings.support.save": "Zapisz plik dziennika",
   "mobile.settings.support.events": {
     one: "{count} zdarzenie",
@@ -45,8 +48,8 @@ export const messages = {
     "Dziennik pozostaje na tym telefonie, a OpenBot go nie wysyła. Zapisuje kroki połączenia, żądania i błędy. Nie zapisuje wiadomości ani plików i maskuje hasła oraz tokeny. Przeczytaj plik, zanim go udostępnisz.",
   "mobile.settings.support.saveFailed": "Nie udało się zapisać pliku dziennika. Spróbuj ponownie.",
   "mobile.settings.support.sharingUnavailable": "Udostępnianie jest niedostępne na tym telefonie.",
-  "mobile.settings.support.recent": "Ostatnie zdarzenia",
-  "mobile.settings.support.recentFooter": "Od najnowszych. Zapisany plik zawiera wszystkie zdarzenia.",
+  "mobile.settings.support.newestFirst": "Od najnowszych.",
+  "mobile.settings.support.showOlder": "Pokaż starsze zdarzenia",
   "mobile.settings.support.empty": "Brak zdarzeń.",
   "mobile.settings.sessions.kindDesktop": "komputer",
   "mobile.settings.sessions.kindMobile": "telefon",
@@ -271,6 +274,14 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "Słuchanie",
   "mobile.settings.voice.tab.speaking": "Mówienie",
+  "mobile.settings.voice.pause.title": "Pauza przed wysłaniem",
+  "mobile.settings.voice.pause.label": "Czekaj na nowe słowa",
+  "mobile.settings.voice.pause.footer":
+    "W rozmowie głosowej OpenBot wysyła Twoje słowa, gdy przez tak długi czas nie rozpozna nowych słów. Hałas bez słów nie przedłuża słuchania. Wybierz dłuższą pauzę, jeśli mówisz wolno lub zatrzymujesz się, by pomyśleć.",
+  "mobile.settings.voice.pause.seconds": "{seconds} s",
+  "mobile.settings.voice.speed.title": "Szybkość odpowiedzi",
+  "mobile.settings.voice.speed.footer": "Szybkość odpowiedzi, które OpenBot czyta na głos, także w rozmowie głosowej.",
+  "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot przesyła Twoją mowę do ElevenLabs z jednorazowym tokenem, a ElevenLabs obciąża Twoje konto. Klucz zostaje na tym telefonie.",
 } as const satisfies PartialTranslation<typeof source>;

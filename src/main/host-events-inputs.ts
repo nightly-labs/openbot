@@ -58,6 +58,7 @@ export function parseSaveEventRoutine(value: unknown): SaveEventRoutineInput {
   if (input.missedPolicy !== undefined && input.missedPolicy !== "skip" && input.missedPolicy !== "run-once") {
     throw invalidEventInput();
   }
+  if (input.runIn !== undefined && input.runIn !== "chat" && input.runIn !== "thread") throw invalidEventInput();
   return {
     ...(input.id === undefined ? {} : { id: requiredString(input.id, 128) }),
     owner: owner(input.owner),
@@ -76,6 +77,7 @@ export function parseSaveEventRoutine(value: unknown): SaveEventRoutineInput {
           },
     ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
     ...(input.missedPolicy === undefined ? {} : { missedPolicy: input.missedPolicy }),
+    ...(input.runIn === undefined ? {} : { runIn: input.runIn }),
   };
 }
 

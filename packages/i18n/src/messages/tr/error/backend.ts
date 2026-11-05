@@ -299,6 +299,16 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "Bu adla bir tarayıcı profili zaten var.",
   "error.backend.browserSessionInUse": "Bir sekme bu tarayıcı oturumunu hâlâ kullanıyor. Yeniden deneyin.",
   "error.backend.browserProfileLimit": "En fazla {limit} tarayıcı profiliniz olabilir.",
+  "error.backend.browserProxyNotFound": "Bu proxy artık yok.",
+  "error.backend.browserProxyAddressInvalid":
+    "socks5://host:1080 veya http://user:password@host:3128 gibi bir proxy adresi yazın.",
+  "error.backend.browserProxyLimit": "En fazla {limit} proxy'niz olabilir.",
+  "error.backend.browserProxyTaken": "Bu adrese sahip bir proxy zaten var.",
+  "error.backend.browserProxyChanged": "Bu proxy siz açtıktan sonra değişti. Yeniden kontrol edip tekrar deneyin.",
+  "error.backend.browserProxyUnreachable": "{name} proxy'si yanıt vermiyor, bu yüzden sayfa açılmadı.",
+  "error.backend.browserProxySignInRefused": "{name} proxy'si oturum açmayı reddetti, bu yüzden sayfa açılmadı.",
+  "error.backend.browserProxyComputerUnreachable":
+    "Bu profilin kullandığı bilgisayar yanıt vermiyor, bu yüzden sayfa açılmadı.",
   "error.backend.browserLowMemory":
     "Bu sunucunun belleği azaldı, bu nedenle tarayıcı başka bir sekme açamıyor. Bir sekmeyi kapatın veya diğer ajanların bitmesini bekleyin.",
   "error.backend.browserOpenFailed": "{url} açılamadı: {reason}",

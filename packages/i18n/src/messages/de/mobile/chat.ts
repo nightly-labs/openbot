@@ -211,6 +211,9 @@ export const messages = {
   "mobile.chat.message.reply": "Antworten",
   "mobile.chat.message.branch": "Hier abzweigen",
   "mobile.chat.message.branchFailed": "Der Chat konnte nicht abgezweigt werden.",
+  "mobile.chat.message.markUnread": "Als ungelesen markieren",
+  "mobile.chat.unread.line": "NEU",
+  "mobile.chat.unread.lineLabel": "Neue Nachrichten",
   "mobile.chat.message.actions": "Nachrichtenaktionen",
   "mobile.chat.message.copy": "Nachricht kopieren",
   "mobile.chat.message.readAloud": "Vorlesen",
@@ -394,13 +397,10 @@ export const messages = {
   "mobile.chat.queue.editEnded": "Die Bearbeitung der Warteschlange ist beendet.",
   "mobile.chat.queue.loadFailed": "Die Warteschlange konnte nicht geladen werden.",
   "mobile.chat.queue.storageUnavailable": "Der Speicher für Anhänge ist nicht verfügbar.",
-  "mobile.chat.queue.buttonFailed":
-    "Die Nachrichten in der Warteschlange wurden nicht geladen. Nachrichten in der Warteschlange anzeigen",
   "mobile.chat.queue.buttonLabel": {
     one: "{count} Nachricht in der Warteschlange. Nachrichten in der Warteschlange anzeigen",
     other: "{count} Nachrichten in der Warteschlange. Nachrichten in der Warteschlange anzeigen",
   },
-  "mobile.chat.queue.unavailable": "Warteschlange nicht verfügbar",
   "mobile.chat.queue.uploading": "Hochladen: {progress} von {total}",
   "mobile.chat.queue.cancelUpload": "Hochladen aus der Warteschlange abbrechen",
   "mobile.chat.queue.waitingTitle": "Warten auf den Agenten",

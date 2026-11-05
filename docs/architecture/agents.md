@@ -99,8 +99,13 @@ the marker it skips the turn's thinking too, so a later import does not bring a 
 
 ## Routine sessions
 
-Each routine of an agent runs in its own side thread, the routine thread. `AgentTasks.routineThread`
-makes the thread on the first run, with the routine's name as its title and `routine_id` set
+An agent routine runs in the agent's own chat, unless its `runIn` is `thread` (migration 57; existing
+routines got `chat`, the place of runs before 0.61). Then it runs in its own side thread, the routine
+thread. The routine settings show a switch for it on this computer's host only: the Team API admin wire
+does not carry `runIn`, and a remote save without it keeps the saved place. The `create_routine`,
+`update_routine`, `create_webhook_routine` and `update_webhook_routine` tools take `runIn` too. A routine set back to `chat` keeps its thread, but new runs,
+the run marker's "Open thread" link, a test run and the routine's reply digest do not use it.
+`AgentTasks.routineThread` makes the thread on the first run in a thread, with the routine's name as its title and `routine_id` set
 (migration 54; a unique index keeps one thread for each routine of an agent, also when it is
 archived). A later run uses the same thread, and a run reopens an archived one. A run also gives the
 thread the routine's current name, unless a person renamed the thread. `RoutineScheduler`
@@ -123,8 +128,10 @@ opens the routine thread. The Team API adapters drop this event, so a remote cli
 notification for a run in a routine thread. The released `agent-tasks-v1` routes do not send
 `routineId`; only this computer's IPC list has it.
 
-A routine thread is a side thread, so its runs have no Computer Use: only the agent's own chat
-drives the screen. Its runs keep the tools of the chat that side threads do not have:
+A routine thread is a side thread, but its runs keep Computer Use when the agent has it on: a
+scheduled run that drives a desktop app has no person to continue the step in the chat. The
+routine thread and the chat of one agent can then drive the screen at the same time, as two agents
+can. Its runs also keep the tools of the chat that side threads do not have:
 `OpenBotToolRouter` does not count a routine thread as an execution thread, so a run can call
 `await_event` and `start_task`.
 
@@ -504,8 +511,17 @@ mark of each open side thread, and a move of one. The marks are rows of `project
 under the side thread's own `threadId`, so the member's devices share them and no migration was
 needed. A desktop marks the open thread read while its window has focus (`markTaskRead` over IPC, or
 the route for a joined server); the phone marks it while the thread screen is in front, and shows a
-dot on the agent's name for an open thread with unread agent messages. The host sends no event when
-a mark moves; a client reads the marks again when `agent-tasks-changed` arrives or a screen that
+dot on the agent's name for an open thread with unread agent messages. The desktop reads the marks
+with `listTaskReads` (`agent:tasks:reads` over IPC, or the `reads` route for a joined server). It shows
+a dot on the tab and the menu row of an idle thread with unread agent messages, and adds those
+messages to the unread count of the agent's sidebar row (`agentUnreadReplies` in
+`conversation-context.tsx`). The Dynamic Island keeps the chat-only count: it shows and opens a
+message of the agent's chat, and a side thread's messages are not in it. "Mark all read" still reads
+only the agent's chat. The desktop reads the marks of an agent only after it reads that agent's thread
+list, so after a start an agent that is not open adds no thread messages to its count until a thread
+event arrives or the person opens it. The host sends no event when
+a mark moves; a client reads the marks again when `agent-tasks-changed` arrives with a thread whose state, outcome or
+last change moved (not for a progress line), or a screen that
 shows them opens. The optional `agent-thread-files-v1` capability
 (`packages/contracts/src/team-protocol/agent-thread-files-v1.ts`, host route `routeAgentThreadFiles` in
 `src/main/team-api/route-agent-threads.ts`) adds `POST /v1/agent-threads/{start-with-files,send-with-files}`:
@@ -558,7 +574,8 @@ opens the task.
 
 Shared writes: each task thread owns its own browser tabs and tab queue. Computer Use is an MCP
 server that the provider starts, so OpenBot cannot queue its calls; `ThreadLifecycle` starts a task
-session without it, and the instructions send desktop work to the agent's own chat. Tasks share the
+session without it, and the instructions send desktop work to the agent's own chat. A routine thread
+is the exception (see above). Tasks share the
 workspace, and OpenBot does not lock files; the `start_task` guidance warns the agent about this.
 
 A provider, account or custom-agent change that a user or an agent asks for while a turn, a task or
@@ -949,8 +966,8 @@ in `.agents/skills` and `.claude/skills` that OpenBot does not manage. Workspace
 and leave out `.openbot/`, the skill folders, links, and every path `isUnsafeArchivePath` refuses
 (`.git`, `node_modules`, `.env*`, private keys, nested archives). Server settings are optional: MCP servers,
 custom model providers, custom ACP agents (as a warning, see below), sidebar sections and routine flows
-between exported agents. A custom provider model keeps its optional `contextWindow`; an app that
-does not know the field ignores it.
+between exported agents. A custom provider model keeps its optional `contextWindow`, `maxOutput`
+and `reasoningEfforts`; an app that does not know a field ignores it.
 
 No secret is in the file: MCP variable and header values are empty, custom providers have no key or
 headers, custom agents keep only the names of their variables, and `signedIn` lists provider ids,

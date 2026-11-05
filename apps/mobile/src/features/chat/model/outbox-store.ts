@@ -308,7 +308,7 @@ export class OutboxStore {
   /**
    * Gives the text, reply and files of a message that is not sending to the composer. The message
    * stays saved, stopped, until the composer sends the change (`cancel`) or the chat closes
-   * (`stopEditing`): a composer draft is not saved.
+   * (`stopEditing`): the chat does not keep a draft that holds an edit.
    */
   async edit(clientMessageId: string): Promise<OutboxDraft | null> {
     const message = this.find(clientMessageId);

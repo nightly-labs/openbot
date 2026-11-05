@@ -77,8 +77,8 @@ export { default as GripVertical } from "lucide-solid/icons/grip-vertical";
 export { default as Hand } from "lucide-solid/icons/hand";
 export { default as HardDrive } from "lucide-solid/icons/hard-drive";
 export { default as Hash } from "lucide-solid/icons/hash";
+export { default as Heart } from "lucide-solid/icons/heart";
 export { default as Highlighter } from "lucide-solid/icons/highlighter";
-export { default as History } from "lucide-solid/icons/history";
 export { default as Hourglass } from "lucide-solid/icons/hourglass";
 export { default as Image } from "lucide-solid/icons/image";
 export { default as Info } from "lucide-solid/icons/info";
@@ -134,6 +134,8 @@ export { default as RefreshCw } from "lucide-solid/icons/refresh-cw";
 export { default as Repeat } from "lucide-solid/icons/repeat";
 export { default as Repeat2 } from "lucide-solid/icons/repeat-2";
 export { default as RotateCcw } from "lucide-solid/icons/rotate-ccw";
+// `history` is an alias. The import names the icon file, so check:ui reads its class, `lucide-rotate-ccw-clock`.
+export { default as History } from "lucide-solid/icons/rotate-ccw-clock";
 export { default as Scan } from "lucide-solid/icons/scan";
 export { default as ScanLine } from "lucide-solid/icons/scan-line";
 export { default as Search } from "lucide-solid/icons/search";

@@ -1,7 +1,11 @@
 import { type AgentStep, AgentStepsDisclosure } from "@openbot/ui/features/conversation/AgentSteps";
+import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
+import { MessageActions } from "@openbot/ui/features/conversation/MessageRendering";
 import { type TraceSpan, TraceWaterfall } from "@openbot/ui/features/conversation/TraceWaterfall";
 import { createMemo, createSignal, onSettled } from "solid-js";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import { STORY_AGENTS } from "./fixtures";
 
 /*
  * The trace of an agent's turn: each model call, tool call, wait and handoff as a bar on one
@@ -288,6 +292,75 @@ export const FromStepsRow: Story = {
         defaultOpen={false}
         trace={{ spans: () => FINISHED, keyboard: "mac" }}
         facts={{ durationMs: TURN_LENGTH, failed: FINISHED.filter((span) => span.failed).length }}
+      />
+    </div>
+  ),
+};
+
+/** One agent answer of a channel, with the actions and the steps row that show on hover. */
+function ChannelAnswer(props: { id: string; agent: number; body: string; first: boolean }) {
+  const agent = STORY_AGENTS[props.agent];
+  const message = { id: props.id, author: "agent" as const, body: props.body, time: "09:31", kind: "text" as const };
+  // The timeline row gives the distance between messages: more before a new author.
+  return (
+    <div class="virtual-chat-list-static">
+      <div class="virtual-chat-row" data-grouped={props.first ? undefined : "sender"}>
+        <ChatMessageRow
+          message={message}
+          author={{ kind: "agent", name: agent?.name ?? "", agent }}
+          showAuthor={props.first}
+          actionsBeside
+          showTime={props.first}
+          agents={STORY_AGENTS}
+          actions={
+            <MessageActions
+              message={message}
+              authorName={agent?.name}
+              reactions={false}
+              pickerOpen={false}
+              expandedEmoji={false}
+              copied={false}
+              onTogglePicker={fn()}
+              onExpandEmoji={fn()}
+              onReact={fn()}
+              onReply={fn()}
+              onCopy={fn()}
+            />
+          }
+          steps={
+            <AgentStepsDisclosure
+              steps={STEPS}
+              defaultOpen={false}
+              list={false}
+              trace={{ spans: () => FINISHED, keyboard: "mac" }}
+              facts={{ durationMs: TURN_LENGTH, failed: FINISHED.filter((span) => span.failed).length }}
+            />
+          }
+          onSelectAgent={fn()}
+          onOpenLink={fn()}
+          onPreview={fn()}
+          onAttachmentAction={fn()}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The placement in a channel: the actions and the steps row stand beside the answer, or under a long
+ * answer, and show on hover. The steps open only the trace, so the channel never grows a list.
+ */
+export const FromChannelAnswer: Story = {
+  render: () => (
+    <div style={{ width: "720px" }}>
+      <ChannelAnswer id="a1" agent={1} first body="Yes. The ping run is at packet 112." />
+      <ChannelAnswer id="a2" agent={1} first={false} body="I stopped it. The process is gone." />
+      <ChannelAnswer id="a3" agent={0} first body="The ping run is cancelled. Nothing else is in progress." />
+      <ChannelAnswer
+        id="a4"
+        agent={0}
+        first={false}
+        body="I checked the other agents too. Research has no open runs, the browser session closed when the ping run stopped, and no file in the shared workspace is still being written."
       />
     </div>
   ),

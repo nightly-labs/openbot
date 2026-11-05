@@ -1,4 +1,4 @@
-import { chmod, mkdir } from "node:fs/promises";
+import { access, chmod, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { SharedTable } from "@openbot/contracts/ipc";
@@ -189,6 +189,19 @@ export class AgentTables {
       if (!dropped.ok) return yield* new AgentTablesError({ message: dropped.message });
     });
     return this.#schemaLock.withPermit(remove);
+  }
+
+  /**
+   * Starts the database host in the background, so the first statement of this run does not wait
+   * for it. Only when the shared database exists: a computer whose agents never made a table does
+   * not keep an idle process for it.
+   */
+  prewarm(): Effect.Effect<void> {
+    return Effect.tryPromise(() => access(this.#path)).pipe(
+      // `try`, not `sync`: a start that throws is then a failure that `ignore` drops, not a defect.
+      Effect.andThen(Effect.try(() => this.#supervisor.prewarm())),
+      Effect.ignore,
+    );
   }
 
   dispose(): void {

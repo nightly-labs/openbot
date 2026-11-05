@@ -104,6 +104,7 @@ export const messages = {
   "chat.awaiting.needsYou": "{name} heeft je nodig",
   "chat.awaiting.limited": "{name} wacht op een gebruikslimiet",
   "chat.awaiting.dismiss": "Deze lijst verbergen",
+  "chat.awaiting.stop": "Stoppen",
   "chat.waits.label": "Open wachttaken",
   "chat.waits.title": { one: "{count} open wachttaak", other: "{count} open wachttaken" },
   "chat.waits.active": "{state}: {note}",
@@ -429,4 +430,8 @@ export const messages = {
   "chat.compaction.failed": "Kan context niet comprimeren",
   "chat.compaction.tokens": "{before} → {after} tokens",
   "chat.compaction.continues": "Berichten in de wachtrij gaan door.",
+  "chat.reference.kind.tab": "Browsertabblad",
+  "chat.reference.kind.thread": "Thread",
+  "chat.reference.open.tab": "Browsertabblad {name} tonen",
+  "chat.reference.open.thread": "Thread {name} openen",
 } as const satisfies PartialTranslation<typeof source>;

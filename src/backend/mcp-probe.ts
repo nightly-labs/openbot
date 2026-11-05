@@ -3,7 +3,11 @@ import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport, StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { AccessDeniedError, UnauthorizedClientError } from "@modelcontextprotocol/sdk/server/auth/errors.js";
+import {
+  AccessDeniedError,
+  InvalidClientError,
+  UnauthorizedClientError,
+} from "@modelcontextprotocol/sdk/server/auth/errors.js";
 import type { FetchLike, Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -221,8 +225,7 @@ function describeProbeFailure(
   signInPlace: McpSignInPlace | null,
 ): string {
   if (signIn?.cancelled()) return sourceText("error.backend.mcpSignInCancelled");
-  if (isAccessRefusal(signIn?.registrationStatus() ?? null)) return REGISTRATION_REFUSED;
-  if (signIn?.registrationFailed() && isRegistrationRefusal(error)) return REGISTRATION_REFUSED;
+  if (signIn && isRegistrationRefusal(error, signIn)) return REGISTRATION_REFUSED;
   if (signIn && httpStatus(error) === 401) return sourceText("error.backend.mcpSignInNotAccepted");
   // A key the user pasted into a header is theirs to fix; the sign-in would not replace it.
   if (challenge?.status === 401 && challenge.bearer && !hasCredentialHeader(config)) {
@@ -596,11 +599,27 @@ function isAccessRefusal(status: number | null): boolean {
 }
 
 /**
+ * Whether the server refused to register OpenBot. Only an error from a registration counts: the
+ * same error classes from the token endpoint mean that the server refused a client it issued.
+ *
  * The SDK keeps the status only when the refusal body is not an OAuth error. A body such as
  * `{"error":"access_denied"}` arrives as its error class, with the status gone.
+ *
+ * RevenueCat answers each registration it did not approve with 400 `invalid_client` ("The client
+ * is not registered.").
  */
-function isRegistrationRefusal(error: unknown): boolean {
-  if (error instanceof AccessDeniedError || error instanceof UnauthorizedClientError) return true;
+function isRegistrationRefusal(error: unknown, signIn: McpSignIn): boolean {
+  const status = signIn.registrationStatus();
+  if (isAccessRefusal(status)) return true;
+  // The SDK also registers when it drops a client bound to another issuer. `registrationFailed`
+  // misses that registration, and the watched status shows it.
+  if (!signIn.registrationFailed() && status === null) return false;
+  if (
+    error instanceof AccessDeniedError ||
+    error instanceof UnauthorizedClientError ||
+    error instanceof InvalidClientError
+  )
+    return true;
   return isAccessRefusal(httpStatus(error));
 }
 

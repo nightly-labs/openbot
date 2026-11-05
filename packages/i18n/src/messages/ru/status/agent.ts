@@ -17,6 +17,7 @@ export const messages = {
   "status.agent.channelRoutineCreated": "Агент {agent} создал регулярную задачу {routine}. Запрос: {person}.",
   "status.agent.channelRoutineUpdated": "Агент {agent} изменил регулярную задачу {routine}. Запрос: {person}.",
   "status.agent.channelRoutineDeleted": "Агент {agent} удалил регулярную задачу {routine}. Запрос: {person}.",
+  "status.agent.channelTaskCancelled": "Агент {agent} отменил задачу «{task}» и её подзадачи. Запрос: {person}.",
   "status.agent.screenCaptureScreen": "Сделать снимок главного экрана и отправить изображение модели агента.",
   "status.agent.screenCaptureChannel":
     "Изображение появится в канале {channel}, и его увидит каждый участник этого сервера, который читает канал.",

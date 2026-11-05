@@ -21,14 +21,14 @@ import { AgentAndroidMenu, AgentContextMenuLink } from "@/features/agents/compon
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-row";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
+import { AgentUnreadBadge } from "@/features/agents/components/agent-unread-badge";
 import { AGENT_WAIT_STATE, AgentWaitBadge, AgentWaitChip } from "@/features/agents/components/agent-wait-badge";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { AgentDragPreview, useChatDrag, useHoldMenu } from "@/features/agents/components/chat-drag";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
 import { useWaitingChannel } from "@/features/channels/components/use-waiting-channel";
-import { useAgentWaitReason } from "@/features/workspace/components/use-agent-activity";
-import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
+import { useAgentListUnreadCount, useAgentListWaitReason } from "@/features/workspace/components/use-agent-activity";
 import { type MobileAgent, useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
@@ -127,8 +127,8 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
   const previewLine = waitingChannel
     ? t("mobile.chat.channelWork.waiting", { channel: waitingChannel.name })
     : lastMessage;
-  const isUnread = useAgentUnread(agent.id);
-  const waitReason = useAgentWaitReason(agent.id);
+  const unreadCount = useAgentListUnreadCount(agent.id);
+  const waitReason = useAgentListWaitReason(agent.id);
   const isUnpinTarget = transition?.chatId === agent.id && transition.target === "row";
   const bloub = (
     <BloubAvatar
@@ -140,9 +140,15 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
       size={54}
       animateIdle={false}
       rings
+      withThreads
     />
   );
-  const waitBadge = waitReason ? <AgentWaitBadge reason={waitReason} /> : null;
+  // As on the desktop, a wait outranks the unread count in the corner of the avatar.
+  const waitBadge = waitReason ? (
+    <AgentWaitBadge reason={waitReason} />
+  ) : unreadCount > 0 ? (
+    <AgentUnreadBadge count={unreadCount} avatarSize={54} ringColor={background} />
+  ) : null;
   const avatar = (
     <AgentPinAvatar agentId={agent.id} location="row" size={54}>
       {bloub}
@@ -159,7 +165,12 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
       accessibilityLabel={
         waitReason
           ? t("mobile.agent.list.withState", { label: openLabel, state: t(AGENT_WAIT_STATE[waitReason]) })
-          : openLabel
+          : unreadCount > 0
+            ? t("mobile.agent.list.withState", {
+                label: openLabel,
+                state: t("mobile.agent.list.unread", { count: unreadCount }),
+              })
+            : openLabel
       }
       accessibilityRole="button"
       accessibilityActions={[{ name: "pin", label: t("mobile.agent.pin.pinNamed", { name: agent.name }) }]}
@@ -186,7 +197,6 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
           <AgentRowTextReveal active={isUnpinTarget}>
             <View className="min-w-0 flex-1 gap-0.5">
               <View className="flex-row items-center gap-2">
-                {isUnread ? <View className="size-2 rounded-full bg-accent" /> : null}
                 <Typography.Paragraph
                   className="font-semibold min-w-0 flex-1"
                   numberOfLines={1}

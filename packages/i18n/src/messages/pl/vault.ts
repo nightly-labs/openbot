@@ -95,7 +95,7 @@ export const messages = {
   "vault.importMenu": "Importuj z pliku CSV",
   "vault.importTitle": "Importuj z pliku CSV",
   "vault.importDescription":
-    "Importuj loginy z pliku CSV wyeksportowanego z 1Password, Bitwarden, Chrome, Edge, Firefox, Safari, Apple Passwords lub LastPass. OpenBot odczytuje plik na tym komputerze i go nie wysyła.",
+    "Importuj loginy z pliku CSV wyeksportowanego z 1Password, Bitwarden, Chrome, Edge, Firefox, Safari, Apple Passwords, LastPass lub Proton Pass. OpenBot odczytuje plik na tym komputerze i go nie wysyła.",
   "vault.importChoose": "Wybierz plik CSV",
   "vault.importDone": "Zaimportowano: {imported}. Pominięto: {skipped}.",
   "vault.unavailableTitle": "Ten komputer nie może przechowywać sekretów",

@@ -110,6 +110,7 @@ export const messages = {
     "Das Kontextfenster eines Modells muss eine ganze Zahl von Tokens zwischen {min} und {max} sein.",
   "error.provider.maxOutputInvalid":
     "Die maximale Ausgabe eines Modells muss eine ganze Zahl von Tokens zwischen {min} und {max} sein.",
+  "error.provider.reasoningEffortsInvalid": "Der Denkaufwand eines Modells ist ungültig.",
   "error.provider.headersTooMany": "Es gibt zu viele Header.",
   "error.provider.headerNameCharacter": "Ein Headername enthält ein Zeichen, das HTTP nicht erlaubt.",
   "error.provider.headerNameTooLong": "Ein Headername ist zu lang.",
@@ -222,6 +223,8 @@ export const messages = {
     "Beim Modellanbieter ist ein Fehler aufgetreten. Deine Verbindung ist nicht die Ursache. Versuche es später erneut oder wähle ein anderes Modell.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode konnte keine Verbindung zum Modellanbieter herstellen. Prüfe die Netzwerkverbindung des Computers, auf dem OpenBot läuft, und versuche es erneut.\n{detail}",
+  "error.provider.codexStateBusy":
+    "ChatGPT bereitet nach einem früheren Start noch seinen lokalen Verlauf vor. Warte ein paar Minuten und versuche es dann erneut.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode konnte seine Datenbank nicht öffnen, weil eine neuere OpenCode-Version sie geändert hat. Aktualisiere OpenCode auf Version 2 oder neuer und versuche es dann erneut.",
   "error.provider.opencodeNoAnswer":
@@ -247,6 +250,8 @@ export const messages = {
     "Gemini wurde nicht heruntergeladen. Lade es in OpenBot herunter, um fortzufahren.",
   "error.provider.antigravityNotStarted":
     "Der Gemini-Server wurde gefunden, aber seine Version kann nicht gelesen werden.",
+  "error.provider.antigravityOverrideInvalid":
+    "Der Gemini-Server in OPENBOT_ANTIGRAVITY_PATH fehlt oder ist nicht ausführbar. Korrigiere den Pfad oder entferne die Variable und starte OpenBot dann neu.",
   "error.provider.antigravityVersionUnreadable": "Die Version des Gemini-Servers konnte nicht gelesen werden.",
   "error.provider.antigravitySignIn": "Melde dich mit Google an, um Gemini zu verwenden.",
   "error.provider.antigravityRateLimited":
@@ -447,6 +452,10 @@ export const messages = {
     "Der benutzerdefinierte Agent hat sich während der Installation geändert. Versuche es erneut.",
   "error.provider.registryInstallFailed":
     "Die Installation des Agenten ist fehlgeschlagen. Die vorherige Installation ist unverändert.",
+  "error.provider.hermesInstallFailed":
+    "Hermes Agent wurde nicht installiert. Versuche es erneut oder nutze die Installationsanleitung.",
+  "error.provider.hermesNeedsGitCurl":
+    "Hermes Agent braucht git und curl. Installiere sie und versuche es dann erneut.",
   "error.provider.registryRemoveBusy":
     "Warte, bis die Installation des Agenten und laufende ACP-Arbeit abgeschlossen sind, bevor du ihn entfernst.",
 } as const satisfies PartialTranslation<typeof source>;

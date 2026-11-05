@@ -43,6 +43,7 @@
 .language-wheel-arrows svg {
   width: var(--openbot-icon-lg);
   height: var(--openbot-icon-lg);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .language-wheel {
@@ -148,6 +149,7 @@
   width: var(--openbot-icon-lg);
   height: var(--openbot-icon-lg);
   transition: translate var(--openbot-duration-normal) var(--openbot-ease-out);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .language-wheel-continue:hover:not(:disabled) {

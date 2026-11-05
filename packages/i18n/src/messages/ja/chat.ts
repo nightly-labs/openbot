@@ -104,6 +104,7 @@ export const messages = {
   "chat.awaiting.needsYou": "{name} があなたを待っています",
   "chat.awaiting.limited": "{name} は使用上限の解除を待っています",
   "chat.awaiting.dismiss": "この一覧を非表示",
+  "chat.awaiting.stop": "停止",
   "chat.waits.label": "未完了の待機",
   "chat.waits.title": { other: "未完了の待機 {count} 件" },
   "chat.waits.active": "{state}: {note}",
@@ -406,4 +407,8 @@ export const messages = {
   "chat.compaction.failed": "コンテキストを圧縮できませんでした",
   "chat.compaction.tokens": "{before} → {after} トークン",
   "chat.compaction.continues": "キュー内のメッセージは続行されます。",
+  "chat.reference.kind.tab": "ブラウザーのタブ",
+  "chat.reference.kind.thread": "スレッド",
+  "chat.reference.open.tab": "ブラウザーのタブ {name} を表示",
+  "chat.reference.open.thread": "スレッド {name} を開く",
 } as const satisfies PartialTranslation<typeof source>;

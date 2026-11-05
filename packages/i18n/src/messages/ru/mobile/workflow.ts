@@ -236,6 +236,8 @@ export const messages = {
   "mobile.workflow.output.discord": "Discord",
   "mobile.workflow.output.slack": "Slack",
   "mobile.workflow.output.telegram": "Telegram",
+  "mobile.workflow.output.telegramHint": "Отвечает, публикует или добавляет реакцию в связанном чате Telegram.",
+  "mobile.workflow.output.slackHint": "Отвечает, публикует или добавляет реакцию в канале Slack.",
   "mobile.workflow.run.stopStep": "Остановить шаг",
   "mobile.workflow.run.stopStepFailed": "Не удалось остановить шаг",
   "mobile.workflow.version.history": "История версий",
@@ -385,8 +387,6 @@ export const messages = {
   "mobile.workflow.slack.action.reply": "Ответить в треде",
   "mobile.workflow.telegram.hostOnly":
     "Чаты Telegram есть только на компьютере, где работает OpenBot. Измените этот шаг в OpenBot на этом компьютере.",
-  "mobile.workflow.telegram.triggerComputerOnly":
-    "Измените этот триггер в OpenBot на компьютере, который его запускает.",
   "mobile.workflow.telegram.outputSummary": "Telegram · {action}",
   "mobile.workflow.telegram.chat": "Чат",
   "mobile.workflow.telegram.anyChat": "Любой связанный чат",
@@ -403,4 +403,14 @@ export const messages = {
   "mobile.workflow.telegram.action.post": "Опубликовать в чате",
   "mobile.workflow.telegram.action.react": "Добавить реакцию",
   "mobile.workflow.telegram.emoji": "Эмодзи",
+  "mobile.workflow.chats.adminOnly": "Изменить этот шаг может только владелец или администратор.",
+  "mobile.workflow.chats.loadFailed": "Не удалось загрузить чаты этого сервера. Повторите попытку позже.",
+  "mobile.workflow.slack.hostOnly":
+    "Рабочие пространства Slack есть только на компьютере, где работает OpenBot. Измените этот шаг в OpenBot на этом компьютере.",
+  "mobile.workflow.slack.workspace": "Рабочее пространство",
+  "mobile.workflow.slack.chooseWorkspace": "Выберите рабочее пространство",
+  "mobile.workflow.slack.oneWorkspace": "Одно рабочее пространство",
+  "mobile.workflow.slack.chooseChannel": "Выберите канал",
+  "mobile.workflow.slack.needsWorkspace": "Выберите рабочее пространство. Без него триггер не запускается.",
+  "mobile.workflow.slack.needsChannel": "Выберите рабочее пространство и канал для публикации.",
 } as const satisfies PartialTranslation<typeof source>;

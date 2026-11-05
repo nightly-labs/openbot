@@ -154,6 +154,7 @@ export const messages = {
   "chat.awaiting.needsYou": "{name} czeka na ciebie",
   "chat.awaiting.limited": "{name} czeka na limit użycia",
   "chat.awaiting.dismiss": "Ukryj tę listę",
+  "chat.awaiting.stop": "Zatrzymaj",
   "chat.waits.label": "Otwarte oczekiwania",
   "chat.waits.title": {
     one: "{count} otwarte oczekiwanie",
@@ -521,4 +522,8 @@ export const messages = {
   "chat.compaction.failed": "Nie udało się skompaktować kontekstu",
   "chat.compaction.tokens": "{before} → {after} tokenów",
   "chat.compaction.continues": "Wiadomości z kolejki są dalej przetwarzane.",
+  "chat.reference.kind.tab": "Karta przeglądarki",
+  "chat.reference.kind.thread": "Wątek",
+  "chat.reference.open.tab": "Pokaż kartę przeglądarki {name}",
+  "chat.reference.open.thread": "Otwórz wątek {name}",
 } as const satisfies PartialTranslation<typeof source>;

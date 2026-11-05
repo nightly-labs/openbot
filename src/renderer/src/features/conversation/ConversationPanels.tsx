@@ -127,7 +127,6 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     agentActivity,
     browserSidebarOpen,
     browserExpandedOpen,
-    hideBrowserPanel,
     browserTabs,
     closeShownSidePanelFile,
     closeBrowserTab,
@@ -163,6 +162,8 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     settingsProvider,
     settingsReasoning,
     updateRuntimeSettings,
+    fastMode,
+    fastModeChange,
     messageLinkRelay,
     openMessageLinkRelay,
     pasteMessageLinkRelay,
@@ -421,6 +422,11 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
           }}
           onToggleMaximized={() => setSidePanelMaximized(!sidePanel().maximized)}
           onCollapse={toggleSidePanel}
+          onNewBrowserTab={() => {
+            // The new tab shows in the Browser pane, so the pane comes to the front first.
+            openSidePanelPane("browser");
+            void openBrowserAddress(BROWSER_NEW_TAB_URL, true);
+          }}
         />
       </Show>
 
@@ -574,7 +580,6 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
           }}
           onCloseTab={(tabId) => void closeBrowserTab(tabId)}
           onNewTab={() => void openBrowserAddress(BROWSER_NEW_TAB_URL, true)}
-          onCollapse={hideBrowserPanel}
         />
       </Show>
 
@@ -629,6 +634,9 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               busyMessageDefaultIsHost={props.server?.kind === "remote"}
               newChatEditable={props.server?.kind === "local" || props.remoteNewChatLoaded === true}
               quickAcknowledgementEditable={props.server?.kind === "local" || props.remotePlanCardLoaded === true}
+              // The same Fast state and switch as the model picker of the chat header.
+              fastMode={fastMode()}
+              onFastModeChange={fastModeChange()}
               taskLimitEditable={props.server?.kind === "local" || props.remoteTaskLimitLoaded === true}
               backupModelsEditable={props.server?.kind === "local" || props.remoteBackupModelsLoaded === true}
               usageLimited={props.usageLimited}

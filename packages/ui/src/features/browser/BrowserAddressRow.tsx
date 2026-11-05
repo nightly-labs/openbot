@@ -1,5 +1,16 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { Button, CircleDot, Clock3, Globe2, Input, Listbox, Search, TriangleAlert, UserRound } from "@openbot/ui";
+import {
+  Button,
+  CircleDot,
+  Clock3,
+  Globe2,
+  Input,
+  Listbox,
+  Search,
+  TriangleAlert,
+  UserRound,
+  Waypoints,
+} from "@openbot/ui";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import {
   BrowserBackIcon,
@@ -343,6 +354,14 @@ export function BrowserAddressRow(props: {
               {(hue) => <BrowserProfileDot hue={hue()} />}
             </Show>
             <span class="browser-profile-status-name">{current().name ?? browserTabProfileLabel(t, current())}</span>
+            <Show when={current().proxy}>
+              {(proxy) => (
+                <>
+                  <Waypoints aria-hidden="true" />
+                  <span class="browser-profile-status-name">{proxy()}</span>
+                </>
+              )}
+            </Show>
           </span>
         )}
       </Show>

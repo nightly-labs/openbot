@@ -30,6 +30,7 @@ import type {
   PublishHostedSiteInput,
   RemoteNetworkRoutePreference,
   RemoteSessionReusePreference,
+  RendererTimingReport,
   ReplaceHostedSiteInput,
   SaveSetupInput,
   SetAnalyticsPreferenceInput,
@@ -70,6 +71,7 @@ import {
   isRemoteNetworkRoute,
   isSkillCategory,
   MAC_AUTOMATION_TARGETS,
+  RENDERER_TIMING_LIMITS,
 } from "@openbot/contracts/ipc";
 import {
   type DynamicRecord,
@@ -103,6 +105,27 @@ export function parseAnalyticsPreference(input: unknown): SetAnalyticsPreference
   if (!isDynamicRecord(input) || !isBoolean(input.enabled)) throw new Error("Analytics preference is required.");
   if (input.chosen !== undefined && !isBoolean(input.chosen)) throw new Error("Analytics choice is not valid.");
   return { enabled: input.enabled, ...(input.chosen ? { chosen: true } : {}) };
+}
+
+function isCount(value: unknown, max: number): value is number {
+  return isNumber(value) && Number.isSafeInteger(value) && value >= 0 && value <= max;
+}
+
+/** Counts and delays only. Each value has a bound, so one window cannot fill the daily summary. */
+export function parseRendererTimingReport(input: unknown): RendererTimingReport {
+  if (!isDynamicRecord(input)) throw new Error("Renderer timing is required.");
+  const { workspaceReady, longTasks, inputs, inputDelaysMs } = input;
+  if (workspaceReady !== undefined && workspaceReady !== true) throw new Error("Workspace ready is not valid.");
+  if (!isCount(longTasks, RENDERER_TIMING_LIMITS.longTasks) || !isCount(inputs, RENDERER_TIMING_LIMITS.inputs))
+    throw new Error("Renderer timing is not valid.");
+  if (
+    !Array.isArray(inputDelaysMs) ||
+    inputDelaysMs.length > Math.min(RENDERER_TIMING_LIMITS.inputDelays, inputs) ||
+    !inputDelaysMs.every((delay) => isCount(delay, RENDERER_TIMING_LIMITS.inputDelayMs))
+  ) {
+    throw new Error("Input delays are not valid.");
+  }
+  return { ...(workspaceReady ? { workspaceReady } : {}), longTasks, inputs, inputDelaysMs: [...inputDelaysMs] };
 }
 
 export function parseBusyMessageModePreference(input: unknown): BusyMessageModePreference {
@@ -285,6 +308,26 @@ export function parseMacAutomationTargets(input: unknown): readonly MacAutomatio
   return [...new Set(input)];
 }
 
+const SOCIAL_DESTINATIONS = [
+  "threads",
+  "instagram",
+  "tiktok",
+  "facebook",
+  "linkedin",
+  "reddit",
+  "x-post",
+  "threads-post",
+  "linkedin-post",
+  "reddit-post",
+  "facebook-post",
+  "instagram-post",
+  "tiktok-post",
+] as const satisfies readonly ExternalDestination[];
+
+function isSocialDestination(input: unknown): input is (typeof SOCIAL_DESTINATIONS)[number] {
+  return SOCIAL_DESTINATIONS.some((destination) => destination === input);
+}
+
 export function parseExternalDestination(input: unknown): ExternalDestination {
   if (
     input !== "agent-setup" &&
@@ -299,6 +342,7 @@ export function parseExternalDestination(input: unknown): ExternalDestination {
     input !== "discord" &&
     input !== "github" &&
     input !== "x" &&
+    !isSocialDestination(input) &&
     input !== "grok-bot-export" &&
     input !== "hosted-server-contact" &&
     input !== "mac-screen-recording"

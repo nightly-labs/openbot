@@ -26,10 +26,14 @@ export const messages = {
   "mobile.settings.home.support": "الدعم",
   "mobile.settings.home.supportHint": "احصل على المساعدة واحفظ سجل الدعم",
   "mobile.settings.support.help": "الحصول على المساعدة",
+  "mobile.settings.support.discord": "افتح تذكرة على Discord",
+  "mobile.settings.support.discordHint": "أسرع طريقة للحصول على المساعدة",
   "mobile.settings.support.message": "راسلنا على X",
   "mobile.settings.support.issues": "الإبلاغ عن مشكلة على GitHub",
-  "mobile.settings.support.helpFooter": "أخبرنا بما حدث ومتى. أرفق ملف سجل الدعم بمشكلتك على GitHub.",
+  "mobile.settings.support.helpFooter":
+    "أخبرنا بما حدث ومتى. أرفق ملف سجل الدعم بتذكرتك على Discord أو بمشكلتك على GitHub.",
   "mobile.settings.support.log": "سجل الدعم",
+  "mobile.settings.support.show": "عرض السجل",
   "mobile.settings.support.save": "حفظ ملف السجل",
   "mobile.settings.support.events": {
     zero: "لا أحداث",
@@ -46,8 +50,8 @@ export const messages = {
     "يبقى السجل على هذا الهاتف، ولا يرسله OpenBot. يسجّل خطوات الاتصال والطلبات والأخطاء. لا يسجّل الرسائل أو الملفات، ويُخفي كلمات المرور والرموز المميزة. اقرأ الملف قبل مشاركته.",
   "mobile.settings.support.saveFailed": "تعذّر حفظ ملف السجل. أعد المحاولة.",
   "mobile.settings.support.sharingUnavailable": "المشاركة غير متاحة على هذا الهاتف.",
-  "mobile.settings.support.recent": "الأحداث الأخيرة",
-  "mobile.settings.support.recentFooter": "الأحدث أولًا. يحتوي الملف المحفوظ على كل الأحداث.",
+  "mobile.settings.support.newestFirst": "الأحدث أولًا.",
+  "mobile.settings.support.showOlder": "عرض الأحداث الأقدم",
   "mobile.settings.support.empty": "لا أحداث بعد.",
   "mobile.settings.sessions.kindDesktop": "سطح المكتب",
   "mobile.settings.sessions.kindMobile": "الهاتف",
@@ -265,6 +269,14 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "الاستماع",
   "mobile.settings.voice.tab.speaking": "التحدث",
+  "mobile.settings.voice.pause.title": "التوقف قبل الإرسال",
+  "mobile.settings.voice.pause.label": "انتظار كلمات جديدة",
+  "mobile.settings.voice.pause.footer":
+    "في المحادثة الصوتية، يرسل OpenBot كلماتك عندما لا يتعرّف على كلمات جديدة لهذه المدة. الضجيج بلا كلمات لا يبقيه في وضع الاستماع. اختر توقفًا أطول إذا كنت تتكلم ببطء أو تتوقف للتفكير.",
+  "mobile.settings.voice.pause.seconds": "{seconds} ث",
+  "mobile.settings.voice.speed.title": "سرعة الردود",
+  "mobile.settings.voice.speed.footer": "سرعة الردود التي يقرؤها OpenBot بصوت عالٍ، وكذلك في المحادثة الصوتية.",
+  "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "يبث OpenBot كلامك إلى ElevenLabs باستخدام رمز مميز للاستخدام مرة واحدة، وتُصدر ElevenLabs الفاتورة على حسابك. يبقى المفتاح على هذا الهاتف.",
 } as const satisfies PartialTranslation<typeof source>;

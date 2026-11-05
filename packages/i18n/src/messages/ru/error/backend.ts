@@ -307,6 +307,17 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "Профиль браузера с таким названием уже существует.",
   "error.backend.browserSessionInUse": "Вкладка всё ещё использует этот сеанс браузера. Повторите попытку.",
   "error.backend.browserProfileLimit": "Можно создать не более {limit} профилей браузера.",
+  "error.backend.browserProxyNotFound": "Этот прокси больше не существует.",
+  "error.backend.browserProxyAddressInvalid":
+    "Введите адрес прокси, например socks5://host:1080 или http://user:password@host:3128.",
+  "error.backend.browserProxyLimit": "Можно создать не более {limit} прокси.",
+  "error.backend.browserProxyTaken": "Прокси с этим адресом уже существует.",
+  "error.backend.browserProxyChanged":
+    "Этот прокси изменился после того, как вы его открыли. Проверьте его ещё раз и повторите попытку.",
+  "error.backend.browserProxyUnreachable": "Прокси {name} не отвечает, поэтому страница не открылась.",
+  "error.backend.browserProxySignInRefused": "Прокси {name} отклонил вход, поэтому страница не открылась.",
+  "error.backend.browserProxyComputerUnreachable":
+    "Компьютер этого профиля не отвечает, поэтому страница не открылась.",
   "error.backend.browserLowMemory":
     "На этом сервере мало памяти, поэтому браузер не может открыть ещё одну вкладку. Закройте вкладку или дождитесь завершения работы других агентов.",
   "error.backend.browserOpenFailed": "Не удалось открыть {url}: {reason}",

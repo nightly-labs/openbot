@@ -10,11 +10,12 @@
 import type { ChannelSummary } from "@openbot/contracts/ipc";
 import { Badge, buttonVariants, ContextMenu } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createSignal, Show } from "solid-js";
+import { createMemo, createSignal, Show } from "solid-js";
 import { useText } from "../../text";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
 import { SidebarAgentIndicator, SidebarWaitChip, SidebarWaitTooltip } from "./SidebarAgentIndicator";
 import { SidebarChannelContextMenu, SidebarDeletedChannelContextMenu } from "./SidebarChannelContextMenu";
+import { sidebarUnreadBadge } from "./sidebar-agent-states";
 import { sidebarAgentStateLabel, sidebarMessageTime } from "./sidebar-filtering";
 import { useSidebarScope } from "./sidebar-scope";
 
@@ -32,6 +33,7 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
   const { t, format } = useText();
   const active = () => props.activeChannelId === rowProps.channel.id;
   const channelWait = () => props.channelWaits?.[rowProps.channel.id];
+  const badgeState = createMemo(() => sidebarUnreadBadge(rowProps.channel.unreadCount, channelWait()));
   const wait = () => (rowProps.waiting ? channelWait() : undefined);
   const waitLabel = () => {
     const current = channelWait();
@@ -84,18 +86,7 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
             icon={rowProps.channel.icon}
             imageUrl={rowProps.channel.imageUrl}
           />
-          <Show
-            when={channelWait()}
-            fallback={
-              <Show when={rowProps.channel.unreadCount > 0}>
-                <Badge class="person-unread-badge" variant="primary-light" aria-hidden="true">
-                  {Math.min(rowProps.channel.unreadCount, 99)}
-                </Badge>
-              </Show>
-            }
-          >
-            <SidebarAgentIndicator state={channelWait} />
-          </Show>
+          <SidebarAgentIndicator state={badgeState} />
         </span>
         <span class="agent-row-copy">
           <span class="agent-row-heading">

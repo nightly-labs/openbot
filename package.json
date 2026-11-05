@@ -2,7 +2,7 @@
   "name": "openbot",
   "productName": "OpenBot",
   "desktopName": "openbot.desktop",
-  "version": "0.60.0",
+  "version": "0.62.0",
   "description": "A local-first multi-agent desktop workspace for Codex, Claude, and Grok.",
   "author": {
     "name": "Norbert Bodziony",
@@ -222,6 +222,7 @@
     "test:acp-mcp-names": "bun scripts/acp-mcp-server-names-e2e.ts",
     "test:acp-mcp-shared-token": "bun scripts/acp-mcp-shared-token-e2e.ts",
     "test:acp-turn-stall": "bun scripts/acp-turn-stall-e2e.ts",
+    "test:agent-database-host-start": "bun scripts/agent-database-host-start-e2e.ts",
     "test:acp-instructions-once": "bun scripts/acp-instructions-once-e2e.ts",
     "test:acp-audio-input": "bun scripts/acp-audio-input-e2e.ts",
     "test:grok-steer": "bun scripts/grok-steer-e2e.ts",
@@ -235,6 +236,7 @@
     "test:muse-instructions-once": "bun scripts/muse-instructions-once-e2e.ts",
     "test:provider-conformance": "bun scripts/provider-conformance-e2e.ts",
     "test:provider-cli-canary": "bun scripts/provider-cli-canary.ts",
+    "test:hermes-server": "bun scripts/hermes-server-e2e.ts",
     "test:custom-agents": "bun scripts/custom-acp-agent-e2e.ts",
     "test:custom-agents:login-path": "bun scripts/custom-acp-agent-login-path-e2e.ts",
     "test:claude:login-path": "bun scripts/claude-session-login-path-e2e.ts",
@@ -281,6 +283,7 @@
     "test:provider-runtime-remove": "bun scripts/provider-runtime-remove-e2e.ts",
     "test:provider-exit-session": "bun scripts/provider-exit-session-e2e.ts",
     "test:codex-hung-app-server": "bun scripts/codex-hung-app-server-e2e.ts",
+    "test:codex-state-busy": "bun scripts/codex-state-busy-e2e.ts",
     "test:codex-subagent-steps": "bun scripts/codex-subagent-steps-e2e.ts",
     "test:subagent-status": "bun scripts/subagent-status-e2e.ts",
     "test:codex-missing-rollout": "bun scripts/codex-missing-rollout-e2e.ts",
@@ -509,7 +512,10 @@
     "react-native-reserved-regions@0.2.0": "patches/react-native-reserved-regions@0.2.0.patch",
     "cuelume@0.2.8": "patches/cuelume@0.2.8.patch",
     "react-native-screens@4.30.0": "patches/react-native-screens@4.30.0.patch",
-    "storybook-solidjs-vite@10.7.1": "patches/storybook-solidjs-vite@10.7.1.patch"
+    "storybook-solidjs-vite@10.7.1": "patches/storybook-solidjs-vite@10.7.1.patch",
+    "react-native-reanimated@4.7.1": "patches/react-native-reanimated@4.7.1.patch",
+    "expo-widgets@58.0.22": "patches/expo-widgets@58.0.22.patch",
+    "react-native-worklets@0.13.0": "patches/react-native-worklets@0.13.0.patch"
   },
   "trustedDependencies": [
     "electron-winstaller",

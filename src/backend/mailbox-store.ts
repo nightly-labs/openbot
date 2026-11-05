@@ -57,6 +57,8 @@ import { isRecord } from "./protocol";
 import { recordRestartActivity } from "./restart-activity";
 
 const MAX_ATTACHMENTS = INPUT_LIMITS.attachments;
+/** How much of a delivery's error the note for a failed request quotes. */
+const FAILED_REQUEST_REASON_LIMIT = 2_000;
 /**
  * The external conversation a message came from. Such a message runs in the execution thread of
  * that conversation, so the queue and the public chat do not show it, like channel work.
@@ -883,6 +885,22 @@ export class MailboxStore {
         return [];
       return [{ deliveryId: delivery.id, text: message.text, createdAt: message.createdAt }];
     });
+  }
+
+  /**
+   * The queued deliveries of one task, in queue order, as the agent's own chat lists its queue. The
+   * same deliveries as `queuedTaskMessages`, with their files and state, for the queue of the thread.
+   */
+  taskQueue(agentId: string, taskId: string): QueueDelivery[] {
+    const queued = this.#queuedFor(agentId).filter((delivery) => !waitsForPlanContinuation(delivery));
+    if (queued.length === 0) return [];
+    const messages = this.#messagesById();
+    const deliveries = queued.filter((delivery) => this.#taskIdOf(delivery, messages) === taskId);
+    // The position is in the queue of the thread, as the panel of the thread shows it.
+    const positions = new Map(deliveries.map((delivery, index) => [delivery.id, index + 1]));
+    return deliveries.map((delivery) =>
+      this.#publicDelivery(delivery, positions, this.#requireMessage(delivery.messageId, messages)),
+    );
   }
 
   /** Whether a delivery of this lane is starting or running: the agent's own chat when `taskId` is null. */
@@ -1730,6 +1748,21 @@ export class MailboxStore {
     return delivery ? this.#context(delivery) : null;
   }
 
+  /**
+   * Whether a turn of the agent started to answer a request that an agent sent from an external
+   * conversation. A request steered into a running turn does not count: the user can watch that turn.
+   */
+  answersMessagingRequest(agentId: string, turnId: string): boolean {
+    return this.#state.deliveries.some(
+      (delivery) =>
+        delivery.recipientAgentId === agentId &&
+        delivery.turnId === turnId &&
+        delivery.steeredAt === undefined &&
+        (delivery.status === "starting" || delivery.status === "running") &&
+        this.#state.messages.some((message) => message.id === delivery.messageId && message.messagingReturn),
+    );
+  }
+
   findDeliveriesByTurn(agentId: string, turnId: string): DeliveryContext[] {
     return this.#contexts(
       this.#state.deliveries.filter(
@@ -1921,6 +1954,50 @@ export class MailboxStore {
         message.sender.kind === "agent" && message.sender.agentId === agentId && message.replyToMessageId === messageId,
     );
   }
+
+  /**
+   * Answers a teammate request whose delivery failed, so the agent that asked does not wait for a
+   * result that never comes (#5055). The note goes where a result would go, as a reply from the
+   * teammate in the reply format, and the key sends it once. The text is the delivery's error, which
+   * `markTerminal` redacted. Returns the agent to wake, or null when no note is due.
+   */
+  answerFailedRequest = Effect.fn("MailboxStore.answerFailedRequest")(function* (
+    this: MailboxStore,
+    deliveryId: string,
+    taskOpen: (taskId: string) => boolean,
+  ): Effect.fn.Return<string | null, StoredStateFailure> {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    const request = delivery && this.#state.messages.find((message) => message.id === delivery.messageId);
+    if (delivery?.status !== "failed" || request?.sender.kind !== "agent" || request.channelId) return null;
+    const teammateId = delivery.recipientAgentId;
+    const requesterId = request.sender.agentId;
+    const originAgentId = this.chainOriginAgentId(request.id);
+    if (
+      requesterId === teammateId ||
+      !originAgentId ||
+      originAgentId === teammateId ||
+      request.expectsReply === false ||
+      this.hasReplyFrom(teammateId, request.id)
+    )
+      return null;
+    const answerTaskId = this.answerTaskId(teammateId, request.id, [requesterId]);
+    const taskId = answerTaskId && taskOpen(answerTaskId) ? answerTaskId : undefined;
+    yield* this.enqueue({
+      sender: { kind: "agent", agentId: teammateId },
+      recipientAgentIds: [requesterId],
+      text: [
+        "Status: blocked",
+        `Result: OpenBot note, not written by this teammate: the request failed before the teammate answered. ${(delivery.error ?? "The provider gave no reason.").slice(0, FAILED_REQUEST_REASON_LIMIT)}`,
+        "Evidence: none",
+        "Unblock: The user must fix the cause, then ask for the request again.",
+      ].join("\n"),
+      replyToMessageId: request.id,
+      ...(taskId ? { taskId } : {}),
+      expectsReply: false,
+      idempotencyKey: `failed-request:${deliveryId}`,
+    });
+    return requesterId;
+  }, Effect.uninterruptible).bind(this);
 
   hasAgentMessageFromTurnTo(agentId: string, turnId: string, recipientAgentId: string): boolean {
     const turnIds = this.#sourceTurnIds();

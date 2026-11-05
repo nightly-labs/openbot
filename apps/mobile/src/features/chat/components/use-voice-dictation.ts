@@ -430,13 +430,10 @@ function useActiveRecognition(): "system" | ModelRecognition {
 export function useVoiceDictation({
   enabled,
   onDraft,
-  onSpeaking,
 }: {
   /** False stops listening and keeps the text, for example when the chat goes offline. */
   enabled: boolean;
   onDraft: (text: string) => void;
-  /** The user speaks now. Only Parakeet and ElevenLabs report it, about ten times a second. */
-  onSpeaking?: () => void;
 }): VoiceDictation {
   const engine = useActiveRecognition();
   const system = useSystemDictation({ enabled: enabled && engine === "system", onDraft });
@@ -444,7 +441,6 @@ export function useVoiceDictation({
     engine: engine === "system" ? null : engine,
     enabled: enabled && engine !== "system",
     onDraft,
-    onSpeaking,
   });
   return engine === "system" ? system : model;
 }

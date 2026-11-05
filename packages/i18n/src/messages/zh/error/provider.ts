@@ -99,6 +99,7 @@ export const messages = {
   "error.provider.modelIdDuplicate": "有两个模型的 ID 相同。",
   "error.provider.contextWindowInvalid": "模型的上下文窗口必须是 {min} 到 {max} 之间的整数个 token。",
   "error.provider.maxOutputInvalid": "模型的最大输出必须是 {min} 到 {max} 之间的整数个 token。",
+  "error.provider.reasoningEffortsInvalid": "模型的推理强度无效。",
   "error.provider.headersTooMany": "请求头数量过多。",
   "error.provider.headerNameCharacter": "某个请求头名称含有 HTTP 不允许的字符。",
   "error.provider.headerNameTooLong": "某个请求头名称过长。",
@@ -189,6 +190,7 @@ export const messages = {
     "模型服务商一侧发生故障，不是你的网络问题。请稍后重试或改用其他模型。\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode 无法连接模型服务商。请检查运行 OpenBot 的电脑的网络连接后重试。\n{detail}",
+  "error.provider.codexStateBusy": "ChatGPT 仍在为上一次启动准备本地历史记录。请等几分钟，然后重试。",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode 无法打开它的数据库，因为较新的 OpenCode 版本已更改了数据库。请把 OpenCode 更新到版本 2 或更高，然后重试。",
   "error.provider.opencodeNoAnswer": "OpenCode 模型结束本轮对话时没有给出回答。请重试或改用其他模型。",
@@ -208,6 +210,8 @@ export const messages = {
   "error.provider.antigravityReleaseShape": "Gemini 发布包的结构异常。",
   "error.provider.antigravityMissing": "Gemini 尚未下载。请在 OpenBot 中下载后继续。",
   "error.provider.antigravityNotStarted": "找到了 Gemini 服务器，但无法读取其版本。",
+  "error.provider.antigravityOverrideInvalid":
+    "OPENBOT_ANTIGRAVITY_PATH 中的 Gemini 服务器不存在或不可执行。请更正路径或删除该变量，然后重启 OpenBot。",
   "error.provider.antigravityVersionUnreadable": "无法读取 Gemini 服务器版本。",
   "error.provider.antigravitySignIn": "请使用 Google 账号登录以使用 Gemini。",
   "error.provider.antigravityRateLimited":
@@ -372,5 +376,7 @@ export const messages = {
   "error.provider.registryPrerequisite": "请先在主机上安装 {tool}，再安装该助手。",
   "error.provider.registryBindingChanged": "安装期间自定义助手发生了变更，请重试。",
   "error.provider.registryInstallFailed": "助手安装失败，之前的安装保持不变。",
+  "error.provider.hermesInstallFailed": "Hermes Agent 未能安装。请重试，或使用安装指南。",
+  "error.provider.hermesNeedsGitCurl": "Hermes Agent 需要 git 和 curl。请先安装它们，然后重试。",
   "error.provider.registryRemoveBusy": "请等待助手安装与正在进行的 ACP 工作结束，再移除它。",
 } as const satisfies PartialTranslation<typeof source>;

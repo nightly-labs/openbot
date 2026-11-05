@@ -1,5 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { z } from "zod";
+import { CHANNEL_REPLY_CHARACTERS, CHANNEL_REPLY_LIMIT } from "./channel-replies";
 import {
   routineInstructionZodSchema,
   routineLimitPolicyZodSchema,
@@ -52,6 +53,19 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
     description:
       "Publish the requested task result once in the shared chat when answering an assigned or transferred task. End your turn without repeating it.",
     shape: { text: z.string().min(1).max(INPUT_LIMITS.messageText) },
+  },
+  {
+    name: "channel_reply",
+    description: `Reply in the shared chat to a message of another channel member, in a short message, when you must ask it a question, agree on something with it, or correct it before you can finish. That member gets one turn to answer, and you continue this task with its answer: end your turn after the call. Use channel_assign for work. A request allows ${CHANNEL_REPLY_LIMIT} member replies, and none after your result. Do not reply only to thank or acknowledge, or when you can answer the person without it.`,
+    shape: {
+      messageId: z.string().min(1).max(INPUT_LIMITS.identifier),
+      text: z.string().min(1).max(CHANNEL_REPLY_CHARACTERS),
+    },
+  },
+  {
+    name: "channel_cancel",
+    description: `Cancel a run that you own when a person asks to drop that work. Give the taskId of its request message or of a subtask: the whole run ends, with its running and queued subtasks. Messages stay. Not for the run of your current task. ${PERSON_ONLY}`,
+    shape: { taskId: z.string().min(1).max(INPUT_LIMITS.identifier) },
   },
   {
     name: "channel_remember",

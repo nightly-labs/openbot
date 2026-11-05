@@ -66,6 +66,17 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
     observeElementOffset,
     measureElement: (element, entry, instance) => {
       syncScrollEndThreshold(instance);
+      // A new row gets its ResizeObserver size before paint. A read of its height when it mounts
+      // lays out the page again while the chat still renders. The size that the virtualizer has now
+      // changes nothing, so the first real size stays a first measurement.
+      if (!entry) {
+        const index = instance.indexFromElement(element);
+        return (
+          instance.itemSizeCache.get(instance.options.getItemKey(index)) ??
+          instance.measurementsCache[index]?.size ??
+          instance.options.estimateSize(index)
+        );
+      }
       return measureRowElement(element, entry, instance);
     },
     scrollToFn: (offset, scroll, instance) => {
@@ -140,6 +151,9 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
         syncScrollEndThreshold(virtualizer);
         virtualizer.setOptions({
           ...virtualizer.options,
+          // A reader who does not follow is never at the end (see `syncScrollEndThreshold`). Without a
+          // follow behavior, the virtualizer does not lay out the page to read where the end is.
+          followOnAppend: options.stickToLatest?.() === false ? false : "auto",
           count,
           getScrollElement: options.getScrollElement,
           estimateSize: options.estimateSize,

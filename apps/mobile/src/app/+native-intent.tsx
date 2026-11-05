@@ -7,7 +7,7 @@ import { isIncomingShareLink } from "@/features/share/model/share-link";
 export function redirectSystemPath({ path, initial }: { path: string; initial: boolean }) {
   // `bun run dev:mobile` pairs a simulator without a tap. DevelopmentConnectLinkHandler redeems it.
   if (acceptDevelopmentConnectLink(path, __DEV__)) return null;
-  // The browser session of Server settings › Connectors takes the return of a Slack or Discord install.
+  // The browser session of the Slack or Discord connector page takes the return of a Slack or Discord install.
   // The same link from another place has no install to finish, so it opens nothing.
   if (isMessagingInstallReturn(path)) return null;
   try {

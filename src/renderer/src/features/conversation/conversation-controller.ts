@@ -11,6 +11,7 @@ import type { AgentActivityLabel } from "@openbot/ui/features/conversation/Agent
 import { currentText } from "@openbot/ui/text";
 import type { UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createSignal, createStore, onCleanup } from "solid-js";
+import { actionToast } from "../../action-toast";
 import type { ChatSearchMatch } from "./chat-search";
 import {
   appendDraftText,
@@ -19,7 +20,10 @@ import {
   EMPTY_DRAFT,
   QUEUE_EDIT_STORAGE_KEY,
   readStoredQueueEdit,
+  readStoredThreadQueueEdit,
   type StoredQueueEdit,
+  type StoredThreadQueueEdit,
+  THREAD_QUEUE_EDIT_STORAGE_KEY,
 } from "./composer-draft";
 import { type StoredComposerDrafts, writeComposerDraftsOnChange } from "./composer-draft-storage";
 import { composerDraftKey } from "./conversation-keys";
@@ -136,8 +140,16 @@ export function createStableConversationState(
   });
   /** Keyed by channel id. A channel id is a UUID, so it does not need its server in the key. */
   const [channelDrafts, setChannelDrafts] = createSignal<Record<string, ComposerDraft>>(storedDrafts?.channels ?? {});
-  /** The message box of each side thread, keyed by `threadDraftKey`. */
-  const [threadDrafts, setThreadDrafts] = createSignal<Record<string, ComposerDraft>>(storedDrafts?.threads ?? {});
+  const restoredThreadEdit = persistDrafts ? readStoredThreadQueueEdit() : null;
+  /** The message box of each side thread, keyed by `threadDraftKey`. A restored queue edit wins, as above. */
+  const [threadDrafts, setThreadDrafts] = createSignal<Record<string, ComposerDraft>>({
+    ...storedDrafts?.threads,
+    ...(restoredThreadEdit ? { [restoredThreadEdit.draftKey]: restoredThreadEdit.draft } : {}),
+  });
+  /** The queue edit in the message box of a side thread. Its draft is the thread's draft. */
+  const [threadQueueEdit, setThreadQueueEdit] = createSignal<Omit<StoredThreadQueueEdit, "draft"> | null>(
+    restoredThreadEdit,
+  );
   const [editingAgentId, setEditingAgentId] = createSignal<string | null>(restoredEdit?.agentId ?? null);
   const [editingServerId, setEditingServerId] = createSignal<string | null>(restoredEdit?.serverId ?? null);
   const [editingEditId, setEditingEditId] = createSignal<string | null>(restoredEdit?.editId ?? null);
@@ -214,6 +226,35 @@ export function createStableConversationState(
       };
     },
   );
+  // The thread edit is stored with its draft, so a restart can save or cancel the edit that the host holds.
+  createEffect(
+    () => {
+      const edit = threadQueueEdit();
+      return edit ? { ...edit, draft: threadDrafts()[edit.draftKey] ?? EMPTY_DRAFT } : null;
+    },
+    (edit) => {
+      if (!edit || !persistDrafts) return;
+      const persist = () => {
+        // A newer edit, or the end of this one, owns the record. Read fresh state: a pending Save set
+        // after this effect ran must not be overwritten by the previous snapshot without it.
+        const current = threadQueueEdit();
+        if (current?.editId !== edit.editId) return;
+        try {
+          window.localStorage.setItem(
+            THREAD_QUEUE_EDIT_STORAGE_KEY,
+            JSON.stringify({ ...current, draft: threadDrafts()[current.draftKey] ?? EMPTY_DRAFT }),
+          );
+        } catch {
+          actionToast.error(currentText().t("composer.error.saveEditLocally"));
+        }
+      };
+      const timer = setTimeout(persist, 300);
+      return () => {
+        clearTimeout(timer);
+        persist();
+      };
+    },
+  );
   if (storedDrafts && persistDrafts)
     writeComposerDraftsOnChange({
       drafts,
@@ -222,6 +263,7 @@ export function createStableConversationState(
       editingAgentId,
       editingServerId,
       editingDraftBackup,
+      threadQueueEdit,
       unsentTexts: pendingSends.unsentTexts,
     });
   const [composerErrors, setComposerErrors] = createSignal<Record<string, string>>({});
@@ -328,6 +370,8 @@ export function createStableConversationState(
     setChannelDrafts,
     threadDrafts,
     setThreadDrafts,
+    threadQueueEdit,
+    setThreadQueueEdit,
     editingAgentId,
     setEditingAgentId,
     editingServerId,

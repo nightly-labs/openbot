@@ -62,7 +62,6 @@ interface LinkRowProps {
     | "/server-settings/members"
     | "/server-settings/roles"
     | "/server-settings/audit"
-    | "/server-settings/connectors"
     | "/server-settings/vault"
     | "/server-settings/storage"
     | "/server-settings/import"
@@ -139,31 +138,18 @@ export function ServerSettingsPeopleScreen() {
   );
 }
 
-/** The AI providers, MCP servers and connectors of the computer that runs the server. */
+/**
+ * The AI providers and MCP servers of the computer that runs the server. Its connectors are apps of the
+ * Marketplace, as on the desktop.
+ */
 export function ServerSettingsAiScreen() {
-  const { t } = useText();
-  const {
-    canManageProviders,
-    canManageMcpServers,
-    canManageConnectors,
-    canManageOnePasswordConnector,
-    canManageBitwardenConnector,
-  } = useMobileWorkspace();
+  const { canManageProviders, canManageMcpServers } = useMobileWorkspace();
   return (
     <ServerSettingsPage>
       {({ id: serverId }) => (
         <SettingsSection>
           {canManageProviders(serverId) ? <ServerProvidersRow serverId={serverId} /> : null}
           {canManageMcpServers(serverId) ? <ServerMcpRow serverId={serverId} /> : null}
-          {canManageConnectors(serverId) ||
-          canManageOnePasswordConnector(serverId) ||
-          canManageBitwardenConnector(serverId) ? (
-            <LinkRow
-              label={t("mobile.server.settings.connectors")}
-              pathname="/server-settings/connectors"
-              serverId={serverId}
-            />
-          ) : null}
         </SettingsSection>
       )}
     </ServerSettingsPage>

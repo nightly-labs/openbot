@@ -5,11 +5,19 @@ import type {
   AttachmentSummary,
   DraftAttachment,
   InstalledSkill,
+  QueueDelivery,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { isAgentTaskActive } from "@openbot/team-client/agent-tasks";
+import { Button } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
-import type { AgentMessage, AgentProfile, ComposerMcpServer } from "@openbot/ui/data";
+import type {
+  AgentMessage,
+  AgentProfile,
+  ComposerBrowserTab,
+  ComposerMcpServer,
+  ComposerThread,
+} from "@openbot/ui/data";
 import { AgentActivityIndicator, nextAgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
 import {
   type AgentStep,
@@ -17,6 +25,7 @@ import {
   type AgentStepsFacts,
 } from "@openbot/ui/features/conversation/AgentSteps";
 import type { AttachmentDownloads, AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
+import { agentActivityExitDuration } from "@openbot/ui/features/conversation/activity-timing";
 import { branchPointIds } from "@openbot/ui/features/conversation/branch-points";
 import { type ChatMessageAuthor, ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ComposerAddMenu } from "@openbot/ui/features/conversation/ComposerAddMenu";
@@ -35,11 +44,12 @@ import { ComposerSendControl } from "@openbot/ui/features/conversation/ComposerS
 import { ContextUsageMeter, type ContextUsageView } from "@openbot/ui/features/conversation/ContextUsage";
 import { ApprovalCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import { DeleteMessageDialog, MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
+import { QueuePanel } from "@openbot/ui/features/conversation/QueuePanel";
 import type { SendShortcut } from "@openbot/ui/features/conversation/send-shortcut";
 import { ComposerVoiceControls, type VoicePhase } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { type TextValue, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { children, createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
+import { children, createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
 import { type AgentThreadBranchSource, BranchDivider } from "./BranchDivider";
 
 const HOLD_TEXT = {
@@ -98,6 +108,23 @@ export interface AgentThreadVoice {
   onSend: () => void;
 }
 
+/** The queue of a thread, with the actions of the queue in the agent's own chat. */
+export interface AgentThreadQueue {
+  /** The messages that wait to start in the thread, in queue order. */
+  deliveries: QueueDelivery[];
+  /** The queued message that the message box edits now, or null. */
+  editingDeliveryId: string | null;
+  /** A save or a cancel of the edit is in progress. */
+  editBusy: boolean;
+  /** Steers a queued message into the running turn. Missing where the provider cannot steer. */
+  onSteer?: ((deliveryId: string) => void) | undefined;
+  onCancel: (deliveryId: string) => void;
+  /** Puts a queued message in the message box. Send saves it in its place. */
+  onEdit: (delivery: QueueDelivery) => void;
+  onCancelEdit: () => void;
+  onReorder: (deliveryIds: string[]) => void;
+}
+
 export interface AgentThreadViewProps {
   /** Null for a new thread: its first message starts it. */
   task: AgentTask | null;
@@ -112,6 +139,12 @@ export interface AgentThreadViewProps {
   skillsLoadFailed?: boolean | undefined;
   /** The host's MCP servers, offered by the same `$` the skills answer. */
   mcpServers?: ComposerMcpServer[] | undefined;
+  /** The agent's browser tabs, for the `@` picker. */
+  browserTabs?: ComposerBrowserTab[] | undefined;
+  /** The agent's side threads, newest first, for the `@` picker. The view leaves out its own thread. */
+  threads?: ComposerThread[] | undefined;
+  /** Shows the browser tab, or opens the thread by its task id, that a tag names. */
+  onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;
   /** The unsent text of this thread's message box. The host keeps it for each thread. */
   draft: string;
   /** The files that the draft names. */
@@ -202,6 +235,11 @@ export interface AgentThreadViewProps {
   onCancelReply?: (() => void) | undefined;
   /** A message to scroll to and mark once, when it shows. Each new request has a new nonce. */
   focusMessage?: { messageId: string; nonce: number } | undefined;
+  /**
+   * The queue of the thread, as the agent's own chat shows its queue. Without it the thread lists the
+   * start of each queued message: a joined server sends no more on `agent-tasks-v1`.
+   */
+  queue?: AgentThreadQueue | undefined;
 }
 
 /**
@@ -216,6 +254,8 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   const [sending, setSending] = createSignal(false);
   const [addMenuOpen, setAddMenuOpen] = createSignal(false);
   const [skillPickerRequest, setSkillPickerRequest] = createSignal(0);
+  /* A thread does not tag itself. */
+  const otherThreads = createMemo(() => props.threads?.filter((thread) => thread.id !== props.task?.id));
   let scroller: HTMLElement | undefined;
   let atEnd = true;
   let shownTaskId = untrack(() => props.task?.id);
@@ -236,8 +276,16 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     const element = scroller;
     const list = element?.firstElementChild;
     if (!element || !list) return fades.stop;
+    let lastTop = element.scrollTop;
+    let lastHeight = element.scrollHeight;
+    // The scroll event of the view's own follow can come after more text, far from the new end (#5002).
+    // That follow moves the view down, so only a move up, with no shorter content, stops the follow.
     const onScroll = () => {
-      atEnd = element.scrollHeight - element.scrollTop - element.clientHeight < STICK_DISTANCE;
+      const { scrollTop, scrollHeight } = element;
+      if (scrollHeight - scrollTop - element.clientHeight < STICK_DISTANCE) atEnd = true;
+      else if (scrollTop < lastTop && scrollHeight >= lastHeight) atEnd = false;
+      lastTop = scrollTop;
+      lastHeight = scrollHeight;
     };
     const follow = new ResizeObserver(() => {
       if (atEnd) element.scrollTop = element.scrollHeight;
@@ -414,7 +462,46 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     props.task?.state === "running" && !props.approval && !props.waitsForAnswer ? props.task : undefined;
   const queued = () => (props.task && props.task.queuedMessages.length > 0 ? props.task : undefined);
   const hold = () => (props.task ? agentThreadHoldText(props.task, props.limit, t) : null);
-  const sendLabel = () => t(recording() ? "composer.send.voice" : "composer.send.message");
+  const editingQueued = () => Boolean(props.queue?.editingDeliveryId);
+  const sendLabel = () =>
+    t(recording() ? "composer.send.voice" : editingQueued() ? "composer.send.saveQueued" : "composer.send.message");
+  /*
+   * The rows that the queue panel shows. The last row leaves with its animation before the panel
+   * closes, as in the agent's own chat. Another thread does not get the rows of the one before.
+   */
+  const [queueRows, setQueueRows] = createSignal<{ taskId: string | undefined; deliveries: QueueDelivery[] }>({
+    taskId: undefined,
+    deliveries: [],
+  });
+  let queueExitTimer: number | undefined;
+  createEffect(
+    () => ({ taskId: props.task?.id, deliveries: props.queue?.deliveries ?? [] }),
+    (next) => {
+      if (queueExitTimer !== undefined) window.clearTimeout(queueExitTimer);
+      queueExitTimer = undefined;
+      const shown = untrack(queueRows);
+      if (next.deliveries.length > 0 || next.taskId !== shown.taskId) {
+        // Each change of the thread sends its queue again. A row that did not change keeps its object,
+        // so the panel does not draw it again and the pointer and the focus stay on it.
+        const previous = new Map(shown.deliveries.map((delivery) => [delivery.id, delivery]));
+        const deliveries = next.deliveries.map((delivery) => {
+          const known = previous.get(delivery.id);
+          return known && JSON.stringify(known) === JSON.stringify(delivery) ? known : delivery;
+        });
+        setQueueRows({ taskId: next.taskId, deliveries });
+        return;
+      }
+      if (shown.deliveries.length === 0) return;
+      queueExitTimer = window.setTimeout(() => {
+        queueExitTimer = undefined;
+        setQueueRows(next);
+      }, agentActivityExitDuration());
+    },
+  );
+  onCleanup(() => {
+    if (queueExitTimer !== undefined) window.clearTimeout(queueExitTimer);
+  });
+  const queuePanelOwner = () => (queueRows().deliveries.length > 0 ? queueRows().taskId : undefined);
   const hasRow = () =>
     Boolean(props.onRemoveAttachment) &&
     ((props.rowAttachments?.length ?? 0) > 0 || (props.pendingImages?.length ?? 0) > 0);
@@ -470,6 +557,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                         agents={props.agents}
                         skills={props.skills}
                         onSelectAgent={() => undefined}
+                        onOpenTag={props.onOpenTag}
                         onOpenLink={props.onOpenLink}
                         onPreview={props.onPreview}
                         onAttachmentAction={props.onAttachmentAction}
@@ -532,7 +620,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
               </div>
             )}
           </Show>
-          <Show when={queued()}>
+          <Show when={!props.queue && queued()}>
             {(task) => (
               <section class="agent-thread-queued" aria-label={t("conversation.threads.view.queued")}>
                 <For each={task().queuedMessages} keyed={(message) => message.deliveryId}>
@@ -564,6 +652,53 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             />
           )}
         </Show>
+        <Show when={props.queue}>
+          {(queue) => (
+            <div class="composer-stack">
+              <div
+                class="agent-queue-slot"
+                data-open={queuePanelOwner() ? "true" : "false"}
+                aria-hidden={queuePanelOwner() ? undefined : "true"}
+                inert={queuePanelOwner() ? undefined : true}
+              >
+                <div class="agent-queue-slot-inner">
+                  {/* Each thread gets its own panel, so its rows do not animate in from the thread before. */}
+                  <Show when={queuePanelOwner()} keyed>
+                    {(_taskId) => (
+                      <QueuePanel
+                        deliveries={queueRows().deliveries}
+                        agents={props.agents}
+                        skills={props.skills}
+                        editingDeliveryId={queue().editingDeliveryId}
+                        canSteer={Boolean(props.task?.activeTurnId)}
+                        onSteer={queue().onSteer}
+                        onCancel={(deliveryId) => queue().onCancel(deliveryId)}
+                        onEdit={(delivery) => queue().onEdit(delivery)}
+                        onReorder={(deliveryIds) => queue().onReorder(deliveryIds)}
+                      />
+                    )}
+                  </Show>
+                </div>
+              </div>
+              <Show when={queue().editingDeliveryId}>
+                <ComposerNotice
+                  body={t("composer.queueEdit.body")}
+                  action={
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      type="button"
+                      disabled={queue().editBusy}
+                      onClick={() => queue().onCancelEdit()}
+                    >
+                      {t("composer.queueEdit.cancel")}
+                    </Button>
+                  }
+                />
+              </Show>
+            </div>
+          )}
+        </Show>
         <form
           class="composer agent-thread-composer"
           data-compact={hasRow() ? undefined : "true"}
@@ -590,6 +725,9 @@ export function AgentThreadView(props: AgentThreadViewProps) {
               skills={props.skills}
               skillsLoadFailed={props.skillsLoadFailed}
               mcpServers={props.mcpServers}
+              browserTabs={props.browserTabs}
+              threads={otherThreads()}
+              onOpenTag={props.onOpenTag}
               attachments={props.draftAttachments}
               value={props.draft}
               placeholder={props.replyTo ? t("composer.placeholder.reply") : placeholder()}

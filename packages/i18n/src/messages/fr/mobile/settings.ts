@@ -26,11 +26,14 @@ export const messages = {
   "mobile.settings.home.support": "Assistance",
   "mobile.settings.home.supportHint": "Obtenir de l’aide et enregistrer un journal d’assistance",
   "mobile.settings.support.help": "Obtenir de l’aide",
+  "mobile.settings.support.discord": "Ouvrir un ticket sur Discord",
+  "mobile.settings.support.discordHint": "Le moyen le plus rapide d’obtenir de l’aide",
   "mobile.settings.support.message": "Nous écrire sur X",
   "mobile.settings.support.issues": "Signaler un problème sur GitHub",
   "mobile.settings.support.helpFooter":
-    "Dites-nous ce qui s’est passé et quand. Joignez le fichier du journal d’assistance à votre ticket GitHub.",
+    "Dites-nous ce qui s’est passé et quand. Joignez le fichier du journal d’assistance à votre ticket Discord ou GitHub.",
   "mobile.settings.support.log": "Journal d’assistance",
+  "mobile.settings.support.show": "Afficher le journal",
   "mobile.settings.support.save": "Enregistrer le fichier du journal",
   "mobile.settings.support.events": { one: "{count} événement", other: "{count} événements" },
   "mobile.settings.support.clear": "Effacer le journal",
@@ -40,9 +43,8 @@ export const messages = {
     "Le journal reste sur ce téléphone et OpenBot ne l’envoie pas. Il enregistre les étapes de connexion, les requêtes et les erreurs. Il n’enregistre ni les messages ni les fichiers, et il masque les mots de passe et les jetons. Lisez le fichier avant de le partager.",
   "mobile.settings.support.saveFailed": "Impossible d’enregistrer le fichier du journal. Réessayez.",
   "mobile.settings.support.sharingUnavailable": "Le partage n’est pas disponible sur ce téléphone.",
-  "mobile.settings.support.recent": "Événements récents",
-  "mobile.settings.support.recentFooter":
-    "Les plus récents en premier. Le fichier enregistré contient tous les événements.",
+  "mobile.settings.support.newestFirst": "Les plus récents en premier.",
+  "mobile.settings.support.showOlder": "Afficher les événements plus anciens",
   "mobile.settings.support.empty": "Aucun événement pour l’instant.",
   "mobile.settings.sessions.kindDesktop": "ordinateur",
   "mobile.settings.sessions.kindMobile": "mobile",
@@ -271,6 +273,15 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "Écoute",
   "mobile.settings.voice.tab.speaking": "Parole",
+  "mobile.settings.voice.pause.title": "Pause avant l’envoi",
+  "mobile.settings.voice.pause.label": "Attendre de nouveaux mots",
+  "mobile.settings.voice.pause.footer":
+    "Dans une conversation vocale, OpenBot envoie vos mots quand il ne reconnaît aucun nouveau mot pendant cette durée. Le bruit sans mots ne le fait pas continuer à écouter. Choisissez une pause plus longue si vous parlez lentement ou vous arrêtez pour réfléchir.",
+  "mobile.settings.voice.pause.seconds": "{seconds} s",
+  "mobile.settings.voice.speed.title": "Vitesse des réponses",
+  "mobile.settings.voice.speed.footer":
+    "La vitesse des réponses qu’OpenBot lit à voix haute, aussi dans une conversation vocale.",
+  "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot envoie votre voix en continu à ElevenLabs avec un jeton à usage unique, et ElevenLabs le facture sur votre compte. La clé reste sur ce téléphone.",
 } as const satisfies PartialTranslation<typeof source>;

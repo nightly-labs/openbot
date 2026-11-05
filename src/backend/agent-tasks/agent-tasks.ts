@@ -484,6 +484,11 @@ export class AgentTasks implements TaskLanes {
     return Boolean(this.#store.taskForThread(threadId)?.branch);
   }
 
+  /** Whether the thread takes the runs of a routine. One read, by thread id. */
+  isRoutineThreadId(threadId: string): boolean {
+    return (this.#store.taskForThread(threadId)?.routineId ?? null) !== null;
+  }
+
   taskForThread(threadId: string): string | null {
     return this.#store.taskForThread(threadId)?.taskId ?? null;
   }
@@ -694,6 +699,7 @@ export class AgentTasks implements TaskLanes {
       progress: activeTurnId ? (this.#progress.get(task.taskId) ?? null) : null,
       error: task.outcome === "failed" ? task.error : null,
       queuedMessages,
+      queue: task.closedAt === null ? this.#mailbox.taskQueue(task.agentId, task.taskId) : [],
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
       closedAt: task.closedAt,

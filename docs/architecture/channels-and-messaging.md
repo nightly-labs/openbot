@@ -254,6 +254,51 @@ writes a `channel-change` note in the same commit, with the agent as author and 
 names the agent, the change and the person. Clients show it as an activity row, and it is not
 unread and not in the model packet.
 
+`channel_cancel` lets a member cancel a run that it owns when a person asks, for example when a
+newer request replaces it (`ChannelService.cancelOwnRun`). The `taskId` names the root task or one
+of its subtasks, and the whole run ends: each task of the run that has not ended becomes
+`cancelled`, running turns stop and queued deliveries are cancelled. Other runs, messages and files
+stay. It has the same person-request rule as the tools above (`PERSON_CANCEL_REQUIRED`). It refuses,
+with `accepted: false`, a run of another owner, the run of the caller's own task, a run that ended,
+and a run that a task of another open run depends on, which would then wait for ever. A person can
+stop those runs with the channel controls. The cancel goes through the command queue, keeps a
+receipt for a retried call and writes one `channel-change` note. The `cancel` command of the
+channel controls still accepts only a stopped or failed run. On desktop, each row of the
+waiting-for-subtasks list above the composer has Stop, which sends the `stop` command for that
+subtask. Its stopped-task card then offers Continue, Reassign and Cancel.
+
+Members can reply to each other (#4847). `channel_reply` takes the id of a message of another member
+and a short text (`CHANNEL_REPLY_CHARACTERS`). It posts the text in the shared chat as a reply to
+that message (`replyToMessageId`), and gives the author of that message one turn to answer: a child
+task of the caller's task, with the reply as its request and instruction. The caller waits for it
+as for `channel_assign`: the child is in `dependencies`, so the caller's turn ends `waiting` and the
+caller continues with the answer. Without the wait, a member that had to agree on something answered
+the person before the other member answered it. The answer of that turn shows as a reply to the
+reply message (`capture`, and `channel_result`). Text that the caller writes after its reply in the
+same turn folds into the steps of that turn, as text after `channel_result` does: models wrote "I
+will report back" there, and the note showed after the answer. `channel-replies.ts`
+finds a reply task by its request id prefix (`channel-reply-`), so the change adds no stored field,
+no migration and no Team API field. A person's message that resumes a reply task gives it a new
+request, so it becomes an ordinary task with the default expected result and answers that person. A
+request allows `CHANNEL_REPLY_LIMIT` (2) member replies, counted from the reply tasks of each root
+task of that request, whoever writes them: one message to two members shares one limit. A reply
+task that fails lets the caller continue without the answer (`settled`), because a short question
+must not hold the request until a person acts. `channel_result` is refused while a reply of the
+task waits for its answer. `channel_reply` refuses, with
+`accepted: false`, a reply after the caller's `channel_result`, in a run that ended, to a message of
+a person or of the caller, to a streaming message, to a member that takes no work, and over the
+limit. Each refusal tells the model not to mention it, because a model wrote one in the chat. The
+reply text is agent text that reaches another agent, so its assignment starts with a line that
+names the sender and says it is not the user, and a reply turn only answers: it cannot use
+`channel_reply`, `channel_assign`, `channel_transfer`, `channel_cancel`, the channel memory tools or
+the channel management tools. The commentary of a turn that posted a reply is left out of the
+transcript that models read, as for a turn that posted a result.
+
+The channel controls stop and cancel a run with no message that a model reads, and a change note is
+not in the packet. So each packet has `stoppedTasks`: the `paused` and `cancelled` tasks of the
+recent messages that the member owns, or that run under work it owns (`channelWorkOwners`). Without
+it, a lead said that it still waited for a subtask that a person had cancelled.
+
 From its own chats, an agent can make and change channels: `create_channel` and `update_channel`
 (`agent/channel-agent-tools.ts`). They set the name, title, instructions, members, lead, isolated
 memory and picture (an icon on a hue, or an image file that `loadAvatarFile` reads before any
@@ -321,7 +366,7 @@ posted a `channel_result`: the result is the answer of that turn.
 | `channel_history` page | 24,000 characters (`HISTORY_PAGE_CHARACTERS`); a longer message is cut at 16,000 | `boundedHistoryPage` |
 | Handoff of an agent in the packet | 24,000 characters (`HANDOFF_INSTRUCTION_CHARACTERS`): 18,000 first and 6,000 last | `cutInstruction` |
 | Instruction of a task this task waits for | 500 characters (`DEPENDENCY_INSTRUCTION_CHARACTERS`) | `channel-history.ts` |
-| Compaction stops | after 2 compactions that leave 90% or more; a `context_compaction_ineffective` notice | `ContextCompaction` |
+| Compaction stops | after 2 compactions that leave 80% or more; a `context_compaction_ineffective` notice | `ContextCompaction` |
 | Retry notice | at the 3rd provider retry; at 50% or more, a compaction before the next turn | `TurnLifecycle` |
 
 - The packet starts with the current assignment. A short assignment comes again at the end, because

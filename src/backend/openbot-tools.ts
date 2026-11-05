@@ -6,7 +6,7 @@ import {
   CHAT_VISUAL_TITLE_LIMIT,
 } from "@openbot/contracts/chat-visual";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { API_KEY_NAME_PATTERN, CONNECTOR_IDS } from "@openbot/contracts/ipc";
+import { API_KEY_NAME_PATTERN, CONNECTOR_IDS, VAULT_API_KEY_LIMIT, VAULT_NOTES_LIMIT } from "@openbot/contracts/ipc";
 import { isUiBlockId, UI_BLOCK_LIMITS } from "@openbot/contracts/ui-blocks";
 import { z } from "zod";
 import pluginCatalog from "../../resources/plugin-catalog/catalog.json";
@@ -51,6 +51,7 @@ import {
   routineInstructionZodSchema,
   routineLimitPolicyZodSchema,
   routineMissedPolicyZodSchema,
+  routineRunPlaceZodSchema,
   routineScheduleZodSchema,
   webhookEventTypeZodSchema,
   webhookFiltersZodSchema,
@@ -284,6 +285,16 @@ export const requestApiKeyToolSchema = z.strictObject({
 
 export const removeApiKeyToolSchema = z.strictObject({ name: apiKeyNameSchema });
 
+export const saveApiKeyToolSchema = z.strictObject({
+  name: apiKeyNameSchema,
+  key: z.string().trim().min(1).max(VAULT_API_KEY_LIMIT).describe("The value, as you got it."),
+  notes: z
+    .string()
+    .max(VAULT_NOTES_LIMIT)
+    .optional()
+    .describe("What the key is for. Never a secret. Omit it to keep the saved notes."),
+});
+
 export const sendToChannelToolSchema = z.strictObject({
   channelId: z.string().min(1).max(INPUT_LIMITS.identifier),
   text: z.string().trim().min(1).max(INPUT_LIMITS.messageText),
@@ -489,6 +500,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       timezone: z.string().min(1).max(128).describe("IANA timezone such as Europe/Warsaw.").optional(),
       limitPolicy: routineLimitPolicyZodSchema.optional(),
       missedPolicy: routineMissedPolicyZodSchema.optional(),
+      runIn: routineRunPlaceZodSchema.optional(),
     },
   },
   {
@@ -509,6 +521,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       filters: webhookFiltersZodSchema.optional(),
       active: z.boolean().optional(),
       limitPolicy: routineLimitPolicyZodSchema.optional(),
+      runIn: routineRunPlaceZodSchema.optional(),
     },
   },
   {
@@ -524,6 +537,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       filters: webhookFiltersZodSchema.optional(),
       active: z.boolean().optional(),
       limitPolicy: routineLimitPolicyZodSchema.optional(),
+      runIn: routineRunPlaceZodSchema.optional(),
     },
   },
   {
@@ -541,6 +555,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       active: z.boolean().optional(),
       limitPolicy: routineLimitPolicyZodSchema.optional(),
       missedPolicy: routineMissedPolicyZodSchema.optional(),
+      runIn: routineRunPlaceZodSchema.optional(),
     },
   },
   {
@@ -575,7 +590,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: AWAIT_EVENT_TOOL,
     description:
-      "Open a wait when you cannot finish the current request in this turn because you wait for something outside it: a build, a deploy, a later check. OpenBot shows the wait to the user until you close it. The next run of one of your routines wakes the wait, or a local script event that names its waitId. The run that wakes it repeats the request and your note. Give routineId to let only that routine wake it. After this call, tell the user what you wait for and end your turn.",
+      "Open a wait when the current request waits for something outside this turn that takes over about 15 minutes, such as a long build or a later check. OpenBot shows the wait to the user until you close it. The next run of one of your routines wakes the wait, or a local script event that names its waitId. The run that wakes it repeats the request and your note. Give routineId to let only that routine wake it. Then tell the user what you wait for and end your turn.",
     shape: awaitEventToolSchema.shape,
   },
   {
@@ -678,7 +693,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     name: "request_api_key",
     description: [
       "Ask the user for an API key, token, or password that your task needs, such as for IMAP, and wait for the answer.",
-      "The user enters it in a secure form in this conversation. OpenBot saves it in a private file outside your workspace for later turns; you never get the value.",
+      "The user enters it in a secure form in this conversation. OpenBot saves it outside your workspace, for all agents or only you; you never get the value.",
       'The result is JSON: {"status":"saved","name","path"} when the user saved it; {"status":"skipped"} when the user closed the form; or {"status":"expired"} when the turn ended first.',
       "Use the key only by reading the file in your command, and quote the path, which can hold spaces: OPENAI_API_KEY=\"$(cat '<path>')\" python script.py. Never print, echo, log or copy the value, and never write it into the workspace.",
       "Call list_api_keys first: do not ask again for a key that is saved. A new answer replaces the saved key. Only the server owner or an admin can answer. It does not work in an external chat.",
@@ -692,6 +707,15 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     shape: {},
   },
   {
+    name: "save_api_key",
+    description: [
+      "Save a key, token or password that you have, such as one the user pasted, in the OpenBot Vault for every agent; list_api_keys gives its path.",
+      "It replaces a Vault key with this name and deletes your own key with this name.",
+      'Returns {"status":"added"|"updated","name","path"}, never the key. Do not repeat the key. Only for a request of a person in your OpenBot chat.',
+    ].join(" "),
+    shape: saveApiKeyToolSchema.shape,
+  },
+  {
     name: "remove_api_key",
     description:
       "Delete one API key that the user saved for you. Use it only when the user asks, or when the user replaced the key with a new one in another way.",
@@ -699,7 +723,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   },
   {
     name: "suggest_marketplace_app",
-    description: `Call this when the user needs a service in this list and you have no working tools for it: ${MARKETPLACE_APP_IDS.join(", ")}. It shows a card in the chat to connect the app; nothing connects without the user. For an installed app, it tests the app and returns the fix, such as a Sign in card or setup steps.`,
+    description: `Call this when the user needs a service in this list and you have no working tools for it: ${MARKETPLACE_APP_IDS.join(", ")}. It shows a card in the chat to connect the app; only the user connects it. For an installed app, it tests it and returns the fix, such as a Sign in card or setup steps.`,
     shape: {
       app: z.string().min(1).max(63).describe("An app from the list, such as notion. Use github for GitHub."),
     },

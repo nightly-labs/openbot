@@ -1,4 +1,5 @@
 import type { ChannelSummary, HiddenAgent, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
+import { Button } from "@openbot/ui";
 import type { AvatarMood } from "@openbot/ui/bloub-avatar";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { SidebarCommunityCard } from "@openbot/ui/features/sidebar/SidebarCommunityCard";
@@ -7,7 +8,7 @@ import { SidebarMobileAppCard } from "@openbot/ui/features/sidebar/SidebarMobile
 import { SidebarStorageCard } from "@openbot/ui/features/sidebar/SidebarStorageCard";
 import { normalizeSidebarPinnedItems, type SidebarPinnedItem } from "@openbot/ui/features/sidebar/sidebar-pins";
 import { SIDEBAR_HIDDEN_GROUP_OPEN_ID, type SidebarAgentState } from "@openbot/ui/features/sidebar/sidebar-types";
-import { createSignal, untrack } from "solid-js";
+import { createSignal, For, untrack } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { defaultSidebarLayout } from "../src/features/sidebar/sidebar-sections";
@@ -107,13 +108,15 @@ const stressLayout: SidebarLayoutSnapshot = {
 };
 
 /* One channel for each shape the member cluster has to draw: a single face, a pair, the triangle,
- * the full quad, and the count that takes the last cell when the members outnumber it. */
+ * the full quad, the count that takes the last cell when the members outnumber it, and the count of
+ * two digits that takes the bottom row. */
 const channelSizes = [
   { name: "Solo", size: 1 },
   { name: "Pair", size: 2 },
   { name: "Trio", size: 3 },
   { name: "Quad", size: 4 },
   { name: "All hands", size: 6 },
+  { name: "Company", size: 13 },
 ];
 const storyChannels: ChannelSummary[] = channelSizes.map(({ name, size }, index) => ({
   id: `channel-${size}`,
@@ -739,4 +742,79 @@ export const DeletedChats: Story = {
     showingArchivedChannels: true,
     deletedChannels: storyChannels.map((channel) => ({ ...channel, id: `deleted-${channel.id}`, archived: true })),
   },
+};
+
+/* The felt badges: unread counts of one, two and three digits, a failed routine, and the "+N" count
+ * of the channel clusters. "Research" is pinned and active, so its badge sits on the raised row. */
+const feltBadgeStates: Record<string, SidebarAgentState> = {
+  chief: { kind: "unread", count: 1 },
+  research: { kind: "unread", count: 10 },
+  sales: { kind: "unread", count: 128 },
+  "stress-agent-1": { kind: "routine", phase: "failed", count: 1 },
+};
+
+export const FeltBadges: Story = {
+  args: {
+    ...Channels.args,
+    activeAgentId: "research",
+    activeChannelId: null,
+    agentStates: feltBadgeStates,
+    pinnedItems: [
+      { kind: "agent", id: "research" },
+      { kind: "agent", id: "stress-agent-1" },
+      { kind: "channel", id: "channel-13" },
+      { kind: "channel", id: "channel-2" },
+    ],
+  },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
+/* The steps of the smoke: a new unread, two counts that go up, the count read to zero, and a routine
+ * that fails and then succeeds. Each button sets the state, so each transition can run again. */
+const feltBadgeSteps: {
+  label: string;
+  chief?: SidebarAgentState | undefined;
+  sales?: SidebarAgentState | undefined;
+}[] = [
+  { label: "1", chief: { kind: "unread", count: 1 } },
+  { label: "10", chief: { kind: "unread", count: 10 } },
+  { label: "128", chief: { kind: "unread", count: 128 } },
+  { label: "Read", chief: undefined },
+  { label: "Fail", sales: { kind: "routine", phase: "failed", count: 1 } },
+  { label: "Succeed", sales: undefined },
+];
+
+function FeltBadgeTransitions(props: Parameters<typeof Sidebar>[0]) {
+  const [states, setStates] = createSignal<Record<string, SidebarAgentState>>({});
+  const apply = (step: (typeof feltBadgeSteps)[number]) =>
+    setStates((current) => {
+      const next = { ...current };
+      for (const id of ["chief", "sales"] as const) {
+        if (!(id in step)) continue;
+        const state = step[id];
+        if (state) next[id] = state;
+        else delete next[id];
+      }
+      return next;
+    });
+  return (
+    <div class="grid h-screen w-[280px] grid-rows-[auto_1fr]">
+      <div class="flex flex-wrap gap-1 p-2">
+        <For each={feltBadgeSteps}>
+          {(step) => (
+            <Button size="sm" variant="outline" onClick={() => apply(step)}>
+              {step.label}
+            </Button>
+          )}
+        </For>
+      </div>
+      <InteractiveSidebar {...props} agentStates={states()} />
+    </div>
+  );
+}
+
+/** Each button sets one state, so the badge lands, rolls its digits, closes, and the X lands. */
+export const FeltBadgeMotion: Story = {
+  args: { pinnedItems: [{ kind: "agent", id: "chief" }], activeAgentId: "research" },
+  render: (storyArgs) => <SettledArgs>{() => <FeltBadgeTransitions {...storyArgs} />}</SettledArgs>,
 };

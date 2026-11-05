@@ -52,6 +52,8 @@ export interface AgentPromptQuestion {
   id: string;
   header: string;
   question: string;
+  /** A short line under the question. The Team API does not carry it. */
+  detail?: string;
   isSecret: boolean;
   options: Array<{ label: string; description: string }> | null;
   /** The user can pick more than one option. Set only when true. */
@@ -64,6 +66,7 @@ export function isAgentPromptQuestion(value: unknown): value is AgentPromptQuest
     isBoundedString(value.id, INPUT_LIMITS.identifier) &&
     isBoundedString(value.header, INPUT_LIMITS.promptHeader) &&
     isBoundedString(value.question, INPUT_LIMITS.promptQuestion) &&
+    (value.detail === undefined || isBoundedString(value.detail, INPUT_LIMITS.promptQuestion)) &&
     isBoolean(value.isSecret) &&
     (value.multiSelect === undefined || isBoolean(value.multiSelect)) &&
     (value.options === null ||

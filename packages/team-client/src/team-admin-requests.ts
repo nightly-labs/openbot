@@ -86,7 +86,11 @@ import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/what
 // them through their own transport, so the path, body and decoding of each request are here once.
 // The host answers only an owner or admin; a member gets a refusal, which the transport rejects.
 
-import { type AgentProviderRef, isAgentProviderRef, type ManagedProviderId } from "@openbot/contracts/agent-providers";
+import {
+  type AgentProviderRef,
+  type DownloadableProviderId,
+  isAgentProviderRef,
+} from "@openbot/contracts/agent-providers";
 import { parseHostedSiteList } from "@openbot/contracts/hosted-sites";
 import {
   type AccountUsage,
@@ -132,6 +136,8 @@ import {
   decodeHostMemoryReview,
   decodeHostMessagingOverview,
   decodeHostOnePasswordConnectorStatus,
+  decodeHostPasswordManagerList,
+  decodeHostPasswordManagerStatus,
   decodeHostProviderAccounts,
   decodeHostProviderAccountUsage,
   decodeHostReleaseStatus,
@@ -192,6 +198,9 @@ import {
   type MessagingOverview,
   type OnePasswordConnectorStatus,
   type OnePasswordHostConnectInput,
+  type PasswordManagerConnectInput,
+  type PasswordManagerId,
+  type PasswordManagerStatus,
   type PromptCacheTtl,
   type PromptCacheTtlSetting,
   type ProviderCodeLoginStart,
@@ -278,6 +287,7 @@ import { MCP_SIGN_IN_APP_ROUTES } from "@openbot/contracts/team-protocol/mcp-sig
 import { MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
 import { ONEPASSWORD_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
+import { PASSWORD_MANAGERS_ROUTES } from "@openbot/contracts/team-protocol/password-managers-v1";
 import type {
   ProviderAccountRelay,
   ProviderAccountRelayProvider,
@@ -1283,7 +1293,7 @@ export function getProviderRuntimes(
 
 export function downloadProviderRuntime(
   request: TeamApiRequest,
-  provider: ManagedProviderId,
+  provider: DownloadableProviderId,
   routes: ProviderRuntimeRoutes = PROVIDERS_ADMIN_ROUTES,
 ): Effect.Effect<ProviderRuntimeSnapshot, TeamAdminRequestError> {
   return adminCall(() => request("POST", routes.runtimesDownload, runtimeDecoder(routes), { provider }));
@@ -1291,7 +1301,7 @@ export function downloadProviderRuntime(
 
 export function cancelProviderRuntime(
   request: TeamApiRequest,
-  provider: ManagedProviderId,
+  provider: DownloadableProviderId,
   routes: ProviderRuntimeRoutes = PROVIDERS_ADMIN_ROUTES,
 ): Effect.Effect<ProviderRuntimeSnapshot, TeamAdminRequestError> {
   return adminCall(() => request("POST", routes.runtimesCancel, runtimeDecoder(routes), { provider }));
@@ -1607,6 +1617,43 @@ export function bitwardenConnectorRequest(
 ): Effect.Effect<BitwardenConnectorStatus, TeamAdminRequestError> {
   return adminCall(() =>
     request("POST", BITWARDEN_CONNECTOR_ROUTES[route], decodeHostBitwardenConnectorStatus, { ...body }),
+  );
+}
+
+/**
+ * The password managers of the host (`password-managers-v1`), such as Proton Pass. The host lists
+ * only the managers that it can connect. No answer carries an access key or a password.
+ */
+export function listPasswordManagers(
+  request: TeamApiRequest,
+): Effect.Effect<PasswordManagerStatus[], TeamAdminRequestError> {
+  return adminCall(() => request("POST", PASSWORD_MANAGERS_ROUTES.list, decodeHostPasswordManagerList, {}));
+}
+
+/**
+ * Starts a connection of one manager, or sends the extra password that a `browser` connection asks
+ * for. The host answers the status at once; the client reads it again until the state changes.
+ */
+export function connectPasswordManager(
+  request: TeamApiRequest,
+  input: PasswordManagerConnectInput,
+): Effect.Effect<PasswordManagerStatus, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", PASSWORD_MANAGERS_ROUTES.connect, decodeHostPasswordManagerStatus, {
+      manager: input.manager,
+      method: { ...input.method },
+    }),
+  );
+}
+
+/** Stops a connection that has not ended (`cancel`), or removes the host's access (`disconnect`). */
+export function passwordManagerRequest(
+  request: TeamApiRequest,
+  route: "cancel" | "disconnect",
+  manager: PasswordManagerId,
+): Effect.Effect<PasswordManagerStatus, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", PASSWORD_MANAGERS_ROUTES[route], decodeHostPasswordManagerStatus, { manager }),
   );
 }
 

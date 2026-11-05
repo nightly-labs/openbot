@@ -41,7 +41,7 @@ import { mentionDraft } from "@/features/chat/model/chat-mentions";
 import {
   type ChatBubbleMessage,
   chatRowIndex,
-  latestReadableMessage,
+  latestReadBoundaryMessage,
   projectChatMessages,
 } from "@/features/chat/model/chat-messages";
 import type { AgentChatTarget } from "@/features/chat/model/chat-target";
@@ -326,7 +326,7 @@ function AgentTaskChat({
     agentId,
     task ? taskId : null,
     isFocused && appActive && conversation.data
-      ? (latestReadableMessage(conversation.data.messages)?.id ?? null)
+      ? (latestReadBoundaryMessage(conversation.data.messages)?.id ?? null)
       : null,
     task?.updatedAt ?? null,
   );

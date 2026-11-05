@@ -520,8 +520,12 @@ export const messages = {
   // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "音声入力",
   "settings.voice.model.parakeet.description": "高速です。ヨーロッパの 25 言語で、話している言語を自動で判別します。",
+  "settings.voice.model.parakeetUnified.description":
+    "高速です。英語のみ。句読点を付け、Parakeet TDT より誤りが少ないです。",
   "settings.voice.model.bark.description": "高速です。英語のみ。ほとんど小文字で書き、句読点はわずかです。",
   "settings.voice.model.whisper.description": "低速です。約 100 言語に対応し、話す言語を指定できます。",
+  "settings.voice.model.cohere.description":
+    "低速です。14 言語に対応し、話す言語を指定します。約 4 GB のメモリを使用します。",
   "settings.voice.model.size": "ダウンロードサイズ: {size}",
   "settings.voice.model.downloading": "ダウンロード中 · {received} / {total}",
   "settings.voice.model.failed": "ダウンロードが止まりました。接続を確認して、もう一度お試しください。",
@@ -535,10 +539,14 @@ export const messages = {
   "settings.voice.model.removeLabel": "{name} をこのコンピュータから削除",
   "settings.voice.language.section": "言語",
   "settings.voice.language.description": "話す言語です。「自動」は録音から言語を判別します。",
+  "settings.voice.language.modelLanguages":
+    "話す言語です。このモデルはこれらの言語のみに対応し、言語を自動で判別しません。",
   "settings.voice.language.modelDetects":
-    "Parakeet は話している言語を自動で判別します。言語を指定するには Whisper または ElevenLabs を使用してください。",
+    "Parakeet は話している言語を自動で判別します。言語を指定するには Whisper、Cohere または ElevenLabs を使用してください。",
   "settings.voice.language.englishOnly":
-    "Bark は英語のみ認識します。言語を指定するには Whisper または ElevenLabs を使用してください。",
+    "Bark は英語のみ認識します。言語を指定するには Whisper、Cohere または ElevenLabs を使用してください。",
+  "settings.voice.language.parakeetUnifiedEnglishOnly":
+    "Parakeet Unified は英語のみ認識します。言語を指定するには Whisper、Cohere または ElevenLabs を使用してください。",
   "settings.voice.language.automatic": "自動",
   "settings.voice.loadFailed": "音声モデルを読み込めませんでした。",
   "settings.voice.saveFailed": "音声の設定を保存できませんでした。もう一度お試しください。",

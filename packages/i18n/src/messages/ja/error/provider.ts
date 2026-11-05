@@ -109,6 +109,7 @@ export const messages = {
   "error.provider.contextWindowInvalid":
     "モデルのコンテキストウィンドウは {min} から {max} までの整数のトークン数にしてください。",
   "error.provider.maxOutputInvalid": "モデルの最大出力は {min} から {max} までの整数のトークン数にしてください。",
+  "error.provider.reasoningEffortsInvalid": "モデルの推論の強さが無効です。",
   "error.provider.headersTooMany": "ヘッダーが多すぎます。",
   "error.provider.headerNameCharacter": "ヘッダー名に HTTP で使用できない文字が含まれています。",
   "error.provider.headerNameTooLong": "ヘッダー名が長すぎます。",
@@ -218,6 +219,8 @@ export const messages = {
     "モデルプロバイダー側で障害が発生しました。お使いの接続は原因ではありません。後でもう一度試すか、別のモデルを選んでください。\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode がモデルプロバイダーに接続できませんでした。OpenBot を実行しているコンピューターのネットワーク接続を確認してから、もう一度お試しください。\n{detail}",
+  "error.provider.codexStateBusy":
+    "ChatGPT は前回の起動後、まだローカル履歴を準備しています。数分待ってから、もう一度お試しください。",
   "error.provider.opencodeDatabaseNewer":
     "新しいバージョンの OpenCode がデータベースを変更したため、OpenCode はデータベースを開けませんでした。OpenCode をバージョン 2 以降に更新してから、もう一度お試しください。",
   "error.provider.opencodeNoAnswer":
@@ -240,6 +243,8 @@ export const messages = {
   "error.provider.antigravityMissing":
     "Gemini はダウンロードされていません。続けるには OpenBot でダウンロードしてください。",
   "error.provider.antigravityNotStarted": "Gemini サーバーは見つかりましたが、バージョンを読み取れません。",
+  "error.provider.antigravityOverrideInvalid":
+    "OPENBOT_ANTIGRAVITY_PATH の Gemini サーバーが見つからないか、実行できません。パスを修正するか変数を削除してから、OpenBot を再起動してください。",
   "error.provider.antigravityVersionUnreadable": "Gemini サーバーのバージョンを読み取れません。",
   "error.provider.antigravitySignIn": "Gemini を使うには Google でサインインしてください。",
   "error.provider.antigravityRateLimited":
@@ -441,6 +446,10 @@ export const messages = {
     "インストール中にカスタムエージェントが変更されました。もう一度お試しください。",
   "error.provider.registryInstallFailed":
     "エージェントのインストールに失敗しました。以前のインストールは変更されていません。",
+  "error.provider.hermesInstallFailed":
+    "Hermes Agent をインストールできませんでした。もう一度試すか、インストールガイドを使ってください。",
+  "error.provider.hermesNeedsGitCurl":
+    "Hermes Agent には git と curl が必要です。インストールしてから、もう一度試してください。",
   "error.provider.registryRemoveBusy":
     "削除する前に、エージェントのインストールと実行中の ACP の作業が終わるまでお待ちください。",
 } as const satisfies PartialTranslation<typeof source>;

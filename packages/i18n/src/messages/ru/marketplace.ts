@@ -123,6 +123,7 @@ export const messages = {
   "marketplace.app.telegramTagline": "Группы и личные чаты в Telegram",
   "marketplace.app.whatsappTagline": "Свой чат и разрешённые люди в WhatsApp",
   "marketplace.app.bitwardenTagline": "Вход на сайты с учётными данными из общей папки",
+  "marketplace.app.protonPassTagline": "Вход на сайты с учётными данными из общего хранилища",
   "marketplace.app.onePasswordCategory": "Управление логинами и учётными данными",
   "marketplace.app.yourApps": "Ваши приложения",
   "marketplace.app.addCustom": "Добавить своё",
@@ -236,6 +237,15 @@ export const messages = {
     "Используйте стили из этого репозитория и сделайте в Paper дизайн страницы настроек.",
   "marketplace.plugin.paper.prompt.tokens":
     "Перечислите токены дизайна в открытом файле Paper и сравните их с нашей темой.",
+  "marketplace.plugin.higgsfield.tagline": "ИИ-изображения, видео и аудио",
+  "marketplace.plugin.higgsfield.description":
+    "Higgsfield позволяет агентам создавать изображения, видео, персонажей и аудио моделями Higgsfield, такими как Seedance, Kling, Veo и MiniMax Hailuo, проверять баланс кредитов и просматривать Asset Library. Результаты сохраняются в Assets Higgsfield пользователя. Каждый пользователь входит в свой аккаунт Higgsfield в браузере. Каждая генерация расходует кредиты этого аккаунта по стандартному тарифу, даже на безлимитном плане.",
+  "marketplace.plugin.higgsfield.app":
+    "Создание изображений, видео и аудио, персонажи, кредиты и ассеты через MCP-сервер Higgsfield со входом в браузере.",
+  "marketplace.plugin.higgsfield.prompt.credits": "Сколько у меня кредитов Higgsfield?",
+  "marketplace.plugin.higgsfield.prompt.productShot":
+    "Сделайте в Higgsfield предметное фото керамической кружки на деревянном столе.",
+  "marketplace.plugin.higgsfield.prompt.clip": "Сделайте в Higgsfield 5-секундное видео волн на закате.",
   "marketplace.plugin.appleApps.tagline": "Почта, Календарь и другое на вашем Mac",
   "marketplace.plugin.appleApps.description":
     "Apple apps позволяет агентам работать с приложениями Почта, Календарь, Контакты, Напоминания, Заметки, Сообщения и Safari на этом Mac. Работает только в macOS. OpenBot запускает mcp-icloud — сервер сообщества, который не создан Apple или OpenBot. Сервер управляет приложениями через AppleScript на этом компьютере, и ему не нужны аккаунт или ключ. При установке OpenBot может сразу запросить у macOS доступ ко всем этим приложениям, по одному запросу на приложение. Иначе macOS спросит, когда агент впервые использует приложение. Чтобы изменить это позже, откройте Системные настройки › Конфиденциальность и безопасность › Автоматизация. Агенты могут отправлять письма и iMessage, а также изменять или удалять события, контакты и напоминания, поэтому проверяйте каждую запись перед подтверждением. То, что читают инструменты, например текст писем, передаётся провайдеру модели агента.",
@@ -292,6 +302,18 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "Найдите этот платёж и объясните, почему он не прошёл.",
   "marketplace.plugin.stripe.prompt.customer": "Кратко опишите счета этого клиента и его задолженность.",
   "marketplace.plugin.stripe.prompt.link": "Составьте платёжную ссылку на тариф Pro за 49 в месяц.",
+  "marketplace.plugin.revenuecat.tagline": "Подписки, продукты и пейволы",
+  "marketplace.plugin.revenuecat.description":
+    "RevenueCat позволяет агентам читать и изменять настройки подписок в приложении: приложения, продукты, entitlements, offerings, пакеты, пейволы и эксперименты. Агенты также могут искать клиентов и их покупки, читать графики и метрики. Секретный API-ключ RevenueCat передаётся в одном заголовке Authorization. Ключ даёт доступ к одному проекту. С ключом только для чтения агенты могут только читать. С ключом для записи агенты могут отправлять продукты на проверку в App Store, выдавать клиентам entitlements и удалять пакеты, правила таргетинга и вебхуки.",
+  "marketplace.plugin.revenuecat.app":
+    "Продукты, entitlements, offerings, пейволы и метрики через MCP-сервер RevenueCat с секретным API-ключом.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "Какие offerings и пакеты есть в моём проекте RevenueCat?",
+  "marketplace.plugin.revenuecat.prompt.revenue":
+    "Как в этом месяце изменились мой доход и активные подписки в RevenueCat?",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "Какие entitlements есть у этого клиента RevenueCat и когда они истекают?",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "В панели RevenueCat откройте API keys в своём проекте и создайте секретный API-ключ. Для просмотра данных достаточно ключа только для чтения.",
   "marketplace.plugin.posthog.tagline": "Продуктовая аналитика и флаги",
   "marketplace.plugin.posthog.description":
     "PostHog позволяет агентам запрашивать события и воронки, проверять флаги функций и кратко описывать, что изменилось после релиза. Персональный API-ключ из настроек проекта передаётся в одном заголовке Authorization.",
@@ -410,6 +432,14 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "Какие задачи в Todoist нужно сделать сегодня?",
   "marketplace.plugin.todoist.prompt.capture": "Добавь эти пункты в мои «Входящие» в Todoist.",
   "marketplace.plugin.todoist.prompt.overdue": "Перенеси мои просроченные задачи в Todoist на завтра.",
+  "marketplace.plugin.ticktick.tagline": "Задачи, списки, привычки и фокус",
+  "marketplace.plugin.ticktick.description":
+    "TickTick позволяет агентам искать и фильтровать задачи, добавлять и изменять задачи, а также управлять списками, разделами, папками, тегами и комментариями. Агенты также могут читать и изменять привычки и записи фокуса и читать события из календарей, подключённых к TickTick. Каждый пользователь входит в свой аккаунт TickTick в браузере. Агенты получают доступ на чтение и запись: они могут завершать, перемещать и удалять задачи, а также удалять теги и записи фокуса.",
+  "marketplace.plugin.ticktick.app":
+    "Задачи, списки, привычки и записи фокуса через MCP-сервер TickTick со входом в браузере.",
+  "marketplace.plugin.ticktick.prompt.today": "Какие задачи в TickTick нужно сделать сегодня?",
+  "marketplace.plugin.ticktick.prompt.capture": "Добавь эти пункты во входящие TickTick.",
+  "marketplace.plugin.ticktick.prompt.week": "Какие задачи в TickTick были выполнены на прошлой неделе?",
   "marketplace.plugin.trello.tagline": "Доски, списки и карточки",
   "marketplace.plugin.trello.description":
     "С Trello агенты ищут и читают доски, списки, карточки, чек-листы и комментарии, создают доски и карточки, перемещают списки и карточки, отмечают карточки выполненными и добавляют чек-листы, комментарии и метки. Агенты также могут читать и добавлять карточки во «Входящих» Trello пользователя и читать события Planner, которые могут приходить из подключённого календаря Google или Outlook. Каждый пользователь входит в свой аккаунт Trello через браузер и выбирает рабочие пространства на экране согласия. В этих рабочих пространствах у агентов те же права, что и у пользователя. Они могут архивировать карточки и списки, но сервер не может ничего удалить навсегда.",
@@ -426,6 +456,25 @@ export const messages = {
   "marketplace.plugin.clickup.prompt.createTask": "Создай задачу в ClickUp из этих пунктов и назначь её мне.",
   "marketplace.plugin.clickup.prompt.summarizeDoc":
     "Найди последнее обновление проекта в ClickUp и кратко перечисли открытые вопросы.",
+  "marketplace.plugin.coinbase.tagline": "Курсы криптовалют, портфели и торговля",
+  "marketplace.plugin.coinbase.description":
+    "Coinbase позволяет агентам читать курсы, балансы, портфели, ордера и комиссии в Coinbase Advanced Trade, просматривать и размещать ордера, обменивать активы и переводить средства между портфелями. Каждый пользователь входит в свой аккаунт Coinbase через браузер. У агентов те же права, что и у пользователя. Ордера и обмены используют реальные средства, а агенты могут оплачивать запросы x402 с баланса USDC.",
+  "marketplace.plugin.coinbase.app":
+    "Курсы, балансы, портфели, ордера и обмены через MCP-сервер Coinbase со входом в браузере.",
+  "marketplace.plugin.coinbase.prompt.balances": "Какие у меня балансы на Coinbase в каждом портфеле?",
+  "marketplace.plugin.coinbase.prompt.price": "Покажи курс BTC-USD на Coinbase и как он менялся на этой неделе.",
+  "marketplace.plugin.coinbase.prompt.previewOrder":
+    "Покажи предварительный просмотр рыночной покупки ETH на 50 USD на Coinbase. Не размещай ордер.",
+  "marketplace.plugin.robinhood.tagline": "Брокерские счета и торговля через агентов",
+  "marketplace.plugin.robinhood.description":
+    "Robinhood позволяет агентам читать счета, позиции, балансы, историю операций и списки наблюдения клиента Robinhood, читать рыночные данные и размещать ордера на акции, опционы и криптовалюту. Каждый пользователь входит в свой аккаунт Robinhood через браузер. При первом входе Robinhood просит пользователя открыть отдельный счёт Agentic. Агенты могут торговать только на этом счёте и по умолчанию размещают ордера, не запрашивая у пользователя подтверждения каждого.",
+  "marketplace.plugin.robinhood.app":
+    "Счета, позиции, рыночные данные и сделки через MCP-сервер Robinhood со входом в браузере.",
+  "marketplace.plugin.robinhood.prompt.positions":
+    "Подведи итог моим позициям в Robinhood и тому, как они изменились сегодня.",
+  "marketplace.plugin.robinhood.prompt.watchlist":
+    "Как на этой неделе изменилась каждая акция из моего списка наблюдения в Robinhood?",
+  "marketplace.plugin.robinhood.prompt.agenticCash": "Сколько наличных на моём счёте Agentic в Robinhood?",
   "marketplace.plugin.huggingface.tagline": "Модели, датасеты и статьи на Hub",
   "marketplace.plugin.huggingface.description":
     "Hugging Face позволяет агентам искать модели, датасеты, Spaces, коллекции и статьи на Hugging Face Hub, читать карточки моделей и файлы репозиториев, просматривать датасеты и искать по документации Hugging Face. Он использует публичные данные Hub и не требует аккаунта и ключа. Инструменты только читают данные: агенты не могут создавать репозитории или запускать задачи.",
