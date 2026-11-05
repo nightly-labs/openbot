@@ -199,16 +199,20 @@ function showToast(): void {
   const [step, setStep] = createSignal<SocialFollowStep>({ kind: "ask" });
   const finish = () => updateState((state) => ({ ...state, done: true }));
   const close = () => toast.dismiss(TOAST_ID);
-  // One post page and one follow page: the copy of a post takes time, and a second click can come.
-  let posting = false;
+  // One post page for each network, and one follow page. The copy of a post takes time, and a
+  // second click can come before it ends.
+  const posted = new Set<SocialNetworkId>();
+  let copying = false;
   let following = false;
 
   const post = async (network: SocialNetwork) => {
-    if (posting) return;
-    posting = true;
+    if (copying || posted.has(network.id)) return;
+    posted.add(network.id);
     finish();
+    copying = network.compose === "copy";
     // The copy comes before the page opens: it needs the focus of this window.
     const result = network.compose === "copy" ? await copyDraftPost() : network.compose;
+    copying = false;
     setStep({ kind: "posted", network, result });
     void appPort().openExternal(POST_DESTINATIONS[network.id]);
   };

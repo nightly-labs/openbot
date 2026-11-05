@@ -54,7 +54,7 @@ function ToastStory(props: { first: SocialFollowStep }) {
 /** After two days and ten messages, an agent's finished reply asks for a post. A network opens its post page. */
 export const AskForPost: Story = { render: () => <ToastStory first={{ kind: "ask" }} /> };
 
-/** Instagram has no post link: the toast copies a post, then asks for a follow. */
+/** Instagram has no post link: the toast copies a post, then asks for a follow. The post buttons stay. */
 export const AfterCopiedPost: Story = {
   render: () => <ToastStory first={{ kind: "posted", network: SOCIAL_NETWORKS.instagram, result: "copied" }} />,
 };

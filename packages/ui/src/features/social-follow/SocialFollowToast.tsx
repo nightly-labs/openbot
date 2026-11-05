@@ -57,6 +57,30 @@ export function SocialFollowToast(props: SocialFollowToastProps) {
     return t("app.socialFollow.followOn", { name: network.name });
   };
 
+  /** The post buttons. They stay after a post, for a post on one more network. */
+  const networkList = () => (
+    <ul class="social-follow-networks" aria-label={t("app.socialFollow.networks")}>
+      <For each={SOCIAL_NETWORK_IDS}>
+        {(id) => (
+          <li>
+            <IconButton
+              class="social-follow-network"
+              variant="ghost"
+              label={postLabel(SOCIAL_NETWORKS[id])}
+              onPointerEnter={() => setPeeking(true)}
+              onPointerLeave={() => setPeeking(false)}
+              onFocus={() => setPeeking(true)}
+              onBlur={() => setPeeking(false)}
+              onClick={() => props.onPost(SOCIAL_NETWORKS[id])}
+            >
+              <SocialNetworkMark network={id} class="social-follow-mark" />
+            </IconButton>
+          </li>
+        )}
+      </For>
+    </ul>
+  );
+
   const posted = () => (props.step.kind === "posted" ? props.step : null);
   const followed = () => (props.step.kind === "followed" ? props.step : null);
 
@@ -90,6 +114,7 @@ export function SocialFollowToast(props: SocialFollowToastProps) {
                     {followLabel(step().network)}
                   </Button>
                 </div>
+                {networkList()}
               </>
             )}
           </Match>
@@ -106,26 +131,7 @@ export function SocialFollowToast(props: SocialFollowToastProps) {
               <strong id={titleId}>{t("app.socialFollow.title")}</strong>
               <p>{t("app.socialFollow.description")}</p>
             </div>
-            <ul class="social-follow-networks" aria-label={t("app.socialFollow.networks")}>
-              <For each={SOCIAL_NETWORK_IDS}>
-                {(id) => (
-                  <li>
-                    <IconButton
-                      class="social-follow-network"
-                      variant="ghost"
-                      label={postLabel(SOCIAL_NETWORKS[id])}
-                      onPointerEnter={() => setPeeking(true)}
-                      onPointerLeave={() => setPeeking(false)}
-                      onFocus={() => setPeeking(true)}
-                      onBlur={() => setPeeking(false)}
-                      onClick={() => props.onPost(SOCIAL_NETWORKS[id])}
-                    >
-                      <SocialNetworkMark network={id} class="social-follow-mark" />
-                    </IconButton>
-                  </li>
-                )}
-              </For>
-            </ul>
+            {networkList()}
           </Match>
         </Switch>
       </div>
