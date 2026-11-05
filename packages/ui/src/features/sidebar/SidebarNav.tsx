@@ -47,7 +47,7 @@ export function SidebarNav() {
       onDrop={dropSidebarNativeDrag}
       onScroll={scrollFades.measure}
     >
-      <div class="agent-list-content">
+      <div ref={scrollFades.watch} class="agent-list-content">
         <Show
           when={
             resolvedPinnedItems().length === 0 &&
