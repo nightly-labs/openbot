@@ -12,8 +12,10 @@ import { importPKCS8, SignJWT } from "jose";
  * A user token (`ghu_`) makes GitHub show "user with OpenBotGit". An installation token (`ghs_`)
  * makes GitHub show `openbotgit[bot]`, but it needs the app's private key, which only this Worker
  * holds. An installation token can do everything that the installation allows, so this service
- * gives one only for the repositories where the user of the token can push. The desktop keeps the
- * user token for every other repository.
+ * gives one only for the repositories where the user of the token can push, and never with
+ * `administration`. GitHub limits a user token to what its user can do. It does not limit an
+ * installation token, so a user with push access would get admin access through one. The desktop
+ * keeps the user token for every other repository and for repository creation.
  *
  * The Worker keeps nothing: it does not store or log a token.
  */
@@ -65,6 +67,8 @@ const MAX_INSTALLATIONS = 20;
 const MAX_REPOSITORY_PAGES = 10;
 /** GitHub limits `repository_ids` to 500 in one token. */
 const MAX_REPOSITORIES_PER_TOKEN = 500;
+/** The installation permissions that a bot token never gets. See the class comment. */
+const USER_ONLY_PERMISSIONS: ReadonlySet<string> = new Set(["administration"]);
 
 const appSchema = Schema.Struct({ id: Schema.Number });
 const installationsSchema = Schema.Struct({
@@ -74,6 +78,8 @@ const installationsSchema = Schema.Struct({
       app_id: Schema.Number,
       account: Schema.Struct({ login: Schema.String }),
       events: Schema.optional(Schema.Array(Schema.String)),
+      /** What the owner of the installation granted, such as `{ contents: "write" }`. */
+      permissions: Schema.optional(Schema.Record(Schema.String, Schema.String)),
     }),
   ),
 });
@@ -103,6 +109,17 @@ interface WritableRepository {
   fullName: string;
 }
 
+/**
+ * The granted permissions of an installation without `USER_ONLY_PERMISSIONS`. GitHub refuses a
+ * token request for a permission that the installation does not have, so the request names only
+ * granted ones. Null when GitHub did not name them.
+ */
+function botPermissions(granted: Readonly<Record<string, string>> | undefined): Record<string, string> | null {
+  if (!granted) return null;
+  const permissions = Object.fromEntries(Object.entries(granted).filter(([name]) => !USER_ONLY_PERMISSIONS.has(name)));
+  return Object.keys(permissions).length > 0 ? permissions : null;
+}
+
 export class GitHubInstallationTokens {
   readonly #options: GitHubInstallationTokensOptions;
   readonly #now: () => number;
@@ -125,8 +142,11 @@ export class GitHubInstallationTokens {
     const { installations } = yield* this.#get(`/user/installations?per_page=${PAGE_SIZE}`, user, installationsSchema);
     const tokens: GitHubInstallationToken[] = [];
     for (const installation of installations.filter((entry) => entry.app_id === appId).slice(0, MAX_INSTALLATIONS)) {
+      const permissions = botPermissions(installation.permissions);
+      // Without the granted permissions, the request cannot leave out `administration`.
+      if (!permissions) continue;
       const result = yield* Effect.result(
-        this.#issueForInstallation(installation.id, installation.account.login, user),
+        this.#issueForInstallation(installation.id, installation.account.login, permissions, user),
       );
       // A suspended installation or SAML SSO refusal must not block the others.
       if (Result.isFailure(result)) {
@@ -175,6 +195,7 @@ export class GitHubInstallationTokens {
     this: GitHubInstallationTokens,
     installationId: number,
     account: string,
+    permissions: Readonly<Record<string, string>>,
     user: Credential,
   ): Effect.fn.Return<GitHubInstallationToken[], GitHubInstallationTokensError> {
     const writable = yield* this.#writableRepositories(installationId, user);
@@ -184,7 +205,7 @@ export class GitHubInstallationTokens {
       const minted = yield* this.#post(
         `/app/installations/${installationId}/access_tokens`,
         APP,
-        { repository_ids: part.map((repository) => repository.id) },
+        { repository_ids: part.map((repository) => repository.id), permissions },
         accessTokenSchema,
       );
       tokens.push({
