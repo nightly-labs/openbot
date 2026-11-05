@@ -8,8 +8,7 @@ import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
 import { ChannelAvatar } from "@/features/channels/components/channel-avatar";
-import { useAgentWaitReason } from "@/features/workspace/components/use-agent-activity";
-import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
+import { useAgentListUnread, useAgentListWaitReason } from "@/features/workspace/components/use-agent-activity";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileSidebarItem } from "@/features/workspace/model/sidebar-layout";
 import { useBarTop } from "@/shared/lib/native-bar";
@@ -57,8 +56,8 @@ function RailUnreadDot() {
 const RailAgent = memo(function RailAgent({ agent }: { agent: MobileAgent }) {
   const { t } = useText();
   const background = useChatRowBackground(agent.id);
-  const unread = useAgentUnread(agent.id);
-  const waitReason = useAgentWaitReason(agent.id);
+  const unread = useAgentListUnread(agent.id);
+  const waitReason = useAgentListWaitReason(agent.id);
   return (
     <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
       <ChatLinkPressable
@@ -78,6 +77,7 @@ const RailAgent = memo(function RailAgent({ agent }: { agent: MobileAgent }) {
             size={AVATAR_SIZE}
             animateIdle={false}
             rings
+            withThreads
           />
           {waitReason ? <AgentWaitBadge reason={waitReason} size={16} /> : null}
         </View>

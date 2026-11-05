@@ -27,8 +27,7 @@ import { AgentDragPreview, useChatDrag, useHoldMenu } from "@/features/agents/co
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
 import { useWaitingChannel } from "@/features/channels/components/use-waiting-channel";
-import { useAgentWaitReason } from "@/features/workspace/components/use-agent-activity";
-import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
+import { useAgentListUnread, useAgentListWaitReason } from "@/features/workspace/components/use-agent-activity";
 import { type MobileAgent, useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
@@ -127,8 +126,8 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
   const previewLine = waitingChannel
     ? t("mobile.chat.channelWork.waiting", { channel: waitingChannel.name })
     : lastMessage;
-  const isUnread = useAgentUnread(agent.id);
-  const waitReason = useAgentWaitReason(agent.id);
+  const isUnread = useAgentListUnread(agent.id);
+  const waitReason = useAgentListWaitReason(agent.id);
   const isUnpinTarget = transition?.chatId === agent.id && transition.target === "row";
   const bloub = (
     <BloubAvatar
@@ -140,6 +139,7 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
       size={54}
       animateIdle={false}
       rings
+      withThreads
     />
   );
   const waitBadge = waitReason ? <AgentWaitBadge reason={waitReason} /> : null;

@@ -25,8 +25,7 @@ import {
   useHoldMenu,
 } from "@/features/agents/components/chat-drag";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
-import { useAgentWaitReason } from "@/features/workspace/components/use-agent-activity";
-import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
+import { useAgentListUnread, useAgentListWaitReason } from "@/features/workspace/components/use-agent-activity";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
@@ -121,8 +120,8 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
     preview: <AgentDragPreview agent={agent} />,
   }));
   const holdMenu = useHoldMenu(drag, () => setMenuKey((key) => key + 1));
-  const isUnread = useAgentUnread(agent.id);
-  const waitReason = useAgentWaitReason(agent.id);
+  const isUnread = useAgentListUnread(agent.id);
+  const waitReason = useAgentListWaitReason(agent.id);
 
   const openLabel = agent.title.trim()
     ? t("mobile.agent.list.openPinnedWithTitle", { name: agent.name, title: agent.title.trim() })
@@ -153,6 +152,7 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
           size={64}
           animateIdle={false}
           rings
+          withThreads
         />
         {isUnread ? (
           <View
