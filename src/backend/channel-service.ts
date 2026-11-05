@@ -1782,7 +1782,8 @@ export class ChannelService {
         }
         yield* channelSync(() => {
           // A stop or reassign that landed during the awaits above is newer: keep it.
-          const latest = this.store.tasks(channelId).find((item) => item.id === task.id);
+          const tasks = this.store.tasks(channelId);
+          const latest = tasks.find((item) => item.id === task.id);
           const current = latest?.revision === task.revision && latest.state === "queued";
           // A delivery means the enqueue consumed the drafts. Keep their saved copies on the
           // request, as the success path does, or Resume would ask for drafts that are gone.
@@ -1798,6 +1799,7 @@ export class ChannelService {
                     state: "failed",
                     error: "Could not queue this assignment. Resume to try again.",
                   },
+                  ...releasedParent(tasks, latest, "failed"),
                 ]
               : latest && context
                 ? [{ ...latest, attachmentDraftIds: [] }]
@@ -1891,13 +1893,15 @@ export class ChannelService {
       this.#preparedFacts.delete(deliveryId);
       const assignment = yield* channelSync(() => this.store.assignmentForDelivery(deliveryId));
       if (!assignment || !activeAssignment(assignment)) return;
-      const task = (yield* channelSync(() => this.store.tasks(assignment.channelId))).find(
-        (item) => item.id === assignment.taskId,
-      );
+      const tasks = yield* channelSync(() => this.store.tasks(assignment.channelId));
+      const task = tasks.find((item) => item.id === assignment.taskId);
       yield* channelSync(() =>
         this.store.update(this.store.get(assignment.channelId), {
           assignments: [{ ...assignment, state: "failed" }],
-          tasks: task?.revision === assignment.taskRevision ? [{ ...task, state: "failed", error: reason }] : [],
+          tasks:
+            task?.revision === assignment.taskRevision
+              ? [{ ...task, state: "failed", error: reason }, ...releasedParent(tasks, task, "failed")]
+              : [],
         }),
       );
       this.publish(assignment.channelId);
@@ -2682,16 +2686,7 @@ export class ChannelService {
                 : null,
         });
       }
-      if (task.parentTaskId) {
-        const parent = tasks.find((item) => item.id === task.parentTaskId);
-        if (
-          parent?.state === "waiting" &&
-          tasks
-            .filter((item) => parent.dependencies.includes(item.id))
-            .every((item) => (item.id === task.id ? settled(task, state) : settled(item)))
-        )
-          updated.push({ ...parent, state: "queued", revision: parent.revision + 1 });
-      }
+      updated.push(...releasedParent(tasks, task, state));
       yield* channelSync(() =>
         this.store.update(this.store.get(channelId), { assignments: [{ ...assignment, state }], tasks: updated }),
       );
@@ -3727,6 +3722,22 @@ function channelResultId(assignment: ChannelAssignment): string {
  */
 function settled(task: ChannelTask, state: string = task.state): boolean {
   return state === "completed" || (state === "failed" && isReplyTask(task));
+}
+
+/**
+ * The waiting parent of `task` queued again, when `task` in `state` settles its last dependency.
+ * Each path that ends a child task calls it, or a failed reply leaves its caller waiting.
+ */
+function releasedParent(tasks: readonly ChannelTask[], task: ChannelTask, state: string): ChannelTask[] {
+  const parent = task.parentTaskId ? tasks.find((item) => item.id === task.parentTaskId) : undefined;
+  if (
+    parent?.state !== "waiting" ||
+    !tasks
+      .filter((item) => parent.dependencies.includes(item.id))
+      .every((item) => (item.id === task.id ? settled(task, state) : settled(item)))
+  )
+    return [];
+  return [{ ...parent, state: "queued", revision: parent.revision + 1 }];
 }
 
 function terminal(task: ChannelTask): boolean {
