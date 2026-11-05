@@ -48,7 +48,9 @@ class LiveVoiceFailed extends Schema.TaggedError<LiveVoiceFailed>()("LiveVoiceFa
 
 const liveStep = <A>(run: () => A) => Effect.try({ try: run, catch: (cause) => new LiveVoiceFailed({ cause }) });
 const liveFailure = (text: string) => new LiveVoiceFailed({ cause: new Error(text) });
-const toLiveVoiceFailed = Effect.mapError((failure: { readonly cause: unknown }) => new LiveVoiceFailed(failure));
+const toLiveVoiceFailed = Effect.mapError(
+  (failure: { readonly cause: unknown }) => new LiveVoiceFailed({ cause: failure.cause }),
+);
 
 /** A Codex process for the voice of one session, with the model that relays its requests. */
 interface LiveVoiceRelay {
