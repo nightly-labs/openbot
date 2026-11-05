@@ -569,7 +569,8 @@ opens the task.
 
 Shared writes: each task thread owns its own browser tabs and tab queue. Computer Use is an MCP
 server that the provider starts, so OpenBot cannot queue its calls; `ThreadLifecycle` starts a task
-session without it, and the instructions send desktop work to the agent's own chat. Tasks share the
+session without it, and the instructions send desktop work to the agent's own chat. A routine thread
+is the exception (see above). Tasks share the
 workspace, and OpenBot does not lock files; the `start_task` guidance warns the agent about this.
 
 A provider, account or custom-agent change that a user or an agent asks for while a turn, a task or
