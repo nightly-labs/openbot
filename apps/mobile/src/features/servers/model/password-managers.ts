@@ -5,7 +5,7 @@ import type { PasswordManagerId, PasswordManagerStatus } from "@openbot/contract
  * (`password-managers-v1`). 1Password and Bitwarden keep their own pages and routes. To add a
  * manager, add its id here with its text and its sign-in site.
  */
-export const MOBILE_PASSWORD_MANAGER_IDS = ["protonpass"] as const satisfies readonly PasswordManagerId[];
+const MOBILE_PASSWORD_MANAGER_IDS = ["protonpass"] as const satisfies readonly PasswordManagerId[];
 
 export type MobilePasswordManagerId = (typeof MOBILE_PASSWORD_MANAGER_IDS)[number];
 
