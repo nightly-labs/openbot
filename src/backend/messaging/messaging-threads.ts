@@ -431,15 +431,14 @@ export class MessagingThreads {
 
   /**
    * One outbound tool call, from any turn of any agent. The arguments name the connection and the
-   * place; only an enabled connection of this host can take a post. `openFiles` opens the files of a
-   * post under the calling agent's path rules, before the text is sent, and keeps them open until the
-   * upload ends.
+   * place; only an enabled connection of this host can take a post. `openFiles` checks the files of a
+   * post under the calling agent's path rules, before the text is sent.
    */
   readonly outboundTool = Effect.fn("MessagingThreads.outboundTool")(function* (
     this: MessagingThreads,
     tool: string,
     args: unknown,
-    openFiles: (paths: string[]) => Effect.Effect<MessagingAnswerFile[], AttachmentOperationError, Scope.Scope>,
+    openFiles: (paths: string[]) => Effect.Effect<MessagingAnswerFile[], AttachmentOperationError>,
   ): Effect.fn.Return<OpenBotToolResponse, AttachmentOperationError> {
     const call = parseMessagingOutboundTool(tool, args);
     if ("error" in call) return openBotToolFailure(call.error);
@@ -464,16 +463,11 @@ export class MessagingThreads {
             Effect.timeout(HISTORY_TIMEOUT_MS),
             Effect.catch(() => Effect.succeed({ error: "The platform did not answer. Try again in a minute." })),
           )
-        : yield* Effect.scoped(
-            Effect.gen(function* () {
-              const files = call.files.length ? yield* openFiles(call.files) : [];
-              return yield* outbound.post(
-                record.connectionId,
-                { platformChannelId: call.place, replyThreadId: call.replyTo },
-                call.text,
-                files,
-              );
-            }),
+        : yield* outbound.post(
+            record.connectionId,
+            { platformChannelId: call.place, replyThreadId: call.replyTo },
+            call.text,
+            call.files.length ? yield* openFiles(call.files) : [],
           );
     return "error" in answer ? openBotToolFailure(answer.error) : openBotToolResult(answer);
   });

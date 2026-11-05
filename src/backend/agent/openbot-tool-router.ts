@@ -3,7 +3,7 @@ import { basename } from "node:path";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import { chatVisualItemType } from "@openbot/contracts/chat-visual";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentModelChoice,
   AgentModelOption,
@@ -38,6 +38,7 @@ import type { AgentTables } from "../agent-data/agent-tables";
 import type { AgentStore } from "../agent-store";
 import type { AgentTasks } from "../agent-tasks/agent-tasks";
 import type { AgentWaits } from "../agent-waits/agent-waits";
+import { attachmentCall, attachmentFailure } from "../attachment-effects";
 import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import type { ChannelService } from "../channel-service";
 import type { ProviderSession } from "../database/provider-sessions";
@@ -581,7 +582,8 @@ export class OpenBotToolRouter {
               PROFILE_TOOL_NAMES.has(tool) ||
               CHANNEL_AGENT_TOOL_NAMES.has(tool) ||
               tool === "list_channels" ||
-              tool === "attach_files_to_response";
+              tool === "attach_files_to_response" ||
+              tool === "messaging_post";
             // A workflow tool reports its own correctable failures; only bad arguments reach this point.
             const correctable = (cause: unknown) =>
               correctableTool || (WORKFLOW_TOOL_NAMES.has(tool) && cause instanceof z.ZodError);
@@ -964,17 +966,22 @@ export class OpenBotToolRouter {
     if (MESSAGING_OUTBOUND_TOOLS.has(params.tool))
       return yield* this.#messaging.outboundTool(params.tool, params.arguments, (paths) =>
         // The attachment path rules: the agent's workspace, its folders, or the OpenBot shared directory,
-        // which holds the files the user attached.
-        Effect.acquireRelease(
+        // which holds the files the user attached. The adapters read each file again by its path.
+        Effect.acquireUseRelease(
           this.#attachments.openSources(senderAgentId, paths, { allowAnyReadablePath: false }),
+          (sources) =>
+            Effect.forEach(sources, (source) =>
+              Effect.gen(function* () {
+                const name = basename(source.path);
+                const { size } = yield* attachmentCall(() => source.handle.stat());
+                if (size > ATTACHMENT_LIMITS.fileBytes)
+                  return yield* attachmentFailure(
+                    new Error(`${name} is larger than ${ATTACHMENT_LIMITS.fileBytes} bytes.`),
+                  );
+                return { name, path: source.path, mimeType: attachmentMimeTypeForName(name) };
+              }),
+            ),
           (sources) => Effect.promise(() => Promise.allSettled(sources.map((source) => source.handle.close()))),
-        ).pipe(
-          Effect.map((sources) =>
-            sources.map((source) => {
-              const name = basename(source.path);
-              return { name, path: source.path, mimeType: attachmentMimeTypeForName(name) };
-            }),
-          ),
         ),
       );
     if (params.tool.startsWith("messaging_")) {
