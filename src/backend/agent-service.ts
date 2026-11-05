@@ -2947,8 +2947,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         if (
           (input.access ?? (providerMove ? previous?.access : undefined)) === "workspace" &&
           confinedProvider !== undefined &&
-          agentProviderDescriptor(confinedProvider).workspaceEnforcement === "confined-process" &&
-          !canConfineProcesses()
+          workspaceOnlyUnavailable(confinedProvider)
         ) {
           throw new AgentSettingsRefused(sourceText("error.agent.workspaceOnlyMacOnly"));
         }
@@ -3244,8 +3243,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     if (!agent?.backupModels || (!agent.backupModels.automatic && !startedWork)) return undefined;
     const current = agentModelChoice(agent);
+    // A Workspace only agent skips a backup that `#applyAgentUpdate` would refuse, so a later one is tried.
     return agent.backupModels.order.find(
-      (choice) => !sameAgentModelChoice(choice, current) && this.#usageLimitReady(choice),
+      (choice) =>
+        !sameAgentModelChoice(choice, current) &&
+        this.#usageLimitReady(choice) &&
+        !(workspaceAccessEnforced(agent) && workspaceOnlyUnavailable(choice.provider)),
     );
   }
 
@@ -5480,6 +5483,11 @@ function agentModelChoice(agent: AgentSummary): AgentModelChoice {
     model: agent.model,
     ...(agent.providerAccountId ? { providerAccountId: agent.providerAccountId } : {}),
   };
+}
+
+/** Whether Workspace only cannot run on `provider` here: its own process needs a sandbox that this computer lacks. */
+function workspaceOnlyUnavailable(provider: AgentProvider): boolean {
+  return agentProviderDescriptor(provider).workspaceEnforcement === "confined-process" && !canConfineProcesses();
 }
 
 function usageLimitOf(choice: AgentModelChoice): UsageLimitKey {
