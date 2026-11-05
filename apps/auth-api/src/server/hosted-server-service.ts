@@ -2469,13 +2469,14 @@ export class HostedServerService {
 
   /**
    * Sends the time of a start that boat reported as usable. Only the caller that clears the start time
-   * sends it, so a webhook and the cron that both see the start send one event.
+   * sends it, so a webhook and the cron that both see the start send one event. It is analytics only:
+   * a failed write is logged, and the provision or observation that called it continues.
    */
   readonly #recordReady = Effect.fn("HostedServerService.recordReady")(function* (
     this: HostedServerService,
     row: HostedServerRow,
     readyAt: number,
-  ): Effect.fn.Return<void, HostedFailure, HostedServerDependencies> {
+  ): Effect.fn.Return<void, never, HostedServerDependencies> {
     const dependencies = yield* HostedServerDependencies;
     const requestedAt = row.start_requested_at;
     if (typeof requestedAt !== "number") return;
@@ -2484,9 +2485,19 @@ export class HostedServerService {
         .prepare("UPDATE hosted_servers SET start_requested_at = NULL WHERE server_id = ? AND start_requested_at = ?")
         .bind(row.server_id, requestedAt)
         .run(),
+    ).pipe(
+      Effect.catch((error) =>
+        Effect.sync(() => {
+          console.warn("Hosted server start time was not cleared.", {
+            serverId: row.server_id,
+            error: safeErrorCode(error),
+          });
+          return null;
+        }),
+      ),
     );
     const durationMs = Math.round(readyAt - requestedAt);
-    if (cleared.meta.changes !== 1 || durationMs < 0 || durationMs > MAX_HOSTED_START_MS) return;
+    if (cleared?.meta.changes !== 1 || durationMs < 0 || durationMs > MAX_HOSTED_START_MS) return;
     this.#track(row, {
       name: "hosted_server_action",
       action: "ready",

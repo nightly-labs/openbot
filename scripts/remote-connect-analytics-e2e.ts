@@ -4,7 +4,8 @@
 //   2. The first failed attempt after a connection sends one `failed` event with its last phase.
 //   3. Later failed attempts send nothing, and the next connection counts them.
 //   4. A cancel sends nothing and starts a new wait, so the next failure is sent again.
-//   5. No event carries a host id, and each one has the host surface and its generation.
+//   5. An old attempt that ends after a newer one began does not stop the newer one.
+//   6. No event carries a host id, and each one has the host surface and its generation.
 // The analytics queue sends in order, so a last connection to another host shows that no other event
 // was sent before it.
 //
@@ -76,8 +77,15 @@ async function run() {
     () => {},
     (summary) => analytics.handleRemoteConnect(summary),
   );
-  const connect = (hostId: string, session: string, firstRequest: "ok" | "error", hostedWaitMs?: number) => {
+  const connect = (
+    hostId: string,
+    session: string,
+    firstRequest: "ok" | "error",
+    hostedWaitMs?: number,
+    afterBegin = () => {},
+  ) => {
     trace.begin(hostId);
+    afterBegin();
     for (const phase of REMOTE_CONNECT_PHASES) {
       if (phase === "compatibility" && hostedWaitMs !== undefined) trace.hostedStart(hostId, hostedWaitMs);
       trace.mark(hostId, phase, phase === "session" ? session : phase === "first-request" ? firstRequest : "ok");
@@ -105,9 +113,9 @@ async function run() {
   check("the hosted start wait has two significant digits", first.hosted_start_wait_ms === 61_000, first);
 
   // 2. The first failure after the connection: a stored session, then an error.
-  trace.begin(HOST);
+  const stored = trace.begin(HOST);
   trace.mark(HOST, "session", "stored");
-  trace.fail(HOST, "error");
+  trace.fail(HOST, stored, "error");
   await sentCount(2);
   const failed = remoteEvents()[1]?.properties ?? {};
   check(
@@ -125,8 +133,7 @@ async function run() {
 
   // 3. Two more failures send nothing. The next connection counts all three.
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    trace.begin(HOST);
-    trace.fail(HOST, "error");
+    trace.fail(HOST, trace.begin(HOST), "error");
   }
   connect(HOST, "reused", "error");
   await sentCount(3);
@@ -143,10 +150,8 @@ async function run() {
   );
 
   // 4. A cancel sends nothing and ends the wait: the next failure is the first one again.
-  trace.begin(OTHER_HOST);
-  trace.fail(OTHER_HOST, "cancelled");
-  trace.begin(OTHER_HOST);
-  trace.fail(OTHER_HOST, "error");
+  trace.fail(OTHER_HOST, trace.begin(OTHER_HOST), "cancelled");
+  trace.fail(OTHER_HOST, trace.begin(OTHER_HOST), "error");
   await sentCount(4);
   const afterCancel = remoteEvents()[3]?.properties ?? {};
   check(
@@ -155,12 +160,20 @@ async function run() {
     afterCancel,
   );
 
-  // 5. A last connection to a new host. The queue is in order, so nothing else was sent.
-  connect(LAST_HOST, "ok", "ok");
+  // 5. A last connection to a new host. An old attempt ends with a cancel after the new one began.
+  // The queue is in order, so nothing else was sent.
+  const old = trace.begin(LAST_HOST);
+  connect(LAST_HOST, "ok", "ok", undefined, () => trace.fail(LAST_HOST, old, "cancelled"));
   await sentCount(5);
+  const last = remoteEvents()[4]?.properties ?? {};
+  check(
+    "an old attempt that ends late does not stop the newer one",
+    last.outcome === "connected" && last.connection === "first" && last.last_phase === "first-request",
+    last,
+  );
   check(
     "only these five events were sent",
-    sent.length === 5 && remoteEvents()[4]?.properties.connection === "first",
+    sent.length === 5,
     sent.map((event) => event.name),
   );
   const body = JSON.stringify({ globals, sent });

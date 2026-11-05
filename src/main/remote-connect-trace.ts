@@ -44,8 +44,8 @@ export interface RemoteConnectSummary {
 }
 
 interface Attempt {
+  readonly id: number;
   readonly startedAt: number;
-  readonly recorded: Set<RemoteConnectPhase>;
   readonly phases: Partial<Record<RemoteConnectPhase, number>>;
   lastPhase: RemoteConnectPhase | "start";
   session?: "new" | "stored" | "reused";
@@ -74,24 +74,28 @@ export class RemoteConnectTrace {
   readonly #attempts = new Map<string, Attempt>();
   readonly #streaks = new Map<string, Streak>();
   readonly #connected = new Set<string>();
+  #nextAttempt = 0;
 
   constructor(record: (span: TraceSpan) => void, summarize: (summary: RemoteConnectSummary) => void = () => {}) {
     this.#record = record;
     this.#summarize = summarize;
   }
 
-  begin(hostId: string): void {
+  /** Starts an attempt and returns its id. A newer attempt to the same host replaces it. */
+  begin(hostId: string): number {
     const startedAt = performance.now();
-    this.#attempts.set(hostId, { startedAt, recorded: new Set(), phases: {}, lastPhase: "start" });
+    this.#nextAttempt += 1;
+    const id = this.#nextAttempt;
+    this.#attempts.set(hostId, { id, startedAt, phases: {}, lastPhase: "start" });
     if (!this.#streaks.has(hostId)) this.#streaks.set(hostId, { startedAt, failures: 0 });
     this.#write("start", startedAt, "ok");
+    return id;
   }
 
   /** Records a phase of the current attempt. A phase without an attempt, or a repeated one, is skipped. */
   mark(hostId: string, phase: RemoteConnectPhase, outcome = "ok"): void {
     const attempt = this.#attempts.get(hostId);
-    if (!attempt || attempt.recorded.has(phase)) return;
-    attempt.recorded.add(phase);
+    if (!attempt || attempt.phases[phase] !== undefined) return;
     const now = performance.now();
     attempt.phases[phase] = now - attempt.startedAt;
     attempt.lastPhase = phase;
@@ -112,10 +116,13 @@ export class RemoteConnectTrace {
     if (attempt) attempt.hostedStartWaitMs = waitedMs;
   }
 
-  /** The attempt ended before its first request. */
-  fail(hostId: string, outcome: "error" | "cancelled"): void {
+  /**
+   * The attempt ended before its first request. An old attempt can end after a newer one began: it
+   * then changes nothing, because the newer attempt replaced it.
+   */
+  fail(hostId: string, attemptId: number, outcome: "error" | "cancelled"): void {
     const attempt = this.#attempts.get(hostId);
-    if (!attempt) return;
+    if (attempt?.id !== attemptId) return;
     this.#attempts.delete(hostId);
     const now = performance.now();
     this.#write("failed", now - attempt.startedAt, outcome);
