@@ -177,8 +177,10 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    minutes: boat runs the hook again before each new try of the stop, so a newer file can belong to a
    save that still runs. The hook sets a transient systemd timer (`openbot-pre-stop-restart`) that
    fires 15 minutes after the last hook. A client wake or a connector event for a server that boat
-   reports as running makes the Worker run `FAILED_STOP_START_COMMAND` after the reply. A machine
-   that stopped runs no timer. A hook that OpenBot did not write stays, and a self-hosted server gets
+   reports as running makes the Worker run `FAILED_STOP_START_COMMAND` after the reply. boat tries
+   the stop again every 4 to 10 minutes (seen on 2026-11-05), and each try stops OpenBot again. Thus
+   the timer fires only after boat stops its tries, and a wake keeps OpenBot running only until the
+   next try. The fix of the cause is in boat. A machine that stopped runs no timer. A hook that OpenBot did not write stays, and a self-hosted server gets
    no hook.
 
    **Check at a start.** `PRAGMA quick_check` reads every page of `openbot.db`: on a 15.7 GB file
