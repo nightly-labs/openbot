@@ -1342,6 +1342,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       onHighlightPlacement: () => () => undefined,
     },
     openExternal: async () => undefined,
+    // A preview user who has used OpenBot for a while, so the social toast can show.
+    getSentMessageStats: async () => ({ firstSentAt: "2026-10-01T09:00:00.000Z", sentCount: 40 }),
     connectProvider: async () => clone(agentStatus),
     connectProviderInMainlandChina: async () => clone(agentStatus),
     updateProviderCli: async () => clone(agentStatus),

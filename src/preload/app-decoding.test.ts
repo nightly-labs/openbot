@@ -32,6 +32,7 @@ import {
   decodeNotificationPreference,
   decodePendingMarketplaceListing,
   decodeProviderDetectionSettings,
+  decodeSentMessageStats,
   decodeUpdatePreference,
   decodeUpdateStatus,
   decodeVoiceServerProbe,
@@ -146,6 +147,8 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
       softwareRendering: true,
     } satisfies AppInfo,
   ],
+  ["sent message stats", decodeSentMessageStats, { firstSentAt: "2026-11-01T09:30:00.000Z", sentCount: 12 }],
+  ["sent message stats before the first message", decodeSentMessageStats, { firstSentAt: null, sentCount: 0 }],
   [
     "setup state",
     decodeAppSetupState,
@@ -276,6 +279,7 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
 ];
 
 const malformed: [string, (value: unknown) => unknown, unknown][] = [
+  ["sent message stats with a negative count", decodeSentMessageStats, { firstSentAt: null, sentCount: -1 }],
   [
     "app info with an install ID that is not text",
     decodeAppInfo,

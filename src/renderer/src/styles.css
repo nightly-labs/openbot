@@ -81,6 +81,7 @@
 @import "@openbot/ui/features/agents/agent-template.css";
 @import "@openbot/ui/features/agents/agent-delete-undo-toast.css";
 @import "@openbot/ui/features/github-star/github-star-toast.css";
+@import "@openbot/ui/features/social-follow/social-follow-toast.css";
 @import "@openbot/ui/features/updates/whats-new.css";
 @import "@openbot/ui/features/billing/billing.css";
 @import "@openbot/ui/styles/reference-chip.css";
