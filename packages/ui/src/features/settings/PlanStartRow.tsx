@@ -15,7 +15,7 @@ import {
   SelectValue,
   SlidingTabs,
 } from "@openbot/ui";
-import { createStore } from "solid-js";
+import { createMemo, createStore } from "solid-js";
 import { useText } from "../../text";
 
 const PRESETS = [10_000, 30_000, 60_000, 300_000] as const;
@@ -70,6 +70,8 @@ export interface PlanStartRowProps {
 export function PlanStartRow(props: PlanStartRowProps) {
   const { t, format } = useText();
   const [state, setState] = createStore<CustomState>({ open: false, amount: "90", unit: "s" });
+  // The same array while the items stay the same: the select builds its list again for a new one.
+  const options = createMemo(() => choices(props.value), { equals: (a, b) => a.join() === b.join() });
   let trigger: HTMLButtonElement | undefined;
 
   const unitText = (value: number, unit: "second" | "minute") =>
@@ -122,7 +124,7 @@ export function PlanStartRow(props: PlanStartRowProps) {
       </ItemContent>
       <ItemActions>
         <Select<PlanStartChoice>
-          options={choices(props.value)}
+          options={options()}
           value={choiceOf(props.value)}
           placement="bottom-end"
           onChange={(next) => {
