@@ -228,7 +228,8 @@ interface ActiveTurn {
   /** The complete messages whose thinking is applied, so that a repeated one is not counted again. */
   thinkingSnapshots: Set<string>;
   assistantMessages: Map<string, string>;
-  toolCalls: Map<string, string>;
+  /** The open tool calls by id. The result sends the input again, so the completed step names what it ran. */
+  toolCalls: Map<string, { name: string; input: unknown }>;
   /**
    * Set when Claude refuses the turn for a spent plan window. The refusal arrives as an assistant
    * message that only states the limit, so its text is held here and not published as the answer.
@@ -1186,7 +1187,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       thinkingSnapshotCounts: new Map<string, number>(),
       thinkingSnapshots: new Set<string>(),
       assistantMessages: new Map<string, string>(),
-      toolCalls: new Map<string, string>(),
+      toolCalls: new Map<string, { name: string; input: unknown }>(),
       usageLimit: null,
       retrying: false,
       unprompted,
@@ -1497,7 +1498,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       for (const toolCall of toolCalls) {
         if (turn.toolCalls.has(toolCall.id)) continue;
         const name = claudeBridgedToolName(toolCall.name, toolCall.input);
-        turn.toolCalls.set(toolCall.id, name);
+        turn.toolCalls.set(toolCall.id, { name, input: toolCall.input });
         this.#emitToolCall(runtime, toolCall.id, name, false, toolCall.input);
         const plan = foldClaudePlanCall(runtime.plan, toolCall);
         if (plan) this.#emitPlan(runtime, plan);
@@ -1528,10 +1529,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             ),
           );
         }
-        const name = turn.toolCalls.get(toolCallId);
-        if (!name) continue;
+        const call = turn.toolCalls.get(toolCallId);
+        if (!call) continue;
         turn.toolCalls.delete(toolCallId);
-        this.#emitToolCall(runtime, toolCallId, name, true, undefined, isError);
+        this.#emitToolCall(runtime, toolCallId, call.name, true, call.input, isError);
       }
       return;
     }
@@ -1571,7 +1572,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const apiError = message.subtype === "success" && message.is_error === true;
     const turn = runtime.activeTurn;
     if (turn) {
-      for (const [toolCallId, name] of turn.toolCalls) {
+      for (const [toolCallId, { name }] of turn.toolCalls) {
         this.#emitToolCall(runtime, toolCallId, name, true);
       }
       turn.toolCalls.clear();
