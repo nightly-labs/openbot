@@ -162,6 +162,8 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     settingsProvider,
     settingsReasoning,
     updateRuntimeSettings,
+    fastMode,
+    fastModeChange,
     messageLinkRelay,
     openMessageLinkRelay,
     pasteMessageLinkRelay,
@@ -632,6 +634,9 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               busyMessageDefaultIsHost={props.server?.kind === "remote"}
               newChatEditable={props.server?.kind === "local" || props.remoteNewChatLoaded === true}
               quickAcknowledgementEditable={props.server?.kind === "local" || props.remotePlanCardLoaded === true}
+              // The same Fast state and switch as the model picker of the chat header.
+              fastMode={fastMode()}
+              onFastModeChange={fastModeChange()}
               taskLimitEditable={props.server?.kind === "local" || props.remoteTaskLimitLoaded === true}
               backupModelsEditable={props.server?.kind === "local" || props.remoteBackupModelsLoaded === true}
               usageLimited={props.usageLimited}

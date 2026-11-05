@@ -177,10 +177,6 @@ export const messages = {
 
   "agentSettings.runtime.model": "نموذج الوكيل",
   "agentSettings.runtime.modelUnavailable": "تتوفر النماذج بعد اتصال CLI لوكيل.",
-  "agentSettings.runtime.reasoning": "الاستدلال",
-  "agentSettings.runtime.reasoningLabel": "مستوى استدلال الوكيل",
-  "agentSettings.runtime.selectReasoning": "اختيار الاستدلال",
-  "agentSettings.runtime.reasoningSetByProvider": "يحدّده {provider}",
   "agentSettings.runtime.access": "الوصول",
   "agentSettings.runtime.accessLabel": "وصول الوكيل",
   "agentSettings.runtime.busyMessage": "أثناء العمل",
