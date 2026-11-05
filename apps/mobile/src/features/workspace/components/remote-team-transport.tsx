@@ -18,6 +18,7 @@ import {
   type RemoteTeamDiagnostic,
   type RemoteUploadProgress,
 } from "@openbot/team-client/remote-peer";
+import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery";
 import { referenceFrom } from "@openbot/user-errors";
 import type { DOMProps } from "expo/dom";
 import * as Crypto from "expo-crypto";
@@ -158,6 +159,9 @@ export const RemoteTeamTransport = memo(
                   path: next.path,
                   body: next.body,
                   upload: next.upload,
+                  // As on desktop and web: a read that makes the server usable fails in seconds, so a
+                  // dead path does not keep the connection attempt running for the 10 min request limit.
+                  timeoutMs: remoteWorkspaceReadTimeout(next.method, next.path),
                   // The transfer file is the one answer larger than an attachment.
                   ...(next.path === INSTANCE_TRANSFER_ROUTES.export
                     ? { largeDownload: { maxBytes: INSTANCE_TRANSFER_REMOTE_BYTES, mimeType: "application/zip" } }
