@@ -1,6 +1,8 @@
 // Runs the real Electron with the attachment file response of `src/main/file-response.ts`:
-// 1. A `Range` request gets 206 with the asked bytes: `bytes=100-199` and the suffix `bytes=-100`.
-// 2. A range that starts after the end of the file gets 416.
+// 1. A `Range` request gets 206 with the asked bytes: `bytes=100-199`, the open range `bytes=100-` and the
+//    suffix `bytes=-100`. A suffix that is longer than the file gets the full file as 206.
+// 2. A range that starts after the end of the file gets 416. A range that ends before it starts is not
+//    valid, so it gets the full file as 200.
 // 3. A <video> loads an MP4 that has its index (`moov`) at the end, as Remotion and ffmpeg write it by
 //    default, and seeks to 75% of its duration. Chromium needs a range request for both.
 //
@@ -91,7 +93,7 @@ try {
   probe = parsed;
   assert.equal(probe.error, undefined, probe.error);
   assert.equal(probe.size, bytes.length);
-  const [middle, suffix, after] = probe.ranges;
+  const [middle, suffix, after, open, longSuffix, reversed] = probe.ranges;
   assert.deepEqual(
     middle,
     {
@@ -119,6 +121,21 @@ try {
   assert.equal(after?.status, 416, "a range after the end of the file");
   assert.equal(after?.contentRange, `bytes */${bytes.length}`);
   assert.equal(after?.length, 0, "a 416 response has no body");
+  assert.deepEqual(
+    [open?.status, open?.contentRange, open?.length],
+    [206, `bytes 100-${bytes.length - 1}/${bytes.length}`, bytes.length - 100],
+    "bytes=100-",
+  );
+  assert.deepEqual(
+    [longSuffix?.status, longSuffix?.contentRange, longSuffix?.length],
+    [206, `bytes 0-${bytes.length - 1}/${bytes.length}`, bytes.length],
+    "a suffix that is longer than the file",
+  );
+  assert.deepEqual(
+    [reversed?.status, reversed?.contentRange, reversed?.length],
+    [200, null, bytes.length],
+    "bytes=5-3",
+  );
   assert.ok(probe.seekable >= probe.target, `seekable to ${probe.seekable}s, not to ${probe.target}s`);
   assert.ok(probe.seeked, "the video did not finish the seek");
   assert.ok(Math.abs(probe.currentTime - probe.target) < 1, `the video is at ${probe.currentTime}s`);

@@ -29,7 +29,10 @@ const PROBE = `(async () => {
     };
   };
   const size = Number((await fetch(url, { method: "HEAD" })).headers.get("Content-Length"));
-  const ranges = [await ranged("bytes=100-199"), await ranged("bytes=-100"), await ranged("bytes=" + size + "-")];
+  const ranges = [];
+  for (const range of ["bytes=100-199", "bytes=-100", "bytes=" + size + "-", "bytes=100-", "bytes=-" + (size + 100), "bytes=5-3"]) {
+    ranges.push(await ranged(range));
+  }
   const video = document.createElement("video");
   video.muted = true;
   video.preload = "metadata";
