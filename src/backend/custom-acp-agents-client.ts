@@ -27,6 +27,7 @@ import type { AcpHistoryPersistence } from "./acp-client";
 import { type AgentClient, AgentProcessExitError, type DiagnosticOrigin } from "./agent-client";
 import { agentLaunchPath } from "./cli";
 import { causeHelpers } from "./effect-boundary";
+import { encodedModelId, providerModelValue } from "./encoded-model-id";
 import {
   type AppServerNotification,
   type AppServerRequest,
@@ -73,8 +74,6 @@ export type CustomAgentChildFactory = (
 ) => AgentClient;
 
 const MODEL_LIST_TIMEOUT_MS = 5_000;
-/** The start of a model value that `routedModels` encoded, because the contract charset refuses it. */
-const ENCODED_MODEL = "b64:";
 
 /** What a write that the macOS sandbox denied looks like: `EPERM`, and SQLite's read-only fallback (#4324). */
 const WRITE_DENIED = /\bEPERM\b|operation not permitted|attempt to write a readonly database/iu;
@@ -727,11 +726,8 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
 /**
  * The agent's models under its id. An agent with no list gets the one model `default`.
  *
- * ACP lets an agent report any string as a model value, and the contract charset is released: the
- * model list decoders of older clients fail closed on the whole array. A value that the charset
- * refuses, such as DeepSeek Harness's `["deepseek-official","deepseek-v4-flash"]`, goes under the
- * agent's id in base64url after `ENCODED_MODEL`, and `forChild` gives the agent its own value back.
- * A value that starts with the marker is encoded too, so no value is read as another. An id that is
+ * ACP lets an agent report any string as a model value, so a value that the contract charset refuses
+ * is encoded (see `encodedModelId`), and `forChild` gives the agent its own value back. An id that is
  * still refused, as one too long, is dropped alone.
  */
 function routedModels(config: CustomAgentConfig, data: readonly ModelEntry[]): ModelEntry[] {
@@ -741,28 +737,17 @@ function routedModels(config: CustomAgentConfig, data: readonly ModelEntry[]): M
   return data.flatMap((item) => {
     const model = item.model?.trim();
     if (!model) return [];
-    const plain = `${config.id}/${model}`;
-    const id =
-      isAgentModel(plain) && !model.startsWith(ENCODED_MODEL)
-        ? plain
-        : `${config.id}/${ENCODED_MODEL}${Buffer.from(model, "utf8").toString("base64url")}`;
+    const id = encodedModelId(`${config.id}/`, model);
     // `<agent name>/<model name>`, as a custom endpoint's models are named: the picker groups by it.
     return isAgentModel(id) ? [{ ...item, model: id, displayName: `${config.name}/${item.displayName ?? model}` }] : [];
   });
-}
-
-/** The agent's own model value of a model id with no agent prefix. */
-function agentModelValue(model: string): string {
-  return model.startsWith(ENCODED_MODEL)
-    ? Buffer.from(model.slice(ENCODED_MODEL.length), "base64url").toString("utf8")
-    : model;
 }
 
 /** The params as the agent's own process takes them: its session id, and its model with no prefix. */
 function forChild(params: unknown, sessionId: string | null): DynamicRecord {
   const record: DynamicRecord = isRecord(params) ? params : {};
   const { model, ...rest } = record;
-  const agentModel = typeof model === "string" ? agentModelValue(model.slice(model.indexOf("/") + 1)) : "";
+  const agentModel = typeof model === "string" ? providerModelValue(model.slice(model.indexOf("/") + 1)) : "";
   return {
     ...rest,
     ...(sessionId === null ? {} : { threadId: sessionId }),
