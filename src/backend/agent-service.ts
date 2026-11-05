@@ -3104,13 +3104,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         : undefined;
     const moved = previousChoice && nextChoice && !sameAgentModelChoice(previousChoice, nextChoice);
     const leaving = Boolean(moved && input.leaveUsageLimit && (wasHeld || failingOver));
+    // A spent balance names no reset, so the agent does not go back to it by itself (#5220).
+    const spentBalance =
+      failingOver && previousChoice !== undefined && this.#usageLimits.isSpent(usageLimitOf(previousChoice));
     const returnTo =
       leaving && previous && previousChoice
-        ? (previous.usageLimitReturn ?? {
-            ...previousChoice,
-            reasoningEffort: previous.reasoningEffort,
-            ...(failingOver ? { cause: "provider-error" as const } : {}),
-          })
+        ? (previous.usageLimitReturn ??
+          (spentBalance
+            ? null
+            : {
+                ...previousChoice,
+                reasoningEffort: previous.reasoningEffort,
+                ...(failingOver ? { cause: "provider-error" as const } : {}),
+              }))
         : undefined;
     const usageLimitReturn =
       returning || (returnTo && nextChoice && sameAgentModelChoice(returnTo, nextChoice)) ? null : returnTo;
