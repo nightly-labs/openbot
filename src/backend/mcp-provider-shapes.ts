@@ -1,7 +1,6 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { constants } from "node:fs";
-import { access, stat } from "node:fs/promises";
+import { access } from "node:fs/promises";
 import { homedir } from "node:os";
 import { delimiter, isAbsolute, join } from "node:path";
 import { promisify } from "node:util";
@@ -16,7 +15,7 @@ import {
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Schema } from "effect";
-import { agentLaunchPath, isWindowsRunnable } from "./cli";
+import { agentLaunchPath, isExecutable, isWindowsRunnable } from "./cli";
 import { causeHelpers } from "./effect-boundary";
 import { isMissingFileError } from "./file-errors";
 import type { McpOperationError } from "./mcp-effects";
@@ -398,22 +397,15 @@ const lookUpMcpCommand = Effect.fn("McpShape.lookUpCommand")(
     for (const folder of (path ?? process.env.PATH ?? "").split(delimiter)) {
       if (!isAbsolute(folder)) continue;
       const candidate = join(folder, trimmed);
-      if (yield* isExecutableFile(candidate)) return candidate;
+      // The deadline of `isMissingCommandFile`: a dead network volume or a privacy prompt can hold it.
+      const found = yield* isExecutable(candidate).pipe(
+        Effect.timeoutOrElse({ duration: COMMAND_FILE_CHECK_MS, orElse: () => Effect.succeed(false) }),
+      );
+      if (found) return candidate;
     }
     return null;
   },
   Effect.catch(() => Effect.succeed(null)),
-);
-
-/** Whether a `PATH` candidate is a file this process can run, with the deadline of `isMissingCommandFile`. */
-const isExecutableFile = Effect.fn("McpShape.isExecutableFile")(
-  function* (path: string) {
-    if (!(yield* mcpShapeIo(() => stat(path))).isFile()) return false;
-    yield* mcpShapeIo(() => access(path, constants.X_OK));
-    return true;
-  },
-  Effect.catch(() => Effect.succeed(false)),
-  Effect.timeoutOrElse({ duration: COMMAND_FILE_CHECK_MS, orElse: () => Effect.succeed(false) }),
 );
 
 /**
