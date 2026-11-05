@@ -2214,6 +2214,11 @@ export class ProviderRuntime implements ProviderPort {
       return this.#hooks.isProviderBusy(provider);
     });
     if (busy) return null;
+    // The system stops each copy in the same way, so a download only waits for the user's fix (#4848).
+    const realtimeLimitZero = sourceText("error.provider.realtimeLimitZero");
+    const stoppedByLimit = this.#status.providers?.find((row) => row.id === provider)?.message === realtimeLimitZero;
+    if (stoppedByLimit && (yield* providerStep(hasZeroRealtimeLimit)))
+      return yield* new ProviderOperationFailed({ cause: new Error(realtimeLimitZero) });
     const previousVersion = this.#cli.get(provider)?.version ?? null;
     const previousExecutable = this.#bundledExecutables[provider];
     // Main names the install path of a managed provider also before its first download, so only a
