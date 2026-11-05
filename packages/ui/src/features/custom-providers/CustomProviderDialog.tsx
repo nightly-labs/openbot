@@ -1,7 +1,17 @@
 import { ProviderLogo } from "@openbot/brand";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { CustomProviderHarness, ProviderRuntimeStatus, SaveCustomProviderInput } from "@openbot/contracts/ipc";
-import { agentProviderName, CUSTOM_PROVIDER_LIMITS, DEFAULT_CUSTOM_PROVIDER_HARNESS } from "@openbot/contracts/ipc";
+import type {
+  CustomProviderHarness,
+  CustomProviderReasoningEffort,
+  ProviderRuntimeStatus,
+  SaveCustomProviderInput,
+} from "@openbot/contracts/ipc";
+import {
+  agentProviderName,
+  CUSTOM_PROVIDER_LIMITS,
+  CUSTOM_PROVIDER_REASONING_EFFORTS,
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
+} from "@openbot/contracts/ipc";
 import {
   ArrowLeft,
   Button,
@@ -37,6 +47,7 @@ import {
   untrack,
 } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
+import { REASONING_LABEL } from "../../components/ProviderModelPicker";
 import { useText } from "../../text";
 import {
   blankModel,
@@ -89,7 +100,10 @@ type HeaderRow = CustomProviderDraft["headers"][number];
 function cloneDraft(draft: CustomProviderDraft): CustomProviderDraft {
   return {
     ...draft,
-    models: draft.models.map((model) => ({ ...model })),
+    models: draft.models.map((model) => ({
+      ...model,
+      ...(model.reasoningEfforts ? { reasoningEfforts: [...model.reasoningEfforts] } : {}),
+    })),
     headers: draft.headers.map((header) => ({ ...header })),
   };
 }
@@ -112,8 +126,8 @@ interface CustomProviderDialogProps {
   /** Main holds a key for this endpoint. A blank key field keeps it. */
   apiKeyKept?: boolean | undefined;
   /**
-   * Shows the context window of each model. This computer only: a joined server's host takes the
-   * model fields of the Team API, which has no context window.
+   * Shows the context window, max output and efforts of each model. This computer only: a joined
+   * server's host takes the model fields of the Team API, which has none of them.
    */
   contextWindows?: boolean | undefined;
   /**
@@ -268,6 +282,38 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     props.contextWindows
       ? [modelNameColumns[0], modelNameColumns[1], contextWindowColumn, maxOutputColumn]
       : modelNameColumns;
+
+  function setEffort(index: number, effort: CustomProviderReasoningEffort, checked: boolean): void {
+    setDraft((state) => {
+      const model = state.models[index];
+      if (!model) return;
+      const others = (model.reasoningEfforts ?? []).filter((item) => item !== effort);
+      model.reasoningEfforts = checked ? [...others, effort] : others;
+    });
+  }
+
+  /** The efforts of one model row. None checked keeps the efforts of the provider that runs it. */
+  const effortsId = createUniqueId();
+  const effortsRow = (row: ModelRow, index: number) => (
+    <fieldset class="custom-provider-efforts" aria-label={t("customProvider.model.efforts", { number: index + 1 })}>
+      <Text tone="muted" variant="caption" aria-hidden="true">
+        {t("customProvider.model.effortsLabel")}
+      </Text>
+      <For each={CUSTOM_PROVIDER_REASONING_EFFORTS}>
+        {(effort) => (
+          <label class="custom-provider-effort" for={`${effortsId}-${index}-${effort}`}>
+            <Checkbox
+              id={`${effortsId}-${index}-${effort}`}
+              checked={row.reasoningEfforts?.includes(effort) ?? false}
+              disabled={busy()}
+              onChange={(event) => setEffort(index, effort, event.currentTarget.checked)}
+            />
+            <Text variant="body-sm">{t(REASONING_LABEL[effort])}</Text>
+          </label>
+        )}
+      </For>
+    </fieldset>
+  );
 
   const headerColumns: readonly [RepeatableColumn<HeaderRow>, RepeatableColumn<HeaderRow>] = [
     {
@@ -569,6 +615,7 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                   busy={busy()}
                   sectionError={shown()?.models}
                   rowError={(index) => shown()?.modelRows[index]}
+                  rowDetails={props.contextWindows ? effortsRow : undefined}
                   onAdd={() =>
                     setDraft((state) => {
                       state.models.push({ id: "", name: "" });
@@ -599,6 +646,13 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                     </Show>
                   }
                 >
+                  <Show when={props.contextWindows}>
+                    <Text tone="muted" variant="caption">
+                      {harness() === "pi"
+                        ? t("customProvider.model.effortsHintPi")
+                        : t("customProvider.model.effortsHintOpenCode")}
+                    </Text>
+                  </Show>
                   <Switch>
                     <Match when={discovery().status === "loading"}>
                       <div class="custom-provider-discovery-status" role="status">

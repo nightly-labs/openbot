@@ -81,6 +81,12 @@ export const messages = {
   "customProvider.model.contextWindowPlaceholder": "Jetons",
   "customProvider.model.maxOutput": "Sortie maximale du modèle {number}",
   "customProvider.model.maxOutputPlaceholder": "Jetons",
+  "customProvider.model.efforts": "Effort du modèle {number}",
+  "customProvider.model.effortsLabel": "Effort",
+  "customProvider.model.effortsHintOpenCode":
+    "Sélectionnez les niveaux d’effort que chaque modèle accepte. Sans sélection, OpenCode propose Faible, Moyen et Élevé.",
+  "customProvider.model.effortsHintPi":
+    "Sélectionnez les niveaux d’effort que chaque modèle accepte. Sans sélection, le modèle ne raisonne pas.",
   "customProvider.model.remove": "Supprimer le modèle {number}",
   "customProvider.model.add": "Ajouter un modèle",
   "customProvider.headers": "En-têtes",
