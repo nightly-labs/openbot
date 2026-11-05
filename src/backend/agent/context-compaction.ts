@@ -35,9 +35,11 @@ const CONTEXT_COMPACTION_THRESHOLD = 0.8;
 /**
  * A session that a compaction leaves at this share of its window holds mostly what no compaction
  * removes: tool schemas, instructions, and the newest messages. Codex compacted such a session five
- * times in five minutes, and each tool result was cut off (#3905).
+ * times in five minutes, and each tool result was cut off (#3905). A session left at the threshold or
+ * above compacts again after a small growth or a retry, so a share between the threshold and 90%
+ * compacted it without end (#5150).
  */
-const INEFFECTIVE_COMPACTION_SHARE = 0.9;
+const INEFFECTIVE_COMPACTION_SHARE = CONTEXT_COMPACTION_THRESHOLD;
 /** After this many such compactions in a row, OpenBot stops asking for more and tells the user. */
 const INEFFECTIVE_COMPACTION_LIMIT = 2;
 /**
