@@ -246,8 +246,9 @@ requests return `409`; refresh the pending list instead of retrying the old resp
 
 All request bodies have a 32 KiB limit. Messages and routine runs share a limit of accepted
 requests per agent per hour, including message retries. The limit is 30 by default; change it in
-Settings › Agents › Local scripts › Requests an hour: 30, 60, 120, 300 or 1,000. Reads, attention responses, settings
-changes and new chats do not use that limit. Routine runs have no retry key; retrying a run can start it twice.
+Settings › Agents › Local scripts › Requests an hour: 30, 60, 120, 300 or 1,000. Reads, attention
+responses, settings changes and new chats do not use that limit. Routine runs have no retry key;
+retrying a run can start it twice.
 
 ## Windows
 

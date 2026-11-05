@@ -13,14 +13,11 @@ import {
 import { createMemo } from "solid-js";
 import { useText } from "../../text";
 
-const PRESETS: number[] = [30, 60, 120, 300, 1_000];
+const PRESETS: readonly number[] = [30, 60, 120, 300, 1_000];
 
-/**
- * The menu items: the same array for each preset. A saved limit that is not a preset (from the
- * preference file) is an item of its own.
- */
+/** The menu items. A saved limit that is not a preset (from the preference file) is an item of its own. */
 function choices(value: number): number[] {
-  return PRESETS.includes(value) ? PRESETS : [...PRESETS, value].sort((a, b) => a - b);
+  return PRESETS.includes(value) ? [...PRESETS] : [...PRESETS, value].sort((a, b) => a - b);
 }
 
 export interface AutomationLimitRowProps {
