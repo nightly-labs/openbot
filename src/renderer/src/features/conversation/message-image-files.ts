@@ -44,7 +44,13 @@ export function createMessageImageFiles(
     const preview =
       file.kind === "shared"
         ? await agent.previewSharedFile({ path: file.path, maxBytes: INLINE_IMAGE_BYTES })
-        : await agent.previewWorkspaceFile({ agentId: agentId ?? "", path: file.path, maxBytes: INLINE_IMAGE_BYTES });
+        : await agent.previewWorkspaceFile({
+            agentId: agentId ?? "",
+            path: file.path,
+            maxBytes: INLINE_IMAGE_BYTES,
+            // An inline image shows only the file that the answer names, not an older file with the same name.
+            exactPath: true,
+          });
     releaseFilePreviewPage(preview.pageUrl);
     const type = preview.mimeType.split(";")[0]?.trim().toLowerCase() ?? "";
     if (preview.previewKind !== "image" || !preview.bytes || !INLINE_IMAGE_TYPES.has(type)) return null;
