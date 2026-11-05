@@ -719,13 +719,14 @@ try {
       m.senderAgentId === to && !question(m) && m.text.replaceAll(run, "").includes("11");
     const questionsBefore = count(await bridge.main(from), question);
     const answersBefore = count(await bridge.main(from), answer);
+    // A's numbers reply to B's question, so OpenBot sends no automatic result: B must send the sum.
     const side = await bridge.startTask(
       from,
       [
         `Use openbot.send_message to send ${toAgentInfo.name} (agent id "${to}") this message, with expectsReply true:`,
         `"${word}: Before you answer, ask me which two numbers to add. Ask with openbot.send_message as a new message:`,
         `recipientAgentIds ["${from}"], no replyToMessageId, expectsReply true, and text that starts with Q14${run}.`,
-        'Then end your turn. When I give you the numbers, answer with only their sum."',
+        'Then end your turn. When I give you the numbers, send me only their sum with openbot.send_message."',
         `When ${toAgentInfo.name} asks which numbers, answer "5 and 6" with openbot.send_message and replyToMessageId.`,
         "Then end your turn and reply with the single word SENT. Do not wait for the answer.",
       ].join("\n"),
