@@ -55,6 +55,11 @@ export function openMessageActions(request: MessageActionsRequest) {
   router.push("/message-actions");
 }
 
+/** Whether a message sheet is open. It covers the chat, so the chat loses focus while it is. */
+export function messageActionsOpen(): boolean {
+  return current !== null;
+}
+
 /** Forgets the request when its sheet closes, unless a newer sheet replaced it. */
 export function releaseMessageActions(request: MessageActionsRequest | null) {
   if (current !== request) return;

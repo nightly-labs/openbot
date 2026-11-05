@@ -24,6 +24,7 @@ import {
   withFailureReasons,
 } from "../model/chat-messages";
 import { requestComposerFocus, requestComposerText } from "../model/composer-requests";
+import { messageActionsOpen } from "../model/message-actions-sheet";
 import { useAgentMentionSkills } from "../model/use-agent-mention-skills";
 import { MAIN_THREAD_ID, useChatThreadMenu } from "./chat-thread-menu";
 import { ChatView } from "./chat-view";
@@ -211,8 +212,9 @@ export function MobileChatView({
   const latest = latestReadBoundaryMessage(conversation?.messages ?? []);
   const latestId = latest?.id;
   // After Mark unread, the open chat does not read itself again until the reader leaves it, as on
-  // desktop. The sheet that marks it covers the chat, so the hold ends only when the chat loses focus
-  // after it was on screen again.
+  // desktop. A message sheet covers the chat but does not leave it, so its focus loss keeps the hold.
+  // The sheet that marks it is open when the hold starts, so the hold waits until the chat is on
+  // screen again.
   const readHeldFor = useRef<{ agentId: string; shown: boolean } | null>(null);
   // The NEW line of this visit, as on desktop. The open chat reads itself at once, so the host read
   // state loses its first unread message: the line keeps it. It takes the host's message until the
@@ -230,7 +232,7 @@ export function MobileChatView({
       return;
     }
     unreadLineSettledFor.current = null;
-    if (held?.shown) readHeldFor.current = null;
+    if (held?.shown && !messageActionsOpen()) readHeldFor.current = null;
   }, [isFocused]);
   useEffect(() => {
     if (firstUnreadMessageId && unreadLineSettledFor.current !== agent.id)
