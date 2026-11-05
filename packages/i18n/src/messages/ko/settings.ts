@@ -117,6 +117,12 @@ export const messages = {
   "settings.planStart.customHint": "5초 이상이어야 해요.",
   "settings.planStart.customInvalid": "5초 이상의 정수를 입력하세요.",
   "settings.planStart.set": "설정",
+  "settings.automationLimit.sectionTitle": "한도",
+  "settings.automationLimit.sectionDescription": "이 컴퓨터의 모든 에이전트에 적용돼요.",
+  "settings.automationLimit.title": "시간당 요청",
+  "settings.automationLimit.option": "시간당 {limit}회",
+  "settings.automationLimit.note":
+    "로컬 스크립트가 한 시간에 각 에이전트에게 보낼 수 있는 메시지와 루틴 실행의 최대 수입니다.",
   "settings.backgroundProcesses.title": "백그라운드 프로세스",
   "settings.backgroundProcesses.description":
     "에이전트가 시작한 뒤 계속 실행 중인 프로그램이에요(예: 개발 서버). 채팅이 끝나도, OpenBot을 종료해도 계속 실행돼요.",

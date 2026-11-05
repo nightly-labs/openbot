@@ -8,7 +8,11 @@ reads delivery results, changes the agent's model and account, and starts a new 
 commands. The listener runs only while at least one agent has `allowAutomation`, and binds
 `127.0.0.1` on a free port. It writes the URL and a new bearer token to `<userData>/automation/`
 (folder `0700`, files `0600`) and deletes them when it stops. It refuses any request with an
-`Origin` header or a foreign `Host` before it checks the token, so a web page cannot reach it.
+`Origin` header or a foreign `Host` before it checks the token, so a web page cannot reach it. Each
+agent accepts at most `automationRunsPerHour` messages and routine runs from scripts in one hour, so
+a script that loops cannot spend the user's quota. The value is an account default
+(`AGENT_DEFAULTS_PREFERENCE_FILE`, 30 when it is missing or invalid), set in Settings › Agents ›
+Local scripts.
 
 A run is a manual routine run with the payload after the instruction, so no Team API protocol, run
 kind or sender changes. The payload is in the run row, and `resumePendingRuns` sends it again after a
