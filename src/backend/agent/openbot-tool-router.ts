@@ -79,7 +79,7 @@ import { loadAvatarFile } from "./avatar-file";
 import type { BrowserUploads } from "./browser-uploads";
 import {
   CHANNEL_AGENT_TOOL_NAMES,
-  channelAgentToolInChannelTask,
+  CHANNEL_AGENT_TOOL_NEEDS_LOCAL_PERSON,
   handleChannelAgentTool,
   listChannelsToolSchema,
 } from "./channel-agent-tools";
@@ -1022,14 +1022,18 @@ export class OpenBotToolRouter {
       return openBotToolResult({ channels: this.#channels.handoffTargets(args.archived === true) });
     }
     if (CHANNEL_AGENT_TOOL_NAMES.has(params.tool)) {
-      if (channelId) return channelAgentToolInChannelTask();
-      if (!this.#requestedByPerson(senderAgentId, params.turnId, executionThreadId))
+      // In a channel task, the request that started the task must come from this computer's user.
+      if (channelId) {
+        if (!(yield* this.#channels.requestedByLocalPerson(channelId, senderAgentId, params.turnId)))
+          return openBotToolFailure(CHANNEL_AGENT_TOOL_NEEDS_LOCAL_PERSON);
+      } else if (!this.#requestedByPerson(senderAgentId, params.turnId, executionThreadId))
         return openBotToolFailure(
           "Only a person's message, in your OpenBot chat or a thread they opened, can create or change a channel. Ask the user to request it there.",
         );
       return yield* handleChannelAgentTool(params, senderAgentId, {
         channels: this.#channels,
         listAgents: () => this.#hooks.listAgents(),
+        taskChannelId: channelId,
       });
     }
     if (params.tool === "send_to_channel") {

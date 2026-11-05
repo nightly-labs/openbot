@@ -2945,15 +2945,13 @@ export class ChannelService {
     return result;
   });
 
-  readonly tool = Effect.fn("ChannelService.tool")(function* (
+  /** The running task of the agent's active assignment in this turn. It fails when the assignment or the task changed. */
+  readonly #runningTask = Effect.fn("ChannelService.runningTask")(function* (
     this: ChannelService,
     channelId: string,
     agentId: string,
     turnId: string,
-    callId: string,
-    tool: string,
-    args: unknown,
-  ): Effect.fn.Return<unknown, ChannelOperationError> {
+  ) {
     const channel = yield* channelSync(() => this.store.get(channelId));
     yield* channelSync(() => this.requireMember(channel, agentId));
     const assignment = (yield* channelSync(() => this.store.assignments(channelId))).find(
@@ -2965,11 +2963,49 @@ export class ChannelService {
     const task = tasks.find((item) => item.id === assignment.taskId);
     if (!task || task.revision !== assignment.taskRevision || task.state !== "running")
       return yield* channelFailure(new Error("The channel task has changed."));
+    return { channel, assignment, tasks, task };
+  });
+
+  /**
+   * The person whose request started the work of the agent's running task. The turn that a member
+   * reply started reads another agent's words, so it has no requester, whoever made the request of
+   * its run.
+   */
+  #requester(channelId: string, task: ChannelTask, tasks: readonly ChannelTask[]) {
+    return isReplyTask(task)
+      ? null
+      : channelRequester(task, tasks, (messageId) => this.store.message(channelId, messageId));
+  }
+
+  /**
+   * Whether this computer's user made the request that started the agent's running task in this
+   * turn. Only then can the task create a channel or change another one (`create_channel`,
+   * `update_channel`). A routine run, an agent's request and a member reply are refused, as for the
+   * channel tools; so is a team member, whose agent access the Team API checks.
+   */
+  readonly requestedByLocalPerson = Effect.fn("ChannelService.requestedByLocalPerson")(function* (
+    this: ChannelService,
+    channelId: string,
+    agentId: string,
+    turnId: string,
+  ) {
+    const { task, tasks } = yield* this.#runningTask(channelId, agentId, turnId);
+    const person = this.#requester(channelId, task, tasks);
+    return person !== null && !(this.hooks.remotePerson?.(person.id) ?? false);
+  });
+
+  readonly tool = Effect.fn("ChannelService.tool")(function* (
+    this: ChannelService,
+    channelId: string,
+    agentId: string,
+    turnId: string,
+    callId: string,
+    tool: string,
+    args: unknown,
+  ): Effect.fn.Return<unknown, ChannelOperationError> {
+    const { channel, assignment, tasks, task } = yield* this.#runningTask(channelId, agentId, turnId);
     if (!isDynamicRecord(args)) return yield* channelFailure(new Error("Provide channel tool arguments."));
-    // The turn that a member reply started reads another agent's words, so it cannot change the
-    // channel, whoever made the request of its run.
-    const requester = () =>
-      isReplyTask(task) ? null : channelRequester(task, tasks, (messageId) => this.store.message(channelId, messageId));
+    const requester = () => this.#requester(channelId, task, tasks);
     if (tool === "channel_cancel") {
       const person = requester();
       if (!person) return yield* channelFailure(new Error(PERSON_CANCEL_REQUIRED));
