@@ -171,6 +171,12 @@ const OPENBOT_CLAUDE_CLIENT = {
   CLAUDE_CODE_ARTIFACT: "0",
   CLAUDE_CODE_ENTRYPOINT: "openbot",
 };
+/**
+ * The name of a new Claude session. Without one, the CLI sends an extra model request at the first
+ * prompt to make a title (about 1.2k input tokens) that OpenBot never shows. Only a new session gets
+ * it: the CLI does not name a resumed session, and a title on resume would rename an older session.
+ */
+const CLAUDE_SESSION_TITLE = "OpenBot";
 
 interface ClientEvents {
   notification: [notification: AppServerNotification];
@@ -992,7 +998,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           ...this.#sdkLaunch,
           ...(config.model ? { model: this.#sdkModel(config.model) } : {}),
           ...(appliedEffort ? { effort: appliedEffort } : {}),
-          ...(resume ? { resume: threadId } : { sessionId: threadId }),
+          ...(resume ? { resume: threadId } : { sessionId: threadId, title: CLAUDE_SESSION_TITLE }),
           systemPrompt: {
             type: "preset",
             preset: "claude_code",
