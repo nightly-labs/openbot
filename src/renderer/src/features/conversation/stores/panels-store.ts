@@ -370,7 +370,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     attachmentFiles.open(attachment, action);
   }
 
-  function openSharedFile(path: string, place: FileTabPlace = "tab") {
+  /** `fallback` opens another target when nothing exists at `path`, in place of the error. */
+  function openSharedFile(path: string, place: FileTabPlace = "tab", fallback?: () => void) {
     const ownerAgentId = conversationOwnerId(deps.props);
     if (!ownerAgentId) return;
     const serverId = deps.props.server?.id ?? "local";
@@ -395,7 +396,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
           if (!scopeActive() || generation !== deps.currentFilePreviewGeneration()) return;
           const showError = () => {
             if (!scopeActive() || generation !== deps.currentFilePreviewGeneration()) return;
-            deps.setComposerError(filePreviewError(error, path), target);
+            if (fallback) fallback();
+            else deps.setComposerError(filePreviewError(error, path), target);
           };
           // A link can name a folder. A local one is shown in the file manager; when that fails too,
           // the preview error stays. A remote or web host cannot show a folder on this computer.
@@ -413,6 +415,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
    * tried; when that fails too, the preview error stays, because it names the path the agent wrote.
    * `agentId` is the agent whose workspace holds the path; in a channel, the agent that wrote it.
    * `attachment` is the file of the same turn that the chip names. It opens when the path does not.
+   * `fallback` opens another target when the attachment does not open either, in place of the error.
    */
   function openWorkspaceFile(
     path: string,
@@ -420,6 +423,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     agentId = deps.props.agent?.id,
     place: FileTabPlace = "tab",
     attachment?: AttachmentSummary,
+    fallback?: () => void,
   ) {
     const ownerAgentId = conversationOwnerId(deps.props);
     if (!agentId || !ownerAgentId) return;
@@ -449,7 +453,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
           () => {
             if (!scopeActive() || generation !== deps.currentFilePreviewGeneration()) return;
             if (!attachment || !canPreviewAttachment(attachment)) {
-              deps.setComposerError(filePreviewError(error, path), target);
+              if (fallback) fallback();
+              else deps.setComposerError(filePreviewError(error, path), target);
               return;
             }
             // The attachment is of the conversation that was open at the click.
