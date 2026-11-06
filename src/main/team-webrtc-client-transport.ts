@@ -64,6 +64,8 @@ interface TeamWebRtcClientTransportEvents {
   event: [hostId: string, event: AgentEvent | TeamRealtimeEvent];
   path: [hostId: string, path: "p2p" | "relay"];
   error: [hostId: string, code: string, message: string];
+  /** An attempt to connect failed. A cancelled or replaced attempt does not count. */
+  connectFailed: [hostId: string];
   desktopData: [hostId: string, data: string | ArrayBuffer];
 }
 
@@ -514,7 +516,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
               body: binary
                 ? null
                 : sideRoute
-                  ? sideRoute.request(path, init.body)
+                  ? sideRoute.request(path, init.body, { channelIsolation: true })
                   : encodeTeamProtocolV8WebRtcHttpRequest(method, path, init.body, {
                       ...(init.preserveSemanticTags === undefined
                         ? {}
@@ -581,6 +583,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                     historyExtent: true,
                     channelAttention: true,
                     agentTaskUiBlocks: true,
+                    channelIsolation: true,
                   })
                 : decodeTeamProtocolV9WebRtcHttpResponse(method, path, status, envelope.body),
             ).pipe(
@@ -868,6 +871,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
             CONNECT_RETRY_START_MILLISECONDS * 2 ** (failures - 1),
           );
           this.#connectRetries.set(hostId, { failure, failures, retryAt: Date.now() + delay });
+          this.emit("connectFailed", hostId);
         }),
       ),
       Effect.onExit((exit) => Deferred.done(done, exit)),

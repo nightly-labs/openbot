@@ -216,6 +216,8 @@ interface HostServiceOptions {
     name: string;
     ownerMembershipId: string;
     devicePublicKey?: string | null;
+    /** The host publishes itself again with no user action. The account service refuses it for a removed host. */
+    automatic?: boolean;
   }) => Effect.Effect<unknown, RemoteWorkflowError>;
   /**
    * Sends a signed key handover to the account service. `refused` means the account service has
@@ -1024,6 +1026,7 @@ export class HostService extends EventEmitter<HostEvents> {
       this: HostService,
       register: NonNullable<HostServiceOptions["registerRemoteHost"]>,
       ownerMembershipId: string,
+      automatic = false,
     ): Effect.fn.Return<void, RemoteWorkflowError> {
       yield* this.#resolvePendingKeyRotation();
       const identity = this.#options.store.getIdentity();
@@ -1033,6 +1036,7 @@ export class HostService extends EventEmitter<HostEvents> {
         name: identity.serverName,
         ownerMembershipId,
         devicePublicKey: identity.publicKey,
+        ...(automatic ? { automatic } : {}),
       });
     },
     (operation) => this.#hostKeyLock.withPermit(operation),
@@ -1062,9 +1066,16 @@ export class HostService extends EventEmitter<HostEvents> {
     return this.#options.store.getIdentity()?.serverId === serverId;
   }
 
-  readonly start = Effect.fn("HostService.start")(function* (this: HostService) {
-    if (this.#startOperation) return yield* Fiber.join(this.#startOperation);
-    const operation = yield* Effect.forkIn(this.#provide(this.#startRuntimeOperation()), this.#runtime.scope, {
+  /** `automatic` is a publish with no user action: at launch, after sign-in, or a retry after a failure. */
+  readonly start = Effect.fn("HostService.start")(function* (this: HostService, automatic = false) {
+    if (this.#startOperation) {
+      const joined = yield* Fiber.join(this.#startOperation);
+      // A publish by the user that joins an automatic start does not take its removal refusal (#5273).
+      if (automatic || joined.message !== sourceText("status.host.removed")) return joined;
+      // Another publish by the user can have started again first.
+      if (this.#startOperation) return yield* Fiber.join(this.#startOperation);
+    }
+    const operation = yield* Effect.forkIn(this.#provide(this.#startRuntimeOperation(automatic)), this.#runtime.scope, {
       startImmediately: false,
     });
     this.#startOperation = operation;
@@ -1076,6 +1087,7 @@ export class HostService extends EventEmitter<HostEvents> {
 
   readonly #startRuntimeOperation = Effect.fn("HostService.startRuntimeOperation")(function* (
     this: HostService,
+    automatic: boolean,
   ): Effect.fn.Return<HostStatus, RemoteWorkflowError, HostApiRuntime> {
     const gateway = this.#webrtcGateway;
     const optionalRegisterRemoteHost = this.#options.registerRemoteHost;
@@ -1105,6 +1117,7 @@ export class HostService extends EventEmitter<HostEvents> {
       yield* this.#registerRemoteHost(
         optionalRegisterRemoteHost,
         yield* remoteDecode(() => this.#requiredOwnerMemberId()),
+        automatic,
       );
       if (yield* this.#cancelSupersededStartEffect(generation)) return this.getStatus();
       if (this.#usesAccountDirectory() && optionalListRemoteMembers) {
@@ -1157,6 +1170,23 @@ export class HostService extends EventEmitter<HostEvents> {
         return this.getStatus();
       }
       yield* this.#stopRuntime();
+      // The owner removed this host on another device. It stays private, as after Stop, until the user
+      // publishes it again here (#5273).
+      if (automatic && isHostRemovedRefusal(error)) {
+        // A newer start or stop owns the status and the launch setting.
+        if (generation !== this.#runtimeGeneration) return this.getStatus();
+        const serverId = this.#options.store.getIdentity()?.serverId;
+        if (serverId) yield* this.#options.store.setEnabledOnLaunch(serverId, false);
+        if (generation !== this.#runtimeGeneration) return this.getStatus();
+        this.#setStatus({
+          phase: "idle",
+          enabledOnLaunch: false,
+          apiOnline: false,
+          apiUrl: null,
+          message: sourceText("status.host.removed"),
+        });
+        return this.getStatus();
+      }
       this.#setStatus({
         phase: "error",
         apiOnline: false,
@@ -2211,4 +2241,9 @@ function normalizeRemoteDesktopPlatform(platform: NodeJS.Platform): "darwin" | "
 function memberChatColorsChanged(before: readonly TeamMemberSummary[], after: readonly TeamMemberSummary[]): boolean {
   const previous = new Map(before.map((member) => [member.id, member.chatColor ?? null]));
   return after.some((member) => (previous.get(member.id) ?? null) !== (member.chatColor ?? null));
+}
+
+/** The account service refused an automatic publish because the owner removed this host (`AuthApiError`). */
+function isHostRemovedRefusal(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "host_removed";
 }

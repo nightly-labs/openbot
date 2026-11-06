@@ -50,6 +50,7 @@ import {
   TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY,
 } from "./browser-view-v1";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "./channel-attention-v1";
+import { CHANNEL_ISOLATION_CAPABILITY } from "./channel-isolation-v1";
 import { CHAT_COLORS_CAPABILITY } from "./chat-colors-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "./claude-api-key-v1";
 import { CODEX_API_KEY_CAPABILITY } from "./codex-api-key-v1";
@@ -215,6 +216,7 @@ export {
   BROWSER_SIGN_IN_CAPABILITY,
   BROWSER_USER_CONTROL_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
+  CHANNEL_ISOLATION_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
   CHAT_COLORS_CAPABILITY,
   COMPUTER_ACTIVITY_CAPABILITY,
@@ -456,6 +458,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   BROWSER_PROXIES_CAPABILITY,
   BROWSER_EGRESS_CAPABILITY,
   CODEX_API_KEY_CAPABILITY,
+  CHANNEL_ISOLATION_CAPABILITY,
   AGENT_THREAD_PAGES_CAPABILITY,
 ] as const;
 
@@ -626,6 +629,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== BROWSER_PROXIES_CAPABILITY &&
     capability !== BROWSER_EGRESS_CAPABILITY &&
     capability !== CODEX_API_KEY_CAPABILITY &&
+    capability !== CHANNEL_ISOLATION_CAPABILITY &&
     capability !== AGENT_THREAD_PAGES_CAPABILITY,
 );
 /**
@@ -671,6 +675,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   BROWSER_PROXIES_CAPABILITY,
   BROWSER_EGRESS_CAPABILITY,
   CODEX_API_KEY_CAPABILITY,
+  CHANNEL_ISOLATION_CAPABILITY,
   AGENT_THREAD_PAGES_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -800,6 +805,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== BROWSER_PROXIES_CAPABILITY &&
       capability !== BROWSER_EGRESS_CAPABILITY &&
       capability !== CODEX_API_KEY_CAPABILITY &&
+      capability !== CHANNEL_ISOLATION_CAPABILITY &&
       capability !== AGENT_THREAD_PAGES_CAPABILITY,
   );
 }

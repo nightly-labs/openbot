@@ -37,6 +37,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import {
+  CHANNEL_ISOLATION_CAPABILITY,
   isTeamCurrentCapability,
   supportsTeamSemanticTags,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
@@ -256,12 +257,14 @@ export async function readJson(request: IncomingMessage): Promise<DynamicRecord>
     const value = JSON.parse(body.toString("utf8"));
     const path = request.url ?? "/";
     const sideRoute = teamSideRouteCodec(path);
+    const capabilities = requestCapabilities(request);
     if (sideRoute) {
-      const input = sideRoute.request(path, value);
+      const input = sideRoute.request(path, value, {
+        channelIsolation: capabilities.has(CHANNEL_ISOLATION_CAPABILITY),
+      });
       if (!isDynamicRecord(input)) throw new Error("Invalid side-protocol request.");
       return input;
     }
-    const capabilities = requestCapabilities(request);
     return teamHttpCodec(requestProtocol(request)).decodeRequest(request.method ?? "GET", path, value, {
       preserveSemanticTags: supportsTeamSemanticTags(capabilities),
       agentCreateModel: capabilities.has(TEAM_AGENT_CREATE_MODEL_CAPABILITY),

@@ -117,6 +117,7 @@
     "./team-protocol/v6-webrtc-adapter": "./src/team-protocol/v6-webrtc-adapter.ts",
     "./validation": "./src/validation.ts",
     "./team-protocol/channels-v1": "./src/team-protocol/channels-v1.ts",
+    "./team-protocol/channel-isolation-v1": "./src/team-protocol/channel-isolation-v1.ts",
     "./team-protocol/claude-api-key-v1": "./src/team-protocol/claude-api-key-v1.ts",
     "./team-protocol/codex-api-key-v1": "./src/team-protocol/codex-api-key-v1.ts",
     "./team-protocol/optional-events": "./src/team-protocol/optional-events.ts",

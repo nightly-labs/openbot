@@ -405,7 +405,7 @@ const ROUTINE_FEED_FILE = "openbot-routine-feed-v1.json";
 const LEGACY_APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v1.json";
 const LANGUAGE_PREFERENCE_FILE = "openbot-language-preference-v1.json";
 const LOGO_COLOR_PREFERENCE_FILE = "openbot-logo-color-preference-v1.json";
-const APPEARANCE_PREFERENCE_FILE = "openbot-appearance-preference-v1.json";
+export const APPEARANCE_PREFERENCE_FILE = "openbot-appearance-preference-v1.json";
 const INTERFACE_SIZE_PREFERENCE_FILE = "openbot-interface-size-preference-v1.json";
 const NOTIFICATION_PREFERENCE_FILE = "openbot-notification-preference-v1.json";
 const PUSH_NOTIFICATION_FILE = "openbot-push-notifications-v1.json";
@@ -3695,7 +3695,7 @@ export async function createApplicationServices({
           if (auth.status === "error" && auth.issue.code === "auth_api_unavailable")
             yield* centralAuth.retry().pipe(toRemoteWorkflowError);
           if (centralAuth.getState().status !== "signed_in") return;
-          return yield* host.start();
+          return yield* host.start(true);
         }),
       onError: (message, error) => logger.warn(message, toLogValue(error)),
     });
@@ -3724,8 +3724,10 @@ export async function createApplicationServices({
       hostPhase: () => host.getStatus().phase,
       startHost: () =>
         Effect.gen(function* () {
+          // The owner removed this server. It stays private until a sign-in or another publish (#5273).
+          if (host.getStatus().message === sourceText("status.host.removed")) return;
           if (centralAuth.getState().status === "error") yield* centralAuth.retry().pipe(toRemoteWorkflowError);
-          yield* serverMode.publish();
+          yield* serverMode.publish(true);
         }),
       onError: (message, error) => logger.warn(message, toLogValue(error)),
     });

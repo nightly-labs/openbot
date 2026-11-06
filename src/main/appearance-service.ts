@@ -59,6 +59,13 @@ const readAppearancePreference = Effect.fn("AppearancePreference.read")(function
     : { ...DEFAULT_PREFERENCE, themeChosen: true };
 });
 
+/** The saved transparent window choice, read before the service exists, so the first window is built with it. */
+export const readSavedTransparentWindow = Effect.fn("AppearancePreference.readTransparentWindow")(function* (
+  path: string,
+) {
+  return (yield* readAppearancePreference(path)).transparentWindow;
+});
+
 const writeAppearancePreference = Effect.fn("AppearancePreference.write")(function* (
   path: string,
   preference: StoredAppearancePreference,

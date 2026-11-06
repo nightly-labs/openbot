@@ -28,6 +28,7 @@ export function serverSupportsCapability(
       capability === "channel-chats-v1" ||
       capability === "channel-delete-v1" ||
       capability === "channel-attention-v1" ||
+      capability === "channel-isolation-v1" ||
       capability === "agent-duplication" ||
       capability === "model-scoped-usage" ||
       capability === "browser-navigation" ||

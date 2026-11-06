@@ -136,7 +136,7 @@ export interface DiscordButton {
 
 /**
  * One Discord call that a host asks Signal to make. Every operation names its guild, and Signal
- * checks that each channel is in that guild. Signal sends no post that can ping anyone.
+ * checks that each channel is in that guild. Only `createMessage` can ping, and only a mentioned user.
  */
 export type DiscordApiRequest =
   | {

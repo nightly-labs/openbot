@@ -527,6 +527,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#events.scheduleReconnect(serverId);
       if (wasOnline) this.emit("directoryInvalidated");
     });
+    // A failed attempt can end with no error event, such as a timeout. The server then stayed offline
+    // with no issue, and the full-window loading screen waits for an issue to end (#5273).
+    this.#webrtcTransport?.on("connectFailed", (serverId) => {
+      if (!this.#store.has(serverId) || this.#connections.hasIssue(serverId)) return;
+      this.#connections.reportUnreachable(serverId, "transport/connect_failed");
+      this.#emitChanged();
+    });
     this.#webrtcTransport?.on("event", (serverId, event) => this.#handleWebRtcEvent(serverId, event));
     this.#webrtcTransport?.on("error", (serverId, code, message) => {
       // Each failure checks the start time, so a start that fails for another reason also ends.

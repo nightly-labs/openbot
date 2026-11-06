@@ -8,6 +8,7 @@
 // below does not change which codec a route gets.
 import { withAgentTaskUiBlocks } from "./agent-task-ui-blocks-v1";
 import { isChannelAttentionRoute, withChannelAttention } from "./channel-attention-v1";
+import { withChannelDraftIsolation, withChannelIsolation } from "./channel-isolation-v1";
 import { channelRequest, channelResponse, isChannelRoute } from "./channels-v1";
 import { isChannelHistoryExtentRoute, withChannelHistoryExtent } from "./history-extent-v1";
 import { isMcpRoute, mcpRequest, mcpResponse } from "./mcp-v1";
@@ -28,24 +29,33 @@ export interface TeamSideRouteOptions {
   channelAttention?: boolean;
   /** agent-task-ui-blocks-v1: a task conversation keeps its UI blocks. Passed as `channelAttention` is. */
   agentTaskUiBlocks?: boolean;
+  /**
+   * channel-isolation-v1: a channel keeps `isolated`, in a response and in the draft of a save. Passed
+   * as `channelAttention` is, for a request as for a response.
+   */
+  channelIsolation?: boolean;
 }
 
 export interface TeamSideRouteCodec {
-  request(path: string, value: unknown): TeamProtocolV2Json;
+  request(path: string, value: unknown, options?: TeamSideRouteOptions): TeamProtocolV2Json;
   response(path: string, status: number, value: unknown, options?: TeamSideRouteOptions): TeamProtocolV2Json;
 }
 
 const CHANNEL_CODEC: TeamSideRouteCodec = {
-  request: channelRequest,
+  request: (path, value, options) => {
+    const projected = channelRequest(path, value);
+    return options?.channelIsolation ? withChannelDraftIsolation(path, projected, value) : projected;
+  },
   response: (path, status, value, options) => {
     const projected = channelResponse(path, status, value);
     const extended =
       options?.historyExtent && status < 400 && isChannelHistoryExtentRoute(path)
         ? withChannelHistoryExtent(projected, value)
         : projected;
+    const isolated = options?.channelIsolation && status < 400 ? withChannelIsolation(path, extended, value) : extended;
     return options?.channelAttention && status < 400 && isChannelAttentionRoute(path)
-      ? withChannelAttention(path, extended, value)
-      : extended;
+      ? withChannelAttention(path, isolated, value)
+      : isolated;
   },
 };
 const MCP_CODEC: TeamSideRouteCodec = { request: mcpRequest, response: mcpResponse };

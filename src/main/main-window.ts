@@ -67,7 +67,7 @@ import type { RemoteWorkflowError } from "./remote-service-effects";
 import { sendToRenderer } from "./renderer-ipc";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 import type { UpdateService } from "./update-service";
-import { followAppearance, followWindowGlass, windowBackgroundColor } from "./window-appearance";
+import { followAppearance, followWindowGlass, glassWindowOptions, windowBackgroundColor } from "./window-appearance";
 import { followWindowButtonSide, WINDOW_BUTTON_INSET } from "./window-buttons";
 
 /** The dark background of the main and setup windows, under the page's own canvas. */
@@ -233,7 +233,7 @@ export function createMainWindowController({
       minWidth: 960,
       minHeight: 640,
       show: false,
-      backgroundColor: windowBackgroundColor(MAIN_WINDOW_DARK_BACKGROUND),
+      ...glassWindowOptions(MAIN_WINDOW_DARK_BACKGROUND),
       title:
         developmentProfile === "test-client"
           ? getTranslate()("window.localClientTitle")
@@ -383,7 +383,7 @@ export function createMainWindowController({
       minWidth: 380,
       minHeight: 480,
       show: false,
-      backgroundColor: windowBackgroundColor(MAIN_WINDOW_DARK_BACKGROUND),
+      ...glassWindowOptions(MAIN_WINDOW_DARK_BACKGROUND),
       // The page sets the chat name as its title when it loads.
       title: getTranslate()("window.localHostTitle"),
       icon: appIconPath,

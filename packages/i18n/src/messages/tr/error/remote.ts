@@ -196,6 +196,7 @@ export const messages = {
   // Channel actions on mobile.
   "error.remote.formUnavailable": "Bu form artık kullanılamıyor.",
   "error.remote.hostedServerRemoval": "Barındırılan bir sunucuyu silmek için Faturalandırma'yı kullanın.",
+  "error.remote.hostRemoved": "Sahibi bu sunucuyu hesaptan kaldırdı.",
   "error.remote.channelsUnsupported": "Kanalları kullanmak için bu masaüstü sunucusunu güncelleyin.",
   "error.remote.channelDeleteUnsupported": "Kanalları silmek için bu masaüstü sunucusunu güncelleyin.",
   "error.remote.historyRefreshFailed": "Mesaj gönderildi, ancak sohbet geçmişi yenilenemedi.",
