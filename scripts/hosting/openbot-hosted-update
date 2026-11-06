@@ -257,6 +257,7 @@ install_hosting() {
   fi
   install_pre_stop "$source" || echo "The boat pre-stop hook is not installed." >&2
   install_boat_ignore || echo "The boat ignore file is not installed." >&2
+  remove_lazy_harnesses || echo "The install-on-first-run agent commands of boat are not removed." >&2
 }
 
 self_hosted() {
@@ -294,6 +295,26 @@ install_boat_ignore() {
   [ -f "$BOAT_IGNORE" ] && [ "$(runuser -u "$BOAT_USER" -- cat "$BOAT_IGNORE")" = "$content" ] && return 0
   printf '%s\n' "$content" | runuser -u "$BOAT_USER" -- tee "${BOAT_IGNORE%/*}/.boatignore.new" >/dev/null
   runuser -u "$BOAT_USER" -- mv -f "${BOAT_IGNORE%/*}/.boatignore.new" "$BOAT_IGNORE"
+}
+
+# The boat image has commands for some agent CLIs (Hermes, Cursor, OpenClaw, Vibe) that install the
+# CLI the first time they run. OpenBot runs each provider command when it starts, so each hosted
+# server installed Hermes and Cursor, about 3 GB that the user did not ask for, and each wake then
+# restored them before the server was fast again. OpenBot downloads these CLIs itself when the user
+# turns the provider on. So remove each command that is still such a placeholder; a CLI that is
+# installed stays.
+remove_lazy_harnesses() {
+  local harnesses=/usr/local/lib/ascii-harnesses/bin launcher name
+  if self_hosted || [ ! -d "$harnesses" ]; then return 0; fi
+  for launcher in "$harnesses"/*; do
+    [ -f "$launcher" ] && [ ! -L "$launcher" ] || continue
+    case $(sed -n 2p "$launcher") in "# ascii-lazy-harness "*) ;; *) continue ;; esac
+    name=${launcher##*/}
+    if [ "$(sed -n 2p "/usr/local/bin/$name" 2>/dev/null)" = "# ascii-harness-shim" ]; then
+      rm -f "/usr/local/bin/$name"
+    fi
+    rm -f "$launcher"
+  done
 }
 
 stage() {
@@ -404,6 +425,7 @@ trigger() {
   fi
   install_pre_stop "$source" || echo "The boat pre-stop hook is not installed." >&2
   install_boat_ignore || echo "The boat ignore file is not installed." >&2
+  remove_lazy_harnesses || echo "The install-on-first-run agent commands of boat are not removed." >&2
   [ -e "$UNIT_DIRECTORY/openbot-update-request.path" ] || return 0
   # Without --no-block, a start during the start of openbot.service could wait for it.
   systemctl is-active --quiet openbot-update-request.path ||
