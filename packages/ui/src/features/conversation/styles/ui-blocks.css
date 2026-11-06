@@ -283,7 +283,8 @@
 .ui-block-option {
   position: relative;
   display: grid;
-  grid-template-columns: var(--openbot-control-xs) minmax(0, 1fr) auto;
+  /* A long meta wraps in its own column; it never takes the label's width. */
+  grid-template-columns: var(--openbot-control-xs) minmax(0, 1fr) fit-content(40%);
   align-items: center;
   gap: var(--openbot-space-3);
   padding: var(--openbot-space-3);
@@ -357,9 +358,11 @@
 }
 
 .ui-block-option-meta {
+  min-width: 0;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-md);
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 /* Quick replies */
