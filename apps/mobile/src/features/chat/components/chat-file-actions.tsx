@@ -53,7 +53,7 @@ export function useMessageFileOpener(serverId: string) {
         const data = await downloadMessageFile(serverId, target);
         // The host sends every workspace file as `application/octet-stream`.
         const mimeType = attachmentMimeTypeForName(data.name);
-        const copy = messageFileCopy(serverId, data.name);
+        const copy = messageFileCopy(serverId, JSON.stringify(target), data.name);
         copy.parentDirectory.create({ intermediates: true, idempotent: true });
         copy.writeSync(data.base64, { encoding: "base64" });
         const file = { uri: copy.uri, name: data.name, mimeType, size: copy.size };

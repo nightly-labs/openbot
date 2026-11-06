@@ -256,11 +256,13 @@ function FileReference({
     // paragraph and wraps as text does.
     return (
       <>
+        {/* The name is the one button that a screen reader finds; the badge only takes the tap. */}
         <Chip
           collapsable={false}
           className="pl-0.5 pr-1"
           style={{ transform: [{ translateY: presentation.mentionOffset }] }}
-          {...control}
+          accessible={false}
+          {...(control ? { onPress: control.onPress } : null)}
         >
           <FileBadge name={name} color={String(color)} soft={String(soft)} />
         </Chip>

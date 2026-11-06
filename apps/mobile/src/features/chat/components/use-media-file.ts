@@ -53,15 +53,16 @@ export function mediaFile(serverId: string, attachment: AttachmentSummary) {
   return new File(mediaFolder(), segment(serverId), segment(attachment.id), name);
 }
 
-let messageFileCount = 0;
-
 /**
- * A new place for a file that a message names, in the folder of downloaded files. Each open gets
- * its own folder: the agent can change the file between two opens.
+ * The place of a file that a message names, in the folder of downloaded files. `key` names the file
+ * on the host, so a second open writes over the copy of the first one and adds no copy.
  */
-export function messageFileCopy(serverId: string, name: string) {
-  messageFileCount += 1;
-  return new File(mediaFolder(), segment(serverId), `message-file-${messageFileCount}`, fileName(name));
+export function messageFileCopy(serverId: string, key: string, name: string) {
+  // FNV-1a: a host path can be longer than a folder name may be.
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < key.length; index += 1) hash = Math.imul(hash ^ key.charCodeAt(index), 0x01000193);
+  const folder = `message-file-${(hash >>> 0).toString(36)}`;
+  return new File(mediaFolder(), segment(serverId), folder, fileName(name));
 }
 
 /**

@@ -708,15 +708,6 @@ export function createHostRequestActions({
       };
     },
   };
-  // Limit native/DOM copies when a message contains several large images.
-  const downloadHostFile = (route: string, serverId: string) => {
-    const result = attachmentDownloads.current.then(() => request("GET", route, decodeHostFile, undefined, serverId));
-    attachmentDownloads.current = result.then(
-      () => {},
-      () => {},
-    );
-    return result;
-  };
   const actions: HostRequestActions = {
     // Async, so a host without the capability rejects the promise and does not throw at the call.
     loadServerTimezone: async (serverId) => runTeamRequest(getHostTimezone(timezoneAdmin(serverId))),
@@ -1332,14 +1323,27 @@ export function createHostRequestActions({
         await request("POST", MESSAGE_DELETE_ROUTES.agent, ignoreResponse, body, serverId);
       }
     },
-    downloadAttachment: (serverId, attachmentId) =>
-      downloadHostFile(TEAM_API_ROUTES.attachment(attachmentId), serverId),
+    downloadAttachment: (serverId, attachmentId) => {
+      const download = () =>
+        request("GET", TEAM_API_ROUTES.attachment(attachmentId), decodeHostFile, undefined, serverId);
+      // Limit native/DOM copies when a message contains several large images.
+      const result = attachmentDownloads.current.then(download);
+      attachmentDownloads.current = result.then(
+        () => {},
+        () => {},
+      );
+      return result;
+    },
+    // The user waits for this one file, so it does not wait behind the images of the chat.
     downloadMessageFile: (serverId, file) =>
-      downloadHostFile(
+      request(
+        "GET",
         file.kind === "shared"
           ? `${TEAM_API_ROUTES.sharedFiles}?${new URLSearchParams({ path: file.path })}`
           : // The released URL spells the agent `botId`.
             `${TEAM_API_ROUTES.workspaceFiles}?${new URLSearchParams({ botId: file.agentId, path: file.path })}`,
+        decodeHostFile,
+        undefined,
         serverId,
       ),
   };
