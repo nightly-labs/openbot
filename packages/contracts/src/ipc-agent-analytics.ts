@@ -101,8 +101,25 @@ export function analyticsDate(date: Date, timeZone: string): string {
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
+/**
+ * The device's time zone for an analytics range. `resolvedOptions().timeZone` is `undefined` when
+ * the bundled ICU cannot map the operating system's zone, such as Windows' "British Columbia
+ * Standard Time" ("(UTC-07:00) Pacific Time (British Columbia)"). The main process rejects a range
+ * with no zone, so the device's whole-hour UTC offset stands in for it as
+ * an `Etc/GMT` zone, which keeps each day the same as the local times the app shows; else UTC.
+ */
+function analyticsTimeZone(now: Date): string {
+  const zone: string | undefined = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (zone) return zone;
+  const offsetMinutes = now.getTimezoneOffset();
+  if (offsetMinutes === 0 || offsetMinutes % 60 !== 0 || offsetMinutes < -14 * 60 || offsetMinutes > 12 * 60)
+    return "UTC";
+  // `Etc/GMT+7` is seven hours behind UTC: the IANA sign is the reverse of the offset's.
+  return `Etc/GMT${offsetMinutes > 0 ? "+" : "-"}${Math.abs(offsetMinutes) / 60}`;
+}
+
 export function analyticsRange(agentId: string, days = 30, now = new Date()): AgentAnalyticsInput {
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const timeZone = analyticsTimeZone(now);
   const endDate = analyticsDate(now, timeZone);
   const start = new Date(`${endDate}T12:00:00Z`);
   start.setUTCDate(start.getUTCDate() - days + 1);
