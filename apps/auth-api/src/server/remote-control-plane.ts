@@ -1558,14 +1558,22 @@ export class RemoteControlPlane {
       // The UPDATE applies only to the status and role read above, and to a free seat when it activates.
       // Another admin's change since that read refuses it, so a stale role change cannot bring back a
       // removed member. The writes after it apply only when it changed the row; a refused UPDATE leaves
-      // the member their sessions and invitations.
-      const applied: SqlCondition = {
-        sql: "EXISTS(SELECT 1 FROM remote_memberships WHERE membership_id = ? AND status = ? AND role = ? AND updated_at = ?)",
-        binds: [input.membershipId, status, role, now],
-      };
+      // the member their sessions and invitations. A revoke or a leave keeps the role and refuses only
+      // the owner, so a role change at the same time cannot stop a removal.
+      const guardsRole = input.revoke !== true;
+      const applied: SqlCondition = guardsRole
+        ? {
+            sql: "EXISTS(SELECT 1 FROM remote_memberships WHERE membership_id = ? AND status = ? AND role = ? AND updated_at = ?)",
+            binds: [input.membershipId, status, role, now],
+          }
+        : {
+            sql: "EXISTS(SELECT 1 FROM remote_memberships WHERE membership_id = ? AND status = ? AND updated_at = ?)",
+            binds: [input.membershipId, status, now],
+          };
       // An admin who leaves, is removed or is demoted can no longer invite, so their open invitations
-      // close. Then they leave the invitation limits and the list.
-      const closingInvites = membership.role === "admin" && (input.revoke === true || role !== "admin");
+      // close. Then they leave the invitation limits and the list. Only an owner or an admin makes
+      // invitations, so a removal closes them for any role, also for a role given at the same time.
+      const closingInvites = input.revoke === true || (membership.role === "admin" && role !== "admin");
       // Only a removal or a leave bumps the host's auth epoch. A new epoch makes Signal drop the host
       // and every connected member. A role change or reactivation ends this member's sessions below.
       const revokingAccess = input.revoke === true;
@@ -1573,17 +1581,17 @@ export class RemoteControlPlane {
         dependencies.database.batch([
           dependencies.database
             .prepare(
-              `UPDATE remote_memberships SET role = ?, status = ?, updated_at = ?, removed_at = ${removedAt}
-            WHERE membership_id = ? AND status = ? AND role = ?${activating ? ` AND ${memberSeat.sql}` : ""}`,
+              `UPDATE remote_memberships SET ${guardsRole ? "role = ?, " : ""}status = ?, updated_at = ?, removed_at = ${removedAt}
+            WHERE membership_id = ? AND status = ?${guardsRole ? " AND role = ?" : " AND role != 'owner'"}${activating ? ` AND ${memberSeat.sql}` : ""}`,
             )
             .bind(
-              role,
+              ...(guardsRole ? [role] : []),
               status,
               now,
               ...(removedAt.includes("?") ? [now] : []),
               input.membershipId,
               membership.status,
-              membership.role,
+              ...(guardsRole ? [membership.role] : []),
               ...(activating ? memberSeat.binds : []),
             ),
           ...(closingInvites
@@ -1644,7 +1652,7 @@ export class RemoteControlPlane {
         return yield* memberLimitReached(memberSeat.limit);
       }
       // Another change already left the membership as this one asks.
-      if (current?.status === status && current.role === role) return;
+      if (current?.status === status && (!guardsRole || current.role === role)) return;
       return yield* new RemoteControlPlaneError(
         409,
         "membership_changed",

@@ -341,7 +341,10 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
 
   /** Schedules the checks that `stop` cleared, for an app that keeps running after it, such as after a Windows session end that another app cancels. */
   resume(): void {
-    if (!this.#started || !this.#checksScheduled || !this.#options.enabled || this.#checkTimer) return;
+    if (!this.#started) return;
+    // `stop` cleared the deadline of a busy phase, and a download keeps running after it.
+    if (!this.#phaseTimer) this.#armPhaseTimer();
+    if (!this.#checksScheduled || !this.#options.enabled || this.#checkTimer) return;
     this.#scheduleCheck(this.#options.initialCheckDelayMs);
   }
 

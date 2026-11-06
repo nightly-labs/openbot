@@ -3,7 +3,8 @@
 // changes that member's role from a read made before the removal. B's change must fail with 409
 // `membership_changed`, and the member must stay removed, with no auth epoch, events or ended sessions
 // from B. A role change with no race succeeds, and two removals of the same member, one from a read
-// made before the other, both succeed and keep the time of the first removal.
+// made before the other, both succeed and keep the time of the first removal. A removal from a read
+// made before another admin's role change also succeeds: a role change cannot stop a removal.
 //
 // The race cannot be timed from outside, so the script orders it: a D1 wrapper runs admin A's whole
 // removal when admin B's change starts its write batch. Then all of B's reads come before A's removal,
@@ -335,7 +336,51 @@ async function twoRemovalsBothSucceed() {
   );
 }
 
-const scenarios = [staleRoleChangeCannotBringBackARemovedMember, roleChangeWithNoRaceSucceeds, twoRemovalsBothSucceed];
+async function removalWinsOverAConcurrentRoleChange() {
+  const host = await seed("host-role-race");
+  const promotion = interleave.beforeNextBatch(async () => {
+    const seenByB = await host.read();
+    tick();
+    const change = await outcome(
+      plane.changeMembership(host.adminA, { hostId: host.hostId, membershipId: host.memberId, role: "admin" }),
+    );
+    return { seenByB, change, promoted: await host.read(), epoch: await host.epoch() };
+  });
+  tick();
+  // Admin B removes the member from a read made before admin A made the member an admin.
+  const removal = await outcome(
+    plane.changeMembership(host.adminB, { hostId: host.hostId, membershipId: host.memberId, revoke: true }),
+  );
+  const after = await host.read();
+  const during = promotion.result;
+  check("role race: admin A's role change ran between admin B's reads and writes", during !== undefined);
+  if (!during) return;
+  check(
+    "role race: admin B read the member as a member, before the role change",
+    during.seenByB.role === "member" && during.seenByB.status === "active",
+    during.seenByB,
+  );
+  check(
+    "role race: admin A makes the member an admin",
+    during.change.code === null && during.promoted.role === "admin",
+    { outcome: during.change, promoted: during.promoted },
+  );
+  check("role race: admin B's removal succeeds", removal.code === null, removal);
+  check("role race: the member is revoked", after.status === "revoked" && after.removed_at !== null, after);
+  check("role race: the removal keeps the newer role", after.role === "admin", after);
+  const epoch = await host.epoch();
+  check("role race: the removal bumps the host auth epoch", epoch === during.epoch + 1, {
+    before: during.epoch,
+    after: epoch,
+  });
+}
+
+const scenarios = [
+  staleRoleChangeCannotBringBackARemovedMember,
+  roleChangeWithNoRaceSucceeds,
+  twoRemovalsBothSucceed,
+  removalWinsOverAConcurrentRoleChange,
+];
 try {
   for (const scenario of scenarios) {
     try {
