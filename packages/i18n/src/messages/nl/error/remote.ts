@@ -7,6 +7,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "Testen van extern bureaublad is niet beschikbaar.",
   "error.remote.controlUnavailable": "Bediening op afstand is niet beschikbaar.",
   "error.remote.controlSessionNotFound": "Sessie voor bediening op afstand niet gevonden.",
+  "error.remote.controlNotAllowed": "De eigenaar van deze computer staat je rol niet toe om hem te bedienen.",
+  "error.remote.controlDeclined": "De persoon bij deze computer heeft bediening op afstand niet toegestaan.",
   "error.remote.testRuntimeUpdate": "Werk de macOS-runtime voor extern bureaublad bij om deze test uit te voeren.",
   "error.remote.testOtherSessions": "Beëindig andere sessies van extern bureaublad voordat je een test start.",
   "error.remote.testPermissions": "Controleer de toestemmingen en de GUI-sessie op de host voordat je de test start.",

@@ -7,6 +7,7 @@ import ChartArea from "lucide-react-native/icons/chart-area";
 import Check from "lucide-react-native/icons/check";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
 import ListChecks from "lucide-react-native/icons/list-checks";
+import Monitor from "lucide-react-native/icons/monitor";
 import Pin from "lucide-react-native/icons/pin";
 import PinOff from "lucide-react-native/icons/pin-off";
 import Plus from "lucide-react-native/icons/plus";
@@ -54,7 +55,7 @@ import {
   useHostedServerAvailability,
 } from "@/features/servers/model/hosted-server-availability";
 import { DrawerPinnedWorkflows, useDrawerWorkflows } from "@/features/workflows/components/drawer-workflows";
-import type { MobileServer } from "@/features/workspace/context/mobile-workspace-context";
+import { type MobileServer, useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { moveServerId } from "@/features/workspace/model/server-order";
 import { serverStatusLabel, showsOnline } from "@/features/workspace/model/server-status";
 import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
@@ -615,6 +616,8 @@ function DrawerServerTools({
   const layout = useDrawerToolLayout();
   // The iOS menu host sizes to its content, so a row in a menu gets the width of the list.
   const [rowWidth, setRowWidth] = useState<number>();
+  // A connected host that shares its screen. The host decides which members it lets in.
+  const remoteDesktop = useMobileWorkspaceSelector((current) => current.canControlComputer(serverId));
   const routes = useMemo(
     (): Record<DrawerRoute, Href> => ({
       tasks: { pathname: "/server-tasks", params: { serverId } },
@@ -622,6 +625,7 @@ function DrawerServerTools({
       workflows: { pathname: "/server-workflows", params: { serverId } },
       marketplace: { pathname: "/server-marketplace", params: { serverId } },
       usage: { pathname: "/server-usage", params: { serverId } },
+      remoteDesktop: { pathname: "/remote-desktop/[serverId]", params: { serverId } },
       members: { pathname: "/server-settings/members", params: { serverId } },
       settings: { pathname: "/server-settings", params: { serverId } },
     }),
@@ -648,6 +652,7 @@ function DrawerServerTools({
       : null,
     marketplace: { icon: Store, label: t("mobile.app.route.marketplace") },
     usage: { icon: ChartArea, label: t("mobile.app.route.usage"), value: values.usage },
+    remoteDesktop: remoteDesktop ? { icon: Monitor, label: t("mobile.app.route.remoteDesktop") } : null,
     members: { icon: UsersRound, label: t("mobile.app.route.members"), value: values.members },
   };
   const available = layout.order.filter((id) => tools[id] !== null);

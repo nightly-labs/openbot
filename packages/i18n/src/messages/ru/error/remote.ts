@@ -7,6 +7,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "Проверка удалённого рабочего стола недоступна.",
   "error.remote.controlUnavailable": "Удалённое управление недоступно.",
   "error.remote.controlSessionNotFound": "Сессия удалённого управления не найдена.",
+  "error.remote.controlNotAllowed": "Владелец этого компьютера не разрешает вашей роли управлять им.",
+  "error.remote.controlDeclined": "Человек за этим компьютером не разрешил удалённое управление.",
   "error.remote.testRuntimeUpdate": "Обновите среду удалённого рабочего стола для macOS, чтобы выполнить эту проверку.",
   "error.remote.testOtherSessions": "Завершите другие сессии удалённого рабочего стола, прежде чем начинать проверку.",
   "error.remote.testPermissions": "Проверьте разрешения и графическую сессию на хосте, прежде чем начинать проверку.",

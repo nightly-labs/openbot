@@ -443,8 +443,8 @@ export const messages = {
   "server.invite.revokeDescription":
     "L'invito smette di funzionare. Le persone che si sono unite con esso restano membri.",
   "server.desktop.accessTitle": "Accesso al desktop remoto",
-  "server.desktop.gatewayDescription":
-    "Ogni membro attivo del server può controllare questo host. Non c'è una password separata per il desktop remoto.",
+  "server.desktop.gatewayPolicyDescription":
+    "Non c'è una password separata per il desktop remoto. Le impostazioni qui sotto scelgono chi può controllare questo computer.",
   "server.desktop.componentInstalled": "Componente dell'host installato",
   "server.desktop.componentNotInstalled": "Componente dell'host non installato",
   "server.desktop.sessions": "Non presidiato: {unattended} · Sessioni attive: {active}/{max}",
@@ -457,12 +457,26 @@ export const messages = {
   "server.desktop.hostOfflineDescription": "Riconnettiti all'host prima di aprire il suo desktop.",
   "server.desktop.hostUpdateDescription": "Aggiorna OpenBot sull'host per usare il controllo remoto.",
   "server.desktop.serviceAvailable": "Servizio disponibile",
-  "server.desktop.serviceAvailableDescription": "Il controllo WebRTC è disponibile per tutti i membri attivi.",
   "server.desktop.serviceNotReady": "Servizio non pronto",
   "server.desktop.serviceNotReadyDescription":
     "Avvia il controllo remoto per verificare i componenti e le autorizzazioni dell'host. L'host segnalerà eventuali errori di configurazione.",
   "server.desktop.remoteControl": "Controllo remoto",
   "server.desktop.startHint": "Avvia il controllo remoto dal pulsante del monitor nell'intestazione del server.",
+  "server.desktop.accessLabel": "Chi può controllare questo computer",
+  "server.desktop.accessDescription":
+    "I membri che possono aprire il desktop di questo computer da un altro dispositivo.",
+  "server.desktop.accessOwner": "Solo il proprietario",
+  "server.desktop.accessAdmins": "Proprietario e amministratori",
+  "server.desktop.accessMembers": "Tutti i membri",
+  "server.desktop.askLabel": "Chiedi su questo computer",
+  "server.desktop.askDescription":
+    "Ogni sessione attende che una persona a questo computer la consenta. Senza risposta entro 30 secondi, OpenBot la rifiuta.",
+  "server.desktop.activeTitle": "Sessioni di desktop remoto attive: {active}",
+  "server.desktop.activeDescription": "Termina subito ogni sessione. I membri possono chiedere di nuovo.",
+  "server.desktop.stopAll": "Interrompi tutto il controllo remoto",
+  "server.desktop.policyLoadFailed": "Impossibile caricare le impostazioni del controllo remoto.",
+  "server.desktop.policySaveFailed": "Impossibile salvare le impostazioni del controllo remoto.",
+  "server.desktop.stopFailed": "Impossibile interrompere il controllo remoto.",
   "server.settings.providersTitle": "Provider",
   "server.settings.providersDescription": "Gestisci i provider di IA del computer che esegue questo server.",
   "server.settings.providersSwitchNote": "Passa a {name} per gestire i suoi provider di IA.",

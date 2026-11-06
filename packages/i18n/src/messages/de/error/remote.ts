@@ -7,6 +7,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "Remote-Desktop-Tests sind nicht verfügbar.",
   "error.remote.controlUnavailable": "Die Fernsteuerung ist nicht verfügbar.",
   "error.remote.controlSessionNotFound": "Fernsteuerungssitzung nicht gefunden.",
+  "error.remote.controlNotAllowed": "Der Eigentümer dieses Computers erlaubt deiner Rolle keine Fernsteuerung.",
+  "error.remote.controlDeclined": "Die Person an diesem Computer hat die Fernsteuerung nicht erlaubt.",
   "error.remote.testRuntimeUpdate": "Aktualisiere die macOS-Remote-Desktop-Laufzeit, um diesen Test auszuführen.",
   "error.remote.testOtherSessions": "Beende andere Remote-Desktop-Sitzungen, bevor du einen Test startest.",
   "error.remote.testPermissions":

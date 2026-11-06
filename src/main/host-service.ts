@@ -27,6 +27,8 @@ import type {
   MarkConversationReadInput,
   MarkConversationUnreadInput,
   MarkDirectReadInput,
+  RemoteControlAccess,
+  RemoteControlPolicy,
   RemoteDesktopDisplay,
   RemoteDesktopIceServer,
   RemoteDesktopSetupAction,
@@ -42,6 +44,7 @@ import type {
 import {
   type AgentAccessLevel,
   conversationMessageSender,
+  DEFAULT_REMOTE_CONTROL_POLICY,
   isAvatarColor,
   type ServerAuditName,
   SIGNED_OUT_CHANNEL_MEMBER_ID,
@@ -50,7 +53,7 @@ import type { LiveActivityRelayPush } from "@openbot/contracts/live-activity-rel
 import type { HostRestartState } from "@openbot/contracts/team-protocol/host-update-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
-import { Cause, Context, Deferred, Effect, Fiber, Layer, ManagedRuntime, Result, Semaphore } from "effect";
+import { Cause, Context, Deferred, Effect, Fiber, Layer, ManagedRuntime, Option, Result, Semaphore } from "effect";
 import type { AgentService } from "../backend/agent-service";
 import type { ChannelService } from "../backend/channel-service";
 import type { TeamChatStore } from "../backend/team-chat-store";
@@ -65,9 +68,15 @@ import {
   PushNotificationSendFailure,
   PushNotificationService,
 } from "./push-notifications";
+import type { RemoteControlPolicyStore } from "./remote-control-policy-store";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
-import { RemoteScreenGateway, type RemoteScreenGatewayCreateRuntime } from "./remote-screen-gateway";
+import {
+  LOCAL_TEST_MEMBER_ID,
+  RemoteScreenGateway,
+  type RemoteScreenGatewayCreateRuntime,
+  remoteControlDeclined,
+} from "./remote-screen-gateway";
 import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
 import { memberAuditChanges, memberAuditName, type ServerAuditStore } from "./server-audit-store";
 import { OWNER_PIN_KEY, type SidebarPinStore } from "./sidebar-pin-store";
@@ -80,9 +89,15 @@ import { TeamWebRtcHostGateway } from "./team-webrtc-host-gateway";
 export const DEVELOPMENT_REMOTE_CLIENT_USERNAME = "openbot-dev-client";
 
 const logger = createOpenBotLogger("host-service");
+/** How long a member's remote control request waits for the person at this computer. */
+const REMOTE_CONTROL_QUESTION_MS = 30_000;
 
 interface HostEvents {
   changed: [status: HostStatus];
+  /** A member's remote desktop stream started on this computer. Not sent for the host owner's local test. */
+  remoteControlStarted: [memberName: string];
+  /** The names of the members whose remote desktop stream runs now, one per session. */
+  remoteControlChanged: [memberNames: string[]];
   presence: [snapshot: TeamPresenceSnapshot];
   directMessage: [event: DirectMessageRealtimeEvent];
   directTyping: [event: DirectTypingRealtimeEvent];
@@ -182,6 +197,13 @@ interface HostServiceOptions {
   getRemoteDesktopIceServers?: () => Effect.Effect<RemoteDesktopIceServer[], RemoteWorkflowError>;
   /** Puts a remote desktop member's pasted text on this computer's clipboard. */
   writeRemoteDesktopClipboard?: (text: string) => void;
+  /** Who may control this computer through remote desktop, and whether its user must allow each session. */
+  remoteControlPolicy?: RemoteControlPolicyStore;
+  /**
+   * Asks the person at this computer whether a member may control it, and answers true when they allow
+   * it. Interrupting it closes the question. Without it, a policy that asks refuses each session.
+   */
+  askRemoteControl?: (memberName: string) => Effect.Effect<boolean, RemoteWorkflowError>;
   platform?: "darwin" | "win32" | "linux";
   unattended?: boolean;
   teamWebRtcBridge?: TeamWebRtcBridge;
@@ -307,6 +329,8 @@ export class HostService extends EventEmitter<HostEvents> {
   /** `undefined` until the account service first reports, so the first report always binds. */
   #boundAccountId: string | null | undefined = undefined;
   #legacyCredentialRemoved = false;
+  /** The members whose remote desktop stream runs now, by remote desktop session. */
+  readonly #remoteControlStreams = new Map<string, string>();
 
   constructor(options: HostServiceOptions) {
     super();
@@ -341,7 +365,9 @@ export class HostService extends EventEmitter<HostEvents> {
       // The gateway owns the answer -- `getStatus` reads it there. This only says it changed, which is
       // what a member's failed attempt has to do to reach the host owner's open settings panel.
       onScreenRecordingDenied: () => this.emit("changed", this.getStatus()),
+      confirmSession: (memberId) => this.#confirmRemoteControl(memberId),
       audit: (event) => {
+        this.#trackRemoteControl(event.event, event.sessionId, event.memberId);
         if (options.logDirectory) {
           Effect.runFork(
             appendRemoteDiagnosticLog(options.logDirectory, "remote-screen", `${JSON.stringify(event)}\n`),
@@ -495,6 +521,7 @@ export class HostService extends EventEmitter<HostEvents> {
       browser: options.browser,
       browserView: this.#browserView,
       remoteScreen: this.#remoteScreen,
+      remoteControlAccess: () => this.remoteControlAccess(),
       redeemCentralTicket: options.redeemCentralTicket,
       ...(options.chat === undefined ? {} : { chat: options.chat }),
       onPresence: (snapshot) => this.emit("presence", snapshot),
@@ -582,6 +609,88 @@ export class HostService extends EventEmitter<HostEvents> {
       remoteDesktopActiveSessions: capabilities.activeSessions,
       remoteDesktopMaxSessions: capabilities.maxSessions,
     };
+  }
+
+  getRemoteControlPolicy(): RemoteControlPolicy {
+    return this.#options.remoteControlPolicy?.get() ?? { ...DEFAULT_REMOTE_CONTROL_POLICY };
+  }
+
+  /** The roles that may control this computer. The Team API reads it at each remote desktop request. */
+  remoteControlAccess(): RemoteControlAccess {
+    return this.getRemoteControlPolicy().access;
+  }
+
+  /**
+   * Saves who may control this computer. A session that runs now keeps running: "Stop all remote
+   * control" ends it.
+   */
+  readonly setRemoteControlPolicy = Effect.fn("HostService.setRemoteControlPolicy")(function* (
+    this: HostService,
+    policy: RemoteControlPolicy,
+  ): Effect.fn.Return<RemoteControlPolicy, RemoteWorkflowError> {
+    const store = this.#options.remoteControlPolicy;
+    if (!store)
+      return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.controlUnavailable")) });
+    return yield* store.set(policy).pipe(Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause })));
+  }).bind(this);
+
+  /** Ends every remote desktop session on this computer, and refuses each request that waits for an answer. */
+  readonly stopRemoteControl = Effect.fn("HostService.stopRemoteControl")(
+    function* (this: HostService): Effect.fn.Return<HostStatus, RemoteWorkflowError> {
+      yield* this.#remoteScreen.closeAllSessions();
+      return this.getStatus();
+    },
+    (operation) => this.#provide(operation),
+  ).bind(this);
+
+  /**
+   * Runs before a member's remote desktop session starts. When the policy asks, the person at this
+   * computer must allow it within `REMOTE_CONTROL_QUESTION_MS`; a refusal, no answer, or no way to ask
+   * refuses the session.
+   */
+  #confirmRemoteControl(memberId: string): Effect.Effect<void, RemoteWorkflowError> {
+    return Effect.gen({ self: this }, function* () {
+      if (!this.getRemoteControlPolicy().askOnHost) return;
+      const ask = this.#options.askRemoteControl;
+      if (!ask) return yield* new RemoteWorkflowError({ cause: remoteControlDeclined() });
+      const answer = yield* ask(this.#memberName(memberId)).pipe(
+        Effect.timeoutOption(REMOTE_CONTROL_QUESTION_MS),
+        // A question that could not open is no answer.
+        Effect.catch(({ cause }) =>
+          Effect.sync(() => {
+            logger.warn("Unable to ask about remote control:", toLogValue(cause));
+            return Option.none<boolean>();
+          }),
+        ),
+      );
+      if (Option.isNone(answer) || !answer.value)
+        return yield* new RemoteWorkflowError({ cause: remoteControlDeclined() });
+    });
+  }
+
+  #memberName(memberId: string): string {
+    const member = this.#options.store.getMember(memberId);
+    return member?.name?.trim() || member?.username || memberId;
+  }
+
+  /**
+   * Keeps the members whose stream runs now. A viewer that connects again, or a display change, starts
+   * the stream of a session again, so only the first start of a session is news.
+   */
+  #trackRemoteControl(event: "started" | "transport" | "ended" | "error", sessionId: string, memberId: string): void {
+    if (event !== "started" && event !== "ended") return;
+    if (memberId !== LOCAL_TEST_MEMBER_ID) {
+      if (event === "started" && !this.#remoteControlStreams.has(sessionId)) {
+        const name = this.#memberName(memberId);
+        this.#remoteControlStreams.set(sessionId, name);
+        this.emit("remoteControlStarted", name);
+        this.emit("remoteControlChanged", [...this.#remoteControlStreams.values()]);
+      } else if (event === "ended" && this.#remoteControlStreams.delete(sessionId)) {
+        this.emit("remoteControlChanged", [...this.#remoteControlStreams.values()]);
+      }
+    }
+    // The active session count of the status changes too.
+    this.emit("changed", this.getStatus());
   }
 
   /**

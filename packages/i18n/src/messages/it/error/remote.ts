@@ -7,6 +7,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "Il test del desktop remoto non è disponibile.",
   "error.remote.controlUnavailable": "Il controllo remoto non è disponibile.",
   "error.remote.controlSessionNotFound": "Sessione di controllo remoto non trovata.",
+  "error.remote.controlNotAllowed": "Il proprietario di questo computer non consente al tuo ruolo di controllarlo.",
+  "error.remote.controlDeclined": "La persona a questo computer non ha consentito il controllo remoto.",
   "error.remote.testRuntimeUpdate": "Aggiorna il runtime del desktop remoto per macOS per eseguire questo test.",
   "error.remote.testOtherSessions": "Termina le altre sessioni di desktop remoto prima di avviare un test.",
   "error.remote.testPermissions": "Controlla i permessi e la sessione grafica sull'host prima di avviare il test.",

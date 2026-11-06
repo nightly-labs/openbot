@@ -453,8 +453,8 @@ export const messages = {
   "server.invite.revokeDescription":
     "La invitación deja de funcionar. Quienes se unieron con ella siguen siendo miembros.",
   "server.desktop.accessTitle": "Acceso al escritorio remoto",
-  "server.desktop.gatewayDescription":
-    "Todos los miembros activos del servidor pueden controlar este host. No hay una contraseña independiente para el escritorio remoto.",
+  "server.desktop.gatewayPolicyDescription":
+    "No hay una contraseña aparte para el escritorio remoto. Los ajustes de abajo eligen quién puede controlar este equipo.",
   "server.desktop.componentInstalled": "Componente del host instalado",
   "server.desktop.componentNotInstalled": "Componente del host sin instalar",
   "server.desktop.sessions": "Acceso desatendido: {unattended} · Sesiones activas: {active}/{max}",
@@ -467,13 +467,26 @@ export const messages = {
   "server.desktop.hostOfflineDescription": "Vuelve a conectarte al host antes de abrir su escritorio.",
   "server.desktop.hostUpdateDescription": "Actualiza OpenBot en el host para usar el control remoto.",
   "server.desktop.serviceAvailable": "Servicio disponible",
-  "server.desktop.serviceAvailableDescription":
-    "El control por WebRTC está disponible para todos los miembros activos.",
   "server.desktop.serviceNotReady": "Servicio no preparado",
   "server.desktop.serviceNotReadyDescription":
     "Inicia el control remoto para comprobar los componentes y permisos del host. El host notificará cualquier error de configuración.",
   "server.desktop.remoteControl": "Control remoto",
   "server.desktop.startHint": "Inicia el control remoto desde el botón del monitor en la cabecera del servidor.",
+  "server.desktop.accessLabel": "Quién puede controlar este equipo",
+  "server.desktop.accessDescription":
+    "Los miembros que pueden abrir el escritorio de este equipo desde otro dispositivo.",
+  "server.desktop.accessOwner": "Solo el propietario",
+  "server.desktop.accessAdmins": "Propietario y administradores",
+  "server.desktop.accessMembers": "Todos los miembros",
+  "server.desktop.askLabel": "Preguntar en este equipo",
+  "server.desktop.askDescription":
+    "Cada sesión espera a que una persona en este equipo la permita. Si no hay respuesta en 30 segundos, OpenBot la rechaza.",
+  "server.desktop.activeTitle": "Sesiones de escritorio remoto activas: {active}",
+  "server.desktop.activeDescription": "Termina cada sesión ahora. Los miembros pueden volver a pedirlo.",
+  "server.desktop.stopAll": "Detener todo el control remoto",
+  "server.desktop.policyLoadFailed": "No se pudieron cargar los ajustes de control remoto.",
+  "server.desktop.policySaveFailed": "No se pudieron guardar los ajustes de control remoto.",
+  "server.desktop.stopFailed": "No se pudo detener el control remoto.",
   "server.settings.providersTitle": "Proveedores",
   "server.settings.providersDescription": "Gestiona los proveedores de IA del equipo que ejecuta este servidor.",
   "server.settings.providersSwitchNote": "Cambia a {name} para gestionar sus proveedores de IA.",

@@ -8,6 +8,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "Uzak masaüstü testi kullanılamıyor.",
   "error.remote.controlUnavailable": "Uzaktan kontrol kullanılamıyor.",
   "error.remote.controlSessionNotFound": "Uzaktan kontrol oturumu bulunamadı.",
+  "error.remote.controlNotAllowed": "Bu bilgisayarın sahibi, rolünüzün onu kontrol etmesine izin vermiyor.",
+  "error.remote.controlDeclined": "Bu bilgisayarın başındaki kişi uzaktan kontrole izin vermedi.",
   "error.remote.testRuntimeUpdate": "Bu testi çalıştırmak için macOS uzak masaüstü çalışma zamanını güncelleyin.",
   "error.remote.testOtherSessions": "Bir teste başlamadan önce diğer uzak masaüstü oturumlarını sonlandırın.",
   "error.remote.testPermissions": "Testi başlatmadan önce ana makinedeki izinleri ve GUI oturumunu kontrol edin.",

@@ -502,8 +502,8 @@ export const messages = {
   "server.invite.revokeDescription":
     "Zaproszenie przestanie działać. Osoby, które dołączyły dzięki niemu, pozostaną członkami.",
   "server.desktop.accessTitle": "Dostęp do zdalnego pulpitu",
-  "server.desktop.gatewayDescription":
-    "Każdy aktywny członek serwera może sterować tym hostem. Nie ma osobnego hasła do zdalnego pulpitu.",
+  "server.desktop.gatewayPolicyDescription":
+    "Nie ma osobnego hasła do pulpitu zdalnego. Ustawienia poniżej określają, kto może sterować tym komputerem.",
   "server.desktop.componentInstalled": "Komponent hosta zainstalowany",
   "server.desktop.componentNotInstalled": "Komponent hosta niezainstalowany",
   "server.desktop.sessions": "Tryb bez nadzoru: {unattended} · Aktywne sesje: {active}/{max}",
@@ -516,13 +516,25 @@ export const messages = {
   "server.desktop.hostOfflineDescription": "Połącz się ponownie z hostem, zanim otworzysz jego pulpit.",
   "server.desktop.hostUpdateDescription": "Zaktualizuj OpenBot na hoście, aby używać zdalnego sterowania.",
   "server.desktop.serviceAvailable": "Usługa dostępna",
-  "server.desktop.serviceAvailableDescription":
-    "Sterowanie przez WebRTC jest dostępne dla wszystkich aktywnych członków.",
   "server.desktop.serviceNotReady": "Usługa nie jest gotowa",
   "server.desktop.serviceNotReadyDescription":
     "Uruchom zdalne sterowanie, aby sprawdzić komponenty i uprawnienia hosta. Host zgłosi każdy błąd konfiguracji.",
   "server.desktop.remoteControl": "Zdalne sterowanie",
   "server.desktop.startHint": "Uruchom zdalne sterowanie przyciskiem monitora w nagłówku serwera.",
+  "server.desktop.accessLabel": "Kto może sterować tym komputerem",
+  "server.desktop.accessDescription": "Członkowie, którzy mogą otworzyć pulpit tego komputera z innego urządzenia.",
+  "server.desktop.accessOwner": "Tylko właściciel",
+  "server.desktop.accessAdmins": "Właściciel i administratorzy",
+  "server.desktop.accessMembers": "Wszyscy członkowie",
+  "server.desktop.askLabel": "Pytaj na tym komputerze",
+  "server.desktop.askDescription":
+    "Każda sesja czeka, aż osoba przy tym komputerze na nią zezwoli. Bez odpowiedzi w ciągu 30 sekund OpenBot ją odrzuci.",
+  "server.desktop.activeTitle": "Aktywne sesje pulpitu zdalnego: {active}",
+  "server.desktop.activeDescription": "Od razu kończy każdą sesję. Członkowie mogą poprosić ponownie.",
+  "server.desktop.stopAll": "Zatrzymaj całe zdalne sterowanie",
+  "server.desktop.policyLoadFailed": "Nie udało się wczytać ustawień zdalnego sterowania.",
+  "server.desktop.policySaveFailed": "Nie udało się zapisać ustawień zdalnego sterowania.",
+  "server.desktop.stopFailed": "Nie udało się zatrzymać zdalnego sterowania.",
   "server.settings.providersTitle": "Dostawcy",
   "server.settings.providersDescription": "Zarządzaj dostawcami AI komputera, na którym działa ten serwer.",
   "server.settings.providersSwitchNote": "Przełącz na serwer {name}, aby zarządzać jego dostawcami AI.",

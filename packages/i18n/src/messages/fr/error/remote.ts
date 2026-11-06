@@ -9,6 +9,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "Le test du bureau à distance n’est pas disponible.",
   "error.remote.controlUnavailable": "Le contrôle à distance n’est pas disponible.",
   "error.remote.controlSessionNotFound": "Session de contrôle à distance introuvable.",
+  "error.remote.controlNotAllowed": "Le propriétaire de cet ordinateur ne permet pas à votre rôle de le contrôler.",
+  "error.remote.controlDeclined": "La personne devant cet ordinateur n’a pas autorisé le contrôle à distance.",
   "error.remote.testRuntimeUpdate": "Mettez à jour le runtime macOS du bureau à distance pour lancer ce test.",
   "error.remote.testOtherSessions": "Terminez les autres sessions de bureau à distance avant de lancer un test.",
   "error.remote.testPermissions":

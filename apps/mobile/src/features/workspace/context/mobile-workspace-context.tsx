@@ -1698,6 +1698,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     const workspace: MobileWorkspaceActions = {
       ...workflows,
       openBrowserView: browser.openBrowserView,
+      remoteDesktopConnection: (serverId) => connections.current.get(serverId)?.client ?? null,
       controlBrowserTab: browser.controlBrowserTab,
       mutateSidebarLayout: async (serverId, action) => {
         requireCapability(

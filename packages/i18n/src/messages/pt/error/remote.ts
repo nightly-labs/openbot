@@ -7,6 +7,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "O teste de área de trabalho remota está indisponível.",
   "error.remote.controlUnavailable": "O controle remoto está indisponível.",
   "error.remote.controlSessionNotFound": "Sessão de controle remoto não encontrada.",
+  "error.remote.controlNotAllowed": "O proprietário deste computador não permite que sua função o controle.",
+  "error.remote.controlDeclined": "A pessoa neste computador não permitiu o controle remoto.",
   "error.remote.testRuntimeUpdate":
     "Atualize o ambiente de execução da área de trabalho remota do macOS para executar este teste.",
   "error.remote.testOtherSessions": "Encerre as outras sessões de área de trabalho remota antes de iniciar um teste.",

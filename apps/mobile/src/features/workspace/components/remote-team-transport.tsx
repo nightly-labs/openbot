@@ -30,6 +30,10 @@ import type {
   BrowserViewBridgeOpen,
   RemoteBrowserViewSession,
 } from "@/features/browser/model/browser-view-bridge";
+import type {
+  RemoteDesktopRelayCommand,
+  RemoteDesktopRelayEvent,
+} from "@/features/remote-desktop/model/remote-desktop-relay";
 import { supportLog, supportLogUrl } from "@/features/support/model/support-log";
 import { InactiveRequestError } from "@/features/workspace/model/pending-approvals";
 import { referencedError } from "@/features/workspace/model/referenced-error";
@@ -60,6 +64,28 @@ export interface RemoteTeamTransportRef {
     options: Omit<BrowserViewBridgeOpen, "viewId">,
     listener: (event: BrowserViewBridgeEvent) => void,
   ): RemoteBrowserViewSession | null;
+  /**
+   * A request whose answer the caller reads: the status, and a JSON body or a file as
+   * `{ name, mimeType, base64 }`. For the remote desktop viewer's own files, so it writes no support log line.
+   */
+  fetchRaw(
+    method: string,
+    path: string,
+    body?: TeamProtocolV2Json,
+    upload?: RemoteFileUpload,
+  ): Promise<{ status: number; body: unknown }>;
+  /** A socket of the remote desktop viewer. Null until the peer page is ready. */
+  openRemoteDesktopStream(path: string, listener: (event: RemoteDesktopRelayEvent) => void): RemoteDesktopStream | null;
+}
+
+/** What the remote desktop viewer uses of a connected peer. */
+export type RemoteDesktopConnection = Pick<RemoteTeamTransportRef, "fetchRaw" | "openRemoteDesktopStream">;
+
+/** One socket of the remote desktop viewer, through the peer's desktop channel. */
+export interface RemoteDesktopStream {
+  sendText(data: string): void;
+  sendBinary(base64: string): void;
+  close(code: number, reason: string): void;
 }
 
 interface RemoteTeamTransportProps {
@@ -137,6 +163,15 @@ export const RemoteTeamTransport = memo(
       const browserView = bridge.current?.browserView;
       if (typeof browserView !== "function") return false;
       browserView(command);
+      return true;
+    }, []);
+
+    const desktopListeners = useRef(new Map<string, (event: RemoteDesktopRelayEvent) => void>());
+    const sendDesktopCommand = useCallback((command: RemoteDesktopRelayCommand) => {
+      // The handle has the method only after the page has registered it.
+      const remoteDesktop = bridge.current?.remoteDesktop;
+      if (typeof remoteDesktop !== "function") return false;
+      remoteDesktop(command);
       return true;
     }, []);
 
@@ -252,8 +287,34 @@ export const RemoteTeamTransport = memo(
             },
           };
         },
+        fetchRaw: async (method, path, body = {}, upload) => {
+          const result = await enqueue({ type: "request", method, path, body, upload });
+          if (!result.ok)
+            throw referencedError(result.error ?? sourceText("error.remote.serverRequestFailed"), result.reference);
+          return { status: result.status ?? 200, body: result.body };
+        },
+        openRemoteDesktopStream: (path, listener) => {
+          const streamId = Crypto.randomUUID();
+          desktopListeners.current.set(streamId, listener);
+          if (!sendDesktopCommand({ type: "open", streamId, path })) {
+            desktopListeners.current.delete(streamId);
+            return null;
+          }
+          return {
+            sendText: (data) => {
+              if (desktopListeners.current.has(streamId)) sendDesktopCommand({ type: "text", streamId, data });
+            },
+            sendBinary: (base64) => {
+              if (desktopListeners.current.has(streamId)) sendDesktopCommand({ type: "binary", streamId, base64 });
+            },
+            close: (code, reason) => {
+              if (!desktopListeners.current.delete(streamId)) return;
+              sendDesktopCommand({ type: "close", streamId, code, reason });
+            },
+          };
+        },
       }),
-      [enqueue, sendViewCommand, backgroundLane],
+      [enqueue, sendViewCommand, sendDesktopCommand, backgroundLane],
     );
 
     // A page that loads again, such as after Android ends its renderer, has none of the commands.
@@ -324,6 +385,11 @@ export const RemoteTeamTransport = memo(
       onBrowserViewEvent: async (event: BrowserViewBridgeEvent) => {
         const listener = viewListeners.current.get(event.viewId);
         if (event.type === "ended") viewListeners.current.delete(event.viewId);
+        listener?.(event);
+      },
+      onRemoteDesktopEvent: async (event: RemoteDesktopRelayEvent) => {
+        const listener = desktopListeners.current.get(event.streamId);
+        if (event.type === "closed") desktopListeners.current.delete(event.streamId);
         listener?.(event);
       },
       onAccountServersChanged: async () => latest.current.props.onMembershipChanged?.(),
