@@ -43,8 +43,8 @@ import type { MobileSession } from "@/features/auth/api/mobile-auth";
 import { mobileUserName } from "@/features/auth/api/mobile-user-name";
 import { hostedServerCalls } from "@/features/servers/api/hosted-servers";
 import {
-  DRAWER_TOOL_IDS,
   type DrawerToolId,
+  isDrawerToolId,
   reorderDrawerTools,
   setDrawerToolPinned,
   useDrawerToolLayout,
@@ -683,14 +683,16 @@ function DrawerServerTools({
                   pinned={!layout.hidden.includes(toolId)}
                   canMoveUp={index > 0}
                   canMoveDown={index < available.length - 1}
-                  onMove={(step) => reorderDrawerTools(moveServerId(available, toolId, index + step).filter(isToolId))}
+                  onMove={(step) =>
+                    reorderDrawerTools(moveServerId(available, toolId, index + step).filter(isDrawerToolId))
+                  }
                   onPinnedChange={(pinned) => setDrawerToolPinned(toolId, pinned)}
                 />
               );
             }}
             onDragActive={onDragActive}
             onReorder={(ids) => {
-              reorderDrawerTools(ids.filter(isToolId));
+              reorderDrawerTools(ids.filter(isDrawerToolId));
               return true;
             }}
           />
@@ -730,15 +732,13 @@ function DrawerServerTools({
         label={t("mobile.server.drawer.serverSettings")}
         href={routes.settings}
         width={rowWidth}
+        // In edit mode a tap does not leave the drawer, as on the server rows.
+        disabled={editing}
         onAction={editing ? undefined : onToolAction}
         onNavigate={onNavigate}
       />
     </View>
   );
-}
-
-function isToolId(id: string): id is DrawerToolId {
-  return DRAWER_TOOL_IDS.some((candidate) => candidate === id);
 }
 
 /** A drawer row with the menu of the tools. `toolId` is null for Server settings, which cannot be unpinned. */
@@ -938,6 +938,7 @@ interface DrawerRowProps {
   /** A value that asks for the person, such as tasks that need them. */
   accentValue?: boolean;
   href: Href;
+  disabled?: boolean;
   onNavigate: (href: Href) => void;
 }
 
@@ -948,6 +949,7 @@ const DrawerRow = memo(function DrawerRow({
   value,
   accentValue = false,
   href,
+  disabled = false,
   onNavigate,
   width,
   accessibilityActions,
@@ -967,6 +969,7 @@ const DrawerRow = memo(function DrawerRow({
       accessibilityActions={accessibilityActions}
       onAccessibilityAction={(event) => onAccessibilityAction?.(event.nativeEvent.actionName)}
       className="flex-row items-center gap-3 rounded-2xl px-3"
+      disabled={disabled}
       style={({ pressed }) => ({
         height: DRAWER_ROW_HEIGHT,
         width,

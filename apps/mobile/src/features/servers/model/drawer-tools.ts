@@ -16,7 +16,7 @@ interface DrawerToolLayout {
 
 const key = "openbot.mobile.drawer-tools.v1";
 
-function isDrawerToolId(value: unknown): value is DrawerToolId {
+export function isDrawerToolId(value: unknown): value is DrawerToolId {
   return DRAWER_TOOL_IDS.some((id) => id === value);
 }
 
