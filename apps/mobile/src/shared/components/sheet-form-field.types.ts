@@ -15,6 +15,8 @@ export interface SheetFormFieldProps {
   label: string;
   maxLength?: number;
   multiline?: boolean;
+  /** A multiline field of about 14 lines instead of 4, for a long text such as an instructions file. */
+  tall?: boolean;
   appearance?: "default" | "soft";
   hideLabel?: boolean;
   /** React Native 0.88 adds `start` and `end`, which the iOS field does not take. */

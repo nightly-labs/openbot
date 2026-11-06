@@ -318,6 +318,7 @@ export const messages = {
   "server.settings.addLogo": "서버 로고 추가",
   "server.settings.removeLogo": "서버 로고 삭제",
   "server.settings.access": "접근 권한",
+  "server.companySignIn.desktopOnly": "싱글 사인온은 OpenBot 데스크톱 앱에서 설정하세요.",
   "server.settings.publish": "이 서버 게시",
   "server.settings.published": "서버가 게시되었어요",
   "server.settings.setUpDesktopTitle": "원격 데스크톱 설정",

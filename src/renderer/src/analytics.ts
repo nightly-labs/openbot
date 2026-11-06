@@ -528,6 +528,7 @@ const SAFE_FAILURE_CODES = new Set([
   "unknown",
   "unpublish_failed",
   "update_failed",
+  "webhook_route_limit",
   "verification_failed",
   "hosted_site_failed",
   "cancelled",

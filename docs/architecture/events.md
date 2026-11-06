@@ -116,6 +116,18 @@ restart that resumes the run still has it. Runs use the existing agent and chann
 limits, and approval controls. While a restart waits for idle agents (`holdRoutines`), the host
 answers 503 and writes no receipt, so the sender retries after the restart.
 
+### Analytics
+
+`HostEventsService` gives each request that it processed, and each test event, to its `onDelivery`
+option as a `WebhookDeliveryReport`: owner kind, format, result, ignored reason, status, body size,
+handle time and, for a request with a valid signature, the delivery age. The application services
+send it as `system_webhook_delivery`, at most 60 each minute (`HostAnalytics.handleWebhookDelivery`).
+The report has no route ID, delivery ID, secret, event type or body. A request that Signal refuses
+before the host does not reach it: Signal counts its answers by status and its waits for the host in
+`/metrics` (`openbot_remote_webhook_*`), and the capacity reporter sends the change of each 5 minutes
+in `signal_capacity`. `bun run test:webhook-analytics` checks the host side. See
+[ANALYTICS.md](../../ANALYTICS.md).
+
 ### Workflow webhook triggers
 
 A workflow webhook trigger has no route until its first secret: `rotateWorkflowSecret` makes the

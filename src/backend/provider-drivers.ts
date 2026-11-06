@@ -1279,6 +1279,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         // A confined process cannot write the CLI's shared package cache, so it unpacks its own.
         extraEnv: () => ({ ...context.agentEnvironment?.(), ...(confinement ? COPILOT_CONFINED_ENV : {}) }),
         signInMessage: sourceText("error.provider.copilotSignIn"),
+        // GitHub Copilot CLI 1.0.106 opens a session without an account, and lists no models then.
+        noModelsWhenSignedOut: true,
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
         reportMcpDrops: context.reportMcpDrops,
@@ -1294,6 +1296,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         profileGeneration: true,
         env: { ...COPILOT_ENV },
         signInMessage: sourceText("error.provider.copilotSignIn"),
+        noModelsWhenSignedOut: true,
         servesModel: context.servesModel,
       }),
     authState: (account) => ({ kind: "copilot", email: account?.email ?? null }),

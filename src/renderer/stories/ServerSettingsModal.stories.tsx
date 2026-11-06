@@ -14,6 +14,7 @@ import {
   type ServerAuditEntry,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { Toaster } from "@openbot/ui";
 import { createSignal, createStore } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -146,6 +147,22 @@ export const ActionError: Story = {
   args: {
     loadError: "The server did not respond. Check the connection and try again.",
   },
+};
+
+/** The browser client: the owner sees company sign-in, but setup needs the desktop app. */
+export const RemoteOwnerInBrowser: Story = {
+  args: {
+    server: remoteServer,
+    hostStatus: null,
+    initialSection: "members",
+    onDownloadDesktopApp: fn(),
+  },
+  render: (args) => (
+    <>
+      <ServerSettingsStory settings={args} />
+      <Toaster />
+    </>
+  ),
 };
 
 export const RemoteAdministrator: Story = {

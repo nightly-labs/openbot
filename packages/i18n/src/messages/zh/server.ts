@@ -315,6 +315,7 @@ export const messages = {
   "server.settings.addLogo": "添加服务器标志",
   "server.settings.removeLogo": "移除服务器标志",
   "server.settings.access": "访问",
+  "server.companySignIn.desktopOnly": "请在 OpenBot 桌面应用中设置单点登录。",
   "server.settings.publish": "发布该服务器",
   "server.settings.published": "服务器已发布",
   "server.settings.setUpDesktopTitle": "设置远程桌面",

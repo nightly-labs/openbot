@@ -312,7 +312,8 @@
   display: grid;
   min-width: 0;
   min-height: 40px;
-  grid-template-columns: 22px minmax(0, 1fr) auto;
+  /* A long meta wraps in its own column; it never takes the label's width. */
+  grid-template-columns: 22px minmax(0, 1fr) fit-content(40%);
   align-items: center;
   gap: var(--openbot-space-3);
   border-radius: var(--openbot-radius-md);
@@ -387,9 +388,11 @@
 }
 
 .ui-block-option-meta {
+  min-width: 0;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 /* Quick replies */

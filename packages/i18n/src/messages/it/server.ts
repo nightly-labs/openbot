@@ -300,6 +300,7 @@ export const messages = {
   "server.settings.addLogo": "Aggiungi il logo del server",
   "server.settings.removeLogo": "Rimuovi il logo del server",
   "server.settings.access": "Accesso",
+  "server.companySignIn.desktopOnly": "Configura il single sign-on nell’app desktop di OpenBot.",
   "server.settings.publish": "Pubblica questo server",
   "server.settings.published": "Il server è pubblicato",
   "server.settings.setUpDesktopTitle": "Configura il desktop remoto",

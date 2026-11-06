@@ -352,6 +352,7 @@ export const messages = defineMessages("server", {
   "server.companySignIn.testedStatus": "Tested for {domains}. Turn it on to use it.",
   "server.companySignIn.setUp": "Set up",
   "server.companySignIn.edit": "Edit",
+  "server.companySignIn.desktopOnly": "Set up single sign-on in the OpenBot desktop app.",
   "server.companySignIn.loadFailed": "OpenBot couldn’t load company sign-in.",
   "server.companySignIn.scim": "User sync (SCIM)",
   "server.companySignIn.scimOff": "Off",

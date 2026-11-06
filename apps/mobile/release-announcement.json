@@ -1,10 +1,10 @@
 {
-  "version": "1.4.6",
+  "version": "1.4.7",
   "highlights": [
-    "On iPhone, sign in again after you upgrade, and turn App lock on again in Settings if you used it.",
-    "Branch a chat from any finished agent answer: touch and hold it and choose Branch from here.",
-    "Dictate into the message box with the mic, and edit the words before you send.",
-    "Pins and chat folders now match the desktop app, and you can drag a chat to pin it or move it.",
-    "Your agents and recent chats show at once after a start, while the app connects to the server."
+    "Delete a message, mark it as unread, or send its text to a channel: touch and hold the message.",
+    "Link WhatsApp numbers and change Telegram and Slack triggers and outputs from your phone. The server needs the latest OpenBot.",
+    "Use the app in Arabic, with a right-to-left layout. Each chat paragraph shows in the direction of its text.",
+    "Connect Coinbase, Robinhood, RevenueCat, TickTick, Proton Pass and Higgsfield from the Apps marketplace.",
+    "The app reconnects faster when you come back to it, uses less memory while a reply streams, and closes less often."
   ]
 }

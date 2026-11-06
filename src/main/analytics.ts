@@ -10,6 +10,7 @@ import {
   hostedSiteConversationEvent,
   isAgentModel,
   parseRoutineRunConversationEventItemType,
+  ROUTINE_RUN_SOURCES,
   type RoutineRunConversationEventStatus,
   type UsageTokens,
   WORKFLOW_RUN_SOURCES,
@@ -35,6 +36,7 @@ import type { TurnModelUsage } from "../backend/database/agent-usage";
 import type { WorkflowRunEnd } from "../backend/workflows/workflows";
 import { type AnalyticsOperationFailure, analyticsIO, analyticsSync } from "./analytics-effects";
 import { PROVIDER_AUTH_KINDS, type ProviderAuthKind } from "./analytics-provider-auth";
+import type { WebhookDeliveryReport } from "./host-events-service";
 import { REMOTE_CONNECT_PHASES, type RemoteConnectPhase, type RemoteConnectSummary } from "./remote-connect-trace";
 import { localDay, RESOURCE_ENUMS, RESOURCE_PROPERTY_NAMES, type ResourceProperties } from "./resource-summary";
 import { UNCLEAN_EXIT_ENUMS, type UncleanExitProperties } from "./run-marker";
@@ -161,7 +163,33 @@ const ROUTINE_TRIGGER_TYPES = [
   "advanced",
   "custom",
   "once",
+  "webhook",
 ] as const;
+const WEBHOOK_DELIVERY_RESULTS = [
+  "started",
+  "ignored",
+  "duplicate",
+  "gone",
+  "too_large",
+  "unavailable",
+  "signed_out",
+  "unknown_route",
+  "secret_unreadable",
+  "bad_signature",
+  "bad_body",
+  "failed",
+] as const;
+const WEBHOOK_IGNORED_REASONS = ["event-type", "filter", "inactive", "busy", "refused"] as const;
+const WEBHOOK_DELIVERY_STATUSES = [200, 202, 400, 401, 404, 413, 429, 503] as const;
+/** Signal and the host refuse larger bodies, so a larger count is not a real request. */
+const MAX_WEBHOOK_BODY_BYTES = 2 * 1024 * 1024;
+/** Signal waits less than this for the host's answer. */
+const MAX_WEBHOOK_HANDLE_MS = 10 * 60 * 1_000;
+/** The signature check refuses a timestamp older than 5 minutes. */
+const MAX_WEBHOOK_AGE_MS = 10 * 60 * 1_000;
+/** A busy sender can send many requests. Analytics sends at most this many each minute. */
+const MAX_WEBHOOK_DELIVERY_EVENTS_PER_MINUTE = 60;
+const WEBHOOK_DELIVERY_WINDOW_MS = 60 * 1_000;
 
 type AnalyticsIdentity = Pick<CentralAuthUser, "id" | "email">;
 /**
@@ -182,6 +210,7 @@ type HostEventName =
   | "system_site_visited"
   | "system_routine_run"
   | "system_workflow_run"
+  | "system_webhook_delivery"
   | "system_inventory"
   | "system_resources"
   | "system_startup"
@@ -251,13 +280,19 @@ export interface AnalyticsResourceSource {
 
 interface AnalyticsRoutineRun {
   runKind: "scheduled" | "manual";
+  /** What started a manual run: a test, a script or a webhook request. */
+  runSource: (typeof ROUTINE_RUN_SOURCES)[number] | null;
   triggerType: string;
 }
 
 /** Counts and closed-set names only: never a user-authored name, URL or command. */
 interface AnalyticsInventory {
   agentCount: number;
+  /** Agent routines with a schedule that are on. */
   enabledRoutineCount: number;
+  enabledWebhookRoutineCount: number;
+  /** Webhook addresses of agents, channels and workflows. */
+  webhookRouteCount: number;
   workflowCount: number;
   customMcpServerCount: number;
   plugins: string[];
@@ -329,7 +364,19 @@ const HOST_ALLOWLIST = {
     "total_tokens",
   ],
   system_site_visited: [...AGENT_PROPERTY_NAMES, "domain", "actor"],
-  system_routine_run: [...AGENT_PROPERTY_NAMES, "status", "run_kind", "trigger_type"],
+  system_routine_run: [...AGENT_PROPERTY_NAMES, "status", "run_kind", "run_source", "trigger_type"],
+  system_webhook_delivery: [
+    "owner_kind",
+    "format",
+    "result",
+    "ignored_reason",
+    "status_code",
+    "body_bytes",
+    "handle_ms",
+    "delivery_age_ms",
+    "test",
+    "skipped_count",
+  ],
   system_workflow_run: [
     "status",
     "source",
@@ -340,6 +387,8 @@ const HOST_ALLOWLIST = {
   system_inventory: [
     "agent_count",
     "enabled_routine_count",
+    "enabled_webhook_routine_count",
+    "webhook_route_count",
     "workflow_count",
     "custom_mcp_server_count",
     "plugins",
@@ -430,6 +479,9 @@ export class HostAnalytics {
   readonly #routineRunOwners = new Map<string, AnalyticsSubject | null>();
   readonly #routineRunReports = new Set<string>();
   readonly #workflowRunReports = new Set<string>();
+  #webhookWindowStart = 0;
+  #webhookWindowCount = 0;
+  #webhookSkipped = 0;
   /** A workflow run that began before this process is a replay after a restart, and is not sent. */
   readonly #createdAt = Date.now();
   #closed = false;
@@ -725,6 +777,38 @@ export class HostAnalytics {
     });
   }
 
+  /**
+   * Reports one inbound webhook request: whose route it reached, what the host answered and how long
+   * it took. At most 60 go each minute; the next event sent counts the requests that did not go.
+   */
+  handleWebhookDelivery(report: WebhookDeliveryReport): void {
+    if (!this.#client) return;
+    const now = Date.now();
+    if (now - this.#webhookWindowStart >= WEBHOOK_DELIVERY_WINDOW_MS) {
+      this.#webhookWindowStart = now;
+      this.#webhookWindowCount = 0;
+    }
+    if (this.#webhookWindowCount >= MAX_WEBHOOK_DELIVERY_EVENTS_PER_MINUTE) {
+      this.#webhookSkipped += 1;
+      return;
+    }
+    this.#webhookWindowCount += 1;
+    const skipped = this.#webhookSkipped;
+    this.#webhookSkipped = 0;
+    this.#track("system_webhook_delivery", {
+      ...(report.ownerKind ? { owner_kind: report.ownerKind } : {}),
+      format: report.format,
+      result: report.result,
+      ...(report.ignoredReason ? { ignored_reason: report.ignoredReason } : {}),
+      status_code: report.status,
+      body_bytes: report.bodyBytes,
+      handle_ms: Math.round(report.handleMs),
+      ...(report.ageMs === null ? {} : { delivery_age_ms: Math.round(report.ageMs) }),
+      test: report.test,
+      ...(skipped > 0 ? { skipped_count: skipped } : {}),
+    });
+  }
+
   /** Reports a tab that reached a new registrable domain. The hostname itself is never sent. */
   handleSiteVisit(visit: BrowserSiteVisit): void {
     if (!this.#client || !this.#trackingEnabled) return;
@@ -873,7 +957,13 @@ export class HostAnalytics {
         {
           ...this.#agentProperties(agentId),
           status: event.status,
-          ...(run ? { run_kind: run.runKind, trigger_type: run.triggerType } : {}),
+          ...(run
+            ? {
+                run_kind: run.runKind,
+                ...(run.runSource ? { run_source: run.runSource } : {}),
+                trigger_type: run.triggerType,
+              }
+            : {}),
         },
         owner,
         false,
@@ -945,6 +1035,8 @@ export class HostAnalytics {
           {
             agent_count: inventory.agentCount,
             enabled_routine_count: inventory.enabledRoutineCount,
+            enabled_webhook_routine_count: inventory.enabledWebhookRoutineCount,
+            webhook_route_count: inventory.webhookRouteCount,
             workflow_count: inventory.workflowCount,
             custom_mcp_server_count: inventory.customMcpServerCount,
             plugins: inventory.plugins,
@@ -1316,7 +1408,21 @@ function sanitizeHostProperty(name: HostEventName, key: string, value: unknown):
       return isOneOf([...ROUTINE_TERMINAL_STATUSES, "needs-attention"] as const, value) ? value : undefined;
     }
     if (key === "run_kind") return isOneOf(["scheduled", "manual"] as const, value) ? value : undefined;
+    if (key === "run_source") return isOneOf(ROUTINE_RUN_SOURCES, value) ? value : undefined;
     if (key === "trigger_type") return isOneOf(ROUTINE_TRIGGER_TYPES, value) ? value : undefined;
+  }
+  if (name === "system_webhook_delivery") {
+    if (key === "owner_kind") return isOneOf(["agent", "channel", "workflow"] as const, value) ? value : undefined;
+    if (key === "format") return isOneOf(["openbot", "standard"] as const, value) ? value : undefined;
+    if (key === "result") return isOneOf(WEBHOOK_DELIVERY_RESULTS, value) ? value : undefined;
+    if (key === "ignored_reason") return isOneOf(WEBHOOK_IGNORED_REASONS, value) ? value : undefined;
+    if (key === "status_code") return isOneOf(WEBHOOK_DELIVERY_STATUSES, value) ? value : undefined;
+    if (key === "body_bytes") return boundedCount(value, MAX_WEBHOOK_BODY_BYTES);
+    if (key === "handle_ms") return boundedCount(value, MAX_WEBHOOK_HANDLE_MS);
+    if (key === "delivery_age_ms") return boundedCount(value, MAX_WEBHOOK_AGE_MS);
+    if (key === "skipped_count") return boundedCount(value, 1_000_000);
+    if (key === "test") return isBoolean(value) ? value : undefined;
+    return undefined;
   }
   if (name === "system_workflow_run") {
     if (key === "status") return isOneOf(["done", "failed", "stopped"] as const, value) ? value : undefined;

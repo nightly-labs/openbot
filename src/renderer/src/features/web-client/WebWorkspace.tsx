@@ -2389,6 +2389,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         onSetPublished={unavailable}
                         onCreateInvite={serverSettings.createInvite}
                         license={licenseCalls}
+                        // Company sign-in setup waits for a loopback listener, so only the desktop app has it.
+                        onDownloadDesktopApp={() => void window.open("/download", "_blank", "noopener")}
                         onContactUs={() => window.location.assign(HOSTED_SERVER_CONTACT_URL)}
                         onUpdateMember={serverSettings.updateMember}
                         onRemoveMember={serverSettings.removeMember}
