@@ -1203,6 +1203,17 @@ Pi unchanged. The catalog drops the aliases that start with `~`, such as
 `provider-model-options.ts`) and marks the `:free` models as free. A 402 means the account has no
 credits. Peers see OpenRouter from v8, as Inception.
 
+## ZCode
+
+ZCode runs as the user's own setup. The `zcode-acp` adapter (an npm package) speaks ACP for the ZCode
+CLI that ZCode Desktop ships, so OpenBot detects and starts the adapter the way it starts the other
+ACP CLIs (`zcode-acp --version` for detection). The adapter runs `zcode -p "<turn>" --json` for each
+turn in the agent's working folder and resumes the same ZCode session across turns, so the session
+keeps its history. The user signs in inside ZCode (`zcode login`); OpenBot only re-probes the
+provider when `~/.zcode/v2/credentials.json` changes. One turn runs at a time, and the answer
+arrives when the turn ends. The adapter lists no model catalog, so the model picker shows no models
+for this provider.
+
 ## Muse
 
 Muse uses the official `@muse-code/sdk` to run `muse serve` over MSP. The SDK is pinned to `1.4.2`;

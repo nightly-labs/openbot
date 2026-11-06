@@ -297,6 +297,11 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "Die Version von Hermes Agent kann nicht gelesen werden.",
   "error.provider.hermesSignIn":
     "Melde dich mit Nous Portal an oder führe `hermes setup` in einem Terminal aus, um Hermes zu verwenden.",
+  "error.provider.zcodeMissing":
+    "ZCode ist nicht installiert. Installiere ZCode Desktop und den zcode-acp-Adapter, dann versuche es erneut.",
+  "error.provider.zcodeNotStarted": "ZCode konnte nicht starten. Führe `zcode-acp --version` in einem Terminal aus.",
+  "error.provider.zcodeVersionUnreadable": "Die ZCode-Version konnte nicht gelesen werden.",
+  "error.provider.zcodeSignIn": "Melde dich bei ZCode an (`zcode login`), dann versuche es erneut.",
   "error.provider.usageLimitReached": "Das Konto hat sein Nutzungslimit erreicht.",
   "error.provider.foreignReasoning":
     "{provider} hat die früheren Überlegungen in diesem Chat nicht akzeptiert, da ein anderes Konto oder ein anderer API-Schlüssel sie erhalten hat. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",

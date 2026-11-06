@@ -264,6 +264,10 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "تتعذّر قراءة إصدار Hermes Agent.",
   "error.provider.hermesSignIn":
     "سجّل الدخول باستخدام Nous Portal، أو شغّل `hermes setup` في نافذة طرفية، لاستخدام Hermes.",
+  "error.provider.zcodeMissing": "ZCode غير مثبّت. ثبّت ZCode Desktop ومحوّل zcode-acp ثم أعد المحاولة.",
+  "error.provider.zcodeNotStarted": "تعذّر تشغيل ZCode. شغّل `zcode-acp --version` في الطرفية.",
+  "error.provider.zcodeVersionUnreadable": "تعذّرت قراءة إصدار ZCode.",
+  "error.provider.zcodeSignIn": "سجّل الدخول إلى ZCode‏ (`zcode login`) ثم أعد المحاولة.",
   "error.provider.usageLimitReached": "بلغ الحساب حد الاستخدام.",
   "error.provider.foreignReasoning":
     "لم يقبل {provider} الاستدلال السابق في هذه الدردشة، لأن حسابًا أو مفتاح API مختلفًا استلمه. بدأ OpenBot جلسة {provider} جديدة بسجل الدردشة. أعد المحاولة.",

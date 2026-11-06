@@ -177,6 +177,7 @@ export type AgentAuthState =
   | { kind: "deepseek"; email: string | null }
   | { kind: "openrouter"; email: string | null }
   | { kind: "hermes"; email: string | null }
+  | { kind: "zcode"; email: string | null }
   | { kind: "acp"; email: string | null };
 
 export interface AccountUsageWindow {

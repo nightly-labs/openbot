@@ -55,6 +55,7 @@ import {
   resolveMuseCli,
   resolveOpencodeCli,
   resolvePiCli,
+  resolveZcodeCli,
 } from "./cli";
 import { clineFreeModels } from "./cline-free-models";
 import { readCursorUsage } from "./cursor-usage";
@@ -100,6 +101,8 @@ import {
   piAgentDirectory,
   piStatePaths,
   type SpawnTarget,
+  zcodeHome,
+  zcodeStatePaths,
 } from "./process-confinement";
 import { type AccountReadResult, isCodexLoginType, type ModelListResponse } from "./protocol";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
@@ -1397,6 +1400,46 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         context.history?.("acp"),
       ),
     authState: () => ({ kind: "acp", email: null }),
+    validateAccount: () => undefined,
+  },
+  {
+    id: "zcode",
+    // The user signs in inside ZCode itself (`zcode login`), so OpenBot only re-probes the provider.
+    signIn: { kind: "external" },
+    // `zcode login` rewrites the shared credentials file when the account changes.
+    signInFiles: () => [join(zcodeHome(), "v2", "credentials.json")],
+    // OpenBot installs no ZCode runtime of its own, so the bundled option is unused.
+    resolveCli: () => resolveZcodeCli(),
+    createClient: (cli, timeout, context, confinement) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "zcode",
+        flavor: DEFAULT_ACP_FLAVOR,
+        argv: [],
+        env: {},
+        ...(confinement ? { confine: (target) => confineSpawnTarget(target, confinement, zcodeStatePaths()) } : {}),
+        extraEnv: () => ({ ...context.agentEnvironment?.() }),
+        // The adapter reports the models of the ZCode plan in its own time.
+        allowNoModels: true,
+        signInMessage: sourceText("error.provider.zcodeSignIn"),
+        servesModel: context.servesModel,
+        mcpServers: context.mcpServers,
+        reportMcpDrops: context.reportMcpDrops,
+        mcpToolRuntimes: context.mcpToolRuntimes,
+        mcpEndpoint: context.mcpEndpoint,
+        history: context.history?.("zcode"),
+      }),
+    createProfileClient: (cli, timeout, context) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "zcode",
+        flavor: DEFAULT_ACP_FLAVOR,
+        argv: [],
+        env: {},
+        profileGeneration: true,
+        allowNoModels: true,
+        signInMessage: sourceText("error.provider.zcodeSignIn"),
+        servesModel: context.servesModel,
+      }),
+    authState: (account) => ({ kind: "zcode", email: account?.email ?? null }),
     validateAccount: () => undefined,
   },
 ] as const;

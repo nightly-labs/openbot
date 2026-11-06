@@ -38,6 +38,7 @@ export const AGENT_PROVIDERS = [
   "kimi",
   "devin",
   "copilot",
+  "zcode",
 ] as const;
 export type AgentProviderId = (typeof AGENT_PROVIDERS)[number];
 
@@ -448,6 +449,31 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: true,
+    reportsUsage: false,
+    approvalsInFullAccess: true,
+    foldersInFullAccess: false,
+  },
+  // The ZCode CLI, driven through the `zcode-acp` ACP adapter. The user signs in inside ZCode
+  // itself (`zcode login`), so OpenBot only re-probes the provider. One turn runs at a time.
+  zcode: {
+    id: "zcode",
+    displayName: "ZCode",
+    cliName: "ZCode CLI",
+    onboardingDescription: "Your ZCode plan as one agent of the team",
+    signInMessage: "Sign in with ZCode (zcode login), then try again.",
+    installGuideLink: null,
+    defaultModel: "",
+    legacyModelPrefix: null,
+    authKind: "zcode",
+    pickerOrder: 10,
+    localCodeSignIn: null,
+    signInPageEnd: "callback",
+    skillFolders: [".agents/skills", ".claude/skills"],
+    homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md"],
+    workspaceEnforcement: "confined-process",
+    steer: "deferred",
+    concurrentTurns: false,
     reportsUsage: false,
     approvalsInFullAccess: true,
     foldersInFullAccess: false,
