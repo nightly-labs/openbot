@@ -553,6 +553,7 @@ export function ConversationTimeline() {
     // In a shared chat, a message from another member is theirs.
     question: (message) =>
       message.author === "you" && !message.actionMarker && !otherSender(message) ? message.body : undefined,
+    reply: (message) => (message.author === "agent" && !message.actionMarker ? message.body : undefined),
     storedCount: () => props.messages.length,
     unloaded: () => props.unloadedHistory,
     virtualizer: messageVirtualizer,
