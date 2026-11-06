@@ -675,8 +675,9 @@ the token and does the platform work for the hosts:
   (`discord-driver.ts`) sends typed operations (`DiscordApiRequest`: post, edit, delete, react, list
   messages, names, a private reply to a button press, upload) to `POST /v1/discord/api` with that
   bearer. Signal accepts an operation only for a guild routed to that socket, and only for a channel
-  of that guild, and makes the call with `@discordjs/rest`. Every post has no allowed mention, so it
-  pings nobody. Attachments are signed CDN addresses, which the host downloads directly.
+  of that guild, and makes the call with `@discordjs/rest`. A new text post allows only user mentions,
+  so it pings each user that it mentions, never a role or `@everyone`. Other posts and edits ping
+  nobody. Attachments are signed CDN addresses, which the host downloads directly.
 - **Conversations.** A conversation is a reply chain, keyed by its first message. Every OpenBot post
   replies to that message, so a reply to an OpenBot post names the conversation through the replied
   post's own reference. A direct message has no guild, so Signal answers it once with a fixed line.
