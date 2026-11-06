@@ -10,6 +10,7 @@ import { AgentApiKeys } from "../backend/agent-api-keys";
 import { AgentDatabaseSupervisor } from "../backend/agent-data/agent-database-supervisor";
 import { AgentTables } from "../backend/agent-data/agent-tables";
 import { AgentRoutineStore } from "../backend/agent-routine-store";
+import { diskRestoreEnded, diskRestoring } from "../backend/disk-restore";
 import { DiscordConnectFailed, toDiscordConnectFailed } from "../backend/messaging/discord/discord-connect";
 import { SlackConnectFailed, toSlackConnectFailed } from "../backend/messaging/slack/slack-connect";
 import { routineFlowRoutines } from "../backend/routine-flows/routine-flow-routines";
@@ -1450,8 +1451,15 @@ export async function createApplicationServices({
         .pipe(Effect.asVoid, toProviderRuntimeFailure);
     },
   });
+  // A hosted server waits for its disk restore before its first update check; the stop ends the wait.
+  let updateCheckWait: Fiber.Fiber<void> | null = null;
   teardown.push(TEARDOWN_ORDER.providerRuntimes, "the provider runtimes", () =>
-    runCauseEffect(providerRuntimes.stop()),
+    runCauseEffect(
+      Effect.gen(function* () {
+        if (updateCheckWait) yield* Fiber.interrupt(updateCheckWait);
+        yield* providerRuntimes.stop();
+      }),
+    ),
   );
   // Before `new AgentService`, which reads every `executablePath` eagerly.
   await runCauseEffect(providerRuntimes.initialize());
@@ -2325,7 +2333,17 @@ export async function createApplicationServices({
   providerRuntimes.on("status", forwardProviderRuntimeStatus);
   // After the status forward, so the offer a check finds reaches the renderer.
   const appUpgraded = providerCliAppVersion.get().appVersion !== app.getVersion();
-  providerRuntimes.startUpdateChecks({ updateInstalled: appUpgraded });
+  // A hosted server checks after its disk restore: the check reads and removes CLI versions, and the
+  // start of the server waits for its own files first.
+  if (diskRestoring()) {
+    updateCheckWait = Effect.runFork(
+      diskRestoreEnded.pipe(
+        Effect.andThen(Effect.sync(() => providerRuntimes.startUpdateChecks({ updateInstalled: appUpgraded }))),
+      ),
+    );
+  } else {
+    providerRuntimes.startUpdateChecks({ updateInstalled: appUpgraded });
+  }
   if (appUpgraded)
     void runCauseEffect(providerCliAppVersion.set({ appVersion: app.getVersion() })).catch((error) =>
       logger.warn("The provider CLI app version did not save.", toLogValue(error)),

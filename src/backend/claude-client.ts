@@ -289,6 +289,9 @@ interface ThreadRuntime {
   mcpConfigFile: string | null;
 }
 
+/** The limit of `claude auth status` when the caller names none. */
+const AUTH_STATUS_TIMEOUT_MS = 5_000;
+
 /**
  * How long a thread with no turn keeps its `claude` process. Each process holds hundreds of MB with
  * its MCP servers, and the SDK resumes the same session from disk, so an idle thread costs only a
@@ -549,7 +552,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       case "initialize":
         return yield* providerSync(() => decoder({}));
       case "account/read": {
-        const response = yield* this.#readAccountEffect();
+        const response = yield* this.#readAccountEffect(timeoutMs);
         return yield* providerSync(() => decoder(response));
       }
       case "account/rateLimits/read": {
@@ -752,10 +755,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
 
   readonly #readAccountEffect = Effect.fn("ClaudeAgentClient.readAccount")(function* (
     this: ClaudeAgentClient,
+    timeoutMs = AUTH_STATUS_TIMEOUT_MS,
   ): Effect.fn.Return<AccountReadResult, ProviderClientOperationError> {
-    let status = yield* this.#readAuthStatusEffect(false);
+    let status = yield* this.#readAuthStatusEffect(false, timeoutMs);
     const onApiKey = status.loggedIn !== true && Boolean(this.#fallbackApiKey?.());
-    if (onApiKey) status = yield* this.#readAuthStatusEffect(true);
+    if (onApiKey) status = yield* this.#readAuthStatusEffect(true, timeoutMs);
     this.#onApiKey = onApiKey && status.loggedIn === true;
     this.#accountRead = true;
     if (status.loggedIn !== true) return { account: null, requiresOpenaiAuth: false };
@@ -792,6 +796,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #readAuthStatusEffect = Effect.fn("ClaudeAgentClient.readAuthStatus")(function* (
     this: ClaudeAgentClient,
     withApiKey: boolean,
+    timeoutMs: number,
   ): Effect.fn.Return<DynamicRecord, ProviderClientOperationError> {
     if (!withApiKey) {
       const stored = yield* readClaudeStoredSignIn({ ...claudeEnvironment(this.#cli), ...this.#environment(false) });
@@ -808,7 +813,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         yield* Effect.result(
           providerCall(() =>
             execFileAsync(target.command, target.args, {
-              timeout: 5_000,
+              timeout: timeoutMs,
               maxBuffer: 64 * 1024,
               windowsVerbatimArguments: target.windowsVerbatimArguments,
               // The agent environment carries the account's `CLAUDE_CONFIG_DIR`, so this reads that account.
