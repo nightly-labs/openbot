@@ -1169,6 +1169,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const billingPlans = previewBillingServers();
 
   const api: OpenBotDesktopApi = {
+    backgroundTasks: {
+      list: async () => [],
+      tail: async () => null,
+      stop: async () => undefined,
+    },
     getAppInfo: async () => clone(appInfo),
     getSetupState: async () => clone(setupState),
     saveSetup: async ({ preferredProvider, preferredModel }) => {

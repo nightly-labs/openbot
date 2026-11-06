@@ -47,6 +47,7 @@ import { speechReading } from "../speech/speech-playback";
 import { stopSpokenReply } from "../speech/speech-replies";
 import { copyComposerSelection, readComposerCopy } from "./composer-clipboard";
 import { useConversationViewScope } from "./conversation-scope";
+import { ManagedTasksSection } from "./ManagedTasksSection";
 import { currentConversationTarget } from "./stores/composer-store";
 
 // Module scope: the composer remounts on navigation, and a dismissed notice must stay dismissed.
@@ -465,6 +466,9 @@ export function ConversationComposer() {
               </Show>
             </div>
           </div>
+          <Show when={props.agent?.id} keyed>
+            {(agentId) => <ManagedTasksSection agentId={agentId} />}
+          </Show>
           <Show when={providerWaitNotice()}>
             {(notice) => <ComposerNotice title={notice().title} body={notice().body} />}
           </Show>
