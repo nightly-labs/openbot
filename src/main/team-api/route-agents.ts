@@ -172,24 +172,29 @@ export async function routeAgents(
     // bodies only. `botId` is what every shipped client sends and what every shipped host reads.
     const agentId = url.searchParams.get("botId") ?? undefined;
     const cursor = url.searchParams.get("cursor") ?? undefined;
-    // Each result holds its whole message. As the conversation page does, long messages make a page
-    // of fewer results, and one message alone that is too large is cut, so the page fits one WebRTC
-    // frame. The cursor is an offset, so the client reads the rest as later pages.
-    for (let limit = pageLimit(url); ; limit = Math.floor(limit / 2)) {
-      const page = agents.searchConversationMessages(query, agentId, cursor, limit);
-      const bytes = Buffer.byteLength(JSON.stringify(page));
-      if (bytes <= WEBRTC_FRAME_BODY_BUDGET) return json(200, page);
-      if (limit === 1) {
-        const cut = messageTextCut(
-          page.results.map((result) => result.message),
-          bytes - WEBRTC_FRAME_BODY_BUDGET,
-        );
-        return json(200, {
-          ...page,
-          results: page.results.map((result) => ({ ...result, message: cut(result.message) })),
-        });
+    // Each result holds its whole message, so a page can be larger than one WebRTC frame. Then the
+    // page keeps the results that fit, and one result alone that is too large is cut. The text filter
+    // reads every stored message, so the search runs at most twice: the second time at the kept
+    // count, which gives the cursor of the next page.
+    let page = agents.searchConversationMessages(query, agentId, cursor, pageLimit(url));
+    let bytes = Buffer.byteLength(JSON.stringify(page));
+    if (bytes > WEBRTC_FRAME_BODY_BUDGET) {
+      let kept = 0;
+      let size = Buffer.byteLength(JSON.stringify({ ...page, results: [] }));
+      for (const result of page.results) {
+        size += Buffer.byteLength(JSON.stringify(result)) + 1;
+        if (size > WEBRTC_FRAME_BODY_BUDGET) break;
+        kept += 1;
       }
+      page = agents.searchConversationMessages(query, agentId, cursor, Math.max(1, kept));
+      bytes = Buffer.byteLength(JSON.stringify(page));
     }
+    if (bytes <= WEBRTC_FRAME_BODY_BUDGET) return json(200, page);
+    const cut = messageTextCut(
+      page.results.map((result) => result.message),
+      bytes - WEBRTC_FRAME_BODY_BUDGET,
+    );
+    return json(200, { ...page, results: page.results.map((result) => ({ ...result, message: cut(result.message) })) });
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.status) {
     return json(200, agents.getStatus());

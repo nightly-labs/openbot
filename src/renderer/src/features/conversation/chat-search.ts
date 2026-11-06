@@ -141,12 +141,17 @@ function lowercase(source: string): LowercaseText {
  */
 const SEARCH_OPENS_CHARACTERS = 300_000;
 
+/** Whether search or a quote jump may open a folded message of this text. */
+export function chatSearchCanOpen(text: string): boolean {
+  return text.length <= SEARCH_OPENS_CHARACTERS;
+}
+
 /**
  * Whether search opens a folded long message. Search reads only the drawn text, so a message opens
  * for a query whose words it holds, and stays folded for any other query.
  */
 export function chatSearchOpensMessage(text: string, query: string): boolean {
-  if (text.length > SEARCH_OPENS_CHARACTERS) return false;
+  if (!chatSearchCanOpen(text)) return false;
   const terms = query.trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean);
   if (terms.length === 0) return false;
   const lower = text.toLocaleLowerCase();

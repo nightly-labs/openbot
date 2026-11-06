@@ -353,6 +353,8 @@ export function MessageBody(props: {
    * what the chat draws.
    */
   showFull?: boolean | undefined;
+  /** Opens a folded long message, as its "Show full message" button does. The reader can fold it again. */
+  open?: boolean | undefined;
 }) {
   const { t } = useText();
   const streamingBody = createStreamingBody(
@@ -379,7 +381,10 @@ export function MessageBody(props: {
   untrack(() => {
     if (props.message.streaming === true || streamingBody.revealing()) expandedLongMessages.add(props.message.id);
   });
-  const [expanded, setExpanded] = createSignal(() => expandedLongMessages.has(props.message.id));
+  const [expanded, setExpanded] = createSignal(() => {
+    if (props.open === true) expandedLongMessages.add(props.message.id);
+    return expandedLongMessages.has(props.message.id);
+  });
   const toggleExpanded = () => {
     const next = !expanded();
     if (next) expandedLongMessages.add(props.message.id);

@@ -1479,7 +1479,8 @@ export function createConversationViewScope(props: ConversationProps) {
     }
     setQuotedMessageId(messageId);
     flush();
-    if (!showQuotedText(messageId, text)) void revealQuote(messageId, text);
+    if (showQuotedText(messageId, text)) setQuotedMessageId(null);
+    else void revealQuote(messageId, text);
   }
 
   /* An attachment opens from its record, so it must be in a loaded message. */
@@ -1511,6 +1512,8 @@ export function createConversationViewScope(props: ConversationProps) {
     const agentId = props.agent?.id;
     const row = await replyJump.reveal(messageId, undefined, agentId);
     if (row && props.agent?.id === agentId) showQuotedText(messageId, text);
+    // The message stays open for the reader; a later jump to it must open it again.
+    setQuotedMessageId((current) => (current === messageId ? null : current));
   }
 
   function showQuotedText(messageId: string, text: string): boolean {
