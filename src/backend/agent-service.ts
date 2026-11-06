@@ -2373,10 +2373,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
-   * Tells the renderer and each joined client to read the model list again, after a change to the
-   * models that the picker shows. The list reaches them by pull, refreshed on a status event.
+   * Tells the renderer and each joined client to read the model list and the provider settings
+   * again, after a change to the models that the picker shows or to the prompt cache time. They
+   * reach the clients by pull, refreshed on a status event.
    */
-  notifyModelsChanged(): void {
+  notifyProviderSettingsChanged(): void {
     this.#emit({ type: "status", status: this.getStatus() });
   }
 

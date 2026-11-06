@@ -162,6 +162,22 @@ export const queryKeys = {
     serverId,
     provider,
   ],
+  /** Every model of one provider of a host, and the ones its model picker shows (`model-visibility-v1`). */
+  providerModels: (scope: QueryScope, serverId: string, ...provider: [] | [provider: string]) => [
+    "provider-models",
+    ...scope,
+    serverId,
+    ...provider,
+  ],
+  /** How long Claude keeps the prompt cache of a host's agents (`prompt-cache-ttl-v1`). */
+  providerPromptCache: (scope: QueryScope, serverId: string) => ["provider-prompt-cache", ...scope, serverId],
+  /** The usage reset credits of each account of one provider of a host (`provider-usage-reset-v1`). */
+  providerUsageResets: (scope: QueryScope, serverId: string, provider: string) => [
+    "provider-usage-resets",
+    ...scope,
+    serverId,
+    provider,
+  ],
   /** The accounts of a host's providers (`provider-accounts-v1`). */
   providerAccounts: (scope: QueryScope, serverId: string) => ["provider-accounts", ...scope, serverId],
   /** The custom ACP agents of a host. A save or a removal answers with the whole list. */

@@ -1998,13 +1998,14 @@ export async function createApplicationServices({
   });
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => runCauseEffect(service.stop()));
   const agentMemoryLimitSetting = reloadingAgentMemoryLimit(agentMemoryLimit, service);
+  promptCacheTtl.onChange(() => service.notifyProviderSettingsChanged());
   // The models that the model picker shows. Agents, tools and automations keep `service.listModels()`.
   const modelVisibility = new ModelVisibility({
     path: join(app.getPath("userData"), MODEL_VISIBILITY_PREFERENCE_FILE),
     catalog: new ModelReleaseCatalog(),
     listModels: () => service.listModels(),
     listAgents: () => service.listAgents(),
-    modelsChanged: () => service.notifyModelsChanged(),
+    modelsChanged: () => service.notifyProviderSettingsChanged(),
   });
   await runCauseEffect(modelVisibility.load());
   /** The answer an agent gave in one turn, for routine flows, routine results and local scripts. */

@@ -5,6 +5,7 @@ import {
   type AccessibilityActionEvent,
   type AccessibilityActionInfo,
   type LayoutChangeEvent,
+  type ScrollViewProps,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -13,14 +14,19 @@ import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
-/** `androidNativeHeader`: the page keeps the native Android header, for a `Stack.SearchBar`. */
+/**
+ * `androidNativeHeader`: the page keeps the native Android header, for a `Stack.SearchBar`.
+ * `onScroll`: for a long list that adds its rows as the reader scrolls.
+ */
 export function SettingsContent({
   children,
   androidNativeHeader,
-}: PropsWithChildren<{ androidNativeHeader?: boolean }>) {
+  onScroll,
+}: PropsWithChildren<{ androidNativeHeader?: boolean; onScroll?: ScrollViewProps["onScroll"] }>) {
   return (
     <SheetScrollView
       androidNativeHeader={androidNativeHeader}
+      onScroll={onScroll}
       scrollEdgeEffect={false}
       contentContainerClassName="gap-7 px-4 pb-safe-offset-5 pt-5"
       keyboardDismissMode="interactive"
@@ -93,6 +99,7 @@ export function SettingsRow({
   disclosure = true,
   accessibilityLabel,
   checked,
+  multiple = false,
   expanded,
   accessibilityActions,
   onAccessibilityAction,
@@ -107,6 +114,8 @@ export function SettingsRow({
   accessibilityLabel?: string;
   /** Makes the row one choice of a list. True when it is the selected choice. */
   checked?: boolean;
+  /** With `checked`: the row is one choice of a list where more than one can be on. */
+  multiple?: boolean;
   /** For a row that shows or hides the rows below it. */
   expanded?: boolean;
   /**
@@ -162,7 +171,7 @@ export function SettingsRow({
   );
   return onPress ? (
     <ListGroup.Item
-      accessibilityRole={checked === undefined ? "button" : "radio"}
+      accessibilityRole={checked === undefined ? "button" : multiple ? "checkbox" : "radio"}
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled, checked, expanded }}
       accessibilityActions={accessibilityActions}

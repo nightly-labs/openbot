@@ -1,29 +1,45 @@
 import {
   type AgentProviderId,
+  agentProviderName,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   isAgentProvider,
   PROVIDER_ACCOUNT_LABEL_MAX_LENGTH,
   type ProviderAccountStatus,
+  type ProviderUsageResetOutcome,
 } from "@openbot/contracts/ipc";
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useProviderAccountName } from "@/features/agents/components/agent-runtime-fields";
-import { type ProviderAdmin, providerAccountStateKey } from "@/features/servers/model/provider-admin";
+import { useQueryScope } from "@/features/auth/context/mobile-session-context";
+import {
+  type ProviderAdmin,
+  providerAccountStateKey,
+  providerSignOutOffered,
+} from "@/features/servers/model/provider-admin";
 import { useOpenSignIn } from "@/features/servers/model/use-open-sign-in";
-import { useProviderAdmin, useServerProviderAccounts } from "@/features/servers/model/use-server-providers";
+import { useServerProviderAccounts, useServerProviders } from "@/features/servers/model/use-server-providers";
 import {
   SettingsContent,
   SettingsNote,
   SettingsRow,
   SettingsSection,
 } from "@/features/settings/components/settings-content";
+import { queryKeys } from "@/features/workspace/model/query-keys";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
-import { useText } from "@/shared/lib/text";
+import { currentText, useText } from "@/shared/lib/text";
+
+const RESET_OUTCOME_KEYS = {
+  reset: "mobile.server.providers.resetUsageDone",
+  nothingToReset: "mobile.server.providers.resetUsageNothing",
+  noCredit: "mobile.server.providers.resetUsageNoCredit",
+  alreadyRedeemed: "mobile.server.providers.resetUsageAlreadyRedeemed",
+} as const satisfies Record<ProviderUsageResetOutcome, string>;
 
 /**
  * Server settings > Providers > a provider > one of its accounts on the host: its name, its sign-in
@@ -33,7 +49,7 @@ export function ServerProviderAccountScreen() {
   const { t, errorMessage } = useText();
   const params = useLocalSearchParams<{ serverId: string; provider: string; accountId: string }>();
   const provider = isAgentProvider(params.provider) ? params.provider : null;
-  const { available, admin } = useProviderAdmin(params.serverId);
+  const { available, admin, rows, refreshStatus } = useServerProviders(params.serverId);
   const accounts = useServerProviderAccounts(params.serverId, admin);
   const list = accounts.list.data?.providers.find((entry) => entry.provider === provider)?.accounts ?? [];
   const index = list.findIndex((account) => account.id === params.accountId);
@@ -60,7 +76,18 @@ export function ServerProviderAccountScreen() {
       account={account}
       index={index}
       accounts={admin.accounts}
+      usageResets={admin.usageResets}
+      // The provider's own sign-in signs out on the host, as the desktop account menu offers it.
+      signOut={
+        account.id === DEFAULT_PROVIDER_ACCOUNT_ID &&
+        account.state === "connected" &&
+        admin.signOut &&
+        rows.some((row) => row.id === provider && providerSignOutOffered(row))
+          ? admin.signOut
+          : null
+      }
       onChanged={accounts.refresh}
+      onStatusChanged={refreshStatus}
     />
   );
 }
@@ -71,20 +98,39 @@ function AccountPage({
   account,
   index,
   accounts,
+  usageResets,
+  signOut,
   onChanged,
+  onStatusChanged,
 }: {
   serverId: string;
   provider: AgentProviderId;
   account: ProviderAccountStatus;
   index: number;
   accounts: NonNullable<ProviderAdmin["accounts"]>;
+  usageResets: ProviderAdmin["usageResets"];
+  signOut: ProviderAdmin["signOut"];
   onChanged: () => Promise<void>;
+  onStatusChanged: () => Promise<void>;
 }) {
   const { t, sourceText, errorMessage } = useText();
   const accountName = useProviderAccountName();
   const name = accountName(account, index);
   const [label, setLabel] = useState(account.label ?? "");
-  const [pending, setPending] = useState<"rename" | "remove" | null>(null);
+  const [pending, setPending] = useState<"rename" | "remove" | "reset" | "sign-out" | null>(null);
+  /** How the last usage reset ended, when it did not fail. */
+  const [notice, setNotice] = useState<string | null>(null);
+  const queryScope = useQueryScope();
+  const credits = useQuery({
+    queryKey: queryKeys.providerUsageResets(queryScope, serverId, provider),
+    retry: false,
+    staleTime: 0,
+    queryFn: usageResets && account.state === "connected" ? () => usageResets.list(provider) : skipToken,
+  });
+  const resetsLeft =
+    account.state === "connected"
+      ? (credits.data?.find((reading) => reading.accountId === account.id)?.available ?? 0)
+      : 0;
   const openSignIn = useOpenSignIn();
   const [error, setError] = useState<string | null>(null);
   const locked = useRef(false);
@@ -96,18 +142,25 @@ function AccountPage({
     void onChanged();
   }, [leaving, onChanged]);
 
-  async function run(kind: "rename" | "remove", operation: () => Promise<void>) {
+  async function run(kind: "rename" | "remove" | "reset" | "sign-out", operation: () => Promise<void>) {
     if (locked.current) return;
     locked.current = true;
     setPending(kind);
     setError(null);
+    setNotice(null);
     try {
       await operation();
       void haptics.notification("success");
       if (kind === "remove") setLeaving(true);
-      else await onChanged();
+      // A reset changes no account; it reads its credits again.
+      else if (kind !== "reset") await onChanged();
     } catch (cause) {
-      setError(errorMessage(cause, t("mobile.server.providers.accountFailed")));
+      setError(
+        errorMessage(
+          cause,
+          t(kind === "reset" ? "mobile.server.providers.resetUsageFailed" : "mobile.server.providers.accountFailed"),
+        ),
+      );
       void haptics.notification("error");
     } finally {
       locked.current = false;
@@ -173,6 +226,71 @@ function AccountPage({
           >
             <Typography.Paragraph className="text-accent">
               {t("mobile.server.providers.accountSignInAgain")}
+            </Typography.Paragraph>
+          </SettingsRow>
+        </SettingsSection>
+      ) : null}
+      {usageResets && resetsLeft > 0 ? (
+        <SettingsSection footer={notice ?? t("mobile.server.providers.resetUsageHint", { available: resetsLeft })}>
+          <SettingsRow
+            disclosure={false}
+            disabled={pending !== null}
+            onPress={() =>
+              Alert.alert(
+                t("mobile.server.providers.resetUsageTitle", { name }),
+                t("mobile.server.providers.resetUsageBody"),
+                [
+                  { text: t("common.cancel"), style: "cancel" },
+                  {
+                    text: t("mobile.server.providers.resetUsage"),
+                    onPress: () =>
+                      void run("reset", async () => {
+                        try {
+                          const outcome = await usageResets.reset(provider, account.id);
+                          setNotice(currentText().t(RESET_OUTCOME_KEYS[outcome], { name }));
+                        } finally {
+                          void credits.refetch();
+                        }
+                      }),
+                  },
+                ],
+              )
+            }
+          >
+            <Typography.Paragraph className="text-accent">
+              {t(pending === "reset" ? "mobile.server.providers.resettingUsage" : "mobile.server.providers.resetUsage")}
+            </Typography.Paragraph>
+          </SettingsRow>
+        </SettingsSection>
+      ) : notice ? (
+        <SettingsNote>{notice}</SettingsNote>
+      ) : null}
+      {signOut ? (
+        <SettingsSection>
+          <SettingsRow
+            disclosure={false}
+            disabled={pending !== null}
+            onPress={() =>
+              Alert.alert(
+                t("mobile.server.providers.disconnectTitle", { name }),
+                t("mobile.server.providers.disconnectBody", { provider: agentProviderName(provider) }),
+                [
+                  { text: t("common.cancel"), style: "cancel" },
+                  {
+                    text: t("mobile.server.providers.disconnect"),
+                    style: "destructive",
+                    onPress: () =>
+                      void run("sign-out", async () => {
+                        await signOut(provider);
+                        await onStatusChanged();
+                      }),
+                  },
+                ],
+              )
+            }
+          >
+            <Typography.Paragraph className="text-danger-text">
+              {t("mobile.server.providers.disconnect")}
             </Typography.Paragraph>
           </SettingsRow>
         </SettingsSection>
