@@ -56,7 +56,7 @@ export interface SmtpWelcomeMessage extends WelcomeEmailInput {
 /** A license email and its address. */
 export type SmtpLicenseMessage = LicenseEmailInput & { email: string };
 
-interface PreparedEmailMessage {
+export interface PreparedEmailMessage {
   email: string;
   /** The address a reply goes to, when it is not the sender. */
   replyTo?: string;
@@ -132,36 +132,28 @@ const RELAY_URL = "https://openbot-email-relay.internal/send";
 const RELAY_TIMEOUT_MS = EMAIL_CODE_DELIVERY_BUDGET_MS + 5_000;
 const EMAIL_PATTERN = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+$/iu;
 
-export const sendPrivateEmailCode = Effect.fn("Smtp.sendPrivateEmailCode ")(function* (
-  config: SmtpEmailConfig,
+/** Checks a sign-in code message and renders it. */
+export const prepareEmailCode = Effect.fn("Email.prepareCode")(function* (
   message: SmtpEmailMessage,
-  connector?: SmtpConnector,
-) {
+): Effect.fn.Return<PreparedEmailMessage, SmtpFailure> {
   yield* smtpValidate(() => {
-    validateConfig(config);
     validateEmail(message.email, "recipient");
     if (!/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}$/u.test(message.code)) {
       throw new Error("smtp_invalid_code");
     }
   });
-  return yield* sendPrivateEmail(
-    config,
-    {
-      email: message.email,
-      content: renderSignInCodeEmail({
-        code: message.code,
-        expiresInMinutes: Math.max(1, Math.ceil((message.expiresAt - Date.now()) / 60_000)),
-      }),
-    },
-    connector,
-  );
+  return {
+    email: message.email,
+    content: renderSignInCodeEmail({
+      code: message.code,
+      expiresInMinutes: Math.max(1, Math.ceil((message.expiresAt - Date.now()) / 60_000)),
+    }),
+  };
 });
 
-export const sendPrivateTeamInvite = Effect.fn("Smtp.sendPrivateTeamInvite ")(function* (
-  config: SmtpEmailConfig,
+export const prepareTeamInvite = Effect.fn("Email.prepareTeamInvite")(function* (
   message: SmtpTeamInviteMessage,
-  connector?: SmtpConnector,
-) {
+): Effect.fn.Return<PreparedEmailMessage, SmtpFailure> {
   yield* smtpValidate(() => {
     validateEmail(message.email, "recipient");
     validateEmail(message.inviterEmail, "inviter");
@@ -176,27 +168,21 @@ export const sendPrivateTeamInvite = Effect.fn("Smtp.sendPrivateTeamInvite ")(fu
       throw new Error("smtp_invalid_invite_url");
     }
   });
-  return yield* sendPrivateEmail(
-    config,
-    {
-      email: message.email,
-      content: renderTeamInviteEmail({
-        inviterEmail: message.inviterEmail,
-        serverName: message.serverName,
-        inviteUrl: message.inviteUrl,
-        role: message.role,
-      }),
-    },
-    connector,
-  );
+  return {
+    email: message.email,
+    content: renderTeamInviteEmail({
+      inviterEmail: message.inviterEmail,
+      serverName: message.serverName,
+      inviteUrl: message.inviteUrl,
+      role: message.role,
+    }),
+  };
 });
 
-/** Sends the welcome email of an account's first plan. A reply goes to the sending mailbox. */
-export const sendPrivateWelcomeEmail = Effect.fn("Smtp.sendPrivateWelcomeEmail")(function* (
-  config: SmtpEmailConfig,
+/** The welcome email of an account's first plan. A reply goes to the sending mailbox. */
+export const prepareWelcomeEmail = Effect.fn("Email.prepareWelcome")(function* (
   message: SmtpWelcomeMessage,
-  connector?: SmtpConnector,
-) {
+): Effect.fn.Return<PreparedEmailMessage, SmtpFailure> {
   yield* smtpValidate(() => {
     if (
       !message.serverName.trim() ||
@@ -206,35 +192,31 @@ export const sendPrivateWelcomeEmail = Effect.fn("Smtp.sendPrivateWelcomeEmail")
       throw new Error("smtp_invalid_server_name");
     }
   });
-  return yield* sendPrivateEmail(
-    config,
-    { email: message.email, content: renderWelcomeEmail({ plan: message.plan, serverName: message.serverName }) },
-    connector,
-  );
+  return { email: message.email, content: renderWelcomeEmail({ plan: message.plan, serverName: message.serverName }) };
 });
 
-export const sendPrivateLicenseEmail = Effect.fn("Smtp.sendPrivateLicenseEmail")(function* (
-  config: SmtpEmailConfig,
-  message: SmtpLicenseMessage,
-  connector?: SmtpConnector,
-) {
-  return yield* sendPrivateEmail(config, { email: message.email, content: renderLicenseEmail(message) }, connector);
-});
+export function prepareLicenseEmail(message: SmtpLicenseMessage): Effect.Effect<PreparedEmailMessage> {
+  return Effect.sync(() => ({ email: message.email, content: renderLicenseEmail(message) }));
+}
 
-/** Sends a message from the site's contact form to the sending mailbox. A reply goes to the visitor. */
-export const sendPrivateContactMessage = Effect.fn("Smtp.sendPrivateContactMessage")(function* (
-  config: SmtpEmailConfig,
+/** A message from the site's contact form to `recipient`, the sending mailbox. A reply goes to the visitor. */
+export function prepareContactMessage(
+  recipient: string,
   message: SmtpContactMessage,
-  connector?: SmtpConnector,
-) {
-  return yield* sendPrivateEmail(
-    config,
-    { email: config.from, replyTo: message.email, content: renderContactMessageEmail(message) },
-    connector,
-  );
-});
+): Effect.Effect<PreparedEmailMessage> {
+  return Effect.sync(() => ({ email: recipient, replyTo: message.email, content: renderContactMessageEmail(message) }));
+}
 
-const sendPrivateEmail = Effect.fn("SmtpEmail.send")(function* (
+/**
+ * The SMTP headers that both senders add: `Auto-Submitted` (RFC 3834) and `X-Auto-Response-Suppress`
+ * (Exchange and Outlook) stop vacation and out-of-office replies to the sending mailbox.
+ */
+export const AUTOMATED_EMAIL_HEADERS = {
+  "Auto-Submitted": "auto-generated",
+  "X-Auto-Response-Suppress": "All",
+} as const;
+
+export const sendPrivateEmail = Effect.fn("SmtpEmail.send")(function* (
   config: SmtpEmailConfig,
   message: PreparedEmailMessage,
   connector?: SmtpConnector,
@@ -524,8 +506,7 @@ class SmtpResponseReader {
 
 // Plain text first and HTML last: a client shows the last part it can render. Both parts are
 // quoted-printable, so the message is 7-bit clean and no line passes the 998-octet limit, whatever
-// the relay supports. `Auto-Submitted` (RFC 3834) and `X-Auto-Response-Suppress` (Exchange and
-// Outlook) stop vacation and out-of-office replies to the sending mailbox.
+// the relay supports.
 function createMimeMessage(from: string, message: PreparedEmailMessage): string {
   const boundary = `openbot-${crypto.randomUUID()}`;
   return dotStuff(
@@ -536,8 +517,7 @@ function createMimeMessage(from: string, message: PreparedEmailMessage): string 
       `Subject: ${encodeHeaderValue(message.content.subject)}`,
       `Date: ${new Date().toUTCString()}`,
       `Message-ID: <${crypto.randomUUID()}@openbot.run>`,
-      "Auto-Submitted: auto-generated",
-      "X-Auto-Response-Suppress: All",
+      ...Object.entries(AUTOMATED_EMAIL_HEADERS).map(([name, value]) => `${name}: ${value}`),
       "MIME-Version: 1.0",
       "Content-Type: multipart/alternative;",
       ` boundary="${boundary}"`,

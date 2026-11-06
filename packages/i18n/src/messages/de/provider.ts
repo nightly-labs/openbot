@@ -101,6 +101,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "Die Anmeldung bei {name} wird auf {host} gestartet…",
   "provider.codeLogin.pageOpening": "Die Anmeldeseite von {name} wird auf {host} geöffnet…",
   "provider.codeLogin.linkStep": "Melde dich bei {name} an. OpenBot fährt automatisch fort.",
+  "provider.codeLogin.chatgptDeviceSetting":
+    "Öffne ChatGPT auf einem Computer, gehe zu den Sicherheitseinstellungen und aktiviere die Anmeldung per Gerätecode für Codex. Bei einem Arbeitskonto aktiviert sie der Admin deines Workspace.",
   "provider.useApp.title": "{name} in der OpenBot-App verbinden",
   "provider.useApp.description":
     "Die Anmeldung bei {name} kehrt zu dem Computer zurück, der sie gestartet hat, und ein Browser-Tab kann sie nicht empfangen. Verbinde {name} in der OpenBot-App. Die App schließt die Anmeldung selbst ab.",
@@ -124,6 +126,8 @@ export const messages = {
   "provider.picker.noModels": "Keine Modelle von {name} verfügbar.",
   "provider.picker.customEmpty":
     "Füge einen OpenAI-kompatiblen Endpunkt hinzu: einen Modellserver auf diesem Computer oder einen Dienst mit Basis-URL und Schlüssel.",
+  "provider.picker.customPending":
+    "Die Modelle deiner Endpunkte sind noch nicht geladen. Der Anbieter liest sie, sobald seine aktuelle Aufgabe beendet ist.",
   "provider.picker.defaultModelLabel": "{name}, Standard",
   "provider.picker.usageLimit": "Nutzungslimit erreicht",
   "provider.picker.usageLimitWindow": "Limit ({window})",
@@ -244,17 +248,10 @@ export const messages = {
   "provider.settings.modelShow": "{name} ({id}) in der Modellauswahl zeigen",
   "provider.settings.modelsNoMatch": "Kein Modell passt zur Suche.",
   "provider.settings.modelsLoadFailed": "Die Modelle dieses Servers konnten nicht geladen werden.",
-  "provider.settings.download": "Download",
-  "provider.settings.downloadedCli": "{name}-CLI",
-  "provider.settings.downloadDetail": {
-    one: "{version} · 1 Version · {size}",
-    other: "{version} · {count} Versionen · {size}",
-  },
-  "provider.settings.downloadVersions": { one: "1 Version · {size}", other: "{count} Versionen · {size}" },
-  "provider.settings.downloadAgain": "Wenn du {name} einschaltest, lädt OpenBot die CLI erneut herunter.",
-  "provider.settings.removeDownloadConfirm": "{size} entfernen?",
-  "provider.settings.removeDownloadKeeps": "Konten, Anmeldungen und Agenten bleiben.",
-  "provider.settings.removeDownload": "Download entfernen",
-  "provider.settings.removingDownload": "Wird entfernt…",
+  "provider.settings.deleteTitle": "{name} löschen",
+  "provider.settings.deleteOn":
+    "Schaltet {name} aus und löscht die CLI, die OpenBot heruntergeladen hat. Konten, Anmeldungen und Agenten bleiben.",
+  "provider.settings.deleteOff":
+    "Löscht die CLI, die OpenBot für {name} heruntergeladen hat ({size}). Konten, Anmeldungen und Agenten bleiben.",
   "provider.settings.removeDownloadFailed": "Der Download konnte nicht entfernt werden.",
 } as const satisfies PartialTranslation<typeof source>;

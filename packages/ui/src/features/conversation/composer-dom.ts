@@ -74,6 +74,12 @@ function serializeNode(node: Node): string {
   const quoteMessageId = node.dataset.quoteMessageId;
   const quoteText = node.dataset.quoteText;
   if (quoteMessageId && quoteText) return serializeChatTagReference("quote", quoteText, quoteMessageId);
+  const tabId = node.dataset.tabId;
+  const tabName = node.dataset.tabName;
+  if (tabId && tabName) return serializeChatTagReference("tab", tabName, tabId);
+  const threadId = node.dataset.threadId;
+  const threadName = node.dataset.threadName;
+  if (threadId && threadName) return serializeChatTagReference("thread", threadName, threadId);
   if (node.tagName === "BR") return "\n";
   const content = Array.from(node.childNodes).map(serializeNode).join("");
   return node.tagName === "DIV" || node.tagName === "P" ? `${content}\n` : content;
@@ -272,7 +278,9 @@ export function mentionTokenAtCaretBoundary(
 function closestMentionToken(node: Node, editor: HTMLDivElement): HTMLElement | null {
   const element = node instanceof HTMLElement ? node : node.parentElement;
   const token =
-    element?.closest<HTMLElement>("[data-mention-id], [data-skill-id], [data-mcp-id], [data-quote-message-id]") ?? null;
+    element?.closest<HTMLElement>(
+      "[data-mention-id], [data-skill-id], [data-mcp-id], [data-quote-message-id], [data-tab-id], [data-thread-id]",
+    ) ?? null;
   return token && editor.contains(token) ? token : null;
 }
 

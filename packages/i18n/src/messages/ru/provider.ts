@@ -113,6 +113,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "Запуск входа в {name} на {host}…",
   "provider.codeLogin.pageOpening": "Открываем страницу входа {name} на {host}…",
   "provider.codeLogin.linkStep": "Войдите в {name}. OpenBot продолжит сам.",
+  "provider.codeLogin.chatgptDeviceSetting":
+    "В ChatGPT на компьютере откройте настройки безопасности и включите вход по коду устройства для Codex. Для рабочего аккаунта его включает администратор рабочего пространства.",
   "provider.useApp.title": "Подключите {name} в приложении OpenBot",
   "provider.useApp.description":
     "Вход в {name} возвращается на компьютер, который его начал, а вкладка браузера не может его принять. Подключите {name} в приложении OpenBot. Приложение завершит вход само.",
@@ -137,6 +139,8 @@ export const messages = {
   "provider.picker.noModels": "У {name} нет доступных моделей.",
   "provider.picker.customEmpty":
     "Добавьте эндпоинт, совместимый с OpenAI: сервер моделей на этом компьютере или любой сервис с базовым URL и ключом.",
+  "provider.picker.customPending":
+    "Модели ваших эндпоинтов ещё не загружены. Провайдер прочитает их, когда завершится текущая задача.",
   "provider.picker.defaultModelLabel": "{name}, по умолчанию",
   "provider.picker.usageLimit": "Лимит использования исчерпан",
   "provider.picker.usageLimitWindow": "Лимит ({window})",
@@ -262,24 +266,10 @@ export const messages = {
   "provider.settings.modelShow": "Показывать {name} ({id}) в выборе модели",
   "provider.settings.modelsNoMatch": "Нет моделей по вашему запросу.",
   "provider.settings.modelsLoadFailed": "Не удалось загрузить модели этого сервера.",
-  "provider.settings.download": "Загрузка",
-  "provider.settings.downloadedCli": "CLI {name}",
-  "provider.settings.downloadDetail": {
-    one: "{version} · {count} версия · {size}",
-    few: "{version} · {count} версии · {size}",
-    many: "{version} · {count} версий · {size}",
-    other: "{version} · {count} версии · {size}",
-  },
-  "provider.settings.downloadVersions": {
-    one: "{count} версия · {size}",
-    few: "{count} версии · {size}",
-    many: "{count} версий · {size}",
-    other: "{count} версии · {size}",
-  },
-  "provider.settings.downloadAgain": "Когда вы включите {name}, OpenBot снова загрузит CLI.",
-  "provider.settings.removeDownloadConfirm": "Удалить {size}?",
-  "provider.settings.removeDownloadKeeps": "Аккаунты, входы и агенты останутся.",
-  "provider.settings.removeDownload": "Удалить загрузку",
-  "provider.settings.removingDownload": "Удаление…",
+  "provider.settings.deleteTitle": "Удалить {name}",
+  "provider.settings.deleteOn":
+    "Выключает {name} и удаляет CLI, загруженный OpenBot. Аккаунты, входы и агенты останутся.",
+  "provider.settings.deleteOff":
+    "Удаляет CLI, который OpenBot загрузил для {name} ({size}). Аккаунты, входы и агенты останутся.",
   "provider.settings.removeDownloadFailed": "Не удалось удалить загрузку.",
 } as const satisfies PartialTranslation<typeof source>;

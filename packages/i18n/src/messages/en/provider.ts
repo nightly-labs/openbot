@@ -105,6 +105,8 @@ export const messages = defineMessages("provider", {
   "provider.codeLogin.relayStarting": "Starting the {name} sign-in on {host}…",
   "provider.codeLogin.pageOpening": "Opening the {name} sign-in page on {host}…",
   "provider.codeLogin.linkStep": "Log in to {name}. OpenBot continues by itself.",
+  "provider.codeLogin.chatgptDeviceSetting":
+    "In ChatGPT on a computer, open the security settings and turn on device code sign-in for Codex. For a work account, your workspace admin turns it on.",
 
   // A provider that only the OpenBot app can sign in, from a browser tab.
   "provider.useApp.title": "Connect {name} in the OpenBot app",
@@ -132,6 +134,8 @@ export const messages = defineMessages("provider", {
   "provider.picker.noModels": "No models are available from {name}.",
   "provider.picker.customEmpty":
     "Add an OpenAI-compatible endpoint — a model server on this computer, or any service with a base URL and a key.",
+  "provider.picker.customPending":
+    "The models of your endpoints are not loaded yet. The provider reads them after its current task stops.",
   "provider.picker.defaultModelLabel": "{name}, default",
   "provider.picker.usageLimit": "Usage limit reached",
   "provider.picker.usageLimitWindow": "{window} limit",
@@ -312,18 +316,11 @@ export const messages = defineMessages("provider", {
   "provider.settings.turnOnFirst": "Turn {name} on first.",
   "provider.settings.makeDefault": "Make default",
   "provider.settings.useTitle": "Use {name}",
-  "provider.settings.download": "Download",
-  "provider.settings.downloadedCli": "{name} CLI",
-  "provider.settings.downloadDetail": {
-    one: "{version} · 1 version · {size}",
-    other: "{version} · {count} versions · {size}",
-  },
-  "provider.settings.downloadVersions": { one: "1 version · {size}", other: "{count} versions · {size}" },
-  "provider.settings.downloadAgain": "When you turn {name} on, OpenBot downloads its CLI again.",
-  "provider.settings.removeDownloadConfirm": "Remove {size}?",
-  "provider.settings.removeDownloadKeeps": "Accounts, sign-ins and agents stay.",
-  "provider.settings.removeDownload": "Remove download",
-  "provider.settings.removingDownload": "Removing…",
+  "provider.settings.deleteTitle": "Delete {name}",
+  "provider.settings.deleteOn":
+    "Turns {name} off and deletes the CLI that OpenBot downloaded. Accounts, sign-ins and agents stay.",
+  "provider.settings.deleteOff":
+    "Deletes the CLI that OpenBot downloaded for {name} ({size}). Accounts, sign-ins and agents stay.",
   "provider.settings.removeDownloadFailed": "Could not remove the download.",
   "provider.settings.endpoints": "Endpoints",
   "provider.settings.noEndpoints": "No endpoints.",

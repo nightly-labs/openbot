@@ -1,6 +1,7 @@
 import { win32 } from "node:path";
 import type { LoadSessionResponse, NewSessionRequest, PromptResponse, RequestError } from "@agentclientprotocol/sdk";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
+import type { CauseCode } from "@openbot/telemetry";
 import { enableCursorMcpServers } from "./cursor-mcp-disabled";
 import { isRecord } from "./protocol";
 
@@ -37,6 +38,12 @@ export interface AcpFlavor {
     model: string | null,
     endpoint: AcpCustomEndpoint | null,
   ): string;
+  /**
+   * The cause of a turn's failure that the agent names in a structured field, such as an error name
+   * in the error's data or a stop reason that means another thing for this agent. `null` gives the
+   * decision to the protocol's rules. It is a fixed code; it never carries the error's text.
+   */
+  failureCause?(error: unknown): CauseCode | null;
   /** The message of a turn that ended with no answer text. Absent: such a turn succeeds. */
   emptyAnswerFailure?(reasoned: boolean): string;
   /**
@@ -92,7 +99,8 @@ export interface AcpFlavor {
   thoughtsInsideAnswer?: true;
   /**
    * `session/prompt` stays open with no update while background tasks run, so a silent turn is not
-   * stalled and OpenBot does not end it (`ACP_TURN_STALL_MS`).
+   * stalled and OpenBot does not end it (`ACP_TURN_STALL_MS`). A prompt that gets no update at all
+   * is sent again once, and then fails (`ACP_FIRST_UPDATE_MS`).
    */
   promptOpenForBackgroundTasks?: true;
   /**
@@ -103,6 +111,16 @@ export interface AcpFlavor {
   unsentBackgroundTurns?: true;
   /** Each answer message has its own `messageId`, so text of a new ID is a new message, not more text. */
   messagePerId?: true;
+  /**
+   * OpenCode sends the work of its subagents as `opencode/session/child_update` notifications when
+   * the client asks for them, and they show in the subagent card, not in the parent's steps.
+   */
+  childSessionUpdates?: true;
+  /**
+   * The tools that run a subagent and send no events of it, as the tool name or `<name>: <description>`.
+   * Each call shows as a subagent with its task, state, and report.
+   */
+  subagentTools?: readonly string[];
   /**
    * The agent keeps one MCP server of each name for a directory, and a session that opens there
    * replaces the server that the others in it use. Their OpenBot servers then share one token.
@@ -136,8 +154,11 @@ export interface AcpFlavor {
   promptUsage?(response: PromptResponse): DynamicRecord | null;
 }
 
-/** The protocol's own behavior: Cline. */
+/** The protocol's own behavior, with no change for one agent. */
 export const DEFAULT_ACP_FLAVOR: AcpFlavor = {};
+
+/** Cline CLI 3.0.68 runs a subagent with its `spawn_agent` tool: `{ systemPrompt, task }`, result `{ text }`. */
+export const CLINE_ACP_FLAVOR: AcpFlavor = { subagentTools: ["spawn_agent"] };
 
 /**
  * Grok CLI 1.0.22 and 1.0.70 send no `usage` in the `session/prompt` result and no `usage_update`.
@@ -155,6 +176,8 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
  */
 export const HERMES_ACP_FLAVOR: AcpFlavor = {
   loadInsteadOfResume: { missing: (response) => response.modes == null },
+  // Its `delegate_task` call is titled `delegate_task: <goal>`, and its subagents send no events.
+  subagentTools: ["delegate_task"],
 };
 
 /**
@@ -197,6 +220,8 @@ export const KIMI_ACP_FLAVOR: AcpFlavor = {
     isRecord(error.data) &&
     typeof error.data.details === "string" &&
     error.data.details.includes("config.toml"),
+  // Its `Agent` call is titled `Agent: <description>`, and its arguments come as content text.
+  subagentTools: ["Agent"],
 };
 
 /**

@@ -72,7 +72,8 @@ export type WorkflowFieldValue = string | number | boolean;
  *   must contain, "" for any).
  * - agent: `agentId`, `task`.
  * - llm: `provider`, `model`, `effort`, `prompt`, `system`.
- * - condition: `rule`, the yes-or-no question about its input.
+ * - condition: `rule`, the yes-or-no question about its input, and `provider`, `model` and `effort`, as
+ *   llm has them. A condition saved with no `model` lets the host choose the model of each run.
  * - approval: `question`.
  * - output: `target` (a `WorkflowOutputTarget`); for `channel`, `connectionId` and `placeId`. For
  *   `github`: `repository` ("owner/name", or "trigger" for the repository of the trigger's event), `item` ("event" for the item

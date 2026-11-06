@@ -8,7 +8,11 @@ reads delivery results, changes the agent's model and account, and starts a new 
 commands. The listener runs only while at least one agent has `allowAutomation`, and binds
 `127.0.0.1` on a free port. It writes the URL and a new bearer token to `<userData>/automation/`
 (folder `0700`, files `0600`) and deletes them when it stops. It refuses any request with an
-`Origin` header or a foreign `Host` before it checks the token, so a web page cannot reach it.
+`Origin` header or a foreign `Host` before it checks the token, so a web page cannot reach it. Each
+agent accepts at most `automationRunsPerHour` messages and routine runs from scripts in one hour, so
+a script that loops cannot spend the user's quota. The value is an account default
+(`AGENT_DEFAULTS_PREFERENCE_FILE`, 30 when it is missing or invalid), set in Settings › Agents ›
+Local scripts.
 
 A run is a manual routine run with the payload after the instruction, so no Team API protocol, run
 kind or sender changes. The payload is in the run row, and `resumePendingRuns` sends it again after a
@@ -99,8 +103,13 @@ the marker it skips the turn's thinking too, so a later import does not bring a 
 
 ## Routine sessions
 
-Each routine of an agent runs in its own side thread, the routine thread. `AgentTasks.routineThread`
-makes the thread on the first run, with the routine's name as its title and `routine_id` set
+An agent routine runs in the agent's own chat, unless its `runIn` is `thread` (migration 57; existing
+routines got `chat`, the place of runs before 0.61). Then it runs in its own side thread, the routine
+thread. The routine settings show a switch for it on this computer's host only: the Team API admin wire
+does not carry `runIn`, and a remote save without it keeps the saved place. The `create_routine`,
+`update_routine`, `create_webhook_routine` and `update_webhook_routine` tools take `runIn` too. A routine set back to `chat` keeps its thread, but new runs,
+the run marker's "Open thread" link, a test run and the routine's reply digest do not use it.
+`AgentTasks.routineThread` makes the thread on the first run in a thread, with the routine's name as its title and `routine_id` set
 (migration 54; a unique index keeps one thread for each routine of an agent, also when it is
 archived). A later run uses the same thread, and a run reopens an archived one. A run also gives the
 thread the routine's current name, unless a person renamed the thread. `RoutineScheduler`
@@ -123,8 +132,10 @@ opens the routine thread. The Team API adapters drop this event, so a remote cli
 notification for a run in a routine thread. The released `agent-tasks-v1` routes do not send
 `routineId`; only this computer's IPC list has it.
 
-A routine thread is a side thread, so its runs have no Computer Use: only the agent's own chat
-drives the screen. Its runs keep the tools of the chat that side threads do not have:
+A routine thread is a side thread, but its runs keep Computer Use when the agent has it on: a
+scheduled run that drives a desktop app has no person to continue the step in the chat. The
+routine thread and the chat of one agent can then drive the screen at the same time, as two agents
+can. Its runs also keep the tools of the chat that side threads do not have:
 `OpenBotToolRouter` does not count a routine thread as an execution thread, so a run can call
 `await_event` and `start_task`.
 
@@ -271,6 +282,44 @@ changed, on this computer and on a joined host.
   post that was on its way fails as uncertain, and the user retries the step.
 - Image, asset, file output and message trigger nodes are kept in the graph but do not run yet; a
   run that reaches one fails with `nodeUnsupported`.
+- Agents use workflows with six `openbot` tools (`workflow-tools.ts`): `list_workflows`,
+  `read_workflow`, `edit_workflow`, `delete_workflow`, `run_workflow` and `read_workflow_runs`. They
+  are not in the visible set, so before `tool_search` finds them they cost only their names. A search
+  word `workflow` or `workflows` gives the schemas of all six, and no other schema or guidance, so one
+  search covers a build, a run and a delete. A read gives only the runtime fields of each node and no
+  positions, unless the agent asks for the layout; then each node has its position and card size. A run read gives each step's kind and a short label
+  (the agent id, prompt, rule or question), so the agent does not read the workflow again.
+  `edit_workflow` takes a list of operations (add, update, move, remove, connect, disconnect) and saves
+  them as one graph with `saveGraph`; a `ref` names a new node for later operations in the same call.
+  The host places nodes, so the agent sends no coordinates. The layout uses the card width of each
+  kind (`CARD_SIZE` in `workflow-tools.ts` copies `workflow-nodes.css`, or the node's `size`) and
+  leaves a 120 px column gap and a 64 px row gap, so each connection and its port chips show. A new node
+  goes one column right of the node before it, at the same top; a condition's "no" child goes below its
+  "yes" child; a node with no input goes below all nodes. After the operations, a new node that a
+  later `connect` links is placed again: a node put between existing nodes moves them and the nodes
+  after them right by its column. A workflow with no steps before the call, or a call with `tidy`,
+  gets a full layout: a column for each step after its inputs. Locked nodes, text, notes, shapes and
+  nodes that the agent placed stay. Bad arguments, a graph rule, an unknown agent or a locked
+  node is a tool failure that the model reads. On a conflict, the operations apply once more to the newer graph.
+  `Workflows` is built after the agent service, so the tool router reads it through a getter.
+- A tool create or save adds the agent's id to the local `workflows-changed` event. The canvas then
+  plays the change (`workflow-build.ts`): a cursor with the agent's name and avatar colour goes to
+  each node that the agent added, changed or moved, in graph order, and the node and the connections
+  that it completes show one after the other. The Workflows page opens a workflow that an agent made
+  while the page is open. A click on the canvas, reduced motion or an agent that the catalog does not
+  know stops or skips the play. `workflows-v1` still sends only `workflowId`, and its decoder drops
+  the agent id, so a joined desktop reloads the graph with no play.
+- As for channels, only a person's message can use `edit_workflow`, `delete_workflow` or
+  `run_workflow`, in the agent's own chat or in a side thread that the person opened or branched
+  (`AgentTasks.isPersonThread`: origin `user`, no routine, no messaging link or channel). A routine or
+  workflow run, an external chat, a thread that the agent started, an agent message or a team
+  member's message gets a tool failure: a run can carry text from outside, such as a webhook body, and
+  a run can send messages and post to outside services. Reads stay open. No tool waits for a run, so
+  the guidance tells the agent to read the run once and report what still runs.
+- `delete_workflow` also waits for the person's approval card (`awaitToolApproval` with `alwaysAsk`),
+  also for an agent with Full access: a delete loses the runs and versions. A decline is a tool
+  failure that tells the agent not to try again. The guidance tells the agent not to ask in chat
+  first, so the person answers once. `scripts/agent-workflow-gate-e2e.ts` checks both rules.
 
 ## Hidden agents
 
@@ -319,6 +368,34 @@ that route removes the colour. With `null`, the hue stays on the `PATCH`. A serv
 capability gets only the hue. A create sends the hue, then sets the colour; a failed colour change
 does not fail the create. The web client (`web-runtime.ts`, `web-client-context.tsx`) does the same
 and keeps the list in its state.
+
+## Agent chat colours
+
+An agent can have a chat colour, `chatColor` (`#rrggbb`, lower case), for its chat bubbles. It is
+not the avatar colour, and it does not change `avatarColor` or `avatarHue`. `chatColor: null`
+removes it. The colour is in `agent_json`, and an instance transfer carries it. A team member record
+has an optional `chatColor` that comes from the member's account.
+
+The released Team API codecs remove `chatColor` from agents, `/v1/members` and presence. A joined
+desktop and the web client use the optional `chat-colors-v1` capability
+(`packages/contracts/src/team-protocol/chat-colors-v1.ts`, protocol 9 only). Host route
+`routeChatColors` (`src/main/team-api/route-chat-colors.ts`):
+
+- `POST /v1/chat-colors` gives `{agents: [{agentId, color}], members: [{memberId, color}]}`: the
+  agents that the member can see, and all members (at most 100).
+- `POST /v1/chat-colors/set` takes exactly `{agentId, color | null}`. It needs manage access to the
+  agent and goes through `agents.updateAgent`. No route sets a member's colour.
+- The host sends `chat-colors-changed` with the whole list after each `agents-changed`, after each
+  presence change, and when a peer declares the capability. Each peer gets the list without the
+  agents that it cannot see, and only when its list changed.
+
+The main process of a joined desktop keeps the last list of each server
+(`RemoteServerEventRefresh`). It puts the agent colours into each agent list and agent result, and
+the member colours into each presence snapshot and members list. The renderer does not get
+`chat-colors-changed`. A save with `chatColor` calls the set route before the released `PATCH`. A
+server without the capability refuses a change of only the chat colour with
+`error.team.chatColorsUnsupported`; with other fields, the other fields change. The web client
+(`web-runtime.ts`, `web-client-context.tsx`) does the same and keeps the list in its state.
 
 ## Sidebar folders
 
@@ -438,8 +515,17 @@ mark of each open side thread, and a move of one. The marks are rows of `project
 under the side thread's own `threadId`, so the member's devices share them and no migration was
 needed. A desktop marks the open thread read while its window has focus (`markTaskRead` over IPC, or
 the route for a joined server); the phone marks it while the thread screen is in front, and shows a
-dot on the agent's name for an open thread with unread agent messages. The host sends no event when
-a mark moves; a client reads the marks again when `agent-tasks-changed` arrives or a screen that
+dot on the agent's name for an open thread with unread agent messages. The desktop reads the marks
+with `listTaskReads` (`agent:tasks:reads` over IPC, or the `reads` route for a joined server). It shows
+a dot on the tab and the menu row of an idle thread with unread agent messages, and adds those
+messages to the unread count of the agent's sidebar row (`agentUnreadReplies` in
+`conversation-context.tsx`). The Dynamic Island keeps the chat-only count: it shows and opens a
+message of the agent's chat, and a side thread's messages are not in it. "Mark all read" still reads
+only the agent's chat. The desktop reads the marks of an agent only after it reads that agent's thread
+list, so after a start an agent that is not open adds no thread messages to its count until a thread
+event arrives or the person opens it. The host sends no event when
+a mark moves; a client reads the marks again when `agent-tasks-changed` arrives with a thread whose state, outcome or
+last change moved (not for a progress line), or a screen that
 shows them opens. The optional `agent-thread-files-v1` capability
 (`packages/contracts/src/team-protocol/agent-thread-files-v1.ts`, host route `routeAgentThreadFiles` in
 `src/main/team-api/route-agent-threads.ts`) adds `POST /v1/agent-threads/{start-with-files,send-with-files}`:
@@ -492,7 +578,8 @@ opens the task.
 
 Shared writes: each task thread owns its own browser tabs and tab queue. Computer Use is an MCP
 server that the provider starts, so OpenBot cannot queue its calls; `ThreadLifecycle` starts a task
-session without it, and the instructions send desktop work to the agent's own chat. Tasks share the
+session without it, and the instructions send desktop work to the agent's own chat. A routine thread
+is the exception (see above). Tasks share the
 workspace, and OpenBot does not lock files; the `start_task` guidance warns the agent about this.
 
 A provider, account or custom-agent change that a user or an agent asks for while a turn, a task or
@@ -667,7 +754,8 @@ and account), the same choices that the settings page offers. OpenBot checks eac
 account against the lists before it writes, and the agent service checks the primary account; an
 account change, like a provider change, waits until the agent is idle. These changes apply at once,
 as the other profile fields do. `read_agent` and the `update_profile` result return the account,
-the backup models and `usageLimitReturn`, the model that the agent left for a usage limit or a provider error (`cause: "provider-error"`). An unknown
+the backup models and `usageLimitReturn`, the model that the agent left for a usage limit or a provider error (`cause: "provider-error"`). A spent credit balance
+that names no reset sets no `usageLimitReturn`, so the agent does not go back to it by itself. An unknown
 model or an unsupported effort is an error that names the valid values; OpenBot checks them before
 it creates the agent. Without a provider and a model, the new agent starts on the calling agent's
 provider, model and reasoning effort, so a team that one agent creates runs where that agent runs.
@@ -883,8 +971,8 @@ in `.agents/skills` and `.claude/skills` that OpenBot does not manage. Workspace
 and leave out `.openbot/`, the skill folders, links, and every path `isUnsafeArchivePath` refuses
 (`.git`, `node_modules`, `.env*`, private keys, nested archives). Server settings are optional: MCP servers,
 custom model providers, custom ACP agents (as a warning, see below), sidebar sections and routine flows
-between exported agents. A custom provider model keeps its optional `contextWindow`; an app that
-does not know the field ignores it.
+between exported agents. A custom provider model keeps its optional `contextWindow`, `maxOutput`
+and `reasoningEfforts`; an app that does not know a field ignores it.
 
 No secret is in the file: MCP variable and header values are empty, custom providers have no key or
 headers, custom agents keep only the names of their variables, and `signedIn` lists provider ids,

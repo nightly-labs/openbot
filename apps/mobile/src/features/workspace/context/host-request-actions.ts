@@ -100,6 +100,7 @@ import {
   type ConversationFileSearchRequest,
   decodeConversationFileSearchResponse,
 } from "@openbot/contracts/team-protocol/conversation-file-search-v1";
+import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import {
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
   TEAM_EML_ATTACHMENTS_CAPABILITY,
@@ -118,7 +119,9 @@ import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-up
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
+import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
+import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v1";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
@@ -133,6 +136,8 @@ import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
+import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-github-v1";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
@@ -150,6 +155,7 @@ import {
   checkHostRelease,
   clearHostBrowserData,
   completeSignInRelay,
+  connectPasswordManager,
   createHostBrowserProfile,
   deleteEventRoutine,
   deleteHostBrowserProfile,
@@ -182,6 +188,7 @@ import {
   listHostVault,
   listMcpServers,
   listMcpSignIns,
+  listPasswordManagers,
   listProviderAccounts,
   listRoutineResultOptions,
   listSharedTables,
@@ -193,6 +200,7 @@ import {
   messagingConnectorReconnect,
   messagingConnectorSetEnabled,
   onePasswordConnectorRequest,
+  passwordManagerRequest,
   previewAgentTemplate,
   publishAgentTemplate,
   readAgentFolders,
@@ -226,6 +234,19 @@ import {
   unpublishAgentTemplate,
   updateHostAgentBrowserProfile,
   updateHostBrowserProfile,
+  whatsappConnectorAddOrchestrator,
+  whatsappConnectorAddSender,
+  whatsappConnectorAnswerRequest,
+  whatsappConnectorCancelLink,
+  whatsappConnectorDisconnect,
+  whatsappConnectorGroups,
+  whatsappConnectorLinkState,
+  whatsappConnectorOverview,
+  whatsappConnectorReconnect,
+  whatsappConnectorRemoveSender,
+  whatsappConnectorSetEnabled,
+  whatsappConnectorSetOwnNumber,
+  whatsappConnectorStartLink,
 } from "@openbot/team-client/team-admin-requests";
 import {
   type AgentMemoriesRequest,
@@ -381,6 +402,10 @@ type HostRequestActions = Pick<
   | "loadBitwardenConnector"
   | "connectBitwarden"
   | "disconnectBitwarden"
+  | "loadPasswordManagers"
+  | "connectPasswordManager"
+  | "cancelPasswordManager"
+  | "disconnectPasswordManager"
   | "loadVault"
   | "saveVaultItem"
   | "deleteVaultItem"
@@ -407,6 +432,19 @@ type HostRequestActions = Pick<
   | "disconnectMessaging"
   | "setMessagingEnabled"
   | "addMessagingOrchestrator"
+  | "loadWhatsAppConnector"
+  | "startWhatsAppLink"
+  | "loadWhatsAppLinkState"
+  | "cancelWhatsAppLink"
+  | "disconnectWhatsAppNumber"
+  | "reconnectWhatsAppNumber"
+  | "setWhatsAppEnabled"
+  | "addWhatsAppOrchestrator"
+  | "loadWhatsAppGroups"
+  | "addWhatsAppSender"
+  | "removeWhatsAppSender"
+  | "answerWhatsAppRequest"
+  | "setWhatsAppOwnNumber"
   | "loadServerUpdate"
   | "checkServerUpdate"
   | "startServerUpdate"
@@ -441,6 +479,7 @@ type HostRequestActions = Pick<
   | "editQueue"
   | "changeQueue"
   | "setMessageReaction"
+  | "deleteMessage"
   | "downloadAttachment"
 >;
 
@@ -586,6 +625,10 @@ export function createHostRequestActions({
     capabilityApi(serverId, ONEPASSWORD_CONNECTOR_CAPABILITY, "mobile.server.connectors.unsupported");
   const bitwardenAdmin = (serverId: string) =>
     capabilityApi(serverId, BITWARDEN_CONNECTOR_CAPABILITY, "mobile.server.connectors.unsupported");
+  const whatsappAdmin = (serverId: string) =>
+    capabilityApi(serverId, WHATSAPP_CONNECTOR_CAPABILITY, "mobile.server.connectors.unsupported");
+  const passwordManagersAdmin = (serverId: string) =>
+    capabilityApi(serverId, PASSWORD_MANAGERS_CAPABILITY, "mobile.server.connectors.unsupported");
   const vaultAdmin = (serverId: string) => capabilityApi(serverId, VAULT_CAPABILITY, "mobile.server.vault.unsupported");
   const vaultImportAdmin = (serverId: string) =>
     capabilityApi(serverId, VAULT_IMPORT_CAPABILITY, "mobile.server.vault.unsupported");
@@ -632,6 +675,10 @@ export function createHostRequestActions({
     canUseWorkflows: (serverId) => has(serverId, WORKFLOWS_CAPABILITY),
     canUseWorkflowGitHub: (serverId) =>
       has(serverId, WORKFLOWS_CAPABILITY) && has(serverId, WORKFLOWS_GITHUB_CAPABILITY),
+    canUseWorkflowChats: (serverId) =>
+      has(serverId, WORKFLOWS_CAPABILITY) &&
+      has(serverId, WORKFLOWS_CHATS_CAPABILITY) &&
+      has(serverId, ROUTINE_RESULTS_CAPABILITY),
     canReadServerStorage: (serverId) => has(serverId, STORAGE_CAPABILITY),
     canSetAgentNotificationLevel: (serverId) => has(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY),
     canStartNewChat: (serverId) => has(serverId, CONTEXT_RESET_CAPABILITY),
@@ -640,6 +687,8 @@ export function createHostRequestActions({
     canInstallAgentTemplate: (serverId) => has(serverId, AGENT_INSTALL_CAPABILITY),
     canEditQueue: (serverId) => has(serverId, TEAM_QUEUE_EDIT_CAPABILITY),
     canRetryMessage: (serverId) => has(serverId, TEAM_MESSAGE_CLIENT_ID_CAPABILITY),
+    canDeleteMessages: (serverId) => has(serverId, MESSAGE_DELETE_CAPABILITY),
+    canMarkUnreadFrom: (serverId) => has(serverId, CONVERSATION_UNREAD_FROM_CAPABILITY),
     attachmentSupport: (serverId) => {
       const advertised = capabilities.get(serverId) ?? [];
       return {
@@ -682,6 +731,13 @@ export function createHostRequestActions({
       runTeamRequest(bitwardenConnectorRequest(bitwardenAdmin(serverId), "connect", input)),
     disconnectBitwarden: async (serverId) =>
       runTeamRequest(bitwardenConnectorRequest(bitwardenAdmin(serverId), "disconnect")),
+    loadPasswordManagers: async (serverId) => runTeamRequest(listPasswordManagers(passwordManagersAdmin(serverId))),
+    connectPasswordManager: async (input, serverId) =>
+      runTeamRequest(connectPasswordManager(passwordManagersAdmin(serverId), input)),
+    cancelPasswordManager: async (manager, serverId) =>
+      runTeamRequest(passwordManagerRequest(passwordManagersAdmin(serverId), "cancel", manager)),
+    disconnectPasswordManager: async (manager, serverId) =>
+      runTeamRequest(passwordManagerRequest(passwordManagersAdmin(serverId), "disconnect", manager)),
     loadVault: async (serverId) =>
       runTeamRequest(listHostVault(vaultAdmin(serverId), has(serverId, VAULT_V2_CAPABILITY))),
     saveVaultItem: async (input, serverId) =>
@@ -731,6 +787,29 @@ export function createHostRequestActions({
       runTeamRequest(messagingConnectorSetEnabled(connectorsAdmin(serverId), input)),
     addMessagingOrchestrator: async (input, serverId) =>
       runTeamRequest(messagingConnectorAddOrchestrator(connectorsAdmin(serverId), input)),
+    loadWhatsAppConnector: async (serverId) => runTeamRequest(whatsappConnectorOverview(whatsappAdmin(serverId))),
+    startWhatsAppLink: async (input, serverId) =>
+      runTeamRequest(whatsappConnectorStartLink(whatsappAdmin(serverId), input)),
+    loadWhatsAppLinkState: async (serverId) => runTeamRequest(whatsappConnectorLinkState(whatsappAdmin(serverId))),
+    cancelWhatsAppLink: async (serverId) => runTeamRequest(whatsappConnectorCancelLink(whatsappAdmin(serverId))),
+    disconnectWhatsAppNumber: async (input, serverId) =>
+      runTeamRequest(whatsappConnectorDisconnect(whatsappAdmin(serverId), input)),
+    reconnectWhatsAppNumber: async (input, serverId) =>
+      runTeamRequest(whatsappConnectorReconnect(whatsappAdmin(serverId), input)),
+    setWhatsAppEnabled: async (input, serverId) =>
+      runTeamRequest(whatsappConnectorSetEnabled(whatsappAdmin(serverId), input)),
+    addWhatsAppOrchestrator: async (serverId) =>
+      runTeamRequest(whatsappConnectorAddOrchestrator(whatsappAdmin(serverId))),
+    loadWhatsAppGroups: async (input, serverId) =>
+      runTeamRequest(whatsappConnectorGroups(whatsappAdmin(serverId), input)),
+    addWhatsAppSender: async (input, serverId) =>
+      runTeamRequest(whatsappConnectorAddSender(whatsappAdmin(serverId), input)),
+    removeWhatsAppSender: async (input, serverId) =>
+      runTeamRequest(whatsappConnectorRemoveSender(whatsappAdmin(serverId), input)),
+    answerWhatsAppRequest: async (input, serverId) =>
+      runTeamRequest(whatsappConnectorAnswerRequest(whatsappAdmin(serverId), input)),
+    setWhatsAppOwnNumber: async (input, serverId) =>
+      runTeamRequest(whatsappConnectorSetOwnNumber(whatsappAdmin(serverId), input)),
     loadServerUpdate: async (serverId, access) =>
       runTeamRequest(getHostUpdateStatus(updateApi(serverId, access), access === "member")),
     checkServerUpdate: async (serverId, access) =>
@@ -1221,6 +1300,20 @@ export function createHostRequestActions({
     },
     setMessageReaction: async (agentId, serverId, messageId, emoji) => {
       await request("POST", TEAM_API_ROUTES.agent.reactions(agentId), ignoreResponse, { messageId, emoji }, serverId);
+    },
+    deleteMessage: async (serverId, target) => {
+      requireCapability(capabilities, serverId, MESSAGE_DELETE_CAPABILITY, "error.team.messageDeleteUnsupported");
+      const { messageId } = target;
+      if (target.kind === "channel") {
+        const body = { channelId: target.channelId, messageId };
+        await request("POST", MESSAGE_DELETE_ROUTES.channel, ignoreResponse, body, serverId);
+      } else if (target.taskId) {
+        const body = { agentId: target.agentId, taskId: target.taskId, messageId };
+        await request("POST", MESSAGE_DELETE_ROUTES.task, ignoreResponse, body, serverId);
+      } else {
+        const body = { agentId: target.agentId, messageId };
+        await request("POST", MESSAGE_DELETE_ROUTES.agent, ignoreResponse, body, serverId);
+      }
     },
     downloadAttachment: (serverId, attachmentId) => {
       const download = () =>

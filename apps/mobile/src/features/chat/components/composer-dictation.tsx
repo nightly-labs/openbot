@@ -147,7 +147,8 @@ function DictationWave({ level, color }: { level: SharedValue<number>; color: st
   return (
     <View
       pointerEvents="none"
-      style={{ flex: 1, height: WAVE_HEIGHT, overflow: "hidden" }}
+      // A wave reads left to right in every language, as a media timeline does.
+      style={{ flex: 1, height: WAVE_HEIGHT, overflow: "hidden", direction: "ltr" }}
       onLayout={({ nativeEvent }) => {
         const next = Math.floor(nativeEvent.layout.width / WAVE_PITCH);
         setCount((current) => (current === next ? current : next));

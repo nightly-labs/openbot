@@ -30,6 +30,7 @@ import type {
   AgentNewChatSettings,
   AgentStatus,
   AgentSummary,
+  AgentTaskReadState,
   ClientAgentModelOption,
   ClientAgentSummary,
   DraftAttachment,
@@ -54,6 +55,7 @@ import {
   isAgentProvider,
   isAgentStatus,
   isAttachmentSummary,
+  isChatColors,
   isClientAgentModelOption,
   isClientAgentSummary,
   isQueuedMessageReceipt,
@@ -70,6 +72,7 @@ import { isAgentThreadBranchLinks } from "@openbot/contracts/team-protocol/agent
 
 export const decodeAgentHostSettingsFromHost = guardedDecoder(isAgentHostSettings, "agent host settings response");
 export const decodeRemoteAgentColors = guardedDecoder(isAgentColors, "agent colors response");
+export const decodeRemoteChatColors = guardedDecoder(isChatColors, "chat colors response");
 export const decodeHiddenAgentsFromHost = guardedDecoder(isHiddenAgentsSnapshot, "hidden agents response");
 export const decodeSidebarPinsFromHost = guardedDecoder(isSidebarPinsSnapshot, "pinned chats response");
 export const decodeAgentNotificationLevelsFromHost = guardedDecoder(
@@ -81,6 +84,10 @@ export const decodeRemoteAgentTask = guardedDecoder(isAgentTask, "remote agent t
 export const decodeRemoteAgentThreadBranches = guardedDecoder(isAgentThreadBranchLinks, "remote thread branches");
 export const decodeRemoteTaskConversation = guardedDecoder(isConversationSnapshot, "remote task conversation");
 export const decodeRemoteTaskReadState = guardedDecoder(isAgentTaskReadState, "remote thread read state");
+const decodeTaskReadStates = guardedListDecoder(isAgentTaskReadState, "remote thread read states");
+export function decodeRemoteTaskReadStates(value: unknown): AgentTaskReadState[] {
+  return decodeTaskReadStates(decodeRecord(value, "remote thread reads").reads);
+}
 
 export function decodeDraftAttachment(value: unknown): DraftAttachment {
   if (!isAttachmentSummary(value)) throw new Error("Invalid attachment.");
@@ -295,8 +302,9 @@ export function decodeAgentAnalyticsFromHost(value: unknown) {
   return decodeAgentAnalytics(value);
 }
 
+/** A remote report has no skills: the frozen wire has no such field, so one that a host sends is not read. */
 export function decodeHostAnalyticsFromHost(value: unknown) {
-  return decodeHostAnalytics(value);
+  return decodeHostAnalytics(isDynamicRecord(value) ? { ...value, skills: undefined } : value);
 }
 
 export function decodeAgentSessionSettingsFromHost(value: unknown): AgentSessionSettings {

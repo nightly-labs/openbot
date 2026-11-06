@@ -10,10 +10,12 @@
     "obsidian",
     "atlassian",
     "todoist",
+    "ticktick",
     "trello",
     "cobrain",
     "figma",
     "paper",
+    "higgsfield",
     "apple-apps",
     "sentry",
     "vercel",
@@ -27,13 +29,16 @@
     "context7",
     "huggingface",
     "stripe",
+    "revenuecat",
     "posthog",
     "airtable",
     "firecrawl",
     "brave-search",
     "resend",
     "composio",
-    "clickup"
+    "clickup",
+    "coinbase",
+    "robinhood"
   ],
   "featured": ["aave", "canva", "notion", "figma"]
 }

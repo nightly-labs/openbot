@@ -113,6 +113,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "Uruchamianie logowania do {name} na {host}…",
   "provider.codeLogin.pageOpening": "Otwieranie strony logowania {name} na {host}…",
   "provider.codeLogin.linkStep": "Zaloguj się do {name}. OpenBot będzie kontynuować samodzielnie.",
+  "provider.codeLogin.chatgptDeviceSetting":
+    "W ChatGPT na komputerze otwórz ustawienia bezpieczeństwa i włącz logowanie kodem urządzenia dla Codex. Na koncie służbowym włącza je administrator obszaru roboczego.",
   "provider.useApp.title": "Połącz {name} w aplikacji OpenBot",
   "provider.useApp.description":
     "Logowanie do {name} wraca na komputer, który je rozpoczął, a karta przeglądarki nie może go odebrać. Połącz {name} w aplikacji OpenBot. Aplikacja sama dokończy logowanie.",
@@ -137,6 +139,8 @@ export const messages = {
   "provider.picker.noModels": "Brak dostępnych modeli od: {name}.",
   "provider.picker.customEmpty":
     "Dodaj endpoint zgodny z OpenAI – serwer modeli na tym komputerze lub dowolną usługę z bazowym adresem URL i kluczem.",
+  "provider.picker.customPending":
+    "Modele Twoich endpointów nie są jeszcze wczytane. Dostawca odczyta je po zakończeniu bieżącego zadania.",
   "provider.picker.defaultModelLabel": "{name}, domyślny",
   "provider.picker.usageLimit": "Osiągnięto limit użycia",
   "provider.picker.usageLimitWindow": "Limit ({window})",
@@ -264,24 +268,9 @@ export const messages = {
   "provider.settings.modelShow": "Pokaż {name} ({id}) w wyborze modelu",
   "provider.settings.modelsNoMatch": "Żaden model nie pasuje do wyszukiwania.",
   "provider.settings.modelsLoadFailed": "Nie udało się wczytać modeli tego serwera.",
-  "provider.settings.download": "Pobrane",
-  "provider.settings.downloadedCli": "CLI {name}",
-  "provider.settings.downloadDetail": {
-    one: "{version} · 1 wersja · {size}",
-    few: "{version} · {count} wersje · {size}",
-    many: "{version} · {count} wersji · {size}",
-    other: "{version} · {count} wersji · {size}",
-  },
-  "provider.settings.downloadVersions": {
-    one: "1 wersja · {size}",
-    few: "{count} wersje · {size}",
-    many: "{count} wersji · {size}",
-    other: "{count} wersji · {size}",
-  },
-  "provider.settings.downloadAgain": "Gdy włączysz {name}, OpenBot pobierze CLI ponownie.",
-  "provider.settings.removeDownloadConfirm": "Usunąć {size}?",
-  "provider.settings.removeDownloadKeeps": "Konta, logowania i agenci zostają.",
-  "provider.settings.removeDownload": "Usuń pobrane",
-  "provider.settings.removingDownload": "Usuwanie…",
+  "provider.settings.deleteTitle": "Usuń {name}",
+  "provider.settings.deleteOn": "Wyłącza {name} i usuwa CLI pobrane przez OpenBot. Konta, logowania i agenci zostają.",
+  "provider.settings.deleteOff":
+    "Usuwa CLI pobrane przez OpenBot dla {name} ({size}). Konta, logowania i agenci zostają.",
   "provider.settings.removeDownloadFailed": "Nie udało się usunąć pobranych plików.",
 } as const satisfies PartialTranslation<typeof source>;

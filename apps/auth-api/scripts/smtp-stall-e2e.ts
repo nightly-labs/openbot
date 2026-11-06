@@ -1,6 +1,6 @@
 // A sign-in email must be sent again when the relay stalls before the message, and must not be sent
-// twice when the relay stalls after it. Drives the real `sendPrivateEmailCode` over a local fake
-// relay through the injected `SmtpConnector`:
+// twice when the relay stalls after it. Drives the real `sendPrivateEmail` over a local fake relay
+// through the injected `SmtpConnector`:
 // - a connection with no greeting whose close is never confirmed (production on 2026-10-23 and
 //   2026-10-29), then a normal relay: the code is sent on the second connection;
 // - a stall after `354`: the result is unknown and there is no second connection;
@@ -10,18 +10,27 @@
 // handler takes the request and sends over the same fake relay. A stall after `354` stays unknown
 // across the binding. A relay Worker that cannot be reached, or that crashes, is unknown too: it can
 // fail after the mail host took the message.
+// The fallback cases drive the production sign-in delivery (`createEmailCodeDelivery`) through the
+// relay Worker handler and a fake Cloudflare `send_email` binding:
+// - a sender limit at `DATA`: Cloudflare sends the code, and the analytics show both sends;
+// - a sender limit, and Cloudflare refuses too: the answer stays the SMTP sender limit;
+// - a stall after `354` (unknown), a normal send, and an invalid code: Cloudflare sends nothing.
 // `bun run test:smtp-stall`. Writes .openbot-build/smtp-stall-e2e.json.
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer, type Server, type Socket, connect as tcpConnect } from "node:net";
 import { resolve } from "node:path";
 import { Effect, Result } from "effect";
+import type { AccountAnalyticsEvent } from "../src/server/account-analytics";
+import { createEmailCodeDelivery } from "../src/server/email-delivery";
 import { createEmailRelayHandler } from "../src/server/email-relay-handler";
 import {
   EMAIL_CODE_DELIVERY_BUDGET_MS,
+  prepareEmailCode,
+  RATE_LIMITED_DELIVERY_ERROR,
   type SmtpConnector,
   type SmtpEmailConfig,
-  sendPrivateEmailCode,
+  sendPrivateEmail,
 } from "../src/server/smtp-email-delivery";
 
 const OUT = resolve(import.meta.dirname, "../../../.openbot-build/smtp-stall-e2e.json");
@@ -33,7 +42,7 @@ const CONFIG = {
   from: "sender@example.com",
 };
 
-type Behavior = "normal" | "silent" | "stall_after_data";
+type Behavior = "normal" | "silent" | "stall_after_data" | "sender_limit";
 /** `direct` opens the socket in the caller; `relay` sends through the relay Worker handler. */
 type Route = "direct" | "relay" | "relay_unreachable" | "relay_crashed";
 
@@ -43,6 +52,13 @@ interface CaseReport {
   connections: number;
   messages: number;
   elapsedMs: number;
+}
+
+interface FallbackCaseReport extends CaseReport {
+  /** The messages that the fake Cloudflare binding took. */
+  fallbackSends: number;
+  /** `<event name>:<result>` of each analytics event, in order. */
+  events: string[];
 }
 
 interface Report {
@@ -130,7 +146,12 @@ function serveSmtp(socket: Socket, behavior: Exclude<Behavior, "silent">, stats:
       if (line.startsWith("EHLO")) socket.write("250-relay.example.com\r\n250-PIPELINING\r\n250 AUTH PLAIN LOGIN\r\n");
       else if (line.startsWith("AUTH PLAIN")) socket.write("235 2.7.0 ok\r\n");
       else if (line.startsWith("MAIL FROM") || line.startsWith("RCPT TO")) socket.write("250 2.1.0 ok\r\n");
-      else if (line === "DATA") {
+      else if (line === "DATA" && behavior === "sender_limit") {
+        // The reply of Namecheap Private Email when the hourly quota of the mailbox is spent.
+        socket.write(
+          "554 5.7.1 <DATA>: Data command rejected: Reject: too many messages from sender in last 60 minutes\r\n",
+        );
+      } else if (line === "DATA") {
         socket.write("354 go ahead\r\n");
         inData = true;
       } else if (line === "QUIT") socket.end("221 bye\r\n");
@@ -163,10 +184,14 @@ async function runCase(name: string, behaviors: Behavior[], route: Route = "dire
   try {
     const result = await Effect.runPromise(
       Effect.result(
-        sendPrivateEmailCode(
-          worker ? { ...CONFIG, relay: worker } : CONFIG,
-          { email: "user@example.com", code: "ABCD-EFGH", expiresAt: Date.now() + 10 * 60_000 },
-          worker ? undefined : relay.connector,
+        prepareEmailCode({ email: "user@example.com", code: "ABCD-EFGH", expiresAt: Date.now() + 10 * 60_000 }).pipe(
+          Effect.flatMap((message) =>
+            sendPrivateEmail(
+              worker ? { ...CONFIG, relay: worker } : CONFIG,
+              message,
+              worker ? undefined : relay.connector,
+            ),
+          ),
         ),
       ),
     );
@@ -179,6 +204,72 @@ async function runCase(name: string, behaviors: Behavior[], route: Route = "dire
     };
     process.stdout.write(`${JSON.stringify(report)}\n`);
     return report;
+  } finally {
+    await relay.stop();
+  }
+}
+
+/** A Cloudflare `send_email` binding that takes each message, or refuses it with a daily limit. */
+function fakeCloudflare(outcome: "accept" | "daily_limit") {
+  const sent: EmailMessageBuilder[] = [];
+  const send = async (message: EmailMessage | EmailMessageBuilder): Promise<EmailSendResult> => {
+    assert("subject" in message, "the fallback must use the message builder");
+    if (outcome === "daily_limit") {
+      // The binding throws an `Error` with a `code`, and a text that can name the recipient.
+      throw Object.assign(new Error("Daily sending quota reached for user@example.com"), {
+        code: "E_DAILY_LIMIT_EXCEEDED",
+      });
+    }
+    sent.push(message);
+    return { messageId: `message-${sent.length}` };
+  };
+  return { binding: { send }, sent };
+}
+
+async function runFallbackCase(
+  name: string,
+  behaviors: Behavior[],
+  outcome: "accept" | "daily_limit",
+  code = "ABCD-EFGH",
+): Promise<FallbackCaseReport & { sent: EmailMessageBuilder[] }> {
+  const relay = await startRelay(behaviors);
+  const handler = createEmailRelayHandler(relay.connector);
+  const cloudflare = fakeCloudflare(outcome);
+  const events: AccountAnalyticsEvent[] = [];
+  const delivery = createEmailCodeDelivery(
+    {
+      EMAIL_SMTP_HOST: CONFIG.host,
+      EMAIL_SMTP_PORT: String(CONFIG.port),
+      EMAIL_SMTP_USERNAME: CONFIG.username,
+      EMAIL_SMTP_PASSWORD: CONFIG.password,
+      EMAIL_FROM: CONFIG.from,
+      EMAIL_RELAY: {
+        fetch: (input, init) => handler.fetch(new Request(input, init)),
+        connect: () => {
+          throw new Error("the relay binding must not open a socket");
+        },
+      },
+      EMAIL_FALLBACK: cloudflare.binding,
+    },
+    { track: (_account, event) => events.push(event) },
+  );
+  assert(delivery, "a complete SMTP configuration must give a delivery");
+  const startedAt = Date.now();
+  try {
+    const result = await Effect.runPromise(
+      Effect.result(delivery.send({ email: "user@example.com", code, expiresAt: Date.now() + 10 * 60_000 })),
+    );
+    const report: FallbackCaseReport = {
+      name,
+      result: Result.isSuccess(result) ? "sent" : result.failure.message,
+      connections: relay.stats.connections,
+      messages: relay.stats.messages,
+      elapsedMs: Date.now() - startedAt,
+      fallbackSends: cloudflare.sent.length,
+      events: events.map((event) => `${event.name}:${"result" in event ? event.result : ""}`),
+    };
+    process.stdout.write(`${JSON.stringify(report)}\n`);
+    return { ...report, sent: cloudflare.sent };
   } finally {
     await relay.stop();
   }
@@ -235,6 +326,55 @@ try {
   report.cases.push(crashed);
   assert.equal(crashed.result, "smtp_delivery_unknown");
   assert.equal(crashed.connections, 0);
+
+  const fellBack = await runFallbackCase("fallback_after_sender_limit", ["sender_limit"], "accept");
+  const { sent: fallbackMessages, ...fellBackReport } = fellBack;
+  report.cases.push(fellBackReport);
+  assert.equal(fellBack.result, "sent");
+  assert.equal(fellBack.messages, 0);
+  assert.equal(fellBack.fallbackSends, 1);
+  assert.deepEqual(fellBack.events, ["email_sent:rate_limited", "email_fallback_sent:accepted"]);
+  const [fallbackMessage] = fallbackMessages;
+  assert(fallbackMessage);
+  assert.deepEqual(fallbackMessage.from, { name: "OpenBot", email: CONFIG.from });
+  assert.equal(fallbackMessage.to, "user@example.com");
+  assert(fallbackMessage.text?.includes("ABCD-EFGH"), "the fallback must carry the sign-in code");
+  assert(fallbackMessage.html?.includes("ABCD-EFGH"), "the fallback must carry the sign-in code");
+  assert.equal(fallbackMessage.headers?.["Auto-Submitted"], "auto-generated");
+
+  const bothLimited = await runFallbackCase("fallback_refused", ["sender_limit"], "daily_limit");
+  report.cases.push(bothLimited);
+  assert.equal(bothLimited.result, RATE_LIMITED_DELIVERY_ERROR);
+  assert.deepEqual(bothLimited.events, ["email_sent:rate_limited", "email_fallback_sent:failed"]);
+
+  // The recipient can already have the message, so a second sender must not send it again.
+  const noFallbackUnknown = await runFallbackCase("no_fallback_after_unknown", ["stall_after_data"], "accept");
+  report.cases.push(noFallbackUnknown);
+  assert.equal(noFallbackUnknown.result, "smtp_delivery_unknown");
+  assert.equal(noFallbackUnknown.fallbackSends, 0);
+  assert.deepEqual(noFallbackUnknown.events, ["email_sent:unknown"]);
+
+  const noFallbackSent = await runFallbackCase("no_fallback_when_sent", ["normal"], "accept");
+  report.cases.push(noFallbackSent);
+  assert.equal(noFallbackSent.result, "sent");
+  assert.equal(noFallbackSent.messages, 1);
+  assert.equal(noFallbackSent.fallbackSends, 0);
+  assert.deepEqual(noFallbackSent.events, ["email_sent:accepted"]);
+
+  const noFallbackInvalid = await runFallbackCase("no_fallback_for_invalid_code", ["normal"], "accept", "not-a-code");
+  report.cases.push(noFallbackInvalid);
+  assert.equal(noFallbackInvalid.result, "smtp_invalid_code");
+  assert.equal(noFallbackInvalid.connections, 0);
+  assert.equal(noFallbackInvalid.fallbackSends, 0);
+  assert.deepEqual(noFallbackInvalid.events, ["email_sent:failed"]);
+
+  // Three SMTP timeouts spend the delivery budget of a sign-in code, so no time is left for Cloudflare.
+  const noFallbackAfterBudget = await runFallbackCase("no_fallback_after_budget", ["silent"], "accept");
+  report.cases.push(noFallbackAfterBudget);
+  assert.equal(noFallbackAfterBudget.result, "smtp_timeout");
+  assert.equal(noFallbackAfterBudget.connections, 3);
+  assert.equal(noFallbackAfterBudget.fallbackSends, 0);
+  assert.deepEqual(noFallbackAfterBudget.events, ["email_sent:failed"]);
 
   report.passed = true;
 } catch (error) {

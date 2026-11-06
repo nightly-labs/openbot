@@ -59,6 +59,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.channelLeadModelUnavailable": "The channel lead model is unavailable.",
   "error.backend.contextCompactionIneffective":
     "Compaction does not make this chat smaller: after two compactions it still uses {percent}% of the model's context window, so OpenBot stops compacting it. Tools and instructions use most of the window. Turn off the MCP servers or computer use that this agent does not need, or select a model with a larger window. Then start a new chat.",
+  "error.backend.contextCompactionStopped":
+    "Two compactions of this chat failed in a row, so OpenBot stops compacting it automatically. Each try sends the whole chat to the model and uses your plan limit. Select Compact now to try again, or start a new chat.",
   "error.backend.providerRetrying":
     "The provider failed this request {attempts} times and tries again. If the agent does not continue, stop the turn.",
   "error.backend.providerRetryingLargeContext":
@@ -304,6 +306,16 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserProfileNameTaken": "A browser profile with this name already exists.",
   "error.backend.browserSessionInUse": "A tab still uses this browser session. Try again.",
   "error.backend.browserProfileLimit": "You can have up to {limit} browser profiles.",
+  "error.backend.browserProxyNotFound": "This proxy no longer exists.",
+  "error.backend.browserProxyAddressInvalid":
+    "Type a proxy address such as socks5://host:1080 or http://user:password@host:3128.",
+  "error.backend.browserProxyLimit": "You can have up to {limit} proxies.",
+  "error.backend.browserProxyTaken": "A proxy with this address already exists.",
+  "error.backend.browserProxyChanged": "This proxy changed after you opened it. Look at it again, then try again.",
+  "error.backend.browserProxyUnreachable": "The proxy {name} does not answer, so the page did not open.",
+  "error.backend.browserProxySignInRefused": "The proxy {name} refused the sign-in, so the page did not open.",
+  "error.backend.browserProxyComputerUnreachable":
+    "The computer that this profile uses does not answer, so the page did not open.",
   "error.backend.browserLowMemory":
     "This server is low on memory, so the browser cannot open another tab. Close a tab, or wait for other agents to finish.",
   "error.backend.browserOpenFailed": "Unable to open {url}: {reason}",

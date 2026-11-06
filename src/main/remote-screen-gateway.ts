@@ -76,6 +76,7 @@ interface RemoteScreenGatewayOptions {
   runtimeStateDirectory: string;
   getRuntimeCredentials: () => Effect.Effect<{ username: string; password: string }, RemoteWorkflowError>;
   getDisplays?: (() => RemoteDesktopDisplay[]) | undefined;
+  getDisplayScreenOrigin?: ((displayId: string) => { x: number; y: number } | undefined) | undefined;
   getIceServers: () => Effect.Effect<RemoteDesktopIceServer[], RemoteWorkflowError>;
   createRuntime?: RemoteScreenGatewayCreateRuntime;
   audit?: (event: RemoteScreenAuditEvent) => void;
@@ -1044,6 +1045,7 @@ export class RemoteScreenGateway {
         platform: this.#options.platform,
         credentials: yield* dependencies.credentials(),
         getDisplays: () => this.#options.getDisplays?.() ?? [],
+        getDisplayScreenOrigin: this.#options.getDisplayScreenOrigin,
         getIceServers: () =>
           Effect.gen({ self: this }, function* () {
             // Loopback tests need no account or Signal service. Keep remote ICE configuration

@@ -68,6 +68,7 @@ import {
   Show,
   untrack,
 } from "solid-js";
+import { avatarHeadColor } from "../../bloub-avatar";
 import { useText } from "../../text";
 import {
   type AddItem,
@@ -121,6 +122,7 @@ import {
   type WfnSize,
   type WfnStretch,
 } from "./workflow-board";
+import { type WorkflowBuild, workflowBuildPlan } from "./workflow-build";
 import { type Camera, type CameraMotion, glideCamera } from "./workflow-camera";
 import { CLIP_TYPE, type Clip, copied, setCopied } from "./workflow-clipboard";
 import type { WorkflowGitHubCanvas } from "./workflow-github";
@@ -162,10 +164,12 @@ import {
   translated,
 } from "./workflow-node-parts";
 import {
+  BuilderCursor,
   FollowFrame,
   PeerCursors,
   PresenceBar,
   peersOf,
+  type WorkflowBuilderSpot,
   type WorkflowPeer,
   type WorkflowPresence,
 } from "./workflow-presence";
@@ -196,6 +200,12 @@ export interface WorkflowCanvasProps {
   readOnly?: boolean | undefined;
   /** The other people on this canvas. It shows only when `features.presence` is on. */
   presence?: WorkflowPresence | undefined;
+  /**
+   * The change that an agent saved. When a reset or the open of `workflow` comes with a new key, the
+   * canvas plays it: the agent's cursor goes to each node that it made or changed, and the new nodes
+   * and connections show one by one. A press on the canvas ends the play.
+   */
+  build?: WorkflowBuild | undefined;
   /** In the desktop window, the top bar is the window's top row, and the canvas fills the card below it. */
   frame?: "window" | undefined;
   /**
@@ -312,6 +322,15 @@ const WHEEL_ZOOM_MAX = Math.log(ZOOM_STEP);
 const FOLLOW_ZONE = 0.25;
 /** The time constant of the follow camera, in milliseconds: it closes 63% of the gap in this time. */
 const FOLLOW_EASE = 180;
+/**
+ * The play of an agent's change, in milliseconds: the wait for the fit of the view, the glide of the
+ * cursor to a node, the time of each node, and how long the cursor stays and fades out at the end.
+ */
+const BUILD_START = 240;
+const BUILD_GLIDE = 380;
+const BUILD_STEP = 620;
+const BUILD_LINGER = 900;
+const BUILD_FADE = 240;
 const FIT_MARGIN = 64;
 /**
  * In screen pixels, as in workflows.css: the gap between a node and its toolbar, and the room that
@@ -583,6 +602,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
 
   const canvas = createBoard({
     catalogs: () => props.catalogs,
+    buildState: (id) => buildState(id),
     github: () => props.github,
     features: () => props.features,
     edges: initial.board.edges,
@@ -1551,6 +1571,79 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   };
   const toggleFollow = (peer: WorkflowPeer) => (following() === peer.member.id ? stopFollow() : follow(peer));
   const followedPeer = () => peers().find((peer) => peer.member.id === following());
+
+  /* --------------------------------------------------------- Agent build */
+
+  /** The nodes and connections of the change that do not show yet, and the ones that just showed. */
+  const [unbuilt, setUnbuilt] = createSignal<ReadonlySet<string>>(new Set());
+  const [arrived, setArrived] = createSignal<ReadonlySet<string>>(new Set());
+  const [builder, setBuilder] = createSignal<WorkflowBuilderSpot>();
+  let playedBuild: number | undefined;
+  let buildTimers: number[] = [];
+  const buildState = (id: string) => (unbuilt().has(id) ? "unbuilt" : arrived().has(id) ? "arrived" : undefined);
+  /** The ring of a node: the person who selected it, or the agent that works on it. */
+  const ringOn = (id: string) => peerOn(id)?.color ?? (builder()?.on === id ? builder()?.color : undefined);
+  /** Shows the whole change at once, and takes the cursor away. */
+  const endBuild = () => {
+    for (const timer of buildTimers) clearTimeout(timer);
+    buildTimers = [];
+    setUnbuilt(new Set<string>());
+    setArrived(new Set<string>());
+    setBuilder(undefined);
+  };
+  onCleanup(endBuild);
+  /** The cursor points at the top-left part of a card, where its title is. */
+  const buildPoint = (id: string): WfnPoint | undefined => {
+    const box = boxOf(id);
+    return box ? { x: box.x + Math.min(56, box.width / 2), y: box.y + Math.min(30, box.height / 2) } : positions[id];
+  };
+  /** Plays the change of `build` once for each key, unless the person wants less motion. */
+  const playBuild = () => {
+    endBuild();
+    const build = props.build;
+    if (!build || build.key === playedBuild || build.workflowId !== props.workflow.summary.id) return;
+    playedBuild = build.key;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const agent = props.catalogs.agents.find((entry) => entry.id === build.agentId);
+    const plan = workflowBuildPlan(build.before, props.workflow.graph);
+    if (!agent || plan.steps.length === 0) return;
+    const later = (run: () => void, wait: number) => buildTimers.push(window.setTimeout(run, wait));
+    const show = (ids: readonly string[]) => {
+      setUnbuilt((hidden) => new Set([...hidden].filter((id) => !ids.includes(id))));
+      setArrived((shown) => new Set([...shown, ...ids]));
+    };
+    setUnbuilt(
+      new Set([
+        ...plan.steps.flatMap((step) => (step.added ? [step.node] : [])),
+        ...plan.steps.flatMap((step) => step.edges),
+        ...plan.rest,
+      ]),
+    );
+    const color = avatarHeadColor(agent.avatarSeed, agent.avatarHue, agent.avatarColor ?? null);
+    // The reset fits the view and measures the cards in the frames after it.
+    later(() => {
+      const first = buildPoint(plan.steps[0]?.node ?? "");
+      if (!first) return endBuild();
+      setBuilder({ name: agent.name, color, at: { x: first.x - 80, y: first.y - 60 }, on: undefined, leaving: false });
+    }, BUILD_START);
+    plan.steps.forEach((step, index) => {
+      const at = BUILD_START + BUILD_GLIDE / 2 + index * BUILD_STEP;
+      later(() => {
+        const point = buildPoint(step.node);
+        setBuilder((spot) => spot && { ...spot, at: point ?? spot.at, on: step.node });
+      }, at);
+      later(() => show([step.node, ...step.edges]), at + BUILD_GLIDE);
+    });
+    const end = BUILD_START + BUILD_GLIDE / 2 + plan.steps.length * BUILD_STEP;
+    later(() => {
+      show(plan.rest);
+      setBuilder((spot) => spot && { ...spot, on: undefined });
+    }, end);
+    later(() => setBuilder((spot) => spot && { ...spot, leaving: true }), end + BUILD_LINGER);
+    later(endBuild, end + BUILD_LINGER + BUILD_FADE);
+  };
+  // After the reset effect: each open and each reset can bring a change to play.
+  createEffect(resetToken, () => untrack(playBuild));
   /**
    * The toolbar of a node goes under the node, and under its results strip, only when above it the
    * toolbar covers another card and under it the toolbar does not. Text and shapes do not count: a
@@ -2652,6 +2745,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         data-frame={props.frame}
         aria-label={t("workflow.canvas.label", { name: name() })}
         onPointerDown={(event) => {
+          // The person works on the canvas, so the agent's change shows whole.
+          if (builder() || unbuilt().size > 0) endBuild();
           if (drop() && !(event.target instanceof Element && event.target.closest(".wfn-drop-menu"))) closeDrop();
           pressing = true;
           const release = () => {
@@ -2710,11 +2805,12 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                         slotResize.observe(element);
                       }}
                       data-kind={node().kind}
-                      data-peer={peerOn(node().id) ? "" : undefined}
+                      data-peer={ringOn(node().id) ? "" : undefined}
+                      data-build={buildState(node().id)}
                       style={{
                         left: `${positions[node().id]?.x ?? 0}px`,
                         top: `${positions[node().id]?.y ?? 0}px`,
-                        "--wfn-peer": peerOn(node().id)?.color,
+                        "--wfn-peer": ringOn(node().id),
                       }}
                     >
                       <CanvasNodeView node={node()} trigger={triggerOf(node().id)} />
@@ -2804,6 +2900,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                 )}
               </Show>
               <PeerCursors peers={peers()} spots={spots()} />
+              <Show when={builder()}>{(spot) => <BuilderCursor spot={spot()} glide={BUILD_GLIDE} />}</Show>
             </div>
             <Show when={marquee()}>
               {(box) => (
@@ -3187,7 +3284,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
             pressed={ui.tool === "select"}
             onClick={() => setTool("select")}
           >
-            <MousePointer2 class="wfn-hud-arrow" />
+            <MousePointer2 />
           </HudButton>
           <HudButton
             label={t("workflow.canvas.tool.pan")}

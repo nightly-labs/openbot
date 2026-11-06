@@ -169,10 +169,6 @@ export const messages = {
 
   "agentSettings.runtime.model": "Модель агента",
   "agentSettings.runtime.modelUnavailable": "Модели станут доступны после подключения CLI агента.",
-  "agentSettings.runtime.reasoning": "Рассуждение",
-  "agentSettings.runtime.reasoningLabel": "Уровень рассуждения агента",
-  "agentSettings.runtime.selectReasoning": "Выберите уровень рассуждения",
-  "agentSettings.runtime.reasoningSetByProvider": "Как в {provider}",
   "agentSettings.runtime.access": "Доступ",
   "agentSettings.runtime.accessLabel": "Доступ агента",
   "agentSettings.runtime.busyMessage": "Во время работы",
@@ -271,8 +267,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "Агент может начать новый чат, когда его чат становится длинным. Сначала он сохраняет заметки.",
   "agentSettings.quickAcknowledgement.title": "Показывать план перед долгими задачами",
-  "agentSettings.quickAcknowledgement.description":
-    "Перед долгой задачей агент показывает свой план. Он начинает через 10 с или когда вы нажимаете «Начать».",
+  "agentSettings.quickAcknowledgement.description": "Перед долгой задачей агент показывает свой план.",
   "agentSettings.browserProfile.label": "Профиль браузера",
   "agentSettings.browserProfile.shared": "Общий",
   "agentSettings.browserProfile.agent": "Только этот агент",

@@ -12,6 +12,7 @@ import {
   relayableSignInLink,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
+import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { toast } from "@openbot/ui";
 import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/QuestionPromptBubble";
 import type { QuoteRequest } from "@openbot/ui/features/conversation/ComposerEditor";
@@ -32,6 +33,7 @@ import {
 import { actionToast } from "../../action-toast";
 import { createScopeGuard } from "../../scope-lifetime";
 import { appendVoiceTranscript } from "../../voice-recording";
+import { serverSupportsCapability } from "../servers/server-capabilities";
 import { createAttachmentImportSounds } from "./attachment-import-sounds";
 import type { ChatSearchMatch } from "./chat-search";
 import { useConversationController } from "./conversation-controller-context";
@@ -68,6 +70,7 @@ import { createSettingsStore, runtimeSettingsEqual } from "./stores/settings-sto
 import { createSideQuestionStore } from "./stores/side-question-store";
 import { createSkillsStore } from "./stores/skills-store";
 import { createThreadComposerActions } from "./stores/thread-composer-actions";
+import { createThreadQueue } from "./stores/thread-queue-edit";
 import { createVoiceConversation } from "./stores/voice-conversation-store";
 import { createVoiceStore } from "./stores/voice-store";
 
@@ -451,7 +454,11 @@ export function createConversationViewScope(props: ConversationProps) {
     browserAddress,
     setBrowserAddress,
     setComposerError: setScopedComposerError,
-    panels: { activeRightPanel, setActiveRightPanel },
+    panels: {
+      activeRightPanel,
+      setActiveRightPanel,
+      closeBrowserPane,
+    },
   });
   const {
     browserSidebarOpen,
@@ -588,7 +595,18 @@ export function createConversationViewScope(props: ConversationProps) {
     if (pane === "question") deleteSideQuestion();
     const shown = sidePanelOpen() && sidePanel().selected === pane;
     const next = removeSidePanelPane(pane);
-    if (!shown) return;
+    if (shown) showSidePanelInPlaceOf(next);
+  }
+  /**
+   * Closes the browser pane when its last tab closes. The full view and picture in picture are outside the
+   * side panel, so the pane closes from them too. The browser store calls this from an effect, where the
+   * panel mode that a write sets does not show yet, so this does not read the mode.
+   */
+  function closeBrowserPane() {
+    showSidePanelInPlaceOf(removeSidePanelPane("browser"));
+  }
+  /** Shows the next tab of the side panel after a tab closed; with no tab, the panel lists the panes. */
+  function showSidePanelInPlaceOf(next: SidePanelPane | null) {
     const thread = sideThreadIds()[0];
     const file = sidePanel().files.at(-1);
     if (next) openSidePanelPane(next);
@@ -654,6 +672,16 @@ export function createConversationViewScope(props: ConversationProps) {
     messageId?.startsWith(PENDING_SEND_ID_PREFIX)
       ? currentPendingSends().find((send) => `${PENDING_SEND_ID_PREFIX}${send.clientMessageId}` === messageId)
       : undefined;
+  // The host id of each sent message, to the key of the row its pending copy drew. The row keeps
+  // that key after the send settles, so it stays mounted while the host's message replaces it.
+  const handedOverRowKeys = createMemo<ReadonlyMap<string, string>>((previous = new Map()) => {
+    const sent = currentPendingSends().flatMap((send) =>
+      send.messageId && !previous.has(send.messageId)
+        ? [[send.messageId, `${PENDING_SEND_ID_PREFIX}${send.clientMessageId}`] as const]
+        : [],
+    );
+    return sent.length ? new Map([...previous, ...sent]) : previous;
+  });
   createEffect(
     () => ({
       target: currentTarget(),
@@ -670,6 +698,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setMarkingRead,
     setComposerError: setScopedComposerError,
     pendingMessages,
+    handedOverRowKeys,
     elements: {
       scrollElement: () => scrollElement,
       virtualRoot: () => virtualRoot,
@@ -773,12 +802,22 @@ export function createConversationViewScope(props: ConversationProps) {
   const handleChatSearchShortcut = (event: KeyboardEvent) => {
     (sideThreadOpen() ? threadSearch : search).handleChatSearchShortcut(event);
   };
+  const threadQueue = createThreadQueue({
+    props,
+    threadDrafts: controller.threadDrafts,
+    setThreadDrafts: controller.setThreadDrafts,
+    edit: controller.threadQueueEdit,
+    setEdit: controller.setThreadQueueEdit,
+    persist: persistDrafts,
+  });
   const threadComposer = createThreadComposerActions({
     props,
     threadDrafts: controller.threadDrafts,
     setThreadDrafts: controller.setThreadDrafts,
     pastePreviews,
     setPastePreviews,
+    draftLocked: threadQueue.draftLocked,
+    keepsAttachment: threadQueue.keepsAttachment,
   });
   /** Moves the open thread's caret to the end of the dictated text. */
   const [threadFocusRequest, setThreadFocusRequest] = createSignal(0);
@@ -823,7 +862,11 @@ export function createConversationViewScope(props: ConversationProps) {
         flush();
         const threads = props.threads;
         if (!threads || threadComposer.openDraftKey() !== key) return;
-        await threadComposer.send(threads, threadComposer.draft(key).text.trim());
+        // While a queued message is in the message box, Send saves it in its place.
+        if (threadQueue.editsDraft(key)) {
+          await threadComposer.importsEnded(key);
+          await threadQueue.save(key);
+        } else await threadComposer.send(threads, threadComposer.draft(key).text.trim());
         // The locked editor did not take the earlier focus request.
         if (threadComposer.openDraftKey() === key) setThreadFocusRequest((current) => current + 1);
       },
@@ -1055,6 +1098,7 @@ export function createConversationViewScope(props: ConversationProps) {
   let latestScrollFrame: number | undefined;
   let latestScrollSettleFrame: number | undefined;
   let lastScrollTop = 0;
+  let lastMaxScrollTop = 0;
   let readerLeftLatest = false;
   let readerDragging = false;
   let readerIntent: { up: boolean; at: number } | undefined;
@@ -1110,6 +1154,15 @@ export function createConversationViewScope(props: ConversationProps) {
     const draft = fastModeDraft();
     return draft && draft.agentId === props.agent?.id ? draft.fastMode : props.agent?.fastMode === true;
   };
+  /**
+   * The Fast switch of the model pickers, in the chat header and in the agent settings. Codex only
+   * for now: on this computer, or on a joined server with `agent-fast-mode-v1`.
+   */
+  const fastModeChange = () =>
+    settingsProvider() === "codex" &&
+    (props.server?.kind === "local" || serverSupportsCapability(props.server, AGENT_FAST_MODE_CAPABILITY))
+      ? (next: boolean) => void changeFastMode(next)
+      : undefined;
   async function changeFastMode(next: boolean): Promise<void> {
     const agentId = props.agent?.id;
     if (!agentId) return;
@@ -1299,7 +1352,10 @@ export function createConversationViewScope(props: ConversationProps) {
     keyboardWindow.addEventListener("pointercancel", endReaderDrag);
     scrollResizeObserver = new ResizeObserver(() => {
       updateVirtualScrollMargin();
-      if (scrollElement && stickToLatest) followConversationBottom(scrollElement);
+      const readerAbove = scrollElement !== undefined && readerAboveShrinkingContent(scrollElement);
+      if (scrollElement && stickToLatest) {
+        if (!readerAbove) followConversationBottom(scrollElement);
+      }
       // An image or a preview that lays out after the opening grows a row above the divider. The chat
       // has no browser scroll anchoring, so without this the divider moves down out of view.
       else if (scrollElement && unreadOpening.holding) scrollToUnreadDivider(scrollElement);
@@ -1377,6 +1433,36 @@ export function createConversationViewScope(props: ConversationProps) {
     // A passage past the message limit would make the composer drop it with the text after it.
     const quoted = limitedQuoteText(text);
     setQuoteRequest((current) => ({ id: (current?.id ?? 0) + 1, messageId, text: quoted }));
+  }
+
+  /*
+   * What `@` can tag beside the agents: the agent's own browser tabs and its side threads that are
+   * not closed, newest first. A channel has many agents, so it tags neither. A tab of an old agent run
+   * has only an owner thread, and the host shares only a tab with an owner agent.
+   */
+  const taggableBrowserTabs = createMemo(() =>
+    props.channel ? [] : browserTabs().filter((tab) => tab.ownerAgentId === props.agent?.id),
+  );
+  const taggableThreads = createMemo(() =>
+    props.channel
+      ? []
+      : (props.threads?.tasks ?? [])
+          .filter((task) => task.closedAt === null)
+          .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
+  );
+
+  /** Shows the browser tab, or the side thread, that a tag names. A tab or a thread that is gone does nothing. */
+  function openTaggedReference(kind: "tab" | "thread", id: string) {
+    if (kind === "tab") {
+      if (!browserTabs().some((tab) => tab.id === id)) return;
+      if (activeBrowserTab()?.id !== id) activateBrowserTab(id);
+      // The same gesture as a preview card: open the page, not the list of tabs.
+      setActiveRightPanel("browser-expanded");
+      return;
+    }
+    if (!taggableThreads().some((task) => task.id === id)) return;
+    if (sideThreadIds().includes(id)) openPanelThread(id);
+    else moveThreadToPanel(id);
   }
 
   /** Scrolls to the passage that a quote points to and marks it. A file passage opens in the side panel. */
@@ -1905,6 +1991,23 @@ export function createConversationViewScope(props: ConversationProps) {
     else if (scrollElement.scrollTop > lastScrollTop) unreadOpening.holding = false;
   }
   /**
+   * Content that gets shorter, such as a plan that closes, keeps the bottom in view by itself when the
+   * chat is at the bottom. A following chat that was more than 80px above the bottom was moved by a
+   * scroll that the chat could not give to the reader. A follow would jump the chat to the old bottom,
+   * and the content would then slide back as it gets shorter, so this resize does not follow. The chat
+   * continues to follow: growth, or a follow that was queued before, still moves it to the bottom.
+   */
+  function readerAboveShrinkingContent(element: HTMLDivElement): boolean {
+    const maxScrollTop = element.scrollHeight - element.clientHeight;
+    const previousMaxScrollTop = lastMaxScrollTop;
+    lastMaxScrollTop = maxScrollTop;
+    return (
+      maxScrollTop < previousMaxScrollTop &&
+      maxScrollTop - element.scrollTop > 1 &&
+      previousMaxScrollTop - element.scrollTop > 80
+    );
+  }
+  /**
    * A scroll is the reader's when the chat moves the way that the reader's last input asked, soon after
    * it, or while the reader drags the scroll bar or a text selection. Input that moves something else,
    * such as a code block that scrolls, a sideways swipe or a key in a field, does not move the chat.
@@ -1912,6 +2015,7 @@ export function createConversationViewScope(props: ConversationProps) {
   const followReaderScroll = (element: HTMLElement) => {
     const moved = element.scrollTop - lastScrollTop;
     lastScrollTop = element.scrollTop;
+    lastMaxScrollTop = element.scrollHeight - element.clientHeight;
     const intent = readerIntent && performance.now() - readerIntent.at < READER_INPUT_WINDOW_MS ? readerIntent : null;
     if (moved < 0 && (readerDragging || intent?.up === true)) leaveLatest();
     else if (moved > 0 && (readerDragging || intent?.up === false)) {
@@ -2002,6 +2106,8 @@ export function createConversationViewScope(props: ConversationProps) {
    * server gets the text only.
    */
   const voiceConversationAvailable = () => !channel && !props.runtime;
+  // A transcribed conversation sends its turns through this view, so it ends with the view.
+  onCleanup(() => controller.voiceSessions.end("transcribed"));
   /** Starts a voice conversation with an agent. It ends with the owner that calls this. */
   const startVoiceConversation = (agentId: string) =>
     createVoiceConversation({
@@ -2023,6 +2129,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setThreadSearchQuery,
     setThreadScrollElement,
     threadComposer,
+    threadQueue,
     threadFocusRequest,
     branchThread,
     threadVoiceLiveText,
@@ -2220,6 +2327,9 @@ export function createConversationViewScope(props: ConversationProps) {
     quoteRequest,
     quoteSelection,
     openQuote,
+    taggableBrowserTabs,
+    taggableThreads,
+    openTaggedReference,
     setActiveRightPanel,
     setBrowserAddress,
     setBrowserPanelWidth,
@@ -2227,6 +2337,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setComposerError: setScopedComposerError,
     changeFastMode,
     fastMode,
+    fastModeChange,
     setComposerFocusRequest,
     setDropActive,
     setExpandedEmojiMessageId,

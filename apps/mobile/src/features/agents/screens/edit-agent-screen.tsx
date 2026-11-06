@@ -204,10 +204,12 @@ function AgentForm({
     (edits.model !== undefined && edits.model !== agent.model) ||
     (edits.reasoningEffort !== undefined && edits.reasoningEffort !== agent.reasoningEffort) ||
     accountChanged;
+  const nameMissing = page === "info" && !name.trim();
+  // The name error shows after the first Save, not while the person still edits.
+  const [triedSave, setTriedSave] = useState(false);
   const valid =
     page !== "info" ||
-    (Boolean(name.trim()) &&
-      name.length <= INPUT_LIMITS.agentName &&
+    (name.length <= INPUT_LIMITS.agentName &&
       title.length <= INPUT_LIMITS.agentTitle &&
       !instructionsTooLong(description));
 
@@ -262,6 +264,11 @@ function AgentForm({
   );
 
   async function submit(): Promise<void> {
+    if (nameMissing) {
+      setTriedSave(true);
+      void haptics.notification("error");
+      return;
+    }
     if (!valid || !dirty || !available || pickingPhoto || pending.current) return;
     pending.current = true;
     setSaving(true);
@@ -362,6 +369,7 @@ function AgentForm({
               maxLength={INPUT_LIMITS.agentName}
               value={name}
               editable={!saving}
+              error={triedSave && nameMissing ? t("mobile.agent.add.nameRequired") : undefined}
               onChangeText={(value) => change({ name: value })}
             />
           </View>

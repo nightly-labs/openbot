@@ -60,6 +60,8 @@ export const messages = {
   "error.backend.channelLeadModelUnavailable": "Il modello del responsabile del canale non è disponibile.",
   "error.backend.contextCompactionIneffective":
     "La compattazione non riduce questa chat: dopo due compattazioni usa ancora il {percent}% della finestra di contesto del modello, quindi OpenBot smette di compattarla. Strumenti e istruzioni usano la maggior parte della finestra. Disattiva i server MCP o l'uso del computer che questo agente non usa, oppure scegli un modello con una finestra più grande. Poi avvia una nuova chat.",
+  "error.backend.contextCompactionStopped":
+    "Due compattazioni di fila di questa chat non sono riuscite, quindi OpenBot smette di compattarla automaticamente. Ogni tentativo invia l'intera chat al modello e consuma il limite del tuo piano. Seleziona «Compatta ora» per riprovare, oppure avvia una nuova chat.",
   "error.backend.providerRetrying":
     "Il provider non è riuscito a completare questa richiesta {attempts} volte e riprova. Se l'agente non continua, interrompi il turno.",
   "error.backend.providerRetryingLargeContext":
@@ -317,6 +319,18 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "Esiste già un profilo browser con questo nome.",
   "error.backend.browserSessionInUse": "Una scheda usa ancora questa sessione del browser. Riprova.",
   "error.backend.browserProfileLimit": "Puoi avere fino a {limit} profili browser.",
+  "error.backend.browserProxyNotFound": "Questo proxy non esiste più.",
+  "error.backend.browserProxyAddressInvalid":
+    "Inserisci un indirizzo proxy come socks5://host:1080 o http://user:password@host:3128.",
+  "error.backend.browserProxyLimit": "Puoi avere fino a {limit} proxy.",
+  "error.backend.browserProxyTaken": "Esiste già un proxy con questo indirizzo.",
+  "error.backend.browserProxyChanged":
+    "Questo proxy è cambiato dopo che l'hai aperto. Controllalo di nuovo, poi riprova.",
+  "error.backend.browserProxyUnreachable": "Il proxy {name} non risponde, quindi la pagina non si è aperta.",
+  "error.backend.browserProxySignInRefused":
+    "Il proxy {name} ha rifiutato l’accesso, quindi la pagina non si è aperta.",
+  "error.backend.browserProxyComputerUnreachable":
+    "Il computer di questo profilo non risponde, quindi la pagina non si è aperta.",
   "error.backend.browserLowMemory":
     "Su questo server la memoria è quasi esaurita, quindi il browser non può aprire un'altra scheda. Chiudi una scheda o attendi che gli altri agenti finiscano.",
   "error.backend.browserOpenFailed": "Impossibile aprire {url}: {reason}",

@@ -139,10 +139,6 @@ export const messages = {
   "agentSettings.avatar.processFailed": "에이전트 아바타를 처리할 수 없어요.",
   "agentSettings.runtime.model": "에이전트 모델",
   "agentSettings.runtime.modelUnavailable": "에이전트 CLI가 연결된 후에 모델을 사용할 수 있어요.",
-  "agentSettings.runtime.reasoning": "추론",
-  "agentSettings.runtime.reasoningLabel": "에이전트 추론 수준",
-  "agentSettings.runtime.selectReasoning": "추론 선택",
-  "agentSettings.runtime.reasoningSetByProvider": "{provider}에서 설정",
   "agentSettings.runtime.access": "접근 권한",
   "agentSettings.runtime.accessLabel": "에이전트 접근 권한",
   "agentSettings.runtime.busyMessage": "작업 중일 때",
@@ -215,8 +211,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "채팅이 길어지면 에이전트가 새 채팅을 시작하도록 허용해요. 먼저 메모를 저장해요.",
   "agentSettings.quickAcknowledgement.title": "긴 작업 전에 계획 표시",
-  "agentSettings.quickAcknowledgement.description":
-    "긴 작업 전에 에이전트가 계획을 보여줘요. 10초 후 또는 시작을 누르면 작업이 시작돼요.",
+  "agentSettings.quickAcknowledgement.description": "긴 작업 전에 에이전트가 계획을 보여줘요.",
   "agentSettings.browserProfile.label": "브라우저 프로필",
   "agentSettings.browserProfile.shared": "공유",
   "agentSettings.browserProfile.agent": "이 에이전트만",

@@ -171,8 +171,17 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    machine in memory and continue it at a resume with no boot: the resume answers `"status":
    "running"`, and the file stays. Then the Worker runs a command on the machine that removes the
    file and starts `openbot.service` (`HELD_RESUME_START_COMMAND`). With no file the command does
-   nothing. If boat does not complete the stop after the hook, OpenBot stays stopped until the next
-   stop and resume. A hook that OpenBot did not write stays, and a self-hosted server gets no hook.
+   nothing. boat can also cancel the stop after the hook, for example when it cannot pause a Docker
+   container that restarts ("Final snapshot failed; stop aborted"). The machine then runs with the
+   file, and OpenBot stays stopped. Two paths start it again, both only for a file older than 5
+   minutes: boat runs the hook again before each new try of the stop, so a newer file can belong to a
+   save that still runs. The hook sets a transient systemd timer (`openbot-pre-stop-restart`) that
+   fires 15 minutes after the last hook. A client wake or a connector event for a server that boat
+   reports as running makes the Worker run `FAILED_STOP_START_COMMAND` after the reply. boat tries
+   the stop again every 4 to 10 minutes (seen on 2026-11-05), and each try stops OpenBot again. Thus
+   the timer fires only after boat stops its tries, and a wake keeps OpenBot running only until the
+   next try. The fix of the cause is in boat. A machine that stopped runs no timer. A hook that OpenBot did not write stays, and a self-hosted server gets
+   no hook.
 
    **Check at a start.** `PRAGMA quick_check` reads every page of `openbot.db`: on a 15.7 GB file
    it stopped the main thread for 77 seconds to about 4 minutes. A clean close removes

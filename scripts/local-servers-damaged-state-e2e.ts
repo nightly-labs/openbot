@@ -73,6 +73,7 @@ function service(root: string, recorder: Recorder): LocalServers {
     cipher: { encrypt: (value) => CIPHER.encrypt(value), decrypt: (value) => CIPHER.decrypt(value) },
     remoteServers: {
       setThisComputerServers: () => undefined,
+      setRegisteredThisComputerServers: () => undefined,
       attachLocalServer: (input) => Effect.succeed(summary(input.serverId, input.select)),
       detachLocalServer: () => Effect.void,
     },
@@ -80,6 +81,7 @@ function service(root: string, recorder: Recorder): LocalServers {
       accountId: () => "synthetic-account",
       register: () => Effect.void,
       credential: () => "synthetic-machine-token",
+      listMembers: () => Effect.succeed([]),
       remove: () => {
         recorder.accountRemovals += 1;
         return Effect.void;

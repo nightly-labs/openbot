@@ -22,6 +22,8 @@ export const messages = {
   "usage.column.tokens": "الرموز",
   "usage.column.date": "التاريخ",
   "usage.column.costUsd": "التكلفة · USD",
+  "usage.column.loads": "مرات التحميل",
+  "usage.column.agents": "الوكلاء",
   "usage.empty": "لا يوجد استخدام مسجّل في هذا النطاق.",
   "usage.partial":
     "بيانات جزئية · {turns} من الأدوار بلا استخدام مُبلَّغ عنه؛ {unpriced} من السجلات بلا تقدير للتكلفة؛ {incomplete} من السجلات ببيانات رموز غير مكتملة.",
@@ -56,9 +58,12 @@ export const messages = {
   "usage.breakdown.model": "النموذج",
   "usage.breakdown.agent": "الوكيل",
   "usage.breakdown.day": "اليوم",
+  "usage.breakdown.skill": "المهارة",
   "usage.breakdown.byModel": "الاستخدام حسب النموذج",
   "usage.breakdown.byAgent": "الاستخدام حسب الوكيل",
   "usage.breakdown.byDay": "الاستخدام والتكلفة اليومية",
+  "usage.breakdown.bySkill": "الاستخدام حسب المهارة",
+  "usage.breakdown.skillEmpty": "لا توجد مهارات محمّلة في هذه الفترة.",
   "usage.unknownModel": "نموذج غير معروف",
   "usage.footer": "بدأ الجمع {started} · آخر تحديث {updated}",
   "usage.updatedNever": "أبدًا",
@@ -78,4 +83,6 @@ export const messages = {
   "usage.panel.loading": "جارٍ تحميل الاستخدام…",
   "usage.panel.unsupported": "لا يدعم هذا المضيف تحليلات الوكلاء. حدّث المضيف لاستخدام هذا العرض.",
   "usage.panel.loadFailed": "تعذّر تحميل الاستخدام. تحقّق من الاتصال ونطاق التاريخ.",
+  "usage.machine.label": "استخدام الجهاز. المعالج: {cpu}، الذاكرة: {memory}",
+  "usage.machine.openStorage": "فتح التخزين. القرص: {percent}، {detail}",
 } as const satisfies PartialTranslation<typeof source>;

@@ -37,6 +37,12 @@
   color: var(--openbot-accent-text);
 }
 
+/* The tile has a margin around its icon, as an avatar has. */
+.custom-provider-mark > svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+}
+
 .custom-provider-title {
   min-width: 0;
   flex: 1;
@@ -128,6 +134,25 @@
 /* Two token counts next to the ID and the name. Each count keeps room for a value such as 131,072. */
 .custom-provider-row-inputs.custom-provider-row-quad {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(9ch, 0.8fr) minmax(9ch, 0.8fr) auto;
+}
+
+/* The efforts of one model, under its fields. They wrap on a narrow dialog. */
+.custom-provider-efforts {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--openbot-space-1) var(--openbot-space-2);
+}
+
+.custom-provider-effort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  cursor: pointer;
 }
 
 .custom-provider-rows-error,

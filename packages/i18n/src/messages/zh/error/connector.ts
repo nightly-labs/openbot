@@ -31,4 +31,18 @@ export const messages = {
     "无法在该服务器上打开 Bitwarden。请检查服务器地址、API 密钥和主密码，并确认有一个文件夹名为 Shared with OpenBot，然后重新连接。",
   "error.connector.bitwardenCliInstallFailed": "无法在该服务器上安装 Bitwarden CLI。请检查它的网络连接，然后重新连接。",
   "error.connector.bitwardenFileUnreadable": "Bitwarden 连接文件无法读取。",
+  "error.connector.passwordManagerUnknown": "OpenBot 不支持此密码管理器。",
+  "error.connector.passwordManagerMethod": "此密码管理器不能以这种方式连接。",
+  "error.connector.passwordManagerNoSignIn": "没有打开的登录页面。请重新连接。",
+  "error.connector.protonPassFailed": "无法连接 Proton Pass。请重新连接。",
+  "error.connector.protonPassCliInstallFailed": "无法安装 Proton Pass CLI。请检查网络连接，然后重新连接。",
+  "error.connector.protonPassPlan": "你的 Proton 套餐不允许使用 Proton Pass CLI。请更改套餐，然后重新连接。",
+  "error.connector.protonPassExpired": "Proton Pass 访问已结束。请重新连接。",
+  "error.connector.protonPassKeyInvalid": "请输入以 pst_ 开头的 Proton Pass 访问密钥。",
+  "error.connector.protonPassExtraPassword": "额外密码不正确。请重新输入。",
+  "error.connector.protonPassExtraPasswordNotAsked": "Proton Pass 没有要求额外密码。",
+  "error.connector.protonPassFileUnreadable": "无法读取 Proton Pass 连接文件。",
+  "error.connector.protonPassSignInTimeout": "Proton 登录用时过长。请重新连接。",
+  "error.connector.protonPassSetupFailed":
+    "无法在 Proton Pass 中创建保管库 Shared with OpenBot 或其访问密钥。请重新连接。",
 } as const satisfies PartialTranslation<typeof source>;

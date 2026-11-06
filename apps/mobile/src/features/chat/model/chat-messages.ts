@@ -1,5 +1,6 @@
-import { CHAT_VISUAL_ITEM_TYPE_PREFIX, chatVisualReply } from "@openbot/contracts/chat-visual";
+import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
+import { itemTypeCountsAsUnread } from "@openbot/contracts/conversation-read";
 import type {
   AgentExchangeSummary,
   AttachmentSummary,
@@ -16,7 +17,6 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   CONVERSATION_PLAN_ITEM_TYPE,
-  CONVERSATION_SUBAGENTS_ITEM_TYPE,
   channelRoutingConversationEvent,
   isContextResetMarker,
   parseConversationPlanText,
@@ -68,6 +68,11 @@ export type ChatMessage =
       speaker?: ChannelMessage["author"];
       /** Another person who wrote this message in an agent chat. The reader's own messages have none. */
       sender?: ConversationMessageSender;
+      /**
+       * The host records the reader as the sender. A member can delete these messages. A message from
+       * before senders were kept shows as the reader's own but is not `mine`.
+       */
+      mine?: boolean;
       superseded?: boolean;
       body: string;
       streaming: boolean;
@@ -390,14 +395,15 @@ export function projectChatMessages(
       let bubble = cached?.readerKey === readerKey ? cached.bubble : undefined;
       if (!bubble) {
         const sender = message.author === "user" ? message.senderMember : undefined;
-        const otherMember =
-          sender !== undefined && reader !== null && sender.id !== reader && sender.id !== readerAccount;
+        const ownSender = sender !== undefined && (sender.id === reader || sender.id === readerAccount);
+        const otherMember = sender !== undefined && reader !== null && !ownSender;
         bubble = projectPlan(message) ?? {
           id: message.id,
           kind: "message",
           // Another person's message stays a person's bubble, on the right, and adds their name.
           author: message.author === "user" ? "user" : "agent",
           ...(otherMember ? { sender } : {}),
+          ...(ownSender ? { mine: true } : {}),
           body: message.exchange ? "" : message.text,
           streaming: message.status === "streaming",
           status: message.status,
@@ -454,6 +460,22 @@ export function chatRowIndex(rows: readonly (ChatMessage | ExchangeGroup)[], mes
   );
 }
 
+const MARKER_ROW_PREFIX = /^(?:exchange|routine|context-reset):/u;
+
+/**
+ * The first row that shows one of `messageIds`, with the row IDs that `chatRowIndex` reads. -1 when
+ * no row shows one of them.
+ */
+export function firstChatRowOf(
+  rows: readonly (ChatMessage | ExchangeGroup)[],
+  messageIds: ReadonlySet<string>,
+): number {
+  const shows = (rowId: string) => messageIds.has(rowId.replace(MARKER_ROW_PREFIX, ""));
+  return rows.findIndex((row) =>
+    row.kind === "exchange-group" ? row.exchanges.some((marker) => shows(marker.id)) : shows(row.id),
+  );
+}
+
 function groupableExchange<T extends ChatMessage>(message: T): message is T & ExchangeMarker {
   return message.kind === "exchange" && !message.standalone;
 }
@@ -502,17 +524,13 @@ function visualReply(message: Parameters<typeof chatVisualReply>[0]): { visual?:
   return { visual: visual.height === undefined ? {} : { height: visual.height } };
 }
 
-/** Like the host read state, a plan or a visual page is not a readable message. */
-export function latestReadableMessage(messages: ConversationMessage[]) {
-  return messages.findLast(
-    (message) =>
-      Boolean(message.questionPrompt) ||
-      (message.author !== "system" &&
-        message.itemType !== CONVERSATION_PLAN_ITEM_TYPE &&
-        message.itemType !== CONVERSATION_SUBAGENTS_ITEM_TYPE &&
-        !message.itemType?.startsWith(CHAT_VISUAL_ITEM_TYPE_PREFIX) &&
-        (message.text.trim().length > 0 || Boolean(message.attachments?.length) || Boolean(message.imageGeneration))),
-  );
+/**
+ * The message that a read of the chat goes through: the newest one that the host counts as unread,
+ * by the rule that the host and the desktop app use. A read through an earlier message left the
+ * chat unread (#5089).
+ */
+export function latestReadBoundaryMessage(messages: ConversationMessage[]) {
+  return messages.findLast((message) => message.author !== "user" && itemTypeCountsAsUnread(message.itemType));
 }
 
 const projectedChannelMessages = new WeakMap<
@@ -583,6 +601,7 @@ function projectChannelMessage(
     id: entry.id,
     kind: "message",
     author: self ? "user" : "agent",
+    ...(self ? { mine: true } : {}),
     speaker: entry.author,
     superseded: entry.superseded,
     body: entry.message.text,

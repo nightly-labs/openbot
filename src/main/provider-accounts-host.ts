@@ -50,7 +50,8 @@ export class ProviderAccountsHost {
         ? [
             {
               provider: row.id,
-              accounts: row.accounts.map((account) => ({
+              // `provider-accounts-v1` carries no model list: the account's models stay on this computer.
+              accounts: row.accounts.map(({ models: _models, ...account }) => ({
                 ...account,
                 message: account.message?.slice(0, PROVIDER_ACCOUNTS_MESSAGE_LIMIT) ?? null,
               })),

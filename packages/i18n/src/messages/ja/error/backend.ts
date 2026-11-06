@@ -60,6 +60,8 @@ export const messages = {
   "error.backend.channelLeadModelUnavailable": "チャンネルリードのモデルを使用できません。",
   "error.backend.contextCompactionIneffective":
     "圧縮してもこのチャットは小さくなりません。2回圧縮しても、モデルのコンテキストウィンドウの{percent}%を使っているため、OpenBotは自動圧縮を止めます。ウィンドウの大部分はツールと指示が使っています。このエージェントに不要なMCPサーバーやコンピューター操作をオフにするか、より大きなウィンドウのモデルを選んでください。その後、新しいチャットを開始してください。",
+  "error.backend.contextCompactionStopped":
+    "このチャットの圧縮が2回続けて失敗したため、OpenBot は自動圧縮を停止します。試行のたびにチャット全体がモデルに送信され、プランの上限を消費します。もう一度試すには「今すぐ圧縮」を選択するか、新しいチャットを開始してください。",
   "error.backend.providerRetrying":
     "プロバイダーでこのリクエストが{attempts}回失敗し、再試行しています。エージェントが続かない場合は、ターンを停止してください。",
   "error.backend.providerRetryingLargeContext":
@@ -317,6 +319,17 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "この名前のブラウザープロファイルはすでにあります。",
   "error.backend.browserSessionInUse": "このブラウザーセッションはまだタブで使われています。もう一度お試しください。",
   "error.backend.browserProfileLimit": "ブラウザープロファイルは {limit} 個まで作成できます。",
+  "error.backend.browserProxyNotFound": "このプロキシはもう存在しません。",
+  "error.backend.browserProxyAddressInvalid":
+    "socks5://host:1080 や http://user:password@host:3128 のようなプロキシアドレスを入力してください。",
+  "error.backend.browserProxyLimit": "プロキシは {limit} 個まで作成できます。",
+  "error.backend.browserProxyTaken": "このアドレスのプロキシはすでに存在します。",
+  "error.backend.browserProxyChanged":
+    "このプロキシは開いた後に変更されました。もう一度確認してから、やり直してください。",
+  "error.backend.browserProxyUnreachable": "プロキシ {name} が応答しないため、ページを開けませんでした。",
+  "error.backend.browserProxySignInRefused": "プロキシ {name} がサインインを拒否したため、ページを開けませんでした。",
+  "error.backend.browserProxyComputerUnreachable":
+    "このプロファイルが使うコンピューターが応答しないため、ページを開けませんでした。",
   "error.backend.browserLowMemory":
     "このサーバーはメモリーが不足しているため、ブラウザーで新しいタブを開けません。タブを閉じるか、ほかのエージェントの作業が終わるまでお待ちください。",
   "error.backend.browserOpenFailed": "{url} を開けません: {reason}",

@@ -59,6 +59,8 @@ export const messages = {
   "error.backend.channelLeadModelUnavailable": "채널 리더 모델을 사용할 수 없어요.",
   "error.backend.contextCompactionIneffective":
     "압축해도 이 채팅이 작아지지 않아요. 두 번 압축한 뒤에도 모델 컨텍스트 창의 {percent}%를 사용해서 OpenBot이 압축을 멈춰요. 창의 대부분은 도구와 지침이 사용해요. 이 에이전트에 필요 없는 MCP 서버나 컴퓨터 사용을 끄거나, 창이 더 큰 모델을 선택하세요. 그런 다음 새 채팅을 시작하세요.",
+  "error.backend.contextCompactionStopped":
+    '이 채팅의 압축이 두 번 연속 실패하여 OpenBot이 자동 압축을 중지합니다. 시도할 때마다 채팅 전체가 모델로 전송되어 요금제 한도를 사용합니다. 다시 시도하려면 "지금 압축"을 선택하거나 새 채팅을 시작하세요.',
   "error.backend.providerRetrying":
     "제공자가 이 요청에 {attempts}번 실패해서 다시 시도하고 있어요. 에이전트가 계속하지 않으면 턴을 중지하세요.",
   "error.backend.providerRetryingLargeContext":
@@ -297,6 +299,16 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "같은 이름의 브라우저 프로필이 이미 있어요.",
   "error.backend.browserSessionInUse": "탭 하나가 아직 이 브라우저 세션을 사용 중이에요. 다시 시도해 주세요.",
   "error.backend.browserProfileLimit": "브라우저 프로필은 최대 {limit}개까지 만들 수 있어요.",
+  "error.backend.browserProxyNotFound": "이 프록시는 더 이상 없어요.",
+  "error.backend.browserProxyAddressInvalid":
+    "socks5://host:1080 또는 http://user:password@host:3128 같은 프록시 주소를 입력하세요.",
+  "error.backend.browserProxyLimit": "프록시는 최대 {limit}개까지 만들 수 있어요.",
+  "error.backend.browserProxyTaken": "이 주소를 사용하는 프록시가 이미 있어요.",
+  "error.backend.browserProxyChanged": "이 프록시를 연 뒤에 변경되었어요. 다시 확인한 다음 다시 시도해 주세요.",
+  "error.backend.browserProxyUnreachable": "프록시 {name}이(가) 응답하지 않아 페이지를 열지 못했어요.",
+  "error.backend.browserProxySignInRefused": "프록시 {name}이(가) 로그인을 거부해 페이지를 열지 못했어요.",
+  "error.backend.browserProxyComputerUnreachable":
+    "이 프로필이 사용하는 컴퓨터가 응답하지 않아 페이지를 열지 못했어요.",
   "error.backend.browserLowMemory":
     "이 서버의 메모리가 부족해서 브라우저에서 탭을 더 열 수 없어요. 탭을 닫거나 다른 에이전트가 끝날 때까지 기다리세요.",
   "error.backend.browserOpenFailed": "{url}을(를) 열 수 없어요: {reason}",

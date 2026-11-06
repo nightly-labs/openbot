@@ -104,6 +104,7 @@ export const messages = {
   "chat.awaiting.needsYou": "{name} 需要你处理",
   "chat.awaiting.limited": "{name} 正在等待用量限额恢复",
   "chat.awaiting.dismiss": "隐藏该列表",
+  "chat.awaiting.stop": "停止",
   "chat.waits.label": "未结等待",
   "chat.waits.title": { one: "{count} 个未结等待", other: "{count} 个未结等待" },
   "chat.waits.active": "{state}：{note}",
@@ -420,4 +421,8 @@ export const messages = {
   "chat.compaction.failed": "无法压缩上下文",
   "chat.compaction.tokens": "{before} → {after} 个 token",
   "chat.compaction.continues": "排队中的消息会继续执行。",
+  "chat.reference.kind.tab": "浏览器标签页",
+  "chat.reference.kind.thread": "话题",
+  "chat.reference.open.tab": "显示浏览器标签页 {name}",
+  "chat.reference.open.thread": "打开话题 {name}",
 } as const satisfies PartialTranslation<typeof source>;

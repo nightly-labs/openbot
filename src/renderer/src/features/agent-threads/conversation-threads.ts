@@ -67,6 +67,7 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
           : ofTaskThread(task, takeovers) !== undefined
             ? "takeover"
             : undefined,
+    unread: (task) => tasks.unreadCount(task),
   };
   const lists = threadLists({ ...listInput, open: tabs.openIds(agentId), draft: tabs.hasDraft(agentId) });
   const activeId = activeThreadId(lists.tabs, tabs.activeId(agentId));
@@ -151,6 +152,7 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
       onMove: (id, index) => tabs.moveSide(agentId, id, index),
     },
     open,
+    tasks: list,
     limit: snapshot?.limit ?? 1,
     running: list.filter(isAgentTaskActive).length,
     conversation: open ? tasks.conversation(open.id) : undefined,
@@ -175,6 +177,15 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
     onCompactContext: open && onCompactContext ? () => onCompactContext(open.id) : undefined,
     // Only this computer moves a queued message to a new thread.
     onRunQueuedMessage: tasks.local() ? (deliveryId) => void tabs.runQueuedMessage(agentId, deliveryId) : undefined,
+    queueActions: tasks.queueActions()
+      ? {
+          cancel: (deliveryId) => tasks.cancelQueuedMessage(agentId, deliveryId),
+          steer: (task, deliveryId) => {
+            if (task.activeTurnId) tasks.steerQueuedMessage(agentId, task.id, deliveryId, task.activeTurnId);
+          },
+          reorder: (taskId, deliveryIds) => tasks.reorderQueue(agentId, taskId, deliveryIds),
+        }
+      : undefined,
     onBranch: tasks.canBranch()
       ? (sourceTaskId, messageId) => tabs.branch(agentId, sourceTaskId, messageId)
       : undefined,

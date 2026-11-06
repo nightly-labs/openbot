@@ -35,4 +35,20 @@ export const messages = {
   "error.connector.bitwardenCliInstallFailed":
     "Bu sunucuya Bitwarden CLI yüklenemedi. Ağ bağlantısını kontrol edin, sonra tekrar bağlanın.",
   "error.connector.bitwardenFileUnreadable": "Bitwarden bağlantı dosyası okunamıyor.",
+  "error.connector.passwordManagerUnknown": "OpenBot bu parola yöneticisini tanımıyor.",
+  "error.connector.passwordManagerMethod": "Bu parola yöneticisi bu yolla bağlanamaz.",
+  "error.connector.passwordManagerNoSignIn": "Açık bir oturum açma sayfası yok. Yeniden bağlanın.",
+  "error.connector.protonPassFailed": "Proton Pass bağlanamadı. Yeniden bağlanın.",
+  "error.connector.protonPassCliInstallFailed":
+    "Proton Pass CLI yüklenemedi. Ağ bağlantısını kontrol edin, ardından yeniden bağlanın.",
+  "error.connector.protonPassPlan":
+    "Proton planınız Proton Pass CLI kullanımına izin vermiyor. Planı değiştirin, ardından yeniden bağlanın.",
+  "error.connector.protonPassExpired": "Proton Pass erişimi sona erdi. Yeniden bağlanın.",
+  "error.connector.protonPassKeyInvalid": "pst_ ile başlayan bir Proton Pass erişim anahtarı girin.",
+  "error.connector.protonPassExtraPassword": "Ek parola doğru değil. Yeniden girin.",
+  "error.connector.protonPassExtraPasswordNotAsked": "Proton Pass ek parola istemedi.",
+  "error.connector.protonPassFileUnreadable": "Proton Pass bağlantı dosyası okunamıyor.",
+  "error.connector.protonPassSignInTimeout": "Proton oturum açma işlemi çok uzun sürdü. Yeniden bağlanın.",
+  "error.connector.protonPassSetupFailed":
+    "Proton Pass'te Shared with OpenBot kasası veya erişim anahtarı oluşturulamadı. Yeniden bağlanın.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -28,4 +28,9 @@ export const messages = {
   "error.voice.speech.timedOut": "Het voorlezen van het antwoord duurde te lang.",
   "error.voice.speech.failed": "OpenBot kon het antwoord niet voorlezen.",
   "error.voice.recordingNotKept": "OpenBot kon de spraakopname niet bewaren.",
+  "error.voice.live.timedOut": "Codex live spraak is niet op tijd gestart. Probeer het opnieuw.",
+  "error.voice.live.failed": "Live spraak is gestopt: {reason}",
+  "error.voice.live.disconnected": "Live spraak is verbroken.",
+  "error.voice.live.signIn": "Meld je met je ChatGPT-account aan bij Codex om live spraak te gebruiken.",
+  "error.voice.live.off": "Codex live spraak staat uit. Zet het aan in Instellingen → Spraak.",
 } as const satisfies PartialTranslation<typeof source>;

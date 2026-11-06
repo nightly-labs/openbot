@@ -142,10 +142,6 @@ export const messages = {
 
   "agentSettings.runtime.model": "エージェントのモデル",
   "agentSettings.runtime.modelUnavailable": "エージェント CLI が接続されると、モデルを選択できます。",
-  "agentSettings.runtime.reasoning": "推論",
-  "agentSettings.runtime.reasoningLabel": "エージェントの推論レベル",
-  "agentSettings.runtime.selectReasoning": "推論を選択",
-  "agentSettings.runtime.reasoningSetByProvider": "{provider} が設定",
   "agentSettings.runtime.access": "アクセス",
   "agentSettings.runtime.accessLabel": "エージェントのアクセス",
   "agentSettings.runtime.busyMessage": "作業中",
@@ -224,8 +220,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "チャットが長くなったときに、エージェントが新しいチャットを開始できます。開始前にメモを保存します。",
   "agentSettings.quickAcknowledgement.title": "長いタスクの前に計画を表示",
-  "agentSettings.quickAcknowledgement.description":
-    "長いタスクの前に、エージェントが計画を表示します。10 秒後、または開始を押すと始まります。",
+  "agentSettings.quickAcknowledgement.description": "長いタスクの前に、エージェントが計画を表示します。",
   "agentSettings.browserProfile.label": "ブラウザープロファイル",
   "agentSettings.browserProfile.shared": "共有",
   "agentSettings.browserProfile.agent": "このエージェントのみ",

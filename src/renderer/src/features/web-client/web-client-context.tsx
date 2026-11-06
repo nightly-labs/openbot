@@ -10,6 +10,7 @@ import type {
   BrowserTab,
   BrowserTakeoverRequest,
   ChannelSummary,
+  ChatColors,
   ClientAgentModelOption,
   ClientAgentSummary,
   ConversationMessage,
@@ -18,6 +19,7 @@ import type {
   HostedServerIssue,
   HostedServerSleep,
   HostedServerStart,
+  MemberChatColorEntry,
   QueueSnapshot,
   RespondToApprovalInput,
   RespondToPromptInput,
@@ -27,7 +29,11 @@ import type {
   TeamRealtimeEvent,
 } from "@openbot/contracts/ipc";
 import { canAdministerServer } from "@openbot/contracts/ipc";
-import { AGENT_COLORS_CAPABILITY, AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import {
+  AGENT_COLORS_CAPABILITY,
+  AGENT_HIDDEN_CAPABILITY,
+  CHAT_COLORS_CAPABILITY,
+} from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_CAPABILITY } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
@@ -87,6 +93,8 @@ interface WebConversation {
 
 /** The messages that a conversation keeps when it is not open, as on the desktop. */
 const LATEST_PAGE_SIZE = 50;
+/** The recently opened agents whose latest page a new page reads after the open one. */
+const PRELOADED_AGENTS = 3;
 
 /**
  * Releases the older pages of a conversation that is not open. Only the open conversation gets new
@@ -154,6 +162,8 @@ interface WebWorkspaceState {
   otherTab: boolean;
   recovery: RemoteRecoveryStatus | null;
   workspaceLoaded: boolean;
+  /** The host answered once. A saved frame sets `workspaceLoaded` before that, so the first-load screen waits for this. */
+  synced: boolean;
   panelsFailed: boolean;
   panelsLoading: boolean;
   agentStatus: AgentStatus | null;
@@ -186,6 +196,11 @@ interface WebWorkspaceState {
   userHiddenAgents: HiddenAgent[];
   /** The exact agent colours on the host (`agent-colors-v1`). The released agent list does not carry them. */
   agentColors: AgentColorEntry[];
+  /**
+   * The chat colours of the agents and members on the host (`chat-colors-v1`). The released agent list
+   * and presence do not carry them. `presence` already has the member chat colours.
+   */
+  chatColors: ChatColors;
 }
 
 export type WebRuntimeFactory = (
@@ -238,6 +253,7 @@ export function createWebWorkspace(
     otherTab: false,
     recovery: null,
     workspaceLoaded: false,
+    synced: false,
     panelsFailed: false,
     panelsLoading: false,
     agentStatus: null,
@@ -258,6 +274,7 @@ export function createWebWorkspace(
     sidebarLayout: defaultSidebarLayout(),
     userHiddenAgents: [],
     agentColors: [],
+    chatColors: { agents: [], members: [] },
   });
   // Every progress line of the newest turns, by turn, for the steps under the activity line.
   const [stepLines, setStepLines] = createSignal<TurnStepLines>({});
@@ -483,7 +500,7 @@ export function createWebWorkspace(
         for (const listener of hostEventListeners) listener(event);
         if (event.type === "team-presence")
           setState((draft) => {
-            draft.presence = event.snapshot;
+            draft.presence = presenceWithChatColors(event.snapshot, draft.chatColors.members);
           });
         if (event.type === "host-restart")
           setState((draft) => {
@@ -621,6 +638,7 @@ export function createWebWorkspace(
           setState((draft) => {
             draft.agentColors = event.agents;
           });
+        if (event.type === "chat-colors-changed") receiveChatColors({ agents: event.agents, members: event.members });
         if (event.type === "sidebar-pins-changed")
           preferences.receiveServerPins(pinScope(), { items: event.items, updatedAt: event.updatedAt });
         // A read loads only the open conversation, so the events of other agents do not start one.
@@ -751,12 +769,21 @@ export function createWebWorkspace(
   );
   const shownAgents = createMemo(() => {
     const colors = new Map(state.agentColors.map((entry) => [entry.agentId, entry.color]));
+    const chatColors = new Map(state.chatColors.agents.map((entry) => [entry.agentId, entry.color]));
     return state.agents.map((agent) => {
       const avatar = avatars().get(agent.id);
-      const { avatarColor: _avatarColor, ...shown } =
-        avatar && avatar.source === agent.avatarUrl ? { ...agent, avatarUrl: avatar.url } : agent;
+      const {
+        avatarColor: _avatarColor,
+        chatColor: _chatColor,
+        ...shown
+      } = avatar && avatar.source === agent.avatarUrl ? { ...agent, avatarUrl: avatar.url } : agent;
       const color = colors.get(agent.id);
-      return color ? { ...shown, avatarColor: color } : shown;
+      const chatColor = chatColors.get(agent.id);
+      return {
+        ...shown,
+        ...(color ? { avatarColor: color } : {}),
+        ...(chatColor ? { chatColor } : {}),
+      };
     });
   });
   // A frame agent's last message is not known: its row shows no preview, not "No messages yet".
@@ -815,6 +842,19 @@ export function createWebWorkspace(
     const read = runtime.listAgentColors;
     if (!capabilities.includes(AGENT_COLORS_CAPABILITY) || !read) return [];
     return (await read()).agents;
+  }
+  /** A host without `chat-colors-v1` has no chat colours. */
+  async function readChatColors(capabilities: readonly string[]): Promise<ChatColors> {
+    const read = runtime.listChatColors;
+    if (!capabilities.includes(CHAT_COLORS_CAPABILITY) || !read) return { agents: [], members: [] };
+    return read();
+  }
+  /** Keeps the chat colours, and puts the member chat colours on the presence that this tab has. */
+  function receiveChatColors(colors: ChatColors): void {
+    setState((draft) => {
+      draft.chatColors = colors;
+      if (draft.presence) draft.presence = presenceWithChatColors(draft.presence, colors.members);
+    });
   }
   function reconcileAgents(agents: ClientAgentSummary[]): void {
     const ids = new Set(agents.map((agent) => agent.id));
@@ -876,6 +916,7 @@ export function createWebWorkspace(
           setState((draft) => {
             draft.host = null;
             draft.workspaceLoaded = false;
+            draft.synced = false;
             draft.memberId = null;
             draft.selectedId = null;
             draft.agents = [];
@@ -893,6 +934,7 @@ export function createWebWorkspace(
             draft.sidebarLayout = defaultSidebarLayout();
             draft.userHiddenAgents = [];
             draft.agentColors = [];
+            draft.chatColors = { agents: [], members: [] };
             draft.duplicatingAgentIds = [];
             draft.capabilities = [];
             draft.status = "offline";
@@ -994,6 +1036,7 @@ export function createWebWorkspace(
     setState((draft) => {
       draft.revocationRevision += 1;
       draft.workspaceLoaded = false;
+      draft.synced = false;
       draft.agents = [];
       draft.agentsLoaded = false;
       draft.conversations = {};
@@ -1010,6 +1053,7 @@ export function createWebWorkspace(
       draft.sidebarLayout = defaultSidebarLayout();
       draft.userHiddenAgents = [];
       draft.agentColors = [];
+      draft.chatColors = { agents: [], members: [] };
       draft.capabilities = [];
       draft.presence = null;
       draft.duplicatingAgentIds = [];
@@ -1091,6 +1135,7 @@ export function createWebWorkspace(
     const frame = savedFrame?.agents.length ? savedFrame : null;
     const frameSelected = frame?.agents.find((agent) => agent.id === frame.selectedAgentId) ?? frame?.agents[0];
     const previousSelected = (sameHost ? selectedId : null) ?? frameSelected?.id ?? null;
+    const recentAgentIds = frame?.recentAgentIds ?? [];
     hostId = host.hostId;
     writeWebServerSelection(props.accountId, host.hostId);
     if (!keepWorkspace) selectedId = null;
@@ -1104,6 +1149,7 @@ export function createWebWorkspace(
       if (!sameHost) draft.otherTab = false;
       if (!sameHost) {
         draft.workspaceLoaded = false;
+        draft.synced = false;
         draft.agentStatus = null;
         draft.models = [];
       }
@@ -1133,6 +1179,7 @@ export function createWebWorkspace(
         draft.sidebarLayout = defaultSidebarLayout();
         draft.userHiddenAgents = [];
         draft.agentColors = [];
+        draft.chatColors = { agents: [], members: [] };
         draft.duplicatingAgentIds = [];
         draft.capabilities = [];
         draft.presence = null;
@@ -1204,6 +1251,7 @@ export function createWebWorkspace(
         draft.agentsLoaded = true;
         draft.agentsFromFrame = false;
         draft.workspaceLoaded = true;
+        draft.synced = true;
         draft.agentStatus = agentStatus;
         draft.models = models;
         draft.connectionError = null;
@@ -1246,7 +1294,7 @@ export function createWebWorkspace(
         (presence) => {
           if (!disposed && current === generation && !state.presence)
             setState((draft) => {
-              draft.presence = presence;
+              draft.presence = presenceWithChatColors(presence, draft.chatColors.members);
             });
         },
         () => undefined,
@@ -1256,6 +1304,10 @@ export function createWebWorkspace(
         markRemoteSync("conversation-ready");
       }
       if (disposed || current !== generation) return;
+      void preloadRecent(
+        recentAgentIds.filter((id) => id !== first?.id && agents.some((agent) => agent.id === id)),
+        current,
+      );
       // The other queues only give the sidebar its marks.
       for (const agent of agents) if (agent.id !== first?.id) loadQueue(agent.id);
     } catch (error) {
@@ -1360,6 +1412,12 @@ export function createWebWorkspace(
             setState((draft) => {
               draft.agentColors = colors;
             });
+        })
+        .catch(() => undefined),
+      // The chat colours are not a panel. If the read fails, the bubbles keep the default colour.
+      readChatColors(capabilities)
+        .then((colors) => {
+          if (isCurrent()) receiveChatColors(colors);
         })
         .catch(() => undefined),
     ]);
@@ -1551,11 +1609,30 @@ export function createWebWorkspace(
       report(error);
     }
   }
+  /**
+   * Reads the latest page of recently opened agents, one at a time, so that the first switch to one
+   * shows its messages at once. An agent with a kept page is not read again. The page stays trimmed:
+   * a closed conversation gets no events, so the read on open replaces it with the host page.
+   */
+  async function preloadRecent(ids: readonly string[], current: number) {
+    for (const id of ids.slice(0, PRELOADED_AGENTS)) {
+      if (disposed || current !== generation) return;
+      if (state.conversations[id]) continue;
+      setState((draft) => {
+        draft.conversations[id] ??= { page: null, draft: "", attachments: [], loading: false, trimmed: true };
+      });
+      try {
+        await load(id);
+      } catch {
+        // A failed early read only costs the early page. The agent loads when it opens.
+      }
+    }
+  }
   async function resync() {
     const current = generation;
     try {
       // A hide on another device can land while this tab is offline, and the event is then lost.
-      const [{ agents, sidebarLayout }, userHiddenAgents, agentColors] = await Promise.all([
+      const [{ agents, sidebarLayout }, userHiddenAgents, agentColors, chatColors] = await Promise.all([
         // The layout read needs the agent ids.
         runtime.listAgents().then(async (agents) => ({
           agents,
@@ -1567,6 +1644,8 @@ export function createWebWorkspace(
         readUserHiddenAgents(state.capabilities),
         // A failed colour read keeps the colours that this tab has.
         readAgentColors(state.capabilities).catch(() => state.agentColors),
+        // A failed chat colour read keeps the chat colours that this tab has.
+        readChatColors(state.capabilities).catch(() => state.chatColors),
       ]);
       if (disposed || current !== generation) return;
       syncedAt = Date.now();
@@ -1576,6 +1655,7 @@ export function createWebWorkspace(
         draft.userHiddenAgents = userHiddenAgents;
         draft.agentColors = agentColors;
       });
+      receiveChatColors(chatColors);
       for (const agent of agents) loadQueue(agent.id);
       if (!selectedId && agents[0]) await select(agents[0].id);
       await refresh();
@@ -2183,4 +2263,19 @@ function changedConversation(event: AgentEvent | TeamRealtimeEvent): string | un
     default:
       return undefined;
   }
+}
+
+/** The presence with the chat colour of each member that has one. Presence on the wire has none. */
+function presenceWithChatColors(
+  presence: TeamPresenceSnapshot,
+  colors: readonly MemberChatColorEntry[],
+): TeamPresenceSnapshot {
+  const byMember = new Map(colors.map((entry) => [entry.memberId, entry.color]));
+  return {
+    ...presence,
+    members: presence.members.map(({ chatColor: _chatColor, ...member }) => {
+      const color = byMember.get(member.id);
+      return color ? { ...member, chatColor: color } : member;
+    }),
+  };
 }

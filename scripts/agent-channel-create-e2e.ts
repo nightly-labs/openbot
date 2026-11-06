@@ -5,8 +5,9 @@
 // The check asserts the stored channel after each call: the members, lead, icon and image of a new
 // channel; a rename, member changes, a new lead and an image that replaces the icon; an icon that
 // removes the image; archive and restore; and the refusals: a hidden agent, a lead that is not a
-// member, an unusable image file, and a call from a channel task. A repeated tool call makes one
-// channel.
+// member, an unusable image file, a routine run and a team member. A channel task that this
+// computer's user started creates a channel and changes another one, but not its own channel; a team
+// member's request in the channel is refused. A repeated tool call makes one channel.
 // `bun scripts/agent-channel-create-e2e.ts`. Writes .openbot-build/agent-channel-create-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -196,6 +197,9 @@ const browser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 
 /** Waits for a state of the service or the fake's log. */
@@ -477,32 +481,89 @@ try {
   });
   pass("An unknown channel is refused", !unknown.success && unknown.text.includes("list_channels"), unknown.text);
 
-  // 7. A channel task cannot use the tools: there, only a person's request changes the channel.
-  const before = toolLogs().length;
-  await runCauseEffect(
-    channels().command(
-      {
-        type: "send",
-        operationId: randomUUID(),
-        channelId,
-        text: `${CALL_MARK} <<ARGS${JSON.stringify({ __tool: "update_channel", channelId, name: "taken" })}ARGS>>`,
-        recipientAgentId: lead.id,
-        replyToMessageId: null,
-        attachmentDraftIds: [],
-      },
-      PERSON,
-    ),
-  );
-  const inTask = await logged("update from a channel task", before);
-  await waitFor("the channel tasks to end", () =>
-    channels()
-      .store.tasks(channelId)
-      .every((task) => !["queued", "running", "waiting"].includes(task.state)),
+  // 7. A channel task that this computer's user started can create a channel and change another one.
+  // It cannot change its own channel (the channel tools do that), and a team member's request is refused.
+  const fromChannel = async (
+    name: string,
+    tool: string,
+    args: ChannelToolArgs,
+    sender: { id: string; name: string },
+  ) => {
+    const before = toolLogs().length;
+    await runCauseEffect(
+      channels().command(
+        {
+          type: "send",
+          operationId: randomUUID(),
+          channelId,
+          text: `${CALL_MARK} <<ARGS${JSON.stringify({ __tool: tool, ...args })}ARGS>>`,
+          recipientAgentId: lead.id,
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        sender,
+      ),
+    );
+    const result = await logged(name, before);
+    await waitFor("the channel tasks to end", () =>
+      channels()
+        .store.tasks(channelId)
+        .every((task) => !["queued", "running", "waiting"].includes(task.state)),
+    );
+    return result;
+  };
+  const ownChannel = await fromChannel(
+    "update the task's own channel",
+    "update_channel",
+    { channelId, name: "taken" },
+    PERSON,
   );
   pass(
-    "A channel task cannot use update_channel",
-    !inTask.success && inTask.text.includes("only in your own chats") && channelOf(channelId).name === "release",
-    inTask.text,
+    "A channel task cannot change its own channel with update_channel",
+    !ownChannel.success && ownChannel.text.includes("channel_add_member") && channelOf(channelId).name === "release",
+    ownChannel.text,
+  );
+  const countBeforeTask = channelCount();
+  const createdInTask = await fromChannel(
+    "create from a channel task",
+    "create_channel",
+    { name: "training", memberAgentIds: [lead.id, tester.id] },
+    PERSON,
+  );
+  const trainingId = createdInTask.success ? resultChannelId(createdInTask.text) : "";
+  pass(
+    "A channel task that the user started creates a channel",
+    createdInTask.success &&
+      channelCount() === countBeforeTask + 1 &&
+      memberIds(trainingId).join() === [lead.id, tester.id].join(),
+    createdInTask.text,
+  );
+  const updatedInTask = await fromChannel(
+    "update another channel from a channel task",
+    "update_channel",
+    { channelId: trainingId, addMemberAgentIds: [writer.id], title: "Onboarding" },
+    PERSON,
+  );
+  pass(
+    "A channel task that the user started changes another channel",
+    updatedInTask.success &&
+      memberIds(trainingId).includes(writer.id) &&
+      channelOf(trainingId).title === "Onboarding" &&
+      channelOf(channelId).name === "release",
+    updatedInTask.text,
+  );
+  const memberInTask = await fromChannel(
+    "create from a team member's channel request",
+    "create_channel",
+    { name: "from-member-task", memberAgentIds: [lead.id] },
+    MEMBER,
+  );
+  pass(
+    "A team member's channel request cannot use create_channel",
+    !memberInTask.success &&
+      memberInTask.text.includes("this computer's user") &&
+      channelCount() === countBeforeTask + 1,
+    memberInTask.text,
   );
 
   // 7b. A routine run can carry text from outside, such as a webhook body, so it cannot use the tools.

@@ -1,10 +1,10 @@
 {
-  "version": "1.4.5",
+  "version": "1.4.6",
   "highlights": [
-    "Tap the speaker under an agent message to hear it read aloud with your reply voice.",
-    "Manage the server from the phone: providers and their accounts, custom providers, the ACP registry, browser profiles, agent folders and backup models.",
-    "Move a server with the new Transfer page, or import agents from a Grok Bot or Hermes Agent export.",
-    "The server Usage screen shows how much of each provider plan limit is left and when it resets.",
-    "The app reconnects within about 30 seconds after the server comes back, and keeps working when a server changes its key."
+    "On iPhone, sign in again after you upgrade, and turn App lock on again in Settings if you used it.",
+    "Branch a chat from any finished agent answer: touch and hold it and choose Branch from here.",
+    "Dictate into the message box with the mic, and edit the words before you send.",
+    "Pins and chat folders now match the desktop app, and you can drag a chat to pin it or move it.",
+    "Your agents and recent chats show at once after a start, while the app connects to the server."
   ]
 }

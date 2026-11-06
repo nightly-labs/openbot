@@ -164,6 +164,11 @@ export function createRoutineTimezonePrompt(targets: () => RoutineZoneTarget[]):
   const shown = new Map<string, string>();
   /** For each server, the source and device zones of toasts closed with no answer until the zone changes. */
   const dismissed = new Map<string, Set<string>>();
+  /**
+   * For each server, the device zone of its last calendar read. A server that comes back online is read
+   * again only after the zone changed: its workspace reads the same agents and channels as it reconnects.
+   */
+  const checkedZones = new Map<string, string>();
 
   async function check(target: RoutineZoneTarget): Promise<void> {
     if (checking.has(target.id) || moving.has(target.id)) return;
@@ -171,6 +176,7 @@ export function createRoutineTimezonePrompt(targets: () => RoutineZoneTarget[]):
     try {
       const zone = deviceZone();
       const byZone = await routinesByZone(target);
+      checkedZones.set(target.id, zone);
       // Read the answers after the wait: the user can answer or start a move while the list loads.
       if (moving.has(target.id)) return;
       const answered = answeredZones(target.id, zone);
@@ -262,9 +268,11 @@ export function createRoutineTimezonePrompt(targets: () => RoutineZoneTarget[]):
     for (const serverId of shown.keys()) {
       if (current.some((target) => target.id === serverId)) continue;
       shown.delete(serverId);
+      // The prompt shows again when the server is back.
+      checkedZones.delete(serverId);
       toast.dismiss(toastId(serverId));
     }
-    for (const target of current) void check(target);
+    for (const target of current) if (checkedZones.get(target.id) !== zone) void check(target);
   }
 
   // An effect runs again each time its key is computed. The server summaries change while a workspace

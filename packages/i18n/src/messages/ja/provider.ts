@@ -99,6 +99,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "{host} で {name} のサインインを開始しています…",
   "provider.codeLogin.pageOpening": "{host} で {name} のサインインページを開いています…",
   "provider.codeLogin.linkStep": "{name} にログインします。OpenBot は自動で続行します。",
+  "provider.codeLogin.chatgptDeviceSetting":
+    "パソコンの ChatGPT でセキュリティ設定を開き、Codex のデバイスコードによるサインインをオンにします。仕事用アカウントでは、ワークスペースの管理者がオンにします。",
   "provider.useApp.title": "OpenBot アプリで {name} に接続",
   "provider.useApp.description":
     "{name} のサインインは開始したコンピューターに戻るため、ブラウザーのタブでは受け取れません。OpenBot アプリで {name} に接続してください。アプリがサインインを自動で完了します。",
@@ -123,6 +125,8 @@ export const messages = {
   "provider.picker.noModels": "{name} で利用できるモデルはありません。",
   "provider.picker.customEmpty":
     "OpenAI 互換のエンドポイントを追加してください。このコンピューター上のモデルサーバーでも、ベース URL とキーがあるサービスでも使えます。",
+  "provider.picker.customPending":
+    "エンドポイントのモデルはまだ読み込まれていません。プロバイダーは現在のタスクが止まったあとで読み込みます。",
   "provider.picker.defaultModelLabel": "{name}、デフォルト",
   "provider.picker.usageLimit": "使用量の上限に達しました",
   "provider.picker.usageLimitWindow": "{window}の上限",
@@ -236,14 +240,10 @@ export const messages = {
   "provider.settings.modelShow": "{name}（{id}）をモデル選択に表示",
   "provider.settings.modelsNoMatch": "検索に一致するモデルはありません。",
   "provider.settings.modelsLoadFailed": "このサーバーのモデルを読み込めませんでした。",
-  "provider.settings.download": "ダウンロード",
-  "provider.settings.downloadedCli": "{name} CLI",
-  "provider.settings.downloadDetail": { other: "{version} · {count} バージョン · {size}" },
-  "provider.settings.downloadVersions": { other: "{count} バージョン · {size}" },
-  "provider.settings.downloadAgain": "{name} をオンにすると、OpenBot が CLI を再度ダウンロードします。",
-  "provider.settings.removeDownloadConfirm": "{size} を削除しますか？",
-  "provider.settings.removeDownloadKeeps": "アカウント、サインイン、エージェントは残ります。",
-  "provider.settings.removeDownload": "ダウンロードを削除",
-  "provider.settings.removingDownload": "削除中…",
+  "provider.settings.deleteTitle": "{name} を削除",
+  "provider.settings.deleteOn":
+    "{name} をオフにして、OpenBot がダウンロードした CLI を削除します。アカウント、サインイン、エージェントは残ります。",
+  "provider.settings.deleteOff":
+    "OpenBot が {name} 用にダウンロードした CLI（{size}）を削除します。アカウント、サインイン、エージェントは残ります。",
   "provider.settings.removeDownloadFailed": "ダウンロードを削除できませんでした。",
 } as const satisfies PartialTranslation<typeof source>;

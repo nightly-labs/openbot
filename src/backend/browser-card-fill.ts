@@ -30,11 +30,13 @@ export interface BrowserCardFieldDescription {
   placeholder: string;
   /** The field's form sends its fields in the page address. */
   sendsGet: boolean;
+  /** The field's frame loaded from the network, not through a service worker that reads Cache Storage. */
+  network: boolean;
 }
 
 export function parseCardFieldDescription(value: unknown): BrowserCardFieldDescription | null {
   if (!isDynamicRecord(value)) return null;
-  const { connected, secure, origin, tag, type, multiple, disabled, maxLength, placeholder, sendsGet } = value;
+  const { connected, secure, origin, tag, type, multiple, disabled, maxLength, placeholder, sendsGet, network } = value;
   if (
     !isBoolean(connected) ||
     !isBoolean(secure) ||
@@ -45,16 +47,20 @@ export function parseCardFieldDescription(value: unknown): BrowserCardFieldDescr
     !isBoolean(disabled) ||
     !isNumber(maxLength) ||
     !isString(placeholder) ||
-    !isBoolean(sendsGet)
+    !isBoolean(sendsGet) ||
+    !isBoolean(network)
   )
     return null;
-  return { connected, secure, origin, tag, type, multiple, disabled, maxLength, placeholder, sendsGet };
+  return { connected, secure, origin, tag, type, multiple, disabled, maxLength, placeholder, sendsGet, network };
 }
 
 /**
  * Reads a field without its value. `ownerDocument === document` keeps the field in the frame whose
  * context runs the function: the main page, or a payment frame in its own process.
  */
+/** Page code: true when the frame's document came from the network, not from a service worker. */
+export const LOADED_FROM_NETWORK = "performance.getEntriesByType('navigation')[0]?.workerStart === 0";
+
 export const CARD_FIELD_DESCRIPTION_FUNCTION = `function() {
   const form = this.form;
   const sendsGet = (element) => element.hasAttribute('formmethod') && element.getAttribute('formmethod').trim().toLowerCase() === 'get';
@@ -69,6 +75,7 @@ export const CARD_FIELD_DESCRIPTION_FUNCTION = `function() {
     maxLength: typeof this.maxLength === 'number' ? this.maxLength : -1,
     placeholder: this.getAttribute('placeholder') ?? '',
     sendsGet: !!form && ((form.getAttribute('method') ?? '').trim().toLowerCase() === 'get' || [...form.elements].some(sendsGet)),
+    network: ${LOADED_FROM_NETWORK},
   };
 }`;
 

@@ -13,7 +13,13 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Exit, Scope, Semaphore } from "effect";
 import type { SpeechPreferenceStore } from "./speech-preference-store";
-import { VOICE_RUNTIME_ADDON, VoiceModelService, VoiceOperationError } from "./voice-model-service";
+import {
+  SPEECH_HOST_THREADS,
+  SPEECH_SESSION_CONFIG,
+  VOICE_RUNTIME_ADDON,
+  VoiceModelService,
+  VoiceOperationError,
+} from "./voice-model-service";
 import type { VoiceSpeechFailure, VoiceSpeechHostProcess, VoiceSpeechResponse } from "./voice-speech-protocol";
 
 const logger = createOpenBotLogger("voice-speech-service");
@@ -201,6 +207,8 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
         language: input.language,
         speakerId,
         loadOnly,
+        numThreads: SPEECH_HOST_THREADS,
+        sessionConfig: SPEECH_SESSION_CONFIG,
       });
       return Effect.sync(() => {
         if (this.#pending?.id === id) this.#pending = null;

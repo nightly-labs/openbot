@@ -78,6 +78,7 @@ import { PlanLimitsHeaderButton } from "@/features/servers/components/plan-limit
 import { usePlanLimits } from "@/features/servers/model/plan-limits";
 import { ConnectionHeaderStatus } from "@/features/workspace/components/connection-header-status";
 import { useWaitingAgentIds } from "@/features/workspace/components/use-agent-activity";
+import { useHomeThreadState } from "@/features/workspace/components/use-home-thread-state";
 import { useUnreadAgentIds, useUnreadCounts } from "@/features/workspace/components/use-live-workspace";
 import {
   type MobileAgent,
@@ -103,6 +104,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { BAR_BUTTON_SIZE, NATIVE_BAR_HEIGHT, useBarTop } from "@/shared/lib/native-bar";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
@@ -579,6 +581,9 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   // The read state changes on each message, so the counts become a string first: the map, and with it
   // `renderItem`, change only when the count of a closed folder changes.
   const unreadCounts = useUnreadCounts();
+  // The unread messages of the agents' side threads count too, as on the desktop.
+  const activeAgentIds = useMemo(() => activeAgents.map((agent) => agent.id), [activeAgents]);
+  const threadUnread = useHomeThreadState(activeServer.id, activeAgentIds);
   const folderUnreadKey = useMemo(() => {
     if (!collapsedSectionIds?.size) return "[]";
     const unread = new Set(unreadAgentIds);
@@ -592,14 +597,12 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         const count =
           item.kind === "channel"
             ? item.channel.unreadCount
-            : unread.has(item.id)
-              ? Math.max(1, unreadCounts[item.id] ?? 1)
-              : 0;
+            : (unread.has(item.id) ? Math.max(1, unreadCounts[item.id] ?? 1) : 0) + (threadUnread.get(item.id) ?? 0);
         if (count > 0) for (const folderId of folderIds) counts.set(folderId, (counts.get(folderId) ?? 0) + count);
       }
     }
     return JSON.stringify([...counts]);
-  }, [items, collapsedSectionIds, unreadAgentIds, unreadCounts]);
+  }, [items, collapsedSectionIds, unreadAgentIds, unreadCounts, threadUnread]);
   const folderUnread = useMemo(() => new Map<string, number>(JSON.parse(folderUnreadKey)), [folderUnreadKey]);
   const sidebarLayout = sidebar?.layout ?? null;
   const serverId = activeServer.id;
@@ -771,7 +774,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         glass={buttonGlass}
         onPress={openDrawer}
       >
-        <PanelLeft color={iconColor} size={22} strokeWidth={2} />
+        <PanelLeft color={iconColor} size={22} strokeWidth={2} style={MIRROR_IN_RTL} />
       </HeaderIconButton>
       <ConnectionHeaderStatus server={hasSelectedServer ? activeServer : undefined} fill={pane} />
     </View>
@@ -831,7 +834,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
           glass={buttonGlass}
           onPress={openDrawer}
         >
-          <PanelLeft color={iconColor} size={22} strokeWidth={2} />
+          <PanelLeft color={iconColor} size={22} strokeWidth={2} style={MIRROR_IN_RTL} />
         </HeaderIconButton>
       }
       pinnedAgents={pinnedAgents}

@@ -128,7 +128,7 @@
     },
     "apps/mobile": {
       "name": "@openbot/mobile",
-      "version": "1.4.6",
+      "version": "1.4.7",
       "dependencies": {
         "@expo/metro-runtime": "~58.0.15",
         "@expo/ui": "~58.0.22",
@@ -416,10 +416,12 @@
     "workerd",
   ],
   "patchedDependencies": {
-    "react-native-reserved-regions@0.2.0": "patches/react-native-reserved-regions@0.2.0.patch",
+    "react-native-reanimated@4.7.1": "patches/react-native-reanimated@4.7.1.patch",
+    "expo-widgets@58.0.22": "patches/expo-widgets@58.0.22.patch",
     "expo-splash-screen@58.0.11": "patches/expo-splash-screen@58.0.11.patch",
-    "react-native-screens@4.30.0": "patches/react-native-screens@4.30.0.patch",
+    "react-native-reserved-regions@0.2.0": "patches/react-native-reserved-regions@0.2.0.patch",
     "expo@58.0.17": "patches/expo@58.0.17.patch",
+    "react-native-screens@4.30.0": "patches/react-native-screens@4.30.0.patch",
     "@kobalte/core@2.0.0-alpha.0": "patches/@kobalte%2Fcore@2.0.0-alpha.0.patch",
     "dmg-builder@26.18.0": "patches/dmg-builder@26.18.0.patch",
     "storybook-solidjs-vite@10.7.1": "patches/storybook-solidjs-vite@10.7.1.patch",
@@ -429,6 +431,7 @@
     "solid-sonner@0.3.2": "patches/solid-sonner@0.3.2.patch",
     "cuelume@0.2.8": "patches/cuelume@0.2.8.patch",
     "react-native-keyboard-controller@1.22.7": "patches/react-native-keyboard-controller@1.22.7.patch",
+    "react-native-worklets@0.13.0": "patches/react-native-worklets@0.13.0.patch",
   },
   "catalog": {
     "@cacheable/node-cache": "1.7.6",

@@ -48,6 +48,7 @@ import type { MessagingConnectionRecord, MessagingLink } from "./messaging-store
 import {
   MESSAGING_NOT_RUNNING,
   type MessagingActivity,
+  type MessagingAnswerFile,
   type MessagingDiscordSend,
   type MessagingHistory,
   type MessagingHistoryScope,
@@ -306,7 +307,7 @@ export class MessagingService {
     this.#threads.setHistorySource((link, scope, limit) => this.#recentMessages(link, scope, limit));
     this.#threads.setOutbound({
       places: (connectionId) => this.#outboundPlaces(connectionId),
-      post: (connectionId, target, markdown) => this.#outboundPost(connectionId, target, markdown),
+      post: (connectionId, target, markdown, files) => this.#outboundPost(connectionId, target, markdown, files),
       discord: (connectionId, send) => this.#outboundDiscord(connectionId, send),
       telegram: (connectionId, send) => this.#outboundTelegram(connectionId, send),
       slack: (connectionId, send) => this.#outboundSlack(connectionId, send),
@@ -1688,6 +1689,7 @@ export class MessagingService {
     connectionId: string,
     target: MessageTarget,
     markdown: string,
+    files: MessagingAnswerFile[] = [],
   ) {
     const live = this.#live.get(connectionId);
     if (!live?.identity) return { error: MESSAGING_NOT_RUNNING, failure: "not-running" as const };
@@ -1700,7 +1702,7 @@ export class MessagingService {
     // A Discord workspace id is the guild id, which a link to the post needs.
     const guildId = live.record.platform === "discord" ? live.identity.workspaceId : null;
     // The place is outside this computer, so a secret in the text must not reach it.
-    return yield* live.adapter.postAnswer(target, redactText(markdown), null).pipe(
+    const posted = yield* live.adapter.postAnswer(target, redactText(markdown), null).pipe(
       Effect.map((messageId) => ({
         posted: true as const,
         messageId,
@@ -1713,6 +1715,17 @@ export class MessagingService {
         }),
       ),
     );
+    if (!("posted" in posted) || !files.length) return posted;
+    // The text is in the place already, so a failed upload names the files and does not fail the post.
+    const skippedFiles = yield* live.adapter.upload(target, files).pipe(
+      Effect.catch((failure) =>
+        Effect.sync(() => {
+          this.#warn(failure.cause);
+          return files.map((file) => file.name);
+        }),
+      ),
+    );
+    return skippedFiles.length ? { ...posted, skippedFiles } : posted;
   });
 
   /** A reply, post or reaction of a workflow's Discord output. */

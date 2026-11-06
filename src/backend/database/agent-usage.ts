@@ -4,6 +4,7 @@ import {
   type AgentAnalytics,
   type AgentAnalyticsInput,
   type AnalyticsProviderDay,
+  type AnalyticsSkill,
   type AnalyticsTotals,
   analyticsDate,
   type ConversationMessage,
@@ -47,6 +48,21 @@ export interface UsageSample {
   costCounterId?: string;
 }
 const TOKEN_KEYS = ["uncachedInput", "cachedInput", "cacheCreation", "output"] as const;
+
+/** One skill an agent loaded, from the finished tool step that loaded it. */
+export interface SkillLoadSample {
+  agentId: string;
+  sessionId: string;
+  turnId: string;
+  /** The provider's id of the tool step. With the skill, it makes a step that comes again count once. */
+  itemId: string;
+  provider: string;
+  model: string;
+  skill: string;
+  /** The estimated tokens of its SKILL.md, or null when the file was not found. */
+  tokens: number | null;
+  occurredAt: string;
+}
 
 /** The tokens one model used in a turn. */
 export interface TurnModelUsage {
@@ -208,6 +224,38 @@ export class AgentUsage {
     );
   }
 
+  /**
+   * Keeps one skill load. Its tokens are priced as uncached input of the turn's model, which is
+   * what the skill adds when it enters the context; later requests read it from the cache.
+   */
+  recordSkillLoad(sample: SkillLoadSample): void {
+    const cost =
+      sample.tokens === null
+        ? null
+        : estimateUsageCost(
+            sample.provider,
+            sample.model,
+            { uncachedInput: sample.tokens, cachedInput: 0, cacheCreation: 0, output: 0 },
+            null,
+            null,
+            sample.occurredAt,
+          ).cost;
+    this.#core.connection
+      .prepare("INSERT OR IGNORE INTO agent_usage_skill_loads VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(
+        sample.agentId,
+        JSON.stringify([sample.sessionId, sample.itemId, sample.skill]),
+        sample.sessionId,
+        sample.turnId,
+        sample.provider,
+        sample.model,
+        sample.skill,
+        sample.tokens,
+        cost,
+        sample.occurredAt,
+      );
+  }
+
   startTurn(agentId: string, sessionId: string, turnId: string, provider: string, model: string): void {
     this.#core.connection
       .prepare("INSERT OR IGNORE INTO agent_usage_activity VALUES (?, ?, ?, ?, ?, ?, 'turn', ?)")
@@ -275,7 +323,12 @@ export class AgentUsage {
   read(raw: AgentAnalyticsInput): AgentAnalytics {
     // A spread does not trigger excess-property checking, so the host-only arrays of a
     // single-agent report are dropped by name rather than left for a decoder to strip.
-    const { agents: _agents, providerDaily: _providerDaily, ...report } = this.readHost(parseAgentAnalyticsInput(raw));
+    const {
+      agents: _agents,
+      providerDaily: _providerDaily,
+      skills: _skills,
+      ...report
+    } = this.readHost(parseAgentAnalyticsInput(raw));
     return { ...report, agentId: raw.agentId };
   }
 
@@ -383,6 +436,28 @@ export class AgentUsage {
       }
     }
     const summary = finish(totals);
+    const skills = new Map<string, { row: AnalyticsSkill; agents: Set<string> }>();
+    let skillTokens = 0;
+    for (const row of readRange("agent_usage_skill_loads")) {
+      const occurred = requiredStringColumn(row, "occurred_at");
+      if (!days.has(analyticsDate(new Date(occurred), input.timeZone))) continue;
+      const name = requiredStringColumn(row, "skill");
+      let entry = skills.get(name);
+      if (!entry) {
+        entry = {
+          row: { skill: name, loads: 0, tokens: 0, estimatedCostUsd: null, agents: 0, share: 0 },
+          agents: new Set(),
+        };
+        skills.set(name, entry);
+      }
+      entry.row.loads++;
+      const tokens = optionalNumberColumn(row, "tokens") ?? 0;
+      entry.row.tokens += tokens;
+      skillTokens += tokens;
+      const cost = optionalNumberColumn(row, "estimated_cost_usd");
+      if (cost !== null) entry.row.estimatedCostUsd = (entry.row.estimatedCostUsd ?? 0) + cost;
+      entry.agents.add(requiredStringColumn(row, "agent_id"));
+    }
     return {
       ...input,
       collectionStartedAt: this.collectionStartedAt(),
@@ -411,6 +486,13 @@ export class AgentUsage {
       providerDaily: [...providerDays.values()].sort(
         (a, b) => a.date.localeCompare(b.date) || a.provider.localeCompare(b.provider),
       ),
+      skills: [...skills.values()]
+        .map(({ row, agents: loadedBy }) => ({
+          ...row,
+          agents: loadedBy.size,
+          share: skillTokens ? row.tokens / skillTokens : 0,
+        }))
+        .sort((a, b) => b.tokens - a.tokens || b.loads - a.loads || a.skill.localeCompare(b.skill)),
     };
   }
 }

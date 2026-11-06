@@ -17,6 +17,7 @@ import {
   CURRENT_MESSAGE_SEPARATOR,
   combinedPromptInput,
   deliveryPromptInput,
+  type TagReferenceSource,
 } from "./delivery-content";
 import type { DuplicationGate } from "./duplication-gate";
 import type { MailboxSync } from "./mailbox-sync";
@@ -34,6 +35,7 @@ import {
   providerForAgent,
 } from "./thread-items";
 import type { ThreadLifecycle } from "./thread-lifecycle";
+import type { DeliveryStart } from "./turn-lifecycle";
 import { TurnSlots } from "./turn-slots";
 import type { UsageLimitGate } from "./usage-limit-gate";
 import { checkAgentFolders, codexSandboxPolicy, workspaceWritableRoots } from "./workspace-sandbox";
@@ -63,6 +65,9 @@ export interface DrainHooks {
    * generic redaction: it does not know which values this machine's MCP servers were given.
    */
   redactMcp(text: string): string;
+  /** The tabs and threads of this agent, as the tags of a delivered message name them. */
+  /** `threadId` is the public thread that gets the prompt. */
+  tagReferences(agentId: string, threadId: string | null): TagReferenceSource;
   /**
    * Gives a channel task back to its channel after a spent plan refused it; false when it cannot go
    * back. `continueWork` keeps the assignment for a ready backup instead.
@@ -80,6 +85,11 @@ export interface DrainHooks {
   turnEnded(turnId: string): boolean;
   /** Forgets the end of an earlier turn with this id: a requeued delivery starts again under the same turn id. */
   turnRestarting(turnId: string): void;
+  /**
+   * When the drain took these deliveries from the queue, and how long their provider process took to
+   * start (null when it was already running). Before `turn/start`, so the turn's start can read it.
+   */
+  deliveriesStarting(deliveryIds: readonly string[], start: DeliveryStart): void;
   /** Starts the new chat that the agent asked for, if it did. The agent's own chat has nothing to start. */
   startRequestedNewChat(agentId: string): Effect.Effect<void>;
   /** Drops that request: a turn in the agent's own chat starts first, so the agent's notes do not cover it. */
@@ -434,11 +444,18 @@ export class DrainScheduler {
   }
 
   holdSessionSettings(agentId: string): () => void {
-    this.#settingsHolds.set(agentId, (this.#settingsHolds.get(agentId) ?? 0) + 1);
+    return this.#hold(this.#settingsHolds, agentId);
+  }
+
+  #hold(holds: Map<string, number>, agentId: string): () => void {
+    holds.set(agentId, (holds.get(agentId) ?? 0) + 1);
+    let released = false;
     return () => {
-      const remaining = (this.#settingsHolds.get(agentId) ?? 1) - 1;
-      if (remaining > 0) this.#settingsHolds.set(agentId, remaining);
-      else this.#settingsHolds.delete(agentId);
+      if (released) return;
+      released = true;
+      const remaining = (holds.get(agentId) ?? 1) - 1;
+      if (remaining > 0) holds.set(agentId, remaining);
+      else holds.delete(agentId);
       this.scheduleDrain(agentId);
     };
   }
@@ -666,6 +683,7 @@ export class DrainScheduler {
     // The model this start asks for. The agent can move to another one while `turn/start` waits, and
     // a plan limit belongs to the model the provider refused.
     let requestedModel: string | null = null;
+    const pickedAt = Date.now();
     yield* Effect.gen({ self: this }, function* () {
       for (const item of batch) yield* this.#mailbox.markStarting(item.delivery.id).pipe(toDeliveryStartFailed);
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
@@ -701,7 +719,13 @@ export class DrainScheduler {
       yield* drainStep(requireServedModel);
       yield* this.#threads.applyPendingRuntimeRefresh(agent, new Set(batch.map((item) => item.delivery.id)));
       releaseRuntimeRefresh = this.#threads.holdRuntimeRefresh(agent.id, taskId !== null);
+      const providerRunning = this.#providers.agentClientRunning(agent);
+      const providerStartedAt = Date.now();
       const client = yield* this.#providers.ensureAgentClient(agent).pipe(toDeliveryStartFailed);
+      this.#hooks.deliveriesStarting(
+        batch.map((item) => item.delivery.id),
+        { pickedAt, providerStartMs: providerRunning ? null : Date.now() - providerStartedAt },
+      );
       const messaging = this.#messaging;
       const channels = this.#channels;
       const taskThreadId = taskId === null ? null : this.#tasks.threadId(taskId);
@@ -767,6 +791,8 @@ export class DrainScheduler {
       }
 
       const agentNames = agentNamesById(this.#store.list());
+      // `threadId` is the provider session; a tab owner is a public thread.
+      const tags = this.#hooks.tagReferences(agent.id, this.#conversation.publicThreadId(agent.id, threadId));
       const requestIds = new Set(
         batch.flatMap(({ delivery: item }) =>
           item.sender.kind === "agent" && item.replyToMessageId ? [item.replyToMessageId] : [],
@@ -786,6 +812,7 @@ export class DrainScheduler {
               routineRun:
                 item.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(item.delivery.id) : null,
               wokenWaits: item.delivery.sender.kind === "routine" ? this.#routines.wokenWaits(item.delivery.id) : [],
+              tags,
               ...(executionText === undefined ? {} : { executionText }),
             });
           }),
@@ -865,12 +892,7 @@ export class DrainScheduler {
                 runtimeWorkspaceRoots: workspaceWritableRoots(agent, this.#store.sharedRoot),
                 approvalPolicy: "on-request",
                 sandboxPolicy: codexSandboxPolicy(agent, this.#store.sharedRoot),
-                ...(client.provider === "codex"
-                  ? codexServiceTier(
-                      this.#store.list().find((current) => current.id === agent.id) ?? agent,
-                      this.#providers.listModels(),
-                    )
-                  : {}),
+                ...(client.provider === "codex" ? this.#codexServiceTier(agent) : {}),
               },
               decodeTurnResponse,
             )
@@ -1038,6 +1060,8 @@ export class DrainScheduler {
               yield* this.#mailbox.restoreQueued(companion.id).pipe(toDeliveryStartFailed);
           }
           this.#mailboxSync.emitQueue(delivery.recipientAgentId);
+          // The agent that asked gets the failure as its answer; the drain of the sender below starts it.
+          yield* this.#answerFailedRequest(delivery.id, delivery.recipientAgentId);
           if (this.#channels)
             yield* this.#channels.deliveryFailed(delivery.id, CHANNEL_START_FAILED).pipe(toDeliveryStartFailed);
           this.#messaging?.deliveryFailed(delivery.id);
@@ -1065,6 +1089,20 @@ export class DrainScheduler {
       ),
     );
   }, Effect.uninterruptible);
+
+  /** Sends the agent that asked the note that its request failed. A failed note does not stop the drain. */
+  #answerFailedRequest(deliveryId: string, agentId: string): Effect.Effect<void> {
+    return this.#mailbox
+      .answerFailedRequest(deliveryId, (taskId) => this.#tasks.threadId(taskId) !== null)
+      .pipe(
+        Effect.match({
+          onFailure: (failure) => this.#hooks.emitError("failed_request_answer_failed", failure.cause, agentId),
+          onSuccess: (requesterId) => {
+            if (requesterId) this.#mailboxSync.emitQueue(requesterId);
+          },
+        }),
+      );
+  }
 
   /**
    * Whether this delivery is a routine run with its own provider session: in the agent's own chat, or
@@ -1148,6 +1186,15 @@ export class DrainScheduler {
   #deliveryProviders(agentId: string): AgentProvider[] {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     return agent ? [providerForAgent(agent)] : [...AGENT_PROVIDERS];
+  }
+
+  /** The agent's account lists a model that only it serves, with its fast tier, before the catalogue (#5217). */
+  #codexServiceTier(agent: AgentSummary): { serviceTier?: string | null } {
+    const current = this.#store.list().find((candidate) => candidate.id === agent.id) ?? agent;
+    return codexServiceTier(current, [
+      ...this.#providers.accountModels("codex", current.providerAccountId),
+      ...this.#providers.listModels(),
+    ]);
   }
 }
 

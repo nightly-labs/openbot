@@ -1,8 +1,10 @@
+import type { AvatarColor } from "@openbot/contracts/ipc";
 import type { AccountSession } from "@openbot/contracts/mobile-connect";
 import { isDynamicRecord, isFunction } from "@openbot/contracts/runtime-values";
 import type { Effect } from "effect";
 import type { AuthStoreError } from "./d1-auth-repository";
 import type { EmailDeliveryError } from "./email-delivery";
+import { observedD1 } from "./observed-d1";
 import type { SmtpContactMessage, SmtpFailure, SmtpLicenseMessage, SmtpWelcomeMessage } from "./smtp-email-delivery";
 
 export interface WorkerBindings {
@@ -27,6 +29,11 @@ export interface WorkerBindings {
   EMAIL_LICENSE_FROM?: string;
   /** The email relay Worker. Without it, email leaves from this Worker's own socket. */
   EMAIL_RELAY?: Fetcher;
+  /**
+   * Cloudflare Email Service. It sends a message only when the SMTP mailbox surely did not, such as
+   * when its hourly sender limit is spent. Without it, an SMTP failure is final.
+   */
+  EMAIL_FALLBACK?: SendEmail;
   EMAIL_DELIVERY_WEBHOOK_URL?: string;
   EMAIL_DELIVERY_WEBHOOK_SECRET?: string;
   SKILLS_ADMIN_TOKEN?: string;
@@ -167,11 +174,18 @@ function isWorkerBindings(value: unknown): value is WorkerBindings {
   return true;
 }
 
+const observedBindings = new WeakMap<WorkerBindings, WorkerBindings>();
+
+/** The bindings of the Worker. `DB` logs each failed call and runs an overloaded read once more (`observed-d1.ts`). */
 export function requireWorkerBindings(value: unknown): WorkerBindings {
   if (!isWorkerBindings(value)) {
     throw new Error("Cloudflare worker bindings are unavailable.");
   }
-  return value;
+  const known = observedBindings.get(value);
+  if (known) return known;
+  const observed = { ...value, DB: observedD1(value.DB) };
+  observedBindings.set(value, observed);
+  return observed;
 }
 
 export interface MobileAuthSessionResult {
@@ -187,6 +201,8 @@ export interface AuthUser {
   avatarUrl: string | null;
   /** The latest product analytics answer from any device. Null until the user answers. */
   analyticsEnabled: boolean | null;
+  /** The tint of the user's own chat bubbles, which members of every server of the user see. */
+  chatColor: AvatarColor | null;
 }
 
 export interface MobileAuthDevice {
@@ -224,15 +240,15 @@ export interface TeamInviteEmailDelivery {
 }
 
 export interface WelcomeEmailDelivery {
-  send(message: SmtpWelcomeMessage): Effect.Effect<void, SmtpFailure>;
+  send(message: SmtpWelcomeMessage): Effect.Effect<void, EmailDeliveryError | SmtpFailure>;
 }
 
 export interface LicenseEmailDelivery {
-  send(message: SmtpLicenseMessage): Effect.Effect<void, SmtpFailure>;
+  send(message: SmtpLicenseMessage): Effect.Effect<void, EmailDeliveryError | SmtpFailure>;
 }
 
 export interface ContactMessageDelivery {
-  send(message: SmtpContactMessage): Effect.Effect<void, SmtpFailure>;
+  send(message: SmtpContactMessage): Effect.Effect<void, EmailDeliveryError | SmtpFailure>;
 }
 
 export type EmailVerificationResult =
@@ -294,6 +310,11 @@ export interface AuthRepository {
     userId: string,
     enabled: boolean,
     answeredAt: number,
+    now: number,
+  ): Effect.Effect<AuthUser, AuthStoreError>;
+  updateUserChatColor(
+    userId: string,
+    chatColor: AvatarColor | null,
     now: number,
   ): Effect.Effect<AuthUser, AuthStoreError>;
   updateUserAvatar(

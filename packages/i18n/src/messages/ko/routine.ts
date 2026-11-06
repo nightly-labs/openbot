@@ -336,6 +336,7 @@ export const messages = {
   "routine.settings.missedPolicy": "예약된 시간에 OpenBot이 닫혀 있었을 때",
   "routine.settings.missedPolicy.skip": "이번 실행 건너뛰기",
   "routine.settings.missedPolicy.runOnce": "OpenBot을 열 때 한 번 실행",
+  "routine.settings.runInThread": "별도 스레드에서 실행",
   "routine.settings.resultDestination": "답변 보낼 곳",
   "routine.settings.resultDestination.none": "이 채팅에만",
   "routine.settings.resultDestination.place": "{connection} · {place}",

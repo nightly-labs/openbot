@@ -309,6 +309,15 @@ and check its SHA-256 against the manifest `sha256`. Set `url`, `assetSha256`, `
 `bin/devin` (`bin/devin.exe` on Windows). `share/` holds only documentation, so it is not in
 `files`.
 
+## Pin the GitHub Copilot CLI
+
+`native-runtime.lock.json` pins the GitHub Copilot CLI by hand. Read the tag of
+`https://api.github.com/repos/github/copilot-cli/releases/latest` and set `version` without its
+`v`. For each target, download `copilot-<target>.tar.gz` (`copilot-win32-x64.zip` on Windows) from
+that release, and check its SHA-256 against the asset `digest`. Set `url`, `assetSha256`,
+`downloadBytes`, `installedBytes` (the size of the extracted `copilot` or `copilot.exe`) and the
+SHA-256 of `bin/copilot` (`bin/copilot.exe` on Windows).
+
 ## Pin the OpenCode CLI
 
 `native-runtime.lock.json` also pins the OpenCode CLI that OpenBot downloads for the OpenCode
@@ -632,10 +641,18 @@ artifact. OpenBot downloads its four pinned files on first voice use, checks the
 each, and keeps the verified files in `runtimes/parakeet-tdt-0.6b-v3-int8` in the user data directory
 for later offline use. The optional Whisper large-v3 turbo int8 model, which takes a fixed dictation
 language, is downloaded the same way only when the user selects Download in Settings > Voice. Its
-three pinned files go in `runtimes/whisper-turbo-int8`. The optional Underdog Bark 3.0 Plus
-int8 model, which recognizes English only, is downloaded the same way when the user selects Download
-in Settings > Voice. Its four pinned files go in `runtimes/bark-3.0-plus-int8`. They come from an
+three pinned files go in `runtimes/whisper-turbo-int8`. The Underdog Bark 3.0 Plus int8 model,
+which recognizes English only, is no longer offered: Settings > Voice shows it only while it is in
+use or downloaded, and a saved choice of it still works. Its four pinned files go in
+`runtimes/bark-3.0-plus-int8`. They come from an
 unofficial sherpa-onnx conversion; the license is in `build/licenses/Underdog-Bark-3.0-Plus-LICENSE`.
+The optional NVIDIA Parakeet Unified EN 0.6B int8 model, which recognizes English only, is downloaded
+the same way when the user selects Download in Settings > Voice. Its four pinned files go in
+`runtimes/parakeet-unified-en-0.6b-int8`. It is under the NVIDIA Open Model License; the license and
+its notice are in `build/licenses/NVIDIA-Parakeet-Unified-EN-0.6B-LICENSE`. The optional Cohere
+Transcribe int8 model, which takes one of its 14 languages, is downloaded the same way when the user
+selects Download in Settings > Voice. Its four pinned files (about 2.9 GB) go in
+`runtimes/cohere-transcribe-14-lang-int8`. Its license is in `build/licenses/Cohere-Transcribe-LICENSE`.
 At startup, a packaged application removes the old `runtimes/whisper` directory if it exists. The
 Supertonic 3 int8 voice model, which reads replies aloud, is downloaded the same way only when the
 user turns on Read replies aloud or selects Download in the Spoken replies section. Its eight pinned

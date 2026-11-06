@@ -6,6 +6,7 @@ import {
   DiscordMark,
   GitHubMark,
   OnePasswordMark,
+  ProtonPassMark,
   SlackMark,
   TelegramMark,
   WhatsAppMark,
@@ -65,5 +66,11 @@ export const CONNECTOR_LISTINGS: Readonly<Record<ConnectorId, ConnectorListing>>
     tagline: "marketplace.app.bitwardenTagline",
     category: "productivity",
     Mark: () => <Lock aria-hidden="true" />,
+  },
+  protonpass: {
+    title: "connector.protonPass.title",
+    tagline: "marketplace.app.protonPassTagline",
+    category: "productivity",
+    Mark: () => <ProtonPassMark />,
   },
 };

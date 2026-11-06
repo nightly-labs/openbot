@@ -7,6 +7,7 @@ import {
   type AgentProviderId,
   type AgentStatus,
   type AppInfo,
+  type AvatarColor,
   CHANNEL_CHATS_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
   type ChannelSummary,
@@ -34,6 +35,7 @@ import { AGENT_TASK_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
+import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
 import { AGENT_HIDDEN_CAPABILITY, TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
@@ -248,6 +250,7 @@ import { createWebNotificationRouting } from "./web-notification-routing";
 import { createWebNotificationSettings } from "./web-notification-settings";
 import { requestWebNotificationPermission } from "./web-notifications";
 import { webOnePasswordConnectorPort } from "./web-onepassword-connector";
+import { webPasswordManagersPort } from "./web-password-managers";
 import { createWebProviderSettings, openWebDestination } from "./web-provider-admin";
 import { webRoutineFlowsHost } from "./web-routine-flows";
 import { webScheduleSource } from "./web-schedule";
@@ -303,6 +306,8 @@ type WebWorkspaceProps = {
   accountEmail?: string;
   accountName?: string | null;
   accountAvatarUrl?: string | null;
+  /** The account's chat color, which tints the user's bubbles. */
+  accountChatColor?: AvatarColor | null;
   accountFetch: typeof fetch;
   onSessionCheck: () => Promise<void>;
   /** True when the account session has ended, so closing sends no remote session end. */
@@ -498,6 +503,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     email: props.accountEmail ?? "",
     name: props.accountName ?? null,
     avatarUrl: props.accountAvatarUrl ?? null,
+    chatColor: props.accountChatColor ?? null,
   }));
   const accountCalls = createWebAccountCalls(props.accountFetch, props.onSessionCheck);
   const [accountSettingsOpen, setAccountSettingsOpen] = createSignal(false);
@@ -565,18 +571,28 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     return current?.state === "incompatible" ? current : null;
   });
   const connectionShown = () => !noHost() && workspace.state.status !== "online" && !blockedServer();
+  /**
+   * A saved frame is on screen and the host did not answer or fail yet. This is a first load: the notice
+   * shows its loading screen, not a reconnect. A reported failure or an offline computer shows the notice.
+   */
+  const frameFirstLoad = () =>
+    workspace.state.workspaceLoaded &&
+    !workspace.state.synced &&
+    !workspace.state.hostOffline &&
+    !workspace.state.connectionError;
   const connectionPhase = () =>
     serverWorkspacePhase({
       hostedSleep: workspace.state.hostedSleep,
       updating: hostUpdating(),
       blocked: workspace.state.recovery?.phase === "suspended",
       loading: workspace.state.status === "connecting",
-      hasContent: workspace.state.workspaceLoaded,
+      hasContent: workspace.state.workspaceLoaded && !frameFirstLoad(),
     });
   // As on desktop, the first load covers the whole window. A server that sleeps, updates or fails
   // shows its screen in the pane only.
   const fullWindowLoading = () =>
     connectionShown() &&
+    // A saved frame stays on screen: the chat shows its history loader until the host answers.
     !workspace.state.workspaceLoaded &&
     !workspace.state.hostOffline &&
     // The status is "offline" before the first attempt too; only a reported failure ends the cover.
@@ -828,6 +844,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     webhookTestsEnabled,
     () => workspace.state.capabilities.includes(BROWSER_PROFILES_CAPABILITY),
     webhookSenderSecretEnabled,
+    () => workspace.state.capabilities.includes(BROWSER_PROXIES_CAPABILITY),
   );
   const remoteAgentAdmin = createRemoteAgentAdmin(
     () => {
@@ -1008,6 +1025,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const githubPort = webGitHubConnectorPort(() => hostRequest());
   const onePasswordPort = webOnePasswordConnectorPort(() => hostRequest());
   const bitwardenPort = webBitwardenConnectorPort(() => hostRequest());
+  const passwordManagersPort = webPasswordManagersPort(() => hostRequest());
   const webMessaging = webHostMessaging(hostRequest, () =>
     workspace.state.capabilities.includes(DISCORD_ACCESS_CAPABILITY),
   );
@@ -1024,6 +1042,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         github: () => githubPort,
         onePassword: () => onePasswordPort,
         bitwarden: () => bitwardenPort,
+        passwordManagers: () => passwordManagersPort,
         messaging: hostMessagingApi(
           () => connectorTarget()?.id,
           () => webMessaging.api,
@@ -1898,13 +1917,26 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     workspace.state.hostedSleep !== "sleeping" && !workspace.state.hostedIssue && !hostUpdating()
       ? (workspace.state.connectionError ?? null)
       : null;
+  /** The chat shows the loader of its history from the start, so the connect and the history load are one screen. */
+  const frameConnecting = () =>
+    connectionShown() &&
+    frameFirstLoad() &&
+    agentChatOpen() &&
+    (connectionPhase() === "loading" || connectionPhase() === "connecting");
+  const conversationLoading = () =>
+    workspace.state.status === "online" &&
+    !workspace.conversation()?.page &&
+    workspace.conversation()?.loading === true;
+  const conversationError = () =>
+    workspace.state.status === "online" ? (workspace.conversation()?.error ?? null) : null;
   const connectionNotice = (cover = false) => (
     <ServerConnectionNotice
       name={workspace.state.host?.name ?? t("webClient.notice.findingHosts")}
-      initial={cover || !workspace.state.workspaceLoaded}
+      initial={cover || !workspace.state.workspaceLoaded || frameFirstLoad()}
       ready={cover ? !fullWindowLoading() : undefined}
       onExited={cover ? () => setLoadingCover(false) : undefined}
       fullWindow={fullWindowLoading()}
+      screen={!frameConnecting()}
       issue={workspace.state.hostedIssue}
       start={workspace.state.hostedStart}
       updateVersion={workspace.state.hostRestart?.version ?? null}
@@ -1986,6 +2018,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               initialLoading={hostOffline()}
               connection={
                 <>
+                  {/* While the chat loader covers the first load, the notice shows only its delayed toast. */}
                   <Show when={connectionShown() && !fullWindowLoading()}>{connectionNotice()}</Show>
                   <Show when={workspace.state.status === "online" && workspace.state.panelsFailed}>
                     <ServerPanelLoadNotice
@@ -1993,11 +2026,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       onRetry={() => void workspace.retryPanels()}
                     />
                   </Show>
-                  <Show when={workspace.state.status === "online" && agentChatOpen()}>
+                  {/* A frame keeps the loader mounted when its connect fails, so the loader leaves with its exit. */}
+                  <Show
+                    when={(workspace.state.status === "online" || workspace.state.workspaceLoaded) && agentChatOpen()}
+                  >
                     <ConversationLoadNotice
                       name={workspace.selected()?.name ?? ""}
-                      loading={!workspace.conversation()?.page && workspace.conversation()?.loading === true}
-                      error={workspace.conversation()?.error ?? null}
+                      loading={frameConnecting() || conversationLoading()}
+                      error={conversationError()}
                       onRetry={() => {
                         const id = workspace.state.selectedId;
                         if (id) void workspace.select(id);

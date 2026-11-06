@@ -62,6 +62,8 @@ export const messages = {
   "error.backend.channelLeadModelUnavailable": "Das Modell der Kanalleitung ist nicht verfügbar.",
   "error.backend.contextCompactionIneffective":
     "Die Komprimierung macht diesen Chat nicht kleiner: Nach zwei Komprimierungen nutzt er noch {percent}% des Kontextfensters des Modells, daher komprimiert OpenBot ihn nicht mehr. Tools und Anweisungen nutzen den größten Teil des Fensters. Schalte die MCP-Server oder die Computersteuerung aus, die dieser Agent nicht braucht, oder wähle ein Modell mit größerem Fenster. Starte dann einen neuen Chat.",
+  "error.backend.contextCompactionStopped":
+    "Zwei Komprimierungen dieses Chats sind nacheinander fehlgeschlagen, daher komprimiert OpenBot ihn nicht mehr automatisch. Jeder Versuch sendet den ganzen Chat an das Modell und verbraucht dein Planlimit. Wähle „Jetzt komprimieren“, um es erneut zu versuchen, oder starte einen neuen Chat.",
   "error.backend.providerRetrying":
     "Der Anbieter hat diese Anfrage {attempts}-mal nicht ausgeführt und versucht es erneut. Wenn der Agent nicht weitermacht, stoppe den Durchlauf.",
   "error.backend.providerRetryingLargeContext":
@@ -330,6 +332,18 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "Es gibt bereits ein Browserprofil mit diesem Namen.",
   "error.backend.browserSessionInUse": "Ein Tab verwendet diese Browsersitzung noch. Versuche es noch einmal.",
   "error.backend.browserProfileLimit": "Du kannst bis zu {limit} Browserprofile haben.",
+  "error.backend.browserProxyNotFound": "Dieser Proxy existiert nicht mehr.",
+  "error.backend.browserProxyAddressInvalid":
+    "Gib eine Proxy-Adresse ein, etwa socks5://host:1080 oder http://user:password@host:3128.",
+  "error.backend.browserProxyLimit": "Du kannst bis zu {limit} Proxys haben.",
+  "error.backend.browserProxyTaken": "Ein Proxy mit dieser Adresse existiert bereits.",
+  "error.backend.browserProxyChanged":
+    "Dieser Proxy wurde geändert, nachdem du ihn geöffnet hast. Sieh ihn dir erneut an und versuche es noch einmal.",
+  "error.backend.browserProxyUnreachable": "Der Proxy {name} antwortet nicht, daher wurde die Seite nicht geöffnet.",
+  "error.backend.browserProxySignInRefused":
+    "Der Proxy {name} hat die Anmeldung abgelehnt, daher wurde die Seite nicht geöffnet.",
+  "error.backend.browserProxyComputerUnreachable":
+    "Der Computer dieses Profils antwortet nicht, daher wurde die Seite nicht geöffnet.",
   "error.backend.browserLowMemory":
     "Dieser Server hat wenig freien Arbeitsspeicher. Der Browser kann daher keinen weiteren Tab öffnen. Schließe einen Tab oder warte, bis andere Agenten fertig sind.",
   "error.backend.browserOpenFailed": "{url} konnte nicht geöffnet werden: {reason}",

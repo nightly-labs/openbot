@@ -7,6 +7,11 @@ export const messages = {
   "mobile.settings.language.row": "应用语言",
   "mobile.settings.language.system": "跟随系统",
   "mobile.settings.language.footer": "“跟随系统”会使用手机设置中的首选语言。尚未翻译的文案将以英文显示。",
+  "mobile.settings.language.restartTitle": "重启 OpenBot？",
+  "mobile.settings.language.restartBody":
+    "该语言的阅读方向相反。OpenBot 下次启动时，界面会切换方向。如果重启后界面仍不正常，请在应用切换器中关闭 OpenBot，然后重新打开。",
+  "mobile.settings.language.restartNow": "立即重启",
+  "mobile.settings.language.restartFailed": "无法重启 OpenBot。下次打开 OpenBot 时，界面会切换方向。",
   "mobile.settings.dictation.language": "听写语言",
   "mobile.settings.about.development": "开发",
   "mobile.settings.about.openFailed": "无法打开该链接，请重试。",
@@ -19,10 +24,14 @@ export const messages = {
   "mobile.settings.home.support": "支持",
   "mobile.settings.home.supportHint": "获取帮助并保存支持日志",
   "mobile.settings.support.help": "获取帮助",
+  "mobile.settings.support.discord": "在 Discord 上提交工单",
+  "mobile.settings.support.discordHint": "获得帮助的最快方式",
   "mobile.settings.support.message": "在 X 上联系我们",
   "mobile.settings.support.issues": "在 GitHub 上反馈问题",
-  "mobile.settings.support.helpFooter": "请说明发生了什么以及发生时间，并把支持日志文件附在 GitHub 问题上。",
+  "mobile.settings.support.helpFooter":
+    "请说明发生了什么以及发生时间，并把支持日志文件附在 Discord 工单或 GitHub 问题上。",
   "mobile.settings.support.log": "支持日志",
+  "mobile.settings.support.show": "查看日志",
   "mobile.settings.support.save": "保存日志文件",
   "mobile.settings.support.events": { one: "{count} 条事件", other: "{count} 条事件" },
   "mobile.settings.support.clear": "清空日志",
@@ -32,8 +41,8 @@ export const messages = {
     "日志只保存在这台手机上，OpenBot 不会发送它。日志记录连接步骤、请求和错误，不记录消息或文件，并会遮蔽密码与令牌。分享前请先自行查看文件内容。",
   "mobile.settings.support.saveFailed": "无法保存日志文件，请重试。",
   "mobile.settings.support.sharingUnavailable": "这台手机不支持分享。",
-  "mobile.settings.support.recent": "最近事件",
-  "mobile.settings.support.recentFooter": "最新的在最前面。保存的文件包含全部事件。",
+  "mobile.settings.support.newestFirst": "最新的在最前面。",
+  "mobile.settings.support.showOlder": "显示更早的事件",
   "mobile.settings.support.empty": "暂无事件。",
   "mobile.settings.sessions.kindDesktop": "桌面端",
   "mobile.settings.sessions.kindMobile": "手机端",
@@ -67,7 +76,8 @@ export const messages = {
     "关闭“动画”可减少整个应用的动态效果。当手机设置中开启“减弱动态效果”时，应用也会减少动效，下面的动画选项将保持关闭。",
   "mobile.settings.animations.all": "动画",
   "mobile.settings.animations.agentFaces": "助手表情动画",
-  "mobile.settings.animations.agentFacesFooter": "助手工作时和休息时，头像上的表情会动。关闭该选项后表情保持静止。",
+  "mobile.settings.animations.agentFacesFooter":
+    "助手工作时和休息时，头像上的表情会动。关闭该选项后表情保持静止，欢迎页和空白主页上的角色也不再漂浮。",
   "mobile.settings.animations.composerResize": "紧凑输入框",
   "mobile.settings.animations.composerResizeFooter":
     "键盘收起时输入框变成一条小工具栏。关闭该选项后输入框保持完整高度。",
@@ -244,6 +254,14 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "聆听",
   "mobile.settings.voice.tab.speaking": "朗读",
+  "mobile.settings.voice.pause.title": "发送前的停顿",
+  "mobile.settings.voice.pause.label": "等待新词",
+  "mobile.settings.voice.pause.footer":
+    "在语音对话中，如果在这段时间内没有识别到新词，OpenBot 会发送你的话。没有词语的噪音不会让它继续聆听。如果你说话较慢或会停下来思考，请选择更长的停顿。",
+  "mobile.settings.voice.pause.seconds": "{seconds} 秒",
+  "mobile.settings.voice.speed.title": "回复速度",
+  "mobile.settings.voice.speed.footer": "OpenBot 朗读回复的速度，语音对话中也适用。",
+  "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot 使用一次性令牌将你的语音流式传输给 ElevenLabs，费用由 ElevenLabs 从你的账户扣除。密钥保存在此手机上。",
 } as const satisfies PartialTranslation<typeof source>;

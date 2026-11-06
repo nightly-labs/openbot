@@ -26,4 +26,9 @@ export const messages = {
   "error.voice.speech.timedOut": "Время чтения ответа вслух истекло.",
   "error.voice.speech.failed": "OpenBot не смог прочитать ответ вслух.",
   "error.voice.recordingNotKept": "OpenBot не смог сохранить голосовую запись.",
+  "error.voice.live.timedOut": "Живой голос Codex не запустился вовремя. Попробуйте ещё раз.",
+  "error.voice.live.failed": "Живой голос остановлен: {reason}",
+  "error.voice.live.disconnected": "Живой голос отключён.",
+  "error.voice.live.signIn": "Войдите в Codex с аккаунтом ChatGPT, чтобы использовать живой голос.",
+  "error.voice.live.off": "Живой голос Codex выключен. Включите его в Настройки → Голос.",
 } as const satisfies PartialTranslation<typeof source>;

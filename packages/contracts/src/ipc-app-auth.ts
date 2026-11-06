@@ -1,5 +1,5 @@
-import type { ManagedProviderId, ManagedToolRuntimeId } from "./agent-providers";
-import type { AgentModelId } from "./ipc-agent-identity";
+import type { InstallerProviderId, ManagedProviderId, ManagedToolRuntimeId } from "./agent-providers";
+import type { AgentModelId, AvatarColor } from "./ipc-agent-identity";
 import type { AgentProviderId } from "./ipc-agent-status";
 import { integerInRange, isFiniteNumber, isIdentifier } from "./ipc-bounded-values";
 import { decodeRecord, nullableNumber, requiredBoolean, requiredNumber, requiredString } from "./ipc-decoding";
@@ -17,6 +17,11 @@ export interface AppInfo {
   analyticsCaptureUrl?: string;
   /** The random analytics ID of this install, for events that do not go with the account. */
   analyticsInstallId?: string;
+  /**
+   * True when Chromium draws the windows on the CPU: hardware acceleration is off, or the GPU is
+   * blocked or missing, as on a server, a remote desktop or a computer whose GPU failed.
+   */
+  softwareRendering?: boolean;
 }
 
 /** The phase list is the source of truth: `UpdatePhase` is derived from it. */
@@ -164,7 +169,7 @@ export interface ProviderRuntimeSnapshot {
    * managed runtime is absent from `ManagedProviderId`, so it needs no fake entry here, and every
    * provider that is in the tuple has a real status.
    */
-  providers: Record<ManagedProviderId, ProviderRuntimeStatus>;
+  providers: Record<ManagedProviderId, ProviderRuntimeStatus> & InstallerRuntimeStatuses;
   /**
    * The tool runtimes, in a field of their own rather than mixed in above.
    *
@@ -174,6 +179,14 @@ export interface ProviderRuntimeSnapshot {
    */
   toolRuntimes: Record<ManagedToolRuntimeId, ProviderRuntimeStatus>;
 }
+
+/**
+ * The status of a provider that OpenBot installs with the provider's own installer: `ready` where
+ * its CLI is found, so that a server's row offers Connect. Absent where the CLI is missing and this
+ * computer cannot run the installer, and on a host before the installer: the row then shows the
+ * install guide, not Download.
+ */
+export type InstallerRuntimeStatuses = { [Provider in InstallerProviderId]?: ProviderRuntimeStatus };
 
 export interface ExportResult {
   saved: boolean;
@@ -205,6 +218,30 @@ export interface AnalyticsPreference {
   enabled: boolean;
 }
 
+/**
+ * Renderer timing for host analytics: counts and milliseconds only. The renderer sends it at most
+ * once a minute, and once when the main window's workspace finished its first load.
+ */
+/** The bounds of one renderer timing report. The renderer keeps to them and main rejects a report outside them. */
+export const RENDERER_TIMING_LIMITS = {
+  longTasks: 10_000,
+  inputs: 100_000,
+  /** Timed inputs in one report. Inputs past this count are left out of `inputs` too. */
+  inputDelays: 64,
+  inputDelayMs: 600_000,
+} as const;
+
+export interface RendererTimingReport {
+  /** The main window's workspace finished its first load. Main times it on its own clock. */
+  workspaceReady?: true;
+  /** Renderer tasks of more than 200 ms since the last report. */
+  longTasks: number;
+  /** Key presses and pointer presses since the last report. */
+  inputs: number;
+  /** The input delay of each of those inputs that the browser timed (16 ms or more of handling), in ms. */
+  inputDelaysMs: number[];
+}
+
 export interface SetAnalyticsPreferenceInput {
   enabled: boolean;
   /** True when the user chose this value. Only a choice is sent to the account; a default is not. */
@@ -221,6 +258,11 @@ export interface CentralAuthUser {
    * never answered, or the account service is older.
    */
   analyticsEnabled?: boolean | null;
+  /**
+   * The tint of the user's own chat bubbles, which members of each server of the user see. Null or
+   * missing: no chat color, or the account service is older.
+   */
+  chatColor?: AvatarColor | null;
 }
 
 export interface CentralAuthIssue {
@@ -231,9 +273,15 @@ export interface CentralAuthIssue {
   reference?: string;
 }
 
+export type CentralAuthSignedOutReason = "keyring_changed";
+
 export type CentralAuthState =
   | { status: "loading" }
-  | { status: "signed_out" }
+  /**
+   * `keyring_changed`: the Linux keyring did not open the saved sign-in, so OpenBot now keeps its
+   * secrets in its own key file and the user signs in one more time.
+   */
+  | { status: "signed_out"; reason?: CentralAuthSignedOutReason }
   | { status: "signing_in" }
   | {
       status: "code_sent";
@@ -508,6 +556,16 @@ export interface ChatWindowTarget {
   agentId: string;
 }
 
+/**
+ * The messages that the user sent to agents on this computer, from the database. The social toast
+ * reads it, so a user who used OpenBot before the toast shipped gets it on time.
+ */
+export interface SentMessageStats {
+  /** When the first message was written, as ISO 8601 text, or null before the first message. */
+  firstSentAt: string | null;
+  sentCount: number;
+}
+
 export type ExternalDestination =
   | "opencode-install"
   | "opencode-auth"
@@ -523,8 +581,24 @@ export type ExternalDestination =
   | "discord"
   // The OpenBot repository, from the toast that asks for a GitHub star.
   | "github"
-  // The OpenBot account on X, from the community card of the sidebar.
+  // The OpenBot account on X, from the community card of the sidebar and the social toast.
   | "x"
+  // The OpenBot profiles and community that the social toast asks the user to follow or join.
+  | "threads"
+  | "instagram"
+  | "tiktok"
+  | "facebook"
+  | "linkedin"
+  | "reddit"
+  // The pages that start a post about OpenBot, from the social toast. Main writes the first post
+  // in the app language.
+  | "x-post"
+  | "threads-post"
+  | "linkedin-post"
+  | "reddit-post"
+  | "facebook-post"
+  | "instagram-post"
+  | "tiktok-post"
   // The x.ai marketplace listing of the Grok Bot agent that exports agents for OpenBot.
   | "grok-bot-export"
   // The email for a hosted server plan that the add server dialog does not have, such as a Mac.

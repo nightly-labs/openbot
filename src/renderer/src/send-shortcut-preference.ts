@@ -1,3 +1,4 @@
+import type { QuoteShortcutModifier } from "@openbot/ui/features/conversation/SelectionActions";
 import {
   parseSendShortcutMode,
   resolveSendShortcut,
@@ -91,4 +92,9 @@ export function setSendShortcutMode(mode: SendShortcutMode): void {
  */
 export function deviceSendShortcut(appPlatform?: "darwin" | "win32" | "linux"): SendShortcut {
   return resolveSendShortcut(sendShortcutMode(), appPlatform ?? currentDevicePlatform());
+}
+
+/** The modifier of the quote chord for selected text: Command on macOS, Control elsewhere. */
+export function deviceQuoteShortcut(appPlatform?: "darwin" | "win32" | "linux"): QuoteShortcutModifier {
+  return (appPlatform ?? currentDevicePlatform()) === "darwin" ? "meta" : "ctrl";
 }

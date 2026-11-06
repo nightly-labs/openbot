@@ -17,6 +17,7 @@ export const messages = {
   "status.agent.channelRoutineCreated": "Агент {agent} создал регулярную задачу {routine}. Запрос: {person}.",
   "status.agent.channelRoutineUpdated": "Агент {agent} изменил регулярную задачу {routine}. Запрос: {person}.",
   "status.agent.channelRoutineDeleted": "Агент {agent} удалил регулярную задачу {routine}. Запрос: {person}.",
+  "status.agent.channelTaskCancelled": "Агент {agent} отменил задачу «{task}» и её подзадачи. Запрос: {person}.",
   "status.agent.screenCaptureScreen": "Сделать снимок главного экрана и отправить изображение модели агента.",
   "status.agent.screenCaptureChannel":
     "Изображение появится в канале {channel}, и его увидит каждый участник этого сервера, который читает канал.",
@@ -24,6 +25,8 @@ export const messages = {
   "status.agent.screenCaptureWindow": "Сделать снимок окна {name} и отправить изображение модели агента.",
   "status.agent.screenCaptureRegion":
     "Сделать снимок области экрана {x}, {y}, {width} × {height} точек и отправить изображение модели агента.",
+  "status.agent.workflowDelete":
+    "Удалить рабочий процесс {title} вместе с его запусками и версиями. Его открытые шаги остановятся.",
   "status.agent.screenCaptureProgress": "Запрос снимка экрана…",
   "status.agent.screenCaptureReviewing": "Просмотр снимка экрана…",
   "status.agent.browserOpening": "Открытие веб-страницы…",

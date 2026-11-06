@@ -177,10 +177,6 @@ export const messages = {
 
   "agentSettings.runtime.model": "نموذج الوكيل",
   "agentSettings.runtime.modelUnavailable": "تتوفر النماذج بعد اتصال CLI لوكيل.",
-  "agentSettings.runtime.reasoning": "الاستدلال",
-  "agentSettings.runtime.reasoningLabel": "مستوى استدلال الوكيل",
-  "agentSettings.runtime.selectReasoning": "اختيار الاستدلال",
-  "agentSettings.runtime.reasoningSetByProvider": "يحدّده {provider}",
   "agentSettings.runtime.access": "الوصول",
   "agentSettings.runtime.accessLabel": "وصول الوكيل",
   "agentSettings.runtime.busyMessage": "أثناء العمل",
@@ -282,8 +278,7 @@ export const messages = {
   "agentSettings.agentNewChat.title": "الوكيل يبدأ دردشات جديدة",
   "agentSettings.agentNewChat.description": "السماح للوكيل ببدء دردشة جديدة عندما تطول دردشته. يحفظ ملاحظات أولًا.",
   "agentSettings.quickAcknowledgement.title": "عرض الخطة قبل المهام الطويلة",
-  "agentSettings.quickAcknowledgement.description":
-    "قبل مهمة طويلة، يعرض الوكيل خطته. ويبدأ بعد 10 ثوانٍ، أو عند الضغط على «بدء».",
+  "agentSettings.quickAcknowledgement.description": "قبل مهمة طويلة، يعرض الوكيل خطته.",
   "agentSettings.browserProfile.label": "ملف تعريف المتصفح",
   "agentSettings.browserProfile.shared": "مشترك",
   "agentSettings.browserProfile.agent": "هذا الوكيل فقط",

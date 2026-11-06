@@ -104,8 +104,9 @@ links from email invitations. Email mode creates an address-bound invitation and
 the same delivery endpoint as desktop; failed delivery attempts revoke the new invitation. Released restore endpoints
 remain compatible with older clients. Member and invitation lists refresh after changes or on explicit request.
 Conversation read cursors belong to a team member and are shared across that member's devices.
-Advancing a cursor emits a conversation invalidation without the reader's identity or cursor;
-clients reload their own read state even when the conversation content revision is unchanged.
+Moving a cursor emits a conversation invalidation without the reader's identity or cursor, only to the
+connections of that member; other members get no event, because their read state did not change. The
+member's clients reload their own read state even when the conversation content revision is unchanged.
 Mobile acknowledges rendered replies only in the foreground, focused chat at the latest messages.
 Mobile attachments use the shared desktop filename allowlist in `packages/contracts/src/attachment-files.ts`.
 The native document and photo pickers and the in-chat camera panel prepare local drafts. The existing Team file protocol
@@ -143,6 +144,15 @@ the native/DOM bridge limits each file to 10 MB and cancels transfers when its c
 The optional `conversation-unread` capability adds a separate `POST /v1/agents/:id/conversation/unread`
 operation. Ordinary read acknowledgements remain monotonic; explicit unread resets persist in the
 host's SQLite and emit the same invalidation. Older hosts disable only this optional action.
+That route marks the whole chat. The optional `conversation-unread-from-v1` capability (protocol 9
+only, `packages/contracts/src/team-protocol/conversation-unread-from-v1.ts`, host route
+`src/main/team-api/route-conversation-unread-from.ts`) adds `POST /v1/conversations/unread-from` with
+`{ agentId, fromMessageId }`: the member's read mark moves to the message shown before it, and the
+answer is the new read state. It needs `view` on the agent, as the other read routes do. A message
+the chat does not show is not found. The phone's message sheet and the desktop message menu on a
+joined server use it for Mark unread. After it, the open chat does not read itself again until it
+opens again. The chat shows a NEW line above the first unread message. The line keeps the message
+that the host had as first unread when the chat opened, because the open chat then reads itself.
 Mobile external links enter through Expo Router's `+native-intent` and the links feature.
 Invitation and Mobile Connect tokens stay in a bounded memory store; navigation carries only a
 local request ID. Invitations wait through sign-in and show a verified host preview before an

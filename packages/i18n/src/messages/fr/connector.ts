@@ -567,4 +567,74 @@ export const messages = {
   "connector.bitwarden.clientSecret": "client_secret de la clé d’API",
   "connector.bitwarden.masterPassword": "Mot de passe principal",
   "connector.bitwarden.connecting": "Connexion",
+  "connector.protonPass.title": "Proton Pass",
+  "connector.protonPass.description":
+    "Les agents se connectent aux sites avec les identifiants d’un coffre Proton Pass partagé.",
+  "connector.protonPass.descriptionHost":
+    "Les agents de {host} se connectent aux sites avec les identifiants d’un coffre Proton Pass partagé.",
+  "connector.protonPass.connect": "Connecter",
+  "connector.protonPass.moreWays": "Autres façons de se connecter",
+  "connector.protonPass.useKey": "Utiliser une clé d’accès",
+  "connector.protonPass.keyLabel": "Clé d’accès",
+  "connector.protonPass.keyPlaceholder": "pst_…",
+  "connector.protonPass.setupTitle": "Configurer",
+  "connector.protonPass.setupDescription":
+    "Connecter ouvre la connexion Proton dans votre navigateur. Ensuite, OpenBot crée le coffre partagé et ne garde qu’une clé en lecture seule.",
+  "connector.protonPass.setupDescriptionHost":
+    "Connecter ouvre la connexion Proton dans votre navigateur. Ensuite, {host} crée le coffre partagé et ne garde qu’une clé en lecture seule.",
+  "connector.protonPass.vaultName": "Shared with OpenBot",
+  "connector.protonPass.vaultSetup":
+    "OpenBot crée ce coffre à la connexion. Déplacez-y des identifiants pour les partager.",
+  "connector.protonPass.showSteps": "Voir les étapes",
+  "connector.protonPass.stepsLabel": "Étapes de connexion",
+  "connector.protonPass.stepSignIn": "Connexion",
+  "connector.protonPass.stepVault": "Créer le coffre partagé",
+  "connector.protonPass.stepDone": "Terminé",
+  "connector.protonPass.signInTitle": "Connectez-vous à Proton",
+  "connector.protonPass.signInStarting": "OpenBot lance la connexion. La page Proton s’ouvre dans votre navigateur.",
+  "connector.protonPass.signInDescription":
+    "La connexion est ouverte dans votre navigateur. Proton demande votre mot de passe et votre second facteur.",
+  "connector.protonPass.signInDescriptionHost":
+    "La connexion pour {host} est ouverte dans votre navigateur. Proton demande votre mot de passe et votre second facteur.",
+  "connector.protonPass.extraPasswordDescription": "Proton Pass demande votre mot de passe supplémentaire.",
+  "connector.protonPass.extraPasswordWrong": "Le mot de passe supplémentaire est incorrect. Saisissez-le à nouveau.",
+  "connector.protonPass.extraPasswordLabel": "Mot de passe supplémentaire",
+  "connector.protonPass.continue": "Continuer",
+  "connector.protonPass.setupStepTitle": "Création du coffre partagé",
+  "connector.protonPass.setupStepDescription":
+    "OpenBot crée le coffre « {vault} » et une clé en lecture seule. Ensuite, il ferme votre session Proton.",
+  "connector.protonPass.doneTitle": "Proton Pass est connecté",
+  "connector.protonPass.doneDescription":
+    "Déplacez des identifiants dans « {vault} » pour que les agents s’en servent.",
+  "connector.protonPass.failedTitle": "Proton Pass n’est pas connecté",
+  "connector.protonPass.copyLink": "Copier le lien",
+  "connector.protonPass.linkCopied": "Copié",
+  "connector.protonPass.openAgain": "Rouvrir",
+  "connector.protonPass.done": "Terminé",
+  "connector.protonPass.close": "Fermer",
+  "connector.protonPass.statusConnecting": "Connexion",
+  "connector.protonPass.statusConnected": "Connecté",
+  "connector.protonPass.statusExpired": "Clé expirée",
+  "connector.protonPass.expiredTitle": "La clé Proton Pass a expiré",
+  "connector.protonPass.expiredDescription":
+    "Les agents ne peuvent plus utiliser vos identifiants partagés tant que vous ne vous reconnectez pas.",
+  "connector.protonPass.reconnect": "Reconnecter",
+  "connector.protonPass.planTitle": "Proton Pass demande une offre payante",
+  "connector.protonPass.planDescription":
+    "La CLI Proton Pass fonctionne uniquement avec une offre Proton payante. Changez d’offre, puis connectez à nouveau.",
+  "connector.protonPass.vaultTitle": "Coffre partagé",
+  "connector.protonPass.vaultDescription":
+    "Les agents peuvent se connecter avec les identifiants de ce coffre. Déplacez-y un identifiant pour le partager.",
+  "connector.protonPass.loginCount": { one: "{count} identifiant", other: "{count} identifiants" },
+  "connector.protonPass.loginsLoading": "Comptage des identifiants…",
+  "connector.protonPass.keyExpires": "Lecture seule. Expire le {date}.",
+  "connector.protonPass.keyExpired": "Lecture seule. Expirée le {date}.",
+  "connector.protonPass.keyNoExpiry": "Lecture seule. N’expire pas.",
+  "connector.protonPass.disconnectTitle": "Déconnecter Proton Pass",
+  "connector.protonPass.disconnectSummary":
+    "OpenBot supprime sa clé d’accès sur cet ordinateur. Le coffre et ses identifiants restent dans votre compte Proton.",
+  "connector.protonPass.disconnectSummaryHost":
+    "OpenBot supprime sa clé d’accès sur {host}. Le coffre et ses identifiants restent dans votre compte Proton.",
+  "connector.protonPass.disconnect": "Déconnecter",
+  "connector.protonPass.actionFailed": "OpenBot n’a pas pu modifier la connexion Proton Pass.",
 } as const satisfies PartialTranslation<typeof source>;

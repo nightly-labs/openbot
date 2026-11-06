@@ -27,4 +27,9 @@ export const messages = {
   "error.voice.speech.timedOut": "La lecture à voix haute de la réponse a expiré.",
   "error.voice.speech.failed": "OpenBot n’a pas pu lire la réponse à voix haute.",
   "error.voice.recordingNotKept": "OpenBot n’a pas pu conserver l’enregistrement vocal.",
+  "error.voice.live.timedOut": "La voix en direct Codex n’a pas démarré à temps. Réessayez.",
+  "error.voice.live.failed": "La voix en direct s’est arrêtée : {reason}",
+  "error.voice.live.disconnected": "La voix en direct est déconnectée.",
+  "error.voice.live.signIn": "Connectez-vous à Codex avec votre compte ChatGPT pour utiliser la voix en direct.",
+  "error.voice.live.off": "La voix en direct Codex est désactivée. Activez-la dans Réglages → Voix.",
 } as const satisfies PartialTranslation<typeof source>;

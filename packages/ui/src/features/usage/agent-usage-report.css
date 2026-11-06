@@ -18,7 +18,8 @@
   line-height: 1.1;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
+  /* A total too wide for the column breaks after the currency, never inside the number. */
+  overflow-wrap: normal;
   margin-bottom: var(--openbot-space-3);
 }
 .agent-usage-providers {
@@ -74,16 +75,20 @@
 
 /* One line, never two. A wrapped second row put two entries under five and read as a
    second, more important group; the entries are a tail of decreasing interest instead, so
-   a panel too narrow to hold them all drops the last ones rather than rewrapping. */
+   a panel too narrow to hold them all drops the last ones rather than rewrapping. The
+   entries that do not fit wrap below the one-row height and are clipped whole, so the
+   drop follows the width of the labels in each language, not a fixed breakpoint. */
 .agent-usage-totals {
   display: flex;
-  flex-wrap: nowrap;
-  gap: calc(var(--openbot-space-6) * 2);
+  flex-wrap: wrap;
+  gap: var(--openbot-space-4) calc(var(--openbot-space-6) * 2);
+  max-height: calc(var(--openbot-leading-sm) + var(--openbot-space-1) + var(--openbot-leading-xl));
   margin-top: var(--openbot-space-4);
   overflow: hidden;
 }
 .agent-usage-totals dt {
   font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
   color: var(--openbot-text-muted);
   margin-bottom: var(--openbot-space-1);
   white-space: nowrap;
@@ -91,6 +96,7 @@
 .agent-usage-totals dd {
   margin: 0;
   font-size: var(--openbot-text-xl);
+  line-height: var(--openbot-leading-xl);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -125,6 +131,22 @@
 }
 .agent-usage-table td {
   color: var(--openbot-text-secondary);
+}
+.agent-usage-table td.agent-usage-table-empty {
+  padding-inline-start: 0;
+  text-align: start;
+  white-space: normal;
+  color: var(--openbot-text-muted);
+}
+/* The open table alone sets the height. A hidden table, such as the 30 rows of Day, adds no
+   empty space under a short one, and it still fades out over the open one. */
+.agent-usage-breakdown {
+  position: relative;
+}
+.agent-usage-breakdown > .ui-sliding-tabs-content:not([data-selected]) {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
 }
 .agent-usage-model-name {
   display: flex;

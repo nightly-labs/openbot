@@ -56,6 +56,7 @@
   height: 20px;
   flex: none;
   color: var(--notice-accent);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 /* The button set has no warning variant, so the notice tints the outline button it already uses. */

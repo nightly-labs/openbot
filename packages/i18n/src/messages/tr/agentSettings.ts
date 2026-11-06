@@ -145,10 +145,6 @@ export const messages = {
   "agentSettings.avatar.processFailed": "Ajan avatarı işlenemedi.",
   "agentSettings.runtime.model": "Ajan modeli",
   "agentSettings.runtime.modelUnavailable": "Modeller bir ajan CLI'sı bağlandıktan sonra kullanılabilir.",
-  "agentSettings.runtime.reasoning": "Akıl yürütme",
-  "agentSettings.runtime.reasoningLabel": "Ajan akıl yürütme düzeyi",
-  "agentSettings.runtime.selectReasoning": "Akıl yürütmeyi seçin",
-  "agentSettings.runtime.reasoningSetByProvider": "{provider} belirler",
   "agentSettings.runtime.access": "Erişim",
   "agentSettings.runtime.accessLabel": "Ajan erişimi",
   "agentSettings.runtime.busyMessage": "Çalışırken",
@@ -222,8 +218,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "Sohbeti uzadığında ajanın yeni bir sohbet başlatmasına izin verir. Önce notlarını kaydeder.",
   "agentSettings.quickAcknowledgement.title": "Uzun görevlerden önce planı göster",
-  "agentSettings.quickAcknowledgement.description":
-    "Uzun bir görevden önce ajan planını gösterir. 10 sn sonra veya Başlat'a bastığınızda başlar.",
+  "agentSettings.quickAcknowledgement.description": "Uzun bir görevden önce ajan planını gösterir.",
   "agentSettings.browserProfile.label": "Tarayıcı profili",
   "agentSettings.browserProfile.shared": "Paylaşılan",
   "agentSettings.browserProfile.agent": "Yalnızca bu ajan",

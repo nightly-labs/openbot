@@ -278,6 +278,7 @@ export function ServerProviderSignInScreen() {
       {signIn ? (
         <SignInSection
           signIn={signIn}
+          chatgpt={provider === "codex"}
           busy={busy}
           code={code}
           address={address}
@@ -330,6 +331,7 @@ function cancelSignIn(admin: ProviderAdmin, provider: AgentProviderId, signIn: S
 
 function SignInSection({
   signIn,
+  chatgpt,
   busy,
   code,
   address,
@@ -342,6 +344,8 @@ function SignInSection({
   onCancel,
 }: {
   signIn: SignIn;
+  /** ChatGPT signs in with a code only when the account turned that on. */
+  chatgpt: boolean;
   busy: boolean;
   code: string;
   address: string;
@@ -367,6 +371,7 @@ function SignInSection({
   const steps =
     signIn.kind === "code"
       ? [
+          ...(chatgpt ? [t("mobile.server.providers.codeStepChatgpt")] : []),
           t("mobile.server.providers.codeStepCopy"),
           t("mobile.server.providers.codeStepEnter"),
           t("mobile.server.providers.codeStepReturn"),

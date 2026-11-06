@@ -9,6 +9,7 @@ import { createHostedBilling } from "./hosted-billing";
 import type { HostedServerBindings } from "./hosted-server-service";
 import { HostedSiteService } from "./hosted-site-service";
 import { enforceMarketplaceIngress, MarketplaceRateLimitError } from "./marketplace-request-policy";
+import { observedD1 } from "./observed-d1";
 import { pageMarkdownResponse } from "./page-markdown";
 import {
   deliverPendingRemoteAuthEvents,
@@ -35,12 +36,13 @@ export function createWorkerHandler(
   return {
     async fetch(
       request: Request,
-      bindings: Pick<WorkerBindings, "MARKETPLACE_INGRESS_RATE_LIMITER"> &
+      workerBindings: Pick<WorkerBindings, "MARKETPLACE_INGRESS_RATE_LIMITER"> &
         Partial<
           Pick<WorkerBindings, "SITES" | "SITE_LOCAL_ORIGIN" | "DB" | "OPENPANEL_CLIENT_ID" | "OPENPANEL_CLIENT_SECRET">
         >,
       context?: WorkerExecutionContext,
     ) {
+      const bindings = workerBindings.DB ? { ...workerBindings, DB: observedD1(workerBindings.DB) } : workerBindings;
       const hostRedirect = canonicalHostRedirect(request);
       if (hostRedirect) return hostRedirect;
       if (request.method === "GET" && new URL(request.url).pathname === "/billing/checkout-return") {
@@ -91,9 +93,10 @@ export function createWorkerHandler(
     },
     async scheduled(
       controller: Pick<ScheduledController, "scheduledTime"> & Partial<Pick<ScheduledController, "cron">>,
-      bindings: RemoteAuthEventBindings &
+      workerBindings: RemoteAuthEventBindings &
         Partial<Pick<WorkerBindings, "SITES" | HostedServerTickBindingKey> & SignalEntryBindings>,
     ) {
+      const bindings = { ...workerBindings, DB: observedD1(workerBindings.DB) };
       if (controller.cron === SIGNAL_ENTRY_CRON) {
         await runSignalEntryCheck(bindings);
         return;

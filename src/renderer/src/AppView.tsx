@@ -15,10 +15,19 @@ import { QuitShortcutHint } from "./features/window/QuitShortcutHint";
 import { useI18n } from "./i18n-context";
 import { AccountLogin, FirstRunFlow, InitialSetup, LanguageStep } from "./lazy-views";
 import { usePlatform } from "./platform";
+import { reportWorkspaceReady } from "./renderer-timing";
 import { WorkspaceShell } from "./WorkspaceShell";
 
 // A server switch mounts this gate again. Only the first splash of a start or a reload plays through.
 let startupSplashPlayed = false;
+
+/**
+ * Lets the next start fade the splash as soon as the app is ready, as after a server switch.
+ * Prototype stories render the whole app on each page load and do not need the crew each time.
+ */
+export function skipStartupSplash(): void {
+  startupSplashPlayed = true;
+}
 
 /** The placeholder every lazy view below falls back to while its code loads. */
 function LoadingScreen() {
@@ -56,7 +65,8 @@ export function AppAccessGate() {
   const settings = useSettings();
   const { joinRemoteDuringSetup } = useServerSelection();
   const started = () => setup.setupLoaded() && platform.appInfo() !== null;
-  const [splashShown, setSplashShown] = createSignal(true);
+  // The landing demo opens on the workspace at once, with no splash.
+  const [splashShown, setSplashShown] = createSignal(!platform.landingPreview);
   // A chat window is a new page too, but it fades as soon as it is ready.
   const splashPlaysThrough = !startupSplashPlayed && platform.chatWindow === null;
   // The splash lets the workspace mount its heavy views before the crew hop out.
@@ -83,6 +93,10 @@ export function AppAccessGate() {
   // A startup mark for `dev:bench`: the first moment the app can leave the splash.
   createEffect(started, (ready) => {
     if (ready) performance.mark("openbot:app-started");
+  });
+  // For the `system_startup` summary: main reads the time of the main window's first workspace load.
+  createEffect(workspaceReady, (ready) => {
+    if (ready && platform.chatWindow === null) reportWorkspaceReady();
   });
 
   return (

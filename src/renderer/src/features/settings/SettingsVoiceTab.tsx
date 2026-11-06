@@ -1,6 +1,9 @@
 import {
   AUTOMATIC_VOICE_LANGUAGE,
+  CODEX_LIVE_VOICES,
+  type CodexLiveVoice,
   ELEVENLABS_VOICE_MODEL_ID,
+  modelLanguage,
   SPEECH_MODEL,
   SPEECH_SPEEDS,
   SPEECH_VOICES,
@@ -40,19 +43,23 @@ import {
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, createStore, For, Show } from "solid-js";
+import type { CodexLiveAccess } from "../speech/codex-live-access";
 import type { SettingsVoiceStore } from "./settings-voice-store";
 import { shortModel, VoiceServerDialog, voiceServerHost } from "./VoiceServerDialog";
 
 const MODEL_DESCRIPTION = {
   "parakeet-tdt-0.6b-v3": "settings.voice.model.parakeet.description",
+  "parakeet-unified-en-0.6b": "settings.voice.model.parakeetUnified.description",
   "bark-3.0-plus": "settings.voice.model.bark.description",
   "whisper-turbo": "settings.voice.model.whisper.description",
+  "cohere-transcribe-03-2026": "settings.voice.model.cohere.description",
   [ELEVENLABS_VOICE_MODEL_ID]: "settings.voice.model.elevenlabs.description",
 } as const satisfies Record<VoiceModelInfo["id"], AppTextKey>;
 
 /** The language that the model uses, and why it cannot be set, for each model that takes no language. */
 const FIXED_LANGUAGE: Partial<Record<VoiceModelInfo["id"], { language: VoiceLanguage; description: AppTextKey }>> = {
   "parakeet-tdt-0.6b-v3": { language: AUTOMATIC_VOICE_LANGUAGE, description: "settings.voice.language.modelDetects" },
+  "parakeet-unified-en-0.6b": { language: "en", description: "settings.voice.language.parakeetUnifiedEnglishOnly" },
   "bark-3.0-plus": { language: "en", description: "settings.voice.language.englishOnly" },
 };
 
@@ -147,15 +154,31 @@ function flagFor(language: VoiceLanguage): string {
   return "🌐";
 }
 
+/** `automatic` lets OpenAI choose the voice of live voice. */
+type LiveVoiceChoice = CodexLiveVoice | "automatic";
+
 interface SettingsVoiceTabProps {
   store: SettingsVoiceStore;
   selectMount: HTMLElement | undefined;
+  codexLiveAccess?: CodexLiveAccess | undefined;
+  /** Opens the Providers section of this computer, where Codex signs in. */
+  onConnectCodex?: (() => void) | undefined;
 }
 
 export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
   const { t, format, errorMessage } = useText();
   const settings = () => props.store.state.settings;
   const activeModel = () => VOICE_MODELS.find((model) => model.id === settings()?.modelId);
+  /** A retired model shows only while it is in use or has files on this computer. */
+  const shownModels = createMemo(() =>
+    VOICE_MODELS.filter(
+      (model) =>
+        model.kind === "cloud" ||
+        !model.retired ||
+        settings()?.modelId === model.id ||
+        (props.store.state.statuses[model.id]?.phase ?? "missing") !== "missing",
+    ),
+  );
   const server = () => props.store.state.server;
   /** While the user's own server takes dictation, no model on this computer is in use. */
   const serverDictates = () => server()?.routes.dictation === true;
@@ -166,16 +189,34 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
     const model = activeModel();
     return model && !model.supportsLanguage && !serverDictates() ? FIXED_LANGUAGE[model.id] : undefined;
   };
+  /**
+   * A model with its own languages, such as Cohere Transcribe, offers only those and no automatic.
+   * A memo, so that a save keeps the same list and the options do not change under the Select.
+   */
+  const modelLanguages = createMemo(() => (serverDictates() ? undefined : activeModel()?.languages));
+  const shownLanguage = (): VoiceLanguage | null => {
+    const fixed = fixedLanguage();
+    if (fixed) return fixed.language;
+    const model = activeModel();
+    const saved = settings()?.language;
+    if (!saved) return null;
+    return model && !serverDictates() ? modelLanguage(model, saved) : saved;
+  };
+  const languageDescription = (): AppTextKey =>
+    fixedLanguage()?.description ??
+    (modelLanguages() ? "settings.voice.language.modelLanguages" : "settings.voice.language.description");
   const languageLocked = () => !settings() || (!serverDictates() && activeModel()?.supportsLanguage === false);
   const languageName = (language: VoiceLanguage) =>
     language === AUTOMATIC_VOICE_LANGUAGE ? t("settings.voice.language.automatic") : t(LANGUAGE_NAME[language]);
   const languageOptions = createMemo((): VoiceLanguage[] => {
     const collator = new Intl.Collator(format.locale);
-    const names = new Map(WHISPER_LANGUAGES.map((language) => [language, languageName(language)]));
-    const sorted = [...WHISPER_LANGUAGES].sort((left, right) =>
+    const own = modelLanguages();
+    const languages = own ?? WHISPER_LANGUAGES;
+    const names = new Map(languages.map((language) => [language, languageName(language)]));
+    const sorted = [...languages].sort((left, right) =>
       collator.compare(names.get(left) ?? left, names.get(right) ?? right),
     );
-    return [AUTOMATIC_VOICE_LANGUAGE, ...sorted];
+    return own ? sorted : [AUTOMATIC_VOICE_LANGUAGE, ...sorted];
   });
 
   // The key is never read back: main has no getter for it, and the field clears once it is saved.
@@ -217,6 +258,11 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
       number: voice.slice(1),
     });
 
+  const liveVoice = (): LiveVoiceChoice => speech().settings?.codexLiveVoice ?? "automatic";
+  /** The voices' own names, which stay the same in each language. */
+  const liveVoiceName = (voice: LiveVoiceChoice) =>
+    voice === "automatic" ? t("settings.voice.language.automatic") : voice.charAt(0).toUpperCase() + voice.slice(1);
+
   const LanguageLabel = (labelProps: { language: VoiceLanguage | undefined }) => (
     <Show when={labelProps.language}>
       {(language) => (
@@ -229,9 +275,12 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
 
   return (
     <>
-      <SettingsSection data-settings-row="settings.voice.models.title" title={t("settings.voice.models.title")}>
+      <SettingsSection
+        data-settings-row="settings.voice.dictation.section"
+        title={t("settings.voice.dictation.section")}
+      >
         <ItemGroup class="settings-modal-card">
-          <For each={VOICE_MODELS}>
+          <For each={shownModels()}>
             {(model) => {
               const status = () => props.store.state.statuses[model.id];
               const phase = () => status()?.phase;
@@ -352,24 +401,17 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
               );
             }}
           </For>
-        </ItemGroup>
-      </SettingsSection>
-
-      <SettingsSection title={t("settings.voice.language.section")}>
-        <ItemGroup class="settings-modal-card">
-          <Item data-settings-row="settings.voice.language.title" class="settings-modal-row">
+          <Item data-settings-row="settings.voice.language.section" class="settings-modal-row">
             <ItemContent>
-              <ItemTitle>{t("settings.voice.language.title")}</ItemTitle>
-              <ItemDescription>
-                {t(fixedLanguage()?.description ?? "settings.voice.language.description")}
-              </ItemDescription>
+              <ItemTitle>{t("settings.voice.language.section")}</ItemTitle>
+              <ItemDescription>{t(languageDescription())}</ItemDescription>
             </ItemContent>
             <ItemActions>
               <Select<VoiceLanguage>
                 class="settings-modal-select"
                 options={languageOptions()}
-                value={fixedLanguage()?.language ?? settings()?.language ?? null}
-                onChange={(next) => next && props.store.setLanguage(next)}
+                value={shownLanguage()}
+                onChange={(next) => next && next !== shownLanguage() && props.store.setLanguage(next)}
                 disabled={languageLocked()}
                 placement="bottom-end"
                 itemComponent={(selectProps) => (
@@ -378,7 +420,7 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
                   </SelectItem>
                 )}
               >
-                <SelectTrigger size="sm" aria-label={t("settings.voice.language.title")}>
+                <SelectTrigger size="sm" aria-label={t("settings.voice.language.section")}>
                   <SelectValue<VoiceLanguage>>
                     {(state) => <LanguageLabel language={state.selectedOption()} />}
                   </SelectValue>
@@ -533,6 +575,68 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
               </Select>
             </ItemActions>
           </Item>
+        </ItemGroup>
+      </SettingsSection>
+
+      <SettingsSection title={t("settings.voice.live.section")}>
+        <ItemGroup class="settings-modal-card">
+          <Show
+            when={props.codexLiveAccess !== "signIn"}
+            fallback={
+              <Item data-settings-row="settings.voice.speech.codexLive.title" class="settings-modal-row">
+                <ItemContent>
+                  <ItemTitle>{t("settings.voice.speech.codexLive.title")}</ItemTitle>
+                  <ItemDescription>{t("settings.voice.live.signIn")}</ItemDescription>
+                </ItemContent>
+                <Show when={props.onConnectCodex}>
+                  {(connect) => (
+                    <ItemActions>
+                      <Button variant="outline" size="sm" type="button" onClick={() => connect()()}>
+                        {t("settings.voice.server.connect")}
+                      </Button>
+                    </ItemActions>
+                  )}
+                </Show>
+              </Item>
+            }
+          >
+            <SwitchField
+              data-settings-row="settings.voice.speech.codexLive.title"
+              checked={speech().settings?.codexLive ?? false}
+              disabled={!speech().settings}
+              onChange={(checked) => props.store.setCodexLive(checked)}
+              label={t("settings.voice.speech.codexLive.title")}
+              description={t("settings.voice.speech.codexLive.description")}
+            />
+            <Item class="settings-modal-row">
+              <ItemContent>
+                <ItemTitle>{t("settings.voice.speech.voice.title")}</ItemTitle>
+              </ItemContent>
+              <ItemActions>
+                <Select<LiveVoiceChoice>
+                  class="settings-modal-select"
+                  options={["automatic", ...CODEX_LIVE_VOICES]}
+                  value={liveVoice()}
+                  onChange={(next) => next && props.store.setCodexLiveVoice(next === "automatic" ? null : next)}
+                  disabled={!speech().settings?.codexLive}
+                  placement="bottom-end"
+                  itemComponent={(selectProps) => (
+                    <SelectItem item={selectProps.item}>{liveVoiceName(selectProps.item.rawValue)}</SelectItem>
+                  )}
+                >
+                  <SelectTrigger size="sm" aria-label={t("settings.voice.speech.voice.title")}>
+                    <SelectValue<LiveVoiceChoice>>
+                      {(state) => {
+                        const voice = state.selectedOption();
+                        return voice && liveVoiceName(voice);
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent mount={props.selectMount} />
+                </Select>
+              </ItemActions>
+            </Item>
+          </Show>
         </ItemGroup>
       </SettingsSection>
 

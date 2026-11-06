@@ -105,6 +105,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "正在 {host} 上启动 {name} 登录…",
   "provider.codeLogin.pageOpening": "正在 {host} 上打开 {name} 登录页面…",
   "provider.codeLogin.linkStep": "登录 {name}，OpenBot 会自动继续。",
+  "provider.codeLogin.chatgptDeviceSetting":
+    "在电脑上的 ChatGPT 中打开安全设置，为 Codex 开启设备代码登录。工作账号由工作区管理员开启。",
 
   // A provider that only the OpenBot app can sign in, from a browser tab.
   "provider.useApp.title": "在 OpenBot 应用中连接 {name}",
@@ -132,6 +134,7 @@ export const messages = {
   "provider.picker.noModels": "{name} 没有可用的模型。",
   "provider.picker.customEmpty":
     "添加一个兼容 OpenAI 的端点 —— 可以是这台电脑上的模型服务，也可以是任何提供 base URL 和密钥的服务。",
+  "provider.picker.customPending": "端点的模型尚未加载。当前任务结束后服务商会读取这些模型。",
   "provider.picker.defaultModelLabel": "{name}，默认",
   "provider.picker.usageLimit": "已达用量上限",
   "provider.picker.usageLimitWindow": "{window}上限",
@@ -291,18 +294,9 @@ export const messages = {
   "provider.settings.turnOnFirst": "请先开启 {name}。",
   "provider.settings.makeDefault": "设为默认",
   "provider.settings.useTitle": "使用 {name}",
-  "provider.settings.download": "下载",
-  "provider.settings.downloadedCli": "{name} CLI",
-  "provider.settings.downloadDetail": {
-    one: "{version} · 1 个版本 · {size}",
-    other: "{version} · {count} 个版本 · {size}",
-  },
-  "provider.settings.downloadVersions": { one: "1 个版本 · {size}", other: "{count} 个版本 · {size}" },
-  "provider.settings.downloadAgain": "开启 {name} 时，OpenBot 会重新下载其 CLI。",
-  "provider.settings.removeDownloadConfirm": "要移除 {size} 吗？",
-  "provider.settings.removeDownloadKeeps": "账户、登录和智能体会保留。",
-  "provider.settings.removeDownload": "移除下载",
-  "provider.settings.removingDownload": "正在移除…",
+  "provider.settings.deleteTitle": "删除 {name}",
+  "provider.settings.deleteOn": "关闭 {name}，并删除 OpenBot 下载的 CLI。账户、登录和智能体会保留。",
+  "provider.settings.deleteOff": "删除 OpenBot 为 {name} 下载的 CLI（{size}）。账户、登录和智能体会保留。",
   "provider.settings.removeDownloadFailed": "无法移除下载。",
   "provider.settings.endpoints": "端点",
   "provider.settings.noEndpoints": "没有端点。",

@@ -70,6 +70,8 @@ export const messages = {
   "account.login.connectingDescription": "جارٍ بدء خدمة الحساب. يستغرق هذا عادةً لحظة.",
   "account.login.unavailableDescription": "يتعذّر على OpenBot الوصول إلى خدمة الحساب الآن.",
   "account.login.signInDescription": "استخدم بريدك الإلكتروني لتسجيل الدخول أو إنشاء حساب. سنرسل إليك رمزًا لمرة واحدة.",
+  "account.login.keyringChangedDescription":
+    "فقدت سلسلة مفاتيح النظام آخر تسجيل دخول لك. يحفظ OpenBot الآن تسجيلات الدخول في ملف خاص به على هذا الحاسوب. سجّل الدخول مرة أخرى.",
   "account.login.codeAccepted": "قُبل رمزك.",
   "account.login.codeSent": "أرسلنا رمزًا إلى {email}.",
   "account.login.connectingSecurely": "جارٍ الاتصال بأمان…",
@@ -99,6 +101,14 @@ export const messages = {
   "account.login.resend": "إعادة إرسال الرمز",
   "account.login.resendIn": "إعادة الإرسال بعد {time}",
   "account.login.loadFailed": "تعذّر على OpenBot تحميل خدمة الحساب.",
+  "account.login.companyTitle": "تابع في متصفحك",
+  "account.login.companyDescription":
+    "يسجّل {email} الدخول بحساب شركة. أكمل تسجيل الدخول في الصفحة التي فُتحت في متصفحك.",
+  "account.login.companyWaiting": "في انتظار متصفحك…",
+  "account.login.companyOpenAgain": "افتح صفحة تسجيل الدخول مرة أخرى",
+  "account.login.companyOpening": "جارٍ الفتح…",
+  "account.login.companyUseAnotherEmail": "استخدم بريدًا إلكترونيًا آخر",
+  "account.login.companyOpenFailed": "تعذّر على OpenBot فتح صفحة تسجيل الدخول. حاول مرة أخرى.",
   "account.otp.incorrect": "هذا الرمز غير صحيح. حاول مرة أخرى.",
   "account.otp.verifying": "جارٍ التحقق…",
   "account.otp.entry": "إدخال الرمز لمرة واحدة",

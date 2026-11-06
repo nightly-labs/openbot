@@ -127,6 +127,8 @@ export interface PreviewSharedFileInput extends OpenSharedFileInput {
 
 export interface PreviewWorkspaceFileInput extends OpenWorkspaceFileInput {
   maxBytes?: number;
+  /** Reads only the path as written. A missing file is not replaced by a file with the same name from the thread's tool history. */
+  exactPath?: boolean;
 }
 
 /** The most entries one folder view shows. The rest are counted by `truncated`. */

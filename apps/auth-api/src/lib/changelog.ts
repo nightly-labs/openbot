@@ -10,17 +10,16 @@
 // under a heading, and inline `**bold**`, `code` and [links](url).
 
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
-import {
-  OPENBOT_SITE_URL,
-  OPENBOT_SOCIAL_IMAGE_ALT,
-  OPENBOT_SOCIAL_IMAGE_URL,
-  OPENBOT_X_HANDLE,
-} from "./site-metadata";
+import { OPENBOT_SITE_URL, OPENBOT_X_HANDLE, type PageSocialImage, pageSocialImageMeta } from "./site-metadata";
 
 export const CHANGELOG_ROUTE = "/changelog";
 const CHANGELOG_TITLE = "OpenBot Changelog: Release Notes for Every Version";
 export const CHANGELOG_DESCRIPTION =
   "Every OpenBot release, newest first: new features, improvements and fixes, with what to do after you upgrade.";
+const CHANGELOG_SOCIAL_IMAGE: PageSocialImage = {
+  path: "/social/changelog.jpg",
+  alt: "Good things in the making. OpenBot agents around a paper sun",
+};
 
 /** The app a changelog covers. The web client ships with the desktop app, so it has no own list. */
 export type ChangelogPlatform = "desktop" | "mobile";
@@ -250,6 +249,7 @@ export function changelogUrl(siteUrl: string = OPENBOT_SITE_URL, platform: Chang
 
 export function changelogHead(siteUrl: string, platform: ChangelogPlatform = "desktop") {
   const url = changelogUrl(siteUrl, platform);
+  const image = pageSocialImageMeta(CHANGELOG_SOCIAL_IMAGE, siteUrl);
 
   return {
     meta: [
@@ -261,14 +261,12 @@ export function changelogHead(siteUrl: string, platform: ChangelogPlatform = "de
       { property: "og:url", content: url },
       { property: "og:title", content: CHANGELOG_TITLE },
       { property: "og:description", content: CHANGELOG_DESCRIPTION },
-      { property: "og:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { property: "og:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+      ...image.openGraph,
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: OPENBOT_X_HANDLE },
       { name: "twitter:title", content: CHANGELOG_TITLE },
       { name: "twitter:description", content: CHANGELOG_DESCRIPTION },
-      { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+      ...image.twitter,
     ],
     links: [{ rel: "canonical", href: url }],
   };

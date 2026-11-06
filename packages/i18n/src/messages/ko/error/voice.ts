@@ -26,4 +26,9 @@ export const messages = {
   "error.voice.speech.timedOut": "답변을 소리 내어 읽는 시간이 초과되었어요.",
   "error.voice.speech.failed": "OpenBot이 답변을 소리 내어 읽지 못했어요.",
   "error.voice.recordingNotKept": "OpenBot이 음성 녹음을 보관하지 못했어요.",
+  "error.voice.live.timedOut": "Codex 라이브 음성이 제시간에 시작되지 않았어요. 다시 시도하세요.",
+  "error.voice.live.failed": "라이브 음성이 중지되었어요: {reason}",
+  "error.voice.live.disconnected": "라이브 음성 연결이 끊어졌어요.",
+  "error.voice.live.signIn": "라이브 음성을 사용하려면 ChatGPT 계정으로 Codex에 로그인하세요.",
+  "error.voice.live.off": "Codex 라이브 음성이 꺼져 있습니다. 설정 → 음성에서 켜세요.",
 } as const satisfies PartialTranslation<typeof source>;

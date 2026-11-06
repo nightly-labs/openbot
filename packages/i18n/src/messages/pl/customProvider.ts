@@ -79,6 +79,12 @@ export const messages = {
   "customProvider.model.contextWindowPlaceholder": "Tokeny",
   "customProvider.model.maxOutput": "Maksymalne wyjście modelu {number}",
   "customProvider.model.maxOutputPlaceholder": "Tokeny",
+  "customProvider.model.efforts": "Wysiłek modelu {number}",
+  "customProvider.model.effortsLabel": "Wysiłek",
+  "customProvider.model.effortsHintOpenCode":
+    "Wybierz poziomy wysiłku, które przyjmuje każdy model. Bez wyboru OpenCode oferuje Niski, Średni i Wysoki.",
+  "customProvider.model.effortsHintPi":
+    "Wybierz poziomy wysiłku, które przyjmuje każdy model. Bez wyboru model nie rozumuje.",
   "customProvider.model.remove": "Usuń model {number}",
   "customProvider.model.add": "Dodaj model",
   "customProvider.headers": "Nagłówki",

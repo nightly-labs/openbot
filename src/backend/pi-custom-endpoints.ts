@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { CustomProviderReasoningEffort } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { type CustomProviderConfig, customModelOutputLimit } from "./opencode-config";
 import type { PiMcpExtension } from "./pi-mcp";
@@ -18,7 +19,39 @@ interface EndpointPayload {
   readonly baseUrl: string;
   readonly apiKey: string | null;
   readonly headers: Readonly<Record<string, string>>;
-  readonly models: readonly { id: string; name: string; contextWindow: number; maxTokens: number }[];
+  readonly models: readonly PiModelPayload[];
+}
+
+interface PiModelPayload {
+  readonly id: string;
+  readonly name: string;
+  readonly contextWindow: number;
+  readonly maxTokens: number;
+  /** Absent: the model does not reason. */
+  readonly thinkingLevelMap?: PiThinkingLevelMap;
+}
+
+type PiThinkingLevelMap = Readonly<
+  Record<"off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max", CustomProviderReasoningEffort | null>
+>;
+
+/**
+ * The `reasoning_effort` that Pi sends for each of its levels, and null for a level that the endpoint
+ * does not accept. Pi lists only the levels that are not null (`getSupportedThinkingLevels`, Pi 1.1.0:
+ * https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/src/models.ts#L1224-L1233).
+ * Pi's `off` is OpenBot's `none`.
+ */
+function thinkingLevelMap(efforts: readonly CustomProviderReasoningEffort[]): PiThinkingLevelMap {
+  const accepted = (effort: CustomProviderReasoningEffort) => (efforts.includes(effort) ? effort : null);
+  return {
+    off: accepted("none"),
+    minimal: accepted("minimal"),
+    low: accepted("low"),
+    medium: accepted("medium"),
+    high: accepted("high"),
+    xhigh: accepted("xhigh"),
+    max: accepted("max"),
+  };
 }
 
 // As in `pi-key-providers.ts`, the endpoints come from the environment, and the extension removes
@@ -45,7 +78,8 @@ const SOURCE = `export default function (pi) {
         type: "chat",
         id: model.id,
         name: model.name,
-        reasoning: false,
+        reasoning: model.thinkingLevelMap !== undefined,
+        ...(model.thinkingLevelMap ? { thinkingLevelMap: model.thinkingLevelMap } : {}),
         input: ["text"],
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         contextWindow: model.contextWindow,
@@ -68,7 +102,13 @@ function payload(endpoint: CustomProviderConfig): EndpointPayload {
       // Pi cuts `maxTokens` to the room that the prompt leaves in the window, so a saved max output
       // above the window does not overflow (`clampMaxTokensToContext`, Pi 1.1.0:
       // https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/src/api/simple-options.ts#L18-L22).
-      return { id: model.id, name: model.name, contextWindow, maxTokens: customModelOutputLimit(model, contextWindow) };
+      return {
+        id: model.id,
+        name: model.name,
+        contextWindow,
+        maxTokens: customModelOutputLimit(model, contextWindow),
+        ...(model.reasoningEfforts ? { thinkingLevelMap: thinkingLevelMap(model.reasoningEfforts) } : {}),
+      };
     }),
   };
 }

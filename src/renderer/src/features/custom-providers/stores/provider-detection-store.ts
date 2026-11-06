@@ -81,6 +81,7 @@ function modelsRow(server: DetectedModelServer, saved: CustomProviderSummary | u
       name: model.name,
       ...(model.contextWindow !== undefined ? { contextWindow: model.contextWindow } : {}),
       ...(model.maxOutput !== undefined ? { maxOutput: model.maxOutput } : {}),
+      ...(model.reasoningEfforts !== undefined ? { reasoningEfforts: [...model.reasoningEfforts] } : {}),
     })),
     keyStored: saved.hasApiKey,
     savedHeaderNames: saved.headerNames ?? [],

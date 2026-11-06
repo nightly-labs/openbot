@@ -6,6 +6,7 @@ import { companySignInErrorKey } from "@openbot/contracts/company-sign-in";
 import type { HostKeyHandover } from "@openbot/contracts/host-key-handover";
 import { parseHostedServerClaim } from "@openbot/contracts/hosted-servers";
 import type {
+  AvatarColor,
   AvatarImageInput,
   CentralAuthIssue,
   CentralAuthState,
@@ -47,11 +48,12 @@ import {
   type RemoteTicketClaims,
 } from "@openbot/contracts/signal-protocol/ticket";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger } from "@openbot/logging";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { referenceFrom, safeReference } from "@openbot/user-errors";
 import { Deferred, Effect, type Layer, Result, Schema, Semaphore } from "effect";
 import { createLocalJWKSet, jwtVerify } from "jose";
 import { z } from "zod";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { isMissingFileError } from "../backend/file-errors";
 import { authCall, authDecode, CentralAuthOperationError, CentralAuthTransport } from "./central-auth-effects";
 import {
@@ -94,6 +96,8 @@ interface CentralAuthManagerOptions {
   encrypt: (value: string) => Buffer;
   decrypt: (value: Buffer) => string;
   canPersist?: () => boolean;
+  /** True when the Linux keyring failed in this process and a key file of OpenBot now keeps the secrets. */
+  keyringChanged?: () => boolean;
   fetch?: AuthFetcher;
   startupRetryWindowMs?: number;
   startupRequestTimeoutMs?: number;
@@ -138,6 +142,11 @@ const TELEGRAM_BOT_USERNAME = /^[A-Za-z0-9_]{5,32}$/u;
 const STARTUP_RETRY_WINDOW_MS = 30_000;
 const STARTUP_REQUEST_TIMEOUT_MS = 3_000;
 const STARTUP_RETRY_DELAYS_MS = [250, 500, 1_000, 2_000] as const;
+// After the start window, the account service is asked again in the background, for example when the
+// network is ready only after the window (#5111). Each delay changes by up to a quarter, so clients
+// that lost the service at the same time do not ask at the same time.
+const UNAVAILABLE_RETRY_DELAYS_MS = [5_000, 10_000, 20_000, 30_000, 60_000] as const;
+const MAX_UNAVAILABLE_RETRY_AFTER_SECONDS = 60 * 60;
 const EMAIL_CODE_REQUEST_TIMEOUT_MS = 35_000;
 const RESEND_FALLBACK_DELAY_MS = 60_000;
 const DEFINITIVE_EMAIL_CODE_REQUEST_FAILURES = new Set([
@@ -203,6 +212,9 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
   /** Ends the company sign-in that waits for the browser. A new one, a cancel, or the shutdown ends it. */
   #companySignInCancel: Deferred.Deferred<void> | null = null;
   #companySignInTestCancel: Deferred.Deferred<void> | null = null;
+  #unavailableRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  #unavailableRetryFailures = 0;
+  #disposed = false;
 
   constructor(options: CentralAuthManagerOptions) {
     super();
@@ -217,6 +229,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       offline: options.offline ?? false,
       mobileConnectApiUrl: options.mobileConnectApiUrl ?? options.apiUrl,
       canPersist: options.offline ? () => false : (options.canPersist ?? (() => true)),
+      keyringChanged: options.keyringChanged ?? (() => false),
       fetch: fetcher,
       startupRetryWindowMs: options.startupRetryWindowMs ?? STARTUP_RETRY_WINDOW_MS,
       startupRequestTimeoutMs: options.startupRequestTimeoutMs ?? STARTUP_REQUEST_TIMEOUT_MS,
@@ -228,6 +241,8 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
 
   readonly #pending = new Set<Deferred.Deferred<void>>();
   readonly dispose = Effect.fn("CentralAuth.dispose")(function* (this: CentralAuthManager) {
+    this.#disposed = true;
+    this.#cancelUnavailableRetry();
     this.stopProfileRefresh();
     this.#endCompanySignIn();
     this.#endCompanySignInTest();
@@ -295,7 +310,8 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         resolved.name === state.user.name &&
         resolved.email === state.user.email &&
         resolved.avatarUrl === state.user.avatarUrl &&
-        resolved.analyticsEnabled === state.user.analyticsEnabled
+        resolved.analyticsEnabled === state.user.analyticsEnabled &&
+        resolved.chatColor === state.user.chatColor
       )
         return this.getState();
       return this.#setState({ status: "signed_in", user: resolved });
@@ -1411,7 +1427,13 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       if (this.#initialization) return yield* Deferred.await(this.#initialization);
       const pending = Deferred.makeUnsafe<CentralAuthState, CentralAuthOperationError>();
       this.#initialization = pending;
+      this.#cancelUnavailableRetry();
       return yield* this.#initialize().pipe(
+        Effect.tap(() =>
+          Effect.sync(() => {
+            this.#unavailableRetryFailures = 0;
+          }),
+        ),
         Effect.catch((error) => Effect.sync(() => this.#setInitializationError(error.cause))),
         Effect.onExit((exit) => Deferred.done(pending, exit)),
         Effect.ensuring(
@@ -1428,11 +1450,77 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     return this.initialize();
   }
 
+  #cancelUnavailableRetry(): void {
+    if (this.#unavailableRetryTimer) clearTimeout(this.#unavailableRetryTimer);
+    this.#unavailableRetryTimer = null;
+  }
+
+  /**
+   * A `Retry-After` from the service makes the wait longer, never shorter. It is limited to one hour:
+   * Node runs a timer of more than 2^31 - 1 ms after 1 ms.
+   */
+  #scheduleUnavailableRetry(error?: unknown): void {
+    this.#cancelUnavailableRetry();
+    if (this.#disposed) return;
+    const delays = UNAVAILABLE_RETRY_DELAYS_MS;
+    const retryAfterMs =
+      error instanceof AuthApiError
+        ? Math.min(error.retryAfterSeconds ?? 0, MAX_UNAVAILABLE_RETRY_AFTER_SECONDS) * 1_000
+        : 0;
+    const delayMs = Math.max(delays[Math.min(this.#unavailableRetryFailures, delays.length - 1)] ?? 0, retryAfterMs);
+    this.#unavailableRetryFailures += 1;
+    this.#unavailableRetryTimer = setTimeout(
+      () => {
+        this.#unavailableRetryTimer = null;
+        void runCauseEffect(this.#owned(this.#unavailableRetryEffect())).catch((error) =>
+          logger.warn("The account service retry failed.", toLogValue(error)),
+        );
+      },
+      Math.round(delayMs * (0.75 + Math.random() * 0.5)),
+    );
+    this.#unavailableRetryTimer.unref?.();
+  }
+
+  #isUnavailable(): boolean {
+    return this.#state.status === "error" && this.#state.issue.code === "auth_api_unavailable";
+  }
+
+  /**
+   * Sends one start request with no loading state, so the error screen stays while the service does
+   * not answer. Only an answer from the service starts the sign-in again.
+   */
+  readonly #unavailableRetryEffect = Effect.fn("CentralAuth.unavailableRetry")(function* (
+    this: CentralAuthManager,
+  ): Effect.fn.Return<void, CentralAuthOperationError, CentralAuthTransport> {
+    if (this.#disposed || this.#initialization || !this.#isUnavailable()) return;
+    const sessionToken = this.#sessionToken;
+    const timeoutMs = this.#options.startupRequestTimeoutMs;
+    const request: Effect.Effect<unknown, CentralAuthOperationError, CentralAuthTransport> = sessionToken
+      ? this.#requestEffect(
+          "/v1/me",
+          { method: "GET", headers: { Authorization: `Bearer ${sessionToken}` } },
+          decodeCentralAuthUser,
+          timeoutMs,
+        )
+      : this.#requestEffect("/health/live", { method: "GET" }, decodeRecordHealth, timeoutMs);
+    const probe = yield* Effect.result(request);
+    if (this.#disposed || this.#initialization || !this.#isUnavailable()) return;
+    if (Result.isFailure(probe)) {
+      const error = probe.failure.cause;
+      if (error instanceof NetworkBlockedError || isTransientStartupError(error)) {
+        this.#scheduleUnavailableRetry(error);
+        return;
+      }
+    }
+    yield* this.initialize();
+  });
+
   readonly #initialize = Effect.fn("CentralAuth.initialize")(function* (
     this: CentralAuthManager,
   ): Effect.fn.Return<CentralAuthState, CentralAuthOperationError, CentralAuthTransport> {
     if (this.#options.offline) return this.#setState({ status: "signed_out" });
     this.#setState({ status: "loading" });
+    let keyringChanged = false;
     // A session that cannot be read now stays on disk: a Keychain that is locked or asks for
     // permission at startup can open it at the next start, and the next sign-in replaces it.
     if (this.#options.canPersist()) {
@@ -1449,7 +1537,10 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         const error = attempt4.failure.cause;
         if (!isMissingFileError(error)) {
           this.#forgetSession();
-          logger.warn("The stored account session could not be restored.", storedSessionFailure(stage, error));
+          const failure = storedSessionFailure(stage, error);
+          logger.warn("The stored account session could not be restored.", failure);
+          // The Linux keyring lost its key, so the sign-in screen tells why it shows again.
+          keyringChanged = failure.stage === "decrypt" && this.#options.keyringChanged();
         }
       }
     } else {
@@ -1457,7 +1548,9 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     }
     if (!this.#sessionToken) {
       yield* this.#startupRequestEffect("/health/live", { method: "GET" }, decodeRecordHealth);
-      return this.#setState({ status: "signed_out" });
+      return this.#setState(
+        keyringChanged ? { status: "signed_out", reason: "keyring_changed" } : { status: "signed_out" },
+      );
     }
     const sessionToken = this.#sessionToken;
     return yield* Effect.gen({ self: this }, function* () {
@@ -2045,6 +2138,46 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     (operation) => this.#owned(operation),
   ).bind(this);
 
+  /**
+   * Saves the chat color of the user on the account. Members of each server of the user see it. An
+   * account service from before chat colors has no such route and answers 404.
+   */
+  readonly updateChatColor = Effect.fn("CentralAuth.updateChatColor")(
+    function* (
+      this: CentralAuthManager,
+      chatColor: AvatarColor | null,
+    ): Effect.fn.Return<CentralAuthState, CentralAuthOperationError, CentralAuthTransport> {
+      const sessionToken = this.#sessionToken;
+      if (!sessionToken)
+        return yield* new CentralAuthOperationError({
+          cause: new AuthApiError(401, "unauthorized", sourceText("error.auth.signInRequired")),
+        });
+      const user = yield* this.#authorizedRequestEffect(
+        "/v1/me/chat-color",
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chatColor }),
+        },
+        decodeCentralAuthUser,
+      ).pipe(
+        Effect.mapError((error) =>
+          error.cause instanceof AuthApiError && error.cause.status === 404
+            ? new CentralAuthOperationError({
+                cause: new AuthApiError(404, "chat_color_unavailable", sourceText("error.auth.chatColorUnavailable")),
+              })
+            : error,
+        ),
+      );
+      if (this.#sessionToken !== sessionToken || this.#state.status !== "signed_in") return this.getState();
+      return this.#setState({
+        status: "signed_in",
+        user: { ...this.#state.user, chatColor: user.chatColor ?? null },
+      });
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
   readonly #requestEffect = Effect.fn("CentralAuth.request")(function* <T>(
     this: CentralAuthManager,
     path: string,
@@ -2080,10 +2213,13 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       deadline += Math.max(0, Date.now() - startedAt - expectedMs);
     };
     let retryIndex = 0;
+    // The code on the error screen names the last failure, such as no network or a 503.
+    let lastFailure: CentralAuthOperationError | null = null;
     while (true) {
       const remainingMs = deadline - Date.now();
       if (remainingMs <= 0)
-        return yield* new CentralAuthOperationError({ cause: new Error(sourceText("error.auth.serviceUnavailable")) });
+        return yield* lastFailure ??
+          new CentralAuthOperationError({ cause: new Error(sourceText("error.auth.serviceUnavailable")) });
       const timeoutMs = Math.max(1, Math.min(this.#options.startupRequestTimeoutMs, remainingMs));
       const startedAt = Date.now();
       const result = yield* this.#requestEffect(
@@ -2097,6 +2233,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       ).pipe(Effect.result);
       if (Result.isSuccess(result)) return result.success;
       excludeBlockedTime(startedAt, timeoutMs);
+      lastFailure = result.failure;
       const error = result.failure.cause;
       if (!isTransientStartupError(error)) return yield* result.failure;
       const delayMs = Math.min(
@@ -2283,6 +2420,8 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
 
   #setInitializationError(error: unknown): CentralAuthState {
     if (error instanceof NetworkBlockedError) {
+      // A captive portal blocks only until the user signs in to it.
+      this.#scheduleUnavailableRetry();
       return this.#setState({ status: "error", issue: { code: "auth_api_unavailable", message: error.message } });
     }
     if (error instanceof AuthApiError && error.status < 500) {
@@ -2291,6 +2430,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     // The renderer shows the retry screen for `auth_api_unavailable`. The message and the reference
     // say which failure it was.
     const unavailable = serviceUnavailableText(error);
+    this.#scheduleUnavailableRetry(error);
     return this.#setState({
       status: "error",
       issue: {
@@ -2467,7 +2607,7 @@ function serviceUnavailableText(error: unknown): { message: string; reference: s
       isDynamicRecord(cause) && isString(cause.code) && /^E[A-Z0-9_]+$/u.test(cause.code) ? cause.code : null;
     return { message: sourceText("error.auth.serviceUnreachable"), reference: referenceFrom("auth", "network", errno) };
   }
-  // The startup retry window ended, or the answer could not be read.
+  // The answer could not be read.
   return { message: sourceText("error.auth.serviceUnavailable"), reference: "auth/unavailable" };
 }
 

@@ -81,7 +81,7 @@ export const messages = {
   "vault.importMenu": "从 CSV 导入",
   "vault.importTitle": "从 CSV 文件导入",
   "vault.importDescription":
-    "从 1Password、Bitwarden、Chrome、Edge、Firefox、Safari、Apple Passwords 或 LastPass 导出的 CSV 文件导入登录信息。OpenBot 在这台电脑上读取该文件，不会上传。",
+    "从 1Password、Bitwarden、Chrome、Edge、Firefox、Safari、Apple Passwords、LastPass 或 Proton Pass 导出的 CSV 文件导入登录信息。OpenBot 在这台电脑上读取该文件，不会上传。",
   "vault.importChoose": "选择 CSV 文件",
   "vault.importDone": "已导入：{imported}。已跳过：{skipped}。",
   "vault.unavailableTitle": "这台电脑无法保管密钥",

@@ -7,6 +7,7 @@
 
 import { AGENT_PROVIDERS, type AgentProviderId } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
+import type { AgentReasoningEffort } from "./ipc-agent-identity";
 import { isBoundedString } from "./ipc-bounded-values";
 import { isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
@@ -64,6 +65,39 @@ export interface CustomProviderModel {
    * OpenCode entry writes no limit without a window. This computer only, like `contextWindow`.
    */
   maxOutput?: number;
+  /**
+   * The reasoning efforts that the endpoint accepts for this model, in `CUSTOM_PROVIDER_REASONING_EFFORTS`
+   * order, never empty (#4154). Absent: OpenCode offers its own Low, Medium and High, and Pi offers no
+   * effort. This computer only, like `contextWindow`.
+   */
+  reasoningEfforts?: CustomProviderReasoningEffort[];
+}
+
+/**
+ * The efforts that a custom model can declare: the `reasoning_effort` values of OpenAI-compatible
+ * endpoints, and Pi's thinking levels, with `none` for Pi's `off`.
+ */
+export const CUSTOM_PROVIDER_REASONING_EFFORTS = [
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+] as const satisfies readonly AgentReasoningEffort[];
+export type CustomProviderReasoningEffort = (typeof CUSTOM_PROVIDER_REASONING_EFFORTS)[number];
+
+/** A non-empty list of efforts, each one time, in `CUSTOM_PROVIDER_REASONING_EFFORTS` order. */
+export function isCustomProviderReasoningEfforts(value: unknown): value is CustomProviderReasoningEffort[] {
+  if (!Array.isArray(value) || value.length === 0) return false;
+  let previous = -1;
+  for (const effort of value) {
+    const index = CUSTOM_PROVIDER_REASONING_EFFORTS.indexOf(effort);
+    if (index <= previous) return false;
+    previous = index;
+  }
+  return true;
 }
 
 /** A context window that OpenCode can use for a model. */
@@ -230,7 +264,8 @@ function isCustomProviderModel(value: unknown): value is CustomProviderModel {
     isBoundedString(value.id, INPUT_LIMITS.identifier) &&
     isBoundedString(value.name, INPUT_LIMITS.modelName) &&
     (value.contextWindow === undefined || isCustomProviderContextWindow(value.contextWindow)) &&
-    (value.maxOutput === undefined || isCustomProviderMaxOutput(value.maxOutput))
+    (value.maxOutput === undefined || isCustomProviderMaxOutput(value.maxOutput)) &&
+    (value.reasoningEfforts === undefined || isCustomProviderReasoningEfforts(value.reasoningEfforts))
   );
 }
 

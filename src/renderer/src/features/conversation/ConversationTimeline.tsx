@@ -22,7 +22,7 @@ import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMes
 import { ReplyReturnButton, ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
 import { DeleteMessageDialog, MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
 import { PendingSendStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
-import { SubagentGroup } from "@openbot/ui/features/conversation/Subagents";
+import { SubagentDock, SubagentGroup } from "@openbot/ui/features/conversation/Subagents";
 import { TaskList } from "@openbot/ui/features/conversation/TaskList";
 import { UnreadMessagesBanner, UnreadMessagesDivider } from "@openbot/ui/features/conversation/UnreadMessages";
 import { VoicePlayer } from "@openbot/ui/features/conversation/VoicePlayer";
@@ -62,6 +62,7 @@ import { RoutineChatCard } from "./RoutineChatCard";
 import { createChatWebhookRoutines, RoutineWebhookChatCard } from "./RoutineWebhookChatCard";
 import { desktopChatEventRoutinesApi } from "./routine-webhooks-api";
 import { PENDING_SEND_ID_PREFIX, pendingSendRetrySafe } from "./stores/pending-send-store";
+import { createSubagentDock } from "./subagent-dock";
 import { createTurnSteps, SUBAGENT_SPAN_PREFIX } from "./turn-steps";
 
 /**
@@ -158,6 +159,7 @@ export function ConversationTimeline() {
     openSharedFile,
     openWorkspaceFile,
     openQuote,
+    openTaggedReference,
     pendingSendFor,
     presentedQueueDeliveries,
     providerUpdateRequired,
@@ -345,8 +347,11 @@ export function ConversationTimeline() {
       kind: "member",
       name: (member ? teamMemberName(member) : sender.name.trim()) || t("chat.message.memberFallback"),
       avatarSeed: sender.id,
+      chatColor: member?.chatColor,
     };
   };
+  /** The reader's own chat color: the member of the server that is the reader. */
+  const ownChatColor = () => props.presence.members.find((member) => props.isOwnSender(member.id))?.chatColor;
   /** The agent messages of the chat by their exchange id, so a marker finds its text and its request. */
   const agentMessagesByExchangeId = createMemo(
     () =>
@@ -415,6 +420,7 @@ export function ConversationTimeline() {
             // A workspace path is in the workspace of the agent that wrote it, as in a channel.
             onOpenWorkspaceFile={(path) => openWorkspaceFile(path, undefined, current().exchange?.senderAgentId)}
             onOpenQuote={openQuote}
+            onOpenTag={openTaggedReference}
             macWindowControls={props.platform === "darwin"}
           />
         )}
@@ -485,6 +491,16 @@ export function ConversationTimeline() {
     },
   );
   const webhookRoutines = createChatWebhookRoutines(webhookRoutineSource);
+  /**
+   * Opens the side thread of a routine's runs. A routine that now runs in the chat has no link, also when
+   * an earlier run made a thread: its new runs are not there. A remote host does not send the place.
+   */
+  const openRoutineThread = (routineId: string) => {
+    const routine =
+      props.routines?.find((candidate) => candidate.id === routineId) ??
+      webhookRoutines.state.routines.find((candidate) => candidate.id === routineId);
+    return routine?.runIn === "chat" ? undefined : props.threads?.routineThread(routineId);
+  };
   // The plain marker of a webhook routine opens it too: the host lists those routines on their own.
   const availableRoutineIds = createMemo(() =>
     props.availableRoutineIds
@@ -512,6 +528,25 @@ export function ConversationTimeline() {
       ? mcpServers().find((config) => config.id === marker.mcpServerId && config.transport === "http")
       : undefined;
   const virtualMessageRows = createMemo(() => messageVirtualizer.getVirtualItems());
+  let timelineScrollElement: HTMLDivElement | undefined;
+  const subagentDock = createSubagentDock({
+    rows: timelineMessages,
+    drawnRows: virtualMessageRows,
+    scrollElement: () => timelineScrollElement,
+    hidden: sideThreadOpen,
+  });
+  /**
+   * Scrolls back to the subagent card, with its header in view when the card is taller than the chat.
+   * The bar that had focus goes away, so focus goes to the card header.
+   */
+  const revealSubagents = async () => {
+    const cardId = subagentDock.cardId();
+    if (!cardId) return;
+    const row = await replyJump.reveal(cardId, undefined, props.agent?.id);
+    const header = row?.querySelector<HTMLElement>(".subagents-group-header");
+    header?.scrollIntoView({ block: "nearest" });
+    header?.focus({ preventScroll: true });
+  };
   const rail = createChatScrollRail({
     rows: timelineMessages,
     // A change the person made in the app, such as to a routine, is a marker, not a message they wrote.
@@ -531,11 +566,11 @@ export function ConversationTimeline() {
   });
   const showAgentSteps = useShowAgentSteps();
   const traceKeyboard = currentDevicePlatform() === "darwin" ? "mac" : "pc";
-  /** The trace that the steps row above an answer opens. */
-  const traceAbove = (messageId: string | undefined): AgentStepsTrace => ({
+  /** The trace that the steps row of an answer opens. A channel names the agent that answered. */
+  const traceAbove = (messageId: string | undefined, agentName?: string): AgentStepsTrace => ({
     spans: () =>
       turnSteps.traceAbove(messageId, {
-        agent: props.agent?.name ?? t("chat.message.agentFallback"),
+        agent: agentName ?? props.agent?.name ?? t("chat.message.agentFallback"),
         thinking: t("chat.trace.step.thinking"),
         answer: t("chat.trace.step.answer"),
         progress: sourceText,
@@ -611,10 +646,17 @@ export function ConversationTimeline() {
         />
       </Show>
 
+      <SubagentDock
+        subagents={subagentDock.subagents()}
+        cardHeader={subagentDock.cardHeader}
+        onReveal={() => void revealSubagents()}
+      />
+
       <div
         class={["conversation-scroll", scrollFades.classes(), { "conversation-covered": sideThreadOpen() }]}
         inert={sideThreadOpen()}
         ref={(element) => {
+          timelineScrollElement = element;
           setScrollElement(element);
           rail.ref(element);
         }}
@@ -624,6 +666,7 @@ export function ConversationTimeline() {
           updateScrollFade(element);
           updateUnreadDividerVisibility();
           replyJump.updateReturnVisibility();
+          subagentDock.update();
         }}
       >
         <ChatScrollRail {...rail.props} />
@@ -727,9 +770,15 @@ export function ConversationTimeline() {
                   const current = message();
                   const sender = otherSender(current);
                   if (sender) return memberAuthor(sender);
-                  if (current?.author === "you") return { kind: "you", name: t("chat.message.you") };
+                  if (current?.author === "you")
+                    return { kind: "you", name: t("chat.message.you"), chatColor: ownChatColor() };
                   if (channel && current) return channel.author(current);
-                  return { kind: "agent", name: props.agent?.name ?? t("chat.message.agentFallback") };
+                  // The profile gives the row the agent's color, for the name and the bubble tint.
+                  return {
+                    kind: "agent",
+                    name: props.agent?.name ?? t("chat.message.agentFallback"),
+                    agent: props.agent,
+                  };
                 });
                 const referencedMessage = createMemo(() => {
                   const replyToMessageId = message()?.replyToMessageId;
@@ -757,9 +806,23 @@ export function ConversationTimeline() {
                   const current = message();
                   return current?.author === "agent" ? current.senderAgentId : undefined;
                 };
+                // A bare file name can be a file that the same turn attached, from a subfolder or a tool
+                // that reports no path. It opens when the workspace has no such file (#5189).
+                const turnAttachment = (path: string) => {
+                  const turnId = message()?.turnId;
+                  if (!turnId || /[/\\]/u.test(path)) return undefined;
+                  const matches = timelineMessages()
+                    .filter((candidate) => candidate.turnId === turnId)
+                    .flatMap((candidate) => candidate.attachments ?? [])
+                    .filter((attachment) => attachment.name === path);
+                  return matches.length === 1 ? matches[0] : undefined;
+                };
                 // A row the host has not drawn yet has no reactions, replies or menu: its id is not the
                 // host's, even after the host answered.
                 const hostless = createMemo(() => message()?.id.startsWith(PENDING_SEND_ID_PREFIX) === true);
+                // The text before a waiting question is a step of the turn (#4897). A step keeps no
+                // reaction, reply or menu, and the row goes back into the steps after the answer.
+                const turnStep = createMemo(() => message()?.itemType === "commentary");
                 const pendingSend = createMemo(() => {
                   const send = pendingSendFor(message()?.id);
                   return send && send.state !== "sent" ? send : undefined;
@@ -856,7 +919,7 @@ export function ConversationTimeline() {
                                                 )}
                                                 onSelectAgent={props.onSelectAgent}
                                                 onOpenRoutine={openRoutineSettings}
-                                                openRoutineThread={props.threads?.routineThread}
+                                                openRoutineThread={openRoutineThread}
                                                 onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
                                                 onToggleRoutineRun={toggleRoutineRun}
                                                 onToggleAgentMessage={toggleAgentMessage}
@@ -1184,6 +1247,25 @@ export function ConversationTimeline() {
                     if (currentMessage) void copyMessage(currentMessage);
                   },
                 };
+                // A channel shows an agent's actions beside the answer. Its steps show only with them, and
+                // they open only the trace.
+                const stepsInRow = () => Boolean(channel) && author().kind === "agent" && !message()?.questionPrompt;
+                const stepsDisclosure = () => (
+                  <Show when={turnSteps.stepsAbove(message()?.id)}>
+                    {(steps) => (
+                      <AgentStepsDisclosure
+                        steps={steps()}
+                        defaultOpen={showAgentSteps()}
+                        list={!stepsInRow()}
+                        trace={traceAbove(
+                          message()?.id,
+                          channel && author().kind === "agent" ? author().name : undefined,
+                        )}
+                        facts={turnSteps.factsAbove(message()?.id)}
+                      />
+                    )}
+                  </Show>
+                );
                 const messageReadAloud = () =>
                   spokenReplyIds().has((message() ?? initialMessage).id)
                     ? undefined
@@ -1219,17 +1301,8 @@ export function ConversationTimeline() {
                         }}
                       />
                     </Show>
-                    <Show when={turnSteps.stepsAbove(message()?.id)}>
-                      {(steps) => (
-                        <ChatRowBoundary>
-                          <AgentStepsDisclosure
-                            steps={steps()}
-                            defaultOpen={showAgentSteps()}
-                            trace={traceAbove(message()?.id)}
-                            facts={turnSteps.factsAbove(message()?.id)}
-                          />
-                        </ChatRowBoundary>
-                      )}
+                    <Show when={!stepsInRow() && turnSteps.stepsAbove(message()?.id)}>
+                      <ChatRowBoundary>{stepsDisclosure()}</ChatRowBoundary>
                     </Show>
                     <ChatRowBoundary>
                       <Show
@@ -1245,6 +1318,8 @@ export function ConversationTimeline() {
                                 : undefined
                             }
                             showTime={!continuesRun()}
+                            steps={stepsInRow() ? stepsDisclosure() : undefined}
+                            actionsBeside={stepsInRow()}
                             animate={animateEntrance}
                             agents={props.agents}
                             skills={installedSkills()}
@@ -1266,10 +1341,12 @@ export function ConversationTimeline() {
                             onOpenSharedFile={openSharedFile}
                             onOpenWorkspaceFile={
                               workspaceAgentId()
-                                ? (path) => openWorkspaceFile(path, undefined, workspaceAgentId())
+                                ? (path) =>
+                                    openWorkspaceFile(path, undefined, workspaceAgentId(), "tab", turnAttachment(path))
                                 : undefined
                             }
                             onOpenQuote={openQuote}
+                            onOpenTag={openTaggedReference}
                             onDownload={(attachment) => attachmentAction(attachment, "download")}
                             mediaSource={runtime.attachmentMedia}
                             downloads={attachmentDownloads}
@@ -1309,7 +1386,7 @@ export function ConversationTimeline() {
                                     }}
                                   />
                                 </Show>
-                                <Show when={!hostless()}>
+                                <Show when={!hostless() && !turnStep()}>
                                   <MessageActions
                                     message={message() ?? initialMessage}
                                     pickerOpen={openReactionMessageId() === message()?.id}
@@ -1339,7 +1416,7 @@ export function ConversationTimeline() {
                               </>
                             }
                             menu={
-                              hostless()
+                              hostless() || turnStep()
                                 ? undefined
                                 : () => (
                                     <MessageMenu

@@ -4,8 +4,6 @@ import type { messages as source } from "../en/uiBlock";
 export const messages = {
   "uiBlock.status.pending": "需要你回答",
   "uiBlock.status.answered": "已回答",
-  "uiBlock.status.expired": "已过期",
-  "uiBlock.status.closed": "已关闭",
   "uiBlock.outcome.expired": "超时未回答",
   "uiBlock.outcome.closed": "未回答即关闭",
   "uiBlock.outcome.autoAnswered": "{outcome}（无人及时回答）",
@@ -13,6 +11,7 @@ export const messages = {
   "uiBlock.confirm.prompt": "确认：{action}？",
   "uiBlock.confirm.accept": "确认",
   "uiBlock.confirm.autoActionLabel": "{action} · {seconds} 秒",
+  "uiBlock.confirm.autoActionClock": "{action} · {time}",
   "uiBlock.confirm.previewLabel": "预览",
   "uiBlock.confirm.showFullPreview": "显示全部",
   "uiBlock.confirm.hideFullPreview": "收起",

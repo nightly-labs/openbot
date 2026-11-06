@@ -181,6 +181,7 @@ export const messages = {
   "chat.awaiting.needsYou": "{name} يحتاج إليك",
   "chat.awaiting.limited": "{name} ينتظر انتهاء حد الاستخدام",
   "chat.awaiting.dismiss": "إخفاء هذه القائمة",
+  "chat.awaiting.stop": "إيقاف",
   "chat.waits.label": "الانتظارات المفتوحة",
   "chat.waits.title": {
     zero: "لا انتظارات مفتوحة",
@@ -505,6 +506,9 @@ export const messages = {
   "chat.voice.pauseReading": "إيقاف القراءة مؤقتًا",
   "chat.voice.resumeReading": "استئناف القراءة",
   "chat.voice.position": "موضع التشغيل",
+  "chat.voice.speed": "سرعة التشغيل",
+  "chat.voice.speedLabel": "سرعة التشغيل: {speed}×",
+  "chat.voice.speedValue": "{speed}×",
   "chat.voice.positionValue": "{elapsed} من {duration}",
   "chat.voice.duration": "{minutes}:{seconds}",
   "chat.voice.playFailed": "تعذّر تشغيل الرسالة الصوتية",
@@ -576,4 +580,8 @@ export const messages = {
   "chat.compaction.failed": "تعذّر ضغط السياق",
   "chat.compaction.tokens": "{before} → {after} رمز",
   "chat.compaction.continues": "تتابع الرسائل في قائمة الانتظار.",
+  "chat.reference.kind.tab": "علامة تبويب المتصفح",
+  "chat.reference.kind.thread": "سلسلة",
+  "chat.reference.open.tab": "إظهار علامة تبويب المتصفح {name}",
+  "chat.reference.open.thread": "فتح السلسلة {name}",
 } as const satisfies PartialTranslation<typeof source>;

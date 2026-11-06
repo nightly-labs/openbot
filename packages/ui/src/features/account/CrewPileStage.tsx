@@ -90,6 +90,7 @@ function playFilm(
   show: (index: number, face: CrewFace) => void,
 ): CrewPlayer {
   const intro: { animation: Animation; element: HTMLElement; keyframes: readonly Keyframe[]; exit?: Keyframe[] }[] = [];
+  const breaths: Animation[] = [];
   let exit: Animation[] = [];
   let exitDelay = 0;
   // Where the exit starts in the hop animations, in ms.
@@ -115,6 +116,7 @@ function playFilm(
       iterations: Number.POSITIVE_INFINITY,
     });
     breath.startTime = start;
+    breaths.push(breath);
     rig.plush.style.visibility = "visible";
   });
 
@@ -169,6 +171,9 @@ function playFilm(
     },
     stop() {
       cancelAnimationFrame(request);
+      // An element that leaves the document keeps its Web Animations. The breath never ends, so
+      // without a cancel the closed screen stays in memory and the page renders each frame (#5144).
+      for (const animation of [...intro.map((track) => track.animation), ...breaths, ...exit]) animation.cancel();
     },
   };
 }

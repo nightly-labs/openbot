@@ -230,6 +230,18 @@ for a team invitation. The message is never sent in that case, so the app can
 ask again later. Namecheap Private Email allows 500 messages an hour for each
 mailbox, and every sign-in code and invitation spends that same quota.
 
+Production has a fallback: the `EMAIL_FALLBACK` `send_email` binding of Cloudflare Email Service.
+When SMTP surely did not send a message (a sender limit, a refusal of the sender or the message, or
+a connection that stopped before `DATA`), the Worker sends the same message through Cloudflare. It
+does not fall back after `smtp_delivery_unknown`, an invalid input or configuration, or a refused
+recipient. The fallback uses only the time left in the 25-second delivery budget of a sign-in code,
+and it does not start with less than 2 seconds left, as after three SMTP timeouts. When
+Cloudflare also fails, the answer stays the SMTP failure, so a sender limit keeps its 429. Each
+fallback sends an `email_fallback_sent` analytics event. Before the first deploy with the binding,
+onboard `openbot.run` in the Cloudflare dashboard under Email Sending, and keep
+`allowed_sender_addresses` equal to `EMAIL_FROM` and `EMAIL_LICENSE_FROM`. The preview and test
+Workers have no fallback.
+
 The contact form on `/contact` posts to `/v1/contact`. The Worker sends each message to
 `EMAIL_FROM` through SMTP, with the visitor's address in `Reply-To`, and stores nothing.
 The D1 counter of sign-in allows 3 messages for each IP address and 15 in total in each 15-minute
@@ -261,9 +273,11 @@ code.
 
 `/v1/sites` takes two optional headers: `OpenBot-Host-Id` and `OpenBot-Host-Token`, the machine token
 of a registered server. With them, a request sees only that server's sites, and a new site counts
-against the server plan's limit. A wrong token gets 401 `host_unauthorized`. Without them, a new site
-goes into the account's unlinked bucket of one site; `GET /v1/sites?scope=unlinked` lists only that
-bucket. `GET /v1/sites` returns `{ sites, limit, used }`.
+against the server's limit: a `server_site_limits` row, else its plan's limit, else the account's shared
+pool (3 sites for each license user, else 1), within an account cap of 300. A wrong token gets 401
+`host_unauthorized`. Without them, a new site goes into the account's unlinked bucket of one site;
+`GET /v1/sites?scope=unlinked` lists only that bucket. `GET /v1/sites` returns `{ sites, limit, used }`, plus an optional `limitReason`: `shared` for a
+server in the shared pool, `account` when the account cap is full.
 
 ## Authentication data retention
 

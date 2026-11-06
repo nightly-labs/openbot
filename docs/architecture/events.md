@@ -246,8 +246,10 @@ owner or admin changes a Slack node (`route-workflows.ts`).
 - Workflow GitHub triggers and outputs: the `workflows` IPC group and the `workflows-github-v1` Team
   API capability (`WORKFLOWS_GITHUB_ROUTES`: catalog, options, history, run with last event). All
   routes need a host administrator. A client without the capability does not offer GitHub.
-- Workflow Discord, Telegram and Slack triggers and outputs: no route of their own. Only the desktop that
-  hosts the workflows offers them, and the `workflows-v1` graph save refuses a change from a member.
+- Workflow Discord, Telegram and Slack triggers and outputs: no route of their own, and the `workflows-v1`
+  graph save refuses a change from a member. The desktop that hosts the workflows offers all three. With
+  `workflows-chats-v1`, an owner or admin of a joined server also adds and changes Telegram and Slack
+  nodes, with the chats and channels of the `routine-results-v1` options.
 - Desktop and web use the shared routine editor components in
   `packages/ui/src/features/conversation`. Mobile uses native components in
   `apps/mobile/src/features/agents/components`.

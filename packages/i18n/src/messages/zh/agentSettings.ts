@@ -138,10 +138,6 @@ export const messages = {
 
   "agentSettings.runtime.model": "助手模型",
   "agentSettings.runtime.modelUnavailable": "助手 CLI 连接后即可选择模型。",
-  "agentSettings.runtime.reasoning": "推理",
-  "agentSettings.runtime.reasoningLabel": "助手推理强度",
-  "agentSettings.runtime.selectReasoning": "选择推理强度",
-  "agentSettings.runtime.reasoningSetByProvider": "由 {provider} 决定",
   "agentSettings.runtime.access": "访问权限",
   "agentSettings.runtime.accessLabel": "助手访问权限",
   "agentSettings.runtime.busyMessage": "忙碌时",
@@ -212,8 +208,7 @@ export const messages = {
   "agentSettings.agentNewChat.title": "助手自行开始新对话",
   "agentSettings.agentNewChat.description": "对话变长时，让助手自行开始新对话。它会先保存笔记。",
   "agentSettings.quickAcknowledgement.title": "长任务开始前显示计划",
-  "agentSettings.quickAcknowledgement.description":
-    "长任务开始前，助手会先显示计划。10 秒后或你点按“开始”时，任务开始。",
+  "agentSettings.quickAcknowledgement.description": "长任务开始前，助手会先显示计划。",
   "agentSettings.browserProfile.label": "浏览器配置文件",
   "agentSettings.browserProfile.shared": "共享",
   "agentSettings.browserProfile.agent": "仅该助手",

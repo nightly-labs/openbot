@@ -5,6 +5,8 @@ import { Effect } from "effect";
 import {
   agentProviderDescriptor,
   agentProviderName,
+  type DownloadableProviderId,
+  isDownloadableProvider,
   isManagedRuntimeProvider,
   type ManagedProviderId,
 } from "@openbot/contracts/agent-providers";
@@ -162,8 +164,10 @@ export function providerIpcHandlers({
     },
     providerRuntimes: {
       getStatus: handler(() => providerRuntimes.getStatus()),
-      download: payloadHandler(parseManagedProviderId, (parsed) => runCauseEffect(providerRuntimes.download(parsed))),
-      cancel: payloadHandler(parseManagedProviderId, (parsed) => runCauseEffect(providerRuntimes.cancel(parsed))),
+      download: payloadHandler(parseDownloadableProviderId, (parsed) =>
+        runCauseEffect(providerRuntimes.download(parsed)),
+      ),
+      cancel: payloadHandler(parseDownloadableProviderId, (parsed) => runCauseEffect(providerRuntimes.cancel(parsed))),
       measureDownload: payloadHandler(parseManagedProviderId, (parsed) =>
         runCauseEffect(providerRuntimes.measureDownload(parsed)),
       ),
@@ -198,9 +202,16 @@ export function parseProviderApiKeyInput(value: unknown): SetProviderApiKeyInput
   return { provider, key: value.key.trim() };
 }
 
-export function parseManagedProviderId(value: unknown): ManagedProviderId {
+function parseManagedProviderId(value: unknown): ManagedProviderId {
   const provider = parseProviderId(value);
   if (!isManagedRuntimeProvider(provider)) throw new Error("OpenBot does not manage this provider's CLI.");
+  return provider;
+}
+
+/** A managed runtime, or a provider that OpenBot installs with the provider's own installer. */
+export function parseDownloadableProviderId(value: unknown): DownloadableProviderId {
+  const provider = parseProviderId(value);
+  if (!isDownloadableProvider(provider)) throw new Error("OpenBot does not manage this provider's CLI.");
   return provider;
 }
 

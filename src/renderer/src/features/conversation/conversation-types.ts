@@ -113,6 +113,8 @@ export interface ConversationChannelSource {
   interactionAgentName: () => string | undefined;
   /** The agents that a lead asked and that did not reply yet. */
   awaitingReplies: () => readonly AwaitingReplyItem[];
+  /** Stops the sub-task of an awaiting row, with the run below it. It does nothing while the channel is read-only. */
+  stopAwaitingReply?: ((taskId: string) => void) | undefined;
   HeaderTitle: (props: { onOpenSettings: () => void }) => JSX.Element;
   SettingsPane: (props: ConversationChannelSettingsPaneProps) => JSX.Element;
   /** Shows above the composer: the stopped tasks, and why the channel cannot work. */
@@ -436,6 +438,8 @@ export interface ConversationThreads {
   side: SideThreads;
   /** The open side thread, or null for a new thread. Undefined while the agent's own chat is open. */
   open: AgentTask | null | undefined;
+  /** All side threads of the agent that the host lists, also the closed ones. */
+  tasks: readonly AgentTask[];
   /** How many side threads of the agent can run at the same time. */
   limit: number;
   /** The side threads that run a turn now. */
@@ -463,6 +467,8 @@ export interface ConversationThreads {
   onCompactContext?: (() => Promise<void>) | undefined;
   /** Missing when the host cannot move a queued message to a new thread. */
   onRunQueuedMessage?: ((deliveryId: string) => void) | undefined;
+  /** The actions of the queue of a side thread. Missing when the host sends no queue of a thread. */
+  queueActions?: ThreadQueueActions | undefined;
   /**
    * Copies a conversation through an agent answer into a new thread, and opens it: the agent's own
    * chat when `sourceTaskId` is null, or a side thread. Resolves true when the branch opened. Missing
@@ -486,6 +492,15 @@ export interface ConversationThreads {
   onOpenRoutineThread: (routineId: string) => Promise<boolean>;
   /** The message that a side thread scrolls to once, after a click on "Branched from". */
   focusMessage: { taskId: string; messageId: string; nonce: number } | null;
+}
+
+/** The actions of the queue of a side thread, as in the agent's own chat. An edit goes through the message box. */
+interface ThreadQueueActions {
+  cancel: (deliveryId: string) => void;
+  /** Gives a queued message to the running turn of `task`. */
+  steer: (task: AgentTask, deliveryId: string) => void;
+  /** Orders the queued messages of the thread `taskId`. */
+  reorder: (taskId: string, deliveryIds: string[]) => void;
 }
 
 /** The source of a branch: the agent's own chat, a side thread, or a side thread that was deleted. */

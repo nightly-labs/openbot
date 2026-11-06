@@ -104,6 +104,7 @@ export const messages = {
   "chat.awaiting.needsYou": "{name} sizi bekliyor",
   "chat.awaiting.limited": "{name} kullanım sınırını bekliyor",
   "chat.awaiting.dismiss": "Bu listeyi gizle",
+  "chat.awaiting.stop": "Durdur",
   "chat.waits.label": "Açık beklemeler",
   "chat.waits.title": { one: "{count} açık bekleme", other: "{count} açık bekleme" },
   "chat.waits.active": "{state}: {note}",
@@ -429,4 +430,8 @@ export const messages = {
   "chat.compaction.failed": "Bağlam sıkıştırılamadı",
   "chat.compaction.tokens": "{before} → {after} token",
   "chat.compaction.continues": "Kuyruktaki mesajlar devam ediyor.",
+  "chat.reference.kind.tab": "Tarayıcı sekmesi",
+  "chat.reference.kind.thread": "Mesaj dizisi",
+  "chat.reference.open.tab": "{name} tarayıcı sekmesini göster",
+  "chat.reference.open.thread": "{name} mesaj dizisini aç",
 } as const satisfies PartialTranslation<typeof source>;

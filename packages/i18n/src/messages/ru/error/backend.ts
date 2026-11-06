@@ -59,6 +59,8 @@ export const messages = {
   "error.backend.channelLeadModelUnavailable": "Модель ведущего канала недоступна.",
   "error.backend.contextCompactionIneffective":
     "Сжатие не уменьшает этот чат: после двух сжатий он всё ещё занимает {percent}% окна контекста модели, поэтому OpenBot перестаёт его сжимать. Большую часть окна занимают инструменты и инструкции. Отключите MCP-серверы или управление компьютером, которые не нужны этому агенту, или выберите модель с большим окном. Затем начните новый чат.",
+  "error.backend.contextCompactionStopped":
+    "Два сжатия этого чата подряд не удались, поэтому OpenBot больше не сжимает его автоматически. Каждая попытка отправляет весь чат модели и расходует лимит тарифа. Выберите «Сжать сейчас», чтобы попробовать снова, или начните новый чат.",
   "error.backend.providerRetrying":
     "Провайдер не выполнил этот запрос {attempts} раза и пробует снова. Если агент не продолжит, остановите ход.",
   "error.backend.providerRetryingLargeContext":
@@ -307,6 +309,17 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "Профиль браузера с таким названием уже существует.",
   "error.backend.browserSessionInUse": "Вкладка всё ещё использует этот сеанс браузера. Повторите попытку.",
   "error.backend.browserProfileLimit": "Можно создать не более {limit} профилей браузера.",
+  "error.backend.browserProxyNotFound": "Этот прокси больше не существует.",
+  "error.backend.browserProxyAddressInvalid":
+    "Введите адрес прокси, например socks5://host:1080 или http://user:password@host:3128.",
+  "error.backend.browserProxyLimit": "Можно создать не более {limit} прокси.",
+  "error.backend.browserProxyTaken": "Прокси с этим адресом уже существует.",
+  "error.backend.browserProxyChanged":
+    "Этот прокси изменился после того, как вы его открыли. Проверьте его ещё раз и повторите попытку.",
+  "error.backend.browserProxyUnreachable": "Прокси {name} не отвечает, поэтому страница не открылась.",
+  "error.backend.browserProxySignInRefused": "Прокси {name} отклонил вход, поэтому страница не открылась.",
+  "error.backend.browserProxyComputerUnreachable":
+    "Компьютер этого профиля не отвечает, поэтому страница не открылась.",
   "error.backend.browserLowMemory":
     "На этом сервере мало памяти, поэтому браузер не может открыть ещё одну вкладку. Закройте вкладку или дождитесь завершения работы других агентов.",
   "error.backend.browserOpenFailed": "Не удалось открыть {url}: {reason}",

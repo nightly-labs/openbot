@@ -148,10 +148,6 @@ export const messages = {
 
   "agentSettings.runtime.model": "Modèle de l’agent",
   "agentSettings.runtime.modelUnavailable": "Les modèles sont disponibles après la connexion d’une CLI d’agent.",
-  "agentSettings.runtime.reasoning": "Raisonnement",
-  "agentSettings.runtime.reasoningLabel": "Niveau de raisonnement de l’agent",
-  "agentSettings.runtime.selectReasoning": "Choisir le raisonnement",
-  "agentSettings.runtime.reasoningSetByProvider": "Selon {provider}",
   "agentSettings.runtime.access": "Accès",
   "agentSettings.runtime.accessLabel": "Accès de l’agent",
   "agentSettings.runtime.busyMessage": "Pendant le travail",
@@ -230,8 +226,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "L’agent peut démarrer une nouvelle discussion quand la sienne devient longue. Il enregistre d’abord des notes.",
   "agentSettings.quickAcknowledgement.title": "Montrer le plan avant les longues tâches",
-  "agentSettings.quickAcknowledgement.description":
-    "Avant une longue tâche, l’agent montre son plan. Il commence après 10 s ou quand vous appuyez sur Démarrer.",
+  "agentSettings.quickAcknowledgement.description": "Avant une longue tâche, l’agent montre son plan.",
   "agentSettings.browserProfile.label": "Profil de navigateur",
   "agentSettings.browserProfile.shared": "Partagé",
   "agentSettings.browserProfile.agent": "Cet agent uniquement",

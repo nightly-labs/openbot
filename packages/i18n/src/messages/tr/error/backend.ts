@@ -60,6 +60,8 @@ export const messages = {
   "error.backend.channelLeadModelUnavailable": "Kanal lideri modeli kullanılamıyor.",
   "error.backend.contextCompactionIneffective":
     "Sıkıştırma bu sohbeti küçültmüyor: iki sıkıştırmadan sonra hâlâ modelin bağlam penceresinin %{percent} kadarını kullanıyor, bu yüzden OpenBot sıkıştırmayı durduruyor. Pencerenin çoğunu araçlar ve talimatlar kullanıyor. Bu ajanın ihtiyaç duymadığı MCP sunucularını veya bilgisayar kullanımını kapatın ya da daha büyük pencereli bir model seçin. Ardından yeni bir sohbet başlatın.",
+  "error.backend.contextCompactionStopped":
+    'Bu sohbetin art arda iki sıkıştırması başarısız oldu, bu yüzden OpenBot onu otomatik olarak sıkıştırmayı bırakıyor. Her deneme tüm sohbeti modele gönderir ve plan sınırınızı kullanır. Yeniden denemek için "Şimdi sıkıştır"ı seçin veya yeni bir sohbet başlatın.',
   "error.backend.providerRetrying":
     "Sağlayıcı bu isteği {attempts} kez tamamlayamadı ve yeniden deniyor. Ajan devam etmezse turu durdurun.",
   "error.backend.providerRetryingLargeContext":
@@ -299,6 +301,16 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "Bu adla bir tarayıcı profili zaten var.",
   "error.backend.browserSessionInUse": "Bir sekme bu tarayıcı oturumunu hâlâ kullanıyor. Yeniden deneyin.",
   "error.backend.browserProfileLimit": "En fazla {limit} tarayıcı profiliniz olabilir.",
+  "error.backend.browserProxyNotFound": "Bu proxy artık yok.",
+  "error.backend.browserProxyAddressInvalid":
+    "socks5://host:1080 veya http://user:password@host:3128 gibi bir proxy adresi yazın.",
+  "error.backend.browserProxyLimit": "En fazla {limit} proxy'niz olabilir.",
+  "error.backend.browserProxyTaken": "Bu adrese sahip bir proxy zaten var.",
+  "error.backend.browserProxyChanged": "Bu proxy siz açtıktan sonra değişti. Yeniden kontrol edip tekrar deneyin.",
+  "error.backend.browserProxyUnreachable": "{name} proxy'si yanıt vermiyor, bu yüzden sayfa açılmadı.",
+  "error.backend.browserProxySignInRefused": "{name} proxy'si oturum açmayı reddetti, bu yüzden sayfa açılmadı.",
+  "error.backend.browserProxyComputerUnreachable":
+    "Bu profilin kullandığı bilgisayar yanıt vermiyor, bu yüzden sayfa açılmadı.",
   "error.backend.browserLowMemory":
     "Bu sunucunun belleği azaldı, bu nedenle tarayıcı başka bir sekme açamıyor. Bir sekmeyi kapatın veya diğer ajanların bitmesini bekleyin.",
   "error.backend.browserOpenFailed": "{url} açılamadı: {reason}",

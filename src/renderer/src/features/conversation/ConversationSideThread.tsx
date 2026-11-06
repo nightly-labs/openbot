@@ -12,9 +12,11 @@ import { actionToast } from "../../action-toast";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { toAgentMessages } from "../../app-message-projection";
 import { usePlatform } from "../../platform";
+import { deviceQuoteShortcut } from "../../send-shortcut-preference";
 import { latestVisibleAgentMessageId } from "./conversation-read-state";
 import { useConversationViewScope } from "./conversation-scope";
 import type { SideThread } from "./conversation-types";
+import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { createTurnSteps } from "./turn-steps";
 
 /**
@@ -32,7 +34,11 @@ export function ConversationSideThread(props: { threadId: string }) {
     installedSkills,
     installedSkillsLoadFailed,
     mcpServers,
+    taggableBrowserTabs,
+    taggableThreads,
+    openTaggedReference,
     threadComposer,
+    threadQueue,
     movePanelThreadToChat,
     copyMessage,
     copiedMessageId,
@@ -89,7 +95,11 @@ export function ConversationSideThread(props: { threadId: string }) {
   /** Sends the draft of this thread. Without its key, a send would take the draft of the chat's thread. */
   function sendSide(side: SideThread, text: string): Promise<boolean> {
     const key = draftKey();
-    return key ? threadComposer.send(side, text, key) : Promise.resolve(false);
+    if (!key) return Promise.resolve(false);
+    // While a queued message is in the message box, Send saves it in its place.
+    return threadQueue.editOf(side.task.id)
+      ? threadComposer.importsEnded(key).then(() => threadQueue.save(key))
+      : threadComposer.send(side, text, key);
   }
   /** The thread waits for an answer to a question or a takeover, which the chat tab of the thread shows. */
   const waitsForAnswer = () => {
@@ -100,6 +110,8 @@ export function ConversationSideThread(props: { threadId: string }) {
     waitsForAnswer() ? (
       <TaskAnswerCard agentName={view.agent?.name ?? ""} onAnswer={() => movePanelThreadToChat(props.threadId)} />
     ) : undefined;
+  /** Continue on a sign-in card goes to this thread, as the person's next message there. */
+  const mcpSignInCard = useThreadMcpSignInCard((body) => thread()?.onSend(body, [], null) ?? Promise.resolve(false));
   /** Branches this thread through an answer. The branch opens as a chat tab. */
   const branch = () => {
     if (!view.threads?.onBranch) return undefined;
@@ -121,6 +133,11 @@ export function ConversationSideThread(props: { threadId: string }) {
     const id = view.threads?.acceptsReplies ? draft()?.replyToMessageId : null;
     return id ? messages.find((message) => message.id === id) : undefined;
   };
+  /** Text selected in this thread goes to this thread, as a reply where the server takes one. */
+  const selectionActions = (side: SideThread) => ({
+    onSend: (messageId: string, body: string) => side.onSend(body, [], view.threads?.acceptsReplies ? messageId : null),
+    quoteShortcut: deviceQuoteShortcut(view.platform),
+  });
   /** Where this thread came from, when it is a branch. The agent's own chat shows the agent's name. */
   const branchSource = (side: SideThread, agentName: string): AgentThreadBranchSource | undefined => {
     const source = view.threads?.branchSource(side.task);
@@ -152,6 +169,9 @@ export function ConversationSideThread(props: { threadId: string }) {
             skills={installedSkills()}
             skillsLoadFailed={installedSkillsLoadFailed()}
             mcpServers={mcpServers()}
+            browserTabs={taggableBrowserTabs()}
+            threads={taggableThreads()}
+            onOpenTag={openTaggedReference}
             draft={draft()?.text ?? ""}
             draftAttachments={draft()?.attachments}
             rowAttachments={rowImages()}
@@ -179,6 +199,7 @@ export function ConversationSideThread(props: { threadId: string }) {
             onCompactContext={current().thread.onCompactContext}
             waitsForAnswer={waitsForAnswer()}
             attention={answerCard()}
+            messageCard={mcpSignInCard}
             stepsAbove={turnSteps.stepsAbove}
             factsAbove={turnSteps.factsAbove}
             activeSteps={turnSteps.activeSteps()}
@@ -192,6 +213,8 @@ export function ConversationSideThread(props: { threadId: string }) {
             onReply={reply()}
             replyTo={replyTo()}
             onCancelReply={() => threadComposer.setReply(draftKey(), null)}
+            queue={threadQueue.view(current().thread.task, draftKey())}
+            selectionActions={selectionActions(current().thread)}
           />
         )}
       </Show>

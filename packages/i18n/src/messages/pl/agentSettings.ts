@@ -165,10 +165,6 @@ export const messages = {
   "agentSettings.avatar.processFailed": "Nie udało się przetworzyć awatara agenta.",
   "agentSettings.runtime.model": "Model agenta",
   "agentSettings.runtime.modelUnavailable": "Modele będą dostępne po połączeniu CLI agenta.",
-  "agentSettings.runtime.reasoning": "Rozumowanie",
-  "agentSettings.runtime.reasoningLabel": "Poziom rozumowania agenta",
-  "agentSettings.runtime.selectReasoning": "Wybierz rozumowanie",
-  "agentSettings.runtime.reasoningSetByProvider": "Wg {provider}",
   "agentSettings.runtime.access": "Dostęp",
   "agentSettings.runtime.accessLabel": "Dostęp agenta",
   "agentSettings.runtime.busyMessage": "Podczas pracy",
@@ -262,8 +258,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "Agent może rozpocząć nowy czat, gdy jego czat staje się długi. Najpierw zapisuje notatki.",
   "agentSettings.quickAcknowledgement.title": "Pokaż plan przed długimi zadaniami",
-  "agentSettings.quickAcknowledgement.description":
-    "Przed długim zadaniem agent pokazuje swój plan. Zaczyna po 10 s lub po naciśnięciu Start.",
+  "agentSettings.quickAcknowledgement.description": "Przed długim zadaniem agent pokazuje swój plan.",
   "agentSettings.browserProfile.label": "Profil przeglądarki",
   "agentSettings.browserProfile.shared": "Wspólny",
   "agentSettings.browserProfile.agent": "Tylko ten agent",

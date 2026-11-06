@@ -1,8 +1,9 @@
 // The cards, contact info and API keys of the Vault, as agents use them. The main process implements
 // this port with the encrypted Vault file. Agents read logins through the `PasswordVault` port instead
-// (`list_logins` / `submit_secret`). Agents can add and change contacts, change the fields of a login
-// or card that are not secret, and delete items; a password or a card number gets in only from the
-// secure input or from the form of `request_vault_item`, which the user fills in.
+// (`list_logins` / `submit_secret`). Agents can add and change contacts, change the fields of a card
+// that are not secret, and delete items. An agent can save a password or an API key that it has, such
+// as one the user pasted in the chat; it never reads one back. A card number gets in only from the
+// form of `request_vault_item`, which the user fills in.
 
 import type {
   VaultCardBrand,
@@ -51,12 +52,12 @@ export interface VaultCardSecret {
 
 /**
  * A change that an agent asks for. A contact without `id` is new. A field that is not given keeps its
- * value; in a new contact it is empty. A login changes only its username, so that its password stays
- * bound to its website. A card changes only its fields that are not secret.
+ * value; in a new contact it is empty. A login changes its username and password, never its website,
+ * so that its password stays bound to its website. A card changes only its fields that are not secret.
  */
 export type VaultAgentChange =
   | { kind: "contact"; id?: string | undefined; fields: { [Key in keyof VaultContactFields]?: string | undefined } }
-  | { kind: "login"; id: string; username?: string | undefined }
+  | { kind: "login"; id: string; username?: string | undefined; password?: string | undefined }
   | {
       kind: "card";
       id: string;
@@ -81,6 +82,15 @@ export interface VaultTypedLogin {
   origin: string;
   username: string;
   password: string;
+}
+
+/** An API key that an agent saves. The Vault has one key for each name. */
+export interface VaultAgentApiKey {
+  /** The environment variable name, such as OPENAI_API_KEY. */
+  name: string;
+  key: string;
+  /** Replaces the saved notes when given. */
+  notes?: string | undefined;
 }
 
 /** A new login, card or contact that the user typed into the form of `request_vault_item`. */
@@ -117,6 +127,11 @@ export interface VaultItems {
     login: VaultTypedLogin,
     addedBy: string | undefined,
   ): Effect.Effect<VaultAgentResult & { created: boolean; changed: boolean }, PasswordVaultError>;
+  /** Adds the API key, or replaces the key of the saved item with its name. */
+  saveApiKey(
+    apiKey: VaultAgentApiKey,
+    addedBy: string | undefined,
+  ): Effect.Effect<VaultAgentResult & { created: boolean }, PasswordVaultError>;
   /**
    * Adds an item that the user typed. The values are checked as the Vault page checks them; a wrong
    * value fails with text that the user reads.

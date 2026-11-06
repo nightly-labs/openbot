@@ -1,11 +1,95 @@
 /* The transparent window on macOS. Main gives the main window the system blur and a clear
- * background, and sets `data-openbot-window-glass` on the root. Only the layers that make the page
- * change here: the frame, the content card and the pages that fill the card. The surface tokens do
- * not change, so dialogs, menus, tooltips, toasts, the composer and the cards stay solid. A browser
+ * background, and sets `data-openbot-window-glass` on the root. The frame, the content card and the
+ * pages that fill the card are clear tints. In the window, the surface tokens are translucent too,
+ * so the bubbles, tables, code blocks, cards, controls and the composer show the blur. Dialogs, menus,
+ * tooltips and toasts open outside `.app-window`, or in a popper inside it, and stay solid. A browser
  * tab, an iframe or a canvas stays opaque: CSS cannot make a native view clear. */
 :root[data-openbot-window-glass] {
   --window-glass-frame: color-mix(in srgb, var(--openbot-bg-frame) 20%, transparent);
-  --window-glass-card: color-mix(in srgb, var(--openbot-bg-canvas) 45%, transparent);
+  --window-glass-card: color-mix(in srgb, var(--openbot-bg-canvas) 30%, transparent);
+
+  /* The root resolves these from the solid tokens, and from a theme palette's inline tokens. */
+  --window-glass-canvas: color-mix(in srgb, var(--openbot-bg-canvas) 25%, transparent);
+  --window-glass-sidebar: color-mix(in srgb, var(--openbot-bg-sidebar) 25%, transparent);
+  --window-glass-frame-fill: color-mix(in srgb, var(--openbot-bg-frame) 30%, transparent);
+  --window-glass-sheet: color-mix(in srgb, var(--openbot-bg-sheet) 35%, transparent);
+  --window-glass-sheet-inset: color-mix(in srgb, var(--openbot-bg-sheet-inset) 25%, transparent);
+  --window-glass-grouped: color-mix(in srgb, var(--openbot-bg-grouped) 35%, transparent);
+  --window-glass-surface: color-mix(in srgb, var(--openbot-bg-surface) 35%, transparent);
+  --window-glass-surface-raised: color-mix(in srgb, var(--openbot-bg-surface-raised) 40%, transparent);
+  --window-glass-control: color-mix(in srgb, var(--openbot-bg-control) 35%, transparent);
+  --window-glass-control-hover: color-mix(in srgb, var(--openbot-bg-control-hover) 45%, transparent);
+  --window-glass-control-active: color-mix(in srgb, var(--openbot-bg-control-active) 55%, transparent);
+  --window-glass-tabs-bar: color-mix(in srgb, var(--openbot-tabs-bar-bg) 35%, transparent);
+  --window-glass-tabs-pill: color-mix(in srgb, var(--openbot-tabs-pill-bg) 45%, transparent);
+
+  /* The solid values, for the floating surfaces that open inside the window. */
+  --window-solid-canvas: var(--openbot-bg-canvas);
+  --window-solid-sidebar: var(--openbot-bg-sidebar);
+  --window-solid-frame: var(--openbot-bg-frame);
+  --window-solid-sheet: var(--openbot-bg-sheet);
+  --window-solid-sheet-inset: var(--openbot-bg-sheet-inset);
+  --window-solid-grouped: var(--openbot-bg-grouped);
+  --window-solid-surface: var(--openbot-bg-surface);
+  --window-solid-surface-raised: var(--openbot-bg-surface-raised);
+  --window-solid-control: var(--openbot-bg-control);
+  --window-solid-control-hover: var(--openbot-bg-control-hover);
+  --window-solid-control-active: var(--openbot-bg-control-active);
+  --window-solid-tabs-bar: var(--openbot-tabs-bar-bg);
+  --window-solid-tabs-pill: var(--openbot-tabs-pill-bg);
+}
+
+/* A token that the root derives from a surface token resolves there, so the window sets it again. */
+:root[data-openbot-window-glass] .app-window {
+  --openbot-bg-canvas: var(--window-glass-canvas);
+  --openbot-bg-sidebar: var(--window-glass-sidebar);
+  --openbot-bg-frame: var(--window-glass-frame-fill);
+  --openbot-bg-sheet: var(--window-glass-sheet);
+  --openbot-bg-sheet-inset: var(--window-glass-sheet-inset);
+  --openbot-bg-grouped: var(--window-glass-grouped);
+  --openbot-bg-surface: var(--window-glass-surface);
+  --openbot-bg-surface-raised: var(--window-glass-surface-raised);
+  --openbot-bg-control: var(--window-glass-control);
+  --openbot-bg-control-hover: var(--window-glass-control-hover);
+  --openbot-bg-control-active: var(--window-glass-control-active);
+  --openbot-tabs-bar-bg: var(--window-glass-tabs-bar);
+  --openbot-tabs-pill-bg: var(--window-glass-tabs-pill);
+  --openbot-queue-surface: var(--openbot-bg-surface);
+  --background: var(--openbot-bg-canvas);
+  --surface: var(--openbot-bg-surface);
+}
+
+/* A popper, a menu, a tooltip or a drag preview covers the chat, so it stays solid in the window. */
+:root[data-openbot-window-glass]
+  .app-window
+  :is(
+    [data-popper-positioner],
+    [role="dialog"],
+    [role="alertdialog"],
+    [role="menu"],
+    [role="listbox"],
+    [role="tooltip"],
+    .ui-popover-menu-surface,
+    .sidebar-agent-drag-preview,
+    .sidebar-person-drag-preview,
+    .sidebar-section-drag-preview
+  ) {
+  --openbot-bg-canvas: var(--window-solid-canvas);
+  --openbot-bg-sidebar: var(--window-solid-sidebar);
+  --openbot-bg-frame: var(--window-solid-frame);
+  --openbot-bg-sheet: var(--window-solid-sheet);
+  --openbot-bg-sheet-inset: var(--window-solid-sheet-inset);
+  --openbot-bg-grouped: var(--window-solid-grouped);
+  --openbot-bg-surface: var(--window-solid-surface);
+  --openbot-bg-surface-raised: var(--window-solid-surface-raised);
+  --openbot-bg-control: var(--window-solid-control);
+  --openbot-bg-control-hover: var(--window-solid-control-hover);
+  --openbot-bg-control-active: var(--window-solid-control-active);
+  --openbot-tabs-bar-bg: var(--window-solid-tabs-bar);
+  --openbot-tabs-pill-bg: var(--window-solid-tabs-pill);
+  --openbot-queue-surface: var(--openbot-bg-surface);
+  --background: var(--openbot-bg-canvas);
+  --surface: var(--openbot-bg-surface);
 }
 
 :root[data-openbot-window-glass] body {
@@ -56,6 +140,27 @@
   --agent-avatar-outline: transparent;
 }
 
+/* The ring filter of the sidebar faces floods the sidebar colour, which would be a halo on the clear
+ * sidebar. A row with its own hover or selected fill keeps the filter of that fill; a row under a drag
+ * has no hover fill. */
+:root[data-openbot-window-glass]
+  .app-window
+  > .app-frame-edge
+  > .sidebar
+  .agent-row:not(:hover, .agent-row-active)
+  .channel-avatar-cluster
+  .agent-avatar:has(> .bloub-avatar-svg image),
+:root[data-openbot-window-glass]
+  .app-window
+  > .app-frame-edge
+  > .sidebar
+  .agent-list[data-sidebar-dragging]
+  .agent-row:hover:not(.agent-row-active)
+  .channel-avatar-cluster
+  .agent-avatar:has(> .bloub-avatar-svg image) {
+  filter: none;
+}
+
 /* With no outline, faces that overlap would merge into one shape, so the channel title and the empty
  * state put them side by side. This also covers the title's hover fill, which has no clear part. */
 :root[data-openbot-window-glass]
@@ -93,7 +198,82 @@
   background: linear-gradient(to top, var(--window-glass-card) 28%, transparent 100%);
 }
 
+/* A sticky bar covers the rows that scroll under it. It keeps its clear tint and blurs the rows, so
+ * their text does not mix with its own. */
+:root[data-openbot-window-glass]
+  .app-window
+  :is(
+    .sidebar-folder > header,
+    .marketplace-skill-group-bar,
+    .agent-instructions-bar,
+    .trace-row[data-parent],
+    .trace-axis-row
+  ) {
+  backdrop-filter: blur(var(--openbot-space-4));
+}
+
+/* A workflow node covers the connections and the nodes under it, so the node cards stay solid on the
+ * clear canvas. */
+:root[data-openbot-window-glass] .app-window .wfn-stage {
+  --wfn-card: var(--window-solid-canvas);
+  --wfn-field: var(--window-solid-surface-raised);
+  --wfn-port: color-mix(in srgb, var(--openbot-text-primary) 10%, var(--window-solid-canvas));
+}
+
+:root[data-openbot-window-glass][data-openbot-color-scheme="light"] .app-window .wfn-stage {
+  --wfn-card: var(--window-solid-surface);
+  --wfn-field: var(--window-solid-control-hover);
+}
+
 /* The full-bleed browser covers the window with its own frame and card. */
 :root[data-openbot-window-glass] .browser-full-view {
   background: var(--window-glass-frame);
+}
+
+/* The surfaces in a bubble with a chat colour are clear here, so the tint of the bubble shows through them
+ * already. They keep the clear values; a mix with the chat colour would tint them twice. */
+:root[data-openbot-window-glass] .app-window .ui-bubble.message-bubble-colored > .ui-bubble-content {
+  --openbot-bg-canvas: var(--window-glass-canvas);
+  --openbot-bg-sidebar: var(--window-glass-sidebar);
+  --openbot-bg-surface: var(--window-glass-surface);
+  --openbot-bg-surface-raised: var(--window-glass-surface-raised);
+  --openbot-bg-control: var(--window-glass-control);
+  --openbot-bg-control-hover: var(--window-glass-control-hover);
+  --openbot-bg-control-active: var(--window-glass-control-active);
+}
+
+/* A chat colour is solid, so a mix with the clear surface would make the bubble less clear than the
+ * others. The window mixes the colour into the solid surface, then gives the result the same alpha as
+ * the plain bubble of that kind. */
+:root[data-openbot-window-glass] .app-window .ui-bubble.message-bubble-member > .ui-bubble-content {
+  background: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--message-author-color, var(--openbot-accent)) 22%, var(--window-solid-surface-raised)) 40%,
+    transparent
+  );
+}
+
+:root[data-openbot-window-glass]
+  .app-window
+  .message-entry-agent
+  .ui-bubble-variant-muted.message-bubble-colored
+  > .ui-bubble-content {
+  background: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--message-chat-color) var(--message-bubble-tint-amount), var(--window-solid-surface)) 35%,
+    transparent
+  );
+}
+
+:root[data-openbot-window-glass]
+  .app-window
+  .message-entry-user
+  .ui-bubble.message-bubble-colored
+  > .ui-bubble-content {
+  background: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--message-chat-color) var(--message-bubble-tint-amount), var(--window-solid-surface-raised))
+      40%,
+    transparent
+  );
 }

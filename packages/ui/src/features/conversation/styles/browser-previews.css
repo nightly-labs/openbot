@@ -3,27 +3,10 @@
   display: none;
 }
 
-.browser-preview-header {
-  display: flex;
-  height: var(--left-header-height, 38px);
-  flex: 0 0 auto;
-  align-items: center;
-  gap: var(--openbot-space-1);
-  padding: 0 var(--openbot-space-3);
-  color: var(--openbot-text-secondary);
-}
-
-.browser-preview-header > span {
-  flex: 1;
-  font-size: var(--openbot-text-sm);
-}
-
-.browser-preview-header > .ui-button,
 .browser-preview-close {
   border-radius: var(--openbot-radius-sm);
 }
 
-.browser-preview-header > .ui-button:focus-visible,
 .browser-preview-close:focus-visible {
   outline: 1px solid var(--openbot-text-muted);
   outline-offset: 1px;
@@ -33,12 +16,6 @@
 .browser-preview-sidebar .ui-button:active:not(:disabled):not([data-disabled]) {
   background: var(--openbot-bg-control-active);
   color: var(--openbot-text-primary);
-}
-
-.browser-preview-header > .ui-button > svg {
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
-  stroke-width: var(--openbot-icon-stroke);
 }
 
 .browser-preview-list {
@@ -60,7 +37,7 @@
   width: var(--openbot-icon-lg);
   height: var(--openbot-icon-lg);
   color: var(--openbot-text-muted);
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .browser-preview-list > .browser-empty-state > svg {
@@ -321,9 +298,4 @@
 .browser-secret-card .browser-takeover-preview-viewport img {
   min-height: 0;
   object-fit: contain;
-}
-
-/* Collapse points to the end edge, where the panel is. */
-:dir(rtl) .side-panel-pane-close svg[class~="lucide-chevron-right"] {
-  transform: scaleX(-1);
 }

@@ -12,6 +12,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Result, Schema, type Scope } from "effect";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "../agent/routine-tools";
+import type { AttachmentOperationError } from "../attachment-effects";
 import { causeHelpers } from "../effect-boundary";
 import type { DeliveryContext, MailboxStore, MessagingOrigin } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
@@ -105,8 +106,9 @@ export interface MessagingOutbound {
     connectionId: string,
     target: MessageTarget,
     markdown: string,
+    files: MessagingAnswerFile[],
   ): Effect.Effect<
-    | { posted: true; messageId: string; url?: string }
+    | { posted: true; messageId: string; url?: string; skippedFiles?: string[] }
     | { error: string; failure: Exclude<MessagingPostFailure, "gone"> }
   >;
   /** A Discord output of a workflow: a reply, a post or a reaction. */
@@ -429,13 +431,15 @@ export class MessagingThreads {
 
   /**
    * One outbound tool call, from any turn of any agent. The arguments name the connection and the
-   * place; only an enabled connection of this host can take a post.
+   * place; only an enabled connection of this host can take a post. `openFiles` checks the files of a
+   * post under the calling agent's path rules, before the text is sent.
    */
   readonly outboundTool = Effect.fn("MessagingThreads.outboundTool")(function* (
     this: MessagingThreads,
     tool: string,
     args: unknown,
-  ): Effect.fn.Return<OpenBotToolResponse> {
+    openFiles: (paths: string[]) => Effect.Effect<MessagingAnswerFile[], AttachmentOperationError>,
+  ): Effect.fn.Return<OpenBotToolResponse, AttachmentOperationError> {
     const call = parseMessagingOutboundTool(tool, args);
     if ("error" in call) return openBotToolFailure(call.error);
     const enabled = this.store.connections().filter((record) => record.enabled);
@@ -463,6 +467,7 @@ export class MessagingThreads {
             record.connectionId,
             { platformChannelId: call.place, replyThreadId: call.replyTo },
             call.text,
+            call.files.length ? yield* openFiles(call.files) : [],
           );
     return "error" in answer ? openBotToolFailure(answer.error) : openBotToolResult(answer);
   });
@@ -480,7 +485,12 @@ export class MessagingThreads {
     if (!this.store.connection(connectionId)?.enabled) return { failure: "gone" };
     const outbound = this.#outbound;
     if (!outbound) return { failure: "not-running" };
-    const answer = yield* outbound.post(connectionId, { platformChannelId: placeId, replyThreadId: null }, markdown);
+    const answer = yield* outbound.post(
+      connectionId,
+      { platformChannelId: placeId, replyThreadId: null },
+      markdown,
+      [],
+    );
     return "error" in answer ? { failure: answer.failure } : answer;
   });
 
@@ -683,6 +693,9 @@ export class MessagingThreads {
       platform: connection?.platform ?? "slack",
       workspaceName: prompt.workspaceName ?? connection?.workspaceName ?? null,
       isDirect: link.isDirect,
+      // Only the "Message yourself" chat has the linked number as the author of a direct message:
+      // the owner's messages in other chats never reach OpenBot (`whatsapp-senders.ts`).
+      fromOwner: connection?.platform === "whatsapp" && link.isDirect && origin.authorId === connection.workspaceId,
       place: prompt.place,
       authorName: origin.authorName,
       authorId: origin.authorId,
@@ -947,7 +960,7 @@ export class MessagingThreads {
 }
 
 /** The same test the turn lifecycle uses for the answer of a turn. */
-function isAnswer(message: ConversationMessage): boolean {
+export function isAnswer(message: ConversationMessage): boolean {
   return (
     message.author === "assistant" &&
     message.itemType !== "commentary" &&

@@ -96,6 +96,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "{host}에서 {name} 로그인을 시작하는 중…",
   "provider.codeLogin.pageOpening": "{host}에서 {name} 로그인 페이지를 여는 중…",
   "provider.codeLogin.linkStep": "{name}에 로그인하세요. OpenBot이 알아서 이어서 진행해요.",
+  "provider.codeLogin.chatgptDeviceSetting":
+    "컴퓨터의 ChatGPT에서 보안 설정을 열고 Codex용 기기 코드 로그인을 켜세요. 회사 계정은 워크스페이스 관리자가 켜요.",
 
   "provider.useApp.title": "OpenBot 앱에서 {name} 연결",
   "provider.useApp.description":
@@ -121,6 +123,8 @@ export const messages = {
   "provider.picker.noModels": "{name}에서 사용할 수 있는 모델이 없어요.",
   "provider.picker.customEmpty":
     "OpenAI 호환 엔드포인트를 추가하세요. 이 컴퓨터의 모델 서버나 기본 URL과 키가 있는 서비스면 돼요.",
+  "provider.picker.customPending":
+    "엔드포인트의 모델을 아직 불러오지 않았어요. 제공자는 현재 작업이 끝난 후 모델을 읽어요.",
   "provider.picker.defaultModelLabel": "{name}, 기본",
   "provider.picker.usageLimit": "사용 한도에 도달했어요",
   "provider.picker.usageLimitWindow": "{window} 한도",
@@ -281,15 +285,10 @@ export const messages = {
   "provider.settings.turnOnFirst": "먼저 {name}을(를) 켜세요.",
   "provider.settings.makeDefault": "기본으로 지정",
   "provider.settings.useTitle": "{name} 사용",
-  "provider.settings.download": "다운로드",
-  "provider.settings.downloadedCli": "{name} CLI",
-  "provider.settings.downloadDetail": { other: "{version} · 버전 {count}개 · {size}" },
-  "provider.settings.downloadVersions": { other: "버전 {count}개 · {size}" },
-  "provider.settings.downloadAgain": "{name}을 켜면 OpenBot이 CLI를 다시 다운로드해요.",
-  "provider.settings.removeDownloadConfirm": "{size}를 삭제할까요?",
-  "provider.settings.removeDownloadKeeps": "계정, 로그인, 에이전트는 유지돼요.",
-  "provider.settings.removeDownload": "다운로드 삭제",
-  "provider.settings.removingDownload": "삭제 중…",
+  "provider.settings.deleteTitle": "{name} 삭제",
+  "provider.settings.deleteOn": "{name}을 끄고 OpenBot이 다운로드한 CLI를 삭제해요. 계정, 로그인, 에이전트는 유지돼요.",
+  "provider.settings.deleteOff":
+    "OpenBot이 {name}용으로 다운로드한 CLI({size})를 삭제해요. 계정, 로그인, 에이전트는 유지돼요.",
   "provider.settings.removeDownloadFailed": "다운로드를 삭제하지 못했어요.",
   "provider.settings.endpoints": "엔드포인트",
   "provider.settings.noEndpoints": "엔드포인트가 없어요.",

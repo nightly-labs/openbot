@@ -31,6 +31,10 @@ export const messages = {
     other:
       "Questo server ha raggiunto il limite di {count} siti attivi. Per pubblicare un altro sito, elimina un sito o usa un server cloud con un piano che ha più siti.",
   },
+  "error.site.sharedLimit":
+    "I server del tuo account senza piano condividono i loro siti attivi, e sono tutti in uso. Per pubblicare un sito qui, elimina un sito su uno di questi server, aggiungi utenti alla tua licenza o usa un server cloud con un piano che ha più siti.",
+  "error.site.accountLimit":
+    "Il tuo account ha il numero massimo di siti attivi su tutti i suoi server: {count}. Per pubblicare un altro sito, elimina un sito.",
   "error.site.unlinkedLimit": {
     one: "Questo computer non è un server, e il suo account ha raggiunto il limite di {count} sito attivo. Per pubblicare un altro sito, elimina un sito o usa un server cloud con un piano che ha più siti.",
     other:

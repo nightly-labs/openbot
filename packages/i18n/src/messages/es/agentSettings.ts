@@ -144,10 +144,6 @@ export const messages = {
   "agentSettings.avatar.processFailed": "No se pudo procesar el avatar del agente.",
   "agentSettings.runtime.model": "Modelo del agente",
   "agentSettings.runtime.modelUnavailable": "Los modelos estarán disponibles cuando se conecte una CLI de agente.",
-  "agentSettings.runtime.reasoning": "Razonamiento",
-  "agentSettings.runtime.reasoningLabel": "Nivel de razonamiento del agente",
-  "agentSettings.runtime.selectReasoning": "Seleccionar razonamiento",
-  "agentSettings.runtime.reasoningSetByProvider": "Según {provider}",
   "agentSettings.runtime.access": "Acceso",
   "agentSettings.runtime.accessLabel": "Acceso del agente",
   "agentSettings.runtime.busyMessage": "Durante el trabajo",
@@ -233,8 +229,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "Permite que el agente inicie un chat nuevo cuando su chat sea largo. Antes guarda notas.",
   "agentSettings.quickAcknowledgement.title": "Mostrar el plan antes de tareas largas",
-  "agentSettings.quickAcknowledgement.description":
-    "Antes de una tarea larga, el agente muestra su plan. Empieza tras 10 s o cuando pulsas Iniciar.",
+  "agentSettings.quickAcknowledgement.description": "Antes de una tarea larga, el agente muestra su plan.",
   "agentSettings.browserProfile.label": "Perfil del navegador",
   "agentSettings.browserProfile.shared": "Compartido",
   "agentSettings.browserProfile.agent": "Solo este agente",

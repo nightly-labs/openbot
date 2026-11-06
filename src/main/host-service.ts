@@ -42,6 +42,7 @@ import type {
 import {
   type AgentAccessLevel,
   conversationMessageSender,
+  isAvatarColor,
   type ServerAuditName,
   SIGNED_OUT_CHANNEL_MEMBER_ID,
 } from "@openbot/contracts/ipc";
@@ -109,6 +110,7 @@ interface HostServiceOptions {
   connectors?: ForwardedApiOptions["connectors"];
   onePasswordConnector?: ForwardedApiOptions["onePasswordConnector"];
   bitwardenConnector?: ForwardedApiOptions["bitwardenConnector"];
+  passwordManagers?: ForwardedApiOptions["passwordManagers"];
   vault?: ForwardedApiOptions["vault"];
   providerHostSignIns?: ForwardedApiOptions["providerHostSignIns"];
   providerAccounts?: ForwardedApiOptions["providerAccounts"];
@@ -138,7 +140,7 @@ interface HostServiceOptions {
   appVersion: string;
   store: TeamStore;
   agents: ForwardedApiOptions["agents"] &
-    Pick<AgentService, "adoptConversationReads" | "branchTask" | "markTaskRead" | "readTask">;
+    Pick<AgentService, "adoptConversationReads" | "branchTask" | "listTaskReads" | "markTaskRead" | "readTask">;
   agentsReady: NonNullable<ForwardedApiOptions["agentsReady"]>;
   skills: NonNullable<ForwardedApiOptions["skills"]>;
   sidebarLayout: NonNullable<ForwardedApiOptions["sidebarLayout"]>;
@@ -150,6 +152,12 @@ interface HostServiceOptions {
    * or writes them in the account directory.
    */
   localDevelopmentHost?: boolean;
+  /**
+   * A server on this computer: its owner is a password member that the desktop app logs in as, so a
+   * directory sync keeps the owner's row. It has no account session, so a name or logo change skips
+   * the account owner check and the account steps.
+   */
+  passwordOwner?: boolean;
   logDirectory?: string;
   removeLegacyRemoteDesktopCredential?: () => Effect.Effect<void, RemoteWorkflowError>;
   getSignedInUser: () => CentralAuthUser;
@@ -170,12 +178,15 @@ interface HostServiceOptions {
   createRemoteDesktopRuntime?: RemoteScreenGatewayCreateRuntime;
   getRemoteDesktopRuntimeCredentials?: () => Effect.Effect<{ username: string; password: string }, RemoteWorkflowError>;
   getRemoteDesktopDisplays?: () => RemoteDesktopDisplay[];
+  getRemoteDesktopDisplayScreenOrigin?: (displayId: string) => { x: number; y: number } | undefined;
   getRemoteDesktopIceServers?: () => Effect.Effect<RemoteDesktopIceServer[], RemoteWorkflowError>;
   /** Puts a remote desktop member's pasted text on this computer's clipboard. */
   writeRemoteDesktopClipboard?: (text: string) => void;
   platform?: "darwin" | "win32" | "linux";
   unattended?: boolean;
   teamWebRtcBridge?: TeamWebRtcBridge;
+  /** A device signed in as a membership, or (`null`) its session ended. Computer proxies use it. */
+  peerMemberChanged?: (peerId: string, membershipId: string | null) => void;
   /** Whether devices may connect to this computer only over a private network, such as Tailscale. */
   privateNetwork?: () => boolean;
   registerRemoteHost?: (input: {
@@ -314,6 +325,7 @@ export class HostService extends EventEmitter<HostEvents> {
         options.getRemoteDesktopRuntimeCredentials ??
         (() => Effect.succeed({ username: "openbot", password: "development-runtime-not-for-release" })),
       ...(options.getRemoteDesktopDisplays ? { getDisplays: options.getRemoteDesktopDisplays } : {}),
+      getDisplayScreenOrigin: options.getRemoteDesktopDisplayScreenOrigin,
       getIceServers:
         options.getRemoteDesktopIceServers ??
         (() => Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.host.iceServersMissing")) }))),
@@ -440,6 +452,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.connectors === undefined ? {} : { connectors: options.connectors }),
       ...(options.onePasswordConnector === undefined ? {} : { onePasswordConnector: options.onePasswordConnector }),
       ...(options.bitwardenConnector === undefined ? {} : { bitwardenConnector: options.bitwardenConnector }),
+      ...(options.passwordManagers === undefined ? {} : { passwordManagers: options.passwordManagers }),
       ...(options.vault === undefined ? {} : { vault: options.vault }),
       ...(options.providerHostSignIns === undefined ? {} : { providerHostSignIns: options.providerHostSignIns }),
       ...(options.providerAccounts === undefined ? {} : { providerAccounts: options.providerAccounts }),
@@ -547,6 +560,7 @@ export class HostService extends EventEmitter<HostEvents> {
             }
           },
           unknownMemberConnected: (membershipId) => this.#dispatch(this.#learnConnectedMember(membershipId)),
+          ...(options.peerMemberChanged ? { peerMemberChanged: options.peerMemberChanged } : {}),
           ...(options.verifyRemoteSessionTicket ? { verifyClientTicket: options.verifyRemoteSessionTicket } : {}),
           ...(options.privateNetwork ? { privateNetwork: options.privateNetwork } : {}),
         })
@@ -806,10 +820,14 @@ export class HostService extends EventEmitter<HostEvents> {
     function* (this: HostService, input: UpdateHostIdentityInput): Effect.fn.Return<HostStatus, RemoteWorkflowError> {
       const optionalRegisterRemoteHost = this.#options.registerRemoteHost;
       const optionalUpdateRemoteHostLogo = this.#options.updateRemoteHostLogo;
-      yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
+      // A server on this computer has no account session (#5092). Only the desktop app knows its
+      // owner password, and the Team API route already required an admin.
+      const passwordOwner = this.#options.passwordOwner === true;
+      if (!passwordOwner)
+        yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
       const identity = yield* this.#options.store.updateIdentity(input);
-      // Before anything is published: the store checked the account before it resolved, and a
-      // switch landing in this gap would show the previous account's name and logo.
+      // Before anything is published: the account was checked before the store resolved (except for
+      // a password owner), and a switch landing in this gap would show the previous account's name and logo.
       if (!this.#isActiveHost(identity.serverId)) return this.getStatus();
       this.#setStatus({
         serverName: identity.serverName,
@@ -817,6 +835,8 @@ export class HostService extends EventEmitter<HostEvents> {
         message: sourceText("status.host.identityUpdated"),
       });
       this.#api.refreshIdentity();
+      // The desktop app registers it for the account at each start, with the name of that start.
+      if (passwordOwner) return this.getStatus();
       const ownerMembershipId = yield* remoteDecode(() => this.#requiredOwnerMemberId());
       if (optionalRegisterRemoteHost) yield* this.#registerRemoteHost(optionalRegisterRemoteHost, ownerMembershipId);
       if (input.logo !== undefined && this.#isActiveHost(identity.serverId)) {
@@ -1218,6 +1238,7 @@ export class HostService extends EventEmitter<HostEvents> {
           email: member.email,
           name: member.name,
           avatarUrl: member.avatarUrl,
+          ...(isAvatarColor(member.chatColor) ? { chatColor: member.chatColor } : {}),
           role: member.role,
           createdAt: new Date(member.createdAt).toISOString(),
           disabled: member.status !== "active",
@@ -1309,6 +1330,11 @@ export class HostService extends EventEmitter<HostEvents> {
     return remoteDecode(() => this.#currentAgentReaderId()).pipe(
       Effect.flatMap((readerId) => this.#options.agents.branchTask(input, readerId)),
     );
+  }
+
+  /** This computer's reader's mark of each open side thread of an agent. */
+  listAgentTaskReads(agentId: string): AgentTaskReadState[] {
+    return this.#options.agents.listTaskReads(agentId, this.#currentAgentReaderId());
   }
 
   /** Moves this computer's reader's mark of a side thread, the mark that the member's other devices read. */
@@ -1617,12 +1643,30 @@ export class HostService extends EventEmitter<HostEvents> {
     by?: MemberAuditActor,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
     const before = this.#options.store.listStoredMembers();
-    const closed = yield* this.#options.store.syncRemoteDirectory(hostId, members);
+    const closed = yield* this.#options.store.syncRemoteDirectory(hostId, members, {
+      keepOwner: this.#options.passwordOwner === true,
+    });
     yield* this.#auditMembers(hostId, before, by);
-    if (closed.length === 0) return;
     for (const sessionId of closed) yield* this.#closeLocalSession(sessionId);
-    this.#api.refreshPresence();
+    // The presence change also sends the new member chat colors to each connected peer.
+    if (closed.length > 0 || memberChatColorsChanged(before, this.#options.store.listStoredMembers())) {
+      this.#api.refreshPresence();
+    }
   });
+
+  /**
+   * A server on this computer: the desktop app read the account directory after it changed a member.
+   * The sync closes the sessions that the directory no longer allows.
+   */
+  readonly applyAccountDirectory = Effect.fn("HostService.applyAccountDirectory")(
+    function* (this: HostService, members: RemoteDirectoryMember[]): Effect.fn.Return<void, RemoteWorkflowError> {
+      const hostId = this.#options.store.getIdentity()?.serverId;
+      if (!hostId) return;
+      yield* this.#syncRemoteDirectory(hostId, members);
+      this.#api.refreshPresence();
+    },
+    (operation) => this.#memberWrites.withPermit(operation),
+  ).bind(this);
 
   /**
    * A member who joined after this host read the account directory connects with no name here, so
@@ -2052,4 +2096,10 @@ function serverLogoUrl(version: string): string {
 function normalizeRemoteDesktopPlatform(platform: NodeJS.Platform): "darwin" | "win32" | "linux" {
   if (platform === "darwin" || platform === "win32") return platform;
   return "linux";
+}
+
+/** True when a directory sync changed the chat color of a member. */
+function memberChatColorsChanged(before: readonly TeamMemberSummary[], after: readonly TeamMemberSummary[]): boolean {
+  const previous = new Map(before.map((member) => [member.id, member.chatColor ?? null]));
+  return after.some((member) => (previous.get(member.id) ?? null) !== (member.chatColor ?? null));
 }

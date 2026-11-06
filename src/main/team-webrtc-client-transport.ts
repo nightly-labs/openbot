@@ -849,7 +849,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this.#hostProtocols.delete(hostId);
     this.#active.set(hostId, active);
     const closes = this.#closes.get(hostId) ?? 0;
-    this.#options.connectTrace?.begin(hostId);
+    const attemptId = this.#options.connectTrace?.begin(hostId);
     return yield* this.#connect(hostId, active, current?.sessionId || null, storedSession).pipe(
       Effect.tapError((failure) =>
         Effect.sync(() => {
@@ -868,7 +868,8 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       Effect.onExit((exit) => Deferred.done(done, exit)),
       Effect.onError(() =>
         Effect.sync(() => {
-          this.#options.connectTrace?.fail(hostId, active.cancelled ? "cancelled" : "error");
+          if (attemptId !== undefined)
+            this.#options.connectTrace?.fail(hostId, attemptId, active.cancelled ? "cancelled" : "error");
           if (this.#active.get(hostId) === active) this.#active.delete(hostId);
         }),
       ),

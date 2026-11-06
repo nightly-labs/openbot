@@ -116,6 +116,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "جارٍ بدء تسجيل الدخول إلى {name} على {host}…",
   "provider.codeLogin.pageOpening": "جارٍ فتح صفحة تسجيل الدخول إلى {name} على {host}…",
   "provider.codeLogin.linkStep": "سجّل الدخول إلى {name}. سيتابع OpenBot تلقائيًا.",
+  "provider.codeLogin.chatgptDeviceSetting":
+    "في ChatGPT على كمبيوتر، افتح إعدادات الأمان وفعّل تسجيل الدخول برمز الجهاز لـ Codex. في حساب العمل، يفعّله مسؤول مساحة العمل.",
   "provider.useApp.title": "توصيل {name} في تطبيق OpenBot",
   "provider.useApp.description":
     "يعود تسجيل الدخول إلى {name} إلى الحاسوب الذي بدأه، ولا يمكن لعلامة تبويب في المتصفح استقباله. وصّل {name} في تطبيق OpenBot. يُكمل التطبيق تسجيل الدخول تلقائيًا.",
@@ -139,6 +141,7 @@ export const messages = {
   "provider.picker.noModels": "لا تتوفر نماذج من {name}.",
   "provider.picker.customEmpty":
     "أضف نقطة نهاية متوافقة مع OpenAI — خادم نماذج على هذا الحاسوب، أو أي خدمة لها عنوان URL أساسي ومفتاح.",
+  "provider.picker.customPending": "لم يتم تحميل نماذج نقاط النهاية بعد. يقرأها المزوّد بعد توقف مهمته الحالية.",
   "provider.picker.defaultModelLabel": "{name}، الافتراضي",
   "provider.picker.usageLimit": "تم بلوغ حد الاستخدام",
   "provider.picker.usageLimitWindow": "حد {window}",
@@ -340,29 +343,11 @@ export const messages = {
   "provider.settings.turnOnFirst": "شغّل {name} أولًا.",
   "provider.settings.makeDefault": "تعيين كافتراضي",
   "provider.settings.useTitle": "استخدام {name}",
-  "provider.settings.download": "التنزيل",
-  "provider.settings.downloadedCli": "{name} CLI",
-  "provider.settings.downloadDetail": {
-    zero: "{version} · {size}",
-    one: "{version} · إصدار واحد · {size}",
-    two: "{version} · إصداران · {size}",
-    few: "{version} · {count} إصدارات · {size}",
-    many: "{version} · {count} إصدارًا · {size}",
-    other: "{version} · {count} إصدار · {size}",
-  },
-  "provider.settings.downloadVersions": {
-    zero: "لا إصدارات · {size}",
-    one: "إصدار واحد · {size}",
-    two: "إصداران · {size}",
-    few: "{count} إصدارات · {size}",
-    many: "{count} إصدارًا · {size}",
-    other: "{count} إصدار · {size}",
-  },
-  "provider.settings.downloadAgain": "عندما تشغّل {name}، ينزّل OpenBot واجهة CLI الخاصة به مرة أخرى.",
-  "provider.settings.removeDownloadConfirm": "إزالة {size}؟",
-  "provider.settings.removeDownloadKeeps": "تبقى الحسابات وبيانات تسجيل الدخول والوكلاء.",
-  "provider.settings.removeDownload": "إزالة التنزيل",
-  "provider.settings.removingDownload": "جارٍ الإزالة…",
+  "provider.settings.deleteTitle": "حذف {name}",
+  "provider.settings.deleteOn":
+    "يوقف {name} ويحذف واجهة CLI التي نزّلها OpenBot. تبقى الحسابات وبيانات تسجيل الدخول والوكلاء.",
+  "provider.settings.deleteOff":
+    "يحذف واجهة CLI التي نزّلها OpenBot لـ {name} ({size}). تبقى الحسابات وبيانات تسجيل الدخول والوكلاء.",
   "provider.settings.removeDownloadFailed": "تعذّرت إزالة التنزيل.",
   "provider.settings.endpoints": "نقاط النهاية",
   "provider.settings.noEndpoints": "لا نقاط نهاية.",

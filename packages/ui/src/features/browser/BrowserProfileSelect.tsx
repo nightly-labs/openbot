@@ -1,5 +1,16 @@
 import { type AvatarHue, BROWSER_PROFILE_NAME_MAX, type BrowserProfileSummary } from "@openbot/contracts/ipc";
-import { Button, Input, Plus, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Text } from "@openbot/ui";
+import {
+  Button,
+  Input,
+  Plus,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Text,
+  Waypoints,
+} from "@openbot/ui";
 import { createStore, Show } from "solid-js";
 import { useText } from "../../text";
 import { BrowserProfileDot } from "./BrowserProfileColor";
@@ -10,10 +21,15 @@ export type BrowserProfileChoice = string;
 /** The last option. It is never a value: choosing it opens the name field in the list. */
 const NEW_PROFILE = "new";
 
+/** `proxy`: the name of the profile's proxy. Absent for Automatic, and when the user cannot see proxies. */
+export type BrowserProfileSelectProfile = Pick<BrowserProfileSummary, "id" | "name" | "hue"> & {
+  proxy?: string | undefined;
+};
+
 interface BrowserProfileSelectProps {
   value: BrowserProfileChoice;
   /** Undefined while the profiles load. */
-  profiles: readonly Pick<BrowserProfileSummary, "id" | "name" | "hue">[] | undefined;
+  profiles: readonly BrowserProfileSelectProfile[] | undefined;
   onChange: (choice: BrowserProfileChoice) => void;
   /** Makes the profile and returns its id. The select then chooses it. */
   onCreate: (name: string) => Promise<string>;
@@ -28,6 +44,19 @@ interface BrowserProfileSelectState {
 }
 
 const CLOSED: BrowserProfileSelectState = { open: false, creating: false, name: "", busy: false, error: null };
+
+function BrowserProfileProxy(props: { name: string | undefined }) {
+  return (
+    <Show when={props.name}>
+      {(name) => (
+        <span class="browser-profile-select-proxy" title={name()}>
+          <Waypoints aria-hidden="true" />
+          <span>{name()}</span>
+        </span>
+      )}
+    </Show>
+  );
+}
 
 /**
  * The browser profile row of the agent settings. "New profile" at the end of the list changes into a
@@ -56,6 +85,9 @@ export function BrowserProfileSelect(props: BrowserProfileSelectProps) {
     if (!props.profiles) return "";
     return props.profiles.find((profile) => profile.id === choice)?.name ?? t("agentSettings.browserProfile.missing");
   }
+
+  const proxy = (choice: BrowserProfileChoice): string | undefined =>
+    props.profiles?.find((profile) => profile.id === choice)?.proxy;
 
   const hue = (choice: BrowserProfileChoice): AvatarHue | "shared" | undefined =>
     choice === "shared" ? "shared" : props.profiles?.find((profile) => profile.id === choice)?.hue;
@@ -122,6 +154,7 @@ export function BrowserProfileSelect(props: BrowserProfileSelectProps) {
                 <Show when={hue(item.item.rawValue)}>{(current) => <BrowserProfileDot hue={current()} />}</Show>
               </span>
               {label(item.item.rawValue)}
+              <BrowserProfileProxy name={proxy(item.item.rawValue)} />
             </SelectItem>
           }
         >
@@ -153,6 +186,7 @@ export function BrowserProfileSelect(props: BrowserProfileSelectProps) {
               <span class="browser-profile-select-value">
                 <Show when={hue(choice())}>{(current) => <BrowserProfileDot hue={current()} />}</Show>
                 {label(choice())}
+                <BrowserProfileProxy name={proxy(choice())} />
               </span>
             );
           }}

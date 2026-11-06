@@ -74,6 +74,9 @@ export const messages = {
   "sitePage.pricing.title": "أسعار OpenBot",
   "sitePage.pricing.description": "خوادم مستضافة وترخيص للفرق. OpenBot مجاني للاستخدام الشخصي على حاسوبك.",
   "sitePage.pricing.heading": "الأسعار",
+  "sitePage.pricing.personal.title": "الاستخدام الشخصي مجاني",
+  "sitePage.pricing.personal.body":
+    "كل الميزات، على حاسوبك، مع خطط الذكاء الاصطناعي التي تدفع لها من قبل. بلا خادم وبلا ترخيص.",
   "sitePage.pricing.enterprise.title": "المؤسسات",
   "sitePage.pricing.enterprise.body": "خوادم أكبر، أو أكثر من {count} عضو، أو أي شيء آخر تحتاجه. مع دعم المؤسسات.",
   "sitePage.pricing.enterprise.contact": "التواصل مع المبيعات",

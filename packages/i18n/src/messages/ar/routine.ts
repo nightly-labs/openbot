@@ -418,6 +418,7 @@ export const messages = {
   "routine.settings.missedPolicy": "إذا كان OpenBot مغلقًا في الوقت المجدول",
   "routine.settings.missedPolicy.skip": "تخطي هذا التشغيل",
   "routine.settings.missedPolicy.runOnce": "التشغيل مرة واحدة عند فتح OpenBot",
+  "routine.settings.runInThread": "التشغيل في سلسلة منفصلة",
   "routine.settings.resultDestination": "إرسال الإجابات إلى",
   "routine.settings.resultDestination.none": "هذه الدردشة فقط",
   "routine.settings.resultDestination.place": "{connection} · {place}",

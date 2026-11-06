@@ -20,7 +20,13 @@ export interface VoiceTranscriptionResult {
 }
 
 /** The local speech recognition models. Saved in `voice-preference.json`; never rename one. */
-export const LOCAL_VOICE_MODEL_IDS = ["parakeet-tdt-0.6b-v3", "bark-3.0-plus", "whisper-turbo"] as const;
+export const LOCAL_VOICE_MODEL_IDS = [
+  "parakeet-tdt-0.6b-v3",
+  "parakeet-unified-en-0.6b",
+  "bark-3.0-plus",
+  "whisper-turbo",
+  "cohere-transcribe-03-2026",
+] as const;
 export type LocalVoiceModelId = (typeof LOCAL_VOICE_MODEL_IDS)[number];
 
 /**
@@ -38,10 +44,15 @@ interface VoiceModelCapabilities {
   /** The product name. It is not translated. */
   name: string;
   /**
-   * True when the model takes a fixed language. Parakeet always finds the language itself, and Bark
-   * recognizes English only.
+   * True when the model takes a fixed language. Parakeet TDT always finds the language itself, and
+   * Parakeet Unified and Bark recognize English only.
    */
   supportsLanguage: boolean;
+  /**
+   * The only languages the model takes, when it cannot find the language itself. Without this
+   * list, a model that `supportsLanguage` takes every Whisper language and automatic.
+   */
+  languages?: readonly WhisperLanguage[];
   /**
    * True when the composer shows text while you speak. Whisper reads 30 s for each pass, so it
    * transcribes only after Stop.
@@ -55,6 +66,11 @@ export interface LocalVoiceModelInfo extends VoiceModelCapabilities {
   id: LocalVoiceModelId;
   /** The download size of all files. */
   bytes: number;
+  /**
+   * Not offered any more. A saved choice still works, and the settings show the model only while it
+   * is in use or downloaded, so that the user can remove its files.
+   */
+  retired?: true;
 }
 
 /** A model that runs at a provider. It is ready when its API key is saved. */
@@ -64,6 +80,24 @@ export interface CloudVoiceModelInfo extends VoiceModelCapabilities {
 }
 
 export type VoiceModelInfo = LocalVoiceModelInfo | CloudVoiceModelInfo;
+
+/** The languages of Cohere Transcribe. It does not find the language itself. */
+const COHERE_TRANSCRIBE_LANGUAGES = [
+  "ar",
+  "de",
+  "el",
+  "en",
+  "es",
+  "fr",
+  "it",
+  "ja",
+  "ko",
+  "nl",
+  "pl",
+  "pt",
+  "vi",
+  "zh",
+] as const satisfies readonly WhisperLanguage[];
 
 export const VOICE_MODELS: readonly VoiceModelInfo[] = [
   {
@@ -76,11 +110,21 @@ export const VOICE_MODELS: readonly VoiceModelInfo[] = [
   },
   {
     kind: "local",
+    id: "parakeet-unified-en-0.6b",
+    name: "Parakeet Unified EN 0.6B",
+    bytes: 663_043_117,
+    supportsLanguage: false,
+    livePreview: true,
+  },
+  {
+    kind: "local",
     id: "bark-3.0-plus",
     name: "Underdog Bark 3.0 Plus",
     bytes: 684_624_267,
     supportsLanguage: false,
     livePreview: true,
+    // Parakeet Unified EN is as fast, with punctuation and fewer errors.
+    retired: true,
   },
   {
     kind: "local",
@@ -88,6 +132,16 @@ export const VOICE_MODELS: readonly VoiceModelInfo[] = [
     name: "Whisper large-v3 turbo",
     bytes: 1_036_613_791,
     supportsLanguage: true,
+    livePreview: false,
+  },
+  {
+    kind: "local",
+    id: "cohere-transcribe-03-2026",
+    name: "Cohere Transcribe",
+    bytes: 2_888_052_036,
+    supportsLanguage: true,
+    languages: COHERE_TRANSCRIBE_LANGUAGES,
+    // A decode takes about three times as long as Parakeet, too long to repeat while you speak.
     livePreview: false,
   },
   {
@@ -257,6 +311,16 @@ export function isVoiceLanguage(value: unknown): value is VoiceLanguage {
 }
 
 /**
+ * The language that a model with its own `languages` uses: the saved language when the model
+ * takes it, else English. A model without the list uses the saved language.
+ */
+export function modelLanguage(model: VoiceModelInfo, language: VoiceLanguage): VoiceLanguage {
+  const languages = model.languages;
+  if (!languages) return language;
+  return languages.find((candidate) => candidate === language) ?? "en";
+}
+
+/**
  * Supertonic 3, the local model that reads replies aloud. Saved in `speech-preference.json` and
  * named in model statuses; never rename it.
  */
@@ -315,15 +379,107 @@ export type SpeechLanguage = (typeof SPEECH_LANGUAGES)[number];
 export const SPEECH_SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const;
 export type SpeechSpeed = (typeof SPEECH_SPEEDS)[number];
 
+/** The order in which a speed button goes through the speeds: from normal speed up, then the slower ones. */
+const SPEECH_SPEED_CYCLE: readonly SpeechSpeed[] = [
+  ...SPEECH_SPEEDS.filter((speed) => speed >= 1),
+  ...SPEECH_SPEEDS.filter((speed) => speed < 1),
+];
+
+/** The speed after `speed` on a speed button: 1×, 1.25×, 1.5×, 2×, 0.75×, then 1× again. */
+export function nextSpeechSpeed(speed: number): SpeechSpeed {
+  const index = SPEECH_SPEED_CYCLE.findIndex((step) => step === speed);
+  return SPEECH_SPEED_CYCLE[(index + 1) % SPEECH_SPEED_CYCLE.length] ?? 1;
+}
+
 export interface SpeechSettings {
   /** Read the reply to a dictated message aloud. */
   readReplies: boolean;
   voice: SpeechVoice;
   /** The speed of each reply that is read aloud. The pitch stays the same. */
   speed: SpeechSpeed;
+  /**
+   * A voice conversation with any agent on this computer uses Codex live voice: the Codex App Server
+   * connects the microphone to OpenAI's realtime model with the user's own Codex sign-in, and gives
+   * each spoken request to the agent's own provider.
+   */
+  codexLive: boolean;
+  /** The voice of Codex live voice. Null lets OpenAI choose. */
+  codexLiveVoice: CodexLiveVoice | null;
 }
 
-export const DEFAULT_SPEECH_SETTINGS: SpeechSettings = { readReplies: false, voice: "F1", speed: 1 };
+export const DEFAULT_SPEECH_SETTINGS: SpeechSettings = {
+  readReplies: false,
+  voice: "F1",
+  speed: 1,
+  codexLive: false,
+  codexLiveVoice: null,
+};
+
+/**
+ * The realtime v3 voices that Codex App Server's `realtime/listVoices` gives for a ChatGPT sign-in.
+ * Its list has no default v3 voice. The names are the voices' own names, in every language.
+ */
+export const CODEX_LIVE_VOICES = [
+  "juniper",
+  "maple",
+  "spruce",
+  "ember",
+  "vale",
+  "breeze",
+  "arbor",
+  "sol",
+  "cove",
+  "aube",
+  "bubbie",
+  "haetsal",
+  "hanul",
+  "himari",
+  "leher",
+  "miko",
+  "neer",
+  "porto",
+  "rindo",
+  "rio",
+  "rivage",
+  "selva",
+  "sonna",
+  "tinta",
+  "viola",
+] as const;
+export type CodexLiveVoice = (typeof CODEX_LIVE_VOICES)[number];
+
+/**
+ * The start of a Codex live voice session. `sdp` is the WebRTC offer of the renderer's peer
+ * connection: one audio track and the `oai-events` data channel.
+ */
+export interface VoiceLiveStart {
+  agentId: string;
+  sdp: string;
+}
+
+/** A live voice session that runs. `sdp` is the answer to the offer of `VoiceLiveStart`. */
+export interface VoiceLiveSession {
+  sessionId: string;
+  sdp: string;
+}
+
+export interface VoiceLiveStop {
+  sessionId: string;
+}
+
+/**
+ * What a live voice session sends while it runs. A transcript part with `final: false` is new text
+ * of the part that is spoken now; `final: true` gives the whole part. `ended` is the last event of a
+ * session; `error` is null when the user or the app ended it.
+ */
+export type VoiceLiveEvent =
+  | { type: "transcript"; sessionId: string; role: "user" | "assistant"; text: string; final: boolean }
+  | { type: "ended"; sessionId: string; error: string | null };
+
+export const VOICE_LIVE_LIMITS = {
+  /** A WebRTC offer of one audio track and one data channel is a few kilobytes. */
+  maximumSdpLength: 65_536,
+} as const;
 
 export interface SpeechModelStatus extends Omit<VoiceModelStatus, "modelId"> {
   modelId: SpeechModelId;
@@ -348,6 +504,10 @@ export interface SpeechAudio {
 
 export function isSpeechVoice(value: unknown): value is SpeechVoice {
   return isOneOf(SPEECH_VOICES, value);
+}
+
+export function isCodexLiveVoice(value: unknown): value is CodexLiveVoice {
+  return isOneOf(CODEX_LIVE_VOICES, value);
 }
 
 export function isSpeechSpeed(value: unknown): value is SpeechSpeed {

@@ -145,10 +145,6 @@ export const messages = {
   "agentSettings.avatar.processFailed": "Der Agentenavatar konnte nicht verarbeitet werden.",
   "agentSettings.runtime.model": "Agentenmodell",
   "agentSettings.runtime.modelUnavailable": "Modelle sind verfügbar, sobald sich eine Agenten-CLI verbindet.",
-  "agentSettings.runtime.reasoning": "Denkleistung",
-  "agentSettings.runtime.reasoningLabel": "Denkleistungsstufe des Agenten",
-  "agentSettings.runtime.selectReasoning": "Denkleistung auswählen",
-  "agentSettings.runtime.reasoningSetByProvider": "Von {provider}",
   "agentSettings.runtime.access": "Zugriff",
   "agentSettings.runtime.accessLabel": "Agentenzugriff",
   "agentSettings.runtime.busyMessage": "Während der Arbeit",
@@ -234,8 +230,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "Der Agent darf einen neuen Chat starten, wenn sein Chat lang wird. Er speichert vorher Notizen.",
   "agentSettings.quickAcknowledgement.title": "Plan vor langen Aufgaben zeigen",
-  "agentSettings.quickAcknowledgement.description":
-    "Vor einer langen Aufgabe zeigt der Agent seinen Plan. Er beginnt nach 10 s oder wenn du auf Start drückst.",
+  "agentSettings.quickAcknowledgement.description": "Vor einer langen Aufgabe zeigt der Agent seinen Plan.",
   "agentSettings.browserProfile.label": "Browser-Profil",
   "agentSettings.browserProfile.shared": "Gemeinsam",
   "agentSettings.browserProfile.agent": "Nur dieser Agent",

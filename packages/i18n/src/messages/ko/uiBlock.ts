@@ -4,8 +4,6 @@ import type { messages as source } from "../en/uiBlock";
 export const messages = {
   "uiBlock.status.pending": "답변 필요",
   "uiBlock.status.answered": "답변 완료",
-  "uiBlock.status.expired": "만료됨",
-  "uiBlock.status.closed": "종료됨",
   "uiBlock.outcome.expired": "제시간에 답변이 없었어요",
   "uiBlock.outcome.closed": "답변 없이 종료되었어요",
   "uiBlock.outcome.autoAnswered": "{outcome} (제시간에 답변한 사람이 없었어요)",
@@ -13,6 +11,7 @@ export const messages = {
   "uiBlock.confirm.prompt": "{action}을(를) 확인할까요?",
   "uiBlock.confirm.accept": "확인",
   "uiBlock.confirm.autoActionLabel": "{action} · {seconds}초",
+  "uiBlock.confirm.autoActionClock": "{action} · {time}",
   "uiBlock.confirm.previewLabel": "미리 보기",
   "uiBlock.confirm.showFullPreview": "모두 보기",
   "uiBlock.confirm.hideFullPreview": "간단히 보기",
