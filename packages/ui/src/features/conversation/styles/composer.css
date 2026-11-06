@@ -123,11 +123,11 @@
   min-height: 96px;
   gap: 4px;
   margin: 0 auto;
-  border: 0.5px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-lg);
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-xl);
   background: var(--openbot-bg-surface);
-  padding: 10px;
-  box-shadow: none;
+  padding: 12px;
+  box-shadow: var(--openbot-shadow-field);
   transition:
     border-color var(--openbot-duration-hover) var(--openbot-ease-out),
     box-shadow var(--openbot-duration-hover) var(--openbot-ease-out);
@@ -135,15 +135,17 @@
 
 .composer[data-compact] {
   grid-template-columns: 28px minmax(0, 1fr) auto;
-  min-height: 48px;
+  min-height: 52px;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 10px 12px;
 }
 
 .composer:focus-within {
-  border-color: var(--openbot-text-dim);
-  box-shadow: 0 0 0 3px var(--openbot-hover);
+  border-color: var(--openbot-accent);
+  box-shadow:
+    var(--openbot-shadow-field),
+    0 0 0 4px var(--openbot-accent-soft);
 }
 
 .composer:has(.composer-editor-surface[aria-disabled="true"]) {
@@ -474,21 +476,23 @@
 }
 
 .voice-button {
-  background: var(--openbot-text-primary);
-  color: var(--openbot-bg-sidebar);
+  background: var(--openbot-accent);
+  color: var(--openbot-text-on-accent);
+  box-shadow: var(--openbot-shadow-primary);
 }
 
 .voice-button-active {
-  background: var(--openbot-text-primary);
-  color: var(--openbot-bg-sidebar);
+  background: var(--openbot-accent);
+  color: var(--openbot-text-on-accent);
+  box-shadow: var(--openbot-shadow-primary);
 }
 
-/* Light circles only dim on hover. The ghost button hover is more specific and would turn them dark. */
+/* The cobalt circles deepen on hover. The ghost button hover is more specific and would clear them. */
 .voice-button:hover:not(:disabled),
 .voice-button.ui-button:hover:not(:disabled),
 .voice-morph .voice-recording-finish:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--openbot-text-primary) 84%, var(--openbot-bg-sidebar));
-  color: var(--openbot-bg-sidebar);
+  background: var(--openbot-accent-hover);
+  color: var(--openbot-text-on-accent);
 }
 
 .composer-input-label,

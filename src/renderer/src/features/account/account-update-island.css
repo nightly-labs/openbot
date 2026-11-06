@@ -144,11 +144,11 @@
   height: var(--openbot-control-sm);
   min-height: var(--openbot-control-sm);
   border-radius: var(--openbot-radius-sm);
-  background: var(--openbot-surface-light);
-  box-shadow: 0 1px 2px var(--openbot-shadow-popover-ambient);
+  background: var(--openbot-accent);
+  box-shadow: var(--openbot-shadow-primary);
   padding-block: 0;
   padding-inline: var(--openbot-space-2) var(--openbot-space-3);
-  color: var(--openbot-text-on-light);
+  color: var(--openbot-text-on-accent);
   transition:
     box-shadow var(--openbot-duration-normal) var(--openbot-ease-out),
     transform var(--openbot-duration-fast) var(--openbot-ease-out);
@@ -307,11 +307,9 @@
 
 @media (hover: hover) and (pointer: fine) {
   .account-update-island__action.ui-button:hover:not(:disabled):not([data-disabled]) {
-    background: var(--openbot-surface-light);
-    box-shadow:
-      0 0 0 1px var(--openbot-text-dim-on-light),
-      0 1px 2px var(--openbot-shadow-popover-ambient);
-    color: var(--openbot-text-on-light);
+    background: var(--openbot-accent-hover);
+    box-shadow: var(--openbot-shadow-primary);
+    color: var(--openbot-text-on-accent);
   }
 }
 

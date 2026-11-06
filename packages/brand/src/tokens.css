@@ -106,8 +106,8 @@
   --openbot-border: #1f1f1f;
   --openbot-border-strong: #2e2e2e;
   --openbot-image-outline: rgba(255, 255, 255, 0.1);
-  /* Focus is neutral: a grey border or a thin grey ring, never blue and never a halo. */
-  --openbot-border-focus: var(--openbot-text-muted);
+  /* Focus is the signature colour: a cobalt border and a soft cobalt halo (Glaze). */
+  --openbot-border-focus: var(--openbot-accent);
   --openbot-text-primary: #ededed;
   --openbot-text-on-light: #141414;
   --openbot-surface-light: #ededed;
@@ -287,16 +287,16 @@
    * an 11px size ended up paired with a 26px line-height. scripts/ui-foundation-check.ts
    * holds "untokenized font-size" at zero, so a size that is not here has nowhere to go. */
   --openbot-text-sm: 12px;
-  --openbot-text-md: 13px;
-  --openbot-text-lg: 14px;
-  --openbot-text-xl: 16px;
-  --openbot-text-2xl: 18px;
+  --openbot-text-md: 14px;
+  --openbot-text-lg: 15px;
+  --openbot-text-xl: 17px;
+  --openbot-text-2xl: 20px;
   --openbot-text-3xl: 24px;
   --openbot-leading-sm: 16px;
-  --openbot-leading-md: 18px;
-  --openbot-leading-lg: 20px;
-  --openbot-leading-xl: 22px;
-  --openbot-leading-2xl: 24px;
+  --openbot-leading-md: 20px;
+  --openbot-leading-lg: 22px;
+  --openbot-leading-xl: 24px;
+  --openbot-leading-2xl: 28px;
   --openbot-leading-3xl: 30px;
 
   /* Not scale steps, and named for their surface so they do not read as one. Three
@@ -318,7 +318,7 @@
   --openbot-weight-medium: 500;
   --openbot-weight-semibold: 600;
   --openbot-weight-bold: 700;
-  --openbot-tracking-tight: -0.1px;
+  --openbot-tracking-tight: -0.01em;
   --openbot-tracking-normal: 0;
   --openbot-tracking-wide: 0.02em;
   --openbot-space-0-5: 2px;
@@ -403,8 +403,12 @@
   --openbot-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --openbot-shadow-raised: 0 12px 32px var(--openbot-shadow-popover-ambient);
   --openbot-shadow-card: 0 0 0 transparent;
+  /* A raised field, such as the composer: a hairline and a soft drop, in the Glaze manner. */
+  --openbot-shadow-field: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  /* The primary button: a light rim on its top edge and a small contact shadow. */
+  --openbot-shadow-primary: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 1px 2px rgba(0, 0, 0, 0.3);
   --openbot-shadow-overlay: 0 12px 32px rgba(0, 0, 0, 0.48);
-  --openbot-focus-ring: 0 0 0 1px var(--openbot-border-focus);
+  --openbot-focus-ring: 0 0 0 1px var(--openbot-border-focus), 0 0 0 4px var(--openbot-accent-soft);
   --openbot-layer-dropdown: 40;
   --openbot-layer-popover: 60;
   --openbot-layer-dialog: 100;
