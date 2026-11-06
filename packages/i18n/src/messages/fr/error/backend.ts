@@ -62,6 +62,8 @@ export const messages = {
   "error.backend.channelLeadModelUnavailable": "Le modèle du responsable du canal est indisponible.",
   "error.backend.contextCompactionIneffective":
     "La compaction ne réduit pas ce chat : après deux compactions, il utilise encore {percent} % de la fenêtre de contexte du modèle, donc OpenBot arrête de le compacter. Les outils et les instructions occupent la plus grande partie de la fenêtre. Désactive les serveurs MCP ou le contrôle de l'ordinateur dont cet agent n'a pas besoin, ou choisis un modèle avec une fenêtre plus grande. Puis démarre un nouveau chat.",
+  "error.backend.contextCompactionStopped":
+    "Deux compactages de suite de cette discussion ont échoué, donc OpenBot ne la compacte plus automatiquement. Chaque essai envoie toute la discussion au modèle et consomme la limite de votre forfait. Sélectionnez « Compacter » pour réessayer, ou démarrez une nouvelle discussion.",
   "error.backend.providerRetrying":
     "Le fournisseur a échoué {attempts} fois sur cette requête et réessaie. Si l'agent ne continue pas, arrête le tour.",
   "error.backend.providerRetryingLargeContext":
