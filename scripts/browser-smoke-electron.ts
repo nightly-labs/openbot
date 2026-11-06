@@ -2015,6 +2015,7 @@ async function main(): Promise<void> {
     await runToolBoundaryScenario(browser, origin);
     await runPopupScenario(browser, origin);
     await runSecretHandoffScenario(browser, origin);
+    await runCookieBannerScenario(browser, origin);
     if (!controlPhases.includes("open:acting") || !controlPhases.includes("open:waiting")) {
       throw new Error(`Browser control lifecycle was not reported: ${controlPhases.join(", ")}`);
     }
