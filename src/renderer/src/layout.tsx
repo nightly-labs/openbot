@@ -119,9 +119,12 @@ const Layout = createSimpleContext({
     /**
      * Whether the window draws the vertical server rail. The frame class and
      * the rail itself need the answer. `appInfo` is null
-     * until main answers, and no rail is drawn before then.
+     * until main answers, and no rail is drawn before then. A chat window
+     * shows no rail, so its frame keeps no space for one (#5346).
      */
-    const serverRailVisible = createMemo(() => platform.appInfo() !== null && serverView() === "rail");
+    const serverRailVisible = createMemo(
+      () => platform.appInfo() !== null && platform.chatWindow === null && serverView() === "rail",
+    );
 
     function updateResponsiveSidebar(): void {
       setLeftPanelAutoCompact(shouldAutoCompactSidebar(platform.appInfo()?.platform, leftPanelWidth(), serverView()));
