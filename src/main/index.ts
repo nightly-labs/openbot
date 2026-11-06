@@ -1211,11 +1211,16 @@ function receiveMessagingInstall(link: Extract<DeepLink, { kind: "slack-workspac
     ),
   )
     .then((accepted) => {
+      if (!accepted) {
+        logger.warn(`A ${platform} install link arrived, but no install of this run waits for it.`);
+        return;
+      }
       const window = windowHolder.current;
-      if (accepted && window && !window.isDestroyed()) showMainWindow(window);
+      if (window && !window.isDestroyed()) showMainWindow(window);
     })
-    .catch(() => {
-      // The connector settings show the connection's state. The error can quote Slack or Discord.
+    .catch((error: unknown) => {
+      // The connector settings show the connection's state. The log keeps the cause.
+      logger.error(`Unable to finish the ${platform} install:`, toLogValue(error));
     });
 }
 
