@@ -34,6 +34,7 @@ export const messages = defineMessages("error.import", {
   "error.import.zipTooLarge": "The export must be a .zip under 2 GB.",
   "error.import.unsafeFile": "The export contains an unsafe file: {name}",
   "error.import.expandedTooLarge": "The export must expand to under 2 GB and {limit} files.",
+  "error.import.remoteExpandedTooLarge": "The export must expand to under 500 MB and {limit} files.",
   "error.import.zipInvalid":
     "The selected file is not a valid .zip. If Grok Bot is still saving it, wait and choose it again.",
   "error.import.empty": "The export is empty.",

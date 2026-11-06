@@ -34,6 +34,7 @@ export const messages = {
   "error.import.zipTooLarge": "내보내기 파일은 2 GB 이하의 .zip이어야 해요.",
   "error.import.unsafeFile": "내보내기 파일에 안전하지 않은 파일이 있어요: {name}",
   "error.import.expandedTooLarge": "내보내기 파일은 압축을 풀었을 때 2 GB 이하, 파일 {limit}개 이하여야 해요.",
+  "error.import.remoteExpandedTooLarge": "내보내기 파일은 압축을 풀었을 때 500 MB 이하, 파일 {limit}개 이하여야 해요.",
   "error.import.zipInvalid":
     "선택한 파일이 올바른 .zip이 아니에요. Grok Bot이 아직 저장 중이라면 잠시 기다린 후 다시 선택해 주세요.",
   "error.import.empty": "내보내기 파일이 비어 있어요.",

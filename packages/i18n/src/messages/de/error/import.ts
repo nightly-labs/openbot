@@ -37,6 +37,8 @@ export const messages = {
   "error.import.unsafeFile": "Der Export enthält eine unsichere Datei: {name}",
   "error.import.expandedTooLarge":
     "Der entpackte Export muss unter 2 GB groß sein und weniger als {limit} Dateien enthalten.",
+  "error.import.remoteExpandedTooLarge":
+    "Der entpackte Export muss unter 500 MB groß sein und weniger als {limit} Dateien enthalten.",
   "error.import.zipInvalid":
     "Die gewählte Datei ist keine gültige .zip-Datei. Falls Grok Bot sie noch speichert, warte und wähle sie erneut.",
   "error.import.empty": "Der Export ist leer.",

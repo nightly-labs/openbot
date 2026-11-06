@@ -37,6 +37,8 @@ export const messages = {
   "error.import.zipTooLarge": "エクスポートは 2 GB 未満の .zip である必要があります。",
   "error.import.unsafeFile": "エクスポートに安全でないファイルが含まれています: {name}",
   "error.import.expandedTooLarge": "エクスポートは展開後に 2 GB 未満かつ {limit} ファイル未満である必要があります。",
+  "error.import.remoteExpandedTooLarge":
+    "エクスポートは展開後に 500 MB 未満かつ {limit} ファイル未満である必要があります。",
   "error.import.zipInvalid":
     "選択したファイルは有効な .zip ではありません。Grok Bot がまだ保存中の場合は、待ってからもう一度選択してください。",
   "error.import.empty": "エクスポートが空です。",
