@@ -4,7 +4,6 @@ import type { messages as source } from "../../en/mobile/server";
 export const messages = {
   "mobile.server.drawer.local": "Local",
   "mobile.server.drawer.remote": "Remoto",
-  "mobile.server.drawer.routines": "Rutinas",
   "mobile.server.drawer.usage": "Uso",
   "mobile.server.drawer.editOrder": "Editar orden",
   "mobile.server.drawer.leaveFailed": "No se pudo salir de {name}",
@@ -20,6 +19,14 @@ export const messages = {
   "mobile.server.drawer.kindMembers": "{kind} · {members}",
   "mobile.server.drawer.memberCount": { one: "{count} miembro", other: "{count} miembros" },
   "mobile.server.drawer.doneEditing": "Terminar de editar el orden",
+  "mobile.server.drawer.editSidebar": "Editar barra lateral",
+  "mobile.server.drawer.unpinTool": "Desfijar",
+  "mobile.server.drawer.pinToolNamed": "Fijar {name}",
+  "mobile.server.drawer.unpinToolNamed": "Desfijar {name}",
+  "mobile.server.drawer.unpinnedTool": "{name}, sin fijar",
+  "mobile.server.drawer.toolsHint":
+    "Arrastra los controles para mover herramientas. Las herramientas sin fijar solo aparecen al editar. El orden se guarda en este dispositivo.",
+  "mobile.server.drawer.doneEditingSidebar": "Terminar de editar",
   "mobile.server.drawer.join": "Unirse a un servidor",
   "mobile.server.drawer.add": "Añadir un servidor",
   "mobile.server.drawer.settings": "Ajustes",

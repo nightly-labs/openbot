@@ -4,7 +4,6 @@ import type { messages as source } from "../../en/mobile/server";
 export const messages = {
   "mobile.server.drawer.local": "Lokaal",
   "mobile.server.drawer.remote": "Extern",
-  "mobile.server.drawer.routines": "Routines",
   "mobile.server.drawer.usage": "Gebruik",
   "mobile.server.drawer.editOrder": "Volgorde wijzigen",
   "mobile.server.drawer.leaveFailed": "Kan {name} niet verlaten",
@@ -20,6 +19,14 @@ export const messages = {
   "mobile.server.drawer.kindMembers": "{kind} · {members}",
   "mobile.server.drawer.memberCount": { one: "{count} lid", other: "{count} leden" },
   "mobile.server.drawer.doneEditing": "Klaar met volgorde wijzigen",
+  "mobile.server.drawer.editSidebar": "Zijbalk bewerken",
+  "mobile.server.drawer.unpinTool": "Losmaken",
+  "mobile.server.drawer.pinToolNamed": "{name} vastmaken",
+  "mobile.server.drawer.unpinToolNamed": "{name} losmaken",
+  "mobile.server.drawer.unpinnedTool": "{name}, losgemaakt",
+  "mobile.server.drawer.toolsHint":
+    "Sleep de grepen om tools te verplaatsen. Losgemaakte tools zie je alleen tijdens het bewerken. De volgorde wordt op dit apparaat bewaard.",
+  "mobile.server.drawer.doneEditingSidebar": "Bewerken voltooien",
   "mobile.server.drawer.join": "Word lid van een server",
   "mobile.server.drawer.add": "Server toevoegen",
   "mobile.server.drawer.settings": "Instellingen",

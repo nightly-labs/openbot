@@ -4,7 +4,6 @@ import type { messages as source } from "../../en/mobile/server";
 export const messages = {
   "mobile.server.drawer.local": "Local",
   "mobile.server.drawer.remote": "Remoto",
-  "mobile.server.drawer.routines": "Rotinas",
   "mobile.server.drawer.usage": "Uso",
   "mobile.server.drawer.editOrder": "Editar ordem",
   "mobile.server.drawer.leaveFailed": "Não foi possível sair de {name}",
@@ -20,6 +19,14 @@ export const messages = {
   "mobile.server.drawer.kindMembers": "{kind} · {members}",
   "mobile.server.drawer.memberCount": { one: "{count} membro", other: "{count} membros" },
   "mobile.server.drawer.doneEditing": "Concluir edição da ordem",
+  "mobile.server.drawer.editSidebar": "Editar barra lateral",
+  "mobile.server.drawer.unpinTool": "Desafixar",
+  "mobile.server.drawer.pinToolNamed": "Fixar {name}",
+  "mobile.server.drawer.unpinToolNamed": "Desafixar {name}",
+  "mobile.server.drawer.unpinnedTool": "{name}, desafixado",
+  "mobile.server.drawer.toolsHint":
+    "Arraste as alças para mover ferramentas. Ferramentas desafixadas só aparecem durante a edição. A ordem é salva neste dispositivo.",
+  "mobile.server.drawer.doneEditingSidebar": "Concluir edição",
   "mobile.server.drawer.join": "Entrar em um servidor",
   "mobile.server.drawer.add": "Adicionar um servidor",
   "mobile.server.drawer.settings": "Configurações",

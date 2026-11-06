@@ -4,7 +4,6 @@ import type { messages as source } from "../../en/mobile/server";
 export const messages = {
   "mobile.server.drawer.local": "로컬",
   "mobile.server.drawer.remote": "원격",
-  "mobile.server.drawer.routines": "루틴",
   "mobile.server.drawer.usage": "사용량",
   "mobile.server.drawer.editOrder": "순서 편집",
   "mobile.server.drawer.leaveFailed": "{name}에서 나가지 못했어요",
@@ -20,6 +19,14 @@ export const messages = {
   "mobile.server.drawer.kindMembers": "{kind} · {members}",
   "mobile.server.drawer.memberCount": { other: "멤버 {count}명" },
   "mobile.server.drawer.doneEditing": "순서 편집 완료",
+  "mobile.server.drawer.editSidebar": "사이드바 편집",
+  "mobile.server.drawer.unpinTool": "고정 해제",
+  "mobile.server.drawer.pinToolNamed": "{name} 고정",
+  "mobile.server.drawer.unpinToolNamed": "{name} 고정 해제",
+  "mobile.server.drawer.unpinnedTool": "{name}, 고정 해제됨",
+  "mobile.server.drawer.toolsHint":
+    "핸들을 끌어 도구를 옮기세요. 고정 해제된 도구는 편집할 때만 보입니다. 순서는 이 기기에 저장됩니다.",
+  "mobile.server.drawer.doneEditingSidebar": "편집 완료",
   "mobile.server.drawer.join": "서버 참여",
   "mobile.server.drawer.add": "서버 추가",
   "mobile.server.drawer.settings": "설정",

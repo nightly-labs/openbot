@@ -25,7 +25,7 @@ export const messages = defineMessages("mobile.app", {
   "mobile.app.route.members": "Members",
   "mobile.app.route.hostedServerPlans": "Cloud server",
   "mobile.app.route.hostedServerSetup": "Setup",
-  "mobile.app.route.routines": "Routines",
+  "mobile.app.route.schedule": "Schedule",
   "mobile.app.route.workflows": "Workflows",
   "mobile.app.route.workflow": "Workflow",
   "mobile.app.route.workflowRun": "Run",
@@ -34,7 +34,6 @@ export const messages = defineMessages("mobile.app", {
   "mobile.app.route.usage": "Usage",
   "mobile.app.route.marketplace": "Marketplace",
   // The quick actions of the app icon, which the phone shows when the icon is held.
-  "mobile.app.quickAction.routines": "Routines",
   "mobile.app.quickAction.search": "Search",
   // The update header on home. A store update names its version; a downloaded update restarts the app.
   "mobile.app.update.title": "OpenBot {version} is here",

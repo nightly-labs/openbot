@@ -120,7 +120,7 @@ export function quickActionItems({ recents, servers, activeServerId, t }: ItemsI
       ),
     {
       id: quickActionId({ type: "routines", serverId: activeServer.id }),
-      title: t("mobile.app.quickAction.routines"),
+      title: t("mobile.app.route.schedule"),
       subtitle: serverName(activeServer.id),
       icon: "routines",
     },

@@ -9,17 +9,17 @@ import { useThemeColor } from "heroui-native/hooks";
 import type { LucideIcon } from "lucide-react-native";
 import ArrowUp from "lucide-react-native/icons/arrow-up";
 import CalendarClock from "lucide-react-native/icons/calendar-clock";
-import ChartColumn from "lucide-react-native/icons/chart-column";
+import ChartArea from "lucide-react-native/icons/chart-area";
 import Check from "lucide-react-native/icons/check";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
 import CircleX from "lucide-react-native/icons/circle-x";
 import EyeOff from "lucide-react-native/icons/eye-off";
+import ListChecks from "lucide-react-native/icons/list-checks";
 import ListRestart from "lucide-react-native/icons/list-restart";
 import Plus from "lucide-react-native/icons/plus";
 import Search from "lucide-react-native/icons/search";
 import Settings from "lucide-react-native/icons/settings";
 import SlidersHorizontal from "lucide-react-native/icons/sliders-horizontal";
-import SquareCheck from "lucide-react-native/icons/square-check";
 import UsersRound from "lucide-react-native/icons/users-round";
 import {
   type ComponentProps,
@@ -1080,7 +1080,7 @@ function HomeSearchIdle({ onLeave, canUseTasks }: { onLeave: () => void; canUseT
             {
               id: "tasks",
               label: t("mobile.app.route.threads"),
-              icon: SquareCheck,
+              icon: ListChecks,
               href: { pathname: "/server-tasks", params: { serverId } } as const,
             },
           ]
@@ -1089,14 +1089,14 @@ function HomeSearchIdle({ onLeave, canUseTasks }: { onLeave: () => void; canUseT
         ? [
             {
               id: "routines",
-              label: t("mobile.app.route.routines"),
+              label: t("mobile.app.route.schedule"),
               icon: CalendarClock,
               href: { pathname: "/server-routines", params: { serverId } } as const,
             },
             {
               id: "usage",
               label: t("mobile.app.route.usage"),
-              icon: ChartColumn,
+              icon: ChartArea,
               href: { pathname: "/server-usage", params: { serverId } } as const,
             },
             {
@@ -1215,7 +1215,7 @@ function TaskEditorPage({ agent, search }: { agent: MobileAgent; search: HomeSea
         </View>
         <View className="flex-row items-start gap-2">
           <View className="pt-0.5">
-            <SquareCheck color={muted} size={16} strokeWidth={1.8} />
+            <ListChecks color={muted} size={16} strokeWidth={1.8} />
           </View>
           <Typography.Paragraph className="min-w-0 flex-1 text-muted" style={typeScale.caption}>
             {t("mobile.search.thread.how", { name: agent.name })}{" "}

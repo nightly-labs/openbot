@@ -4,7 +4,6 @@ import type { messages as source } from "../../en/mobile/server";
 export const messages = {
   "mobile.server.drawer.local": "Lokal",
   "mobile.server.drawer.remote": "Remote",
-  "mobile.server.drawer.routines": "Routinen",
   "mobile.server.drawer.usage": "Nutzung",
   "mobile.server.drawer.editOrder": "Reihenfolge bearbeiten",
   "mobile.server.drawer.leaveFailed": "{name} konnte nicht verlassen werden",
@@ -21,6 +20,14 @@ export const messages = {
   "mobile.server.drawer.kindMembers": "{kind} · {members}",
   "mobile.server.drawer.memberCount": { one: "{count} Mitglied", other: "{count} Mitglieder" },
   "mobile.server.drawer.doneEditing": "Bearbeitung der Reihenfolge beenden",
+  "mobile.server.drawer.editSidebar": "Seitenleiste bearbeiten",
+  "mobile.server.drawer.unpinTool": "Lösen",
+  "mobile.server.drawer.pinToolNamed": "{name} anheften",
+  "mobile.server.drawer.unpinToolNamed": "{name} lösen",
+  "mobile.server.drawer.unpinnedTool": "{name}, gelöst",
+  "mobile.server.drawer.toolsHint":
+    "Ziehe die Griffe, um Tools zu verschieben. Gelöste Tools erscheinen nur beim Bearbeiten. Die Reihenfolge wird auf diesem Gerät gespeichert.",
+  "mobile.server.drawer.doneEditingSidebar": "Bearbeiten beenden",
   "mobile.server.drawer.join": "Einem Server beitreten",
   "mobile.server.drawer.add": "Server hinzufügen",
   "mobile.server.drawer.settings": "Einstellungen",

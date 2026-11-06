@@ -55,13 +55,22 @@ interface SortableServerListProps {
   onDragActive: (active: boolean) => void;
   /** Returns false when the order could not be saved. */
   onReorder: (ids: string[]) => boolean;
+  /** The height of each row. The server list uses `SERVER_ROW_HEIGHT`. */
+  rowHeight?: number;
 }
 
 /**
  * The UI thread owns row positions during a drag and after the drop. React later renders the saved order,
  * which gives the same positions, so the rows do not jump back while the workspace renders again.
  */
-export function SortableServerList({ color, ids, renderRow, onDragActive, onReorder }: SortableServerListProps) {
+export function SortableServerList({
+  color,
+  ids,
+  renderRow,
+  onDragActive,
+  onReorder,
+  rowHeight = SERVER_ROW_HEIGHT,
+}: SortableServerListProps) {
   const signature = ids.join("\n");
   const drag: DragState = {
     positions: useSharedValue(positionsOf(ids)),
@@ -84,7 +93,7 @@ export function SortableServerList({ color, ids, renderRow, onDragActive, onReor
   };
 
   return (
-    <View style={{ height: ids.length * SERVER_ROW_HEIGHT }}>
+    <View style={{ height: ids.length * rowHeight }}>
       {ids.map((id) => (
         <SortableServerRow
           key={id}
@@ -93,6 +102,7 @@ export function SortableServerList({ color, ids, renderRow, onDragActive, onReor
           drag={drag}
           id={id}
           onDragActive={onDragActive}
+          rowHeight={rowHeight}
           onDrop={finish}
         >
           {renderRow(id)}
@@ -110,24 +120,34 @@ interface SortableServerRowProps {
   id: string;
   onDragActive: (active: boolean) => void;
   onDrop: (order: string[]) => void;
+  rowHeight: number;
 }
 
-function SortableServerRow({ children, color, count, drag, id, onDragActive, onDrop }: SortableServerRowProps) {
+function SortableServerRow({
+  children,
+  color,
+  count,
+  drag,
+  id,
+  onDragActive,
+  onDrop,
+  rowHeight,
+}: SortableServerRowProps) {
   const { activeId, offset, positions, startY } = drag;
   const pan = Gesture.Pan()
     .minDistance(0)
     .onStart(() => {
       activeId.set(id);
-      startY.set((positions.get()[id] ?? 0) * SERVER_ROW_HEIGHT);
+      startY.set((positions.get()[id] ?? 0) * rowHeight);
       offset.set(0);
       scheduleOnRN(onDragActive, true);
       scheduleOnRN(selectionHaptic);
     })
     .onUpdate((event) => {
       const start = startY.get();
-      const next = Math.max(-start, Math.min((count - 1) * SERVER_ROW_HEIGHT - start, event.translationY));
+      const next = Math.max(-start, Math.min((count - 1) * rowHeight - start, event.translationY));
       offset.set(next);
-      const target = Math.round((start + next) / SERVER_ROW_HEIGHT);
+      const target = Math.round((start + next) / rowHeight);
       if (target !== positions.get()[id]) {
         positions.set(movePosition(positions.get(), id, target));
         scheduleOnRN(selectionHaptic);
@@ -135,7 +155,7 @@ function SortableServerRow({ children, color, count, drag, id, onDragActive, onD
     })
     .onFinalize(() => {
       if (activeId.get() !== id) return;
-      const settled = (positions.get()[id] ?? 0) * SERVER_ROW_HEIGHT - startY.get();
+      const settled = (positions.get()[id] ?? 0) * rowHeight - startY.get();
       offset.set(
         withSpring(settled, SETTLE, (finished) => {
           // A new drag interrupts the settle and owns the state from then on.
@@ -149,12 +169,12 @@ function SortableServerRow({ children, color, count, drag, id, onDragActive, onD
   const style = useAnimatedStyle(() => {
     const active = activeId.get();
     if (active === id) return { transform: [{ translateY: startY.get() + offset.get() }, { scale: 1.02 }], zIndex: 10 };
-    const y = (positions.get()[id] ?? 0) * SERVER_ROW_HEIGHT;
+    const y = (positions.get()[id] ?? 0) * rowHeight;
     return { transform: [{ translateY: active === null ? y : withTiming(y, SHIFT) }, { scale: 1 }], zIndex: 0 };
   });
 
   return (
-    <Animated.View style={[{ height: SERVER_ROW_HEIGHT, left: 0, position: "absolute", right: 0, top: 0 }, style]}>
+    <Animated.View style={[{ height: rowHeight, left: 0, position: "absolute", right: 0, top: 0 }, style]}>
       <View className="flex-1 flex-row items-center">
         <View className="min-w-0 flex-1">{children}</View>
         <GestureDetector gesture={pan}>
