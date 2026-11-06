@@ -8,14 +8,14 @@
 //      keeps its model.
 //   2. A restart while the earlier process's activation still waits: the earlier activation does not
 //      move the agent on the new process's first lists, and the agent keeps its model.
-//   3. Control: after a restart whose lists all lack the model, the agent moves to Grok's default.
+//   3. Control: after a restart whose lists all lack the model, the agent moves to the first built-in model.
 // `bun run test:grok-partial-model-list`. Writes .openbot-build/grok-partial-model-list-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AGENT_PROVIDERS, defaultProviderModel } from "@openbot/contracts/ipc";
+import { AGENT_PROVIDERS } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import { installFakeAgent, readJsonl } from "./provider-fakes/host";
@@ -28,7 +28,8 @@ const fakeGrok = join(root, "grok");
 const logPath = join(root, "grok.jsonl");
 const controlPath = join(root, "control.json");
 const MODEL = "grok-4.7";
-const DEFAULT = defaultProviderModel("grok");
+// The short list lacks the Grok default (`grok-4.7`), so an agent moves to its first model.
+const FALLBACK = "grok-4.6";
 
 // Before the service modules load: the stores and the CLI search read these.
 process.env.HOME = home;
@@ -173,11 +174,11 @@ try {
   report.restartDuringWait = { setups: secondLists, model: modelOf(agent.id) };
   assert.equal(report.restartDuringWait.model, MODEL, "A replaced process's activation does not move the agent.");
 
-  // 3. Control: every list lacks the model. The agent moves to Grok's default, after a second list.
+  // 3. Control: every list lacks the model. The agent moves to the first built-in model, after a second list.
   const gone = await restartGrok(Number.MAX_SAFE_INTEGER);
   const goneLists = await listsAfter("the agent to move", gone, () => modelOf(agent.id) !== MODEL);
   report.restartWithoutModel = { setups: goneLists, model: modelOf(agent.id) };
-  assert.equal(report.restartWithoutModel.model, DEFAULT, "A model that every list lacks still moves.");
+  assert.equal(report.restartWithoutModel.model, FALLBACK, "A model that every list lacks still moves.");
   assert.ok(report.restartWithoutModel.setups.length >= 3, "The agent moves only after Grok is asked again.");
   report.passed = true;
 } catch (error) {
