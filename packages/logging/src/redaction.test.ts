@@ -321,6 +321,24 @@ describe("registerSecretValue", () => {
 
     expect(redactText(`key ${secret} rejected`)).toBe("key [redacted] rejected");
   });
+
+  // `allowShort` is used for saved passwords and one-time codes. A one-letter password used to
+  // register `e`, and because a match grows to its whole token, every word holding that letter left
+  // the log and the outgoing chat answer as `[redacted]`: "her şey" became "[redacted]".
+  it("refuses a short value even when the caller allows one, so prose stays readable", () => {
+    registerSecretValue("e", { allowShort: true });
+    registerSecretValue("ab", { allowShort: true });
+    registerSecretValue("abc", { allowShort: true });
+
+    expect(redactText("her şey çalışıyor, bir konu adı seç")).toBe("her şey çalışıyor, bir konu adı seç");
+  });
+
+  it("still masks a short value that no ordinary word holds", () => {
+    registerSecretValue("zq9x", { allowShort: true });
+
+    // Not `password`: an earlier test registers that label itself, and the set is shared.
+    expect(redactText("the code is zq9x today")).toBe("the code is [redacted] today");
+  });
 });
 
 describe("redactValue", () => {
