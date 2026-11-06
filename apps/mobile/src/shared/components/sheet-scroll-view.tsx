@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useCSSVariable, withUniwind } from "uniwind";
+import { withUniwind } from "uniwind";
 import { AndroidBlurHeader, AndroidBlurTarget } from "@/shared/components/android-header-blur";
 import { ANDROID_BLUR } from "@/shared/components/glass-capsule";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
@@ -67,28 +67,23 @@ export function SheetScrollView({
   const androidBlurHeader = ANDROID_BLUR && headerShown && !header && headerOverlaysContent;
   const blurTarget = useRef<ViewInstance>(null);
   const navigation = useContext(NavigationContext);
-  const sheetBackground = String(useCSSVariable("--openbot-bg-sheet"));
   useLayoutEffect(() => {
     if (!androidBlurHeader || !navigation) return;
     navigation.setOptions({
       headerTransparent: true,
-      header: ({ options, back }: NativeStackHeaderProps) => (
+      header: ({ options, back, navigation: stack }: NativeStackHeaderProps) => (
         <AndroidBlurHeader
           options={options}
           back={back}
+          navigation={stack}
           blurTarget={blurTarget}
           underStatusBar={!isSheetHeader(options)}
         />
       ),
     });
-    // A page that shows other content after this scroll view gets the opaque native header of its stack back.
-    return () =>
-      navigation.setOptions({
-        header: undefined,
-        headerTransparent: false,
-        headerStyle: { backgroundColor: sheetBackground },
-      });
-  }, [androidBlurHeader, navigation, sheetBackground]);
+    // A page that shows other content after this scroll view gets the native header of its stack back.
+    return () => navigation.setOptions({ header: undefined, headerTransparent: false });
+  }, [androidBlurHeader, navigation]);
   const nativeHeader = isIOS && headerShown && !header;
   const stickyEdge = scrollEdgeEffect && !nativeHeader;
   // Android draws no blur at the sheet edge. A sticky header gets the opaque sheet color instead.

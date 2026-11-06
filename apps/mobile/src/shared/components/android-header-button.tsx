@@ -80,7 +80,7 @@ export function AndroidHeaderButton({
 }
 
 /** The round back button that `androidBackOptions` puts in the header. */
-function AndroidStackBackButton({ glass: hasGlass, onPress }: { glass: boolean; onPress: () => void }) {
+export function AndroidStackBackButton({ glass: hasGlass, onPress }: { glass: boolean; onPress: () => void }) {
   const { t } = useText();
   const foreground = useThemeColor("foreground");
   const glass = useChromeGlass({ shadow: false });

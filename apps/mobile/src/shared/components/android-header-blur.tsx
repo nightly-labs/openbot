@@ -8,6 +8,7 @@ import { StyleSheet, View, type ViewInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useUniwind } from "uniwind";
+import { AndroidStackBackButton } from "@/shared/components/android-header-button";
 import { ANDROID_BLUR } from "@/shared/components/glass-capsule";
 import { typeScale } from "@/shared/lib/type-scale";
 
@@ -126,16 +127,23 @@ export function AndroidHeaderBlur({
 export function AndroidBlurHeader({
   options,
   back,
+  navigation,
   blurTarget,
   underStatusBar,
-}: Pick<NativeStackHeaderProps, "options" | "back"> & {
+}: Pick<NativeStackHeaderProps, "options" | "back" | "navigation"> & {
   blurTarget: RefObject<ViewInstance | null>;
   underStatusBar: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const foreground = String(useThemeColor("foreground"));
   const itemProps = { tintColor: foreground, canGoBack: back !== undefined };
-  const left = options.headerLeft?.(itemProps);
+  // A stack without `androidBackOptions` (such as `SheetPageStack`) relies on the native back arrow, so
+  // an inner page gets the same round back button here. Full screens put it in the glass circle.
+  const left =
+    options.headerLeft?.(itemProps) ??
+    (back && options.headerBackVisible !== false ? (
+      <AndroidStackBackButton glass={underStatusBar} onPress={() => navigation.goBack()} />
+    ) : undefined);
   const right = options.headerRight?.(itemProps);
   const title = typeof options.headerTitle === "string" ? options.headerTitle : (options.title ?? "");
   return (
