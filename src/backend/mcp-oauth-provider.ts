@@ -944,7 +944,10 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       return this.#register();
     }
     if (!this.#options.state || this.#exchangingCode) return client;
-    if (client.redirect_uris.includes(this.#options.redirectUrl)) return client;
+    // A registration made before its scope named `offline_access` refuses the request that adds it.
+    const scopeAllowed =
+      !client.scope || !scopeWithOfflineAccess(client.scope, this.#discoveryState?.authorizationServerMetadata);
+    if (client.redirect_uris.includes(this.#options.redirectUrl) && scopeAllowed) return client;
     const refreshWorthTrying = !this.#redirectAddressChecked && Boolean(record.tokens?.refresh_token);
     this.#redirectAddressChecked = true;
     return refreshWorthTrying ? client : this.#register();
@@ -961,15 +964,28 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   /**
    * Matched by address, not by `#registrationPending`: the SDK also registers when it drops a
    * client bound to another issuer, which this provider never hears about.
+   *
+   * The registration asks for the scope the authorization request will ask for, `offline_access`
+   * included (SEP-2207). A server that limits a client to its registered scope refused the request
+   * otherwise: ActiveCampaign answered `invalid_scope` at the authorization page (#5419).
    */
   watchRegistration(fetch: FetchLike): FetchLike {
     return async (input, init) => {
-      const response = await fetch(input, init);
       const registrationUrl = this.#registrationUrl();
-      if (init?.method === "POST" && registrationUrl !== null && new URL(String(input)).href === registrationUrl)
-        this.#registrationStatus = response.status;
+      const registering =
+        init?.method === "POST" && registrationUrl !== null && new URL(String(input)).href === registrationUrl;
+      const response = await fetch(input, registering ? this.#withOfflineAccessRegistration(init) : init);
+      if (registering) this.#registrationStatus = response.status;
       return response;
     };
+  }
+
+  /** The SDK's registration body, with the `offline_access` that `withOfflineAccess` will request. */
+  #withOfflineAccessRegistration(init: RequestInit): RequestInit {
+    if (typeof init.body !== "string") return init;
+    const body = registrationBodySchema.parse(JSON.parse(init.body));
+    const scope = scopeWithOfflineAccess(body.scope ?? null, this.#discoveryState?.authorizationServerMetadata);
+    return scope ? { ...init, body: JSON.stringify({ ...body, scope }) } : init;
   }
 
   /** Where the SDK registers: the advertised endpoint, or `/register` when no metadata was found. */
@@ -1410,13 +1426,25 @@ function withAppScope(authorizationUrl: URL, app: McpOAuthApp | undefined): URL 
  * `offline_access` would replace.
  */
 function withOfflineAccess(authorizationUrl: URL, metadata: OAuthDiscoveryState["authorizationServerMetadata"]): URL {
-  const scope = authorizationUrl.searchParams.get("scope");
-  if (!scope || !metadata?.scopes_supported?.includes("offline_access")) return authorizationUrl;
-  if (scope.split(/\s+/).includes("offline_access")) return authorizationUrl;
+  const scope = scopeWithOfflineAccess(authorizationUrl.searchParams.get("scope"), metadata);
+  if (!scope) return authorizationUrl;
   const url = new URL(authorizationUrl);
-  url.searchParams.set("scope", `${scope} offline_access`);
+  url.searchParams.set("scope", scope);
   if (!url.searchParams.has("prompt")) url.searchParams.set("prompt", "consent");
   return url;
+}
+
+/** The one field of the SDK's registration body that `watchRegistration` changes; the rest stays. */
+const registrationBodySchema = z.looseObject({ scope: z.string().optional() });
+
+/** `scope` with `offline_access` added, or `null` when `withOfflineAccess` leaves it as it is. */
+function scopeWithOfflineAccess(
+  scope: string | null,
+  metadata: OAuthDiscoveryState["authorizationServerMetadata"],
+): string | null {
+  if (!scope || !metadata?.scopes_supported?.includes("offline_access")) return null;
+  if (scope.split(/\s+/).includes("offline_access")) return null;
+  return `${scope} offline_access`;
 }
 
 /**
