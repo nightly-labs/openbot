@@ -5,11 +5,12 @@ For a worked example and the sign-in on a joined server, read
 
 One developer bundle per directory: `plugins/<slug>/plugin.json`.
 `catalog.json` sets the order and the featured flags.
-`scripts/build-plugin-catalog.ts` validates the source and writes three
+`scripts/build-plugin-catalog.ts` validates the source and writes four
 generated outputs; never edit those by hand:
 
 - `src/renderer/src/features/settings/marketplace-plugin-catalog.ts` (Apps tab)
 - `apps/auth-api/src/lib/plugin-catalog.generated.ts` (Worker JSON routes)
+- `apps/mobile/src/features/marketplace/model/plugin-catalog.generated.ts` (mobile)
 - `resources/plugin-catalog/` (offline snapshot shipped with the app)
 
 ```sh
@@ -105,3 +106,12 @@ Troubleshooting:
   the prompts again.
 - Mail or Calendar tools time out: AppleScript is slow on large mailboxes and
   on many subscribed calendars. Ask for one folder and a smaller count.
+
+## Pagey Site
+
+The [Pagey plugin](plugins/pagey/README.md) ships its standalone MCP adapter in this
+repository. A stdio server can set `embeddedScript` to `server.mjs`, with command `bun`
+and empty `args`. The builder reads that exact file beside `plugin.json` and embeds it
+in the generated command arguments. It rejects other file names, commands, and scripts
+that exceed the command-line size limit. Increase the plugin version when its adapter
+changes. Do not put credentials in the script.

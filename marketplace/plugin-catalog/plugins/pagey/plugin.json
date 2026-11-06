@@ -1,0 +1,59 @@
+{
+  "slug": "pagey",
+  "name": "Pagey Site",
+  "tagline": "Free static hosting, with no total site cap",
+  "description": "Pagey Site lets agents publish an HTML file, ZIP archive, or static build folder and return a live HTTPS link. Hosting is free, with no subscription, credit card, or total site cap; registered accounts can create 25 new sites per UTC day. Preview files, update a site at the same address, choose a custom Pagey subdomain, control maintenance, and read analytics from chat. The Pagey dashboard also provides password protection, secure sharing, a file browser, an AI site builder, and a custom form builder with a built-in backend. All features are free for registered accounts; usage limits apply.",
+  "category": "coding",
+  "creatorName": "pagey.site",
+  "iconUrl": null,
+  "version": "1.0.0",
+  "prompts": [
+    {
+      "id": "prompt-publish",
+      "text": "Publish this static build folder to Pagey Site and give me the link."
+    },
+    {
+      "id": "prompt-update",
+      "text": "Update my existing Pagey site with this build and keep its address."
+    },
+    {
+      "id": "prompt-sites",
+      "text": "List my Pagey sites and show their visitor analytics for the last week."
+    }
+  ],
+  "apps": [
+    {
+      "id": "app-pagey-mcp",
+      "name": "Pagey Site",
+      "description": "Publish static sites for free, preview build files, and manage your Pagey sites with your API token.",
+      "iconUrl": null,
+      "server": {
+        "name": "pagey",
+        "transport": "stdio",
+        "command": "bun",
+        "args": [],
+        "embeddedScript": "server.mjs",
+        "auth": [
+          {
+            "id": "pagey-token",
+            "kind": "key",
+            "label": "API key",
+            "fields": [
+              {
+                "id": "api-token",
+                "label": "API key",
+                "env": "PAGEY_API_TOKEN"
+              }
+            ],
+            "docsUrl": "https://pagey.site/dashboard/api-tokens",
+            "docsLabel": "Create a key"
+          }
+        ]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://pagey.site",
+  "privacyPolicyUrl": "https://pagey.site/privacy",
+  "termsUrl": "https://pagey.site/terms"
+}
