@@ -52,7 +52,7 @@ import { AgentLifecycleFailed } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { parseProviderId } from "../ipc/app-inputs";
 import { parseDeleteCustomProvider, parseSaveCustomProvider } from "../ipc/custom-provider-inputs";
-import { parseProviderApiKeyInput } from "../ipc/provider-handlers";
+import { parseProviderApiKeyInput, signInCodexWithApiKey } from "../ipc/provider-handlers";
 import { isObject } from "../ipc/validation";
 import type { TeamApiAdmin } from "./dependencies";
 import { HttpError } from "./http-error";
@@ -177,15 +177,18 @@ export async function routeProviders(
         return json(200, wireSnapshotV4(await runCauseEffect(runtimes.checkForUpdates())));
       case PROVIDERS_V8_ROUTES.apiKeyState:
       case PROVIDERS_V5_ROUTES.apiKeyState:
-      case PROVIDERS_ADMIN_ROUTES.apiKeyState:
-        return json(200, {
-          status: credentials.status(
-            parsed(
-              V8_ROUTES.has(url.pathname) ? keyProviderV8 : V5_ROUTES.has(url.pathname) ? managedProviderV5 : provider,
-              body,
-            ),
-          ),
-        });
+      case PROVIDERS_ADMIN_ROUTES.apiKeyState: {
+        const id = parsed(
+          V8_ROUTES.has(url.pathname) ? keyProviderV8 : V5_ROUTES.has(url.pathname) ? managedProviderV5 : provider,
+          body,
+        );
+        // `codex-api-key-v1`: the key is in Codex's own login, which the agent status reads.
+        if (id === "codex") {
+          const codex = service.getStatus().providers?.find((candidate) => candidate.id === "codex");
+          return json(200, { status: codex?.apiKeyInUse ? "saved" : "missing" });
+        }
+        return json(200, { status: credentials.status(id) });
+      }
       case PROVIDERS_V8_ROUTES.apiKeySet:
       case PROVIDERS_V5_ROUTES.apiKeySet:
       case PROVIDERS_ADMIN_ROUTES.apiKeySet: {
@@ -197,6 +200,11 @@ export async function routeProviders(
               : wireApiKeyInput,
           body,
         );
+        // `codex-api-key-v1`: Codex keeps the key in its own login, as on this computer, not in the key store.
+        if (input.provider === "codex") {
+          await signInCodexWithApiKey(service, input.key);
+          return json(200, {});
+        }
         const save = () =>
           credentials
             .set(input.provider, input.key)

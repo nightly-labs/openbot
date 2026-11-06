@@ -177,6 +177,8 @@ export const messages = defineMessages("provider", {
   "provider.codexKey.title": "Log in with an OpenAI API key",
   "provider.codexKey.description":
     "Codex saves the key on this computer. OpenAI bills each request to the key, not to your ChatGPT plan. To use the plan again, disconnect the account and connect ChatGPT.",
+  "provider.codexKey.descriptionHost":
+    "Codex saves the key on the host. OpenAI bills each request to the key, not to your ChatGPT plan. To use the plan again, disconnect the account and connect ChatGPT.",
   "provider.codexKey.label": "OpenAI API key",
   "provider.inceptionKey.title": "Inception API key",
   "provider.inceptionKey.description":

@@ -567,6 +567,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `custom-provider-harness-v1` | List, add and remove custom endpoints as `providers-v1` does; each endpoint in a response names its harness (`opencode` or `pi`). A save names no harness: a new endpoint runs on OpenCode | `providerAdmin` |
 | `custom-agents-v1` | List, add, replace and remove the host's custom ACP agents. The host starts each command on its computer. An environment value goes only in a save body; a response names the variables only, and `value: null` keeps a saved value. Protocol 9 only | `providerAdmin` |
 | `claude-api-key-v1` | No routes. The host saves an Anthropic API key for Claude through the `providers-v1` key routes | `providerAdmin` |
+| `codex-api-key-v1` | No routes. The host logs Codex in with an OpenAI API key sent through the `apiKeySet` route of `providers-v1`, `-v5` or `-v8` | `providerAdmin` |
 | `provider-usage-reset-v1` | Read the usage reset credits of each provider account on the host, and spend one. Only Codex gives credits | `providerAdmin` |
 | `provider-sign-out-v1` | Sign the host's own Claude or Codex sign-in out. The host's other accounts stay | `providerAdmin` |
 | `host-admin-v1` | Server name and logo | `hostAdmin` |
@@ -767,6 +768,16 @@ agent already uses the key. A removed key removes its account and moves its agen
 A removed account with a saved key comes back at the next account check. An added account never gets
 the key. An older host saved the key but did not use it, so a client shows the Claude key only when
 the host advertises the capability.
+
+`codex-api-key-v1` has no routes. It tells a client that the host logs Codex in with an OpenAI API
+key that the released `apiKeySet` route of `providers-v1`, `-v5` or `-v8` sends for `codex`, as
+`codex login --with-api-key` does on this computer. Codex keeps the key in its own login, not in the
+OpenBot key store. The released agent status does not carry the login type, so `apiKeyState` for
+`codex` answers from that login: `saved` while Codex runs on a key. `apiKeyClear` does not remove the
+login, as on this computer. OpenAI bills each request to the key. The ChatGPT sign-in and the sign-out
+replace the key.
+An older host saved the key but did not use it, so a client shows the Codex key for a joined server
+only when the host advertises the capability.
 
 `host-update-v1` runs the same update as the host's own Settings. `src/main/requested-update.ts`
 keeps the schedule in memory: who asked, and whether the restart waits until

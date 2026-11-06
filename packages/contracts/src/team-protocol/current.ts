@@ -51,6 +51,7 @@ import {
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "./channel-attention-v1";
 import { CHAT_COLORS_CAPABILITY } from "./chat-colors-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "./claude-api-key-v1";
+import { CODEX_API_KEY_CAPABILITY } from "./codex-api-key-v1";
 import { COMPUTER_ACTIVITY_CAPABILITY } from "./computer-activity-v1";
 import { CONNECTORS_CAPABILITY } from "./connectors-v1";
 import { CONTEXT_COMPACT_CAPABILITY } from "./context-compact-v1";
@@ -452,6 +453,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   PASSWORD_MANAGERS_CAPABILITY,
   BROWSER_PROXIES_CAPABILITY,
   BROWSER_EGRESS_CAPABILITY,
+  CODEX_API_KEY_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -619,7 +621,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== WORKFLOWS_CHATS_CAPABILITY &&
     capability !== PASSWORD_MANAGERS_CAPABILITY &&
     capability !== BROWSER_PROXIES_CAPABILITY &&
-    capability !== BROWSER_EGRESS_CAPABILITY,
+    capability !== BROWSER_EGRESS_CAPABILITY &&
+    capability !== CODEX_API_KEY_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -663,6 +666,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   PASSWORD_MANAGERS_CAPABILITY,
   BROWSER_PROXIES_CAPABILITY,
   BROWSER_EGRESS_CAPABILITY,
+  CODEX_API_KEY_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -789,6 +793,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== WORKFLOWS_CHATS_CAPABILITY &&
       capability !== PASSWORD_MANAGERS_CAPABILITY &&
       capability !== BROWSER_PROXIES_CAPABILITY &&
-      capability !== BROWSER_EGRESS_CAPABILITY,
+      capability !== BROWSER_EGRESS_CAPABILITY &&
+      capability !== CODEX_API_KEY_CAPABILITY,
   );
 }
