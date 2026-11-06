@@ -1,9 +1,10 @@
 import {
   BROWSER_PROXY_ADDRESS_MAX,
   BROWSER_PROXY_LIMIT,
-  type BrowserProxySummary,
   browserProxyAddressText,
   browserProxyName,
+  browserProxySaveAddress,
+  editableBrowserProxyAddress,
   parseBrowserProxyAddress,
   type SaveBrowserProxyInput,
 } from "@openbot/contracts/ipc";
@@ -35,17 +36,6 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
-
-/** Stands in for a saved password in the address field. The password itself stays on the host. */
-const SAVED_PASSWORD = "••••••••";
-
-/** The address to edit: a saved password shows as `SAVED_PASSWORD`. */
-function editableAddress(proxy: BrowserProxySummary | undefined): string {
-  if (!proxy) return "";
-  if (!proxy.hasPassword) return browserProxyAddressText(proxy);
-  const user = proxy.username === null ? "" : encodeURIComponent(proxy.username);
-  return `${proxy.scheme}://${user}:${SAVED_PASSWORD}@${proxy.host}:${proxy.port}`;
-}
 
 function stackOf(agentId: string | undefined): BrowserProfileStack {
   return agentId ? { kind: "agent", agentId } : { kind: "server" };
@@ -164,7 +154,7 @@ export function ServerBrowserProxyScreen() {
   // The address that the page opened with: the host refuses a save when the proxy is different now.
   const opened = useRef<{ address: string; previousAddress: string } | null>(null);
   if (proxy && opened.current === null)
-    opened.current = { address: editableAddress(proxy), previousAddress: browserProxyAddressText(proxy) };
+    opened.current = { address: editableBrowserProxyAddress(proxy), previousAddress: browserProxyAddressText(proxy) };
   const initial = opened.current?.address ?? "";
   const [draft, setDraft] = useState<string | undefined>();
   const [pending, setPending] = useState(false);
@@ -218,6 +208,8 @@ export function ServerBrowserProxyScreen() {
     }
   }
 
+  // After a delete the new list has no proxy: the closing page shows nothing, not the gone note.
+  if (proxyId && !choice && leaving.current) return <SettingsContent />;
   if (!proxies.available || !list || (proxyId && !choice))
     return (
       <SettingsContent>
@@ -249,13 +241,13 @@ export function ServerBrowserProxyScreen() {
       setError(t("mobile.server.browserProxies.addressInvalid"));
       return;
     }
-    const keepPassword = proxy?.hasPassword === true && parsed.password === SAVED_PASSWORD;
-    const input: SaveBrowserProxyInput = { address: keepPassword ? browserProxyAddressText(parsed) : trimmed };
+    const next = browserProxySaveAddress(proxy, parsed, trimmed);
+    const input: SaveBrowserProxyInput = { address: next.address };
     if (proxy && opened.current) {
       input.proxyId = proxy.id;
       input.previousAddress = opened.current.previousAddress;
     }
-    if (keepPassword) input.keepPassword = true;
+    if (next.keepPassword) input.keepPassword = true;
     const run = () =>
       void perform(async () => {
         const saved = await proxies.save(input);

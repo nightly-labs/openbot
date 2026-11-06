@@ -4,8 +4,9 @@ import {
   type BrowserProxyFailure,
   type BrowserProxyNameParts,
   type BrowserProxySummary,
-  browserProxyAddressText,
   browserProxyName,
+  browserProxySaveAddress,
+  editableBrowserProxyAddress,
   parseBrowserProxyAddress,
 } from "@openbot/contracts/ipc";
 import {
@@ -281,17 +282,6 @@ export function BrowserComputerShareDialog(props: {
   );
 }
 
-/** Stands in for a saved password in the address field. The password itself stays on the host. */
-const SAVED_PASSWORD = "••••••••";
-
-/** The address to edit: a saved password shows as `SAVED_PASSWORD`. */
-function editableAddress(proxy: BrowserProxySummary | null): string {
-  if (!proxy) return "";
-  if (!proxy.hasPassword) return browserProxyAddressText(proxy);
-  const user = proxy.username === null ? "" : encodeURIComponent(proxy.username);
-  return `${proxy.scheme}://${user}:${SAVED_PASSWORD}@${proxy.host}:${proxy.port}`;
-}
-
 /** Tells that a change closes open tabs. */
 export function BrowserProxyClosesTabs(props: { count: number }) {
   const { t } = useText();
@@ -316,7 +306,7 @@ export function BrowserProxyDialog(props: {
   onCancel: () => void;
 }) {
   const { t, errorMessage } = useText();
-  const initial = untrack(() => editableAddress(props.proxy));
+  const initial = untrack(() => editableBrowserProxyAddress(props.proxy));
   const [form, setForm] = createStore({ address: initial, error: "" });
   const changed = () => props.proxy === null || form.address.trim() !== initial;
   const closesTabs = () => (changed() ? props.closesTabs : 0);
@@ -332,9 +322,9 @@ export function BrowserProxyDialog(props: {
       });
       return;
     }
-    const keepPassword = props.proxy?.hasPassword === true && parsed.password === SAVED_PASSWORD;
+    const { address, keepPassword } = browserProxySaveAddress(props.proxy, parsed, form.address);
     try {
-      await props.onSave(keepPassword ? browserProxyAddressText(parsed) : form.address.trim(), keepPassword);
+      await props.onSave(address, keepPassword);
     } catch (error) {
       setForm((draft) => {
         draft.error = errorMessage(error, t("browser.profiles.failed"));

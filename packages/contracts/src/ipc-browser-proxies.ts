@@ -184,6 +184,30 @@ export interface BrowserProxySummary {
   failure: BrowserProxyFailure | null;
 }
 
+/** Stands in for a saved password in the address field. The password itself stays on the host. */
+const BROWSER_PROXY_SAVED_PASSWORD = "••••••••";
+
+/** The address to edit: a saved password shows as a mask. */
+export function editableBrowserProxyAddress(proxy: BrowserProxySummary | null | undefined): string {
+  if (!proxy) return "";
+  if (!proxy.hasPassword) return browserProxyAddressText(proxy);
+  const user = proxy.username === null ? "" : encodeURIComponent(proxy.username);
+  return `${proxy.scheme}://${user}:${BROWSER_PROXY_SAVED_PASSWORD}@${proxy.host}:${proxy.port}`;
+}
+
+/**
+ * The address to save from the edited text. When the mask of a saved password stays, the address has
+ * no password and `keepPassword` is true, so the host keeps the saved password.
+ */
+export function browserProxySaveAddress(
+  proxy: BrowserProxySummary | null | undefined,
+  parsed: BrowserProxyAddress,
+  text: string,
+): { address: string; keepPassword: boolean } {
+  const keepPassword = proxy?.hasPassword === true && parsed.password === BROWSER_PROXY_SAVED_PASSWORD;
+  return { address: keepPassword ? browserProxyAddressText(parsed) : text.trim(), keepPassword };
+}
+
 /** The computer of one member, as a proxy. Each member has at most one. */
 export interface BrowserProxyComputer {
   id: string;
