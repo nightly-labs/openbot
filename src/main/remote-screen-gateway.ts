@@ -162,6 +162,11 @@ export class RemoteScreenGateway {
   readonly #pendingStreamStarts: Array<{ sessionId: string; start: () => void }> = [];
   // The session requests that wait for `confirmSession`. Aborting one refuses it.
   readonly #pendingConfirmations = new Map<AbortController, { memberId: string; teamSessionId: string }>();
+  /**
+   * The requests between the question and their session. The runtime can take seconds to start
+   * after Allow, and a revoke or Stop all in that time must refuse the session that comes after it.
+   */
+  readonly #requestsAfterQuestion = new Set<{ memberId: string; teamSessionId: string; refused: boolean }>();
   readonly #layer: Layer.Layer<ScreenDependencies>;
   #scope = Scope.makeUnsafe();
   readonly #operations = new Set<Deferred.Deferred<void>>();
@@ -549,10 +554,17 @@ export class RemoteScreenGateway {
       });
     // After the checks that need no answer, so the person at this computer is not asked about a
     // request that fails anyway.
-    yield* this.#confirm(input);
-    yield* this.#ensureRuntime().pipe(
-      Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause: this.#runtimeStartRefusal(cause) })),
+    const starting = { memberId: input.memberId, teamSessionId: input.teamSessionId, refused: false };
+    this.#requestsAfterQuestion.add(starting);
+    yield* this.#confirm(input).pipe(
+      Effect.andThen(
+        this.#ensureRuntime().pipe(
+          Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause: this.#runtimeStartRefusal(cause) })),
+        ),
+      ),
+      Effect.ensuring(Effect.sync(() => this.#requestsAfterQuestion.delete(starting))),
     );
+    if (starting.refused) return yield* new RemoteWorkflowError({ cause: remoteControlDeclined() });
     if (this.#testSessionId)
       return yield* new RemoteWorkflowError({
         cause: new RemoteScreenError(409, "session_capacity_reached", sourceText("error.remote.testActive")),
@@ -650,6 +662,7 @@ export class RemoteScreenGateway {
 
   #abortConfirmations(matches: (pending: { memberId: string; teamSessionId: string }) => boolean): void {
     for (const [controller, pending] of this.#pendingConfirmations) if (matches(pending)) controller.abort();
+    for (const starting of this.#requestsAfterQuestion) if (matches(starting)) starting.refused = true;
   }
 
   /** Ends every session, the host owner's test included, and refuses each request that waits for an answer. */

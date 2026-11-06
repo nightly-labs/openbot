@@ -327,7 +327,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   let syncedServerId = "";
 
   const local = () => props.server.kind === "local";
-  const remoteDesktopSection = () => props.remoteDesktopSupported !== false && props.platform === "darwin";
+  // The client's remote desktop setup is for macOS. A local server shows the section on every platform,
+  // because its owner chooses there who can control the computer.
+  const remoteDesktopSection = () => props.remoteDesktopSupported !== false && (props.platform === "darwin" || local());
   const configured = () => (local() ? Boolean(props.hostStatus?.configured) : true);
   /**
    * The role check without `configured()`. MCP servers belong to this machine and are spawned

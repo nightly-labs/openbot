@@ -7,6 +7,7 @@ import type {
   RemoteDesktopConnection,
   RemoteDesktopStream,
 } from "@/features/workspace/components/remote-team-transport";
+import { currentText } from "@/shared/lib/text";
 import { remoteViewerProxyNative, type ViewerProxyRequest } from "./remote-viewer-proxy-native";
 import { VIEWER_STATS_FILE } from "./viewer-page-script";
 
@@ -33,6 +34,8 @@ export interface ViewerProxy {
 
 /** The host's file answers and the attachment limit allow a few files at a time. */
 const REQUESTS_IN_FLIGHT = 4;
+/** The native server answers 504 after this, so a request that takes longer frees its place. */
+const REQUEST_DEADLINE_MS = 60_000;
 /** As the desktop proxy: what a socket can hold before the host opens it. */
 const MAX_PENDING_SIGNAL_BYTES = 1024 * 1024;
 // The desktop proxy sends the same policy for the viewer's pages.
@@ -157,7 +160,9 @@ export async function startViewerProxy(
 
   const forward = async (request: ViewerProxyRequest) => {
     const route = upstream(request.target);
-    if (!route || !viewerRoute.test(route.pathname)) return respondText(request.requestId, 404, "Not found");
+    // A request of a proxy that a newer session started: that proxy answers it.
+    if (!route) return;
+    if (!viewerRoute.test(route.pathname)) return respondText(request.requestId, 404, "Not found");
     if (route.pathname === statsPath) {
       if (request.method === "POST" && request.bodyBase64) {
         try {
@@ -189,7 +194,17 @@ export async function startViewerProxy(
       }
     }
     try {
-      const answer = await limit(() => connection.fetchRaw(method, route.path, body, upload));
+      const answer = await limit(async () => {
+        // A request that waited for its place after the stop does not go to the host.
+        if (stopped) throw new Error("The viewer proxy stopped.");
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const deadline = new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error("The host did not answer in time.")), REQUEST_DEADLINE_MS);
+        });
+        return Promise.race([connection.fetchRaw(method, route.path, body, upload), deadline]).finally(() =>
+          clearTimeout(timer),
+        );
+      });
       if (stopped) return;
       if (answer.status === 204) return respond(request.requestId, 204, {});
       const file = answer.body;
@@ -230,7 +245,9 @@ export async function startViewerProxy(
     native.addListener("onRequest", (request) => void forward(request)),
     native.addListener("onSocketOpen", ({ socketId, target }) => {
       const route = upstream(target);
-      if (!route || route.path !== streamPath) {
+      // A socket of a proxy that a newer session started: that proxy takes it.
+      if (!route) return;
+      if (route.path !== streamPath) {
         void native.socketClose(socketId, 1008, "").catch(() => undefined);
         return;
       }
@@ -277,9 +294,10 @@ export async function startViewerProxy(
   let port: number;
   try {
     port = await native.start(token);
-  } catch (error) {
+  } catch {
     for (const subscription of subscriptions) subscription.remove();
-    throw error;
+    // The native reason is English: the screen shows the app's own text.
+    throw new Error(currentText().t("mobile.server.remoteDesktop.failed"));
   }
 
   return {

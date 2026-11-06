@@ -110,6 +110,8 @@ export async function routeRemoteScreen(
     return json(201, session);
   }
   if (method === "PUT" && url.pathname === TEAM_API_ROUTES.remoteScreen.display) {
+    // A new display restarts every open stream, so only a role that may control this computer changes it.
+    requireControlRole(member);
     if (!remoteScreen) {
       throw new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.controlUnavailable"));
     }

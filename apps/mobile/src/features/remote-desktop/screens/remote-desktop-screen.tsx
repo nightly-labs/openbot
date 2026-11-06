@@ -29,7 +29,7 @@ import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import { useUniwind } from "uniwind";
-import { authenticateWithDevice } from "@/features/app-lock/model/device-unlock";
+import { checkDeviceUnlock } from "@/features/app-lock/model/app-lock";
 import { ChatGlassButton, ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { type MenuAction, MenuView } from "@/shared/components/menu-view";
@@ -159,6 +159,19 @@ export function RemoteDesktopScreen() {
     generation: 0,
   });
 
+  // The unlock prompt shows: on Android 9 and 10 it is an activity of its own, and the app reads as
+  // in the background. A session that passes it has unlocked once, so Retry does not ask again.
+  const unlocking = useRef(false);
+  const unlocked = useRef(false);
+  const scriptFor = useCallback(
+    (display: RemoteDesktopHost["displays"][number] | undefined) =>
+      viewerPageScript(chosenQuality, chosenTouchMode, display, String(background), {
+        top: insets.top + (isIOS ? NATIVE_BAR_HEIGHT : CONTROL_OFFSET + CONTROL_SIZE),
+        bottom: insets.bottom + CONTROL_OFFSET + CONTROL_SIZE,
+      }),
+    [background, insets.top, insets.bottom],
+  );
+
   const stop = useCallback(async () => {
     const current = running.current;
     current.generation += 1;
@@ -172,8 +185,10 @@ export function RemoteDesktopScreen() {
 
   const start = useCallback(
     async (unlock: boolean) => {
-      await stop();
+      // The generation is read before the wait: a second start during the wait makes this one old.
+      const stopping = stop();
       const generation = running.current.generation;
+      await stopping;
       const current = () => running.current.generation === generation;
       setPhase({ type: "starting" });
       setViewer({ kind: "connecting" });
@@ -184,12 +199,19 @@ export function RemoteDesktopScreen() {
         return setPhase({ type: "failed", message: t("mobile.server.remoteDesktop.unsupported") });
       if (unlock) {
         // The phone's owner, not only a person who holds an unlocked phone, controls the computer.
-        const result = await authenticateWithDevice(t("mobile.server.remoteDesktop.unlockPrompt"), t("common.cancel"));
+        unlocking.current = true;
+        const result = await checkDeviceUnlock(
+          t("mobile.server.remoteDesktop.unlockPrompt"),
+          t("common.cancel"),
+        ).finally(() => {
+          unlocking.current = false;
+        });
         if (!current()) return;
         if (result === "cancel" || result === "failed") {
           router.back();
           return;
         }
+        unlocked.current = true;
       }
       const connection = remoteDesktopConnection(serverId);
       if (!connection) return setPhase({ type: "failed", message: t("mobile.server.remoteDesktop.offline") });
@@ -228,10 +250,7 @@ export function RemoteDesktopScreen() {
         setPhase({
           type: "viewing",
           url: proxy.viewerUrl(session.viewerGrant),
-          script: viewerPageScript(chosenQuality, chosenTouchMode, display, String(background), {
-            top: insets.top + (isIOS ? NATIVE_BAR_HEIGHT : CONTROL_OFFSET + CONTROL_SIZE),
-            bottom: insets.bottom + CONTROL_OFFSET + CONTROL_SIZE,
-          }),
+          script: scriptFor(display),
           host,
           session,
         });
@@ -240,7 +259,7 @@ export function RemoteDesktopScreen() {
           setPhase({ type: "failed", message: failureText(error) ?? t("mobile.server.remoteDesktop.failed") });
       }
     },
-    [stop, canControlComputer, remoteDesktopConnection, serverId, t, background, insets.top, insets.bottom],
+    [stop, canControlComputer, remoteDesktopConnection, serverId, t, scriptFor],
   );
 
   // Starts once, and ends the session when the screen closes. The workspace gives new functions on
@@ -254,7 +273,7 @@ export function RemoteDesktopScreen() {
 
   // The stream ends when the app leaves the foreground: the phone cannot hold it, and nobody sees it.
   useEffect(() => {
-    if (appForeground || phase.type === "paused" || phase.type === "failed") return;
+    if (appForeground || unlocking.current || phase.type === "paused" || phase.type === "failed") return;
     void stop();
     setPhase({ type: "paused" });
   }, [appForeground, phase.type, stop]);
@@ -444,14 +463,28 @@ export function RemoteDesktopScreen() {
       const display = viewing.session.displays.find((item) => item.id === displayId);
       if (!display || displayId === viewing.session.selectedDisplayId) return;
       void haptics.selection();
+      const generation = running.current.generation;
+      const previous = viewing.session.selectedDisplayId;
       setViewer({ kind: "switching", display: display.label, lastError: null });
-      setPhase({ ...viewing, session: { ...viewing.session, selectedDisplayId: displayId } });
-      void selectRemoteDesktopDisplay(connection, displayId).catch((error: unknown) =>
+      // The page loads again for the new display, and asks for a stream of that display's size.
+      setPhase({
+        ...viewing,
+        script: scriptFor(display),
+        session: { ...viewing.session, selectedDisplayId: displayId },
+      });
+      void selectRemoteDesktopDisplay(connection, displayId).catch((error: unknown) => {
+        if (running.current.generation !== generation) return;
+        // The host kept the display it had, so the phone shows that one as chosen again.
+        setPhase((current) =>
+          current.type === "viewing"
+            ? { ...current, session: { ...current.session, selectedDisplayId: previous } }
+            : current,
+        );
         setViewer({
           kind: "failed",
           message: failureText(error) ?? t("mobile.server.remoteDesktop.displaySwitchFailed", { name: display.label }),
-        }),
-      );
+        });
+      });
     } else if (id.startsWith("quality:")) {
       const quality = id === "quality:saver" ? "saver" : id === "quality:fast" ? "fast" : "smooth";
       if (quality === chosenQuality) return;
@@ -532,7 +565,9 @@ export function RemoteDesktopScreen() {
               source={{ uri: viewing.url }}
               injectedJavaScriptBeforeContentLoaded={viewing.script}
               // Only the viewer's own loopback address loads. The page has no `onMessage`, so it cannot call the app.
-              originWhitelist={["http://127.0.0.1:*"]}
+              // Every origin passes the list, so the handler below decides each load: the library opens a
+              // URL that fails the list in another app, and the host's page must not open links or apps.
+              originWhitelist={["*"]}
               onShouldStartLoadWithRequest={(request) => request.url.startsWith(viewing.url.split("/v1/")[0] ?? "")}
               onOpenWindow={() => undefined}
               setSupportMultipleWindows={false}
@@ -565,7 +600,8 @@ export function RemoteDesktopScreen() {
                   variant="secondary"
                   onPress={() => {
                     void haptics.impact("soft");
-                    void start(status.action === "reconnect");
+                    // After the app was in the background the phone asks again; a retry does not.
+                    void start(status.action === "reconnect" || !unlocked.current);
                   }}
                 >
                   <Button.Label>

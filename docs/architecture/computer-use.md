@@ -144,16 +144,27 @@ capability. On a server with an agent display, Sunshine runs on that display (se
 
 The host owner chooses in Server settings › Remote desktop which roles may start a session
 (`owner`, `admins` or `members`; `members` by default) and whether the person at the computer must
-allow each session. `remote-control-policy-store.ts` keeps both in a JSON file in userData, as the
-Private network setting does. The route checks the role on `sessions`, `setup` and `test`.
-`remote-control-question.ts` asks with a sheet on the main window, and a request that nobody allows
-in 30 s, that the client drops, or that a revoke or Stop all ends, is refused. A host with no window
-refuses every session while the question is on. Both refusals are a 403 with a localized message
-and no code: every released protocol rejects an error code it does not know.
+allow each session. The section shows for the local server on every platform; the client setup
+steps in it stay macOS only. `remote-control-policy-store.ts` keeps both settings in a JSON file in
+userData, as the Private network setting does. The route checks the role on `sessions`, `setup`,
+`test` and `display`: a new display restarts every open stream.
+
+`remote-control-question.ts` asks with a sheet on the main window. A request is refused when
+nobody allows it in 30 s, when a revoke or Stop all ends it, or when a client on a direct HTTP
+connection drops it. A WebRTC client has no cancel frame, so its question stays until an answer or
+the 30 s end. A released desktop client on direct HTTP stops waiting after 15 s. After Allow, the
+runtime can take seconds to start; a revoke or Stop all in that time also refuses the request. A
+host with no window refuses every session while the question is on. Both refusals are a 403 with a
+localized message and no code: every released protocol rejects an error code it does not know.
 
 The gateway's audit events show the sign: a notification at the first stream of a remote session,
-and the tray item while a session streams, with the member's name and **Stop all remote control**.
-A local test session does not count.
+and the tray item with the member's name and **Stop all remote control** while the session exists.
+A session that a client leaves without a close stays until it is closed, revoked, or its team
+session ends. A local test session does not count.
+
+An extra server on the same computer (`local-server-child.ts`) runs its own gateway with its own
+policy file and no question, tray or notification. Its members are not covered by the desktop's
+settings.
 
 ### Remote desktop on the phone
 

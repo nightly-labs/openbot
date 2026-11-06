@@ -1,6 +1,7 @@
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import type { RemoteDesktopConnection } from "@/features/workspace/components/remote-team-transport";
+import { currentText } from "@/shared/lib/text";
 
 // The released remote screen routes, as the desktop app's `RemoteServerClient` uses them. The phone
 // reads only the fields it shows.
@@ -28,7 +29,7 @@ export interface RemoteDesktopViewerSession {
 }
 
 function invalid(): never {
-  throw new Error("The host sent an invalid remote desktop answer.");
+  throw new Error(currentText().t("mobile.server.remoteDesktop.failed"));
 }
 
 function decodeDisplays(value: unknown): RemoteDesktopDisplay[] {
@@ -68,7 +69,7 @@ function decodeSession(value: unknown): RemoteDesktopViewerSession {
 
 /** A refused request names the host's reason in its error, so only a status the host sent as a value is checked here. */
 function requireStatus(status: number): void {
-  if (status >= 400) throw new Error("The host refused the remote desktop request.");
+  if (status >= 400) throw new Error(currentText().t("mobile.server.remoteDesktop.failed"));
 }
 
 export async function readRemoteDesktopHost(connection: RemoteDesktopConnection): Promise<RemoteDesktopHost> {
