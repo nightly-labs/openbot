@@ -348,6 +348,11 @@ export function MessageBody(props: {
   onDownloadImageFile?: ((file: MessageImageFile) => void) | undefined;
   /** The window draws the macOS window controls over the top start corner. The image viewer leaves room. */
   macWindowControls?: boolean | undefined;
+  /**
+   * Draws a long message in full, with no fold. In-chat search and a quote jump find text only in
+   * what the chat draws.
+   */
+  showFull?: boolean | undefined;
 }) {
   const { t } = useText();
   const streamingBody = createStreamingBody(
@@ -491,7 +496,7 @@ export function MessageBody(props: {
     standaloneAttachments().filter((attachment) => !isLightboxImage(attachment)),
   );
   const contentBlocks = createMemo<MessageContentBlock[]>((previous) => {
-    const folded = longMessage() && !expanded();
+    const folded = longMessage() && !expanded() && props.showFull !== true;
     const text = folded ? messagePreview(fullText()) : fullText();
     return reuseUnchangedBlocks(
       previous ?? [],
@@ -778,7 +783,7 @@ export function MessageBody(props: {
                   </Switch>
                 )}
               </For>
-              <Show when={longMessage()}>
+              <Show when={longMessage() && props.showFull !== true}>
                 <Button
                   variant="ghost"
                   size="sm"

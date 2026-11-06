@@ -17,6 +17,7 @@ import { usePlatform } from "../../platform";
 import { deviceQuoteShortcut, deviceSendShortcut } from "../../send-shortcut-preference";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
 import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
+import { chatSearchOpensMessage } from "./chat-search";
 import { latestVisibleAgentMessageId } from "./conversation-read-state";
 import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationThreads } from "./conversation-types";
@@ -265,6 +266,9 @@ export function ConversationThread() {
           </Show>
           <AgentThreadView
             scrollRef={setThreadScrollElement}
+            showFullMessage={(message) =>
+              threadSearchOpen() && chatSearchOpensMessage(message.body, threadSearchQuery())
+            }
             task={current().threads.open ?? null}
             limit={current().threads.limit}
             agent={current().agent}

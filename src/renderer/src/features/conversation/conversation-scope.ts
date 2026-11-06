@@ -1465,6 +1465,9 @@ export function createConversationViewScope(props: ConversationProps) {
     else moveThreadToPanel(id);
   }
 
+  /** The message that a quote jump opened. A long message draws only its start, and the passage can be later. */
+  const [quotedMessageId, setQuotedMessageId] = createSignal<string | null>(null);
+
   /** Scrolls to the passage that a quote points to and marks it. A file passage opens in the side panel. */
   function openQuote(messageId: string, text: string) {
     stopRevealingFileQuote();
@@ -1474,6 +1477,8 @@ export function createConversationViewScope(props: ConversationProps) {
       if (shown || openQuotedFile(file)) revealFileQuote(document, file, text);
       return;
     }
+    setQuotedMessageId(messageId);
+    flush();
     if (!showQuotedText(messageId, text)) void revealQuote(messageId, text);
   }
 
@@ -2212,6 +2217,7 @@ export function createConversationViewScope(props: ConversationProps) {
     composerFocusRequest,
     composerHasContent,
     copiedMessageId,
+    quotedMessageId,
     copyMessage,
     messageText,
     pasteFiles,

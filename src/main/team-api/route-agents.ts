@@ -49,6 +49,7 @@ import {
   browserTakeoverDecision,
   markerExclusionsForCapabilities,
   memberSender,
+  messageTextCut,
   pageLimit,
   pathIdentifier,
   promptAnswers,
@@ -58,6 +59,7 @@ import {
   requireAdmin,
   requireAgentLevel,
   stringField,
+  WEBRTC_FRAME_BODY_BUDGET,
 } from "./request-helpers";
 import { routeAgentConversation } from "./route-agent-conversation";
 import { routeAgentMemories } from "./route-agent-memories";
@@ -166,17 +168,28 @@ export async function routeAgents(
     if (!query.trim() || query.length > INPUT_LIMITS.messageText) {
       throw new HttpError(400, sourceText("error.team.searchQueryRequired"));
     }
-    return json(
-      200,
-      agents.searchConversationMessages(
-        query,
-        // A query parameter is part of the released URL, and the versioned adapters translate JSON
-        // bodies only. `botId` is what every shipped client sends and what every shipped host reads.
-        url.searchParams.get("botId") ?? undefined,
-        url.searchParams.get("cursor") ?? undefined,
-        pageLimit(url),
-      ),
-    );
+    // A query parameter is part of the released URL, and the versioned adapters translate JSON
+    // bodies only. `botId` is what every shipped client sends and what every shipped host reads.
+    const agentId = url.searchParams.get("botId") ?? undefined;
+    const cursor = url.searchParams.get("cursor") ?? undefined;
+    // Each result holds its whole message. As the conversation page does, long messages make a page
+    // of fewer results, and one message alone that is too large is cut, so the page fits one WebRTC
+    // frame. The cursor is an offset, so the client reads the rest as later pages.
+    for (let limit = pageLimit(url); ; limit = Math.floor(limit / 2)) {
+      const page = agents.searchConversationMessages(query, agentId, cursor, limit);
+      const bytes = Buffer.byteLength(JSON.stringify(page));
+      if (bytes <= WEBRTC_FRAME_BODY_BUDGET) return json(200, page);
+      if (limit === 1) {
+        const cut = messageTextCut(
+          page.results.map((result) => result.message),
+          bytes - WEBRTC_FRAME_BODY_BUDGET,
+        );
+        return json(200, {
+          ...page,
+          results: page.results.map((result) => ({ ...result, message: cut(result.message) })),
+        });
+      }
+    }
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.status) {
     return json(200, agents.getStatus());
