@@ -28,8 +28,10 @@ export function shellReadPaths(item: unknown): string[] {
     });
   }
   if (item.type !== "toolCall" || getString(item, "name") !== "Bash") return [];
-  return shownFileCommands(getString(item, "command") ?? "")
-    .filter((command) => !REMOTE_COMMAND.test(command))
+  // A remote command can hold several commands in quotes, so the whole line is checked before the split.
+  const line = getString(item, "command") ?? "";
+  if (REMOTE_COMMAND.test(line)) return [];
+  return shownFileCommands(line)
     .flatMap(shellWords)
     .map(expandHome)
     .filter((path) => isAbsolute(path) && !GLOB.test(path));
