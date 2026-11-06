@@ -111,7 +111,7 @@ class ShareIntoViewController: UIViewController {
       "hostPublicKey": server.publicKey,
       "hosted": server.hosted,
       "agentId": agent.id,
-      "text": content.text,
+      "text": model.text,
       "files": content.files.map { ["name": $0.name, "mimeType": $0.mimeType] },
       "clientMessageId": UUID().uuidString,
       "timezone": TimeZone.current.identifier,
