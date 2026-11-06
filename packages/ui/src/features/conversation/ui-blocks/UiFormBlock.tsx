@@ -104,7 +104,7 @@ function FooterSelect(props: {
       disabled={props.disabled}
       disallowEmptySelection={props.field.required === true}
       placeholder={props.field.required ? t("uiBlock.form.choose") : t("uiBlock.form.notSet")}
-      validationState={props.invalid ? "invalid" : undefined}
+      validationState={props.invalid ? "invalid" : "valid"}
       sameWidth={false}
       placement="bottom-start"
       onChange={(value) => props.onChange(value ?? "")}
