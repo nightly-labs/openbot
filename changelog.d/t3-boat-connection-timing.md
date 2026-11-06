@@ -1,7 +1,6 @@
 ### Changed
 
 - A hosted server that was asleep connects sooner after you open it. The server starts OpenBot sooner, publishes itself to the account service right after it signs in, and the app connects as soon as the server is ready instead of at its next check.
-- A hosted server runs OpenBot from its AppImage file, not from more than 1,000 unpacked files. After a wake, the host restores one file instead of each file of the app, so the server is ready about half a minute sooner. A server that an older release installed changes to the AppImage at its next update check.
 - After a wake, a hosted server checks its providers with a longer time limit while its disk is restored, and looks for provider updates after the restore. Before, a provider that worked could show that the computer was busy.
 - A hosted server no longer saves its npm download cache when it goes to sleep, so a wake restores less data.
 - The installed app uses about 150 MB less disk space: it no longer includes the source maps of its dependencies.

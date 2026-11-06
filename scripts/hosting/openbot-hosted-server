@@ -155,14 +155,9 @@ export GNOME_KEYRING_CONTROL
 # both. lightdm keeps the other keys when it writes the file. After a resume, boat can start the
 # session after this service. A sandbox that has no desktop session uses two virtual displays.
 
-# A hosted server runs OpenBot from the AppImage that `openbot-hosted-update trigger` mounted;
-# openbot-hosted-update says why. A self-hosted server, and one that has no AppImage yet, run the
-# unpacked release.
-app=/opt/OpenBot/app
-if mountpoint -q /run/openbot-app; then app=/run/openbot-app; fi
 # OpenBot writes its PID for `--stop` before it starts.
 openbot=(bash -c 'echo "$$" >"$XDG_RUNTIME_DIR/openbot.pid" && exec "$@"' openbot-hosted-server
-  "$app/openbot" --password-store=gnome-libsecret)
+  /opt/OpenBot/app/openbot --password-store=gnome-libsecret)
 if [ "$mode" = hosted ]; then
   # The same 2 minutes as before, but OpenBot starts within 0.4 s after the desktop is ready.
   for _ in $(seq 1 300); do
