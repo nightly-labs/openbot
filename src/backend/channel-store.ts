@@ -405,9 +405,9 @@ export class ChannelStore {
     return row ? decodeAssignment(JSON.parse(requiredStringColumn(row, "assignment_json"))) : null;
   }
 
-  page(channelId: string, before?: number): ChannelPage {
-    const messages = this.messages(channelId, before, 101);
-    const hasOlder = messages.length > 100;
+  page(channelId: string, before?: number, limit = 100): ChannelPage {
+    const messages = this.messages(channelId, before, limit + 1);
+    const hasOlder = messages.length > limit;
     if (hasOlder) messages.shift();
     const olderCursor = hasOlder ? (messages[0]?.sequence ?? null) : null;
     return {
