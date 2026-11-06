@@ -2005,7 +2005,7 @@ export async function createApplicationServices({
     catalog: new ModelReleaseCatalog(),
     listModels: () => service.listModels(),
     listAgents: () => service.listAgents(),
-    modelsChanged: () => service.notifyModelsChanged(),
+    modelsChanged: () => service.notifyProviderSettingsChanged(),
   });
   await runCauseEffect(modelVisibility.load());
   /** The answer an agent gave in one turn, for routine flows, routine results and local scripts. */

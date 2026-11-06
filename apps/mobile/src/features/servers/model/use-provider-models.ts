@@ -52,7 +52,9 @@ export function useProviderModels(serverId: string, provider: AgentProviderId | 
       }
     } catch (cause) {
       queued.current = null;
+      saving.current = false;
       setError(errorMessage(cause, t("mobile.server.providers.modelsFailed")));
+      // The page shows the change that failed; the host has the list that is true.
       await queryClient.invalidateQueries({ queryKey: key, exact: true });
     } finally {
       saving.current = false;
@@ -65,7 +67,8 @@ export function useProviderModels(serverId: string, provider: AgentProviderId | 
     (shown: AgentModelId[]) => {
       const key = keys.current;
       if (!queryClient.getQueryData<ProviderModelVisibility>(key)) return;
-      void queryClient.cancelQueries({ queryKey: key, exact: true });
+      // A read that started before the change stops, and does not put back the list from before it.
+      void queryClient.cancelQueries({ queryKey: key, exact: true }, { revert: false });
       queryClient.setQueryData<ProviderModelVisibility>(key, (current) =>
         current ? { ...current, shown: [...shown], changed: true } : current,
       );

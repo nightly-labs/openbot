@@ -40,7 +40,7 @@ export class PromptCacheTtlPreferenceStore {
     });
   }
 
-  /** Runs after each saved change, from this computer or a joined server, so every client reads it again. */
+  /** Runs after a save that changes the time, from this computer or a joined server, so every client reads it again. */
   onChange(listener: () => void): void {
     this.#changed = listener;
   }
@@ -50,18 +50,26 @@ export class PromptCacheTtlPreferenceStore {
   }
 
   readonly set = Effect.fn("PromptCacheTtlPreference.set")((ttl: PromptCacheTtl) =>
-    this.#writes.withPermit(
-      Effect.uninterruptible(
-        writePreferenceFile(this.#path, { version: 1, ttl }).pipe(
-          Effect.tap(() =>
-            Effect.sync(() => {
+    this.#writes
+      .withPermit(
+        Effect.uninterruptible(
+          writePreferenceFile(this.#path, { version: 1, ttl }).pipe(
+            Effect.map(() => {
+              const changed = this.#ttl !== ttl;
               this.#ttl = ttl;
-              this.#changed();
+              return changed;
             }),
           ),
-          Effect.map(() => this.get()),
         ),
+      )
+      .pipe(
+        // After the permit, and only for a new time: the clients read it again.
+        Effect.tap((changed) =>
+          Effect.sync(() => {
+            if (changed) this.#changed();
+          }),
+        ),
+        Effect.map(() => this.get()),
       ),
-    ),
   );
 }

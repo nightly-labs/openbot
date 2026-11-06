@@ -152,7 +152,8 @@ function AccountPage({
       await operation();
       void haptics.notification("success");
       if (kind === "remove") setLeaving(true);
-      else await onChanged();
+      // A reset changes no account; it reads its credits again.
+      else if (kind !== "reset") await onChanged();
     } catch (cause) {
       setError(
         errorMessage(

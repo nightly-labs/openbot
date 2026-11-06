@@ -54,8 +54,9 @@ export function ServerProviderScreen() {
   const providers = useServerProviders(serverId);
   const { available, admin, status, rows, applyStatus, applyRuntimes, refreshStatus } = providers;
   const accounts = useServerProviderAccounts(serverId, admin);
-  const models = useProviderModels(serverId, provider, admin);
   const row = rows.find((candidate) => candidate.id === provider);
+  // A provider that is off has no Models row, so the page does not read its list.
+  const models = useProviderModels(serverId, row?.status?.off ? null : provider, admin);
   const locked = useRef(false);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);

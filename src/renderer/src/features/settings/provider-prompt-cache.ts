@@ -48,11 +48,10 @@ export function createProviderPromptCache(
           if (request === generation && read === reads && !state.pending)
             setState((draft) => {
               draft.value = next.ttl;
-              draft.error = null;
             });
         },
         (error: unknown) => {
-          if (request === generation && read === reads)
+          if (request === generation && read === reads && !state.pending)
             setState((draft) => {
               draft.error = errorMessage(error, t("provider.settings.promptCacheLoadFailed"));
             });
