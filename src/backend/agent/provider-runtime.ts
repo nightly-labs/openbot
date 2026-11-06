@@ -96,6 +96,7 @@ import {
   isGitSpawnDiagnostic,
   isGlogBelowErrorDiagnostic,
   isIgnoredConfigDiagnostic,
+  isMcpSignInDiagnostic,
   isMcpSubsystemDiagnostic,
   isRustLogBelowErrorDiagnostic,
   isTelemetryExportDiagnostic,
@@ -450,6 +451,8 @@ export class ProviderRuntime implements ProviderPort {
    */
   readonly #lastErrors = new Map<AgentProvider, { message: string; at: number; serial: number }>();
   #errorSerial = 0;
+  /** The MCP server failures shown in this run, by provider, server and kind. */
+  readonly #reportedMcpFailures = new Set<string>();
   /** The last usage each provider reported, shown for a released provider instead of starting it. */
   readonly #lastUsage = new Map<AgentProvider, AccountUsage["limits"][number]>();
   /**
@@ -3729,18 +3732,10 @@ export class ProviderRuntime implements ProviderPort {
         });
         return;
       }
-      // Also the name a provider was given. One with no letter or digit, such as `__`, would match
-      // every `mcp__server__tool` line.
-      const names = new Set(
-        [...this.#credentials.mcpServers().map((config) => config.name), ...this.#mcpHandoff.names()].flatMap(
-          (name) => {
-            const given = providerMcpServerName(name);
-            return /[A-Za-z0-9]/u.test(given) ? [name, given] : [name];
-          },
-        ),
-      );
-      if (isMcpSubsystemDiagnostic(message, [...names])) {
-        stderrLogger.warn("A provider reported an MCP server failure.", { provider: client.provider, message });
+      if (isMcpSubsystemDiagnostic(message)) {
+        const server = this.#configuredMcpServerIn(message);
+        stderrLogger.warn("A provider reported an MCP server failure.", { provider: client.provider, server, message });
+        if (server) this.#reportMcpServerFailure(client.provider, server, message);
         return;
       }
       if (isTelemetryExportDiagnostic(message)) {
@@ -4054,6 +4049,51 @@ export class ProviderRuntime implements ProviderPort {
     }
     this.#emitError(`${provider}_${kind}`, error, agentId, context);
     this.#setStatus({});
+  }
+
+  /**
+   * The name of the MCP server from this app's list that a provider's MCP line is about, or null
+   * for a server from the user's own provider files, which goes to the log only.
+   *
+   * A line can name the server by its URL rather than its name: Grok's `rmcp` worker quotes only the
+   * OAuth metadata address, `https://<host>/.well-known/oauth-protected-resource/<path>`, so the host
+   * is what the two forms share. The URL is read first, because a short name such as `mcp` is in
+   * every MCP line. A name the provider was given counts too; one with no letter or digit, such as
+   * `__`, would match every `mcp__server__tool` line.
+   */
+  #configuredMcpServerIn(message: string): string | null {
+    const configs = this.#credentials.mcpServers();
+    const byHost = configs.flatMap((config) => {
+      const url = config.transport === "http" ? URL.parse(config.url) : null;
+      return url?.host && message.includes(url.host) ? [{ name: config.name, path: url.pathname }] : [];
+    });
+    const byUrl = byHost.find((row) => row.path !== "/" && message.includes(row.path)) ?? byHost[0];
+    if (byUrl) return byUrl.name;
+    const named = (name: string) => {
+      const given = providerMcpServerName(name);
+      return (name !== "" && message.includes(name)) || (/[A-Za-z0-9]/u.test(given) && message.includes(given));
+    };
+    return [...configs.map((config) => config.name), ...this.#mcpHandoff.names()].find(named) ?? null;
+  }
+
+  /**
+   * Shows that a provider could not use an MCP server from this app's list, once for each server and
+   * kind in this run: a server spawns for each session, so the same line arrives at every start. The
+   * provider works without the server, so its row keeps no error, and the toast sends the user to
+   * the MCP settings, where Sign in and Test connection give the cause.
+   */
+  #reportMcpServerFailure(provider: AgentProvider, server: string, message: string): void {
+    const signIn = isMcpSignInDiagnostic(message);
+    const key = [provider, server, signIn].join("\u0000");
+    if (this.#reportedMcpFailures.has(key)) return;
+    this.#reportedMcpFailures.add(key);
+    this.#emitError(
+      "mcp_server_not_started",
+      sourceText(signIn ? "error.backend.mcpServerSignInForProvider" : "error.backend.mcpServerFailedForProvider", {
+        provider: providerLabel(provider),
+        name: server,
+      }),
+    );
   }
 
   #recordProviderError(provider: AgentProvider, error: unknown): void {
