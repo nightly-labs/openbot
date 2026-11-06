@@ -117,6 +117,17 @@ export function syncEventQueries(
       predicate: (query) => query.queryKey.at(-1) === "browser-profile",
     });
   }
+  if (event.type === "status") {
+    // The host sends a status event after a change to its providers, the models that its picker
+    // shows or the prompt cache time, such as one on the desktop app. Open provider pages read again.
+    for (const queryKey of [
+      queryKeys.providerStatus(scope, serverId),
+      queryKeys.providerModels(scope, serverId),
+      queryKeys.providerPromptCache(scope, serverId),
+      queryKeys.agentModels(scope, serverId),
+    ])
+      void queryClient.invalidateQueries({ queryKey });
+  }
   if (event.type === "workflows-changed") {
     void queryClient.invalidateQueries({ queryKey: queryKeys.workflowList(scope, serverId) });
     void queryClient.invalidateQueries({ queryKey: queryKeys.workflow(scope, serverId, event.workflowId) });

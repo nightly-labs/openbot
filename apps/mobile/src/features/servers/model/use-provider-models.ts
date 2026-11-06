@@ -1,0 +1,88 @@
+import type { AgentModelId, AgentProviderId, ProviderModelVisibility } from "@openbot/contracts/ipc";
+import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useRef, useState } from "react";
+import { useQueryScope } from "@/features/auth/context/mobile-session-context";
+import type { ProviderAdmin } from "@/features/servers/model/provider-admin";
+import { queryKeys } from "@/features/workspace/model/query-keys";
+import { useText } from "@/shared/lib/text";
+
+/**
+ * The models of one provider of a host and the ones its model picker shows (`model-visibility-v1`),
+ * as the provider page and the Models page read them. The host checks the role again.
+ *
+ * A change shows at once. Saves go one at a time, and only the last change is sent, as on desktop.
+ * A failed save reads the list again, because the host has the list that is true.
+ */
+export function useProviderModels(serverId: string, provider: AgentProviderId | null, admin: ProviderAdmin | null) {
+  const { t, errorMessage } = useText();
+  const queryScope = useQueryScope();
+  const queryClient = useQueryClient();
+  const models = admin?.models;
+  const queryKey = queryKeys.providerModels(queryScope, serverId, provider ?? "");
+  const keys = useRef(queryKey);
+  keys.current = queryKey;
+  const [error, setError] = useState<string | null>(null);
+  /** The next list to send; `shown: null` resets the provider. */
+  const queued = useRef<{ shown: AgentModelId[] | null } | null>(null);
+  const saving = useRef(false);
+  const list = useQuery({
+    queryKey,
+    retry: false,
+    staleTime: 0,
+    // A read while a change is saved would show the list from before it; the save answers the list.
+    queryFn:
+      models && provider
+        ? async () => {
+            const shown = queryClient.getQueryData<ProviderModelVisibility>(keys.current);
+            return shown && (saving.current || queued.current) ? shown : models.read(provider);
+          }
+        : skipToken,
+  });
+
+  const flush = useCallback(async () => {
+    if (!models || !provider || saving.current) return;
+    saving.current = true;
+    const key = keys.current;
+    try {
+      while (queued.current) {
+        const { shown } = queued.current;
+        queued.current = null;
+        const next = await models.set(provider, shown);
+        if (queued.current === null) queryClient.setQueryData(key, next);
+      }
+    } catch (cause) {
+      queued.current = null;
+      setError(errorMessage(cause, t("mobile.server.providers.modelsFailed")));
+      await queryClient.invalidateQueries({ queryKey: key, exact: true });
+    } finally {
+      saving.current = false;
+      // The model pickers of this server read the list that the host now gives.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.agentModels(queryScope, serverId) });
+    }
+  }, [models, provider, queryClient, queryScope, serverId, errorMessage, t]);
+
+  const change = useCallback(
+    (shown: AgentModelId[]) => {
+      const key = keys.current;
+      if (!queryClient.getQueryData<ProviderModelVisibility>(key)) return;
+      void queryClient.cancelQueries({ queryKey: key, exact: true });
+      queryClient.setQueryData<ProviderModelVisibility>(key, (current) =>
+        current ? { ...current, shown: [...shown], changed: true } : current,
+      );
+      setError(null);
+      queued.current = { shown: [...shown] };
+      void flush();
+    },
+    [flush, queryClient],
+  );
+
+  /** The host knows the default; the list changes when it answers. */
+  const reset = useCallback(() => {
+    if (!queryClient.getQueryData(keys.current)) return;
+    setError(null);
+    queued.current = { shown: null };
+    void flush();
+  }, [flush, queryClient]);
+
+  return { available: Boolean(models), list, error, change, reset };
+}

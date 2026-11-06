@@ -573,7 +573,10 @@ export function HostProviderSettingsPanel(
   },
 ) {
   const hostDefaultProvider = createHostDefaultProvider(() => props.hostDefaultProvider);
-  const promptCache = createProviderPromptCache(() => props.promptCache);
+  const promptCache = createProviderPromptCache(
+    () => props.promptCache,
+    () => props.agentStatus,
+  );
   const modelVisibility = createProviderModelVisibility(
     () => props.modelVisibility,
     () => props.agentStatus,

@@ -20,6 +20,7 @@ export class PromptCacheTtlPreferenceStore {
   readonly #path: string;
   #ttl: PromptCacheTtl = DEFAULT_PROMPT_CACHE_TTL.ttl;
   #writes = Semaphore.makeUnsafe(1);
+  #changed: () => void = () => undefined;
 
   constructor(path: string) {
     this.#path = path;
@@ -39,6 +40,11 @@ export class PromptCacheTtlPreferenceStore {
     });
   }
 
+  /** Runs after each saved change, from this computer or a joined server, so every client reads it again. */
+  onChange(listener: () => void): void {
+    this.#changed = listener;
+  }
+
   get(): PromptCacheTtlSetting {
     return { ttl: this.#ttl };
   }
@@ -50,6 +56,7 @@ export class PromptCacheTtlPreferenceStore {
           Effect.tap(() =>
             Effect.sync(() => {
               this.#ttl = ttl;
+              this.#changed();
             }),
           ),
           Effect.map(() => this.get()),

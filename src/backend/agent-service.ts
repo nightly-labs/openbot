@@ -2380,6 +2380,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#emit({ type: "status", status: this.getStatus() });
   }
 
+  /**
+   * Tells the renderer and each joined client to read the provider settings again, such as the
+   * prompt cache time. They read them by pull, refreshed on a status event.
+   */
+  notifyProviderSettingsChanged(): void {
+    this.#emit({ type: "status", status: this.getStatus() });
+  }
+
   readonly generateProfile = Effect.fn("AgentService.generateProfile")(
     function* (this: AgentService, input: GenerateAgentProfileInput, sections: SidebarSection[]) {
       const agent = input.agentId ? this.listAgents().find((candidate) => candidate.id === input.agentId) : null;
