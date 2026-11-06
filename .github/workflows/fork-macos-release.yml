@@ -111,11 +111,19 @@ jobs:
           bun run test:desktop -- --maxWorkers=2
           NODE_OPTIONS=--max-old-space-size=4096 bun run check:api
 
-      - name: Prepare packaged runtimes
+      - name: Prepare voice runtime
+        run: bun run voice:prepare-runtime
+
+      - name: Download remote desktop runtime
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bun run prepare:remote-desktop-runtime
+
+      - name: Verify remote desktop runtime
+        run: bun run verify:remote-desktop-runtime
+
+      - name: Prepare Computer Use driver and app build
         run: |
-          bun run voice:prepare-runtime
-          bun run prepare:remote-desktop-runtime
-          bun run verify:remote-desktop-runtime
           bun run prepare:cua-driver
           bun run build
 
