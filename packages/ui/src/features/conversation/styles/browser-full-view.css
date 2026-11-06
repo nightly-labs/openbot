@@ -8,8 +8,11 @@
  * (`BrowserFullView.tsx`), so an opening transition is only time in front of an empty card.
  */
 
-/* Keep app navigation below the portaled browser and its backdrop. */
-body:has(.browser-full-view) .app-frame {
+/*
+ * Keep app navigation below the portaled browser and its backdrop. `BrowserFullView` sets the body
+ * attribute: a `body:has()` rule makes the browser restyle the whole page on each change in the chat.
+ */
+body[data-browser-full-view] .app-frame {
   isolation: isolate;
 }
 
