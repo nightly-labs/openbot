@@ -3234,7 +3234,10 @@ function normalizeStoredState(value: StoredState): StoredState {
   };
 }
 
-/** Durable final answers, bound to the request's worker and original sender, are completion evidence. */
+/**
+ * Durable final answers, bound to the request's worker and original sender, are completion evidence.
+ * A stored request expects a reply by default. Enqueue stores `expectsReply` only for an explicit `false`.
+ */
 function answeredDeliveryIds(state: StoredState): Set<string> {
   const messages = new Map(state.messages.map((message) => [message.id, message]));
   // Failure notes use the reply wire shape, but never prove that the teammate answered.
