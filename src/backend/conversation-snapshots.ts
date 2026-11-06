@@ -144,7 +144,7 @@ export function mergeProviderHistoryMessages(
 }
 
 /** A user prompt from provider history, or the mailbox delivery that the prompt came from. */
-function promptMessage(
+export function promptMessage(
   context: DeliveryContext | null,
   row: Pick<ConversationMessage, "id" | "turnId" | "text" | "createdAt">,
 ): ConversationMessage {

@@ -16,7 +16,6 @@ import {
   agentNamesById,
   CURRENT_MESSAGE_SEPARATOR,
   combinedPromptInput,
-  deliveryConversationMessage,
   deliveryPromptInput,
   type TagReferenceSource,
 } from "./delivery-content";
@@ -846,7 +845,18 @@ export class DrainScheduler {
 
       for (const { delivery: item } of batch) {
         if (snapshot.messages.some((message) => message.id === item.id)) continue;
-        snapshot.messages.push(deliveryConversationMessage(item));
+        snapshot.messages.push({
+          id: item.id,
+          author: item.sender.kind === "agent" ? "agent" : "user",
+          source: item.sender.kind === "agent" ? "agent" : "user",
+          ...(item.sender.kind === "agent" ? { senderAgentId: item.sender.agentId } : {}),
+          replyToMessageId: item.replyToMessageId,
+          attachments: item.attachments,
+          delivery: { id: item.id, status: "starting", position: null },
+          text: item.text,
+          createdAt: item.createdAt,
+          status: "completed",
+        });
       }
       this.#conversation.emitConversation(snapshot);
 
