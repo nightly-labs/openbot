@@ -421,8 +421,11 @@ export function ConversationTimeline() {
             referencedMessage={quoted()}
             referencedAuthorName={quotedAuthorName()}
             // The sender's name opens the side thread that sent the message, or else the sender's own chat.
+            // Another agent, such as a mention in the text, opens as before.
             onSelectAgent={(agentId) =>
-              props.onSelectAgent(agentId, current().exchange?.senderTaskId ?? MAIN_THREAD_ID)
+              agentId === current().exchange?.senderAgentId
+                ? props.onSelectAgent(agentId, current().exchange?.senderTaskId ?? MAIN_THREAD_ID)
+                : props.onSelectAgent(agentId)
             }
             onOpenLink={(url) => void openExternalMessageUrl(url)}
             onPreview={(attachment) => void previewAttachment(attachment)}
