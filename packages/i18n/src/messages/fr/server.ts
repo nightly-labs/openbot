@@ -307,6 +307,7 @@ export const messages = {
   "server.settings.addLogo": "Ajouter un logo au serveur",
   "server.settings.removeLogo": "Supprimer le logo du serveur",
   "server.settings.access": "Accès",
+  "server.companySignIn.desktopOnly": "Configurez l’authentification unique dans l’application de bureau OpenBot.",
   "server.settings.publish": "Publier ce serveur",
   "server.settings.published": "Le serveur est publié",
   "server.settings.setUpDesktopTitle": "Configurer le bureau à distance",

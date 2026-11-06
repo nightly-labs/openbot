@@ -1,8 +1,9 @@
 import type { UiBlockStatus } from "@openbot/contracts/ui-blocks";
-import { Badge, Button, CircleCheck, Clock3, LoaderCircle, X } from "@openbot/ui";
+import { Bubble, BubbleContent, Button, CircleCheck, Clock3, Spinner, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createUniqueId, Match, Show, Switch } from "solid-js";
 import { useText } from "../../../text";
+import { cx } from "../../../utils";
 
 export interface UiBlockCardProps {
   title?: string | undefined;
@@ -20,6 +21,10 @@ export interface UiBlockCardProps {
   error?: string | undefined;
   /** Closes the open block without an answer. */
   onSkip?: (() => void) | undefined;
+  /** The buttons that answer the open block. The footer shows them at its end, after Skip. */
+  actions?: JSX.Element | undefined;
+  /** A small control at the start of the footer, such as a choice that goes with the answer. */
+  footerStart?: JSX.Element | undefined;
   class?: string | undefined;
   elementRef?: ((element: HTMLElement) => void) | undefined;
   children?: JSX.Element;
@@ -95,44 +100,79 @@ export function UiBlockFooter(props: {
 }
 
 /**
- * The frame of a blocking block: title, subtitle, a badge while it waits, the body, and, once the
- * block is answered, expired or closed, the outcome line. A closed block says its state once, in
- * the outcome line, so it has no badge.
+ * The frame of a blocking block, in the style of an agent question: a bubble with the title, the
+ * body, and, while the block is open, a footer with Skip and the block's own buttons. Once the
+ * block is answered, expired or closed, the outcome line takes the place of the footer.
  */
 export function UiBlockCard(props: UiBlockCardProps) {
   const { t } = useText();
   const titleId = createUniqueId();
+  const pending = () => props.status === "pending";
   return (
-    <article
-      class={["conversation-interaction-card", "ui-block-card", props.class]}
+    <Bubble
+      variant="muted"
+      class={cx("ui-block-card", props.class)}
       data-status={props.status}
       data-danger={props.danger ? "" : undefined}
-      aria-labelledby={props.title ? titleId : undefined}
-      aria-busy={props.busy ? "true" : undefined}
-      ref={(element) => props.elementRef?.(element)}
+      ref={(element: HTMLDivElement) => props.elementRef?.(element)}
     >
-      <header class="ui-block-header">
-        {props.icon}
-        <div class="ui-block-heading">
-          <Show when={props.title}>
-            <h3 id={titleId} class="ui-block-title">
-              {props.title}
-            </h3>
-          </Show>
-          <Show when={props.subtitle}>
-            <p class="ui-block-subtitle">{props.subtitle}</p>
-          </Show>
-        </div>
-        <Show when={props.status === "pending"}>
-          <Badge variant="warning-light" class="conversation-interaction-status ui-block-status">
-            <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
-            {t("uiBlock.status.pending")}
-          </Badge>
+      <BubbleContent
+        as="article"
+        class="ui-block-content"
+        aria-labelledby={props.title ? titleId : undefined}
+        aria-busy={props.busy ? "true" : undefined}
+      >
+        <Show when={props.title || props.subtitle || props.icon}>
+          <header class="ui-block-header">
+            {props.icon}
+            <div class="ui-block-heading">
+              <Show when={props.title}>
+                <h3 id={titleId} class="ui-block-title">
+                  {props.title}
+                </h3>
+              </Show>
+              <Show when={props.subtitle}>
+                <p class="ui-block-subtitle">{props.subtitle}</p>
+              </Show>
+            </div>
+          </header>
         </Show>
-      </header>
-      <div class="ui-block-body">{props.children}</div>
-      <UiBlockFooter status={props.status} error={props.error} onSkip={props.onSkip} busy={props.busy} />
-      <UiBlockOutcome status={props.status} outcome={props.outcome} />
-    </article>
+        <div class="ui-block-body">{props.children}</div>
+        <Show when={pending() && props.error}>
+          <p class="ui-block-error" role="alert">
+            {props.error}
+          </p>
+        </Show>
+        <Show when={pending() && (props.actions || props.onSkip)}>
+          <footer class="ui-block-card-footer">
+            {props.footerStart}
+            <Show when={props.busy}>
+              <span class="ui-block-sending" role="status">
+                <Spinner size="sm" />
+                {t("common.sending")}
+              </span>
+            </Show>
+            <span class="ui-block-actions">
+              <Show when={props.onSkip}>
+                {(skip) => (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    class="ui-block-skip"
+                    disabled={props.busy === true}
+                    onClick={() => skip()()}
+                  >
+                    {t("uiBlock.skip")}
+                  </Button>
+                )}
+              </Show>
+              {props.actions}
+            </span>
+          </footer>
+        </Show>
+        <UiBlockOutcome status={props.status} outcome={props.outcome} />
+      </BubbleContent>
+    </Bubble>
   );
 }

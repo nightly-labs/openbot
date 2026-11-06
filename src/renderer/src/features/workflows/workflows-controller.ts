@@ -30,6 +30,7 @@ import { EMPTY_WORKFLOW_RUN_VIEW, type WorkflowRunView } from "@openbot/ui/featu
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, untrack } from "solid-js";
 import type { DesktopAnalyticsScope, WorkflowAnalyticsAction } from "../../analytics";
+import { webhookFailureCode } from "../../webhook-failure-code";
 import { createGitHubConnector } from "../connectors/github-connector";
 import type { WorkflowHost } from "./workflows-port";
 
@@ -75,20 +76,20 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
   ): Promise<T> => {
     const scope = analytics?.();
     const startedAt = performance.now();
-    const send = (result: "succeeded" | "failed") =>
+    const send = (result: "succeeded" | "failed", error?: unknown) =>
       scope?.track("workflow_action", {
         action,
         ...(nodeKind ? { node_kind: nodeKind } : {}),
         duration_ms: Math.max(0, Math.round(performance.now() - startedAt)),
         result,
-        ...(result === "failed" ? { failure_code: FAILURE_CODES[action] } : {}),
+        ...(result === "failed" ? { failure_code: webhookFailureCode(error, FAILURE_CODES[action]) } : {}),
       });
     try {
       const value = await call();
       send("succeeded");
       return value;
     } catch (error) {
-      send("failed");
+      send("failed", error);
       throw error;
     }
   };

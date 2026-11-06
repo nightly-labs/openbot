@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/uiBlock";
 
 export const messages = {
-  "uiBlock.status.pending": "답변 필요",
   "uiBlock.status.answered": "답변 완료",
   "uiBlock.outcome.expired": "제시간에 답변이 없었어요",
   "uiBlock.outcome.closed": "답변 없이 종료되었어요",
@@ -17,8 +16,6 @@ export const messages = {
   "uiBlock.confirm.hideFullPreview": "간단히 보기",
   "uiBlock.choice.submit": "보내기",
   "uiBlock.choice.shortcutHint": "{first}~{last}을(를) 눌러 선택하세요",
-  "uiBlock.choice.selectedCount": { other: "{count}개 선택됨" },
-  "uiBlock.choice.noneSelected": "선택한 항목 없음",
   "uiBlock.quick.label": "빠른 답장",
   "uiBlock.quick.textLabel": "직접 답장",
   "uiBlock.quick.textPlaceholder": "또는 직접 답장을 입력하세요",

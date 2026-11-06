@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/uiBlock";
 
 export const messages = {
-  "uiBlock.status.pending": "Czeka na odpowiedź",
   "uiBlock.status.answered": "Odpowiedziano",
   "uiBlock.outcome.expired": "Nie udzielono odpowiedzi na czas",
   "uiBlock.outcome.closed": "Zamknięto bez odpowiedzi",
@@ -17,13 +16,6 @@ export const messages = {
   "uiBlock.confirm.hideFullPreview": "Pokaż mniej",
   "uiBlock.choice.submit": "Wyślij",
   "uiBlock.choice.shortcutHint": "Naciśnij od {first} do {last}, aby wybrać",
-  "uiBlock.choice.selectedCount": {
-    one: "Wybrano: {count}",
-    few: "Wybrano: {count}",
-    many: "Wybrano: {count}",
-    other: "Wybrano: {count}",
-  },
-  "uiBlock.choice.noneSelected": "Nic nie wybrano",
   "uiBlock.quick.label": "Szybkie odpowiedzi",
   "uiBlock.quick.textLabel": "Twoja odpowiedź",
   "uiBlock.quick.textPlaceholder": "Lub wpisz własną odpowiedź",

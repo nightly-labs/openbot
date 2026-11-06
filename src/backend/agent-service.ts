@@ -254,7 +254,7 @@ import { isAnswer, MessagingThreads, toMessagingThreadFailed } from "./messaging
 import type { PasswordVault } from "./password-vault";
 import { canConfineProcesses } from "./process-confinement";
 import { decodeRecordResponse, getString } from "./protocol";
-import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext } from "./provider-drivers";
+import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext, requireProviderDriver } from "./provider-drivers";
 import { providerHistoryPersistence } from "./provider-history-persistence";
 import { recordAgentRestartActivity } from "./restart-activity";
 import type { RoutineFlowTools } from "./routine-flows/routine-flow-tools";
@@ -435,6 +435,11 @@ const USER_SEND_RETRY_WINDOW_MS = 24 * 60 * 60 * 1000;
 const MAX_SECTION_TEAMMATES = 32;
 /** How long an archive waits for the provider to end the turn that it stopped. After it, the archive is refused. */
 const TASK_STOP_WAIT_MS = 15_000;
+/**
+ * How long after a list that lacks an agent's model a `catalog.partialListAtStart` provider is asked
+ * again. Grok 1.0.70 has its whole catalogue about a second after it starts on an expired sign-in.
+ */
+const PARTIAL_LIST_RECHECK_MS = 5_000;
 
 /** The user's update, and the browser profile choice that the profile operations set after their checks. */
 export type AgentUpdate = UpdateAgentInput & {
@@ -868,10 +873,23 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         onProviderActivated: (provider, configRevision) =>
           Effect.gen({ self: this }, function* () {
             if (isCustomProviderHarness(provider)) this.#endpoints.clearReleased(provider, configRevision);
+            // A CLI that can list part of its models at start is asked once more, outside the lock,
+            // before an agent leaves a model. A second list that is not fresh moves nobody, and
+            // neither does one from a process that replaced this one: its own activation decides.
+            let listConfirmed = true;
+            if (
+              requireProviderDriver(provider).catalog?.partialListAtStart &&
+              this.#endpoints.hasAgentsOffList(provider)
+            ) {
+              const client = this.#providers.currentClient(provider);
+              yield* Effect.sleep(PARTIAL_LIST_RECHECK_MS);
+              const fresh = yield* this.#providers.refreshModels();
+              listConfirmed = fresh.has(provider) && this.#providers.currentClient(provider) === client;
+            }
             yield* this.#endpoints.runExclusive(() =>
               Effect.gen({ self: this }, function* () {
                 if (isCustomProviderHarness(provider)) yield* this.#endpoints.moveAgentsToHarness(provider);
-                yield* this.#endpoints.moveAgentsOffUnlistedModels(provider);
+                if (listConfirmed) yield* this.#endpoints.moveAgentsOffUnlistedModels(provider);
               }),
             );
           }),

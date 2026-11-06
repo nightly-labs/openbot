@@ -1,4 +1,4 @@
-import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
+import { chatTagReferences, referenceName } from "@openbot/contracts/chat-tag-references";
 import type { DraftAttachment } from "@openbot/contracts/ipc";
 import { referenceChipClasses } from "@openbot/ui/reference-chip";
 import { usesTouchLayout } from "@openbot/ui/utils";
@@ -267,22 +267,6 @@ export function createQuoteToken(messageId: string, text: string): HTMLSpanEleme
   name.textContent = text;
   token.append(iconWrap, name);
   return token;
-}
-
-/**
- * The most characters of a tab or thread title that a tag keeps. The provider reads the current
- * title when the message is delivered, so the tag needs only enough to show what it names.
- */
-const REFERENCE_NAME_LIMIT = 80;
-
-function referenceName(name: string): string {
-  const characters = Array.from(name.replace(/\s+/gu, " ").trim());
-  return characters.length > REFERENCE_NAME_LIMIT
-    ? `${characters
-        .slice(0, REFERENCE_NAME_LIMIT - 1)
-        .join("")
-        .trimEnd()}…`
-    : characters.join("");
 }
 
 /** A browser tab of the agent. The tag keeps the title that the tab had when the user tagged it. */

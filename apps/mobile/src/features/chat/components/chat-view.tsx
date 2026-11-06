@@ -25,7 +25,7 @@ import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { useBrowserFeature } from "@/features/browser/components/use-browser-feature";
 import { channelRecipient } from "@/features/channels/model/channel-draft";
 import type { ApprovalDecision } from "@/features/chat/components/chat-approval-card";
-import { ChatComposer, type MentionSkill } from "@/features/chat/components/chat-composer";
+import { ChatComposer, type MentionReference, type MentionSkill } from "@/features/chat/components/chat-composer";
 import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
 import { ChatHeader } from "@/features/chat/components/chat-header";
 import { ChatMessageList } from "@/features/chat/components/chat-message-list";
@@ -99,6 +99,8 @@ export interface ChatViewProps {
   mentionAgents: MobileAgent[];
   /** The skills of the chat's agent, for `@` and for Use skill in the plus menu. */
   mentionSkills?: readonly MentionSkill[];
+  /** The agent's browser tabs and open threads, for `@`. */
+  mentionReferences?: readonly MentionReference[];
   projectedMessages: ChatMessage[];
   referenceMessages: ChatMessage[];
   ready: boolean;
@@ -235,6 +237,7 @@ export function ChatView({
   agents: serverAgents,
   mentionAgents,
   mentionSkills,
+  mentionReferences,
   projectedMessages,
   referenceMessages,
   ready,
@@ -1283,6 +1286,7 @@ export function ChatView({
                   onCancelReply={cancelReply}
                   mentionAgents={mentionAgents}
                   mentionSkills={mentionSkills}
+                  mentionReferences={mentionReferences}
                   skillPickerVersion={skillPickerVersion}
                   onSuggestionsVisibleChange={setSuggestionsOpen}
                   key={target.id}

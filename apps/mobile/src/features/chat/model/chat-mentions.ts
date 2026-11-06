@@ -13,7 +13,7 @@ export function mentionDraft(source: string) {
     const start = text.length;
     // A quote keeps its marker through an edit, as a mention does. The phone cannot jump to its source.
     // A skill or an app reads as its name after @, as the desktop chip does; its marker goes to the host.
-    // A browser tab or a thread of the agent is on the host only, so it reads as its name.
+    // A browser tab or a thread of the agent reads as its name, as the desktop chip does.
     text += mentionText(reference);
     mentions.push({ start, end: text.length, reference, wire: source.slice(reference.start, reference.end) });
     cursor = reference.end;
@@ -58,12 +58,15 @@ export function mentionQuery(source: string, cursor: number) {
   return { start, end: cursor, query: query.toLocaleLowerCase() };
 }
 
-/** Writes an agent mention, or a skill or app reference as the desktop chip sends it, over the typed `@query`. */
+/**
+ * Writes an agent mention, or a skill, app, browser tab or thread reference as the desktop chip sends
+ * it, over the typed `@query`.
+ */
 export function insertMention(
   source: string,
   range: { start: number; end: number },
   agent: { id: string; name: string },
-  kind: "agent" | "skill" | "mcp" = "agent",
+  kind: "agent" | "skill" | "mcp" | "tab" | "thread" = "agent",
 ) {
   const wireOffset = (position: number) => {
     let offset = position;

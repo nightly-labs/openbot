@@ -1,5 +1,5 @@
 import type { UiAction, UiActionStyle, UiConfirmBlock as UiConfirmSpec } from "@openbot/contracts/ui-blocks";
-import { Button, NativeSelect, Spinner } from "@openbot/ui";
+import { Button, NativeSelect } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, createUniqueId, For, flush, Match, onSettled, Show, Switch } from "solid-js";
 import { useText } from "../../../text";
@@ -187,6 +187,50 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
     );
   }
 
+  /**
+   * The footer buttons. An agent lists the main action first; the footer shows it last, at the end of
+   * the row, as the main button of a question. The step that asks again shows its own buttons, so the
+   * footer has none then.
+   */
+  function actionButtonsOrNone(): JSX.Element | undefined {
+    if (confirming()) return undefined;
+    return (
+      <For each={props.spec.actions.toReversed()}>
+        {(action) => (
+          <Switch>
+            <Match when={isHeld(action)}>
+              <UiHoldButton
+                holdMs={holdMs()}
+                variant={BUTTON_VARIANT[actionStyle(action)]}
+                disabled={locked()}
+                describedBy={hintId}
+                ref={(element) => actionButtons.set(action.id, element)}
+                onComplete={() => respond(action)}
+                onClickWithoutHold={() => askAgain(action)}
+              >
+                {action.label}
+              </UiHoldButton>
+            </Match>
+            <Match when={true}>
+              <Button
+                type="button"
+                size="sm"
+                variant={BUTTON_VARIANT[actionStyle(action)]}
+                disabled={locked()}
+                ref={(element: HTMLButtonElement) => {
+                  actionButtons.set(action.id, element);
+                }}
+                onClick={() => (action.confirm === true ? askAgain(action) : respond(action))}
+              >
+                {actionLabel(action)}
+              </Button>
+            </Match>
+          </Switch>
+        )}
+      </For>
+    );
+  }
+
   return (
     <UiBlockCard
       class={cx("ui-block-confirm", props.class)}
@@ -196,7 +240,9 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
       danger={props.spec.danger}
       busy={props.busy}
       error={props.error}
-      onSkip={props.disabled || autoAnswer() ? undefined : props.onSkip}
+      // The step that asks again has its own Cancel, so it has no Skip.
+      onSkip={props.disabled || autoAnswer() || confirming() ? undefined : props.onSkip}
+      actions={actionButtonsOrNone()}
       elementRef={props.elementRef}
     >
       <Show when={(props.spec.fields?.length ?? 0) > 0}>
@@ -241,8 +287,12 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
           <fieldset class="ui-block-confirm-step">
             <legend class="ui-block-confirm-question">{t("uiBlock.confirm.prompt", { action: action().label })}</legend>
             <div class="ui-block-actions">
+              <Button type="button" size="sm" variant="secondary" disabled={props.busy === true} onClick={stopAsking}>
+                {t("common.cancel")}
+              </Button>
               <Button
                 type="button"
+                size="sm"
                 variant={BUTTON_VARIANT[actionStyle(action())]}
                 disabled={locked()}
                 ref={(element: HTMLButtonElement) => {
@@ -252,59 +302,14 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
               >
                 {t("uiBlock.confirm.accept")}
               </Button>
-              <Button type="button" variant="ghost" disabled={props.busy === true} onClick={stopAsking}>
-                {t("common.cancel")}
-              </Button>
             </div>
           </fieldset>
         )}
       </Show>
-      <Show when={!frozen() && !confirming()}>
-        <div class={cx("ui-block-actions", autoAnswer() && "ui-block-actions-auto")}>
-          <For each={props.spec.actions}>
-            {(action) => (
-              <Switch>
-                <Match when={isHeld(action)}>
-                  <UiHoldButton
-                    holdMs={holdMs()}
-                    variant={BUTTON_VARIANT[actionStyle(action)]}
-                    disabled={locked()}
-                    describedBy={hintId}
-                    ref={(element) => actionButtons.set(action.id, element)}
-                    onComplete={() => respond(action)}
-                    onClickWithoutHold={() => askAgain(action)}
-                  >
-                    {action.label}
-                  </UiHoldButton>
-                </Match>
-                <Match when={true}>
-                  <Button
-                    type="button"
-                    variant={BUTTON_VARIANT[actionStyle(action)]}
-                    disabled={locked()}
-                    ref={(element: HTMLButtonElement) => {
-                      actionButtons.set(action.id, element);
-                    }}
-                    onClick={() => (action.confirm === true ? askAgain(action) : respond(action))}
-                  >
-                    {actionLabel(action)}
-                  </Button>
-                </Match>
-              </Switch>
-            )}
-          </For>
-          <Show when={props.busy}>
-            <span class="ui-block-sending" role="status">
-              <Spinner size="sm" />
-              {t("common.sending")}
-            </span>
-          </Show>
-        </div>
-        <Show when={anyHeld()}>
-          <p id={hintId} class="ui-block-hint">
-            {t("uiBlock.confirm.holdHint")}
-          </p>
-        </Show>
+      <Show when={!frozen() && !confirming() && anyHeld()}>
+        <p id={hintId} class="ui-block-hint">
+          {t("uiBlock.confirm.holdHint")}
+        </p>
       </Show>
     </UiBlockCard>
   );

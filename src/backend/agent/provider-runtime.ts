@@ -934,6 +934,16 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   /**
+   * Reads the model list of each connected provider again and answers the providers that gave a fresh
+   * one. The status event tells the renderer to read the catalogue again.
+   */
+  readonly refreshModels = Effect.fn("ProviderRuntime.refreshModels")(function* (this: ProviderRuntime) {
+    const fresh = yield* this.#refreshModelCatalog();
+    this.#setStatus({});
+    return fresh;
+  }).bind(this);
+
+  /**
    * A client for one generation without tools. With `accountId`, it signs in as that provider account,
    * as the agent's own process does, so the generation does not spend the limit of the provider's own sign-in.
    */

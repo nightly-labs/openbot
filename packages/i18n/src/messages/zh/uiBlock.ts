@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/uiBlock";
 
 export const messages = {
-  "uiBlock.status.pending": "需要你回答",
   "uiBlock.status.answered": "已回答",
   "uiBlock.outcome.expired": "超时未回答",
   "uiBlock.outcome.closed": "未回答即关闭",
@@ -17,8 +16,6 @@ export const messages = {
   "uiBlock.confirm.hideFullPreview": "收起",
   "uiBlock.choice.submit": "发送",
   "uiBlock.choice.shortcutHint": "按 {first} 到 {last} 选择",
-  "uiBlock.choice.selectedCount": { one: "已选 {count} 项", other: "已选 {count} 项" },
-  "uiBlock.choice.noneSelected": "未选择任何项",
   "uiBlock.quick.label": "快捷回复",
   "uiBlock.quick.textLabel": "自己写的回复",
   "uiBlock.quick.textPlaceholder": "也可以自己输入回复",

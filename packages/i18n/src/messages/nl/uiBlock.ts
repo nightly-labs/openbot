@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/uiBlock";
 
 export const messages = {
-  "uiBlock.status.pending": "Wacht op je antwoord",
   "uiBlock.status.answered": "Beantwoord",
   "uiBlock.outcome.expired": "Er is niet op tijd geantwoord",
   "uiBlock.outcome.closed": "Gesloten zonder antwoord",
@@ -18,8 +17,6 @@ export const messages = {
   "uiBlock.confirm.hideFullPreview": "Minder tonen",
   "uiBlock.choice.submit": "Sturen",
   "uiBlock.choice.shortcutHint": "Druk op {first} t/m {last} om te kiezen",
-  "uiBlock.choice.selectedCount": { one: "{count} geselecteerd", other: "{count} geselecteerd" },
-  "uiBlock.choice.noneSelected": "Niets geselecteerd",
   "uiBlock.quick.label": "Snelle antwoorden",
   "uiBlock.quick.textLabel": "Je eigen antwoord",
   "uiBlock.quick.textPlaceholder": "Of typ je eigen antwoord",

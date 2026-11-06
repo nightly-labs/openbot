@@ -2333,8 +2333,8 @@ textarea {
 
 /* The working badge, with its felt balls, is in `@openbot/ui/features/sidebar/sidebar-working-badge.css`. */
 
-/* The unread count and the failed routine mark are felt too, with their transitions, in
-   `@openbot/ui/features/sidebar/sidebar-felt-badges.css`. */
+/* The unread count, the failed routine mark and the badge of an agent that waits for the user are
+   felt too, with their transitions, in `@openbot/ui/features/sidebar/sidebar-felt-badges.css`. */
 
 .agent-row-thinking-dots {
   display: inline-flex;
@@ -2390,21 +2390,6 @@ textarea {
 .agent-row-agent-status-limited svg {
   width: 10px;
   height: 10px;
-}
-
-/* An agent that waits for the user: amber, and a little larger than the routine marks, so it is
-   the first badge the eye finds in a busy list. */
-.agent-row-agent-status-waiting {
-  width: 18px;
-  height: 18px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-warning);
-  color: var(--openbot-bg-sidebar);
-}
-
-.agent-row-agent-status-waiting svg {
-  width: 11px;
-  height: 11px;
 }
 
 /* The action chip takes the time slot: the time does not matter while the agent waits. */

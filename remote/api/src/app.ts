@@ -53,12 +53,14 @@ import type { RemoteApiConfig } from "./config";
 import { type DiscordApi, type DiscordUpload, decodeDiscordApiRequest } from "./discord-api";
 import type { SignalEntry } from "./entry";
 import { SLACK_DELIVERY_BODY_BYTES_LIMIT, type SlackDeliveryKind } from "./protocol";
-import type {
-  SignalService,
-  SignalSocket,
-  SignalTokens,
-  SlackDeliveryResponse,
-  WebhookDelivery,
+import {
+  type SignalService,
+  type SignalSocket,
+  type SignalTokens,
+  type SlackDeliveryResponse,
+  WEBHOOK_ANSWER_STATUSES,
+  type WebhookAnswerStatus,
+  type WebhookDelivery,
 } from "./signal-service";
 import { telegramFailure } from "./telegram";
 import { verifyGitHubSignature, verifySlackSignature, verifyWebhookSignature } from "./tokens";
@@ -283,32 +285,36 @@ export function createRemoteApiApp(
     .post(
       `${WEBHOOK_EVENTS_PATH}/:routeId`,
       async ({ request, params, server }) => {
-        if (!entry.isEntry) return webhookResponse(503);
+        const answer = (status: WebhookAnswerStatus) => {
+          signal.recordWebhookAnswer(status);
+          return webhookResponse(status);
+        };
+        if (!entry.isEntry) return answer(503);
         const routeId = params.routeId;
-        if (!WEBHOOK_ROUTE_ID_PATTERN.test(routeId)) return webhookResponse(404);
+        if (!WEBHOOK_ROUTE_ID_PATTERN.test(routeId)) return answer(404);
         const declaredLength = Number(request.headers.get("content-length") ?? "0");
         if (!Number.isFinite(declaredLength) || declaredLength > WEBHOOK_DELIVERY_BODY_BYTES_LIMIT) {
-          return webhookResponse(413);
+          return answer(413);
         }
         const mediaType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
-        if (mediaType !== "application/json") return webhookResponse(415);
+        if (mediaType !== "application/json") return answer(415);
         const signed = webhookSignedHeaders(request.headers);
-        if (!signed) return webhookResponse(401);
-        if (!signal.holdsWebhookRoute(routeId)) return webhookResponse(503);
+        if (!signed) return answer(401);
+        if (!signal.holdsWebhookRoute(routeId)) return answer(503);
         // An older host refuses the signature of this format, so the request cannot authenticate.
-        if (signed.format && !signal.webhookRouteAccepts(routeId, signed.format)) return webhookResponse(401);
+        if (signed.format && !signal.webhookRouteAccepts(routeId, signed.format)) return answer(401);
         const address = signalClientIp(
           server?.requestIP(request)?.address,
           request.headers.get("x-forwarded-for"),
           config.trustProxy,
         );
-        if (!signal.acceptWebhookRequest(`${routeId}:${address}`)) return webhookResponse(429);
+        if (!signal.acceptWebhookRequest(`${routeId}:${address}`)) return answer(429);
         const body = await readBounded(request, WEBHOOK_DELIVERY_BODY_BYTES_LIMIT);
-        if (!body) return webhookResponse(413);
+        if (!body) return answer(413);
         const result = await runtime.runPromise(signal.deliverWebhook(routeId, { ...signed, body }), {
           signal: request.signal,
         });
-        return webhookResponse(result.status);
+        return answer(result.status);
       },
       { parse: "none" },
     )
@@ -830,6 +836,16 @@ export function prometheusMetrics(signal: SignalService, turnRelays: TurnRelays,
     `openbot_remote_slack_deliveries_total ${metrics.slackDeliveries}`,
     "# TYPE openbot_remote_slack_deliveries_unavailable_total counter",
     `openbot_remote_slack_deliveries_unavailable_total ${metrics.slackDeliveriesUnavailable}`,
+    "# TYPE openbot_remote_webhook_answers_total counter",
+    ...WEBHOOK_ANSWER_STATUSES.map(
+      (status) => `openbot_remote_webhook_answers_total{status="${status}"} ${metrics.webhookAnswers[status]}`,
+    ),
+    "# TYPE openbot_remote_webhook_waits_total counter",
+    `openbot_remote_webhook_waits_total ${metrics.webhookWaits}`,
+    "# TYPE openbot_remote_webhook_wait_milliseconds_total counter",
+    `openbot_remote_webhook_wait_milliseconds_total ${metrics.webhookWaitMilliseconds}`,
+    "# TYPE openbot_remote_webhook_slow_waits_total counter",
+    `openbot_remote_webhook_slow_waits_total ${metrics.webhookSlowWaits}`,
     "# TYPE openbot_remote_github_deliveries_total counter",
     `openbot_remote_github_deliveries_total ${metrics.githubDeliveries}`,
     "# TYPE openbot_remote_github_deliveries_unavailable_total counter",

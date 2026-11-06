@@ -846,10 +846,14 @@ export class HostedServerService {
       yield* this.#startForUse(row);
       const current = yield* this.#requireRow(serverId);
       // A client asks for a start because it cannot reach the server. When the row says it runs, a lost
-      // provider event can hide a stop, so the provider is asked.
-      if (current.observed_state === "running" && current.provider_sandbox_id) {
-        yield* this.#refresh(current);
-        yield* this.#startAfterFailedStop(yield* this.#requireRow(serverId));
+      // provider event can hide a stop, so the provider is asked. A stop that boat cannot finish keeps
+      // the row `stopping` while the machine runs, so the provider is asked then too.
+      if (
+        (current.observed_state === "running" || current.observed_state === "stopping") &&
+        current.provider_sandbox_id
+      ) {
+        const stopFailing = yield* this.#refresh(current);
+        yield* this.#startAfterFailedStop(yield* this.#requireRow(serverId), stopFailing);
       }
       return summary(yield* this.#requireRow(serverId));
     },
@@ -957,9 +961,12 @@ export class HostedServerService {
       yield* this.#startForUse(row);
       const current = yield* this.#requireRow(hostId);
       // As for a client: the host has no socket, and a lost provider event can hide a stop.
-      if (current.observed_state === "running" && current.provider_sandbox_id) {
-        yield* this.#refresh(current);
-        yield* this.#startAfterFailedStop(yield* this.#requireRow(hostId));
+      if (
+        (current.observed_state === "running" || current.observed_state === "stopping") &&
+        current.provider_sandbox_id
+      ) {
+        const stopFailing = yield* this.#refresh(current);
+        yield* this.#startAfterFailedStop(yield* this.#requireRow(hostId), stopFailing);
       }
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -1118,7 +1125,10 @@ export class HostedServerService {
             .bind(event.sandboxId)
             .first<HostedServerRow>(),
         );
-        if (row) yield* this.#observe(row, event.state, event.createdAt);
+        // A stop that boat cannot finish keeps a usable state, and the event does not tell about the
+        // stop. For a stopping server the provider is asked, so the event does not hide a failing stop.
+        if (row?.observed_state === "stopping" && isUsable(event.state)) yield* this.#refresh(row);
+        else if (row) yield* this.#observe(row, event.state, event.createdAt);
       }
       // Recorded after the change, so a delivery that failed half way is applied again on retry.
       yield* hostedCall(() =>
@@ -1815,23 +1825,28 @@ export class HostedServerService {
     return removed.meta.changes === 1;
   });
 
-  /** Reads the real state of the sandbox from the provider. A sandbox that boat does not have is gone. */
+  /**
+   * Reads the real state of the sandbox from the provider. A sandbox that boat does not have is gone.
+   * True when it recorded a stop that boat cannot finish on a sandbox that boat keeps usable.
+   */
   readonly #refresh = Effect.fn("HostedServerService.refresh")(function* (
     this: HostedServerService,
     row: HostedServerRow,
-  ): Effect.fn.Return<void, HostedFailure, HostedServerDependencies> {
+  ): Effect.fn.Return<boolean, HostedFailure, HostedServerDependencies> {
     const dependencies = yield* HostedServerDependencies;
     const boat = dependencies.boat;
     const sandboxId = row.provider_sandbox_id;
-    if (!boat || !sandboxId) return;
+    if (!boat || !sandboxId) return false;
     // The state can be as old as the request. With the time from before the request, `#observe` refuses it
     // when a wake or a webhook wrote a newer `provider_event_at` while the request ran.
     const readAt = dependencies.now();
-    const state = yield* boat.getSandbox(sandboxId).pipe(
-      Effect.map((sandbox) => sandbox.state),
-      Effect.catch((error) => (error.status === 404 ? Effect.succeed("cancelled" as const) : Effect.fail(error))),
+    const sandbox = yield* boat.getSandbox(sandboxId).pipe(
+      Effect.map((value) => ({ state: value.state, stopFailing: value.stopFailing })),
+      Effect.catch((error) =>
+        error.status === 404 ? Effect.succeed({ state: "cancelled" as const, stopFailing: false }) : Effect.fail(error),
+      ),
     );
-    yield* this.#observe(row, state, readAt);
+    return yield* this.#observe(row, sandbox.state, readAt, sandbox.stopFailing);
   });
 
   /**
@@ -1953,7 +1968,10 @@ export class HostedServerService {
 
       // 409: the sandbox cannot stop in its current state. A lost event can hide that it is stopped
       // already, so the provider is asked. Else the cron tries again.
-      if (error instanceof BoatApiError && error.status === 409) return yield* this.#refresh(row);
+      if (error instanceof BoatApiError && error.status === 409) {
+        yield* this.#refresh(row);
+        return;
+      }
       return yield* error;
     }
     yield* hostedCall(() =>
@@ -2178,16 +2196,19 @@ export class HostedServerService {
   /**
    * A client or a connector cannot reach a server that boat runs. A stop that boat cancelled after the
    * pre-stop hook leaves OpenBot stopped there, so the Worker starts it (`FAILED_STOP_START_COMMAND`).
-   * The command runs after the reply, and on a server with no old flag it does nothing.
+   * The command runs after the reply, and on a server with no old flag it does nothing. A stop that boat
+   * cannot finish (`stopFailing`) sets the row to `stopping`, but the machine runs, so the command runs too.
    */
   readonly #startAfterFailedStop = Effect.fn("HostedServerService.startAfterFailedStop")(function* (
     this: HostedServerService,
     row: HostedServerRow,
+    stopFailing: boolean,
   ): Effect.fn.Return<void, never, HostedServerDependencies> {
     const dependencies = yield* HostedServerDependencies;
     const boat = dependencies.boat;
     const sandboxId = row.provider_sandbox_id;
-    if (!boat || !sandboxId || row.observed_state !== "running") return;
+    if (!boat || !sandboxId) return;
+    if (row.observed_state !== "running" && !(stopFailing && row.observed_state === "stopping")) return;
     dependencies.schedule(startOpenBot(boat, row.server_id, sandboxId, "failed stop"));
   });
 
@@ -2368,14 +2389,18 @@ export class HostedServerService {
     row: HostedServerRow,
     state: BoatSandboxState,
     eventAt: number,
-  ): Effect.fn.Return<void, HostedFailure, HostedServerDependencies> {
+    stopFailing = false,
+  ): Effect.fn.Return<boolean, HostedFailure, HostedServerDependencies> {
     const dependencies = yield* HostedServerDependencies;
-    if (row.desired_state === "deleted") return;
-    if (row.provider_event_at !== null && eventAt < row.provider_event_at) return;
+    if (row.desired_state === "deleted") return false;
+    if (row.provider_event_at !== null && eventAt < row.provider_event_at) return false;
     let observed = row.observed_state;
     let error = row.observed_error;
+    // boat could not save the disk for a stop and tries again until the save works. The sandbox keeps a
+    // usable state, but the pre-stop hook stopped OpenBot, and each new try stops it again.
+    const failingStop = stopFailing && isUsable(state);
     if (isUsable(state)) {
-      observed = "running";
+      observed = failingStop ? "stopping" : "running";
       // A server whose plan ended keeps the reason until the stop is done.
       error = row.desired_state === "stopped" ? "plan_ended" : null;
     } else if (state === "archiving") {
@@ -2397,12 +2422,19 @@ export class HostedServerService {
         .bind(observed, error, eventAt, dependencies.now(), row.server_id, eventAt)
         .run(),
     );
-    if (updated.meta.changes !== 1) return;
+    if (updated.meta.changes !== 1) return false;
+    if (failingStop) {
+      // The Worker does not end the stop. A resume can restore the last saved disk, and a forced stop
+      // loses what was written after it. An operator decides (docs/hosted-servers.md).
+      console.warn("Hosted server stop is failing.", { serverId: row.server_id, desiredState: row.desired_state });
+      return true;
+    }
     if (observed === "running") yield* this.#recordReady(row, eventAt);
-    if (observed !== "stopped") return;
+    if (observed !== "stopped") return false;
     // The provider stops a server, for example for maintenance or at the end of its lease, and a resize
     // stops it. A server in use must run, so it starts again. An idle server stays stopped (`#wake`).
     yield* this.#wake(yield* this.#requireRow(row.server_id), "restart");
+    return false;
   });
 
   readonly #finishDelete = Effect.fn("HostedServerService.finishDelete")(function* (
