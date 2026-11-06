@@ -356,7 +356,7 @@ export const messages = {
   "mobile.agent.backupModels.intro":
     "Quando {model} atinge o limite de uso antes de {name} começar a escrever, {name} pergunta qual modelo você quer usar.",
   "mobile.agent.backupModels.introAutomatic":
-    "Quando {model} atinge o limite de uso ou falha por um erro do provedor antes de {name} começar a escrever, {name} troca para o primeiro modelo disponível na ordem.",
+    "Quando {model} atinge o limite de uso, {name} troca para o primeiro modelo disponível na ordem. {name} também troca quando {model} falha por um erro do provedor antes de {name} começar a escrever.",
   "mobile.agent.backupModels.ask": "Perguntar antes de trocar",
   "mobile.agent.backupModels.order": "Ordem",
   "mobile.agent.backupModels.empty": "Nenhuma ordem definida. {name} oferece cada modelo disponível.",

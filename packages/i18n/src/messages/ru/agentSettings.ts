@@ -105,7 +105,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "Если {model} достигнет лимита использования до того, как {name} начнёт писать, {name} спросит вас, какую модель использовать.",
   "agentSettings.backupModels.introAutomatic":
-    "Если {model} достигнет лимита использования или завершится с ошибкой провайдера до того, как {name} начнёт писать, {name} переключится на первую доступную модель по порядку.",
+    "Если {model} достигнет лимита использования, {name} переключится на первую доступную модель по порядку. {name} также переключится, если {model} завершится с ошибкой провайдера до того, как {name} начнёт писать.",
   "agentSettings.backupModels.ask": "Спрашивать перед переключением",
   "agentSettings.backupModels.order": "Порядок",
   "agentSettings.backupModels.listLabel": "Резервные модели по порядку",

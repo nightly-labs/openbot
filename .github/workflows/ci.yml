@@ -538,6 +538,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-usage-metering
 
+      - name: Run the Gemini quota failover E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:antigravity-quota-failover
+
       - name: Run the workflow model steps E2E test
         if: ${{ !cancelled() }}
         run: bun run test:workflow-model-steps
@@ -651,6 +655,7 @@ jobs:
             .openbot-build/antigravity-usage-e2e/
             .openbot-build/antigravity-accounts-e2e/
             .openbot-build/antigravity-usage-metering-e2e/
+            .openbot-build/antigravity-quota-failover-e2e/
             .openbot-build/workflow-model-steps-e2e/
             .openbot-build/workflow-discord-e2e/
             .openbot-build/workflow-telegram-e2e/
