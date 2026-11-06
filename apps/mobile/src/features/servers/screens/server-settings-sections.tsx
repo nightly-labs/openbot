@@ -3,6 +3,26 @@ import { WAKE_RECONNECT_STATES } from "@openbot/team-client/hosted-server-wake";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
+import type { LucideIcon } from "lucide-react-native";
+import AppWindow from "lucide-react-native/icons/app-window";
+import ArrowLeftRight from "lucide-react-native/icons/arrow-left-right";
+import Blocks from "lucide-react-native/icons/blocks";
+import Brain from "lucide-react-native/icons/brain";
+import Clock from "lucide-react-native/icons/clock";
+import Download from "lucide-react-native/icons/download";
+import Globe2 from "lucide-react-native/icons/earth";
+import Fingerprint from "lucide-react-native/icons/fingerprint-pattern";
+import HardDrive from "lucide-react-native/icons/hard-drive";
+import KeyRound from "lucide-react-native/icons/key-round";
+import RefreshCcw from "lucide-react-native/icons/refresh-ccw";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import History from "lucide-react-native/icons/rotate-ccw-clock";
+import RotateCcwKey from "lucide-react-native/icons/rotate-ccw-key";
+import ShieldCheck from "lucide-react-native/icons/shield-check";
+import Sparkles from "lucide-react-native/icons/sparkles";
+import UserRound from "lucide-react-native/icons/user-round";
+import UsersRound from "lucide-react-native/icons/users-round";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useUniwind } from "uniwind";
@@ -22,15 +42,20 @@ import { useServerTimezone } from "@/features/servers/model/use-server-timezone"
 import { updateAvailable, useServerUpdate } from "@/features/servers/model/use-server-update";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
+import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 
-function LinkRow({ label, pathname, serverId, trailing }: LinkRowProps) {
+function LinkRow({ label, icon, pathname, serverId, trailing }: LinkRowProps) {
   return (
-    <SettingsRow trailing={trailing} onPress={() => router.push({ pathname, params: { serverId } })}>
+    <SettingsRow
+      leading={<RowIcon icon={icon} />}
+      trailing={trailing}
+      onPress={() => router.push({ pathname, params: { serverId } })}
+    >
       <Typography.Paragraph>{label}</Typography.Paragraph>
     </SettingsRow>
   );
@@ -38,6 +63,7 @@ function LinkRow({ label, pathname, serverId, trailing }: LinkRowProps) {
 
 interface LinkRowProps {
   label: string;
+  icon: LucideIcon;
   pathname:
     | "/server-settings/members"
     | "/server-settings/roles"
@@ -59,6 +85,7 @@ export function ServerPeopleSection({ server }: { server: MobileServer }) {
     <SettingsSection title={t("mobile.server.settings.peopleSection")}>
       <SettingsRow
         disclosure={false}
+        leading={<RowIcon icon={UserRound} />}
         trailing={
           <Typography.Paragraph className="text-grouped-secondary">
             {t(SERVER_ROLE_LABEL_KEYS[server.role])}
@@ -69,6 +96,7 @@ export function ServerPeopleSection({ server }: { server: MobileServer }) {
       </SettingsRow>
       <LinkRow
         label={t("mobile.server.settings.members")}
+        icon={UsersRound}
         pathname="/server-settings/members"
         serverId={server.id}
         trailing={
@@ -83,10 +111,20 @@ export function ServerPeopleSection({ server }: { server: MobileServer }) {
         }
       />
       {canManageServerRoles(server.id) ? (
-        <LinkRow label={t("mobile.server.route.roles")} pathname="/server-settings/roles" serverId={server.id} />
+        <LinkRow
+          label={t("mobile.server.route.roles")}
+          icon={ShieldCheck}
+          pathname="/server-settings/roles"
+          serverId={server.id}
+        />
       ) : null}
       {canReadServerAudit(server.id) ? (
-        <LinkRow label={t("mobile.server.route.audit")} pathname="/server-settings/audit" serverId={server.id} />
+        <LinkRow
+          label={t("mobile.server.route.audit")}
+          icon={History}
+          pathname="/server-settings/audit"
+          serverId={server.id}
+        />
       ) : null}
     </SettingsSection>
   );
@@ -127,13 +165,19 @@ export function ServerDataSections({ serverId }: { serverId: string }) {
       canReadServerStorage(serverId) ? (
         <SettingsSection title={t("mobile.server.settings.dataSection")}>
           {canManageVault(serverId) ? (
-            <LinkRow label={t("mobile.server.settings.vault")} pathname="/server-settings/vault" serverId={serverId} />
+            <LinkRow
+              label={t("mobile.server.settings.vault")}
+              icon={KeyRound}
+              pathname="/server-settings/vault"
+              serverId={serverId}
+            />
           ) : null}
           {canManageBrowserProfiles(serverId) ? <ServerBrowserProfilesRow serverId={serverId} /> : null}
           {canViewHostedSites(serverId) ? <ServerSitesRow serverId={serverId} /> : null}
           {canReadServerStorage(serverId) ? (
             <LinkRow
               label={t("mobile.server.settings.storage")}
+              icon={HardDrive}
               pathname="/server-settings/storage"
               serverId={serverId}
             />
@@ -145,6 +189,7 @@ export function ServerDataSections({ serverId }: { serverId: string }) {
           {canImportAgents(serverId) ? (
             <LinkRow
               label={t("mobile.server.settings.importAgents")}
+              icon={Download}
               pathname="/server-settings/import"
               serverId={serverId}
             />
@@ -152,6 +197,7 @@ export function ServerDataSections({ serverId }: { serverId: string }) {
           {canTransferServer(serverId) ? (
             <LinkRow
               label={t("mobile.server.settings.transfer")}
+              icon={ArrowLeftRight}
               pathname="/server-settings/transfer"
               serverId={serverId}
             />
@@ -184,7 +230,12 @@ export function ServerConnectionSection({
   }
   return (
     <SettingsSection footer={error ?? restarted}>
-      <SettingsRow disclosure={false} disabled={busy} onPress={() => void perform(() => refreshServer(serverId))}>
+      <SettingsRow
+        leading={<RowIcon icon={RefreshCcw} tone="accent" />}
+        disclosure={false}
+        disabled={busy}
+        onPress={() => void perform(() => refreshServer(serverId))}
+      >
         <Typography.Paragraph className="text-accent">
           {busy && !restarting ? t("mobile.server.settings.refreshing") : t("mobile.server.settings.refresh")}
         </Typography.Paragraph>
@@ -192,6 +243,7 @@ export function ServerConnectionSection({
       {canRestartServer(server, hostedServerIds) ? (
         // The account server stops the hosted server and starts it again. The app connects again after it.
         <SettingsRow
+          leading={<RowIcon icon={RotateCcw} tone="accent" />}
           disclosure={false}
           disabled={busy}
           onPress={() =>
@@ -301,6 +353,7 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
       {updateShown ? <ServerUpdatesRow serverId={serverId} update={update} /> : null}
       {timezone.available ? (
         <SettingsRow
+          leading={<RowIcon icon={Clock} />}
           trailing={
             zone ? (
               <TrailingValue
@@ -316,6 +369,7 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
       ) : null}
       {memoryLimitAvailable ? (
         <SettingsRow
+          leading={<RowIcon icon={Brain} />}
           disclosure={false}
           trailing={
             limit ? (
@@ -398,6 +452,7 @@ export function ServerKeySettings({ server }: { server: MobileServer }) {
     <SettingsSection title={t("mobile.server.settings.keySection")} footer={footer}>
       {server.keyChangedAt === undefined ? null : (
         <SettingsRow
+          leading={<RowIcon icon={Fingerprint} />}
           trailing={
             <Typography.Paragraph className="text-grouped-secondary">
               {format.date(new Date(server.keyChangedAt), { dateStyle: "medium", timeStyle: "short" })}
@@ -409,6 +464,7 @@ export function ServerKeySettings({ server }: { server: MobileServer }) {
       )}
       {canRotate ? (
         <SettingsRow
+          leading={<RowIcon icon={RotateCcwKey} tone="accent" />}
           disclosure={false}
           disabled={changing}
           onPress={() =>
@@ -441,6 +497,7 @@ function ServerUpdatesRow({ serverId, update }: { serverId: string; update: Retu
   const status = update.query.data?.status;
   return (
     <SettingsRow
+      leading={<RowIcon icon={RefreshCw} />}
       trailing={
         status ? (
           <TrailingValue
@@ -469,6 +526,7 @@ function ServerProvidersRow({ serverId }: { serverId: string }) {
   const connected = rows.filter((row) => row.status?.state === "available").length;
   return (
     <SettingsRow
+      leading={<RowIcon icon={Sparkles} />}
       trailing={
         status.data ? (
           <TrailingValue value={t("mobile.server.settings.providersConnected", { count: connected })} />
@@ -487,6 +545,7 @@ function ServerMcpRow({ serverId }: { serverId: string }) {
   const { list } = useMcpServerList(serverId);
   return (
     <SettingsRow
+      leading={<RowIcon icon={Blocks} />}
       trailing={
         list.data ? (
           <TrailingValue value={t("mobile.server.settings.mcpCount", { count: list.data.length })} />
@@ -505,6 +564,7 @@ function ServerBrowserProfilesRow({ serverId }: { serverId: string }) {
   const { profiles } = useServerBrowserProfiles(serverId);
   return (
     <SettingsRow
+      leading={<RowIcon icon={AppWindow} />}
       trailing={profiles ? <TrailingValue value={String(profiles.length)} /> : undefined}
       onPress={() => router.push({ pathname: "/server-settings/browser-profiles", params: { serverId } })}
     >
@@ -520,6 +580,7 @@ function ServerSitesRow({ serverId }: { serverId: string }) {
   const list = query.data;
   return (
     <SettingsRow
+      leading={<RowIcon icon={Globe2} />}
       trailing={
         list ? (
           <TrailingValue value={t("mobile.server.settings.siteCount", { count: list.used, limit: list.limit })} />

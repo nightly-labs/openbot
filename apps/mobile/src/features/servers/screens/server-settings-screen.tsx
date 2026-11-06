@@ -2,13 +2,11 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { canAdministerServer } from "@openbot/contracts/ipc";
 import { router, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
-import { Input, Typography } from "heroui-native";
-import { useThemeColor } from "heroui-native/hooks";
-import Camera from "lucide-react-native/icons/camera";
-import Pencil from "lucide-react-native/icons/pencil";
+import { Typography } from "heroui-native";
+import LogOut from "lucide-react-native/icons/log-out";
+import Trash2 from "lucide-react-native/icons/trash";
 import { useRef, useState } from "react";
-import { Alert, Pressable, type TextInputInstance, View } from "react-native";
-import { useCSSVariable } from "uniwind";
+import { Alert, Keyboard, View } from "react-native";
 import { SERVER_AVATAR_CORNER_RATIO, ServerAvatar } from "@/features/servers/components/server-avatar";
 import { ServerStatusLabel } from "@/features/servers/components/server-status-label";
 import { useOwnerHostedServerIds } from "@/features/servers/model/server-settings-access";
@@ -28,6 +26,8 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@/features/settings/components/settings-content";
+import { IDENTITY_PICTURE_SIZE, SettingsIdentityHeader } from "@/features/settings/components/settings-identity-header";
+import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { useLiveServerRecovery } from "@/features/workspace/context/server-recovery-countdown";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
@@ -35,9 +35,6 @@ import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { type AvatarPhoto, pickAvatarPhoto } from "@/shared/lib/pick-avatar-photo";
 import { useText } from "@/shared/lib/text";
-
-/** The logo beside the name and the status. */
-const LOGO_SIZE = 72;
 
 /**
  * Server settings, on one page: the server name, logo and status, then a section for each group of
@@ -120,6 +117,7 @@ function ServerExitSection({
     return (
       <SettingsSection footer={error}>
         <SettingsRow
+          leading={<RowIcon icon={LogOut} tone="danger" />}
           disclosure={false}
           disabled={busy}
           onPress={() =>
@@ -153,6 +151,7 @@ function ServerExitSection({
       // to the Trash. Removed from the account only, it would come back at the next start of the app.
       <SettingsSection footer={error}>
         <SettingsRow
+          leading={<RowIcon icon={Trash2} tone="danger" />}
           disclosure={false}
           disabled={busy}
           onPress={() =>
@@ -186,6 +185,7 @@ function ServerExitSection({
     // The owner removes the server from the account. The host does not need to be online.
     <SettingsSection footer={error}>
       <SettingsRow
+        leading={<RowIcon icon={Trash2} tone="danger" />}
         disclosure={false}
         disabled={busy}
         onPress={() =>
@@ -219,16 +219,14 @@ function ServerExitSection({
 
 /** The logo, name and status of the server, for a member, who cannot change the name or logo. */
 function ServerHeader({ server }: { server: MobileServer }) {
+  const { t } = useText();
   return (
-    <View className="flex-row items-center gap-4">
-      <ServerAvatar server={server} size={LOGO_SIZE} showStatus={false} />
-      <View className="min-w-0 flex-1 gap-1">
-        <Typography.Heading type="h4" numberOfLines={2}>
-          {server.name}
-        </Typography.Heading>
-        <ServerStatusLine server={server} />
-      </View>
-    </View>
+    <SettingsIdentityHeader
+      picture={<ServerAvatar server={server} size={IDENTITY_PICTURE_SIZE} showStatus={false} />}
+      name={server.name}
+      nameLabel={t("mobile.server.settings.name")}
+      subtitle={<ServerStatusLine server={server} />}
+    />
   );
 }
 
@@ -239,11 +237,7 @@ function ServerHeader({ server }: { server: MobileServer }) {
 function ServerIdentityForm({ server }: { server: MobileServer }) {
   const { t, errorMessage } = useText();
   const { canEditServerIdentity, updateServerIdentity } = useMobileWorkspace();
-  const foreground = useThemeColor("foreground");
-  const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
   const available = canEditServerIdentity(server.id);
-  const nameInput = useRef<TextInputInstance>(null);
-  const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState<string | undefined>();
   // Undefined keeps the saved logo; null removes it.
   const [logo, setLogo] = useState<AvatarPhoto | null | undefined>();
@@ -319,7 +313,7 @@ function ServerIdentityForm({ server }: { server: MobileServer }) {
     pending.current = true;
     setSaving(true);
     setError(null);
-    nameInput.current?.blur();
+    Keyboard.dismiss();
     try {
       await updateServerIdentity(server.id, {
         ...(nameChanged ? { serverName: trimmed } : {}),
@@ -340,54 +334,32 @@ function ServerIdentityForm({ server }: { server: MobileServer }) {
   const locked = !available || saving || picking;
   return (
     <View className="gap-3">
-      <View className="flex-row items-center gap-4">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t(hasLogo ? "mobile.server.settings.editLogo" : "mobile.server.settings.addLogo")}
-          accessibilityState={{ disabled: locked }}
-          disabled={locked}
-          onPress={editLogo}
-        >
+      <SettingsIdentityHeader
+        picture={
           <ServerAvatar
             server={{ ...server, name: trimmed || server.name }}
-            size={LOGO_SIZE}
+            size={IDENTITY_PICTURE_SIZE}
             showStatus={false}
             logoUri={logo === undefined ? undefined : (logo?.uri ?? null)}
           />
-          <View className="absolute -right-1.5 -bottom-1.5 size-7 items-center justify-center rounded-full border-4 border-sheet bg-grouped">
-            <Camera color={foreground} size={12} />
-          </View>
-        </Pressable>
-        <View className="min-w-0 flex-1 gap-1">
-          {/* The name field has no fill until it has the focus, so it reads as the title of the page. */}
-          <View className={`-ml-2 flex-row items-center gap-1.5 rounded-xl pr-2 ${editingName ? "bg-grouped" : ""}`}>
-            <Input
-              ref={nameInput}
-              accessibilityLabel={t("mobile.server.settings.name")}
-              autoCapitalize="words"
-              maxLength={INPUT_LIMITS.serverName}
-              value={name}
-              editable={!locked}
-              returnKeyType="done"
-              variant="primary"
-              className="min-h-10 flex-1 border-0 bg-transparent px-2 font-sans text-title font-semibold shadow-none"
-              onFocus={() => setEditingName(true)}
-              onBlur={() => setEditingName(false)}
-              onSubmitEditing={() => void save()}
-              onChangeText={(value) => {
+        }
+        pictureLabel={t(hasLogo ? "mobile.server.settings.editLogo" : "mobile.server.settings.addLogo")}
+        onPicturePress={available ? editLogo : undefined}
+        name={name}
+        nameLabel={t("mobile.server.settings.name")}
+        nameMaxLength={INPUT_LIMITS.serverName}
+        disabled={locked}
+        onNameChange={
+          available
+            ? (value) => {
                 setDraftName(value);
                 setError(null);
-              }}
-            />
-            {available && !editingName ? (
-              <Pressable accessible={false} hitSlop={12} disabled={locked} onPress={() => nameInput.current?.focus()}>
-                <Pencil color={muted} size={16} strokeWidth={1.75} />
-              </Pressable>
-            ) : null}
-          </View>
-          <ServerStatusLine server={server} />
-        </View>
-      </View>
+              }
+            : undefined
+        }
+        onNameSubmit={() => void save()}
+        subtitle={<ServerStatusLine server={server} />}
+      />
       {!nameValid ? (
         <Typography.Paragraph type="body-xs" className="px-1 text-danger-text">
           {t("mobile.server.settings.nameLength", { min: INPUT_LIMITS.serverNameMin, max: INPUT_LIMITS.serverName })}
