@@ -86,7 +86,8 @@ function issuerHost(issuer: string): string {
 /**
  * Company sign-in in Members: one card with single sign-on and user sync, and a dialog for the
  * provider values. Only the owner of a published server sees it. Where the app cannot manage it
- * (the browser client), the card looks the same, and Set up tells the owner to use the desktop app.
+ * (the browser client), the card shows only the single sign-on row with no status, and Set up tells
+ * the owner to use the desktop app.
  */
 export function createServerCompanySignInSection(
   host: ServerSettingsSectionHost,
@@ -291,6 +292,7 @@ export function createServerCompanySignInSection(
                     size="sm"
                     onClick={() =>
                       toast.info(t("server.companySignIn.desktopOnly"), {
+                        id: "company-sign-in-desktop-only",
                         action: { label: t("common.download"), onClick: () => openDownload()() },
                       })
                     }
