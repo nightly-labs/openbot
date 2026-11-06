@@ -193,8 +193,16 @@ export async function announcedTags(endpoints: Endpoints): Promise<Set<string>> 
   return new Set(await getJson(url, tagNames, endpoints.token));
 }
 
-/** Why users of `store` cannot see `version` yet. Undefined when the Worker has it live. */
-export async function liveProblem(site: string, version: string, store: MobileStore): Promise<string | undefined> {
+/**
+ * Why users of `store` cannot see `version` yet. Undefined when the Worker has it live. Without
+ * `newest`, an older version passes too: a post with `--version` can name one.
+ */
+export async function liveProblem(
+  site: string,
+  version: string,
+  store: MobileStore,
+  { newest = true }: { newest?: boolean } = {},
+): Promise<string | undefined> {
   const releases = (await getJson(`${site}${MOBILE_CHANGELOG_PATH}?platform=${store}`, parseMobileReleaseNotes)) ?? [];
   if (!releases.some((release) => release.version === version)) {
     return `the live /changelog does not list ${version} for ${MOBILE_STORE_NAMES[store]}`;
@@ -203,7 +211,8 @@ export async function liveProblem(site: string, version: string, store: MobileSt
     `${site}${MOBILE_FEATURES_PATH}?platform=${store}&version=${version}`,
     (answer) => ({ latest: parseMobileLatestVersion(answer), live: parseMobileFeatureFlags(answer) }),
   );
-  if (latest !== version) return `the live newest ${MOBILE_STORE_NAMES[store]} version is ${latest ?? "none"}`;
+  if (newest && latest !== version)
+    return `the live newest ${MOBILE_STORE_NAMES[store]} version is ${latest ?? "none"}`;
   const expected = resolveMobileFeatures(MOBILE_FEATURE_CONFIG, store, version);
   const different = MOBILE_FEATURES.filter((feature) => live?.[feature] !== expected[feature]);
   if (different.length > 0) return `the live ${different.join(" and ")} flags are not the ones in main`;
@@ -440,7 +449,7 @@ if (import.meta.main) {
       if (command !== "announce") fail(["--version works only with announce."]);
       const stores = storesArgument(option("--stores"));
       for (const store of stores) {
-        const reason = await liveProblem(endpoints.site, version, store);
+        const reason = await liveProblem(endpoints.site, version, store, { newest: false });
         if (reason !== undefined) fail([`Users cannot see ${version} yet: ${reason}.`]);
       }
       await sendPost(changelog, { version, stores }, endpoints, args.includes("--again"));

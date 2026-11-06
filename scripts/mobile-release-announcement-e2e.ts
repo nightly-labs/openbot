@@ -275,6 +275,37 @@ try {
   );
   writeFileSync(configPath, originalConfig);
 
+  // `--version` posts an older version, which is not the newest one in the store.
+  writeChangelog({ "1.4.7": "2026-11-06", "1.4.6": "2026-11-04" });
+  state.live.ios = ["1.4.7", "1.4.6"];
+  writeFileSync(
+    join(work, "apps/mobile/release-announcement.json"),
+    JSON.stringify({ version: "1.4.6", highlights: ["One.", "Two.", "Three."] }),
+  );
+  const beforeOlder = state.posts.length;
+  result = await cli("discord-mobile-release-announcement.ts", [
+    "announce",
+    "--version",
+    "1.4.6",
+    "--stores",
+    "ios",
+    "--site",
+    site,
+    "--github-api",
+    site,
+  ]);
+  check(
+    "--version posts an older version",
+    result.status === 0 &&
+      state.posts.length === beforeOlder + 1 &&
+      lastPost().includes("OpenBot v1.4.6 is out on iOS"),
+    result.output,
+  );
+  writeFileSync(
+    join(work, "apps/mobile/release-announcement.json"),
+    JSON.stringify({ version: "1.4.7", highlights: ["One.", "Two.", "Three."] }),
+  );
+
   // The publish step: Android 1.4.7 available, with the older 1.4.5 marked as skipped.
   writeChangelog({ "1.4.7": "2026-11-06 (iOS)", "1.4.6": "2026-11-04", "1.4.5": "2026-11-01 (iOS)" });
   result = await cli("publish-mobile-release.ts", ["android", "--skip-older"]);
