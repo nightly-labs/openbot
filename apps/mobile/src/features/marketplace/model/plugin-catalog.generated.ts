@@ -1307,6 +1307,39 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "omnisend",
+    name: "Omnisend",
+    tagline: "Email and SMS marketing",
+    description:
+      "Omnisend lets agents read campaign and form reports, find contacts and segments, and create and edit campaigns, automations, email templates, forms and products. Each user signs in to their own Omnisend account through the browser and selects the access level on the consent screen. With write access, agents can also send campaigns and delete data. Select read-only access when agents only need reports.",
+    category: "automation",
+    creatorName: "Omnisend",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-last-campaign", text: "How did last week's campaigns perform compared to the week before?" },
+      { id: "prompt-segment", text: "How many contacts are in the VIP segment, and how did it change this month?" },
+      { id: "prompt-draft-campaign", text: "Draft a campaign for the new collection, but do not send it." },
+    ],
+    websiteUrl: "https://www.omnisend.com",
+    privacyPolicyUrl: "https://www.omnisend.com/privacy/",
+    termsUrl: "https://www.omnisend.com/terms/",
+    featured: false,
+    apps: [
+      {
+        id: "app-omnisend-mcp",
+        name: "Omnisend",
+        description:
+          "Campaigns, automations, contacts, segments, forms and reports, over Omnisend's MCP server with browser sign-in.",
+        server: {
+          name: "omnisend",
+          transport: "http",
+          url: "https://mcp.omnisend.com/mcp",
+          auth: [{ id: "omnisend-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
     slug: "composio",
     name: "Composio",
     tagline: "Many apps through your own Composio link",

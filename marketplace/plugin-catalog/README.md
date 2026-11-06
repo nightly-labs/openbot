@@ -125,6 +125,27 @@ Troubleshooting:
   must allow access to the MCP server for the instance. The server is GA from
   GitLab 19.5.
 
+## Omnisend
+
+The listing connects to Omnisend's own MCP server at `https://mcp.omnisend.com/mcp`
+(<https://api-docs.omnisend.com/reference/mcp-server>). The server uses OAuth with
+dynamic client registration, so the user signs in through the browser and types
+no key. The user selects the access level on Omnisend's consent screen. The
+account needs the Owner, Admin, Manager or Partner role.
+
+The server shows four tools: `search`, `tool_schema`, `tool_documentation` and
+`execute`. The agent finds an Omnisend operation with `search` and runs it with
+`execute`. With write access, the operations include sending and deleting
+campaigns, automations and segments.
+
+Troubleshooting:
+
+- A write fails with "Permission denied": the user granted read-only access.
+  Disconnect and sign in again with write access.
+- The account has more than one brand: one connection works on one brand.
+  Omnisend's guide adds a separate server for each brand with a `?brand=` query
+  parameter; add it in the MCP servers settings and select Sign in.
+
 ## ElevenLabs
 
 The listing connects to ElevenLabs' hosted MCP server at `https://api.elevenlabs.io/v1/mcp`

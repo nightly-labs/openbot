@@ -366,6 +366,15 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "ローンチのお知らせの下書きをベータリストに送信してください。",
   "marketplace.plugin.resend.prompt.status": "請求書のメールは顧客に届きましたか？",
   "marketplace.plugin.resend.prompt.template": "新しいフロー用のパスワードリセットメールの下書きを作成してください。",
+  "marketplace.plugin.omnisend.tagline": "メールとSMSのマーケティング",
+  "marketplace.plugin.omnisend.description":
+    "Omnisend を使うと、エージェントはキャンペーンとフォームのレポートを読み、連絡先とセグメントを探し、キャンペーン、オートメーション、メールテンプレート、フォーム、商品を作成・編集できます。各ユーザーはブラウザで自分の Omnisend アカウントにサインインし、同意画面でアクセスレベルを選びます。書き込みアクセスがあると、エージェントはキャンペーンの送信やデータの削除もできます。レポートだけが必要な場合は読み取り専用アクセスを選んでください。",
+  "marketplace.plugin.omnisend.app":
+    "キャンペーン、オートメーション、連絡先、セグメント、フォーム、レポート。ブラウザでサインインし、Omnisend の MCP サーバー経由で使います。",
+  "marketplace.plugin.omnisend.prompt.lastCampaign": "先週のキャンペーンの成果は、その前の週と比べてどうでしたか?",
+  "marketplace.plugin.omnisend.prompt.segment": "VIP セグメントには何件の連絡先があり、今月どう変わりましたか?",
+  "marketplace.plugin.omnisend.prompt.draftCampaign":
+    "新しいコレクション用のキャンペーンの下書きを作成してください。ただし送信はしないでください。",
   "marketplace.plugin.composio.tagline": "自分の Composio リンクで多数のアプリを利用",
   "marketplace.plugin.composio.description":
     "Composio は、1 つの MCP サーバーでエージェントを Gmail、Slack、GitHub など数百のアプリに接続します。Composio アカウントで使いたいアプリを接続し、その MCP URL と API キーをここに貼り付けてください。",

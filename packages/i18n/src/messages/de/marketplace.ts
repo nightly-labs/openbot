@@ -377,6 +377,17 @@ export const messages = {
   "marketplace.plugin.resend.prompt.status": "Hat die Rechnungs-E-Mail den Kunden erreicht?",
   "marketplace.plugin.resend.prompt.template":
     "Entwirf eine E-Mail zum Zurücksetzen des Passworts für den neuen Ablauf.",
+  "marketplace.plugin.omnisend.tagline": "E-Mail- und SMS-Marketing",
+  "marketplace.plugin.omnisend.description":
+    "Mit Omnisend lesen Agenten Kampagnen- und Formularberichte, finden Kontakte und Segmente und erstellen und bearbeiten Kampagnen, Automatisierungen, E-Mail-Vorlagen, Formulare und Produkte. Jede Person meldet sich im Browser bei ihrem eigenen Omnisend-Konto an und wählt die Zugriffsstufe auf der Zustimmungsseite. Mit Schreibzugriff können Agenten auch Kampagnen senden und Daten löschen. Wähle Nur-Lese-Zugriff, wenn Agenten nur Berichte brauchen.",
+  "marketplace.plugin.omnisend.app":
+    "Kampagnen, Automatisierungen, Kontakte, Segmente, Formulare und Berichte über den MCP-Server von Omnisend mit Anmeldung im Browser.",
+  "marketplace.plugin.omnisend.prompt.lastCampaign":
+    "Wie haben die Kampagnen der letzten Woche im Vergleich zur Woche davor abgeschnitten?",
+  "marketplace.plugin.omnisend.prompt.segment":
+    "Wie viele Kontakte sind im VIP-Segment, und wie hat es sich diesen Monat verändert?",
+  "marketplace.plugin.omnisend.prompt.draftCampaign":
+    "Entwirf eine Kampagne für die neue Kollektion, aber sende sie nicht.",
   "marketplace.plugin.composio.tagline": "Viele Apps über deinen eigenen Composio-Link",
   "marketplace.plugin.composio.description":
     "Composio verbindet Agenten über einen MCP-Server mit Gmail, Slack, GitHub und Hunderten weiterer Apps. Verbinde die gewünschten Apps in deinem Composio-Konto und füge dann hier seine MCP-URL und seinen API-Schlüssel ein.",

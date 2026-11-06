@@ -330,6 +330,14 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "把发布公告草稿发送到内测名单。",
   "marketplace.plugin.resend.prompt.status": "发票邮件送达客户了吗？",
   "marketplace.plugin.resend.prompt.template": "为新流程起草一封密码重置邮件。",
+  "marketplace.plugin.omnisend.tagline": "邮件和短信营销",
+  "marketplace.plugin.omnisend.description":
+    "Omnisend 让智能体读取活动和表单报告，查找联系人和细分，并创建和编辑活动、自动化流程、邮件模板、表单和商品。每个用户在浏览器中登录自己的 Omnisend 账户，并在授权页面选择访问级别。拥有写入权限时，智能体还可以发送活动和删除数据。如果智能体只需要报告，请选择只读权限。",
+  "marketplace.plugin.omnisend.app":
+    "活动、自动化流程、联系人、细分、表单和报告，通过 Omnisend 的 MCP 服务器并在浏览器中登录。",
+  "marketplace.plugin.omnisend.prompt.lastCampaign": "上周的活动与前一周相比效果如何？",
+  "marketplace.plugin.omnisend.prompt.segment": "VIP 细分中有多少联系人，本月有什么变化？",
+  "marketplace.plugin.omnisend.prompt.draftCampaign": "为新系列起草一个活动，但不要发送。",
   "marketplace.plugin.composio.tagline": "通过你自己的 Composio 链接连接大量应用",
   "marketplace.plugin.composio.description":
     "Composio 通过一个 MCP 服务器把助手连接到 Gmail、Slack、GitHub 以及数百个其他应用。在你的 Composio 账号中连接想要的应用，然后把它的 MCP URL 和 API 密钥粘贴到这里。",
