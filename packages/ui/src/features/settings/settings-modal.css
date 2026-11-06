@@ -54,8 +54,8 @@
 }
 
 .settings-modal-nav-item[aria-current="page"] {
-  background: var(--openbot-bg-control-hover);
-  color: var(--openbot-text-primary);
+  background: var(--openbot-accent-soft);
+  color: var(--openbot-accent-text);
   font-weight: var(--openbot-weight-medium);
 }
 
@@ -82,8 +82,12 @@
   color: var(--openbot-text-muted);
 }
 
-.settings-modal-nav-item:is([aria-current], [data-selected], :focus-visible) > svg:first-child {
+.settings-modal-nav-item:focus-visible > svg:first-child {
   color: var(--openbot-text-primary);
+}
+
+.settings-modal-nav-item:is([aria-current], [data-selected]) > svg:first-child {
+  color: currentcolor;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -168,6 +172,8 @@
   margin: 0;
   overflow: hidden;
   font: inherit;
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-tight);
   text-overflow: ellipsis;
 }
 
@@ -262,10 +268,10 @@
   width: 100%;
   display: grid;
   overflow: hidden;
-  border: 0;
-  border-radius: var(--openbot-radius-lg);
-  background: var(--openbot-bg-surface);
-  box-shadow: none;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-card);
+  background: var(--openbot-bg-card);
+  box-shadow: var(--openbot-shadow-pane);
 }
 
 .settings-modal-card.ui-card {
@@ -397,8 +403,8 @@
 }
 
 :is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-nav-item[data-selected] {
-  background: var(--openbot-bg-control-hover);
-  color: var(--openbot-text-primary);
+  background: var(--openbot-accent-soft);
+  color: var(--openbot-accent-text);
   font-weight: var(--openbot-weight-medium);
 }
 

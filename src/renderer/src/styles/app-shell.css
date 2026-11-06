@@ -1371,7 +1371,7 @@ textarea {
 
 .sidebar-search-wrap {
   position: relative;
-  padding: 8px 12px 6px;
+  padding: 8px 12px 10px;
 }
 
 /* The field opens the global search, so it is a button drawn as the search field. */
@@ -1385,9 +1385,9 @@ textarea {
 }
 
 .sidebar-search-trigger:hover:not(:disabled) {
-  border-color: var(--openbot-text-dim);
-  background: var(--openbot-bg-surface);
-  color: var(--openbot-text-dim);
+  border-color: var(--openbot-border-strong);
+  background: var(--openbot-bg-control-hover);
+  color: var(--openbot-text-muted);
 }
 
 .sidebar-search-placeholder {
@@ -1426,14 +1426,14 @@ textarea {
 
 .search-field {
   display: flex;
-  height: 32px;
+  height: var(--openbot-control-lg);
   align-items: center;
   gap: 8px;
-  border: 0.5px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-sm);
-  background: var(--openbot-hover);
-  padding: 0 9px;
-  color: var(--openbot-text-dim);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-control);
+  padding: 0 11px;
+  color: var(--openbot-text-muted);
   opacity: 1;
   transform: translateX(0);
   transition:
@@ -2259,16 +2259,16 @@ textarea {
 }
 
 .agent-row {
-  --agent-row-avatar-size: 46px;
+  --agent-row-avatar-size: 42px;
 
   display: flex;
   width: 100%;
   height: 62px;
   min-height: 62px;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   border: 0;
-  border-radius: var(--openbot-radius-md);
+  border-radius: var(--openbot-radius-lg);
   background: transparent;
   padding: 8px;
   color: inherit;
@@ -2280,7 +2280,7 @@ textarea {
 }
 
 .agent-row + .agent-row {
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .agent-row:hover {
@@ -2295,6 +2295,7 @@ textarea {
   --agent-avatar-outline: var(--openbot-bg-surface);
 
   background: var(--openbot-bg-surface);
+  box-shadow: inset 0 0 0 1px var(--openbot-border);
 }
 
 .agent-row-avatar {
@@ -2985,9 +2986,20 @@ textarea {
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-lg);
   line-height: 20px;
-  font-weight: 500;
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-tight);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The sidebar row is name, time and last message. The role stays in the row's label and in the
+   agent's settings; as a boxed chip beside every name it crowded the name. */
+.sidebar .agent-row-title:has(.agent-role-badge) {
+  display: flex;
+}
+
+.sidebar .agent-row-title .agent-role-badge {
+  display: none;
 }
 
 .agent-role-badge {
@@ -3023,6 +3035,7 @@ textarea {
   flex: 0 0 auto;
   color: var(--openbot-text-readable);
   font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
   line-height: 16px;
   white-space: nowrap;
 }
@@ -3052,11 +3065,11 @@ textarea {
 
 .agent-row-preview {
   display: block;
-  margin-top: 0;
+  margin-top: 1px;
   overflow: hidden;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-md);
-  line-height: 18px;
+  line-height: 20px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

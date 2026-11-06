@@ -726,8 +726,8 @@
 }
 
 .settings-page-nav-group .settings-modal-nav-item[data-selected] {
-  background: var(--openbot-bg-control-hover);
-  color: var(--openbot-text-primary);
+  background: var(--openbot-accent-soft);
+  color: var(--openbot-accent-text);
   font-weight: var(--openbot-weight-medium);
 }
 

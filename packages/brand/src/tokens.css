@@ -40,6 +40,9 @@
   --openbot-bg-sidebar: #000000;
   --openbot-marketplace-detail-bg: #050505;
   --openbot-bg-surface: #0a0a0a;
+  /* A settings card or panel: the surface with a hairline, not a filled block (Glaze). */
+  --openbot-bg-card: #0a0a0a;
+  --openbot-shadow-pane: 0 0 0 transparent;
   --openbot-bg-surface-raised: #111111;
   --openbot-bg-control: #111111;
   --openbot-bg-control-hover: #1a1a1a;
