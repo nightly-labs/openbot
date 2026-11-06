@@ -2,7 +2,7 @@ import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import type { ConversationMessageSender, MessageReaction } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 import { Button } from "@openbot/ui";
-import type { AgentMessage, ChatActionMarkerModel } from "@openbot/ui/data";
+import type { AgentMessage, ChatActionMarkerModel, MessageKind } from "@openbot/ui/data";
 import { ChannelActivityIndicator } from "@openbot/ui/features/channels/ChannelActivityIndicator";
 import { AgentActivityIndicator } from "@openbot/ui/features/conversation/AgentActivity";
 import { AgentChatEmptyState } from "@openbot/ui/features/conversation/AgentChatEmptyState";
@@ -114,6 +114,9 @@ function routineMarkerAvailable(
 }
 
 /** @internal Stable HMR boundary for conversation timeline. */
+/** The message kinds that can be the reply on a rail card. */
+const REPLY_KINDS: ReadonlySet<MessageKind> = new Set(["text", "question"]);
+
 export function ConversationTimeline() {
   const {
     activeChatSearchIndex,
@@ -554,9 +557,10 @@ export function ConversationTimeline() {
     // In a shared chat, a message from another member is theirs.
     question: (message) =>
       message.author === "you" && !message.actionMarker && !otherSender(message) ? message.body : undefined,
-    // The first answer the reader would call a message: not thinking, a plan, a tool exchange or a quiet run.
+    // The first answer the reader would call a message, or a question the agent asks: not thinking, a plan,
+    // a tool exchange, an error or a quiet run.
     reply: (message) =>
-      countableTimelineMessage(message) && (message.kind ?? "text") === "text" ? message.body : undefined,
+      countableTimelineMessage(message) && REPLY_KINDS.has(message.kind ?? "text") ? message.body : undefined,
     storedCount: () => props.messages.length,
     unloaded: () => props.unloadedHistory,
     virtualizer: messageVirtualizer,
