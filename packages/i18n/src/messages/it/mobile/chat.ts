@@ -32,6 +32,15 @@ export const messages = {
   "mobile.chat.routine.created": "Routine creata",
   "mobile.chat.routine.updated": "Routine aggiornata",
   "mobile.chat.routine.deleted": "Routine eliminata",
+  "mobile.chat.routine.runGroup.count": { one: "{count} esecuzione", other: "{count} esecuzioni" },
+  "mobile.chat.routine.runGroup.show": {
+    one: "Mostra {count} esecuzione di {name}",
+    other: "Mostra {count} esecuzioni di {name}",
+  },
+  "mobile.chat.routine.runGroup.hide": {
+    one: "Nascondi {count} esecuzione di {name}",
+    other: "Nascondi {count} esecuzioni di {name}",
+  },
   "mobile.chat.contextReset": "Nuova chat iniziata",
   "mobile.chat.plan.title": "Attività",
   "mobile.chat.plan.stopped": "Interrotto",
