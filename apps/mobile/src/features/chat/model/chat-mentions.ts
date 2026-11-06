@@ -58,12 +58,15 @@ export function mentionQuery(source: string, cursor: number) {
   return { start, end: cursor, query: query.toLocaleLowerCase() };
 }
 
-/** Writes an agent mention, or a skill or app reference as the desktop chip sends it, over the typed `@query`. */
+/**
+ * Writes an agent mention, or a skill, app, browser tab or thread reference as the desktop chip sends
+ * it, over the typed `@query`.
+ */
 export function insertMention(
   source: string,
   range: { start: number; end: number },
   agent: { id: string; name: string },
-  kind: "agent" | "skill" | "mcp" = "agent",
+  kind: "agent" | "skill" | "mcp" | "tab" | "thread" = "agent",
 ) {
   const wireOffset = (position: number) => {
     let offset = position;

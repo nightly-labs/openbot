@@ -44,8 +44,8 @@ const markdown = new Marked({
         // The phone cannot open the quoted passage, so a quote reads as its text in quotation marks.
         if (reference?.start === 0 && reference.kind === "quote")
           return { type: "text", raw: source.slice(0, reference.end), text: `“${reference.name}”` };
-        // A browser tab or a thread of the agent is on the host only, so it reads as its name.
-        if (reference?.start === 0 && (reference.kind === "tab" || reference.kind === "thread"))
+        // A thread of the agent reads as its name.
+        if (reference?.start === 0 && reference.kind === "thread")
           return { type: "text", raw: source.slice(0, reference.end), text: reference.name };
       },
     },
@@ -58,6 +58,17 @@ const markdown = new Marked({
         // A skill or an app that a message names, such as a Try from the Marketplace, draws as a chip.
         if (reference?.start === 0 && (reference.kind === "skill" || reference.kind === "mcp"))
           return { type: "skillMention", raw: source.slice(0, reference.end) };
+      },
+    },
+    {
+      name: "tabReference",
+      level: "inline",
+      start: (source) => source.indexOf("@["),
+      tokenizer(source) {
+        const reference = chatTagReferences(source)[0];
+        // A browser tab of the agent draws as a chip, and a tap opens the tab, as the desktop chip does.
+        if (reference?.start === 0 && reference.kind === "tab")
+          return { type: "tabMention", raw: source.slice(0, reference.end) };
       },
     },
   ],
