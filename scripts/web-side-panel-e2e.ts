@@ -102,7 +102,7 @@ async function settled(page: Page): Promise<void> {
 }
 
 async function open(browser: Browser, client: Client, width: number): Promise<Page> {
-  const page = await browser.newPage({ viewport: { width, height: HEIGHT } });
+  const page = await browser.newPage({ viewport: { width, height: HEIGHT }, locale: "en-US" });
   await page.goto(`${storybook}/iframe.html?id=${STORIES[client]}&viewMode=story`);
   await page.locator(".side-panel-toggle").first().waitFor({ timeout: 120_000 });
   return page;
@@ -159,6 +159,12 @@ async function desktopStates(browser: Browser, client: Client, width: number) {
     await settled(page);
     states.resized = await measure(page);
     const after = await page.locator(".conversation-panel .settings-panel").evaluate((element) => element.clientWidth);
+    await page.locator(".conversation-panel .right-panel-resizer").focus();
+    await page.keyboard.press("End");
+    await settled(page);
+    const minimumChatWidth = await page
+      .locator(".conversation-panel .conversation-header")
+      .evaluate((element) => element.clientWidth);
 
     // Delete closes the focused tab, and the focus goes to the pane list that takes its place.
     await page.locator(".side-panel-tab-select").first().focus();
@@ -175,7 +181,16 @@ async function desktopStates(browser: Browser, client: Client, width: number) {
     await page.locator(".side-panel-header").waitFor({ state: "detached" });
     const closedAgain = await toggle.getAttribute("aria-expanded");
 
-    return { closed, launcher, states, panelWidth, resize: { before, after }, focusAfterDelete, closedAgain };
+    return {
+      closed,
+      launcher,
+      states,
+      panelWidth,
+      resize: { before, after },
+      minimumChatWidth,
+      focusAfterDelete,
+      closedAgain,
+    };
   } finally {
     await page.close();
   }
@@ -248,8 +263,13 @@ try {
       );
       check(
         `${client} ${width}: the resize handle widens the pane`,
-        result.resize.after - result.resize.before === RESIZE_BY,
+        result.resize.after > result.resize.before && result.resize.after - result.resize.before <= RESIZE_BY,
         result.resize,
+      );
+      check(
+        `${client} ${width}: the chat keeps at least 320px when the pane is widest`,
+        result.minimumChatWidth >= 320,
+        result.minimumChatWidth,
       );
       check(
         `${client} ${width}: Delete on the last tab moves the focus to the pane list`,

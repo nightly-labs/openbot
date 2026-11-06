@@ -33,7 +33,7 @@ import type { VoiceConversationKind } from "./stores/voice-session-store";
 const BROWSER_PANEL_DEFAULT_RATIO = 0.5;
 const BROWSER_PANEL_MIN = 220;
 const BROWSER_PANEL_MAX = 1600;
-const CONVERSATION_PANEL_MIN = 96;
+const CONVERSATION_PANEL_MIN = 320;
 const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
 import { type HostFolderPick, HostFolderPicker } from "@openbot/ui/features/conversation/HostFolderPicker";
