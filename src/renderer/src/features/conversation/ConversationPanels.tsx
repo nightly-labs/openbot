@@ -390,13 +390,13 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
   };
   /**
    * Opens the message of a routine run in the chat. A run that is not in the chat ran in the routine's
-   * thread, so that thread opens.
+   * thread, so that thread opens. A remote runtime has no desktop port, so it opens the chat only.
    */
   const openRoutineRun = async (messageId: string, routineId: string | null) => {
     const agentId = props.agent?.id;
-    if (agentId && routineId && props.threads) {
+    if (agentId && routineId && props.threads && !props.runtime) {
       const inChat = await conversationPort()
-        .agent.readConversationPage({ agentId, anchor: { type: "around", messageId }, limit: 1 })
+        .agent.readConversationPage({ agentId, anchor: { type: "around", messageId }, limit: 1 }, props.server?.id)
         .then(
           (page) => page.messages.some((message) => message.id === messageId),
           () => true,
