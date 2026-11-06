@@ -533,7 +533,9 @@ export function createAgentTasks(options: AgentTasksOptions) {
     const unread = (state.snapshots[agentId]?.tasks ?? []).filter((task) => unreadCount(task) > 0);
     await Promise.all(
       unread.map(async (task) => {
-        const latestMessageId = (await port().readTask({ agentId, taskId: task.id })).messages.at(-1)?.id;
+        const messages =
+          state.conversations[task.id]?.messages ?? (await port().readTask({ agentId, taskId: task.id })).messages;
+        const latestMessageId = messages.at(-1)?.id;
         if (latestMessageId && scopeIsCurrent()) markTaskRead(agentId, task.id, latestMessageId);
       }),
     );
