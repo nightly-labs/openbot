@@ -32,6 +32,15 @@ export const messages = {
   "mobile.chat.routine.created": "Oluşturulan rutin",
   "mobile.chat.routine.updated": "Güncellenen rutin",
   "mobile.chat.routine.deleted": "Silinen rutin",
+  "mobile.chat.routine.runGroup.count": { one: "{count} çalıştırma", other: "{count} çalıştırma" },
+  "mobile.chat.routine.runGroup.show": {
+    one: "{name} için {count} çalıştırmayı göster",
+    other: "{name} için {count} çalıştırmayı göster",
+  },
+  "mobile.chat.routine.runGroup.hide": {
+    one: "{name} için {count} çalıştırmayı gizle",
+    other: "{name} için {count} çalıştırmayı gizle",
+  },
   "mobile.chat.contextReset": "Yeni sohbet başlatıldı",
   "mobile.chat.plan.title": "Görevler",
   "mobile.chat.plan.stopped": "Durduruldu",

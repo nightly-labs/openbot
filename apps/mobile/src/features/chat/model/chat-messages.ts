@@ -52,7 +52,16 @@ export type ChatMessage =
   /** Where a new chat started: the agent does not see the messages above it. */
   | { id: string; kind: "context-reset" }
   /** A routine created, changed, deleted, or run by the agent. The label matches the desktop marker. */
-  | { id: string; kind: "routine"; event: RoutineMarkerEvent; label: MobileTextKey; routineName: string }
+  | {
+      id: string;
+      kind: "routine";
+      event: RoutineMarkerEvent;
+      label: MobileTextKey;
+      routineId: string;
+      routineName: string;
+      /** When the host stored the marker. Not `createdAt`: a marker gets no day label. */
+      storedAt?: string;
+    }
   | {
       id: string;
       kind: "question";
@@ -106,6 +115,8 @@ export type ChatMessage =
 export type ChatBubbleMessage = Extract<ChatMessage, { kind: "message" }>;
 
 export type ExchangeMarker = Extract<ChatMessage, { kind: "exchange" }>;
+
+export type RoutineMarker = Extract<ChatMessage, { kind: "routine" }>;
 
 /** An older host sends only the reader's own reaction, in `reaction`. */
 function messageReactions(message: ConversationMessage): readonly ConversationReaction[] | undefined {
@@ -201,6 +212,7 @@ function routineMarker(message: ConversationMessage) {
   if (lifecycle) {
     return {
       runId: null,
+      routineId: lifecycle.routineId,
       event: lifecycle.action,
       label: ROUTINE_ACTION_LABELS[lifecycle.action],
       routineName: lifecycle.routineName,
@@ -208,10 +220,17 @@ function routineMarker(message: ConversationMessage) {
   }
   const run = routineRunConversationEvent(message);
   if (run)
-    return { runId: run.runId, event: run.status, label: ROUTINE_RUN_LABELS[run.status], routineName: run.routineName };
+    return {
+      runId: run.runId,
+      routineId: run.routineId,
+      event: run.status,
+      label: ROUTINE_RUN_LABELS[run.status],
+      routineName: run.routineName,
+    };
   if (message.routine)
     return {
       runId: message.routine.runId,
+      routineId: message.routine.routineId,
       event: "queued" as const,
       label: ROUTINE_RUN_LABELS.queued,
       routineName: message.routine.name,
@@ -237,7 +256,9 @@ function projectRoutineMarker(message: ConversationMessage, latestRuns: Readonly
     kind: "routine",
     event: marker.event,
     label: marker.label,
+    routineId: marker.routineId,
     routineName: marker.routineName,
+    storedAt: message.createdAt,
   }));
 }
 const aliasedMessages = new WeakMap<ChatMessage, ChatMessage>();
@@ -449,15 +470,122 @@ export function groupExchangeMarkers<T extends ChatMessage>(messages: readonly T
   return rows;
 }
 
+/** Consecutive completed runs of one routine, drawn as one row as on desktop. */
+export interface RoutineRunGroup {
+  /** The ID of the first run, so the row stays the same while new runs join. */
+  id: string;
+  kind: "routine-run-group";
+  /** The name of the newest run. */
+  routineName: string;
+  runs: RoutineMarker[];
+}
+
+/** A row that holds several markers. */
+export type ChatMarkerGroup = ExchangeGroup | RoutineRunGroup;
+
+type ChatRow = ChatMessage | ChatMarkerGroup;
+
+/** The markers of a group row, or the row itself. */
+function rowMarkers(row: ChatRow): readonly { id: string }[] {
+  return row.kind === "exchange-group" ? row.exchanges : row.kind === "routine-run-group" ? row.runs : [row];
+}
+
+const routineRunGroups = new WeakMap<RoutineMarker, RoutineRunGroup>();
+
+/** The rows where a routine run group must stop, so a line or a focused run keeps a row of its own. */
+export interface RoutineRunGroupStops {
+  /** The NEW line shows above the first row of these messages. */
+  unreadMessageIds?: ReadonlySet<string> | null;
+  /** The message that the chat opens at, from a search result. */
+  focusMessageId?: string | null;
+  /** The row that the branch divider follows. */
+  branchRowId?: string | null;
+}
+
+/**
+ * Joins consecutive completed runs of one routine into one row, as desktop does, so a routine that
+ * runs often does not fill the chat. Any other row stops the group, and so does a run that did not
+ * complete. A group also stops at a new day, at the first unread row, at the branch divider, and
+ * around the run that the chat opens at.
+ */
+export function groupRoutineRunMarkers<T extends ChatRow>(
+  rows: readonly T[],
+  { unreadMessageIds = null, focusMessageId = null, branchRowId = null }: RoutineRunGroupStops = {},
+): (T | RoutineRunGroup)[] {
+  // A new group starts at each of these rows.
+  const starts = new Set<number>();
+  if (unreadMessageIds) starts.add(firstChatRowOf(rows, unreadMessageIds));
+  if (focusMessageId) {
+    const focus = chatRowIndex(rows, focusMessageId);
+    if (focus >= 0) starts.add(focus).add(focus + 1);
+  }
+  if (branchRowId) {
+    const branch = chatRowHolding(rows, branchRowId);
+    if (branch >= 0) starts.add(branch + 1);
+  }
+  const result: (T | RoutineRunGroup)[] = [];
+  let run: (T & RoutineMarker)[] = [];
+  const closeRun = () => {
+    const [first] = run;
+    if (first) result.push(run.length === 1 ? first : routineRunGroup(first, run));
+    run = [];
+  };
+  rows.forEach((row, index) => {
+    if (!completedRun(row)) {
+      closeRun();
+      result.push(row);
+      return;
+    }
+    const previous = run.at(-1);
+    if (
+      previous &&
+      (starts.has(index) || previous.routineId !== row.routineId || startsDay(previous.storedAt, row.storedAt))
+    )
+      closeRun();
+    run.push(row);
+  });
+  closeRun();
+  return result;
+}
+
+/** Whether `current` is on a later local day than `previous`. A marker with no time starts no day. */
+function startsDay(previous: string | undefined, current: string | undefined): boolean {
+  if (!previous || !current) return false;
+  const [before, after] = [new Date(previous), new Date(current)];
+  if (Number.isNaN(before.getTime()) || Number.isNaN(after.getTime())) return false;
+  return before.toDateString() !== after.toDateString();
+}
+
+function completedRun<T extends ChatRow>(row: T): row is T & RoutineMarker {
+  return row.kind === "routine" && row.event === "succeeded";
+}
+
+/** Reuse the group of the same runs, so a streamed reply does not draw the group row again. */
+function routineRunGroup(first: RoutineMarker, runs: RoutineMarker[]): RoutineRunGroup {
+  const cached = routineRunGroups.get(first);
+  if (cached?.runs.length === runs.length && cached.runs.every((item, index) => item === runs[index])) return cached;
+  const group: RoutineRunGroup = {
+    id: first.id,
+    kind: "routine-run-group",
+    routineName: runs.at(-1)?.routineName ?? first.routineName,
+    runs,
+  };
+  routineRunGroups.set(first, group);
+  return group;
+}
+
 /**
  * The row that shows a host message, for a chat that opens at a search result. A marker row has the
  * message ID after its prefix, and a group row holds several markers. -1 when no row shows it.
  */
-export function chatRowIndex(rows: readonly (ChatMessage | ExchangeGroup)[], messageId: string): number {
+export function chatRowIndex(rows: readonly ChatRow[], messageId: string): number {
   const ids = new Set([messageId, `exchange:${messageId}`, `routine:${messageId}`, `context-reset:${messageId}`]);
-  return rows.findIndex((row) =>
-    row.kind === "exchange-group" ? row.exchanges.some((marker) => ids.has(marker.id)) : ids.has(row.id),
-  );
+  return rows.findIndex((row) => rowMarkers(row).some((marker) => ids.has(marker.id)));
+}
+
+/** The row that holds the row with `id`: the row itself, or the group it is in. -1 when none does. */
+export function chatRowHolding(rows: readonly ChatRow[], id: string): number {
+  return rows.findIndex((row) => rowMarkers(row).some((marker) => marker.id === id));
 }
 
 const MARKER_ROW_PREFIX = /^(?:exchange|routine|context-reset):/u;
@@ -466,13 +594,9 @@ const MARKER_ROW_PREFIX = /^(?:exchange|routine|context-reset):/u;
  * The first row that shows one of `messageIds`, with the row IDs that `chatRowIndex` reads. -1 when
  * no row shows one of them.
  */
-export function firstChatRowOf(
-  rows: readonly (ChatMessage | ExchangeGroup)[],
-  messageIds: ReadonlySet<string>,
-): number {
-  const shows = (rowId: string) => messageIds.has(rowId.replace(MARKER_ROW_PREFIX, ""));
+export function firstChatRowOf(rows: readonly ChatRow[], messageIds: ReadonlySet<string>): number {
   return rows.findIndex((row) =>
-    row.kind === "exchange-group" ? row.exchanges.some((marker) => shows(marker.id)) : shows(row.id),
+    rowMarkers(row).some((marker) => messageIds.has(marker.id.replace(MARKER_ROW_PREFIX, ""))),
   );
 }
 
@@ -551,7 +675,9 @@ function projectChannelMessage(
       kind: "routine",
       event: routine.event,
       label: routine.label,
+      routineId: routine.routineId,
       routineName: routine.routineName,
+      storedAt: entry.message.createdAt,
     };
   }
   if (entry.message.questionPrompt) {

@@ -11,6 +11,7 @@ import type { LucideIcon } from "lucide-react-native";
 import CalendarClock from "lucide-react-native/icons/calendar-clock";
 import CalendarPlus from "lucide-react-native/icons/calendar-plus";
 import CalendarX2 from "lucide-react-native/icons/calendar-x-2";
+import ChevronDown from "lucide-react-native/icons/chevron-down";
 import CircleCheck from "lucide-react-native/icons/circle-check";
 import CirclePause from "lucide-react-native/icons/circle-pause";
 import CircleX from "lucide-react-native/icons/circle-x";
@@ -68,13 +69,17 @@ import { useMessageArrivals } from "@/features/chat/components/use-message-arriv
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import {
   type ChatBubbleMessage,
+  type ChatMarkerGroup,
   type ChatMessage,
+  chatRowHolding,
   chatRowIndex,
-  type ExchangeGroup,
   firstChatRowOf,
   groupExchangeMarkers,
+  groupRoutineRunMarkers,
   indexChatMessages,
+  type RoutineMarker,
   type RoutineMarkerEvent,
+  type RoutineRunGroup,
 } from "@/features/chat/model/chat-messages";
 import type { TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { useAgentColorMessages } from "@/features/settings/model/message-color";
@@ -115,7 +120,7 @@ const TAP_DURATION_MS = 400;
 const HANDLE_MARGIN = 24;
 
 /** A row of the list. Thinking steps show in the activity row instead. */
-type VisibleMessage = Exclude<ChatMessage, { kind: "thinking" }> | ExchangeGroup;
+type VisibleMessage = Exclude<ChatMessage, { kind: "thinking" }> | ChatMarkerGroup;
 const NO_ROWS: VisibleMessage[] = [];
 /**
  * While the chat opens on Android, the list renders only the latest rows, which the reader sees
@@ -414,13 +419,7 @@ const ROUTINE_MARKER_ICONS: Record<RoutineMarkerEvent, LucideIcon> = {
   cancelled: CirclePause,
 };
 
-function RoutineMarkerRow({
-  message,
-  muted,
-}: {
-  message: Extract<ChatMessage, { kind: "routine" }>;
-  muted: ViewStyle["backgroundColor"];
-}) {
+function RoutineMarkerRow({ message, muted }: { message: RoutineMarker; muted: ViewStyle["backgroundColor"] }) {
   const { t } = useText();
   const [success, danger] = useCSSVariable(["--openbot-success-text", "--openbot-danger-text"]);
   const Icon = ROUTINE_MARKER_ICONS[message.event];
@@ -443,6 +442,53 @@ function RoutineMarkerRow({
       <Typography.Paragraph type="body-sm" className="font-medium" style={{ color: muted }}>
         {message.routineName}
       </Typography.Paragraph>
+    </View>
+  );
+}
+
+/**
+ * Consecutive completed runs of one routine, drawn as one row as on desktop. The row names the
+ * routine and how many runs there are, and opens to show each run's own marker.
+ */
+function RoutineRunGroupRow({ group, muted }: { group: RoutineRunGroup; muted: ViewStyle["backgroundColor"] }) {
+  const { t } = useText();
+  const [success] = useCSSVariable(["--openbot-success-text"]);
+  const [open, setOpen] = useState(false);
+  const count = group.runs.length;
+  return (
+    <View className="items-center">
+      <View className="flex-row flex-wrap items-center justify-center gap-1.5 py-2">
+        <CircleCheck size={16} color={String(success)} strokeWidth={1.75} />
+        <Typography.Paragraph type="body-sm" className="font-medium" style={{ color: muted }}>
+          {group.routineName}
+        </Typography.Paragraph>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ expanded: open }}
+          accessibilityLabel={t(open ? "mobile.chat.routine.runGroup.hide" : "mobile.chat.routine.runGroup.show", {
+            count,
+            name: group.routineName,
+          })}
+          hitSlop={8}
+          onPress={() => {
+            void haptics.selection();
+            setOpen((value) => !value);
+          }}
+          className="flex-row items-center gap-1"
+          style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+        >
+          <Typography.Paragraph type="body-sm" style={{ color: muted }}>
+            {t("mobile.chat.routine.runGroup.count", { count })}
+          </Typography.Paragraph>
+          <ChevronDown
+            size={14}
+            color={String(muted)}
+            strokeWidth={2}
+            style={{ transform: [{ rotate: open ? "180deg" : "0deg" }] }}
+          />
+        </Pressable>
+      </View>
+      {open ? group.runs.map((run) => <RoutineMarkerRow key={run.id} message={run} muted={muted} />) : null}
     </View>
   );
 }
@@ -752,6 +798,8 @@ const MessageRow = memo(function MessageRow({
   const rendered =
     message.kind === "routine" ? (
       <RoutineMarkerRow key={message.id} message={message} muted={muted} />
+    ) : message.kind === "routine-run-group" ? (
+      <RoutineRunGroupRow key={message.id} group={message} muted={muted} />
     ) : message.kind === "context-reset" ? (
       <ContextResetMarkerRow key={message.id} muted={muted} />
     ) : message.kind === "exchange-group" ? (
@@ -1302,8 +1350,13 @@ export const ChatMessageList = memo(function ChatMessageList({
   });
 
   const visibleMessages = useMemo(
-    () => groupExchangeMarkers(messages.filter((message) => message.kind !== "thinking")),
-    [messages],
+    () =>
+      groupRoutineRunMarkers(groupExchangeMarkers(messages.filter((message) => message.kind !== "thinking")), {
+        unreadMessageIds: unreadLineMessageIds,
+        focusMessageId,
+        branchRowId: branchDivider?.afterId,
+      }),
+    [messages, unreadLineMessageIds, focusMessageId, branchDivider?.afterId],
   );
   // One pass over the loaded rows when they change; the rows read their label from the context.
   const dayLabels = useMemo(() => chatDayLabels(visibleMessages, { t, format }), [visibleMessages, t, format]);
@@ -1524,19 +1577,14 @@ export const ChatMessageList = memo(function ChatMessageList({
   const responseIds = useMemo(() => new Set(rows.slice(tailIndex + 1).map((row) => row.id)), [rows, tailIndex]);
   // The opening rows do not start at the first message of the chat.
   const firstUserId = rowsShown && tailIndex === 0 && !hasOlder ? (rows[0]?.id ?? null) : null;
-  // The line follows its row, or the row of the exchange group that holds it.
+  // The line follows its row, or the row of the group that holds it.
   const openBranchSource = useRef(onOpenBranchSource);
   openBranchSource.current = onOpenBranchSource;
   const canOpenBranchSource = Boolean(onOpenBranchSource);
   const dividerRowId = useMemo(() => {
     const afterId = branchDivider?.afterId;
     if (!afterId) return null;
-    const row = visibleMessages.find(
-      (message) =>
-        message.id === afterId ||
-        (message.kind === "exchange-group" && message.exchanges.some((exchange) => exchange.id === afterId)),
-    );
-    return row?.id ?? null;
+    return visibleMessages[chatRowHolding(visibleMessages, afterId)]?.id ?? null;
   }, [branchDivider?.afterId, visibleMessages]);
   // The NEW line shows above the first unread row. A message without a row, such as a thinking step,
   // gives the line to the next row that has one.
