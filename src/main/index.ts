@@ -387,6 +387,8 @@ let activeRemotePrincipalId: string | null = null;
 /** Counts account transitions, so queued work for a superseded one is dropped rather than applied. */
 let centralAuthGeneration = 0;
 let activeAnalyticsPrincipalId: string | null = null;
+/** The last account state that `forwardCentralAuth` saw. It tells a sign-in by the user from a restored session. */
+let previousCentralAuthStatus: CentralAuthState["status"] | null = null;
 const remoteAccountGate = Semaphore.makeUnsafe(1);
 const macHapticFeedback = new MacHapticFeedback();
 let isQuitting = false;
@@ -1018,6 +1020,14 @@ function centralAuthPrincipalId(state: CentralAuthState): string | null {
 function forwardCentralAuth(state: CentralAuthState): void {
   // A local server has no account: its owner is a password member that a sign-out must not unbind.
   if (localServerChild) return;
+  // A session that loads, recovers after an error, or refreshes is not a sign-in by the user. Its
+  // publish is automatic, so the account service can refuse a server that its owner removed (#5273).
+  const automaticSignIn =
+    previousCentralAuthStatus === null ||
+    previousCentralAuthStatus === "loading" ||
+    previousCentralAuthStatus === "error" ||
+    previousCentralAuthStatus === "signed_in";
+  previousCentralAuthStatus = state.status;
   if (state.status === "signed_in") {
     if (activeAnalyticsPrincipalId && activeAnalyticsPrincipalId !== state.user.id) services?.analytics.clear();
     activeAnalyticsPrincipalId = state.user.id;
@@ -1097,9 +1107,9 @@ function forwardCentralAuth(state: CentralAuthState): void {
               ),
             );
         // A self-hosted server exists to be a host, so its first sign-in names and starts it too.
-        if (host && services?.serverMode) yield* services.serverMode.publish();
+        if (host && services?.serverMode) yield* services.serverMode.publish(automaticSignIn);
         else if (host && shouldAutoStartHost({ ...host.getStatus(), remoteRole: developmentRemoteRole }))
-          yield* host.start();
+          yield* host.start(true);
       }),
     ),
   ).catch((error) => {
@@ -1637,7 +1647,7 @@ if (!hasSingleInstanceLock) {
       if (built.serverMode) {
         const serverModeControl = built.serverMode;
         void runCauseEffect(
-          built.centralAuthInitialization.pipe(Effect.flatMap(() => serverModeControl.publish())),
+          built.centralAuthInitialization.pipe(Effect.flatMap(() => serverModeControl.publish(true))),
         ).catch((error) => logger.error("Unable to publish this server:", toLogValue(error)));
       } else if (
         shouldAutoStartHost({
@@ -1646,8 +1656,8 @@ if (!hasSingleInstanceLock) {
           remoteRole: developmentRemoteRole,
         })
       ) {
-        void runCauseEffect(built.centralAuthInitialization.pipe(Effect.flatMap(() => host.start()))).catch((error) =>
-          logger.error("Unable to republish this OpenBot:", toLogValue(error)),
+        void runCauseEffect(built.centralAuthInitialization.pipe(Effect.flatMap(() => host.start(true)))).catch(
+          (error) => logger.error("Unable to republish this OpenBot:", toLogValue(error)),
         );
       }
       void runCauseEffect(built.agentInitialization.start()).catch((error) => {

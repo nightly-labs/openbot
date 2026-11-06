@@ -201,6 +201,7 @@ export const messages = {
   "error.remote.hostRefused": "Der Host hat die Anfrage abgelehnt ({status}).",
   "error.remote.formUnavailable": "Dieses Formular ist nicht mehr verfügbar.",
   "error.remote.hostedServerRemoval": "Lösche einen gehosteten Server unter „Abrechnung“.",
+  "error.remote.hostRemoved": "Der Eigentümer hat diesen Server aus dem Konto entfernt.",
   "error.remote.channelsUnsupported": "Aktualisiere diesen Desktop-Server, um Kanäle zu verwenden.",
   "error.remote.channelDeleteUnsupported": "Aktualisiere diesen Desktop-Server, um Kanäle zu löschen.",
   "error.remote.historyRefreshFailed":

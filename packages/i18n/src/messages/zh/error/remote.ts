@@ -186,6 +186,7 @@ export const messages = {
   // Channel actions on mobile.
   "error.remote.formUnavailable": "该表单已不可用。",
   "error.remote.hostedServerRemoval": "请使用账单页面删除托管服务器。",
+  "error.remote.hostRemoved": "所有者已将该服务器从账户中移除。",
   "error.remote.channelsUnsupported": "请更新这台桌面服务器以使用频道。",
   "error.remote.channelDeleteUnsupported": "请更新这台桌面服务器以删除频道。",
   "error.remote.historyRefreshFailed": "消息已发送，但无法刷新对话历史。",

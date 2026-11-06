@@ -201,6 +201,7 @@ export const messages = {
   "error.remote.hostRefused": "ホストがリクエストを拒否しました ({status})。",
   "error.remote.formUnavailable": "このフォームは利用できなくなりました。",
   "error.remote.hostedServerRemoval": "ホスト型サーバーを削除するには「お支払い」を使用してください。",
+  "error.remote.hostRemoved": "所有者がこのサーバーをアカウントから削除しました。",
   "error.remote.channelsUnsupported": "チャンネルを使うには、このデスクトップサーバーを更新してください。",
   "error.remote.channelDeleteUnsupported": "チャンネルを削除するには、このデスクトップサーバーを更新してください。",
   "error.remote.historyRefreshFailed": "メッセージは送信されましたが、チャット履歴を更新できませんでした。",

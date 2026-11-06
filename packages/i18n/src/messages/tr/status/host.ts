@@ -9,4 +9,5 @@ export const messages = {
   "status.host.ready": "Bu OpenBot, WebRTC bağlantıları için hazır.",
   "status.host.stopping": "Bu OpenBot özel yapılıyor…",
   "status.host.private": "Bu OpenBot özel.",
+  "status.host.removed": "Bu OpenBot hesabınızdan kaldırıldı. Paylaşmak için yeniden yayımlayın.",
 } as const satisfies PartialTranslation<typeof source>;

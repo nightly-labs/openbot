@@ -10,4 +10,5 @@ export const messages = {
   "status.host.ready": "本 OpenBot 已可用于 WebRTC 连接。",
   "status.host.stopping": "正在将本 OpenBot 设为私有…",
   "status.host.private": "本 OpenBot 已设为私有。",
+  "status.host.removed": "本 OpenBot 已从你的账户中移除。如需共享，请重新发布。",
 } as const satisfies PartialTranslation<typeof source>;

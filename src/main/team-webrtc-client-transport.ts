@@ -64,6 +64,8 @@ interface TeamWebRtcClientTransportEvents {
   event: [hostId: string, event: AgentEvent | TeamRealtimeEvent];
   path: [hostId: string, path: "p2p" | "relay"];
   error: [hostId: string, code: string, message: string];
+  /** An attempt to connect failed. A cancelled or replaced attempt does not count. */
+  connectFailed: [hostId: string];
   desktopData: [hostId: string, data: string | ArrayBuffer];
 }
 
@@ -868,6 +870,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
             CONNECT_RETRY_START_MILLISECONDS * 2 ** (failures - 1),
           );
           this.#connectRetries.set(hostId, { failure, failures, retryAt: Date.now() + delay });
+          this.emit("connectFailed", hostId);
         }),
       ),
       Effect.onExit((exit) => Deferred.done(done, exit)),
