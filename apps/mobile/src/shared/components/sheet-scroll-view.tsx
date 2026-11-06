@@ -31,6 +31,11 @@ interface SheetScrollViewProps extends PropsWithChildren {
   showsVerticalScrollIndicator?: boolean;
   /** False stops the scroll that keeps a focused field and the content above the keyboard. */
   keyboardAware?: boolean;
+  /**
+   * Android: keeps the native header, without the blur header, for a page that puts native header
+   * content in it that the custom header cannot draw, such as a `Stack.SearchBar`.
+   */
+  androidNativeHeader?: boolean;
   /** The scroll view, for a screen that keeps its newest content in view. */
   scrollRef?: Ref<KeyboardAwareScrollViewRef>;
   onScroll?: ScrollViewProps["onScroll"];
@@ -49,6 +54,7 @@ export function SheetScrollView({
   keyboardShouldPersistTaps,
   showsVerticalScrollIndicator = false,
   keyboardAware = true,
+  androidNativeHeader = false,
   scrollRef,
   onScroll,
   onContentSizeChange,
@@ -64,7 +70,7 @@ export function SheetScrollView({
   // Android 12 and later: the page draws its own header in place of the native one, over a blur of the
   // content, which scrolls under it as under the iOS header. The stack measures that header, so the
   // content clears exactly its height. Earlier versions keep the opaque native header and the fade.
-  const androidBlurHeader = ANDROID_BLUR && headerShown && !header && headerOverlaysContent;
+  const androidBlurHeader = ANDROID_BLUR && headerShown && !header && headerOverlaysContent && !androidNativeHeader;
   const blurTarget = useRef<ViewInstance>(null);
   const navigation = useContext(NavigationContext);
   useLayoutEffect(() => {

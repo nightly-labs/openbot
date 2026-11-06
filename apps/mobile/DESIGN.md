@@ -305,7 +305,8 @@ header draws the page's `headerLeft`, title and `headerRight`, so `androidBackOp
 `AndroidHeaderButton` and `SheetSaveAction` keep working. The stack measures it, and the content
 clears exactly that height. A sheet header (`sheetHeaderInsetOptions`, see `isSheetHeader`) does not
 reach the status bar; a full screen adds it. A page without `SheetScrollView`, such as a scanner or a
-PIN page, keeps the opaque native header. Before Android 12, and at the top of a sheet with no header, the
+PIN page, keeps the opaque native header. A page that puts a `Stack.SearchBar` in the header (the
+audit log) sets `androidNativeHeader`, because the custom header cannot draw it. Before Android 12, and at the top of a sheet with no header, the
 content fades into a 32 dp masked `bg-sheet` layer below the opaque header.
 The fade follows the same rule as the iOS blur. A sticky custom header, such as search, uses the opaque `bg-sheet` color. Chat and drawer
 edges keep their canvas effect.
