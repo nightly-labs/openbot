@@ -5,15 +5,20 @@ import { shownFileCommands } from "./skill-loads";
 
 /** A path that a shell expands to many files. It names no one file. */
 const GLOB = /[*?[]/u;
+/** A command that reads a file on another computer or in a container, not on this one. */
+const REMOTE_COMMAND = /(?:^|[\s;&|('"])(?:ssh|docker|podman|kubectl)\s/u;
+/** The characters that a backslash escapes in a double-quoted shell word. */
+const DOUBLE_QUOTE_ESCAPES = new Set(["$", "`", '"', "\\", "\n"]);
 
 /**
- * The files that a shell step shows, such as `tail -n 50 ~/Library/…/main.log`, so a chip that names
- * only `main.log` finds a file that the agent read with a shell command. Codex parses its own command
- * into `commandActions`; a Claude `Bash` command is split here. Only absolute and home paths count.
+ * The files that a finished shell step showed, such as `tail -n 50 ~/Library/…/main.log`, so a chip that
+ * names only `main.log` finds a file that the agent read with a shell command. Codex parses its own
+ * command into `commandActions`; a Claude `Bash` command is split here. Only absolute and home paths
+ * count. A step that failed or did not run read nothing.
  */
 export function shellReadPaths(item: unknown): string[] {
-  if (!isRecord(item)) return [];
-  if (item.type === "commandExecution" && Array.isArray(item.commandActions)) {
+  if (!isRecord(item) || getString(item, "status") !== "completed") return [];
+  if (item.type === "commandExecution") {
     const cwd = getString(item, "cwd");
     return getArray(item, "commandActions").flatMap((action) => {
       const path = isRecord(action) && action.type === "read" ? getString(action, "path") : null;
@@ -22,8 +27,9 @@ export function shellReadPaths(item: unknown): string[] {
       return [isAbsolute(expanded) || !cwd ? expanded : join(cwd, expanded)];
     });
   }
-  if (item.type !== "commandExecution" && !(item.type === "toolCall" && getString(item, "name") === "Bash")) return [];
+  if (item.type !== "toolCall" || getString(item, "name") !== "Bash") return [];
   return shownFileCommands(getString(item, "command") ?? "")
+    .filter((command) => !REMOTE_COMMAND.test(command))
     .flatMap(shellWords)
     .map(expandHome)
     .filter((path) => isAbsolute(path) && !GLOB.test(path));
@@ -43,7 +49,8 @@ function shellWords(command: string): string[] {
     const char = command[index] ?? "";
     if (quote) {
       if (char === quote) quote = null;
-      else if (char === "\\" && quote === '"' && index + 1 < command.length) word += command[++index];
+      else if (char === "\\" && quote === '"' && DOUBLE_QUOTE_ESCAPES.has(command[index + 1] ?? ""))
+        word += command[++index];
       else word += char;
     } else if (char === "'" || char === '"') {
       quote = char;
