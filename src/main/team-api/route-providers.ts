@@ -177,15 +177,18 @@ export async function routeProviders(
         return json(200, wireSnapshotV4(await runCauseEffect(runtimes.checkForUpdates())));
       case PROVIDERS_V8_ROUTES.apiKeyState:
       case PROVIDERS_V5_ROUTES.apiKeyState:
-      case PROVIDERS_ADMIN_ROUTES.apiKeyState:
-        return json(200, {
-          status: credentials.status(
-            parsed(
-              V8_ROUTES.has(url.pathname) ? keyProviderV8 : V5_ROUTES.has(url.pathname) ? managedProviderV5 : provider,
-              body,
-            ),
-          ),
-        });
+      case PROVIDERS_ADMIN_ROUTES.apiKeyState: {
+        const id = parsed(
+          V8_ROUTES.has(url.pathname) ? keyProviderV8 : V5_ROUTES.has(url.pathname) ? managedProviderV5 : provider,
+          body,
+        );
+        // `codex-api-key-v1`: the key is in Codex's own login, which the agent status reads.
+        if (id === "codex") {
+          const codex = service.getStatus().providers?.find((candidate) => candidate.id === "codex");
+          return json(200, { status: codex?.apiKeyInUse ? "saved" : "missing" });
+        }
+        return json(200, { status: credentials.status(id) });
+      }
       case PROVIDERS_V8_ROUTES.apiKeySet:
       case PROVIDERS_V5_ROUTES.apiKeySet:
       case PROVIDERS_ADMIN_ROUTES.apiKeySet: {

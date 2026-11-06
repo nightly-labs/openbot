@@ -408,6 +408,8 @@ function queueSnapshot(agentId: string): QueueSnapshot {
 
 // The provider keys that the fake host keeps.
 const providerKeys = new Set<string>();
+// Whether the fake host's Codex logged in with an OpenAI API key (`codex-api-key-v1`).
+let codexOnKey = false;
 const NO_STATUS: AgentStatus = {
   phase: "ready",
   cliVersion: null,
@@ -1282,8 +1284,22 @@ try {
           signInCodexWithApiKey: (key) =>
             Effect.sync(() => {
               record("signInCodexWithApiKey", key);
+              codexOnKey = true;
               return NO_STATUS;
             }),
+          // The released status routes drop `apiKeyInUse`, so `apiKeyState` reads it here for Codex.
+          getStatus: () => ({
+            ...NO_STATUS,
+            providers: [
+              {
+                id: "codex",
+                state: "available",
+                version: null,
+                message: null,
+                ...(codexOnKey ? { apiKeyInUse: true } : {}),
+              },
+            ],
+          }),
         },
         credentials: {
           status: (provider) => (providerKeys.has(provider) ? "saved" : "missing"),
@@ -4773,10 +4789,12 @@ try {
     const keysBefore = callsOf("setProviderKey").length;
     const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
     const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    const stateBefore = await call("POST", PROVIDERS_V8_ROUTES.apiKeyState, { ...v8, json: { provider: "codex" } });
     const codex = await call("POST", PROVIDERS_V8_ROUTES.apiKeySet, {
       ...v8,
       json: { provider: "codex", key: openAiKey },
     });
+    const stateAfter = await call("POST", PROVIDERS_V8_ROUTES.apiKeyState, { ...v8, json: { provider: "codex" } });
     const codexMember = await call("POST", PROVIDERS_V8_ROUTES.apiKeySet, {
       ...v8,
       token: bobToken,
@@ -4791,6 +4809,11 @@ try {
         isDeepStrictEqual(callsOf("signInCodexWithApiKey"), [[openAiKey]]) &&
         callsOf("setProviderKey").length === keysBefore,
       [summary(codex), summary(codexMember)],
+    );
+    check(
+      "apiKeyState answers for the host's Codex login, which the released status routes do not carry",
+      field(stateBefore.body, "status") === "missing" && field(stateAfter.body, "status") === "saved",
+      [summary(stateBefore), summary(stateAfter)],
     );
   }
 

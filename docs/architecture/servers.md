@@ -772,8 +772,10 @@ the host advertises the capability.
 `codex-api-key-v1` has no routes. It tells a client that the host logs Codex in with an OpenAI API
 key that the released `apiKeySet` route of `providers-v1`, `-v5` or `-v8` sends for `codex`, as
 `codex login --with-api-key` does on this computer. Codex keeps the key in its own login, not in the
-OpenBot key store, so `apiKeyState` does not report it; the host's agent status gives `apiKeyInUse`
-instead. OpenAI bills each request to the key. The ChatGPT sign-in and the sign-out replace the key.
+OpenBot key store. The released agent status does not carry the login type, so `apiKeyState` for
+`codex` answers from that login: `saved` while Codex runs on a key. `apiKeyClear` does not remove the
+login, as on this computer. OpenAI bills each request to the key. The ChatGPT sign-in and the sign-out
+replace the key.
 An older host saved the key but did not use it, so a client shows the Codex key for a joined server
 only when the host advertises the capability.
 

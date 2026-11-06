@@ -125,22 +125,27 @@ const codeSignInAgentStatus: AgentStatus = {
       : provider,
   ),
 };
-/** Codex on a joined server with `codex-api-key-v1`, logged in with an OpenAI API key. */
+/**
+ * Codex on a joined server with `codex-api-key-v1`, logged in with an OpenAI API key. The host status
+ * does not carry the key, so only the key route says it is saved.
+ */
 const hostCodexKeyAgentStatus: AgentStatus = {
   ...codeSignInAgentStatus,
   providers: (codeSignInAgentStatus.providers ?? []).map((provider) =>
-    provider.id === "codex" ? { ...provider, state: "available", message: null, apiKeyInUse: true } : provider,
+    provider.id === "codex" ? { ...provider, state: "available", message: null } : provider,
   ),
 };
 /** The key routes of a joined server's host that logs Codex in with a pasted OpenAI key. */
-const hostCodexKeys: ProviderKeyApi = {
-  readsCodexKey: true,
-  onHost: true,
-  getProviderApiKeyState: async (provider) => ({ provider, status: "missing" }),
-  setProviderApiKey: fn(async () => undefined),
-  clearProviderApiKey: fn(async () => undefined),
-  openExternal: fn(async () => undefined),
-};
+function hostCodexKeys(codex: "missing" | "saved"): ProviderKeyApi {
+  return {
+    readsCodexKey: true,
+    onHost: true,
+    getProviderApiKeyState: async (provider) => ({ provider, status: provider === "codex" ? codex : "missing" }),
+    setProviderApiKey: fn(async () => undefined),
+    clearProviderApiKey: fn(async () => undefined),
+    openExternal: fn(async () => undefined),
+  };
+}
 /** Two saved endpoints: one with a key of its own, one on this computer that asks for none. */
 const STORY_CUSTOM_PROVIDERS: readonly CustomProviderSummary[] = [
   {
@@ -363,7 +368,7 @@ function ServerProvidersStory(props: {
           ? fn()
           : undefined,
       accountActions: usageResetAccounts,
-      providerKeys: props.hostCodexKey ? hostCodexKeys : undefined,
+      providerKeys: props.hostCodexKey ? hostCodexKeys(props.hostCodexKey) : undefined,
       onAddCustomProvider: addCustomProvider,
       onDeleteCustomProvider: deleteCustomProvider,
       onUpdateCustomProvider: updateCustomProvider,
