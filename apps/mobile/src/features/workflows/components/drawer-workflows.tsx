@@ -1,8 +1,6 @@
 import type { WorkflowSummary } from "@openbot/contracts/ipc";
 import type { Href } from "expo-router";
 import { Typography } from "heroui-native";
-import Play from "lucide-react-native/icons/play";
-import UserRoundCheck from "lucide-react-native/icons/user-round-check";
 import { memo, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, View } from "react-native";
 import { useCSSVariable } from "uniwind";
@@ -11,6 +9,7 @@ import { useWorkflowList } from "@/features/workflows/model/use-workflows";
 import { RUN_STATUS_LABEL } from "@/features/workflows/model/workflow-steps";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { rememberDrawerValues, useDrawerSnapshot } from "@/features/workspace/model/drawer-snapshot";
+import { Play, UserRoundCheck } from "@/shared/icons";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";

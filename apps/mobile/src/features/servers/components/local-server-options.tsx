@@ -1,10 +1,10 @@
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import Monitor from "lucide-react-native/icons/monitor";
 import { View } from "react-native";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { Monitor } from "@/shared/icons";
 import { useText } from "@/shared/lib/text";
 
 /** The create page of the sheet that shows these rows. */

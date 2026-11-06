@@ -1,7 +1,6 @@
 import type { WorkflowSummary } from "@openbot/contracts/ipc";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
-import Plus from "lucide-react-native/icons/plus";
 import { Pressable, View } from "react-native";
 import { SettingsSection } from "@/features/settings/components/settings-content";
 import { WorkflowRow } from "@/features/workflows/components/workflow-row";
@@ -11,6 +10,7 @@ import { isActiveRun } from "@/features/workflows/model/workflow-steps";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { AndroidHeaderButton } from "@/shared/components/android-header-button";
 import { LargeTitleScrollView } from "@/shared/components/large-title";
+import { Plus } from "@/shared/icons";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";

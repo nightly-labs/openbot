@@ -1,10 +1,5 @@
 import { GlassView } from "expo-glass-effect";
 import { Typography } from "heroui-native";
-import type { LucideIcon } from "lucide-react-native";
-import Camera from "lucide-react-native/icons/camera";
-import Images from "lucide-react-native/icons/images";
-import Paperclip from "lucide-react-native/icons/paperclip";
-import Sparkles from "lucide-react-native/icons/sparkles";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BackHandler, Keyboard, Pressable, StyleSheet, useWindowDimensions, View, type ViewStyle } from "react-native";
 import Animated, {
@@ -20,6 +15,8 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { useColumnWidth } from "@/shared/components/adaptive-split";
+import type { LucideIcon } from "@/shared/icons";
+import { Camera, Images, Paperclip, Sparkles } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";

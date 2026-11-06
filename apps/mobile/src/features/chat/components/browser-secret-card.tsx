@@ -4,14 +4,11 @@ import { markdownInlinePlainText } from "@openbot/contracts/markdown-preview-tex
 import { GlassView } from "expo-glass-effect";
 import { Button, Spinner, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import ArrowUp from "lucide-react-native/icons/arrow-up";
-import Globe from "lucide-react-native/icons/globe";
-import KeyRound from "lucide-react-native/icons/key-round";
-import X from "lucide-react-native/icons/x";
 import { type ReactNode, useState } from "react";
 import { Pressable, TextInput, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
+import { ArrowUp, Globe, KeyRound, X } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { useText } from "@/shared/lib/text";

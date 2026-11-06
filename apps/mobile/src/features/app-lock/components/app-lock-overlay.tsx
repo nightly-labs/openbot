@@ -1,9 +1,6 @@
 import { usePathname } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import Fingerprint from "lucide-react-native/icons/fingerprint-pattern";
-import LockKeyhole from "lucide-react-native/icons/lock-keyhole";
-import ScanFace from "lucide-react-native/icons/scan-face";
 import { type ReactNode, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Alert, AppState, BackHandler, Modal, StyleSheet, useWindowDimensions, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -27,6 +24,7 @@ import { type DeviceUnlockKind, deviceUnlockKind } from "@/features/app-lock/mod
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { BloubBlock } from "@/shared/components/bloub-stage/bloub-block";
 import { useBloubColors } from "@/shared/components/bloub-stage/bloub-look";
+import { FingerprintPattern as Fingerprint, LockKeyhole, ScanFace } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { isIOS } from "@/shared/lib/platform";

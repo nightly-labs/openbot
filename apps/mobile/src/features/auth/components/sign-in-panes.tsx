@@ -1,8 +1,5 @@
 import { ONE_TIME_CODE_LENGTH } from "@openbot/contracts/validation";
 import { Button, Spinner, Typography } from "heroui-native";
-import type { LucideIcon } from "lucide-react-native";
-import ChevronDown from "lucide-react-native/icons/chevron-down";
-import ScanLine from "lucide-react-native/icons/scan-line";
 import { type ReactNode, type Ref, useEffect } from "react";
 import { Pressable, type TextInputInstance, View } from "react-native";
 import Animated, {
@@ -14,7 +11,6 @@ import Animated, {
   withDelay,
   withTiming,
 } from "react-native-reanimated";
-
 import { EmailCodeInput, type EmailCodeInputHandle } from "@/features/auth/components/email-code-input";
 import { EmailField } from "@/features/auth/components/email-field";
 import { SIGN_IN_CONTROL_HEIGHT, useSignInColors } from "@/features/auth/components/sign-in-colors";
@@ -28,6 +24,8 @@ import {
 } from "@/features/auth/components/sign-in-motion";
 import { type EmailSignIn, formatTimer } from "@/features/auth/model/use-email-sign-in";
 import { BLOUB_MOVE_MS } from "@/shared/components/bloub-stage/bloub-look";
+import type { LucideIcon } from "@/shared/icons";
+import { ChevronDown, ScanLine } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { SPLASH_EASE_IN_OUT } from "@/shared/lib/splash-motion";
 import { useText } from "@/shared/lib/text";

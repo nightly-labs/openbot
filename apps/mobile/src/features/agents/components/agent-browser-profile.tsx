@@ -6,8 +6,6 @@ import {
 } from "@openbot/contracts/ipc";
 import { router, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
-import Check from "lucide-react-native/icons/check";
-import Plus from "lucide-react-native/icons/plus";
 import { useState } from "react";
 import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
@@ -22,6 +20,7 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
+import { Check, Plus } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 

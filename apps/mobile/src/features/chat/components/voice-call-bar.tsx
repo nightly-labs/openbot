@@ -1,16 +1,13 @@
 import type { AvatarColor, AvatarHue } from "@openbot/contracts/ipc";
 import { Spinner, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import Mic from "lucide-react-native/icons/mic";
-import MicOff from "lucide-react-native/icons/mic-off";
-import Square from "lucide-react-native/icons/square";
-import X from "lucide-react-native/icons/x";
 import { type ReactNode, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { Extrapolation, interpolate, useAnimatedStyle } from "react-native-reanimated";
 import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 import { agentActivityMood } from "@/features/workspace/model/agent-activity";
+import { Mic, MicOff, Square, X } from "@/shared/icons";
 import type { VoicePalette } from "../model/voice-palette";
 import type { ComposerVoice } from "./composer-voice";
 import { VoiceAurora } from "./voice-aurora";

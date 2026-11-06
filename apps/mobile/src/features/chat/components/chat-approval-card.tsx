@@ -1,7 +1,5 @@
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import Folder from "lucide-react-native/icons/folder";
-import ShieldAlert from "lucide-react-native/icons/shield-alert";
 import { useState } from "react";
 import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
@@ -11,6 +9,7 @@ import {
   InactiveRequestError,
   type PendingApproval,
 } from "@/features/workspace/model/pending-approvals";
+import { Folder, ShieldAlert } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { type MobileText, useText } from "@/shared/lib/text";
 

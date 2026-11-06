@@ -1,13 +1,13 @@
 import { Image } from "expo-image";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import CircleCheck from "lucide-react-native/icons/circle-check";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { AvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import { ConnectorLogo } from "@/features/servers/components/connector-logo";
 import { SettingsRow } from "@/features/settings/components/settings-content";
+import { CircleCheck } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";

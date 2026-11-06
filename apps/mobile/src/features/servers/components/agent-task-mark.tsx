@@ -1,9 +1,7 @@
 import type { AgentTask } from "@openbot/contracts/ipc";
-import Check from "lucide-react-native/icons/check";
-import Circle from "lucide-react-native/icons/circle";
-import X from "lucide-react-native/icons/x";
 import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
+import { Check, Circle, X } from "@/shared/icons";
 
 /**
  * As on desktop: a dot while the task runs, a ring while it waits or has not started, and a mark for

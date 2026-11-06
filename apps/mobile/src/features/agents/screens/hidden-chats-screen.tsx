@@ -1,7 +1,6 @@
 import { type Href, Link, router } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import Eye from "lucide-react-native/icons/eye";
 import { type ReactNode, useMemo } from "react";
 import { Pressable, View } from "react-native";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
@@ -10,6 +9,7 @@ import { useChannels } from "@/features/channels/components/use-channels";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { Eye } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 

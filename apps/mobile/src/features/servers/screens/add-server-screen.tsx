@@ -8,13 +8,8 @@ import { type Href, router } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Button, Spinner, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import CircleCheck from "lucide-react-native/icons/circle-check";
-import ClipboardPaste from "lucide-react-native/icons/clipboard-paste";
-import ScanLine from "lucide-react-native/icons/scan-line";
-import Server from "lucide-react-native/icons/server";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AppState, Keyboard, Pressable, View } from "react-native";
-
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { LocalServerOptions, type LocalServerPathname } from "@/features/servers/components/local-server-options";
 import { SERVER_ROLE_KEYS } from "@/features/servers/model/server-role";
@@ -23,6 +18,7 @@ import { useLiveServerRecovery } from "@/features/workspace/context/server-recov
 import { ErrorReference } from "@/shared/components/error-reference";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { CircleCheck, ClipboardPaste, ScanLine, Server } from "@/shared/icons";
 import { readClipboardText } from "@/shared/lib/clipboard";
 import { haptics } from "@/shared/lib/haptics";
 import { isIOS } from "@/shared/lib/platform";

@@ -1,22 +1,24 @@
 import type { WorkflowNodeKind, WorkflowTriggerType } from "@openbot/contracts/ipc";
-import type { LucideIcon } from "lucide-react-native";
-import AtSign from "lucide-react-native/icons/at-sign";
-import Bot from "lucide-react-native/icons/bot";
-import Clock from "lucide-react-native/icons/clock";
-import File from "lucide-react-native/icons/file";
-import GitBranch from "lucide-react-native/icons/git-branch";
-import GitPullRequest from "lucide-react-native/icons/git-pull-request";
-import Image from "lucide-react-native/icons/image";
-import MessageSquare from "lucide-react-native/icons/message-square";
-import MessageSquareText from "lucide-react-native/icons/message-square-text";
-import Send from "lucide-react-native/icons/send";
-import Sparkles from "lucide-react-native/icons/sparkles";
-import StickyNote from "lucide-react-native/icons/sticky-note";
-import UserRoundCheck from "lucide-react-native/icons/user-round-check";
-import Webhook from "lucide-react-native/icons/webhook";
-import Zap from "lucide-react-native/icons/zap";
 import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
+import type { LucideIcon } from "@/shared/icons";
+import {
+  AtSign,
+  Bot,
+  Clock,
+  FileIcon as File,
+  GitBranch,
+  GitPullRequest,
+  ImageIcon as Image,
+  MessageSquare,
+  MessageSquareText,
+  Send,
+  Sparkles,
+  StickyNote,
+  UserRoundCheck,
+  Webhook,
+  Zap,
+} from "@/shared/icons";
 
 /** The colour family of each kind, from the file reference tokens: the same hues in both themes. */
 const KIND_TINT: Record<WorkflowNodeKind, string> = {

@@ -1,10 +1,10 @@
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import X from "lucide-react-native/icons/x";
 import { type ReactNode, useRef, useState } from "react";
 import { type TextInputProps, View } from "react-native";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
+import { X } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 
 /** One item of a pair field: an argument name and its value, or a model ID and its name. */

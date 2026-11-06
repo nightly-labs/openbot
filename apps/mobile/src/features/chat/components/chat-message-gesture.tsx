@@ -1,5 +1,4 @@
 import { useThemeColor } from "heroui-native/hooks";
-import Reply from "lucide-react-native/icons/reply";
 import { type PropsWithChildren, useMemo, useRef, useState } from "react";
 import { View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -13,6 +12,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
+import { Reply } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { END_X, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 

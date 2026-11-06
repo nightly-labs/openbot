@@ -4,8 +4,6 @@ import { Stack, useLocalSearchParams } from "expo-router";
 import { HeaderHeightContext } from "expo-router/react-navigation";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import ArrowDown from "lucide-react-native/icons/arrow-down";
-import Puzzle from "lucide-react-native/icons/puzzle";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, View } from "react-native";
 import type { KeyboardAwareScrollViewRef } from "react-native-keyboard-controller";
@@ -23,6 +21,7 @@ import { useTurnStepLines } from "@/features/workspace/components/use-agent-acti
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { ArrowDown, Puzzle } from "@/shared/icons";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";

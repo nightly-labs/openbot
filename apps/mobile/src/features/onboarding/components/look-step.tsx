@@ -2,16 +2,12 @@ import { AVATAR_COLOR_CHOICES, type AvatarColorChoice, isAvatarColorChoice } fro
 import type { AvatarColor, AvatarHue } from "@openbot/contracts/ipc";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import ChevronLeft from "lucide-react-native/icons/chevron-left";
-import ChevronRight from "lucide-react-native/icons/chevron-right";
-import Dices from "lucide-react-native/icons/dices";
 import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { Pressable, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { ReduceMotion, type SharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
-
 import { type AgentColorValue, avatarColorChoiceLabel } from "@/features/agents/components/agent-appearance-picker";
 import { createAvatarCandidates } from "@/features/agents/model/avatar-candidates";
 import { OnboardingIconButton, OnboardingPillButton } from "@/features/onboarding/components/onboarding-buttons";
@@ -24,6 +20,7 @@ import {
   STAGGER_MS,
 } from "@/features/onboarding/components/onboarding-motion";
 import { STEP_TOP_GAP, StepHeader } from "@/features/onboarding/components/onboarding-parts";
+import { ChevronLeft, ChevronRight, Dices } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { SPLASH_EASE_OUT } from "@/shared/lib/splash-motion";
 import { useText } from "@/shared/lib/text";

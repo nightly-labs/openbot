@@ -1,11 +1,9 @@
 import { Typography } from "heroui-native";
-import ChevronLeft from "lucide-react-native/icons/chevron-left";
 import type { ReactNode, RefObject } from "react";
 import { ScrollView, View, type ViewInstance } from "react-native";
 import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
 import {
   OnboardingIconButton,
   OnboardingPillButton,
@@ -17,6 +15,7 @@ import {
   popEntering,
   STAGGER_MS,
 } from "@/features/onboarding/components/onboarding-motion";
+import { ChevronLeft } from "@/shared/icons";
 import { useText } from "@/shared/lib/text";
 
 // The space between the status bar and the title of a step.

@@ -1,11 +1,11 @@
 import type { ChannelSummary } from "@openbot/contracts/ipc";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import Folder from "lucide-react-native/icons/folder";
 import { memo } from "react";
 import { View } from "react-native";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import { Folder } from "@/shared/icons";
 import { useText } from "@/shared/lib/text";
 
 /*

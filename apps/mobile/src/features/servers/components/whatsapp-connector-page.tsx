@@ -9,8 +9,6 @@ import {
 import type { UseQueryResult } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
-import UserRound from "lucide-react-native/icons/user-round";
-import UsersRound from "lucide-react-native/icons/users-round";
 import { Fragment } from "react";
 import { Alert } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
@@ -36,6 +34,7 @@ import {
 import { SettingsSwitch } from "@/features/settings/components/settings-controls";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgent, MobileServer } from "@/features/workspace/model/workspace-types";
+import { UserRound, UsersRound } from "@/shared/icons";
 import { type MobileText, useText } from "@/shared/lib/text";
 
 const KIND_KEYS = {

@@ -4,10 +4,6 @@ import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Image } from "expo-image";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import Check from "lucide-react-native/icons/check";
-import Download from "lucide-react-native/icons/download";
-import Share from "lucide-react-native/icons/share";
-import X from "lucide-react-native/icons/x";
 import { useCallback, useEffect, useState } from "react";
 import { AccessibilityInfo, Modal, Platform, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
@@ -29,6 +25,7 @@ import Animated, {
 import { initialWindowMetrics, useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN, scheduleOnUI } from "react-native-worklets";
 import { useUniwind } from "uniwind";
+import { Check, Download, Share, X } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";

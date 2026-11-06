@@ -3,8 +3,6 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Skeleton, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import ImageOff from "lucide-react-native/icons/image-off";
-import Images from "lucide-react-native/icons/images";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -18,6 +16,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN, scheduleOnUI } from "react-native-worklets";
+import { ImageOff, Images } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";

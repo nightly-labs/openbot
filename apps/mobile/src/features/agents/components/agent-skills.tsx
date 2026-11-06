@@ -5,7 +5,6 @@ import { type QueryKey, useQueryClient } from "@tanstack/react-query";
 import { Stack, useNavigation } from "expo-router";
 import { StackActions } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
-import Plus from "lucide-react-native/icons/plus";
 import { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useUniwind } from "uniwind";
@@ -13,6 +12,7 @@ import { requestComposerFocus, requestComposerText } from "@/features/chat/model
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { type MobileAgent, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { AndroidHeaderButton } from "@/shared/components/android-header-button";
+import { Plus } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { nativeLabelFont } from "@/shared/lib/native-label-font";
 import { isAndroid, isIOS } from "@/shared/lib/platform";

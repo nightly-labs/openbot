@@ -1,18 +1,6 @@
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import type { Href } from "expo-router";
 import { Typography } from "heroui-native";
-import type { LucideIcon } from "lucide-react-native";
-import Calendar from "lucide-react-native/icons/calendar";
-import ChartColumn from "lucide-react-native/icons/chart-column";
-import Check from "lucide-react-native/icons/check";
-import ChevronDown from "lucide-react-native/icons/chevron-down";
-import Plus from "lucide-react-native/icons/plus";
-import Settings from "lucide-react-native/icons/settings";
-import Settings2 from "lucide-react-native/icons/settings-2";
-import ShoppingBag from "lucide-react-native/icons/shopping-bag";
-import SquareCheck from "lucide-react-native/icons/square-check";
-import UsersRound from "lucide-react-native/icons/users-round";
-import WorkflowIcon from "lucide-react-native/icons/workflow";
 import { memo, type PropsWithChildren, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, View, type ViewStyle } from "react-native";
 import Animated, {
@@ -40,6 +28,20 @@ import { moveServerId } from "@/features/workspace/model/server-order";
 import { serverStatusLabel, showsOnline } from "@/features/workspace/model/server-status";
 import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
+import type { LucideIcon } from "@/shared/icons";
+import {
+  Calendar,
+  ChartColumn,
+  Check,
+  ChevronDown,
+  Plus,
+  Settings,
+  Settings2,
+  ShoppingBag,
+  SquareCheck,
+  UsersRound,
+  Workflow as WorkflowIcon,
+} from "@/shared/icons";
 import { devFeatureOverride } from "@/shared/lib/dev-feature-overrides";
 import { haptics } from "@/shared/lib/haptics";
 import { refreshMobileFeatures, useMobileFeature } from "@/shared/lib/mobile-features";

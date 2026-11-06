@@ -1,7 +1,7 @@
 import { Typography } from "heroui-native";
-import ChevronRight from "lucide-react-native/icons/chevron-right";
 import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
+import { ChevronRight } from "@/shared/icons";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 /** A value and the disclosure chevron at the end of a navigation row. */

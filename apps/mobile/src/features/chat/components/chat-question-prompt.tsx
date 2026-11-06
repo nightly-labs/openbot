@@ -2,11 +2,6 @@ import type { ConversationQuestionPrompt } from "@openbot/contracts/ipc";
 import { type ConversationUiBlock, UI_CHOICE_QUESTION_ID } from "@openbot/contracts/ui-blocks";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import Check from "lucide-react-native/icons/check";
-import ChevronLeft from "lucide-react-native/icons/chevron-left";
-import ChevronRight from "lucide-react-native/icons/chevron-right";
-import MessageSquareText from "lucide-react-native/icons/message-square-text";
-import X from "lucide-react-native/icons/x";
 import { View } from "react-native";
 import {
   answeredSelect,
@@ -22,6 +17,7 @@ import { ChatVaultRequest } from "@/features/chat/components/chat-vault-request"
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
 import { vaultRequestOf } from "@/features/chat/model/vault-request";
+import { Check, ChevronLeft, ChevronRight, MessageSquareText, X } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";

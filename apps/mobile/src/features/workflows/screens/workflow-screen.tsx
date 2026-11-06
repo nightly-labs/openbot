@@ -2,8 +2,6 @@ import { isWorkflowStepKind, type WorkflowNode } from "@openbot/contracts/ipc";
 import * as Clipboard from "expo-clipboard";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { Button, Typography } from "heroui-native";
-import Pin from "lucide-react-native/icons/pin";
-import PinOff from "lucide-react-native/icons/pin-off";
 import { useState } from "react";
 import { Alert, View } from "react-native";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
@@ -23,6 +21,7 @@ import {
 } from "@/features/workspace/context/mobile-workspace-context";
 import { AndroidHeaderButton } from "@/shared/components/android-header-button";
 import { LargeTitleScrollView } from "@/shared/components/large-title";
+import { Pin, PinOff } from "@/shared/icons";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";

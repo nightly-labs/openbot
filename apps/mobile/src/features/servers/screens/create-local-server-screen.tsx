@@ -6,7 +6,6 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Button, Spinner, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import CircleCheck from "lucide-react-native/icons/circle-check";
 import { useRef, useState } from "react";
 import { Keyboard, View } from "react-native";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
@@ -17,6 +16,7 @@ import { ErrorReference } from "@/shared/components/error-reference";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { CircleCheck } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 

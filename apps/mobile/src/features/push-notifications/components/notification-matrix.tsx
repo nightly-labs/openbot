@@ -5,7 +5,6 @@ import {
 } from "@openbot/contracts/ipc";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import Plus from "lucide-react-native/icons/plus";
 import { type PropsWithChildren, type ReactNode, useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
@@ -29,6 +28,7 @@ import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/worksp
 import { showsOnline } from "@/features/workspace/model/server-status";
 import type { MobileAgent, MobileServer } from "@/features/workspace/model/workspace-types";
 import { MenuView } from "@/shared/components/menu-view";
+import { Plus } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { isIOS } from "@/shared/lib/platform";

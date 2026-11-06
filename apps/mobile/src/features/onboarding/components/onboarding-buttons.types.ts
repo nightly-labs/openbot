@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react-native";
+import type { LucideIcon } from "@/shared/icons";
 
 interface GlassTiming {
   /** iOS: when the glass may form, after the fade of its step (see `glassAfter`). */

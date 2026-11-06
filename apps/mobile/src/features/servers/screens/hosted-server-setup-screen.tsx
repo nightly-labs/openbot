@@ -3,9 +3,6 @@ import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { router, useLocalSearchParams } from "expo-router";
 import { Button, Spinner, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import Circle from "lucide-react-native/icons/circle";
-import CircleCheck from "lucide-react-native/icons/circle-check";
-import CircleX from "lucide-react-native/icons/circle-x";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppState, View } from "react-native";
 import { AppLogo } from "@/features/auth/components/app-logo";
@@ -19,6 +16,7 @@ import {
 } from "@/features/servers/model/hosted-server-plans";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { Circle, CircleCheck, CircleX } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 

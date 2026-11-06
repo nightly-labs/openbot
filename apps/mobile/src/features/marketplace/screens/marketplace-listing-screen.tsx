@@ -6,9 +6,6 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Button, Spinner, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import ArrowRight from "lucide-react-native/icons/arrow-right";
-import CalendarClock from "lucide-react-native/icons/calendar-clock";
-import X from "lucide-react-native/icons/x";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Linking, View } from "react-native";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
@@ -22,6 +19,7 @@ import {
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { AndroidHeaderButton } from "@/shared/components/android-header-button";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { ArrowRight, CalendarClock, X } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";

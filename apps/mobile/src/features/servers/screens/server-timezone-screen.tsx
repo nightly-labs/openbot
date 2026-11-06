@@ -1,6 +1,5 @@
 import { useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
-import Check from "lucide-react-native/icons/check";
 import { useMemo, useState } from "react";
 import { useCSSVariable } from "uniwind";
 import { knownTimeZones, matchTimeZones, timeZoneLabel } from "@/features/servers/model/time-zones";
@@ -12,6 +11,7 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
+import { Check } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 

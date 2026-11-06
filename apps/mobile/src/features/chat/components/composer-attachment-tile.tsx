@@ -1,9 +1,9 @@
 import { Image } from "expo-image";
 import { Typography } from "heroui-native";
-import X from "lucide-react-native/icons/x";
 import { useState } from "react";
 import { Pressable, View, type ViewStyle } from "react-native";
 import Animated, { cubicBezier, Easing, Keyframe, LinearTransition, ReduceMotion } from "react-native-reanimated";
+import { X } from "@/shared/icons";
 import { useText } from "@/shared/lib/text";
 import { attachmentTypeLabel } from "./attachment-preview";
 import type { ChatAttachment } from "./use-chat-attachments";

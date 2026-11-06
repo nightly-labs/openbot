@@ -1,6 +1,5 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
-import Plus from "lucide-react-native/icons/plus";
 import { mcpServerDetail } from "@/features/servers/model/mcp-server-draft";
 import { useServerMcp } from "@/features/servers/model/use-server-mcp";
 import {
@@ -10,6 +9,7 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { AndroidHeaderButton } from "@/shared/components/android-header-button";
+import { Plus } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";

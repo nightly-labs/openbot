@@ -5,10 +5,6 @@ import { skipToken, useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { Button, Chip, Skeleton, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import ChevronRight from "lucide-react-native/icons/chevron-right";
-import CreditCard from "lucide-react-native/icons/credit-card";
-import Monitor from "lucide-react-native/icons/monitor";
-import Ticket from "lucide-react-native/icons/ticket";
 import { type ReactNode, useEffect, useMemo } from "react";
 import { View } from "react-native";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
@@ -22,6 +18,7 @@ import { SettingsRow, SettingsSection } from "@/features/settings/components/set
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { ChevronRight, CreditCard, Monitor, Ticket } from "@/shared/icons";
 import { devFeatureOverride } from "@/shared/lib/dev-feature-overrides";
 import { refreshMobileFeatures, useMobileFeature } from "@/shared/lib/mobile-features";
 import { useText } from "@/shared/lib/text";

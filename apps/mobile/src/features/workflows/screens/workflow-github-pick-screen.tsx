@@ -1,6 +1,5 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
-import Check from "lucide-react-native/icons/check";
 import { useState } from "react";
 import { useCSSVariable, useUniwind } from "uniwind";
 import {
@@ -20,6 +19,7 @@ import {
   SAME_REPOSITORY,
 } from "@/features/workflows/model/workflow-github";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
+import { Check } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 

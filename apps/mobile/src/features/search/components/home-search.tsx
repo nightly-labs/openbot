@@ -6,21 +6,6 @@ import type { NativeStackNavigationProp } from "expo-router/native-stack";
 import { type ParamListBase, useNavigation } from "expo-router/react-navigation";
 import { Spinner, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import type { LucideIcon } from "lucide-react-native";
-import ArrowUp from "lucide-react-native/icons/arrow-up";
-import CalendarClock from "lucide-react-native/icons/calendar-clock";
-import ChartColumn from "lucide-react-native/icons/chart-column";
-import Check from "lucide-react-native/icons/check";
-import ChevronDown from "lucide-react-native/icons/chevron-down";
-import CircleX from "lucide-react-native/icons/circle-x";
-import EyeOff from "lucide-react-native/icons/eye-off";
-import ListRestart from "lucide-react-native/icons/list-restart";
-import Plus from "lucide-react-native/icons/plus";
-import Search from "lucide-react-native/icons/search";
-import Settings from "lucide-react-native/icons/settings";
-import SlidersHorizontal from "lucide-react-native/icons/sliders-horizontal";
-import SquareCheck from "lucide-react-native/icons/square-check";
-import UsersRound from "lucide-react-native/icons/users-round";
 import {
   type ComponentProps,
   type PropsWithChildren,
@@ -76,6 +61,23 @@ import { BlurSwap } from "@/shared/components/blur-swap";
 import { useBottomFieldMetrics } from "@/shared/components/bottom-field-metrics";
 import { ANDROID_BLUR, GLASS_CAPSULE_HEIGHT, GlassCapsule } from "@/shared/components/glass-capsule";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
+import type { LucideIcon } from "@/shared/icons";
+import {
+  ArrowUp,
+  CalendarClock,
+  ChartColumn,
+  Check,
+  ChevronDown,
+  CircleX,
+  EyeOff,
+  ListRestart,
+  Plus,
+  Search,
+  Settings,
+  SlidersHorizontal,
+  SquareCheck,
+  UsersRound,
+} from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion, useTransitionMode } from "@/shared/lib/motion";
 import { selectionColorProps } from "@/shared/lib/selection-color";

@@ -3,7 +3,6 @@ import type { MobileTextKey } from "@openbot/i18n/mobile";
 import * as Clipboard from "expo-clipboard";
 import { router, useLocalSearchParams } from "expo-router";
 import { Spinner, Typography } from "heroui-native";
-import Check from "lucide-react-native/icons/check";
 import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
@@ -22,6 +21,7 @@ import {
 } from "@/features/settings/components/settings-content";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
+import { Check } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 

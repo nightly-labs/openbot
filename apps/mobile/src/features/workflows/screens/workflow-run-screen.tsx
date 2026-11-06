@@ -1,6 +1,5 @@
 import { Stack, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
-import Square from "lucide-react-native/icons/square";
 import { Alert, Linking, View } from "react-native";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { WorkflowRunStepRow } from "@/features/workflows/components/workflow-run-step-row";
@@ -18,6 +17,7 @@ import {
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { AndroidHeaderButton } from "@/shared/components/android-header-button";
 import { LargeTitleScrollView } from "@/shared/components/large-title";
+import { Square } from "@/shared/icons";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";

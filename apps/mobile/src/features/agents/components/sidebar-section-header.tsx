@@ -9,10 +9,6 @@ import {
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import ChevronRight from "lucide-react-native/icons/chevron-right";
-import Ellipsis from "lucide-react-native/icons/ellipsis";
-import Folder from "lucide-react-native/icons/folder";
-import FolderOpen from "lucide-react-native/icons/folder-open";
 import { memo, useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import Animated, { cubicBezier } from "react-native-reanimated";
@@ -23,6 +19,7 @@ import {
 } from "@/features/workspace/context/mobile-workspace-context";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import { type MenuAction, MenuView } from "@/shared/components/menu-view";
+import { ChevronRight, Ellipsis, Folder, FolderOpen } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { currentText, useText } from "@/shared/lib/text";

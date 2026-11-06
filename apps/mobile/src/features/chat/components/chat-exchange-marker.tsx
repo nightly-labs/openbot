@@ -2,13 +2,13 @@ import type { AgentExchangeSummary } from "@openbot/contracts/ipc";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import { Link } from "expo-router";
 import { Typography } from "heroui-native";
-import ChevronDown from "lucide-react-native/icons/chevron-down";
 import { useState } from "react";
 import { Pressable, View, type ViewStyle } from "react-native";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import type { ChatMessage, ExchangeGroup, ExchangeMarker } from "@/features/chat/model/chat-messages";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
+import { ChevronDown } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 

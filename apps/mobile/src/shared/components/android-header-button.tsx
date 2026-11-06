@@ -1,11 +1,11 @@
 import { Stack } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import type { LucideIcon } from "lucide-react-native";
-import ArrowLeft from "lucide-react-native/icons/arrow-left";
 import { type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
 import { Pressable, View, type ViewStyle } from "react-native";
 import { ChromeGlassSheen } from "@/shared/components/chrome-glass-sheen";
+import type { LucideIcon } from "@/shared/icons";
+import { ArrowLeft } from "@/shared/icons";
 import { useChromeGlass } from "@/shared/lib/chrome-glass";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";

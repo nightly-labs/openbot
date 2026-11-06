@@ -97,27 +97,27 @@
   }
 }
 
-/* Inter is the desktop and web font. The expo-font plugin in app.json embeds it as one family, so
+/* Figtree is the desktop and web font. The expo-font plugin in app.json embeds it as one family, so
  * `fontWeight` picks the face. A build without the files falls back to the system font. HeroUI
  * reads --font-normal to --font-bold. */
 @media ios {
   :root {
-    --font-sans: Inter;
-    --font-normal: Inter;
-    --font-medium: Inter;
-    --font-semibold: Inter;
-    --font-bold: Inter;
+    --font-sans: Figtree;
+    --font-normal: Figtree;
+    --font-medium: Figtree;
+    --font-semibold: Figtree;
+    --font-bold: Figtree;
     --font-mono: ui-monospace;
   }
 }
 
 @media android {
   :root {
-    --font-sans: Inter;
-    --font-normal: Inter;
-    --font-medium: Inter;
-    --font-semibold: Inter;
-    --font-bold: Inter;
+    --font-sans: Figtree;
+    --font-normal: Figtree;
+    --font-medium: Figtree;
+    --font-semibold: Figtree;
+    --font-bold: Figtree;
     --font-mono: monospace;
   }
 }

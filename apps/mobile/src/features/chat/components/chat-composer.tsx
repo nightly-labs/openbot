@@ -2,16 +2,6 @@ import { rankAgentMentions } from "@openbot/contracts/agent-mention-rank";
 import { GlassView } from "expo-glass-effect";
 import { useIsFocused } from "expo-router";
 import { Button, Spinner, Typography } from "heroui-native";
-import ArrowUp from "lucide-react-native/icons/arrow-up";
-import AudioLines from "lucide-react-native/icons/audio-lines";
-import Blocks from "lucide-react-native/icons/blocks";
-import Mic from "lucide-react-native/icons/mic";
-import MicOff from "lucide-react-native/icons/mic-off";
-import Plus from "lucide-react-native/icons/plus";
-import Reply from "lucide-react-native/icons/reply";
-import Sparkles from "lucide-react-native/icons/sparkles";
-import Square from "lucide-react-native/icons/square";
-import X from "lucide-react-native/icons/x";
 import { memo, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   AccessibilityInfo,
@@ -49,6 +39,7 @@ import { showFailureAlert } from "@/features/analytics/failure-reports";
 import type { ChatBubbleMessage } from "@/features/chat/model/chat-messages";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { useColumnWidth } from "@/shared/components/adaptive-split";
+import { ArrowUp, AudioLines, Blocks, Mic, MicOff, Plus, Reply, Sparkles, Square, X } from "@/shared/icons";
 import {
   COMPOSER_FIELD_VERTICAL_PADDING,
   COMPOSER_TOOLBAR_HEIGHT,

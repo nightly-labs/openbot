@@ -2,16 +2,6 @@ import { MESSAGE_REACTIONS, MORE_MESSAGE_REACTIONS, nextSpeechSpeed } from "@ope
 import { router } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import Copy from "lucide-react-native/icons/copy";
-import SmilePlus from "lucide-react-native/icons/face-slightly-smiling-plus";
-import GitFork from "lucide-react-native/icons/git-fork";
-import Hash from "lucide-react-native/icons/hash";
-import MailDot from "lucide-react-native/icons/mail-dot";
-import Reply from "lucide-react-native/icons/reply";
-import Square from "lucide-react-native/icons/square";
-import TextCursor from "lucide-react-native/icons/text-cursor";
-import Trash2 from "lucide-react-native/icons/trash";
-import Volume2 from "lucide-react-native/icons/volume-2";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { useCSSVariable } from "uniwind";
@@ -21,6 +11,18 @@ import { canChangeReplySpeed } from "@/features/voice/model/reply-voice";
 import { saveVoiceSettings, useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { CoveringMenuView } from "@/shared/components/covering-menu-view";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import {
+  Copy,
+  GitFork,
+  Hash,
+  MailDot,
+  Reply,
+  FaceSlightlySmilingPlus as SmilePlus,
+  Square,
+  TextCursor,
+  Trash as Trash2,
+  Volume2,
+} from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";

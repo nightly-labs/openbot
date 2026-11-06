@@ -4,10 +4,6 @@ import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
-import Bot from "lucide-react-native/icons/bot";
-import Globe from "lucide-react-native/icons/globe";
-import HardDrive from "lucide-react-native/icons/hard-drive";
-import PackageSearch from "lucide-react-native/icons/package-search";
 import { useEffect, useRef, useState } from "react";
 import { Alert, View } from "react-native";
 import { useCSSVariable } from "uniwind";
@@ -34,6 +30,7 @@ import {
 } from "@/features/settings/components/settings-content";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
+import { Bot, Globe, HardDrive, PackageSearch } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 

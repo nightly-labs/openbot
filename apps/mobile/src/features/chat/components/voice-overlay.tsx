@@ -1,6 +1,5 @@
 import { BlurView } from "expo-blur";
 import { Typography } from "heroui-native";
-import Reply from "lucide-react-native/icons/reply";
 import { memo, useEffect, useId, useRef, useState } from "react";
 import { type ColorValue, ScrollView, type ScrollViewInstance, StyleSheet, View } from "react-native";
 import Animated, {
@@ -19,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useCSSVariable } from "uniwind";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
+import { Reply } from "@/shared/icons";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { isIOS } from "@/shared/lib/platform";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";

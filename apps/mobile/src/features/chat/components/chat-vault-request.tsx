@@ -4,14 +4,11 @@ import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { router } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import Check from "lucide-react-native/icons/check";
-import CreditCard from "lucide-react-native/icons/credit-card";
-import KeyRound from "lucide-react-native/icons/key-round";
-import UserRound from "lucide-react-native/icons/user-round";
 import { useEffect, useRef } from "react";
 import { View } from "react-native";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { setVaultRequestHandoff, vaultRequestAnswers, vaultRequestPrefill } from "@/features/chat/model/vault-request";
+import { Check, CreditCard, KeyRound, UserRound } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 

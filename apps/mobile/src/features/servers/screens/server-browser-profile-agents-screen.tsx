@@ -1,7 +1,6 @@
 import type { AgentBrowserProfile } from "@openbot/contracts/ipc";
 import { useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
-import Check from "lucide-react-native/icons/check";
 import { useMemo, useState } from "react";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
@@ -13,6 +12,7 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
+import { Check } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 

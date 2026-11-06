@@ -1,7 +1,6 @@
 import { Button } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import ChevronLeft from "lucide-react-native/icons/chevron-left";
-import X from "lucide-react-native/icons/x";
+import { ChevronLeft, X } from "@/shared/icons";
 
 import { haptics } from "@/shared/lib/haptics";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";

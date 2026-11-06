@@ -1,15 +1,11 @@
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { ROUTINE_SAVED_DRAFT_KIND_VALUES, type RoutineDraftKind } from "@openbot/team-client/routine-schedule-draft";
 import { Typography } from "heroui-native";
-import AlarmClock from "lucide-react-native/icons/alarm-clock";
-import Check from "lucide-react-native/icons/check";
-import ChevronsDownUp from "lucide-react-native/icons/chevrons-down-up";
-import ChevronsUpDown from "lucide-react-native/icons/chevrons-up-down";
-import Webhook from "lucide-react-native/icons/webhook";
 import { useState } from "react";
 import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { SettingsRow } from "@/features/settings/components/settings-content";
+import { AlarmClock, Check, ChevronsDownUp, ChevronsUpDown, Webhook } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 

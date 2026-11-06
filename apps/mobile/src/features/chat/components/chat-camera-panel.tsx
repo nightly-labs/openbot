@@ -1,10 +1,9 @@
 import { type CameraType, CameraView } from "expo-camera";
 import { Button, Typography } from "heroui-native";
-import ChevronLeft from "lucide-react-native/icons/chevron-left";
-import SwitchCamera from "lucide-react-native/icons/switch-camera";
 import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import Animated, { cubicBezier } from "react-native-reanimated";
+import { ChevronLeft, SwitchCamera } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";

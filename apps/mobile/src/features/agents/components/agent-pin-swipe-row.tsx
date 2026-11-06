@@ -1,7 +1,5 @@
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import Pin from "lucide-react-native/icons/pin";
-import PinOff from "lucide-react-native/icons/pin-off";
 import type { PropsWithChildren } from "react";
 import { Pressable, View } from "react-native";
 import { GestureDetector } from "react-native-gesture-handler";
@@ -9,6 +7,7 @@ import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeabl
 import Animated, { type SharedValue, useAnimatedStyle } from "react-native-reanimated";
 import { ChatDragArea, type useChatDrag } from "@/features/agents/components/chat-drag";
 import { useAppDrawer } from "@/features/servers/components/app-drawer-shell";
+import { Pin, PinOff } from "@/shared/icons";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 import { END_X } from "@/shared/lib/text-direction";

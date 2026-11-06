@@ -12,10 +12,6 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { router, useNavigation } from "expo-router";
 import { Button, Typography } from "heroui-native";
-import ChevronDown from "lucide-react-native/icons/chevron-down";
-import ChevronUp from "lucide-react-native/icons/chevron-up";
-import Plus from "lucide-react-native/icons/plus";
-import Trash2 from "lucide-react-native/icons/trash";
 import { type ReactNode, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
@@ -31,6 +27,7 @@ import {
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
+import { ChevronDown, ChevronUp, Plus, Trash as Trash2 } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 

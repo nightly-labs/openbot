@@ -1,11 +1,11 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import X from "lucide-react-native/icons/x";
 import { useState } from "react";
 import { vaultRequestHandoff } from "@/features/chat/model/vault-request";
 import { useServerVault } from "@/features/servers/model/use-server-vault";
 import { VaultItemForm } from "@/features/servers/screens/server-vault-item-screen";
 import { SettingsContent, SettingsNote } from "@/features/settings/components/settings-content";
 import { AndroidHeaderButton } from "@/shared/components/android-header-button";
+import { X } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";

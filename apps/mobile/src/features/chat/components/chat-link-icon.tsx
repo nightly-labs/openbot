@@ -1,7 +1,7 @@
 import { Image } from "expo-image";
-import LinkIcon from "lucide-react-native/icons/link";
 import { memo, useState } from "react";
 import { type ColorValue, View } from "react-native";
+import { LinkIcon } from "@/shared/icons";
 
 /** Sites with no favicon, so that a message drawn again does not ask them again. */
 const missingFavicons = new Set<string>();

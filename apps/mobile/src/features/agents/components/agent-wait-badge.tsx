@@ -1,13 +1,11 @@
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import type { LucideIcon } from "lucide-react-native";
-import MessageCircleQuestionMark from "lucide-react-native/icons/message-circle-question-mark";
-import MousePointer2 from "lucide-react-native/icons/mouse-pointer-2";
-import ShieldCheck from "lucide-react-native/icons/shield-check";
 import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import type { MobileAgentWaitReason } from "@/features/workspace/model/agent-activity";
+import type { LucideIcon } from "@/shared/icons";
+import { MessageCircleQuestionMark, MousePointer2, ShieldCheck } from "@/shared/icons";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 

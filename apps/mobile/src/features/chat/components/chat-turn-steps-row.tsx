@@ -1,9 +1,8 @@
 import { Typography } from "heroui-native";
-import Brain from "lucide-react-native/icons/brain";
-import ChevronRight from "lucide-react-native/icons/chevron-right";
 import { useState } from "react";
 import { type ColorValue, Pressable } from "react-native";
 import Animated, { cubicBezier } from "react-native-reanimated";
+import { Brain, ChevronRight } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { type MobileText, useText } from "@/shared/lib/text";

@@ -5,7 +5,7 @@ import { isIOS } from "@/shared/lib/platform";
  * The app font, as on desktop and web. The expo-font plugin in app.json embeds it as one family, so
  * `fontWeight` picks the face. A build without the files falls back to the system font.
  */
-export const APP_FONT = "Inter";
+export const APP_FONT = "Figtree";
 
 /**
  * React Navigation fonts with the weights of its default theme. Native header titles, back titles and

@@ -2,13 +2,6 @@ import type { AgentAccessLevel, ServerAuditChange, ServerAuditEntry } from "@ope
 import { Stack, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import Crown from "lucide-react-native/icons/crown";
-import KeyRound from "lucide-react-native/icons/key-round";
-import LogOut from "lucide-react-native/icons/log-out";
-import Pencil from "lucide-react-native/icons/pencil";
-import ShieldCheck from "lucide-react-native/icons/shield-check";
-import Trash from "lucide-react-native/icons/trash";
-import UserRoundPlus from "lucide-react-native/icons/user-round-plus";
 import { useMemo, useState } from "react";
 import { View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
@@ -32,6 +25,7 @@ import {
 } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
+import { Crown, KeyRound, LogOut, Pencil, ShieldCheck, Trash, UserRoundPlus } from "@/shared/icons";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 

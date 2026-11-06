@@ -1,10 +1,10 @@
 import type { AvatarMood } from "@openbot/brand/bloub-avatar-motion";
-import ChevronRight from "lucide-react-native/icons/chevron-right";
 import { useState } from "react";
 import { type ColorValue, Pressable, View } from "react-native";
 import Animated, { cubicBezier, Easing, ReduceMotion, withTiming } from "react-native-reanimated";
 import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import { ChevronRight } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";

@@ -27,7 +27,6 @@ import { type QueryKey, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
-import Check from "lucide-react-native/icons/check";
 import { useEffect, useRef, useState } from "react";
 import { Alert, View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
@@ -40,6 +39,7 @@ import {
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
+import { Check } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { nativeLabelFont } from "@/shared/lib/native-label-font";
 import { useText } from "@/shared/lib/text";

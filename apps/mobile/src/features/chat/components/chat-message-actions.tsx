@@ -1,11 +1,11 @@
 import type { ConversationReaction } from "@openbot/contracts/ipc";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import Ellipsis from "lucide-react-native/icons/ellipsis";
 import { useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
+import { Ellipsis } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 import { type MessageChannelTargets, openMessageActions } from "../model/message-actions-sheet";

@@ -1,8 +1,8 @@
 import { Redirect, router } from "expo-router";
-import Share from "lucide-react-native/icons/share";
 import { useEffect, useRef, useState } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SignInScreen } from "@/features/auth/screens/sign-in-screen";
+import { Share } from "@/shared/icons";
 import { useText } from "@/shared/lib/text";
 import { discardWaitingShare, hasIncomingShare } from "../model/incoming-share";
 import { openShareSheet } from "../model/share-sheet-opener";

@@ -1,6 +1,6 @@
-import ClipboardPaste from "lucide-react-native/icons/clipboard-paste";
 import { Pressable } from "react-native";
 import { useCSSVariable } from "uniwind";
+import { ClipboardPaste } from "@/shared/icons";
 import { readClipboardText } from "@/shared/lib/clipboard";
 import { useText } from "@/shared/lib/text";
 

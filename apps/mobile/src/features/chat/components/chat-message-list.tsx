@@ -7,18 +7,6 @@ import type { AttachmentSummary, BrowserTakeoverRequest } from "@openbot/contrac
 import { markdownInlinePlainText, markdownPlainText } from "@openbot/contracts/markdown-preview-text";
 import { useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
-import type { LucideIcon } from "lucide-react-native";
-import CalendarClock from "lucide-react-native/icons/calendar-clock";
-import CalendarPlus from "lucide-react-native/icons/calendar-plus";
-import CalendarX2 from "lucide-react-native/icons/calendar-x-2";
-import CircleCheck from "lucide-react-native/icons/circle-check";
-import CirclePause from "lucide-react-native/icons/circle-pause";
-import CircleX from "lucide-react-native/icons/circle-x";
-import Clock3 from "lucide-react-native/icons/clock-3";
-import CornerUpRight from "lucide-react-native/icons/corner-up-right";
-import GitFork from "lucide-react-native/icons/git-fork";
-import LoaderCircle from "lucide-react-native/icons/loader-circle";
-import TriangleAlert from "lucide-react-native/icons/triangle-alert";
 import {
   type ComponentProps,
   createContext,
@@ -84,6 +72,20 @@ import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-
 import { agentActivityMood, type MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import type { PendingApproval } from "@/features/workspace/model/pending-approvals";
 import { useColumnWidth } from "@/shared/components/adaptive-split";
+import type { LucideIcon } from "@/shared/icons";
+import {
+  CalendarClock,
+  CalendarPlus,
+  CalendarX2,
+  CircleCheck,
+  CirclePause,
+  CircleX,
+  Clock3,
+  CornerUpRight,
+  GitFork,
+  LoaderCircle,
+  TriangleAlert,
+} from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid } from "@/shared/lib/platform";

@@ -1,10 +1,5 @@
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import ChevronDown from "lucide-react-native/icons/chevron-down";
-import CircleX from "lucide-react-native/icons/circle-x";
-import Search from "lucide-react-native/icons/search";
-import SlidersHorizontal from "lucide-react-native/icons/sliders-horizontal";
-import X from "lucide-react-native/icons/x";
 import { useRef } from "react";
 import { Keyboard, Pressable, TextInput, type TextInputInstance, View } from "react-native";
 import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
@@ -14,6 +9,7 @@ import { useCSSVariable, useUniwind } from "uniwind";
 import { useBottomFieldMetrics } from "@/shared/components/bottom-field-metrics";
 import { GlassCapsule } from "@/shared/components/glass-capsule";
 import { type MenuAction, MenuView } from "@/shared/components/menu-view";
+import { ChevronDown, CircleX, Search, SlidersHorizontal, X } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid } from "@/shared/lib/platform";

@@ -2,8 +2,6 @@ import { isAgentProvider, providerDisplayName } from "@openbot/contracts/ipc";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
-import Plus from "lucide-react-native/icons/plus";
-import Server from "lucide-react-native/icons/server";
 import { useState } from "react";
 import { View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
@@ -29,6 +27,7 @@ import {
 } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+import { Plus, Server } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, type MobileText, useText } from "@/shared/lib/text";
 

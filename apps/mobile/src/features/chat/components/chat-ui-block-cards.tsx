@@ -16,8 +16,6 @@ import {
 import { router } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import Check from "lucide-react-native/icons/check";
-import X from "lucide-react-native/icons/x";
 import { type ReactNode, useEffect, useState } from "react";
 import { AccessibilityInfo, View } from "react-native";
 import { useCSSVariable } from "uniwind";
@@ -25,6 +23,7 @@ import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { storeCodePreview } from "@/features/chat/model/code-preview-store";
 import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
+import { Check, X } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 

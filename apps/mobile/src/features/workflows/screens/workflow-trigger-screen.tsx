@@ -10,7 +10,6 @@ import {
 import * as Clipboard from "expo-clipboard";
 import { useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
-import Check from "lucide-react-native/icons/check";
 import { useEffect, useState } from "react";
 import { Alert } from "react-native";
 import { useCSSVariable } from "uniwind";
@@ -43,6 +42,7 @@ import {
   useMobileWorkspaceActions,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
+import { Check } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 

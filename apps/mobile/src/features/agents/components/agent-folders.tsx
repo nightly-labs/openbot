@@ -16,15 +16,6 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { router, useLocalSearchParams } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import Check from "lucide-react-native/icons/check";
-import CornerLeftUp from "lucide-react-native/icons/corner-left-up";
-import Folder from "lucide-react-native/icons/folder";
-import HardDrive from "lucide-react-native/icons/hard-drive";
-import House from "lucide-react-native/icons/house";
-import Lock from "lucide-react-native/icons/lock";
-import Plus from "lucide-react-native/icons/plus";
-import TriangleAlert from "lucide-react-native/icons/triangle-alert";
-import X from "lucide-react-native/icons/x";
 import { useEffect, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { PERMISSION_LABEL, useAgentAdminSettings } from "@/features/agents/components/agent-access-fields";
@@ -39,6 +30,7 @@ import {
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
+import { Check, CornerLeftUp, Folder, HardDrive, House, Lock, Plus, TriangleAlert, X } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";

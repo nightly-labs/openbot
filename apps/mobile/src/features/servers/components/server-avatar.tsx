@@ -3,7 +3,6 @@ import MaskedView from "@react-native-masked-view/masked-view";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { Typography } from "heroui-native";
-import Monitor from "lucide-react-native/icons/monitor";
 import { useState } from "react";
 import { View } from "react-native";
 import Svg, { Path } from "react-native-svg";
@@ -15,6 +14,7 @@ import { DISCONNECTED_APPEARANCE } from "@/features/workspace/components/use-con
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
+import { Monitor } from "@/shared/icons";
 import { END_X } from "@/shared/lib/text-direction";
 
 const INK = "rgba(0, 0, 0, 0.72)";

@@ -1,8 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Typography } from "heroui-native";
-import Check from "lucide-react-native/icons/check";
-import ChevronsDownUp from "lucide-react-native/icons/chevrons-down-up";
-import ChevronsUpDown from "lucide-react-native/icons/chevrons-up-down";
 import { useState } from "react";
 import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
@@ -10,6 +7,7 @@ import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+import { Check, ChevronsDownUp, ChevronsUpDown } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 

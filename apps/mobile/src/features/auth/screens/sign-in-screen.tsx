@@ -1,8 +1,6 @@
 import { useIsFocused } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import type { LucideIcon } from "lucide-react-native";
-import X from "lucide-react-native/icons/x";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
   AppState,
@@ -23,7 +21,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { type MobileSession, redeemMobileConnectUrl } from "@/features/auth/api/mobile-auth";
 import type { EmailCodeInputHandle } from "@/features/auth/components/email-code-input";
@@ -45,6 +42,8 @@ import {
   type BloubMood,
   type BloubStageRequest,
 } from "@/shared/components/bloub-stage/bloub-stage-store";
+import type { LucideIcon } from "@/shared/icons";
+import { X } from "@/shared/icons";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 import { SPLASH_HANDOFF_DEADLINE_MS, SplashContentReadyContext } from "@/shared/lib/use-splash-gate";

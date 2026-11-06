@@ -2,16 +2,12 @@ import type { AvatarMood } from "@openbot/brand/bloub-avatar-motion";
 import type { AvatarHue } from "@openbot/contracts/ipc";
 import { useIsFocused } from "expo-router";
 import { useThemeColor } from "heroui-native/hooks";
-import type { LucideIcon } from "lucide-react-native";
-import CalendarCheck from "lucide-react-native/icons/calendar-check";
-import Code from "lucide-react-native/icons/code";
-import PenLine from "lucide-react-native/icons/pen-line";
-import Search from "lucide-react-native/icons/search";
 import { type ReactNode, useState } from "react";
 import { View } from "react-native";
 import Animated, { cubicBezier } from "react-native-reanimated";
-
 import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
+import type { LucideIcon } from "@/shared/icons";
+import { CalendarCheck, Code, PenLine, Search } from "@/shared/icons";
 import { useMotionPreference } from "@/shared/lib/motion";
 
 // CSS animations take `cubicBezier`.

@@ -1,14 +1,11 @@
 import { StatusBar } from "expo-status-bar";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useThemeColor } from "heroui-native/hooks";
-import Check from "lucide-react-native/icons/check";
-import Download from "lucide-react-native/icons/download";
-import Share from "lucide-react-native/icons/share";
-import X from "lucide-react-native/icons/x";
 import { useState } from "react";
 import { Modal, View } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScopedTheme } from "uniwind";
+import { Check, Download, Share, X } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";

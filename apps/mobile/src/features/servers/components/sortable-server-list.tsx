@@ -1,4 +1,3 @@
-import GripVertical from "lucide-react-native/icons/grip-vertical";
 import { type ReactNode, useEffect } from "react";
 import { View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -11,6 +10,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
+import { GripVertical } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 
 export const SERVER_ROW_HEIGHT = 64;

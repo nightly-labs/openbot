@@ -1,6 +1,6 @@
 import { Typography } from "heroui-native";
-import RotateCw from "lucide-react-native/icons/rotate-cw";
 import { Pressable } from "react-native";
+import { RotateCw } from "@/shared/icons";
 
 import { haptics } from "@/shared/lib/haptics";
 

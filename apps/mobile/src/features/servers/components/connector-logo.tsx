@@ -8,10 +8,10 @@ import {
   WHATSAPP_MARK_PATH,
 } from "@openbot/brand/connector-mark-shape";
 import { useThemeColor } from "heroui-native/hooks";
-import Lock from "lucide-react-native/icons/lock";
 import { View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import type { MobileConnectorId } from "@/features/servers/model/connectors";
+import { Lock } from "@/shared/icons";
 
 const MARK_PATHS: Record<Exclude<MobileConnectorId, "bitwarden">, string> = {
   slack: SLACK_MARK_PATH,

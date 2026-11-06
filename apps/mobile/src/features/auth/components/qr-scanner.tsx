@@ -4,11 +4,8 @@ import { useIsFocused } from "expo-router/react-navigation";
 import { StatusBar } from "expo-status-bar";
 import { Alert, Button, Card, Spinner, Surface, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import Camera from "lucide-react-native/icons/camera";
-import ScanLine from "lucide-react-native/icons/scan-line";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AppState, Linking, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
-
 import Animated, {
   Easing,
   FadeIn,
@@ -20,6 +17,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
+import { Camera, ScanLine } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid, isIOS } from "@/shared/lib/platform";

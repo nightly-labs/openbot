@@ -2,11 +2,6 @@ import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { router, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import ArrowUpToLine from "lucide-react-native/icons/arrow-up-to-line";
-import CornerDownRight from "lucide-react-native/icons/corner-down-right";
-import ExternalLink from "lucide-react-native/icons/external-link";
-import Pencil from "lucide-react-native/icons/pencil";
-import Trash2 from "lucide-react-native/icons/trash";
 import { Alert } from "react-native";
 import { useCSSVariable } from "uniwind";
 import {
@@ -15,6 +10,7 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@/features/settings/components/settings-content";
+import { ArrowUpToLine, CornerDownRight, ExternalLink, Pencil, Trash as Trash2 } from "@/shared/icons";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";

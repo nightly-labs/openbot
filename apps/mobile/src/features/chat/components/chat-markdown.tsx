@@ -11,9 +11,6 @@ import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import * as Linking from "expo-linking";
 import { useThemeColor } from "heroui-native/hooks";
-import Blocks from "lucide-react-native/icons/blocks";
-import FileText from "lucide-react-native/icons/file-text";
-import Sparkles from "lucide-react-native/icons/sparkles";
 import type { Token, Tokens } from "marked";
 import { Fragment, memo, type ReactNode, useMemo } from "react";
 import {
@@ -36,6 +33,7 @@ import {
   StreamRevealProvider,
 } from "@/features/chat/components/streaming-tail-text";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import { Blocks, FileText, Sparkles } from "@/shared/icons";
 import { graphemes } from "@/shared/lib/graphemes";
 import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference } from "@/shared/lib/motion";

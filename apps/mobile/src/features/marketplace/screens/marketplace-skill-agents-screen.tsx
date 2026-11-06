@@ -2,7 +2,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Spinner, Typography } from "heroui-native";
-import Check from "lucide-react-native/icons/check";
 import { useEffect, useRef, useState } from "react";
 import { useCSSVariable } from "uniwind";
 import { AvatarThumbnail } from "@/features/agents/components/bloub-avatar";
@@ -16,6 +15,7 @@ import {
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { Check } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { loadMarketplaceSkill } from "../api/marketplace-catalog";

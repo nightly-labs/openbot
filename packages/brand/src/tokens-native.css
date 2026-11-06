@@ -16,59 +16,62 @@
  * other is a theme that cannot resolve it. uniwind notices, but only writes a red
  * line to the console - it does not fail the build. Keep every value here equal to
  * the base, so that mobile dark does not drift away from desktop.
+ *
+ * The palette is the Glaze one, as on desktop: pure white or pure black, ink or soft-white
+ * text, and cobalt for the accent and the main action.
  */
 
 :root {
   @variant light {
-    --openbot-bg-canvas: #f5f5f7;
-    --openbot-bg-native-canvas: #f5f5f7;
+    --openbot-bg-canvas: #ffffff;
+    --openbot-bg-native-canvas: #ffffff;
     --openbot-bg-native-sidebar: #ffffff;
     --openbot-bg-sidebar: #ffffff;
-    --openbot-bg-surface: #ffffff;
-    --openbot-bg-surface-raised: #f0f0f3;
-    --openbot-bg-control: #e9e9ed;
-    --openbot-bg-control-active: #dedee4;
-    --openbot-bg-overlay: rgba(20, 20, 20, 0.28);
-    --openbot-border: rgba(20, 20, 20, 0.1);
-    --openbot-border-strong: rgba(20, 20, 20, 0.16);
-    --openbot-text-primary: #141414;
-    --openbot-text-secondary: rgba(20, 20, 20, 0.72);
-    --openbot-text-muted: rgba(20, 20, 20, 0.64);
-    --openbot-text-dim: rgba(20, 20, 20, 0.34);
+    --openbot-bg-surface: #f4f5f7;
+    --openbot-bg-surface-raised: #eef0f3;
+    --openbot-bg-control: #f4f5f7;
+    --openbot-bg-control-active: #e4e8ed;
+    --openbot-bg-overlay: rgba(21, 23, 28, 0.24);
+    --openbot-border: #e6e8ec;
+    --openbot-border-strong: #dfe3e9;
+    --openbot-text-primary: #15171c;
+    --openbot-text-secondary: #2c3038;
+    --openbot-text-muted: #5b6270;
+    --openbot-text-dim: #8a909c;
     --openbot-text-on-accent: #ffffff;
-    --openbot-text-on-light: #141414;
+    --openbot-text-on-light: #15171c;
     --openbot-text-on-status: #07130c;
-    --openbot-action: #141414;
-    --openbot-action-foreground: #f2f2f2;
-    --openbot-accent: #6960f1;
-    --openbot-accent-text: #5b52df;
+    --openbot-action: #2445e6;
+    --openbot-action-foreground: #ffffff;
+    --openbot-accent: #2445e6;
+    --openbot-accent-text: #2445e6;
     --openbot-logo-production: #cdadec;
     --openbot-logo-eye: #040007;
-    --openbot-success: #32a85d;
+    --openbot-success: #17795e;
     --openbot-warning: #c58a23;
     --openbot-danger: #d85f58;
-    --openbot-success-text: #1e6f3b;
+    --openbot-success-text: #17795e;
     --openbot-warning-text: #865700;
     --openbot-danger-text: #b02a2f;
     --openbot-drawer-scrim: #000000;
-    --openbot-scroll-edge-overlay: rgba(245, 245, 247, 0.46);
-    --openbot-shadow-card: 0 1px 2px rgba(20, 20, 20, 0.05);
-    --openbot-shadow-overlay: 0 12px 32px rgba(20, 20, 20, 0.12);
+    --openbot-scroll-edge-overlay: rgba(255, 255, 255, 0.46);
+    --openbot-shadow-card: 0 1px 2px rgba(21, 23, 28, 0.04);
+    --openbot-shadow-overlay: 0 16px 36px -12px rgba(21, 23, 28, 0.18);
 
     /* Not a colour, and identical in both themes. uniwind only ever learns a
      * variable from a @variant block, so a token @theme inline reaches through
      * var() has to be declared here or the utility resolves to nothing on native.
      * These two back tracking-openbot-tight and tracking-openbot-wide. */
-    --openbot-tracking-tight: -0.1px;
+    --openbot-tracking-tight: -0.01em;
     --openbot-tracking-wide: 0.02em;
-    --openbot-bg-sheet: #fcfcfc;
-    --openbot-bg-grouped: #f2f2f2;
-    --openbot-text-grouped-secondary: #69696e;
-    --openbot-border-grouped: #dddddf;
+    --openbot-bg-sheet: #ffffff;
+    --openbot-bg-grouped: #f4f5f7;
+    --openbot-text-grouped-secondary: #5b6270;
+    --openbot-border-grouped: #e6e8ec;
     --openbot-radius-grouped: 16px;
-    --openbot-bg-chrome-glass: rgba(250, 250, 252, 0.94);
-    --openbot-border-chrome-glass: rgba(20, 20, 20, 0.1);
-    --openbot-bg-chrome-blur: rgba(255, 255, 255, 0.55);
+    --openbot-bg-chrome-glass: rgba(255, 255, 255, 0.94);
+    --openbot-border-chrome-glass: rgba(21, 23, 28, 0.08);
+    --openbot-bg-chrome-blur: rgba(255, 255, 255, 0.6);
     /* File references: the same hues as dark, darker so the name reads on a light surface. */
     --openbot-file-blue: #1f6fd1;
     --openbot-file-blue-soft: rgba(31, 111, 209, 0.12);
@@ -84,56 +87,56 @@
     --openbot-file-red-soft: rgba(216, 95, 88, 0.14);
     --openbot-file-pink: #a3478f;
     --openbot-file-pink-soft: rgba(163, 71, 143, 0.12);
-    --openbot-file-default: #5b52df;
-    --openbot-file-default-soft: rgba(91, 82, 223, 0.12);
+    --openbot-file-default: #2445e6;
+    --openbot-file-default-soft: rgba(36, 69, 230, 0.1);
   }
 
   @variant dark {
     /* biome-ignore lint/suspicious/noDuplicateCustomProperties: Theme variants intentionally share semantic token names. */
-    --openbot-bg-canvas: #1a1a1a;
-    --openbot-bg-native-canvas: #141414;
-    --openbot-bg-native-sidebar: #141414;
-    --openbot-bg-sidebar: #1a1a1a;
-    --openbot-bg-surface: #212121;
-    --openbot-bg-surface-raised: #242424;
-    --openbot-bg-control: #212121;
-    --openbot-bg-control-active: #2a2a2a;
-    --openbot-bg-overlay: rgba(26, 26, 26, 0.92);
-    --openbot-border: rgba(255, 255, 255, 0.035);
-    --openbot-border-strong: rgba(255, 255, 255, 0.045);
-    --openbot-text-primary: #ffffff;
-    --openbot-text-secondary: #dcdcdc;
-    --openbot-text-muted: #979797;
-    --openbot-text-dim: #6a6a6a;
+    --openbot-bg-canvas: #000000;
+    --openbot-bg-native-canvas: #000000;
+    --openbot-bg-native-sidebar: #000000;
+    --openbot-bg-sidebar: #000000;
+    --openbot-bg-surface: #0a0a0a;
+    --openbot-bg-surface-raised: #111111;
+    --openbot-bg-control: #111111;
+    --openbot-bg-control-active: #222222;
+    --openbot-bg-overlay: rgba(0, 0, 0, 0.92);
+    --openbot-border: #1f1f1f;
+    --openbot-border-strong: #2e2e2e;
+    --openbot-text-primary: #ededed;
+    --openbot-text-secondary: #d4d4d4;
+    --openbot-text-muted: #a1a1a1;
+    --openbot-text-dim: #737373;
     --openbot-text-on-accent: #ffffff;
     --openbot-text-on-light: #141414;
     --openbot-text-on-status: #07130c;
-    --openbot-action: #f0f0f0;
-    --openbot-action-foreground: #141414;
-    --openbot-accent: #007cf7;
-    --openbot-accent-text: #42a0ff;
+    --openbot-action: #4f6bff;
+    --openbot-action-foreground: #ffffff;
+    --openbot-accent: #4f6bff;
+    --openbot-accent-text: #8c9bff;
     --openbot-logo-production: #d6adf2;
     --openbot-logo-eye: #040007;
-    --openbot-success: #31cf76;
+    --openbot-success: #4fd1a5;
     --openbot-warning: #ff9412;
     --openbot-danger: #fd2f3b;
-    --openbot-success-text: #31cf76;
+    --openbot-success-text: #4fd1a5;
     --openbot-warning-text: #ff9412;
     --openbot-danger-text: #ff6069;
     --openbot-drawer-scrim: #000000;
     --openbot-scroll-edge-overlay: rgba(0, 0, 0, 0.72);
     --openbot-shadow-card: 0 0 0 transparent;
-    --openbot-shadow-overlay: 0 12px 32px rgba(0, 0, 0, 0.48);
-    --openbot-tracking-tight: -0.1px;
+    --openbot-shadow-overlay: 0 24px 48px -12px #000000;
+    --openbot-tracking-tight: -0.01em;
     --openbot-tracking-wide: 0.02em;
-    --openbot-bg-sheet: #141414;
-    --openbot-bg-grouped: #212121;
-    --openbot-text-grouped-secondary: #96969b;
-    --openbot-border-grouped: #333335;
+    --openbot-bg-sheet: #111111;
+    --openbot-bg-grouped: #0a0a0a;
+    --openbot-text-grouped-secondary: #a1a1a1;
+    --openbot-border-grouped: #1f1f1f;
     --openbot-radius-grouped: 16px;
-    --openbot-bg-chrome-glass: rgba(38, 38, 40, 0.96);
+    --openbot-bg-chrome-glass: rgba(17, 17, 17, 0.96);
     --openbot-border-chrome-glass: rgba(255, 255, 255, 0.08);
-    --openbot-bg-chrome-blur: rgba(26, 26, 28, 0.62);
+    --openbot-bg-chrome-blur: rgba(10, 10, 10, 0.62);
     --openbot-file-blue: #74b9ff;
     --openbot-file-blue-soft: rgba(116, 185, 255, 0.14);
     --openbot-file-yellow: #ff9412;
@@ -148,7 +151,7 @@
     --openbot-file-red-soft: rgba(253, 47, 59, 0.16);
     --openbot-file-pink: #d98ac9;
     --openbot-file-pink-soft: rgba(217, 138, 201, 0.14);
-    --openbot-file-default: #42a0ff;
-    --openbot-file-default-soft: rgba(0, 124, 247, 0.14);
+    --openbot-file-default: #8c9bff;
+    --openbot-file-default-soft: rgba(79, 107, 255, 0.14);
   }
 }

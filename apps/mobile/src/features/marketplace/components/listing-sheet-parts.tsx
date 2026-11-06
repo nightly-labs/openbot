@@ -1,15 +1,13 @@
 import { Stack } from "expo-router";
 import { Typography } from "heroui-native";
-import type { LucideIcon } from "lucide-react-native";
-import ArrowRight from "lucide-react-native/icons/arrow-right";
-import Plus from "lucide-react-native/icons/plus";
-import RotateCw from "lucide-react-native/icons/rotate-cw";
 import type { ReactNode } from "react";
 import { Pressable, View } from "react-native";
 import { useUniwind } from "uniwind";
 import { AndroidHeaderButton } from "@/shared/components/android-header-button";
 import { CoveringMenuView } from "@/shared/components/covering-menu-view";
 import type { MenuAction } from "@/shared/components/menu-view";
+import type { LucideIcon } from "@/shared/icons";
+import { ArrowRight, Plus, RotateCw } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";

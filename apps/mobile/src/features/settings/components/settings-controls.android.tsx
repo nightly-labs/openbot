@@ -1,8 +1,8 @@
 import { Typography } from "heroui-native";
-import ChevronsUpDown from "lucide-react-native/icons/chevrons-up-down";
 import { Switch, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { MenuView } from "@/shared/components/menu-view";
+import { ChevronsUpDown } from "@/shared/icons";
 import type { SettingsPickerProps, SettingsSwitchProps } from "./settings-controls.types";
 
 /**

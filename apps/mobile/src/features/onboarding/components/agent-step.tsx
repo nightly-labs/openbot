@@ -1,6 +1,5 @@
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import Sparkles from "lucide-react-native/icons/sparkles";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type AccessibilityActionEvent, Pressable, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -16,7 +15,6 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
-
 import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
 import { HERO_LANDS_MS, HeroSlot } from "@/features/onboarding/components/onboarding-hero";
 import {
@@ -36,6 +34,7 @@ import {
   ONBOARDING_ROLES,
 } from "@/features/onboarding/model/onboarding-roles";
 import { useColumnWidth } from "@/shared/components/adaptive-split";
+import { Sparkles } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { SPLASH_EASE_OUT } from "@/shared/lib/splash-motion";
 import { useText } from "@/shared/lib/text";

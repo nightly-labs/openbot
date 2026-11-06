@@ -5,10 +5,6 @@ import { runTeamEffect } from "@openbot/team-client";
 import * as Clipboard from "expo-clipboard";
 import { useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
-import Check from "lucide-react-native/icons/check";
-import Link from "lucide-react-native/icons/link";
-import Mail from "lucide-react-native/icons/mail";
-import Repeat from "lucide-react-native/icons/repeat";
 import { useState } from "react";
 import { Alert, Share } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
@@ -24,6 +20,7 @@ import {
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
+import { Check, LinkIcon as Link, Mail, Repeat } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { isIOS } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";

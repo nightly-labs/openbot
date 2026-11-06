@@ -3,8 +3,6 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Button, Spinner, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import Check from "lucide-react-native/icons/check";
-import Lock from "lucide-react-native/icons/lock";
 import { useEffect, useState } from "react";
 import { Linking, View } from "react-native";
 import { useCSSVariable } from "uniwind";
@@ -14,6 +12,7 @@ import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { Check, Lock } from "@/shared/icons";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 import { ListingIcon } from "../components/marketplace-parts";

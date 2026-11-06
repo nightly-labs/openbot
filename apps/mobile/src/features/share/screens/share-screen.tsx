@@ -2,8 +2,6 @@ import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import { router, Stack, useNavigation } from "expo-router";
 import { StackActions } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
-import Check from "lucide-react-native/icons/check";
-import X from "lucide-react-native/icons/x";
 import { useEffect, useRef, useState } from "react";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
@@ -16,6 +14,7 @@ import { serverStatusLabel, showsOnline } from "@/features/workspace/model/serve
 import { AndroidHeaderButton } from "@/shared/components/android-header-button";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { Check, X } from "@/shared/icons";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { discardIncomingShare, type IncomingShare, takeIncomingShare } from "../model/incoming-share";

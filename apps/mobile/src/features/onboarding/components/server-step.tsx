@@ -1,11 +1,6 @@
 import { useIsFocused } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import type { LucideIcon } from "lucide-react-native";
-import ChevronRight from "lucide-react-native/icons/chevron-right";
-import Cloud from "lucide-react-native/icons/cloud";
-import Mail from "lucide-react-native/icons/mail";
-import Monitor from "lucide-react-native/icons/monitor";
 import { View } from "react-native";
 import { GlassChoice } from "@/features/onboarding/components/onboarding-glass";
 import { glassAfter, type OnboardingMotion, STAGGER_MS } from "@/features/onboarding/components/onboarding-motion";
@@ -13,6 +8,8 @@ import { StepHeader, StepScroll } from "@/features/onboarding/components/onboard
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { useBloubStageRequest } from "@/shared/components/bloub-stage/bloub-stage-context";
 import { BLOUB_PRIORITY } from "@/shared/components/bloub-stage/bloub-stage-store";
+import type { LucideIcon } from "@/shared/icons";
+import { ChevronRight, Cloud, Mail, Monitor } from "@/shared/icons";
 import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 

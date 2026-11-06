@@ -1,13 +1,11 @@
 import type { WorkflowSummary } from "@openbot/contracts/ipc";
 import { Typography } from "heroui-native";
-import ChevronRight from "lucide-react-native/icons/chevron-right";
-import Pin from "lucide-react-native/icons/pin";
-import WorkflowIcon from "lucide-react-native/icons/workflow";
 import { useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
 import { RUN_STATUS_LABEL } from "@/features/workflows/model/workflow-steps";
 import { type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
+import { ChevronRight, Pin, Workflow as WorkflowIcon } from "@/shared/icons";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";

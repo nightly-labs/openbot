@@ -1,50 +1,5 @@
 import type { MenuAction, MenuComponentProps, MenuComponentRef } from "@expo/ui/community/menu";
 import { Menu, type MenuTriggerRef, Separator, SubMenu, Typography } from "heroui-native";
-import type { LucideIcon } from "lucide-react-native";
-import Archive from "lucide-react-native/icons/archive";
-import ArrowDown from "lucide-react-native/icons/arrow-down";
-import ArrowUp from "lucide-react-native/icons/arrow-up";
-import ArrowUpDown from "lucide-react-native/icons/arrow-up-down";
-import Calendar from "lucide-react-native/icons/calendar";
-import ChartColumn from "lucide-react-native/icons/chart-column";
-import Circle from "lucide-react-native/icons/circle";
-import CircleCheck from "lucide-react-native/icons/circle-check";
-import CircleStop from "lucide-react-native/icons/circle-stop";
-import ClipboardPaste from "lucide-react-native/icons/clipboard-paste";
-import Code from "lucide-react-native/icons/code";
-import Copy from "lucide-react-native/icons/copy";
-import CopyPlus from "lucide-react-native/icons/copy-plus";
-import Crosshair from "lucide-react-native/icons/crosshair";
-import Ellipsis from "lucide-react-native/icons/ellipsis";
-import Eye from "lucide-react-native/icons/eye";
-import EyeOff from "lucide-react-native/icons/eye-off";
-import File from "lucide-react-native/icons/file";
-import Folder from "lucide-react-native/icons/folder";
-import Globe from "lucide-react-native/icons/globe";
-import Info from "lucide-react-native/icons/info";
-import LayoutGrid from "lucide-react-native/icons/layout-grid";
-import Link from "lucide-react-native/icons/link";
-import List from "lucide-react-native/icons/list";
-import ListChecks from "lucide-react-native/icons/list-checks";
-import LogOut from "lucide-react-native/icons/log-out";
-import MailBadge from "lucide-react-native/icons/mail-badge";
-import MailOpen from "lucide-react-native/icons/mail-open";
-import MessagesSquare from "lucide-react-native/icons/messages-square";
-import MousePointerClick from "lucide-react-native/icons/mouse-pointer-click";
-import Pencil from "lucide-react-native/icons/pencil";
-import Pin from "lucide-react-native/icons/pin";
-import PinOff from "lucide-react-native/icons/pin-off";
-import Play from "lucide-react-native/icons/play";
-import Plus from "lucide-react-native/icons/plus";
-import RotateCw from "lucide-react-native/icons/rotate-cw";
-import Settings from "lucide-react-native/icons/settings";
-import Share from "lucide-react-native/icons/share";
-import Star from "lucide-react-native/icons/star";
-import StarOff from "lucide-react-native/icons/star-off";
-import TextWrap from "lucide-react-native/icons/text-wrap";
-import Trash2 from "lucide-react-native/icons/trash";
-import Users from "lucide-react-native/icons/users";
-import X from "lucide-react-native/icons/x";
 import {
   Fragment,
   type Ref,
@@ -59,6 +14,53 @@ import { BackHandler, Pressable, StyleSheet, useWindowDimensions, View, type Vie
 import { ScrollView } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCSSVariable } from "uniwind";
+import type { LucideIcon } from "@/shared/icons";
+import {
+  Archive,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Calendar,
+  ChartColumn,
+  Circle,
+  CircleCheck,
+  CircleStop,
+  ClipboardPaste,
+  Code,
+  Copy,
+  CopyPlus,
+  Crosshair,
+  Ellipsis,
+  Eye,
+  EyeOff,
+  FileIcon as File,
+  Folder,
+  Globe,
+  Info,
+  LayoutGrid,
+  LinkIcon as Link,
+  List,
+  ListChecks,
+  LogOut,
+  MailBadge,
+  MailOpen,
+  MessagesSquare,
+  MousePointerClick,
+  Pencil,
+  Pin,
+  PinOff,
+  Play,
+  Plus,
+  RotateCw,
+  Settings,
+  Share,
+  Star,
+  StarOff,
+  TextWrap,
+  Trash as Trash2,
+  Users,
+  X,
+} from "@/shared/icons";
 
 export type { MenuAction, MenuComponentRef } from "@expo/ui/community/menu";
 

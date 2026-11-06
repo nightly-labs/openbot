@@ -1,6 +1,5 @@
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
-import Check from "lucide-react-native/icons/check";
 import { useEffect, useState } from "react";
 import { useCSSVariable, useUniwind } from "uniwind";
 import { deviceUnlockName } from "@/features/app-lock/components/app-lock-overlay";
@@ -15,6 +14,7 @@ import { appLockEnabled, LOCK_AFTER_OPTIONS_MS } from "@/features/app-lock/model
 import { type DeviceUnlockKind, deviceUnlockKind } from "@/features/app-lock/model/device-unlock";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsSwitch } from "@/features/settings/components/settings-controls";
+import { Check } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { type MobileText, useText } from "@/shared/lib/text";
 

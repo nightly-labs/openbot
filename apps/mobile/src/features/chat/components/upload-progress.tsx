@@ -1,5 +1,4 @@
 import { useThemeColor } from "heroui-native/hooks";
-import Check from "lucide-react-native/icons/check";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
 import Animated, {
@@ -12,6 +11,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import Svg, { Circle } from "react-native-svg";
+import { Check } from "@/shared/icons";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 

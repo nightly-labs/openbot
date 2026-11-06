@@ -1,11 +1,10 @@
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import CircleX from "lucide-react-native/icons/circle-x";
-import Clock from "lucide-react-native/icons/clock";
 import type { PropsWithChildren } from "react";
 import { View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
 import { type MenuAction, MenuView } from "@/shared/components/menu-view";
+import { CircleX, Clock } from "@/shared/icons";
 import { useText } from "@/shared/lib/text";
 import { type OutboxMessage, outboxRetrySafe } from "../model/outbox";
 

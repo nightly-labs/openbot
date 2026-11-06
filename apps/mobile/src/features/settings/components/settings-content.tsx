@@ -1,5 +1,4 @@
 import { ListGroup, Typography } from "heroui-native";
-import ChevronRight from "lucide-react-native/icons/chevron-right";
 import { Children, type PropsWithChildren, type ReactNode, useState } from "react";
 import {
   type AccessibilityActionEvent,
@@ -10,6 +9,7 @@ import {
 } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { ChevronRight } from "@/shared/icons";
 import { haptics } from "@/shared/lib/haptics";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 

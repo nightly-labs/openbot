@@ -4,12 +4,6 @@ import { GlassView } from "expo-glass-effect";
 import { type Href, router, Stack } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import Ellipsis from "lucide-react-native/icons/ellipsis";
-import EllipsisVertical from "lucide-react-native/icons/ellipsis-vertical";
-import Layers3 from "lucide-react-native/icons/layers";
-import MessagesSquare from "lucide-react-native/icons/messages-square";
-import PanelLeft from "lucide-react-native/icons/panel-left";
-import WifiOff from "lucide-react-native/icons/wifi-off";
 import {
   memo,
   type ReactNode,
@@ -99,6 +93,7 @@ import { useAppLoadingOverlay, useScreenLoadingLabel } from "@/shared/components
 import { ChromeGlassSheen } from "@/shared/components/chrome-glass-sheen";
 import { LargeTitle, LargeTitleBar, useLargeTitleScroll } from "@/shared/components/large-title";
 import { type MenuAction, MenuView } from "@/shared/components/menu-view";
+import { Ellipsis, EllipsisVertical, Layers as Layers3, MessagesSquare, PanelLeft, WifiOff } from "@/shared/icons";
 import { useChromeGlass } from "@/shared/lib/chrome-glass";
 import { haptics } from "@/shared/lib/haptics";
 import { BAR_BUTTON_SIZE, NATIVE_BAR_HEIGHT, useBarTop } from "@/shared/lib/native-bar";
