@@ -30,6 +30,7 @@ class ShareIntoViewController: UIViewController {
   private var started = false
   private var payloads: [SharePayload] = []
   private var content: ShareContent?
+  private var model: ShareModel?
   private var sender: ShareSender?
   private var finished = false
 
@@ -72,6 +73,7 @@ class ShareIntoViewController: UIViewController {
       lastAgent: lastAgent,
       avatars: ShareExtensionData.avatars(appGroupId: appGroupId, directory: directory)
     )
+    self.model = model
     model.onCancel = { [weak self] in self?.cancel() }
     model.onOpenApp = { [weak self] in self?.openApp() }
     model.onSend = { [weak self, weak model] agent in
@@ -111,7 +113,7 @@ class ShareIntoViewController: UIViewController {
       "hostPublicKey": server.publicKey,
       "hosted": server.hosted,
       "agentId": agent.id,
-      "text": content.text,
+      "text": model.text,
       "files": content.files.map { ["name": $0.name, "mimeType": $0.mimeType] },
       "clientMessageId": UUID().uuidString,
       "timezone": TimeZone.current.identifier,
@@ -174,7 +176,10 @@ class ShareIntoViewController: UIViewController {
   private func openApp() {
     guard !finished else { return }
     ShareContent.removeFiles(content?.madeFiles ?? [])
-    guard let defaults = UserDefaults(suiteName: appGroupId), let encoded = try? JSONEncoder().encode(payloads) else {
+    // The app puts the text payloads in the message field in this order, so the user's words go first.
+    let message = model?.message.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    let typed = message.isEmpty ? [] : [SharePayload(type: .text, value: message, mimeType: "text/plain", metadata: nil)]
+    guard let defaults = UserDefaults(suiteName: appGroupId), let encoded = try? JSONEncoder().encode(typed + payloads) else {
       return complete()
     }
     defaults.set(encoded, forKey: SHARE_INTO_DEFAULTS_KEY)

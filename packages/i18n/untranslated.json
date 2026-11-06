@@ -2328,6 +2328,7 @@
   "mobile.settings.voice.voice": ["nl"],
   "mobile.share.extension.failed": ["nl"],
   "mobile.share.extension.footer": ["nl"],
+  "mobile.share.extension.message": ["nl"],
   "mobile.share.extension.openApp": ["nl"],
   "mobile.share.extension.send": ["nl"],
   "mobile.share.extension.sending": ["nl"],
