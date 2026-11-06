@@ -282,7 +282,7 @@ const HEADER_RIPPLE = { borderless: true, radius: 20 } as const;
 const PANE_BAR_HEIGHT = NATIVE_BAR_HEIGHT;
 
 /**
- * On Android, the content under the search field, which the field blurs: Android blurs only the
+ * On Android, the content under the search field and the bar, which they blur: Android blurs only the
  * content of a `BlurTargetView`. iOS blurs with its glass and needs no target.
  */
 function SearchBlurTarget({ target, children }: { target: RefObject<ViewInstance | null>; children: ReactNode }) {
@@ -1021,6 +1021,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         <LargeTitleBar
           scroll={scroll}
           title={activeServer.name}
+          blurTarget={searchBlurTarget}
           // The connection state takes the place of the title in the bar.
           hidden={!searchShows || statusShows || search.open}
         >

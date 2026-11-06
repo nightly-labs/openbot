@@ -1,11 +1,12 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { Button, Spinner, Typography } from "heroui-native";
-import { type ReactNode, useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { type ReactNode, useRef, useState } from "react";
+import { Pressable, ScrollView, View, type ViewInstance } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SettingsNote, SettingsSection } from "@/features/settings/components/settings-content";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
+import { AndroidBlurTarget } from "@/shared/components/android-header-blur";
 import { GLASS_CAPSULE_HEIGHT } from "@/shared/components/glass-capsule";
 import { LargeTitle, LargeTitleBar, useLargeTitleScroll } from "@/shared/components/large-title";
 import { haptics } from "@/shared/lib/haptics";
@@ -46,6 +47,7 @@ export function MarketplaceScreen() {
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
   const server = useMobileWorkspaceSelector((workspace) => workspace.servers.find((item) => item.id === serverId));
   const scroll = useLargeTitleScroll();
+  const blurTarget = useRef<ViewInstance>(null);
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<MarketplaceFilter>(NO_MARKETPLACE_FILTER);
   const [query, setQuery] = useState("");
@@ -118,30 +120,32 @@ export function MarketplaceScreen() {
 
   return (
     <View className="flex-1 bg-sheet">
-      <Animated.ScrollView
-        className="flex-1"
-        // The side insets go outside the scroll view, as in `LargeTitleScrollView`.
-        style={{ marginLeft: insets.left, marginRight: insets.right }}
-        contentInsetAdjustmentBehavior={scroll.ownsInset ? "never" : "always"}
-        // Android has no content inset, so the content starts below the transparent header. The bottom
-        // keeps the last row above the field.
-        contentContainerStyle={{
-          paddingTop: scroll.ownsInset ? scroll.headerHeight : 0,
-          paddingBottom: insets.bottom + GLASS_CAPSULE_HEIGHT + 32,
-        }}
-        keyboardDismissMode="on-drag"
-        keyboardShouldPersistTaps="handled"
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-        onScroll={scroll.onScroll}
-      >
-        <LargeTitle scroll={scroll} title={title} caption={server?.name} />
-        <View className="gap-7 pt-3">
-          {loadFailed}
-          {content}
-        </View>
-      </Animated.ScrollView>
-      <LargeTitleBar scroll={scroll} title={title} surface="sheet" />
+      <AndroidBlurTarget target={blurTarget} surface="sheet">
+        <Animated.ScrollView
+          className="flex-1"
+          // The side insets go outside the scroll view, as in `LargeTitleScrollView`.
+          style={{ marginLeft: insets.left, marginRight: insets.right }}
+          contentInsetAdjustmentBehavior={scroll.ownsInset ? "never" : "always"}
+          // Android has no content inset, so the content starts below the transparent header. The bottom
+          // keeps the last row above the field.
+          contentContainerStyle={{
+            paddingTop: scroll.ownsInset ? scroll.headerHeight : 0,
+            paddingBottom: insets.bottom + GLASS_CAPSULE_HEIGHT + 32,
+          }}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={false}
+          onScroll={scroll.onScroll}
+        >
+          <LargeTitle scroll={scroll} title={title} caption={server?.name} />
+          <View className="gap-7 pt-3">
+            {loadFailed}
+            {content}
+          </View>
+        </Animated.ScrollView>
+      </AndroidBlurTarget>
+      <LargeTitleBar scroll={scroll} title={title} surface="sheet" blurTarget={blurTarget} />
       {server ? (
         <MarketplaceSearchBar
           query={query}
