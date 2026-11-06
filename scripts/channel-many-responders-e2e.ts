@@ -7,7 +7,8 @@
 //    task of its own for the same request, with no routing turn, and each member replies.
 // 2. A request to the whole group goes through the lead, which gives it to more than one member; the
 //    lead posts one dispatch row for each, and each member replies.
-// 3. A plain question that one member can answer still goes to one member only.
+// 3. A plain question that one member can answer still goes to one member only. A question to the
+//    coordinator also goes to one member: routing does not answer it in a Coordinator message.
 // 4. "Everyone", picked in the composer's mention menu, gives each member a task with no routing turn.
 //    Stop while they work pauses each task, and "continue" continues the same tasks; it starts no
 //    new ones.
@@ -35,6 +36,7 @@ interface Report {
   mentions?: RequestResult;
   group?: RequestResult;
   single?: RequestResult;
+  coordinator?: RequestResult;
   everyone?: RequestResult & { afterStop: string[]; continued: RequestResult };
   pageErrors: string[];
   screenshots: string[];
@@ -172,6 +174,40 @@ try {
   report.single = single;
   assert.equal(single.owners.length, 1, `A plain question went to ${single.owners.length} members.`);
   await shot("single");
+
+  // A question to the coordinator goes to a member. Before the fix, routing answered it as a
+  // Coordinator message and paused the task, so wait for a pause too, to fail at once.
+  const coordinatorText = "Coordinator, who are you? Reply in one short sentence. Do not use tools.";
+  await client.send(channel.id, coordinatorText, null);
+  const coordinatorRequest = await requestId(channel.id, coordinatorText);
+  const routed = await waitFor(
+    page,
+    "coordinator: the request is routed or paused",
+    () => client.read(channel.id),
+    (current: ChannelPage) =>
+      current.tasks.some(
+        (task) =>
+          task.requestMessageId === coordinatorRequest &&
+          !task.parentTaskId &&
+          (task.ownerAgentId || task.state === "paused"),
+      ),
+    120_000,
+  );
+  const coordinatorRows = routed.messages.filter(
+    (row) =>
+      row.author.kind === "coordinator" &&
+      routed.tasks.some((task) => task.id === row.taskId && task.requestMessageId === coordinatorRequest),
+  );
+  assert.equal(coordinatorRows.length, 0, `Routing answered as the Coordinator: ${coordinatorRows[0]?.message.text}`);
+  const coordinator = await settle(channel.id, coordinatorRequest, "coordinator");
+  report.coordinator = coordinator;
+  assert.equal(
+    coordinator.owners.length,
+    1,
+    `A question to the coordinator went to ${coordinator.owners.length} members.`,
+  );
+  assert.deepEqual(coordinator.repliedBy, coordinator.owners, "The selected member replies.");
+  await shot("coordinator");
 
   // 4. Everyone, then Stop, then "continue".
   const everyoneText = "write a numbered list of 30 short facts about mountains, one per line. Do not use tools.";
