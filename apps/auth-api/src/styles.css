@@ -2180,6 +2180,11 @@ a {
   text-wrap: pretty;
 }
 
+/* The wide tiles have room for longer lines, so their text takes fewer lines and the tiles are lower. */
+.landing-feature:is([data-feature="team"], [data-feature="multiplayer"], [data-feature="persist"]) p {
+  max-width: 64ch;
+}
+
 .landing-feature[data-feature="local"] p {
   color: var(--openbot-download-card-muted);
 }
