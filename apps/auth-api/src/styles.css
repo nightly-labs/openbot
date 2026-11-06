@@ -10143,6 +10143,16 @@ a {
   color: inherit;
 }
 
+/* A store that a newer version replaced. It will not ship this version, so it reads as done, not waiting. */
+.changelog-store[data-state="skipped"] {
+  color: var(--openbot-text-dim);
+}
+
+.changelog-store[data-state="skipped"] .changelog-store-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+
 .changelog-release-title {
   margin: 8px 0 0;
   font-size: clamp(24px, 2.4vw, 32px);
