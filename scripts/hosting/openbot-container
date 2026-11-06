@@ -63,6 +63,11 @@ for display in :0 :1; do
   done
   xdpyinfo -display "$display" >/dev/null 2>&1 || fail "The virtual display $display did not start."
 done
+# The agent display gets a grey background and openbox, as on the boat desktop, so remote desktop
+# does not show a black screen and agent windows get a frame and the focus on a click. tini adopts
+# openbox, as it adopts Xvfb.
+xsetroot -display :1 -solid "#3a3a3c"
+(DISPLAY=:1 openbox >/dev/null 2>&1 &)
 
 # Each data volume makes its own keyring password on its first start. The password only lets the
 # daemon open the keyring without a person; the file is 0600. A keyring with no password file is not
