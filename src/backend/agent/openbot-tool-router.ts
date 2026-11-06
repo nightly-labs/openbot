@@ -685,10 +685,17 @@ export class OpenBotToolRouter {
       const parsed = removeApiKeyToolSchema.safeParse(params.arguments);
       if (!parsed.success)
         return openBotToolFailure(`${z.prettifyError(parsed.error)}\nCorrect the arguments and retry.`);
-      return yield* apiKeys.remove(agentId, parsed.data.name).pipe(
-        Effect.map((removed) =>
-          openBotToolResult({ status: removed ? "removed" : "not_found", name: parsed.data.name }),
-        ),
+      const { name } = parsed.data;
+      return yield* apiKeys.remove(agentId, name).pipe(
+        Effect.map((removed) => {
+          if (removed) return openBotToolResult({ status: "removed", name });
+          // Agents cannot delete a Vault key: every agent reads it.
+          if (this.#vaultItems?.apiKeys().some((key) => key.name === name))
+            return openBotToolFailure(
+              `${name} is in the Vault, which every agent uses. Only the user can delete it, in Server settings > Vault.`,
+            );
+          return openBotToolResult({ status: "not_found", name });
+        }),
         Effect.catch(failed),
       );
     }
