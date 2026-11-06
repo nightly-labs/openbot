@@ -105,3 +105,22 @@ Troubleshooting:
   the prompts again.
 - Mail or Calendar tools time out: AppleScript is slow on large mailboxes and
   on many subscribed calendars. Ask for one folder and a smaller count.
+
+## GitLab
+
+The listing connects to GitLab's own MCP server at `https://gitlab.com/api/v4/mcp`
+(<https://docs.gitlab.com/user/model_context_protocol/mcp_server/>). The server
+uses OAuth with dynamic client registration and the `mcp` scope, so the user
+signs in through the browser and types no token.
+
+A listing cannot ask for a server address and a browser sign-in together: a
+`url` field exists only in a `key` flow. GitLab refuses classic personal access
+tokens on this server, so a key flow would need a fine-grained token. For a
+self-hosted GitLab, the user adds `https://<gitlab-host>/api/v4/mcp` in the
+server's MCP servers settings and selects Sign in.
+
+Troubleshooting:
+
+- A self-hosted server refuses the connection or has no MCP endpoint: an admin
+  must allow access to the MCP server for the instance. The server is GA from
+  GitLab 19.5.

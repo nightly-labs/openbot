@@ -10,6 +10,7 @@ import { COMPOSIO_PLUGIN_GUIDE } from "./composio";
 import { CONTEXT7_PLUGIN_GUIDE } from "./context7";
 import { FIGMA_PLUGIN_GUIDE } from "./figma";
 import { FIRECRAWL_PLUGIN_GUIDE } from "./firecrawl";
+import { GITLAB_PLUGIN_GUIDE } from "./gitlab";
 import { HIGGSFIELD_PLUGIN_GUIDE } from "./higgsfield";
 import { HUGGINGFACE_PLUGIN_GUIDE } from "./huggingface";
 import { LINEAR_PLUGIN_GUIDE } from "./linear";
@@ -52,6 +53,7 @@ const PLUGIN_GUIDES: Readonly<Record<string, PluginGuide>> = {
   posthog: POSTHOG_PLUGIN_GUIDE,
   resend: RESEND_PLUGIN_GUIDE,
   sentry: SENTRY_PLUGIN_GUIDE,
+  gitlab: GITLAB_PLUGIN_GUIDE,
   stripe: STRIPE_PLUGIN_GUIDE,
   revenuecat: REVENUECAT_PLUGIN_GUIDE,
   vercel: VERCEL_PLUGIN_GUIDE,

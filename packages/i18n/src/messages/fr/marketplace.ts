@@ -247,6 +247,16 @@ export const messages = {
   "marketplace.plugin.sentry.prompt.topCrash": "Expliquez le principal plantage du projet mobile et sa cause probable.",
   "marketplace.plugin.sentry.prompt.releaseHealth":
     "Quelle est la santé de la version actuelle par rapport à la précédente ?",
+  "marketplace.plugin.gitlab.tagline": "Tickets, merge requests et pipelines",
+  "marketplace.plugin.gitlab.description":
+    "GitLab permet aux agents de rechercher des projets, de lire et créer des tickets, de relire et mettre à jour des merge requests, de lire les fichiers et les commits du dépôt, et de vérifier les pipelines et les jobs CI sur GitLab.com. Chaque utilisateur se connecte à son propre compte GitLab dans le navigateur. Les agents ont les mêmes droits que l’utilisateur : ils peuvent pousser des commits, modifier des tickets et des merge requests, et les fusionner. Pour un GitLab auto-hébergé, ajoutez un serveur MCP avec votre adresse GitLab suivie de /api/v4/mcp dans les réglages des serveurs MCP, puis connectez-vous.",
+  "marketplace.plugin.gitlab.app":
+    "Projets, tickets, merge requests, dépôts et pipelines CI, via le serveur MCP de GitLab avec connexion dans le navigateur.",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "Quelles merge requests attendent ma relecture ?",
+  "marketplace.plugin.gitlab.prompt.failedPipeline":
+    "Pourquoi le dernier pipeline de la branche par défaut a-t-il échoué ?",
+  "marketplace.plugin.gitlab.prompt.newIssue":
+    "Créez un ticket pour le plantage dans la file de synchronisation, avec les étapes de reproduction.",
   "marketplace.plugin.vercel.tagline": "Déploiements, journaux de build et projets",
   "marketplace.plugin.vercel.description":
     "Vercel permet aux agents de lister les projets et les déploiements récents, de lire les journaux de build et d’exécution, et de trouver pourquoi un build a échoué. Chaque utilisateur se connecte à son propre compte Vercel dans le navigateur et choisit les équipes que les agents peuvent utiliser. Dans ces équipes, les agents ont les mêmes droits que le compte de l’utilisateur. Ils peuvent aussi modifier les variables d’environnement, les domaines, les enregistrements DNS et les déploiements, et acheter des domaines.",

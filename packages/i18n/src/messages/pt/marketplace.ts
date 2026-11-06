@@ -229,6 +229,15 @@ export const messages = {
   "marketplace.plugin.sentry.prompt.newErrors": "Quais erros novos apareceram desde o deploy de ontem?",
   "marketplace.plugin.sentry.prompt.topCrash": "Explique o principal crash do projeto mobile e sua causa provável.",
   "marketplace.plugin.sentry.prompt.releaseHealth": "Quão saudável está o release atual em comparação com o anterior?",
+  "marketplace.plugin.gitlab.tagline": "Issues, merge requests e pipelines",
+  "marketplace.plugin.gitlab.description":
+    "O GitLab permite que agentes busquem projetos, leiam e criem issues, revisem e atualizem merge requests, leiam arquivos e commits do repositório e verifiquem pipelines e jobs de CI no GitLab.com. Cada usuário entra com a própria conta GitLab pelo navegador. Os agentes têm as mesmas permissões que o usuário: podem enviar commits, alterar issues e merge requests e fazer o merge deles. Para um GitLab auto-hospedado, adicione um servidor MCP com o endereço do seu GitLab seguido de /api/v4/mcp nas configurações de servidores MCP e entre por lá.",
+  "marketplace.plugin.gitlab.app":
+    "Projetos, issues, merge requests, repositórios e pipelines de CI, através do servidor MCP do GitLab com login pelo navegador.",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "Quais merge requests esperam a minha revisão?",
+  "marketplace.plugin.gitlab.prompt.failedPipeline": "Por que o último pipeline no branch padrão falhou?",
+  "marketplace.plugin.gitlab.prompt.newIssue":
+    "Abra uma issue para o crash na fila de sincronização com passos de reprodução.",
   "marketplace.plugin.vercel.tagline": "Deploys, logs de build e projetos",
   "marketplace.plugin.vercel.description":
     "O Vercel permite que agentes listem projetos e deploys recentes, leiam logs de build e de execução, e descubram por que um build falhou. Cada usuário entra com a própria conta Vercel pelo navegador e escolhe as equipes que os agentes podem usar. Nessas equipes, os agentes têm as mesmas permissões da conta do usuário. Eles também podem alterar variáveis de ambiente, domínios, registros DNS e deploys, e comprar domínios.",

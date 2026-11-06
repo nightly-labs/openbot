@@ -248,6 +248,16 @@ export const messages = {
   "marketplace.plugin.sentry.prompt.topCrash":
     "Erkläre den häufigsten Absturz im Mobile-Projekt und seine wahrscheinliche Ursache.",
   "marketplace.plugin.sentry.prompt.releaseHealth": "Wie stabil ist das aktuelle Release im Vergleich zum letzten?",
+  "marketplace.plugin.gitlab.tagline": "Issues, Merge Requests und Pipelines",
+  "marketplace.plugin.gitlab.description":
+    "Mit GitLab durchsuchen Agenten Projekte, lesen und erstellen Issues, prüfen und aktualisieren Merge Requests, lesen Dateien und Commits im Repository und prüfen CI-Pipelines und Jobs auf GitLab.com. Jeder Nutzer meldet sich im Browser bei seinem eigenen GitLab-Konto an. Agenten haben dieselben Berechtigungen wie der Nutzer: Sie können Commits pushen, Issues und Merge Requests ändern und Merge Requests mergen. Für ein selbst gehostetes GitLab fügst du in den Einstellungen für MCP-Server einen Server mit deiner GitLab-Adresse und /api/v4/mcp hinzu und meldest dich dort an.",
+  "marketplace.plugin.gitlab.app":
+    "Projekte, Issues, Merge Requests, Repositorys und CI-Pipelines über den MCP-Server von GitLab mit Anmeldung im Browser.",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "Welche Merge Requests warten auf mein Review?",
+  "marketplace.plugin.gitlab.prompt.failedPipeline":
+    "Warum ist die letzte Pipeline auf dem Standard-Branch fehlgeschlagen?",
+  "marketplace.plugin.gitlab.prompt.newIssue":
+    "Erstelle ein Issue für den Absturz in der Sync-Warteschlange mit Schritten zur Reproduktion.",
   "marketplace.plugin.vercel.tagline": "Deployments, Build-Logs und Projekte",
   "marketplace.plugin.vercel.description":
     "Mit Vercel listen Agenten Projekte und aktuelle Deployments auf, lesen Build- und Laufzeit-Logs und finden heraus, warum ein Build fehlgeschlagen ist. Jeder Nutzer meldet sich im Browser bei seinem eigenen Vercel-Konto an und wählt die Teams, die Agenten nutzen dürfen. In diesen Teams haben Agenten dieselben Rechte wie das Konto des Nutzers. Sie können auch Umgebungsvariablen, Domains, DNS-Einträge und Deployments ändern und Domains kaufen.",

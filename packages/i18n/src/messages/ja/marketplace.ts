@@ -239,6 +239,15 @@ export const messages = {
   "marketplace.plugin.sentry.prompt.topCrash":
     "モバイルプロジェクトで最も多いクラッシュと、その原因として考えられるものを説明してください。",
   "marketplace.plugin.sentry.prompt.releaseHealth": "現在のリリースは前回と比べてどのくらい健全ですか？",
+  "marketplace.plugin.gitlab.tagline": "Issue、マージリクエスト、パイプライン",
+  "marketplace.plugin.gitlab.description":
+    "GitLab を使うと、エージェントは GitLab.com でプロジェクトを検索し、Issue を読んで作成し、マージリクエストをレビューして更新し、リポジトリーのファイルとコミットを読み、CI パイプラインとジョブを確認できます。各ユーザーはブラウザーで自分の GitLab アカウントにサインインします。エージェントにはユーザーと同じ権限があり、コミットのプッシュ、Issue とマージリクエストの変更、マージができます。セルフホストの GitLab では、MCP サーバーの設定で GitLab のアドレスの後に /api/v4/mcp を付けたサーバーを追加し、そこでサインインしてください。",
+  "marketplace.plugin.gitlab.app":
+    "プロジェクト、Issue、マージリクエスト、リポジトリー、CI パイプラインを、ブラウザーでサインインする GitLab の MCP サーバーで提供します。",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "自分のレビューを待っているマージリクエストはどれですか？",
+  "marketplace.plugin.gitlab.prompt.failedPipeline": "デフォルトブランチの最新のパイプラインはなぜ失敗したのですか？",
+  "marketplace.plugin.gitlab.prompt.newIssue":
+    "同期キューのクラッシュについて、再現手順を付けて Issue を作成してください。",
   "marketplace.plugin.vercel.tagline": "デプロイ、ビルドログ、プロジェクト",
   "marketplace.plugin.vercel.description":
     "Vercel を使うと、エージェントはプロジェクトと最近のデプロイを一覧表示し、ビルドログとランタイムログを読み、ビルドが失敗した理由を調べられます。各ユーザーはブラウザーで自分の Vercel アカウントにサインインし、エージェントが使えるチームを選びます。それらのチームでは、エージェントはユーザーのアカウントと同じ権限を持ちます。環境変数、ドメイン、DNS レコード、デプロイの変更や、ドメインの購入もできます。",

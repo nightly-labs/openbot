@@ -231,6 +231,15 @@ export const messages = {
   "marketplace.plugin.sentry.prompt.topCrash":
     "Leg de meest voorkomende crash in het mobiele project uit en de waarschijnlijke oorzaak.",
   "marketplace.plugin.sentry.prompt.releaseHealth": "Hoe gezond is de huidige release vergeleken met de vorige?",
+  "marketplace.plugin.gitlab.tagline": "Issues, merge requests en pipelines",
+  "marketplace.plugin.gitlab.description":
+    "Met GitLab kunnen agents projecten zoeken, issues lezen en maken, merge requests reviewen en bijwerken, bestanden en commits in de repository lezen, en CI-pipelines en jobs op GitLab.com controleren. Elke gebruiker logt via de browser in met een eigen GitLab-account. Agents krijgen dezelfde rechten als de gebruiker: ze kunnen commits pushen, issues en merge requests wijzigen en ze mergen. Voor een zelfgehoste GitLab voeg je in de instellingen voor MCP-servers een server toe met je GitLab-adres gevolgd door /api/v4/mcp, en log je daar in.",
+  "marketplace.plugin.gitlab.app":
+    "Projecten, issues, merge requests, repository's en CI-pipelines, via de MCP-server van GitLab met inloggen in de browser.",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "Welke merge requests wachten op mijn review?",
+  "marketplace.plugin.gitlab.prompt.failedPipeline": "Waarom is de laatste pipeline op de standaardbranch mislukt?",
+  "marketplace.plugin.gitlab.prompt.newIssue":
+    "Maak een issue aan voor de crash in de sync-wachtrij, met stappen om die te reproduceren.",
   "marketplace.plugin.vercel.tagline": "Deployments, buildlogs en projecten",
   "marketplace.plugin.vercel.description":
     "Met Vercel kunnen agents projecten en recente deployments tonen, build- en runtimelogs lezen en uitzoeken waarom een build mislukte. Elke gebruiker logt via de browser in met een eigen Vercel-account en kiest de teams die agents mogen gebruiken. In die teams krijgen agents dezelfde rechten als het account van de gebruiker. Ze kunnen ook omgevingsvariabelen, domeinen, DNS-records en deployments wijzigen, en domeinen kopen.",
