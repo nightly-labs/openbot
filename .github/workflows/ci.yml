@@ -506,6 +506,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:svg-attachments
 
+      - name: Run the channel notifications and channel settings E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:channel-notifications
+
       - name: Run the agent MCP server tools E2E test
         if: ${{ !cancelled() }}
         run: bun run test:agent-mcp-tools

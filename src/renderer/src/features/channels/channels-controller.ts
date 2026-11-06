@@ -63,6 +63,12 @@ export interface ChannelsEnvironment {
   /** Whether the host takes `cancel` (`channel-task-cancel-v1`); `supported()` is checked as well. */
   taskCancelSupported: () => boolean;
   /**
+   * Whether the host reads and keeps "Keep memories in this channel" (`channel-isolation-v1`);
+   * `supported()` is checked as well. An older joined server drops the setting on the wire, so its
+   * switch would always show off and never save.
+   */
+  isolationSupported: () => boolean;
+  /**
    * Whether this reader can change the picture of a channel. Only this computer keeps a channel
    * picture: the Team API does not carry it, so a joined server and the browser client cannot.
    */
@@ -476,6 +482,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
     supported,
     deletionSupported: () => supported() && env.deletionSupported(),
     taskCancelSupported: () => supported() && env.taskCancelSupported(),
+    isolationSupported: () => supported() && env.isolationSupported(),
     messageDeletionSupported,
     deletesAnyMessage: env.deletesAnyMessage,
     deleteMessage,

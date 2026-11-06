@@ -56,7 +56,7 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
     options.body === undefined
       ? undefined
       : sideRoute
-        ? JSON.stringify(sideRoute.request(path, options.body))
+        ? JSON.stringify(sideRoute.request(path, options.body, { channelIsolation: true }))
         : codec.encodeRequest(method, path, options.body, {
             ...(options.preserveSemanticTags === undefined
               ? {}
@@ -113,6 +113,7 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
               historyExtent: true,
               channelAttention: true,
               agentTaskUiBlocks: true,
+              channelIsolation: true,
             })
           : codec.decodeResponse(method, path, response.status, input),
       catch: (cause) =>

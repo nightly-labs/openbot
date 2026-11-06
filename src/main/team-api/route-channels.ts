@@ -90,7 +90,9 @@ export async function routeChannels(
     return empty(204);
   }
   if (settings) return routeChannelSettings(context, agents, channels, channelHiddenAgentIds);
-  const input = parseChannelCommand(channelRequest(url.pathname, await readJson(request)));
+  // `readJson` has already run the body through the channel wire codec, with the `isolated` of a peer
+  // that advertises channel-isolation-v1. A second pass through channels-v1 would drop it.
+  const input = parseChannelCommand(await readJson(request));
   requireVisibleChannel(channels, input.channelId, channelHiddenAgentIds);
   if (input.type === "archive" && !canAdministerServer(member.role))
     throw new HttpError(403, sourceText("error.team.membersCannotArchiveChannels"));

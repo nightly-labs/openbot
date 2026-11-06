@@ -371,16 +371,18 @@ export function ChannelEditor(props: ChannelEditorProps) {
         />
         <InstructionsLimit text={fields.instructions} />
       </SettingsField>
-      <SwitchField
-        checked={channel()?.isolated === true}
-        onChange={(isolated) =>
-          void commit((draft) => {
-            draft.isolated = isolated;
-          })
-        }
-        label={t("channel.settings.isolated")}
-        description={t("channel.settings.isolatedDescription")}
-      />
+      <Show when={channels.isolationSupported()}>
+        <SwitchField
+          checked={channel()?.isolated === true}
+          onChange={(isolated) =>
+            void commit((draft) => {
+              draft.isolated = isolated;
+            })
+          }
+          label={t("channel.settings.isolated")}
+          description={t("channel.settings.isolatedDescription")}
+        />
+      </Show>
       <SettingsLinkGroup>
         <SettingsLinkRow
           label={t("channel.settings.memories")}

@@ -514,7 +514,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
               body: binary
                 ? null
                 : sideRoute
-                  ? sideRoute.request(path, init.body)
+                  ? sideRoute.request(path, init.body, { channelIsolation: true })
                   : encodeTeamProtocolV8WebRtcHttpRequest(method, path, init.body, {
                       ...(init.preserveSemanticTags === undefined
                         ? {}
@@ -581,6 +581,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                     historyExtent: true,
                     channelAttention: true,
                     agentTaskUiBlocks: true,
+                    channelIsolation: true,
                   })
                 : decodeTeamProtocolV9WebRtcHttpResponse(method, path, status, envelope.body),
             ).pipe(

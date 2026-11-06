@@ -70,6 +70,7 @@ import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SIGN_IN_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
+  CHANNEL_ISOLATION_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
   COMPUTER_ACTIVITY_CAPABILITY,
   CONNECTORS_CAPABILITY,
@@ -2074,6 +2075,7 @@ export class TeamApiServer {
       preserveSemanticTags: supportsTeamSemanticTags(route.capabilities),
       historyExtent: route.capabilities.has(TEAM_HISTORY_EXTENT_CAPABILITY),
       channelAttention: route.capabilities.has(TEAM_CHANNEL_ATTENTION_CAPABILITY),
+      channelIsolation: route.capabilities.has(CHANNEL_ISOLATION_CAPABILITY),
       agentTaskUiBlocks: route.capabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
       uiBlocks: route.capabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
       subagents: route.capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
@@ -2243,7 +2245,8 @@ export class TeamApiServer {
           if (
             capability === "channel-chats-v1" ||
             capability === CHANNEL_DELETE_CAPABILITY ||
-            capability === CHANNEL_TASK_CANCEL_CAPABILITY
+            capability === CHANNEL_TASK_CANCEL_CAPABILITY ||
+            capability === CHANNEL_ISOLATION_CAPABILITY
           )
             return this.#options.channels !== undefined;
           // Advertised only when this host can serve it: a client that negotiated it gets a route,
