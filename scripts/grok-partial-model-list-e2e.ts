@@ -106,11 +106,18 @@ const idle = (agentId: string) =>
   !agents.listQueue(agentId).deliveries.some((delivery) => ["queued", "starting", "running"].includes(delivery.status));
 const setups = async () => (await readJsonl<SetupLine>(logPath)).filter((line) => line.event === "setup");
 
-/** Restarts Grok with `partial` short lists, and answers the pids that ran before the restart. */
+/**
+ * Restarts Grok with `partial` short lists, and answers the pids that ran before the restart. It
+ * returns when the restart is done: a restart while one is still pending does nothing.
+ */
 async function restartGrok(partial: number): Promise<Set<number>> {
   const before = new Set((await setups()).map((line) => line.pid));
   writeFileSync(controlPath, JSON.stringify({ partial }));
   await runCauseEffect(agents.restartProvider("grok"));
+  await waitFor("the restart to end", async () => {
+    const row = agents.getStatus().providers?.find((provider) => provider.id === "grok");
+    return row !== undefined && !row.restartPending;
+  });
   return before;
 }
 
