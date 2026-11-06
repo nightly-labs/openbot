@@ -101,6 +101,7 @@ export function detectedModelsDraft(provider: Extract<DetectedProvider, { kind: 
     contextWindow: model.contextWindow?.toString() ?? "",
     maxOutput: model.maxOutput?.toString() ?? "",
     ...(model.reasoningEfforts ? { reasoningEfforts: [...model.reasoningEfforts] } : {}),
+    ...(model.inputs ? { inputs: [...model.inputs] } : {}),
   }));
   return {
     providerId: provider.id,

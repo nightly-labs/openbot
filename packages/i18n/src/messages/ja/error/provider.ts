@@ -110,6 +110,7 @@ export const messages = {
     "モデルのコンテキストウィンドウは {min} から {max} までの整数のトークン数にしてください。",
   "error.provider.maxOutputInvalid": "モデルの最大出力は {min} から {max} までの整数のトークン数にしてください。",
   "error.provider.reasoningEffortsInvalid": "モデルの推論の強さが無効です。",
+  "error.provider.inputsInvalid": "モデルの入力の種類が無効です。",
   "error.provider.headersTooMany": "ヘッダーが多すぎます。",
   "error.provider.headerNameCharacter": "ヘッダー名に HTTP で使用できない文字が含まれています。",
   "error.provider.headerNameTooLong": "ヘッダー名が長すぎます。",

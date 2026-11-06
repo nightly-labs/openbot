@@ -112,6 +112,7 @@ export const messages = {
   "error.provider.maxOutputInvalid":
     "A saída máxima de um modelo deve ser um número inteiro de tokens entre {min} e {max}.",
   "error.provider.reasoningEffortsInvalid": "Os níveis de esforço de um modelo não são válidos.",
+  "error.provider.inputsInvalid": "Os tipos de entrada de um modelo não são válidos.",
   "error.provider.headersTooMany": "Há cabeçalhos demais.",
   "error.provider.headerNameCharacter": "O nome de um cabeçalho contém um caractere não permitido pelo HTTP.",
   "error.provider.headerNameTooLong": "O nome de um cabeçalho é muito longo.",

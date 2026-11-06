@@ -100,6 +100,7 @@ export const messages = {
   "error.provider.contextWindowInvalid": "模型的上下文窗口必须是 {min} 到 {max} 之间的整数个 token。",
   "error.provider.maxOutputInvalid": "模型的最大输出必须是 {min} 到 {max} 之间的整数个 token。",
   "error.provider.reasoningEffortsInvalid": "模型的推理强度无效。",
+  "error.provider.inputsInvalid": "模型的输入类型无效。",
   "error.provider.headersTooMany": "请求头数量过多。",
   "error.provider.headerNameCharacter": "某个请求头名称含有 HTTP 不允许的字符。",
   "error.provider.headerNameTooLong": "某个请求头名称过长。",

@@ -120,6 +120,7 @@ export const messages = {
   "error.provider.maxOutputInvalid":
     "La sortie maximale d’un modèle doit être un nombre entier de jetons entre {min} et {max}.",
   "error.provider.reasoningEffortsInvalid": "Les niveaux d’effort d’un modèle ne sont pas valides.",
+  "error.provider.inputsInvalid": "Les types d’entrée d’un modèle ne sont pas valides.",
   "error.provider.headersTooMany": "Il y a trop d’en-têtes.",
   "error.provider.headerNameCharacter": "Un nom d’en-tête contient un caractère que HTTP n’autorise pas.",
   "error.provider.headerNameTooLong": "Un nom d’en-tête est trop long.",

@@ -12,6 +12,7 @@ import type {
   CustomProviderHarness,
   CustomProviderHeader,
   CustomProviderHeaderInput,
+  CustomProviderInputKind,
   CustomProviderModel,
   CustomProviderReasoningEffort,
   CustomProviderSummary,
@@ -22,6 +23,7 @@ import {
   CUSTOM_PROVIDER_HARNESSES,
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   isCustomProviderContextWindow,
+  isCustomProviderInputs,
   isCustomProviderMaxOutput,
   isCustomProviderReasoningEfforts,
   sameCustomProviderOrigin,
@@ -46,8 +48,8 @@ export interface CustomProviderCipher {
 }
 
 /**
- * `contextWindow`, `maxOutput` and `reasoningEfforts` were added in later releases: a file without them
- * still reads, and an older build drops them. A value out of range is dropped, not refused, so that it cannot hide every
+ * `contextWindow`, `maxOutput`, `reasoningEfforts` and `inputs` were added in later releases: a file
+ * without them still reads, and an older build drops them. A value out of range is dropped, not refused, so that it cannot hide every
  * saved endpoint.
  */
 const modelSchema = z.object({
@@ -59,6 +61,7 @@ const modelSchema = z.object({
     .custom<CustomProviderReasoningEffort[]>(isCustomProviderReasoningEfforts)
     .optional()
     .catch(undefined),
+  inputs: z.custom<CustomProviderInputKind[]>(isCustomProviderInputs).optional().catch(undefined),
 });
 const headerSchema = z.object({ name: z.string(), value: z.string() });
 
@@ -365,7 +368,7 @@ function storedHarness(harness: CustomProviderHarness | undefined): { harness?: 
   return harness && harness !== DEFAULT_CUSTOM_PROVIDER_HARNESS ? { harness } : {};
 }
 
-/** The parse keeps an invalid `contextWindow`, `maxOutput` or `reasoningEfforts` key as undefined. The copy drops that key. */
+/** The parse keeps an invalid `contextWindow`, `maxOutput`, `reasoningEfforts` or `inputs` key as undefined. The copy drops that key. */
 function copyModel(model: z.infer<typeof modelSchema>): CustomProviderModel {
   return {
     id: model.id,
@@ -373,6 +376,7 @@ function copyModel(model: z.infer<typeof modelSchema>): CustomProviderModel {
     ...(model.contextWindow !== undefined ? { contextWindow: model.contextWindow } : {}),
     ...(model.maxOutput !== undefined ? { maxOutput: model.maxOutput } : {}),
     ...(model.reasoningEfforts !== undefined ? { reasoningEfforts: [...model.reasoningEfforts] } : {}),
+    ...(model.inputs !== undefined ? { inputs: [...model.inputs] } : {}),
   };
 }
 

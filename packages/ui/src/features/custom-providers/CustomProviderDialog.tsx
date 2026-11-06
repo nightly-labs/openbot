@@ -2,16 +2,20 @@ import { ProviderLogo } from "@openbot/brand";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   CustomProviderHarness,
+  CustomProviderInputKind,
   CustomProviderReasoningEffort,
   ProviderRuntimeStatus,
   SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
 import {
   agentProviderName,
+  CUSTOM_PROVIDER_DEFAULT_INPUTS,
+  CUSTOM_PROVIDER_HARNESS_INPUT_KINDS,
   CUSTOM_PROVIDER_LIMITS,
   CUSTOM_PROVIDER_REASONING_EFFORTS,
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
 } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import {
   ArrowLeft,
   Button,
@@ -71,6 +75,11 @@ const BASE_URL_PLACEHOLDER = "http://127.0.0.1:11434/v1";
 const MODEL_ID_PLACEHOLDER = "model-id";
 const HEADER_NAME_PLACEHOLDER = "Header-Name";
 
+const INPUT_KIND_LABEL = {
+  image: "customProvider.model.inputImage",
+  pdf: "customProvider.model.inputPdf",
+} as const satisfies Record<CustomProviderInputKind, AppTextKey>;
+
 /** A provider that can run the endpoint, and whether it can run it now. */
 export interface CustomProviderHarnessChoice {
   id: CustomProviderHarness;
@@ -103,6 +112,7 @@ function cloneDraft(draft: CustomProviderDraft): CustomProviderDraft {
     models: draft.models.map((model) => ({
       ...model,
       ...(model.reasoningEfforts ? { reasoningEfforts: [...model.reasoningEfforts] } : {}),
+      ...(model.inputs ? { inputs: [...model.inputs] } : {}),
     })),
     headers: draft.headers.map((header) => ({ ...header })),
   };
@@ -318,6 +328,56 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     </fieldset>
   );
 
+  /** What the model accepts beside text: the saved kinds, or the default of the harness that runs it. */
+  const modelInputs = (row: ModelRow): readonly CustomProviderInputKind[] =>
+    row.inputs ?? CUSTOM_PROVIDER_DEFAULT_INPUTS[harness()];
+
+  function setInput(index: number, kind: CustomProviderInputKind, checked: boolean): void {
+    setDraft((state) => {
+      const model = state.models[index];
+      if (!model) return;
+      // The first change saves the default that the boxes showed, so the other kinds stay as shown.
+      // In place after that, as for the efforts.
+      model.inputs ??= [...CUSTOM_PROVIDER_DEFAULT_INPUTS[harness()]];
+      const at = model.inputs.indexOf(kind);
+      if (checked && at < 0) model.inputs.push(kind);
+      if (!checked && at >= 0) model.inputs.splice(at, 1);
+    });
+  }
+
+  /**
+   * The input kinds of one model row beside text, as the harness will use them. Only the kinds that
+   * the harness can send show; a hidden kind stays saved, so a change of harness and back keeps it.
+   */
+  const inputsId = createUniqueId();
+  const inputsRow = (row: ModelRow, index: () => number) => (
+    <fieldset class="custom-provider-efforts" aria-label={t("customProvider.model.inputs", { number: index() + 1 })}>
+      <Text tone="muted" variant="caption" aria-hidden="true">
+        {t("customProvider.model.inputsLabel")}
+      </Text>
+      <For each={CUSTOM_PROVIDER_HARNESS_INPUT_KINDS[harness()]}>
+        {(kind) => (
+          <label class="custom-provider-effort" for={`${inputsId}-${index()}-${kind}`}>
+            <Checkbox
+              id={`${inputsId}-${index()}-${kind}`}
+              checked={modelInputs(row).includes(kind)}
+              disabled={busy()}
+              onChange={(event) => setInput(index(), kind, event.currentTarget.checked)}
+            />
+            <Text variant="body-sm">{t(INPUT_KIND_LABEL[kind])}</Text>
+          </label>
+        )}
+      </For>
+    </fieldset>
+  );
+
+  const modelDetails = (row: ModelRow, index: () => number) => (
+    <>
+      {effortsRow(row, index)}
+      {inputsRow(row, index)}
+    </>
+  );
+
   const headerColumns: readonly [RepeatableColumn<HeaderRow>, RepeatableColumn<HeaderRow>] = [
     {
       label: (number) => t("customProvider.header.name", { number }),
@@ -374,6 +434,7 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
         name: model.name ?? model.id,
         contextWindow: model.contextWindow?.toString() ?? "",
         ...(model.reasoningEfforts ? { reasoningEfforts: [...model.reasoningEfforts] } : {}),
+        ...(model.inputs ? { inputs: [...model.inputs] } : {}),
       };
       // The blank row that a new form opens with is a placeholder, not a model the user added.
       const blank = state.models.findIndex(blankModel);
@@ -623,7 +684,7 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                   busy={busy()}
                   sectionError={shown()?.models}
                   rowError={(index) => shown()?.modelRows[index]}
-                  rowDetails={props.contextWindows ? effortsRow : undefined}
+                  rowDetails={props.contextWindows ? modelDetails : undefined}
                   onAdd={() =>
                     setDraft((state) => {
                       state.models.push({ id: "", name: "" });
@@ -659,6 +720,9 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                       {harness() === "pi"
                         ? t("customProvider.model.effortsHintPi")
                         : t("customProvider.model.effortsHintOpenCode")}
+                    </Text>
+                    <Text tone="muted" variant="caption">
+                      {t("customProvider.model.inputsHint")}
                     </Text>
                   </Show>
                   <Switch>

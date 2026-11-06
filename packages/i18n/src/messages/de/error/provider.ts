@@ -111,6 +111,7 @@ export const messages = {
   "error.provider.maxOutputInvalid":
     "Die maximale Ausgabe eines Modells muss eine ganze Zahl von Tokens zwischen {min} und {max} sein.",
   "error.provider.reasoningEffortsInvalid": "Der Denkaufwand eines Modells ist ungültig.",
+  "error.provider.inputsInvalid": "Die Eingabearten eines Modells sind ungültig.",
   "error.provider.headersTooMany": "Es gibt zu viele Header.",
   "error.provider.headerNameCharacter": "Ein Headername enthält ein Zeichen, das HTTP nicht erlaubt.",
   "error.provider.headerNameTooLong": "Ein Headername ist zu lang.",

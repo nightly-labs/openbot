@@ -106,6 +106,7 @@ export const messages = {
   "error.provider.contextWindowInvalid": "Контекстное окно модели должно быть целым числом токенов от {min} до {max}.",
   "error.provider.maxOutputInvalid": "Максимальный вывод модели должен быть целым числом токенов от {min} до {max}.",
   "error.provider.reasoningEffortsInvalid": "Уровни усилий модели недопустимы.",
+  "error.provider.inputsInvalid": "Типы входных данных модели недопустимы.",
   "error.provider.headersTooMany": "Слишком много заголовков.",
   "error.provider.headerNameCharacter": "В имени заголовка есть символ, недопустимый в HTTP.",
   "error.provider.headerNameTooLong": "Имя заголовка слишком длинное.",
