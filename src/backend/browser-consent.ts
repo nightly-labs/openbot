@@ -2,7 +2,7 @@ import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import type { WebContents } from "electron";
 
 /** The isolated world of the consent script. The page cannot read its state or its functions. */
-const CONSENT_WORLD = 1_019;
+export const CONSENT_WORLD = 1_019;
 
 /** How long a document can show its banner after `dom-ready`. After this, the script stops watching. */
 const WATCH_MS = 15_000;
@@ -45,9 +45,11 @@ const REJECT_LABEL = new RegExp(
   "u",
 );
 
-/** Text that a cookie banner shows. */
-const COOKIE_TEXT =
-  /cookie|consent|gdpr|rgpd|datenschutz|einwilligung|ciasteczk|consentement|consentimiento|consenso/iu;
+/**
+ * Text that a cookie banner shows. Banners in these languages use the word "cookie". Words such as
+ * "consent" also show on sign-in and terms dialogs, where a "Decline" button must stay.
+ */
+const COOKIE_TEXT = /cookie|ciasteczk/iu;
 
 /** An id or class of a consent container. */
 const CONSENT_NAME = /cookie|consent|gdpr|cmp/iu;
@@ -67,6 +69,7 @@ const CONSENT_SCRIPT = String.raw`(() => {
   const candidates = "button, [role=button], input[type=button], input[type=submit], a";
   let done = false;
   let timer = 0;
+  const watched = new WeakSet();
 
   const roots = () => {
     const found = [document];
@@ -130,8 +133,7 @@ const CONSENT_SCRIPT = String.raw`(() => {
     }
     return false;
   };
-  const find = () => {
-    const all = roots();
+  const find = (all) => {
     for (const root of all) {
       for (const selector of selectors) {
         const element = root.querySelector(selector);
@@ -150,24 +152,37 @@ const CONSENT_SCRIPT = String.raw`(() => {
   const observer = new MutationObserver(() => {
     if (!done && !timer) timer = setTimeout(scan, 250);
   });
-  const stop = () => {
-    done = true;
-    observer.disconnect();
-  };
-  function scan() {
-    timer = 0;
-    if (done) return;
-    const target = find();
-    if (!target) return;
-    stop();
-    target.click();
-  }
-  observer.observe(document.documentElement, {
+  const options = {
     childList: true,
     subtree: true,
     attributes: true,
     attributeFilter: ["class", "style", "hidden", "aria-hidden", "open"],
-  });
+  };
+  // A subtree observer does not see into shadow roots, and a platform can fill its root later.
+  const watch = (all) => {
+    for (const root of all) {
+      if (watched.has(root)) continue;
+      watched.add(root);
+      observer.observe(root === document ? document.documentElement : root, options);
+    }
+  };
+  const stop = () => {
+    done = true;
+    globalThis.__openbotConsent = "stopped";
+    clearTimeout(timer);
+    observer.disconnect();
+  };
+  globalThis.__openbotConsentStop = stop;
+  function scan() {
+    timer = 0;
+    if (done) return;
+    const all = roots();
+    watch(all);
+    const target = find(all);
+    if (!target) return;
+    stop();
+    target.click();
+  }
   setTimeout(stop, ${WATCH_MS});
   scan();
 })();`;
@@ -183,4 +198,12 @@ export function refuseCookieBanners(contents: WebContents): void {
   void contents
     .executeJavaScriptInIsolatedWorld(CONSENT_WORLD, [{ code: CONSENT_SCRIPT }])
     .catch((error: unknown) => logger.debug("Cookie banner script stopped", { error: toLogValue(error) }));
+}
+
+/** Stops the script of the current document, when a person or a secret entry takes the tab. */
+export function stopCookieBanners(contents: WebContents): void {
+  if (contents.isDestroyed()) return;
+  void contents
+    .executeJavaScriptInIsolatedWorld(CONSENT_WORLD, [{ code: "globalThis.__openbotConsentStop?.()" }])
+    .catch(() => undefined);
 }
