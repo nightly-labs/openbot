@@ -355,6 +355,17 @@ export const messages = {
   "marketplace.plugin.resend.prompt.status": "L'email della fattura è arrivata al cliente?",
   "marketplace.plugin.resend.prompt.template":
     "Prepara una bozza di email per reimpostare la password nel nuovo flusso.",
+  "marketplace.plugin.omnisend.tagline": "Marketing via email e SMS",
+  "marketplace.plugin.omnisend.description":
+    "Omnisend permette agli agenti di leggere i report di campagne e moduli, trovare contatti e segmenti, e creare e modificare campagne, automazioni, modelli email, moduli e prodotti. Ogni utente accede al proprio account Omnisend nel browser e sceglie il livello di accesso nella schermata di consenso. Con l'accesso in scrittura, gli agenti possono anche inviare campagne ed eliminare dati. Scegli l'accesso in sola lettura quando agli agenti servono solo i report.",
+  "marketplace.plugin.omnisend.app":
+    "Campagne, automazioni, contatti, segmenti, moduli e report, tramite il server MCP di Omnisend con accesso nel browser.",
+  "marketplace.plugin.omnisend.prompt.lastCampaign":
+    "Come sono andate le campagne della scorsa settimana rispetto a quella precedente?",
+  "marketplace.plugin.omnisend.prompt.segment":
+    "Quanti contatti ci sono nel segmento VIP e come è cambiato questo mese?",
+  "marketplace.plugin.omnisend.prompt.draftCampaign":
+    "Prepara una bozza di campagna per la nuova collezione, ma non inviarla.",
   "marketplace.plugin.composio.tagline": "Tante app tramite il tuo link Composio",
   "marketplace.plugin.composio.description":
     "Composio collega gli agenti a Gmail, Slack, GitHub e centinaia di altre app tramite un solo server MCP. Collega le app che vuoi nel tuo account Composio, poi incolla qui il suo URL MCP e la sua chiave API.",

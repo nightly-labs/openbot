@@ -322,6 +322,14 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "출시 공지 초안을 베타 목록에 보내 줘.",
   "marketplace.plugin.resend.prompt.status": "청구서 이메일이 고객에게 도착했어?",
   "marketplace.plugin.resend.prompt.template": "새 플로우에 맞는 비밀번호 재설정 이메일 초안을 작성해 줘.",
+  "marketplace.plugin.omnisend.tagline": "이메일 및 SMS 마케팅",
+  "marketplace.plugin.omnisend.description":
+    "Omnisend를 사용하면 에이전트가 캠페인과 양식 보고서를 읽고, 연락처와 세그먼트를 찾고, 캠페인, 자동화, 이메일 템플릿, 양식, 상품을 만들고 수정할 수 있습니다. 각 사용자는 브라우저에서 자신의 Omnisend 계정에 로그인하고 동의 화면에서 액세스 수준을 선택합니다. 쓰기 액세스가 있으면 에이전트가 캠페인을 보내고 데이터를 삭제할 수도 있습니다. 에이전트에게 보고서만 필요하면 읽기 전용 액세스를 선택하세요.",
+  "marketplace.plugin.omnisend.app":
+    "캠페인, 자동화, 연락처, 세그먼트, 양식, 보고서. 브라우저 로그인으로 Omnisend MCP 서버를 통해 사용합니다.",
+  "marketplace.plugin.omnisend.prompt.lastCampaign": "지난주 캠페인 성과는 그 전 주와 비교해 어땠어?",
+  "marketplace.plugin.omnisend.prompt.segment": "VIP 세그먼트에 연락처가 몇 개 있고, 이번 달에 어떻게 바뀌었어?",
+  "marketplace.plugin.omnisend.prompt.draftCampaign": "새 컬렉션용 캠페인 초안을 작성해 줘. 단, 보내지는 마.",
   "marketplace.plugin.composio.tagline": "내 Composio 링크로 연결하는 다양한 앱",
   "marketplace.plugin.composio.description":
     "Composio는 MCP 서버 하나로 에이전트를 Gmail, Slack, GitHub 등 수백 개의 앱에 연결해요. Composio 계정에서 원하는 앱을 연결한 다음, 해당 MCP URL과 API 키를 여기에 붙여넣어 주세요.",

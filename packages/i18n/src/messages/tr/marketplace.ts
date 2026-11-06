@@ -371,6 +371,15 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "Lansman duyurusu taslağını beta listesine gönder.",
   "marketplace.plugin.resend.prompt.status": "Fatura e-postası müşteriye ulaştı mı?",
   "marketplace.plugin.resend.prompt.template": "Yeni akış için bir parola sıfırlama e-postası taslağı hazırla.",
+  "marketplace.plugin.omnisend.tagline": "E-posta ve SMS pazarlaması",
+  "marketplace.plugin.omnisend.description":
+    "Omnisend, ajanların kampanya ve form raporlarını okumasını, kişileri ve segmentleri bulmasını, kampanyalar, otomasyonlar, e-posta şablonları, formlar ve ürünler oluşturup düzenlemesini sağlar. Her kullanıcı tarayıcıda kendi Omnisend hesabına giriş yapar ve onay ekranında erişim düzeyini seçer. Yazma erişimiyle ajanlar kampanya da gönderebilir ve veri silebilir. Ajanlar yalnızca rapora ihtiyaç duyuyorsa salt okunur erişimi seç.",
+  "marketplace.plugin.omnisend.app":
+    "Kampanyalar, otomasyonlar, kişiler, segmentler, formlar ve raporlar; tarayıcıda giriş ile Omnisend'in MCP sunucusu üzerinden.",
+  "marketplace.plugin.omnisend.prompt.lastCampaign":
+    "Geçen haftanın kampanyaları bir önceki haftaya göre nasıl performans gösterdi?",
+  "marketplace.plugin.omnisend.prompt.segment": "VIP segmentinde kaç kişi var ve bu ay nasıl değişti?",
+  "marketplace.plugin.omnisend.prompt.draftCampaign": "Yeni koleksiyon için bir kampanya taslağı hazırla ama gönderme.",
   "marketplace.plugin.composio.tagline": "Kendi Composio bağlantınız üzerinden birçok uygulama",
   "marketplace.plugin.composio.description":
     "Composio, ajanları tek bir MCP sunucusu üzerinden Gmail, Slack, GitHub ve yüzlerce başka uygulamaya bağlar. İstediğiniz uygulamaları Composio hesabınızda bağlayın, ardından MCP URL'sini ve API anahtarını buraya yapıştırın.",

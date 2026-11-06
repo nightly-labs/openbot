@@ -297,6 +297,18 @@ const PLUGIN_TEXT = {
       "prompt-template": "marketplace.plugin.resend.prompt.template",
     },
   },
+  omnisend: {
+    tagline: "marketplace.plugin.omnisend.tagline",
+    description: "marketplace.plugin.omnisend.description",
+    apps: {
+      "app-omnisend-mcp": "marketplace.plugin.omnisend.app",
+    },
+    prompts: {
+      "prompt-last-campaign": "marketplace.plugin.omnisend.prompt.lastCampaign",
+      "prompt-segment": "marketplace.plugin.omnisend.prompt.segment",
+      "prompt-draft-campaign": "marketplace.plugin.omnisend.prompt.draftCampaign",
+    },
+  },
   composio: {
     tagline: "marketplace.plugin.composio.tagline",
     description: "marketplace.plugin.composio.description",
