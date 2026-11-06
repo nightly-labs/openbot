@@ -480,6 +480,59 @@ export const messages = {
   "mobile.server.browserProfiles.deleteBody":
     "Dies löscht die Anmeldungen, Cookies und Websitedaten des Profils. Seine offenen Tabs werden geschlossen.",
   "mobile.server.browserProfiles.deleteAgents": "Diese Agenten wechseln zum gemeinsamen Profil: {agents}.",
+  "mobile.server.browserProxies.unsupported":
+    "Aktualisiere OpenBot auf diesem Server, um seine Proxys hier zu verwalten.",
+  "mobile.server.browserProxies.loading": "Proxys werden geladen…",
+  "mobile.server.browserProxies.loadFailed": "OpenBot konnte die Proxys nicht laden.",
+  "mobile.server.browserProxies.saveFailed": "OpenBot konnte den Proxy nicht ändern.",
+  "mobile.server.browserProxies.title": "Proxys",
+  "mobile.server.browserProxies.sectionHint":
+    "Ein Profil mit Proxy öffnet seine Seiten über diesen Proxy. Ein Mitglied teilt einen Computer über die OpenBot-Desktop-App.",
+  "mobile.server.browserProxies.limit": "Ein Server kann höchstens {limit} Proxys haben.",
+  "mobile.server.browserProxies.add": "Proxy hinzufügen",
+  "mobile.server.browserProxies.new": "Neuer Proxy",
+  "mobile.server.browserProxies.menu": "Proxy",
+  "mobile.server.browserProxies.automatic": "Automatisch",
+  "mobile.server.browserProxies.profileHint":
+    "„Automatisch“ verwendet die Proxy-Einstellungen des Computers, auf dem der Server läuft.",
+  "mobile.server.browserProxies.profileUsage": "{usage} · {proxy}",
+  "mobile.server.browserProxies.summary": "{scheme} · Port {port} · {profiles}",
+  "mobile.server.browserProxies.computerSummary": "{state} · {profiles}",
+  "mobile.server.browserProxies.profiles": { one: "{count} Profil", other: "{count} Profile" },
+  "mobile.server.browserProxies.online": "Online",
+  "mobile.server.browserProxies.offline": "{name} ist offline",
+  "mobile.server.browserProxies.failing": "{name} antwortet nicht",
+  "mobile.server.browserProxies.signInRefused": "{name} hat die Anmeldung abgelehnt",
+  "mobile.server.browserProxies.yourComputer": "Dein Computer",
+  "mobile.server.browserProxies.memberComputer": "Computer von {name}",
+  "mobile.server.browserProxies.unknownComputer": "Computer eines Mitglieds",
+  "mobile.server.browserProxies.gone": "Dieser Proxy ist nicht mehr auf dem Server.",
+  "mobile.server.browserProxies.editTitle": "{name} ändern?",
+  "mobile.server.browserProxies.address": "Adresse",
+  "mobile.server.browserProxies.addressPlaceholder": "socks5://user:password@host:1080",
+  "mobile.server.browserProxies.addressHint":
+    "Verwende socks5, http oder https. Benutzername und Passwort sind optional. Das Passwort bleibt verschlüsselt auf dem Computer, auf dem der Server läuft.",
+  "mobile.server.browserProxies.addressInvalid":
+    "Das ist keine Proxy-Adresse. Verwende socks5://host:1080, http://user:password@host:3128 oder host:port:user:password.",
+  "mobile.server.browserProxies.computerHint":
+    "Die Seiten der Profile, die diesen Computer verwenden, laufen über seine Internetverbindung, solange sein Mitglied ihn in der OpenBot-Desktop-App teilt. Der Computer öffnet nur öffentliche Internetadressen.",
+  "mobile.server.browserProxies.profilesTitle": "Profile",
+  "mobile.server.browserProxies.delete": "Proxy löschen",
+  "mobile.server.browserProxies.deleteHint": "„Löschen“ stellt die Profile dieses Proxys auf „Automatisch“ um.",
+  "mobile.server.browserProxies.deleteUsed": {
+    one: "{count} Profil nutzt diesen Proxy. Es wechselt zu „Automatisch“.",
+    other: "{count} Profile nutzen diesen Proxy. Sie wechseln zu „Automatisch“.",
+  },
+  "mobile.server.browserProxies.deleteUnused": "Kein Profil nutzt diesen Proxy.",
+  "mobile.server.browserProxies.closesTabs": {
+    one: "{count} offener Tab wird geschlossen.",
+    other: "{count} offene Tabs werden geschlossen.",
+  },
+  "mobile.server.browserProxies.changeTitle": "Proxy von {name} ändern?",
+  "mobile.server.browserProxies.change": "Proxy ändern",
+  "mobile.server.browserProxies.choiceHint":
+    "„Automatisch“ verwendet die Proxy-Einstellungen des Computers, auf dem der Server läuft. Eine Änderung schließt die offenen Tabs des Profils.",
+  "mobile.server.browserProxies.shareHint": "Teile deinen Computer in der OpenBot-Desktop-App, um ihn zu verwenden.",
   "mobile.server.route.connectors": "Konnektoren",
   "mobile.server.connectors.unavailable":
     "Verbinde dich als Eigentümer oder Administrator mit diesem Server, um seine Konnektoren zu verwalten.",

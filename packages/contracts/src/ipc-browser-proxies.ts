@@ -138,6 +138,27 @@ export function browserProxyAddressText(proxy: {
   return `${proxy.scheme}://${user}${proxy.host}:${proxy.port}`;
 }
 
+export type BrowserProxyNameParts = Pick<BrowserProxySummary, "id" | "scheme" | "host" | "port" | "username">;
+
+/** The parts of a proxy name, from short to long. */
+const PROXY_NAME_FORMS: readonly ((proxy: BrowserProxyNameParts) => string)[] = [
+  (proxy) => proxy.host,
+  (proxy) => `${proxy.host}:${proxy.port}`,
+  (proxy) => browserProxyAddressText(proxy).replace(/^[a-z0-9]+:\/\//u, ""),
+  browserProxyAddressText,
+];
+
+/**
+ * The name of a saved proxy: its host. When another saved proxy has the same host, the name adds the
+ * port, then the user name, then the scheme, until no other saved proxy has the same name. The
+ * desktop app, the web client and the phone name a proxy with it.
+ */
+export function browserProxyName(proxy: BrowserProxyNameParts, proxies: readonly BrowserProxyNameParts[]): string {
+  const others = proxies.filter((other) => other.id !== proxy.id && other.host === proxy.host);
+  const form = PROXY_NAME_FORMS.find((name) => others.every((other) => name(other) !== name(proxy)));
+  return (form ?? browserProxyAddressText)(proxy);
+}
+
 /**
  * Why the last page load through a proxy failed: the proxy did not answer or could not reach the
  * site (`unreachable`), or it refused the saved sign-in (`signIn`).

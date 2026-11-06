@@ -47,6 +47,8 @@ import type {
   BranchAgentTaskInput,
   BrowserProfileList,
   BrowserProfileSummary,
+  BrowserProxyList,
+  BrowserProxySummary,
   ClearableStorageCategory,
   ClearBrowserDataInput,
   ConnectorMessagingPlatform,
@@ -57,6 +59,7 @@ import type {
   CreateRoutineInput,
   CreateWorkflowInput,
   DecideWorkflowStepInput,
+  DeleteBrowserProxyInput,
   DraftAttachment,
   ExportInstanceInput,
   ForeignProviderId,
@@ -109,6 +112,7 @@ import type {
   RoutineResultDestination,
   RoutineResultRoutineInput,
   SaveAgentInstructionsInput,
+  SaveBrowserProxyInput,
   SaveWorkflowGraphInput,
   ServerAuditLog,
   ServerNotificationLevel,
@@ -116,6 +120,7 @@ import type {
   SetAgentNotificationLevelInput,
   SetAgentProviderAccountInput,
   SetAgentSessionSettingInput,
+  SetBrowserProfileProxyInput,
   SetEnabledSkillInput,
   SetMessagingEnabledInput,
   SetRoutineResultDestinationInput,
@@ -506,6 +511,11 @@ export interface MobileWorkspaceContextValue {
    * each agent (`browser-profiles-v1`). The host checks the role again.
    */
   canManageBrowserProfiles: (serverId: string) => boolean;
+  /**
+   * True for an owner or admin of a host that serves the proxies of its named profiles
+   * (`browser-proxies-v1`). The phone cannot share its own connection: it has no TCP sockets.
+   */
+  canManageBrowserProxies: (serverId: string) => boolean;
   /** Reads or changes the host's GitHub connection. The answer names the GitHub pages that the phone opens. */
   githubConnector: (route: GitHubConnectorRoute, serverId: string) => Promise<HostGitHubConnectorStatus>;
   /** The repositories where the host's GitHub App is installed. The host reads them from GitHub. */
@@ -574,6 +584,14 @@ export interface MobileWorkspaceContextValue {
   loadAgentBrowserProfile: (agentId: string, serverId: string) => Promise<AgentBrowserProfile>;
   /** The host closes the open tabs of the agent. */
   updateAgentBrowserProfile: (input: UpdateAgentBrowserProfileInput, serverId: string) => Promise<AgentBrowserProfile>;
+  /** The saved proxies of the named profiles, and the computers of members. No proxy carries its password. */
+  loadBrowserProxies: (serverId: string) => Promise<BrowserProxyList>;
+  /** A new proxy, or a change to one. The host closes the tabs of the profiles that use a changed proxy. */
+  saveBrowserProxy: (input: SaveBrowserProxyInput, serverId: string) => Promise<BrowserProxySummary>;
+  /** Its profiles change to Automatic. Takes a computer id too. */
+  deleteBrowserProxy: (input: DeleteBrowserProxyInput, serverId: string) => Promise<void>;
+  /** Null: Automatic. The host closes the tabs of the profile. */
+  setBrowserProfileProxy: (input: SetBrowserProfileProxyInput, serverId: string) => Promise<void>;
   loadMessagingConnections: (platform: ConnectorMessagingPlatform, serverId: string) => Promise<MessagingOverview>;
   /** The platform's page that the phone opens. The host opens no page. */
   connectMessaging: (input: HostMessagingConnectInput, serverId: string) => Promise<MessagingConnectorPage>;
@@ -1105,6 +1123,7 @@ type MobileWorkspaceStateKey =
   | "canTransferServer"
   | "canManageVaultApiKeys"
   | "canManageBrowserProfiles"
+  | "canManageBrowserProxies"
   | "serverUpdateAccess"
   | "canReadServerRelease"
   | "canViewHostedSites"

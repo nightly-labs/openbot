@@ -320,7 +320,7 @@ the address that the dialog opened with, and a delete sends the profiles that th
 The host refuses either one when the proxy is different now (`browserProxyChanged`), so a profile
 never changes to Automatic without an admin seeing it. Server settings > Browser profiles shows a
 Proxies section and a Proxy submenu in each named profile's menu when the host has
-`browser-proxies-v1`; the phone does not show proxies yet. For an owner or an admin, the agent's
+`browser-proxies-v1`. The phone shows the same proxy list, Edit page and Proxy choice (`server-browser-proxy-screen.tsx`), with the same checks of `previousAddress`, `keepPassword` and the profiles that a delete saw; it cannot share its own connection, because the phone app has no TCP sockets. For an owner or an admin, the agent's
 profile select and the toolbar label of a tab also show the proxy. The renderer matches the tab
 profile to the proxy list by name, so `BrowserTabProfile` of `browser-profiles-v1` does not change.
 
