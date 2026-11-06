@@ -2,7 +2,7 @@ import type { Effect } from "effect";
 import type { AgentClient, AgentProvider } from "../agent-client";
 import { type AccountReadResult, decodeAccountReadResult } from "../protocol";
 import type { ProviderClientOperationError } from "../provider-client-effects";
-import { requireProviderDriver } from "../provider-drivers";
+import { findProviderDriver } from "../provider-drivers";
 
 /**
  * The wait for a provider request that does not declare a slow path. A provider that cannot answer
@@ -18,10 +18,11 @@ export interface ProviderRequestClient {
 /**
  * `account/read` runs before the first model list, so a provider whose account read is slow on a
  * proxied or distant network gets the normal request timeout instead of the fast-fail one. Only a
- * driver that sets `slowAccount` takes this path; every other provider still fails in 5 s.
+ * driver that sets `slowAccount` takes this path; a provider without a driver falls back to the
+ * fast timeout instead of throwing from a call that used to pass a literal.
  */
 export function providerAccountReadTimeoutMs(provider: AgentProvider, requestTimeoutMs: number): number {
-  return requireProviderDriver(provider).slowAccount ? requestTimeoutMs : PROVIDER_FAST_TIMEOUT_MS;
+  return findProviderDriver(provider)?.slowAccount === true ? requestTimeoutMs : PROVIDER_FAST_TIMEOUT_MS;
 }
 
 /** Reads a provider account with the wait that provider declares for a start or a refresh. */

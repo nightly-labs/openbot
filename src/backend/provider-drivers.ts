@@ -1481,8 +1481,13 @@ const CUSTOM_AGENTS_CLI: AgentCliInfo = { executable: "", version: "", source: "
 
 const PROVIDER_DRIVERS = new Map(BUILT_IN_PROVIDER_DRIVERS.map((driver) => [driver.id, driver]));
 
+/** The driver of a built-in provider, or undefined when this build has no driver for it. */
+export function findProviderDriver(provider: AgentProviderId): BuiltInProviderDriver | undefined {
+  return PROVIDER_DRIVERS.get(provider);
+}
+
 export function requireProviderDriver(provider: AgentProviderId): BuiltInProviderDriver {
-  const driver = PROVIDER_DRIVERS.get(provider);
+  const driver = findProviderDriver(provider);
   if (!driver) throw new Error(`Unknown agent provider: ${provider}`);
   return driver;
 }

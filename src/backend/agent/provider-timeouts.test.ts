@@ -32,7 +32,8 @@ function slowClient(provider: AgentProvider, calls: FakeCall[]): ModelCatalogCli
           : { account: { type: "chatgpt", email: "slow@example.com" }, requiresOpenaiAuth: false };
       return Effect.sleep(SLOW_DELAY).pipe(
         Effect.as(decoder(response)),
-        Effect.timeout(timeoutMs ?? REQUEST_TIMEOUT_MS),
+        // A caller that forgets the timeout must exercise the fast-fail path, not the slow one.
+        Effect.timeout(timeoutMs ?? PROVIDER_FAST_TIMEOUT_MS),
         Effect.mapError((error) => new ProviderClientOperationError({ cause: error })),
       );
     },
@@ -57,6 +58,12 @@ describe("providerAccountReadTimeoutMs", () => {
   it("keeps every other provider on the 5 s fast-fail wait", () => {
     expect(providerAccountReadTimeoutMs("claude", REQUEST_TIMEOUT_MS)).toBe(PROVIDER_FAST_TIMEOUT_MS);
     expect(providerAccountReadTimeoutMs("cursor", REQUEST_TIMEOUT_MS)).toBe(PROVIDER_FAST_TIMEOUT_MS);
+    expect(providerAccountReadTimeoutMs("acp", REQUEST_TIMEOUT_MS)).toBe(PROVIDER_FAST_TIMEOUT_MS);
+  });
+
+  it("falls back to the fast-fail wait for a provider without a driver", () => {
+    // biome-ignore lint/nursery/noUnsafeTypeAssertion: the test deliberately uses an unregistered provider id.
+    expect(providerAccountReadTimeoutMs("future" as AgentProvider, REQUEST_TIMEOUT_MS)).toBe(PROVIDER_FAST_TIMEOUT_MS);
   });
 });
 
