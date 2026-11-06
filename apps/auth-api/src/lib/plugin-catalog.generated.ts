@@ -97,6 +97,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "d527206a8519ea548c3438fa2ee3c4c158a33c85557a650fc62686b257236271",
     },
     {
+      slug: "elevenlabs",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "89647f4be8ae4d078a7c42cf3a2ccd1046c15454d2af9e60057b03208996fd77",
+    },
+    {
       slug: "apple-apps",
       version: "1.1.0",
       featured: false,
@@ -759,6 +765,41 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://higgsfield.ai",
     privacyPolicyUrl: "https://higgsfield.ai/privacy-policy",
     termsUrl: "https://higgsfield.ai/terms-of-use-agreement",
+    skills: [],
+  },
+  elevenlabs: {
+    slug: "elevenlabs",
+    name: "ElevenLabs",
+    tagline: "Speech, voices and voice agents",
+    description:
+      "ElevenLabs lets agents turn text into speech, work with voices, and create, test and review ElevenLabs voice agents and their conversations. Generated audio comes back as a short-lived download link. Each user signs in to their own ElevenLabs account through the browser, and each generation uses credits of that account.",
+    category: "design",
+    creatorName: "ElevenLabs",
+    iconUrl: "https://elevenlabs.io/favicon.ico",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-speech", text: "Read this paragraph aloud with a calm ElevenLabs voice and give me the audio." },
+      { id: "prompt-agents", text: "List my ElevenLabs voice agents and the voice each one uses." },
+      { id: "prompt-conversations", text: "Summarize the last ten conversations of my support voice agent." },
+    ],
+    apps: [
+      {
+        id: "app-elevenlabs-mcp",
+        name: "ElevenLabs",
+        description:
+          "Text to speech, voices, and voice agent management, over ElevenLabs' MCP server with browser sign-in.",
+        iconUrl: "https://elevenlabs.io/favicon.ico",
+        server: {
+          name: "elevenlabs",
+          transport: "http",
+          url: "https://api.elevenlabs.io/v1/mcp",
+          auth: [{ id: "elevenlabs-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://elevenlabs.io",
+    privacyPolicyUrl: "https://elevenlabs.io/privacy-policy",
+    termsUrl: "https://elevenlabs.io/terms-of-use",
     skills: [],
   },
   "apple-apps": {

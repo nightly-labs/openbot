@@ -117,6 +117,18 @@ const PLUGIN_TEXT = {
       "prompt-clip": "marketplace.plugin.higgsfield.prompt.clip",
     },
   },
+  elevenlabs: {
+    tagline: "marketplace.plugin.elevenlabs.tagline",
+    description: "marketplace.plugin.elevenlabs.description",
+    apps: {
+      "app-elevenlabs-mcp": "marketplace.plugin.elevenlabs.app",
+    },
+    prompts: {
+      "prompt-speech": "marketplace.plugin.elevenlabs.prompt.speech",
+      "prompt-agents": "marketplace.plugin.elevenlabs.prompt.agents",
+      "prompt-conversations": "marketplace.plugin.elevenlabs.prompt.conversations",
+    },
+  },
   "apple-apps": {
     tagline: "marketplace.plugin.appleApps.tagline",
     description: "marketplace.plugin.appleApps.description",

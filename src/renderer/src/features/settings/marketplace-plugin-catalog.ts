@@ -588,6 +588,47 @@ const HIGGSFIELD: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/higgsfield",
 };
 
+const ELEVENLABS: MarketplacePluginDetail = {
+  id: "plugin-elevenlabs",
+  slug: "elevenlabs",
+  name: "ElevenLabs",
+  tagline: "Speech, voices and voice agents",
+  description:
+    "ElevenLabs lets agents turn text into speech, work with voices, and create, test and review ElevenLabs voice agents and their conversations. Generated audio comes back as a short-lived download link. Each user signs in to their own ElevenLabs account through the browser, and each generation uses credits of that account.",
+  category: "design",
+  creatorName: "ElevenLabs",
+  iconUrl: "https://elevenlabs.io/favicon.ico",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-speech", text: "Read this paragraph aloud with a calm ElevenLabs voice and give me the audio." },
+    { id: "prompt-agents", text: "List my ElevenLabs voice agents and the voice each one uses." },
+    { id: "prompt-conversations", text: "Summarize the last ten conversations of my support voice agent." },
+  ],
+  apps: [
+    {
+      id: "app-elevenlabs-mcp",
+      name: "ElevenLabs",
+      description:
+        "Text to speech, voices, and voice agent management, over ElevenLabs' MCP server with browser sign-in.",
+      iconUrl: "https://elevenlabs.io/favicon.ico",
+      server: {
+        name: "elevenlabs",
+        transport: "http",
+        url: "https://api.elevenlabs.io/v1/mcp",
+        auth: [{ id: "elevenlabs-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://elevenlabs.io",
+  privacyPolicyUrl: "https://elevenlabs.io/privacy-policy",
+  termsUrl: "https://elevenlabs.io/terms-of-use",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-09-30T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/elevenlabs",
+};
+
 const APPLE_APPS: MarketplacePluginDetail = {
   id: "plugin-apple-apps",
   slug: "apple-apps",
@@ -1731,6 +1772,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   FIGMA,
   PAPER,
   HIGGSFIELD,
+  ELEVENLABS,
   APPLE_APPS,
   SENTRY,
   GITLAB,

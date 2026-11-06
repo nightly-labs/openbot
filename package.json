@@ -254,6 +254,7 @@
     "test:mcp-oauth": "bun scripts/mcp-oauth-e2e.ts",
     "test:mcp-oauth-store": "bun scripts/mcp-oauth-store-e2e.ts",
     "test:mcp-sign-in-client-refused": "bun scripts/mcp-sign-in-client-refused-e2e.ts",
+    "test:mcp-sign-in-client-metadata-document": "bun scripts/mcp-sign-in-client-metadata-document-e2e.ts",
     "test:mcp-server-unreadable-row": "bun scripts/mcp-server-unreadable-row-e2e.ts",
     "test:mcp-tool-consent": "bun scripts/mcp-tool-consent-e2e.ts",
     "test:agent-mcp-tools": "bun scripts/agent-mcp-tools-e2e.ts",

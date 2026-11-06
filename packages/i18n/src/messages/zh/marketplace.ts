@@ -210,6 +210,14 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.credits": "我还有多少 Higgsfield 积分？",
   "marketplace.plugin.higgsfield.prompt.productShot": "用 Higgsfield 生成一张陶瓷马克杯放在木桌上的产品照。",
   "marketplace.plugin.higgsfield.prompt.clip": "用 Higgsfield 生成一段 5 秒的日落海浪视频。",
+  "marketplace.plugin.elevenlabs.tagline": "语音、声音和语音智能体",
+  "marketplace.plugin.elevenlabs.description":
+    "ElevenLabs 让智能体把文本转成语音、使用各种声音，并创建、测试和查看 ElevenLabs 语音智能体及其对话。生成的音频以短时有效的下载链接返回。每位用户在浏览器中登录自己的 ElevenLabs 账号，每次生成都会使用该账号的额度。",
+  "marketplace.plugin.elevenlabs.app":
+    "文本转语音、声音和语音智能体管理，通过 ElevenLabs 的 MCP 服务器，在浏览器中登录。",
+  "marketplace.plugin.elevenlabs.prompt.speech": "用平静的 ElevenLabs 声音朗读这段文字，并把音频给我。",
+  "marketplace.plugin.elevenlabs.prompt.agents": "列出我的 ElevenLabs 语音智能体以及每个使用的声音。",
+  "marketplace.plugin.elevenlabs.prompt.conversations": "总结我的客服语音智能体最近十次对话。",
   "marketplace.plugin.appleApps.tagline": "Mac 上的邮件、日历等",
   "marketplace.plugin.appleApps.description":
     "Apple apps 让助手使用这台 Mac 上的邮件、日历、通讯录、提醒事项、备忘录、信息和 Safari。它仅适用于 macOS。OpenBot 会启动 mcp-icloud，这是一个社区服务器，不是 Apple 或 OpenBot 制作的。该服务器在这台电脑上通过 AppleScript 控制这些应用，不需要账号和密钥。安装时，OpenBot 可以一次性向 macOS 请求访问所有这些应用，每个应用显示一次提示。如果不这样做，macOS 会在助手第一次使用某个应用时询问。如需之后更改，打开系统设置 › 隐私与安全性 › 自动化。助手可以发送邮件和 iMessage，并修改或删除日程、联系人和提醒事项，因此请在批准前检查每次写入。工具读取的内容（例如邮件正文）会发送给助手的模型提供商。",

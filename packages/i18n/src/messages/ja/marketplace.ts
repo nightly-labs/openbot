@@ -221,6 +221,17 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Higgsfield で、木のテーブルに置いた陶器のマグカップの商品写真を作ってください。",
   "marketplace.plugin.higgsfield.prompt.clip": "Higgsfield で、夕暮れの波の 5 秒の動画を作ってください。",
+  "marketplace.plugin.elevenlabs.tagline": "音声、ボイス、音声エージェント",
+  "marketplace.plugin.elevenlabs.description":
+    "ElevenLabs を使うと、エージェントがテキストを音声に変換し、ボイスを扱い、ElevenLabs の音声エージェントとその会話を作成、テスト、確認できます。生成された音声は短時間だけ有効なダウンロードリンクで返されます。各ユーザーはブラウザーで自分の ElevenLabs アカウントにサインインし、生成ごとにそのアカウントのクレジットを使います。",
+  "marketplace.plugin.elevenlabs.app":
+    "テキスト読み上げ、ボイス、音声エージェントの管理。ブラウザーでサインインする ElevenLabs の MCP サーバー経由です。",
+  "marketplace.plugin.elevenlabs.prompt.speech":
+    "この段落を落ち着いた ElevenLabs のボイスで読み上げて、音声をください。",
+  "marketplace.plugin.elevenlabs.prompt.agents":
+    "私の ElevenLabs 音声エージェントと、それぞれが使うボイスを一覧にしてください。",
+  "marketplace.plugin.elevenlabs.prompt.conversations":
+    "サポート用音声エージェントの直近 10 件の会話を要約してください。",
   "marketplace.plugin.appleApps.tagline": "Mac のメール、カレンダーなど",
   "marketplace.plugin.appleApps.description":
     "Apple apps を使うと、エージェントはこの Mac のメール、カレンダー、連絡先、リマインダー、メモ、メッセージ、Safari を使えます。macOS でのみ動作します。OpenBot は mcp-icloud を起動します。これは Apple や OpenBot が作ったものではない、コミュニティのサーバーです。サーバーはこのコンピューター上で AppleScript を使ってアプリを操作し、アカウントもキーも不要です。インストール時に、OpenBot はこれらすべてのアプリへのアクセスを macOS にまとめて求めることができます。確認はアプリごとに 1 回表示されます。求めない場合は、エージェントが初めてアプリを使うときに macOS が確認します。後で変更するには、システム設定 › プライバシーとセキュリティ › オートメーション を開いてください。エージェントはメールや iMessage を送信し、イベント、連絡先、リマインダーを変更・削除できるので、承認する前に各書き込みを確認してください。ツールが読んだ内容（メールの本文など）は、エージェントのモデルプロバイダーに送られます。",
