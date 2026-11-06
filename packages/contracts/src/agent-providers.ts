@@ -257,7 +257,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     onboardingDescription: "Included with OpenBot",
     signInMessage: "Run `grok login` or set XAI_API_KEY to use Grok.",
     installGuideLink: null,
-    defaultModel: "grok-4.6",
+    defaultModel: "grok-4.7",
     legacyModelPrefix: "grok-",
     authKind: "grok",
     pickerOrder: 2,
