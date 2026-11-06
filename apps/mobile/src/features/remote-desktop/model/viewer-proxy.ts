@@ -16,7 +16,7 @@ import { VIEWER_STATS_FILE } from "./viewer-page-script";
 // WebSocket frames; this file sends each request to the host as a Team API request and each socket
 // over the peer's desktop channel. The viewer's video goes over its own WebRTC connection.
 
-export type ViewerState = "connecting" | "connected" | "error";
+type ViewerState = "connecting" | "connected" | "error";
 /** How the video reaches the phone: straight from the computer, or through a TURN relay. */
 export type ViewerRoute = "p2p" | "relay";
 
