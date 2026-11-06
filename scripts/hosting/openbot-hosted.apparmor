@@ -1,7 +1,8 @@
 abi <abi/4.0>,
 include <tunables/global>
 
-profile openbot-hosted /opt/OpenBot/app/openbot flags=(unconfined) {
+# The unpacked release, and the AppImage that openbot-hosted-update mounts on a hosted server.
+profile openbot-hosted /{opt/OpenBot/app,run/openbot-app}/openbot flags=(unconfined) {
   userns,
   # Kernels before 6.1 still mediate the network of an unconfined-mode profile (#4335).
   network,

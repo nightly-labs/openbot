@@ -2,8 +2,9 @@
 # Keeps a hosted server on the newest OpenBot release. systemd runs it as root:
 #
 #   openbot-hosted-update stage   openbot-update.timer. Downloads a newer release, checks it against
-#                                 the release manifest, copies it to /opt/OpenBot/staged, and installs
-#                                 the packages that it needs. OpenBot keeps running.
+#                                 the release manifest, copies it to /opt/OpenBot/staged.AppImage (or
+#                                 unpacked to /opt/OpenBot/staged on a self-hosted server), and
+#                                 installs the packages that it needs. OpenBot keeps running.
 #   openbot-hosted-update boot    openbot-update-apply.service, at boot before openbot.service. Runs
 #                                 `apply` when the disk of the server is complete. After a boat wake,
 #                                 boat restores the disk for some minutes, and OpenBot does not wait
@@ -15,9 +16,10 @@
 #   openbot-hosted-update request openbot-update-request.service, when OpenBot asks for an update in
 #                                 Server Settings. Runs `stage`, or stops OpenBot, runs `apply` and
 #                                 starts it again.
-#   openbot-hosted-update trigger openbot.service, as root before OpenBot starts. Repairs the modes
-#                                 of the release, and installs the units of `request` and the boat
-#                                 pre-stop hook when an older release moved this one into place.
+#   openbot-hosted-update trigger openbot.service, as root before OpenBot starts. Mounts the AppImage
+#                                 of a hosted server, repairs the modes of an unpacked release, and
+#                                 installs the units of `request` and the boat pre-stop hook when an
+#                                 older release moved this one into place.
 #
 # The manifest is the one that the Linux desktop updater reads, so a server trusts the same source as
 # a desktop install. A server only moves to a newer version: an older OpenBot cannot open a database
@@ -48,6 +50,14 @@ BOAT_USER=user
 BOAT_PRE_STOP=/home/$BOAT_USER/.boat/pre-stop
 # All that `install_hosting` reads from a release.
 RELEASE_FILES=(packages.txt openbot-hosted.apparmor openbot-boat-pre-stop "${HOSTED_FILES[@]}" "${UNITS[@]}")
+# A hosted server runs the release from its AppImage, which `trigger` mounts read-only at each boot.
+# After a wake, boat restores each file on its first read, one file after the other. The unpacked
+# release has more than 1,000 files and took 40 s or more; the AppImage is one file. /run is empty at
+# each boot, so the mount does not stay in a snapshot. A self-hosted server keeps the unpacked
+# release in `app`.
+IMAGE=$INSTALL/OpenBot.AppImage
+STAGED_IMAGE=$INSTALL/staged.AppImage
+MOUNT=/run/openbot-app
 
 fail() {
   echo "$*" >&2
@@ -87,12 +97,81 @@ wait_for_restore() {
 }
 
 # The version of the complete staged release, or nothing. `staged.ready` comes after the last file.
+# `stage` checked the version of a staged AppImage before it wrote `staged.ready`. When `apply` moved
+# that AppImage into place and then stopped, `.applying` stays.
 staged_version() {
   local ready
   [ -f "$INSTALL/staged.ready" ] || return 0
   ready=$(<"$INSTALL/staged.ready")
-  if [ -n "$ready" ] && [ "$(version_of "$INSTALL/staged")" = "$ready" ]; then echo "$ready"; fi
+  [ -n "$ready" ] || return 0
+  if [ -d "$INSTALL/staged" ]; then
+    if [ "$(version_of "$INSTALL/staged")" = "$ready" ]; then echo "$ready"; fi
+  elif [ -f "$STAGED_IMAGE" ] || [ -e "$INSTALL/.applying" ]; then
+    echo "$ready"
+  fi
   return 0
+}
+
+remove_staged() {
+  rm -rf "$INSTALL/staged" "$INSTALL/staged.ready" "$STAGED_IMAGE" "$STAGED_IMAGE.part" "$IMAGE.part"
+}
+
+image_layout() {
+  ! self_hosted
+}
+
+# The byte where the squashfs of AppImage $1 starts: the end of the section headers of its ELF
+# runtime. It comes from the header, so root never runs the AppImage. Both release machines are
+# little-endian, as `od` reads.
+image_offset() {
+  local offset
+  [ "$(od -An -tx1 -N6 "$1" | tr -d ' \n')" = 7f454c460201 ] || fail "The AppImage is not a 64-bit ELF file."
+  offset=$(($(od -An -tu8 -j40 -N8 "$1") + $(od -An -tu2 -j58 -N2 "$1") * $(od -An -tu2 -j60 -N2 "$1")))
+  [ "$(od -An -c -j"$offset" -N4 "$1" | tr -d ' \n')" = hsqs ] || fail "The AppImage has no squashfs."
+  echo "$offset"
+}
+
+# Mounts AppImage $1 read-only at $2. The image has no SUID helper, so the Electron sandbox uses an
+# unprivileged user namespace, which the AppArmor profile permits. Callers can test the result, so
+# each step returns its failure.
+mount_image() {
+  local offset
+  offset=$(image_offset "$1") || return 1
+  install -d -m 0755 "$2" || return 1
+  mount -t squashfs -o "ro,nodev,nosuid,loop,offset=$offset" "$1" "$2"
+}
+
+mount_release() {
+  if ! image_layout || [ ! -f "$IMAGE" ] || mountpoint -q "$MOUNT"; then return 0; fi
+  mount_image "$IMAGE" "$MOUNT"
+}
+
+# OpenBot is stopped. A process that still holds a file keeps the old image until it ends.
+unmount_release() {
+  mountpoint -q "$MOUNT" || return 0
+  umount "$MOUNT" || umount --lazy "$MOUNT"
+}
+
+# The release that OpenBot starts: openbot-hosted-server makes the same choice.
+release_directory() {
+  if image_layout && mountpoint -q "$MOUNT"; then echo "$MOUNT"; else echo "$INSTALL/app"; fi
+}
+
+installed_version() {
+  version_of "$(release_directory)"
+}
+
+# The unpacked release of a server that runs from its AppImage now. A process that runs a file of
+# it, for example OpenBot before its restart, keeps it. Its path stays in /proc after boat moves /opt
+# from the restore mount to the disk, with " (deleted)" after it.
+remove_unpacked_release() {
+  local exe
+  if [ ! -d "$INSTALL/app" ] || [ "$(release_directory)" != "$MOUNT" ]; then return 0; fi
+  for exe in /proc/[0-9]*/exe; do
+    case $(readlink "$exe" 2>/dev/null) in "$INSTALL/app/"*) return 0 ;; esac
+  done
+  rm -rf "$INSTALL/app"
+  echo "Removed the unpacked release. OpenBot runs from its AppImage."
 }
 
 # Succeeds when $1 is a newer version than $2. Each version is newer than an unknown one.
@@ -189,7 +268,21 @@ swap_in() {
 
 finish_swap() {
   rm -f "$INSTALL/.applying"
-  rm -rf "$INSTALL/staged" "$INSTALL/staged.ready"
+  remove_staged
+}
+
+# Moves the staged AppImage into place and mounts it, while OpenBot is stopped. `.applying` stays
+# until `finish_swap`, so a stop between the rename and the hosting files repeats the rest.
+swap_in_image() {
+  : >"$INSTALL/.applying"
+  if [ -f "$STAGED_IMAGE" ]; then
+    unmount_release
+    mv -f "$STAGED_IMAGE" "$IMAGE"
+  fi
+  mount_release
+  [ "$(version_of "$MOUNT")" = "$1" ] || fail "The AppImage in place does not have version $1."
+  install_hosting "$MOUNT/resources/hosting"
+  rm -rf "$INSTALL/app"
 }
 
 stage_release() {
@@ -199,6 +292,11 @@ stage_release() {
 }
 
 recover() {
+  local check
+  # The check mount of a `stage` that a stop interrupted.
+  for check in "$SCRATCH"/openbot-update.*/root; do
+    if mountpoint -q "$check"; then umount --lazy "$check"; fi
+  done
   rm -rf "$SCRATCH"/openbot-update.*
 }
 
@@ -287,7 +385,10 @@ stage() {
     echo "The last update is not complete. It completes at the next start of the server." >&2
     return 0
   fi
-  [ -x "$INSTALL/app/openbot" ] || fail "OpenBot is not installed."
+  [ -x "$INSTALL/app/openbot" ] || [ -f "$IMAGE" ] || fail "OpenBot is not installed."
+  mount_release || echo "The AppImage of the release is not mounted." >&2
+  # OpenBot started from the AppImage after the stage that wrote it.
+  remove_unpacked_release
   manifest=$(fetch "$RELEASES/latest/download/$manifest")
   version=$(sed -n 's/^version: *//p' <<<"$manifest" | head -n 1)
   path=$(sed -n 's/^path: *//p' <<<"$manifest" | head -n 1)
@@ -299,31 +400,65 @@ stage() {
   [[ $sha512 =~ ^[A-Za-z0-9+/]{86}==$ ]] || fail "The release manifest has no valid SHA-512."
   # A release that is no longer the latest one, for example because it was withdrawn, is removed. A
   # server that starts before this check applies it. This also removes a copy that a stop interrupted.
-  if [ "$(staged_version)" != "$version" ]; then rm -rf "$INSTALL/staged" "$INSTALL/staged.ready"; fi
-  current=$(version_of "$INSTALL/app")
+  if [ "$(staged_version)" != "$version" ]; then remove_staged; fi
+  current=$(installed_version)
   # With an unknown version, each release looks newer, and an update could be a downgrade.
   [ -n "$current" ] || fail "The installed version is not known."
-  newer "$version" "$current" || return 0
-  [ -d "$INSTALL/staged" ] && return 0
+  # A hosted server that an older script updated has the unpacked release. It gets the AppImage of
+  # the same version, and starts from it at its next start.
+  local convert=0
+  if image_layout && [ ! -f "$IMAGE" ] && [ "$version" = "$current" ]; then convert=1; fi
+  [ "$convert" -eq 1 ] || newer "$version" "$current" || return 0
+  [ -n "$(staged_version)" ] && return 0
   echo "Staging OpenBot $version (installed: ${current:-unknown})."
   # Global: the trap runs after this function returns.
   work=$(mktemp -d "$SCRATCH/openbot-update.XXXXXX")
-  trap 'rm -rf "$work"; rm -f "$STATE"' EXIT
+  trap 'if mountpoint -q "$work/root"; then umount --lazy "$work/root"; fi; rm -rf "$work"; rm -f "$STATE"' EXIT
   download "$RELEASES/download/v$version/$path" "$work/OpenBot.AppImage" "$size"
   set_state preparing
   [ "$(openssl dgst -sha512 -binary "$work/OpenBot.AppImage" | openssl base64 -A)" = "$sha512" ] ||
     fail "The AppImage does not match the release manifest."
-  unpack "$work/OpenBot.AppImage"
-  [ "$(version_of "$work/squashfs-root")" = "$version" ] || fail "The AppImage has another version."
+  local root=$work/squashfs-root
+  if image_layout; then
+    root=$work/root
+    mount_image "$work/OpenBot.AppImage" "$root"
+  else
+    unpack "$work/OpenBot.AppImage"
+  fi
+  [ "$(version_of "$root")" = "$version" ] || fail "The AppImage has another version."
   # The release names its own packages and units. A release without them cannot update a server.
   local file
   for file in "${RELEASE_FILES[@]}"; do
-    [ -f "$work/squashfs-root/resources/hosting/$file" ] || fail "The release has no hosting files."
+    [ -f "$root/resources/hosting/$file" ] || fail "The release has no hosting files."
   done
-  prepare_release "$work/squashfs-root"
-  install_packages "$work/squashfs-root/resources/hosting/packages.txt"
-  stage_release "$work/squashfs-root"
+  if image_layout; then
+    [ -x "$root/openbot" ] || fail "The AppImage has no openbot executable."
+    install_packages "$root/resources/hosting/packages.txt"
+    umount "$root"
+    stage_image "$work/OpenBot.AppImage" "$version" "$convert"
+    return 0
+  fi
+  prepare_release "$root"
+  install_packages "$root/resources/hosting/packages.txt"
+  stage_release "$root"
   echo "OpenBot $version starts at the next start of the server."
+}
+
+# Copies the checked AppImage $1 of version $2 to /opt, with a file rename, which boat keeps. With $3
+# set, it is the release that runs now, and it goes in place at once: `trigger` mounts it at the next
+# start. Otherwise it waits for `apply`.
+stage_image() {
+  local target=$STAGED_IMAGE
+  if [ "$3" -eq 1 ]; then target=$IMAGE; fi
+  cp "$1" "$target.part"
+  chmod 0644 "$target.part"
+  mv -f "$target.part" "$target"
+  if [ "$3" -eq 1 ]; then
+    echo "OpenBot $2 starts from its AppImage at the next start of the server."
+    return 0
+  fi
+  printf '%s\n' "$2" >"$INSTALL/staged.ready"
+  echo "OpenBot $2 starts at the next start of the server."
 }
 
 apply() {
@@ -332,17 +467,22 @@ apply() {
   staged=$(staged_version)
   # An incomplete release stays. `stage` removes it when it is not the latest one.
   if [ -z "$staged" ]; then
-    if [ -d "$INSTALL/staged" ]; then echo "The staged release is not complete." >&2; fi
+    if [ -d "$INSTALL/staged" ] || [ -f "$STAGED_IMAGE" ]; then echo "The staged release is not complete." >&2; fi
     return 0
   fi
-  current=$(version_of "$INSTALL/app")
+  mount_release || echo "The AppImage of the release is not mounted." >&2
+  current=$(installed_version)
   # `.applying` means that a stop came during the last copy, so `app` is not complete.
-  if [ ! -e "$INSTALL/.applying" ] && [ -d "$INSTALL/app" ] && ! newer "$staged" "$current"; then
-    rm -rf "$INSTALL/staged" "$INSTALL/staged.ready"
+  if [ ! -e "$INSTALL/.applying" ] && { [ -d "$INSTALL/app" ] || [ -f "$IMAGE" ]; } && ! newer "$staged" "$current"; then
+    remove_staged
     return 0
   fi
-  swap_in
-  install_hosting "$INSTALL/app/resources/hosting"
+  if [ -d "$INSTALL/staged" ]; then
+    swap_in
+    install_hosting "$INSTALL/app/resources/hosting"
+  else
+    swap_in_image "$staged"
+  fi
   finish_swap
   echo "Updated OpenBot from ${current:-unknown} to $staged."
 }
@@ -366,11 +506,35 @@ boot() {
   apply
 }
 
-# A release that an older script moved into place has the units of `request`, but that script
+# While boat restores the disk, OpenBot reads its database and about 30 small files of its profile
+# one after the other before it publishes, and each first read waits for the network. This reads
+# them in parallel while the AppImage is restored, as the service user, so root opens no path that
+# the user controls. It does not wait: OpenBot reads what is not complete yet as before.
+prefetch_profile() {
+  local user home
+  if ! image_layout || ! restoring || [ ! -r "$INSTALL/hosted/service-user" ]; then return 0; fi
+  user=$(<"$INSTALL/hosted/service-user")
+  [[ $user =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]] || return 1
+  home=$(getent passwd "$user" | cut -d: -f6)
+  [ -d "$home/.config/OpenBot" ] || return 0
+  # -type f skips links and FIFOs. The larger files of Chromium wait for their first read.
+  runuser -u "$user" -- timeout 300 find "$home/.config/OpenBot" -maxdepth 2 -type f \
+    \( -path "$home/.config/OpenBot/openbot.db*" -o -size -1024k \) -print0 2>/dev/null |
+    runuser -u "$user" -- timeout 300 xargs -0 -r -n 8 -P 8 cat >/dev/null 2>&1 &
+}
+
+# Mounts the AppImage of a hosted server: its first read after a wake waits for boat to restore the
+# file. A release that an older script moved into place has the units of `request`, but that script
 # installed only the units that it knew. The start of OpenBot does not wait for the update lock.
 trigger() {
-  local source=$INSTALL/app/resources/hosting unit changed=0
-  repair_release_modes || echo "The modes of the release are not repaired." >&2
+  local source unit changed=0
+  prefetch_profile || echo "The OpenBot profile is not read ahead." >&2
+  mount_release || echo "The AppImage of the release is not mounted." >&2
+  source=$(release_directory)/resources/hosting
+  # A mounted image is read-only and has the modes of the build.
+  if [ "$source" = "$INSTALL/app/resources/hosting" ]; then
+    repair_release_modes || echo "The modes of the release are not repaired." >&2
+  fi
   for unit in "${REQUEST_UNITS[@]}"; do
     if [ ! -e "$UNIT_DIRECTORY/$unit" ] && [ -f "$source/$unit" ]; then
       install -m 0644 "$source/$unit" "$UNIT_DIRECTORY/$unit"

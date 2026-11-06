@@ -45,21 +45,30 @@ apt-get clean
 install -d -m 0755 "$INSTALL" "$INSTALL/hosted"
 recover
 work=$(mktemp -d "$SCRATCH/openbot-update.XXXXXX")
-trap 'rm -rf "$work"' EXIT
+trap 'if mountpoint -q "$work/root"; then umount --lazy "$work/root"; fi; rm -rf "$work"' EXIT
 fetch --output "$work/OpenBot.AppImage" "$APPIMAGE_URL"
 echo "$APPIMAGE_SHA256  $work/OpenBot.AppImage" | sha256sum --check --quiet
-unpack "$work/OpenBot.AppImage"
-prepare_release "$work/squashfs-root"
+# A hosted server runs OpenBot from its AppImage (openbot-hosted-update says why).
+mount_image "$work/OpenBot.AppImage" "$work/root"
+[ -x "$work/root/openbot" ] || fail "The AppImage has no openbot executable."
 # An older OpenBot cannot open a database that a newer one migrated.
-installed=$(version_of "$INSTALL/app")
-if [ -n "$installed" ] && newer "$installed" "$(version_of "$work/squashfs-root")"; then
+mount_release
+installed=$(installed_version)
+if [ -n "$installed" ] && newer "$installed" "$(version_of "$work/root")"; then
   fail "OpenBot $installed is installed, and this AppImage has an older version."
 fi
-stage_release "$work/squashfs-root"
-swap_in
+version=$(version_of "$work/root")
+umount "$work/root"
+: >"$INSTALL/.applying"
+install -m 0644 "$work/OpenBot.AppImage" "$IMAGE.part"
+unmount_release
+mv -f "$IMAGE.part" "$IMAGE"
+mount_release
+[ "$(installed_version)" = "$version" ] || fail "The AppImage in place does not have version $version."
 printf '%s\n' "$SERVICE_USER" >"$INSTALL/hosted/service-user"
 chmod 0644 "$INSTALL/hosted/service-user"
 install_hosting "$SOURCE"
+rm -rf "$INSTALL/app"
 finish_swap
 
 # The server keyring. boat keeps changes in /srv, and /srv is on the disk while /home is still on

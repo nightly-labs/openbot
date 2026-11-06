@@ -505,7 +505,8 @@ named snapshot access. The script:
 1. creates a builder sandbox with `noEnv`;
 2. uploads `scripts/hosting/` and runs `provision.sh` with `sudo`. It installs the packages in
    `packages.txt` (Xvfb, D-Bus, gnome-keyring, the Electron libraries and the remote desktop runtime
-   libraries), checks the AppImage SHA-256, unpacks the AppImage to `/opt/OpenBot/app`, adds an
+   libraries), checks the AppImage SHA-256, copies it to `/opt/OpenBot/OpenBot.AppImage` (see
+   [Release layout](#release-layout)), adds an
    AppArmor profile that lets Chromium make user namespaces, and enables `openbot.service` and the
    [update](#updates) units;
 3. checks the installed version, that OpenBot did not start, and that no profile or claim exists;
@@ -556,14 +557,17 @@ On a server, root runs `openbot-hosted-update`:
 1. `openbot-update.timer` runs `stage` 5 to 10 minutes after each start of the timer and then
    about each 6 hours. It reads the `latest-linux.yml` (`latest-linux-arm64.yml` on arm64) of the
    latest GitHub release, the manifest that the Linux desktop updater reads. When that version is newer than the installed one, it downloads the
-   AppImage, checks its SHA-512 against the manifest, unpacks it in `/var/tmp`, checks that it has
-   all hosting files, installs the packages in the `packages.txt` of that release, and copies it
+   AppImage to `/var/tmp` and checks its SHA-512 against the manifest. A hosted server mounts it
+   there read-only; a self-hosted server unpacks it. It checks that the release has all hosting
+   files and installs the packages in the `packages.txt` of that release. A hosted server copies
+   the AppImage to `/opt/OpenBot/staged.AppImage`; a self-hosted server copies the unpacked release
    to `/opt/OpenBot/staged`.
    `staged.ready` comes after the last file. OpenBot keeps running. The download and unpack use
    idle CPU and disk priority.
-2. `apply` copies `staged` to `app`, and then installs the scripts, AppArmor profile and units of
-   the new release. `.applying` and `staged` stay until all of this is complete, so after a stop or
-   a failure the next start does it again, and `stage` does nothing until then.
+2. `apply` renames `staged.AppImage` to `OpenBot.AppImage` and mounts it again, or copies `staged`
+   to `app`. It then installs the scripts, AppArmor profile and units of the new release.
+   `.applying` stays until all of this is complete, so after a stop or a failure the next start
+   does it again, and `stage` does nothing until then.
    `openbot-update-apply.service` runs `boot` before `openbot.service`. `boot` runs `apply` only on
    a complete disk, or when `.applying` shows an interrupted copy. `openbot.service` does not
    require it, so it starts after a failure too: with the old release, or with a partial copy after
@@ -573,6 +577,25 @@ On a server, root runs `openbot-hosted-update`:
    start was 5 minutes ago. Reading is not use. Server Settings shows this wait as "other work",
    because `host-update-v1` has no reason for it. The automatic update switch of a hosted server
    is always on.
+
+#### Release layout
+
+A hosted server runs OpenBot from `/opt/OpenBot/OpenBot.AppImage`. `openbot-hosted-update trigger`
+mounts it read-only (squashfs, `nosuid`, `nodev`) at `/run/openbot-app` before each start of
+OpenBot, and `openbot-hosted-server` starts `/run/openbot-app/openbot` when that mount is there.
+After a wake, boat restores each file on its first read, one file after the other. The unpacked
+release has more than 1,000 files, and reading them took 40 s or more on a cold wake. The AppImage
+is one file. In a test on 2026-11-06, a client was connected 40 s and 45 s after the wake, and
+72 to 85 s with the unpacked release. The mount offset comes from the ELF header of the
+AppImage, so root never runs the AppImage. The image has no SUID sandbox helper, so Chromium uses
+a user namespace, which the AppArmor profile permits for both paths. `/run` is empty at each boot,
+so the mount does not stay in a snapshot.
+
+A server that an older release updated has the unpacked release in `/opt/OpenBot/app`. Its next
+`stage` downloads the AppImage of the installed version and puts it in place at once, and OpenBot
+starts from it at the next start of the server. A later `stage` removes `app` when no process
+runs a file of it. An `apply` of a newer release does the same change in one step. A self-hosted
+server keeps the unpacked release.
 
 boat saves `/opt` by the paths that change, and it does not look into a directory that a rename
 moves. After the next stop, such a directory is empty or has its old files. So a release gets to

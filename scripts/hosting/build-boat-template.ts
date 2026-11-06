@@ -119,8 +119,11 @@ async function main(): Promise<void> {
       boat,
       builderId,
       [
-        "test -x /opt/OpenBot/app/openbot",
-        `test "$(sed -n 's/^X-AppImage-Version=//p' /opt/OpenBot/app/*.desktop)" = ${shellQuote(options.version)}`,
+        // The release runs from its AppImage, which openbot-hosted-update mounts at each boot.
+        "test -f /opt/OpenBot/OpenBot.AppImage",
+        "test ! -e /opt/OpenBot/app",
+        "test -x /run/openbot-app/openbot",
+        `test "$(sed -n 's/^X-AppImage-Version=//p' /run/openbot-app/*.desktop)" = ${shellQuote(options.version)}`,
         "systemctl is-enabled --quiet openbot.service",
         "! systemctl is-active --quiet openbot.service",
         // With more than one unit, `is-enabled` passes when one of them is enabled.

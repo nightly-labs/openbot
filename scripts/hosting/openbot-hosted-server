@@ -14,7 +14,13 @@ umask 077
 # database. So this gives the signal to OpenBot only and waits for it; the unit then stops the rest.
 if [ "${1:-}" = --stop ]; then
   pid=$(cat "$XDG_RUNTIME_DIR/openbot.pid" 2>/dev/null) || exit 0
-  [[ $pid =~ ^[1-9][0-9]*$ && /proc/$pid/exe -ef /opt/OpenBot/app/openbot ]] || exit 0
+  # The PID is still OpenBot when it is a process named openbot in the cgroup of this unit, as this
+  # script is. Do not compare /proc/$pid/exe with /opt/OpenBot/app/openbot: after a resume, OpenBot
+  # starts from the FUSE mount of /opt, and when boat moves /opt back to the disk, the two are
+  # different files. The stop then sent no signal, and OpenBot ended with its database open.
+  [[ $pid =~ ^[1-9][0-9]*$ ]] || exit 0
+  [ "$(cat "/proc/$pid/comm" 2>/dev/null)" = openbot ] || exit 0
+  [ "$(cat "/proc/$pid/cgroup" 2>/dev/null)" = "$(cat /proc/$$/cgroup)" ] || exit 0
   kill -TERM "$pid" 2>/dev/null || exit 0
   while [ -e "/proc/$pid" ]; do sleep 0.2; done
   exit 0
@@ -105,8 +111,24 @@ printf login >"$keyrings/default"
 # An assignment first, so `set -e` stops the start when the daemon fails. `eval "$(…)"` ignores it.
 unlocked=$(gnome-keyring-daemon --unlock --components=secrets <"$state/keyring-password")
 eval "$unlocked"
-started=$(gnome-keyring-daemon --start --components=secrets)
-eval "$started"
+# Electron finds the keyring through the Secret Service name on the session bus. The daemon that
+# `--unlock` starts gets this name: gnome-keyring 46 does this in 0.15 s and `--start` adds nothing.
+# After a resume, under heavy disk load, `--start` waited 20 s for that daemon and then failed. The
+# service then stopped and started again, 46 s later. So wait for the name, and use `--start` only
+# when the name does not come.
+secret_service() {
+  for _ in $(seq 1 "$1"); do
+    dbus-send --session --print-reply --dest=org.freedesktop.DBus / org.freedesktop.DBus.NameHasOwner \
+      string:org.freedesktop.secrets 2>/dev/null | grep -q 'boolean true' && return 0
+    sleep 0.1
+  done
+  return 1
+}
+if ! secret_service 100; then
+  started=$(timeout 30 gnome-keyring-daemon --start --components=secrets) || true
+  eval "$started"
+  secret_service 300 || { echo "The keyring daemon did not start the Secret Service." >&2; exit 1; }
+fi
 unset XDG_DATA_HOME
 export GNOME_KEYRING_CONTROL
 
@@ -133,16 +155,22 @@ export GNOME_KEYRING_CONTROL
 # both. lightdm keeps the other keys when it writes the file. After a resume, boat can start the
 # session after this service. A sandbox that has no desktop session uses two virtual displays.
 
+# A hosted server runs OpenBot from the AppImage that `openbot-hosted-update trigger` mounted;
+# openbot-hosted-update says why. A self-hosted server, and one that has no AppImage yet, run the
+# unpacked release.
+app=/opt/OpenBot/app
+if mountpoint -q /run/openbot-app; then app=/run/openbot-app; fi
 # OpenBot writes its PID for `--stop` before it starts.
 openbot=(bash -c 'echo "$$" >"$XDG_RUNTIME_DIR/openbot.pid" && exec "$@"' openbot-hosted-server
-  /opt/OpenBot/app/openbot --password-store=gnome-libsecret)
+  "$app/openbot" --password-store=gnome-libsecret)
 if [ "$mode" = hosted ]; then
-  for _ in $(seq 1 60); do
+  # The same 2 minutes as before, but OpenBot starts within 0.4 s after the desktop is ready.
+  for _ in $(seq 1 300); do
     if DISPLAY=:0 XAUTHORITY="$HOME/.Xauthority" xdpyinfo >/dev/null 2>&1; then
       export OPENBOT_AGENT_DISPLAY=:0
       exec xvfb-run -a -f "$HOME/.Xauthority" -s "-screen 0 1280x800x24 -nolisten tcp" "${openbot[@]}"
     fi
-    sleep 2
+    sleep 0.4
   done
   echo "The boat desktop session did not start. OpenBot uses two virtual displays." >&2
 fi

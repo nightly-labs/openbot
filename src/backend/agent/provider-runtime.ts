@@ -47,6 +47,7 @@ import {
   resolveInstalledFirst,
 } from "./../cli";
 import { readCursorUsage } from "./../cursor-usage";
+import { DISK_RESTORE_WAIT_MS, diskRestoring, providerCheckTimeoutMs } from "../disk-restore";
 import { causeHelpers } from "../effect-boundary";
 import { isPythonKimiCli, type SignInRegion } from "../kimi-region";
 import { readKimiUsage } from "../kimi-usage";
@@ -3511,7 +3512,7 @@ export class ProviderRuntime implements ProviderPort {
           stage = "account";
           stageStartedAt = performance.now();
           const account = yield* candidate
-            .request("account/read", { refreshToken: false }, decodeAccountReadResult, 5_000)
+            .request("account/read", { refreshToken: false }, decodeAccountReadResult, providerCheckTimeoutMs(5_000))
             .pipe(toProviderOperationFailed);
           if (!account.account) {
             const message = this.#signInRequiredMessage(provider);
@@ -3927,10 +3928,12 @@ export class ProviderRuntime implements ProviderPort {
    * The `initialize` wait of a start that has no wait of its own. Codex gets the long wait on each
    * start path: its first start after a restore can read its state database for longer than the
    * request timeout, and a stop in that step holds the database for 15 minutes, so each start in that
-   * time fails (#4995).
+   * time fails (#4995). While the disk of a hosted server is restored, the other CLIs wait longer too:
+   * their files arrive over the network on first read, and a start in the request timeout failed.
    */
   #defaultStartTimeoutMs(provider: AgentProvider): number | undefined {
-    return provider === "codex" ? this.#longStartTimeoutMs : undefined;
+    if (provider === "codex") return this.#longStartTimeoutMs;
+    return diskRestoring() ? Math.max(this.#requestTimeoutMs, DISK_RESTORE_WAIT_MS) : undefined;
   }
 
   /**
