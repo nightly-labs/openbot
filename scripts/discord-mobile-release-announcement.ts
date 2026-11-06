@@ -273,16 +273,27 @@ async function createTag(endpoints: Endpoints, tag: string, sha: string): Promis
   return true;
 }
 
-async function deleteTag(endpoints: Endpoints, tag: string): Promise<void> {
-  await fetch(`${endpoints.githubApi}/repos/${endpoints.repository}/git/refs/tags/${tag}`, {
-    method: "DELETE",
-    headers: {
-      authorization: `Bearer ${endpoints.token}`,
-      accept: "application/vnd.github+json",
-      "user-agent": "openbot-release",
-    },
-    signal: AbortSignal.timeout(20_000),
-  });
+/** Removes `tags`. Returns the ones that GitHub did not remove, for example because of a ruleset. */
+async function deleteTags(endpoints: Endpoints, tags: readonly string[]): Promise<string[]> {
+  const left: string[] = [];
+  for (const tag of tags) {
+    const response = await fetch(`${endpoints.githubApi}/repos/${endpoints.repository}/git/refs/tags/${tag}`, {
+      method: "DELETE",
+      headers: {
+        authorization: `Bearer ${endpoints.token}`,
+        accept: "application/vnd.github+json",
+        "user-agent": "openbot-release",
+      },
+      signal: AbortSignal.timeout(20_000),
+    }).catch(() => undefined);
+    if (!response?.ok) left.push(tag);
+  }
+  return left;
+}
+
+/** The lines that name each tag that stays without a post. Each later run skips that post until it goes. */
+function leftTagLines(left: readonly string[]): string[] {
+  return left.map((tag) => `Could not remove the tag ${tag}. Delete it by hand, or the post is never sent.`);
 }
 
 function git(args: readonly string[]): string {
@@ -382,7 +393,8 @@ async function sendPost(changelog: string, post: PlannedPost, endpoints: Endpoin
     const tag = announcedTag(post.version, store);
     if (await createTag(endpoints, tag, sha)) created.push(tag);
     else if (!again) {
-      for (const done of created) await deleteTag(endpoints, done);
+      const left = await deleteTags(endpoints, created);
+      if (left.length > 0) fail(leftTagLines(left));
       process.stdout.write(`${tag} exists, so another run posted it. Nothing to do.\n`);
       return;
     }
@@ -391,8 +403,7 @@ async function sendPost(changelog: string, post: PlannedPost, endpoints: Endpoin
   // Only this role is notified, even when a highlight or a changelog text names another one.
   const failure = await postAnnouncement(prepared.content, { parse: [], roles: [roleId] }, WEBHOOK_VARIABLE, DOCS);
   if (failure !== undefined) {
-    for (const tag of created) await deleteTag(endpoints, tag);
-    fail([failure]);
+    fail([failure, ...leftTagLines(await deleteTags(endpoints, created))]);
   }
   process.stdout.write(`Posted the ${post.version} announcement for ${storeList(post.stores)} to Discord.\n`);
 }

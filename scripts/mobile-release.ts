@@ -427,19 +427,25 @@ async function live(): Promise<void> {
     process.stdout.write("Started mobile-release-announcement.yml.\n");
   }
   if (action === "mark") {
-    const version = appVersion();
-    const stores = await choose(`Which store got the ${version} post?`, numbered(storeChoices()));
-    if (stores === undefined) return;
-    spawnSync(
-      "bun",
-      [
-        "scripts/discord-mobile-release-announcement.ts",
-        "mark-posted",
-        version,
-        stores.length > 1 ? "both" : (stores[0] ?? ""),
-      ],
-      { stdio: "inherit" },
+    // Only a post that the workflow would send: the version and store that it is due or waits for.
+    const posts = [
+      ...plan.due.flatMap((post) => post.stores.map((store) => ({ version: post.version, store }))),
+      ...plan.waiting.map(({ version, store }) => ({ version, store })),
+    ];
+    if (posts.length === 0) {
+      process.stdout.write("\nNo post is due or waiting, so there is nothing to record.\n");
+      return;
+    }
+    const post = await choose(
+      "Which post did you send by hand?",
+      numbered(
+        posts.map((entry) => ({ label: `${entry.version} on ${MOBILE_STORE_NAMES[entry.store]}`, value: entry })),
+      ),
     );
+    if (post === undefined) return;
+    spawnSync("bun", ["scripts/discord-mobile-release-announcement.ts", "mark-posted", post.version, post.store], {
+      stdio: "inherit",
+    });
   }
 }
 

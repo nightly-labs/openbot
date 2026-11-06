@@ -28,6 +28,8 @@ interface FakeState {
   tags: Set<string>;
   posts: string[];
   discordStatus: number;
+  /** The status of a tag delete. A ruleset can refuse it. */
+  deleteStatus: number;
 }
 
 const state: FakeState = {
@@ -37,6 +39,7 @@ const state: FakeState = {
   tags: new Set(),
   posts: [],
   discordStatus: 200,
+  deleteStatus: 204,
 };
 
 /** The text of `name` in a request body, or "". */
@@ -73,6 +76,7 @@ const server = Bun.serve({
       return Response.json({ ref }, { status: 201 });
     }
     if (url.pathname.startsWith(`${prefix}refs/tags/`) && request.method === "DELETE") {
+      if (state.deleteStatus !== 204) return new Response("refused", { status: state.deleteStatus });
       state.tags.delete(url.pathname.slice(`${prefix}refs/tags/`.length));
       return new Response(null, { status: 204 });
     }
@@ -192,6 +196,17 @@ try {
     output: result.output,
     tags: [...state.tags],
   });
+
+  // GitHub does not remove the tag: the run says which tag to delete by hand.
+  state.deleteStatus = 403;
+  result = await announce();
+  check(
+    "names a tag that GitHub did not remove",
+    result.status !== 0 && result.output.includes("Could not remove the tag mobile-announced/v1.4.7/android"),
+    result.output,
+  );
+  state.deleteStatus = 204;
+  state.tags.delete("mobile-announced/v1.4.7/android");
 
   state.discordStatus = 200;
   result = await announce();
