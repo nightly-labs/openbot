@@ -336,6 +336,8 @@ export const messages = {
   "chat.message.agentFallback": "Ajan",
   "chat.message.memberFallback": "Ekip üyesi",
   "chat.message.attachment": "Ek",
+  "chat.message.showFull": "Mesajın tamamını göster",
+  "chat.message.showLess": "Daha az göster",
   "chat.actions.userLabel": "Kullanıcı mesajı işlemleri",
   "chat.actions.label": "{name} mesaj işlemleri",
   "chat.actions.addReaction": "Tepki ekle",

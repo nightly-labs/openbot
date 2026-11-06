@@ -68,4 +68,6 @@ export const messages = {
     many: "جارٍ إعادة الاتصال {attempt}/{count}",
     other: "جارٍ إعادة الاتصال {attempt}/{count}",
   },
+  "status.remote.messageCut":
+    "[لا يظهر {size} ميغابايت من هذه الرسالة على هذا الجهاز. افتحها على الكمبيوتر الذي يشغّل الخادم لقراءتها كاملة.]",
 } as const satisfies PartialTranslation<typeof source>;

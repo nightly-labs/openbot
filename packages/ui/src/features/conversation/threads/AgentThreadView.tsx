@@ -228,6 +228,8 @@ export interface AgentThreadViewProps {
   stepsOpenByDefault?: boolean | undefined;
   /** Receives the message list, where the app searches the thread. */
   scrollRef?: ((element: HTMLElement) => void) | undefined;
+  /** Whether a long message draws in full, with no fold: the app searches the drawn text of the thread. */
+  showFullMessage?: ((message: AgentMessage) => boolean) | undefined;
   /** The user's send shortcut. Enter when absent. */
   sendShortcut?: SendShortcut | undefined;
   /** Copies a message. Without it, the messages have no action row and no right-click menu. */
@@ -650,6 +652,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                         <ChatMessageRow
                           message={message()}
                           author={author(message())}
+                          showFull={props.showFullMessage?.(message())}
                           agents={props.agents}
                           skills={props.skills}
                           onSelectAgent={() => undefined}
