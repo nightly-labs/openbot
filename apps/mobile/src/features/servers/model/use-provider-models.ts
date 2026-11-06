@@ -6,6 +6,28 @@ import type { ProviderAdmin } from "@/features/servers/model/provider-admin";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { useText } from "@/shared/lib/text";
 
+/** The save of one model list: the next list to send (`shown: null` resets the provider), and whether a save runs. */
+interface ModelSave {
+  queued: { shown: AgentModelId[] | null } | null;
+  saving: boolean;
+}
+
+/**
+ * The saves by query key. The provider page and the Models page read the same list, and either
+ * page's read can run, so both must see a save that runs.
+ */
+const saves = new Map<string, ModelSave>();
+
+function saveOf(key: readonly unknown[]): ModelSave {
+  const id = JSON.stringify(key);
+  let save = saves.get(id);
+  if (!save) {
+    save = { queued: null, saving: false };
+    saves.set(id, save);
+  }
+  return save;
+}
+
 /**
  * The models of one provider of a host and the ones its model picker shows (`model-visibility-v1`),
  * as the provider page and the Models page read them. The host checks the role again.
@@ -22,9 +44,6 @@ export function useProviderModels(serverId: string, provider: AgentProviderId | 
   const keys = useRef(queryKey);
   keys.current = queryKey;
   const [error, setError] = useState<string | null>(null);
-  /** The next list to send; `shown: null` resets the provider. */
-  const queued = useRef<{ shown: AgentModelId[] | null } | null>(null);
-  const saving = useRef(false);
   const list = useQuery({
     queryKey,
     retry: false,
@@ -34,29 +53,33 @@ export function useProviderModels(serverId: string, provider: AgentProviderId | 
       models && provider
         ? async () => {
             const shown = queryClient.getQueryData<ProviderModelVisibility>(keys.current);
-            return shown && (saving.current || queued.current) ? shown : models.read(provider);
+            const save = saveOf(keys.current);
+            return shown && (save.saving || save.queued) ? shown : models.read(provider);
           }
         : skipToken,
   });
 
   const flush = useCallback(async () => {
-    if (!models || !provider || saving.current) return;
-    saving.current = true;
     const key = keys.current;
+    const save = saveOf(key);
+    if (!models || !provider || save.saving) return;
+    save.saving = true;
     let failed = false;
     try {
-      while (queued.current) {
-        const { shown } = queued.current;
-        queued.current = null;
+      while (save.queued) {
+        const { shown } = save.queued;
+        save.queued = null;
         const next = await models.set(provider, shown);
-        if (queued.current === null) queryClient.setQueryData(key, next);
+        if (save.queued === null) queryClient.setQueryData(key, next);
       }
     } catch (cause) {
-      queued.current = null;
+      save.queued = null;
       failed = true;
       setError(errorMessage(cause, t("mobile.server.providers.modelsFailed")));
     } finally {
-      saving.current = false;
+      save.saving = false;
+      // The loop ends with nothing queued, so the next change starts from a new record.
+      saves.delete(JSON.stringify(key));
       // The page shows the change that failed; the host has the list that is true. The read starts
       // after the flag is reset, so it asks the host and a new change can start its own save.
       if (failed) void queryClient.invalidateQueries({ queryKey: key, exact: true });
@@ -75,7 +98,7 @@ export function useProviderModels(serverId: string, provider: AgentProviderId | 
         current ? { ...current, shown: [...shown], changed: true } : current,
       );
       setError(null);
-      queued.current = { shown: [...shown] };
+      saveOf(key).queued = { shown: [...shown] };
       void flush();
     },
     [flush, queryClient],
@@ -85,7 +108,7 @@ export function useProviderModels(serverId: string, provider: AgentProviderId | 
   const reset = useCallback(() => {
     if (!queryClient.getQueryData(keys.current)) return;
     setError(null);
-    queued.current = { shown: null };
+    saveOf(keys.current).queued = { shown: null };
     void flush();
   }, [flush, queryClient]);
 
