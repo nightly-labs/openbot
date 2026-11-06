@@ -1075,7 +1075,10 @@ function ChatRow({ message }: { message: VisibleMessage }) {
   const day = row.dayLabels.get(message.id);
   return (
     <Animated.View
-      style={[ROW_STYLE, response ? row.responseStyle : undefined]}
+      // The row takes the list width itself. The list gives its item containers the width it last
+      // measured, and a measure of 0 (a fold, a split change, the app in the background) left rows at
+      // no width: right-aligned bubbles then showed only at the left edge, and the rest was blank.
+      style={[ROW_STYLE, { width: row.shared.listWidth }, response ? row.responseStyle : undefined]}
       accessibilityElementsHidden={response && !row.responseVisible}
       importantForAccessibility={response && !row.responseVisible ? "no-hide-descendants" : "auto"}
     >
