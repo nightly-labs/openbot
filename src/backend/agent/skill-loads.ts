@@ -72,7 +72,7 @@ export function skillLoads(item: unknown, filePaths: readonly unknown[]): SkillL
  * The commands of a shell line that show a file, each cut before its first output redirection, so a
  * file that a command writes is not a load.
  */
-function shownFileCommands(line: string): string[] {
+export function shownFileCommands(line: string): string[] {
   return line
     .split(COMMAND_SEPARATOR)
     .filter((command) => READ_COMMAND.test(command) && !SED_IN_PLACE.test(command))

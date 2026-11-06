@@ -1,4 +1,67 @@
-import { isAbsolute } from "node:path";
+import { homedir } from "node:os";
+import { isAbsolute, join } from "node:path";
+import { getArray, getString, isRecord } from "../protocol";
+import { shownFileCommands } from "./skill-loads";
+
+/** A path that a shell expands to many files. It names no one file. */
+const GLOB = /[*?[]/u;
+
+/**
+ * The files that a shell step shows, such as `tail -n 50 ~/Library/…/main.log`, so a chip that names
+ * only `main.log` finds a file that the agent read with a shell command. Codex parses its own command
+ * into `commandActions`; a Claude `Bash` command is split here. Only absolute and home paths count.
+ */
+export function shellReadPaths(item: unknown): string[] {
+  if (!isRecord(item)) return [];
+  if (item.type === "commandExecution" && Array.isArray(item.commandActions)) {
+    const cwd = getString(item, "cwd");
+    return getArray(item, "commandActions").flatMap((action) => {
+      const path = isRecord(action) && action.type === "read" ? getString(action, "path") : null;
+      if (!path) return [];
+      const expanded = expandHome(path);
+      return [isAbsolute(expanded) || !cwd ? expanded : join(cwd, expanded)];
+    });
+  }
+  if (item.type !== "commandExecution" && !(item.type === "toolCall" && getString(item, "name") === "Bash")) return [];
+  return shownFileCommands(getString(item, "command") ?? "")
+    .flatMap(shellWords)
+    .map(expandHome)
+    .filter((path) => isAbsolute(path) && !GLOB.test(path));
+}
+
+function expandHome(path: string): string {
+  return path.replace(/^(?:~|\$HOME|\$\{HOME\})(?=\/)/u, homedir());
+}
+
+/** The words of one shell command, with quotes and backslash escapes removed. */
+function shellWords(command: string): string[] {
+  const words: string[] = [];
+  let word = "";
+  let quote: "'" | '"' | null = null;
+  let started = false;
+  for (let index = 0; index < command.length; index += 1) {
+    const char = command[index] ?? "";
+    if (quote) {
+      if (char === quote) quote = null;
+      else if (char === "\\" && quote === '"' && index + 1 < command.length) word += command[++index];
+      else word += char;
+    } else if (char === "'" || char === '"') {
+      quote = char;
+      started = true;
+    } else if (char === "\\" && index + 1 < command.length) {
+      word += command[++index];
+      started = true;
+    } else if (/\s/u.test(char)) {
+      if (started || word) words.push(word);
+      word = "";
+      started = false;
+    } else {
+      word += char;
+    }
+  }
+  if (started || word) words.push(word);
+  return words;
+}
 
 /** Owns local, in-memory tool paths. These paths never enter conversation events or storage. */
 export class ThreadFileHistory {
