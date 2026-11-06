@@ -203,7 +203,10 @@ export interface AgentThreadViewProps {
   attention?: JSX.Element | undefined;
   /** The card that the app draws in the place of a message row, such as an MCP sign-in. Undefined keeps the row. */
   messageCard?: ((message: AgentMessage) => JSX.Element | undefined) | undefined;
-  /** The steps of the finished turn above an answer, or undefined for a message that has none. */
+  /**
+   * The steps of the finished turn above an answer, or on the thinking row of a finished turn with no
+   * answer. Undefined for a message that has none.
+   */
   stepsAbove?: ((messageId: string) => AgentStep[] | undefined) | undefined;
   /** The time that the turn of an answer took, and how many of its steps failed. */
   factsAbove?: ((messageId: string) => AgentStepsFacts | undefined) | undefined;
@@ -461,6 +464,9 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       />
     );
   }
+  /** A finished turn with no answer shows its steps on its thinking row, with no message under them. */
+  const shownRow = (message: AgentMessage) =>
+    shownInThread(message) || (message.kind === "thinking" && props.stepsAbove?.(message.id) !== undefined);
   /**
    * The row that the branch line follows: the last message that the branch copied. That message can be
    * one that the thread does not show as a row, such as a thought in the steps of a turn. Then the line
@@ -469,7 +475,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   const branchDividerId = createMemo(() => {
     const source = props.branchSource;
     if (!source) return undefined;
-    const shown = props.messages.filter(shownInThread);
+    const shown = props.messages.filter(shownRow);
     if (shown.some((message) => message.id === source.throughMessageId)) return source.throughMessageId;
     const branchedAt = props.task ? Date.parse(props.task.createdAt) : Number.NaN;
     if (Number.isNaN(branchedAt)) return undefined;
@@ -571,7 +577,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
               {t("conversation.threads.view.startedByAgent", { name: props.agent.name })}
             </p>
           </Show>
-          <For each={props.messages.filter(shownInThread)} keyed={(message) => message.id}>
+          <For each={props.messages.filter(shownRow)} keyed={(message) => message.id}>
             {(message) => {
               const card = createMemo(() => props.messageCard?.(message()));
               return (
@@ -585,35 +591,37 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                       />
                     )}
                   </Show>
-                  <Show
-                    when={card()}
-                    fallback={
-                      <ChatMessageRow
-                        message={message()}
-                        author={author(message())}
-                        agents={props.agents}
-                        skills={props.skills}
-                        onSelectAgent={() => undefined}
-                        onOpenTag={props.onOpenTag}
-                        onOpenLink={props.onOpenLink}
-                        onPreview={props.onPreview}
-                        onAttachmentAction={props.onAttachmentAction}
-                        mediaSource={props.mediaSource}
-                        downloads={props.downloads}
-                        onDownload={(attachment) => props.onAttachmentAction(attachment, "download")}
-                        macWindowControls={props.macWindowControls}
-                        referencedMessage={referenced(message())}
-                        onOpenReference={() => {
-                          const id = message().replyToMessageId;
-                          if (id) showMessage(id);
-                        }}
-                        actions={messageActions(message())}
-                        menu={messageMenu(message())}
-                        data-chat-search-message={message().id}
-                      />
-                    }
-                  >
-                    {card()}
+                  <Show when={message().kind !== "thinking"}>
+                    <Show
+                      when={card()}
+                      fallback={
+                        <ChatMessageRow
+                          message={message()}
+                          author={author(message())}
+                          agents={props.agents}
+                          skills={props.skills}
+                          onSelectAgent={() => undefined}
+                          onOpenTag={props.onOpenTag}
+                          onOpenLink={props.onOpenLink}
+                          onPreview={props.onPreview}
+                          onAttachmentAction={props.onAttachmentAction}
+                          mediaSource={props.mediaSource}
+                          downloads={props.downloads}
+                          onDownload={(attachment) => props.onAttachmentAction(attachment, "download")}
+                          macWindowControls={props.macWindowControls}
+                          referencedMessage={referenced(message())}
+                          onOpenReference={() => {
+                            const id = message().replyToMessageId;
+                            if (id) showMessage(id);
+                          }}
+                          actions={messageActions(message())}
+                          menu={messageMenu(message())}
+                          data-chat-search-message={message().id}
+                        />
+                      }
+                    >
+                      {card()}
+                    </Show>
                   </Show>
                   <Show when={branchDividerAfter(message().id)}>{(source) => <BranchDivider source={source()} />}</Show>
                 </div>

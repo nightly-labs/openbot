@@ -93,6 +93,7 @@ function rowDrawsTime(message: AgentMessage): boolean {
     message.kind !== "plan" &&
     message.kind !== "subagents" &&
     message.kind !== "memory-changes" &&
+    message.kind !== "thinking" &&
     chatVisualReply(message) === null
   );
 }
@@ -1120,8 +1121,8 @@ export function ConversationTimeline() {
                     </div>
                   );
                 }
-                if (untrack(() => initialMessage.kind === "memory-changes")) {
-                  // Only a turn with no answer gets this row: an answer shows the changes in its steps.
+                if (untrack(() => initialMessage.kind === "memory-changes" || initialMessage.kind === "thinking")) {
+                  // Only a finished turn with no answer gets this row: an answer shows the steps above it.
                   return (
                     <div
                       data-index={virtualRow.index}
