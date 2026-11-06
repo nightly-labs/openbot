@@ -2079,17 +2079,21 @@ export class OpenBotToolRouter {
           .replace(/^"(.*)"$/s, "$1")
           .trim() || null;
       // An id that names no message would store the answer outside the thread that asked, and stop the
-      // automatic result for the request (#5452). Nothing is written, so the agent can send it again.
+      // automatic result for the request (#5452). Nothing is written, so the agent can send it again. The
+      // agent corrects its own call, so the user gets no error for it.
       if (replyTo && !this.#mailbox.hasMessage(replyTo)) {
         const requestIds = turnDeliveries
           .filter(
             ({ delivery }) => delivery.sender.kind === "agent" && recipientValues.includes(delivery.sender.agentId),
           )
           .map(({ delivery }) => delivery.messageId);
-        throw new Error(
-          `replyToMessageId ${replyTo} names no message. Use the Message ID of the message that you answer${
-            requestIds.length > 0 ? ` (${requestIds.join(", ")})` : ""
-          }, or leave replyToMessageId out.`,
+        return openBotToolFailure(
+          [
+            sourceText("error.backend.replyReferenceUnknown", { id: replyTo }),
+            ...(requestIds.length > 0
+              ? [sourceText("error.backend.replyReferenceRequests", { ids: requestIds.join(", ") })]
+              : []),
+          ].join(" "),
         );
       }
       // An answer to a request from a side thread runs in that thread. When the thread is archived, the
