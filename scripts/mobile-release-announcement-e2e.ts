@@ -227,6 +227,25 @@ try {
     { output: result.output, post: lastPost() },
   );
 
+  // The highlights are for the next version: the post waits, and the run does not fail.
+  state.tags.clear();
+  writeFileSync(
+    join(work, "apps/mobile/release-announcement.json"),
+    JSON.stringify({ version: "1.4.8", highlights: ["One.", "Two.", "Three."] }),
+  );
+  const postsBefore = state.posts.length;
+  result = await announce();
+  check(
+    "waits for the highlights",
+    result.status === 0 && state.posts.length === postsBefore && /waits: .*1\.4\.8/.test(result.output),
+    result.output,
+  );
+  writeFileSync(
+    join(work, "apps/mobile/release-announcement.json"),
+    JSON.stringify({ version: "1.4.7", highlights: ["One.", "Two.", "Three."] }),
+  );
+  state.tags.add("mobile-announced/v1.4.7/ios");
+
   // `--version --again` posts again, with a tag already there.
   result = await cli("discord-mobile-release-announcement.ts", [
     "announce",
@@ -241,6 +260,20 @@ try {
     site,
   ]);
   check("--again posts again", result.status === 0 && state.posts.length === 5, result.output);
+
+  // A feature at "0" is off for every version, so the publish step keeps it off.
+  const configPath = join(work, "apps/auth-api/src/server/mobile-features-config.ts");
+  const originalConfig = readFileSync(configPath, "utf8");
+  writeFileSync(configPath, originalConfig.replace(/(browser: \{\s+ios: \{ upTo: ")[^"]+(")/, "$10$2"));
+  writeChangelog({ "1.4.7": "In review" });
+  result = await cli("publish-mobile-release.ts", ["ios"]);
+  const offConfig = readFileSync(configPath, "utf8");
+  check(
+    'publish keeps upTo "0"',
+    result.status === 0 && /browser: \{\s+ios: \{ upTo: "0" \}/.test(offConfig) && /ios: "1\.4\.7"/.test(offConfig),
+    { output: result.output, config: offConfig },
+  );
+  writeFileSync(configPath, originalConfig);
 
   // The publish step: Android 1.4.7 available, with the older 1.4.5 marked as skipped.
   writeChangelog({ "1.4.7": "2026-11-06 (iOS)", "1.4.6": "2026-11-04", "1.4.5": "2026-11-01 (iOS)" });

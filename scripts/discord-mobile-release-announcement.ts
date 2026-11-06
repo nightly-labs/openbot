@@ -217,7 +217,8 @@ export interface Plan {
 
 /**
  * The posts that are due: the newest dated version of each store, from FIRST_TAGGED_VERSION on, with
- * no tag, that the Worker has live. An older version is old news, so it waits for `--version`.
+ * no tag, that the Worker has live, and whose highlights are in the file. An older version is old
+ * news, so it waits for `--version`.
  * The stores of one version that are due at the same time share one post.
  */
 export async function planPosts(changelog: string, endpoints: Endpoints): Promise<Plan> {
@@ -229,7 +230,10 @@ export async function planPosts(changelog: string, endpoints: Endpoints): Promis
     const newest = versions.find(({ dates }) => storeDay(dates, store) !== undefined);
     if (newest === undefined || tags.has(announcedTag(newest.version, store))) continue;
     if (isNewerMobileVersion(FIRST_TAGGED_VERSION, newest.version)) continue;
-    const reason = await liveProblem(endpoints.site, newest.version, store);
+    // The highlights file can already hold the next version when the second store ships an older one.
+    const reason =
+      (await liveProblem(endpoints.site, newest.version, store)) ??
+      mobileAnnouncementProblems(readFileSync(MOBILE_ANNOUNCEMENT_FILE, "utf8"), newest.version)[0];
     if (reason !== undefined) waiting.push({ version: newest.version, store, reason });
     else due.set(newest.version, [...(due.get(newest.version) ?? []), store]);
   }

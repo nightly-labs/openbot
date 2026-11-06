@@ -127,7 +127,7 @@ async function overview(): Promise<void> {
 // ---------------------------------------------------------------------------------------------
 // The steps.
 
-/** Runs `step` on a new branch, then goes back. A step that returns no paths deletes the branch. */
+/** Runs `step` on a new branch, then goes back. A step that commits nothing deletes the branch. */
 async function onBranch(name: string, step: (branch: string) => Promise<string | undefined>): Promise<void> {
   assertCleanTree();
   const original = run("git", ["branch", "--show-current"]);
@@ -136,9 +136,14 @@ async function onBranch(name: string, step: (branch: string) => Promise<string |
   try {
     url = await step(branch);
   } finally {
+    // A commit that did not reach a pull request, after a failed push, stays on its branch.
+    const committed = run("git", ["rev-parse", "HEAD"]) !== run("git", ["rev-parse", "origin/main"]);
     if (run("git", ["status", "--porcelain"]) === "") {
       run("git", ["switch", "--quiet", original]);
-      if (url === undefined) run("git", ["branch", "--quiet", "-D", branch]);
+      if (url === undefined && !committed) run("git", ["branch", "--quiet", "-D", branch]);
+      if (url === undefined && committed) {
+        process.stdout.write(`\nThe branch ${branch} keeps the commit. Push it and open the PR by hand.\n`);
+      }
     } else {
       process.stdout.write(`\nThe branch ${branch} has changes that are not committed. It stays checked out.\n`);
     }

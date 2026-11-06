@@ -13,7 +13,6 @@ import {
   MOBILE_CHANGELOG,
   MOBILE_FRAGMENT_DIR,
   MOBILE_STORE_NAMES,
-  MOBILE_STORES,
   MOBILE_VERSION_FILES,
   type MobileStore,
   parseStoreDates,
@@ -91,26 +90,17 @@ export function olderInReview(changelog: string, version: string, store: MobileS
   });
 }
 
-/** Each version with a store that still reviews it, newest first. */
-export function versionsInReview(changelog: string): { version: string; stores: MobileStore[] }[] {
-  return changelog.split("\n").flatMap((line) => {
-    const [, version = "", text = ""] = /^## \[([^\]]+)\] - (.+)$/.exec(line) ?? [];
-    const dates = parseStoreDates(text);
-    const stores = dates === undefined ? [] : MOBILE_STORES.filter((store) => dates[store] === undefined);
-    return stores.length > 0 ? [{ version, stores }] : [];
-  });
-}
-
 const QUOTED_VERSION = (store: MobileStore) => new RegExp(`(\\n\\s+${store}: \\{ upTo: ")([^"]+)(")`, "g");
 const LATEST_VERSION = (store: MobileStore) => new RegExp(`(\\n\\s+${store}: ")([^"]+)(")`, "g");
 
 /**
  * The feature config with the `upTo` of each feature and the newest version of `store` raised to
- * `version`. A version that is not newer leaves the file as it is. `except` lists stay.
+ * `version`. A version that is not newer leaves the file as it is, and so does "0", which turns a
+ * feature off for every version. `except` lists stay.
  */
 export function withStoreFeatures(source: string, store: MobileStore, version: string): string {
   const raise = (_match: string, start: string, current: string, end: string) =>
-    `${start}${isNewerMobileVersion(version, current) ? version : current}${end}`;
+    `${start}${current !== "0" && isNewerMobileVersion(version, current) ? version : current}${end}`;
   const features = source.replace(QUOTED_VERSION(store), raise);
   const next = features.replace(LATEST_VERSION(store), raise);
   if (
@@ -174,7 +164,7 @@ export function publishPlan(version: string, stores: readonly MobileStore[], ski
     changes.push({
       path: MOBILE_FEATURES_CONFIG_FILE,
       text: config,
-      summary: `${names} cloudServers and browser up to ${version}, newest ${names} version ${version}`,
+      summary: `${names} feature flags up to ${version} (a flag at "0" stays off), newest ${names} version ${version}`,
     });
   }
   return {

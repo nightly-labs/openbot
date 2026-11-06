@@ -41,11 +41,6 @@ export function storeDay(dates: StoreDates, store: MobileStore): string | undefi
   return state === undefined || state === SKIPPED ? undefined : state;
 }
 
-/** The stores that still review the version. */
-export function storesInReview(dates: StoreDates): MobileStore[] {
-  return MOBILE_STORES.filter((store) => dates[store] === undefined);
-}
-
 /**
  * Reads what follows `## [x.y.z] - ` in a mobile heading. Undefined when it is not one of:
  *
