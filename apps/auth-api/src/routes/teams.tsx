@@ -1,32 +1,30 @@
 import { createFileRoute } from "@tanstack/solid-router";
 import { TeamsPage } from "../components/teams/TeamsPage";
-import { OPENBOT_X_HANDLE, pageSocialImageMeta } from "../lib/site-metadata";
-import { TEAMS_PAGE_META, TEAMS_ROUTE, TEAMS_SOCIAL_IMAGE } from "../lib/teams-page";
+import { teamsPageText } from "../components/teams/teams-page-text";
+import { loadSitePage, siteLocale } from "../lib/site-locale";
+import { sitePageHead } from "../lib/site-page-head";
+import { TEAMS_ROUTE, TEAMS_SOCIAL_IMAGE_PATH } from "../lib/teams-page";
 
+// The Teams page in the language of the request: Polish for Polish, English for all others.
+// `/pl/teams` always shows Polish.
 export const Route = createFileRoute("/teams")({
-  head: ({ match }) => {
-    const url = new URL(TEAMS_ROUTE, match.context.siteUrl).toString();
-    const { title, description } = TEAMS_PAGE_META;
-    const image = pageSocialImageMeta(TEAMS_SOCIAL_IMAGE, match.context.siteUrl);
-    return {
-      meta: [
-        { title },
-        { name: "description", content: description },
-        { property: "og:type", content: "website" },
-        { property: "og:site_name", content: "OpenBot" },
-        { property: "og:locale", content: "en_US" },
-        { property: "og:url", content: url },
-        { property: "og:title", content: title },
-        { property: "og:description", content: description },
-        ...image.openGraph,
-        { name: "twitter:card", content: "summary_large_image" },
-        { name: "twitter:site", content: OPENBOT_X_HANDLE },
-        { name: "twitter:title", content: title },
-        { name: "twitter:description", content: description },
-        ...image.twitter,
-      ],
-      links: [{ rel: "canonical", href: url }],
-    };
+  loader: ({ context }) => loadSitePage(siteLocale(context.locale), teamsPageText),
+  head: ({ match, loaderData }) => {
+    if (!loaderData)
+      return { links: [{ rel: "canonical", href: new URL(TEAMS_ROUTE, match.context.siteUrl).toString() }] };
+    return sitePageHead(match.context.siteUrl, {
+      page: TEAMS_ROUTE,
+      path: TEAMS_ROUTE,
+      locale: loaderData.site.locale,
+      title: loaderData.text.title,
+      description: loaderData.text.description,
+      image: { path: TEAMS_SOCIAL_IMAGE_PATH, alt: loaderData.text.imageAlt },
+    });
   },
-  component: TeamsPage,
+  component: Teams,
 });
+
+function Teams() {
+  const page = Route.useLoaderData();
+  return <TeamsPage lang={page().lang} text={page().text} />;
+}

@@ -1,14 +1,7 @@
 import { ProviderLogo } from "@openbot/brand";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createSignal, For, onSettled } from "solid-js";
-import {
-  LANDING_NETWORK_AGENTS,
-  LANDING_NETWORK_DESCRIPTION,
-  LANDING_NETWORK_HUB,
-  LANDING_NETWORK_TITLE,
-  LANDING_PROVIDERS,
-  LANDING_TEAM_MESSAGES,
-} from "../../lib/landing-content";
+import { LANDING_NETWORK_AGENTS, LANDING_NETWORK_HUB, LANDING_PROVIDERS } from "../../lib/landing-content";
 import { createAgentNetworkEggs } from "./agent-network-eggs";
 import {
   agentNetworkHubAt,
@@ -23,6 +16,7 @@ import {
   regrowAgentNetwork,
   startHubSignal,
 } from "./agent-network-scene";
+import { useLandingText } from "./LandingText";
 
 /** The grown network chooses from this many avatars. The three named agents come after them. */
 const GROWN_AVATARS = 24;
@@ -133,6 +127,7 @@ export function AgentNetworkSection() {
   let canvasRef: HTMLCanvasElement | undefined;
   let marksRef: HTMLDivElement | undefined;
   let headingRef: HTMLElement | undefined;
+  const text = useLandingText();
 
   onSettled(() => {
     const stage = stageRef;
@@ -144,7 +139,7 @@ export function AgentNetworkSection() {
       mark: MARKS.indexOf(agent.provider),
     }));
     const [first, second, third] = named;
-    const [firstMessage, secondMessage, thirdMessage] = LANDING_TEAM_MESSAGES;
+    const [firstMessage, secondMessage, thirdMessage] = text().picture.team.messages;
     // With no canvas, or in Safari before 16, which cannot draw rounded rectangles,
     // the section shows its heading with no network.
     if (
@@ -169,7 +164,7 @@ export function AgentNetworkSection() {
     const seed = newSeed();
     let network = buildAgentNetwork({
       agents: [first, second, third],
-      messages: [firstMessage.text, secondMessage.text, thirdMessage.text],
+      messages: [firstMessage, secondMessage, thirdMessage],
       hubLabel: LANDING_NETWORK_HUB,
       seed,
       avatarCount: GROWN_AVATARS,
@@ -260,7 +255,14 @@ export function AgentNetworkSection() {
       const signal = startHubSignal(network, style, at);
       if (signal) signals = [...signals, signal];
     };
-    const eggs = createAgentNetworkEggs({ network: () => network, view, now, unmasked, signal: startSignal });
+    const eggs = createAgentNetworkEggs({
+      network: () => network,
+      view,
+      now,
+      unmasked,
+      signal: startSignal,
+      eggs: text().network.eggs,
+    });
     // When the network is complete, a click on a visible agent grows a new network from it.
     const agentAt = (event: MouseEvent) => {
       if (now() < network.end) return -1;
@@ -390,7 +392,7 @@ export function AgentNetworkSection() {
         <canvas ref={canvasRef} class="landing-network-canvas" />
         <header ref={headingRef} class="landing-section-heading landing-network-heading">
           <h2 id="network-title">
-            <For each={LANDING_NETWORK_TITLE}>
+            <For each={text().network.title}>
               {(word, index) => (
                 <>
                   <span class="landing-network-word" style={{ "--landing-network-word": index() }}>
@@ -400,7 +402,7 @@ export function AgentNetworkSection() {
               )}
             </For>
           </h2>
-          <p class="landing-network-description">{LANDING_NETWORK_DESCRIPTION}</p>
+          <p class="landing-network-description">{text().network.description}</p>
         </header>
         {/* The provider marks that the scene draws on each badge, with their page colours. */}
         <div ref={marksRef} class="landing-network-marks" aria-hidden="true">

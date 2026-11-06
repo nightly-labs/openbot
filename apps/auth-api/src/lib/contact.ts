@@ -3,9 +3,13 @@
 /** The path of the contact page. */
 export const CONTACT_ROUTE = "/contact";
 
+/** The social image of the contact page. Its alt text is the `sitePage.contact.imageAlt` key. */
+export const CONTACT_SOCIAL_IMAGE_PATH = "/social/contact.jpg";
+
 /** The mailbox that receives each message. The form also names it for people who prefer email. */
 export const CONTACT_EMAIL = "hello@openbot.run";
 
+/** The topics of the form. The labels name the topic in the email to the team; the form shows `sitePage.contact.topic.*`. */
 export const CONTACT_TOPICS = [
   { id: "setup", label: "Custom setup" },
   { id: "partnership", label: "Partnership" },

@@ -1,3 +1,5 @@
+import type { FooterColumnId, FooterTextId } from "./site-text";
+
 export const EXTERNAL_LINK_REL = "noopener noreferrer";
 
 /** The installer each platform's download button starts: Apple silicon on macOS, x64 elsewhere. */
@@ -27,6 +29,12 @@ export const OPENBOT_LINKS = {
   /** The contact form page. */
   contact: "/contact",
   x: "https://x.com/OpenBot_",
+  threads: "https://www.threads.com/@openbot.run",
+  linkedin: "https://www.linkedin.com/company/openbot-si/",
+  reddit: "https://www.reddit.com/r/OpenBot_/",
+  instagram: "https://www.instagram.com/openbot.run/",
+  tiktok: "https://www.tiktok.com/@openbot.run",
+  facebook: "https://www.facebook.com/profile.php?id=61595425259628",
   /** A Redirect Rule in the openbot.run Cloudflare zone sends this to the current Discord invite. */
   discord: "https://discord.openbot.run",
   download: "#download",
@@ -53,15 +61,21 @@ export const OPENBOT_LINKS = {
 } as const;
 
 /**
+ * The name of a footer entry: a product or page name that stays the same in every language, or the
+ * id of its text in `SiteText`.
+ */
+type FooterLabel = string | { readonly text: FooterTextId };
+
+/**
  * One entry in a footer column. An internal entry carries a route, not a string,
  * so the footer can render it as a client navigation. It also fixes a link that
  * only worked on one page: "#download" on its own finds nothing on /news, because
  * there is no download section there for it to scroll to.
  */
 export type FooterLink =
-  | { readonly label: string; readonly external: true; readonly href: string }
+  | { readonly label: FooterLabel; readonly external: true; readonly href: string }
   | {
-      readonly label: string;
+      readonly label: FooterLabel;
       readonly external: false;
       readonly to:
         | "/"
@@ -84,55 +98,56 @@ export type FooterLink =
       readonly hash?: string;
     }
   | {
-      readonly label: string;
+      readonly label: FooterLabel;
       readonly external: false;
       readonly to: "/compare/$slug" | "/providers/$slug";
       readonly slug: string;
     };
 
 export interface FooterColumn {
-  readonly title: string;
+  /** The column title, in `SiteText`. */
+  readonly id: FooterColumnId;
   readonly links: readonly FooterLink[];
 }
 
 export const FOOTER_COLUMNS: readonly FooterColumn[] = [
   {
-    title: "Product",
+    id: "product",
     links: [
-      { label: "Download", external: false, to: "/download" },
-      { label: "News", external: false, to: "/news" },
-      { label: "Guides", external: false, to: "/guides" },
-      { label: "Marketplace", external: false, to: "/marketplace" },
-      { label: "Changelog", external: false, to: "/changelog" },
-      { label: "Teams", external: false, to: "/teams" },
-      { label: "Pricing", external: false, to: "/pricing" },
-      { label: "Contact", external: false, to: "/contact" },
-      { label: "Brand", external: false, to: "/brand" },
-      { label: "Source code", external: true, href: OPENBOT_LINKS.repository },
-      { label: "License", external: true, href: OPENBOT_LINKS.license },
-      { label: "Privacy policy", external: false, to: "/privacy-policy" },
-      { label: "Terms", external: false, to: "/terms" },
-      { label: "Commercial license", external: false, to: "/commercial-license" },
+      { label: { text: "download" }, external: false, to: "/download" },
+      { label: { text: "news" }, external: false, to: "/news" },
+      { label: { text: "guides" }, external: false, to: "/guides" },
+      { label: { text: "marketplace" }, external: false, to: "/marketplace" },
+      { label: { text: "changelog" }, external: false, to: "/changelog" },
+      { label: { text: "teams" }, external: false, to: "/teams" },
+      { label: { text: "pricing" }, external: false, to: "/pricing" },
+      { label: { text: "contact" }, external: false, to: "/contact" },
+      { label: { text: "brand" }, external: false, to: "/brand" },
+      { label: { text: "sourceCode" }, external: true, href: OPENBOT_LINKS.repository },
+      { label: { text: "license" }, external: true, href: OPENBOT_LINKS.license },
+      { label: { text: "privacy" }, external: false, to: "/privacy-policy" },
+      { label: { text: "terms" }, external: false, to: "/terms" },
+      { label: { text: "commercialLicense" }, external: false, to: "/commercial-license" },
       { label: "DPA", external: false, to: "/dpa" },
       { label: "CLA", external: false, to: "/cla" },
     ],
   },
   {
-    title: "Resources",
+    id: "resources",
     links: [
-      { label: "Documentation", external: true, href: OPENBOT_LINKS.documentation },
-      { label: "Troubleshooting", external: true, href: OPENBOT_LINKS.troubleshooting },
-      { label: "Status", external: true, href: OPENBOT_LINKS.status },
-      { label: "Self-hosted server", external: true, href: OPENBOT_LINKS.selfHostedServer },
-      { label: "Architecture", external: true, href: OPENBOT_LINKS.architecture },
-      { label: "Contributing", external: true, href: OPENBOT_LINKS.contributing },
+      { label: { text: "documentation" }, external: true, href: OPENBOT_LINKS.documentation },
+      { label: { text: "troubleshooting" }, external: true, href: OPENBOT_LINKS.troubleshooting },
+      { label: { text: "status" }, external: true, href: OPENBOT_LINKS.status },
+      { label: { text: "selfHosted" }, external: true, href: OPENBOT_LINKS.selfHostedServer },
+      { label: { text: "architecture" }, external: true, href: OPENBOT_LINKS.architecture },
+      { label: { text: "contributing" }, external: true, href: OPENBOT_LINKS.contributing },
       { label: "Codex", external: true, href: OPENBOT_LINKS.codex },
       { label: "Claude Code", external: true, href: OPENBOT_LINKS.claude },
       { label: "Discord", external: true, href: OPENBOT_LINKS.discord },
     ],
   },
   {
-    title: "Providers",
+    id: "providers",
     links: [
       { label: "Claude Code", external: false, to: "/providers/$slug", slug: "claude-code" },
       { label: "Codex", external: false, to: "/providers/$slug", slug: "codex" },
@@ -141,12 +156,12 @@ export const FOOTER_COLUMNS: readonly FooterColumn[] = [
       { label: "Cursor", external: false, to: "/providers/$slug", slug: "cursor" },
       { label: "OpenCode", external: false, to: "/providers/$slug", slug: "opencode" },
       { label: "Cline", external: false, to: "/providers/$slug", slug: "cline" },
-      { label: "Ollama and LM Studio", external: false, to: "/providers/$slug", slug: "local-models" },
-      { label: "All providers", external: false, to: "/providers" },
+      { label: { text: "localModels" }, external: false, to: "/providers/$slug", slug: "local-models" },
+      { label: { text: "allProviders" }, external: false, to: "/providers" },
     ],
   },
   {
-    title: "Compare",
+    id: "compare",
     links: [
       { label: "OpenBot vs Grok Bot", external: false, to: "/compare/$slug", slug: "grok-bot" },
       { label: "OpenBot vs Hermes Agent", external: false, to: "/compare/$slug", slug: "hermes-agent" },
@@ -159,8 +174,8 @@ export const FOOTER_COLUMNS: readonly FooterColumn[] = [
       { label: "OpenBot vs Paperclip", external: false, to: "/compare/$slug", slug: "paperclip" },
       { label: "OpenBot vs Viktor", external: false, to: "/compare/$slug", slug: "viktor" },
       { label: "OpenBot vs Instinct", external: false, to: "/compare/$slug", slug: "instinct" },
-      { label: "Best AI agent apps", external: false, to: "/compare/$slug", slug: "best-ai-agent-apps" },
-      { label: "All comparisons", external: false, to: "/compare" },
+      { label: { text: "bestApps" }, external: false, to: "/compare/$slug", slug: "best-ai-agent-apps" },
+      { label: { text: "allComparisons" }, external: false, to: "/compare" },
     ],
   },
 ];
