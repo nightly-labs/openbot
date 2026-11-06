@@ -104,6 +104,7 @@ import {
 import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import {
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
+  TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
   TEAM_MESSAGE_CLIENT_ID_CAPABILITY,
@@ -721,6 +722,7 @@ export function createHostRequestActions({
         zip: advertised.includes(TEAM_ZIP_ATTACHMENTS_CAPABILITY),
         mp4: advertised.includes(TEAM_MP4_ATTACHMENTS_CAPABILITY),
         svg: advertised.includes(TEAM_SVG_ATTACHMENTS_CAPABILITY),
+        anyFile: advertised.includes(TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY),
       };
     },
   };

@@ -75,7 +75,7 @@ export const messages = {
   "agentSettings.backupModels.valueCount": { one: "{mode} · {count}", other: "{mode} · {count}" },
   "agentSettings.backupModels.intro": "如果 {model} 在 {name} 开始输出之前就用完了额度，{name} 会询问你要用哪个模型。",
   "agentSettings.backupModels.introAutomatic":
-    "如果 {model} 在 {name} 开始输出之前就用完了额度或出现服务商错误，{name} 会按顺序切换到第一个可用模型。",
+    "如果 {model} 用完了额度，{name} 会按顺序切换到第一个可用模型。如果 {model} 在 {name} 开始输出之前出现服务商错误，{name} 也会切换。",
   "agentSettings.backupModels.ask": "切换前询问",
   "agentSettings.backupModels.order": "顺序",
   "agentSettings.backupModels.listLabel": "备用模型（按顺序）",

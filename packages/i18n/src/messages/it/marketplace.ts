@@ -224,6 +224,16 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Crea con Higgsfield una foto prodotto di una tazza in ceramica su un tavolo di legno.",
   "marketplace.plugin.higgsfield.prompt.clip": "Crea con Higgsfield un video di 5 secondi di onde al tramonto.",
+  "marketplace.plugin.elevenlabs.tagline": "Voce, voci e agenti vocali",
+  "marketplace.plugin.elevenlabs.description":
+    "ElevenLabs permette agli agenti di trasformare il testo in voce, lavorare con le voci e creare, testare e rivedere gli agenti vocali di ElevenLabs e le loro conversazioni. L'audio generato torna come link di download di breve durata. Ogni utente accede al proprio account ElevenLabs nel browser, e ogni generazione usa i crediti di quell'account.",
+  "marketplace.plugin.elevenlabs.app":
+    "Sintesi vocale, voci e gestione degli agenti vocali, tramite il server MCP di ElevenLabs con accesso nel browser.",
+  "marketplace.plugin.elevenlabs.prompt.speech":
+    "Leggi ad alta voce questo paragrafo con una voce calma di ElevenLabs e dammi l'audio.",
+  "marketplace.plugin.elevenlabs.prompt.agents": "Elenca i miei agenti vocali ElevenLabs e la voce che usa ciascuno.",
+  "marketplace.plugin.elevenlabs.prompt.conversations":
+    "Riassumi le ultime dieci conversazioni del mio agente vocale di assistenza.",
   "marketplace.plugin.appleApps.tagline": "Mail, Calendario e altro sul tuo Mac",
   "marketplace.plugin.appleApps.description":
     "Apple apps consente agli agenti di usare Mail, Calendario, Contatti, Promemoria, Note, Messaggi e Safari su questo Mac. Funziona solo su macOS. OpenBot avvia mcp-icloud, un server della community che non è fatto da Apple né da OpenBot. Il server controlla le app tramite AppleScript, su questo computer, e non richiede account né chiavi. Durante l'installazione, OpenBot può chiedere a macOS l'accesso a tutte queste app in una volta, con una richiesta per app. Altrimenti macOS lo chiede la prima volta che un agente usa un'app. Per cambiarlo in seguito, apri Impostazioni di Sistema › Privacy e sicurezza › Automazione. Gli agenti possono inviare email e iMessage e modificare o eliminare eventi, contatti e promemoria, quindi controlla ogni scrittura prima di approvarla. Ciò che gli strumenti leggono, come il testo delle email, va al provider del modello dell'agente.",
@@ -355,6 +365,17 @@ export const messages = {
   "marketplace.plugin.resend.prompt.status": "L'email della fattura è arrivata al cliente?",
   "marketplace.plugin.resend.prompt.template":
     "Prepara una bozza di email per reimpostare la password nel nuovo flusso.",
+  "marketplace.plugin.omnisend.tagline": "Marketing via email e SMS",
+  "marketplace.plugin.omnisend.description":
+    "Omnisend permette agli agenti di leggere i report di campagne e moduli, trovare contatti e segmenti, e creare e modificare campagne, automazioni, modelli email, moduli e prodotti. Ogni utente accede al proprio account Omnisend nel browser e sceglie il livello di accesso nella schermata di consenso. Con l'accesso in scrittura, gli agenti possono anche inviare campagne ed eliminare dati. Scegli l'accesso in sola lettura quando agli agenti servono solo i report.",
+  "marketplace.plugin.omnisend.app":
+    "Campagne, automazioni, contatti, segmenti, moduli e report, tramite il server MCP di Omnisend con accesso nel browser.",
+  "marketplace.plugin.omnisend.prompt.lastCampaign":
+    "Come sono andate le campagne della scorsa settimana rispetto a quella precedente?",
+  "marketplace.plugin.omnisend.prompt.segment":
+    "Quanti contatti ci sono nel segmento VIP e come è cambiato questo mese?",
+  "marketplace.plugin.omnisend.prompt.draftCampaign":
+    "Prepara una bozza di campagna per la nuova collezione, ma non inviarla.",
   "marketplace.plugin.composio.tagline": "Tante app tramite il tuo link Composio",
   "marketplace.plugin.composio.description":
     "Composio collega gli agenti a Gmail, Slack, GitHub e centinaia di altre app tramite un solo server MCP. Collega le app che vuoi nel tuo account Composio, poi incolla qui il suo URL MCP e la sua chiave API.",

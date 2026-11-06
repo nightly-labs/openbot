@@ -27,6 +27,7 @@ import { MARKETPLACE_TAB_ROUTES } from "./marketplace-routes";
 import { MOBILE_APPS } from "./mobile-apps";
 import { PRICING_ROUTE } from "./pricing-page";
 import { PRIVACY_POLICY_ROUTE } from "./privacy-policy";
+import { pagePaths } from "./site-paths";
 import { TEAMS_ROUTE } from "./teams-page";
 import { TERMS_ROUTE } from "./terms";
 
@@ -111,6 +112,12 @@ type LandingDestination =
   | "teams"
   | "pricing"
   | "x"
+  | "threads"
+  | "linkedin"
+  | "reddit"
+  | "instagram"
+  | "tiktok"
+  | "facebook"
   | "discord"
   | "repository"
   | "releases"
@@ -239,7 +246,17 @@ const LINK_DESTINATIONS = new Map<string, LandingDestination>([
   [OPENBOT_LINKS.contact, "contact"],
   [TEAMS_ROUTE, "teams"],
   [PRICING_ROUTE, "pricing"],
+  // The Polish copies are the same destinations.
+  [pagePaths("/contact").pl, "contact"],
+  [pagePaths("/teams").pl, "teams"],
+  [pagePaths("/pricing").pl, "pricing"],
   [OPENBOT_LINKS.x, "x"],
+  [OPENBOT_LINKS.threads, "threads"],
+  [OPENBOT_LINKS.linkedin, "linkedin"],
+  [OPENBOT_LINKS.reddit, "reddit"],
+  [OPENBOT_LINKS.instagram, "instagram"],
+  [OPENBOT_LINKS.tiktok, "tiktok"],
+  [OPENBOT_LINKS.facebook, "facebook"],
   [OPENBOT_LINKS.discord, "discord"],
   [OPENBOT_LINKS.repository, "repository"],
   [OPENBOT_LINKS.releases, "releases"],
@@ -441,7 +458,8 @@ class LandingAnalytics {
   #handleClick(event: MouseEvent): void {
     const target = event.target;
     const link = target instanceof Element ? target.closest<HTMLAnchorElement>("a[href]") : null;
-    if (!link) return;
+    // A language choice opens the same page, not a destination.
+    if (!link || link.closest(".site-language-menu")) return;
     const placement = landingPlacement(link);
     const href = link.getAttribute("href") ?? "";
     const downloadPlatform = DOWNLOAD_PLATFORMS_BY_HREF.get(href);

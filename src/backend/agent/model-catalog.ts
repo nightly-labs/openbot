@@ -3,6 +3,7 @@ import { isAgentModel, isReasoningEffort } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import type { AgentClient, AgentProvider } from "./../agent-client";
+import { providerCheckTimeoutMs } from "../disk-restore";
 import { decodeModelListResponse, type ModelListResponse } from "./../protocol";
 import { providerFailure } from "../provider-client-effects";
 import {
@@ -72,7 +73,7 @@ export class ModelCatalog {
         decodeModelListResponse,
         // A slow list answers inside the normal request timeout, and a list that timed out
         // kept that agent out of the catalogue.
-        catalog.slowList ? this.#options.requestTimeoutMs : 5_000,
+        providerCheckTimeoutMs(catalog.slowList ? this.#options.requestTimeoutMs : 5_000),
       );
       // Every model the CLI reports is offered, the ones it marks hidden included; only the
       // stored-key drop below keeps a model out. A CLI hides a model it still accepts -- a new release such

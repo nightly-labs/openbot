@@ -84,7 +84,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "{model}, {name} yazmaya başlamadan önce kullanım sınırına ulaşırsa {name} hangi modelin kullanılacağını size sorar.",
   "agentSettings.backupModels.introAutomatic":
-    "{model}, {name} yazmaya başlamadan önce kullanım sınırına ulaşırsa veya bir sağlayıcı hatasıyla başarısız olursa {name} sıradaki ilk uygun modele geçer.",
+    "{model} kullanım sınırına ulaşırsa {name} sıradaki ilk uygun modele geçer. {name} yazmaya başlamadan önce {model} bir sağlayıcı hatasıyla başarısız olursa da {name} geçiş yapar.",
   "agentSettings.backupModels.ask": "Değiştirmeden önce sor",
   "agentSettings.backupModels.order": "Sıra",
   "agentSettings.backupModels.listLabel": "Yedek modeller, sırayla",

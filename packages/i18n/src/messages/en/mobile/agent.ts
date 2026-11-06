@@ -343,7 +343,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.backupModels.intro":
     "When {model} reaches its usage limit before {name} starts to write, {name} asks you which model to use.",
   "mobile.agent.backupModels.introAutomatic":
-    "When {model} reaches its usage limit or fails with a provider error before {name} starts to write, {name} switches to the first available model in the order.",
+    "When {model} reaches its usage limit, {name} switches to the first available model in the order. {name} also switches when {model} fails with a provider error before {name} starts to write.",
   "mobile.agent.backupModels.ask": "Ask before switching",
   "mobile.agent.backupModels.order": "Order",
   "mobile.agent.backupModels.empty": "No order set. {name} offers each available model.",

@@ -359,7 +359,7 @@ export const messages = {
   "mobile.agent.backupModels.intro":
     "Wenn {model} sein Nutzungslimit erreicht, bevor {name} zu schreiben beginnt, fragt {name} dich, welches Modell verwendet werden soll.",
   "mobile.agent.backupModels.introAutomatic":
-    "Wenn {model} sein Nutzungslimit erreicht oder mit einem Anbieterfehler scheitert, bevor {name} zu schreiben beginnt, wechselt {name} zum ersten verfügbaren Modell in der Reihenfolge.",
+    "Wenn {model} sein Nutzungslimit erreicht, wechselt {name} zum ersten verfügbaren Modell in der Reihenfolge. {name} wechselt auch, wenn {model} mit einem Anbieterfehler scheitert, bevor {name} zu schreiben beginnt.",
   "mobile.agent.backupModels.ask": "Vor dem Wechsel fragen",
   "mobile.agent.backupModels.order": "Reihenfolge",
   "mobile.agent.backupModels.empty": "Keine Reihenfolge festgelegt. {name} bietet jedes verfügbare Modell an.",

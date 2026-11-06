@@ -203,6 +203,14 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Higgsfield로 나무 테이블 위 세라믹 머그잔의 제품 사진을 만들어 줘.",
   "marketplace.plugin.higgsfield.prompt.clip": "Higgsfield로 해 질 녘 파도의 5초 동영상을 만들어 줘.",
+  "marketplace.plugin.elevenlabs.tagline": "음성, 보이스, 음성 에이전트",
+  "marketplace.plugin.elevenlabs.description":
+    "ElevenLabs로 에이전트가 텍스트를 음성으로 바꾸고, 보이스를 다루고, ElevenLabs 음성 에이전트와 그 대화를 만들고 테스트하고 검토할 수 있습니다. 생성된 오디오는 잠시만 유효한 다운로드 링크로 돌아옵니다. 각 사용자는 브라우저에서 자신의 ElevenLabs 계정에 로그인하며, 생성할 때마다 그 계정의 크레딧을 사용합니다.",
+  "marketplace.plugin.elevenlabs.app":
+    "텍스트 음성 변환, 보이스, 음성 에이전트 관리. 브라우저 로그인을 쓰는 ElevenLabs MCP 서버를 통해 작동합니다.",
+  "marketplace.plugin.elevenlabs.prompt.speech": "이 문단을 차분한 ElevenLabs 보이스로 읽어 주고 오디오를 줘.",
+  "marketplace.plugin.elevenlabs.prompt.agents": "내 ElevenLabs 음성 에이전트와 각각이 쓰는 보이스를 보여 줘.",
+  "marketplace.plugin.elevenlabs.prompt.conversations": "지원용 음성 에이전트의 최근 대화 10개를 요약해 줘.",
   "marketplace.plugin.appleApps.tagline": "Mac의 Mail, 캘린더 등",
   "marketplace.plugin.appleApps.description":
     "Apple apps를 사용하면 에이전트가 이 Mac의 Mail, 캘린더, 연락처, 미리 알림, 메모, 메시지, Safari를 사용할 수 있어요. macOS에서만 작동해요. OpenBot은 mcp-icloud를 시작해요. Apple이나 OpenBot이 만들지 않은 커뮤니티 서버예요. 서버는 이 컴퓨터에서 AppleScript로 앱을 제어하며, 계정이나 키가 필요 없어요. 설치할 때 OpenBot이 이 모든 앱에 대한 접근을 macOS에 한 번에 요청할 수 있어요. 앱마다 확인 창이 하나씩 떠요. 요청하지 않으면 에이전트가 앱을 처음 사용할 때 macOS가 물어요. 나중에 바꾸려면 시스템 설정 › 개인정보 보호 및 보안 › 자동화를 여세요. 에이전트는 이메일과 iMessage를 보내고 이벤트, 연락처, 미리 알림을 변경하거나 삭제할 수 있으니, 승인하기 전에 각 쓰기를 확인하세요. 이메일 본문처럼 도구가 읽은 내용은 에이전트의 모델 제공자에게 전송돼요.",
@@ -322,6 +330,14 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "출시 공지 초안을 베타 목록에 보내 줘.",
   "marketplace.plugin.resend.prompt.status": "청구서 이메일이 고객에게 도착했어?",
   "marketplace.plugin.resend.prompt.template": "새 플로우에 맞는 비밀번호 재설정 이메일 초안을 작성해 줘.",
+  "marketplace.plugin.omnisend.tagline": "이메일 및 SMS 마케팅",
+  "marketplace.plugin.omnisend.description":
+    "Omnisend를 사용하면 에이전트가 캠페인과 양식 보고서를 읽고, 연락처와 세그먼트를 찾고, 캠페인, 자동화, 이메일 템플릿, 양식, 상품을 만들고 수정할 수 있습니다. 각 사용자는 브라우저에서 자신의 Omnisend 계정에 로그인하고 동의 화면에서 액세스 수준을 선택합니다. 쓰기 액세스가 있으면 에이전트가 캠페인을 보내고 데이터를 삭제할 수도 있습니다. 에이전트에게 보고서만 필요하면 읽기 전용 액세스를 선택하세요.",
+  "marketplace.plugin.omnisend.app":
+    "캠페인, 자동화, 연락처, 세그먼트, 양식, 보고서. 브라우저 로그인으로 Omnisend MCP 서버를 통해 사용합니다.",
+  "marketplace.plugin.omnisend.prompt.lastCampaign": "지난주 캠페인 성과는 그 전 주와 비교해 어땠어?",
+  "marketplace.plugin.omnisend.prompt.segment": "VIP 세그먼트에 연락처가 몇 개 있고, 이번 달에 어떻게 바뀌었어?",
+  "marketplace.plugin.omnisend.prompt.draftCampaign": "새 컬렉션용 캠페인 초안을 작성해 줘. 단, 보내지는 마.",
   "marketplace.plugin.composio.tagline": "내 Composio 링크로 연결하는 다양한 앱",
   "marketplace.plugin.composio.description":
     "Composio는 MCP 서버 하나로 에이전트를 Gmail, Slack, GitHub 등 수백 개의 앱에 연결해요. Composio 계정에서 원하는 앱을 연결한 다음, 해당 MCP URL과 API 키를 여기에 붙여넣어 주세요.",

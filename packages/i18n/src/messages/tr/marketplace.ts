@@ -244,6 +244,14 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Higgsfield ile ahşap masa üzerinde seramik bir kupanın ürün fotoğrafını yap.",
   "marketplace.plugin.higgsfield.prompt.clip": "Higgsfield ile gün batımında dalgaların 5 saniyelik bir videosunu yap.",
+  "marketplace.plugin.elevenlabs.tagline": "Konuşma, sesler ve sesli ajanlar",
+  "marketplace.plugin.elevenlabs.description":
+    "ElevenLabs, ajanların metni konuşmaya çevirmesini, seslerle çalışmasını ve ElevenLabs sesli ajanlarını ve konuşmalarını oluşturmasını, test etmesini ve incelemesini sağlar. Üretilen ses kısa ömürlü bir indirme bağlantısı olarak gelir. Her kullanıcı tarayıcıda kendi ElevenLabs hesabına giriş yapar ve her üretim o hesabın kredilerini kullanır.",
+  "marketplace.plugin.elevenlabs.app":
+    "Metinden konuşmaya, sesler ve sesli ajan yönetimi, tarayıcıda giriş ile ElevenLabs'in MCP sunucusu üzerinden.",
+  "marketplace.plugin.elevenlabs.prompt.speech": "Bu paragrafı sakin bir ElevenLabs sesiyle oku ve sesi bana ver.",
+  "marketplace.plugin.elevenlabs.prompt.agents": "ElevenLabs sesli ajanlarımı ve her birinin kullandığı sesi listele.",
+  "marketplace.plugin.elevenlabs.prompt.conversations": "Destek sesli ajanımın son on konuşmasını özetle.",
   "marketplace.plugin.appleApps.tagline": "Mac'inizde Mail, Takvim ve daha fazlası",
   "marketplace.plugin.appleApps.description":
     "Apple apps, ajanların bu Mac'te Mail, Takvim, Kişiler, Anımsatıcılar, Notlar, Mesajlar ve Safari'yi kullanmasını sağlar. Yalnızca macOS'te çalışır. OpenBot, Apple veya OpenBot tarafından yapılmamış bir topluluk sunucusu olan mcp-icloud'u başlatır. Sunucu uygulamaları bu bilgisayarda AppleScript ile kontrol eder ve hesap ya da anahtar gerektirmez. Yükleme sırasında OpenBot, macOS'ten bu uygulamaların tümüne tek seferde erişim isteyebilir; her uygulama için bir istem gösterilir. İstemezseniz, bir ajan bir uygulamayı ilk kez kullandığında macOS sorar. Bunu daha sonra değiştirmek için Sistem Ayarları › Gizlilik ve Güvenlik › Otomasyon'u açın. Ajanlar e-posta ve iMessage gönderebilir, etkinlikleri, kişileri ve anımsatıcıları değiştirebilir veya silebilir; bu yüzden her yazma işlemini onaylamadan önce gözden geçirin. Araçların okuduğu içerik, örneğin e-posta metni, ajanın model sağlayıcısına gider.",
@@ -371,6 +379,15 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "Lansman duyurusu taslağını beta listesine gönder.",
   "marketplace.plugin.resend.prompt.status": "Fatura e-postası müşteriye ulaştı mı?",
   "marketplace.plugin.resend.prompt.template": "Yeni akış için bir parola sıfırlama e-postası taslağı hazırla.",
+  "marketplace.plugin.omnisend.tagline": "E-posta ve SMS pazarlaması",
+  "marketplace.plugin.omnisend.description":
+    "Omnisend, ajanların kampanya ve form raporlarını okumasını, kişileri ve segmentleri bulmasını, kampanyalar, otomasyonlar, e-posta şablonları, formlar ve ürünler oluşturup düzenlemesini sağlar. Her kullanıcı tarayıcıda kendi Omnisend hesabına giriş yapar ve onay ekranında erişim düzeyini seçer. Yazma erişimiyle ajanlar kampanya da gönderebilir ve veri silebilir. Ajanlar yalnızca rapora ihtiyaç duyuyorsa salt okunur erişimi seç.",
+  "marketplace.plugin.omnisend.app":
+    "Kampanyalar, otomasyonlar, kişiler, segmentler, formlar ve raporlar; tarayıcıda giriş ile Omnisend'in MCP sunucusu üzerinden.",
+  "marketplace.plugin.omnisend.prompt.lastCampaign":
+    "Geçen haftanın kampanyaları bir önceki haftaya göre nasıl performans gösterdi?",
+  "marketplace.plugin.omnisend.prompt.segment": "VIP segmentinde kaç kişi var ve bu ay nasıl değişti?",
+  "marketplace.plugin.omnisend.prompt.draftCampaign": "Yeni koleksiyon için bir kampanya taslağı hazırla ama gönderme.",
   "marketplace.plugin.composio.tagline": "Kendi Composio bağlantınız üzerinden birçok uygulama",
   "marketplace.plugin.composio.description":
     "Composio, ajanları tek bir MCP sunucusu üzerinden Gmail, Slack, GitHub ve yüzlerce başka uygulamaya bağlar. İstediğiniz uygulamaları Composio hesabınızda bağlayın, ardından MCP URL'sini ve API anahtarını buraya yapıştırın.",

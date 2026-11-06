@@ -236,6 +236,10 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Сервер остановился, не ответив. Запустите команду в терминале, чтобы увидеть ошибку.",
   "error.backend.mcpServerFailedToStart": "Сервер не запустился: {reason}",
+  "error.backend.mcpServerSignInForProvider":
+    "{provider} не может использовать MCP-сервер {name}: сервер требует входа. Откройте настройки MCP и выберите «Войти».",
+  "error.backend.mcpServerFailedForProvider":
+    "{provider} не может запустить MCP-сервер {name}. Откройте настройки MCP и выберите «Проверить подключение», чтобы увидеть причину.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot не смог запустить локальное подключение для входа на этот сервер. Перезапустите OpenBot и повторите попытку.",
   "error.backend.mcpOAuthSignInNeeded":

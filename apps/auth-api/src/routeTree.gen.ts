@@ -21,6 +21,7 @@ import { Route as ContactRouteImport } from './routes/contact'
 import { Route as DpaRouteImport } from './routes/dpa'
 import { Route as JoinRouteImport } from './routes/join'
 import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
+import { Route as PlRouteImport } from './routes/pl'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
@@ -52,6 +53,10 @@ import { Route as NewsIndexRouteImport } from './routes/news/index'
 import { Route as NewsSlugRouteImport } from './routes/news/$slug'
 import { Route as NewsOpenbotVsGrokbotRouteImport } from './routes/news/openbot-vs-grokbot'
 import { Route as NewsRssDotxmlRouteImport } from './routes/news/rss[.]xml'
+import { Route as OauthMcpClientDotjsonRouteImport } from './routes/oauth/mcp-client[.]json'
+import { Route as PlContactRouteImport } from './routes/pl_/contact'
+import { Route as PlPricingRouteImport } from './routes/pl_/pricing'
+import { Route as PlTeamsRouteImport } from './routes/pl_/teams'
 import { Route as PluginsIndexRouteImport } from './routes/plugins/index'
 import { Route as PluginsSlugRouteImport } from './routes/plugins/$slug'
 import { Route as ProvidersIndexRouteImport } from './routes/providers/index'
@@ -259,6 +264,11 @@ const LlmsDottxtRoute = LlmsDottxtRouteImport.update({
   path: '/llms.txt',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlRoute = PlRouteImport.update({
+  id: '/pl',
+  path: '/pl',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PricingRoute = PricingRouteImport.update({
   id: '/pricing',
   path: '/pricing',
@@ -413,6 +423,26 @@ const NewsOpenbotVsGrokbotRoute = NewsOpenbotVsGrokbotRouteImport.update({
 const NewsRssDotxmlRoute = NewsRssDotxmlRouteImport.update({
   id: '/news/rss.xml',
   path: '/news/rss.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OauthMcpClientDotjsonRoute = OauthMcpClientDotjsonRouteImport.update({
+  id: '/oauth/mcp-client.json',
+  path: '/oauth/mcp-client.json',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlContactRoute = PlContactRouteImport.update({
+  id: '/pl_/contact',
+  path: '/pl/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlPricingRoute = PlPricingRouteImport.update({
+  id: '/pl_/pricing',
+  path: '/pl/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlTeamsRoute = PlTeamsRouteImport.update({
+  id: '/pl_/teams',
+  path: '/pl/teams',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PluginsIndexRoute = PluginsIndexRouteImport.update({
@@ -1224,6 +1254,7 @@ export interface FileRoutesByFullPath {
   '/dpa': typeof DpaRoute
   '/join': typeof JoinRoute
   '/llms.txt': typeof LlmsDottxtRoute
+  '/pl': typeof PlRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
@@ -1249,6 +1280,10 @@ export interface FileRoutesByFullPath {
   '/news/$slug': typeof NewsSlugRoute
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
+  '/oauth/mcp-client.json': typeof OauthMcpClientDotjsonRoute
+  '/pl/contact': typeof PlContactRoute
+  '/pl/pricing': typeof PlPricingRoute
+  '/pl/teams': typeof PlTeamsRoute
   '/plugins/$slug': typeof PluginsSlugRoute
   '/providers/$slug': typeof ProvidersSlugRoute
   '/providers/rss.xml': typeof ProvidersRssDotxmlRoute
@@ -1415,6 +1450,7 @@ export interface FileRoutesByTo {
   '/dpa': typeof DpaRoute
   '/join': typeof JoinRoute
   '/llms.txt': typeof LlmsDottxtRoute
+  '/pl': typeof PlRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
@@ -1440,6 +1476,10 @@ export interface FileRoutesByTo {
   '/news/$slug': typeof NewsSlugRoute
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
+  '/oauth/mcp-client.json': typeof OauthMcpClientDotjsonRoute
+  '/pl/contact': typeof PlContactRoute
+  '/pl/pricing': typeof PlPricingRoute
+  '/pl/teams': typeof PlTeamsRoute
   '/plugins/$slug': typeof PluginsSlugRoute
   '/providers/$slug': typeof ProvidersSlugRoute
   '/providers/rss.xml': typeof ProvidersRssDotxmlRoute
@@ -1607,6 +1647,7 @@ export interface FileRoutesById {
   '/dpa': typeof DpaRoute
   '/join': typeof JoinRoute
   '/llms.txt': typeof LlmsDottxtRoute
+  '/pl': typeof PlRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
@@ -1632,6 +1673,10 @@ export interface FileRoutesById {
   '/news/$slug': typeof NewsSlugRoute
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
+  '/oauth/mcp-client.json': typeof OauthMcpClientDotjsonRoute
+  '/pl_/contact': typeof PlContactRoute
+  '/pl_/pricing': typeof PlPricingRoute
+  '/pl_/teams': typeof PlTeamsRoute
   '/plugins/$slug': typeof PluginsSlugRoute
   '/providers/$slug': typeof ProvidersSlugRoute
   '/providers/rss.xml': typeof ProvidersRssDotxmlRoute
@@ -1800,6 +1845,7 @@ export interface FileRouteTypes {
     | '/dpa'
     | '/join'
     | '/llms.txt'
+    | '/pl'
     | '/pricing'
     | '/privacy'
     | '/privacy-policy'
@@ -1825,6 +1871,10 @@ export interface FileRouteTypes {
     | '/news/$slug'
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
+    | '/oauth/mcp-client.json'
+    | '/pl/contact'
+    | '/pl/pricing'
+    | '/pl/teams'
     | '/plugins/$slug'
     | '/providers/$slug'
     | '/providers/rss.xml'
@@ -1991,6 +2041,7 @@ export interface FileRouteTypes {
     | '/dpa'
     | '/join'
     | '/llms.txt'
+    | '/pl'
     | '/pricing'
     | '/privacy'
     | '/privacy-policy'
@@ -2016,6 +2067,10 @@ export interface FileRouteTypes {
     | '/news/$slug'
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
+    | '/oauth/mcp-client.json'
+    | '/pl/contact'
+    | '/pl/pricing'
+    | '/pl/teams'
     | '/plugins/$slug'
     | '/providers/$slug'
     | '/providers/rss.xml'
@@ -2182,6 +2237,7 @@ export interface FileRouteTypes {
     | '/dpa'
     | '/join'
     | '/llms.txt'
+    | '/pl'
     | '/pricing'
     | '/privacy'
     | '/privacy-policy'
@@ -2207,6 +2263,10 @@ export interface FileRouteTypes {
     | '/news/$slug'
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
+    | '/oauth/mcp-client.json'
+    | '/pl_/contact'
+    | '/pl_/pricing'
+    | '/pl_/teams'
     | '/plugins/$slug'
     | '/providers/$slug'
     | '/providers/rss.xml'
@@ -2374,6 +2434,7 @@ export interface RootRouteChildren {
   DpaRoute: typeof DpaRoute
   JoinRoute: typeof JoinRoute
   LlmsDottxtRoute: typeof LlmsDottxtRoute
+  PlRoute: typeof PlRoute
   PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
   PrivacyPolicyRoute: typeof PrivacyPolicyRoute
@@ -2399,6 +2460,10 @@ export interface RootRouteChildren {
   NewsSlugRoute: typeof NewsSlugRoute
   NewsOpenbotVsGrokbotRoute: typeof NewsOpenbotVsGrokbotRoute
   NewsRssDotxmlRoute: typeof NewsRssDotxmlRoute
+  OauthMcpClientDotjsonRoute: typeof OauthMcpClientDotjsonRoute
+  PlContactRoute: typeof PlContactRoute
+  PlPricingRoute: typeof PlPricingRoute
+  PlTeamsRoute: typeof PlTeamsRoute
   PluginsSlugRoute: typeof PluginsSlugRoute
   ProvidersSlugRoute: typeof ProvidersSlugRoute
   ProvidersRssDotxmlRoute: typeof ProvidersRssDotxmlRoute
@@ -2611,6 +2676,13 @@ declare module '@tanstack/solid-router' {
       path: '/llms.txt'
       fullPath: '/llms.txt'
       preLoaderRoute: typeof LlmsDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pl': {
+      id: '/pl'
+      path: '/pl'
+      fullPath: '/pl'
+      preLoaderRoute: typeof PlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pricing': {
@@ -2828,6 +2900,34 @@ declare module '@tanstack/solid-router' {
       path: '/news/rss.xml'
       fullPath: '/news/rss.xml'
       preLoaderRoute: typeof NewsRssDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oauth/mcp-client.json': {
+      id: '/oauth/mcp-client.json'
+      path: '/oauth/mcp-client.json'
+      fullPath: '/oauth/mcp-client.json'
+      preLoaderRoute: typeof OauthMcpClientDotjsonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pl_/contact': {
+      id: '/pl_/contact'
+      path: '/pl/contact'
+      fullPath: '/pl/contact'
+      preLoaderRoute: typeof PlContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pl_/pricing': {
+      id: '/pl_/pricing'
+      path: '/pl/pricing'
+      fullPath: '/pl/pricing'
+      preLoaderRoute: typeof PlPricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pl_/teams': {
+      id: '/pl_/teams'
+      path: '/pl/teams'
+      fullPath: '/pl/teams'
+      preLoaderRoute: typeof PlTeamsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/plugins/': {
@@ -4015,6 +4115,7 @@ const rootRouteChildren: RootRouteChildren = {
   DpaRoute: DpaRoute,
   JoinRoute: JoinRoute,
   LlmsDottxtRoute: LlmsDottxtRoute,
+  PlRoute: PlRoute,
   PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
   PrivacyPolicyRoute: PrivacyPolicyRoute,
@@ -4041,6 +4142,10 @@ const rootRouteChildren: RootRouteChildren = {
   NewsSlugRoute: NewsSlugRoute,
   NewsOpenbotVsGrokbotRoute: NewsOpenbotVsGrokbotRoute,
   NewsRssDotxmlRoute: NewsRssDotxmlRoute,
+  OauthMcpClientDotjsonRoute: OauthMcpClientDotjsonRoute,
+  PlContactRoute: PlContactRoute,
+  PlPricingRoute: PlPricingRoute,
+  PlTeamsRoute: PlTeamsRoute,
   PluginsSlugRoute: PluginsSlugRoute,
   ProvidersSlugRoute: ProvidersSlugRoute,
   ProvidersRssDotxmlRoute: ProvidersRssDotxmlRoute,

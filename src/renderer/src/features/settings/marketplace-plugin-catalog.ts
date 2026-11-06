@@ -588,6 +588,47 @@ const HIGGSFIELD: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/higgsfield",
 };
 
+const ELEVENLABS: MarketplacePluginDetail = {
+  id: "plugin-elevenlabs",
+  slug: "elevenlabs",
+  name: "ElevenLabs",
+  tagline: "Speech, voices and voice agents",
+  description:
+    "ElevenLabs lets agents turn text into speech, work with voices, and create, test and review ElevenLabs voice agents and their conversations. Generated audio comes back as a short-lived download link. Each user signs in to their own ElevenLabs account through the browser, and each generation uses credits of that account.",
+  category: "design",
+  creatorName: "ElevenLabs",
+  iconUrl: "https://elevenlabs.io/favicon.ico",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-speech", text: "Read this paragraph aloud with a calm ElevenLabs voice and give me the audio." },
+    { id: "prompt-agents", text: "List my ElevenLabs voice agents and the voice each one uses." },
+    { id: "prompt-conversations", text: "Summarize the last ten conversations of my support voice agent." },
+  ],
+  apps: [
+    {
+      id: "app-elevenlabs-mcp",
+      name: "ElevenLabs",
+      description:
+        "Text to speech, voices, and voice agent management, over ElevenLabs' MCP server with browser sign-in.",
+      iconUrl: "https://elevenlabs.io/favicon.ico",
+      server: {
+        name: "elevenlabs",
+        transport: "http",
+        url: "https://api.elevenlabs.io/v1/mcp",
+        auth: [{ id: "elevenlabs-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://elevenlabs.io",
+  privacyPolicyUrl: "https://elevenlabs.io/privacy-policy",
+  termsUrl: "https://elevenlabs.io/terms-of-use",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-09-30T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/elevenlabs",
+};
+
 const APPLE_APPS: MarketplacePluginDetail = {
   id: "plugin-apple-apps",
   slug: "apple-apps",
@@ -1491,6 +1532,47 @@ const RESEND: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/resend",
 };
 
+const OMNISEND: MarketplacePluginDetail = {
+  id: "plugin-omnisend",
+  slug: "omnisend",
+  name: "Omnisend",
+  tagline: "Email and SMS marketing",
+  description:
+    "Omnisend lets agents read campaign and form reports, find contacts and segments, and create and edit campaigns, automations, email templates, forms and products. Each user signs in to their own Omnisend account through the browser and selects the access level on the consent screen. With write access, agents can also send campaigns and delete data. Select read-only access when agents only need reports.",
+  category: "automation",
+  creatorName: "Omnisend",
+  iconUrl: "https://www.omnisend.com/wp-content/uploads/2022/07/cropped-favi-192x192.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-last-campaign", text: "How did last week's campaigns perform compared to the week before?" },
+    { id: "prompt-segment", text: "How many contacts are in the VIP segment, and how did it change this month?" },
+    { id: "prompt-draft-campaign", text: "Draft a campaign for the new collection, but do not send it." },
+  ],
+  apps: [
+    {
+      id: "app-omnisend-mcp",
+      name: "Omnisend",
+      description:
+        "Campaigns, automations, contacts, segments, forms and reports, over Omnisend's MCP server with browser sign-in.",
+      iconUrl: "https://www.omnisend.com/wp-content/uploads/2022/07/cropped-favi-192x192.png",
+      server: {
+        name: "omnisend",
+        transport: "http",
+        url: "https://mcp.omnisend.com/mcp",
+        auth: [{ id: "omnisend-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://www.omnisend.com",
+  privacyPolicyUrl: "https://www.omnisend.com/privacy/",
+  termsUrl: "https://www.omnisend.com/terms/",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-09-30T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/omnisend",
+};
+
 const COMPOSIO: MarketplacePluginDetail = {
   id: "plugin-composio",
   slug: "composio",
@@ -1690,6 +1772,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   FIGMA,
   PAPER,
   HIGGSFIELD,
+  ELEVENLABS,
   APPLE_APPS,
   SENTRY,
   GITLAB,
@@ -1710,6 +1793,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   FIRECRAWL,
   BRAVE_SEARCH,
   RESEND,
+  OMNISEND,
   COMPOSIO,
   CLICKUP,
   COINBASE,

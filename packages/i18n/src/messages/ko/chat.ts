@@ -319,6 +319,8 @@ export const messages = {
   "chat.message.agentFallback": "에이전트",
   "chat.message.memberFallback": "팀 멤버",
   "chat.message.attachment": "첨부 파일",
+  "chat.message.showFull": "전체 메시지 보기",
+  "chat.message.showLess": "간단히 보기",
   "chat.actions.userLabel": "사용자 메시지 작업",
   "chat.actions.label": "{name} 메시지 작업",
   "chat.actions.addReaction": "반응 추가",

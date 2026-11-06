@@ -36,6 +36,7 @@ import { AgentAvatar } from "../agents/AgentAvatar";
 import type { AgentInstructionsFileCalls } from "./AgentInstructionsView";
 import { formatChatTimestamp } from "./chat-timestamp";
 import { InstructionsChangeActions } from "./InstructionsChangeActions";
+import { MAIN_THREAD_ID } from "./threads/thread-types";
 
 interface ChatActionMarkerProps {
   marker: ChatActionMarkerModel;
@@ -43,7 +44,7 @@ interface ChatActionMarkerProps {
   announce?: boolean | undefined;
   onOpenSkill?: ((skill: { skillId: string }) => void) | undefined;
   routineAvailable?: boolean | undefined;
-  onSelectAgent: (agentId: string) => void;
+  onSelectAgent: (agentId: string, tabId?: string) => void;
   onOpenRoutine?: ((routine: { routineId: string; name: string }) => void) | undefined;
   /**
    * The action that opens the side thread where a routine runs, by routine id. Absent, or undefined
@@ -188,7 +189,7 @@ function MarkerGroup(
     drawnCount: number;
     agents: AgentProfile[];
     routineAvailable?: boolean | undefined;
-    onSelectAgent: (agentId: string) => void;
+    onSelectAgent: (agentId: string, tabId?: string) => void;
     onOpenRoutine?: ((routine: { routineId: string; name: string }) => void) | undefined;
     expanded?: boolean | undefined;
     onToggle?: (() => void) | undefined;
@@ -275,7 +276,7 @@ function AgentMessageGroupMarker(
     group: AgentMessageGroupMarkerModel;
     agents: AgentProfile[];
     drawnMessageCount: number;
-    onSelectAgent: (agentId: string) => void;
+    onSelectAgent: (agentId: string, tabId?: string) => void;
   },
 ) {
   const { t, format } = useText();
@@ -348,7 +349,7 @@ function RoutineRunGroupMarker(props: {
   agents: AgentProfile[];
   drawnRunCount: number;
   routineAvailable?: boolean | undefined;
-  onSelectAgent: (agentId: string) => void;
+  onSelectAgent: (agentId: string, tabId?: string) => void;
   onOpenRoutine?: ((routine: { routineId: string; name: string }) => void) | undefined;
   openRoutineThread?: ((routineId: string) => (() => void) | undefined) | undefined;
   onToggle?: (() => void) | undefined;
@@ -745,9 +746,13 @@ function HostedSiteTarget(props: {
 function AgentTarget(props: {
   marker: Extract<ChatActionMarkerModel, { kind: "agent-message" }>;
   agents: AgentProfile[];
-  onSelectAgent: (agentId: string) => void;
+  onSelectAgent: (agentId: string, tabId?: string) => void;
 }) {
   const { t } = useText();
+  // A link opens a conversation of the message, not the thread tab the agent showed last: the side
+  // thread that sent it, or else the agent's own chat.
+  const openSource = (agentId: string) => props.onSelectAgent(agentId, props.marker.senderTaskId ?? MAIN_THREAD_ID);
+  const openRecipient = (agentId: string) => props.onSelectAgent(agentId, MAIN_THREAD_ID);
   const source = () => props.agents.find((agent) => agent.id === props.marker.sourceAgentId);
   const recipients = () => props.marker.targetDeliveries;
   const singleRecipient = () => {
@@ -757,18 +762,12 @@ function AgentTarget(props: {
   return (
     <Show
       when={props.marker.direction === "outgoing"}
-      fallback={
-        <AgentButton agent={source()} fallbackId={props.marker.sourceAgentId} onSelectAgent={props.onSelectAgent} />
-      }
+      fallback={<AgentButton agent={source()} fallbackId={props.marker.sourceAgentId} onSelectAgent={openSource} />}
     >
       <Show
         when={recipients().length > 1}
         fallback={
-          <AgentButton
-            agent={singleRecipient()}
-            fallbackId={recipients()[0]?.agentId}
-            onSelectAgent={props.onSelectAgent}
-          />
+          <AgentButton agent={singleRecipient()} fallbackId={recipients()[0]?.agentId} onSelectAgent={openRecipient} />
         }
       >
         <DropdownMenu.Root placement="bottom" gutter={8} modal={false}>
@@ -798,7 +797,7 @@ function AgentTarget(props: {
                   <DropdownMenu.Item
                     class="chat-action-agent-menu-item"
                     disabled={!agent()}
-                    onSelect={() => props.onSelectAgent(delivery.agentId)}
+                    onSelect={() => openRecipient(delivery.agentId)}
                   >
                     <AgentAvatar agent={agent()} class="chat-action-agent-avatar" />
                     <span class="chat-action-agent-menu-name">

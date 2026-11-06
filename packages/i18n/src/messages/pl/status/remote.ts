@@ -58,4 +58,6 @@ export const messages = {
     many: "Ponowne łączenie {attempt}/{count}",
     other: "Ponowne łączenie {attempt}/{count}",
   },
+  "status.remote.messageCut":
+    "[{size} MB tej wiadomości nie jest widoczne na tym urządzeniu. Otwórz ją na komputerze, na którym działa serwer, aby przeczytać całość.]",
 } as const satisfies PartialTranslation<typeof source>;
