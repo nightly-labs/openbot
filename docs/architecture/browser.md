@@ -142,6 +142,17 @@ non-login work. The host does not rewrite site scripts or weaken cross-origin se
 Input dispatch runs inside those checks and queues. Upload staging also uses the shared parser before
 it checks local file access.
 
+An agent tab refuses cookie banners (`browser-consent.ts`). On `dom-ready`, the host runs a small
+script of its own in an isolated world of the main frame. For up to 15 seconds, it looks for one
+visible reject button: the button of a common consent platform, or a button whose whole label
+refuses optional cookies ("Reject all", "Only necessary", and the same in some other languages)
+inside a dialog, a fixed or sticky box, or a consent container that shows cookie text. It also
+looks in open shadow roots, because some platforms build the banner from web components. It clicks
+that button once and stops. It never accepts, so a banner with no reject button stays. A tab that a
+person opened, or controls when its page loads, keeps its banner, and so does a secret tab. Banners
+in frames (for example Sourcepoint) are not handled. `bun run test:browser --scenario=cookie-banner` covers it and writes
+`.openbot-build/browser-cookie-banner.json`.
+
 ### Fill inspected ordinary fields
 
 `openbot_browser.fill_fields` is a deferred tool in the original browser catalog. It replaces
