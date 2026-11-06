@@ -296,12 +296,13 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   let scroller: HTMLElement | undefined;
   let atEnd = true;
   /**
-   * The place of the reader when they asked for older messages: the first message then, and the
-   * distance from the end. The page goes in above, and the view keeps the reader at the same message.
+   * The place of the reader when they asked for older messages: the first message then, and where its
+   * row was. The page goes in above, and the view keeps that row in its place.
    */
-  let olderAnchor: { firstId: string | undefined; fromEnd: number } | undefined;
+  let olderAnchor: { firstId: string | undefined; row: Element; top: number } | undefined;
   function loadOlder(older: AgentThreadOlderMessages): void {
-    if (scroller) olderAnchor = { firstId: props.messages[0]?.id, fromEnd: scroller.scrollHeight - scroller.scrollTop };
+    const row = scroller?.querySelector(".virtual-chat-row");
+    if (row) olderAnchor = { firstId: props.messages[0]?.id, row, top: row.getBoundingClientRect().top };
     older.onLoad();
   }
   // A read that ends with no new messages leaves no place to keep.
@@ -345,7 +346,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       const anchor = olderAnchor;
       if (anchor && untrack(() => props.messages[0]?.id) !== anchor.firstId) {
         olderAnchor = undefined;
-        element.scrollTop = element.scrollHeight - anchor.fromEnd;
+        element.scrollTop += anchor.row.getBoundingClientRect().top - anchor.top;
         return;
       }
       if (atEnd) element.scrollTop = element.scrollHeight;
