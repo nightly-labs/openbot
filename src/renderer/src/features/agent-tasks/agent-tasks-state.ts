@@ -522,10 +522,14 @@ export function createAgentTasks(options: AgentTasksOptions) {
       });
   }
 
-  /** Whether a thread has a message. It reads the thread's conversation when it is not loaded. */
+  /** The messages of a thread: the loaded conversation, else a read of it. */
+  async function taskMessages(agentId: string, taskId: string): Promise<ConversationSnapshot["messages"]> {
+    return state.conversations[taskId]?.messages ?? (await port().readTask({ agentId, taskId })).messages;
+  }
+
+  /** Whether a thread has a message. */
   async function taskHasMessage(agentId: string, taskId: string, messageId: string): Promise<boolean> {
-    const messages = state.conversations[taskId]?.messages ?? (await port().readTask({ agentId, taskId })).messages;
-    return messages.some((message) => message.id === messageId);
+    return (await taskMessages(agentId, taskId)).some((message) => message.id === messageId);
   }
 
   /** Moves the read mark of each open thread of an agent with unread messages to its latest message. */
@@ -533,9 +537,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
     const unread = (state.snapshots[agentId]?.tasks ?? []).filter((task) => unreadCount(task) > 0);
     await Promise.all(
       unread.map(async (task) => {
-        const messages =
-          state.conversations[task.id]?.messages ?? (await port().readTask({ agentId, taskId: task.id })).messages;
-        const latestMessageId = messages.at(-1)?.id;
+        const latestMessageId = (await taskMessages(agentId, task.id)).at(-1)?.id;
         if (latestMessageId && scopeIsCurrent()) markTaskRead(agentId, task.id, latestMessageId);
       }),
     );
