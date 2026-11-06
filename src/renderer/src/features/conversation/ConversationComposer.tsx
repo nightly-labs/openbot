@@ -19,6 +19,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { spentUsageWindow } from "@openbot/team-client/plan-limits";
 import { Button, Input } from "@openbot/ui";
 import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingReplies";
+import { BackgroundTasksCard } from "@openbot/ui/features/conversation/BackgroundTasksCard";
 import { ComposerAddMenu } from "@openbot/ui/features/conversation/ComposerAddMenu";
 import { ComposerAttachmentRow } from "@openbot/ui/features/conversation/ComposerAttachmentRow";
 import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
@@ -41,11 +42,13 @@ import { type OpenWaitItem, OpenWaits } from "@openbot/ui/features/conversation/
 import { SpeakingBar } from "@openbot/ui/features/conversation/SpeakingBar";
 import { ComposerVoiceControls } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, createStore, Loading, lazy, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, Loading, lazy, onCleanup, Show } from "solid-js";
+import { actionToast } from "../../action-toast";
 import { reportErrorBanner, reportNotification } from "../../error-reports";
 import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
 import { speechReading } from "../speech/speech-playback";
 import { stopSpokenReply } from "../speech/speech-replies";
+import { backgroundProcesses, stopBackgroundProcess, subscribeBackgroundProcesses } from "./background-processes";
 import { copyComposerSelection, readComposerCopy } from "./composer-clipboard";
 import { useConversationViewScope } from "./conversation-scope";
 import { currentConversationTarget } from "./stores/composer-store";
@@ -131,7 +134,7 @@ export function ConversationComposer() {
     agentProviderName,
     sideThreadOpen,
   } = useConversationViewScope();
-  const { t, format, sourceText: localizeSourceText } = useText();
+  const { t, errorMessage, format, sourceText: localizeSourceText } = useText();
   const messageLabel = () =>
     channel
       ? t("channel.composer.placeholder", { name: channel.name() })
@@ -190,7 +193,28 @@ export function ConversationComposer() {
   const awaitingVisible = () => awaitingReplies().length > 0 && !pickerOpen();
   const waitItems = createMemo(() => openWaitItems(props.waits ?? [], props.queue));
   const waitsVisible = () => waitItems().length > 0 && Boolean(props.onCancelWait) && !pickerOpen();
-  const slotOpen = () => queueVisible() || awaitingVisible() || waitsVisible();
+  const backgroundTasks = createMemo(() => {
+    const agentId = props.agent?.id;
+    if (!agentId) return [];
+    return backgroundProcesses()
+      .filter((process) => process.agentId === agentId)
+      .sort((left, right) => left.startedAt - right.startedAt);
+  });
+  const backgroundTasksVisible = () => backgroundTasks().length > 0 && !pickerOpen();
+  const slotOpen = () => queueVisible() || awaitingVisible() || waitsVisible() || backgroundTasksVisible();
+  const unsubscribeBackgroundProcesses = subscribeBackgroundProcesses();
+  onCleanup(unsubscribeBackgroundProcesses);
+  async function stopBackgroundTask(id: string): Promise<void> {
+    try {
+      await stopBackgroundProcess(id);
+    } catch (error) {
+      actionToast.error(errorMessage(error, t("chat.backgroundTasks.stopFailed")), {
+        id: "conversation-background-task-stop-failed",
+        report: { operation: "other", source: "action", cause_code: "unknown" },
+      });
+      throw error;
+    }
+  }
   // A channel has many speakers, so it has no voice input.
   const voiceAvailable = () => !channel && !props.runtime;
   /** The reply of this agent that is read aloud. The voice pane shows its own. */
@@ -444,6 +468,7 @@ export function ConversationComposer() {
                   />
                 )}
               </Show>
+              <BackgroundTasksCard processes={backgroundTasks()} onStop={stopBackgroundTask} />
               <Show when={queueVisible() ? queueOwner() : undefined} keyed>
                 {(_owner) => (
                   <Loading>

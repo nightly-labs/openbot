@@ -1,0 +1,99 @@
+/* The background processes that the agent of this conversation left running. */
+
+.background-tasks {
+  width: auto;
+  background: var(--openbot-queue-surface);
+}
+
+.background-tasks-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-3);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+}
+
+.background-tasks-icon {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted);
+}
+
+.background-tasks-title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-weight: var(--openbot-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.background-tasks .task-list-items {
+  padding-bottom: var(--openbot-space-3);
+}
+
+.background-tasks-row {
+  align-items: center;
+}
+
+.background-tasks-mark {
+  align-items: center;
+}
+
+.background-tasks-dot {
+  width: var(--openbot-space-2);
+  height: var(--openbot-space-2);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-success);
+}
+
+.background-tasks-body {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: var(--openbot-space-0-5);
+}
+
+.background-tasks-command {
+  display: block;
+  overflow: hidden;
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.background-tasks-meta {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--openbot-space-2);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.background-tasks-stop {
+  flex: 0 0 auto;
+}
+
+.background-tasks-stop svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+@media (max-width: 520px) {
+  .background-tasks-row {
+    align-items: flex-start;
+  }
+
+  .background-tasks-stop {
+    margin-inline-start: auto;
+  }
+}

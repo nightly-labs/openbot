@@ -16,6 +16,7 @@
 @import "./styles/subagents.css";
 @import "./styles/awaiting-replies.css";
 @import "./styles/open-waits.css";
+@import "./styles/background-tasks.css";
 @import "./styles/header-controls.css";
 @import "./styles/timeline.css";
 @import "./styles/scroll-rail.css";
