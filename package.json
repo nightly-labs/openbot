@@ -456,6 +456,7 @@
     "@paper-design/shaders": "catalog:",
     "@solidjs/web": "catalog:",
     "@speed-highlight/core": "catalog:",
+    "@tanstack/start-server-core": "1.169.39",
     "@tanstack/virtual-core": "catalog:",
     "async-mutex": "catalog:",
     "class-variance-authority": "catalog:",
