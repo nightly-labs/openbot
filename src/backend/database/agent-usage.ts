@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
+import { KEY_ONLY_PROVIDERS } from "@openbot/contracts/agent-providers";
 import {
   type AgentAnalytics,
   type AgentAnalyticsInput,
@@ -182,12 +183,7 @@ export class AgentUsage {
             ? null
             : {
                 cost: Math.max(0, sample.reportedCost - (typeof previousCost === "number" ? previousCost : 0)),
-                basis:
-                  sample.provider === "opencode"
-                    ? "OpenCode session cost report; API-equivalent rates, not subscription charges"
-                    : sample.provider === "grok"
-                      ? "Grok CLI prompt cost report"
-                      : "Claude SDK list-price estimate; https://platform.claude.com/docs/en/about-claude/pricing; verified 2026-09-07",
+                basis: reportedCostBasis(sample.provider),
               };
         const turn = databaseRow(
           db
@@ -540,4 +536,14 @@ export function recordUsageMessage(
     message.createdAt,
     message.createdAt,
   );
+}
+
+function reportedCostBasis(provider: string) {
+  if (provider === "claude")
+    return "Claude SDK list-price estimate; https://platform.claude.com/docs/en/about-claude/pricing; verified 2026-09-07";
+  if (provider === "opencode") return "OpenCode session cost report; API-equivalent rates, not subscription charges";
+  if (provider === "grok") return "Grok CLI prompt cost report";
+  if (provider === "pi" || KEY_ONLY_PROVIDERS.some((id) => id === provider))
+    return "Pi session cost report; rates of Pi's model list, not subscription charges";
+  return "ACP session cost report";
 }

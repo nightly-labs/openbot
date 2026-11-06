@@ -163,7 +163,11 @@ export function collectProviderUsage(
   // ACP `Usage` is session-cumulative by contract: its fields are documented as "Sum of all token
   // types across session" and "Total input tokens across all turns". So one counter per session,
   // like Codex, and the first report of a session that predates collection is a baseline: it
-  // carries tokens spent before analytics existed.
+  // carries tokens spent before analytics existed. The cost is session-cumulative too: Pi's
+  // `get_session_stats` cost, or the ACP `usage_update` cost. Its checkpoint is the token counter,
+  // so a session that ran before costs were kept prices its turns only from its second report. A
+  // cost of 0 is a model with no rates in the provider's list, not a free turn, so it stays unpriced.
+  const reportedCost = isDynamicRecord(params) ? cost(params.cost) : null;
   usage.record({
     agentId: agent.id,
     sessionId: session.id,
@@ -173,6 +177,7 @@ export function collectProviderUsage(
     counterId: `${session.id}:grok`,
     baseline: session.createdAt < usage.collectionStartedAt(),
     tokens: acpTokens(value),
+    reportedCost: reportedCost === 0 ? null : reportedCost,
   });
 }
 
