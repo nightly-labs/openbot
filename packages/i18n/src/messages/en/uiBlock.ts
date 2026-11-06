@@ -10,6 +10,7 @@ export const messages = defineMessages("uiBlock", {
   "uiBlock.confirm.prompt": "Confirm: {action}?",
   "uiBlock.confirm.accept": "Confirm",
   "uiBlock.confirm.autoActionLabel": "{action} · {seconds} s",
+  "uiBlock.confirm.autoActionClock": "{action} · {time}",
   "uiBlock.confirm.previewLabel": "Preview",
   "uiBlock.confirm.showFullPreview": "Show all",
   "uiBlock.confirm.hideFullPreview": "Show less",

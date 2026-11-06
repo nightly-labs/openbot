@@ -75,6 +75,12 @@
       "detailSha256": "d15a140eec6ab0a0a6e79e354ccaba88d035435112bdb7a044528b2a4c7a1548"
     },
     {
+      "slug": "higgsfield",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "d527206a8519ea548c3438fa2ee3c4c158a33c85557a650fc62686b257236271"
+    },
+    {
       "slug": "apple-apps",
       "version": "1.1.0",
       "featured": false,

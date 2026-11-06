@@ -30,8 +30,12 @@ export interface RichMessageTextProps {
   onSelectAgent: (agentId: string) => void;
   onOpenLink: (url: string) => void;
   onOpenAttachment?: ((attachment: AttachmentSummary) => void) | undefined;
-  onOpenSharedFile?: ((path: string) => void) | undefined;
-  onOpenWorkspaceFile?: ((path: string) => void) | undefined;
+  /**
+   * Opens a file chip. `asWritten` is the code span text when the chip joined it to the folder that the
+   * message names; it opens in the workspace when the joined path does not.
+   */
+  onOpenSharedFile?: ((path: string, asWritten?: string) => void) | undefined;
+  onOpenWorkspaceFile?: ((path: string, asWritten?: string) => void) | undefined;
   /** Shows the passage that a quote tag names. Without it, a quote is a chip that does nothing. */
   onOpenQuote?: ((messageId: string, text: string) => void) | undefined;
   /** Shows the browser tab or opens the thread that a tag names. Without it, the chip does nothing. */

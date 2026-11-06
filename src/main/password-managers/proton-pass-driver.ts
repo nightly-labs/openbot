@@ -18,7 +18,7 @@ import {
   type PasswordManagerStatus,
   type PasswordManagerStep,
 } from "@openbot/contracts/ipc";
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
 import { Effect, Exit, Schema, Scope, Semaphore } from "effect";
@@ -184,17 +184,28 @@ function sharedVaultFirst(names: readonly string[]): string[] {
   return [...names].sort((a, b) => Number(b === PROTON_PASS_SHARED_VAULT) - Number(a === PROTON_PASS_SHARED_VAULT));
 }
 
+/** The share ids of `vault list --output json`. A vault without a valid id is skipped. */
+function vaultShareIds(output: string): string[] {
+  return vaultsIn(JSON.parse(output)).flatMap((vault) =>
+    typeof vault.share_id === "string" && PROTON_ID.test(vault.share_id) ? [vault.share_id] : [],
+  );
+}
+
 function namesIn(value: unknown): string[] {
-  const list = Array.isArray(value)
+  return vaultsIn(value).flatMap((vault) => {
+    const name = vault.name ?? vault.title;
+    return typeof name === "string" ? [name] : [];
+  });
+}
+
+/** The vault records of `vault list --output json`: a list, or an object that holds one. */
+function vaultsIn(value: unknown): DynamicRecord[] {
+  const list: unknown[] = Array.isArray(value)
     ? value
     : isDynamicRecord(value)
       ? (Object.values(value).find(Array.isArray) ?? [])
       : [];
-  return list.flatMap((vault: unknown) => {
-    if (!isDynamicRecord(vault)) return [];
-    const name = vault.name ?? vault.title;
-    return typeof name === "string" ? [name] : [];
-  });
+  return list.filter(isDynamicRecord);
 }
 
 function tokenIn(value: unknown): string | null {
@@ -764,13 +775,32 @@ export class ProtonPassDriver implements PasswordManagerDriver, PasswordVault {
       Effect.gen({ self: this }, function* () {
         const current = this.#index;
         if (current && this.#now() - current.readAt < INDEX_MS) return current.logins;
-        const output = yield* this.#agentCall(["item", "list", "--filter-type", "login", "--output", "json"]);
-        const listed = yield* Effect.try({
-          try: () => Schema.decodeUnknownSync(itemListSchema)(JSON.parse(output)),
+        // `item list` reads one vault, and no default vault is set: each vault that the key reads is listed.
+        const vaultOutput = yield* this.#agentCall(["vault", "list", "--output", "json"]);
+        const shareIds = yield* Effect.try({
+          try: () => vaultShareIds(vaultOutput),
           catch: () => fail(sourceText("error.connector.protonPassFailed")),
         });
+        const pages: (typeof itemListSchema.Type)[] = [];
+        for (const shareId of shareIds) {
+          const output = yield* this.#agentCall([
+            "item",
+            "list",
+            "--share-id",
+            shareId,
+            "--filter-type",
+            "login",
+            "--output",
+            "json",
+          ]);
+          const page = yield* Effect.try({
+            try: () => Schema.decodeUnknownSync(itemListSchema)(JSON.parse(output)),
+            catch: () => fail(sourceText("error.connector.protonPassFailed")),
+          });
+          pages.push(page);
+        }
         const logins = new Map<string, IndexedLogin>();
-        for (const item of listed.items) {
+        for (const item of pages.flatMap((page) => page.items)) {
           if (logins.size >= MAX_LOGINS) break;
           if (!isActive(item.state) || !PROTON_ID.test(item.id) || !PROTON_ID.test(item.share_id)) continue;
           const id = `${item.share_id}:${item.id}`;

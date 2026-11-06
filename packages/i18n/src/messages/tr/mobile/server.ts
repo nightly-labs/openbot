@@ -882,6 +882,8 @@ export const messages = {
   "mobile.server.providers.copy": "Kopyala",
   "mobile.server.providers.copyCode": "Kodu kopyala",
   "mobile.server.providers.paste": "Yapıştır",
+  "mobile.server.providers.codeStepChatgpt":
+    "Bir bilgisayarda ChatGPT'de güvenlik ayarlarını açın ve Codex için cihaz koduyla oturum açmayı açın. İş hesabında bunu çalışma alanı yöneticiniz açar.",
   "mobile.server.providers.codeStepCopy": "Kodu kopyalayın.",
   "mobile.server.providers.codeStepEnter": "Oturum açma sayfasını açın ve kodu girin.",
   "mobile.server.providers.codeStepReturn": "OpenBot'a dönün. Oturum açma kendiliğinden tamamlanır.",

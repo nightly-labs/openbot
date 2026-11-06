@@ -309,6 +309,7 @@ export const messages = {
   "server.settings.addLogo": "Sunucu logosu ekle",
   "server.settings.removeLogo": "Sunucu logosunu kaldır",
   "server.settings.access": "Erişim",
+  "server.companySignIn.desktopOnly": "Çoklu oturum açmayı OpenBot masaüstü uygulamasında ayarlayın.",
   "server.settings.publish": "Bu sunucuyu yayımla",
   "server.settings.published": "Sunucu yayımlandı",
   "server.settings.setUpDesktopTitle": "Uzak masaüstünü ayarlayın",

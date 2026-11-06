@@ -169,8 +169,9 @@ type TeamApiAgentMethods = Pick<
 >;
 
 export type TeamApiAgents = TeamApiAgentMethods & {
-  on: (event: "event", listener: (event: AgentEvent) => void) => void;
-  off: (event: "event", listener: (event: AgentEvent) => void) => void;
+  /** With `memberId`, the event is only for the connections of that member. */
+  on: (event: "event", listener: (event: AgentEvent, memberId?: string) => void) => void;
+  off: (event: "event", listener: (event: AgentEvent, memberId?: string) => void) => void;
 };
 
 /**

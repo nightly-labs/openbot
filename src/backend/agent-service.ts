@@ -171,7 +171,7 @@ import type { FailureContext, FailureSignal } from "./agent/failure-signal";
 import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-site-coordinator";
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import { InstructionsChanges } from "./agent/instructions-changes";
-import { LiveVoice } from "./agent/live-voice";
+import { LiveVoice, type LiveVoiceReply } from "./agent/live-voice";
 import { MailboxSync } from "./agent/mailbox-sync";
 import { type GitHubConnectorSource, McpGateway, type TestMcpServerOptions } from "./agent/mcp-gateway";
 import { type MarketplaceAppServer, mcpServersFromGateway } from "./agent/mcp-tools";
@@ -250,9 +250,10 @@ import { toMcpOperationError } from "./mcp-effects";
 import type { McpSignInOpener } from "./mcp-oauth-provider";
 import { McpServerStore } from "./mcp-server-store";
 import type { MessageDeleteAccess, MessageDeleteRefused } from "./message-delete";
-import { MessagingThreads, toMessagingThreadFailed } from "./messaging/messaging-threads";
+import { isAnswer, MessagingThreads, toMessagingThreadFailed } from "./messaging/messaging-threads";
 import type { PasswordVault } from "./password-vault";
-import { type AppServerNotification, decodeRecordResponse, getString, isRecord } from "./protocol";
+import { canConfineProcesses } from "./process-confinement";
+import { decodeRecordResponse, getString } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext } from "./provider-drivers";
 import { providerHistoryPersistence } from "./provider-history-persistence";
 import { recordAgentRestartActivity } from "./restart-activity";
@@ -261,6 +262,7 @@ import { RoutineRecords } from "./routine-records";
 import type { RoutineHoldWindow } from "./routine-store";
 import { type RoutineDueSource, RoutineTimer } from "./routine-timer";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
+import { shortenDiagnostic } from "./stderr-diagnostics";
 import type { VaultItems } from "./vault-items";
 import type { WorkflowTools } from "./workflows/workflow-tools";
 import type { WorkflowRunEnd } from "./workflows/workflows";
@@ -274,6 +276,8 @@ import {
 const logger = createOpenBotLogger("agent-service");
 /** Its lines also go to `main.log`, so a support report can show why channel routing failed (#3041). */
 const routingLogger = createOpenBotLogger("channel-routing");
+/** Its lines also go to `providers.log`: the screen can show a general sentence in place of the cause (#5222). */
+const errorLogger = createOpenBotLogger("agent-error");
 
 /**
  * Only the application knows which managed CLIs it downloaded, so a caller that says nothing gets
@@ -288,7 +292,8 @@ export type { ResolvedSharedFile } from "./workspace-paths";
 
 interface AgentServiceEvents {
   failure: [failure: FailureSignal];
-  event: [event: AgentEvent];
+  /** With `memberId`, the event is only for the connections of that member, such as a read mark change. */
+  event: [event: AgentEvent, memberId?: string];
   /** Finished tool steps for the local host's product analytics. Never forwarded to a client. */
   toolUsage: [usage: ToolUsageSignal];
   /** A workflow run ended, for the local host's product analytics. Never forwarded to a client. */
@@ -639,7 +644,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       profileClients: this.#profileClients,
       listAgents: () => this.listAgents(),
       models: (agent) =>
-        this.#providers.ensureProvider(agent.provider).pipe(Effect.map(() => this.#endpoints.available())),
+        this.#providers.ensureProvider(agent.provider).pipe(Effect.map(() => this.#agentModels(agent))),
       createProfileClient: (agent) => this.#providers.createProfileClient(agent.provider, agent.providerAccountId),
       usageObserver: (agent, model) =>
         memoryReviewUsageObserver(this.#store.database.usage, agent.id, agent.provider, model.id),
@@ -748,12 +753,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       hooks: {
         bindClient: (client) => {
-          client.on("notification", (incoming) => {
-            if (incoming.method.startsWith("thread/realtime/")) {
-              this.#liveVoice.handleNotification(incoming, client);
-              return;
-            }
-            const notification = this.#liveVoiceTurn(incoming);
+          client.on("notification", (notification) => {
             if (notification.method === "openbot/sessionSettings/updated") {
               const threadId = getString(notification.params, "threadId");
               const agentId = threadId ? this.#conversation.agentForThread(threadId) : undefined;
@@ -1067,7 +1067,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       mailboxSync: this.#mailboxSync,
       hooks: {
-        emit: (event) => this.#emit(event),
+        emit: (event, memberId) => this.#emit(event, memberId),
         listAgents: () => this.listAgents(),
       },
     });
@@ -1148,10 +1148,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         Effect.gen({ self: this }, function* () {
           const modelOf = (agent: AgentSummary) =>
             (background
-              ? backgroundModel(agent, this.#endpoints.available())
-              : this.#endpoints
-                  .available()
-                  .find((item) => item.provider === agent.provider && item.id === agent.model)) ?? undefined;
+              ? backgroundModel(agent, this.#agentModels(agent))
+              : this.#agentModels(agent).find((item) => item.provider === agent.provider && item.id === agent.model)) ??
+            undefined;
           const leadStarted = yield* Effect.result(this.#providers.ensureProvider(lead.provider));
           let selected = lead;
           let model = Result.isSuccess(leadStarted) ? modelOf(lead) : undefined;
@@ -1484,12 +1483,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         if (!agent) throw new Error(sourceText("error.agent.selectedGone"));
         return agent;
       },
-      // OpenBot stops an idle provider CLI; a typed message starts it again, and so does live voice.
-      client: (agent) => this.#providers.ensureAgentClient(agent),
-      ensureThread: (agent, client) => this.#threads.ensureThread(agent, client),
-      holdDrain: (agentId) => this.#drain.holdLiveVoice(agentId),
-      awaitDrain: (agentId) => this.#drain.taskFor(agentId)?.pipe(Effect.ignore) ?? Effect.void,
-      addSpeech: (agentId, providerThreadId, role, text) => this.#addSpeech(agentId, providerThreadId, role, text),
+      relay: (agent) => this.#liveVoiceRelay(agent),
+      send: (agentId, text) =>
+        this.sendMessage({ agentId, text }).pipe(
+          Effect.flatMap((receipt) => {
+            const deliveryId = receipt.deliveries[0]?.id;
+            return deliveryId
+              ? Effect.succeed(deliveryId)
+              : Effect.fail({ cause: new Error(sourceText("error.voice.live.disconnected")) });
+          }),
+        ),
+      reply: (agentId, deliveryId) => this.#liveVoiceReply(agentId, deliveryId),
       emit: (event) => this.emit("liveVoice", event),
       redact: (text) => this.#mcp.redact(text),
     });
@@ -2339,6 +2343,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
+   * The models one agent can run: the catalogue, and the models that only the agent's account after
+   * the first serves (#5217).
+   */
+  #agentModels(agent: { provider: AgentProvider; providerAccountId?: string | undefined }): AgentModelOption[] {
+    const models = this.#endpoints.available();
+    const own = this.#providers
+      .accountModels(agent.provider, agent.providerAccountId)
+      .filter((option) => !models.some((model) => model.provider === option.provider && model.id === option.id));
+    return own.length ? [...models, ...own] : models;
+  }
+
+  /**
    * Tells the renderer and each joined client to read the model list again, after a change to the
    * models that the picker shows. The list reaches them by pull, refreshed on a status event.
    */
@@ -2359,7 +2375,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         });
       const provider = agent?.provider ?? this.#startingChoice()?.provider ?? this.#providers.preferredProvider();
       yield* this.#providers.ensureProvider(provider);
-      const models = this.#endpoints.available();
+      const models = agent ? this.#agentModels(agent) : this.#endpoints.available();
       const model = agent
         ? models.find((candidate) => candidate.id === agent.model && candidate.provider === provider)
         : startingModel(provider, models, this.#preference());
@@ -2390,9 +2406,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
       if (this.#profileClients.busy()) return yield* failed(sourceText("error.agent.sideQuestionBusy"));
       yield* this.#providers.ensureProvider(agent.provider);
-      const model = this.#endpoints
-        .available()
-        .find((candidate) => candidate.provider === agent.provider && candidate.id === agent.model);
+      const model = this.#agentModels(agent).find(
+        (candidate) => candidate.provider === agent.provider && candidate.id === agent.model,
+      );
       if (!model) return yield* failed(sourceText("error.provider.noModel"));
       if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
       if (this.#profileClients.busy()) return yield* failed(sourceText("error.agent.sideQuestionBusy"));
@@ -2596,6 +2612,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           );
           if (requested) {
             yield* lifecycleStep("check provider switch", () => this.#providers.requireProviderOn(requested.provider));
+            // The new agent has no session yet, so its account is set with the model and needs no handover.
+            const account = agentProviderAccount(input);
+            if (account)
+              yield* lifecycleStep("check provider account", () => {
+                if (!this.#providers.hasProviderAccount(requested.provider, account))
+                  throw new Error(
+                    sourceText("error.provider.accountNotFound", { provider: providerLabel(requested.provider) }),
+                  );
+              });
             // The new-agent form names the development default's model but no effort, so the effort
             // comes from that default, as it does for an agent that names no model.
             const development = developmentStartingModel({
@@ -2611,6 +2636,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                 input.reasoningEffort && requested.model.supportedReasoningEfforts.includes(input.reasoningEffort)
                   ? input.reasoningEffort
                   : (development?.model ?? requested.model).defaultReasoningEffort,
+              ...(account ? { providerAccountId: account } : {}),
             });
           }
           const starting = this.#startingChoice();
@@ -2858,8 +2884,43 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     queueWhileBusy = true,
   ): Effect.Effect<AgentSummary, AgentLifecycleFailed> {
     return this.#endpoints
-      .runExclusive(() => this.#applyAgentUpdate(input, initiatingAgentId, null, queueWhileBusy))
+      .runExclusive(() =>
+        this.#applyAgentUpdate(this.#withAccountModel(input), initiatingAgentId, null, queueWhileBusy),
+      )
       .pipe(Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "updateAgent", cause: failure.cause })));
+  }
+
+  /** An update of the account alone also takes the new account's model when `#modelForAccount` gives one. */
+  #withAccountModel(input: AgentUpdate): AgentUpdate {
+    if (input.providerAccountId === undefined || input.model !== undefined || input.provider !== undefined)
+      return input;
+    const agent = this.#store.list().find((candidate) => candidate.id === input.agentId);
+    const model = agent
+      ? this.#modelForAccount({ ...agent, provider: providerForAgent(agent) }, input.providerAccountId ?? undefined)
+      : null;
+    return model ? { ...input, ...model } : input;
+  }
+
+  /**
+   * The starting model of `accountId` when `choice` runs a model that only its own account serves:
+   * that model fails each turn on the other account (#5217). Null when the model stays.
+   */
+  #modelForAccount(
+    choice: AgentModelChoice & { reasoningEffort: AgentReasoningEffort },
+    accountId: string | undefined,
+  ): { model: AgentModelId; reasoningEffort: AgentReasoningEffort } | null {
+    const lists = (models: AgentModelOption[]) =>
+      models.some((model) => model.provider === choice.provider && model.id === choice.model);
+    const models = this.#agentModels({ provider: choice.provider, providerAccountId: accountId });
+    if (lists(models) || !lists(this.#providers.accountModels(choice.provider, choice.providerAccountId))) return null;
+    const model = startingModel(choice.provider, models, this.#preference());
+    if (!model) return null;
+    return {
+      model: model.id,
+      reasoningEffort: model.supportedReasoningEfforts.includes(choice.reasoningEffort)
+        ? choice.reasoningEffort
+        : model.defaultReasoningEffort,
+    };
   }
 
   /**
@@ -2912,18 +2973,29 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       () => {
         this.#conversation.requireKnownAgent(input.agentId);
         const previous = this.#store.list().find((agent) => agent.id === input.agentId);
+        const modelProvider = input.provider ?? (previous ? providerForAgent(previous) : undefined);
         const requestedModel = input.model
-          ? this.#endpoints
+          ? (this.#endpoints
               .available()
-              .find((model) => model.id === input.model && (!input.provider || model.provider === input.provider))
+              .find((model) => model.id === input.model && (!input.provider || model.provider === input.provider)) ??
+            // A model that only the agent's account after the first serves (#5217).
+            (modelProvider
+              ? this.#providers
+                  .accountModels(
+                    modelProvider,
+                    input.providerAccountId !== undefined
+                      ? (input.providerAccountId ?? undefined)
+                      : previous?.providerAccountId,
+                  )
+                  .find((model) => model.id === input.model)
+              : undefined))
           : undefined;
         if (input.model && !requestedModel) {
           // A change of model alone stays on the agent's provider, so that provider is the one to explain.
-          const provider = input.provider ?? (previous ? providerForAgent(previous) : undefined);
           throw new AgentSettingsRefused(
             modelUnavailableError(
               input.model,
-              provider,
+              modelProvider,
               this.#endpoints.available(),
               this.#providers.status().providers ?? [],
             ).message,
@@ -2932,6 +3004,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const requestedProvider = input.provider ?? requestedModel?.provider ?? previous?.provider;
         if (input.provider && requestedModel && requestedModel.provider !== input.provider) {
           throw new AgentSettingsRefused(sourceText("error.agent.modelProviderMismatch"));
+        }
+        // Refuse Workspace only now, not at the next turn, when this computer cannot confine the
+        // provider's own process: the agent then could not start until the user gives it more access.
+        // A requested move to such a provider is refused too while the agent keeps Workspace only, also
+        // when it was queued for the next turn.
+        const confinedProvider = requestedProvider ?? (previous ? providerForAgent(previous) : undefined);
+        const providerMove =
+          (move === null || move === "next-turn") &&
+          previous !== undefined &&
+          confinedProvider !== providerForAgent(previous);
+        if (
+          (input.access ?? (providerMove ? previous?.access : undefined)) === "workspace" &&
+          confinedProvider !== undefined &&
+          workspaceOnlyUnavailable(confinedProvider)
+        ) {
+          throw new AgentSettingsRefused(sourceText("error.agent.workspaceOnlyMacOnly"));
         }
         if (requestedProvider && previous && requestedProvider !== providerForAgent(previous)) {
           if (!input.model || !input.provider) {
@@ -3034,7 +3122,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     ) {
       const queuedModel =
         requestedModel ??
-        this.#endpoints.available().find((model) => model.provider === queued.provider && model.id === queued.model);
+        this.#agentModels(queued).find((model) => model.provider === queued.provider && model.id === queued.model);
       return yield* queue({
         ...queued,
         ...(requestedModel ? { model: requestedModel.id } : {}),
@@ -3073,13 +3161,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         : undefined;
     const moved = previousChoice && nextChoice && !sameAgentModelChoice(previousChoice, nextChoice);
     const leaving = Boolean(moved && input.leaveUsageLimit && (wasHeld || failingOver));
+    // A spent balance names no reset, so the agent does not go back to it by itself (#5220).
+    const spentBalance =
+      failingOver && previousChoice !== undefined && this.#usageLimits.isSpent(usageLimitOf(previousChoice));
     const returnTo =
       leaving && previous && previousChoice
-        ? (previous.usageLimitReturn ?? {
-            ...previousChoice,
-            reasoningEffort: previous.reasoningEffort,
-            ...(failingOver ? { cause: "provider-error" as const } : {}),
-          })
+        ? (previous.usageLimitReturn ??
+          (spentBalance
+            ? null
+            : {
+                ...previousChoice,
+                reasoningEffort: previous.reasoningEffort,
+                ...(failingOver ? { cause: "provider-error" as const } : {}),
+              }))
         : undefined;
     const usageLimitReturn =
       returning || (returnTo && nextChoice && sameAgentModelChoice(returnTo, nextChoice)) ? null : returnTo;
@@ -3190,9 +3284,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (this.#runsTurn(agentId) || this.#mailbox.hasStartedDelivery(agentId)) return null;
     // The agent keeps its reasoning effort where the other model has it. It goes back with the effort it left.
     const move = (choice: AgentModelChoice, reasoningEffort = agent.reasoningEffort) => {
-      const model = this.#endpoints
-        .available()
-        .find((option) => option.provider === choice.provider && option.id === choice.model);
+      const model = this.#agentModels(choice).find(
+        (option) => option.provider === choice.provider && option.id === choice.model,
+      );
       return {
         agentId,
         provider: choice.provider,
@@ -3225,8 +3319,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     if (!agent?.backupModels || (!agent.backupModels.automatic && !startedWork)) return undefined;
     const current = agentModelChoice(agent);
+    // A Workspace only agent skips a backup that `#applyAgentUpdate` would refuse, so a later one is tried.
     return agent.backupModels.order.find(
-      (choice) => !sameAgentModelChoice(choice, current) && this.#usageLimitReady(choice),
+      (choice) =>
+        !sameAgentModelChoice(choice, current) &&
+        this.#usageLimitReady(choice) &&
+        !(workspaceAccessEnforced(agent) && workspaceOnlyUnavailable(choice.provider)),
     );
   }
 
@@ -3258,7 +3356,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       (accounts === undefined
         ? accountId === DEFAULT_PROVIDER_ACCOUNT_ID
         : accounts.some((account) => account.id === accountId && account.state === "connected")) &&
-      this.#endpoints.available().some((model) => model.provider === choice.provider && model.id === choice.model)
+      this.#agentModels(choice).some((model) => model.provider === choice.provider && model.id === choice.model)
     );
   }
 
@@ -3392,7 +3490,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    */
   #appendModelSwitchMarker(agent: AgentSummary, reason: ModelSwitchReason): void {
     const model =
-      this.#endpoints.available().find((option) => option.provider === agent.provider && option.id === agent.model)
+      this.#agentModels(agent).find((option) => option.provider === agent.provider && option.id === agent.model)
         ?.name ?? agent.model;
     const text = sourceText(MODEL_SWITCH_TEXT[reason], { model });
     try {
@@ -3912,7 +4010,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             if (agents.some((agent) => this.#runsTurn(agent.id) || this.#mailbox.hasUnfinishedDelivery(agent.id)))
               throw new Error(sourceText("error.provider.accountInUse"));
           });
-          for (const agent of agents) yield* this.#applyAgentUpdate({ agentId: agent.id, providerAccountId: null });
+          for (const agent of agents)
+            yield* this.#applyAgentUpdate({
+              agentId: agent.id,
+              providerAccountId: null,
+              ...this.#modelForAccount({ ...agent, provider }, undefined),
+            });
           // A queued change to the account moves to the provider's own sign-in too, so it does not fail
           // before the next turn. The running turn does not use the account, so it can continue.
           const queued = this.#store
@@ -3925,7 +4028,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             if (agent.pendingRuntime)
               yield* this.#store.updateAgent({
                 agentId: agent.id,
-                pendingRuntime: { ...agent.pendingRuntime, providerAccountId: undefined },
+                pendingRuntime: {
+                  ...agent.pendingRuntime,
+                  providerAccountId: undefined,
+                  ...this.#modelForAccount(agent.pendingRuntime, undefined),
+                },
               });
           if (queued.length > 0) this.#emit({ type: "agents-changed", agents: this.listAgents() });
           return yield* this.#providers.removeProviderAccount(provider, accountId);
@@ -4257,7 +4364,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       { startImmediately: true },
     );
     this.#initialized = false;
-    this.#liveVoice.dispose();
+    yield* this.#liveVoice.dispose();
     this.#routineTimer.dispose();
     yield* this.#memoryHold.dispose();
     this.#hostedSites.dispose();
@@ -4426,7 +4533,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
-  /** Starts Codex live voice in the agent's chat and answers the renderer's WebRTC offer. */
+  /** Starts live voice for the agent and answers the renderer's WebRTC offer. */
   startLiveVoice(
     input: VoiceLiveStart,
     voice: CodexLiveVoice | null,
@@ -4443,34 +4550,60 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
-   * The voice model of a live session starts its turns itself. A delivery that starts at the same
-   * time must not take such a turn, so the lifecycle reads it as a turn that no delivery started.
+   * The Codex process of a live voice session. An agent on Codex lends its own Codex account; any other
+   * agent uses the Codex sign-in of this computer. The relay model only passes requests on, so it is
+   * the small default model, with low effort.
    */
-  #liveVoiceTurn(notification: AppServerNotification): AppServerNotification {
-    if (notification.method !== "turn/started" || !isRecord(notification.params)) return notification;
-    const threadId = getString(notification.params, "threadId");
-    if (!threadId || !this.#liveVoice.isLiveThread(threadId)) return notification;
-    return { ...notification, params: { ...notification.params, unprompted: true } };
-  }
+  readonly #liveVoiceRelay = Effect.fn("AgentService.liveVoiceRelay")(function* (
+    this: AgentService,
+    agent: AgentSummary,
+  ) {
+    const signIn = () => ({ cause: new Error(sourceText("error.voice.live.signIn")) });
+    yield* this.#providers.ensureProvider("codex").pipe(Effect.mapError(signIn));
+    const models = this.#endpoints.available().filter((model) => model.provider === "codex");
+    const model =
+      models.find((candidate) => candidate.id === agentProviderDescriptor("codex").defaultModel) ?? models[0];
+    if (!model) return yield* Effect.fail({ cause: new Error(sourceText("error.provider.noModel")) });
+    const client = yield* Effect.try({
+      try: () =>
+        this.#providers.createProfileClient("codex", agent.provider === "codex" ? agent.providerAccountId : undefined),
+      catch: signIn,
+    });
+    const effort: AgentReasoningEffort = model.supportedReasoningEfforts.includes("low")
+      ? "low"
+      : model.defaultReasoningEffort;
+    return { client, model: model.id, effort };
+  }).bind(this);
 
-  /** What the user or the voice said in a live voice session, as a message in the chat of that thread. */
-  #addSpeech(agentId: string, providerThreadId: string, role: "user" | "assistant", text: string): void {
-    try {
-      const snapshot = this.#conversation.ensureSnapshot(
-        agentId,
-        this.#conversation.publicThreadId(agentId, providerThreadId),
-      );
-      snapshot.messages.push({
-        id: randomUUID(),
-        author: role,
-        source: role,
-        text,
-        createdAt: new Date().toISOString(),
-        status: "completed",
-      });
-      this.#conversation.emitConversation(snapshot);
-    } catch (error) {
-      this.#emitError("live_voice_message_failed", error, agentId);
+  /**
+   * The end of a request that live voice gave to the agent: the answer of the delivery's last turn,
+   * or why it has none. The text goes to the voice model, which says it in the user's language.
+   */
+  #liveVoiceReply(agentId: string, deliveryId: string): LiveVoiceReply | null {
+    const delivery = this.#mailbox.getDelivery(deliveryId)?.delivery;
+    if (!delivery) return { success: false, text: "The user removed the request." };
+    switch (delivery.status) {
+      case "queued":
+      case "starting":
+      case "running":
+        return null;
+      case "cancelled":
+        return { success: false, text: "The user cancelled the request." };
+      case "interrupted":
+        return { success: false, text: "The user stopped the agent before it finished." };
+      case "failed":
+        return { success: false, text: delivery.error ?? "The agent could not finish the request." };
+      case "completed": {
+        const turnId = delivery.turnId;
+        const ofTurn = (messages: readonly ConversationMessage[]) =>
+          messages.filter((message) => message.turnId === turnId);
+        const loaded = ofTurn(this.#conversation.loadedSnapshot(agentId)?.messages ?? []);
+        const threadId = this.#store.list().find((agent) => agent.id === agentId)?.threadId ?? null;
+        const messages =
+          loaded.length > 0 ? loaded : ofTurn(this.#store.database.readConversation(agentId, threadId).messages);
+        const answer = turnId ? messages.findLast(isAnswer)?.text : undefined;
+        return { success: true, text: answer ?? "The agent finished and gave no answer." };
+      }
     }
   }
 
@@ -5373,20 +5506,33 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   #emitError(code: string, error: unknown, agentId?: string, context?: FailureContext): void {
+    const causeCode = context?.causeCode ?? classifyFailure(error);
     this.emit("failure", {
       ...context,
       code,
       ...(agentId !== undefined ? { agentId } : {}),
-      causeCode: context?.causeCode ?? classifyFailure(error),
+      causeCode,
+    });
+    // Redacted, because every error from a provider CLI arrives here on its way to the renderer
+    // and the log, and a CLI quotes what it was given: a failure against a custom endpoint can
+    // carry that endpoint's API key or a header value.
+    const message = this.#mcp.redact(error instanceof Error ? error.message : String(error));
+    // The renderer shows a general sentence for an empty, long or technical text, so this line is
+    // the only record of the cause (#5222).
+    errorLogger.warn("An agent error was reported.", {
+      code,
+      agentId: agentId ?? null,
+      provider: context?.provider ?? null,
+      model: context?.model ?? null,
+      turnId: context?.turnId ?? null,
+      causeCode,
+      message: shortenDiagnostic(message),
     });
     this.#emit({
       type: "error",
       ...(agentId !== undefined ? { agentId } : {}),
       code,
-      // Redacted, because every error from a provider CLI arrives here on its way to the renderer
-      // and the log, and a CLI quotes what it was given: a failure against a custom endpoint can
-      // carry that endpoint's API key or a header value.
-      message: this.#mcp.redact(error instanceof Error ? error.message : String(error)),
+      message,
       ...(context?.provider ? { provider: context.provider } : {}),
       ...(context?.model ? { model: context.model } : {}),
     });
@@ -5396,10 +5542,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#emit({ type: "runtime-snapshot", snapshot: this.getRuntimeSnapshot() });
   }
 
-  #emit(event: AgentEvent): void {
+  #emit(event: AgentEvent, memberId?: string): void {
     recordAgentRestartActivity(event);
+    this.#liveVoice?.observe(event);
     if (this.channels?.event(event) || this.messaging?.event(event, this.#scope) || this.#tasks?.event(event)) return;
-    this.emit("event", event);
+    this.emit("event", event, memberId);
   }
 
   /** Removes live provider state for an execution thread before its durable rows are deleted. */
@@ -5461,6 +5608,11 @@ function agentModelChoice(agent: AgentSummary): AgentModelChoice {
     model: agent.model,
     ...(agent.providerAccountId ? { providerAccountId: agent.providerAccountId } : {}),
   };
+}
+
+/** Whether Workspace only cannot run on `provider` here: its own process needs a sandbox that this computer lacks. */
+function workspaceOnlyUnavailable(provider: AgentProvider): boolean {
+  return agentProviderDescriptor(provider).workspaceEnforcement === "confined-process" && !canConfineProcesses();
 }
 
 function usageLimitOf(choice: AgentModelChoice): UsageLimitKey {

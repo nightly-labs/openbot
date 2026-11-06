@@ -132,6 +132,22 @@
 .agent-usage-table td {
   color: var(--openbot-text-secondary);
 }
+.agent-usage-table td.agent-usage-table-empty {
+  padding-inline-start: 0;
+  text-align: start;
+  white-space: normal;
+  color: var(--openbot-text-muted);
+}
+/* The open table alone sets the height. A hidden table, such as the 30 rows of Day, adds no
+   empty space under a short one, and it still fades out over the open one. */
+.agent-usage-breakdown {
+  position: relative;
+}
+.agent-usage-breakdown > .ui-sliding-tabs-content:not([data-selected]) {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
 .agent-usage-model-name {
   display: flex;
   align-items: center;

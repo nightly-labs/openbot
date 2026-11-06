@@ -183,6 +183,7 @@ import {
   readMobileConnectApiUrl,
 } from "./central-auth-manager";
 import { ChatVisualPreviewer } from "./chat-visual-preview";
+import { createComputerIdle } from "./computer-idle";
 import { ComputerUseHighlightController } from "./computer-use-highlight-window";
 import { applicationBundlePath, applicationIconName } from "./computer-use-permission-app";
 import { ComputerUsePermissionHelpWindowController } from "./computer-use-permission-help-window";
@@ -2656,6 +2657,11 @@ export async function createApplicationServices({
   // Development only: a shorter or longer time without input before a phone notifies, to test it.
   const awaySeconds = app.isPackaged ? Number.NaN : Number(process.env.OPENBOT_DEV_AWAY_SECONDS);
   const awayAfterMs = Number.isInteger(awaySeconds) && awaySeconds > 0 ? awaySeconds * 1_000 : DESKTOP_USE_MS;
+  const computerIdle = createComputerIdle(
+    (contents) =>
+      windows.getMainWindow()?.webContents === contents ||
+      windows.getChatWindows().some((chat) => chat.webContents === contents),
+  );
   // A server on this computer has no account session: the desktop app reads its directory for it.
   const localServerMembers = new LocalServerMembers(() => process.stdout.write(formatLocalServerMembersRequest()));
   const host = new HostService({
@@ -2857,7 +2863,9 @@ export async function createApplicationServices({
     hostComputerInUse: (event) => {
       const window = windows.getMainWindow();
       if (!window || window.isDestroyed()) return false;
+      // Also a locked screen. In a Wayland session, `computerIdle` counts the input in OpenBot only.
       if (powerMonitor.getSystemIdleState(awayAfterMs / 1_000) !== "active") return false;
+      if (computerIdle.seconds() * 1_000 >= awayAfterMs) return false;
       if (window.isFocused()) return true;
       // Without a notification service, as on Linux without a daemon, the desktop shows nothing.
       if (!Notification.isSupported()) return false;
@@ -3102,7 +3110,10 @@ export async function createApplicationServices({
     Effect.runFork(startup.recordStart());
     teardown.push(TEARDOWN_ORDER.startupTiming, "the startup timing", () => startup.dispose());
   }
-  const connectTrace = new RemoteConnectTrace((span) => trace.record(span));
+  const connectTrace = new RemoteConnectTrace(
+    (span) => trace.record(span),
+    (summary) => analytics.handleRemoteConnect(summary),
+  );
   // Development only: a network round trip added to the WebRTC client, for `bun run perf:remote`.
   const developmentRoundTripMs = app.isPackaged ? 0 : Math.max(0, Number(process.env.OPENBOT_DEV_RTT_MS) || 0);
   installRemoteSyncProfileSink(
@@ -3144,7 +3155,7 @@ export async function createApplicationServices({
         : {
             computerActivity: {
               awayAfterMs,
-              idleSeconds: () => powerMonitor.getSystemIdleTime(),
+              idleSeconds: () => computerIdle.seconds(),
               showsEvents: (server) => {
                 const window = windows.getMainWindow();
                 if (!window || window.isDestroyed()) return false;

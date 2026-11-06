@@ -14,6 +14,7 @@ import type {
   CustomAgentUsage,
   CustomProviderHarness,
   CustomProviderRestart,
+  ProviderAccountStatus,
   ProviderCodeLoginStart,
   ProviderUsageResetOutcome,
   ProviderUsageResets,
@@ -111,6 +112,7 @@ import {
   updateProviderStatus,
   waitForSuccessfulProcess,
 } from "./provider-status";
+import { hasZeroRealtimeLimit } from "./realtime-limit";
 import { providerForAgent, providerLabel } from "./thread-items";
 import { UsageReadGate } from "./usage-read-gate";
 import { checkAgentFolders, workspaceExcludedFolders, workspaceWritableRoots } from "./workspace-sandbox";
@@ -188,6 +190,8 @@ const OPENCODE_NEWER_DATABASE = /\bDatabase is not empty and has no session tabl
  * way, with any version of the CLI (#4995).
  */
 const CODEX_STATE_BUSY = /\btimed out waiting for state db backfill\b/u;
+/** An ACP provider CLI that the system stopped, not one that ended by itself. */
+const KILLED_BY_SYSTEM = /\(signal SIGKILL\)/u;
 /**
  * The providers whose shared process reads the agent environment only when it starts. Claude reads
  * it at each session start, and Codex with each thread's config.
@@ -624,6 +628,20 @@ export class ProviderRuntime implements ProviderPort {
             this.#refreshUsage(client, model, false).pipe(
               Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })),
             ),
+          // Read as the own sign-in's catalogue is. An account process never gets the saved key.
+          readModels: (client) =>
+            this.#modelCatalog.read(client, requireProviderDriver(client.provider).catalog).pipe(
+              Effect.map(({ models }) => models),
+              Effect.catch((failure) =>
+                Effect.sync(() => {
+                  logger.warn("A provider account did not list its models.", {
+                    provider: client.provider,
+                    timeout: isProviderTimeout(failure.cause),
+                  });
+                  return null;
+                }),
+              ),
+            ),
           resetCredits: (client) => this.#resetCredits.get(client),
           consumeUsageReset: (client) =>
             this.#consumeUsageReset(client).pipe(
@@ -679,7 +697,9 @@ export class ProviderRuntime implements ProviderPort {
         };
         const accounts =
           row.state === "available" && row.id !== "acp"
-            ? this.#providerAccounts?.rows(row.id, row.email ?? null)
+            ? this.#providerAccounts
+                ?.rows(row.id, row.email ?? null)
+                ?.map((account) => this.#extraModels(row.id, account))
             : undefined;
         const withAccounts = accounts ? { ...withSource, accounts } : withSource;
         return this.#restartsWhenIdle.has(row.id) ? { ...withAccounts, restartPending: true } : withAccounts;
@@ -1747,6 +1767,24 @@ export class ProviderRuntime implements ProviderPort {
     return (this.#providerAccounts?.keyChanged(provider) ?? Effect.void).pipe(Effect.map(() => this.status()));
   }
 
+  /**
+   * The row with only the models that the provider's catalogue does not list. The picker shows the
+   * catalogue, with the models an admin turned off left out, and then these (#5217).
+   */
+  #extraModels(provider: AgentProvider, account: ProviderAccountStatus): ProviderAccountStatus {
+    if (!account.models) return account;
+    const catalogue = this.#modelCatalog.list().filter((model) => model.provider === provider);
+    const models = account.models.filter((model) => !catalogue.some((listed) => listed.id === model.id));
+    return { ...account, models };
+  }
+
+  /** The models of an account after the first, from its last check. Empty for the own sign-in. */
+  accountModels(provider: AgentProvider, accountId: string | undefined): AgentModelOption[] {
+    // A turned-off provider offers no model, as `listModels` does.
+    if (this.#off.has(provider)) return [];
+    return this.#providerAccounts?.models(provider, accountId) ?? [];
+  }
+
   /** True when `accountId` names an account after the first that this computer holds. */
   hasProviderAccount(provider: AgentProvider, accountId: string): boolean {
     return this.#providerAccounts?.account(provider, accountId) != null;
@@ -2198,6 +2236,11 @@ export class ProviderRuntime implements ProviderPort {
       return this.#hooks.isProviderBusy(provider);
     });
     if (busy) return null;
+    // The system stops each copy in the same way, so a download only waits for the user's fix (#4848).
+    const realtimeLimitZero = sourceText("error.provider.realtimeLimitZero");
+    const stoppedByLimit = this.#status.providers?.find((row) => row.id === provider)?.message === realtimeLimitZero;
+    if (stoppedByLimit && (yield* providerStep(hasZeroRealtimeLimit)))
+      return yield* new ProviderOperationFailed({ cause: new Error(realtimeLimitZero) });
     const previousVersion = this.#cli.get(provider)?.version ?? null;
     const previousExecutable = this.#bundledExecutables[provider];
     // Main names the install path of a managed provider also before its first download, so only a
@@ -2874,6 +2917,10 @@ export class ProviderRuntime implements ProviderPort {
     // The CLI's words name a database step, not a cause the user can act on.
     if (CODEX_STATE_BUSY.test(detailed.message))
       return new AgentProcessExitError(sourceText("error.provider.codexStateBusy"), null, { cause: detailed });
+    // "Stopped (signal SIGKILL)" does not tell the user that the fix is in the system. Only the ending
+    // counts: the stderr line can quote another process.
+    if (KILLED_BY_SYSTEM.test(error.message) && hasZeroRealtimeLimit())
+      return new AgentProcessExitError(sourceText("error.provider.realtimeLimitZero"), null, { cause: detailed });
     return detailed;
   }
 
@@ -3238,6 +3285,8 @@ export class ProviderRuntime implements ProviderPort {
       // The new copy is not at fault: the old one fails the same way until the lease ends. Removing the
       // copy showed "could not update", and the next start downloaded it again (#4995).
       if (status?.message === sourceText("error.provider.codexStateBusy")) return;
+      // The system stops each copy in the same way, so the copy stays for the start after the user's fix.
+      if (status?.message === sourceText("error.provider.realtimeLimitZero")) return;
       if (status?.version !== cli.version || !["available", "sign-in-required"].includes(status.state)) {
         // The update reason keeps catalog text only, so other text would leave only "Try again.".
         // The log keeps the start failure as the cause.
@@ -3796,7 +3845,9 @@ export class ProviderRuntime implements ProviderPort {
     const providers = updateProviderStatus(this.#status.providers, client.provider, {
       state: "error",
       version: this.#cli.get(client.provider)?.version ?? null,
-      message: startStopped ? this.#startStoppedMessage(client.provider) : this.#redactMcp(error.message),
+      message: startStopped
+        ? this.#startStoppedMessage(client.provider, error.message)
+        : this.#redactMcp(error.message),
     });
     const anotherProviderIsReady = this.#clients.size > 0 || this.#released.size > 0;
 
@@ -3814,7 +3865,7 @@ export class ProviderRuntime implements ProviderPort {
               providers,
               capabilities: { ...this.#status.capabilities, chat: "unavailable" },
               message: startStopped
-                ? this.#startStoppedMessage(client.provider)
+                ? this.#startStoppedMessage(client.provider, error.message)
                 : `${providerLabel(client.provider)} stopped repeatedly. Restart OpenBot after checking the CLI.`,
             },
       );
@@ -3898,14 +3949,17 @@ export class ProviderRuntime implements ProviderPort {
     return true;
   }
 
-  #startStoppedMessage(provider: AgentProvider): string {
+  #startStoppedMessage(provider: AgentProvider, reason?: string | null): string {
+    // Each start ends in the same way until the user fixes the system, so the fix stays on the row (#4848).
+    const realtimeLimitZero = sourceText("error.provider.realtimeLimitZero");
+    if (reason === realtimeLimitZero) return realtimeLimitZero;
     return sourceText("error.provider.startStopped", { provider: providerLabel(provider) });
   }
 
   /** Shows on the provider row that OpenBot stopped starting it, and answers the message. */
   #showStartStopped(provider: AgentProvider): string {
-    const message = this.#startStoppedMessage(provider);
     const row = this.#status.providers?.find((candidate) => candidate.id === provider);
+    const message = this.#startStoppedMessage(provider, row?.message);
     this.#setStatus({
       providers: updateProviderStatus(this.#status.providers, provider, {
         state: "error",

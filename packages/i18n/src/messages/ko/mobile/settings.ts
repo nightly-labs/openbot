@@ -264,6 +264,14 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "듣기",
   "mobile.settings.voice.tab.speaking": "말하기",
+  "mobile.settings.voice.pause.title": "보내기 전 멈춤",
+  "mobile.settings.voice.pause.label": "새 단어 대기",
+  "mobile.settings.voice.pause.footer":
+    "음성 대화에서 이 시간 동안 새 단어가 인식되지 않으면 OpenBot이 말을 보냅니다. 단어 없는 소음은 듣기를 유지하지 않습니다. 천천히 말하거나 생각하려고 멈춘다면 더 긴 멈춤을 선택하세요.",
+  "mobile.settings.voice.pause.seconds": "{seconds}초",
+  "mobile.settings.voice.speed.title": "답장 속도",
+  "mobile.settings.voice.speed.footer": "OpenBot이 소리 내어 읽는 답장의 속도입니다. 음성 대화에도 적용됩니다.",
+  "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot은 일회용 토큰으로 음성을 ElevenLabs에 스트리밍하고, ElevenLabs가 계정에 요금을 청구해요. 키는 이 휴대폰에 남아 있어요.",
 } as const satisfies PartialTranslation<typeof source>;

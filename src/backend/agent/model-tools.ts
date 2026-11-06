@@ -39,7 +39,8 @@ export type ProviderAccountRows = (provider: AgentProvider) => ProviderAccountSt
 interface ProviderModels {
   provider: AgentProvider;
   defaultModel: string;
-  models: Pick<AgentModelOption, "id" | "name" | "defaultReasoningEffort" | "supportedReasoningEfforts">[];
+  models: (Pick<AgentModelOption, "id" | "name"> &
+    Partial<Pick<AgentModelOption, "defaultReasoningEffort" | "supportedReasoningEfforts">>)[];
   /** The number of models of the provider that the list leaves out. */
   omittedModels?: number;
   accounts?: Pick<ProviderAccountStatus, "id" | "label" | "state">[];
@@ -115,8 +116,14 @@ export function listModelsPayload(
           models: listed.map((model) => ({
             id: model.id,
             name: model.name,
-            defaultReasoningEffort: model.defaultReasoningEffort,
-            supportedReasoningEfforts: model.supportedReasoningEfforts,
+            // A model with no effort setting holds only a `medium` placeholder that never reaches the
+            // provider, and an agent read it as a choice (#5215).
+            ...(model.reasoningEffortConfigurable === false
+              ? {}
+              : {
+                  defaultReasoningEffort: model.defaultReasoningEffort,
+                  supportedReasoningEfforts: model.supportedReasoningEfforts,
+                }),
           })),
           ...(omitted > 0 ? { omittedModels: omitted } : {}),
           ...(rows

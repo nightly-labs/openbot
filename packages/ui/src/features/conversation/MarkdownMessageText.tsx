@@ -655,19 +655,21 @@ function MarkdownInline(props: {
           case "codespan": {
             if (!tokenIs(token, "codespan")) return token.raw;
             const file = mentionedFileTarget(token.text, props.content.fileDirectory);
-            return file && file.kind === "shared" && props.content.onOpenSharedFile ? (
+            const openShared = props.content.onOpenSharedFile;
+            const openWorkspace = props.content.onOpenWorkspaceFile;
+            return file && file.kind === "shared" && openShared ? (
               <LocalFileLink
                 path={file.path}
                 label={token.text}
                 kind="shared"
-                onOpen={props.content.onOpenSharedFile}
+                onOpen={(path) => openShared(path, file.asWritten)}
               />
-            ) : file && file.kind === "workspace" && props.content.onOpenWorkspaceFile ? (
+            ) : file && file.kind === "workspace" && openWorkspace ? (
               <LocalFileLink
                 path={file.path}
                 label={token.text}
                 kind="workspace"
-                onOpen={props.content.onOpenWorkspaceFile}
+                onOpen={(path) => openWorkspace(path, file.asWritten)}
               />
             ) : (
               <code dir="ltr">{token.text}</code>
@@ -1227,7 +1229,11 @@ function messageFileDirectory(body: string): FileDirectoryContext | null {
   return contexts.size === 1 ? (contexts.values().next().value ?? null) : null;
 }
 
-function mentionedFileTarget(value: string, directory: FileDirectoryContext | null): FileDirectoryContext | null {
+/** The file that a code span names. `asWritten` is the span text when the path joins it to `directory`. */
+function mentionedFileTarget(
+  value: string,
+  directory: FileDirectoryContext | null,
+): (FileDirectoryContext & { asWritten?: string }) | null {
   const path = value.trim();
   if (!isFileReference(path)) return null;
   const shared = sharedFileTarget(path);
@@ -1241,6 +1247,7 @@ function mentionedFileTarget(value: string, directory: FileDirectoryContext | nu
   return {
     path: `${directory.path.replace(/[/\\]+$/u, "")}${separator}${path}`,
     kind: directory.kind,
+    asWritten: path,
   };
 }
 
@@ -1265,7 +1272,8 @@ export function messageImageFiles(blocks: readonly string[]): MessageImageFile[]
         : tokenIs(token, "link")
           ? linkFileTarget(token.href)
           : null;
-      if (file && IMAGE_FILE_PATTERN.test(fileReferenceName(file.path))) files.set(`${file.kind}:${file.path}`, file);
+      if (file && IMAGE_FILE_PATTERN.test(fileReferenceName(file.path)))
+        files.set(`${file.kind}:${file.path}`, { path: file.path, kind: file.kind });
     });
   }
   return [...files.values()].slice(0, IMAGE_FILE_LIMIT);

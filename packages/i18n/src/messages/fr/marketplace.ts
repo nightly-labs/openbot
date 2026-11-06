@@ -218,6 +218,16 @@ export const messages = {
     "Utilisez les styles de ce dépôt et concevez une page de réglages dans Paper.",
   "marketplace.plugin.paper.prompt.tokens":
     "Listez les tokens de design du fichier Paper ouvert et comparez-les avec notre thème.",
+  "marketplace.plugin.higgsfield.tagline": "Images, vidéos et audio par IA",
+  "marketplace.plugin.higgsfield.description":
+    "Higgsfield permet aux agents de générer des images, des vidéos, des personnages et de l'audio avec des modèles Higgsfield comme Seedance, Kling, Veo et MiniMax Hailuo, de consulter le solde de crédits et de parcourir l'Asset Library. Les résultats sont enregistrés dans les Assets Higgsfield de l'utilisateur. Chaque utilisateur se connecte à son propre compte Higgsfield dans le navigateur. Chaque génération utilise des crédits de ce compte au tarif standard, même avec un forfait illimité.",
+  "marketplace.plugin.higgsfield.app":
+    "Génération d'images, de vidéos et d'audio, personnages, crédits et assets, via le serveur MCP de Higgsfield avec connexion dans le navigateur.",
+  "marketplace.plugin.higgsfield.prompt.credits": "Combien de crédits Higgsfield me reste-t-il ?",
+  "marketplace.plugin.higgsfield.prompt.productShot":
+    "Crée avec Higgsfield une photo produit d'une tasse en céramique sur une table en bois.",
+  "marketplace.plugin.higgsfield.prompt.clip":
+    "Crée avec Higgsfield une vidéo de 5 secondes de vagues au coucher du soleil.",
   "marketplace.plugin.appleApps.tagline": "Mail, Calendrier et plus sur votre Mac",
   "marketplace.plugin.appleApps.description":
     "Apple apps permet aux agents d’utiliser Mail, Calendrier, Contacts, Rappels, Notes, Messages et Safari sur ce Mac. Il fonctionne uniquement sous macOS. OpenBot démarre mcp-icloud, un serveur communautaire qui n’est fait ni par Apple ni par OpenBot. Le serveur contrôle les apps via AppleScript, sur cet ordinateur, et ne demande ni compte ni clé. À l’installation, OpenBot peut demander à macOS l’accès à toutes ces apps en une fois, avec une demande par app. Sinon, macOS demande la première fois qu’un agent utilise une app. Pour changer ce choix plus tard, ouvrez Réglages Système › Confidentialité et sécurité › Automatisation. Les agents peuvent envoyer des e-mails et des iMessages, et modifier ou supprimer des événements, des contacts et des rappels : vérifiez chaque écriture avant de l’approuver. Ce que les outils lisent, comme le texte des e-mails, est envoyé au fournisseur du modèle de l’agent.",

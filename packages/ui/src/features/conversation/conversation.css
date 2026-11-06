@@ -42,6 +42,7 @@
 @import "./styles/composer-stack.css";
 @import "./styles/interaction-cards.css";
 @import "./styles/browser-takeover.css";
+@import "./styles/question-prompt.css";
 @import "./styles/ui-blocks.css";
 @import "./styles/surface-overrides.css";
 @import "./styles/browser-previews.css";

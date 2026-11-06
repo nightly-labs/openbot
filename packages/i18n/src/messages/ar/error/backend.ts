@@ -58,6 +58,8 @@ export const messages = {
   "error.backend.channelLeadModelUnavailable": "نموذج الوكيل الرئيسي للقناة غير متاح.",
   "error.backend.contextCompactionIneffective":
     "لا يؤدي الضغط إلى تصغير هذه الدردشة: بعد عمليتي ضغط لا تزال تستخدم {percent}% من نافذة سياق النموذج، لذا يتوقف OpenBot عن ضغطها. تستخدم الأدوات والتعليمات معظم النافذة. أوقف خوادم MCP أو التحكم في الحاسوب التي لا يحتاج إليها هذا الوكيل، أو اختر نموذجًا بنافذة أكبر. ثم ابدأ دردشة جديدة.",
+  "error.backend.contextCompactionStopped":
+    'فشلت عمليتا ضغط متتاليتان لهذه الدردشة، لذا يتوقف OpenBot عن ضغطها تلقائيًا. كل محاولة ترسل الدردشة كاملة إلى النموذج وتستهلك من حد خطتك. اختر "الضغط الآن" للمحاولة مرة أخرى، أو ابدأ دردشة جديدة.',
   "error.backend.providerRetrying":
     "فشل المزوّد في هذا الطلب {attempts} مرات ويحاول مرة أخرى. إذا لم يتابع الوكيل، فأوقف الدور.",
   "error.backend.providerRetryingLargeContext":

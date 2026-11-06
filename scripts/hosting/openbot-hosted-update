@@ -233,8 +233,10 @@ install_hosting() {
     mv -f "$INSTALL/hosted/.$file.new" "$INSTALL/hosted/$file"
   done
   install -m 0644 "$source/openbot-hosted.apparmor" /etc/apparmor.d/openbot-hosted
+  # A container, for example on LXC, can show AppArmor and still not load a profile (#5256).
   if command -v apparmor_parser >/dev/null && [ -d /sys/kernel/security/apparmor ]; then
-    apparmor_parser --replace /etc/apparmor.d/openbot-hosted
+    apparmor_parser --replace /etc/apparmor.d/openbot-hosted ||
+      echo "The AppArmor profile is not loaded." >&2
   fi
   for unit in "${UNITS[@]}"; do
     sed "s/@SERVICE_USER@/$user/g" "$source/$unit" >"$INSTALL/hosted/.unit.new"

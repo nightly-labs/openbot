@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { access, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { isAbsolute } from "node:path";
+import { isAbsolute, resolve } from "node:path";
 import { agentProviderName, type KeyOnlyProviderId } from "@openbot/contracts/agent-providers";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -940,7 +940,10 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         ...(done ? { contentItems: [{ type: "inputText", text: piText(getRecord(record, "result")?.content) }] } : {}),
       };
       turn.items.set(id, item);
-      this.#notify(done ? "item/completed" : "item/started", thread, { item });
+      this.#notify(done ? "item/completed" : "item/started", thread, {
+        item,
+        filePaths: piToolFilePaths(item.tool, item.arguments, thread.cwd),
+      });
     }
   }
 
@@ -1155,4 +1158,17 @@ function piFailureCause(message: string | null): CauseCode {
     classifyFailure(message),
   );
   return cause === "unknown" && PI_PROVIDER_STOP.test(message) ? "provider_unavailable" : cause;
+}
+
+/**
+ * The absolute path of a file that a Pi `read`, `write` or `edit` call names, for the thread's file
+ * history. Pi resolves the path as these tools do: without a leading `@`, from `~`, or from the cwd.
+ */
+function piToolFilePaths(tool: unknown, args: unknown, cwd: string): string[] | undefined {
+  if (tool !== "read" && tool !== "write" && tool !== "edit") return undefined;
+  const path = isRecord(args) && typeof args.path === "string" ? args.path.replace(/^@/u, "") : "";
+  if (!path) return undefined;
+  const home = path.startsWith("~/") || (process.platform === "win32" && path.startsWith("~\\"));
+  if (path === "~" || home) return [resolve(homedir(), path.slice(2))];
+  return [resolve(cwd, path)];
 }

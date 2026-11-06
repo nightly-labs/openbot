@@ -522,6 +522,27 @@ export function createAgentTasks(options: AgentTasksOptions) {
       });
   }
 
+  /** The messages of a thread: the loaded conversation, else a read of it. */
+  async function taskMessages(agentId: string, taskId: string): Promise<ConversationSnapshot["messages"]> {
+    return state.conversations[taskId]?.messages ?? (await port().readTask({ agentId, taskId })).messages;
+  }
+
+  /** Whether a thread has a message. */
+  async function taskHasMessage(agentId: string, taskId: string, messageId: string): Promise<boolean> {
+    return (await taskMessages(agentId, taskId)).some((message) => message.id === messageId);
+  }
+
+  /** Moves the read mark of each open thread of an agent with unread messages to its latest message. */
+  async function markAllTasksRead(agentId: string): Promise<void> {
+    const unread = (state.snapshots[agentId]?.tasks ?? []).filter((task) => unreadCount(task) > 0);
+    await Promise.all(
+      unread.map(async (task) => {
+        const latestMessageId = (await taskMessages(agentId, task.id)).at(-1)?.id;
+        if (latestMessageId && scopeIsCurrent()) markTaskRead(agentId, task.id, latestMessageId);
+      }),
+    );
+  }
+
   /**
    * Reads the lists of the active agent, of each agent with a running thread and of each loaded
    * conversation again, after the server was away. Then it reads each loaded conversation. The lists
@@ -574,6 +595,8 @@ export function createAgentTasks(options: AgentTasksOptions) {
     canDeleteMessage,
     deleteTaskMessage,
     markTaskRead,
+    markAllTasksRead,
+    taskHasMessage,
     unreadCount,
     unreadTotals,
     loadUnread,

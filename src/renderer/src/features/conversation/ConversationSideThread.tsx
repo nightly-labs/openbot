@@ -12,6 +12,7 @@ import { actionToast } from "../../action-toast";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { toAgentMessages } from "../../app-message-projection";
 import { usePlatform } from "../../platform";
+import { deviceQuoteShortcut } from "../../send-shortcut-preference";
 import { latestVisibleAgentMessageId } from "./conversation-read-state";
 import { useConversationViewScope } from "./conversation-scope";
 import type { SideThread } from "./conversation-types";
@@ -132,6 +133,11 @@ export function ConversationSideThread(props: { threadId: string }) {
     const id = view.threads?.acceptsReplies ? draft()?.replyToMessageId : null;
     return id ? messages.find((message) => message.id === id) : undefined;
   };
+  /** Text selected in this thread goes to this thread, as a reply where the server takes one. */
+  const selectionActions = (side: SideThread) => ({
+    onSend: (messageId: string, body: string) => side.onSend(body, [], view.threads?.acceptsReplies ? messageId : null),
+    quoteShortcut: deviceQuoteShortcut(view.platform),
+  });
   /** Where this thread came from, when it is a branch. The agent's own chat shows the agent's name. */
   const branchSource = (side: SideThread, agentName: string): AgentThreadBranchSource | undefined => {
     const source = view.threads?.branchSource(side.task);
@@ -208,6 +214,7 @@ export function ConversationSideThread(props: { threadId: string }) {
             replyTo={replyTo()}
             onCancelReply={() => threadComposer.setReply(draftKey(), null)}
             queue={threadQueue.view(current().thread.task, draftKey())}
+            selectionActions={selectionActions(current().thread)}
           />
         )}
       </Show>

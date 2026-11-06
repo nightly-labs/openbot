@@ -105,6 +105,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "正在 {host} 上启动 {name} 登录…",
   "provider.codeLogin.pageOpening": "正在 {host} 上打开 {name} 登录页面…",
   "provider.codeLogin.linkStep": "登录 {name}，OpenBot 会自动继续。",
+  "provider.codeLogin.chatgptDeviceSetting":
+    "在电脑上的 ChatGPT 中打开安全设置，为 Codex 开启设备代码登录。工作账号由工作区管理员开启。",
 
   // A provider that only the OpenBot app can sign in, from a browser tab.
   "provider.useApp.title": "在 OpenBot 应用中连接 {name}",

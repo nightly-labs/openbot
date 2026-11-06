@@ -203,6 +203,16 @@ export const messages = {
     "Gebruik de stijlen in deze repository en ontwerp een instellingenpagina in Paper.",
   "marketplace.plugin.paper.prompt.tokens":
     "Toon de designtokens in het open Paper-bestand en vergelijk ze met ons thema.",
+  "marketplace.plugin.higgsfield.tagline": "AI-afbeeldingen, -video's en -audio",
+  "marketplace.plugin.higgsfield.description":
+    "Met Higgsfield maken agents afbeeldingen, video's, personages en audio met Higgsfield-modellen zoals Seedance, Kling, Veo en MiniMax Hailuo, controleren ze het creditsaldo en bladeren ze door de Asset Library. Resultaten worden opgeslagen in de Higgsfield Assets van de gebruiker. Elke gebruiker meldt zich in de browser aan bij een eigen Higgsfield-account. Elke generatie gebruikt credits van dat account tegen het standaardtarief, ook met een onbeperkt abonnement.",
+  "marketplace.plugin.higgsfield.app":
+    "Afbeeldingen, video en audio genereren, personages, credits en assets, via de MCP-server van Higgsfield met aanmelden in de browser.",
+  "marketplace.plugin.higgsfield.prompt.credits": "Hoeveel Higgsfield-credits heb ik?",
+  "marketplace.plugin.higgsfield.prompt.productShot":
+    "Maak met Higgsfield een productfoto van een keramische mok op een houten tafel.",
+  "marketplace.plugin.higgsfield.prompt.clip":
+    "Maak met Higgsfield een video van 5 seconden met golven bij zonsondergang.",
   "marketplace.plugin.appleApps.tagline": "Mail, Agenda en meer op je Mac",
   "marketplace.plugin.appleApps.description":
     "Met Apple-apps kunnen agents Mail, Agenda, Contacten, Herinneringen, Notities, Berichten en Safari op deze Mac gebruiken. Het werkt alleen op macOS. OpenBot start mcp-icloud, een communityserver die niet van Apple of OpenBot is. De server bestuurt de apps via AppleScript op deze computer en heeft geen account en geen sleutel nodig. Bij de installatie kan OpenBot macOS in één keer om toegang tot al deze apps vragen, met één vraag per app. Anders vraagt macOS het de eerste keer dat een agent een app gebruikt. Om dit later te wijzigen, open je Systeeminstellingen › Privacy en beveiliging › Automatisering. Agents kunnen e-mail en iMessages versturen en afspraken, contacten en herinneringen wijzigen of verwijderen, dus controleer elke wijziging voordat je die goedkeurt. Wat de tools lezen, zoals de tekst van e-mails, gaat naar de modelaanbieder van de agent.",

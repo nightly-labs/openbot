@@ -365,7 +365,7 @@
   stroke: currentcolor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .initial-setup-eyebrow {
@@ -450,7 +450,7 @@
   stroke: currentcolor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .setup-route-icon i {
@@ -723,7 +723,7 @@
   height: 18px;
   grid-column: 2;
   color: var(--openbot-text-secondary);
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .provider-picker-option-unavailable .provider-picker-logo,
@@ -1359,18 +1359,6 @@ textarea:not(.ui-textarea):focus-visible {
     var(--openbot-text-primary) calc(100% - 18px),
     transparent 100%
   );
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }
 
 body,

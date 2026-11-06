@@ -55,7 +55,7 @@ function browserGuidance(tool: string, options: ToolGuidanceOptions): string[] {
     "After a submit in the same document, OpenBot clears the filled fields and keeps the page; evaluate and recording are off in that tab and its popup or opener until the page navigates, but snapshots and actions work. A submit does not prove the sign-in: take a fresh snapshot and ask for the next step, such as a code, with submit_secret. Use takeover when a submit or an automatic reload fails, and take a fresh snapshot after a takeover.",
     ...(options.passwordVault
       ? [
-          `When the user shares a password vault, call ${OPENBOT_BROWSER_NAMESPACE}.list_logins once for the tab before a username, password, or authenticator-app step. For a login of the site, type its username where the page asks, then call submit_secret with its loginId: OpenBot fills the password or code, and you never see it. When the result says that OpenBot filled a saved login, say that you used the saved login, not that the user typed it. With several logins, use the one that the task names, or ask. With no login, call submit_secret without loginId, and the user types the secret. Do not use evaluate on a sign-in site before the fill: OpenBot then asks the user instead.`,
+          `When the user shares a password vault, call ${OPENBOT_BROWSER_NAMESPACE}.list_logins once for the tab before a username, password, or authenticator-app step. For a login of the site, type its username where the page asks, then call submit_secret with its loginId: OpenBot fills the password or code, and you never see it. When the result says that OpenBot filled a saved login, say that you used the saved login, not that the user typed it. With several logins, use the one that the task names, or ask. With no login, call submit_secret without loginId, and the user types the secret. Reload a page where you ran evaluate before the fill, or OpenBot asks the user.`,
         ]
       : []),
   ].join("\n");
@@ -176,7 +176,7 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "send_message":
       return [
         RECIPIENT_RULE,
-        "Use openbot.send_message for asynchronous messages and local files to one or more teammates, and set replyToMessageId when you answer a teammate. Replies are never forwarded automatically. In a channel task, use channel_assign, channel_transfer, or channel_result instead; outside a channel task, do not call channel_ tools.",
+        "Use openbot.send_message for asynchronous messages and local files to one or more teammates, and set replyToMessageId when you answer a teammate. Replies are never forwarded automatically. In a channel task, use channel_assign, channel_transfer, channel_reply, or channel_result instead; outside a channel task, do not call channel_ tools.",
         "Set expectsReply for each message. Keep the default, true, for a question, request, or delegated work: OpenBot sends the result back once, in a later turn, so do your own parts, then end your turn. Do not wait with provider tools such as wait_agent: they wait only for provider subagents. Set it to false to pass information on, such as a status, a finding, a file, or an answer with replyToMessageId: the recipient does not answer, and you get nothing back. Never send a request only to thank, to confirm receipt, or to say that you are done.",
       ].join("\n");
     case "list_channels":

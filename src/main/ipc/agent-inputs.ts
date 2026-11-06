@@ -252,6 +252,10 @@ export function parseCreateAgent(value: unknown): CreateAgentInput {
     if (!isReasoningEffort(value.reasoningEffort)) throw new Error("Invalid reasoning effort.");
     result.reasoningEffort = value.reasoningEffort;
   }
+  if (value.providerAccountId !== undefined) {
+    if (!isProviderAccountId(value.providerAccountId)) throw new Error("Invalid provider account.");
+    result.providerAccountId = value.providerAccountId;
+  }
   return result;
 }
 

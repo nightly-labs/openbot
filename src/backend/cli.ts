@@ -1354,7 +1354,7 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
 });
 
 /** `X_OK` also passes for a folder, and a login-shell `PATH` folder can hold one with the CLI's name. */
-const isExecutable = Effect.fn("Cli.isExecutable")((path: string) =>
+export const isExecutable = Effect.fn("Cli.isExecutable")((path: string) =>
   providerCall(async () => {
     await access(path, process.platform === "win32" ? constants.F_OK : constants.X_OK);
     return (await stat(path)).isFile();

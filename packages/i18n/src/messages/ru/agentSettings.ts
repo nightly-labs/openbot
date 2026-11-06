@@ -267,8 +267,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "Агент может начать новый чат, когда его чат становится длинным. Сначала он сохраняет заметки.",
   "agentSettings.quickAcknowledgement.title": "Показывать план перед долгими задачами",
-  "agentSettings.quickAcknowledgement.description":
-    "Перед долгой задачей агент показывает свой план. Он начинает через 10 с или когда вы нажимаете «Начать».",
+  "agentSettings.quickAcknowledgement.description": "Перед долгой задачей агент показывает свой план.",
   "agentSettings.browserProfile.label": "Профиль браузера",
   "agentSettings.browserProfile.shared": "Общий",
   "agentSettings.browserProfile.agent": "Только этот агент",

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { accountUsageCoversModel } from "@openbot/contracts/agent-providers";
 import { type AgentSummary, isAgentModel, type UsageTokens, WORKFLOWS_USAGE_ID } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -119,7 +120,9 @@ export function collectProviderUsage(
     // OpenCode 1.19 and 2.x send the tokens of this prompt only (`state.usage.turn` starts again for
     // each prompt). `inputTokens` is the uncached input, and each cache and thinking field is left
     // out when it is 0, so a missing one is 0. Reasoning is billed as output. The cost is the
-    // session's total, so its own counter keeps the last one.
+    // session's total, so its own counter keeps the last one. From OpenCode 2.2.0 the cost is what
+    // OpenCode Console charged, and the Go subscription charges $0 for a Go model, so a Go turn has
+    // no API-equivalent cost.
     const output = count(value.outputTokens);
     usage.record({
       agentId: agent.id,
@@ -129,7 +132,7 @@ export function collectProviderUsage(
       model,
       counterId: `${session.id}:opencode:${getString(params, "promptId") ?? turnId}`,
       costCounterId: `${session.id}:opencode:cost`,
-      reportedCost: isDynamicRecord(params) ? cost(params.cost) : null,
+      reportedCost: isDynamicRecord(params) && !accountUsageCoversModel("opencode", model) ? cost(params.cost) : null,
       baseline: false,
       tokens: {
         uncachedInput: count(value.inputTokens),

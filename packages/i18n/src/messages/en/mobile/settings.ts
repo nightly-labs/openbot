@@ -266,6 +266,14 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "Listening",
   "mobile.settings.voice.tab.speaking": "Speaking",
+  "mobile.settings.voice.pause.title": "Pause before sending",
+  "mobile.settings.voice.pause.label": "Wait for new words",
+  "mobile.settings.voice.pause.footer":
+    "In a voice conversation, OpenBot sends your words when it recognizes no new words for this long. Noise without words does not keep it listening. Choose a longer pause if you speak slowly or stop to think.",
+  "mobile.settings.voice.pause.seconds": "{seconds} s",
+  "mobile.settings.voice.speed.title": "Reply speed",
+  "mobile.settings.voice.speed.footer": "The speed of replies that OpenBot reads aloud, also in a voice conversation.",
+  "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot streams your speech to ElevenLabs with a single-use token, and ElevenLabs bills your account. The key stays on this phone.",
 });

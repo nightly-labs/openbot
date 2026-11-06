@@ -274,6 +274,14 @@ export const messages = {
   "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
   "mobile.settings.voice.tab.listening": "Słuchanie",
   "mobile.settings.voice.tab.speaking": "Mówienie",
+  "mobile.settings.voice.pause.title": "Pauza przed wysłaniem",
+  "mobile.settings.voice.pause.label": "Czekaj na nowe słowa",
+  "mobile.settings.voice.pause.footer":
+    "W rozmowie głosowej OpenBot wysyła Twoje słowa, gdy przez tak długi czas nie rozpozna nowych słów. Hałas bez słów nie przedłuża słuchania. Wybierz dłuższą pauzę, jeśli mówisz wolno lub zatrzymujesz się, by pomyśleć.",
+  "mobile.settings.voice.pause.seconds": "{seconds} s",
+  "mobile.settings.voice.speed.title": "Szybkość odpowiedzi",
+  "mobile.settings.voice.speed.footer": "Szybkość odpowiedzi, które OpenBot czyta na głos, także w rozmowie głosowej.",
+  "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.elevenLabs.recognitionFooter":
     "OpenBot przesyła Twoją mowę do ElevenLabs z jednorazowym tokenem, a ElevenLabs obciąża Twoje konto. Klucz zostaje na tym telefonie.",
 } as const satisfies PartialTranslation<typeof source>;

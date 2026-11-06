@@ -212,6 +212,15 @@ export const messages = {
     "このリポジトリのスタイルを使って、Paper で設定ページをデザインしてください。",
   "marketplace.plugin.paper.prompt.tokens":
     "開いている Paper のファイルにあるデザイントークンを一覧にして、私たちのテーマと比較してください。",
+  "marketplace.plugin.higgsfield.tagline": "AI による画像、動画、音声",
+  "marketplace.plugin.higgsfield.description":
+    "Higgsfield を使うと、エージェントは Seedance、Kling、Veo、MiniMax Hailuo などの Higgsfield モデルで画像、動画、キャラクター、音声を生成し、クレジット残高を確認し、Asset Library を閲覧できます。結果はユーザーの Higgsfield Assets に保存されます。各ユーザーはブラウザで自分の Higgsfield アカウントにサインインします。生成のたびに、そのアカウントのクレジットが標準料金で使われます。無制限プランでも同じです。",
+  "marketplace.plugin.higgsfield.app":
+    "Higgsfield の MCP サーバー経由で、画像・動画・音声の生成、キャラクター、クレジット、アセットを扱います。ブラウザでサインインします。",
+  "marketplace.plugin.higgsfield.prompt.credits": "Higgsfield のクレジットは何残っていますか？",
+  "marketplace.plugin.higgsfield.prompt.productShot":
+    "Higgsfield で、木のテーブルに置いた陶器のマグカップの商品写真を作ってください。",
+  "marketplace.plugin.higgsfield.prompt.clip": "Higgsfield で、夕暮れの波の 5 秒の動画を作ってください。",
   "marketplace.plugin.appleApps.tagline": "Mac のメール、カレンダーなど",
   "marketplace.plugin.appleApps.description":
     "Apple apps を使うと、エージェントはこの Mac のメール、カレンダー、連絡先、リマインダー、メモ、メッセージ、Safari を使えます。macOS でのみ動作します。OpenBot は mcp-icloud を起動します。これは Apple や OpenBot が作ったものではない、コミュニティのサーバーです。サーバーはこのコンピューター上で AppleScript を使ってアプリを操作し、アカウントもキーも不要です。インストール時に、OpenBot はこれらすべてのアプリへのアクセスを macOS にまとめて求めることができます。確認はアプリごとに 1 回表示されます。求めない場合は、エージェントが初めてアプリを使うときに macOS が確認します。後で変更するには、システム設定 › プライバシーとセキュリティ › オートメーション を開いてください。エージェントはメールや iMessage を送信し、イベント、連絡先、リマインダーを変更・削除できるので、承認する前に各書き込みを確認してください。ツールが読んだ内容（メールの本文など）は、エージェントのモデルプロバイダーに送られます。",

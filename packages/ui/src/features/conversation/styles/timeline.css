@@ -177,7 +177,7 @@
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 /* The mark is as tall as the arrow, so one padding can hold both away from every edge. */

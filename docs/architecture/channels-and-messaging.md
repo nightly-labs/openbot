@@ -267,6 +267,33 @@ channel controls still accepts only a stopped or failed run. On desktop, each ro
 waiting-for-subtasks list above the composer has Stop, which sends the `stop` command for that
 subtask. Its stopped-task card then offers Continue, Reassign and Cancel.
 
+Members can reply to each other (#4847). `channel_reply` takes the id of a message of another member
+and a short text (`CHANNEL_REPLY_CHARACTERS`). It posts the text in the shared chat as a reply to
+that message (`replyToMessageId`), and gives the author of that message one turn to answer: a child
+task of the caller's task, with the reply as its request and instruction. The caller waits for it
+as for `channel_assign`: the child is in `dependencies`, so the caller's turn ends `waiting` and the
+caller continues with the answer. Without the wait, a member that had to agree on something answered
+the person before the other member answered it. The answer of that turn shows as a reply to the
+reply message (`capture`, and `channel_result`). Text that the caller writes after its reply in the
+same turn folds into the steps of that turn, as text after `channel_result` does: models wrote "I
+will report back" there, and the note showed after the answer. `channel-replies.ts`
+finds a reply task by its request id prefix (`channel-reply-`), so the change adds no stored field,
+no migration and no Team API field. A person's message that resumes a reply task gives it a new
+request, so it becomes an ordinary task with the default expected result and answers that person. A
+request allows `CHANNEL_REPLY_LIMIT` (2) member replies, counted from the reply tasks of each root
+task of that request, whoever writes them: one message to two members shares one limit. A reply
+task that fails lets the caller continue without the answer (`settled`), because a short question
+must not hold the request until a person acts. `channel_result` is refused while a reply of the
+task waits for its answer. `channel_reply` refuses, with
+`accepted: false`, a reply after the caller's `channel_result`, in a run that ended, to a message of
+a person or of the caller, to a streaming message, to a member that takes no work, and over the
+limit. Each refusal tells the model not to mention it, because a model wrote one in the chat. The
+reply text is agent text that reaches another agent, so its assignment starts with a line that
+names the sender and says it is not the user, and a reply turn only answers: it cannot use
+`channel_reply`, `channel_assign`, `channel_transfer`, `channel_cancel`, the channel memory tools or
+the channel management tools. The commentary of a turn that posted a reply is left out of the
+transcript that models read, as for a turn that posted a result.
+
 The channel controls stop and cancel a run with no message that a model reads, and a change note is
 not in the packet. So each packet has `stoppedTasks`: the `paused` and `cancelled` tasks of the
 recent messages that the member owns, or that run under work it owns (`channelWorkOwners`). Without
@@ -280,12 +307,15 @@ The change is a `save` through the command queue (`ChannelService.agentSave`), w
 from the stored channel when its turn comes, and the actor id `agent:<agentId>`. A new channel's id
 comes from the tool call id, so a retried call makes no second channel. Members must exist and not
 be hidden, and the lead must be a member; an icon removes an image, as in the channel settings.
-These changes write no `channel-change` note. Inside a channel task, both tools are refused, so only
-a person's request changes the channel there. They also need a turn of only this computer's user's
-messages, in the agent's own chat or in a side thread that the person opened or branched (no routine,
-messaging link or channel): an external chat, a routine run or an agent message can carry text from
-outside, and the Team API checks a team member's agent access. Webhook routines still need the
-agent's own chat.
+These changes write no `channel-change` note. Outside a channel, they need a turn of only this
+computer's user's messages, in the agent's own chat or in a side thread that the person opened or
+branched (no routine or messaging link): an external chat, a routine run or an agent message can
+carry text from outside, and the Team API checks a team member's agent access. Inside a channel task,
+they need a task whose request this computer's user wrote (`ChannelService.requestedByLocalPerson`):
+the same `channelRequester` check as the channel tools, which refuses a routine run, an agent's
+request and a member reply, and also a team member. There, `update_channel` does not change the
+task's own channel: the channel tools change it, write the note, and keep the caller's work from
+stopping. Webhook routines still need the agent's own chat.
 
 Channel work holds only the agent that does it. An agent runs one main-lane turn at a time: its chat,
 a channel delivery or a messaging delivery. While the agent has an active assignment,
@@ -340,6 +370,7 @@ posted a `channel_result`: the result is the answer of that turn.
 | Handoff of an agent in the packet | 24,000 characters (`HANDOFF_INSTRUCTION_CHARACTERS`): 18,000 first and 6,000 last | `cutInstruction` |
 | Instruction of a task this task waits for | 500 characters (`DEPENDENCY_INSTRUCTION_CHARACTERS`) | `channel-history.ts` |
 | Compaction stops | after 2 compactions that leave 80% or more; a `context_compaction_ineffective` notice | `ContextCompaction` |
+| Compaction stops after failures | after 2 compactions in a row that fail or time out; a `context_compaction_stopped` notice. A completed compaction or a session under 80% starts the count again | `ContextCompaction` |
 | Retry notice | at the 3rd provider retry; at 50% or more, a compaction before the next turn | `TurnLifecycle` |
 
 - The packet starts with the current assignment. A short assignment comes again at the end, because

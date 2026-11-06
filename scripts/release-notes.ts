@@ -18,13 +18,28 @@ export const MOBILE_STORES = ["ios", "android"] as const;
 export type MobileStore = (typeof MOBILE_STORES)[number];
 export const MOBILE_STORE_NAMES: Record<MobileStore, string> = { ios: "iOS", android: "Android" };
 
-/** The day each store made the version available. A store that still reviews it has no entry. */
-export type StoreDates = Partial<Record<MobileStore, string>>;
+/**
+ * A store that will never ship the version, because a newer one replaced it before review ended:
+ * `Skipped (Android)` in a heading. `/changelog` shows it as skipped, and it gets no Discord post.
+ */
+export const SKIPPED = "Skipped";
+
+/** What a store did with a version: the day it made it available, or `SKIPPED`. */
+export type StoreState = string;
+
+/** The state of each store. A store that still reviews the version has no entry. */
+export type StoreDates = Partial<Record<MobileStore, StoreState>>;
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
-const STORE_DATE = /^(\d{4}-\d{2}-\d{2}) \(([^)]+)\)$/;
+const STORE_STATE = /^(\d{4}-\d{2}-\d{2}|Skipped) \(([^)]+)\)$/;
 const isDay = (text: string) => DAY.test(text) && !Number.isNaN(Date.parse(`${text}T00:00:00Z`));
 const storeNamed = (name: string) => MOBILE_STORES.find((store) => MOBILE_STORE_NAMES[store] === name);
+
+/** The day that `store` made the version available. Undefined while it reviews it, or when it skipped it. */
+export function storeDay(dates: StoreDates, store: MobileStore): string | undefined {
+  const state = dates[store];
+  return state === undefined || state === SKIPPED ? undefined : state;
+}
 
 /**
  * Reads what follows `## [x.y.z] - ` in a mobile heading. Undefined when it is not one of:
@@ -33,6 +48,8 @@ const storeNamed = (name: string) => MOBILE_STORES.find((store) => MOBILE_STORE_
  *   2026-10-14                               both stores since that day
  *   2026-10-14 (Android)                     only that store; the other one still reviews it
  *   2026-10-14 (Android), 2026-10-16 (iOS)   both stores, earlier day first
+ *   2026-11-01 (iOS), Skipped (Android)      a store skipped the version; days come first
+ *   Skipped (Android)                        Android skipped it; iOS still reviews it
  */
 export function parseStoreDates(text: string): StoreDates | undefined {
   if (text === IN_REVIEW) return {};
@@ -40,10 +57,10 @@ export function parseStoreDates(text: string): StoreDates | undefined {
   const dates: StoreDates = {};
   const parts = text.split(", ");
   for (const part of parts) {
-    const [, day = "", name = ""] = STORE_DATE.exec(part) ?? [];
+    const [, state = "", name = ""] = STORE_STATE.exec(part) ?? [];
     const store = storeNamed(name);
-    if (!isDay(day) || store === undefined || dates[store] !== undefined) return undefined;
-    dates[store] = day;
+    if ((state !== SKIPPED && !isDay(state)) || store === undefined || dates[store] !== undefined) return undefined;
+    dates[store] = state;
   }
   // One form for each state, so a heading that `formatStoreDates` would write differently is wrong.
   return parts.length <= 2 && formatStoreDates(dates) === text ? dates : undefined;
@@ -51,14 +68,18 @@ export function parseStoreDates(text: string): StoreDates | undefined {
 
 /** The heading text of `dates`. The inverse of `parseStoreDates`. */
 export function formatStoreDates(dates: StoreDates): string {
-  const entries = MOBILE_STORES.flatMap((store) => {
-    const day = dates[store];
+  const days = MOBILE_STORES.flatMap((store) => {
+    const day = storeDay(dates, store);
     return day === undefined ? [] : [{ store, day }];
   }).sort((a, b) => a.day.localeCompare(b.day));
-  const [first, second] = entries;
-  if (first === undefined) return IN_REVIEW;
-  if (second !== undefined && second.day === first.day) return first.day;
-  return entries.map(({ store, day }) => `${day} (${MOBILE_STORE_NAMES[store]})`).join(", ");
+  const skipped = MOBILE_STORES.filter((store) => dates[store] === SKIPPED);
+  const [first, second] = days;
+  if (first === undefined && skipped.length === 0) return IN_REVIEW;
+  if (first !== undefined && second !== undefined && second.day === first.day) return first.day;
+  return [
+    ...days.map(({ store, day }) => `${day} (${MOBILE_STORE_NAMES[store]})`),
+    ...skipped.map((store) => `${SKIPPED} (${MOBILE_STORE_NAMES[store]})`),
+  ].join(", ");
 }
 
 interface ReleaseNotesOptions {
@@ -92,7 +113,7 @@ export function releaseNotesProblems(
       problems.push(
         `"${heading}" must be "${prefix}" and then "${IN_REVIEW}", a real YYYY-MM-DD date for both stores, ` +
           `"YYYY-MM-DD (Android)" or "YYYY-MM-DD (iOS)" for one store, or "YYYY-MM-DD (Android), YYYY-MM-DD (iOS)" ` +
-          "with the earlier date first.",
+          `with the earlier date first. A store that skipped the version is "${SKIPPED} (iOS)" or "${SKIPPED} (Android)", after the dates.`,
       );
     }
   } else if (version !== UNRELEASED && (date === undefined || !isDay(date))) {

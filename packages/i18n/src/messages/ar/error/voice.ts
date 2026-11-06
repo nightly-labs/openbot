@@ -25,7 +25,6 @@ export const messages = {
   "error.voice.speech.timedOut": "انتهت مهلة قراءة الرد بصوت عالٍ.",
   "error.voice.speech.failed": "تعذّر على OpenBot قراءة الرد بصوت عالٍ.",
   "error.voice.recordingNotKept": "تعذّر على OpenBot الاحتفاظ بالتسجيل الصوتي.",
-  "error.voice.live.codexOnly": "يعمل الصوت المباشر مع وكلاء Codex فقط.",
   "error.voice.live.timedOut": "لم يبدأ صوت Codex المباشر في الوقت المحدد. حاول مرة أخرى.",
   "error.voice.live.failed": "توقف الصوت المباشر: {reason}",
   "error.voice.live.disconnected": "انقطع اتصال الصوت المباشر.",

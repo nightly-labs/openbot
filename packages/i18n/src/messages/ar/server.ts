@@ -339,6 +339,7 @@ export const messages = {
   "server.companySignIn.testedStatus": "اختُبر لـ {domains}. فعّله لاستخدامه.",
   "server.companySignIn.setUp": "إعداد",
   "server.companySignIn.edit": "تعديل",
+  "server.companySignIn.desktopOnly": "أعدّ تسجيل الدخول الموحّد في تطبيق OpenBot لسطح المكتب.",
   "server.companySignIn.loadFailed": "تعذّر على OpenBot تحميل تسجيل الدخول بحساب الشركة.",
   "server.companySignIn.scim": "مزامنة المستخدمين (SCIM)",
   "server.companySignIn.scimOff": "متوقف",

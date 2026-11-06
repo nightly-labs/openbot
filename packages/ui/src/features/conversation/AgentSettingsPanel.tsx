@@ -80,6 +80,7 @@ import {
   type SupportedAvatarSilhouetteId,
 } from "@openbot/ui/bloub-avatar";
 import { ProviderModelPicker } from "@openbot/ui/components/ProviderModelPicker";
+import { findModelOption } from "@openbot/ui/components/provider-accounts";
 import { ResizableTextarea } from "@openbot/ui/components/ResizableTextarea";
 import {
   SettingsField,
@@ -790,9 +791,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     accountId: string | null | undefined,
     preferredEffort?: AgentReasoningEffort,
   ): Promise<void> {
-    const option = props.modelOptions.find(
-      (candidate) => candidate.provider === nextProvider && candidate.id === nextModel,
-    );
+    const option = findModelOption(props.modelOptions, props.agentStatus.providers, nextProvider, nextModel);
     if (!option) return;
     // A plain copy, not `snapshot`: a snapshot of an unmodified subtree is the store's own object,
     // which the write below would mutate, leaving nothing to roll back to.
@@ -926,10 +925,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     };
   const ownModelName = () => {
     const own = ownModel();
-    return (
-      props.modelOptions.find((option) => option.provider === own.provider && option.id === own.model)?.name ??
-      own.model
-    );
+    return findModelOption(props.modelOptions, props.agentStatus.providers, own.provider, own.model)?.name ?? own.model;
   };
 
   const backupModelsSummary = () => {
