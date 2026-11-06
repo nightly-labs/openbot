@@ -7,6 +7,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "Testowanie zdalnego pulpitu jest niedostępne.",
   "error.remote.controlUnavailable": "Zdalne sterowanie jest niedostępne.",
   "error.remote.controlSessionNotFound": "Nie znaleziono sesji zdalnego sterowania.",
+  "error.remote.controlNotAllowed": "Właściciel tego komputera nie pozwala twojej roli na sterowanie nim.",
+  "error.remote.controlDeclined": "Osoba przy tym komputerze nie zezwoliła na zdalne sterowanie.",
   "error.remote.testRuntimeUpdate": "Zaktualizuj środowisko zdalnego pulpitu macOS, aby uruchomić ten test.",
   "error.remote.testOtherSessions": "Zakończ inne sesje zdalnego pulpitu, zanim rozpoczniesz test.",
   "error.remote.testPermissions": "Przed rozpoczęciem testu sprawdź uprawnienia i sesję GUI na hoście.",

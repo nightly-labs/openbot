@@ -7,6 +7,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "원격 데스크톱 테스트를 사용할 수 없어요.",
   "error.remote.controlUnavailable": "원격 제어를 사용할 수 없어요.",
   "error.remote.controlSessionNotFound": "원격 제어 세션을 찾을 수 없어요.",
+  "error.remote.controlNotAllowed": "이 컴퓨터의 소유자가 내 역할의 원격 제어를 허용하지 않아요.",
+  "error.remote.controlDeclined": "이 컴퓨터 앞에 있는 사람이 원격 제어를 허용하지 않았어요.",
   "error.remote.testRuntimeUpdate": "이 테스트를 실행하려면 macOS 원격 데스크톱 런타임을 업데이트해 주세요.",
   "error.remote.testOtherSessions": "테스트를 시작하기 전에 다른 원격 데스크톱 세션을 종료해 주세요.",
   "error.remote.testPermissions": "테스트를 시작하기 전에 호스트의 권한과 GUI 세션을 확인해 주세요.",

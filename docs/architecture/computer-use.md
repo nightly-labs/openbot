@@ -140,6 +140,67 @@ sends input through XTest, so a hosted server under Xvfb needs no uinput device 
 capability. On a server with an agent display, Sunshine runs on that display (see
 [Agent display on a server](#agent-display-on-a-server)). Linux has no permission checks: an X11 session is ready.
 
+### Host controls
+
+The host owner chooses in Server settings › Remote desktop which roles may start a session
+(`owner`, `admins` or `members`; `members` by default) and whether the person at the computer must
+allow each session. `remote-control-policy-store.ts` keeps both in a JSON file in userData, as the
+Private network setting does. The route checks the role on `sessions`, `setup` and `test`.
+`remote-control-question.ts` asks with a sheet on the main window, and a request that nobody allows
+in 30 s, that the client drops, or that a revoke or Stop all ends, is refused. A host with no window
+refuses every session while the question is on. Both refusals are a 403 with a localized message
+and no code: every released protocol rejects an error code it does not know.
+
+The gateway's audit events show the sign: a notification at the first stream of a remote session,
+and the tray item while a session streams, with the member's name and **Stop all remote control**.
+A local test session does not count.
+
+### Remote desktop on the phone
+
+The mobile app shows the host's own Moonlight Web viewer, as the desktop app does
+(`apps/mobile/src/features/remote-desktop`). The viewer is code from the host, so it runs in a
+plain `react-native-webview`, not in an Expo DOM component: the web view has no `onMessage`, loads
+only its loopback address, and cannot call the app. The app calls the page with `injectJavaScript`.
+
+- `modules/remote-viewer-proxy` is a native HTTP and WebSocket server on `127.0.0.1` (Swift and
+  Kotlin). It answers 404 to a path without the session's random token and reads only HTTP and
+  WebSocket frames. `viewer-proxy.ts` sends each request to the host as a Team API request, and
+  rewrites `/v1/remote-screen` in HTML and JavaScript as `RemoteViewerProxy` does on desktop. It
+  takes only the routes of its own session.
+- The viewer's signaling socket goes over the peer's desktop channel. The hidden peer page
+  (`remote-desktop-relay.ts`) relays it with the `remote-stream-v1` frames; the browser live view
+  reads the same channel and leaves frames of other streams alone.
+- The proxy reads the viewer's `viewer-state` reports on their way to the host, so the screen
+  knows when the first frame arrives (the desktop's 60 s limit) and whether the video is direct or
+  relayed. A failure report does not close the page: after a display change the host closes the
+  stream socket with 4410, and the viewer loads again by itself. During a display change the screen
+  says "Switching to <display>…" and keeps the old stream's end report. It shows that report, or a
+  switch failure, only when the new stream shows no picture within 30 s.
+- The app's page script sets Moonlight's `mlSettings` before the page starts: H.264, a stream no
+  wider than 1920 px (Fast, 120 fps, 20 Mbit/s; Smooth, 60 fps, 10 Mbit/s) or 1280 px (Data saver,
+  30 fps, 3 Mbit/s), and Moonlight's `mouseRelative` (Trackpad mode) or `pointAndDrag` touch mode.
+  Sunshine on macOS captures no faster than the display, so Fast sends more frames only from a
+  display of 120 Hz or more. The script also puts the app's background in place of Moonlight's blue
+  page, which is a `body::before` layer, and hides Moonlight's stats overlay.
+- Connection stats is a sheet. While it is open, the page posts Moonlight's stats once a second to
+  `moonlight/openbot-phone-stats`. The proxy answers that one path itself and sends it to no host,
+  so the page gets no other way to reach the app. Moonlight's WebRTC values named "…Ms" are running
+  totals in seconds, so the sheet shows the time per frame from the change between two samples. Copy
+  in the sheet's header copies the shown values and Moonlight's raw values.
+  OpenBot's patch hides Moonlight's sidebar, so the app adds a key bar above the phone keyboard.
+- Typing sends `keydown` and `keyup` of a US keyboard to the document, as the paste script does.
+  Sunshine on macOS does not type text ("Unicode input not yet implemented for MacOS"), so only a
+  character with no key goes through Moonlight's `sendText`, which Windows and Linux hosts type.
+- Zoom is a transform of Moonlight's `.video-stream` element. That element is `position: fixed`, so
+  a transform of a parent would move it out of view. Moonlight maps a touch through the video's
+  bounding box, so a touch lands where the finger is. A two-finger pinch zooms; while zoomed in, two
+  fingers also move the view. The script then calls Moonlight's `onTouchCancel`, so a finger that
+  Moonlight saw first does not click. At full size, a two-finger drag still scrolls and a two-finger
+  tap still right-clicks.
+- Before a session the phone asks for Face ID, Touch ID or the phone unlock. It ends the session
+  when the app leaves the foreground, covers the screen in the app switcher, keeps the phone awake,
+  and sets `FLAG_SECURE` on Android.
+
 ### Codex tool approvals
 
 Codex saves an “Always allow” tool decision only when the MCP server is in a file-backed

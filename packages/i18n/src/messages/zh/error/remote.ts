@@ -8,6 +8,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "远程桌面测试不可用。",
   "error.remote.controlUnavailable": "远程控制不可用。",
   "error.remote.controlSessionNotFound": "未找到远程控制会话。",
+  "error.remote.controlNotAllowed": "此电脑的所有者不允许你的角色控制它。",
+  "error.remote.controlDeclined": "此电脑前的人没有允许远程控制。",
   "error.remote.testRuntimeUpdate": "请更新 macOS 远程桌面运行时以运行该测试。",
   "error.remote.testOtherSessions": "开始测试前请先结束其他远程桌面会话。",
   "error.remote.testPermissions": "开始测试前请检查主机上的权限和图形会话。",

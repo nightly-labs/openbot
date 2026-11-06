@@ -444,8 +444,8 @@ export const messages = {
   "server.invite.revokeTitle": "Revogar este convite?",
   "server.invite.revokeDescription": "O convite deixa de funcionar. Quem entrou com ele continua como membro.",
   "server.desktop.accessTitle": "Acesso à área de trabalho remota",
-  "server.desktop.gatewayDescription":
-    "Todo membro ativo do servidor pode controlar este computador anfitrião. Não há senha separada para a área de trabalho remota.",
+  "server.desktop.gatewayPolicyDescription":
+    "Não há uma senha separada para a área de trabalho remota. As configurações abaixo escolhem quem pode controlar este computador.",
   "server.desktop.componentInstalled": "Componente instalado",
   "server.desktop.componentNotInstalled": "Componente não instalado",
   "server.desktop.sessions": "Acesso não supervisionado: {unattended} · Sessões ativas: {active}/{max}",
@@ -458,12 +458,26 @@ export const messages = {
   "server.desktop.hostOfflineDescription": "Reconecte-se ao computador anfitrião antes de abrir sua área de trabalho.",
   "server.desktop.hostUpdateDescription": "Atualize o OpenBot no computador anfitrião para usar o controle remoto.",
   "server.desktop.serviceAvailable": "Serviço disponível",
-  "server.desktop.serviceAvailableDescription": "O controle por WebRTC está disponível para todos os membros ativos.",
   "server.desktop.serviceNotReady": "Serviço ainda não pronto",
   "server.desktop.serviceNotReadyDescription":
     "Inicie o Controle remoto para verificar os componentes e as permissões do computador anfitrião. Ele informará qualquer erro de configuração.",
   "server.desktop.remoteControl": "Controle remoto",
   "server.desktop.startHint": "Inicie o Controle remoto pelo botão de monitor no cabeçalho do servidor.",
+  "server.desktop.accessLabel": "Quem pode controlar este computador",
+  "server.desktop.accessDescription":
+    "Os membros que podem abrir a área de trabalho deste computador em outro dispositivo.",
+  "server.desktop.accessOwner": "Somente o proprietário",
+  "server.desktop.accessAdmins": "Proprietário e administradores",
+  "server.desktop.accessMembers": "Todos os membros",
+  "server.desktop.askLabel": "Perguntar neste computador",
+  "server.desktop.askDescription":
+    "Cada sessão espera até uma pessoa neste computador permitir. Sem resposta em 30 segundos, o OpenBot recusa.",
+  "server.desktop.activeTitle": "Sessões de área de trabalho remota ativas: {active}",
+  "server.desktop.activeDescription": "Encerra cada sessão agora. Os membros podem pedir de novo.",
+  "server.desktop.stopAll": "Parar todo o controle remoto",
+  "server.desktop.policyLoadFailed": "Não foi possível carregar as configurações de controle remoto.",
+  "server.desktop.policySaveFailed": "Não foi possível salvar as configurações de controle remoto.",
+  "server.desktop.stopFailed": "Não foi possível parar o controle remoto.",
   "server.settings.providersTitle": "Provedores",
   "server.settings.providersDescription": "Gerencie os provedores de IA do computador que executa este servidor.",
   "server.settings.providersSwitchNote": "Mude para {name} para gerenciar seus provedores de IA.",

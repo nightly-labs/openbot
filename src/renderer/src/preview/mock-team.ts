@@ -12,6 +12,7 @@ import type {
   InviteSummary,
   JoinServerInput,
   OpenBotDesktopApi,
+  RemoteControlPolicy,
   RemoteDesktopSession,
   SendDirectMessageInput,
   ServerSummary,
@@ -22,6 +23,7 @@ import type {
   TeamSessionSummary,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
+import { DEFAULT_REMOTE_CONTROL_POLICY } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import {
   STORY_DIRECT_SNAPSHOTS,
@@ -66,6 +68,7 @@ export function createMockTeam(
   let teamMembers = clone(options.teamMembers ?? STORY_TEAM_MEMBERS);
   let invites = clone(options.invites ?? STORY_INVITES);
   let sessions = clone(options.sessions ?? STORY_SESSIONS);
+  let remoteControlPolicy: RemoteControlPolicy = { ...DEFAULT_REMOTE_CONTROL_POLICY };
   let remoteDesktopSessions = clone(options.remoteDesktopSessions ?? [STORY_REMOTE_DESKTOP_SESSION]);
   let directMessageCounter = 10;
   const serverListeners = new Set<Listener<ServerSummary[]>>();
@@ -398,6 +401,17 @@ export function createMockTeam(
     listSessions: async () => clone(sessions),
     revokeSession: async (sessionId) => {
       sessions = sessions.filter((session) => session.id !== sessionId);
+    },
+    getRemoteControlPolicy: async () => clone(remoteControlPolicy),
+    setRemoteControlPolicy: async (policy) => {
+      remoteControlPolicy = { access: policy.access, askOnHost: policy.askOnHost };
+      return clone(remoteControlPolicy);
+    },
+    // The preview's sessions end at once, as the host's do.
+    stopRemoteControl: async () => {
+      hostStatus = { ...hostStatus, remoteDesktopActiveSessions: 0 };
+      emitHostStatus(hostStatus);
+      return clone(hostStatus);
     },
     listInvites: async () => clone(invites),
     revokeInvite: async (inviteId) => {

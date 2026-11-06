@@ -8,6 +8,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "リモートデスクトップのテストを利用できません。",
   "error.remote.controlUnavailable": "リモート操作を利用できません。",
   "error.remote.controlSessionNotFound": "リモート操作のセッションが見つかりません。",
+  "error.remote.controlNotAllowed": "このコンピューターのオーナーは、あなたのロールによる操作を許可していません。",
+  "error.remote.controlDeclined": "このコンピューターの前にいるユーザーがリモート操作を許可しませんでした。",
   "error.remote.testRuntimeUpdate":
     "このテストを実行するには、macOS のリモートデスクトップのランタイムを更新してください。",
   "error.remote.testOtherSessions": "テストを開始する前に、ほかのリモートデスクトップのセッションを終了してください。",

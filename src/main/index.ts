@@ -128,6 +128,7 @@ import { ensureMacApplicationPresence, secondLaunchResponse } from "./main-windo
 import { MessageLinkRelay, openHttpLink } from "./message-link-relay";
 import { recoverFromNewerDatabase } from "./newer-database-recovery";
 import { startMainLog } from "./provider-log";
+import { notifyRemoteControlStarted } from "./remote-control-question";
 import { watchRemoteHostDirectory } from "./remote-server-host-directory";
 import { createRendererForwarders } from "./renderer-forwarders";
 import { sendToRenderer } from "./renderer-ipc";
@@ -1518,19 +1519,31 @@ if (!hasSingleInstanceLock) {
         () => windowHolder.current,
         quitFor,
       );
-      // The way back to a window hidden in the background.
+      // The way back to a window hidden in the background, and the sign that a member controls
+      // this computer.
       backgroundTray = createBackgroundTray({
         icon: appIconColorImage ?? nativeImage.createFromPath(appIconPath),
         menuBarIcon: loadMenuBarIcon(),
         translate: language.translate,
         open: reopenMainWindow,
         quit: () => quitFor("tray"),
+        stopRemoteControl: () => {
+          void runCauseEffect(host.stopRemoteControl()).catch((error) =>
+            logger.warn("Unable to stop remote control:", toLogValue(error)),
+          );
+        },
       });
       const tray = backgroundTray;
       tray.sync(appBehavior.keepRunningInBackground);
       const unsubscribeBackgroundTray = appBehavior.subscribe(() => tray.sync(appBehavior.keepRunningInBackground));
+      const showRemoteControl = (memberNames: string[]) => tray.setRemoteControl(memberNames);
+      const announceRemoteControl = (memberName: string) => notifyRemoteControlStarted(language.translate, memberName);
+      host.on("remoteControlChanged", showRemoteControl);
+      host.on("remoteControlStarted", announceRemoteControl);
       teardown.push(0, "background tray", () => {
         unsubscribeBackgroundTray();
+        host.off("remoteControlChanged", showRemoteControl);
+        host.off("remoteControlStarted", announceRemoteControl);
         tray.destroy();
       });
       // One place turns a language change into every visible consequence: the menu is built again

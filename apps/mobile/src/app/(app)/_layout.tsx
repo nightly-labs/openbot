@@ -239,6 +239,41 @@ function AuthenticatedStack() {
         }}
       />
       <Stack.Screen
+        name="remote-desktop/[serverId]"
+        options={{
+          animation: pushAnimation,
+          contentStyle: { backgroundColor: background },
+          // Every finger on the screen is the computer's pointer, so only the screen edge goes back.
+          fullScreenGestureEnabled: false,
+          gestureEnabled: true,
+          ...nativeBarOptions,
+        }}
+      />
+      <Stack.Screen
+        name="remote-desktop-stats"
+        // Lower than a form, so the stream that the stats describe stays in view above it.
+        options={{
+          contentStyle: { backgroundColor: sheetBackground },
+          headerShown: false,
+          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.6],
+          sheetGrabberVisible: true,
+        }}
+      />
+      <Stack.Screen
+        name="remote-desktop-help"
+        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
+        options={{
+          contentStyle: { backgroundColor: sheetBackground },
+          headerShown: false,
+          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.85],
+          sheetGrabberVisible: true,
+        }}
+      />
+      <Stack.Screen
         name="browser-help"
         // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
         options={{

@@ -191,6 +191,7 @@ import type { BrowserViewBridgeEvent, RemoteBrowserViewSession } from "@/feature
 import type { MobileChannelStore } from "@/features/channels/model/channel-store";
 import type { MessageFileTarget } from "@/features/chat/model/message-file-target";
 import type { ProviderAdmin } from "@/features/servers/model/provider-admin";
+import type { RemoteDesktopConnection } from "@/features/workspace/components/remote-team-transport";
 import type { MobileConversationStore } from "./conversation-store";
 import type { LiveWorkspaceStore } from "./live-workspace-store";
 
@@ -764,6 +765,10 @@ export interface MobileWorkspaceContextValue {
   loadAgentStorage: (agentId: string, serverId: string, force?: boolean) => Promise<StorageUsage | null>;
   /** True when the host advertises `storage-v1`. Every member reads the host's storage. */
   canReadServerStorage: (serverId: string) => boolean;
+  /** True when the host advertises `remote-desktop`. The host decides which members it lets in. */
+  canControlComputer: (serverId: string) => boolean;
+  /** The connected peer's path for the remote desktop viewer, or null while the server is not connected. */
+  remoteDesktopConnection: (serverId: string) => RemoteDesktopConnection | null;
   /** Every location on the host, its agents, its largest chats and its stored files. */
   loadServerStorage: (serverId: string, force?: boolean) => Promise<StorageUsage>;
   /** Owners and admins only; the host refuses a member. */
@@ -1090,6 +1095,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canUseWorkflowGitHub"
   | "canUseWorkflowChats"
   | "canReadServerStorage"
+  | "canControlComputer"
   | "canSetAgentNotificationLevel";
 
 type MobileWorkspaceStateKey =

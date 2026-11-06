@@ -268,6 +268,8 @@ export interface DevelopmentRemoteServerConnection {
 }
 
 const REMOTE_DUPLICATION_TIMEOUT_MS = TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS;
+// The 30 seconds that a host can ask its user, and the time that it needs to start the runtime.
+const REMOTE_DESKTOP_SESSION_HTTP_TIMEOUT_MS = 60_000;
 /** An export of up to 100 MB goes up and is read in one request, and apply creates many agents. */
 export const AGENT_IMPORT_UPLOAD_TIMEOUT_MS = TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS;
 // How long a host that restarts into an update keeps the fast retry after Signal first misses it. A
@@ -2023,12 +2025,14 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       serverId: string,
     ): Effect.fn.Return<RemoteDesktopSession, RemoteWorkflowError, RemoteRequest> {
       const viewerProxy = this.#remoteViewerProxy;
-
+      const webRtc = (yield* remoteDecode(() => this.#store.require(serverId))).transport === "webrtc-v2";
+      // The host can wait for its user to allow the session. A WebRTC request already waits longer.
       const session = yield* this.request(serverId, TEAM_API_ROUTES.remoteScreen.sessions, decodeRemoteDesktopSession, {
         method: "POST",
         body: {},
+        ...(webRtc ? {} : { timeoutMs: REMOTE_DESKTOP_SESSION_HTTP_TIMEOUT_MS }),
       });
-      if ((yield* remoteDecode(() => this.#store.require(serverId))).transport !== "webrtc-v2") return session;
+      if (!webRtc) return session;
       if (!viewerProxy)
         return yield* new RemoteWorkflowError({
           cause: new Error(sourceText("error.remote.viewerProxyUnavailable")),

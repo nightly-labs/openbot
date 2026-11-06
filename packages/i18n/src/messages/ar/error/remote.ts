@@ -7,6 +7,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "اختبار سطح المكتب البعيد غير متاح.",
   "error.remote.controlUnavailable": "التحكم عن بُعد غير متاح.",
   "error.remote.controlSessionNotFound": "جلسة التحكم عن بُعد غير موجودة.",
+  "error.remote.controlNotAllowed": "لا يسمح مالك هذا الحاسوب لدورك بالتحكم فيه.",
+  "error.remote.controlDeclined": "لم يسمح الشخص الموجود عند هذا الحاسوب بالتحكم عن بُعد.",
   "error.remote.testRuntimeUpdate": "حدّث بيئة تشغيل سطح المكتب البعيد على macOS لإجراء هذا الاختبار.",
   "error.remote.testOtherSessions": "أنهِ جلسات سطح المكتب البعيد الأخرى قبل بدء الاختبار.",
   "error.remote.testPermissions": "تحقق من الأذونات ومن جلسة الواجهة الرسومية على المضيف قبل بدء الاختبار.",

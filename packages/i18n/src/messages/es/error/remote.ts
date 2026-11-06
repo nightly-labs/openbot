@@ -7,6 +7,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "Las pruebas del escritorio remoto no están disponibles.",
   "error.remote.controlUnavailable": "El control remoto no está disponible.",
   "error.remote.controlSessionNotFound": "No se encontró la sesión de control remoto.",
+  "error.remote.controlNotAllowed": "El propietario de este equipo no permite que tu rol lo controle.",
+  "error.remote.controlDeclined": "La persona en este equipo no permitió el control remoto.",
   "error.remote.testRuntimeUpdate":
     "Actualiza el entorno de ejecución del escritorio remoto de macOS para ejecutar esta prueba.",
   "error.remote.testOtherSessions": "Finaliza las otras sesiones de escritorio remoto antes de iniciar una prueba.",

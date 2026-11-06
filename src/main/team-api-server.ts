@@ -1193,10 +1193,11 @@ export class TeamApiServer {
   }
 
   #routeRemoteScreen(context: TeamApiRequestContext): Promise<RouteOutcome> {
-    const remoteScreen = this.#options.remoteScreen;
+    const { remoteScreen, remoteControlAccess } = this.#options;
     return routeRemoteScreen(context, {
       store: this.#options.store,
       ...(remoteScreen === undefined ? {} : { remoteScreen }),
+      ...(remoteControlAccess === undefined ? {} : { remoteControlAccess }),
     });
   }
 

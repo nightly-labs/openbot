@@ -7,6 +7,10 @@ export const messages = defineMessages("error.remote", {
   "error.remote.desktopTestUnavailable": "Remote desktop testing is unavailable.",
   "error.remote.controlUnavailable": "Remote control is unavailable.",
   "error.remote.controlSessionNotFound": "Remote control session not found.",
+  // The host owner's remote control setting does not include the member's role.
+  "error.remote.controlNotAllowed": "The owner of this computer does not let your role control it.",
+  // The person at the host computer chose Deny, or did not answer in 30 seconds.
+  "error.remote.controlDeclined": "The person at this computer did not allow remote control.",
   "error.remote.testRuntimeUpdate": "Update the macOS remote desktop runtime to run this test.",
   "error.remote.testOtherSessions": "End other remote desktop sessions before you start a test.",
   "error.remote.testPermissions": "Check permissions and the GUI session on the host before starting the test.",

@@ -45,6 +45,7 @@ import type {
   CentralAuthUser,
   DirectMessageRealtimeEvent,
   DirectTypingRealtimeEvent,
+  RemoteControlAccess,
   RoutineResultConnectionOption,
   RoutineResultDestination,
   RoutineResultRoutineInput,
@@ -649,6 +650,8 @@ export interface TeamApiOptions {
   browser: TeamApiBrowser;
   browserView?: TeamApiBrowserView | undefined;
   remoteScreen?: TeamApiRemoteScreen | undefined;
+  /** The roles that may control this computer through remote desktop. Every member when not set. */
+  remoteControlAccess?: (() => RemoteControlAccess) | undefined;
   redeemCentralTicket?: (
     ticket: string,
     serverId: string,

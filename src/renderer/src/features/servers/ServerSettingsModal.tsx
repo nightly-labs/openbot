@@ -792,7 +792,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         </Show>
         <Show when={remoteDesktopSection()}>
           <Tabs.Content value="desktop" class="settings-modal-tab-panel server-settings-panel" data-tab="desktop">
-            <ServerDesktopPanel server={props.server} platform={props.platform} hostStatus={props.hostStatus} />
+            <ServerDesktopPanel
+              server={props.server}
+              platform={props.platform}
+              hostStatus={props.hostStatus}
+              menuMount={modalElement()}
+            />
           </Tabs.Content>
         </Show>
         <Show when={props.mcpServers}>
