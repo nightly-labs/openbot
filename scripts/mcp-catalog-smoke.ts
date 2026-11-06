@@ -189,6 +189,12 @@ async function checkLink(url: string, requests: string[]): Promise<LinkDetails> 
     metadata.registration_endpoint || clientIdMetadataDocument,
     "no registration_endpoint and no client metadata document: the user would need a sign-in app",
   );
+  // The document names a public client, so the token endpoint must take `none`.
+  const methods = metadata.token_endpoint_auth_methods_supported;
+  check(
+    metadata.registration_endpoint || methods?.includes("none"),
+    "the client metadata document needs the none token endpoint auth method",
+  );
   check(metadata.code_challenge_methods_supported?.includes("S256"), "S256 PKCE is not listed");
   check(metadata.response_types_supported.includes("code"), "response type code is not supported");
 

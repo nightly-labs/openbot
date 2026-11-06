@@ -18,6 +18,8 @@ import { testMcpServer } from "../src/backend/mcp-probe";
 const out = resolve(import.meta.dirname, "../.openbot-build/mcp-sign-in-client-metadata-document-e2e");
 const CLIENT_METADATA_URL = "https://openbot.run/oauth/mcp-client.json";
 const REDIRECT_URL = "http://127.0.0.1:28417/mcp-auth";
+/** The address when another program holds the preferred port. */
+const OTHER_REDIRECT_URL = "http://127.0.0.1:28418/mcp-auth";
 const ACCESS_TOKEN = "e2e-access-token";
 const REGISTERED_CLIENT = "e2e-registered-client";
 
@@ -27,6 +29,8 @@ interface FakeServer {
   url: string;
   /** The `client_id` of each authorization page that the sign-in opened, in order. */
   pageClientIds: (string | null)[];
+  /** The `redirect_uri` of each authorization page that the sign-in opened, in order. */
+  pageRedirectUris: (string | null)[];
   /** The `client_id` of each token request, in order. */
   tokenClientIds: (string | null)[];
   /** Whether each token request carried a client secret, in order. */
@@ -52,7 +56,11 @@ interface Case {
   failures: string[];
 }
 
-const report: { passed: boolean; cases: Case[]; failures: string[] } = { passed: false, cases: [], failures: [] };
+const report: { passed: boolean; cases: (Case | PortChangeCase)[]; failures: string[] } = {
+  passed: false,
+  cases: [],
+  failures: [],
+};
 
 async function body(request: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
@@ -69,6 +77,7 @@ function json(response: ServerResponse, status: number, value: unknown, headers:
 async function fakeServer(registration: boolean): Promise<FakeServer> {
   const state: Omit<FakeServer, "url" | "close"> = {
     pageClientIds: [],
+    pageRedirectUris: [],
     tokenClientIds: [],
     tokenRequestsWithSecret: [],
     registrations: 0,
@@ -180,7 +189,7 @@ function httpConfig(url: string): McpServerConfig {
  * The records go through JSON and `mcpOAuthRecordSchema` on each write, as the encrypted store does
  * when it loads them. A record that the schema refuses fails the case.
  */
-function oauthOn(records: Map<string, McpOAuthRecord>, server: FakeServer): McpOAuth {
+function oauthOn(records: Map<string, McpOAuthRecord>, server: FakeServer, redirectUrl = REDIRECT_URL): McpOAuth {
   const oauth: McpOAuth = new McpOAuth({
     storage: {
       read: (resource) => records.get(resource) ?? null,
@@ -192,11 +201,12 @@ function oauthOn(records: Map<string, McpOAuthRecord>, server: FakeServer): McpO
     openExternal: async (page) => {
       const url = new URL(page);
       server.pageClientIds.push(url.searchParams.get("client_id"));
+      server.pageRedirectUris.push(url.searchParams.get("redirect_uri"));
       const state = url.searchParams.get("state");
       assert.ok(state, "the page has a state");
       setTimeout(() => oauth.receiveAuthorizationCode(state, "e2e-grant"), 50);
     },
-    redirectUrl: REDIRECT_URL,
+    redirectUrl,
     signInTimeoutMs: 10_000,
   });
   return oauth;
@@ -240,7 +250,48 @@ async function runCase(name: string, registration: boolean): Promise<Case> {
   }
 }
 
-function check(entry: Case, condition: boolean, text: string): void {
+interface PortChangeCase {
+  name: string;
+  attempts: { toolCount: number; error: string | null }[];
+  pageClientIds: (string | null)[];
+  pageRedirectUris: (string | null)[];
+  registrations: number;
+  storedRedirectUris: string[] | null;
+  failures: string[];
+}
+
+/**
+ * A sign-in, a sign-out, and a sign-in after a restart on another port. The stored client names the
+ * first address, so the second sign-in must use the document again with the new address. It must
+ * not try to register with a server that has no registration endpoint.
+ */
+async function runPortChange(): Promise<PortChangeCase> {
+  const server = await fakeServer(false);
+  const records = new Map<string, McpOAuthRecord>();
+  const first = oauthOn(records, server);
+  let second: McpOAuth | null = null;
+  try {
+    const attempts = [await probe(first, server.url)];
+    await runCauseEffect(first.signOut(server.url));
+    await runCauseEffect(first.close());
+    second = oauthOn(records, server, OTHER_REDIRECT_URL);
+    attempts.push(await probe(second, server.url));
+    return {
+      name: "client-metadata-document-port-change",
+      attempts,
+      pageClientIds: [...server.pageClientIds],
+      pageRedirectUris: [...server.pageRedirectUris],
+      registrations: server.registrations,
+      storedRedirectUris: records.get(server.url)?.client?.redirect_uris ?? null,
+      failures: [],
+    };
+  } finally {
+    if (second) await runCauseEffect(second.close());
+    await server.close();
+  }
+}
+
+function check(entry: { failures: string[] }, condition: boolean, text: string): void {
   if (!condition) entry.failures.push(text);
 }
 
@@ -274,6 +325,28 @@ async function main(): Promise<void> {
     check(document, document.pageClientIds.length === 1, "a restart opened the sign-in page again");
     check(document, document.signedIn, "no token is stored after the sign-in");
     report.cases.push(document);
+
+    // Another port after a restart: the document again, with the new address, and no registration.
+    const port = await runPortChange();
+    for (const [index, attempt] of port.attempts.entries())
+      check(port, attempt.error === null, `attempt ${index + 1} failed: ${attempt.error}`);
+    check(
+      port,
+      port.pageClientIds.join() === `${CLIENT_METADATA_URL},${CLIENT_METADATA_URL}`,
+      `the pages named ${port.pageClientIds.join()}`,
+    );
+    check(
+      port,
+      port.pageRedirectUris.join() === `${REDIRECT_URL},${OTHER_REDIRECT_URL}`,
+      `the pages sent ${port.pageRedirectUris.join()}`,
+    );
+    check(port, port.registrations === 0, `the sign-ins registered ${port.registrations} times`);
+    check(
+      port,
+      port.storedRedirectUris?.join() === OTHER_REDIRECT_URL,
+      `the stored client names ${port.storedRedirectUris?.join()}`,
+    );
+    report.cases.push(port);
 
     // A server that offers registration as well keeps the registration.
     const both = await runCase("registration-preferred", true);

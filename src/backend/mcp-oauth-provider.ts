@@ -87,7 +87,11 @@ export const mcpOAuthRecordSchema = z.object({
       issuer: z.string().optional(),
     })
     .optional(),
-  /** This installation's registration with that authorization server, from RFC 7591. */
+  /**
+   * This installation's registration with that authorization server, from RFC 7591. For a client
+   * metadata document it is the document URL, and `redirect_uris` holds the address of the run that
+   * used it, so a run on another address uses the document again.
+   */
   client: OAuthClientInformationFullSchema.optional(),
   tokens: OAuthTokensSchema.optional(),
   /** When `tokens` arrived. `expires_in` is a duration, and a duration alone names no moment. */
