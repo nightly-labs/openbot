@@ -211,6 +211,8 @@ try {
     assert.ok(!JSON.stringify(snapshot).includes(KEY), "the key is in the stored conversation");
     const message = snapshot.messages.find((candidate) => candidate.uiBlock?.blockId === "block-1");
     assert.equal(message?.uiBlock?.state.status, "answered");
+    // With no Vault the form has no scope choice, so the app draws no small select.
+    assert.equal(message?.uiBlock?.apiKey, undefined);
     return { mode: mode.toString(8), folderMode: folderMode.toString(8) };
   });
 
@@ -388,6 +390,8 @@ try {
       const message = snapshot.messages.find((candidate) => candidate.uiBlock?.blockId === `block-${id}`);
       assert.equal(message?.uiBlock?.state.status, "answered");
       assert.equal(message?.uiBlock?.state.outcome, "Saved to Vault: DEPLOY_TOKEN");
+      // The app draws the scope choice small, next to the submit button, also after the answer.
+      assert.equal(message?.uiBlock?.apiKey, true);
       for (const raw of formClient.answers.values()) assert.ok(!raw.includes(VAULT_KEY), "the key is in a result");
       assert.ok(!JSON.stringify(events).includes(VAULT_KEY), "the key is in an event");
       assert.ok(!JSON.stringify(snapshot).includes(VAULT_KEY), "the key is in the stored conversation");

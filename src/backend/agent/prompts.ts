@@ -14,6 +14,7 @@ import {
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import {
   normalizeUiBlockSpec,
+  UI_API_KEY_SCOPE_FIELD_ID,
   UI_VAULT_REQUEST_FIELDS,
   UI_VAULT_SECRET_FIELDS,
   type UiBlockResponse,
@@ -340,7 +341,7 @@ export function uiBlockPromptResult(outcome: UiBlockPromptOutcome): DynamicToolR
 export const API_KEY_FIELD_ID = "key";
 
 /** The id of the field of the `request_api_key` form that selects who can use the key. */
-export const API_KEY_SCOPE_FIELD_ID = "scope";
+export const API_KEY_SCOPE_FIELD_ID = UI_API_KEY_SCOPE_FIELD_ID;
 
 /** The option of the scope field that keeps the key for the asking agent only. */
 export const API_KEY_SCOPE_AGENT = sourceText("status.agent.apiKeyScope.agent");
