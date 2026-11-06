@@ -27,7 +27,17 @@ const BoatSandboxState = Schema.Literals([
   "cancelled",
 ]);
 export type BoatSandboxState = typeof BoatSandboxState.Type;
-const BoatSandbox = Schema.Struct({ id: Schema.String, state: BoatSandboxState });
+/**
+ * The last stop of the sandbox. `failing`: boat could not save the disk, and it tries again until the
+ * save works. The sandbox keeps its usable state for this time. Only a resume ends the stop
+ * (`superseded`). Other values are `pending`, `completed` and `superseded`.
+ */
+const BoatStop = Schema.Struct({ status: Schema.String });
+const BoatSandbox = Schema.Struct({
+  id: Schema.String,
+  state: BoatSandboxState,
+  stop: Schema.optional(Schema.NullOr(BoatStop)),
+});
 const BoatCommandResult = Schema.Struct({ exitCode: Schema.NullOr(Schema.Number), stdout: Schema.String });
 
 /** Provider messages and raw causes can contain credentials and are not retained. */
