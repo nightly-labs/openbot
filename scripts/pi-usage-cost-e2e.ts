@@ -4,7 +4,8 @@
 // model list; both are session totals, so each turn books the difference from the last one. The
 // agent directory has a `models.json` with a priced model and a model with no rates. Cases: a first
 // turn, a second turn in the same session (it books its own cost, not the session total), a model
-// with no rates (Pi reports 0, which is not a free turn, so the turn stays unpriced), and a session
+// with no rates (Pi reports 0, which is not a free turn, so the turn stays unpriced), a change in the
+// same session to the priced model (priced) and back (unpriced again), and a session
 // from before Pi costs were kept (its first cost report also counts that earlier use, so the turn
 // stays unpriced and the next turn is priced).
 // `PI_CLI=<pi> bun run test:pi-usage-cost`. Writes .openbot-build/pi-usage-cost-e2e/report.json.
@@ -189,18 +190,29 @@ try {
     return thread;
   }
 
-  async function turn(name: string, thread: string, sent: Sent, expectedCost: number | null): Promise<void> {
+  async function turn(
+    name: string,
+    thread: string,
+    sent: Sent,
+    expectedCost: number | null,
+    model?: string,
+  ): Promise<void> {
     const session = sessions.get(thread);
     assert.ok(session, `${name}: no session`);
+    if (model) session.model = model;
+    const rows = () =>
+      reader
+        .prepare(
+          "SELECT estimated_cost_usd AS cost, rate_basis AS basis FROM agent_usage_records WHERE session_id = ? ORDER BY rowid",
+        )
+        .all(session.id);
+    const count = rows().length;
     next = sent;
-    const result = await runTurn(client, thread, { text: name, timeoutMs: 60_000 });
+    const result = await runTurn(client, thread, { text: name, timeoutMs: 60_000, ...(model ? { model } : {}) });
     assert.equal(result.error, null, `${name}: the turn failed: ${result.error}`);
-    const rows = reader
-      .prepare(
-        "SELECT estimated_cost_usd AS cost, rate_basis AS basis FROM agent_usage_records WHERE session_id = ? ORDER BY rowid",
-      )
-      .all(session.id);
-    const row = rows.at(-1);
+    const after = rows();
+    assert.equal(after.length, count + 1, `${name}: the turn must add one usage record`);
+    const row = after.at(-1);
     assert.ok(row, `${name}: no usage record`);
     const cost = typeof row.cost === "number" ? row.cost : null;
     const entry: CaseReport = {
@@ -230,6 +242,15 @@ try {
 
   const free = await open(`${PROVIDER}/unpriced`);
   await turn("model with no rates", free, { input: 900, cached: 0, output: 50 }, null);
+  const changed = { input: 3_000, cached: 2_000, output: 150 };
+  await turn("change to the priced model", free, changed, price(changed, true), priced);
+  await turn(
+    "change back to the model with no rates",
+    free,
+    { input: 800, cached: 0, output: 40 },
+    null,
+    `${PROVIDER}/unpriced`,
+  );
 
   // A session from before Pi costs were kept: its first turn has tokens and no cost.
   const older = await open(priced, true);
