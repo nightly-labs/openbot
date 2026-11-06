@@ -396,8 +396,10 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
           if (!scopeActive() || generation !== deps.currentFilePreviewGeneration()) return;
           const showError = () => {
             if (!scopeActive() || generation !== deps.currentFilePreviewGeneration()) return;
-            if (fallback) fallback();
-            else deps.setComposerError(filePreviewError(error, path), target);
+            // The fallback is for the conversation that was open at the click.
+            if (fallback) {
+              if (conversationOwnerId(deps.props) === ownerAgentId) fallback();
+            } else deps.setComposerError(filePreviewError(error, path), target);
           };
           // A link can name a folder. A local one is shown in the file manager; when that fails too,
           // the preview error stays. A remote or web host cannot show a folder on this computer.
@@ -453,8 +455,9 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
           () => {
             if (!scopeActive() || generation !== deps.currentFilePreviewGeneration()) return;
             if (!attachment || !canPreviewAttachment(attachment)) {
-              if (fallback) fallback();
-              else deps.setComposerError(filePreviewError(error, path), target);
+              if (fallback) {
+                if (current()) fallback();
+              } else deps.setComposerError(filePreviewError(error, path), target);
               return;
             }
             // The attachment is of the conversation that was open at the click.
