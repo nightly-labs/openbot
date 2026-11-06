@@ -152,7 +152,10 @@ export interface AgentTaskInput {
 /** The older messages of a side thread: the page before a message that its view holds. */
 export interface ReadAgentTaskPageInput extends AgentTaskInput {
   beforeMessageId: string;
-  /** 0 to 100. With 0, the page has no messages and tells only whether the thread has older ones. */
+  /**
+   * 0 to 100: a target. The page has whole turns, so it can have more or fewer messages, and never more
+   * than 100. With 0, the page has no messages and tells only whether the thread has older ones.
+   */
   limit: number;
 }
 

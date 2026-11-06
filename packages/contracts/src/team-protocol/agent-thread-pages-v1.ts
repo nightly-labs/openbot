@@ -3,11 +3,13 @@
 // What it grants, recorded here because freezing it makes it permanent: a signed-in member who can
 // read the side threads of an agent can read the older messages of one of them, page by page. A side
 // thread is a task of `agent-tasks-v1`, named by its task id. `beforeMessageId` names a message of the
-// thread that the client holds, usually its oldest; the answer has at most `limit` (0 to 100) messages
-// from before it, oldest first, in the frozen `agent-tasks-v1` conversation shape, and `hasOlder` says
-// if the thread has more before them. A limit of 0 asks only for `hasOlder`. The host can send fewer
-// messages than the limit, for example so that the answer fits one WebRTC frame. A message that the thread does not hold gives no messages and
-// `hasOlder: false`. A host that grants this also grants `agent-tasks-v1`. The host does not ask for a
+// thread that the client holds, usually its oldest. The answer has the messages from before it, oldest
+// first, in the frozen `agent-tasks-v1` conversation shape, and `hasOlder` says if the thread has more
+// before them. `limit` (0 to 100) is a target, not a bound: the host sends whole turns, and adds turns
+// until the page has `limit` messages or the next turn does not fit. A page can thus have more or fewer
+// messages than `limit`, and never more than 100. The host can also send fewer so that the answer fits
+// one WebRTC frame. A limit of 0 asks only for `hasOlder`. A message that the thread does not hold gives
+// no messages and `hasOlder: false`. A host that grants this also grants `agent-tasks-v1`. The host does not ask for a
 // role, as for `agent-tasks-v1` reads. A hidden agent, or an agent that the peer cannot see, is not
 // found (404). The route is a POST with its ids in the body. Bounds and meaning do not follow IPC
 // changes; widening any of it needs a second capability string.

@@ -556,8 +556,10 @@ refuses a branch with `error.backend.branchRemoteUnsupported`. The phone does no
 newest 100 messages of the thread. The optional `agent-thread-pages-v1` capability
 (`packages/contracts/src/team-protocol/agent-thread-pages-v1.ts`, host route `routeAgentThreadPages` in
 `src/main/team-api/route-agent-threads.ts`) adds `POST /v1/agent-threads/read-older` with
-`{agentId, taskId, beforeMessageId, limit}`. It answers `{conversation, hasOlder}`: at most `limit` (0 to 100)
-messages from before that message, oldest first, in the frozen `agent-tasks-v1` conversation shape. A limit of 0
+`{agentId, taskId, beforeMessageId, limit}`. It answers `{conversation, hasOlder}`: the messages from before that message, oldest first, in the
+frozen `agent-tasks-v1` conversation shape. The page has whole turns: the host adds turns until it has
+`limit` (0 to 100) messages or the next turn does not fit, so it can have more or fewer than `limit`, and
+never more than 100. A limit of 0
 asks only for `hasOlder`, and a message that the thread does not hold has none. The host makes a page smaller
 until it fits one WebRTC frame. A thread tab on desktop and the web asks once after its read, and shows "Load older
 messages" when the thread has more; a new conversation of the thread keeps the pages that it read
