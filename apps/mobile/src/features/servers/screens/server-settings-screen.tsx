@@ -289,6 +289,8 @@ function ServerIdentityForm({ server }: { server: MobileServer }) {
   }
 
   function editLogo(): void {
+    // The name field locks while the photo picker is open, so it gives up the keyboard first.
+    Keyboard.dismiss();
     void haptics.impact("soft");
     if (!hasLogo) {
       void chooseLogo();
@@ -361,7 +363,7 @@ function ServerIdentityForm({ server }: { server: MobileServer }) {
         subtitle={<ServerStatusLine server={server} />}
       />
       {!nameValid ? (
-        <Typography.Paragraph type="body-xs" className="px-1 text-danger-text">
+        <Typography.Paragraph type="body-xs" accessibilityRole="alert" className="px-1 text-danger-text">
           {t("mobile.server.settings.nameLength", { min: INPUT_LIMITS.serverNameMin, max: INPUT_LIMITS.serverName })}
         </Typography.Paragraph>
       ) : null}

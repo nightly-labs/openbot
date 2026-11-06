@@ -77,6 +77,8 @@ export function ProfileSettingsScreen() {
   }
 
   function editPhoto(): void {
+    // The name field locks while the photo picker is open, so it gives up the keyboard first.
+    Keyboard.dismiss();
     void haptics.impact("soft");
     if (!avatarUrl) {
       void perform("photo", choosePhoto);

@@ -10,14 +10,14 @@ import Blocks from "lucide-react-native/icons/blocks";
 import Brain from "lucide-react-native/icons/brain";
 import Clock from "lucide-react-native/icons/clock";
 import Download from "lucide-react-native/icons/download";
-import Globe2 from "lucide-react-native/icons/earth";
+import Earth from "lucide-react-native/icons/earth";
 import Fingerprint from "lucide-react-native/icons/fingerprint-pattern";
 import HardDrive from "lucide-react-native/icons/hard-drive";
 import KeyRound from "lucide-react-native/icons/key-round";
 import RefreshCcw from "lucide-react-native/icons/refresh-ccw";
 import RefreshCw from "lucide-react-native/icons/refresh-cw";
 import RotateCcw from "lucide-react-native/icons/rotate-ccw";
-import History from "lucide-react-native/icons/rotate-ccw-clock";
+import RotateCcwClock from "lucide-react-native/icons/rotate-ccw-clock";
 import RotateCcwKey from "lucide-react-native/icons/rotate-ccw-key";
 import ShieldCheck from "lucide-react-native/icons/shield-check";
 import Sparkles from "lucide-react-native/icons/sparkles";
@@ -121,7 +121,7 @@ export function ServerPeopleSection({ server }: { server: MobileServer }) {
       {canReadServerAudit(server.id) ? (
         <LinkRow
           label={t("mobile.server.route.audit")}
-          icon={History}
+          icon={RotateCcwClock}
           pathname="/server-settings/audit"
           serverId={server.id}
         />
@@ -580,7 +580,7 @@ function ServerSitesRow({ serverId }: { serverId: string }) {
   const list = query.data;
   return (
     <SettingsRow
-      leading={<RowIcon icon={Globe2} />}
+      leading={<RowIcon icon={Earth} />}
       trailing={
         list ? (
           <TrailingValue value={t("mobile.server.settings.siteCount", { count: list.used, limit: list.limit })} />
