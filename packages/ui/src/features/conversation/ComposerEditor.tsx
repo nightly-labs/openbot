@@ -176,6 +176,9 @@ const EMPTY_TABS: ComposerBrowserTab[] = [];
 const EMPTY_THREADS: ComposerThread[] = [];
 /** The name of the file that a long text paste becomes, as on mobile. */
 const PASTED_TEXT_FILE_NAME = "pasted-text.txt";
+/** The tags that the attachment, skill, MCP server, tab and thread lists redraw. */
+const DRAFT_TAG_SELECTOR =
+  "[data-attachment-reference-id], [data-skill-id], [data-mcp-id], [data-tab-id], [data-thread-id]";
 
 export function expandComposerMentions(value: string): string {
   return value.replace(MENTION_PATTERN, (match, name: string, target: string) => {
@@ -445,7 +448,11 @@ export function ComposerEditor(props: ComposerEditorProps) {
       const skillsChanged = skillKey !== lastSkillKey;
       const mcpChanged = mcpKey !== lastMcpKey;
       const referencesChanged = referenceKey !== lastReferenceKey;
-      const editorChanges = contentChanged || attachmentsChanged || skillsChanged || mcpChanged || referencesChanged;
+      // A list change redraws only the tags in the draft, so a draft without tags does not change.
+      const tagsChange =
+        (attachmentsChanged || skillsChanged || mcpChanged || referencesChanged) &&
+        editor.querySelector(DRAFT_TAG_SELECTOR) !== null;
+      const editorChanges = contentChanged || tagsChange;
       // Only a change of the editor's content can move its caret or scroll position. A read of either
       // lays out the page, and this effect runs for each list that loads while a conversation opens.
       const selection =
