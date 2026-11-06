@@ -198,7 +198,7 @@
     max-width: 132px;
   }
 
-  .web-app-frame[data-web-mobile-pane="conversation"] .conversation-panel:has(.settings-panel) .settings-panel {
+  .web-app-frame[data-web-mobile-pane="conversation"] .conversation-panel[data-settings-panel] .settings-panel {
     width: 100%;
   }
 

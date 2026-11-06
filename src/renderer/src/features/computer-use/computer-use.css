@@ -180,9 +180,9 @@
  * own: every pixel outside the rim stays transparent, so the applications below are seen and
  * clicked exactly as before. The frame inside it is what main places over one window.
  */
-html:has(.computer-use-highlight-surface),
-body:has(.computer-use-highlight-surface),
-#root:has(.computer-use-highlight-surface) {
+:root[data-surface="computer-use-highlight"],
+:root[data-surface="computer-use-highlight"] body,
+:root[data-surface="computer-use-highlight"] #root {
   width: 100%;
   height: 100%;
   overflow: hidden;
