@@ -857,8 +857,13 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
 
   #notify(method: string, thread: PiThread, params: DynamicRecord): void {
     // Usage contains only validated numeric counters. Generic secret-name matching masks `*Tokens`.
+    // A turn notice holds only OpenBot's own `{ turn: { id, status } }`. A short saved secret could
+    // mask its `turn` key or its status, and the turn would then not end (#5390).
     const safe =
-      method === "openbot/usage" || method === "thread/tokenUsage/updated"
+      method === "openbot/usage" ||
+      method === "thread/tokenUsage/updated" ||
+      method === "turn/started" ||
+      method === "turn/completed"
         ? params
         : withOwnIds(redactMcpRecord(params, this.#secretValues()), params);
     this.emit("notification", {
@@ -1129,21 +1134,17 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
 }
 
 /**
- * Puts back the ids of a turn and its items after the secret masking. The masking hides the whole
- * token around a saved value, and a short saved password can occur in a UUID. The engine then ended
- * a turn named `[redacted]`, and the real turn ran on (#5390). OpenBot and Pi make these ids; they
- * hold no text from the model or a tool.
+ * Puts back the ids of the items of a turn after the secret masking. The masking hides the whole
+ * token around a saved value, and a short saved password can occur in a UUID (#5390). OpenBot and
+ * Pi make these ids; they hold no text from the model or a tool.
  */
 function withOwnIds(safe: LogValue, original: DynamicRecord | ThreadItem): LogValue {
   if (!isRecord(safe)) return safe;
   const restored = { ...safe };
   if (isString(original.id)) restored.id = original.id;
   if (isString(original.itemId)) restored.itemId = original.itemId;
-  for (const key of ["turn", "item"]) {
-    const id = getString(getRecord(original, key), "id");
-    const value = restored[key];
-    if (id !== undefined && isRecord(value)) restored[key] = { ...value, id };
-  }
+  const itemId = getString(getRecord(original, "item"), "id");
+  if (itemId !== undefined && isRecord(restored.item)) restored.item = { ...restored.item, id: itemId };
   return restored;
 }
 
