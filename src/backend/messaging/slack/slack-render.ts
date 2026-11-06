@@ -5,12 +5,13 @@ const SLACK_CHUNK_CHARACTERS = 3_900;
 
 /**
  * Markdown as Slack `mrkdwn`. Content `&`, `<` and `>` are escaped, also in code, as Slack
- * requires. That also makes `<!channel>` and `<@U…>` inert: an answer cannot ping a workspace.
+ * requires. That also makes `<!channel>`, `<!here>` and `<!subteam^…>` inert: an answer cannot ping a
+ * workspace or a group. Only a user mention `<@U…>` or `<@W…>` is made live again, so it pings that user.
  */
 export function slackMrkdwn(markdown: string): string {
   const lines = escapeSlack(markdown).split("\n");
   let inFence = false;
-  return lines
+  const mrkdwn = lines
     .map((line) => {
       if (line.trimStart().startsWith(FENCE)) {
         inFence = !inFence;
@@ -19,6 +20,7 @@ export function slackMrkdwn(markdown: string): string {
       return inFence ? line : inlineMrkdwn(blockMrkdwn(line));
     })
     .join("\n");
+  return mrkdwn.replace(/&lt;@([UW][A-Z0-9]+)&gt;/g, "<@$1>");
 }
 
 function escapeSlack(text: string): string {
