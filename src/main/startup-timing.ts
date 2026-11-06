@@ -43,7 +43,7 @@ export const SERVICE_STEPS = [
 ] as const;
 type ServiceStep = (typeof SERVICE_STEPS)[number];
 /** `service_pre_store_ms` for `pre-store`: the time of one step. */
-export type ServiceStepProperty = `service_${Snake<ServiceStep>}_ms`;
+type ServiceStepProperty = `service_${Snake<ServiceStep>}_ms`;
 type Snake<T extends string> = T extends `${infer Head}-${infer Tail}` ? `${Head}_${Snake<Tail>}` : T;
 
 // The template type cannot follow a runtime `replaceAll`, so this list maps each name once.
