@@ -759,7 +759,18 @@ try {
     },
   );
 
-  await step("A save without isolated keeps the setting on, as a released client sends it", async () => {
+  await step(
+    "A save of a peer without channel-isolation-v1 keeps the setting on, even with isolated false",
+    async () => {
+      // An older desktop client, the phone, or a client of an older host: the raw body may carry the field.
+      const response = await v9(false, "POST", CHANNEL_ROUTES.command, save(false));
+      assert.equal(response.status, 200, `The save failed: ${JSON.stringify(response.body)}`);
+      assert.equal(stored(), true, "A save of a peer without the capability turned the setting off.");
+      return { stored: stored() ?? null };
+    },
+  );
+
+  await step("A save without isolated keeps the setting on, as the editor sends a rename", async () => {
     const body = codec.request(CHANNEL_ROUTES.command, save(), { channelIsolation: true });
     const read = await readIsolated(await v9(true, "POST", CHANNEL_ROUTES.command, body));
     assert.deepEqual(read, { list: true, page: true, command: true, stored: true });
