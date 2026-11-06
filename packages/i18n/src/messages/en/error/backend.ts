@@ -230,6 +230,10 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpServerExited":
     "The server stopped before it answered. Run the command in a terminal to see its error.",
   "error.backend.mcpServerFailedToStart": "The server did not start: {reason}",
+  "error.backend.mcpServerSignInForProvider":
+    "{provider} could not use the MCP server {name}, because the server asks for a sign-in. Open the MCP settings and choose Sign in.",
+  "error.backend.mcpServerFailedForProvider":
+    "{provider} could not start the MCP server {name}. Open the MCP settings and choose Test connection to see the cause.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot could not start its local sign-in connection for this server. Restart OpenBot, then try again.",
   "error.backend.mcpOAuthSignInNeeded":

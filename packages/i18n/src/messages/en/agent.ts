@@ -62,6 +62,7 @@ export const messages = defineMessages("agent", {
   "agent.error.adminOnly": "Agent settings can only be changed by a server administrator.",
   "agent.error.continueFailed": "The agent could not continue. Try again.",
   "agent.error.mcpNotStarted": "MCP server not started",
+  "agent.error.openMcpSettings": "Open MCP settings",
   "agent.error.provider": "Provider error",
   "agent.error.run": "{provider} · {model}",
   "agent.error.providerNamed": "{provider} error",

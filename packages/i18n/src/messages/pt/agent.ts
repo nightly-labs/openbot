@@ -62,6 +62,7 @@ export const messages = {
   "agent.error.adminOnly": "Somente um administrador do servidor pode alterar as configurações do agente.",
   "agent.error.continueFailed": "O agente não conseguiu continuar. Tente novamente.",
   "agent.error.mcpNotStarted": "Servidor MCP não iniciado",
+  "agent.error.openMcpSettings": "Abrir configurações de MCP",
   "agent.error.provider": "Erro do provedor",
   "agent.error.run": "{provider} · {model}",
   "agent.error.providerNamed": "Erro de {provider}",
