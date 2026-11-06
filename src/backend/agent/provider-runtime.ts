@@ -4068,22 +4068,25 @@ export class ProviderRuntime implements ProviderPort {
    * A line can name the server by its URL rather than its name: Grok's `rmcp` worker quotes only the
    * OAuth metadata address, `https://<host>/.well-known/oauth-protected-resource/<path>`, so the host
    * is what the two forms share, and the longest path that matches picks between two servers on one
-   * host. The URL is read first. A name counts only as a whole word, so `git` is not in `github`; a
-   * name the provider was given counts too, and one with no letter or digit, such as `__`, would
-   * match every `mcp__server__tool` line.
+   * host. The URL is read first. The host counts only as a whole URL authority, so `example.com` is
+   * not in `mcp.example.com` and `localhost:3000` is not in `localhost:30001`. A name counts only as
+   * a whole word, so `git` is not in `github`; a name the provider was given counts too, and one with
+   * no letter or digit, such as `__`, would match every `mcp__server__tool` line.
    */
   #configuredMcpServerIn(message: string): { name: string; builtIn: boolean } | null {
     const configs = this.#credentials.mcpServers();
     const builtIn = (id: string) => id === COMPUTER_USE_MCP_SERVER_ID || id === GITHUB_CONNECTOR_MCP_SERVER_ID;
+    const bounded = (text: string, before: string, after: string) =>
+      new RegExp(`${before}${RegExp.escape(text)}${after}`, "u").test(message);
     const byHost = configs
       .flatMap((config) => {
         const url = config.transport === "http" ? URL.parse(config.url) : null;
-        return url?.host && message.includes(url.host) ? [{ config, path: url.pathname }] : [];
+        return url?.host && bounded(url.host, "(?<=//|@)", "(?![\\w.-])") ? [{ config, path: url.pathname }] : [];
       })
       .sort((a, b) => b.path.length - a.path.length);
     const byUrl = byHost.find((row) => row.path !== "/" && message.includes(row.path)) ?? byHost[0];
     if (byUrl) return { name: byUrl.config.name, builtIn: builtIn(byUrl.config.id) };
-    const word = (text: string) => new RegExp(`(?<![\\w-])${RegExp.escape(text)}(?![\\w-])`, "u").test(message);
+    const word = (text: string) => bounded(text, "(?<![\\w-])", "(?![\\w-])");
     const named = (name: string) => {
       const given = providerMcpServerName(name);
       return (name !== "" && word(name)) || (/[A-Za-z0-9]/u.test(given) && word(given));
