@@ -725,12 +725,12 @@ a {
   top: calc(100% + 8px);
   right: 0;
   z-index: 2;
-  min-width: 168px;
+  min-width: 200px;
   margin: 0;
   padding: 6px;
-  border-radius: var(--site-nav-radius);
+  border-radius: 14px;
   background: rgba(22, 22, 22, 0.8);
-  box-shadow: 0 0 0 1px var(--site-nav-hairline);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
   list-style: none;
   backdrop-filter: blur(40px) saturate(180%);
 }
@@ -739,31 +739,46 @@ a {
   display: none;
 }
 
+/* The rows match the header logo menu (`.site-logo-menu-item`). */
 .site-language-list a {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: var(--openbot-radius-md);
-  color: var(--openbot-text-secondary);
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  color: var(--openbot-text-primary);
   font-size: 14px;
 }
 
 .site-language-list a:hover,
 .site-language-list a:focus-visible {
   outline: 0;
-  background: var(--openbot-bg-control-hover);
-  color: var(--openbot-text-primary);
+  background: rgba(255, 255, 255, 0.05);
 }
 
-.site-language-list a[aria-current="page"] {
-  color: var(--openbot-text-primary);
-}
-
-.site-language-list svg {
-  width: 14px;
+.site-language-flag {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 20px;
   height: 14px;
+  overflow: hidden;
+  border-radius: 3px;
+}
+
+.site-language-flag svg {
+  width: 100%;
+  height: 100%;
+}
+
+.site-language-name {
+  flex: 1 1 auto;
+}
+
+.site-language-check {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  color: var(--openbot-text-secondary);
 }
 
 /* Just above the mobile header, the brand, the full menu and the buttons do not fit with the menu

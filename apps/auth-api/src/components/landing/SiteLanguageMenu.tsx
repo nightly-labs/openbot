@@ -83,9 +83,10 @@ function LanguageMenu(props: { page: EnglishPagePath }) {
                 aria-current={item === locale() ? "page" : undefined}
                 onClick={() => rememberLanguage(item)}
               >
-                {appLanguageOption(item).label}
+                <LanguageFlag locale={item} />
+                <span class="site-language-name">{appLanguageOption(item).label}</span>
                 <Show when={item === locale()}>
-                  <LandingIcon name="check" />
+                  <LandingIcon name="check" class="site-language-check" />
                 </Show>
               </a>
             </li>
@@ -93,5 +94,36 @@ function LanguageMenu(props: { page: EnglishPagePath }) {
         </For>
       </ul>
     </div>
+  );
+}
+
+/**
+ * The flag of the usual country of each language, as in the app's language selector. It is drawn,
+ * not an emoji: Windows shows a flag emoji as two letters.
+ */
+function LanguageFlag(props: { locale: SiteLocale }) {
+  return (
+    <span class="site-language-flag">
+      <Show when={props.locale === "pl"} fallback={<UnitedStatesFlag />}>
+        <svg viewBox="0 0 16 10" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+          <rect width="16" height="5" fill="#fff" />
+          <rect y="5" width="16" height="5" fill="#dc143c" />
+        </svg>
+      </Show>
+    </span>
+  );
+}
+
+const US_STRIPES = [0, 2, 4, 6, 8, 10, 12];
+const US_STARS = [1, 2.5, 4, 5.5].flatMap((x) => [1.2, 2.8, 4.4].map((y) => ({ x, y })));
+
+function UnitedStatesFlag() {
+  return (
+    <svg viewBox="0 0 19 13" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <rect width="19" height="13" fill="#fff" />
+      <For each={US_STRIPES}>{(y) => <rect y={y} width="19" height="1" fill="#b22234" />}</For>
+      <rect width="7.6" height="7" fill="#3c3b6e" />
+      <For each={US_STARS}>{(star) => <circle cx={star.x + 0.3} cy={star.y} r="0.4" fill="#fff" />}</For>
+    </svg>
   );
 }
