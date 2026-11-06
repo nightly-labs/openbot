@@ -313,6 +313,7 @@ export type TeamApiAgentTasks = Pick<
   | "listAgents"
   | "listTasks"
   | "readTask"
+  | "readTaskPage"
   | "startTask"
   | "sendMessage"
   | "stopTask"

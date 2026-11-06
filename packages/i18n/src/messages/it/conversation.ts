@@ -82,6 +82,7 @@ export const messages = {
   },
   "conversation.threads.view.label": "Thread {title}",
   "conversation.threads.view.startedByAgent": "{name} ha avviato questo thread.",
+  "conversation.threads.view.loadOlder": "Carica i messaggi precedenti",
   "conversation.threads.branch.from": "Ramificato da {title}",
   "conversation.threads.branch.fromDeleted": "Ramificato da un thread eliminato",
   "conversation.threads.view.newPlaceholder": "Nuovo thread con {name}",

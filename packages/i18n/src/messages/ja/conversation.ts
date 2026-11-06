@@ -79,6 +79,7 @@ export const messages = {
   "conversation.threads.hold.threadLimit": { other: "空きを待っています。実行中のスレッド: {count} 件" },
   "conversation.threads.view.label": "スレッド {title}",
   "conversation.threads.view.startedByAgent": "{name} がこのスレッドを開始しました。",
+  "conversation.threads.view.loadOlder": "以前のメッセージを読み込む",
   "conversation.threads.branch.from": "{title} から分岐",
   "conversation.threads.branch.fromDeleted": "削除されたスレッドから分岐",
   "conversation.threads.view.newPlaceholder": "{name} との新しいスレッド",

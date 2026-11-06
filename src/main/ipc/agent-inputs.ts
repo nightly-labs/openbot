@@ -52,6 +52,7 @@ import {
   type PasteMessageLinkInput,
   type PreviewSharedFileInput,
   type PreviewWorkspaceFileInput,
+  type ReadAgentTaskPageInput,
   type ReadConversationPageInput,
   type RenameAgentTaskInput,
   type ReorderQueueInput,
@@ -621,6 +622,17 @@ export function parseAgentTask(value: unknown): AgentTaskInput {
   return {
     agentId: requireString(value.agentId, "agentId"),
     taskId: requireString(value.taskId, "taskId"),
+  };
+}
+
+export function parseReadAgentTaskPage(value: unknown): ReadAgentTaskPageInput {
+  if (!isObject(value)) throw new Error("Invalid task request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier),
+    beforeMessageId: requireString(value.beforeMessageId, "beforeMessageId", INPUT_LIMITS.identifier),
+    // 0 asks only whether the thread has older messages.
+    limit: value.limit === 0 ? 0 : parsePageLimit(value.limit),
   };
 }
 

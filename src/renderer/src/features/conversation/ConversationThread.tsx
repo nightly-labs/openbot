@@ -317,6 +317,7 @@ export function ConversationThread() {
             waitsForAnswer={props.prompt !== undefined || props.browserTakeover !== undefined}
             attention={attention()}
             messageCard={mcpSignInCard}
+            olderMessages={current().threads.olderMessages}
             stepsAbove={turnSteps.stepsAbove}
             factsAbove={turnSteps.factsAbove}
             activeSteps={turnSteps.activeSteps()}

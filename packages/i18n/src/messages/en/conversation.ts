@@ -81,6 +81,7 @@ export const messages = defineMessages("conversation", {
   },
   "conversation.threads.view.label": "Thread {title}",
   "conversation.threads.view.startedByAgent": "{name} started this thread.",
+  "conversation.threads.view.loadOlder": "Load older messages",
   "conversation.threads.branch.from": "Branched from {title}",
   "conversation.threads.branch.fromDeleted": "Branched from a deleted thread",
   "conversation.threads.view.newPlaceholder": "New thread with {name}",

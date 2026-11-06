@@ -1,7 +1,12 @@
 import { type AgentProviderId, agentProviderDescriptor } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { integerInRange, isBoundedString, isIdentifier, isNullableBoundedString } from "./ipc-bounded-values";
-import { type ConversationReadState, isConversationReadState } from "./ipc-conversations";
+import {
+  type ConversationReadState,
+  type ConversationSnapshot,
+  isConversationReadState,
+  isConversationSnapshot,
+} from "./ipc-conversations";
 import { isQueueDelivery, type QueueDelivery } from "./ipc-queue";
 import { isDynamicRecord, isOneOf } from "./runtime-values";
 
@@ -142,6 +147,27 @@ export interface RunQueuedMessageAsTaskInput {
 export interface AgentTaskInput {
   agentId: string;
   taskId: string;
+}
+
+/** The older messages of a side thread: the page before a message that its view holds. */
+export interface ReadAgentTaskPageInput extends AgentTaskInput {
+  beforeMessageId: string;
+  /**
+   * 0 to 100: a target. The page has whole turns, so it can have more or fewer messages, and never more
+   * than 100; a turn of more than 100 messages is split over pages. With 0, the page has no messages and tells only whether the thread has older ones.
+   */
+  limit: number;
+}
+
+/** A page of the older messages of a side thread, oldest first. */
+export interface AgentTaskPage {
+  conversation: ConversationSnapshot;
+  /** The thread has messages before this page. */
+  hasOlder: boolean;
+}
+
+export function isAgentTaskPage(value: unknown): value is AgentTaskPage {
+  return isDynamicRecord(value) && isConversationSnapshot(value.conversation) && typeof value.hasOlder === "boolean";
 }
 
 /**

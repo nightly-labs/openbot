@@ -12,6 +12,7 @@ import {
   isAgentNotificationLevelsSnapshot,
   isAgentSessionSettings,
   isAgentTask,
+  isAgentTaskPage,
   isAgentTaskReadState,
   isAgentTasksSnapshot,
   isConversationSnapshot,
@@ -83,6 +84,7 @@ export const decodeRemoteAgentTasks = guardedDecoder(isAgentTasksSnapshot, "remo
 export const decodeRemoteAgentTask = guardedDecoder(isAgentTask, "remote agent task");
 export const decodeRemoteAgentThreadBranches = guardedDecoder(isAgentThreadBranchLinks, "remote thread branches");
 export const decodeRemoteTaskConversation = guardedDecoder(isConversationSnapshot, "remote task conversation");
+export const decodeRemoteTaskPage = guardedDecoder(isAgentTaskPage, "remote thread page");
 export const decodeRemoteTaskReadState = guardedDecoder(isAgentTaskReadState, "remote thread read state");
 const decodeTaskReadStates = guardedListDecoder(isAgentTaskReadState, "remote thread read states");
 export function decodeRemoteTaskReadStates(value: unknown): AgentTaskReadState[] {

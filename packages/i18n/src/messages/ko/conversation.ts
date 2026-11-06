@@ -81,6 +81,7 @@ export const messages = {
   },
   "conversation.threads.view.label": "스레드 {title}",
   "conversation.threads.view.startedByAgent": "{name}이(가) 이 스레드를 시작했어요.",
+  "conversation.threads.view.loadOlder": "이전 메시지 불러오기",
   "conversation.threads.branch.from": "{title}에서 분기됨",
   "conversation.threads.branch.fromDeleted": "삭제된 스레드에서 분기됨",
   "conversation.threads.view.newPlaceholder": "{name}와(과) 새 스레드",

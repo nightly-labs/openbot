@@ -82,6 +82,7 @@ export const messages = {
   },
   "conversation.threads.view.label": "Thread {title}",
   "conversation.threads.view.startedByAgent": "{name} heeft deze thread gestart.",
+  "conversation.threads.view.loadOlder": "Laad oudere berichten",
   "conversation.threads.branch.from": "Afgetakt van {title}",
   "conversation.threads.branch.fromDeleted": "Afgetakt van een verwijderde thread",
   "conversation.threads.view.newPlaceholder": "Nieuwe thread met {name}",
