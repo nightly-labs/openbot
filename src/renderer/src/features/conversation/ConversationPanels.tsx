@@ -388,6 +388,23 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     if (opened) setActiveRightPanel("none");
     return opened;
   };
+  /**
+   * Opens the message of a routine run in the chat. A run that is not in the chat ran in the routine's
+   * thread, so that thread opens.
+   */
+  const openRoutineRun = async (messageId: string, routineId: string | null) => {
+    const agentId = props.agent?.id;
+    if (agentId && routineId && props.threads) {
+      const inChat = await conversationPort()
+        .agent.readConversationPage({ agentId, anchor: { type: "around", messageId }, limit: 1 })
+        .then(
+          (page) => page.messages.some((message) => message.id === messageId),
+          () => true,
+        );
+      if (!inChat && (await openRoutineThread(routineId))) return;
+    }
+    openRoutineRunMessage(messageId);
+  };
   const sideThreadTabs = () => props.threads?.side.tabs ?? [];
   const moveSideThread = (id: string, index: number) => props.threads?.side.onMove(id, index);
   return (
@@ -710,7 +727,9 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 routineSettingsRequest()?.agentId === agent().id ? routineSettingsRequest() : null
               }
               onRoutineSelectionRequestHandled={handleRoutineSettingsRequest}
-              onOpenRoutineRun={props.onOpenSearchMessage ? openRoutineRunMessage : undefined}
+              onOpenRoutineRun={
+                props.onOpenSearchMessage ? (id, routineId) => void openRoutineRun(id, routineId) : undefined
+              }
               onOpenRoutineThread={props.threads ? openRoutineThread : undefined}
               files={agentFiles(props.server, agent().id)}
               eventRoutines={desktopChatEventRoutinesApi(props.server, props.runtime)}

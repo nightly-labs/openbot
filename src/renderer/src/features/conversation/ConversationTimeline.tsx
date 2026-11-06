@@ -225,9 +225,13 @@ export function ConversationTimeline() {
   };
   /** The message that the delete dialog asks about. */
   const [deleteTargetId, setDeleteTargetId] = createSignal<string | null>(null);
-  /** A message that the host stores can be deleted, when the reader may delete it. */
+  /**
+   * A message that the host stores can be deleted, when the reader may delete it. A `ui-` row is an
+   * error that only this window shows.
+   */
   const deleteAction = (message: AgentMessage) => {
     if (!props.onDeleteMessage || message.streaming || message.id.startsWith(PENDING_SEND_ID_PREFIX)) return;
+    if (message.id.startsWith("ui-")) return;
     if (props.canDeleteMessage && !props.canDeleteMessage(message)) return;
     return () => setDeleteTargetId(message.id);
   };

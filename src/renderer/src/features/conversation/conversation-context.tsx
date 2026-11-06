@@ -1024,25 +1024,32 @@ const Conversation = createSimpleContext({
       });
     }
 
-    /** Marks each unread agent chat read through its newest message, which may not be loaded yet. */
+    /**
+     * Marks each unread agent chat and open side thread read through its newest message, which may not be
+     * loaded yet. The sidebar count holds both.
+     */
     async function markAllAgentMessagesRead(): Promise<void> {
       const serverId = activeServerId();
       // Only listed agents: a read of an id the host no longer knows creates that agent again.
       const unread = agentList()
         .map((agent) => agent.id)
-        .filter((agentId) => (unreadReplies()[agentId] ?? 0) > 0);
+        .filter((agentId) => (agentUnreadReplies()[agentId] ?? 0) > 0);
       await Promise.all(
         unread.map(async (agentId) => {
-          try {
-            const page = await conversationPort().agent.readConversationPage(
-              { agentId, anchor: { type: "latest" }, limit: 1 },
-              serverId,
-            );
-            const latestMessageId = page.messages.at(-1)?.id;
-            if (latestMessageId) await markAgentMessagesRead(agentId, latestMessageId, serverId);
-          } catch (error) {
-            appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
-          }
+          const chatUnread = (unreadReplies()[agentId] ?? 0) > 0;
+          const results = await Promise.allSettled([
+            agentTasks.markAllTasksRead(agentId),
+            chatUnread
+              ? conversationPort()
+                  .agent.readConversationPage({ agentId, anchor: { type: "latest" }, limit: 1 }, serverId)
+                  .then((page) => {
+                    const latestMessageId = page.messages.at(-1)?.id;
+                    if (latestMessageId) return markAgentMessagesRead(agentId, latestMessageId, serverId);
+                  })
+              : undefined,
+          ]);
+          const failure = results.find((result) => result.status === "rejected");
+          if (failure) appendUiError(agentId, failure.reason, currentText().t("chat.errorStatus.readState"), serverId);
         }),
       );
     }
