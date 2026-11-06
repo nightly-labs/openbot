@@ -1233,6 +1233,7 @@ export class ThreadLifecycle {
           developerInstructions: instructions,
           memoryContext: memoryContext(memories, options),
           sectionTeammates: section,
+          ...(options.responseStyle === "natural" ? { turnStyleReminder: true } : {}),
         }
       : { developerInstructions: instructions };
   }

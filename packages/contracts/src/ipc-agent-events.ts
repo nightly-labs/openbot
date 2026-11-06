@@ -141,7 +141,18 @@ export type AgentEvent =
       createdAt: string;
       revision: number;
     }
-  | { type: "turn-progress"; agentId: string; threadId: string; turnId: string; detail: string }
+  | {
+      type: "turn-progress";
+      agentId: string;
+      threadId: string;
+      turnId: string;
+      detail: string;
+      /**
+       * True while a tool step of the turn runs, such as a long command. The turn then works, it does not wait
+       * for its provider. A host before this field leaves it out, and the client counts silence as before.
+       */
+      running?: boolean;
+    }
   | { type: "turn-started"; agentId: string; threadId: string; turnId: string; origin?: AgentTurnOrigin }
   | AgentTurnCompletedEvent
   /**
@@ -322,7 +333,8 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         isIdentifier(value.turnId) &&
         isString(value.detail) &&
         value.detail.length > 0 &&
-        value.detail.length <= INPUT_LIMITS.promptQuestion
+        value.detail.length <= INPUT_LIMITS.promptQuestion &&
+        (value.running === undefined || typeof value.running === "boolean")
       );
     case "routine-thread-turn-completed":
       return (

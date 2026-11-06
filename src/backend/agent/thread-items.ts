@@ -22,6 +22,7 @@ import {
   reasoningText,
   type ThreadItem,
 } from "../protocol";
+import { stepLabel } from "./step-labels";
 import { BUILTIN_TOOL_CATALOG } from "./tool-catalog";
 
 export function isNonActionableCodexWarning(message: string): boolean {
@@ -446,6 +447,9 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
   // the generic words below. It can quote a path or a value, so it is redacted like the trace's command.
   const description = completed ? null : getString(item, "description")?.trim();
   if (description) return redactText(description);
+  // Next, a label from what the step does, such as "Reading main.ts…", for a provider that sends no label.
+  const label = completed ? null : stepLabel(item);
+  if (label) return label;
   if (/(search|browser|fetch|navigate|open_url|web)/u.test(descriptor)) {
     return completed ? sourceText("status.agent.sourcesReviewing") : sourceText("status.agent.sourcesSearching");
   }

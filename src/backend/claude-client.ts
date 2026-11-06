@@ -30,6 +30,7 @@ import {
   isTurnContextBlock,
   type MemoryContext,
   memoryContextUpdate,
+  NATURAL_TURN_REMINDER,
   type SectionTeammates,
   sectionTeammatesUpdate,
 } from "./agent/developer-instructions";
@@ -419,6 +420,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     string,
     { current: SectionTeammates | null; delivered: SectionTeammates | null | undefined }
   >();
+  /** The threads whose turns repeat the natural style's first-line rule (`NATURAL_TURN_REMINDER`). */
+  readonly #styleReminders = new Set<string>();
   /** Resumes of one thread run one after another: two at once would leave a query nobody closes. */
   readonly #threadResumes = new Map<string, Deferred.Deferred<void, ProviderClientOperationError>>();
   #running = false;
@@ -520,6 +523,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#threads.forget(threadId);
     this.#memoryContexts.delete(threadId);
     this.#teammates.delete(threadId);
+    this.#styleReminders.delete(threadId);
     const runtime = this.#threads.get(threadId);
     if (!runtime) return;
     yield* this.#threads.close(runtime).pipe(toProviderClientOperationError);
@@ -850,6 +854,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   }
 
   #setTurnContext(threadId: string, params: unknown, resume: boolean): void {
+    if (isRecord(params) && params.turnStyleReminder === true) this.#styleReminders.add(threadId);
+    else this.#styleReminders.delete(threadId);
     const current = readMemoryContext(params);
     if (current) {
       const memory = this.#memoryContexts.get(threadId);
@@ -1157,6 +1163,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       : [
           memory ? memoryContextUpdate(memory.delivered, memory.current) : null,
           teammates ? sectionTeammatesUpdate(teammates.delivered, teammates.current) : null,
+          this.#styleReminders.has(threadId) ? NATURAL_TURN_REMINDER : null,
         ].filter((block): block is string => block !== null);
     runtime.input.push({
       type: "user",
@@ -1721,6 +1728,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           ...(!completed && isRecord(input) && typeof input.description === "string"
             ? { description: input.description.slice(0, TOOL_DESCRIPTION_LIMIT) }
             : {}),
+          // What a read, search or fetch works on, for a label such as "Reading main.ts…".
+          ...(completed ? {} : claudeStepTarget(name, input)),
           // The turn trace shows the command and the recipients; it redacts the command.
           ...(name === "Bash" && isRecord(input) && typeof input.command === "string"
             ? { command: input.command.slice(0, INPUT_LIMITS.messageText) }
@@ -2650,6 +2659,22 @@ function claudeTurnModelUsage(
     total.smallestRequestInputTokens = isNumber(smallest) && prompt !== null ? Math.min(smallest, prompt) : null;
   }
   return models;
+}
+
+/** The file, pattern, query or address of a running Claude tool, for the activity line's label. */
+function claudeStepTarget(name: string, input: unknown): Record<string, string> {
+  if (!isRecord(input)) return {};
+  const text = (key: string) => (typeof input[key] === "string" ? input[key].slice(0, INPUT_LIMITS.identifier) : null);
+  const path = name === "Read" ? text("file_path") : null;
+  const pattern = name === "Grep" || name === "Glob" ? text("pattern") : null;
+  const query = name === "WebSearch" ? text("query") : null;
+  const url = name === "WebFetch" ? text("url") : null;
+  return {
+    ...(path ? { path } : {}),
+    ...(pattern ? { pattern } : {}),
+    ...(query ? { query } : {}),
+    ...(url ? { url } : {}),
+  };
 }
 
 /** The input fields that the completed step of a tool call sends again. Recipients and file contents stay out. */

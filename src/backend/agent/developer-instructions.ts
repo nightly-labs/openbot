@@ -238,12 +238,24 @@ export function memoryContextUpdate(delivered: MemoryContext | null, current: Me
   return update.length < full.length ? update : full;
 }
 
+const TURN_STYLE_START = "<openbot_turn_style>";
+
 /**
- * Whether a user text block is one that `memoryContextUpdate` or `sectionTeammatesUpdate` wrote, not
- * text that a person wrote.
+ * The first line that the natural style asks for, again with each turn. Deep in a long thread the
+ * system prompt is far away, and Claude then skipped the line in about half of its tool turns.
+ */
+export const NATURAL_TURN_REMINDER = [
+  TURN_STYLE_START,
+  "Unless this is a routine run: if this turn uses a tool, first write one short line, in your own words, of what you understood and what you check first. Name the work, not commands or tools.",
+  "</openbot_turn_style>",
+].join("\n");
+
+/**
+ * Whether a user text block is one that `memoryContextUpdate`, `sectionTeammatesUpdate` or the
+ * turn style reminder wrote, not text that a person wrote.
  */
 export function isTurnContextBlock(text: string): boolean {
-  return [MEMORY_BLOCK_START, MEMORY_UPDATE_START, TEAMMATES_BLOCK_START].some((start) =>
+  return [MEMORY_BLOCK_START, MEMORY_UPDATE_START, TEAMMATES_BLOCK_START, TURN_STYLE_START].some((start) =>
     text.startsWith(`${start}\n`),
   );
 }

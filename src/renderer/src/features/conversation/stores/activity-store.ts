@@ -243,8 +243,8 @@ export function createActivityStore(deps: ActivityStoreDeps) {
   );
   /**
    * What the running turn of this agent's chat waits for, when it waits for the provider rather than
-   * the user. The renderer does not know whether a tool step is open, so a long silent tool step
-   * also counts as silence: what the user reads is only that nothing came, not why.
+   * the user. A host that does not send `running` gives no sign of an open tool step, so there a long
+   * silent tool step also counts as silence.
    */
   const waitsForProvider = createMemo(
     () =>
@@ -289,9 +289,12 @@ export function createActivityStore(deps: ActivityStoreDeps) {
   const updateOnline = () => setOnline(navigator.onLine);
   window.addEventListener("online", updateOnline);
   window.addEventListener("offline", updateOnline);
-  /** Whole minutes with nothing from the provider, from the first minute; else null. */
+  /**
+   * Whole minutes with nothing from the provider, from the first minute; else null. A tool step that
+   * still runs, such as a long scan, is work: the activity line keeps its label and its time.
+   */
   const providerSilentMinutes = createMemo(() => {
-    if (!waitsForProvider()) return null;
+    if (!waitsForProvider() || deps.props.activityRunning) return null;
     const minutes = Math.floor((clock() - lastTurnUpdateAt()) / PROVIDER_SILENT_AFTER_MS);
     return minutes >= 1 ? minutes : null;
   });

@@ -12,6 +12,12 @@
 - While a Claude agent runs a command or a subagent, the activity line shows the agent's own short
   label of that step, such as "Find three largest folders in ~/Library/Caches", in place of a
   general text.
+- The activity line of Codex, Grok and the other agents now names the running step from its
+  command, such as "Reading the file main.ts…", "Measuring folder sizes…" or "Visiting github.com…".
+- While a tool step runs, the activity line keeps its label and no longer changes to "Waiting
+  for…" after a few quiet minutes.
+- With the Natural style, a Claude agent gets the opening-line rule again with each message, so a
+  long chat keeps the short first line.
 
 ### Changed
 

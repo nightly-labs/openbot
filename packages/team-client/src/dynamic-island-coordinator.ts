@@ -18,7 +18,7 @@ import {
 } from "./dynamic-island-presentation";
 
 type ServerRuntime = DynamicIslandPresentationInput & {
-  turnProgress: Record<string, { turnId: string; detail: string } | undefined>;
+  turnProgress: Record<string, { turnId: string; detail: string; running?: boolean } | undefined>;
   incomingMessageAnchors: Map<string, string>;
   completedAgents: Set<string>;
   lastRecordedMessageIds: Map<string, string>;
@@ -220,6 +220,7 @@ export class DynamicIslandCoordinator {
         runtime.turnProgress[event.agentId] = {
           turnId: event.turnId,
           detail: cleanAgentMessageText(event.detail),
+          ...(event.running ? { running: true } : {}),
         };
         return;
       case "turn-completed":

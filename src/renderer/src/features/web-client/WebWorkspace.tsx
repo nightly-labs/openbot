@@ -2888,6 +2888,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       ? workspace.state.progress[workspace.state.selectedId]?.detail
                       : undefined
                   }
+                  activityRunning={
+                    workspace.state.selectedId
+                      ? workspace.state.progress[workspace.state.selectedId]?.running
+                      : undefined
+                  }
                   turnStepLines={workspace.stepLines()}
                   skillsMarketplaceOpen={marketplaceOpen()}
                   mcpSettingsOpen={serverSettings.state.open || marketplaceOpen()}
