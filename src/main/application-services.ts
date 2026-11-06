@@ -3684,6 +3684,8 @@ export async function createApplicationServices({
       hostPhase: () => host.getStatus().phase,
       startHost: () =>
         Effect.gen(function* () {
+          // The owner removed this server. It stays private until a sign-in or another publish (#5273).
+          if (host.getStatus().message === sourceText("status.host.removed")) return;
           if (centralAuth.getState().status === "error") yield* centralAuth.retry().pipe(toRemoteWorkflowError);
           yield* serverMode.publish(true);
         }),
