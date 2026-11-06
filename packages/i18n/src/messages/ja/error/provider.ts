@@ -299,6 +299,8 @@ export const messages = {
     "OpenCode がリクエストを拒否しましたが、原因は示されていません。長いチャットやモデルの変更後に起こることがあります。OpenBot はチャット履歴を引き継いだ新しい OpenCode セッションを開始しました。もう一度お試しください。エラーが続く場合は、別のモデルを選ぶか推論レベルを下げてください。",
   "error.provider.museMcpStartupFault":
     "Muse が MCP サーバーを起動できず、このセッションで MCP をブロックしました。OpenBot はチャット履歴を引き継いだ新しい Muse セッションを開始しました。もう一度お試しください。エラーが続く場合は、このエージェントの Computer Use または失敗した MCP サーバーをオフにしてください。",
+  "error.provider.claudeSessionMissing":
+    "Claude Code はこのチャットの保存済みセッションを見つけられませんでした。OpenBot はチャット履歴を引き継いだ新しい Claude Code セッションを開始しました。もう一度お試しください。",
   "error.provider.grokSignIn": "Grok を使うには `grok login` を実行するか、XAI_API_KEY を設定してください。",
   "error.provider.acpSignInTimedOut": "サインインがタイムアウトしました。",
   "error.provider.acpSignInStopped": "サインインが完了する前に停止しました。",

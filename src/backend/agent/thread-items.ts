@@ -114,6 +114,15 @@ function isMuseMcpStartupFault(provider: AgentProvider, message: string): boolea
 }
 
 /**
+ * OpenBot names a new Claude session before the CLI writes it, and a first turn that stops before
+ * that write, such as on a terms prompt, leaves a session that does not exist. The CLI then refuses
+ * each resume of it, and so does a session file lost with a changed config folder (#5365).
+ */
+function isMissingClaudeSession(provider: AgentProvider, message: string): boolean {
+  return provider === "claude" && /\bNo conversation found with session ID\b/.test(message);
+}
+
+/**
  * The failure to show when the provider refused the session's own history, or null when it did
  * not. Each turn of a refused session fails the same way, so the caller closes the session.
  */
@@ -122,6 +131,7 @@ export function refusedSessionFailure(provider: AgentProvider, message: string):
     return sourceText("error.provider.foreignReasoning", { provider: providerLabel(provider) });
   if (isRejectedOpenCodeRequest(provider, message)) return sourceText("error.provider.opencodeSessionRejected");
   if (isMuseMcpStartupFault(provider, message)) return sourceText("error.provider.museMcpStartupFault");
+  if (isMissingClaudeSession(provider, message)) return sourceText("error.provider.claudeSessionMissing");
   return null;
 }
 

@@ -289,6 +289,8 @@ export const messages = {
     "OpenCode heeft het verzoek geweigerd zonder de oorzaak te geven. Dit kan gebeuren in een lange chat of na een modelwijziging. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een ander model of een lager niveau.",
   "error.provider.museMcpStartupFault":
     "Muse kon een MCP-server niet starten en heeft MCP in deze sessie geblokkeerd. OpenBot heeft een nieuwe Muse-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, zet dan Computerbesturing of de mislukte MCP-server uit voor deze agent.",
+  "error.provider.claudeSessionMissing":
+    "Claude Code heeft de opgeslagen sessie van deze chat niet gevonden. OpenBot heeft een nieuwe Claude Code-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.grokSignIn": "Voer `grok login` uit of stel XAI_API_KEY in om Grok te gebruiken.",
   "error.provider.acpSignInTimedOut": "Het inloggen duurde te lang.",
   "error.provider.acpSignInStopped": "Het inloggen is gestopt voordat het klaar was.",

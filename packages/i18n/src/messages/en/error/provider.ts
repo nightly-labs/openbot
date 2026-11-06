@@ -279,6 +279,8 @@ export const messages = defineMessages("error.provider", {
     "OpenCode refused the request and did not give the cause. This can occur in a long chat or after a model change. OpenBot started a new OpenCode session with the chat history. Try again. If the error continues, select a different model or a lower effort.",
   "error.provider.museMcpStartupFault":
     "Muse could not start an MCP server and blocked MCP in this session. OpenBot started a new Muse session with the chat history. Try again. If the error continues, turn off Computer Use or the failed MCP server for this agent.",
+  "error.provider.claudeSessionMissing":
+    "Claude Code could not find the saved session of this chat. OpenBot started a new Claude Code session with the chat history. Try again.",
   "error.provider.grokSignIn": "Run `grok login` or set XAI_API_KEY to use Grok.",
   "error.provider.acpSignInTimedOut": "The sign-in timed out.",
   "error.provider.acpSignInStopped": "The sign-in stopped before it was complete.",
