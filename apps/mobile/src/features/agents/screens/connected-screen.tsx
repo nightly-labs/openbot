@@ -1088,29 +1088,33 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         />
       )}
 
-      {isIOS && headerActions && !pane ? (
+      {isIOS && !pane ? (
         <>
-          {/* iOS moves the native bar buttons into the vertical bar of iPhone Duo and keeps custom views at
+          {/* The toolbar stays mounted while the list loads or reconnects, and its items hide instead.
+              Removed and added again, the native items came back at the wrong place on iPhone Duo.
+              iOS moves the native bar buttons into the vertical bar of iPhone Duo and keeps custom views at
               the top. Keyed by the bar's edge, the items are placed again when the bar shows, hides or
               moves; the custom views leave the toolbar while it shows, as in the chat header. */}
           <Stack.Toolbar key={`left-${verticalBarEdge ?? "none"}`} placement="left">
             {/* The search takes the screen, so the bar buttons go while it is open. */}
-            <Stack.Toolbar.Button icon="sidebar.leading" hidden={search.open} onPress={openDrawer} />
+            <Stack.Toolbar.Button icon="sidebar.leading" hidden={!headerActions || search.open} onPress={openDrawer} />
             {verticalBar ? null : (
-              <Stack.Toolbar.View hidesSharedBackground hidden={search.open}>
+              <Stack.Toolbar.View hidesSharedBackground hidden={!headerActions || search.open}>
                 <ConnectionHeaderStatus server={hasSelectedServer ? activeServer : undefined} />
               </Stack.Toolbar.View>
             )}
           </Stack.Toolbar>
           <Stack.Toolbar key={`right-${verticalBarEdge ?? "none"}`} placement="right">
             {verticalBar ? null : (
-              <Stack.Toolbar.View hidden={search.open || !showsPlanLimits}>{planLimitsButton}</Stack.Toolbar.View>
+              <Stack.Toolbar.View hidden={!headerActions || search.open || !showsPlanLimits}>
+                {planLimitsButton}
+              </Stack.Toolbar.View>
             )}
             <Stack.Toolbar.Menu
               icon="ellipsis"
               accessibilityLabel={t("mobile.agent.home.chatOptions")}
               separateBackground
-              hidden={search.open}
+              hidden={!headerActions || search.open}
             >
               {/* Add actions come first, then a divider and the actions on existing chats. */}
               <Stack.Toolbar.Menu inline>
@@ -1164,7 +1168,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
               ) : null}
             </Stack.Toolbar.Menu>
           </Stack.Toolbar>
-          {verticalBar && !search.open ? (
+          {headerActions && verticalBar && !search.open ? (
             // With the vertical bar, the status and the plan limits stay drawn at the top.
             <View
               className="absolute z-20 flex-row items-center justify-between gap-2"
