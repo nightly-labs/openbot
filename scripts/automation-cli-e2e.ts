@@ -5,7 +5,8 @@
 // Writes .openbot-build/automation-cli-e2e/report.json. Run: `bun scripts/automation-cli-e2e.ts`.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
@@ -350,6 +351,7 @@ try {
     return run.stderr.includes("Wait for the active turn to finish.") && cleared.length === 1;
   });
   busy = false;
+  automationRunsPerHour = 100;
   const retry = ["handoff", "Ada", "-", "--id", "reverse-abc", "--wait", "--json"];
   const previousCount = deliveries.size;
   const interrupted = startCli(retry);
@@ -392,14 +394,20 @@ try {
     },
   });
   const stateRoot = join(root, "state", "openbot-handoffs");
-  const [savedFolder] = readdirSync(stateRoot);
-  assert.ok(savedFolder);
+  const savedFolder = createHash("sha256")
+    .update(JSON.stringify([originatingChat, resolve(root), "reverse-abc"]))
+    .digest("hex");
   const intentPath = join(stateRoot, savedFolder, "intent.json");
+  const deliveryPath = join(stateRoot, savedFolder, "delivery.json");
   const intent = JSON.parse(readFileSync(intentPath, "utf8"));
+  assert.deepEqual(JSON.parse(readFileSync(deliveryPath, "utf8")), {
+    messageId: recovered.messageId,
+    deliveryId: recovered.deliveryId,
+  });
   intent.createdAt = Date.now() - 24 * 60 * 60 * 1000;
   writeFileSync(intentPath, JSON.stringify(intent));
   const oldReceipt = parsed(await cli(["resume", "reverse-abc", "--json"]));
-  rmSync(join(stateRoot, savedFolder, "delivery.json"));
+  rmSync(deliveryPath);
   // Simulate expiry on both sides; a new POST would now enqueue a second task.
   receipts.clear();
   const expired = await cli(retry, "ABC backwards");
