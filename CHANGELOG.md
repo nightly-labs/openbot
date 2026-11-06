@@ -39,6 +39,9 @@ All notable changes to OpenBot will be documented here. The project follows
   right, and the "Needs your answer" label is gone.
 - In the API key form, the choice of who can use the key is now a small menu next to the submit button.
 - The sidebar badge of an agent that waits for you is now felt: an amber felt ball with a cream yarn icon, with the same ring as the other felt badges.
+- Remove the "development preview" and "early stage" text from the website, the welcome email, the
+  README and the security policy. OpenBot is ready for production use and gets a new release almost
+  every day.
 
 ### Fixed
 
