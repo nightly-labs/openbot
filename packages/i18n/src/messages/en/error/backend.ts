@@ -142,6 +142,9 @@ export const messages = defineMessages("error.backend", {
     "Mailbox state is corrupt or from a newer OpenBot version; refusing to overwrite it.",
   "error.backend.recipientDeleting": "The recipient is being deleted. Retry after deletion finishes.",
   "error.backend.recipientHidden": "This agent is hidden. Restore it to send messages.",
+  "error.backend.replyReferenceUnknown":
+    "replyToMessageId {id} names no message. Use the Message ID of the message that you answer, or leave replyToMessageId out.",
+  "error.backend.replyReferenceRequests": "Messages from these recipients in this turn: {ids}.",
   "error.backend.attachBetween": "Attach between 1 and {limit} files.",
   "error.backend.attachmentNotFile": "Attachment is not a file: {path}",
   "error.backend.generatedImageTooLarge": "Generated image exceeds the 100 MB limit.",
