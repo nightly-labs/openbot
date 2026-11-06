@@ -28,7 +28,7 @@ export interface BrowserProxyChoice {
 }
 
 /** The name of the computer of a member, as the desktop Browser profiles section names it. */
-export function useBrowserComputerName() {
+function useBrowserComputerName() {
   const { t } = useText();
   return (computer: Pick<BrowserProxyComputer, "mine" | "name">) => {
     if (computer.mine) return t("mobile.server.browserProxies.yourComputer");
