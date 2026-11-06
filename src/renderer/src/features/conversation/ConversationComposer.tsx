@@ -8,6 +8,7 @@ import {
   type QueueSnapshot,
 } from "@openbot/contracts/ipc";
 import {
+  TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
   TEAM_MP4_ATTACHMENTS_CAPABILITY,
@@ -338,12 +339,14 @@ export function ConversationComposer() {
     const server = props.server;
     const local = server?.kind !== "remote";
     const capabilities = server?.compatibility?.capabilities ?? [];
+    // A host that takes any file gets no filter, so the picker shows every file.
+    if (local || capabilities.includes(TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY)) return undefined;
     return supportedAttachmentExtensions({
-      eml: local || capabilities.includes(TEAM_EML_ATTACHMENTS_CAPABILITY),
-      media: local || capabilities.includes(TEAM_MEDIA_ATTACHMENTS_CAPABILITY),
-      zip: local || capabilities.includes(TEAM_ZIP_ATTACHMENTS_CAPABILITY),
-      mp4: local || capabilities.includes(TEAM_MP4_ATTACHMENTS_CAPABILITY),
-      svg: local || capabilities.includes(TEAM_SVG_ATTACHMENTS_CAPABILITY),
+      eml: capabilities.includes(TEAM_EML_ATTACHMENTS_CAPABILITY),
+      media: capabilities.includes(TEAM_MEDIA_ATTACHMENTS_CAPABILITY),
+      zip: capabilities.includes(TEAM_ZIP_ATTACHMENTS_CAPABILITY),
+      mp4: capabilities.includes(TEAM_MP4_ATTACHMENTS_CAPABILITY),
+      svg: capabilities.includes(TEAM_SVG_ATTACHMENTS_CAPABILITY),
     })
       .map((extension) => `.${extension}`)
       .join(",");

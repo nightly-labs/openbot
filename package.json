@@ -312,6 +312,7 @@
     "test:zip-attachments": "bun scripts/zip-attachment-e2e.ts",
     "test:mp4-attachments": "bun scripts/mp4-attachment-e2e.ts",
     "test:svg-attachments": "bun scripts/svg-attachment-e2e.ts",
+    "test:any-file-attachments": "bun scripts/any-file-attachment-e2e.ts",
     "test:channel-notifications": "bun scripts/channel-notifications-e2e.ts",
     "test:acp-effort-variants": "bun scripts/acp-effort-variants-e2e.ts",
     "test:cline-free-models": "bun scripts/cline-free-models-e2e.ts",
