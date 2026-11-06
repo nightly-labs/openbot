@@ -212,6 +212,16 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Faça no Higgsfield uma foto de produto de uma caneca de cerâmica sobre uma mesa de madeira.",
   "marketplace.plugin.higgsfield.prompt.clip": "Faça no Higgsfield um vídeo de 5 segundos de ondas ao pôr do sol.",
+  "marketplace.plugin.elevenlabs.tagline": "Fala, vozes e agentes de voz",
+  "marketplace.plugin.elevenlabs.description":
+    "O ElevenLabs permite que agentes transformem texto em fala, trabalhem com vozes e criem, testem e revisem agentes de voz do ElevenLabs e suas conversas. O áudio gerado volta como um link de download de curta duração. Cada usuário entra na própria conta do ElevenLabs pelo navegador, e cada geração usa créditos dessa conta.",
+  "marketplace.plugin.elevenlabs.app":
+    "Texto para fala, vozes e gestão de agentes de voz, pelo servidor MCP do ElevenLabs com login no navegador.",
+  "marketplace.plugin.elevenlabs.prompt.speech":
+    "Leia este parágrafo em voz alta com uma voz calma do ElevenLabs e me dê o áudio.",
+  "marketplace.plugin.elevenlabs.prompt.agents": "Liste meus agentes de voz do ElevenLabs e a voz que cada um usa.",
+  "marketplace.plugin.elevenlabs.prompt.conversations":
+    "Resuma as últimas dez conversas do meu agente de voz de suporte.",
   "marketplace.plugin.appleApps.tagline": "Mail, Calendário e mais no seu Mac",
   "marketplace.plugin.appleApps.description":
     "Apple apps permite que agentes usem Mail, Calendário, Contatos, Lembretes, Notas, Mensagens e Safari neste Mac. Funciona somente no macOS. O OpenBot inicia o mcp-icloud, um servidor da comunidade que não é feito pela Apple nem pelo OpenBot. O servidor controla os apps com AppleScript, neste computador, e não precisa de conta nem de chave. Na instalação, o OpenBot pode pedir ao macOS acesso a todos esses apps de uma vez, com um pedido para cada app. Se você não fizer isso, o macOS pergunta na primeira vez que um agente usa um app. Para mudar isso depois, abra Ajustes do Sistema › Privacidade e Segurança › Automação. Os agentes podem enviar e-mails e iMessages, e alterar ou excluir eventos, contatos e lembretes, então revise cada gravação antes de aprová-la. O que as ferramentas leem, como o texto dos e-mails, vai para o provedor do modelo do agente.",

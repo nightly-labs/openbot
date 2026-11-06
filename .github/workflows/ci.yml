@@ -522,6 +522,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:mcp-sign-in-client-refused
 
+      - name: Run the MCP sign-in client metadata document E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:mcp-sign-in-client-metadata-document
+
       - name: Run the unreadable MCP server row E2E test
         if: ${{ !cancelled() }}
         run: bun run test:mcp-server-unreadable-row

@@ -228,6 +228,16 @@ export const messages = {
     "Crée avec Higgsfield une photo produit d'une tasse en céramique sur une table en bois.",
   "marketplace.plugin.higgsfield.prompt.clip":
     "Crée avec Higgsfield une vidéo de 5 secondes de vagues au coucher du soleil.",
+  "marketplace.plugin.elevenlabs.tagline": "Parole, voix et agents vocaux",
+  "marketplace.plugin.elevenlabs.description":
+    "ElevenLabs permet aux agents de convertir du texte en parole, de travailler avec des voix, et de créer, tester et examiner des agents vocaux ElevenLabs et leurs conversations. L'audio généré revient sous forme de lien de téléchargement de courte durée. Chaque utilisateur se connecte à son propre compte ElevenLabs dans le navigateur, et chaque génération utilise des crédits de ce compte.",
+  "marketplace.plugin.elevenlabs.app":
+    "Synthèse vocale, voix et gestion des agents vocaux, via le serveur MCP d'ElevenLabs avec connexion dans le navigateur.",
+  "marketplace.plugin.elevenlabs.prompt.speech":
+    "Lis ce paragraphe à voix haute avec une voix calme d'ElevenLabs et donne-moi l'audio.",
+  "marketplace.plugin.elevenlabs.prompt.agents": "Liste mes agents vocaux ElevenLabs et la voix utilisée par chacun.",
+  "marketplace.plugin.elevenlabs.prompt.conversations":
+    "Résume les dix dernières conversations de mon agent vocal d'assistance.",
   "marketplace.plugin.appleApps.tagline": "Mail, Calendrier et plus sur votre Mac",
   "marketplace.plugin.appleApps.description":
     "Apple apps permet aux agents d’utiliser Mail, Calendrier, Contacts, Rappels, Notes, Messages et Safari sur ce Mac. Il fonctionne uniquement sous macOS. OpenBot démarre mcp-icloud, un serveur communautaire qui n’est fait ni par Apple ni par OpenBot. Le serveur contrôle les apps via AppleScript, sur cet ordinateur, et ne demande ni compte ni clé. À l’installation, OpenBot peut demander à macOS l’accès à toutes ces apps en une fois, avec une demande par app. Sinon, macOS demande la première fois qu’un agent utilise une app. Pour changer ce choix plus tard, ouvrez Réglages Système › Confidentialité et sécurité › Automatisation. Les agents peuvent envoyer des e-mails et des iMessages, et modifier ou supprimer des événements, des contacts et des rappels : vérifiez chaque écriture avant de l’approuver. Ce que les outils lisent, comme le texte des e-mails, est envoyé au fournisseur du modèle de l’agent.",

@@ -246,6 +246,16 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Make a Higgsfield product photo of a ceramic mug on a wooden table.",
   "marketplace.plugin.higgsfield.prompt.clip": "Make a 5-second Higgsfield video of waves at sunset.",
+  "marketplace.plugin.elevenlabs.tagline": "Speech, voices and voice agents",
+  "marketplace.plugin.elevenlabs.description":
+    "ElevenLabs lets agents turn text into speech, work with voices, and create, test and review ElevenLabs voice agents and their conversations. Generated audio comes back as a short-lived download link. Each user signs in to their own ElevenLabs account through the browser, and each generation uses credits of that account.",
+  "marketplace.plugin.elevenlabs.app":
+    "Text to speech, voices, and voice agent management, over ElevenLabs' MCP server with browser sign-in.",
+  "marketplace.plugin.elevenlabs.prompt.speech":
+    "Read this paragraph aloud with a calm ElevenLabs voice and give me the audio.",
+  "marketplace.plugin.elevenlabs.prompt.agents": "List my ElevenLabs voice agents and the voice each one uses.",
+  "marketplace.plugin.elevenlabs.prompt.conversations":
+    "Summarize the last ten conversations of my support voice agent.",
   "marketplace.plugin.appleApps.tagline": "Mail, Calendar and more on your Mac",
   "marketplace.plugin.appleApps.description":
     "Apple apps lets agents use Mail, Calendar, Contacts, Reminders, Notes, Messages and Safari on this Mac. It works on macOS only. OpenBot starts mcp-icloud, a community server that is not made by Apple or OpenBot. The server controls the apps through AppleScript, on this computer, and needs no account and no key. When you install it, OpenBot can ask macOS for access to all of these apps at once, with one prompt for each app. If you do not, macOS asks the first time an agent uses an app. To change this later, open System Settings › Privacy & Security › Automation. Agents can send email and iMessages, and change or delete events, contacts and reminders, so review each write before you approve it. What the tools read, such as email text, goes to the model provider of the agent.",

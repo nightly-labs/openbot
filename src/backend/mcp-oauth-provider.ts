@@ -62,6 +62,12 @@ import {
 } from "./network-address";
 import { withTimeout } from "./with-timeout";
 
+/**
+ * OpenBot's OAuth client metadata document. `apps/auth-api` serves it, and its `redirect_uris`
+ * must hold every address that `redirectUrl` can be.
+ */
+const MCP_CLIENT_METADATA_URL = "https://openbot.run/oauth/mcp-client.json";
+
 /** What one server's sign-in leaves behind, and all of it: nothing else is kept between runs. */
 export const mcpOAuthRecordSchema = z.object({
   /**
@@ -838,6 +844,14 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   #activeIssuer: string | undefined;
   /** Full discovery for this attempt, including custom protected-resource metadata. */
   #discoveryState: OAuthDiscoveryState | undefined;
+  /**
+   * The client metadata document (CIMD, SEP-991) that names OpenBot. Set in `saveDiscoveryState`
+   * only for an authorization server with no RFC 7591 registration endpoint; ElevenLabs accepts only
+   * this. The SDK uses it only when the server sets `client_id_metadata_document_supported`. A server
+   * with a registration endpoint keeps the registration, so a sign-in that works now does not change
+   * to a different client.
+   */
+  clientMetadataUrl?: string;
   /** Set when the SDK is told to register, and cleared when it saves what it registered. */
   #registrationPending = false;
   /** The status the authorization server answered the pending registration with. */
@@ -1030,6 +1044,15 @@ class McpOAuthClientProvider implements OAuthClientProvider {
             yield* this.#save({ app: { ...app, issuer: information.issuer } });
           return;
         }
+        // For a client metadata document the SDK passes only its URL and the issuer. The store
+        // refuses a client with no `redirect_uris`, so the address of this run is added, as a
+        // registration has it. A later run on another port then uses the document again.
+        if (information.client_id === MCP_CLIENT_METADATA_URL) {
+          yield* this.#save({
+            client: { ...information, redirect_uris: [this.#options.redirectUrl], token_endpoint_auth_method: "none" },
+          });
+          return;
+        }
         yield* this.#save({ client: information });
       }),
     );
@@ -1191,6 +1214,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       Effect.gen({ self: this }, function* () {
         this.#activeIssuer = discovery.authorizationServerUrl;
         this.#discoveryState = discovery;
+        const metadata = discovery.authorizationServerMetadata;
+        if (metadata && !metadata.registration_endpoint) this.clientMetadataUrl = MCP_CLIENT_METADATA_URL;
         // A pre-1.31 record has no safe issuer when its discovery state is absent. Do not let a
         // malicious resource install its authorization server as the binding for that record.
         // When old discovery exists, keep it until the old credentials have been stamped.
