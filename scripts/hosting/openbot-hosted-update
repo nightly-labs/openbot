@@ -308,9 +308,9 @@ remove_lazy_harnesses() {
   if self_hosted || [ ! -d "$harnesses" ]; then return 0; fi
   for launcher in "$harnesses"/*; do
     [ -f "$launcher" ] && [ ! -L "$launcher" ] || continue
-    case $(sed -n 2p "$launcher") in "# ascii-lazy-harness "*) ;; *) continue ;; esac
+    case $(sed -n '2{p;q;}' "$launcher") in "# ascii-lazy-harness "*) ;; *) continue ;; esac
     name=${launcher##*/}
-    if [ "$(sed -n 2p "/usr/local/bin/$name" 2>/dev/null)" = "# ascii-harness-shim" ]; then
+    if [ "$(sed -n '2{p;q;}' "/usr/local/bin/$name" 2>/dev/null)" = "# ascii-harness-shim" ]; then
       rm -f "/usr/local/bin/$name"
     fi
     rm -f "$launcher"
