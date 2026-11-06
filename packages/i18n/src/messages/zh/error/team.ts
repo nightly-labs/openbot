@@ -151,4 +151,5 @@ export const messages = {
   "error.team.signInRelayUsed": "该登录已发送过。",
   "error.team.signInRelayMismatch": "该地址不属于本次登录。",
   "error.team.signInRelayLinkUnknown": "该服务器上没有任何助手展示过该登录链接。",
+  "error.team.hostPersonalityUnsupported": "此连接不支持服务器个性。",
 } as const satisfies PartialTranslation<typeof source>;

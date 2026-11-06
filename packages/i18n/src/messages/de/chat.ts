@@ -356,6 +356,7 @@ export const messages = {
   "chat.actions.branch": "In neuem Thread abzweigen",
   "chat.actions.readAloud": "Vorlesen",
   "chat.actions.stopReading": "Vorlesen stoppen",
+  "chat.actions.more": "Weitere Aktionen",
   "chat.menu.reply": "Antworten",
   "chat.menu.copy": "Nachricht kopieren",
   "chat.menu.react": "Reagieren",

@@ -159,6 +159,10 @@ const CLAUDE_NATIVE_SCHEDULING = [
  * OpenBot workflow tools.
  */
 const CLAUDE_DUPLICATE_TOOLS = ["ListAgents", "Workflow", "Skill(workflow-authoring)"];
+
+/** The longest tool description the activity line shows. The model writes about 5 to 10 words. */
+const TOOL_DESCRIPTION_LIMIT = 120;
+
 /**
  * Names OpenBot to Claude. Without `CLAUDE_CODE_ENTRYPOINT` the SDK labels each request `sdk-ts`, and
  * Claude's 5-hour window counts `sdk-*` requests about twice as heavily (anthropics/claude-code#97074).
@@ -1438,6 +1442,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         block.type === "thinking"
       ) {
         this.#streamThinkingBlock(runtime, event.index, true);
+      } else if (
+        isRecord(event) &&
+        event.type === "content_block_start" &&
+        isRecord(block) &&
+        (block.type === "tool_use" || block.type === "server_tool_use" || block.type === "mcp_tool_use")
+      ) {
+        /* A tool call beginning closes the step, as a thinking block does. The text before it shows
+           now, not after Claude has written the whole tool input, which can take seconds. */
+        this.#flushNarration(runtime);
       } else if (event && isRecord(event) && event.type === "content_block_delta" && isRecord(delta)) {
         if (delta.type === "text_delta" && isString(delta.text)) {
           this.#outputTurn(runtime);
@@ -1702,6 +1715,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           // The skill that a `Skill` call loads, for the turn's activity line.
           ...(name === "Skill" && isRecord(input) && typeof input.skill === "string"
             ? { skill: input.skill.slice(0, INPUT_LIMITS.identifier) }
+            : {}),
+          // The model's own short label of a running command or subagent, such as "Show folder sizes",
+          // for the turn's activity line.
+          ...(!completed && isRecord(input) && typeof input.description === "string"
+            ? { description: input.description.slice(0, TOOL_DESCRIPTION_LIMIT) }
             : {}),
           // The turn trace shows the command and the recipients; it redacts the command.
           ...(name === "Bash" && isRecord(input) && typeof input.command === "string"

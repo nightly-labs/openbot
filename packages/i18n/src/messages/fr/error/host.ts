@@ -33,4 +33,5 @@ export const messages = {
     "L’arrêt des locataires a expiré. Aucun remplacement de l’application n’a démarré.",
   "error.host.tenantHealthMissing":
     "Les rapports d’état des locataires sont absents ou signalent un problème après le redémarrage. Examinez les sessions des locataires avant une autre mise à jour.",
+  "error.host.personalityInvalid": "Ce style de réponse est inconnu.",
 } as const satisfies PartialTranslation<typeof source>;

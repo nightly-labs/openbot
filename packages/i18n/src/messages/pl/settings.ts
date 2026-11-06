@@ -84,6 +84,9 @@ export const messages = {
   "settings.showAgentSteps.title": "Pokazuj kroki agenta",
   "settings.showAgentSteps.description":
     "Domyślnie otwiera myślenie, kroki narzędzi i zmiany wspomnień z każdej tury na tym urządzeniu i w tej przeglądarce.",
+  "settings.compactMessageActions.title": "Kompaktowe akcje wiadomości",
+  "settings.compactMessageActions.description":
+    "Pokazuje Reaguj, Odpowiedz i Więcej obok wiadomości, a godzinę między wiadomościami. Gdy jest wyłączone, wszystkie akcje i godzina są pod każdą wiadomością.",
   "settings.busyMessage.title": "Kieruj agentami podczas pracy",
   "settings.busyMessage.description":
     "Nowe wiadomości dołączają do bieżącej pracy agenta, a nie do kolejki. Działa z ChatGPT i Claude.",

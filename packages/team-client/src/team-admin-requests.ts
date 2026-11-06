@@ -68,6 +68,7 @@ import type { CUSTOM_PROVIDER_HARNESS_ROUTES } from "@openbot/contracts/team-pro
 import { DISCORD_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/discord-access-v1";
 import { HOST_KEY_ROTATION_ROUTES } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-member-update-v1";
+import { HOST_PERSONALITY_ROUTES } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { LOCAL_SERVERS_ROUTES } from "@openbot/contracts/team-protocol/local-servers-v1";
@@ -143,6 +144,7 @@ import {
   decodeHostOnePasswordConnectorStatus,
   decodeHostPasswordManagerList,
   decodeHostPasswordManagerStatus,
+  decodeHostPersonality,
   decodeHostProviderAccounts,
   decodeHostProviderAccountUsage,
   decodeHostReleaseStatus,
@@ -180,6 +182,7 @@ import {
   type HostMessagingConnectInput,
   type HostMessagingPlatformInput,
   type HostMessagingWorkspaceInput,
+  type HostPersonality,
   type HostProviderAccounts,
   type HostReleaseStatus,
   type HostSetMessagingEnabledInput,
@@ -644,6 +647,23 @@ export function setHostTimezone(
   timezone: string | null,
 ): Effect.Effect<HostTimezoneSettings, TeamAdminRequestError> {
   return adminCall(() => request("POST", HOST_TIMEZONE_ROUTES.update, decodeHostTimezoneSettings, { timezone }));
+}
+
+/** Any member can read the server personality (`host-personality-v1`). */
+export function getHostPersonality(request: TeamApiRequest): Effect.Effect<HostPersonality, TeamAdminRequestError> {
+  return adminCall(() => request("POST", HOST_PERSONALITY_ROUTES.settings, decodeHostPersonality, {}));
+}
+
+/** Only an owner or admin can set it. */
+export function setHostPersonality(
+  request: TeamApiRequest,
+  personality: HostPersonality,
+): Effect.Effect<HostPersonality, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", HOST_PERSONALITY_ROUTES.update, decodeHostPersonality, {
+      responseStyle: personality.responseStyle,
+    }),
+  );
 }
 
 /**

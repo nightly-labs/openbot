@@ -332,6 +332,7 @@ export const messages = {
   "chat.actions.branch": "새 스레드로 분기",
   "chat.actions.readAloud": "소리 내어 읽기",
   "chat.actions.stopReading": "읽기 중지",
+  "chat.actions.more": "추가 작업",
   "chat.menu.reply": "답장",
   "chat.menu.copy": "메시지 복사",
   "chat.menu.react": "반응",

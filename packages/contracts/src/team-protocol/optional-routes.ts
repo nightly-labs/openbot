@@ -52,6 +52,7 @@ import { FOCUS_USE_CODECS } from "./focus-use-v1";
 import { HOST_ADMIN_CODECS } from "./host-admin-v1";
 import { HOST_KEY_ROTATION_CODECS } from "./host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_CODECS } from "./host-member-update-v1";
+import { HOST_PERSONALITY_CODECS } from "./host-personality-v1";
 import { HOST_RELEASE_CODECS } from "./host-release-v1";
 import { HOST_TIMEZONE_CODECS } from "./host-timezone-v1";
 import { HOST_UPDATE_CODECS } from "./host-update-v1";
@@ -126,6 +127,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...HOST_ADMIN_CODECS,
   ...HOST_UPDATE_CODECS,
   ...HOST_TIMEZONE_CODECS,
+  ...HOST_PERSONALITY_CODECS,
   ...HOST_KEY_ROTATION_CODECS,
   ...LOCAL_SERVERS_CODECS,
   ...AGENT_MEMORY_LIMIT_CODECS,

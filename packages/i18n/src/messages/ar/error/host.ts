@@ -28,4 +28,5 @@ export const messages = {
   "error.host.tenantShutdownTimeout": "انتهت مهلة إيقاف المستأجر. لم يبدأ استبدال التطبيق.",
   "error.host.tenantHealthMissing":
     "تقارير سلامة المستأجرين مفقودة أو غير سليمة بعد إعادة التشغيل. افحص جلسات المستأجرين قبل تحديث آخر.",
+  "error.host.personalityInvalid": "أسلوب الرد هذا غير معروف.",
 } as const satisfies PartialTranslation<typeof source>;

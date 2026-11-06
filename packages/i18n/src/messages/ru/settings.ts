@@ -85,6 +85,9 @@ export const messages = {
   "settings.showAgentSteps.title": "Показывать шаги агента",
   "settings.showAgentSteps.description":
     "По умолчанию раскрывать размышления, шаги инструментов и изменения памяти в каждом ходе на этом устройстве и в этом браузере.",
+  "settings.compactMessageActions.title": "Компактные действия с сообщениями",
+  "settings.compactMessageActions.description":
+    "Показывает «Реакция», «Ответить» и «Ещё» рядом с сообщением, а время — между сообщениями. Если выключено, все действия и время показываются под каждым сообщением.",
   "settings.busyMessage.title": "Направлять агентов, пока они работают",
   "settings.busyMessage.description":
     "Новые сообщения присоединяются к текущей работе агента, а не встают в очередь. Работает с ChatGPT и Claude.",

@@ -1,7 +1,7 @@
 import type { MessageReaction } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
-import { MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
+import { MessageActions, MessageMenu, MessageMenuItems } from "@openbot/ui/features/conversation/MessageRendering";
 import { createStore } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -84,17 +84,26 @@ function MenuRow(props: { message: AgentMessage; channel?: boolean; busy?: boole
           reactions={!props.channel}
           pickerOpen={state.pickerOpen}
           expandedEmoji={false}
-          copied={false}
           onTogglePicker={() =>
             setState((draft) => {
               draft.pickerOpen = !draft.pickerOpen;
             })
           }
           onExpandEmoji={fn()}
-          readAloud={readAloud()}
-          onBranch={branch()}
-          branchDisabled={props.busy}
-          {...actions}
+          onReact={actions.onReact}
+          onReply={actions.onReply}
+          menu={() => (
+            <MessageMenuItems
+              message={message()}
+              reactions={!props.channel}
+              readAloud={readAloud()}
+              onMarkUnread={own() || props.channel ? undefined : onMarkUnread}
+              onBranch={branch()}
+              branchDisabled={props.busy}
+              onDelete={onDelete}
+              {...actions}
+            />
+          )}
         />
       }
       menu={() => (

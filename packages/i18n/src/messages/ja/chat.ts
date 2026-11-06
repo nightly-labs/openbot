@@ -325,6 +325,7 @@ export const messages = {
   "chat.actions.branch": "新しいスレッドに分岐",
   "chat.actions.readAloud": "読み上げ",
   "chat.actions.stopReading": "読み上げを停止",
+  "chat.actions.more": "その他の操作",
   "chat.menu.reply": "返信",
   "chat.menu.copy": "メッセージをコピー",
   "chat.menu.react": "リアクション",

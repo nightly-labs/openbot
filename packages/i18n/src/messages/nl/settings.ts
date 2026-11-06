@@ -84,6 +84,9 @@ export const messages = {
   "settings.showAgentSteps.title": "Toon stappen van agents",
   "settings.showAgentSteps.description":
     "Open standaard het denkwerk, de toolstappen en de geheugenwijzigingen van elke beurt op dit apparaat en in deze browser.",
+  "settings.compactMessageActions.title": "Compacte berichtacties",
+  "settings.compactMessageActions.description":
+    "Toont Reageren, Beantwoorden en Meer naast een bericht, en de tijd tussen berichten. Als dit uit staat, staan alle acties en de tijd onder elk bericht.",
   "settings.busyMessage.title": "Stuur agents bij terwijl ze werken",
   "settings.busyMessage.description":
     "Nieuwe berichten gaan naar het huidige werk van de agent, niet naar de wachtrij. Werkt met ChatGPT en Claude.",

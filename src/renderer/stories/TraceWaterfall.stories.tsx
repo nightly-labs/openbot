@@ -1,6 +1,6 @@
 import { type AgentStep, AgentStepsDisclosure } from "@openbot/ui/features/conversation/AgentSteps";
 import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
-import { MessageActions } from "@openbot/ui/features/conversation/MessageRendering";
+import { MessageActions, MessageMenuItems } from "@openbot/ui/features/conversation/MessageRendering";
 import { type TraceSpan, TraceWaterfall } from "@openbot/ui/features/conversation/TraceWaterfall";
 import { createMemo, createSignal, onSettled } from "solid-js";
 import { fn } from "storybook/test";
@@ -319,12 +319,13 @@ function ChannelAnswer(props: { id: string; agent: number; body: string; first: 
               reactions={false}
               pickerOpen={false}
               expandedEmoji={false}
-              copied={false}
               onTogglePicker={fn()}
               onExpandEmoji={fn()}
               onReact={fn()}
               onReply={fn()}
-              onCopy={fn()}
+              menu={() => (
+                <MessageMenuItems message={message} reactions={false} onReact={fn()} onReply={fn()} onCopy={fn()} />
+              )}
             />
           }
           steps={

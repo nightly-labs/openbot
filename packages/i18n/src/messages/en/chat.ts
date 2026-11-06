@@ -332,6 +332,7 @@ export const messages = defineMessages("chat", {
   "chat.actions.branch": "Branch in new thread",
   "chat.actions.readAloud": "Read aloud",
   "chat.actions.stopReading": "Stop reading",
+  "chat.actions.more": "More actions",
   "chat.menu.reply": "Reply",
   "chat.menu.copy": "Copy message",
   "chat.menu.react": "React",

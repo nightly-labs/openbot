@@ -601,7 +601,10 @@ const Conversation = createSimpleContext({
         const next = mappedMessages.map((mapped) => {
           const existing = previousById.get(mapped.id);
           if (!existing) return createStoredMessage({ ...mapped, animate: !initialLoad });
-          if (!agentMessagesEqual(existing, mapped)) updateStored(existing, mapped);
+          // A turn's thinking message gets its progress updates as changes, and each one enters as the
+          // message did, so a change keeps the message's entrance.
+          if (!agentMessagesEqual(existing, mapped))
+            updateStored(existing, existing.animate === undefined ? mapped : { ...mapped, animate: existing.animate });
           return existing;
         });
         if (previous.length === next.length && previous.every((message, index) => message === next[index])) {

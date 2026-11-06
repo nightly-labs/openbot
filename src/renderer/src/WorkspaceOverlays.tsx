@@ -808,6 +808,7 @@ function ServerSettings() {
           }
           hostUpdate={{}}
           hostTimezone={{}}
+          hostPersonality={{}}
           hostMemoryLimit={{}}
           memoryReview={{}}
           hostPromptCacheTtl={{}}

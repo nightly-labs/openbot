@@ -234,12 +234,30 @@
 }
 
 /* The general steps row rules load later, so these name the steps block too. */
+/* The steps button matches the action buttons beside it: their height, and their hover as one unit. */
 .message-steps .agent-steps .agent-steps-header {
+  height: 24px;
   margin-inline-start: 0;
   padding-block: 0;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
+  transition:
+    background var(--openbot-duration-hover) ease,
+    color var(--openbot-duration-hover) ease;
+}
+
+.message-steps .agent-steps .agent-steps-header:is(:hover, :focus-visible) {
+  background: var(--openbot-bg-control-hover);
+  color: var(--openbot-text-primary);
+  outline: none;
+}
+
+.message-steps .agent-steps-header :is(.agent-steps-duration, .agent-steps-chevron) {
+  color: inherit;
+  transition:
+    color var(--openbot-duration-hover) ease,
+    rotate var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
 .message-steps .agent-steps-summary {
@@ -1658,4 +1676,61 @@ button.chat-action-target:active,
 .pending-send-error::before {
   content: "·";
   margin-inline-end: var(--openbot-space-1);
+}
+
+/*
+ * The reader's own actions stand before the bubble, in the same line. The stack takes the width of
+ * the bubble, not the line, so the actions fit beside it. A message with images keeps the full
+ * line, and its actions go under it.
+ */
+.message-entry-user.message-entry-actions-beside .message-stack:not(:has(.message-media-before)) {
+  width: auto;
+  max-width: min(80%, 720px);
+  flex: 0 1 auto;
+}
+
+.message-entry-user.message-entry-actions-beside .message-stack:not(:has(.message-media-before)) > .ui-bubble {
+  max-width: 100%;
+}
+
+.message-entry-user.message-entry-actions-beside .message-stack:not(:has(.message-media-before)) + .message-action-row {
+  order: -1;
+}
+
+/*
+ * A run of messages by one sender reads as one block: where two bubbles of the run meet, their
+ * corners on the sender's side are small, at the start for an agent and at the end for the reader.
+ * Only a row that the timeline groups with the row above it, and that starts with its message (no
+ * marker or steps above it), joins the bubble above.
+ */
+.virtual-chat-row[data-grouped="sender"]
+  > .message-entry-agent:first-child
+  .message-shell
+  > .ui-bubble
+  > .ui-bubble-content {
+  border-start-start-radius: var(--openbot-radius-sm);
+}
+
+.virtual-chat-row[data-grouped="sender"]
+  > .message-entry-user:first-child
+  .message-stack
+  > .ui-bubble:first-child
+  > .ui-bubble-content {
+  border-start-end-radius: var(--openbot-radius-sm);
+}
+
+.virtual-chat-row:has(+ .virtual-chat-row[data-grouped="sender"] > .message-entry-agent:first-child)
+  > .message-entry-agent:last-child
+  .message-shell
+  > .ui-bubble
+  > .ui-bubble-content {
+  border-end-start-radius: var(--openbot-radius-sm);
+}
+
+.virtual-chat-row:has(+ .virtual-chat-row[data-grouped="sender"] > .message-entry-user:first-child)
+  > .message-entry-user:last-child
+  .message-stack
+  > .ui-bubble:last-child
+  > .ui-bubble-content {
+  border-end-end-radius: var(--openbot-radius-sm);
 }

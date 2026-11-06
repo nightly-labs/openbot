@@ -150,4 +150,5 @@ export const messages = {
   "error.team.signInRelayUsed": "Bu oturum açma zaten gönderildi.",
   "error.team.signInRelayMismatch": "Bu adres bu oturum açmaya ait değil.",
   "error.team.signInRelayLinkUnknown": "Bu sunucudaki hiçbir ajan bu oturum açma bağlantısını göstermedi.",
+  "error.team.hostPersonalityUnsupported": "Bu bağlantı sunucu kişiliğini desteklemiyor.",
 } as const satisfies PartialTranslation<typeof source>;

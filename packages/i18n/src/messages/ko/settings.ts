@@ -83,6 +83,9 @@ export const messages = {
   "settings.showAgentSteps.title": "에이전트 단계 표시",
   "settings.showAgentSteps.description":
     "이 기기와 브라우저에서 각 턴의 생각, 도구 단계, 메모리 변경을 기본으로 펼쳐서 보여줘요.",
+  "settings.compactMessageActions.title": "간단한 메시지 작업",
+  "settings.compactMessageActions.description":
+    "메시지 옆에 반응, 답장, 더 보기를 표시하고 메시지 사이에 시간을 표시합니다. 끄면 모든 작업과 시간이 각 메시지 아래에 표시됩니다.",
   "settings.busyMessage.title": "작업 중인 에이전트에 방향 지시",
   "settings.busyMessage.description":
     "새 메시지가 대기열이 아니라 에이전트의 현재 작업에 반영돼요. ChatGPT와 Claude에서 사용할 수 있어요.",

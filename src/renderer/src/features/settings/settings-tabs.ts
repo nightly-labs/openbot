@@ -69,6 +69,10 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
       { titleKey: "settings.chatColor.title", descriptionKey: "settings.chatColor.description" },
       { titleKey: "settings.sendShortcut.title", descriptionKey: "settings.sendShortcut.description" },
       { titleKey: "settings.showAgentSteps.title", descriptionKey: "settings.showAgentSteps.description" },
+      {
+        titleKey: "settings.compactMessageActions.title",
+        descriptionKey: "settings.compactMessageActions.description",
+      },
       { titleKey: "settings.externalLinks.title", descriptionKey: "settings.externalLinks.description" },
       { titleKey: "settings.launchAtLogin.title", descriptionKey: "settings.launchAtLogin.description" },
       { titleKey: "settings.keepRemoteSessions.title", descriptionKey: "settings.keepRemoteSessions.description" },

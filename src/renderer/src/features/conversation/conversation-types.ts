@@ -22,6 +22,7 @@ import type {
   FilePreview,
   ProviderRuntimeStatus,
   QueueSnapshot,
+  ResponseStyle,
   RoutineFields,
   ServerSummary,
   TeamPresenceSnapshot,
@@ -250,6 +251,11 @@ export interface ConversationProps {
   /** Optional browser stream adapter for a non-Electron client. */
   browserRuntime?: BrowserViewRuntime | undefined;
   server: ServerSummary | undefined;
+  /**
+   * The response style of the server (Server settings → Personality). A "natural" server shows what
+   * the agent says between its steps as messages of their own. Undefined until the host answers.
+   */
+  responseStyle?: ResponseStyle | undefined;
   presence: TeamPresenceSnapshot;
   currentUserEmail: string;
   /**

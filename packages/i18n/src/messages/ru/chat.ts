@@ -436,6 +436,7 @@ export const messages = {
   "chat.actions.branch": "Ответвить в новую ветку",
   "chat.actions.readAloud": "Прочитать вслух",
   "chat.actions.stopReading": "Остановить чтение",
+  "chat.actions.more": "Другие действия",
   "chat.menu.reply": "Ответить",
   "chat.menu.copy": "Копировать сообщение",
   "chat.menu.react": "Реакция",

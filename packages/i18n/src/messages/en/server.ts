@@ -739,4 +739,12 @@ export const messages = defineMessages("server", {
   "server.restartNotice.restartingTitle": "{name} is restarting to install an update",
   "server.restartNotice.restartingDescription": "OpenBot connects again automatically when {name} is back.",
   "server.restartNotice.backTitle": "{name} is back online",
+  "server.settings.personalityTitle": "Personality",
+  "server.settings.personalityDescription": "Choose how the agents on this server talk to you.",
+  "server.settings.responseStyle": "Response style",
+  "server.settings.responseStyleDescription":
+    "Natural: agents send short updates while they work, and the chat shows them. Classic: agents answer once, when they are done.",
+  "server.settings.responseStyleNatural": "Natural",
+  "server.settings.responseStyleClassic": "Classic",
+  "server.settings.personalityLoadFailed": "Could not load the server personality.",
 });

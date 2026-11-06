@@ -153,4 +153,5 @@ export const messages = {
   "error.team.signInRelayUsed": "このサインインはすでに送信されています。",
   "error.team.signInRelayMismatch": "このアドレスはこのサインインのものではありません。",
   "error.team.signInRelayLinkUnknown": "このサーバーのエージェントはこのサインインリンクを表示していません。",
+  "error.team.hostPersonalityUnsupported": "この接続はサーバーのパーソナリティに対応していません。",
 } as const satisfies PartialTranslation<typeof source>;

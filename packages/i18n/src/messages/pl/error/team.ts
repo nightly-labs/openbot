@@ -151,4 +151,5 @@ export const messages = {
   "error.team.signInRelayUsed": "To logowanie zostało już wysłane.",
   "error.team.signInRelayMismatch": "Ten adres nie pochodzi z tego logowania.",
   "error.team.signInRelayLinkUnknown": "Żaden agent na tym serwerze nie pokazał tego linku logowania.",
+  "error.team.hostPersonalityUnsupported": "To połączenie nie obsługuje osobowości serwera.",
 } as const satisfies PartialTranslation<typeof source>;

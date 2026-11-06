@@ -3,6 +3,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { agentProviderName, COMPUTER_USE_MCP_SERVER_NAME, DEFAULT_PROVIDER_ACCOUNT_ID } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { redactText } from "@openbot/logging";
 import {
   type AgentProvider,
   MissingClaudeSessionError,
@@ -441,6 +442,10 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
   if (browser !== null) {
     return completed ? sourceText("status.agent.browserReviewing") : browserProgressText(browser);
   }
+  // The model's own label of the step, such as "Show folder sizes in home", tells the user more than
+  // the generic words below. It can quote a path or a value, so it is redacted like the trace's command.
+  const description = completed ? null : getString(item, "description")?.trim();
+  if (description) return redactText(description);
   if (/(search|browser|fetch|navigate|open_url|web)/u.test(descriptor)) {
     return completed ? sourceText("status.agent.sourcesReviewing") : sourceText("status.agent.sourcesSearching");
   }

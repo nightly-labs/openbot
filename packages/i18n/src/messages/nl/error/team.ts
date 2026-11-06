@@ -159,4 +159,5 @@ export const messages = {
   "error.team.signInRelayUsed": "Deze inlog is al verstuurd.",
   "error.team.signInRelayMismatch": "Dit adres hoort niet bij deze inlog.",
   "error.team.signInRelayLinkUnknown": "Geen enkele agent op deze server heeft deze inloglink getoond.",
+  "error.team.hostPersonalityUnsupported": "Deze verbinding ondersteunt de persoonlijkheid van de server niet.",
 } as const satisfies PartialTranslation<typeof source>;

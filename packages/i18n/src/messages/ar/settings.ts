@@ -83,6 +83,9 @@ export const messages = {
   "settings.showAgentSteps.title": "عرض خطوات الوكيل",
   "settings.showAgentSteps.description":
     "فتح التفكير وخطوات الأدوات وتغييرات الذاكرة لكل دور افتراضيًا على هذا الجهاز والمتصفح.",
+  "settings.compactMessageActions.title": "إجراءات رسائل مختصرة",
+  "settings.compactMessageActions.description":
+    "يعرض التفاعل والرد والمزيد بجانب الرسالة، والوقت بين الرسائل. عند إيقافه تظهر كل الإجراءات والوقت تحت كل رسالة.",
   "settings.busyMessage.title": "توجيه الوكلاء أثناء عملهم",
   "settings.busyMessage.description":
     "تنضم الرسائل الجديدة إلى العمل الحالي للوكيل، لا إلى قائمة الانتظار. يعمل مع ChatGPT وClaude.",

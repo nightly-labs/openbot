@@ -206,6 +206,7 @@ import { createMockBrowser, type MockBrowserOptions } from "./mock-browser";
 import { createMockChannels, type MockChannelSeed } from "./mock-channels";
 import { createMockEvents } from "./mock-events";
 import { createMockGitHubConnector } from "./mock-github-connector";
+import { createMockHostPersonality } from "./mock-host-personality";
 import { createMockHostTimezone } from "./mock-host-timezone";
 import { createMockHostUpdate, type MockHostUpdateOptions } from "./mock-host-update";
 import { createMockHostedServers } from "./mock-hosted-servers";
@@ -3405,6 +3406,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       ...createMockHostUpdate(options),
       ...createMockHostTimezone(),
+      ...createMockHostPersonality(),
       // Preview has one host, so every server shares one limit. Main tells the window, as here.
       getAgentMemoryLimit: async () => hostAgentMemoryLimit(agentMemoryLimit),
       setAgentMemoryLimit: async (limit) => {

@@ -49,6 +49,7 @@ import { useConnectors } from "../connectors/connectors-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
 import { remoteMcpSignIn, serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
+import { loadServerPersonality, serverResponseStyle } from "../servers/server-personality";
 import { useServerScope } from "../servers/server-scope";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
@@ -120,6 +121,17 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     else await connection.connect(provider, "composer");
   };
   const signInWithCode = (provider: AgentProviderId) => connection.alternative(provider, "composer");
+  // The server's response style decides whether progress updates show as messages.
+  createEffect(
+    () => activeServer()?.id,
+    (serverId) => {
+      if (serverId) loadServerPersonality(serverId, window.openbot.hostAdmin);
+    },
+  );
+  const responseStyle = () => {
+    const serverId = activeServer()?.id;
+    return serverId ? serverResponseStyle(serverId) : undefined;
+  };
   const { customAgents } = useCustomAgents();
   const {
     agentStatus,
@@ -610,6 +622,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         workspaceCovered={windowPage.conversationCovered()}
         browserControlState={browserControlState()}
         server={activeServer()}
+        responseStyle={responseStyle()}
         presence={teamPresence()}
         currentUserEmail={props.account().email}
         isOwnSender={isOwnSender}

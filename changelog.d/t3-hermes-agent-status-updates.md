@@ -1,0 +1,30 @@
+### Added
+
+- The chat now shows what an agent says between its steps, such as "I found the config, now I check
+  the logs", as messages while the agent works. Its thinking stays in the steps. This works for
+  Claude, Codex, Grok, Pi and the ACP agents. Grok's thinking also stays in the steps. Agents now
+  write a short update only when a finding changes the plan or before a long step: what they
+  learned and what is next. This is the new "Natural" response style of a server. To get the old behavior, choose
+  "Classic" in Server settings → Personality.
+- With the Natural style, an agent that uses a tool first writes one line: what it understood and
+  what it checks first. Its final answer starts with the verdict, explains technical terms in a few
+  words, and says what it could not check, and whether a read-only task still wrote files.
+- While a Claude agent runs a command or a subagent, the activity line shows the agent's own short
+  label of that step, such as "Find three largest folders in ~/Library/Caches", in place of a
+  general text.
+
+### Changed
+
+- In an agent chat, the steps of a turn now show under the answer, as a channel shows them. Select them to open the trace. With "Show agent steps" on, the open list stays above
+  the answer.
+- A message now shows only React, Reply and a More button (⋯) when you hover it. More opens the
+  same actions as a right-click: Copy, Read aloud, Send to channel, Branch, Mark unread and Delete.
+- An agent chat no longer shows the time under each message. A centered time shows above a message
+  on a new day or after a pause of one hour or more.
+- Messages sent one after another, by an agent or by you, now read as one block: where two
+  bubbles meet, their corners are smaller. All the updates of one agent turn stay in one block,
+  also when a long step keeps the agent quiet for more than 5 minutes.
+- The actions of your own text messages now show beside the bubble, on its left, so your messages
+  sent one after another stay close together. A message with images keeps its actions under it.
+- To get the full action row and the time under each message again, turn off Settings → General →
+  Compact message actions.

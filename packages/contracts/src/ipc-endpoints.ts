@@ -335,6 +335,7 @@ import type { GitHubConnectorRepositories, GitHubConnectorStatus } from "./ipc-g
 import type { ApplyHermesImportInput, HermesImportPreview } from "./ipc-hermes-import";
 import type { HiddenAgentsSnapshot, SetAgentHiddenInput } from "./ipc-hidden-agents";
 import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
+import type { HostPersonality } from "./ipc-host-personality";
 import type { HostReleaseStatus } from "./ipc-host-release";
 import type { HostTimezoneSettings } from "./ipc-host-timezone";
 import type {
@@ -1272,6 +1273,10 @@ export const IPC_ENDPOINTS = {
     // The server timezone. `null` is automatic: the host system zone.
     getTimezone: scopedQuery<HostTimezoneSettings, "required">()("host-admin:get-timezone"),
     setTimezone: scopedRequest<string | null, HostTimezoneSettings, "required">()("host-admin:set-timezone"),
+    // The server personality: how the server's agents talk while they work. Any member can read it;
+    // only an owner or admin can set it.
+    getPersonality: scopedQuery<HostPersonality, "required">()("host-admin:get-personality"),
+    setPersonality: scopedRequest<HostPersonality, HostPersonality, "required">()("host-admin:set-personality"),
     // How many memories each agent of the server can keep, and the values its host permits.
     getAgentMemoryLimit: scopedQuery<HostAgentMemoryLimit, "required">()("host-admin:get-agent-memory-limit"),
     setAgentMemoryLimit: scopedRequest<number, HostAgentMemoryLimit, "required">()("host-admin:set-agent-memory-limit"),

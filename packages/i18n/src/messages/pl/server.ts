@@ -658,4 +658,12 @@ export const messages = {
   "server.restartNotice.restartingTitle": "{name} uruchamia się ponownie, aby zainstalować aktualizację",
   "server.restartNotice.restartingDescription": "OpenBot połączy się ponownie automatycznie, gdy {name} wróci.",
   "server.restartNotice.backTitle": "{name} jest znów online",
+  "server.settings.personalityTitle": "Osobowość",
+  "server.settings.personalityDescription": "Wybierz, jak agenci na tym serwerze z Tobą rozmawiają.",
+  "server.settings.responseStyle": "Styl odpowiedzi",
+  "server.settings.responseStyleDescription":
+    "Naturalny: agenci wysyłają krótkie aktualizacje podczas pracy, a czat je pokazuje. Klasyczny: agenci odpowiadają raz, gdy skończą.",
+  "server.settings.responseStyleNatural": "Naturalny",
+  "server.settings.responseStyleClassic": "Klasyczny",
+  "server.settings.personalityLoadFailed": "Nie udało się wczytać osobowości serwera.",
 } as const satisfies PartialTranslation<typeof source>;

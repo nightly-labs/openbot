@@ -11,6 +11,7 @@ import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
 import { agentConversationKey } from "../conversation-keys";
 import type { ConversationProps } from "../conversation-types";
+import { isNarrationItemId } from "../narration-rows";
 
 /** A turn with nothing from its provider for this long shows that it waits, not that it works. */
 const PROVIDER_SILENT_AFTER_MS = 60_000;
@@ -85,11 +86,14 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     if (!activeTurnId) return null;
     const streamingMessage = streamingAgentMessage();
     if (streamingMessage && streamingMessage.itemType !== "commentary") return null;
+    const narrationShown = !deps.props.channel && deps.props.responseStyle === "natural";
     for (let index = deps.props.messages.length - 1; index >= 0; index -= 1) {
       const message = deps.props.messages[index];
       if (message?.turnId !== activeTurnId || message.itemType !== "commentary") continue;
       const items = message.items ?? [message.body];
       for (let itemIndex = items.length - 1; itemIndex >= 0; itemIndex -= 1) {
+        // Narration that the chat shows as a progress update is not repeated in the activity line.
+        if (narrationShown && isNarrationItemId(message.itemIds?.[itemIndex], deps.props.agent?.provider)) continue;
         const detail = markdownPreviewText(items[itemIndex] ?? "");
         if (detail) return detail;
       }
