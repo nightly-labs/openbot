@@ -472,6 +472,58 @@ export const messages = {
   "mobile.server.browserProfiles.deleteBody":
     "Bu, profilin oturum açma bilgilerini, çerezlerini ve site verilerini siler. Açık sekmeleri kapanır.",
   "mobile.server.browserProfiles.deleteAgents": "Bu ajanlar ortak profile geçer: {agents}.",
+  "mobile.server.browserProxies.unsupported": "Proxy'lerini burada yönetmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.browserProxies.loading": "Proxy'ler yükleniyor…",
+  "mobile.server.browserProxies.loadFailed": "OpenBot proxy'leri yükleyemedi.",
+  "mobile.server.browserProxies.saveFailed": "OpenBot proxy'yi değiştiremedi.",
+  "mobile.server.browserProxies.title": "Proxy'ler",
+  "mobile.server.browserProxies.sectionHint":
+    "Proxy'si olan bir profil, sayfalarını o proxy üzerinden açar. Bir üye, bilgisayarını OpenBot masaüstü uygulamasından paylaşır.",
+  "mobile.server.browserProxies.limit": "Bir sunucuda en fazla {limit} proxy olabilir.",
+  "mobile.server.browserProxies.add": "Proxy ekle",
+  "mobile.server.browserProxies.new": "Yeni proxy",
+  "mobile.server.browserProxies.menu": "Proxy",
+  "mobile.server.browserProxies.automatic": "Otomatik",
+  "mobile.server.browserProxies.profileHint": "“Otomatik”, sunucuyu çalıştıran bilgisayarın proxy ayarlarını kullanır.",
+  "mobile.server.browserProxies.profileUsage": "{usage} · {proxy}",
+  "mobile.server.browserProxies.summary": "{scheme} · port {port} · {profiles}",
+  "mobile.server.browserProxies.computerSummary": "{state} · {profiles}",
+  "mobile.server.browserProxies.profiles": { one: "{count} profil", other: "{count} profil" },
+  "mobile.server.browserProxies.online": "Çevrim içi",
+  "mobile.server.browserProxies.offline": "{name} çevrim dışı",
+  "mobile.server.browserProxies.failing": "{name} yanıt vermiyor",
+  "mobile.server.browserProxies.signInRefused": "{name} oturum açmayı reddetti",
+  "mobile.server.browserProxies.yourComputer": "Bilgisayarınız",
+  "mobile.server.browserProxies.memberComputer": "{name} üyesinin bilgisayarı",
+  "mobile.server.browserProxies.unknownComputer": "Bir üyenin bilgisayarı",
+  "mobile.server.browserProxies.gone": "Bu proxy artık sunucuda değil.",
+  "mobile.server.browserProxies.editTitle": "{name} değiştirilsin mi?",
+  "mobile.server.browserProxies.address": "Adres",
+  "mobile.server.browserProxies.addressPlaceholder": "socks5://user:password@host:1080",
+  "mobile.server.browserProxies.addressHint":
+    "socks5, http veya https kullanın. Kullanıcı adı ve parola isteğe bağlıdır. Parola, sunucuyu çalıştıran bilgisayarda şifreli olarak kalır.",
+  "mobile.server.browserProxies.addressInvalid":
+    "Bu bir proxy adresi değil. socks5://host:1080, http://user:password@host:3128 veya host:port:user:password kullanın.",
+  "mobile.server.browserProxies.computerHint":
+    "Bu bilgisayarı kullanan profillerin sayfaları, üyesi bilgisayarı OpenBot masaüstü uygulamasından paylaştığı sürece bu bilgisayarın internet bağlantısı üzerinden çıkar. Bilgisayar yalnızca herkese açık internet adreslerini açar.",
+  "mobile.server.browserProxies.profilesTitle": "Profiller",
+  "mobile.server.browserProxies.delete": "Proxy'yi sil",
+  "mobile.server.browserProxies.deleteHint": "Silme, bu proxy'nin profillerini “Otomatik” ayarına geçirir.",
+  "mobile.server.browserProxies.deleteUsed": {
+    one: "{count} profil bu proxy'yi kullanıyor. Profil “Otomatik” ayarına geçer.",
+    other: "{count} profil bu proxy'yi kullanıyor. Profiller “Otomatik” ayarına geçer.",
+  },
+  "mobile.server.browserProxies.deleteUnused": "Bu proxy'yi kullanan profil yok.",
+  "mobile.server.browserProxies.closesTabs": {
+    one: "{count} açık sekme kapanır.",
+    other: "{count} açık sekme kapanır.",
+  },
+  "mobile.server.browserProxies.changeTitle": "{name} profilinin proxy'si değiştirilsin mi?",
+  "mobile.server.browserProxies.change": "Proxy'yi değiştir",
+  "mobile.server.browserProxies.choiceHint":
+    "“Otomatik”, sunucuyu çalıştıran bilgisayarın proxy ayarlarını kullanır. Bir değişiklik profilin açık sekmelerini kapatır.",
+  "mobile.server.browserProxies.shareHint":
+    "Bilgisayarınızı kullanmak için onu OpenBot masaüstü uygulamasında paylaşın.",
   "mobile.server.route.connectors": "Bağlayıcılar",
   "mobile.server.connectors.unavailable":
     "Bağlayıcılarını yönetmek için bu sunucuya sahip veya yönetici olarak bağlanın.",

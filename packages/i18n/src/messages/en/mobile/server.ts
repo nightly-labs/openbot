@@ -464,6 +464,57 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.browserProfiles.deleteBody":
     "This deletes the sign-ins, cookies and site data of the profile. Its open tabs close.",
   "mobile.server.browserProfiles.deleteAgents": "These agents change to the shared profile: {agents}.",
+  // Server settings › Browser profiles › Proxies: the saved proxies of the named profiles, and the
+  // computers of members that share their internet connection from the desktop app. A phone cannot
+  // share its own connection. {name} is a proxy host, such as proxy.example.com, or a computer name.
+  "mobile.server.browserProxies.unsupported": "Update OpenBot on this server to manage its proxies here.",
+  "mobile.server.browserProxies.loading": "Loading proxies…",
+  "mobile.server.browserProxies.loadFailed": "OpenBot could not load the proxies.",
+  "mobile.server.browserProxies.saveFailed": "OpenBot could not change the proxy.",
+  "mobile.server.browserProxies.title": "Proxies",
+  "mobile.server.browserProxies.sectionHint":
+    "A profile with a proxy opens its pages through that proxy. A member shares a computer from the OpenBot desktop app.",
+  "mobile.server.browserProxies.limit": "A server can have at most {limit} proxies.",
+  "mobile.server.browserProxies.add": "Add proxy",
+  "mobile.server.browserProxies.new": "New proxy",
+  "mobile.server.browserProxies.menu": "Proxy",
+  "mobile.server.browserProxies.automatic": "Automatic",
+  "mobile.server.browserProxies.profileHint": "Automatic uses the proxy settings of the computer that runs the server.",
+  "mobile.server.browserProxies.profileUsage": "{usage} · {proxy}",
+  "mobile.server.browserProxies.summary": "{scheme} · port {port} · {profiles}",
+  "mobile.server.browserProxies.computerSummary": "{state} · {profiles}",
+  "mobile.server.browserProxies.profiles": { one: "{count} profile", other: "{count} profiles" },
+  "mobile.server.browserProxies.online": "Online",
+  "mobile.server.browserProxies.offline": "{name} is offline",
+  "mobile.server.browserProxies.failing": "{name} does not answer",
+  "mobile.server.browserProxies.signInRefused": "{name} refused the sign-in",
+  "mobile.server.browserProxies.yourComputer": "Your computer",
+  "mobile.server.browserProxies.memberComputer": "{name}'s computer",
+  "mobile.server.browserProxies.unknownComputer": "A member's computer",
+  "mobile.server.browserProxies.gone": "This proxy is no longer on the server.",
+  "mobile.server.browserProxies.editTitle": "Change {name}?",
+  "mobile.server.browserProxies.address": "Address",
+  "mobile.server.browserProxies.addressPlaceholder": "socks5://user:password@host:1080",
+  "mobile.server.browserProxies.addressHint":
+    "Use socks5, http or https. A user name and a password are optional. The password stays encrypted on the computer that runs the server.",
+  "mobile.server.browserProxies.addressInvalid":
+    "This is not a proxy address. Use socks5://host:1080, http://user:password@host:3128 or host:port:user:password.",
+  "mobile.server.browserProxies.computerHint":
+    "The pages of the profiles that use this computer go out through its internet connection while its member shares it from the OpenBot desktop app. The computer opens only public internet addresses.",
+  "mobile.server.browserProxies.profilesTitle": "Profiles",
+  "mobile.server.browserProxies.delete": "Delete proxy",
+  "mobile.server.browserProxies.deleteHint": "Delete changes the profiles of this proxy to Automatic.",
+  "mobile.server.browserProxies.deleteUsed": {
+    one: "{count} profile uses this proxy. It changes to Automatic.",
+    other: "{count} profiles use this proxy. They change to Automatic.",
+  },
+  "mobile.server.browserProxies.deleteUnused": "No profile uses this proxy.",
+  "mobile.server.browserProxies.closesTabs": { one: "{count} open tab closes.", other: "{count} open tabs close." },
+  "mobile.server.browserProxies.changeTitle": "Change the proxy of {name}?",
+  "mobile.server.browserProxies.change": "Change proxy",
+  "mobile.server.browserProxies.choiceHint":
+    "Automatic uses the proxy settings of the computer that runs the server. A change closes the open tabs of the profile.",
+  "mobile.server.browserProxies.shareHint": "To use your computer, share it in the OpenBot desktop app.",
   "mobile.server.route.vault": "Vault",
   "mobile.server.settings.vault": "Vault",
   "mobile.server.vault.unavailable": "Connect to this server as an owner or admin to manage its Vault.",

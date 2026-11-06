@@ -84,6 +84,9 @@ export default function ServerSettingsLayout() {
       {/* The page names its profile. */}
       <Stack.Screen name="browser-profile" options={{ title: t("mobile.server.route.browserProfiles") }} />
       <Stack.Screen name="browser-profile-agents" options={{ title: t("mobile.server.browserProfiles.agentsTitle") }} />
+      <Stack.Screen name="browser-profile-proxy" options={{ title: t("mobile.server.browserProxies.menu") }} />
+      {/* The page names its proxy, or says Add proxy. */}
+      <Stack.Screen name="browser-proxy" options={{ title: t("mobile.server.browserProxies.title") }} />
     </Stack>
   );
 }

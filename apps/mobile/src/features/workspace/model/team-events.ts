@@ -109,8 +109,9 @@ export function syncEventQueries(
     });
   }
   if (event.type === "browser-profiles-changed") {
-    // A change on the desktop or another phone: the profile list and each agent's choice read again.
+    // A change on the desktop or another phone: the profiles, their proxies and each agent's choice read again.
     void queryClient.invalidateQueries({ queryKey: queryKeys.serverBrowserProfiles(scope, serverId) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.serverBrowserProxies(scope, serverId) });
     void queryClient.invalidateQueries({
       queryKey: queryKeys.agentInfo(scope, serverId),
       predicate: (query) => query.queryKey.at(-1) === "browser-profile",

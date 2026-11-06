@@ -44,6 +44,8 @@ An owner or admin can give a named browser profile a proxy. The pages of that pr
 through the proxy server that they chose, and that server can see which sites the profile opens.
 OpenBot keeps the proxy password encrypted on the computer that runs OpenBot, sends it only to that
 proxy, and does not log it or send it back to a client.
+The desktop app, the web client and the mobile app send a new password to that computer only in a
+save, through the encrypted host connection, and do not keep it.
 An owner or admin of a joined server can also share the internet connection of their own computer
 with that server. While their desktop app is open and sharing is on, the pages of the profiles that
 use that computer go through it: the sites see the address of that computer, and the bytes go

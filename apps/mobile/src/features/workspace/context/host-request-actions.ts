@@ -87,6 +87,7 @@ import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent
 import { AGENT_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-update-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
+import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
 import {
@@ -159,6 +160,7 @@ import {
   createHostBrowserProfile,
   deleteEventRoutine,
   deleteHostBrowserProfile,
+  deleteHostBrowserProxy,
   deleteHostedSite,
   deleteHostVaultItem,
   deleteSharedTable,
@@ -184,6 +186,7 @@ import {
   listEventRoutines,
   listHiddenAgents,
   listHostBrowserProfiles,
+  listHostBrowserProxies,
   listHostedSites,
   listHostVault,
   listMcpServers,
@@ -210,6 +213,7 @@ import {
   resetAgentSessionSetting,
   rotateEventRoutineSecret,
   saveEventRoutine,
+  saveHostBrowserProxy,
   saveHostVaultItem,
   saveMcpServer,
   setAgentHidden,
@@ -219,6 +223,7 @@ import {
   setAgentSkillEnabled,
   setHostAgentAccess,
   setHostAgentMemoryLimit,
+  setHostBrowserProfileProxy,
   setHostTimezone,
   setHostUpdateSettings,
   setMcpServerEnabled,
@@ -425,6 +430,10 @@ type HostRequestActions = Pick<
   | "deleteBrowserProfile"
   | "loadAgentBrowserProfile"
   | "updateAgentBrowserProfile"
+  | "loadBrowserProxies"
+  | "saveBrowserProxy"
+  | "deleteBrowserProxy"
+  | "setBrowserProfileProxy"
   | "loadMessagingConnections"
   | "connectMessaging"
   | "completeMessagingInstall"
@@ -650,6 +659,8 @@ export function createHostRequestActions({
   const phoneTimezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
   const browserProfilesAdmin = (serverId: string) =>
     capabilityApi(serverId, BROWSER_PROFILES_CAPABILITY, "mobile.server.browserProfiles.unsupported");
+  const browserProxiesAdmin = (serverId: string) =>
+    capabilityApi(serverId, BROWSER_PROXIES_CAPABILITY, "mobile.server.browserProxies.unsupported");
   /** The OpenBot update of the host: the admin route set, or the member set that only checks and starts. */
   const updateApi = (serverId: string, access: ServerUpdateAccess) =>
     capabilityApi(
@@ -781,6 +792,13 @@ export function createHostRequestActions({
       runTeamRequest(getHostAgentBrowserProfile(browserProfilesAdmin(serverId), agentId)),
     updateAgentBrowserProfile: async (input, serverId) =>
       runTeamRequest(updateHostAgentBrowserProfile(browserProfilesAdmin(serverId), input)),
+    loadBrowserProxies: async (serverId) => runTeamRequest(listHostBrowserProxies(browserProxiesAdmin(serverId))),
+    saveBrowserProxy: async (input, serverId) =>
+      runTeamRequest(saveHostBrowserProxy(browserProxiesAdmin(serverId), input)),
+    deleteBrowserProxy: async (input, serverId) =>
+      runTeamRequest(deleteHostBrowserProxy(browserProxiesAdmin(serverId), input)),
+    setBrowserProfileProxy: async (input, serverId) =>
+      runTeamRequest(setHostBrowserProfileProxy(browserProxiesAdmin(serverId), input)),
     loadMessagingConnections: async (platform, serverId) =>
       runTeamRequest(messagingConnectorOverview(connectorsAdmin(serverId), { platform })),
     connectMessaging: async (input, serverId) =>
