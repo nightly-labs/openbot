@@ -320,6 +320,8 @@ export const messages = {
   "chat.message.agentFallback": "助手",
   "chat.message.memberFallback": "团队成员",
   "chat.message.attachment": "附件",
+  "chat.message.showFull": "显示完整消息",
+  "chat.message.showLess": "收起",
   "chat.actions.userLabel": "用户消息操作",
   "chat.actions.label": "{name} 的消息操作",
   "chat.actions.addReaction": "添加回应",

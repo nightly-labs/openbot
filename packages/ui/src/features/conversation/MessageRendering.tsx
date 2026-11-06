@@ -73,6 +73,22 @@ function sharedContentBlocks(body: string, streaming: boolean): MessageContentBl
   return lastContentBlocks.blocks;
 }
 
+/** A message longer than this shows its start and a button that draws the rest. */
+const LONG_MESSAGE_CHARACTERS = 20_000;
+const MESSAGE_PREVIEW_CHARACTERS = 3_000;
+/** The long messages that the reader opened. The chat list mounts a row again when it scrolls back. */
+const expandedLongMessages = new Set<string>();
+
+/** The start of a long message, to the end of a line when one is near. */
+function messagePreview(text: string): string {
+  const lineEnd = text.lastIndexOf("\n", MESSAGE_PREVIEW_CHARACTERS);
+  let end = lineEnd > MESSAGE_PREVIEW_CHARACTERS / 2 ? lineEnd : MESSAGE_PREVIEW_CHARACTERS;
+  // Do not split a surrogate pair.
+  const last = text.charCodeAt(end - 1);
+  if (last >= 0xd800 && last <= 0xdbff) end -= 1;
+  return text.slice(0, end).trimEnd();
+}
+
 export function conversationBubbleVariant(message: AgentMessage): BubbleVariant {
   if (message.author === "you") return "secondary";
   if (message.imageGeneration || (!message.body.trim() && message.attachments?.length)) return "ghost";
@@ -346,6 +362,20 @@ export function MessageBody(props: {
       ? parseSelectionInstruction(props.message.body)
       : null,
   );
+  const fullText = () =>
+    props.message.author === "agent" ? streamedBody() : (selectionInstruction()?.instruction ?? props.message.body);
+  // A long message draws only its start until the reader asks for the rest: a text of hundreds of
+  // kilobytes holds the window for seconds. A reply that still streams or reveals draws in full.
+  const longMessage = createMemo(
+    () => props.message.streaming !== true && !streamingBody.revealing() && fullText().length > LONG_MESSAGE_CHARACTERS,
+  );
+  const [expanded, setExpanded] = createSignal(() => expandedLongMessages.has(props.message.id));
+  const toggleExpanded = () => {
+    const next = !expanded();
+    if (next) expandedLongMessages.add(props.message.id);
+    else expandedLongMessages.delete(props.message.id);
+    setExpanded(next);
+  };
   /* A finished image with no `previewUrl` (the web client) shows as a file card instead. */
   const generatedImageShown = createMemo(() => {
     if (!props.message.imageGeneration) return false;
@@ -455,14 +485,15 @@ export function MessageBody(props: {
   const standaloneFileAttachments = createMemo(() =>
     standaloneAttachments().filter((attachment) => !isLightboxImage(attachment)),
   );
-  const contentBlocks = createMemo<MessageContentBlock[]>((previous) =>
-    reuseUnchangedBlocks(
+  const contentBlocks = createMemo<MessageContentBlock[]>((previous) => {
+    const text = longMessage() && !expanded() ? messagePreview(fullText()) : fullText();
+    return reuseUnchangedBlocks(
       previous ?? [],
       props.message.author === "agent"
-        ? sharedContentBlocks(streamedBody(), streamingBody.revealing())
-        : [{ type: "text", text: selectionInstruction()?.instruction ?? props.message.body }],
-    ),
-  );
+        ? sharedContentBlocks(text, streamingBody.revealing())
+        : [{ type: "text", text }],
+    );
+  });
   const textTailAfter = createMemo(
     () =>
       streamingBody.animateTail()
@@ -738,6 +769,18 @@ export function MessageBody(props: {
                   </Switch>
                 )}
               </For>
+              <Show when={longMessage()}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  class="message-show-full"
+                  aria-expanded={expanded() ? "true" : "false"}
+                  onClick={toggleExpanded}
+                >
+                  {expanded() ? t("chat.message.showLess") : t("chat.message.showFull")}
+                </Button>
+              </Show>
               <Show when={selectionInstruction()}>
                 {(selection) => <blockquote class="message-selection-quote">{selection().quote}</blockquote>}
               </Show>

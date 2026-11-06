@@ -61,12 +61,15 @@ export const JSON_LIMIT = 1024 * 1024;
 /** A response body leaves room in one WebRTC frame for the response envelope around it. */
 export const WEBRTC_FRAME_BODY_BUDGET = Math.floor(TEAM_PROTOCOL_V2_MAX_JSON_FRAME_BYTES * 0.75);
 
+/** A client draws a text of a few megabytes for seconds, so a cut text keeps at most this much. */
+const CUT_TEXT_BYTES = 256 * 1024;
+
 /**
  * A page of one message can still be larger than one WebRTC frame, and a remote client could then not
  * open the chat or read the history behind that message. The texts of `messages` give up
- * `excessBytes` of their JSON size: the largest texts are cut to one size, and the smaller texts stay
- * whole. The start and the end of a cut text stay, with a note between them. The host keeps the whole
- * text.
+ * `excessBytes` of their JSON size: the largest texts are cut to one size, at most `CUT_TEXT_BYTES`,
+ * and the smaller texts stay whole. The start and the end of a cut text stay, with a note between
+ * them. The host keeps the whole text.
  */
 export function messageTextCut(
   messages: readonly ConversationMessage[],
@@ -85,7 +88,9 @@ export function messageTextCut(
     }
     remaining -= size;
   }
-  return (message) => ((sizes.get(message) ?? 0) > cap ? { ...message, text: cutText(message.text, cap) } : message);
+  const limit = Math.min(cap, CUT_TEXT_BYTES);
+  return (message) =>
+    (sizes.get(message) ?? 0) > limit ? { ...message, text: cutText(message.text, limit) } : message;
 }
 
 function cutText(text: string, maxBytes: number): string {
