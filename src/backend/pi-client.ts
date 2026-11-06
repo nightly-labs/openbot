@@ -103,6 +103,12 @@ const PiSessionUsage = Schema.Struct({
 });
 
 /**
+ * The session cost of `get_session_stats`, in USD, at the rates of Pi's model list. Pi sends it with
+ * its tokens; a version that does not leaves the turns unpriced.
+ */
+const PiSessionCost = Schema.Struct({ cost: Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)) });
+
+/**
  * The context fill of `get_session_stats`. Pi omits it with no model or window, and its `tokens` is
  * null after a compaction until the next model answer.
  */
@@ -976,9 +982,14 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
               estimated: true,
             },
           });
-        return providerSync(() => Schema.decodeUnknownSync(PiSessionUsage)(stats));
+        // A bad cost must not drop the totals either.
+        const cost = Schema.decodeUnknownOption(PiSessionCost)(stats);
+        return providerSync(() => ({
+          ...Schema.decodeUnknownSync(PiSessionUsage)(stats),
+          cost: Option.isSome(cost) ? cost.value.cost : null,
+        }));
       }),
-      Effect.map(({ tokens }) =>
+      Effect.map(({ tokens, cost }) =>
         this.#notify("openbot/usage", thread, {
           usage: {
             inputTokens: tokens.input + tokens.cacheRead + tokens.cacheWrite,
@@ -986,6 +997,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
             cachedReadTokens: tokens.cacheRead,
             cachedWriteTokens: tokens.cacheWrite,
           },
+          ...(cost === null ? {} : { cost }),
         }),
       ),
       // A crashed host cannot answer telemetry; it must not block durable completion.

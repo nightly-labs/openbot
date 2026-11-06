@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { accountUsageCoversModel } from "@openbot/contracts/agent-providers";
+import { accountUsageCoversModel, isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
 import { type AgentSummary, isAgentModel, type UsageTokens, WORKFLOWS_USAGE_ID } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -163,7 +163,12 @@ export function collectProviderUsage(
   // ACP `Usage` is session-cumulative by contract: its fields are documented as "Sum of all token
   // types across session" and "Total input tokens across all turns". So one counter per session,
   // like Codex, and the first report of a session that predates collection is a baseline: it
-  // carries tokens spent before analytics existed.
+  // carries tokens spent before analytics existed. Pi also reports its `get_session_stats` cost, a
+  // session total at the rates of Pi's model list. Its checkpoint is the token counter, so a session
+  // that ran before costs were kept prices its turns only from its second report. A turn that adds 0
+  // ran on a model with no rates in that list, not a free turn, so it stays unpriced.
+  const piCost = session.provider === "pi" || isKeyOnlyProvider(session.provider);
+  const reportedCost = piCost && isDynamicRecord(params) ? cost(params.cost) : null;
   usage.record({
     agentId: agent.id,
     sessionId: session.id,
@@ -173,6 +178,8 @@ export function collectProviderUsage(
     counterId: `${session.id}:grok`,
     baseline: session.createdAt < usage.collectionStartedAt(),
     tokens: acpTokens(value),
+    reportedCost,
+    zeroCostUnpriced: piCost,
   });
 }
 
