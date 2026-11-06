@@ -254,6 +254,13 @@ const NO_AGENTS: MobileAgent[] = [];
 const OTHER_SERVERS_RETURN_DELAY_MS = 3_000;
 /** How long the app waits at start for the first server before it opens a server that is online. */
 const STARTUP_SERVER_WAIT_MS = 4_000;
+/**
+ * How long the first attempt of a server shows as its first connection. The app loader covers home
+ * and stops all touches in that time. A computer that sleeps can keep the attempt for 30 seconds,
+ * so after this wait the server shows as offline while the attempt continues, and the user can use
+ * the app or select another server.
+ */
+const FIRST_CONNECTION_WAIT_MS = 5_000;
 const EMPTY_SERVER: MobileServer = {
   id: "unavailable",
   name: "OpenBot",
@@ -348,6 +355,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const [serverDirectoryError, setServerDirectoryError] = useState<string | null>(null);
   const serversRef = useRef(servers);
   serversRef.current = servers;
+  /** One timer for each server whose first attempt runs in the foreground: it ends the first connection state. */
+  const firstConnectionTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const [sidebarByServer, setSidebarByServer] = useState<
     Record<string, { layout: SidebarLayoutSnapshot | null; error: string | null }>
   >({});
@@ -530,6 +539,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       const removedAgentIds = new Set<string>();
       for (const serverId of serverIds) {
         removedServers.current.add(serverId);
+        clearTimeout(firstConnectionTimers.current.get(serverId));
+        firstConnectionTimers.current.delete(serverId);
         deleteServerAvatars(serverId);
         connectionWaits.drop(serverId, new Error(currentText().t("mobile.workspace.error.transportNotReady")));
         readRefresh.invalidate(serverId);
@@ -1290,6 +1301,43 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   }, []);
   const wakeReconnect = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(wakeReconnect.current), []);
+  const limitFirstConnection = useCallback((hostId: string) => {
+    if (
+      !foregroundRef.current ||
+      firstConnectionTimers.current.has(hostId) ||
+      !serversRef.current.some((server) => server.id === hostId && server.initialConnectionPending)
+    )
+      return;
+    firstConnectionTimers.current.set(
+      hostId,
+      setTimeout(() => {
+        firstConnectionTimers.current.delete(hostId);
+        setServers((current) =>
+          current.some((server) => server.id === hostId && server.initialConnectionPending)
+            ? current.map((server) =>
+                server.id === hostId && server.initialConnectionPending
+                  ? { ...server, initialConnectionPending: false }
+                  : server,
+              )
+            : current,
+        );
+      }, FIRST_CONNECTION_WAIT_MS),
+    );
+  }, []);
+  // The wait counts only time in the foreground. On a return, an attempt from the last visit can
+  // continue with no new status, so the wait starts again for each server that still connects.
+  useEffect(() => {
+    const timers = firstConnectionTimers.current;
+    if (foreground) {
+      for (const server of serversRef.current) {
+        if (server.state === "connecting") limitFirstConnection(server.id);
+      }
+    }
+    return () => {
+      for (const timer of timers.values()) clearTimeout(timer);
+      timers.clear();
+    };
+  }, [foreground, limitFirstConnection]);
   /** The account server says that the hosted server starts, so the app connects to it again soon. */
   const hostedServerStarting = useCallback((hostId: string) => {
     clearTimeout(wakeReconnect.current);
@@ -1313,6 +1361,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const handleConnectionStatus = useCallback(
     (hostId: string, status: RemoteRecoveryStatus, failure: RemoteConnectionFailure | null, resuming: boolean) => {
       recoveryCountdowns.publish(hostId, { status, message: remoteRecoveryMessage(status, failure?.message ?? null) });
+      if (status.phase === "connecting") limitFirstConnection(hostId);
       setServers((current) => {
         const index = current.findIndex((server) => server.id === hostId);
         const server = current[index];
@@ -1334,7 +1383,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       wakeAttempts.current.set(hostId, status.attempt);
       wakeSelectedServer(hostId);
     },
-    [recoveryCountdowns, wakeSelectedServer, connectionWaits],
+    [recoveryCountdowns, wakeSelectedServer, connectionWaits, limitFirstConnection],
   );
   // The next retry of an offline server can be 30 seconds away, so a server starts when it is selected.
   useEffect(() => {
