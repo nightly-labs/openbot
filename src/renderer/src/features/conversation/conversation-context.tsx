@@ -211,7 +211,20 @@ const Conversation = createSimpleContext({
         serverState: activeServer()?.state,
         sequence: activeServer()?.connectionSequence,
       }),
-      ({ agentId }) => {
+      (next, previous) => {
+        // Each provider status update gives a new source, also when these values do not change. A read
+        // of the latest page replaces the older pages that the reader scrolled up to load.
+        if (
+          previous &&
+          next.agentId === previous.agentId &&
+          next.agentPhase === previous.agentPhase &&
+          next.openRevision === previous.openRevision &&
+          next.serverState === previous.serverState &&
+          next.sequence === previous.sequence
+        ) {
+          return;
+        }
+        const { agentId } = next;
         if (!agentId) return;
         const serverId = untrack(activeServerId);
         const trackingKey = agentConversationKey(serverId, agentId);
@@ -1028,11 +1041,12 @@ const Conversation = createSimpleContext({
     async function markAllAgentMessagesRead(): Promise<void> {
       const serverId = activeServerId();
       // Only listed agents: a read of an id the host no longer knows creates that agent again.
-      const unread = agentList()
-        .map((agent) => agent.id)
-        .filter((agentId) => (unreadReplies()[agentId] ?? 0) > 0);
-      await Promise.all(
-        unread.map(async (agentId) => {
+      const agentIds = agentList().map((agent) => agent.id);
+      const unread = agentIds.filter((agentId) => (unreadReplies()[agentId] ?? 0) > 0);
+      // The sidebar count includes the open side threads, such as a routine's thread.
+      const threadsUnread = agentIds.filter((agentId) => (agentTasks.unreadTotals()[agentId] ?? 0) > 0);
+      await Promise.all([
+        ...unread.map(async (agentId) => {
           try {
             const page = await conversationPort().agent.readConversationPage(
               { agentId, anchor: { type: "latest" }, limit: 1 },
@@ -1044,7 +1058,12 @@ const Conversation = createSimpleContext({
             appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
           }
         }),
-      );
+        ...threadsUnread.map((agentId) =>
+          agentTasks
+            .markAllTasksRead(agentId)
+            .catch((error) => appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId)),
+        ),
+      ]);
     }
 
     function presentPromptResolution(agentId: string, turnId: string, requestId: string | number): void {

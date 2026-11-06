@@ -14,7 +14,7 @@ import { actionToast } from "../../action-toast";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { toAgentMessages } from "../../app-message-projection";
 import { usePlatform } from "../../platform";
-import { deviceSendShortcut } from "../../send-shortcut-preference";
+import { deviceQuoteShortcut, deviceSendShortcut } from "../../send-shortcut-preference";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
 import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
 import { latestVisibleAgentMessageId } from "./conversation-read-state";
@@ -198,6 +198,11 @@ export function ConversationThread() {
     const id = props.threads?.acceptsReplies ? draft()?.replyToMessageId : null;
     return id ? messages.find((message) => message.id === id) : undefined;
   };
+  /** Text selected in the open thread goes to this thread, as a reply where the server takes one. */
+  const selectionActions = (threads: ConversationThreads) => ({
+    onSend: (messageId: string, body: string) => threads.onSend(body, [], threads.acceptsReplies ? messageId : null),
+    quoteShortcut: deviceQuoteShortcut(props.platform),
+  });
   /** Where the open thread came from, when it is a branch. The agent's own chat shows the agent's name. */
   const branchSource = (threads: ConversationThreads, agentName: string): AgentThreadBranchSource | undefined => {
     const source = threads.open ? threads.branchSource(threads.open) : undefined;
@@ -328,6 +333,7 @@ export function ConversationThread() {
             replyTo={replyTo()}
             onCancelReply={() => threadComposer.setReply(threadComposer.openDraftKey(), null)}
             queue={threadQueue.view(current().threads.open, threadComposer.openDraftKey())}
+            selectionActions={selectionActions(current().threads)}
           />
         </>
       )}

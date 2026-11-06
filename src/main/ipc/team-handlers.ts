@@ -15,6 +15,7 @@ import {
   parseLoginServer,
   parseMarkDirectRead,
   parseReadDirectConversationPage,
+  parseRemoteControlPolicy,
   parseRemoteDesktopConnect,
   parseRemoteDesktopDisplay,
   parseRemoteDesktopSetupAction,
@@ -167,6 +168,11 @@ export function teamIpcHandlers({
       revokeSession: payloadHandler(stringPayload("sessionId"), (sessionId) =>
         runCauseEffect(host.revokeSession(sessionId)),
       ),
+      getRemoteControlPolicy: handler(() => host.getRemoteControlPolicy()),
+      setRemoteControlPolicy: payloadHandler(parseRemoteControlPolicy, (policy) =>
+        runCauseEffect(host.setRemoteControlPolicy(policy)),
+      ),
+      stopRemoteControl: handler(() => runCauseEffect(host.stopRemoteControl())),
       listInvites: handler(() => runCauseEffect(host.listInvites())),
       revokeInvite: payloadHandler(stringPayload("inviteId"), (inviteId) =>
         runCauseEffect(host.revokeInvite(inviteId)),

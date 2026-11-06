@@ -4,7 +4,6 @@ import type { messages as source } from "../../en/mobile/server";
 export const messages = {
   "mobile.server.drawer.local": "ローカル",
   "mobile.server.drawer.remote": "リモート",
-  "mobile.server.drawer.routines": "ルーティン",
   "mobile.server.drawer.usage": "使用量",
   "mobile.server.drawer.editOrder": "順序を編集",
   "mobile.server.drawer.leaveFailed": "{name} から退出できませんでした",
@@ -20,6 +19,14 @@ export const messages = {
   "mobile.server.drawer.kindMembers": "{kind} · {members}",
   "mobile.server.drawer.memberCount": { other: "メンバー {count} 人" },
   "mobile.server.drawer.doneEditing": "順序の編集を完了",
+  "mobile.server.drawer.editSidebar": "サイドバーを編集",
+  "mobile.server.drawer.unpinTool": "固定を解除",
+  "mobile.server.drawer.pinToolNamed": "{name} を固定",
+  "mobile.server.drawer.unpinToolNamed": "{name} の固定を解除",
+  "mobile.server.drawer.unpinnedTool": "{name}、固定解除",
+  "mobile.server.drawer.toolsHint":
+    "ハンドルをドラッグしてツールを移動します。固定を解除したツールは編集中にのみ表示されます。順序はこのデバイスに保存されます。",
+  "mobile.server.drawer.doneEditingSidebar": "編集を完了",
   "mobile.server.drawer.join": "サーバーに参加",
   "mobile.server.drawer.add": "サーバーを追加",
   "mobile.server.drawer.settings": "設定",
@@ -463,6 +470,58 @@ export const messages = {
   "mobile.server.browserProfiles.deleteBody":
     "プロファイルのサインイン、Cookie、サイトデータを削除します。開いているタブは閉じます。",
   "mobile.server.browserProfiles.deleteAgents": "これらのエージェントは共有プロファイルに変わります: {agents}。",
+  "mobile.server.browserProxies.unsupported":
+    "ここでプロキシを管理するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.browserProxies.loading": "プロキシを読み込んでいます…",
+  "mobile.server.browserProxies.loadFailed": "OpenBot はプロキシを読み込めませんでした。",
+  "mobile.server.browserProxies.saveFailed": "OpenBot はプロキシを変更できませんでした。",
+  "mobile.server.browserProxies.title": "プロキシ",
+  "mobile.server.browserProxies.sectionHint":
+    "プロキシを設定したプロファイルは、そのプロキシを通じてページを開きます。メンバーは OpenBot デスクトップアプリからコンピュータを共有します。",
+  "mobile.server.browserProxies.limit": "1 つのサーバーに作れるプロキシは最大 {limit} 個です。",
+  "mobile.server.browserProxies.add": "プロキシを追加",
+  "mobile.server.browserProxies.new": "新しいプロキシ",
+  "mobile.server.browserProxies.menu": "プロキシ",
+  "mobile.server.browserProxies.automatic": "自動",
+  "mobile.server.browserProxies.profileHint":
+    "「自動」は、サーバーを実行しているコンピューターのプロキシ設定を使用します。",
+  "mobile.server.browserProxies.profileUsage": "{usage} · {proxy}",
+  "mobile.server.browserProxies.summary": "{scheme} · ポート {port} · {profiles}",
+  "mobile.server.browserProxies.computerSummary": "{state} · {profiles}",
+  "mobile.server.browserProxies.profiles": { other: "{count} 個のプロファイル" },
+  "mobile.server.browserProxies.online": "オンライン",
+  "mobile.server.browserProxies.offline": "{name} はオフラインです",
+  "mobile.server.browserProxies.failing": "{name} が応答しません",
+  "mobile.server.browserProxies.signInRefused": "{name} がサインインを拒否しました",
+  "mobile.server.browserProxies.yourComputer": "あなたのコンピュータ",
+  "mobile.server.browserProxies.memberComputer": "{name} のコンピュータ",
+  "mobile.server.browserProxies.unknownComputer": "メンバーのコンピュータ",
+  "mobile.server.browserProxies.gone": "このプロキシはサーバーにありません。",
+  "mobile.server.browserProxies.editTitle": "{name} を変更しますか？",
+  "mobile.server.browserProxies.address": "アドレス",
+  "mobile.server.browserProxies.addressPlaceholder": "socks5://user:password@host:1080",
+  "mobile.server.browserProxies.addressHint":
+    "socks5、http、https を使用できます。ユーザー名とパスワードは任意です。パスワードはサーバーを実行しているコンピューターに暗号化して保存されます。",
+  "mobile.server.browserProxies.addressInvalid":
+    "プロキシのアドレスではありません。socks5://host:1080、http://user:password@host:3128、または host:port:user:password を使用してください。",
+  "mobile.server.browserProxies.computerHint":
+    "このコンピュータを使用するプロファイルのページは、メンバーが OpenBot デスクトップアプリで共有している間、このコンピュータのインターネット接続を通じて送信されます。このコンピュータは公開インターネット上のアドレスだけを開きます。",
+  "mobile.server.browserProxies.profilesTitle": "プロファイル",
+  "mobile.server.browserProxies.delete": "プロキシを削除",
+  "mobile.server.browserProxies.deleteHint": "削除すると、このプロキシのプロファイルは「自動」に切り替わります。",
+  "mobile.server.browserProxies.deleteUsed": {
+    other: "{count} 個のプロファイルがこのプロキシを使用しています。これらは「自動」に切り替わります。",
+  },
+  "mobile.server.browserProxies.deleteUnused": "このプロキシを使用しているプロファイルはありません。",
+  "mobile.server.browserProxies.closesTabs": {
+    other: "開いている {count} 個のタブが閉じます。",
+  },
+  "mobile.server.browserProxies.changeTitle": "{name} のプロキシを変更しますか？",
+  "mobile.server.browserProxies.change": "プロキシを変更",
+  "mobile.server.browserProxies.choiceHint":
+    "「自動」は、サーバーを実行しているコンピューターのプロキシ設定を使用します。変更するとプロファイルの開いているタブは閉じます。",
+  "mobile.server.browserProxies.shareHint":
+    "あなたのコンピュータを使用するには、OpenBot デスクトップアプリで共有してください。",
   "mobile.server.route.connectors": "コネクター",
   "mobile.server.connectors.unavailable":
     "コネクターを管理するには、オーナーまたは管理者としてこのサーバーに接続してください。",

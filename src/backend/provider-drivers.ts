@@ -581,6 +581,11 @@ interface ProviderModelCatalog {
   readonly slowList?: true;
   /** No models while the provider says that the user must sign in and it has no client. */
   readonly hiddenWhenSignedOut?: true;
+  /**
+   * The CLI can list only some of its models just after it starts, and the whole list a moment later.
+   * A list that lacks an agent's model is read once more before the agent leaves that model.
+   */
+  readonly partialListAtStart?: true;
   /** The name to show for a model, before the name the CLI gives. Null keeps the CLI's name. */
   modelName?(id: string): string | null;
   /** Fields that only this provider's CLI reports. */
@@ -912,6 +917,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       ),
     authState: (account) => ({ kind: "grok", email: account?.email ?? null }),
     validateAccount: () => undefined,
+    // Grok 1.0.70 starts on its two built-in models when its sign-in has expired, renews the sign-in,
+    // and then fetches its catalogue. A `model/list` in between misses the newer models.
+    catalog: { partialListAtStart: true },
   },
   {
     id: "opencode",
@@ -1279,6 +1287,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         // A confined process cannot write the CLI's shared package cache, so it unpacks its own.
         extraEnv: () => ({ ...context.agentEnvironment?.(), ...(confinement ? COPILOT_CONFINED_ENV : {}) }),
         signInMessage: sourceText("error.provider.copilotSignIn"),
+        // GitHub Copilot CLI 1.0.106 opens a session without an account, and lists no models then.
+        noModelsWhenSignedOut: true,
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
         reportMcpDrops: context.reportMcpDrops,
@@ -1294,6 +1304,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         profileGeneration: true,
         env: { ...COPILOT_ENV },
         signInMessage: sourceText("error.provider.copilotSignIn"),
+        noModelsWhenSignedOut: true,
         servesModel: context.servesModel,
       }),
     authState: (account) => ({ kind: "copilot", email: account?.email ?? null }),

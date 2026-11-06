@@ -70,6 +70,7 @@ import {
   isApprovalAutomationPreference,
   isAppThemePalette,
   isAppThemePaletteId,
+  isAutomationRunsPerHour,
   isAvatarColor,
   isBusyMessageMode,
   isCodexLiveVoice,
@@ -213,6 +214,8 @@ export function decodeAgentDefaults(value: unknown): AgentDefaults {
   for (const key of AGENT_DEFAULT_KEYS) decoded[key] = requiredBoolean(defaults, key);
   if (!isPlanStartAfterMs(defaults.planStartAfterMs)) throw new Error("Invalid plan start time.");
   decoded.planStartAfterMs = defaults.planStartAfterMs;
+  if (!isAutomationRunsPerHour(defaults.automationRunsPerHour)) throw new Error("Invalid local script limit.");
+  decoded.automationRunsPerHour = defaults.automationRunsPerHour;
   return decoded;
 }
 

@@ -398,8 +398,9 @@ export interface SpeechSettings {
   /** The speed of each reply that is read aloud. The pitch stays the same. */
   speed: SpeechSpeed;
   /**
-   * A voice conversation with a Codex agent uses Codex live voice: the Codex App Server connects the
-   * microphone to OpenAI's realtime model with the user's own Codex sign-in.
+   * A voice conversation with any agent on this computer uses Codex live voice: the Codex App Server
+   * connects the microphone to OpenAI's realtime model with the user's own Codex sign-in, and gives
+   * each spoken request to the agent's own provider.
    */
   codexLive: boolean;
   /** The voice of Codex live voice. Null lets OpenAI choose. */

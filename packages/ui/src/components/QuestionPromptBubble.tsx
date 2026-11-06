@@ -42,6 +42,23 @@ export interface QuestionPromptBubbleProps {
 /** The time a single pick stays on screen before the next question moves in. */
 const PICK_HOLD_MS = 180;
 
+const queuedStageFits: Array<() => (() => void) | undefined> = [];
+
+/**
+ * Fits the stages of the bubbles that mount together. All read their page heights before any of
+ * them writes: a write before the next read lays out the page again, and a chat can open with many
+ * question cards.
+ */
+function queueStageFit(measure: () => (() => void) | undefined): void {
+  if (queuedStageFits.length === 0) {
+    queueMicrotask(() => {
+      const writes = queuedStageFits.splice(0).map((queued) => queued());
+      for (const write of writes) write?.();
+    });
+  }
+  queuedStageFits.push(measure);
+}
+
 /**
  * A private answer has its own masked field, never the composer. A plugin consent takes only one of
  * its options, so a typed answer would cancel it.
@@ -152,17 +169,27 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     props.elementRef?.(undefined);
   });
 
+  /** Reads the height of the open page and returns the write that gives it to the stage. */
+  function measureStage(step = resolved() ? total() : state.step): (() => void) | undefined {
+    const target = stage;
+    const page = target?.children[step];
+    if (!target?.isConnected || !(page instanceof HTMLElement)) return undefined;
+    const height = `${page.offsetHeight}px`;
+    return () => {
+      target.style.height = height;
+    };
+  }
+
   /** The stage takes the height of the open page, so the bubble grows and shrinks with it. */
-  function fitStage(step = resolved() ? total() : state.step) {
-    const page = stage?.children[step];
-    if (stage && page instanceof HTMLElement) stage.style.height = `${page.offsetHeight}px`;
+  function fitStage(step?: number) {
+    measureStage(step)?.();
   }
 
   onSettled(() => {
     if (!stage) return;
     const observer = new ResizeObserver(() => fitStage());
     for (const page of Array.from(stage.children)) observer.observe(page);
-    fitStage();
+    queueStageFit(() => measureStage());
     return () => observer.disconnect();
   });
 
@@ -461,7 +488,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
               </p>
             }
           >
-            <p class="question-prompt-sent sr-only" role="status">
+            <p class="sr-only" role="status">
               {statusTitle()}
             </p>
             <For each={props.questions}>
@@ -544,7 +571,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
                 <X aria-hidden="true" />
               </Questionnaire.Cancel>
             </Show>
-            <p class="question-prompt-announce sr-only" aria-live="polite">
+            <p class="sr-only" aria-live="polite">
               {resolved() ? "" : state.announced}
             </p>
             <div ref={stage} class="question-prompt-stage" tabindex="-1">

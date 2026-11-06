@@ -4,7 +4,6 @@ import type { messages as source } from "../../en/mobile/server";
 export const messages = {
   "mobile.server.drawer.local": "Local",
   "mobile.server.drawer.remote": "Distant",
-  "mobile.server.drawer.routines": "Routines",
   "mobile.server.drawer.usage": "Utilisation",
   "mobile.server.drawer.editOrder": "Modifier l’ordre",
   "mobile.server.drawer.leaveFailed": "Impossible de quitter {name}",
@@ -20,6 +19,14 @@ export const messages = {
   "mobile.server.drawer.kindMembers": "{kind} · {members}",
   "mobile.server.drawer.memberCount": { one: "{count} membre", other: "{count} membres" },
   "mobile.server.drawer.doneEditing": "Terminer la modification de l’ordre",
+  "mobile.server.drawer.editSidebar": "Modifier la barre latérale",
+  "mobile.server.drawer.unpinTool": "Désépingler",
+  "mobile.server.drawer.pinToolNamed": "Épingler {name}",
+  "mobile.server.drawer.unpinToolNamed": "Désépingler {name}",
+  "mobile.server.drawer.unpinnedTool": "{name}, désépinglé",
+  "mobile.server.drawer.toolsHint":
+    "Faites glisser les poignées pour déplacer les outils. Les outils désépinglés n'apparaissent qu'en modification. L'ordre est enregistré sur cet appareil.",
+  "mobile.server.drawer.doneEditingSidebar": "Terminer la modification",
   "mobile.server.drawer.join": "Rejoindre un serveur",
   "mobile.server.drawer.add": "Ajouter un serveur",
   "mobile.server.drawer.settings": "Réglages",
@@ -471,6 +478,59 @@ export const messages = {
   "mobile.server.browserProfiles.deleteBody":
     "Cela supprime les connexions, cookies et données de sites du profil. Ses onglets ouverts se ferment.",
   "mobile.server.browserProfiles.deleteAgents": "Ces agents passent au profil partagé : {agents}.",
+  "mobile.server.browserProxies.unsupported": "Mettez à jour OpenBot sur ce serveur pour gérer ses proxys ici.",
+  "mobile.server.browserProxies.loading": "Chargement des proxys…",
+  "mobile.server.browserProxies.loadFailed": "OpenBot n’a pas pu charger les proxys.",
+  "mobile.server.browserProxies.saveFailed": "OpenBot n’a pas pu modifier le proxy.",
+  "mobile.server.browserProxies.title": "Proxys",
+  "mobile.server.browserProxies.sectionHint":
+    "Un profil avec un proxy ouvre ses pages via ce proxy. Un membre partage un ordinateur depuis l’application de bureau OpenBot.",
+  "mobile.server.browserProxies.limit": "Un serveur peut avoir au plus {limit} proxys.",
+  "mobile.server.browserProxies.add": "Ajouter un proxy",
+  "mobile.server.browserProxies.new": "Nouveau proxy",
+  "mobile.server.browserProxies.menu": "Proxy",
+  "mobile.server.browserProxies.automatic": "Automatique",
+  "mobile.server.browserProxies.profileHint":
+    "« Automatique » utilise les réglages de proxy de l’ordinateur qui exécute le serveur.",
+  "mobile.server.browserProxies.profileUsage": "{usage} · {proxy}",
+  "mobile.server.browserProxies.summary": "{scheme} · port {port} · {profiles}",
+  "mobile.server.browserProxies.computerSummary": "{state} · {profiles}",
+  "mobile.server.browserProxies.profiles": { one: "{count} profil", other: "{count} profils" },
+  "mobile.server.browserProxies.online": "En ligne",
+  "mobile.server.browserProxies.offline": "{name} est hors ligne",
+  "mobile.server.browserProxies.failing": "{name} ne répond pas",
+  "mobile.server.browserProxies.signInRefused": "{name} a refusé l’identification",
+  "mobile.server.browserProxies.yourComputer": "Votre ordinateur",
+  "mobile.server.browserProxies.memberComputer": "Ordinateur de {name}",
+  "mobile.server.browserProxies.unknownComputer": "Ordinateur d’un membre",
+  "mobile.server.browserProxies.gone": "Ce proxy n’est plus sur le serveur.",
+  "mobile.server.browserProxies.editTitle": "Modifier {name} ?",
+  "mobile.server.browserProxies.address": "Adresse",
+  "mobile.server.browserProxies.addressPlaceholder": "socks5://user:password@host:1080",
+  "mobile.server.browserProxies.addressHint":
+    "Utilisez socks5, http ou https. Le nom d’utilisateur et le mot de passe sont facultatifs. Le mot de passe reste chiffré sur l’ordinateur qui exécute le serveur.",
+  "mobile.server.browserProxies.addressInvalid":
+    "Ce n’est pas une adresse de proxy. Utilisez socks5://host:1080, http://user:password@host:3128 ou host:port:user:password.",
+  "mobile.server.browserProxies.computerHint":
+    "Les pages des profils qui utilisent cet ordinateur passent par sa connexion Internet tant que son membre le partage depuis l’application de bureau OpenBot. L’ordinateur n’ouvre que les adresses Internet publiques.",
+  "mobile.server.browserProxies.profilesTitle": "Profils",
+  "mobile.server.browserProxies.delete": "Supprimer le proxy",
+  "mobile.server.browserProxies.deleteHint": "La suppression fait passer les profils de ce proxy en « Automatique ».",
+  "mobile.server.browserProxies.deleteUsed": {
+    one: "{count} profil utilise ce proxy. Il passe en « Automatique ».",
+    other: "{count} profils utilisent ce proxy. Ils passent en « Automatique ».",
+  },
+  "mobile.server.browserProxies.deleteUnused": "Aucun profil n’utilise ce proxy.",
+  "mobile.server.browserProxies.closesTabs": {
+    one: "{count} onglet ouvert se ferme.",
+    other: "{count} onglets ouverts se ferment.",
+  },
+  "mobile.server.browserProxies.changeTitle": "Changer le proxy de {name} ?",
+  "mobile.server.browserProxies.change": "Changer de proxy",
+  "mobile.server.browserProxies.choiceHint":
+    "« Automatique » utilise les réglages de proxy de l’ordinateur qui exécute le serveur. Un changement ferme les onglets ouverts du profil.",
+  "mobile.server.browserProxies.shareHint":
+    "Pour utiliser votre ordinateur, partagez-le dans l’application de bureau OpenBot.",
   "mobile.server.route.connectors": "Connecteurs",
   "mobile.server.connectors.unavailable":
     "Connectez-vous à ce serveur en tant que propriétaire ou administrateur pour gérer ses connecteurs.",

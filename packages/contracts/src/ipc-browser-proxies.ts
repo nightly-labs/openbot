@@ -138,6 +138,27 @@ export function browserProxyAddressText(proxy: {
   return `${proxy.scheme}://${user}${proxy.host}:${proxy.port}`;
 }
 
+export type BrowserProxyNameParts = Pick<BrowserProxySummary, "id" | "scheme" | "host" | "port" | "username">;
+
+/** The parts of a proxy name, from short to long. */
+const PROXY_NAME_FORMS: readonly ((proxy: BrowserProxyNameParts) => string)[] = [
+  (proxy) => proxy.host,
+  (proxy) => `${proxy.host}:${proxy.port}`,
+  (proxy) => browserProxyAddressText(proxy).replace(/^[a-z0-9]+:\/\//u, ""),
+  browserProxyAddressText,
+];
+
+/**
+ * The name of a saved proxy: its host. When another saved proxy has the same host, the name adds the
+ * port, then the user name, then the scheme, until no other saved proxy has the same name. The
+ * desktop app, the web client and the phone name a proxy with it.
+ */
+export function browserProxyName(proxy: BrowserProxyNameParts, proxies: readonly BrowserProxyNameParts[]): string {
+  const others = proxies.filter((other) => other.id !== proxy.id && other.host === proxy.host);
+  const form = PROXY_NAME_FORMS.find((name) => others.every((other) => name(other) !== name(proxy)));
+  return (form ?? browserProxyAddressText)(proxy);
+}
+
 /**
  * Why the last page load through a proxy failed: the proxy did not answer or could not reach the
  * site (`unreachable`), or it refused the saved sign-in (`signIn`).
@@ -161,6 +182,30 @@ export interface BrowserProxySummary {
   profileIds: string[];
   /** Why the last page load through the proxy failed, or null when it did not fail. */
   failure: BrowserProxyFailure | null;
+}
+
+/** Stands in for a saved password in the address field. The password itself stays on the host. */
+const BROWSER_PROXY_SAVED_PASSWORD = "••••••••";
+
+/** The address to edit: a saved password shows as a mask. */
+export function editableBrowserProxyAddress(proxy: BrowserProxySummary | null | undefined): string {
+  if (!proxy) return "";
+  if (!proxy.hasPassword) return browserProxyAddressText(proxy);
+  const user = proxy.username === null ? "" : encodeURIComponent(proxy.username);
+  return `${proxy.scheme}://${user}:${BROWSER_PROXY_SAVED_PASSWORD}@${proxy.host}:${proxy.port}`;
+}
+
+/**
+ * The address to save from the edited text. When the mask of a saved password stays, the address has
+ * no password and `keepPassword` is true, so the host keeps the saved password.
+ */
+export function browserProxySaveAddress(
+  proxy: BrowserProxySummary | null | undefined,
+  parsed: BrowserProxyAddress,
+  text: string,
+): { address: string; keepPassword: boolean } {
+  const keepPassword = proxy?.hasPassword === true && parsed.password === BROWSER_PROXY_SAVED_PASSWORD;
+  return { address: keepPassword ? browserProxyAddressText(parsed) : text.trim(), keepPassword };
 }
 
 /** The computer of one member, as a proxy. Each member has at most one. */

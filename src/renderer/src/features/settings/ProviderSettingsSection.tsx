@@ -384,11 +384,17 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
  * with a save or a removal. Absent until the first read, and on a read failure, so the row shows no
  * key badge rather than a wrong one.
  */
-function createProviderKeyState(props: { readonly open: boolean; readonly providerKeys?: ProviderKeyApi | undefined }) {
+function createProviderKeyState(props: {
+  readonly open: boolean;
+  readonly providerKeys?: ProviderKeyApi | undefined;
+  /** The state of the host's Codex. A sign-in or a sign-out there replaces its key login. */
+  readonly codexState?: string | undefined;
+}) {
   const [keyDialogOpen, setKeyDialogOpen] = createSignal(false);
   const [keyProvider, setKeyProvider] = createSignal<KeyDialogProvider>("opencode");
   const [openCodeKeyStatus, setOpenCodeKeyStatus] = createSignal<ProviderApiKeyStatus | undefined>(undefined);
   const [claudeKeyStatus, setClaudeKeyStatus] = createSignal<ProviderApiKeyStatus | undefined>(undefined);
+  const [codexKeyStatus, setCodexKeyStatus] = createSignal<ProviderApiKeyStatus | undefined>(undefined);
   async function readKeyStatus(keys: ProviderKeyApi, provider: AgentProviderId) {
     try {
       return (await keys.getProviderApiKeyState(provider)).status;
@@ -399,14 +405,17 @@ function createProviderKeyState(props: { readonly open: boolean; readonly provid
   async function refreshOpenCodeKeyStatus(): Promise<void> {
     const keys = props.providerKeys;
     if (!keys) return;
-    const [openCode, claude] = await Promise.all([
+    // This computer's Codex key is in the agent status. A joined server's host answers for its Codex login.
+    const [openCode, claude, codex] = await Promise.all([
       readKeyStatus(keys, "opencode"),
       keys.readsClaudeKey ? readKeyStatus(keys, "claude") : undefined,
+      keys.readsCodexKey && keys.onHost ? readKeyStatus(keys, "codex") : undefined,
     ]);
     // An answer from a source the modal has since left belongs to the other computer.
     if (keys !== props.providerKeys) return;
     setOpenCodeKeyStatus(openCode);
     setClaudeKeyStatus(claude);
+    setCodexKeyStatus(codex);
   }
   // The badge has to answer on first paint: the key state arrives after the rows, so an open
   // without a read would show no badge until something else re-renders the list. The keys can move
@@ -417,7 +426,23 @@ function createProviderKeyState(props: { readonly open: boolean; readonly provid
     (keys) => {
       setOpenCodeKeyStatus(undefined);
       setClaudeKeyStatus(undefined);
+      setCodexKeyStatus(undefined);
       if (keys) void untrack(refreshOpenCodeKeyStatus);
+    },
+  );
+  // A joined server's host gives no status event for its Codex key, so a change of its Codex state
+  // reads the key again. The first state is the one the read above answers for.
+  let codexState: string | undefined;
+  createEffect(
+    () => props.codexState,
+    (state) => {
+      const previous = codexState;
+      codexState = state;
+      const keys = untrack(() => props.providerKeys);
+      if (previous === undefined || state === previous || !keys?.readsCodexKey || !keys.onHost) return;
+      void readKeyStatus(keys, "codex").then((status) => {
+        if (keys === props.providerKeys) setCodexKeyStatus(status);
+      });
     },
   );
   return {
@@ -425,13 +450,18 @@ function createProviderKeyState(props: { readonly open: boolean; readonly provid
     keyProvider,
     openCodeKeyStatus,
     claudeKeyStatus,
+    codexKeyStatus,
     /**
      * Only the providers whose sign-in can be a pasted key are served: OpenCode, Muse, Gemini, Claude
-     * and, on this computer, Codex. Claude's Sign in also lands here on an older host, which would
-     * store the key and never read it.
+     * and Codex. Claude's and Codex's Sign in also land here on an older host, which would store the
+     * key and never read it.
      */
     openKeyDialog(provider: AgentProviderId): void {
-      if (isKeyDialogProvider(provider) && (provider !== "claude" || props.providerKeys?.readsClaudeKey)) {
+      if (
+        isKeyDialogProvider(provider) &&
+        (provider !== "claude" || props.providerKeys?.readsClaudeKey) &&
+        (provider !== "codex" || props.providerKeys?.readsCodexKey)
+      ) {
         setKeyProvider(provider);
         setKeyDialogOpen(true);
       }
@@ -553,6 +583,9 @@ export function HostProviderSettingsPanel(
     get providerKeys() {
       return props.providerKeys;
     },
+    get codexState() {
+      return props.agentStatus?.providers?.find((provider) => provider.id === "codex")?.state;
+    },
   });
   const store = createSettingsGeneralStore({
     get agentStatus() {
@@ -566,6 +599,7 @@ export function HostProviderSettingsPanel(
     },
     openCodeKeyStatus: keys.openCodeKeyStatus,
     claudeKeyStatus: keys.claudeKeyStatus,
+    codexKeyStatus: keys.codexKeyStatus,
     get providerHostName() {
       return props.hostName;
     },

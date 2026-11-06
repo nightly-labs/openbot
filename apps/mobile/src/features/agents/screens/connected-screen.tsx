@@ -1,5 +1,4 @@
 import type { ChannelSummary, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
-import { BlurTargetView } from "expo-blur";
 import { GlassView } from "expo-glass-effect";
 import { type Href, router, Stack } from "expo-router";
 import { Button, Typography } from "heroui-native";
@@ -10,17 +9,7 @@ import Layers3 from "lucide-react-native/icons/layers";
 import MessagesSquare from "lucide-react-native/icons/messages-square";
 import PanelLeft from "lucide-react-native/icons/panel-left";
 import WifiOff from "lucide-react-native/icons/wifi-off";
-import {
-  memo,
-  type ReactNode,
-  type RefObject,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { memo, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type FlatList, Pressable, StyleSheet, View, type ViewInstance, type ViewStyle } from "react-native";
 import Animated, {
   cancelAnimation,
@@ -95,6 +84,7 @@ import {
   mobileWaitingItems,
 } from "@/features/workspace/model/sidebar-layout";
 import { SplitPaneLayers, useSplitLayout } from "@/shared/components/adaptive-split";
+import { AndroidBlurTarget } from "@/shared/components/android-header-blur";
 import { useAppLoadingOverlay, useScreenLoadingLabel } from "@/shared/components/app-loading-overlay";
 import { ChromeGlassSheen } from "@/shared/components/chrome-glass-sheen";
 import { LargeTitle, LargeTitleBar, useLargeTitleScroll } from "@/shared/components/large-title";
@@ -282,19 +272,6 @@ const HEADER_RIPPLE = { borderless: true, radius: 20 } as const;
 const PANE_BAR_HEIGHT = NATIVE_BAR_HEIGHT;
 
 /**
- * On Android, the content under the search field, which the field blurs: Android blurs only the
- * content of a `BlurTargetView`. iOS blurs with its glass and needs no target.
- */
-function SearchBlurTarget({ target, children }: { target: RefObject<ViewInstance | null>; children: ReactNode }) {
-  if (!isAndroid) return children;
-  return (
-    <BlurTargetView ref={target} style={{ flex: 1 }}>
-      <View className="flex-1 bg-background">{children}</View>
-    </BlurTargetView>
-  );
-}
-
-/**
  * The glass behind a header button that the screen draws. Android has the solid glass of the design.
  * On iOS, the chat list pane draws its own bar, so its buttons take Liquid Glass as the native bar does.
  */
@@ -399,7 +376,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   );
   const [foreground, muted] = useThemeColor(["foreground", "muted"]);
   // The Android header buttons have the glass of the search field.
-  const buttonGlass = useChromeGlass();
+  const buttonGlass = useChromeGlass({ shadow: isIOS });
   const searchBlurTarget = useRef<ViewInstance>(null);
   const iconColor = String(foreground);
   const mutedColor = String(muted);
@@ -848,7 +825,8 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
 
   const listTree = (
     <View className="flex-1 bg-background">
-      <SearchBlurTarget target={searchBlurTarget}>
+      {/* The search field and the bar blur the home content. */}
+      <AndroidBlurTarget target={searchBlurTarget} surface="canvas">
         <HomeSearchList search={search} barHeight={searchBarOffset}>
           {onboarding.active ? null : sceneShows ? (
             // The scene has the insets of the welcome, so the characters stand in the same places on
@@ -1013,7 +991,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
             </ChatDragProvider>
           ) : null}
         </HomeSearchList>
-      </SearchBlurTarget>
+      </AndroidBlurTarget>
 
       {/* The list scrolls under the transparent header, which gets the blur of the chat header. iOS 27
           shows no native scroll edge effect here. The native top edge is hidden to avoid two effects. */}
@@ -1021,6 +999,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         <LargeTitleBar
           scroll={scroll}
           title={activeServer.name}
+          blurTarget={searchBlurTarget}
           // The connection state takes the place of the title in the bar.
           hidden={!searchShows || statusShows || search.open}
         >

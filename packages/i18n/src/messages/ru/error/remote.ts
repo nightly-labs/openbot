@@ -7,6 +7,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "Проверка удалённого рабочего стола недоступна.",
   "error.remote.controlUnavailable": "Удалённое управление недоступно.",
   "error.remote.controlSessionNotFound": "Сессия удалённого управления не найдена.",
+  "error.remote.controlNotAllowed": "Владелец этого компьютера не разрешает вашей роли управлять им.",
+  "error.remote.controlDeclined": "Человек за этим компьютером не разрешил удалённое управление.",
   "error.remote.testRuntimeUpdate": "Обновите среду удалённого рабочего стола для macOS, чтобы выполнить эту проверку.",
   "error.remote.testOtherSessions": "Завершите другие сессии удалённого рабочего стола, прежде чем начинать проверку.",
   "error.remote.testPermissions": "Проверьте разрешения и графическую сессию на хосте, прежде чем начинать проверку.",
@@ -186,6 +188,8 @@ export const messages = {
   "error.remote.memberLimitReached": "На этом хосте достигнут лимит участников. Попросите владельца освободить место.",
   "error.remote.hostNotRegistered": "Этот хост больше не зарегистрирован в службе OpenBot.",
   "error.remote.membershipEnded": "Вы больше не участник этого хоста. Попросите у владельца новое приглашение.",
+  "error.remote.membershipChanged":
+    "Кто-то другой изменил этого участника в то же время. Загрузите участников заново и повторите попытку.",
   "error.remote.accountSessionInactive": "Ваш вход больше не активен. Войдите снова.",
   "error.remote.hostOtherAccount": "Этот хост принадлежит другому аккаунту.",
   "error.remote.remoteNotConfigured": "Удалённые подключения не настроены в этой службе OpenBot.",

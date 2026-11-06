@@ -59,6 +59,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.channelLeadModelUnavailable": "The channel lead model is unavailable.",
   "error.backend.contextCompactionIneffective":
     "Compaction does not make this chat smaller: after two compactions it still uses {percent}% of the model's context window, so OpenBot stops compacting it. Tools and instructions use most of the window. Turn off the MCP servers or computer use that this agent does not need, or select a model with a larger window. Then start a new chat.",
+  "error.backend.contextCompactionStopped":
+    "Two compactions of this chat failed in a row, so OpenBot stops compacting it automatically. Each try sends the whole chat to the model and uses your plan limit. Select Compact now to try again, or start a new chat.",
   "error.backend.providerRetrying":
     "The provider failed this request {attempts} times and tries again. If the agent does not continue, stop the turn.",
   "error.backend.providerRetryingLargeContext":

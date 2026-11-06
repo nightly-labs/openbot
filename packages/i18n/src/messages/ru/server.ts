@@ -308,6 +308,7 @@ export const messages = {
   "server.settings.addLogo": "Добавить логотип сервера",
   "server.settings.removeLogo": "Удалить логотип сервера",
   "server.settings.access": "Доступ",
+  "server.companySignIn.desktopOnly": "Настройте единый вход в настольном приложении OpenBot.",
   "server.settings.publish": "Опубликовать этот сервер",
   "server.settings.published": "Сервер опубликован",
   "server.settings.setUpDesktopTitle": "Настройка удалённого рабочего стола",
@@ -471,8 +472,8 @@ export const messages = {
   "server.invite.revokeDescription":
     "Приглашение перестанет работать. Те, кто присоединился по нему, останутся участниками.",
   "server.desktop.accessTitle": "Доступ к удалённому рабочему столу",
-  "server.desktop.gatewayDescription":
-    "Каждый активный участник сервера может управлять этим хостом. Отдельного пароля для удалённого рабочего стола нет.",
+  "server.desktop.gatewayPolicyDescription":
+    "Отдельного пароля для удалённого рабочего стола нет. Настройки ниже определяют, кто может управлять этим компьютером.",
   "server.desktop.componentInstalled": "Компонент хоста установлен",
   "server.desktop.componentNotInstalled": "Компонент хоста не установлен",
   "server.desktop.sessions": "Без присмотра: {unattended} · Активные сеансы: {active}/{max}",
@@ -485,12 +486,26 @@ export const messages = {
   "server.desktop.hostOfflineDescription": "Переподключитесь к хосту, прежде чем открывать его рабочий стол.",
   "server.desktop.hostUpdateDescription": "Обновите OpenBot на хосте, чтобы пользоваться удалённым управлением.",
   "server.desktop.serviceAvailable": "Служба доступна",
-  "server.desktop.serviceAvailableDescription": "Управление через WebRTC доступно всем активным участникам.",
   "server.desktop.serviceNotReady": "Служба не готова",
   "server.desktop.serviceNotReadyDescription":
     "Запустите удалённое управление, чтобы проверить компоненты и разрешения хоста. Хост сообщит об ошибке настройки, если она есть.",
   "server.desktop.remoteControl": "Удалённое управление",
   "server.desktop.startHint": "Запустите удалённое управление кнопкой с монитором в заголовке сервера.",
+  "server.desktop.accessLabel": "Кто может управлять этим компьютером",
+  "server.desktop.accessDescription":
+    "Участники, которые могут открыть рабочий стол этого компьютера с другого устройства.",
+  "server.desktop.accessOwner": "Только владелец",
+  "server.desktop.accessAdmins": "Владелец и администраторы",
+  "server.desktop.accessMembers": "Все участники",
+  "server.desktop.askLabel": "Спрашивать на этом компьютере",
+  "server.desktop.askDescription":
+    "Каждый сеанс ждёт, пока человек за этим компьютером его разрешит. Если ответа нет 30 секунд, OpenBot его отклоняет.",
+  "server.desktop.activeTitle": "Активные сеансы удалённого рабочего стола: {active}",
+  "server.desktop.activeDescription": "Сразу завершает каждый сеанс. Участники могут запросить снова.",
+  "server.desktop.stopAll": "Остановить всё удалённое управление",
+  "server.desktop.policyLoadFailed": "Не удалось загрузить настройки удалённого управления.",
+  "server.desktop.policySaveFailed": "Не удалось сохранить настройки удалённого управления.",
+  "server.desktop.stopFailed": "Не удалось остановить удалённое управление.",
   "server.settings.providersTitle": "Провайдеры",
   "server.settings.providersDescription": "Управляйте провайдерами ИИ на компьютере, на котором работает этот сервер.",
   "server.settings.providersSwitchNote": "Переключитесь на {name}, чтобы управлять его провайдерами ИИ.",

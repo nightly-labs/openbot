@@ -14,6 +14,7 @@ import {
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import {
   normalizeUiBlockSpec,
+  UI_API_KEY_SCOPE_FIELD_ID,
   UI_VAULT_REQUEST_FIELDS,
   UI_VAULT_SECRET_FIELDS,
   type UiBlockResponse,
@@ -39,7 +40,7 @@ export function secretElicitationField(id: string, property: DynamicRecord | und
   return SECRET_FIELD_PATTERN.test(`${id} ${getString(property, "title") ?? ""}`);
 }
 
-export function elicitationOptions(property: DynamicRecord): Array<{ label: string; description: string }> | null {
+function elicitationOptions(property: DynamicRecord): Array<{ label: string; description: string }> | null {
   if (Array.isArray(property.oneOf)) {
     return property.oneOf.filter(isRecord).flatMap((option) => {
       const value = getString(option, "const");
@@ -132,18 +133,24 @@ function elicitationConsentQuestion(params: unknown, serverName: string | null):
   };
 }
 
-/** One question per requested field, so a plugin can collect an API key or any other value. */
-function elicitationFieldQuestions(params: unknown, subject: string): AgentPromptQuestion[] {
+/**
+ * One question per requested field, so a plugin can collect an API key or any other value. When a
+ * field has its own text, the request message goes under the first question, so it is not lost.
+ */
+export function elicitationFieldQuestions(params: unknown, subject: string): AgentPromptQuestion[] {
   const properties = getRecord(getRecord(params, "requestedSchema"), "properties") ?? {};
-  const message = getString(params, "message")?.trim();
-  return Object.entries(properties).flatMap(([id, property]) => {
+  const message = getString(params, "message")?.trim() || undefined;
+  return Object.entries(properties).flatMap(([id, property], index) => {
     if (!isRecord(property)) return [];
-    const question = getString(property, "description") ?? message ?? `${subject} needs more information.`;
+    const description = getString(property, "description");
+    const question = description ?? message ?? `${subject} needs more information.`;
+    const detail = index === 0 && description && message && message !== description ? message : undefined;
     return [
       {
         id,
         header: (getString(property, "title") ?? id).slice(0, INPUT_LIMITS.promptHeader),
         question: question.slice(0, INPUT_LIMITS.promptQuestion),
+        ...(detail ? { detail: detail.slice(0, INPUT_LIMITS.promptQuestion) } : {}),
         isSecret: secretElicitationField(id, property),
         options: elicitationOptions(property),
       },
@@ -334,7 +341,7 @@ export function uiBlockPromptResult(outcome: UiBlockPromptOutcome): DynamicToolR
 export const API_KEY_FIELD_ID = "key";
 
 /** The id of the field of the `request_api_key` form that selects who can use the key. */
-export const API_KEY_SCOPE_FIELD_ID = "scope";
+export const API_KEY_SCOPE_FIELD_ID = UI_API_KEY_SCOPE_FIELD_ID;
 
 /** The option of the scope field that keeps the key for the asking agent only. */
 export const API_KEY_SCOPE_AGENT = sourceText("status.agent.apiKeyScope.agent");

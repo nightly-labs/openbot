@@ -10,6 +10,7 @@ import type {
 import { decodeRegistryEntries, decodeRegistryInstallResult, decodeRegistryOperations } from "@openbot/contracts/ipc";
 import { ACP_REGISTRY_ROUTES } from "@openbot/contracts/team-protocol/acp-registry-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
+import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
 import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
@@ -329,12 +330,14 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
   });
   // A boolean, so that a server-list update that keeps the capability does not rebuild the keys.
   const readsClaudeKey = createMemo(() => serverSupportsCapability(options.server(), CLAUDE_API_KEY_CAPABILITY));
+  const readsCodexKey = createMemo(() => serverSupportsCapability(options.server(), CODEX_API_KEY_CAPABILITY));
   const providerKeys = createMemo(() => {
     const id = serverId();
     return id
       ? {
           ...hostProviderKeyApi(() => admin, id, openWebDestination),
           readsClaudeKey: readsClaudeKey(),
+          readsCodexKey: readsCodexKey(),
         }
       : undefined;
   });

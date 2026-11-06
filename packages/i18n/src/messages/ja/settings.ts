@@ -119,6 +119,12 @@ export const messages = {
   "settings.planStart.customHint": "5 秒以上。",
   "settings.planStart.customInvalid": "5 秒以上の整数を入力してください。",
   "settings.planStart.set": "設定",
+  "settings.automationLimit.sectionTitle": "上限",
+  "settings.automationLimit.sectionDescription": "このコンピューターのすべてのエージェントに適用されます。",
+  "settings.automationLimit.title": "1時間あたりのリクエスト",
+  "settings.automationLimit.option": "1時間あたり{limit}件",
+  "settings.automationLimit.note":
+    "ローカルスクリプトが1時間に各エージェントへ送れるメッセージとルーティン実行の上限です。",
   "settings.backgroundProcesses.title": "バックグラウンドプロセス",
   "settings.backgroundProcesses.description":
     "エージェントが起動して実行したままにしたプログラム（開発サーバーなど）です。チャットが終わっても、OpenBot を終了しても動き続けます。",
@@ -585,7 +591,7 @@ export const messages = {
     "メッセージを音声入力すると、返信が読み上げられます。止めるには、もう一度音声入力してください。",
   "settings.voice.speech.codexLive.title": "Codex ライブ音声",
   "settings.voice.speech.codexLive.description":
-    "Codex エージェントとの音声会話は、Codex のサインインで OpenAI のライブ音声を使います。音声は OpenAI に送られます。",
+    "どのエージェントとの音声会話も、Codex のサインインで OpenAI のライブ音声を使います。音声、依頼、エージェントの返信は OpenAI に送られます。",
   "settings.voice.speech.speed.title": "速度",
   "settings.voice.speech.voice.title": "声",
   "settings.voice.speech.voice.female": "女性の声 {number}",

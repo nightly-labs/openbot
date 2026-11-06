@@ -17,6 +17,7 @@ import { AGENT_WAIT_SCHEMA_SQL } from "./agent-waits/agent-wait-schema";
 import { BROWSER_PROFILE_SCHEMA_SQL } from "./browser-profiles/browser-profile-schema";
 import { BROWSER_PROXY_SCHEMA_SQL } from "./browser-profiles/browser-proxy-schema";
 import { CHANNEL_SCHEMA_SQL, CHANNEL_SETTINGS_SCHEMA_SQL } from "./channel-schema";
+import { AGENT_SKILL_LOADS_SCHEMA_SQL } from "./database/agent-skill-loads-schema";
 import { DELETED_THREAD_MESSAGES_SCHEMA_SQL } from "./database/deleted-thread-messages-schema";
 import { PROVIDER_HISTORY_SCHEMA_SQL } from "./database/provider-history-schema";
 import { MCP_SERVERS_SCHEMA_SQL } from "./mcp-schema";
@@ -629,7 +630,8 @@ const LATEST_SCHEMA_SQL =
   WORKFLOW_GITHUB_SCHEMA_SQL +
   MESSAGING_ALLOWED_SENDERS_SCHEMA_SQL +
   DELETED_THREAD_MESSAGES_SCHEMA_SQL +
-  BROWSER_PROXY_SCHEMA_SQL;
+  BROWSER_PROXY_SCHEMA_SQL +
+  AGENT_SKILL_LOADS_SCHEMA_SQL;
 
 /** The end of the thread message table with the migration 40 columns before its PRIMARY KEY constraint. */
 function withThreadMessageOrderColumns(tableEnd: string): string {
@@ -971,6 +973,12 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     // Adds one column with a constant default: no rebuild, so no foreign-key pause and no vacuum. Every
     // existing agent routine gets 'chat', so its runs go back to the agent's chat, as before 0.61.
     up: addAgentRoutineRunPlace,
+  },
+  {
+    version: 58,
+    // Only creates a table and its indexes, so no foreign-key pause and no vacuum. No skill load was
+    // recorded before it, so the table starts empty and no usage row changes.
+    up: (db) => db.exec(AGENT_SKILL_LOADS_SCHEMA_SQL),
   },
 ];
 

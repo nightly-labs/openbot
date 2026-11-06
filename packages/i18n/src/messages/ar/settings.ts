@@ -117,6 +117,12 @@ export const messages = {
   "settings.planStart.customHint": "5 ثوانٍ على الأقل.",
   "settings.planStart.customInvalid": "أدخل عددًا صحيحًا لا يقل عن 5 ثوانٍ.",
   "settings.planStart.set": "تعيين",
+  "settings.automationLimit.sectionTitle": "الحد",
+  "settings.automationLimit.sectionDescription": "ينطبق على كل الوكلاء على هذا الحاسوب.",
+  "settings.automationLimit.title": "الطلبات في الساعة",
+  "settings.automationLimit.option": "{limit} في الساعة",
+  "settings.automationLimit.note":
+    "أقصى عدد من الرسائل وتشغيلات المهام الدورية التي يمكن للبرامج النصية المحلية إرسالها إلى كل وكيل في ساعة واحدة.",
   "settings.backgroundProcesses.title": "العمليات في الخلفية",
   "settings.backgroundProcesses.description":
     "برامج بدأها الوكلاء وتركوها تعمل، مثل خوادم التطوير. تستمر في العمل بعد انتهاء الدردشة وبعد إنهاء OpenBot.",
@@ -617,7 +623,7 @@ export const messages = {
   "settings.voice.speech.readReplies.description": "عندما تُملي رسالة، يُقرأ الرد بصوت عالٍ. أَمْلِ مرة أخرى لإيقافه.",
   "settings.voice.speech.codexLive.title": "صوت Codex المباشر",
   "settings.voice.speech.codexLive.description":
-    "تستخدم المحادثات الصوتية مع وكلاء Codex الصوت المباشر من OpenAI بتسجيل دخولك إلى Codex. يُرسَل صوتك إلى OpenAI.",
+    "تستخدم المحادثات الصوتية مع أي وكيل الصوت المباشر من OpenAI بتسجيل دخولك إلى Codex. يُرسَل صوتك وطلباتك وردود الوكيل إلى OpenAI.",
   "settings.voice.speech.speed.title": "السرعة",
   "settings.voice.speech.voice.title": "الصوت",
   "settings.voice.speech.voice.female": "صوت أنثوي {number}",

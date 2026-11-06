@@ -56,6 +56,7 @@ import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/bro
 import { BROWSER_USER_CONTROL_CAPABILITY } from "@openbot/contracts/team-protocol/browser-user-control-v1";
 import { CHAT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
+import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
 import {
   AGENT_ADMIN_CAPABILITY,
   AGENT_HOST_SETTINGS_CAPABILITY,
@@ -1193,10 +1194,11 @@ export class TeamApiServer {
   }
 
   #routeRemoteScreen(context: TeamApiRequestContext): Promise<RouteOutcome> {
-    const remoteScreen = this.#options.remoteScreen;
+    const { remoteScreen, remoteControlAccess } = this.#options;
     return routeRemoteScreen(context, {
       store: this.#options.store,
       ...(remoteScreen === undefined ? {} : { remoteScreen }),
+      ...(remoteControlAccess === undefined ? {} : { remoteControlAccess }),
     });
   }
 
@@ -2335,7 +2337,8 @@ export class TeamApiServer {
             capability === CUSTOM_PROVIDER_HARNESS_CAPABILITY
           )
             return this.#options.admin?.providers !== undefined;
-          if (capability === CLAUDE_API_KEY_CAPABILITY) return this.#options.admin?.providers !== undefined;
+          if (capability === CLAUDE_API_KEY_CAPABILITY || capability === CODEX_API_KEY_CAPABILITY)
+            return this.#options.admin?.providers !== undefined;
           if (capability === PROVIDERS_SIGN_IN_V3_CAPABILITY)
             return this.#options.admin?.providers?.pasteSignIn === true;
           if (capability === HOST_ADMIN_CAPABILITY) return this.#options.admin?.identity !== undefined;

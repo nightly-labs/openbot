@@ -99,6 +99,7 @@ import {
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
 import { CHAT_COLORS_CAPABILITY, CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
+import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
 import {
   CONTEXT_COMPACT_CAPABILITY,
   CONTEXT_COMPACT_ROUTES,
@@ -407,6 +408,8 @@ function queueSnapshot(agentId: string): QueueSnapshot {
 
 // The provider keys that the fake host keeps.
 const providerKeys = new Set<string>();
+// Whether the fake host's Codex logged in with an OpenAI API key (`codex-api-key-v1`).
+let codexOnKey = false;
 const NO_STATUS: AgentStatus = {
   phase: "ready",
   cliVersion: null,
@@ -502,6 +505,16 @@ const fakeAgents: TeamApiAgents = {
       return path === "big.bin"
         ? { path: workspacePath, name: "big.bin", size: ATTACHMENT_LIMITS.fileBytes + 1, insideWorkspace: true }
         : { path: workspacePath, name: "notes.md", size: readFileSync(workspacePath).length, insideWorkspace: true };
+    }),
+  resolveLocalWorkspaceFile: (agentId, path) =>
+    Effect.sync(() => {
+      record("resolveLocalWorkspaceFile", agentId, path);
+      return {
+        path: workspacePath,
+        name: "notes.md",
+        size: readFileSync(workspacePath).length,
+        insideWorkspace: false,
+      };
     }),
   deleteAgent: (agentId) => Effect.sync(() => record("deleteAgent", agentId)),
   getRuntimeSnapshot: unused("getRuntimeSnapshot"),
@@ -1267,6 +1280,26 @@ try {
             return change().pipe(Effect.as(NO_STATUS));
           },
           clearProviderCredential: (_provider, change) => change().pipe(Effect.as(NO_STATUS)),
+          // Codex keeps the key in its own login, so the host passes it to the CLI, not to the key store.
+          signInCodexWithApiKey: (key) =>
+            Effect.sync(() => {
+              record("signInCodexWithApiKey", key);
+              codexOnKey = true;
+              return NO_STATUS;
+            }),
+          // The released status routes drop `apiKeyInUse`, so `apiKeyState` reads it here for Codex.
+          getStatus: () => ({
+            ...NO_STATUS,
+            providers: [
+              {
+                id: "codex",
+                state: "available",
+                version: null,
+                message: null,
+                ...(codexOnKey ? { apiKeyInUse: true } : {}),
+              },
+            ],
+          }),
         },
         credentials: {
           status: (provider) => (providerKeys.has(provider) ? "saved" : "missing"),
@@ -4751,6 +4784,37 @@ try {
         isDeepStrictEqual(callsOf("changeProviderCredential"), [["deepseek"]]),
       summary(pending),
     );
+    // codex-api-key-v1: an OpenAI key logs the host's Codex in and never reaches the key store.
+    const openAiKey = ["sk", "e2e", "openai", "fake0000"].join("-");
+    const keysBefore = callsOf("setProviderKey").length;
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    const stateBefore = await call("POST", PROVIDERS_V8_ROUTES.apiKeyState, { ...v8, json: { provider: "codex" } });
+    const codex = await call("POST", PROVIDERS_V8_ROUTES.apiKeySet, {
+      ...v8,
+      json: { provider: "codex", key: openAiKey },
+    });
+    const stateAfter = await call("POST", PROVIDERS_V8_ROUTES.apiKeyState, { ...v8, json: { provider: "codex" } });
+    const codexMember = await call("POST", PROVIDERS_V8_ROUTES.apiKeySet, {
+      ...v8,
+      token: bobToken,
+      json: { provider: "codex", key: openAiKey },
+    });
+    check(
+      "the host advertises codex-api-key-v1 to protocol 9, and an admin's OpenAI key logs Codex in, not the key store",
+      list(field(compatibility.body, "capabilities")).includes(CODEX_API_KEY_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(CODEX_API_KEY_CAPABILITY) &&
+        codex.status === 200 &&
+        codexMember.status === 403 &&
+        isDeepStrictEqual(callsOf("signInCodexWithApiKey"), [[openAiKey]]) &&
+        callsOf("setProviderKey").length === keysBefore,
+      [summary(codex), summary(codexMember)],
+    );
+    check(
+      "apiKeyState answers for the host's Codex login, which the released status routes do not carry",
+      field(stateBefore.body, "status") === "missing" && field(stateAfter.body, "status") === "saved",
+      [summary(stateBefore), summary(stateAfter)],
+    );
   }
 
   // ---- Custom agents (custom-agents-v1) ----
@@ -6217,6 +6281,22 @@ try {
         workspace.text === "# workspace notes\n" &&
         errorIs(workspaceBig, 413, sourceText("error.team.workspaceFileTooLarge")),
       [summary(workspaceMissing), summary(workspace), summary(workspaceBig)],
+    );
+    const outsidePath = `${TEAM_API_ROUTES.workspaceFiles}?botId=agent-ada&path=${encodeURIComponent("~/Desktop/notes.md")}`;
+    const localReads = callsOf("resolveLocalWorkspaceFile").length;
+    const memberOutside = await call("GET", outsidePath, { token: bobToken });
+    const memberLocalReads = callsOf("resolveLocalWorkspaceFile").length - localReads;
+    const ownerOutside = await call("GET", outsidePath, { token: adaToken });
+    check(
+      "workspace files: a member reads with the workspace limit, and the owner reads as the local user does",
+      memberOutside.status === 200 &&
+        memberLocalReads === 0 &&
+        isDeepStrictEqual(callsOf("resolveWorkspaceFile").at(-1), ["agent-ada", "~/Desktop/notes.md"]) &&
+        ownerOutside.status === 200 &&
+        ownerOutside.text === "# workspace notes\n" &&
+        callsOf("resolveLocalWorkspaceFile").length === localReads + 1 &&
+        isDeepStrictEqual(callsOf("resolveLocalWorkspaceFile").at(-1), ["agent-ada", "~/Desktop/notes.md"]),
+      [summary(memberOutside), summary(ownerOutside), callsOf("resolveLocalWorkspaceFile")],
     );
   }
 

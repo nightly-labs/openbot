@@ -151,6 +151,8 @@ export const queryKeys = {
   instanceTransferSummary: (scope: QueryScope, serverId: string) => ["instance-transfer-summary", ...scope, serverId],
   /** The named browser profiles of a host. `browser-profiles-changed` reads them again. */
   serverBrowserProfiles: (scope: QueryScope, serverId: string) => ["server-browser-profiles", ...scope, serverId],
+  /** The saved proxies and the member computers of a host. `browser-profiles-changed` reads them again. */
+  serverBrowserProxies: (scope: QueryScope, serverId: string) => ["server-browser-proxies", ...scope, serverId],
   providerStatus: (scope: QueryScope, serverId: string) => ["provider-status", ...scope, serverId],
   providerRuntimes: (scope: QueryScope, serverId: string) => ["provider-runtimes", ...scope, serverId],
   providerDefault: (scope: QueryScope, serverId: string) => ["provider-default", ...scope, serverId],

@@ -45,14 +45,18 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
     if (entry) clearTimeout(entry.timer);
     downloads.delete(id);
   }
-  function expire(id: string) {
+  /** Ends the download and the request that waits for it, so the request does not wait for the timeout. */
+  function fail(id: string, message: string) {
     remove(id);
     const waiter = waiters.get(id);
     if (waiter) {
       clearTimeout(waiter.timer);
       waiters.delete(id);
-      waiter.reject(new Error(sourceText("error.remote.downloadTimeout")));
+      waiter.reject(new Error(message));
     }
+  }
+  function expire(id: string) {
+    fail(id, sourceText("error.remote.downloadTimeout"));
   }
   function touch(id: string) {
     const entry = downloads.get(id);
@@ -154,6 +158,13 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
             reason: "Attachments must be 10 MB or smaller. Download fewer files at once.",
           }),
         );
+        // A request can wait for this file before it starts. It ends now, not at the timeout.
+        fail(
+          frame.transferId,
+          sourceText(
+            frame.size > MOBILE_ATTACHMENT_BYTES ? "error.remote.attachmentTooLarge" : "error.remote.tooManyDownloads",
+          ),
+        );
         return true;
       }
       downloads.set(frame.transferId, {
@@ -175,11 +186,13 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
     if (frame.type === "file-complete") {
       const entry = downloads.get(frame.transferId);
       if (!entry) return true;
-      if (entry.received !== entry.bytes.length)
+      if (entry.received !== entry.bytes.length) {
+        fail(frame.transferId, sourceText("error.remote.downloadIncomplete"));
         return yield* transferFailure(sourceText("error.remote.downloadIncomplete"));
+      }
       const digest = Array.from(sha256(entry.bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
       if (digest !== entry.digest) {
-        remove(frame.transferId);
+        fail(frame.transferId, sourceText("error.remote.downloadDamaged"));
         return yield* transferFailure(sourceText("error.remote.downloadDamaged"));
       }
       entry.complete = true;
@@ -192,8 +205,9 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
       }
       return true;
     }
-    if (frame.type === "file-cancel" && downloads.has(frame.transferId)) {
-      remove(frame.transferId);
+    // A cancel can come before the file starts, while a request already waits for it.
+    if (frame.type === "file-cancel" && (downloads.has(frame.transferId) || waiters.has(frame.transferId))) {
+      fail(frame.transferId, sourceText("error.remote.downloadStopped"));
       return true;
     }
     return false;

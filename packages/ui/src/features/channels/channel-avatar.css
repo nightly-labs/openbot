@@ -131,8 +131,8 @@
    the same. The felt is opaque from 0.19 of the slice on all four sides. It goes out by that much past
    the felt box, and the clip cuts it 0.25px inside the box, on the felt fill. The slice is half of the
    felt height, so the ends stay round: 2 × slice = box + 2 × 0.19 × slice, thus slice = box / 1.62.
-   The filter darkens the lilac to plum. */
-:is(.channel-avatar-count, .agent-row-agent-status-unread)::before {
+   The filter darkens the lilac to plum. The badge of a waiting agent is the same felt, dyed amber. */
+:is(.channel-avatar-count, .agent-row-agent-status-unread, .agent-row-agent-status-waiting)::before {
   --felt-slice: calc(var(--felt-box) / 1.62);
   --felt-edge: calc(var(--felt-slice) * 0.19);
 
@@ -144,6 +144,10 @@
   clip-path: inset(calc(var(--felt-edge) + 0.25px) round calc(var(--felt-box) / 2 - 0.25px));
   filter: brightness(0.52) saturate(1.35) contrast(1.1);
   content: "";
+}
+.agent-row-agent-status-waiting::before {
+  border-image-source: url("../../assets/plush/felt-pill-amber.webp");
+  filter: none;
 }
 /* With the 3.5px ring, the count sits 1.5px lower than the cell centre, so its ring meets the faces
    above it at the same gap as the ring between the faces. */

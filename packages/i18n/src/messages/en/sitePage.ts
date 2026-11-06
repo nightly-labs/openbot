@@ -430,7 +430,7 @@ export const messages = defineMessages("sitePage", {
     "macOS 13 or newer on Apple silicon or Intel, Windows 10 or newer on x64, and Linux on x64 or arm64 as an AppImage.",
   "sitePage.landing.faq.safety.question": "Is it safe to let agents work on my computer?",
   "sitePage.landing.faq.safety.answer":
-    "OpenBot is a development preview. Agents can read and change files, run commands, use the network and control the built-in browser without asking each time. Give them only tasks you trust, and keep backups.",
+    "Agents can read and change files, run commands, use the network and control the built-in browser without asking each time. Give them only tasks you trust, and keep backups.",
   "sitePage.landing.faq.compare": "Compare OpenBot",
   "sitePage.landing.download.title": "Download OpenBot",
   "sitePage.landing.download.description":

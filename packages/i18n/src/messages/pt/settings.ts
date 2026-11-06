@@ -120,6 +120,12 @@ export const messages = {
   "settings.planStart.customHint": "Pelo menos 5 segundos.",
   "settings.planStart.customInvalid": "Digite um número inteiro de pelo menos 5 segundos.",
   "settings.planStart.set": "Definir",
+  "settings.automationLimit.sectionTitle": "Limite",
+  "settings.automationLimit.sectionDescription": "Vale para todos os agentes neste computador.",
+  "settings.automationLimit.title": "Pedidos por hora",
+  "settings.automationLimit.option": "{limit} por hora",
+  "settings.automationLimit.note":
+    "O máximo de mensagens e execuções de rotinas que scripts locais podem enviar a cada agente numa hora.",
   "settings.backgroundProcesses.title": "Processos em segundo plano",
   "settings.backgroundProcesses.description":
     "Programas que os agentes iniciaram e deixaram rodando, como servidores de desenvolvimento. Eles continuam rodando quando o chat termina e quando você fecha o OpenBot.",
@@ -590,7 +596,7 @@ export const messages = {
     "Quando você dita uma mensagem, a resposta é lida em voz alta. Dite de novo para parar.",
   "settings.voice.speech.codexLive.title": "Voz ao vivo do Codex",
   "settings.voice.speech.codexLive.description":
-    "As conversas por voz com agentes Codex usam a voz ao vivo da OpenAI com a sua sessão do Codex. A sua voz vai para a OpenAI.",
+    "As conversas por voz com qualquer agente usam a voz ao vivo da OpenAI com a sua sessão do Codex. A sua voz, os seus pedidos e as respostas do agente vão para a OpenAI.",
   "settings.voice.speech.speed.title": "Velocidade",
   "settings.voice.speech.voice.title": "Voz",
   "settings.voice.speech.voice.female": "Voz feminina {number}",

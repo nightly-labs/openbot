@@ -124,6 +124,12 @@ export const messages = defineMessages("settings", {
   "settings.planStart.customHint": "At least 5 seconds.",
   "settings.planStart.customInvalid": "Enter a whole number of at least 5 seconds.",
   "settings.planStart.set": "Set",
+  "settings.automationLimit.sectionTitle": "Limit",
+  "settings.automationLimit.sectionDescription": "It applies to all agents on this computer.",
+  "settings.automationLimit.title": "Requests an hour",
+  "settings.automationLimit.option": "{limit} an hour",
+  "settings.automationLimit.note":
+    "The most messages and routine runs that local scripts can send each agent in one hour.",
   "settings.backgroundProcesses.title": "Background processes",
   "settings.backgroundProcesses.description":
     "Programs that agents started and left running, such as dev servers. They keep running after the chat ends and after you quit OpenBot.",
@@ -609,7 +615,7 @@ export const messages = defineMessages("settings", {
     "When you dictate a message, the reply is read aloud. Dictate again to stop it.",
   "settings.voice.speech.codexLive.title": "Codex live voice",
   "settings.voice.speech.codexLive.description":
-    "Voice conversations with Codex agents use OpenAI live voice with your Codex sign-in. Your voice goes to OpenAI.",
+    "Voice conversations with any agent use OpenAI live voice with your Codex sign-in. Your voice, your requests and the agent's replies go to OpenAI.",
   "settings.voice.speech.speed.title": "Speed",
   "settings.voice.speech.voice.title": "Voice",
   "settings.voice.speech.voice.female": "Female voice {number}",

@@ -128,6 +128,7 @@ import { ensureMacApplicationPresence, secondLaunchResponse } from "./main-windo
 import { MessageLinkRelay, openHttpLink } from "./message-link-relay";
 import { recoverFromNewerDatabase } from "./newer-database-recovery";
 import { startMainLog } from "./provider-log";
+import { notifyRemoteControlStarted } from "./remote-control-question";
 import { watchRemoteHostDirectory } from "./remote-server-host-directory";
 import { createRendererForwarders } from "./renderer-forwarders";
 import { sendToRenderer } from "./renderer-ipc";
@@ -415,6 +416,7 @@ let pendingDeepLink: RendererDeepLink | null = takeRendererDeepLink(findDeepLink
 let deepLinkReceiverReady = false;
 
 const MAIN_WINDOW_STATE_FILE = "openbot-main-window-state-v1.json";
+const WM_ENDSESSION = 0x0016;
 
 // A server is stopped with SIGTERM (systemd, Docker). Without a handler, Electron ends at once and its
 // services do not stop. A hosted server's boat pre-stop hook stops it this way before the disk save
@@ -608,6 +610,17 @@ function attachWindowsSessionEndHandlers(window: BrowserWindow): void {
       void runCauseEffect(services.browser.flushPersistentStorage()).catch((error) =>
         logger.error("Unable to flush browser storage before Windows session end:", toLogValue(error)),
       );
+  });
+  // Windows sends WM_ENDSESSION with a zero wParam when another app cancels the session end. Electron
+  // has no event for it. Without this reset, closing the window later quits instead of hiding, and the
+  // next quit skips `prepareForShutdown`.
+  window.hookWindowMessage(WM_ENDSESSION, (wParam) => {
+    if (quitStarted || !systemSessionEnding || wParam.some((byte) => byte !== 0)) return;
+    systemSessionEnding = false;
+    systemSessionEndFlushStarted = false;
+    isQuitting = false;
+    // The query stopped the update checks.
+    services?.updater.resume();
   });
   window.on("session-end", () => {
     recordExit("session_end");
@@ -1506,19 +1519,31 @@ if (!hasSingleInstanceLock) {
         () => windowHolder.current,
         quitFor,
       );
-      // The way back to a window hidden in the background.
+      // The way back to a window hidden in the background, and the sign that a member controls
+      // this computer.
       backgroundTray = createBackgroundTray({
         icon: appIconColorImage ?? nativeImage.createFromPath(appIconPath),
         menuBarIcon: loadMenuBarIcon(),
         translate: language.translate,
         open: reopenMainWindow,
         quit: () => quitFor("tray"),
+        stopRemoteControl: () => {
+          void runCauseEffect(host.stopRemoteControl()).catch((error) =>
+            logger.warn("Unable to stop remote control:", toLogValue(error)),
+          );
+        },
       });
       const tray = backgroundTray;
       tray.sync(appBehavior.keepRunningInBackground);
       const unsubscribeBackgroundTray = appBehavior.subscribe(() => tray.sync(appBehavior.keepRunningInBackground));
+      const showRemoteControl = (memberNames: string[]) => tray.setRemoteControl(memberNames);
+      const announceRemoteControl = (memberName: string) => notifyRemoteControlStarted(language.translate, memberName);
+      host.on("remoteControlChanged", showRemoteControl);
+      host.on("remoteControlStarted", announceRemoteControl);
       teardown.push(0, "background tray", () => {
         unsubscribeBackgroundTray();
+        host.off("remoteControlChanged", showRemoteControl);
+        host.off("remoteControlStarted", announceRemoteControl);
         tray.destroy();
       });
       // One place turns a language change into every visible consequence: the menu is built again

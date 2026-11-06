@@ -510,6 +510,31 @@ export const REMOTE_DESKTOP_ERROR_CODES = [
 
 export type RemoteDesktopErrorCode = (typeof REMOTE_DESKTOP_ERROR_CODES)[number];
 
+/**
+ * Who may control this computer through remote desktop. `members` is every member, as before the
+ * setting existed; `admins` is the owner and the admins; `owner` is only the owner.
+ */
+export const REMOTE_CONTROL_ACCESS_LEVELS = ["owner", "admins", "members"] as const;
+export type RemoteControlAccess = (typeof REMOTE_CONTROL_ACCESS_LEVELS)[number];
+
+/** The host owner's remote control choices, as they are stored and as they cross IPC. */
+export interface RemoteControlPolicy {
+  access: RemoteControlAccess;
+  /** Ask the person at this computer to allow each remote control session before it starts. */
+  askOnHost: boolean;
+}
+
+export const DEFAULT_REMOTE_CONTROL_POLICY: RemoteControlPolicy = { access: "members", askOnHost: false };
+
+export function isRemoteControlAccess(value: unknown): value is RemoteControlAccess {
+  return isOneOf(REMOTE_CONTROL_ACCESS_LEVELS, value);
+}
+
+export function remoteControlAllowsRole(access: RemoteControlAccess, role: TeamRole): boolean {
+  if (access === "members") return true;
+  return access === "admins" ? canAdministerServer(role) : role === "owner";
+}
+
 export interface RemoteDesktopSession {
   id: string;
   serverId: string;
@@ -548,4 +573,4 @@ export interface RemoteDesktopSelectDisplayInput {
 }
 
 import { INPUT_LIMITS } from "./input-limits";
-import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
+import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";

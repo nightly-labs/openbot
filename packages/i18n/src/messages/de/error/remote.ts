@@ -7,6 +7,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "Remote-Desktop-Tests sind nicht verfügbar.",
   "error.remote.controlUnavailable": "Die Fernsteuerung ist nicht verfügbar.",
   "error.remote.controlSessionNotFound": "Fernsteuerungssitzung nicht gefunden.",
+  "error.remote.controlNotAllowed": "Der Eigentümer dieses Computers erlaubt deiner Rolle keine Fernsteuerung.",
+  "error.remote.controlDeclined": "Die Person an diesem Computer hat die Fernsteuerung nicht erlaubt.",
   "error.remote.testRuntimeUpdate": "Aktualisiere die macOS-Remote-Desktop-Laufzeit, um diesen Test auszuführen.",
   "error.remote.testOtherSessions": "Beende andere Remote-Desktop-Sitzungen, bevor du einen Test startest.",
   "error.remote.testPermissions":
@@ -191,6 +193,8 @@ export const messages = {
   "error.remote.hostNotRegistered": "Dieser Host ist nicht mehr beim OpenBot-Dienst registriert.",
   "error.remote.membershipEnded":
     "Du bist kein Mitglied dieses Hosts mehr. Bitte den Eigentümer um eine neue Einladung.",
+  "error.remote.membershipChanged":
+    "Jemand hat dieses Mitglied gleichzeitig geändert. Lade die Mitglieder neu und versuche es erneut.",
   "error.remote.accountSessionInactive": "Deine Anmeldung ist nicht mehr aktiv. Melde dich erneut an.",
   "error.remote.hostOtherAccount": "Dieser Host gehört zu einem anderen Konto.",
   "error.remote.remoteNotConfigured": "Remote-Verbindungen sind für diesen OpenBot-Dienst nicht eingerichtet.",

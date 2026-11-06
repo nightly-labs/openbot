@@ -108,6 +108,8 @@ import {
   type BitwardenHostConnectInput,
   type BrowserProfileList,
   type BrowserProfileSummary,
+  type BrowserProxyList,
+  type BrowserProxySummary,
   type CancelMcpSignInInput,
   type ClearBrowserDataInput,
   type ClearStorageInput,
@@ -116,12 +118,15 @@ import {
   type CustomAgentSummary,
   type CustomProviderResult,
   type CustomProviderSummary,
+  type DeleteBrowserProxyInput,
   type DeleteCustomProviderInput,
   type DeleteStoredFileInput,
   decodeAgentAdminSettings,
   decodeAgentBrowserProfile,
   decodeBrowserProfileList,
   decodeBrowserProfileSummary,
+  decodeBrowserProxyList,
+  decodeBrowserProxySummary,
   decodeCustomAgentResult,
   decodeCustomAgentSummaries,
   decodeCustomProviderResult,
@@ -218,11 +223,13 @@ import {
   type RoutineResultConnectionOption,
   type RoutineResultDestination,
   type RoutineResultRoutineInput,
+  type SaveBrowserProxyInput,
   type SaveCustomAgentInput,
   type SaveCustomProviderInput,
   type SaveMcpServerInput,
   type SaveMcpSignInAppInput,
   type SetAgentProviderAccountInput,
+  type SetBrowserProfileProxyInput,
   type SetEnabledSkillInput,
   type SetMcpServerEnabledInput,
   type SetProviderApiKeyInput,
@@ -278,6 +285,7 @@ import { AGENT_PUBLISH_IMAGE_BYTES, AGENT_PUBLISH_ROUTES } from "@openbot/contra
 import { AGENT_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/agent-update-v1";
 import { BITWARDEN_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
 import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browser-profiles-v1";
+import { BROWSER_PROXIES_ROUTES } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { CONNECTORS_ROUTES } from "@openbot/contracts/team-protocol/connectors-v1";
 import { EVENTS_ROUTES } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
@@ -1760,6 +1768,45 @@ export function updateHostAgentBrowserProfile(
       profile: { ...input.profile },
     }),
   );
+}
+
+/**
+ * The saved proxies of the host's named profiles, and the computers of members (`browser-proxies-v1`).
+ * No proxy carries its password.
+ */
+export function listHostBrowserProxies(
+  request: TeamApiRequest,
+): Effect.Effect<BrowserProxyList, TeamAdminRequestError> {
+  return adminCall(() => request("POST", BROWSER_PROXIES_ROUTES.list, decodeBrowserProxyList, {}));
+}
+
+/** A new proxy, or a change to one. The host refuses a change when the proxy is not at `previousAddress` now. */
+export function saveHostBrowserProxy(
+  request: TeamApiRequest,
+  input: SaveBrowserProxyInput,
+): Effect.Effect<BrowserProxySummary, TeamAdminRequestError> {
+  return adminCall(() => request("POST", BROWSER_PROXIES_ROUTES.save, decodeBrowserProxySummary, { ...input }));
+}
+
+/** Its profiles change to Automatic. The host refuses the delete when other profiles use it now. Takes a computer id too. */
+export function deleteHostBrowserProxy(
+  request: TeamApiRequest,
+  input: DeleteBrowserProxyInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", BROWSER_PROXIES_ROUTES.delete, ignoreResponse, {
+      proxyId: input.proxyId,
+      profileIds: [...input.profileIds],
+    }),
+  );
+}
+
+/** The proxy of one named profile, or null for Automatic. The host closes the tabs of the profile. */
+export function setHostBrowserProfileProxy(
+  request: TeamApiRequest,
+  input: SetBrowserProfileProxyInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", BROWSER_PROXIES_ROUTES.profile, ignoreResponse, { ...input }));
 }
 
 /** The host's Slack workspaces, Discord servers or Telegram chats (`connectors-v1`). */

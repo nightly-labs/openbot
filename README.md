@@ -11,10 +11,12 @@ OpenCode, Gemini, [Cursor CLI](https://cursor.com/cli), [Cline CLI](https://clin
 conversation, and provides local queues, file transfers, an embedded browser, and agent-to-agent
 messaging in one desktop app.
 
+OpenBot is ready for production use. A new release ships almost every day.
+
 > [!WARNING]
-> OpenBot is a development preview. Agents currently run with `danger-full-access` and
-> `approvalPolicy: never`. They can read and modify files, run commands, use the network, and control
-> the embedded browser without per-action confirmations after the explicit first-launch consent.
+> Agents run with `danger-full-access` and `approvalPolicy: never`. They can read and modify files,
+> run commands, use the network, and control the embedded browser without per-action confirmations
+> after the explicit first-launch consent.
 > Run only agents and tasks you trust, keep backups, and review [Security](#security) before use.
 
 ## What works
@@ -466,8 +468,9 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun run dist:linux` | Build an unsigned Linux x64 AppImage on Linux. |
 | `bun run dist:linux:arm64` | Build an unsigned Linux arm64 AppImage on arm64 Linux. |
 | `bun run release:patch` | Create the next patch version commit and tag. |
+| `bun run mobile:release` | Open the mobile release menu: prepare a version, build it, mark it available or skipped on a store (with its flags), write the Discord highlights, and see the live state. Each step that changes files opens its pull request. |
 | `bun run mobile:release:patch` | Move the iPhone app notes from `apps/mobile/changelog.d` into `apps/mobile/CHANGELOG.md` and set the next patch version in `app.json`. Also `mobile:release:minor` and `mobile:release:major`. |
-| `bun run mobile:release:published <ios\|android\|both>` | Write today's date for a store that made the mobile build available. `/changelog` shows each store, and a store that still reviews the build as "In review". Add `--version x.y.z` for a version that is not in `app.json`. |
+| `bun run mobile:release:published <ios\|android\|both>` | Write today's date for a store that made the mobile build available. `/changelog` shows each store, and a store that still reviews the build as "In review". Also raises that store's flags in `mobile-features-config.ts`. Add `--version x.y.z` for a version that is not in `app.json`, and `--skip-older` to mark the older versions that the store still reviews as skipped. |
 | `bun run test:acp-directories` | Run three fake ACP agents through the `acp` provider driver: new, load and resume requests carry the workspace roots as `additionalDirectories` only when the agent advertises them. Offline; writes `.openbot-build/acp-additional-directories-e2e/report.json`. |
 | `bun run test:custom-agents` | Run two fake ACP agents through the agent store, Check agent (with its model list) and the `acp` provider router: equal session ids, restart and resume, switch, and delete. Offline; writes `.openbot-build/custom-acp-agent-e2e/report.json`. |
 | `bun run test:mcp-tool-consent` | Run the real Codex app-server with a fake model, a real MCP server and the real attention registry: tool consent at Ask first and Full access, Always allow and a restart, refusals, and the requests that stay with the user (forms, sign-in, look-alikes). Needs a Codex CLI; offline; writes `.openbot-build/mcp-tool-consent-e2e/report.json`. |

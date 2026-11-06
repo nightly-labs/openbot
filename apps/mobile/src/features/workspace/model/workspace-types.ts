@@ -47,6 +47,8 @@ import type {
   BranchAgentTaskInput,
   BrowserProfileList,
   BrowserProfileSummary,
+  BrowserProxyList,
+  BrowserProxySummary,
   ClearableStorageCategory,
   ClearBrowserDataInput,
   ConnectorMessagingPlatform,
@@ -57,6 +59,7 @@ import type {
   CreateRoutineInput,
   CreateWorkflowInput,
   DecideWorkflowStepInput,
+  DeleteBrowserProxyInput,
   DraftAttachment,
   ExportInstanceInput,
   ForeignProviderId,
@@ -109,6 +112,7 @@ import type {
   RoutineResultDestination,
   RoutineResultRoutineInput,
   SaveAgentInstructionsInput,
+  SaveBrowserProxyInput,
   SaveWorkflowGraphInput,
   ServerAuditLog,
   ServerNotificationLevel,
@@ -116,6 +120,7 @@ import type {
   SetAgentNotificationLevelInput,
   SetAgentProviderAccountInput,
   SetAgentSessionSettingInput,
+  SetBrowserProfileProxyInput,
   SetEnabledSkillInput,
   SetMessagingEnabledInput,
   SetRoutineResultDestinationInput,
@@ -184,7 +189,9 @@ import type {
 import type { MobileBrowserTab } from "@/features/browser/model/browser-tabs";
 import type { BrowserViewBridgeEvent, RemoteBrowserViewSession } from "@/features/browser/model/browser-view-bridge";
 import type { MobileChannelStore } from "@/features/channels/model/channel-store";
+import type { MessageFileTarget } from "@/features/chat/model/message-file-target";
 import type { ProviderAdmin } from "@/features/servers/model/provider-admin";
+import type { RemoteDesktopConnection } from "@/features/workspace/components/remote-team-transport";
 import type { MobileConversationStore } from "./conversation-store";
 import type { LiveWorkspaceStore } from "./live-workspace-store";
 
@@ -506,6 +513,11 @@ export interface MobileWorkspaceContextValue {
    * each agent (`browser-profiles-v1`). The host checks the role again.
    */
   canManageBrowserProfiles: (serverId: string) => boolean;
+  /**
+   * True for an owner or admin of a host that serves the proxies of its named profiles
+   * (`browser-proxies-v1`). The phone cannot share its own connection: it has no TCP sockets.
+   */
+  canManageBrowserProxies: (serverId: string) => boolean;
   /** Reads or changes the host's GitHub connection. The answer names the GitHub pages that the phone opens. */
   githubConnector: (route: GitHubConnectorRoute, serverId: string) => Promise<HostGitHubConnectorStatus>;
   /** The repositories where the host's GitHub App is installed. The host reads them from GitHub. */
@@ -574,6 +586,14 @@ export interface MobileWorkspaceContextValue {
   loadAgentBrowserProfile: (agentId: string, serverId: string) => Promise<AgentBrowserProfile>;
   /** The host closes the open tabs of the agent. */
   updateAgentBrowserProfile: (input: UpdateAgentBrowserProfileInput, serverId: string) => Promise<AgentBrowserProfile>;
+  /** The saved proxies of the named profiles, and the computers of members. No proxy carries its password. */
+  loadBrowserProxies: (serverId: string) => Promise<BrowserProxyList>;
+  /** A new proxy, or a change to one. The host closes the tabs of the profiles that use a changed proxy. */
+  saveBrowserProxy: (input: SaveBrowserProxyInput, serverId: string) => Promise<BrowserProxySummary>;
+  /** Its profiles change to Automatic. Takes a computer id too. */
+  deleteBrowserProxy: (input: DeleteBrowserProxyInput, serverId: string) => Promise<void>;
+  /** Null: Automatic. The host closes the tabs of the profile. */
+  setBrowserProfileProxy: (input: SetBrowserProfileProxyInput, serverId: string) => Promise<void>;
   loadMessagingConnections: (platform: ConnectorMessagingPlatform, serverId: string) => Promise<MessagingOverview>;
   /** The platform's page that the phone opens. The host opens no page. */
   connectMessaging: (input: HostMessagingConnectInput, serverId: string) => Promise<MessagingConnectorPage>;
@@ -745,6 +765,10 @@ export interface MobileWorkspaceContextValue {
   loadAgentStorage: (agentId: string, serverId: string, force?: boolean) => Promise<StorageUsage | null>;
   /** True when the host advertises `storage-v1`. Every member reads the host's storage. */
   canReadServerStorage: (serverId: string) => boolean;
+  /** True when the host advertises `remote-desktop`. The host decides which members it lets in. */
+  canControlComputer: (serverId: string) => boolean;
+  /** The connected peer's path for the remote desktop viewer, or null while the server is not connected. */
+  remoteDesktopConnection: (serverId: string) => RemoteDesktopConnection | null;
   /** Every location on the host, its agents, its largest chats and its stored files. */
   loadServerStorage: (serverId: string, force?: boolean) => Promise<StorageUsage>;
   /** Owners and admins only; the host refuses a member. */
@@ -1004,6 +1028,11 @@ export interface MobileWorkspaceContextValue {
     onProgress?: (fraction: number) => void,
   ) => Promise<DraftAttachment>;
   downloadAttachment: (serverId: string, attachmentId: string) => Promise<RemoteFileUpload>;
+  /**
+   * A file that a message names, from the agent's workspace or from the shared folder. Any member
+   * reads it; the host keeps the path inside the folder.
+   */
+  downloadMessageFile: (serverId: string, file: MessageFileTarget) => Promise<RemoteFileUpload>;
   discardAttachment: (agentId: string, attachmentId: string, serverId?: string) => Promise<void>;
   /**
    * True when a hide goes to the host (`agent-hidden-v1`, and the user is an owner or admin), so each
@@ -1066,6 +1095,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canUseWorkflowGitHub"
   | "canUseWorkflowChats"
   | "canReadServerStorage"
+  | "canControlComputer"
   | "canSetAgentNotificationLevel";
 
 type MobileWorkspaceStateKey =
@@ -1105,6 +1135,7 @@ type MobileWorkspaceStateKey =
   | "canTransferServer"
   | "canManageVaultApiKeys"
   | "canManageBrowserProfiles"
+  | "canManageBrowserProxies"
   | "serverUpdateAccess"
   | "canReadServerRelease"
   | "canViewHostedSites"

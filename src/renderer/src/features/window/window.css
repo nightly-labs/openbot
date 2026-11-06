@@ -487,7 +487,8 @@
   /* The schedule, usage and Marketplace titles, and the path to an open settings detail page, go in the
    * top row, after the server menu, and the rest of the top row lets clicks through to that menu. The
    * rail is the way back, so these titles have no Back button and no server name. The section list and
-   * the panel of a settings page start below the top row. */
+   * the panel of a settings page start below the top row. The page covers the server menu and inherits
+   * `-webkit-app-region`, so the frame must not drag: a drag region over the menu takes its clicks. */
   .app-frame-edge[data-window-page-kind="settings"] > .window-page {
     pointer-events: none;
   }
@@ -524,11 +525,6 @@
     max-width: none;
     margin-inline: 0;
     padding-inline: 0;
-  }
-
-  /* The hidden chat header no longer moves the window, so the empty top row of the settings page does. */
-  .app-frame-edge[data-window-page-kind="settings"] {
-    -webkit-app-region: drag;
   }
 
   .app-frame-edge[data-window-page-kind="titled"] > .window-page {

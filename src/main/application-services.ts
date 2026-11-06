@@ -183,6 +183,7 @@ import {
   readMobileConnectApiUrl,
 } from "./central-auth-manager";
 import { ChatVisualPreviewer } from "./chat-visual-preview";
+import { createComputerIdle } from "./computer-idle";
 import { ComputerUseHighlightController } from "./computer-use-highlight-window";
 import { applicationBundlePath, applicationIconName } from "./computer-use-permission-app";
 import { ComputerUsePermissionHelpWindowController } from "./computer-use-permission-help-window";
@@ -223,7 +224,7 @@ import { createGitHubRest, type WorkflowGitHubDirectory, workflowGitHubDirectory
 import { HermesImportService } from "./hermes-import-service";
 import { HermesInstaller } from "./hermes-installer";
 import { HostEventsRuntime } from "./host-events-runtime";
-import { agentWebhookRoutineWriter, HostEventsService } from "./host-events-service";
+import { agentWebhookRoutineWriter, HostEventsService, type WebhookDeliveryReport } from "./host-events-service";
 import { HostService } from "./host-service";
 import { HostUpdateCoordinator } from "./host-update-coordinator";
 import { CLIENT_USE_WINDOW_MS, HostedServerActivity } from "./hosted-server-activity";
@@ -303,6 +304,8 @@ import { ProviderUseSettingsStore } from "./provider-use-settings-store";
 import { RelayedMessagingInstalls } from "./relayed-messaging-installs";
 import { decodeQueuedMessageReceipt } from "./remote-agent-decoding";
 import { RemoteConnectTrace } from "./remote-connect-trace";
+import { createRemoteControlPolicyStore } from "./remote-control-policy-store";
+import { createRemoteControlQuestion } from "./remote-control-question";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
 import { loadOrCreateRemoteDesktopCredentials } from "./remote-desktop-secret-store";
@@ -419,6 +422,7 @@ const MODEL_VISIBILITY_PREFERENCE_FILE = "openbot-model-visibility-v1.json";
 const REMOTE_SESSION_REUSE_PREFERENCE_FILE = "openbot-remote-session-reuse-preference-v1.json";
 const EXTERNAL_LINK_PREFERENCE_FILE = "openbot-external-link-preference-v1.json";
 const REMOTE_NETWORK_ROUTE_PREFERENCE_FILE = "openbot-remote-network-route-v1.json";
+const REMOTE_CONTROL_POLICY_FILE = "openbot-remote-control-policy-v1.json";
 const APP_BEHAVIOR_PREFERENCE_FILE = "openbot-app-behavior-preference-v1.json";
 const DYNAMIC_ISLAND_PREFERENCE_FILE = "openbot-dynamic-island-preference-v1.json";
 const BROWSER_STATE_FILE = "openbot-browser-state-v1.json";
@@ -1347,6 +1351,8 @@ export async function createApplicationServices({
     join(app.getPath("userData"), REMOTE_NETWORK_ROUTE_PREFERENCE_FILE),
   );
   await runCauseEffect(remoteNetworkRoute.load());
+  const remoteControlPolicy = createRemoteControlPolicyStore(join(app.getPath("userData"), REMOTE_CONTROL_POLICY_FILE));
+  await runCauseEffect(remoteControlPolicy.load());
   const appBehavior = new AppBehaviorService({
     path: join(app.getPath("userData"), APP_BEHAVIOR_PREFERENCE_FILE),
     loginItem: createLoginItem({
@@ -2407,6 +2413,8 @@ export async function createApplicationServices({
     ingress: signalIngress,
     hostId: () => teamStore.getIdentity()?.serverId ?? null,
   });
+  // Analytics starts later in this function. A request before then is not reported.
+  let reportWebhookDelivery: ((report: WebhookDeliveryReport) => void) | null = null;
   const events = new HostEventsService({
     routines: service.routineRecords,
     workflows: {
@@ -2419,6 +2427,7 @@ export async function createApplicationServices({
       const state = centralAuth.getState();
       return state.status === "signed_in" ? state.user.id : null;
     },
+    onDelivery: (report) => reportWebhookDelivery?.(report),
   });
   const eventsRuntime = new HostEventsRuntime(events);
   signalIngress.handleWebhooks((input) => events.receive(input));
@@ -2656,6 +2665,11 @@ export async function createApplicationServices({
   // Development only: a shorter or longer time without input before a phone notifies, to test it.
   const awaySeconds = app.isPackaged ? Number.NaN : Number(process.env.OPENBOT_DEV_AWAY_SECONDS);
   const awayAfterMs = Number.isInteger(awaySeconds) && awaySeconds > 0 ? awaySeconds * 1_000 : DESKTOP_USE_MS;
+  const computerIdle = createComputerIdle(
+    (contents) =>
+      windows.getMainWindow()?.webContents === contents ||
+      windows.getChatWindows().some((chat) => chat.webContents === contents),
+  );
   // A server on this computer has no account session: the desktop app reads its directory for it.
   const localServerMembers = new LocalServerMembers(() => process.stdout.write(formatLocalServerMembersRequest()));
   const host = new HostService({
@@ -2857,7 +2871,9 @@ export async function createApplicationServices({
     hostComputerInUse: (event) => {
       const window = windows.getMainWindow();
       if (!window || window.isDestroyed()) return false;
+      // Also a locked screen. In a Wayland session, `computerIdle` counts the input in OpenBot only.
       if (powerMonitor.getSystemIdleState(awayAfterMs / 1_000) !== "active") return false;
+      if (computerIdle.seconds() * 1_000 >= awayAfterMs) return false;
       if (window.isFocused()) return true;
       // Without a notification service, as on Linux without a daemon, the desktop shows nothing.
       if (!Notification.isSupported()) return false;
@@ -2905,6 +2921,17 @@ export async function createApplicationServices({
     platform: process.platform === "darwin" || process.platform === "win32" ? process.platform : "linux",
     unattended: false,
     remoteDesktopRuntimePaths: remoteDesktopRuntime,
+    remoteControlPolicy,
+    // A server process has no window and nobody to answer, so a policy that asks refuses there.
+    ...(hostedServer || serverModeEnvironment || localServerChild
+      ? {}
+      : {
+          askRemoteControl: createRemoteControlQuestion({
+            translate: language.translate,
+            ensureMainWindow: windows.ensureMainWindow,
+            presentMainWindow: showMainWindow,
+          }),
+        }),
     openRemoteDesktopSetup: (action, appPath) =>
       Effect.tryPromise({
         try: async () => {
@@ -3056,13 +3083,24 @@ export async function createApplicationServices({
     },
     resolveRoutineRun: (agentId, routineId, runId) => {
       const run = service.listRoutineRuns({ agentId, routineId }).find((item) => item.id === runId);
-      const routine = service.listRoutines(agentId).find((item) => item.id === routineId);
-      return run && routine ? { runKind: run.kind, triggerType: routine.trigger.schedule.kind } : null;
+      // The records include webhook routines, which the schedule list leaves out.
+      const routine = service.routineRecords.get({ kind: "agent", id: agentId }, routineId);
+      if (!run || !routine) return null;
+      return {
+        runKind: run.kind,
+        runSource: run.source ?? null,
+        triggerType: routine.trigger.kind === "webhook" ? "webhook" : routine.trigger.schedule.kind,
+      };
     },
     resolveInventory: () =>
       collectAnalyticsInventory({
         agents: () => service.listAgents(),
         routines: (agentId) => service.listRoutines(agentId),
+        enabledWebhookRoutineCount: (agentId) =>
+          service.routineRecords
+            .list({ kind: "agent", id: agentId })
+            .filter((routine) => routine.active && routine.trigger.kind === "webhook").length,
+        webhookRouteCount: () => service.routineRecords.routes.list().length,
         workflowCount: () => workflowStore.list().length,
         // The local read: `listInstalled` asks the marketplace for each skill's latest version.
         skills: (agentId) => skills.listInstalledForChatTags(agentId),
@@ -3088,6 +3126,7 @@ export async function createApplicationServices({
   // than flushing a queue, so a later call would attribute them to nobody.
   analytics.flushPending();
   service.on("failure", (failure) => analytics.handleFailure(failure));
+  reportWebhookDelivery = (report) => analytics.handleWebhookDelivery(report);
   resourceMonitor.start(() => analytics.checkResources());
   const startup = localServerChild
     ? null
@@ -3102,7 +3141,10 @@ export async function createApplicationServices({
     Effect.runFork(startup.recordStart());
     teardown.push(TEARDOWN_ORDER.startupTiming, "the startup timing", () => startup.dispose());
   }
-  const connectTrace = new RemoteConnectTrace((span) => trace.record(span));
+  const connectTrace = new RemoteConnectTrace(
+    (span) => trace.record(span),
+    (summary) => analytics.handleRemoteConnect(summary),
+  );
   // Development only: a network round trip added to the WebRTC client, for `bun run perf:remote`.
   const developmentRoundTripMs = app.isPackaged ? 0 : Math.max(0, Number(process.env.OPENBOT_DEV_RTT_MS) || 0);
   installRemoteSyncProfileSink(
@@ -3144,7 +3186,7 @@ export async function createApplicationServices({
         : {
             computerActivity: {
               awayAfterMs,
-              idleSeconds: () => powerMonitor.getSystemIdleTime(),
+              idleSeconds: () => computerIdle.seconds(),
               showsEvents: (server) => {
                 const window = windows.getMainWindow();
                 if (!window || window.isDestroyed()) return false;

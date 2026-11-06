@@ -367,7 +367,7 @@ export const messages = {
     "macOS 13 lub nowszy na Apple silicon lub Intelu, Windows 10 lub nowszy na x64 oraz Linux na x64 lub arm64 jako AppImage.",
   "sitePage.landing.faq.safety.question": "Czy pozwolenie agentom na pracę na moim komputerze jest bezpieczne?",
   "sitePage.landing.faq.safety.answer":
-    "OpenBot to wersja rozwojowa. Agenci mogą czytać i zmieniać pliki, uruchamiać polecenia, korzystać z sieci i obsługiwać wbudowaną przeglądarkę bez pytania za każdym razem. Dawaj im tylko zadania, którym ufasz, i rób kopie zapasowe.",
+    "Agenci mogą czytać i zmieniać pliki, uruchamiać polecenia, korzystać z sieci i obsługiwać wbudowaną przeglądarkę bez pytania za każdym razem. Dawaj im tylko zadania, którym ufasz, i rób kopie zapasowe.",
   "sitePage.landing.faq.compare": "Porównaj OpenBot",
   "sitePage.landing.download.title": "Pobierz OpenBot",
   "sitePage.landing.download.description":

@@ -268,6 +268,8 @@ export interface DevelopmentRemoteServerConnection {
 }
 
 const REMOTE_DUPLICATION_TIMEOUT_MS = TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS;
+// The 30 seconds that a host can ask its user, and the time that it needs to start the runtime.
+const REMOTE_DESKTOP_SESSION_HTTP_TIMEOUT_MS = 60_000;
 /** An export of up to 100 MB goes up and is read in one request, and apply creates many agents. */
 export const AGENT_IMPORT_UPLOAD_TIMEOUT_MS = TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS;
 // How long a host that restarts into an update keeps the fast retry after Signal first misses it. A
@@ -473,6 +475,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#webrtcTransport?.on("connected", (serverId) => {
       this.#events.clearReconnectBackoff(serverId);
       this.#hostRestartAway.delete(serverId);
+      const hostedStartAt = this.#hostedStartAt.get(serverId);
+      if (hostedStartAt !== undefined)
+        this.#connectTrace?.hostedStart(serverId, Math.max(0, Date.now() - hostedStartAt));
       this.#clearHostedStart(serverId);
       this.#hostedStartExpired.delete(serverId);
       this.#connections.markConnected(serverId);
@@ -1580,13 +1585,16 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     if (!hosted || this.#stopping || !this.#hostedStartAt.has(serverId)) return;
     const revision = this.#hostedStartRevision.get(serverId) ?? 0;
     const status = yield* hosted.status(serverId).pipe(Effect.catch(() => Effect.succeed(null)));
-    if (
-      this.#stopping ||
-      !this.#hostedStartAt.has(serverId) ||
-      !this.#store.has(serverId) ||
-      this.#connections.stateFor(serverId) === "online"
-    )
+    if (this.#stopping || !this.#hostedStartAt.has(serverId) || this.#connections.stateFor(serverId) === "online")
       return;
+    // A late wake reply can start a server after its removal cleared the start state but before the
+    // store dropped it. Nothing else ends that start, and it hides the next start of the same id.
+    if (!this.#store.has(serverId)) {
+      this.#clearHostedStart(serverId);
+      this.#events.setHostStarting(serverId, false);
+      this.#connections.setHostedSleep(serverId, null);
+      return;
+    }
     // A wake during the read changed the start. Its state is read again later.
     if ((this.#hostedStartRevision.get(serverId) ?? 0) !== revision) {
       this.#scheduleHostedStartRead(serverId);
@@ -2017,12 +2025,14 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       serverId: string,
     ): Effect.fn.Return<RemoteDesktopSession, RemoteWorkflowError, RemoteRequest> {
       const viewerProxy = this.#remoteViewerProxy;
-
+      const webRtc = (yield* remoteDecode(() => this.#store.require(serverId))).transport === "webrtc-v2";
+      // The host can wait for its user to allow the session. A WebRTC request already waits longer.
       const session = yield* this.request(serverId, TEAM_API_ROUTES.remoteScreen.sessions, decodeRemoteDesktopSession, {
         method: "POST",
         body: {},
+        ...(webRtc ? {} : { timeoutMs: REMOTE_DESKTOP_SESSION_HTTP_TIMEOUT_MS }),
       });
-      if ((yield* remoteDecode(() => this.#store.require(serverId))).transport !== "webrtc-v2") return session;
+      if (!webRtc) return session;
       if (!viewerProxy)
         return yield* new RemoteWorkflowError({
           cause: new Error(sourceText("error.remote.viewerProxyUnavailable")),

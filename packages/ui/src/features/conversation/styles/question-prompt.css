@@ -1,0 +1,440 @@
+/* Question prompt: one bubble, one question at a time. The open page moves and fades in; the others
+   wait to the start (done) or to the end (later). The stage height follows the open page. */
+
+.question-prompt-bubble.ui-bubble {
+  width: min(540px, 100%);
+  max-width: 100%;
+}
+
+.question-prompt-bubble[data-entrance] {
+  animation: question-prompt-in var(--page-slide-dur) var(--page-slide-ease) both;
+}
+
+@keyframes question-prompt-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--page-slide-distance));
+    filter: blur(var(--page-blur));
+  }
+}
+
+.question-prompt-bubble > .ui-bubble-content {
+  width: 100%;
+  padding: var(--openbot-space-4) var(--openbot-space-2) var(--openbot-space-2);
+}
+
+.question-prompt-form.ui-questionnaire {
+  position: relative;
+  gap: 0;
+}
+
+.question-prompt-cancel.ui-button {
+  position: absolute;
+  z-index: 2;
+  inset-block-start: calc(-1 * var(--openbot-space-2));
+  inset-inline-end: 0;
+  color: var(--openbot-text-muted);
+}
+
+.question-prompt-stage {
+  display: grid;
+  overflow: hidden;
+  outline: 0;
+  transition: height var(--page-slide-dur) var(--page-slide-ease);
+}
+
+.question-prompt-page {
+  grid-area: 1 / 1;
+  align-self: start;
+  min-width: 0;
+  transition:
+    opacity var(--page-fade-dur) var(--page-fade-ease),
+    transform var(--page-slide-dur) var(--page-slide-ease),
+    filter var(--page-slide-dur) var(--page-slide-ease),
+    visibility 0s linear var(--page-slide-dur);
+}
+
+.question-prompt-page[data-pos="prev"],
+.question-prompt-page[data-pos="next"] {
+  opacity: 0;
+  filter: blur(var(--page-blur));
+  visibility: hidden;
+}
+
+.question-prompt-page[data-pos="prev"] {
+  transform: translateX(calc(-1 * var(--page-slide-distance)));
+}
+
+.question-prompt-page[data-pos="next"] {
+  transform: translateX(var(--page-slide-distance));
+}
+
+:dir(rtl) .question-prompt-page[data-pos="prev"] {
+  transform: translateX(var(--page-slide-distance));
+}
+
+:dir(rtl) .question-prompt-page[data-pos="next"] {
+  transform: translateX(calc(-1 * var(--page-slide-distance)));
+}
+
+.question-prompt-page[data-pos="current"] {
+  transition-delay: 0s, 0s, 0s, 0s;
+}
+
+/* The footer folds away when the answers are sent. */
+.question-prompt-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--acc-collapse) var(--acc-ease);
+}
+
+.question-prompt-fold[data-open="true"] {
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--acc-expand) var(--acc-ease);
+}
+
+.question-prompt-fold-inner {
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  filter: blur(var(--text-swap-blur));
+  transition:
+    opacity var(--acc-collapse) var(--acc-ease),
+    filter var(--acc-collapse) var(--acc-ease);
+}
+
+.question-prompt-fold[data-open="true"] .question-prompt-fold-inner {
+  opacity: 1;
+  filter: blur(0);
+  transition:
+    opacity var(--acc-expand) var(--acc-ease),
+    filter var(--acc-expand) var(--acc-ease);
+}
+
+/* Question ------------------------------------------------------------------------------------ */
+
+.question-prompt-header {
+  display: grid;
+  gap: var(--openbot-space-0-5);
+  padding: 0 var(--openbot-space-2) var(--openbot-space-2);
+}
+
+.question-prompt-page:not(.question-prompt-summary) .question-prompt-header {
+  padding-inline-end: var(--openbot-space-8);
+}
+
+.question-prompt-title {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-lg);
+  letter-spacing: var(--openbot-tracking-tight);
+  overflow-wrap: anywhere;
+}
+
+.question-prompt-detail {
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+}
+
+.question-prompt-options {
+  gap: var(--openbot-space-0-5);
+}
+
+.question-prompt-options > .question-prompt-option {
+  position: relative;
+  min-width: 0;
+  min-height: 40px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--openbot-space-3);
+  border-radius: var(--openbot-radius-md);
+  padding: var(--openbot-space-2);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+  cursor: pointer;
+  transition: background-color var(--openbot-duration-fast) ease-out;
+}
+
+.question-prompt-option:hover:not([data-disabled]),
+.question-prompt-custom:focus-within {
+  background: var(--openbot-question-option-soft);
+}
+
+.question-prompt-option[data-checked] {
+  background: var(--openbot-question-option-hover);
+}
+
+.question-prompt-option:active:not([data-disabled]) {
+  background: var(--openbot-question-option-pressed);
+}
+
+/* The stage clips, so the keyboard ring sits inside the row. */
+.question-prompt-option.ui-questionnaire-choice:focus-within {
+  outline: 0;
+}
+
+.question-prompt-option:has(.ui-questionnaire-choice-input:focus-visible) {
+  background: var(--openbot-question-option-soft);
+  box-shadow: inset 0 0 0 1px var(--openbot-question-option);
+}
+
+.question-prompt-option-text {
+  min-width: 0;
+  display: grid;
+}
+
+.question-prompt-option-label {
+  overflow-wrap: anywhere;
+}
+
+.question-prompt-option-description {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  overflow-wrap: anywhere;
+}
+
+/* Letter badge: a question tint; solid when picked, with a small pop; success tint once answered. */
+.question-prompt-letter.ui-kbd {
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  border-color: transparent;
+  border-radius: var(--openbot-radius-xs);
+  background: var(--openbot-question-badge-soft);
+  color: var(--openbot-question-badge-text);
+  font-family: var(--openbot-font-sans);
+  font-weight: var(--openbot-weight-semibold);
+  transition:
+    background-color var(--openbot-duration-fast) ease-out,
+    color var(--openbot-duration-fast) ease-out;
+}
+
+.question-prompt-answer-skipped .question-prompt-letter.ui-kbd {
+  background: var(--openbot-bg-control-active);
+  color: var(--openbot-text-muted);
+}
+
+.question-prompt-option[data-checked] .question-prompt-letter.ui-kbd {
+  background: var(--openbot-question-option);
+  color: var(--openbot-text-on-status);
+  animation: question-prompt-badge-pop var(--openbot-duration-slow) var(--openbot-ease-out);
+}
+
+.question-prompt-letter[data-answered].ui-kbd {
+  background: var(--openbot-success);
+  color: var(--openbot-text-on-status);
+}
+
+.question-prompt-bubble[data-entrance][data-state="done"] .question-prompt-letter[data-answered].ui-kbd {
+  animation: question-prompt-badge-pop var(--openbot-duration-slow) var(--openbot-ease-out) var(--openbot-duration-fast)
+    both;
+}
+
+@keyframes question-prompt-badge-pop {
+  from {
+    transform: scale(0.8);
+  }
+}
+
+.question-prompt-custom {
+  cursor: text;
+}
+
+.question-prompt-custom-input.ui-input {
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  color: var(--openbot-text-primary);
+  font: inherit;
+}
+
+.question-prompt-custom-input.ui-input::placeholder {
+  color: var(--openbot-text-muted);
+}
+
+.question-prompt-custom-input.ui-input:focus,
+.question-prompt-custom-input.ui-input:focus-visible {
+  outline: 0;
+  box-shadow: none;
+}
+
+/* Footer: progress, then Back, Skip and Next. ------------------------------------------------ */
+
+.question-prompt-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  padding-block: var(--openbot-space-3) var(--openbot-space-1);
+  padding-inline: var(--openbot-space-2) var(--openbot-space-1);
+}
+
+.question-prompt-progress.ui-questionnaire-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+}
+
+.question-prompt-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-text-dim);
+  transition:
+    width var(--page-slide-dur) var(--page-slide-ease),
+    background-color var(--page-slide-dur) var(--page-slide-ease),
+    opacity var(--page-slide-dur) var(--page-slide-ease);
+}
+
+.question-prompt-dot[data-state="done"] {
+  background: var(--openbot-question-badge-text);
+  opacity: 0.55;
+}
+
+/* The current question is a wide pill. It moves along as the questions open. */
+.question-prompt-dot[data-state="current"] {
+  width: 18px;
+  background: var(--openbot-question-option);
+}
+
+.question-prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  margin-inline-start: auto;
+}
+
+.question-prompt-pill.ui-button {
+  border-radius: var(--openbot-radius-pill);
+  padding-inline: var(--openbot-space-4);
+  font-size: var(--openbot-text-md);
+}
+
+/* Summary ------------------------------------------------------------------------------------- */
+
+.question-prompt-summary {
+  display: grid;
+}
+
+.question-prompt-section .question-prompt-title {
+  padding: 0 var(--openbot-space-2) var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+}
+
+.question-prompt-section + .question-prompt-section {
+  margin-top: var(--openbot-space-2);
+  border-top: 1px solid var(--openbot-border);
+  padding-top: var(--openbot-space-3);
+}
+
+.question-prompt-answers {
+  display: grid;
+  gap: var(--openbot-space-1);
+  margin: 0;
+  list-style: none;
+}
+
+.question-prompt-answers,
+.question-prompt-answer-skipped {
+  padding: var(--openbot-space-0-5) var(--openbot-space-2) var(--openbot-space-2);
+}
+
+.question-prompt-answer {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--openbot-space-3);
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+  overflow-wrap: anywhere;
+}
+
+.question-prompt-answer-skipped {
+  color: var(--openbot-text-muted);
+}
+
+.question-prompt-closed {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  padding: 0 var(--openbot-space-2) var(--openbot-space-2);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+}
+
+.question-prompt-closed svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.question-prompt-empty {
+  min-width: 0;
+  display: grid;
+  gap: var(--openbot-space-0-5);
+  padding: var(--openbot-space-1);
+}
+
+.question-prompt-empty strong {
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-md);
+}
+
+.question-prompt-empty > span {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.question-prompt-history-entry {
+  width: min(540px, 100%);
+}
+
+@media (max-width: 520px) {
+  .question-prompt-bubble.ui-bubble {
+    width: 100%;
+  }
+
+  .question-prompt-footer {
+    flex-wrap: wrap;
+  }
+
+  .question-prompt-pill.ui-button {
+    padding-inline: var(--openbot-space-3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .question-prompt-bubble[data-entrance],
+  .question-prompt-letter.ui-kbd,
+  .question-prompt-option[data-checked] .question-prompt-letter.ui-kbd,
+  .question-prompt-bubble[data-entrance][data-state="done"] .question-prompt-letter[data-answered].ui-kbd {
+    animation: none;
+  }
+
+  :is(
+    .question-prompt-stage,
+    .question-prompt-page,
+    .question-prompt-fold,
+    .question-prompt-fold-inner,
+    .question-prompt-letter,
+    .question-prompt-dot,
+    .question-prompt-option
+  ) {
+    transition: none;
+  }
+}

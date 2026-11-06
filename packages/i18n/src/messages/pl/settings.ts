@@ -118,6 +118,12 @@ export const messages = {
   "settings.planStart.customHint": "Co najmniej 5 sekund.",
   "settings.planStart.customInvalid": "Wpisz liczbę całkowitą, co najmniej 5 sekund.",
   "settings.planStart.set": "Ustaw",
+  "settings.automationLimit.sectionTitle": "Limit",
+  "settings.automationLimit.sectionDescription": "Dotyczy wszystkich agentów na tym komputerze.",
+  "settings.automationLimit.title": "Żądania na godzinę",
+  "settings.automationLimit.option": "{limit} na godzinę",
+  "settings.automationLimit.note":
+    "Najwięcej wiadomości i uruchomień rutyn, które lokalne skrypty mogą wysłać do każdego agenta w ciągu godziny.",
   "settings.backgroundProcesses.title": "Procesy w tle",
   "settings.backgroundProcesses.description":
     "Programy, które agenci uruchomili i zostawili włączone, np. serwery deweloperskie. Działają dalej po końcu czatu i po zamknięciu OpenBota.",
@@ -619,7 +625,7 @@ export const messages = {
     "Gdy dyktujesz wiadomość, odpowiedź jest czytana na głos. Aby ją zatrzymać, zacznij dyktować ponownie.",
   "settings.voice.speech.codexLive.title": "Głos na żywo Codex",
   "settings.voice.speech.codexLive.description":
-    "Rozmowy głosowe z agentami Codex używają głosu na żywo OpenAI z Twoim logowaniem Codex. Twój głos trafia do OpenAI.",
+    "Rozmowy głosowe z każdym agentem używają głosu na żywo OpenAI z Twoim logowaniem Codex. Twój głos, Twoje prośby i odpowiedzi agenta trafiają do OpenAI.",
   "settings.voice.speech.speed.title": "Szybkość",
   "settings.voice.speech.voice.title": "Głos",
   "settings.voice.speech.voice.female": "Głos żeński {number}",

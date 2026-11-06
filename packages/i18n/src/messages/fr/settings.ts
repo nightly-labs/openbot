@@ -127,6 +127,12 @@ export const messages = {
   "settings.planStart.customHint": "Au moins 5 secondes.",
   "settings.planStart.customInvalid": "Saisissez un nombre entier d’au moins 5 secondes.",
   "settings.planStart.set": "Définir",
+  "settings.automationLimit.sectionTitle": "Limite",
+  "settings.automationLimit.sectionDescription": "Elle s’applique à tous les agents de cet ordinateur.",
+  "settings.automationLimit.title": "Requêtes par heure",
+  "settings.automationLimit.option": "{limit} par heure",
+  "settings.automationLimit.note":
+    "Le nombre maximal de messages et d’exécutions de routines que les scripts locaux peuvent envoyer à chaque agent en une heure.",
   "settings.backgroundProcesses.title": "Processus en arrière-plan",
   "settings.backgroundProcesses.description":
     "Programmes que les agents ont lancés et laissés en marche, comme des serveurs de développement. Ils continuent après la fin du chat et quand vous quittez OpenBot.",
@@ -607,7 +613,7 @@ export const messages = {
     "Quand vous dictez un message, la réponse est lue à voix haute. Dictez à nouveau pour l’arrêter.",
   "settings.voice.speech.codexLive.title": "Voix en direct Codex",
   "settings.voice.speech.codexLive.description":
-    "Les conversations vocales avec les agents Codex utilisent la voix en direct d’OpenAI avec votre connexion Codex. Votre voix est envoyée à OpenAI.",
+    "Les conversations vocales avec n’importe quel agent utilisent la voix en direct d’OpenAI avec votre connexion Codex. Votre voix, vos demandes et les réponses de l’agent sont envoyées à OpenAI.",
   "settings.voice.speech.speed.title": "Vitesse",
   "settings.voice.speech.voice.title": "Voix",
   "settings.voice.speech.voice.female": "Voix féminine {number}",

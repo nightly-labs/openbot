@@ -120,6 +120,12 @@ export const messages = {
   "settings.planStart.customHint": "Mindestens 5 Sekunden.",
   "settings.planStart.customInvalid": "Gib eine ganze Zahl ab 5 Sekunden ein.",
   "settings.planStart.set": "Festlegen",
+  "settings.automationLimit.sectionTitle": "Limit",
+  "settings.automationLimit.sectionDescription": "Es gilt für alle Agenten auf diesem Computer.",
+  "settings.automationLimit.title": "Anfragen pro Stunde",
+  "settings.automationLimit.option": "{limit} pro Stunde",
+  "settings.automationLimit.note":
+    "So viele Nachrichten und Routineläufe können lokale Skripte jedem Agenten pro Stunde höchstens senden.",
   "settings.backgroundProcesses.title": "Hintergrundprozesse",
   "settings.backgroundProcesses.description":
     "Programme, die Agenten gestartet und laufen gelassen haben, etwa Dev-Server. Sie laufen weiter, wenn der Chat endet und wenn du OpenBot beendest.",
@@ -606,7 +612,7 @@ export const messages = {
     "Wenn du eine Nachricht diktierst, wird die Antwort vorgelesen. Diktiere erneut, um sie zu stoppen.",
   "settings.voice.speech.codexLive.title": "Codex-Live-Sprache",
   "settings.voice.speech.codexLive.description":
-    "Sprachgespräche mit Codex-Agenten nutzen OpenAI-Live-Sprache mit deiner Codex-Anmeldung. Deine Stimme geht an OpenAI.",
+    "Sprachgespräche mit jedem Agenten nutzen OpenAI-Live-Sprache mit deiner Codex-Anmeldung. Deine Stimme, deine Anfragen und die Antworten des Agenten gehen an OpenAI.",
   "settings.voice.speech.speed.title": "Geschwindigkeit",
   "settings.voice.speech.voice.title": "Stimme",
   "settings.voice.speech.voice.female": "Weibliche Stimme {number}",

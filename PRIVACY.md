@@ -44,6 +44,8 @@ An owner or admin can give a named browser profile a proxy. The pages of that pr
 through the proxy server that they chose, and that server can see which sites the profile opens.
 OpenBot keeps the proxy password encrypted on the computer that runs OpenBot, sends it only to that
 proxy, and does not log it or send it back to a client.
+The desktop app, the web client and the mobile app send a new password to that computer only in a
+save, through the encrypted host connection, and do not keep it.
 An owner or admin of a joined server can also share the internet connection of their own computer
 with that server. While their desktop app is open and sharing is on, the pages of the profiles that
 use that computer go through it: the sites see the address of that computer, and the bytes go
@@ -73,14 +75,14 @@ self-hosted OpenPanel service for product analytics. Development builds, preview
 The production account service also sends OpenPanel an event when a paid plan or a hosted server
 changes: a Checkout starts or expires, a plan starts, changes, is cancelled or ends, a payment
 succeeds or fails, a payment is refunded or disputed, the Customer Portal opens, or a hosted server is set up, fails to set up, stops
-after no use, starts, changes its machine, stops at the end of its plan, is renewed or is deleted.
+after no use, starts, becomes ready after a start, changes its machine, stops at the end of its plan, is renewed or is deleted.
 It also sends these events for a license: a Checkout starts, the license starts, its number of
 users goes up or down, its renewal is cancelled or resumed, it ends, or its payment succeeds, fails,
 is refunded or is disputed.
 Each event has your account ID and only fixed values: the action, whether it is a server plan or a
 license, the plan, the number of license users, the billing period, the currency, the amount that
-Stripe reports, the place in the app where the plans were opened, the server size, the start reason
-and an error code. It has
+Stripe reports, the place in the app where the plans were opened, the server size, the start reason,
+how long a start took, and an error code. It has
 no email, name, Stripe ID or server ID. The desktop analytics setting does not stop these events,
 because the account service sends them and not your computer.
 When you pay for a plan or a license (it starts, each payment succeeds, it changes, or its renewal
@@ -94,8 +96,9 @@ message, a welcome email for a server plan, or a license email), it sends OpenPa
 event has no account ID, email address, name or message content.
 
 Every 5 minutes, each Signal host sends OpenPanel one event with the number of TURN relay allocations
-and the number of Signal connections. It has no account ID, address, session or
-message content.
+and the number of Signal connections. It also has the number of webhook requests that Signal answered
+in those 5 minutes, by HTTP status, and the average time it waited for a host. It has no account ID,
+address, session, route, or message content.
 
 The account service also records a return from Checkout without payment and later payment
 recovery. Verified paid invoices produce a revenue event in USD, with the original amount,
@@ -180,7 +183,10 @@ application-version-change actions. Plans and license events send the plan, bill
 currency, where the plans were opened, and whether a license user count went up or down; they do
 not send a price, a payment detail or a Stripe ID. Connector events name only the connector type,
 such as Slack; channel events send no channel name. Message events can send the kinds of the
-attached files (image, document, spreadsheet, ZIP or other), never their names or types. Event properties are limited to metadata such as counts, result states, timing, provider,
+attached files (image, document, spreadsheet, ZIP or other), never their names or types. For each
+webhook request that reaches the computer, the app records the kind of owner (agent, channel or
+workflow), the result, the HTTP status, the body size and the times, at most 60 each minute; it
+never sends the URL, a route or delivery ID, the secret, the event type or the body. Event properties are limited to metadata such as counts, result states, timing, provider,
 model, reasoning effort, application version, operating system, and coarse failure codes. Voice events
 send only lengths, times, counts, the chosen voice (for example `F1`), whether the server is local or
 remote, and whether speech recognition runs on the computer or in the cloud. They never send what
@@ -325,6 +331,12 @@ when there is no install ID.
   slowest startup step from a fixed list; and whether it was the first start since the computer
   booted, a later one, or the first start of a new version. To know this, the app keeps the time and
   version of its last start in a local file that is not sent. Paths and names are not sent.
+- **Connection time.** When this computer connects to a remote server, the host sends how long the
+  connection took, rounded, and how long each fixed step of it took; whether it was the first
+  connection to that server since the app started; whether the session was new or saved; how many
+  attempts failed before it; and, for a hosted server, how long the server took to start. The first
+  attempt that fails after a connection also sends the last step that finished. The server ID,
+  address, session, ticket and keys are not sent.
 - **Turn times.** When a turn completes, the host sends how long the message waited in the queue, how
   long the provider took to start the turn and, when it had to start, its process, and how long until
   the first output. These are times only; the messages are not sent.
@@ -941,13 +953,22 @@ client and host use a separate OpenBot Signal service to establish WebRTC. Signa
 short-lived authentication, SDP, and ICE messages. Team API data uses WebRTC DataChannels. Remote
 Desktop media and input use a separate WebRTC connection. A paste in the Remote Desktop viewer
 sends the member's clipboard text to the host, which puts it on the host's clipboard. The live browser view sends compressed
-images of the host's browser tab, and the watching member's pointer and key input, over that same
-media connection. ICE uses a direct peer-to-peer path when possible. If a direct path is not possible, encrypted WebRTC traffic uses an OpenBot coturn relay.
+images of the host's browser tab, and the watching member's pointer and key input, through the
+desktop DataChannel of the Team API connection. ICE uses a direct peer-to-peer path when possible. If a direct path is not possible, encrypted WebRTC traffic uses an OpenBot coturn relay.
 When the owner selects **Private network** in Settings › Mobile Connect, the host gets no STUN or
 TURN server, so no WebRTC traffic goes through an OpenBot relay. Team API connections then use only
 addresses on a private network, such as the Wi-Fi or a Tailscale tailnet. The desktop media
 connection gets the same empty server list for each new stream, so it also uses only a direct path,
 which can be a public IPv6 address of the computer. Sign-in and Signal messages do not change.
+
+The phone app shows a Remote Desktop in a web view that loads the host's viewer from a server on the
+phone's loopback address (`127.0.0.1`). That server takes only requests with a random token, serves
+one session, and stops when the screen closes. The viewer's files and its signaling go to the host
+through the encrypted Team API connection; the video and input use the separate WebRTC connection as
+on desktop. The phone does not store the viewer's files, the screen, or the connection stats that its stats
+sheet shows; Copy in that sheet puts them on the phone's clipboard only when the user taps it. It asks for Face ID, Touch ID
+or the phone unlock before a session, ends the session when the app leaves the foreground, and on
+Android does not allow screenshots or screen recording of the screen while it is open.
 
 Agents, conversations, queues, direct messages, attachments, browser data, prompts, approvals, and
 Remote Desktop data remain on the host. The central account service does not copy them into D1 or
@@ -1028,15 +1049,18 @@ Network traffic can also occur when:
   text, as for a typed message, and no recording is kept. Recordings show in the Storage tab of
   **Server Settings**, where the user can delete them, and are part of a data export. A recording is
   deleted with the agent's or channel's data;
-- the user turns on Codex live voice in **Settings → Voice** and opens the Voice pane of a Codex agent
-  on this computer. The app window sends a WebRTC offer to the local Codex App Server, which opens a
-  realtime voice session with OpenAI through the user's own Codex sign-in. The microphone audio then
-  goes from this computer to OpenAI, and the spoken reply comes back, until the pane closes. OpenAI
-  also gets the instructions and the chat context that Codex sends for the agent's thread, as for a
-  typed message. OpenBot never reads the Codex credentials. What the user says is added to the chat
-  as text; no recording is kept. OpenAI handles the audio and the text under its own policy and the
-  user's ChatGPT plan. The setting is saved in `speech-preference.json` in the application data
-  folder. It is off by default;
+- the user turns on Codex live voice in **Settings → Voice** and opens the Voice pane of an agent on
+  this computer, with any provider. OpenBot starts a separate Codex App Server process for the
+  session. The app window sends a WebRTC offer to it, and it opens a realtime voice session with
+  OpenAI through the user's own Codex sign-in: the agent's own Codex account for an agent on Codex,
+  else the default Codex sign-in. The microphone audio then goes from this computer to OpenAI, and the
+  spoken reply comes back, until the pane closes. OpenAI also gets the short relay instructions of
+  OpenBot, but not the agent's chat. Each request that the voice gives to the agent goes to the
+  agent's own provider as a text message, as for a typed message, and shows in the chat. The agent's
+  text answer then goes to OpenAI to be spoken. OpenBot never reads the Codex credentials. The voice
+  transcript is not added to the chat; no recording is kept. OpenAI handles the audio and the text
+  under its own policy and the user's ChatGPT plan. The setting is saved in `speech-preference.json`
+  in the application data folder. It is off by default;
 - the user connects Bitwarden. OpenBot runs the installed `bw` CLI to sync with the server already
   configured in that CLI, including a self-hosted server. It syncs before listing or filling logins.
   These calls send no OpenBot conversations, files, or agent instructions to Bitwarden. For a

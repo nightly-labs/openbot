@@ -171,8 +171,27 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    machine in memory and continue it at a resume with no boot: the resume answers `"status":
    "running"`, and the file stays. Then the Worker runs a command on the machine that removes the
    file and starts `openbot.service` (`HELD_RESUME_START_COMMAND`). With no file the command does
-   nothing. If boat does not complete the stop after the hook, OpenBot stays stopped until the next
-   stop and resume. A hook that OpenBot did not write stays, and a self-hosted server gets no hook.
+   nothing. boat can also cancel the stop after the hook, for example when it cannot pause a Docker
+   container that restarts ("Final snapshot failed; stop aborted"). The machine then runs with the
+   file, and OpenBot stays stopped. Two paths start it again, both only for a file older than 5
+   minutes: boat runs the hook again before each new try of the stop, so a newer file can belong to a
+   save that still runs. The hook sets a transient systemd timer (`openbot-pre-stop-restart`) that
+   fires 15 minutes after the last hook. A client wake or a connector event for a server that boat
+   reports as running makes the Worker run `FAILED_STOP_START_COMMAND` after the reply. boat tries
+   the stop again every 4 to 10 minutes (seen on 2026-11-05), and each try stops OpenBot again. Thus
+   the timer fires only after boat stops its tries, and a wake keeps OpenBot running only until the
+   next try. boat reports these tries as `stop.status: "failing"` and keeps the sandbox state
+   `idle`. On 2026-11-05 a save failed this way for 18 hours, while the restore of the disk stalled,
+   and the start command failed with `sandbox_restoring`. Thus the Worker reads a failing stop as
+   `stopping`, not `running`, and logs `Hosted server stop is failing.` at each check. A `sandbox.ready`
+   webhook for a stopping server makes the Worker read the sandbox again, so the webhook does not hide
+   the failing stop. Each client wake and connector event still sends `FAILED_STOP_START_COMMAND`. The Worker does not end the stop. Only a resume ends it
+   (`superseded`), but boat does not say if that resume keeps the disk or restores the last saved
+   disk. A forced stop keeps only the last saved disk and loses what was written after it. An
+   operator decides: compare `snapshotCompletedAt` with the last writes of OpenBot before a force,
+   then wake the server. A machine that stopped
+   runs no timer. A hook that OpenBot did not write stays, and a self-hosted server gets
+   no hook.
 
    **Check at a start.** `PRAGMA quick_check` reads every page of `openbot.db`: on a 15.7 GB file
    it stopped the main thread for 77 seconds to about 4 minutes. A clean close removes

@@ -26,7 +26,6 @@ export const messages = {
   "error.voice.speech.timedOut": "Czytanie odpowiedzi na głos trwało zbyt długo.",
   "error.voice.speech.failed": "OpenBot nie mógł przeczytać odpowiedzi na głos.",
   "error.voice.recordingNotKept": "OpenBot nie mógł zachować nagrania głosowego.",
-  "error.voice.live.codexOnly": "Głos na żywo działa tylko z agentami Codex.",
   "error.voice.live.timedOut": "Głos na żywo Codex nie uruchomił się na czas. Spróbuj ponownie.",
   "error.voice.live.failed": "Głos na żywo zatrzymał się: {reason}",
   "error.voice.live.disconnected": "Głos na żywo został rozłączony.",

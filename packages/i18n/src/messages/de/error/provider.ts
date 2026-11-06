@@ -304,6 +304,8 @@ export const messages = {
     "OpenCode hat die Anfrage abgelehnt und keinen Grund genannt. Das kann in einem langen Chat oder nach einem Modellwechsel passieren. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, wähle ein anderes Modell oder einen niedrigeren Aufwand.",
   "error.provider.museMcpStartupFault":
     "Muse konnte einen MCP-Server nicht starten und hat MCP in dieser Sitzung gesperrt. OpenBot hat eine neue Muse-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, schalte Computersteuerung oder den fehlerhaften MCP-Server für diesen Agenten aus.",
+  "error.provider.claudeSessionMissing":
+    "Claude Code hat die gespeicherte Sitzung dieses Chats nicht gefunden. OpenBot hat eine neue Claude-Code-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.grokSignIn": "Führe `grok login` aus oder setze XAI_API_KEY, um Grok zu verwenden.",
   "error.provider.acpSignInTimedOut": "Die Zeit für die Anmeldung ist abgelaufen.",
   "error.provider.acpSignInStopped": "Die Anmeldung wurde vor dem Abschluss gestoppt.",

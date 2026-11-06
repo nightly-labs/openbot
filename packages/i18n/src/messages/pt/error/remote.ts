@@ -7,6 +7,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "O teste de área de trabalho remota está indisponível.",
   "error.remote.controlUnavailable": "O controle remoto está indisponível.",
   "error.remote.controlSessionNotFound": "Sessão de controle remoto não encontrada.",
+  "error.remote.controlNotAllowed": "O proprietário deste computador não permite que sua função o controle.",
+  "error.remote.controlDeclined": "A pessoa neste computador não permitiu o controle remoto.",
   "error.remote.testRuntimeUpdate":
     "Atualize o ambiente de execução da área de trabalho remota do macOS para executar este teste.",
   "error.remote.testOtherSessions": "Encerre as outras sessões de área de trabalho remota antes de iniciar um teste.",
@@ -195,6 +197,8 @@ export const messages = {
   "error.remote.hostNotRegistered": "Este computador anfitrião não está mais registrado no serviço do OpenBot.",
   "error.remote.membershipEnded":
     "Você não é mais membro deste computador anfitrião. Peça um novo convite ao proprietário.",
+  "error.remote.membershipChanged":
+    "Outra pessoa alterou este membro ao mesmo tempo. Carregue os membros novamente e tente de novo.",
   "error.remote.accountSessionInactive": "Seu login não está mais ativo. Entre novamente.",
   "error.remote.hostOtherAccount": "Este computador anfitrião pertence a outra conta.",
   "error.remote.remoteNotConfigured": "As conexões remotas não estão configuradas neste serviço do OpenBot.",

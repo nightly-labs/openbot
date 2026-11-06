@@ -104,6 +104,11 @@ export interface ServerSettingsModalProps {
   license?: Pick<LicenseCalls, "getState" | "setUsers" | "changePlan"> | undefined;
   /** Company sign-in for the owner of a published server. Absent where the app cannot manage it. */
   companySignIn?: CompanySignInCalls | undefined;
+  /**
+   * Opens the desktop app download where `companySignIn` is absent. The owner then sees that setup
+   * needs the desktop app, instead of no section.
+   */
+  onDownloadDesktopApp?: (() => void) | undefined;
   /** Opens the contact page when a full license already has the most users that the app sells. */
   onContactUs?: () => void;
   onUpdateMember: (input: UpdateTeamMemberInput) => Promise<void>;
@@ -322,7 +327,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   let syncedServerId = "";
 
   const local = () => props.server.kind === "local";
-  const remoteDesktopSection = () => props.remoteDesktopSupported !== false && props.platform === "darwin";
+  // The client's remote desktop setup is for macOS. A local server shows the section on every platform,
+  // because its owner chooses there who can control the computer.
+  const remoteDesktopSection = () => props.remoteDesktopSupported !== false && (props.platform === "darwin" || local());
   const configured = () => (local() ? Boolean(props.hostStatus?.configured) : true);
   /**
    * The role check without `configured()`. MCP servers belong to this machine and are spawned
@@ -399,6 +406,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const companySignIn = createServerCompanySignInSection(
     host,
     () => props.companySignIn,
+    () => props.onDownloadDesktopApp,
     () => props.open && section() === "members",
   );
   const hostedSites = createSettingsHostedSitesStore(
@@ -786,7 +794,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         </Show>
         <Show when={remoteDesktopSection()}>
           <Tabs.Content value="desktop" class="settings-modal-tab-panel server-settings-panel" data-tab="desktop">
-            <ServerDesktopPanel server={props.server} platform={props.platform} hostStatus={props.hostStatus} />
+            <ServerDesktopPanel
+              server={props.server}
+              platform={props.platform}
+              hostStatus={props.hostStatus}
+              menuMount={modalElement()}
+            />
           </Tabs.Content>
         </Show>
         <Show when={props.mcpServers}>

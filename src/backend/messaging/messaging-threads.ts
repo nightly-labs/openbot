@@ -960,7 +960,7 @@ export class MessagingThreads {
 }
 
 /** The same test the turn lifecycle uses for the answer of a turn. */
-function isAnswer(message: ConversationMessage): boolean {
+export function isAnswer(message: ConversationMessage): boolean {
   return (
     message.author === "assistant" &&
     message.itemType !== "commentary" &&

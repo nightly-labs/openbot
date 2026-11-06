@@ -152,7 +152,9 @@ external chat, a team member, a routine, another agent, or a web page cannot rep
 password. They return no secret. `save_api_key` replaces a Vault key with the same name and deletes
 the calling agent's own key with that name, because the agent's own key wins in `list_api_keys`.
 Another agent's own key with that name stays and still wins for that agent. The value is in the provider's
-transcript because the agent sent it; OpenBot keeps no tool arguments in its trace.
+transcript because the agent sent it; OpenBot keeps no tool arguments in its trace. An agent cannot
+delete a Vault key: for a name that only the Vault has, `remove_api_key` fails and tells the agent
+that the user deletes it in Server settings > Vault.
 
 `password-vault-router.ts` joins metadata from every manager and prefixes Bitwarden ids with
 `bitwarden:` and Proton Pass ids with `proton:`. Existing 1Password ids stay unchanged. The

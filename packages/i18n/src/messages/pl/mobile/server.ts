@@ -4,7 +4,6 @@ import type { messages as source } from "../../en/mobile/server";
 export const messages = {
   "mobile.server.drawer.local": "Lokalne",
   "mobile.server.drawer.remote": "Zdalne",
-  "mobile.server.drawer.routines": "Rutyny",
   "mobile.server.drawer.usage": "Użycie",
   "mobile.server.drawer.editOrder": "Zmień kolejność",
   "mobile.server.drawer.leaveFailed": "Nie udało się opuścić serwera {name}",
@@ -26,6 +25,14 @@ export const messages = {
     other: "{count} członka",
   },
   "mobile.server.drawer.doneEditing": "Zakończ zmianę kolejności",
+  "mobile.server.drawer.editSidebar": "Edytuj pasek boczny",
+  "mobile.server.drawer.unpinTool": "Odepnij",
+  "mobile.server.drawer.pinToolNamed": "Przypnij {name}",
+  "mobile.server.drawer.unpinToolNamed": "Odepnij {name}",
+  "mobile.server.drawer.unpinnedTool": "{name}, odpięte",
+  "mobile.server.drawer.toolsHint":
+    "Przeciągnij uchwyty, aby przenieść narzędzia. Odpięte narzędzia widać tylko podczas edycji. Kolejność jest zapisana na tym urządzeniu.",
+  "mobile.server.drawer.doneEditingSidebar": "Zakończ edycję",
   "mobile.server.drawer.join": "Dołącz do serwera",
   "mobile.server.drawer.add": "Dodaj serwer",
   "mobile.server.drawer.settings": "Ustawienia",
@@ -532,6 +539,69 @@ export const messages = {
   "mobile.server.browserProfiles.deleteBody":
     "To usuwa logowania, pliki cookie i dane witryn profilu. Jego otwarte karty zostaną zamknięte.",
   "mobile.server.browserProfiles.deleteAgents": "Ci agenci przejdą do profilu wspólnego: {agents}.",
+  "mobile.server.browserProxies.unsupported":
+    "Zaktualizuj OpenBot na tym serwerze, aby zarządzać tu jego serwerami proxy.",
+  "mobile.server.browserProxies.loading": "Wczytywanie serwerów proxy…",
+  "mobile.server.browserProxies.loadFailed": "OpenBot nie mógł wczytać serwerów proxy.",
+  "mobile.server.browserProxies.saveFailed": "OpenBot nie mógł zmienić serwera proxy.",
+  "mobile.server.browserProxies.title": "Serwery proxy",
+  "mobile.server.browserProxies.sectionHint":
+    "Profil z serwerem proxy otwiera strony przez ten serwer proxy. Członek udostępnia komputer z aplikacji OpenBot na komputer.",
+  "mobile.server.browserProxies.limit": "Serwer może mieć najwyżej {limit} serwerów proxy.",
+  "mobile.server.browserProxies.add": "Dodaj proxy",
+  "mobile.server.browserProxies.new": "Nowe proxy",
+  "mobile.server.browserProxies.menu": "Proxy",
+  "mobile.server.browserProxies.automatic": "Automatycznie",
+  "mobile.server.browserProxies.profileHint":
+    "„Automatycznie” używa ustawień proxy komputera, na którym działa serwer.",
+  "mobile.server.browserProxies.profileUsage": "{usage} · {proxy}",
+  "mobile.server.browserProxies.summary": "{scheme} · port {port} · {profiles}",
+  "mobile.server.browserProxies.computerSummary": "{state} · {profiles}",
+  "mobile.server.browserProxies.profiles": {
+    one: "{count} profil",
+    few: "{count} profile",
+    many: "{count} profili",
+    other: "{count} profilu",
+  },
+  "mobile.server.browserProxies.online": "Online",
+  "mobile.server.browserProxies.offline": "{name} jest offline",
+  "mobile.server.browserProxies.failing": "{name} nie odpowiada",
+  "mobile.server.browserProxies.signInRefused": "{name} odrzucił logowanie",
+  "mobile.server.browserProxies.yourComputer": "Twój komputer",
+  "mobile.server.browserProxies.memberComputer": "Komputer użytkownika {name}",
+  "mobile.server.browserProxies.unknownComputer": "Komputer członka",
+  "mobile.server.browserProxies.gone": "Tego serwera proxy nie ma już na serwerze.",
+  "mobile.server.browserProxies.editTitle": "Zmienić {name}?",
+  "mobile.server.browserProxies.address": "Adres",
+  "mobile.server.browserProxies.addressPlaceholder": "socks5://user:password@host:1080",
+  "mobile.server.browserProxies.addressHint":
+    "Użyj socks5, http lub https. Nazwa użytkownika i hasło są opcjonalne. Hasło pozostaje zaszyfrowane na komputerze, na którym działa serwer.",
+  "mobile.server.browserProxies.addressInvalid":
+    "To nie jest adres serwera proxy. Użyj socks5://host:1080, http://user:password@host:3128 lub host:port:user:password.",
+  "mobile.server.browserProxies.computerHint":
+    "Strony profili, które używają tego komputera, przechodzą przez jego połączenie internetowe, gdy jego członek udostępnia go w aplikacji OpenBot na komputer. Komputer otwiera tylko publiczne adresy internetowe.",
+  "mobile.server.browserProxies.profilesTitle": "Profile",
+  "mobile.server.browserProxies.delete": "Usuń proxy",
+  "mobile.server.browserProxies.deleteHint": "Usunięcie przełącza profile tego serwera proxy na „Automatycznie”.",
+  "mobile.server.browserProxies.deleteUsed": {
+    one: "{count} profil używa tego serwera proxy. Przełączy się na „Automatycznie”.",
+    few: "{count} profile używają tego serwera proxy. Przełączą się na „Automatycznie”.",
+    many: "{count} profili używa tego serwera proxy. Przełączą się na „Automatycznie”.",
+    other: "{count} profilu używa tego serwera proxy. Przełączą się na „Automatycznie”.",
+  },
+  "mobile.server.browserProxies.deleteUnused": "Żaden profil nie używa tego serwera proxy.",
+  "mobile.server.browserProxies.closesTabs": {
+    one: "Zamknie się {count} otwarta karta.",
+    few: "Zamkną się {count} otwarte karty.",
+    many: "Zamknie się {count} otwartych kart.",
+    other: "Zamknie się {count} otwartej karty.",
+  },
+  "mobile.server.browserProxies.changeTitle": "Zmienić serwer proxy profilu {name}?",
+  "mobile.server.browserProxies.change": "Zmień serwer proxy",
+  "mobile.server.browserProxies.choiceHint":
+    "„Automatycznie” używa ustawień proxy komputera, na którym działa serwer. Zmiana zamyka otwarte karty profilu.",
+  "mobile.server.browserProxies.shareHint":
+    "Aby użyć swojego komputera, udostępnij go w aplikacji OpenBot na komputer.",
   "mobile.server.route.connectors": "Konektory",
   "mobile.server.connectors.unavailable":
     "Połącz się z tym serwerem jako właściciel lub administrator, aby zarządzać jego konektorami.",

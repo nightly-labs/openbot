@@ -9,7 +9,7 @@ import { Button, Input, TextQuote } from "@openbot/ui";
 import { clamp } from "@openbot/ui/utils";
 import { Portal } from "@solidjs/web";
 import type { Element as SolidElement } from "solid-js";
-import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show } from "solid-js";
 import { useText } from "../../text";
 
 const MESSAGE_TEXT_SELECTOR = "[data-selection-message-id]";
@@ -18,6 +18,8 @@ const MESSAGE_TEXT_SELECTOR = "[data-selection-message-id]";
  * `data-selection-file-lines` marks text that is the file source, so a selection gives its lines.
  */
 const FILE_TEXT_SELECTOR = "[data-selection-file-quote]";
+/** A view with its own selection actions, such as a side thread. The actions around it leave its text alone. */
+const SCOPE_SELECTOR = "[data-selection-scope]";
 const INTERACTIVE_SELECTOR =
   'a, button, input, textarea, select, [contenteditable="true"], [role="button"], .message-citation';
 const HIGHLIGHT_NAME = "openbot-message-selection";
@@ -95,12 +97,16 @@ export function MessageSelectionActions(props: {
   /** Puts the selected text in the composer as a quote. Without it, the toolbar has no Quote action. */
   onQuote?: ((messageId: string, text: string) => void) | undefined;
   quoteShortcut?: QuoteShortcutModifier;
+  /** The `data-selection-scope` element whose text these actions take. Without it, they take the text outside each scope. */
+  scope?: HTMLElement | undefined;
 }) {
   const [selection, setSelection] = createSignal<MessageTextSelection | null>(null);
   const [fallbackHighlight, setFallbackHighlight] = createSignal(false);
   let lastContextKey: string | undefined;
 
   const clearSelection = () => {
+    // The highlight has one name for all actions, so only the actions that hold a selection clear it.
+    if (!selection()) return;
     setSelection(null);
     clearPersistentHighlight();
   };
@@ -126,7 +132,7 @@ export function MessageSelectionActions(props: {
       return;
     }
     const next = messageTextSelection(window.getSelection());
-    if (!next) {
+    if (!next || selectionScope(next.range.startContainer) !== (props.scope ?? null)) {
       clearSelection();
       return;
     }
@@ -151,7 +157,8 @@ export function MessageSelectionActions(props: {
   createEffect(
     () => selection(),
     (active) => {
-      clearPersistentHighlight();
+      // The cleanup clears the highlight of the previous selection. Without a selection, the highlight
+      // can be of other actions, such as those of a side thread, so it stays.
       if (!active) {
         setFallbackHighlight(false);
         return;
@@ -195,7 +202,7 @@ export function MessageSelectionActions(props: {
       window.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("keydown", onKeyDown);
-      clearPersistentHighlight();
+      if (selection()) clearPersistentHighlight();
     };
   });
 
@@ -236,6 +243,12 @@ export function SelectionActionsBar(props: {
   let content: HTMLDivElement | undefined;
   let animationFrame: number | undefined;
   let previousSelectionKey = "";
+  // Counts selection changes. A send that ends after one applies its result to no selection.
+  let selectionGeneration = 0;
+  // A new mouse selection dismisses this bar on `pointerdown` and mounts a new one on `pointerup`.
+  onCleanup(() => {
+    selectionGeneration += 1;
+  });
 
   const hasPrompt = createMemo(() => prompt().trim().length > 0);
   const selectionBody = (instruction: string) =>
@@ -305,6 +318,7 @@ export function SelectionActionsBar(props: {
         setExpanded(false);
         setMode("idle");
         setLastInstruction("");
+        selectionGeneration += 1;
       }
       previousSelectionKey = key;
       schedulePosition();
@@ -358,12 +372,18 @@ export function SelectionActionsBar(props: {
     setLastInstruction(normalized);
     setExpanded(false);
     setMode("sending");
+    const generation = selectionGeneration;
+    let sent: boolean;
     try {
-      if (await props.onSend(props.selection.messageId, body)) props.onDismiss();
-      else setMode("error");
+      sent = await props.onSend(props.selection.messageId, body);
     } catch {
-      setMode("error");
+      sent = false;
     }
+    // The user selected other text while it sent: the bar now belongs to that selection, or a new bar
+    // shows it. The late reply must not dismiss that selection.
+    if (generation !== selectionGeneration) return;
+    if (sent) props.onDismiss();
+    else setMode("error");
   };
 
   return (
@@ -602,6 +622,11 @@ const QUOTE_ACTION_WIDTH = 84;
 function isQuoteShortcut(event: KeyboardEvent, modifier: QuoteShortcutModifier): boolean {
   const modifierDown = modifier === "meta" ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
   return modifierDown && event.shiftKey && !event.altKey && event.code === "Period";
+}
+
+function selectionScope(node: Node): HTMLElement | null {
+  const element = node instanceof HTMLElement ? node : node.parentElement;
+  return element?.closest<HTMLElement>(SCOPE_SELECTOR) ?? null;
 }
 
 function messageTextBlock(node: Node): HTMLElement | null {

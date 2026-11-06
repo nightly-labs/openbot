@@ -121,6 +121,7 @@ const DIRECTORY_ERROR_TEXT = new Map<string, string>([
   ["license_users_full", sourceText("error.remote.licenseUsersFull")],
   ["host_not_found", sourceText("error.remote.hostNotRegistered")],
   ["membership_not_found", sourceText("error.remote.membershipEnded")],
+  ["membership_changed", sourceText("error.remote.membershipChanged")],
   ["session_inactive", sourceText("error.remote.accountSessionInactive")],
   ["host_owner_mismatch", sourceText("error.remote.hostOtherAccount")],
   ["remote_not_configured", sourceText("error.remote.remoteNotConfigured")],

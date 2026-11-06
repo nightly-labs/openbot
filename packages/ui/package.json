@@ -427,6 +427,7 @@
     "./features/conversation/FilePreviewPanel": "./src/features/conversation/FilePreviewPanel.tsx",
     "./features/conversation/BrowserPreviewSidebar": "./src/features/conversation/BrowserPreviewSidebar.tsx",
     "./styles/sliding-tabs.css": "./src/styles/sliding-tabs.css",
+    "./styles/sr-only.css": "./src/styles/sr-only.css",
     "./styles/action-menu.css": "./src/styles/action-menu.css",
     "./features/dynamic-island/dynamic-island.css": "./src/features/dynamic-island/dynamic-island.css",
     "./features/dynamic-island/dynamic-island-surface.css": "./src/features/dynamic-island/dynamic-island-surface.css",

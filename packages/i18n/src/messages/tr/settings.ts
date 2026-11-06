@@ -118,6 +118,12 @@ export const messages = {
   "settings.planStart.customHint": "En az 5 saniye.",
   "settings.planStart.customInvalid": "En az 5 saniyelik bir tam sayı girin.",
   "settings.planStart.set": "Ayarla",
+  "settings.automationLimit.sectionTitle": "Sınır",
+  "settings.automationLimit.sectionDescription": "Bu bilgisayardaki tüm ajanlar için geçerlidir.",
+  "settings.automationLimit.title": "Saatlik istek",
+  "settings.automationLimit.option": "Saatte {limit}",
+  "settings.automationLimit.note":
+    "Yerel betiklerin bir saatte her ajana gönderebileceği en fazla mesaj ve rutin çalıştırma sayısı.",
   "settings.backgroundProcesses.title": "Arka plan işlemleri",
   "settings.backgroundProcesses.description":
     "Ajanların başlatıp çalışır bıraktığı programlar, örneğin geliştirme sunucuları. Sohbet bittiğinde ve OpenBot'tan çıktığınızda da çalışmaya devam ederler.",
@@ -593,7 +599,7 @@ export const messages = {
     "Bir mesajı dikte ettiğinizde yanıt sesli okunur. Durdurmak için yeniden dikte edin.",
   "settings.voice.speech.codexLive.title": "Codex canlı ses",
   "settings.voice.speech.codexLive.description":
-    "Codex ajanlarıyla sesli konuşmalar, Codex oturumunla OpenAI canlı sesini kullanır. Sesin OpenAI'ye gider.",
+    "Herhangi bir ajanla sesli konuşmalar, Codex oturumunla OpenAI canlı sesini kullanır. Sesin, isteklerin ve ajanın yanıtları OpenAI'ye gider.",
   "settings.voice.speech.speed.title": "Hız",
   "settings.voice.speech.voice.title": "Ses",
   "settings.voice.speech.voice.female": "Kadın sesi {number}",

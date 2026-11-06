@@ -3,6 +3,7 @@ import type { AgentProviderId } from "@openbot/contracts/agent-providers";
 import {
   type AccountUsage,
   type AccountUsageLimit,
+  type AgentModelOption,
   agentProviderDescriptor,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   MAX_PROVIDER_ACCOUNTS,
@@ -89,6 +90,8 @@ export interface ProviderAccountsHost {
   isAccountBusy(provider: AgentProviderId, accountId: string): boolean;
   stopAgentClients(provider: AgentProviderId, accountId: string): Effect.Effect<void>;
   readUsage(client: AgentClient, model?: string): Effect.Effect<AccountUsage, ProviderAccountFailed>;
+  /** The models that the client's account serves, or null when its `model/list` failed. */
+  readModels(client: AgentClient): Effect.Effect<AgentModelOption[] | null>;
   /** The usage reset credits that the client's last usage reading counted; undefined for a provider with none. */
   resetCredits(client: AgentClient): number | null | undefined;
   consumeUsageReset(client: AgentClient): Effect.Effect<ProviderUsageResetOutcome, ProviderAccountFailed>;
@@ -115,6 +118,11 @@ export class ProviderAccounts {
   readonly #usage = new Map<string, { limit: AccountUsageLimit; resetCredits: number | null | undefined }>();
   /** Paces the usage reads of each account. A new key resets it, and a removed account drops it. */
   readonly #usageGates = new Map<string, UsageReadGate>();
+  /**
+   * The models of each account, from its last check. A plan can serve models that the provider's own
+   * sign-in does not, so the catalogue of the own sign-in is not the account's (#5217).
+   */
+  readonly #models = new Map<string, AgentModelOption[]>();
 
   constructor(store: ProviderAccountStore, host: ProviderAccountsHost) {
     this.#store = store;
@@ -174,15 +182,23 @@ export class ProviderAccounts {
         .filter((account) => !isKeyAccount(account) || !this.#host.defaultUsesApiKey(provider))
         .map((account) => {
           const state = this.#states.get(account.id);
+          const models = this.#models.get(account.id);
           return {
             id: account.id,
             label: account.label,
             email: state?.email ?? null,
             state: state?.state ?? "checking",
             message: state?.message ?? null,
+            ...(models ? { models: structuredClone(models) } : {}),
           };
         }),
     ];
+  }
+
+  /** The models of an account after the first, from its last check; empty before one listed them. */
+  models(provider: AgentProviderId, accountId: string | undefined): AgentModelOption[] {
+    const account = this.account(provider, accountId);
+    return account ? structuredClone(this.#models.get(account.id) ?? []) : [];
   }
 
   /**
@@ -617,6 +633,13 @@ export class ProviderAccounts {
           this.#setState(account.id, { state: "connected", email, organization, message: null });
           // The rail shows an account only with a reading, and no usage request follows a sign-in.
           if (limit) this.#host.usageChanged(limit);
+          // After the connected state, so a slow list does not delay it; the end of the sign-in still
+          // waits for the list. A failed list keeps the last one.
+          const models = yield* this.#host.readModels(client);
+          if (models && this.#states.has(account.id)) {
+            this.#models.set(account.id, models);
+            this.#host.changed();
+          }
         }),
       ({ client }) => this.#host.stopClient(client),
     );
@@ -765,6 +788,7 @@ export class ProviderAccounts {
     this.#states.delete(accountId);
     this.#usage.delete(accountId);
     this.#usageGates.delete(accountId);
+    this.#models.delete(accountId);
   }
 
   #usageGate(accountId: string): UsageReadGate {
