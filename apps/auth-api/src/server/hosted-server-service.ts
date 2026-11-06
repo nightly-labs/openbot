@@ -1824,11 +1824,14 @@ export class HostedServerService {
     const boat = dependencies.boat;
     const sandboxId = row.provider_sandbox_id;
     if (!boat || !sandboxId) return;
+    // The state can be as old as the request. With the time from before the request, `#observe` refuses it
+    // when a wake or a webhook wrote a newer `provider_event_at` while the request ran.
+    const readAt = dependencies.now();
     const state = yield* boat.getSandbox(sandboxId).pipe(
       Effect.map((sandbox) => sandbox.state),
       Effect.catch((error) => (error.status === 404 ? Effect.succeed("cancelled" as const) : Effect.fail(error))),
     );
-    yield* this.#observe(row, state, dependencies.now());
+    yield* this.#observe(row, state, readAt);
   });
 
   /**

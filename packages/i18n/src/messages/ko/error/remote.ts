@@ -184,6 +184,8 @@ export const messages = {
     "이 호스트의 멤버 한도에 도달했어요. 소유자에게 자리를 만들어 달라고 요청해 주세요.",
   "error.remote.hostNotRegistered": "이 호스트는 더 이상 OpenBot 서비스에 등록되어 있지 않아요.",
   "error.remote.membershipEnded": "더 이상 이 호스트의 멤버가 아니에요. 소유자에게 새 초대를 요청해 주세요.",
+  "error.remote.membershipChanged":
+    "다른 사람이 동시에 이 멤버를 변경했어요. 멤버 목록을 다시 불러온 뒤 다시 시도해 주세요.",
   "error.remote.accountSessionInactive": "로그인이 더 이상 유효하지 않아요. 다시 로그인해 주세요.",
   "error.remote.hostOtherAccount": "이 호스트는 다른 계정의 호스트예요.",
   "error.remote.remoteNotConfigured": "이 OpenBot 서비스에는 원격 연결이 설정되어 있지 않아요.",

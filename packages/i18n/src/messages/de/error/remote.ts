@@ -191,6 +191,8 @@ export const messages = {
   "error.remote.hostNotRegistered": "Dieser Host ist nicht mehr beim OpenBot-Dienst registriert.",
   "error.remote.membershipEnded":
     "Du bist kein Mitglied dieses Hosts mehr. Bitte den Eigentümer um eine neue Einladung.",
+  "error.remote.membershipChanged":
+    "Jemand hat dieses Mitglied gleichzeitig geändert. Lade die Mitglieder neu und versuche es erneut.",
   "error.remote.accountSessionInactive": "Deine Anmeldung ist nicht mehr aktiv. Melde dich erneut an.",
   "error.remote.hostOtherAccount": "Dieser Host gehört zu einem anderen Konto.",
   "error.remote.remoteNotConfigured": "Remote-Verbindungen sind für diesen OpenBot-Dienst nicht eingerichtet.",

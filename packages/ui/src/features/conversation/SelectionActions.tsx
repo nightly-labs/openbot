@@ -243,6 +243,8 @@ export function SelectionActionsBar(props: {
   let content: HTMLDivElement | undefined;
   let animationFrame: number | undefined;
   let previousSelectionKey = "";
+  // Counts selection changes. A send that ends after one applies its result to no selection.
+  let selectionGeneration = 0;
 
   const hasPrompt = createMemo(() => prompt().trim().length > 0);
   const selectionBody = (instruction: string) =>
@@ -312,6 +314,7 @@ export function SelectionActionsBar(props: {
         setExpanded(false);
         setMode("idle");
         setLastInstruction("");
+        selectionGeneration += 1;
       }
       previousSelectionKey = key;
       schedulePosition();
@@ -365,12 +368,17 @@ export function SelectionActionsBar(props: {
     setLastInstruction(normalized);
     setExpanded(false);
     setMode("sending");
+    const generation = selectionGeneration;
+    let sent: boolean;
     try {
-      if (await props.onSend(props.selection.messageId, body)) props.onDismiss();
-      else setMode("error");
+      sent = await props.onSend(props.selection.messageId, body);
     } catch {
-      setMode("error");
+      sent = false;
     }
+    // The user selected other text while it sent: the bar now belongs to that selection.
+    if (generation !== selectionGeneration) return;
+    if (sent) props.onDismiss();
+    else setMode("error");
   };
 
   return (

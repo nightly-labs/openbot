@@ -185,6 +185,8 @@ export const messages = {
   "error.remote.memberLimitReached": "Bu ana makine üye sınırına ulaştı. Sahibinden yer açmasını isteyin.",
   "error.remote.hostNotRegistered": "Bu ana makine artık OpenBot hizmetine kayıtlı değil.",
   "error.remote.membershipEnded": "Artık bu ana makinenin üyesi değilsiniz. Sahibinden yeni bir davet isteyin.",
+  "error.remote.membershipChanged":
+    "Başka biri bu üyeyi aynı anda değiştirdi. Üyeleri yeniden yükleyin ve tekrar deneyin.",
   "error.remote.accountSessionInactive": "Oturumunuz artık etkin değil. Tekrar oturum açın.",
   "error.remote.hostOtherAccount": "Bu ana makine başka bir hesaba ait.",
   "error.remote.remoteNotConfigured": "Bu OpenBot hizmetinde uzak bağlantılar ayarlanmamış.",

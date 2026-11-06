@@ -461,8 +461,11 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
     resources.voiceThreadSend = false;
     resources.voiceChunks = [];
     resources.voiceSubmitRequest = undefined;
-    // The recorder also stops by itself, for example when the microphone is disconnected.
+    // The recorder also stops by itself, for example when the microphone is disconnected. Then the
+    // limit timer must not stop the next recording before its time.
     stopVoiceElapsedTimer();
+    if (resources.voiceRecordingTimer) clearTimeout(resources.voiceRecordingTimer);
+    resources.voiceRecordingTimer = undefined;
     stopVoiceStream();
     if (!targetAgentId || !targetServerId || resources.voiceDisposed) {
       if (cloud) {

@@ -190,6 +190,8 @@ export const messages = {
     "Deze host heeft het maximumaantal leden bereikt. Vraag de eigenaar om ruimte te maken.",
   "error.remote.hostNotRegistered": "Deze host is niet meer geregistreerd bij de OpenBot-service.",
   "error.remote.membershipEnded": "Je bent geen lid meer van deze host. Vraag de eigenaar om een nieuwe uitnodiging.",
+  "error.remote.membershipChanged":
+    "Iemand anders heeft dit lid tegelijk gewijzigd. Laad de leden opnieuw en probeer het nog eens.",
   "error.remote.accountSessionInactive": "Je inlog is niet meer actief. Log opnieuw in.",
   "error.remote.hostOtherAccount": "Deze host hoort bij een ander account.",
   "error.remote.remoteNotConfigured": "Externe verbindingen zijn niet ingesteld op deze OpenBot-service.",

@@ -1583,13 +1583,16 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     if (!hosted || this.#stopping || !this.#hostedStartAt.has(serverId)) return;
     const revision = this.#hostedStartRevision.get(serverId) ?? 0;
     const status = yield* hosted.status(serverId).pipe(Effect.catch(() => Effect.succeed(null)));
-    if (
-      this.#stopping ||
-      !this.#hostedStartAt.has(serverId) ||
-      !this.#store.has(serverId) ||
-      this.#connections.stateFor(serverId) === "online"
-    )
+    if (this.#stopping || !this.#hostedStartAt.has(serverId) || this.#connections.stateFor(serverId) === "online")
       return;
+    // A late wake reply can start a server after its removal cleared the start state but before the
+    // store dropped it. Nothing else ends that start, and it hides the next start of the same id.
+    if (!this.#store.has(serverId)) {
+      this.#clearHostedStart(serverId);
+      this.#events.setHostStarting(serverId, false);
+      this.#connections.setHostedSleep(serverId, null);
+      return;
+    }
     // A wake during the read changed the start. Its state is read again later.
     if ((this.#hostedStartRevision.get(serverId) ?? 0) !== revision) {
       this.#scheduleHostedStartRead(serverId);

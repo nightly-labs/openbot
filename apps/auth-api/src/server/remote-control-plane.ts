@@ -1554,14 +1554,15 @@ export class RemoteControlPlane {
         activating,
       });
       const now = dependencies.now();
-      // The writes after the membership apply only when it took its seat. A refused UPDATE leaves the
-      // membership as it was, so the member keeps their sessions and invitations.
-      const applied = activating
-        ? {
-            sql: "EXISTS(SELECT 1 FROM remote_memberships WHERE membership_id = ? AND status = 'active')",
-            binds: [input.membershipId],
-          }
-        : undefined;
+      const status = input.revoke ? "revoked" : activating ? "active" : membership.status;
+      // The UPDATE applies only to the status and role read above, and to a free seat when it activates.
+      // Another admin's change since that read refuses it, so a stale role change cannot bring back a
+      // removed member. The writes after it apply only when it changed the row; a refused UPDATE leaves
+      // the member their sessions and invitations.
+      const applied: SqlCondition = {
+        sql: "EXISTS(SELECT 1 FROM remote_memberships WHERE membership_id = ? AND status = ? AND role = ? AND updated_at = ?)",
+        binds: [input.membershipId, status, role, now],
+      };
       // An admin who leaves, is removed or is demoted can no longer invite, so their open invitations
       // close. Then they leave the invitation limits and the list.
       const closingInvites = membership.role === "admin" && (input.revoke === true || role !== "admin");
@@ -1573,14 +1574,16 @@ export class RemoteControlPlane {
           dependencies.database
             .prepare(
               `UPDATE remote_memberships SET role = ?, status = ?, updated_at = ?, removed_at = ${removedAt}
-            WHERE membership_id = ?${activating ? ` AND ${memberSeat.sql}` : ""}`,
+            WHERE membership_id = ? AND status = ? AND role = ?${activating ? ` AND ${memberSeat.sql}` : ""}`,
             )
             .bind(
               role,
-              input.revoke ? "revoked" : activating ? "active" : membership.status,
+              status,
               now,
               ...(removedAt.includes("?") ? [now] : []),
               input.membershipId,
+              membership.status,
+              membership.role,
               ...(activating ? memberSeat.binds : []),
             ),
           ...(closingInvites
@@ -1589,16 +1592,18 @@ export class RemoteControlPlane {
                   .prepare(
                     `UPDATE remote_invites SET revoked_at = ?
                   WHERE host_id = ? AND created_by_user_id = ? AND revoked_at IS NULL
-                    AND (used_at IS NULL OR max_uses IS NULL)${applied ? ` AND ${applied.sql}` : ""}`,
+                    AND (used_at IS NULL OR max_uses IS NULL) AND ${applied.sql}`,
                   )
-                  .bind(now, input.hostId, membership.user_id, ...(applied?.binds ?? [])),
+                  .bind(now, input.hostId, membership.user_id, ...applied.binds),
               ]
             : []),
           ...(revokingAccess
             ? [
                 dependencies.database
-                  .prepare("UPDATE remote_hosts SET auth_epoch = auth_epoch + 1, updated_at = ? WHERE host_id = ?")
-                  .bind(now, input.hostId),
+                  .prepare(
+                    `UPDATE remote_hosts SET auth_epoch = auth_epoch + 1, updated_at = ? WHERE host_id = ? AND ${applied.sql}`,
+                  )
+                  .bind(now, input.hostId, ...applied.binds),
               ]
             : []),
           // The events come from the same batch as the UPDATE below, so a session that opened during
@@ -1610,27 +1615,41 @@ export class RemoteControlPlane {
                    json_object('type', 'remote-session-ended', 'hostId', host_id, 'sessionId', session_id),
                    ?, 0, ?
               FROM remote_sessions
-             WHERE host_id = ? AND user_id = ? AND ended_at IS NULL${applied ? ` AND ${applied.sql}` : ""}`,
+             WHERE host_id = ? AND user_id = ? AND ended_at IS NULL AND ${applied.sql}`,
             )
-            .bind(now, now, input.hostId, membership.user_id, ...(applied?.binds ?? [])),
+            .bind(now, now, input.hostId, membership.user_id, ...applied.binds),
           dependencies.database
             .prepare(
               `UPDATE remote_sessions SET ended_at = ?
-            WHERE host_id = ? AND user_id = ? AND ended_at IS NULL${applied ? ` AND ${applied.sql}` : ""}`,
+            WHERE host_id = ? AND user_id = ? AND ended_at IS NULL AND ${applied.sql}`,
             )
-            .bind(now, input.hostId, membership.user_id, ...(applied?.binds ?? [])),
-          ...(revokingAccess ? [this.#authEpochEventStatement(input.hostId, now)] : []),
+            .bind(now, input.hostId, membership.user_id, ...applied.binds),
+          ...(revokingAccess ? [this.#authEpochEventStatement(input.hostId, now, undefined, applied)] : []),
           // The member whose membership this is, and not the owner who changed it: a revoked server
           // has to leave that member's list on every device they are signed in on.
           this.#authEventStatement({ type: "account-servers-changed", userId: membership.user_id }, now, applied),
         ]),
       );
       yield* this.#flushAuthEvents();
+      if ((changed[0]?.meta.changes ?? 0) === 1) return;
+      const current = yield* remoteCall(() =>
+        dependencies.database
+          .prepare("SELECT role, status FROM remote_memberships WHERE membership_id = ?")
+          .bind(input.membershipId)
+          .first<Pick<RemoteMembershipRow, "role" | "status">>(),
+      );
       // A concurrent join, reactivation or revoke took the seat after the check above.
-      if (activating && (changed[0]?.meta.changes ?? 0) !== 1) {
+      if (activating && current?.status === membership.status && current.role === membership.role) {
         yield* this.#requireMemberSeat(memberSeat);
         return yield* memberLimitReached(memberSeat.limit);
       }
+      // Another change already left the membership as this one asks.
+      if (current?.status === status && current.role === role) return;
+      return yield* new RemoteControlPlaneError(
+        409,
+        "membership_changed",
+        "The membership changed while this change was made. Load the members again.",
+      );
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -3258,14 +3277,27 @@ export class RemoteControlPlane {
     return authEventStatement(this.#database, event, now, condition);
   }
 
-  #authEpochEventStatement(hostId: string, now: number, ownerUserId?: string): D1PreparedStatement {
+  #authEpochEventStatement(
+    hostId: string,
+    now: number,
+    ownerUserId?: string,
+    condition?: SqlCondition,
+  ): D1PreparedStatement {
     return this.#database
       .prepare(
         `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at)
          SELECT ?, json_object('type', 'remote-auth-changed', 'hostId', host_id, 'authEpoch', auth_epoch), ?, 0, ?
-         FROM remote_hosts WHERE host_id = ? AND (? IS NULL OR owner_user_id = ?)`,
+         FROM remote_hosts WHERE host_id = ? AND (? IS NULL OR owner_user_id = ?)${condition ? ` AND ${condition.sql}` : ""}`,
       )
-      .bind(crypto.randomUUID(), now, now, hostId, ownerUserId ?? null, ownerUserId ?? null);
+      .bind(
+        crypto.randomUUID(),
+        now,
+        now,
+        hostId,
+        ownerUserId ?? null,
+        ownerUserId ?? null,
+        ...(condition?.binds ?? []),
+      );
   }
 
   /**
