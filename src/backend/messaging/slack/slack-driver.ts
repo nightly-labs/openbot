@@ -190,7 +190,7 @@ class SlackAdapter implements MessagingAdapter {
     markdown: string,
     replaceMessageId: string | null,
   ) {
-    const [first = "", ...rest] = slackChunks(slackMrkdwn(markdown));
+    const [first = "", ...rest] = slackChunks(slackMrkdwn(markdown, true));
     let firstId: string;
     if (replaceMessageId) {
       firstId = replaceMessageId;
