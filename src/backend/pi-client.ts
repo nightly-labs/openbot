@@ -1166,8 +1166,9 @@ function piFailureCause(message: string | null): CauseCode {
  */
 function piToolFilePaths(tool: unknown, args: unknown, cwd: string): string[] | undefined {
   if (tool !== "read" && tool !== "write" && tool !== "edit") return undefined;
-  const path = isRecord(args) && typeof args.path === "string" ? args.path.trim().replace(/^@/u, "") : "";
+  const path = isRecord(args) && typeof args.path === "string" ? args.path.replace(/^@/u, "") : "";
   if (!path) return undefined;
-  if (path === "~" || path.startsWith("~/") || path.startsWith("~\\")) return [resolve(homedir(), path.slice(2))];
+  const home = path.startsWith("~/") || (process.platform === "win32" && path.startsWith("~\\"));
+  if (path === "~" || home) return [resolve(homedir(), path.slice(2))];
   return [resolve(cwd, path)];
 }
