@@ -104,6 +104,11 @@ export interface ServerSettingsModalProps {
   license?: Pick<LicenseCalls, "getState" | "setUsers" | "changePlan"> | undefined;
   /** Company sign-in for the owner of a published server. Absent where the app cannot manage it. */
   companySignIn?: CompanySignInCalls | undefined;
+  /**
+   * Opens the desktop app download where `companySignIn` is absent. The owner then sees that setup
+   * needs the desktop app, instead of no section.
+   */
+  onDownloadDesktopApp?: (() => void) | undefined;
   /** Opens the contact page when a full license already has the most users that the app sells. */
   onContactUs?: () => void;
   onUpdateMember: (input: UpdateTeamMemberInput) => Promise<void>;
@@ -399,6 +404,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const companySignIn = createServerCompanySignInSection(
     host,
     () => props.companySignIn,
+    () => props.onDownloadDesktopApp,
     () => props.open && section() === "members",
   );
   const hostedSites = createSettingsHostedSitesStore(

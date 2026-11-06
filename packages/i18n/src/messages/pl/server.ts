@@ -307,6 +307,7 @@ export const messages = {
   "server.settings.addLogo": "Dodaj logo serwera",
   "server.settings.removeLogo": "Usuń logo serwera",
   "server.settings.access": "Dostęp",
+  "server.companySignIn.desktopOnly": "Skonfiguruj logowanie jednokrotne w aplikacji OpenBot na komputer.",
   "server.settings.publish": "Opublikuj ten serwer",
   "server.settings.published": "Serwer jest opublikowany",
   "server.settings.setUpDesktopTitle": "Skonfiguruj zdalny pulpit",
