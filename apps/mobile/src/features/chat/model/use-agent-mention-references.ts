@@ -1,3 +1,4 @@
+import { referenceName } from "@openbot/contracts/chat-tag-references";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { agentBrowserTabs, browserTabHost, browserTabTitle } from "@/features/browser/model/browser-tabs";
 import { selectLiveState } from "@/features/workspace/components/use-live-workspace";
@@ -7,20 +8,6 @@ import type { MentionReference } from "../components/chat-composer";
 import { useOpenAgentTasks } from "../components/use-open-agent-tasks";
 
 const NO_REFERENCES: readonly MentionReference[] = [];
-
-/** The longest tag name, as the desktop composer writes it (`referenceName` in `@openbot/ui`). */
-const REFERENCE_NAME_LIMIT = 80;
-
-/** One line, at most `REFERENCE_NAME_LIMIT` characters, so a tag from the phone matches a desktop tag. */
-function referenceName(name: string): string {
-  const characters = Array.from(name.replace(/\s+/gu, " ").trim());
-  return characters.length > REFERENCE_NAME_LIMIT
-    ? `${characters
-        .slice(0, REFERENCE_NAME_LIMIT - 1)
-        .join("")
-        .trimEnd()}…`
-    : characters.join("");
-}
 
 /** The address without the scheme and `www.`, as the desktop picker matches it. */
 function displayUrl(url: string): string {
