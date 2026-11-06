@@ -945,8 +945,12 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     }
     if (!this.#options.state || this.#exchangingCode) return client;
     // A registration made before its scope named `offline_access` refuses the request that adds it.
+    // Only a scope from the resource's metadata is checked: with no scope to send, nothing is added.
+    const discovery = this.#discoveryState;
     const scopeAllowed =
-      !client.scope || !scopeWithOfflineAccess(client.scope, this.#discoveryState?.authorizationServerMetadata);
+      !client.scope ||
+      !discovery?.resourceMetadata?.scopes_supported?.length ||
+      !scopeWithOfflineAccess(client.scope, discovery.authorizationServerMetadata);
     if (client.redirect_uris.includes(this.#options.redirectUrl) && scopeAllowed) return client;
     const refreshWorthTrying = !this.#redirectAddressChecked && Boolean(record.tokens?.refresh_token);
     this.#redirectAddressChecked = true;
