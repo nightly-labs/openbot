@@ -20,6 +20,7 @@ import { serverCanAdminister, serverSupportsCapability } from "../servers/server
 import { codexLiveAccess } from "../speech/codex-live-access";
 import { speechPort } from "../speech/speech-port";
 import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
+import { AgentWorkView } from "../tasks/AgentWorkView";
 import { ConversationSideThread } from "./ConversationSideThread";
 import { htmlAttachmentPageHtml, htmlAttachmentPageUrl } from "./chat-visual-url";
 import { useConversationController } from "./conversation-controller-context";
@@ -550,6 +551,15 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
           agentName={props.agent?.name ?? ""}
           onClosePanel={() => closeSidePanelPane("subagent")}
         />
+      </Show>
+
+      {/* Keyed, so the tree of each agent keeps its own open rows. */}
+      <Show when={activeRightPanel() === "work" && props.agent?.id} keyed>
+        {(agentId) => (
+          <aside class="browser-panel agent-work-panel" aria-label={t("conversation.sidePanel.pane.work")}>
+            <AgentWorkView agentId={agentId} />
+          </aside>
+        )}
       </Show>
 
       <Show when={browserSidebarOpen() || browserExpandedOpen()}>

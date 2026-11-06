@@ -113,6 +113,7 @@ export const messages = {
   "conversation.sidePanel.pane.settings": "Ajan ayarları",
   "conversation.sidePanel.pane.question": "Yan soru",
   "conversation.sidePanel.pane.voice": "Ses",
+  "conversation.sidePanel.pane.work": "Çalışma",
   "conversation.sidePanel.pane.subagent": "Alt ajan",
   "conversation.sideQuestion.emptyTitle": "Bu sohbet hakkında sor",
   "conversation.sideQuestion.emptyBody":
@@ -200,4 +201,13 @@ export const messages = {
   "conversation.tasks.state.waitingApproval": "Onayınızı bekliyor",
   "conversation.tasks.state.waitingAnswer": "Sizi bekliyor",
   "conversation.tasks.title": "Görevler",
+  "conversation.tasks.work.failed": { one: "{count} başarısız", other: "{count} başarısız" },
+  "conversation.tasks.work.hide": { one: "{title} oturumunu gizle", other: "{title} için {count} oturumu gizle" },
+  "conversation.tasks.work.idle": "Çalışan bir şey yok",
+  "conversation.tasks.work.mainChat": "Ana sohbet",
+  "conversation.tasks.work.replied": "Yanıtladı",
+  "conversation.tasks.work.show": { one: "{title} oturumunu göster", other: "{title} için {count} oturumu göster" },
+  "conversation.tasks.work.startedBy": "{name} başlattı",
+  "conversation.tasks.work.title": "{name} çalışması",
+  "conversation.tasks.work.working": { one: "{count} çalışıyor", other: "{count} çalışıyor" },
 } as const satisfies PartialTranslation<typeof source>;

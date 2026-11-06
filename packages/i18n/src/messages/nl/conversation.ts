@@ -112,6 +112,7 @@ export const messages = {
   "conversation.sidePanel.pane.settings": "Agentinstellingen",
   "conversation.sidePanel.pane.question": "Zijvraag",
   "conversation.sidePanel.pane.voice": "Spraak",
+  "conversation.sidePanel.pane.work": "Werk",
   "conversation.sidePanel.pane.subagent": "Subagent",
   "conversation.sideQuestion.emptyTitle": "Vraag iets over deze chat",
   "conversation.sideQuestion.emptyBody":
@@ -199,4 +200,16 @@ export const messages = {
   "conversation.tasks.state.waitingApproval": "Wacht op je goedkeuring",
   "conversation.tasks.state.waitingAnswer": "Wacht op jou",
   "conversation.tasks.title": "Taken",
+  "conversation.tasks.work.failed": { one: "{count} mislukt", other: "{count} mislukt" },
+  "conversation.tasks.work.hide": {
+    one: "Sessie van {title} verbergen",
+    other: "{count} sessies van {title} verbergen",
+  },
+  "conversation.tasks.work.idle": "Niets bezig",
+  "conversation.tasks.work.mainChat": "Hoofdchat",
+  "conversation.tasks.work.replied": "Geantwoord",
+  "conversation.tasks.work.show": { one: "Sessie van {title} tonen", other: "{count} sessies van {title} tonen" },
+  "conversation.tasks.work.startedBy": "Gestart door {name}",
+  "conversation.tasks.work.title": "Werk van {name}",
+  "conversation.tasks.work.working": { one: "{count} bezig", other: "{count} bezig" },
 } as const satisfies PartialTranslation<typeof source>;

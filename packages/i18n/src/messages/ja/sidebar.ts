@@ -68,6 +68,7 @@ export const messages = {
   "sidebar.agentMenu.restoreTo": "{section} に復元",
   "sidebar.agentMenu.openWindow": "新しいウインドウで開く",
   "sidebar.agentMenu.newThread": "新しいスレッド",
+  "sidebar.agentMenu.showWork": "作業を表示",
   "sidebar.agentMenu.inWindow": "別のウインドウで開いています",
   "sidebar.channelMenu.label": "チャンネルの操作",
   "sidebar.channelMenu.edit": "チャンネルを編集",

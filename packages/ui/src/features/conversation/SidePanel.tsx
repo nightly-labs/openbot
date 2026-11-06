@@ -5,6 +5,7 @@ import {
   buttonVariants,
   DropdownMenu,
   Folder,
+  ListTree,
   Maximize2,
   MessageCircleQuestionMark,
   Minimize2,
@@ -45,10 +46,10 @@ function fileValue(key: string): string {
 
 /**
  * A pane of the side panel. Each open pane has a tab at the top of the panel. A side question opens
- * from the composer only, and a subagent from its row in the chat, so the launcher and Add do not
- * list them.
+ * from the composer only, a subagent from its row in the chat, and the work of the agent from the
+ * agent menu of the sidebar, so the launcher and Add do not list them.
  */
-export type SidePanelPane = "browser" | "files" | "settings" | "question" | "voice" | "subagent";
+export type SidePanelPane = "browser" | "files" | "settings" | "question" | "voice" | "subagent" | "work";
 
 const PANE_LABELS: Record<SidePanelPane, AppTextKey> = {
   browser: "conversation.sidePanel.pane.browser",
@@ -57,6 +58,7 @@ const PANE_LABELS: Record<SidePanelPane, AppTextKey> = {
   question: "conversation.sidePanel.pane.question",
   voice: "conversation.sidePanel.pane.voice",
   subagent: "conversation.sidePanel.pane.subagent",
+  work: "conversation.sidePanel.pane.work",
 };
 
 /** The same glyphs as the rest of the app: the browser is the computer. */
@@ -74,6 +76,8 @@ function PaneIcon(props: { pane: SidePanelPane }): JSX.Element {
       return <AudioLines aria-hidden="true" />;
     case "subagent":
       return <Workflow aria-hidden="true" />;
+    case "work":
+      return <ListTree aria-hidden="true" />;
   }
 }
 

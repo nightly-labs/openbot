@@ -121,6 +121,8 @@ export interface SidebarProps {
   onRestoreAgent?: ((agentId: string) => void) | undefined;
   /** Opens the agent's chat with a new thread. Without it, such as on a host without threads, the agent menu shows no new thread item. */
   onNewAgentThread?: ((agentId: string) => void) | undefined;
+  /** Opens the work of the agent beside its chat. Without it, such as on a host without threads, the agent menu shows no work item. */
+  onShowAgentWork?: ((agentId: string) => void) | undefined;
   /** Opens the agent's chat in a window of its own. Without it, the agent menu shows no window item. */
   onOpenAgentWindow?: ((agentId: string) => void) | undefined;
   /** The agents whose chat is open in a window of its own. Their rows show a window mark. */

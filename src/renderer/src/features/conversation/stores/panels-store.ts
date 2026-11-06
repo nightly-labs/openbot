@@ -90,10 +90,36 @@ export const SIDE_PANEL_MODES = {
   question: "question",
   voice: "voice",
   subagent: "subagent",
+  work: "work",
 } as const satisfies Record<SidePanelPane, RightPanelMode>;
 
 function isSidePanelPane(value: string): value is SidePanelPane {
   return value in SIDE_PANEL_MODES;
+}
+
+/** The side panel with the tab of `pane` added, when it has none, and selected. */
+function withPane(state: SidePanelState, pane: SidePanelPane): SidePanelState {
+  return {
+    ...state,
+    panes: state.panes.includes(pane) ? state.panes : [...state.panes, pane],
+    selected: pane,
+    file: null,
+  };
+}
+
+/**
+ * Opens a pane in the side panel of an agent from outside its chat, such as from the sidebar. The panel
+ * of each agent is kept while its chat is not on screen, so the pane shows when the chat opens.
+ */
+export function openAgentSidePanelPane(
+  state: Pick<PanelsStoreDeps, "setRightPanels" | "setPanels">,
+  agentId: string,
+  pane: SidePanelPane,
+): void {
+  state.setRightPanels((current) => ({ ...current, [agentId]: SIDE_PANEL_MODES[pane] }));
+  state.setPanels((draft) => {
+    draft.side[agentId] = withPane(draft.side[agentId] ?? SIDE_PANEL_EMPTY, pane);
+  });
 }
 
 /** The pane that shows a panel mode, or null for a mode outside the side panel. */
@@ -242,13 +268,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     }
     deps.setRightPanels((current) => (current[agentId] === mode ? current : { ...current, [agentId]: mode }));
     const pane = paneOfMode(mode);
-    if (pane)
-      updateSidePanel(agentId, (state) => ({
-        ...state,
-        panes: state.panes.includes(pane) ? state.panes : [...state.panes, pane],
-        selected: pane,
-        file: null,
-      }));
+    if (pane) updateSidePanel(agentId, (state) => withPane(state, pane));
     else if (mode === "side-panel" || mode === "thread")
       updateSidePanel(agentId, (state) => ({ ...state, selected: null, file: null }));
     else if (mode === "none" && panels.side[agentId]?.maximized) {

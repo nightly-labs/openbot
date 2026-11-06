@@ -73,6 +73,7 @@ export const messages = {
   "sidebar.agentMenu.restoreTo": "Przywróć do: {section}",
   "sidebar.agentMenu.openWindow": "Otwórz w nowym oknie",
   "sidebar.agentMenu.newThread": "Nowy wątek",
+  "sidebar.agentMenu.showWork": "Pokaż pracę",
   "sidebar.agentMenu.inWindow": "Otwarty we własnym oknie",
   "sidebar.channelMenu.label": "Akcje kanału",
   "sidebar.channelMenu.edit": "Edytuj kanał",

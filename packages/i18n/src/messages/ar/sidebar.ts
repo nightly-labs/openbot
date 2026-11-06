@@ -75,6 +75,7 @@ export const messages = {
   "sidebar.agentMenu.restoreTo": "استعادة إلى {section}",
   "sidebar.agentMenu.openWindow": "فتح في نافذة جديدة",
   "sidebar.agentMenu.newThread": "سلسلة جديدة",
+  "sidebar.agentMenu.showWork": "عرض العمل",
   "sidebar.agentMenu.inWindow": "فتح في نافذة خاصة به",
   "sidebar.channelMenu.label": "إجراءات القناة",
   "sidebar.channelMenu.edit": "تعديل القناة",

@@ -68,6 +68,7 @@ export const messages = {
   "sidebar.agentMenu.restoreTo": "恢复到 {section}",
   "sidebar.agentMenu.openWindow": "在新窗口中打开",
   "sidebar.agentMenu.newThread": "新话题",
+  "sidebar.agentMenu.showWork": "查看工作",
   "sidebar.agentMenu.inWindow": "在独立窗口中打开",
   "sidebar.channelMenu.label": "频道操作",
   "sidebar.channelMenu.edit": "编辑频道",

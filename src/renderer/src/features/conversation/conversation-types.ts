@@ -423,6 +423,8 @@ export type RightPanelMode =
   | "question"
   | "voice"
   | "subagent"
+  /** The work of the agent as a tree: its chats, threads, subagents and teammates. */
+  | "work"
   /** A side thread in the side panel, beside the agent's own chat. */
   | "thread";
 
