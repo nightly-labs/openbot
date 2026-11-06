@@ -304,6 +304,7 @@ export const messages = {
   "server.settings.addLogo": "Añadir logotipo del servidor",
   "server.settings.removeLogo": "Eliminar logotipo del servidor",
   "server.settings.access": "Acceso",
+  "server.companySignIn.desktopOnly": "Configura el inicio de sesión único en la app de escritorio de OpenBot.",
   "server.settings.publish": "Publicar este servidor",
   "server.settings.published": "El servidor está publicado",
   "server.settings.setUpDesktopTitle": "Configurar escritorio remoto",

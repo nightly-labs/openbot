@@ -297,6 +297,7 @@ export const messages = {
   "server.settings.addLogo": "サーバーのロゴを追加",
   "server.settings.removeLogo": "サーバーのロゴを削除",
   "server.settings.access": "アクセス",
+  "server.companySignIn.desktopOnly": "シングルサインオンは OpenBot デスクトップアプリで設定します。",
   "server.settings.publish": "このサーバーを公開",
   "server.settings.published": "サーバーは公開されています",
   "server.settings.setUpDesktopTitle": "リモートデスクトップを設定",

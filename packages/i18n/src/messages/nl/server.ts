@@ -314,6 +314,7 @@ export const messages = {
   "server.settings.addLogo": "Voeg serverlogo toe",
   "server.settings.removeLogo": "Verwijder serverlogo",
   "server.settings.access": "Toegang",
+  "server.companySignIn.desktopOnly": "Stel single sign-on in via de desktop-app van OpenBot.",
   "server.settings.publish": "Publiceer deze server",
   "server.settings.published": "Server is gepubliceerd",
   "server.settings.setUpDesktopTitle": "Stel extern bureaublad in",
