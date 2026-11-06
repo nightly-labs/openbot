@@ -290,6 +290,11 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "Hermes Agent 버전을 읽을 수 없습니다.",
   "error.provider.hermesSignIn":
     "Hermes를 사용하려면 Nous Portal로 로그인하거나 터미널에서 `hermes setup`을 실행하세요.",
+  "error.provider.zcodeMissing":
+    "ZCode가 설치되어 있지 않습니다. ZCode Desktop과 zcode-acp 어댑터를 설치한 후 다시 시도하세요.",
+  "error.provider.zcodeNotStarted": "ZCode를 시작할 수 없었습니다. 터미널에서 `zcode-acp --version`을 실행하세요.",
+  "error.provider.zcodeVersionUnreadable": "ZCode 버전을 읽을 수 없습니다.",
+  "error.provider.zcodeSignIn": "ZCode에 로그인한(`zcode login`) 후 다시 시도하세요.",
   "error.provider.usageLimitReached": "계정이 사용 한도에 도달했어요.",
   "error.provider.claudeContextFull":
     "이 채팅이 Claude가 처리하기에 너무 길어졌어요. OpenBot이 채팅 기록으로 새 Claude Code 세션을 시작했어요. 다시 시도해 주세요.",

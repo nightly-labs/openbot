@@ -77,6 +77,14 @@ export interface HermesCliInfo extends ResolvedCli {
   source?: "system" | "managed";
 }
 
+/**
+ * The user's own `zcode-acp` adapter, which speaks ACP for the ZCode CLI that ZCode Desktop ships.
+ * The adapter runs the user's installed ZCode, so OpenBot has no copy of its own.
+ */
+export interface ZcodeCliInfo extends ResolvedCli {
+  source?: "system" | "managed";
+}
+
 export type AgentCliInfo =
   | CodexCliInfo
   | ClaudeCliInfo
@@ -86,7 +94,8 @@ export type AgentCliInfo =
   | CursorCliInfo
   | ClineCliInfo
   | KimiCliInfo
-  | HermesCliInfo;
+  | HermesCliInfo
+  | ZcodeCliInfo;
 
 export class CodexCliError extends Error {
   constructor(
@@ -474,6 +483,54 @@ export const resolveHermesCli: (input?: {
 function parseHermesVersion(output: string): string {
   const version = output.match(/^Hermes Agent v(\d+\.\d+\.\d+)\b/mu)?.[1];
   if (!version) throw new CodexCliError(sourceText("error.provider.hermesVersionUnreadable"), "invalid");
+  return version;
+}
+
+/**
+ * Finds the user's own `zcode-acp` adapter, which drives the user's installed ZCode CLI over ACP.
+ * OpenBot has no copy of its own: the adapter is tied to the ZCode Desktop install it wraps, so the
+ * user installs it next to ZCode (`npm install -g zcode-acp`).
+ */
+export const resolveZcodeCli: (input?: {
+  systemCandidates?: string[];
+}) => Effect.Effect<ZcodeCliInfo, ProviderClientOperationError> = Effect.fn("Cli.resolveZcodeCli")(
+  function* (
+    input: { systemCandidates?: string[] } = {},
+  ): Effect.fn.Return<ZcodeCliInfo, ProviderClientOperationError> {
+    const candidates = yield* cliCandidates("zcode", input.systemCandidates, null);
+    let found = false;
+    for (const candidate of candidates) {
+      if (!(yield* isExecutable(candidate.executable))) continue;
+      found = true;
+      const attempt = yield* Effect.result(
+        Effect.gen(function* () {
+          const { stdout, launch } = yield* readCliVersion(candidate, "zcode");
+          return {
+            executable: candidate.executable,
+            version: parseZcodeVersion(stdout),
+            source: "system" as const,
+            ...launch,
+          };
+        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
+      );
+      if (Result.isSuccess(attempt)) return attempt.success;
+      const error = attempt.failure.cause;
+
+      if (isCliTimeout(error)) throw error;
+      /* Try the remaining installed candidates. */
+    }
+    throw new CodexCliError(
+      found ? sourceText("error.provider.zcodeNotStarted") : sourceText("error.provider.zcodeMissing"),
+      found ? "invalid" : "missing",
+    );
+  },
+  Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
+);
+
+/** `zcode-acp --version` prints one line, such as `zcode-acp v1.0.0`. */
+function parseZcodeVersion(output: string): string {
+  const version = output.match(/^zcode-acp v(\d+\.\d+\.\d+)\b/mu)?.[1];
+  if (!version) throw new CodexCliError(sourceText("error.provider.zcodeVersionUnreadable"), "invalid");
   return version;
 }
 
@@ -922,7 +979,14 @@ export function resolveInstalledFirst<Cli extends AgentCliInfo, E>(
 /** The command name of a provider's CLI on `PATH`. */
 function cliCommandName(provider: AgentProviderId): string {
   // Mistral Vibe's `vibe` command is its terminal app; `vibe-acp` is its ACP server.
-  return provider === "cursor" ? "cursor-agent" : provider === "mistral" ? "vibe-acp" : provider;
+  // ZCode runs headless through the `zcode-acp` adapter.
+  return provider === "cursor"
+    ? "cursor-agent"
+    : provider === "mistral"
+      ? "vibe-acp"
+      : provider === "zcode"
+        ? "zcode-acp"
+        : provider;
 }
 
 /** An explicit path remains under the user's control, including during managed updates. */
