@@ -172,18 +172,17 @@ const LISTED_INPUT_KINDS: ReadonlyMap<string, CustomProviderInputKind> = new Map
  * What a list entry says about the model, in the shapes that servers publish: models.dev
  * (`modalities.input`, `limit.context`, `limit.output`), OpenRouter (`architecture.input_modalities`,
  * `context_length`, `top_provider.max_completion_tokens`) and vLLM (`max_model_len`). A missing or
- * out-of-range value is left out; nothing is guessed.
+ * out-of-range value is left out.
  */
 function modelDetails(entry: DynamicRecord): Omit<DetectedModel, "id"> {
   const limit = isDynamicRecord(entry.limit) ? entry.limit : {};
   const topProvider = isDynamicRecord(entry.top_provider) ? entry.top_provider : {};
   const contextWindow = [limit.context, entry.context_length, entry.max_model_len].find(isCustomProviderContextWindow);
   const maxOutput = [limit.output, topProvider.max_completion_tokens].find(isCustomProviderMaxOutput);
-  const listed = isDynamicRecord(entry.modalities)
-    ? entry.modalities.input
-    : isDynamicRecord(entry.architecture)
-      ? entry.architecture.input_modalities
-      : undefined;
+  const listed = [
+    isDynamicRecord(entry.modalities) ? entry.modalities.input : undefined,
+    isDynamicRecord(entry.architecture) ? entry.architecture.input_modalities : undefined,
+  ].find(Array.isArray);
   const inputs = Array.isArray(listed)
     ? CUSTOM_PROVIDER_INPUT_KINDS.filter((kind) =>
         listed.some((name) => isString(name) && LISTED_INPUT_KINDS.get(name) === kind),
@@ -192,7 +191,8 @@ function modelDetails(entry: DynamicRecord): Omit<DetectedModel, "id"> {
   return {
     ...(inputs ? { inputs } : {}),
     ...(contextWindow !== undefined ? { contextWindow } : {}),
-    // The form takes a max output only with a context window.
-    ...(contextWindow !== undefined && maxOutput !== undefined ? { maxOutput } : {}),
+    // The form takes a max output only with a context window. A cap as large as the window leaves no
+    // room for the prompt (OpenRouter often lists both as the same number), so the default stays.
+    ...(contextWindow !== undefined && maxOutput !== undefined && maxOutput < contextWindow ? { maxOutput } : {}),
   };
 }

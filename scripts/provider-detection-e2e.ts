@@ -38,7 +38,7 @@ interface FakeServer {
 interface ListedModel {
   id: string;
   object?: string;
-  modalities?: { input: string[] | string };
+  modalities?: { input?: string[] | string };
   limit?: { context?: number; output?: number };
   context_length?: number;
   architecture?: { input_modalities: string[] };
@@ -126,6 +126,15 @@ try {
       context_length: 131_072,
       architecture: { input_modalities: ["text", "file"] },
       top_provider: { max_completion_tokens: 65_536 },
+    },
+    // OpenRouter often lists the max output as the whole window: it leaves no room for the prompt.
+    // An empty `modalities` does not hide the OpenRouter kinds.
+    {
+      id: "router-full-cap",
+      context_length: 163_840,
+      modalities: {},
+      architecture: { input_modalities: ["text", "image"] },
+      top_provider: { max_completion_tokens: 163_840 },
     },
     // vLLM: a window, and no input kinds.
     { id: "vllm-model", object: "model", max_model_len: 32_768 },
@@ -330,6 +339,7 @@ try {
   assert.deepEqual(listed.models, [
     { id: "gateway-vision", inputs: ["image", "pdf"], contextWindow: 200_000, maxOutput: 32_000 },
     { id: "router-model", inputs: ["pdf"], contextWindow: 131_072, maxOutput: 65_536 },
+    { id: "router-full-cap", inputs: ["image"], contextWindow: 163_840 },
     { id: "vllm-model", contextWindow: 32_768 },
     { id: "text-only", inputs: [] },
     { id: "odd-model" },

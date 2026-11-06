@@ -59,8 +59,9 @@ interface OpenCodeModelEntry {
    */
   readonly variants?: Readonly<Record<string, { readonly reasoningEffort: string }>>;
   /**
-   * What the model reads and writes. OpenCode 2.2.5 makes a custom model without it text-only, refuses
-   * an image prompt, and its read tool refuses a PDF. `migrateModel` turns it into the model's
+   * What the model reads and writes. OpenCode 2.2.5 gives a custom model without it text and image input
+   * (`Capabilities.default()` in `packages/schema/src/model.ts`); with it, the read tool refuses a kind
+   * that is not listed. `migrateModel` turns it into the model's
    * capabilities (`packages/core/src/v1/config/migrate.ts`).
    */
   readonly modalities?: { readonly input: readonly string[]; readonly output: readonly string[] };

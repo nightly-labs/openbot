@@ -120,8 +120,7 @@ export function blankModel(model: CustomModelDraft): boolean {
     !model.name.trim() &&
     !model.contextWindow?.trim() &&
     !model.maxOutput?.trim() &&
-    !model.reasoningEfforts?.length &&
-    model.inputs === undefined
+    !model.reasoningEfforts?.length
   );
 }
 
@@ -395,9 +394,11 @@ export interface DiscoveredModel {
   inputs?: CustomProviderInputKind[];
 }
 
-/** The list gave more than the model id, so the form can fill fields from it. */
-export function hasFoundValues(model: DiscoveredModel): boolean {
-  return model.contextWindow !== undefined || model.inputs !== undefined;
+/** The row holds a value that the list gives for its model, so the form can say where it comes from. */
+export function holdsFoundValues(row: CustomModelDraft, found: DiscoveredModel): boolean {
+  const window = found.contextWindow !== undefined && contextWindowValue(row) === found.contextWindow;
+  const inputs = found.inputs !== undefined && row.inputs?.join() === found.inputs.join();
+  return window || inputs;
 }
 
 /**
@@ -408,8 +409,14 @@ export function fillFoundValues(row: CustomModelDraft, found: DiscoveredModel): 
   if (!row.contextWindow?.trim() && found.contextWindow !== undefined) {
     row.contextWindow = found.contextWindow.toString();
   }
-  // A max output needs a window, as `validateCustomProvider` says.
-  if (!row.maxOutput?.trim() && row.contextWindow?.trim() && found.maxOutput !== undefined) {
+  // A max output needs a window, as `validateCustomProvider` says, and must leave room for the prompt.
+  const window = contextWindowValue(row);
+  if (
+    !row.maxOutput?.trim() &&
+    typeof window === "number" &&
+    found.maxOutput !== undefined &&
+    found.maxOutput < window
+  ) {
     row.maxOutput = found.maxOutput.toString();
   }
   if (row.inputs === undefined && found.inputs !== undefined) row.inputs = [...found.inputs];

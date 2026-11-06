@@ -64,7 +64,7 @@ import {
   emptyCustomProviderDraft,
   fillFoundValues,
   hasCustomProviderError,
-  hasFoundValues,
+  holdsFoundValues,
   keepsHeaderValue,
   type ModelDiscovery,
   validateCustomProvider,
@@ -176,6 +176,9 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
   // open covered in messages about fields nobody has reached yet.
   const [submitted, setSubmitted] = createSignal(untrack(() => Boolean(props.showErrors)));
 
+  // Set by a Find click: the list that it gets fills the empty fields of the rows (#3946).
+  let fillNextList = false;
+
   /**
    * Both hosts keep this dialog mounted after a close, and the draft above is a snapshot, so without
    * this a second "Add provider" reopens the form still holding the last endpoint - including its API
@@ -189,6 +192,7 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
       const next = untrack(() => props.draft);
       setDraft(() => (next ? cloneDraft(next) : emptyCustomProviderDraft()));
       setSubmitted(untrack(() => Boolean(props.showErrors)));
+      fillNextList = false;
     },
   );
 
@@ -421,9 +425,17 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
   const discoveryId = createUniqueId();
   const listed = (id: string) => draft.models.some((model) => model.id.trim() === id);
 
-  /** A new list fills the empty fields of the rows that it names, such as the rows of a saved endpoint. */
-  createEffect(discovered, (models) => {
-    if (!models || !untrack(() => props.contextWindows)) return;
+  /**
+   * The list that a Find click gets fills the empty fields of the rows that it names, such as the rows
+   * of a saved endpoint. A list that the dialog opens with does not: an empty saved field there is the
+   * harness default that the user kept.
+   */
+  createEffect(discovery, (list) => {
+    if (list.status === "loading") return;
+    const fill = fillNextList;
+    fillNextList = false;
+    if (!fill || list.status !== "found" || !untrack(() => props.contextWindows)) return;
+    const models = list.models;
     setDraft((state) => {
       for (const row of state.models) {
         const found = models.find((model) => model.id === row.id.trim());
@@ -718,7 +730,10 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                           size="xs"
                           class="custom-provider-discover"
                           disabled={busy() || !draft.baseUrl.trim() || discovery().status === "loading"}
-                          onClick={() => discover()(customProviderEndpoint(draft))}
+                          onClick={() => {
+                            fillNextList = true;
+                            discover()(customProviderEndpoint(draft));
+                          }}
                         >
                           <RefreshCw />
                           {discovery().status === "idle"
@@ -768,7 +783,14 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                           <Text tone="muted" variant="caption" role="status">
                             {t("customProvider.discovery.found", { count: models().length })}
                           </Text>
-                          <Show when={props.contextWindows && models().some(hasFoundValues)}>
+                          <Show
+                            when={
+                              props.contextWindows &&
+                              draft.models.some((row) =>
+                                models().some((model) => model.id === row.id.trim() && holdsFoundValues(row, model)),
+                              )
+                            }
+                          >
                             <Text tone="muted" variant="caption">
                               {t("customProvider.model.foundValuesHint")}
                             </Text>
