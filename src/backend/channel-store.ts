@@ -480,20 +480,18 @@ export class ChannelStore {
       { channel, messages: [message], tasks: [], assignments: [] },
       (db, sequence) => {
         // The range reads the command index, not the payloads: they hold the long text.
-        const events = databaseRows(
+        const match = "command_id > ? AND command_id < ?";
+        const range = [commandPrefix, `${commandPrefix}\uffff`] as const;
+        const superseded = databaseRows(
           db
             .prepare(
-              "SELECT sequence, command_id FROM orchestration_events WHERE command_id > ? AND command_id < ? AND sequence < ? ORDER BY sequence",
+              `DELETE FROM orchestration_events WHERE ${match} AND sequence < ?
+                 AND sequence > (SELECT MIN(sequence) FROM orchestration_events WHERE ${match})
+               RETURNING command_id`,
             )
-            .all(commandPrefix, `${commandPrefix}\uffff`, sequence),
-        ).slice(1);
-        if (events.length === 0) return;
-        const remove = db.prepare("DELETE FROM orchestration_events WHERE sequence = ?");
-        for (const event of events) remove.run(requiredNumberColumn(event, "sequence"));
-        deleteReceiptsOf(
-          db,
-          events.map((event) => requiredStringColumn(event, "command_id")),
-        );
+            .all(...range, sequence, ...range),
+        ).map((row) => requiredStringColumn(row, "command_id"));
+        deleteReceiptsOf(db, superseded);
       },
     );
   }
