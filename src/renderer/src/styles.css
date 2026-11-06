@@ -7,6 +7,7 @@
 @import "@openbot/ui/styles.css";
 @import "@openbot/ui/features/account/otp-input.css";
 @import "./styles/transitions.css";
+@import "./styles/theme-sweep.css";
 @import "@openbot/ui/styles/sliding-tabs.css";
 @import "@openbot/ui/styles/action-menu.css";
 @import "@openbot/ui/features/dynamic-island/dynamic-island.css";

@@ -17,6 +17,7 @@ import { createSignal, onSettled } from "solid-js";
 import { appPort } from "./app-port";
 import { syncColorScheme } from "./color-scheme";
 import { applyThemePalette } from "./theme-palette";
+import { sweepTheme } from "./theme-sweep";
 
 /** One Settings control's value. Set optimistically, and reverted if main refuses the write. */
 function optimisticChoice<T extends string | boolean>(initial: T, save: (next: T) => Promise<T>) {
@@ -163,9 +164,30 @@ export function syncAppearance(options: { windowGlass?: boolean } = {}): void {
     applyThemePalette(selectedThemePalette(next));
     showGlass();
   };
+  // A sweep applies its value later, so each change compares with the last value from main, and a
+  // sweep applies the newest value: a fast second change cannot be replaced by an older one.
+  let latest = preference;
   void appPort()
     .getAppAppearancePreference()
-    .then(apply)
+    .then((next) => {
+      latest = next;
+      apply(next);
+    })
     .catch(() => undefined);
-  appPort().onAppAppearancePreference(apply);
+  // Main sends each saved change. A change that the window shows moves in behind a band; the first
+  // value above replaces the cached copy at once, as it is not a choice the user made now.
+  appPort().onAppAppearancePreference((next) => {
+    const before = latest;
+    latest = next;
+    if (visibleLook(next) === visibleLook(before)) apply(next);
+    else sweepTheme(() => apply(latest));
+  });
+}
+
+/** What the window shows of a preference: the palette, or the light or dark scheme. */
+function visibleLook(preference: AppAppearancePreference): string {
+  const palette = selectedThemePalette(preference);
+  if (palette !== null) return `palette:${palette.id}`;
+  if (preference.appearance !== "system") return preference.appearance;
+  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
 }
