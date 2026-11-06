@@ -42,6 +42,7 @@ import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
+import { menuIcon } from "../model/menu-icons";
 import {
   endRemoteDesktopSession,
   type RemoteDesktopHost,
@@ -378,16 +379,20 @@ export function RemoteDesktopScreen() {
     {
       id: "trackpad",
       title: t("mobile.server.remoteDesktop.trackpadMode"),
-      image: "cursorarrow.motionlines",
+      image: menuIcon("trackpad", "cursorarrow.motionlines"),
       state: touchMode === "trackpad" ? "on" : "off",
     },
-    { id: "fit", title: t("mobile.server.remoteDesktop.zoomFit"), image: "arrow.down.right.and.arrow.up.left" },
+    {
+      id: "fit",
+      title: t("mobile.server.remoteDesktop.zoomFit"),
+      image: menuIcon("fit", "arrow.down.right.and.arrow.up.left"),
+    },
     ...(displays.length > 1
       ? [
           {
             id: "display",
             title: t("mobile.server.remoteDesktop.display"),
-            image: "display.2",
+            image: menuIcon("display", "display.2"),
             subactions: displays.map(
               (display): MenuAction => ({
                 id: `display:${display.id}`,
@@ -401,7 +406,7 @@ export function RemoteDesktopScreen() {
     {
       id: "quality",
       title: t("mobile.server.remoteDesktop.quality"),
-      image: "speedometer",
+      image: menuIcon("quality", "speedometer"),
       subactions: (
         [
           ["fast", "mobile.server.remoteDesktop.qualityFast"],
@@ -416,7 +421,7 @@ export function RemoteDesktopScreen() {
         }),
       ),
     },
-    { id: "stats", title: t("mobile.server.remoteDesktop.stats"), image: "chart.bar.xaxis" },
+    { id: "stats", title: t("mobile.server.remoteDesktop.stats"), image: menuIcon("stats", "chart.bar.xaxis") },
   ];
   const runOption = (id: string) => {
     const connection = remoteDesktopConnection(serverId);

@@ -15,3 +15,9 @@ declare module "*.ttf" {
   const asset: number;
   export default asset;
 }
+
+// An Android vector drawable, such as the leading icon of a menu item on Android.
+declare module "*.xml" {
+  const asset: number;
+  export default asset;
+}
