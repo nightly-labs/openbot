@@ -10,7 +10,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { legacyAgentId } from "@openbot/contracts/validation";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect } from "effect";
+import { Effect, Result } from "effect";
 import { type AttachmentOperationError, attachmentCall, attachmentFailure } from "./attachment-effects";
 import { isRecord } from "./protocol";
 
@@ -172,10 +172,20 @@ const resolveWorkspacePath = Effect.fn("Workspace.resolveWorkspacePath")(functio
       if (isAbsolute(requestedPath) || requestedPath.replaceAll("\\", "/").startsWith("~/")) return Effect.fail(error);
       const name = basename(candidatePath);
       const withoutLocation = name.replace(LOCATION_SUFFIX, "");
-      const historyPath =
-        options.fileHistory?.findLast((path) => basename(path) === name) ??
-        options.fileHistory?.findLast((path) => basename(path) === withoutLocation);
-      return historyPath ? attachmentCall(() => realpath(historyPath)) : Effect.fail(error);
+      const history = [...(options.fileHistory ?? [])].reverse();
+      // The newest file with the name goes first; a file that is gone does not hide an older one.
+      const historyPaths = new Set([
+        ...history.filter((path) => basename(path) === name),
+        ...history.filter((path) => basename(path) === withoutLocation),
+      ]);
+      return Effect.gen(function* () {
+        for (const historyPath of historyPaths) {
+          const found = yield* Effect.result(attachmentCall(() => realpath(historyPath)));
+          if (Result.isSuccess(found)) return found.success;
+          if (!isMissing(found.failure)) return yield* Effect.fail(found.failure);
+        }
+        return yield* Effect.fail(error);
+      });
     }),
     Effect.catch((error) =>
       isMissing(error)
