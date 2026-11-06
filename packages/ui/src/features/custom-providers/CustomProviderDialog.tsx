@@ -62,7 +62,9 @@ import {
   customProviderValue,
   type DiscoveredModel,
   emptyCustomProviderDraft,
+  fillFoundValues,
   hasCustomProviderError,
+  hasFoundValues,
   keepsHeaderValue,
   type ModelDiscovery,
   validateCustomProvider,
@@ -419,6 +421,17 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
   const discoveryId = createUniqueId();
   const listed = (id: string) => draft.models.some((model) => model.id.trim() === id);
 
+  /** A new list fills the empty fields of the rows that it names, such as the rows of a saved endpoint. */
+  createEffect(discovered, (models) => {
+    if (!models || !untrack(() => props.contextWindows)) return;
+    setDraft((state) => {
+      for (const row of state.models) {
+        const found = models.find((model) => model.id === row.id.trim());
+        if (found) fillFoundValues(row, found);
+      }
+    });
+  });
+
   /** A found model is a row in the same list the user types into, so submit has one source. */
   function toggleModel(model: DiscoveredModel, checked: boolean): void {
     setDraft((state) => {
@@ -433,6 +446,7 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
         id: model.id,
         name: model.name ?? model.id,
         contextWindow: model.contextWindow?.toString() ?? "",
+        maxOutput: model.maxOutput?.toString() ?? "",
         ...(model.reasoningEfforts ? { reasoningEfforts: [...model.reasoningEfforts] } : {}),
         ...(model.inputs ? { inputs: [...model.inputs] } : {}),
       };
@@ -754,6 +768,11 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                           <Text tone="muted" variant="caption" role="status">
                             {t("customProvider.discovery.found", { count: models().length })}
                           </Text>
+                          <Show when={props.contextWindows && models().some(hasFoundValues)}>
+                            <Text tone="muted" variant="caption">
+                              {t("customProvider.model.foundValuesHint")}
+                            </Text>
+                          </Show>
                           <ul class="custom-provider-discovered" aria-label={t("customProvider.discovery.label")}>
                             <For each={models()}>
                               {(model, index) => (

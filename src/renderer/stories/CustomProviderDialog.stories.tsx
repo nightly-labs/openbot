@@ -195,6 +195,26 @@ export const DiscoveryFound: Story = {
   },
 };
 
+/**
+ * The list gives a window, a max output and input kinds (#3946): they fill the empty fields of the
+ * rows that it names, and a line says where they come from.
+ */
+export const DiscoveryFoundValues: Story = {
+  args: {
+    contextWindows: true,
+    draft: { ...ollama, models: localEndpoint.models },
+    onDiscoverModels: fn(),
+    discovery: {
+      status: "found",
+      models: [
+        { id: "qwen3-coder:30b", contextWindow: 262_144, maxOutput: 65_536, inputs: [] },
+        { id: "gpt-oss:120b", contextWindow: 131_072 },
+        { id: "gemma3:27b", contextWindow: 131_072, inputs: ["image"] },
+      ],
+    },
+  },
+};
+
 export const DiscoveryEmpty: Story = {
   args: { draft: ollama, onDiscoverModels: fn(), discovery: { status: "found", models: [] } },
 };

@@ -94,6 +94,7 @@ export const messages = {
   "customProvider.model.inputImage": "이미지",
   "customProvider.model.inputPdf": "PDF",
   "customProvider.model.inputsHint": "각 모델이 텍스트 외에 읽을 수 있는 것을 선택하세요.",
+  "customProvider.model.foundValuesHint": "일부 값은 엔드포인트에서 가져왔어요. 변경할 수 있어요.",
   "customProvider.model.remove": "모델 {number} 제거",
   "customProvider.model.add": "모델 추가",
   "customProvider.headers": "헤더",

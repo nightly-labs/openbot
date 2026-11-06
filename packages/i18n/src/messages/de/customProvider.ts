@@ -95,6 +95,7 @@ export const messages = {
   "customProvider.model.inputImage": "Bilder",
   "customProvider.model.inputPdf": "PDF",
   "customProvider.model.inputsHint": "Wähle, was jedes Modell neben Text lesen kann.",
+  "customProvider.model.foundValuesHint": "Einige Werte kommen vom Endpunkt. Du kannst sie ändern.",
   "customProvider.model.remove": "Modell {number} entfernen",
   "customProvider.model.add": "Modell hinzufügen",
   "customProvider.headers": "Header",

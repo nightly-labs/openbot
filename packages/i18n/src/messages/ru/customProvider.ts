@@ -91,6 +91,7 @@ export const messages = {
   "customProvider.model.inputImage": "Изображения",
   "customProvider.model.inputPdf": "PDF",
   "customProvider.model.inputsHint": "Выберите, что каждая модель может читать помимо текста.",
+  "customProvider.model.foundValuesHint": "Некоторые значения получены от эндпоинта. Вы можете их изменить.",
   "customProvider.model.remove": "Удалить модель {number}",
   "customProvider.model.add": "Добавить модель",
   "customProvider.headers": "Заголовки",

@@ -95,6 +95,7 @@ export const messages = {
   "customProvider.model.inputImage": "Görseller",
   "customProvider.model.inputPdf": "PDF",
   "customProvider.model.inputsHint": "Her modelin metin dışında okuyabileceklerini seçin.",
+  "customProvider.model.foundValuesHint": "Bazı değerler uç noktadan geliyor. Bunları değiştirebilirsiniz.",
   "customProvider.model.remove": "{number}. modeli kaldır",
   "customProvider.model.add": "Model ekle",
   "customProvider.headers": "Başlıklar",

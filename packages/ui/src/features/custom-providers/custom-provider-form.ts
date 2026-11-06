@@ -395,6 +395,26 @@ export interface DiscoveredModel {
   inputs?: CustomProviderInputKind[];
 }
 
+/** The list gave more than the model id, so the form can fill fields from it. */
+export function hasFoundValues(model: DiscoveredModel): boolean {
+  return model.contextWindow !== undefined || model.inputs !== undefined;
+}
+
+/**
+ * Puts what a model list says about a model into the empty fields of its row (#3946). A typed or
+ * saved value stays.
+ */
+export function fillFoundValues(row: CustomModelDraft, found: DiscoveredModel): void {
+  if (!row.contextWindow?.trim() && found.contextWindow !== undefined) {
+    row.contextWindow = found.contextWindow.toString();
+  }
+  // A max output needs a window, as `validateCustomProvider` says.
+  if (!row.maxOutput?.trim() && row.contextWindow?.trim() && found.maxOutput !== undefined) {
+    row.maxOutput = found.maxOutput.toString();
+  }
+  if (row.inputs === undefined && found.inputs !== undefined) row.inputs = [...found.inputs];
+}
+
 /** The state of one `GET {baseUrl}/models` request, owned by the host that makes it. */
 export type ModelDiscovery =
   | { status: "idle" }

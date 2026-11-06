@@ -93,6 +93,7 @@ export const messages = {
   "customProvider.model.inputImage": "画像",
   "customProvider.model.inputPdf": "PDF",
   "customProvider.model.inputsHint": "各モデルがテキスト以外に読めるものを選択します。",
+  "customProvider.model.foundValuesHint": "一部の値はエンドポイントから取得しました。変更できます。",
   "customProvider.model.remove": "モデル {number} を削除",
   "customProvider.model.add": "モデルを追加",
   "customProvider.headers": "ヘッダー",

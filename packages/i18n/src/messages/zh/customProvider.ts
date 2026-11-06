@@ -89,6 +89,7 @@ export const messages = {
   "customProvider.model.inputImage": "图片",
   "customProvider.model.inputPdf": "PDF",
   "customProvider.model.inputsHint": "选择每个模型除文本外可以读取的内容。",
+  "customProvider.model.foundValuesHint": "部分值来自该端点。你可以更改它们。",
   "customProvider.model.remove": "移除模型 {number}",
   "customProvider.model.add": "添加模型",
   "customProvider.headers": "请求头",
