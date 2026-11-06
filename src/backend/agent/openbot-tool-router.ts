@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { basename, resolve, sep } from "node:path";
+import { basename } from "node:path";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import { chatVisualItemType } from "@openbot/contracts/chat-visual";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
@@ -78,6 +78,7 @@ import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION } from "./approva
 import type { AttachmentGateway } from "./attachment-gateway";
 import type { AttentionRegistry } from "./attention-registry";
 import { loadAvatarFile } from "./avatar-file";
+import { resolveBackgroundTaskCwd } from "./background-task-cwd";
 import type { BrowserUploads } from "./browser-uploads";
 import {
   CHANNEL_AGENT_TOOL_NAMES,
@@ -1093,10 +1094,8 @@ export class OpenBotToolRouter {
       if (!backgroundTasks) return openBotToolFailure("This server cannot start background tasks.");
       const args = runBackgroundToolSchema.parse(params.arguments ?? {}, { reportInput: true });
       const sender = this.#requireAgent(senderAgentId);
-      const root = sender.workspacePath;
-      const workspace = args.cwd === undefined ? root : resolve(root, args.cwd);
-      if (workspace !== root && !workspace.startsWith(`${root}${sep}`))
-        return openBotToolFailure("cwd must stay inside your workspace.");
+      const workspace = resolveBackgroundTaskCwd(sender.workspacePath, args.cwd);
+      if (workspace === null) return openBotToolFailure("cwd must stay inside your workspace.");
       const task = yield* Effect.tryPromise({
         try: () =>
           backgroundTasks.start({
@@ -1109,6 +1108,9 @@ export class OpenBotToolRouter {
       });
       return openBotToolResult({
         id: task.id,
+        pid: task.pid,
+        startedAt: task.startedAt,
+        logPath: task.logPath,
         title: task.title,
         status: task.status,
         next: "The program runs outside this turn. OpenBot shows it above the input with its last output line and exit code. Tell the user what it does and that they can watch it there; do not poll it in this turn.",

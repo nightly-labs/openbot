@@ -4,8 +4,8 @@ import { type BackgroundTask, isBackgroundTask } from "@openbot/contracts/ipc";
 
 function decodeBackgroundTask(value: unknown): BackgroundTask {
   if (!isBackgroundTask(value)) throw new Error("Invalid background task.");
-  const { id, agentId, command, title, pid, startedAt, endedAt, exitCode, status, lastLine } = value;
-  return { id, agentId, command, title, pid, startedAt, endedAt, exitCode, status, lastLine };
+  const { id, agentId, command, title, pid, startedAt, endedAt, exitCode, status, lastLine, logPath } = value;
+  return { id, agentId, command, title, pid, startedAt, endedAt, exitCode, status, lastLine, logPath };
 }
 
 export function decodeBackgroundTasks(value: unknown): BackgroundTask[] {

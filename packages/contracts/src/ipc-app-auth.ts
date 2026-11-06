@@ -468,6 +468,8 @@ export interface BackgroundTask {
   exitCode: number | null;
   status: (typeof BACKGROUND_TASK_STATUSES)[number];
   lastLine: string;
+  /** Where the program writes its output, so a caller can read more than the last line. */
+  logPath: string;
 }
 
 export function isBackgroundTask(value: unknown): value is BackgroundTask {
@@ -485,7 +487,8 @@ export function isBackgroundTask(value: unknown): value is BackgroundTask {
       value.status === "finished" ||
       value.status === "stopped" ||
       value.status === "unknown") &&
-    isString(value.lastLine)
+    isString(value.lastLine) &&
+    isString(value.logPath)
   );
 }
 

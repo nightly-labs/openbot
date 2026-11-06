@@ -16,13 +16,22 @@ import { AGENT_PROCESS_VARIABLE } from "./server-memory";
 
 const MAX_COMMAND_LENGTH = 500;
 const MAX_TITLE_LENGTH = 120;
-/** The log keeps its last 5 MB, so a download that prints often cannot fill the disk. */
+/** The log keeps at most this much on disk, so a download that prints often cannot fill the disk. */
 const LOG_LIMIT_BYTES = 5 * 1024 * 1024;
+/**
+ * When the log passes the limit it is cut back to this much. A smaller tail than the limit means the
+ * file is not rewritten again after a few more bytes, which a busy program would otherwise cause.
+ */
+const LOG_KEEP_BYTES = 1 * 1024 * 1024;
+/** How often a running log may be measured and cut, so a fast writer cannot stall the poll. */
+const LOG_TRIM_INTERVAL_MS = 2_000;
 const LAST_LINE_BYTES = 8 * 1024;
 const LAST_LINE_LENGTH = 160;
 const MAX_KEPT_TASKS = 50;
 const STOP_GRACE_MS = 3_000;
 const STOP_CHECK_INTERVAL_MS = 100;
+const LOG_FILE = "output.log";
+const EXIT_FILE = "output.log.exit";
 
 interface StoredTask extends BackgroundTask {
   workspace: string;
@@ -64,6 +73,19 @@ function callerArguments(command: string): [string, string[]] {
   return ["/bin/sh", ["-c", command]];
 }
 
+/** One path as a shell word, so a folder with a space or a quote still names the same file. */
+function shellQuote(value: string): string {
+  return `'${value.split("'").join(`'\\''`)}'`;
+}
+
+/**
+ * The command in a subshell, so an `exit` inside it does not skip the line that records the code.
+ * The wrapper outlives OpenBot: even when the app quits first, the program writes its own exit file.
+ */
+function commandWithExitFile(command: string, exitPath: string): string {
+  return `( ${command}\n); printf %s $? > ${shellQuote(exitPath)}`;
+}
+
 export class BackgroundTasks {
   readonly #root: string;
   readonly #file: string;
@@ -71,6 +93,8 @@ export class BackgroundTasks {
   readonly #children = new Map<string, ChildProcess>();
   /** Tasks whose stop the app asked for, so their exit reads as stopped, not finished. */
   readonly #stopping = new Set<string>();
+  /** When each task's log was last measured, so trimming runs at most once per interval. */
+  readonly #trimmedAt = new Map<string, number>();
   #loaded: Promise<void> | null = null;
   /** Writes run one after another, so two settlements cannot rename the file at once. */
   #saving: Promise<void> = Promise.resolve();
@@ -78,6 +102,8 @@ export class BackgroundTasks {
   constructor(root: string) {
     this.#root = root;
     this.#file = join(root, "tasks.json");
+    // A log that is measured only when a page polls would grow while the window is hidden.
+    setInterval(() => void this.#trimRunningLogs(), LOG_TRIM_INTERVAL_MS).unref();
   }
 
   async list(agentId: string): Promise<BackgroundTask[]> {
@@ -93,6 +119,7 @@ export class BackgroundTasks {
         const presented = this.#present(task);
         if (presented.status === "running") {
           presented.lastLine = await this.#readLastLine(task.id);
+          await this.#trimLog(task.id);
         }
         return presented;
       }),
@@ -104,7 +131,8 @@ export class BackgroundTasks {
     const id = crypto.randomUUID();
     const folder = join(this.#root, id);
     await mkdir(folder, { recursive: true });
-    const logPath = join(folder, "output.log");
+    const logPath = join(folder, LOG_FILE);
+    const exitPath = join(folder, EXIT_FILE);
     const startedAt = Date.now();
     const record: StoredTask = {
       id,
@@ -117,9 +145,11 @@ export class BackgroundTasks {
       exitCode: null,
       status: "running",
       lastLine: "",
+      logPath,
       workspace: input.workspace,
     };
-    const [caller, args] = callerArguments(input.command);
+    const command = process.platform === "win32" ? input.command : commandWithExitFile(input.command, exitPath);
+    const [caller, args] = callerArguments(command);
     const fd = openSync(logPath, "a");
     let child: ChildProcess;
     try {
@@ -140,10 +170,9 @@ export class BackgroundTasks {
     record.pid = child.pid ?? 0;
     this.#tasks.set(id, record);
     this.#children.set(id, child);
-    child.once("exit", (code, signal) => {
+    child.once("exit", (code) => {
       const stopped = this.#stopping.delete(id);
-      const exitCode = code ?? (signal ? 1 : null);
-      this.#settle(id, stopped ? null : exitCode, stopped ? "stopped" : undefined).catch(() => undefined);
+      void this.#finish(id, stopped, code);
     });
     child.unref();
     await this.#save();
@@ -154,7 +183,7 @@ export class BackgroundTasks {
     await this.#load();
     const task = this.#tasks.get(id);
     if (!task) return null;
-    const logPath = join(this.#root, task.id, "output.log");
+    const logPath = join(this.#root, task.id, LOG_FILE);
     try {
       const info = await stat(logPath);
       const length = Math.min(info.size, Math.max(1, maxBytes));
@@ -201,6 +230,16 @@ export class BackgroundTasks {
     return presented;
   }
 
+  /** Reads the code that the program itself wrote when OpenBot was not around to see it end. */
+  async #finish(id: string, stopped: boolean, code: number | null): Promise<void> {
+    if (stopped) {
+      await this.#settle(id, null, "stopped");
+      return;
+    }
+    const [fileCode] = await this.#readExit(id);
+    await this.#settle(id, fileCode ?? code);
+  }
+
   async #settle(id: string, exitCode: number | null, status?: "stopped"): Promise<void> {
     const task = this.#tasks.get(id);
     if (task?.status !== "running") return;
@@ -210,28 +249,13 @@ export class BackgroundTasks {
     task.exitCode = exitCode;
     task.status = status ?? (exitCode === null ? "unknown" : "finished");
     task.lastLine = await this.#readLastLine(id);
-    const logPath = join(this.#root, id, "output.log");
-    await writeFile(join(this.#root, id, "exit"), exitCode === null ? "" : String(exitCode)).catch(() => undefined);
-    try {
-      const info = await stat(logPath);
-      if (info.size > LOG_LIMIT_BYTES) {
-        const handle = await open(logPath, "r");
-        try {
-          const buffer = Buffer.alloc(LOG_LIMIT_BYTES);
-          await handle.read(buffer, 0, LOG_LIMIT_BYTES, info.size - LOG_LIMIT_BYTES);
-          await writeFile(logPath, buffer);
-        } finally {
-          await handle.close();
-        }
-      }
-    } catch {
-      // A program that wrote nothing has no log to trim.
-    }
+    await this.#trimLog(id, true);
+    await writeFile(join(this.#root, id, EXIT_FILE), exitCode === null ? "" : String(exitCode)).catch(() => undefined);
     await this.#save();
   }
 
   async #readLastLine(id: string): Promise<string> {
-    const logPath = join(this.#root, id, "output.log");
+    const logPath = join(this.#root, id, LOG_FILE);
     try {
       const info = await stat(logPath);
       const length = Math.min(info.size, LAST_LINE_BYTES);
@@ -271,13 +295,45 @@ export class BackgroundTasks {
   }
 
   async #readExit(id: string): Promise<[number | null, number | null]> {
+    const exitPath = join(this.#root, id, EXIT_FILE);
     try {
-      const text = (await readFile(join(this.#root, id, "exit"), "utf8")).trim();
+      const text = (await readFile(exitPath, "utf8")).trim();
       const code = text === "" ? null : Number(text);
-      const info = await stat(join(this.#root, id, "exit"));
+      const info = await stat(exitPath);
       return [Number.isInteger(code) ? code : null, info.mtimeMs];
     } catch {
       return [null, null];
+    }
+  }
+
+  /** Cuts a log that passed the limit back to its tail; the program keeps appending after it. */
+  async #trimLog(id: string, force = false): Promise<void> {
+    const now = Date.now();
+    if (!force && now - (this.#trimmedAt.get(id) ?? 0) < LOG_TRIM_INTERVAL_MS) return;
+    this.#trimmedAt.set(id, now);
+    const logPath = join(this.#root, id, LOG_FILE);
+    try {
+      const info = await stat(logPath);
+      if (info.size <= LOG_LIMIT_BYTES) return;
+      const length = Math.min(info.size, LOG_KEEP_BYTES);
+      const handle = await open(logPath, "r");
+      try {
+        const buffer = Buffer.alloc(length);
+        await handle.read(buffer, 0, length, info.size - length);
+        await writeFile(logPath, buffer);
+      } finally {
+        await handle.close();
+      }
+    } catch {
+      // A program that wrote nothing has no log to trim.
+    }
+  }
+
+  /** Trims the log of every running task, so a hidden window cannot let one grow without bound. */
+  async #trimRunningLogs(): Promise<void> {
+    if (!this.#loaded) return;
+    for (const task of this.#tasks.values()) {
+      if (task.status === "running") await this.#trimLog(task.id);
     }
   }
 
@@ -329,6 +385,7 @@ function isStoredTask(value: unknown): value is StoredTask {
     typeof value.title === "string" &&
     typeof value.pid === "number" &&
     typeof value.startedAt === "number" &&
+    typeof value.logPath === "string" &&
     (value.status === "running" ||
       value.status === "finished" ||
       value.status === "stopped" ||

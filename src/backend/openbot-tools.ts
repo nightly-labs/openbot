@@ -380,7 +380,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "run_background",
     description:
-      "Start a long command in the background and get its id. Use it for a download, a build, a server, or anything that may outlive this turn or take more than about 30 seconds. OpenBot keeps the output in a log, shows the last line in the conversation, and records the exit code, so the user sees progress instead of a silent wait. Reply with the id and what it does; do not wait in this turn for a download that the user can watch.",
+      "Start a long command in the background and get its id, pid, start time, and log path. Use it for a download, a build, a server, or anything that may outlive this turn or take more than about 30 seconds. OpenBot keeps stdout and stderr in the log, shows the last line in the conversation, and records the exit code next to the log, so the user sees progress instead of a silent wait. Reply with the id and what it does; do not wait in this turn for a download that the user can watch.",
     shape: runBackgroundToolSchema.shape,
   },
   {

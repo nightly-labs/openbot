@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -60,6 +60,8 @@ describe.skipIf(process.platform === "win32")("background tasks", () => {
     expect(finished?.lastLine).toBe("two");
     expect(finished?.title).toBe("Two lines");
     expect(finished?.endedAt).toBeGreaterThan(0);
+    expect(finished?.logPath).toBe(join(root, started.id, "output.log"));
+    expect(await readFile(join(root, started.id, "output.log.exit"), "utf8")).toBe("3");
   });
 
   it("reads the tail of a running program", async () => {
@@ -71,6 +73,29 @@ describe.skipIf(process.platform === "win32")("background tasks", () => {
     expect(tail).toBe("ghij");
     expect(await tasks.tail("not-a-task", 4)).toBeNull();
   });
+
+  it("keeps only the tail of a log that passes the limit", async () => {
+    const root = await makeRoot();
+    const tasks = new BackgroundTasks(root);
+    const task = await tasks.start({
+      agentId: "agent-2c",
+      workspace: root,
+      command: "head -c 6291456 /dev/zero | tr '\\0' x; sleep 30",
+    });
+    const logPath = join(root, task.id, "output.log");
+    await waitFor(async () => {
+      const info = await stat(logPath).catch(() => null);
+      if (info === null || info.size <= 5 * 1024 * 1024) return false;
+      await tasks.list("agent-2c");
+      return true;
+    }, 15_000);
+    await waitFor(async () => {
+      const info = await stat(logPath);
+      return info.size <= 5 * 1024 * 1024;
+    }, 15_000);
+    expect((await tasks.tail(task.id, 8))?.endsWith("xxxxxxxx")).toBe(true);
+    await tasks.stop(task.id);
+  }, 30_000);
 
   it("shows the last line of a program that is still running", async () => {
     const root = await makeRoot();
