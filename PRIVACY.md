@@ -330,7 +330,7 @@ The local host also records how the agents are used:
 when there is no install ID.
 - **Startup time.** Once per start, the host sends how long the start took, rounded: until the
   window could show, until the services were ready, and until the workspace loaded; the name of the
-  slowest startup step from a fixed list; and whether it was the first start since the computer
+  slowest startup step from a fixed list, and how long each step of that list took; and whether it was the first start since the computer
   booted, a later one, or the first start of a new version. To know this, the app keeps the time and
   version of its last start in a local file that is not sent. Paths and names are not sent.
 - **Connection time.** When this computer connects to a remote server, the host sends how long the
