@@ -5,6 +5,7 @@ import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references"
 import type {
   AgentSummary,
   AgentWait,
+  ConversationMessage,
   ConversationPlanStep,
   ConversationSnapshot,
   QueueDelivery,
@@ -237,6 +238,22 @@ function currentTeammatePrompts(prompt: string): TeammatePrompt[] | null {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** A delivery as the message of the side thread or chat turn that it starts or steers. */
+export function deliveryConversationMessage(delivery: QueueDelivery): ConversationMessage {
+  return {
+    id: delivery.id,
+    author: delivery.sender.kind === "agent" ? "agent" : "user",
+    source: delivery.sender.kind === "agent" ? "agent" : "user",
+    ...(delivery.sender.kind === "agent" ? { senderAgentId: delivery.sender.agentId } : {}),
+    replyToMessageId: delivery.replyToMessageId,
+    attachments: delivery.attachments,
+    delivery: { id: delivery.id, status: "starting", position: null },
+    text: delivery.text,
+    createdAt: delivery.createdAt,
+    status: "completed",
+  };
 }
 
 /**

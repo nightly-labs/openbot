@@ -16,7 +16,12 @@ import type { MailboxStore } from "../mailbox-store";
 import { decodeRecordResponse } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { CustomEndpoints } from "./custom-endpoints";
-import { agentNamesById, deliveryPromptInput, type TagReferenceSource } from "./delivery-content";
+import {
+  agentNamesById,
+  deliveryConversationMessage,
+  deliveryPromptInput,
+  type TagReferenceSource,
+} from "./delivery-content";
 import { type DrainScheduler, REMOVED_ENDPOINT_MESSAGE } from "./drain-scheduler";
 import type { MailboxSync } from "./mailbox-sync";
 import type { ProviderRuntime } from "./provider-runtime";
@@ -322,6 +327,18 @@ export class QueueControls {
       );
     yield* this.#mailbox.markRunning(input.deliveryId, turnId).pipe(toQueueOperationFailed);
     yield* queueStep(() => {
+      // A side thread reads no mailbox copies, so the steered message joins it here, at the steer
+      // time, as the drain adds a message that starts a turn (#5263).
+      if (
+        this.#conversation.isExecutionThread(snapshot.threadId) &&
+        !snapshot.messages.some((message) => message.id === input.deliveryId)
+      ) {
+        snapshot.messages.push({
+          ...deliveryConversationMessage(context.delivery),
+          createdAt: new Date().toISOString(),
+        });
+        this.#mailboxSync.syncDeliveryMessage(snapshot, input.deliveryId);
+      }
       this.#mailboxSync.syncMailboxMessages(snapshot);
       this.#mailboxSync.emitQueue(agent.id);
       this.#conversation.emitConversation(snapshot, "queue.message-steered", { deliveryId: input.deliveryId });
