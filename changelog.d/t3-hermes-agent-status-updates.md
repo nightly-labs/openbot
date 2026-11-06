@@ -18,6 +18,11 @@
   for…" after a few quiet minutes.
 - With the Natural style, a Claude agent gets the opening-line rule again with each message, so a
   long chat keeps the short first line.
+- With the Natural style, the "Working on it…" post in Slack, Discord, Telegram and WhatsApp shows
+  the agent's newest progress line, such as "Measuring folder sizes first", until the answer
+  replaces it. Secrets are removed, and the agent's thinking never goes there. The Stop button stays.
+- With the Natural style, the activity line of an agent chat shows "Thinking it through…" until
+  the first step, not a random playful text.
 
 ### Changed
 

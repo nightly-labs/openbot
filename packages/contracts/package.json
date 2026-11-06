@@ -27,6 +27,7 @@
     "./chat-preview": "./src/chat-preview.ts",
     "./chat-visual": "./src/chat-visual.ts",
     "./chat-tag-references": "./src/chat-tag-references.ts",
+    "./conversation-narration": "./src/conversation-narration.ts",
     "./conversation-order": "./src/conversation-order.ts",
     "./conversation-read": "./src/conversation-read.ts",
     "./hosted-servers": "./src/hosted-servers.ts",

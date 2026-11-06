@@ -1,3 +1,4 @@
+import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
 import type { AgentModelId, AgentProviderRef, AgentReasoningEffort } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import type { AgentProfile } from "@openbot/ui/data";
@@ -11,7 +12,6 @@ import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
 import { agentConversationKey } from "../conversation-keys";
 import type { ConversationProps } from "../conversation-types";
-import { isNarrationItemId } from "../narration-rows";
 
 /** A turn with nothing from its provider for this long shows that it waits, not that it works. */
 const PROVIDER_SILENT_AFTER_MS = 60_000;
@@ -144,7 +144,12 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     if (!agentId || !activityId) return null;
     const previous = deps.agentActivityLabels.get(agentId);
     if (previous?.activityId === activityId) return previous.label;
-    const label = nextAgentActivityLabel(previous?.label);
+    // A natural agent says what it does in its own words, so the line before its first step is plain
+    // and steady, not a random playful text.
+    const label: AgentActivityLabel =
+      !deps.props.channel && deps.props.responseStyle === "natural"
+        ? "Thinking it through…"
+        : nextAgentActivityLabel(previous?.label);
     deps.agentActivityLabels.set(agentId, { activityId, label });
     return label;
   });
