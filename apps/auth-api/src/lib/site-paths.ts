@@ -38,3 +38,22 @@ function hasPolishCopy(path: string): path is EnglishPagePath {
 export function localizedPath<Path extends string>(path: Path, locale: SiteLocale): Path | PolishPagePath {
   return locale === "pl" && hasPolishCopy(path) ? POLISH_PAGE_PATHS[path] : path;
 }
+
+/**
+ * The cookie that keeps the language that the visitor chose in the header. It holds `en` or `pl`,
+ * and the English addresses show that language in place of the `Accept-Language` language.
+ */
+export const SITE_LOCALE_COOKIE = "openbot_lang";
+
+/** The language in the value of `SITE_LOCALE_COOKIE`, or `undefined` for no value or another value. */
+export function chosenSiteLocale(value: string | undefined): SiteLocale | undefined {
+  return SITE_LOCALES.find((locale) => locale === value);
+}
+
+/** The page at `pathname`, when it is the English or the Polish address of a page with a Polish copy. */
+export function pageWithPolishCopy(pathname: string): EnglishPagePath | undefined {
+  const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+  return Object.keys(POLISH_PAGE_PATHS)
+    .filter(hasPolishCopy)
+    .find((page) => page === path || POLISH_PAGE_PATHS[page] === path);
+}

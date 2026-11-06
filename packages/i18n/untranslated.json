@@ -3139,6 +3139,8 @@
   "sitePage.site.guides.index": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "pt", "ru", "tr", "zh"],
   "sitePage.site.guides.summary": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "pt", "ru", "tr", "zh"],
   "sitePage.site.home": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "pt", "ru", "tr", "zh"],
+  "sitePage.site.language": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "pt", "ru", "tr", "zh"],
+  "sitePage.site.language.current": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "pt", "ru", "tr", "zh"],
   "sitePage.site.latest": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "pt", "ru", "tr", "zh"],
   "sitePage.site.logo.copyIcon": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "pt", "ru", "tr", "zh"],
   "sitePage.site.logo.copyLockup": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "pt", "ru", "tr", "zh"],

@@ -714,9 +714,61 @@ a {
   display: none;
 }
 
+/* The language button and its list. Only pages with a copy in each language show it. The button
+   rules come after the `landing-button` rules, which they change. */
+.site-language-menu {
+  position: relative;
+}
+
+.site-language-list {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 2;
+  min-width: 168px;
+  margin: 0;
+  padding: 6px;
+  border-radius: var(--site-nav-radius);
+  background: rgba(22, 22, 22, 0.8);
+  box-shadow: 0 0 0 1px var(--site-nav-hairline);
+  list-style: none;
+  backdrop-filter: blur(40px) saturate(180%);
+}
+
+.site-language-list[hidden] {
+  display: none;
+}
+
+.site-language-list a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--openbot-radius-md);
+  color: var(--openbot-text-secondary);
+  font-size: 14px;
+}
+
+.site-language-list a:hover,
+.site-language-list a:focus-visible {
+  outline: 0;
+  background: var(--openbot-bg-control-hover);
+  color: var(--openbot-text-primary);
+}
+
+.site-language-list a[aria-current="page"] {
+  color: var(--openbot-text-primary);
+}
+
+.site-language-list svg {
+  width: 14px;
+  height: 14px;
+}
+
 /* Just above the mobile header, the brand, the full menu and the buttons do not fit with the menu
    at the true centre. The menu centres between them, and the triggers are tighter. */
-@media (min-width: 901px) and (max-width: 1040px) {
+@media (min-width: 1101px) and (max-width: 1280px) {
   .landing-header {
     grid-template-columns: auto 1fr auto;
     gap: 12px;
@@ -762,8 +814,9 @@ a {
 }
 
 /* The header on a narrow screen: the brand, the download button and a menu
-   button that opens the sheet. 900px is MOBILE_HEADER_QUERY in SiteMobileMenu. */
-@media (max-width: 900px) {
+   button that opens the sheet. 1100px is MOBILE_HEADER_QUERY in SiteMobileMenu. Below it, the
+   full menu in Polish and the language button do not fit. */
+@media (max-width: 1100px) {
   .landing-header {
     display: flex;
     justify-content: space-between;
@@ -1191,6 +1244,42 @@ a {
 
 .landing-button:active {
   transform: scale(0.97);
+}
+
+/* The language button of the header. See `.site-language-menu`. */
+.site-language-trigger {
+  gap: 6px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+/* The icons are children here, not the mask of `landing-button`. */
+.site-language-trigger::before {
+  content: none;
+}
+
+.site-language-trigger svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Below the full desktop header, there is room for one more round button only: the globe. */
+@media (max-width: 1280px) {
+  .site-language-trigger {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .site-language-trigger > :not(:first-child) {
+    display: none;
+  }
+
+  .site-language-trigger svg {
+    width: 18px;
+    height: 18px;
+  }
 }
 
 .landing-hero {
@@ -3880,7 +3969,7 @@ a {
 }
 
 /* After the button rules, which it resizes. The sheet shows only below the header breakpoint. */
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .site-sheet-actions > .landing-button {
     flex: 1 1 0;
     height: 44px;

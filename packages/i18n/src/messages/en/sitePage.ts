@@ -450,6 +450,10 @@ export const messages = defineMessages("sitePage", {
   "sitePage.site.siteMenu": "Site menu",
   "sitePage.site.openMenu": "Open menu",
   "sitePage.site.closeMenu": "Close menu",
+  // The label of the list of the languages of the site.
+  "sitePage.site.language": "Language",
+  // The header button that opens the list of languages. {language} is the name of the page language in that language.
+  "sitePage.site.language.current": "Language: {language}",
   // A badge on the newest article in the menu.
   "sitePage.site.latest": "Latest",
   "sitePage.site.home": "OpenBot home",

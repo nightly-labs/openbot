@@ -383,6 +383,8 @@ export const messages = {
   "sitePage.site.siteMenu": "Menu strony",
   "sitePage.site.openMenu": "Otwórz menu",
   "sitePage.site.closeMenu": "Zamknij menu",
+  "sitePage.site.language": "Język",
+  "sitePage.site.language.current": "Język: {language}",
   "sitePage.site.latest": "Najnowsze",
   "sitePage.site.home": "Strona główna OpenBot",
   "sitePage.site.logo.menu": "Logo",

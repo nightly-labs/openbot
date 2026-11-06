@@ -36,8 +36,9 @@ export const Route = createRootRoute({
     if (!matches.some((match) => match._notFound)) return head;
     return { ...head, meta: head.meta.map((tag) => ("title" in tag ? { title: NOT_FOUND_TITLE } : tag)) };
   },
-  // The HTML holds catalog text in the language of `Accept-Language`, so a cache must keep it apart.
-  headers: () => ({ ...OPENBOT_SECURITY_HEADERS, Vary: "Accept-Language" }),
+  // The HTML holds catalog text in the language of `Accept-Language`, or of the language cookie, so a
+  // cache must keep them apart.
+  headers: () => ({ ...OPENBOT_SECURITY_HEADERS, Vary: "Accept-Language, Cookie" }),
   component: RootComponent,
   shellComponent: RootDocument,
   errorComponent: RootError,

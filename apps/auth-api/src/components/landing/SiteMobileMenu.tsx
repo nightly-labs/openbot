@@ -7,7 +7,7 @@ import { SiteNavigationPanel } from "./SiteNavigationPanel";
 import { useSiteChrome, useSitePath } from "./SiteText";
 
 /** The width under which the header folds into the menu button. Matches the stylesheet. */
-const MOBILE_HEADER_QUERY = "(max-width: 900px)";
+const MOBILE_HEADER_QUERY = "(max-width: 1100px)";
 
 export interface SiteMobileMenuProps {
   /** Draws the header's own buttons again, at the foot of the sheet. A node can sit in one place only. */

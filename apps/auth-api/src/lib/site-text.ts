@@ -1,4 +1,5 @@
 import type { AppTranslate } from "@openbot/i18n";
+import { appLanguageOption } from "@openbot/i18n/languages";
 import type { SiteLocale } from "./site-paths";
 
 /*
@@ -55,6 +56,14 @@ export function siteText(t: AppTranslate) {
     siteMenu: t("sitePage.site.siteMenu"),
     openMenu: t("sitePage.site.openMenu"),
     closeMenu: t("sitePage.site.closeMenu"),
+    language: {
+      label: t("sitePage.site.language"),
+      /** The label of the header button on a page in each language. */
+      current: {
+        en: t("sitePage.site.language.current", { language: appLanguageOption("en").label }),
+        pl: t("sitePage.site.language.current", { language: appLanguageOption("pl").label }),
+      } satisfies Record<SiteLocale, string>,
+    },
     latest: t("sitePage.site.latest"),
     home: t("sitePage.site.home"),
     logo: {

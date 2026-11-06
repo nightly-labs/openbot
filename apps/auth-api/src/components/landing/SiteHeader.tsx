@@ -1,6 +1,7 @@
 import { OPENBOT_LINKS } from "../../lib/landing-links";
 import { SiteLogoLink } from "../brand/SiteLogoLink";
 import { Button, ButtonLink } from "../ui/button";
+import { SiteLanguageMenu } from "./SiteLanguageMenu";
 import { SiteMobileMenu } from "./SiteMobileMenu";
 import { SiteNavigationMenu } from "./SiteNavigationMenu";
 import { useSiteChrome } from "./SiteText";
@@ -53,6 +54,7 @@ export function SiteHeader(props: SiteHeaderProps) {
       <SiteLogoLink />
       <SiteNavigationMenu />
       <div class="site-header-actions">
+        <SiteLanguageMenu />
         {actions(props.downloadRef)}
         <SiteMobileMenu actions={() => actions()} />
       </div>
