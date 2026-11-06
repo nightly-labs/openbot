@@ -2223,8 +2223,11 @@ a {
 }
 
 /* The channel runs off the right edge and fades out above the copy. */
+/* The window starts under the top padding and fills the tile down to the copy, so no gap is left
+   above it when the tiles on the right make the row taller. */
 .landing-feature[data-feature="team"] .landing-feature-visual {
   display: flex;
+  align-items: stretch;
   padding: 36px 0 0 36px;
 }
 
@@ -3013,56 +3016,73 @@ a {
   }
 }
 
-/* One icon for each provider. The pointer on an icon shows the provider's colour. */
+/* Two rows of providers that scroll the opposite way. Each track holds its
+   list twice, so moving it by half loops with no jump. The pointer stops them. */
 .landing-feature[data-feature="providers"] .landing-feature-visual {
-  padding: 36px 32px 8px;
+  padding: 36px 0 0;
 }
 
-.landing-provider-grid {
+.landing-marquee {
+  width: 100%;
+  display: grid;
+  gap: 12px;
+  /* The mask hides all that is outside this box, so leave room for a pill that
+     moves up on hover. */
+  padding-block: 4px;
+  mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
+}
+
+.landing-marquee-row {
+  /* Clip only the sides, so a pill that moves up on hover keeps its top edge. A clip,
+     unlike a scroll container, does not let a grid item shrink, so set the minimum. */
+  min-width: 0;
+  overflow-x: clip;
+}
+
+.landing-marquee-track {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 14px 6px;
-  max-width: 400px;
+  gap: 10px;
+  width: max-content;
   margin: 0;
   padding: 0;
   list-style: none;
+  animation: landing-marquee 36s linear infinite;
 }
 
-.landing-provider-tile {
-  display: grid;
-  justify-items: center;
-  gap: 6px;
-  width: 88px;
-  color: var(--openbot-text-secondary);
-  font-size: 13px;
+.landing-marquee-row + .landing-marquee-row .landing-marquee-track {
+  animation-direction: reverse;
+}
+
+.landing-feature[data-feature="providers"]:hover .landing-marquee-track {
+  animation-play-state: paused;
+}
+
+.landing-provider-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 16px 10px 12px;
+  border: 1px solid var(--landing-card-border);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--landing-card-fill);
+  font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
-}
-
-.landing-provider-tile-icon {
-  display: grid;
-  place-items: center;
-  width: 52px;
-  height: 52px;
-  border: 1px solid var(--landing-card-border);
-  border-radius: 14px;
-  background: var(--landing-card-fill);
   transition:
     border-color 160ms ease,
     background-color 160ms ease,
     transform 160ms ease;
 }
 
-.landing-provider-tile:hover .landing-provider-tile-icon {
+.landing-provider-pill:hover {
   border-color: color-mix(in srgb, var(--openbot-provider-current) 55%, transparent);
   background: color-mix(in srgb, var(--openbot-provider-current) 12%, transparent);
   transform: translateY(-2px);
 }
 
-.landing-provider-tile-logo {
-  width: 24px;
-  height: 24px;
+.landing-provider-pill-logo {
+  width: 20px;
+  height: 20px;
 }
 
 /* The copy on the left, and the data folder that runs off the bottom right. */
@@ -3480,6 +3500,10 @@ a {
     padding: 24px 24px 28px;
   }
 
+  .landing-marquee-row + .landing-marquee-row {
+    display: none;
+  }
+
   .landing-feature[data-feature="local"] {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
@@ -3783,6 +3807,12 @@ a {
     opacity: 1;
     filter: blur(0.001px);
     transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes landing-marquee {
+  to {
+    transform: translateX(calc(-50% - 5px));
   }
 }
 
@@ -4265,6 +4295,7 @@ a {
     animation: none;
   }
 
+  .landing-marquee-track,
   .landing-team-typing span,
   .landing-feature[data-feature="local"]:hover .landing-lock-shackle {
     animation: none;

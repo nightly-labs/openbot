@@ -36,6 +36,9 @@ const AgentAvatar = lazy(() =>
   import("@openbot/ui/features/agents/AgentAvatar").then((module) => ({ default: module.AgentAvatar })),
 );
 
+/** The second marquee row runs the other way, so it starts from the other end of the list. */
+const PROVIDER_ROWS = [LANDING_PROVIDERS, [...LANDING_PROVIDERS].reverse()];
+
 /** Tiles whose avatars move when the pointer is on the tile. */
 const AVATAR_HOVER_FEATURES: ReadonlySet<LandingFeatureId> = new Set(["team", "multiplayer", "workflows", "persist"]);
 
@@ -175,18 +178,24 @@ export function FeaturesSection() {
       </div>
     ),
     providers: () => (
-      <ul class="landing-provider-grid">
-        <For each={LANDING_PROVIDERS}>
-          {(entry) => (
-            <li class="landing-provider-tile" data-provider={entry.provider}>
-              <span class="landing-provider-tile-icon">
-                <ProviderLogo provider={entry.provider} class="landing-provider-tile-logo" />
-              </span>
-              {entry.name}
-            </li>
+      <div class="landing-marquee">
+        <For each={PROVIDER_ROWS}>
+          {(row) => (
+            <div class="landing-marquee-row">
+              <ul class="landing-marquee-track">
+                <For each={[...row, ...row]}>
+                  {(entry) => (
+                    <li class="landing-provider-pill" data-provider={entry.provider}>
+                      <ProviderLogo provider={entry.provider} class="landing-provider-pill-logo" />
+                      {entry.name}
+                    </li>
+                  )}
+                </For>
+              </ul>
+            </div>
           )}
         </For>
-      </ul>
+      </div>
     ),
     local: () => (
       <div class="landing-window landing-local-window">
