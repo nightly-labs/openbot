@@ -39,6 +39,10 @@ const loaders: Record<LoadableLocale, () => Promise<LocaleCatalogs>> = {
     Promise.all([import("./messages/es/index"), import("./messages/es/source"), import("./messages/es/format")]).then(
       ([app, source, format]) => ({ app: app.es, source: source.source, format: format.messages }),
     ),
+  fa: () =>
+    Promise.all([import("./messages/fa/index"), import("./messages/fa/source"), import("./messages/fa/format")]).then(
+      ([app, source, format]) => ({ app: app.fa, source: source.source, format: format.messages }),
+    ),
   fr: () =>
     Promise.all([import("./messages/fr/index"), import("./messages/fr/source"), import("./messages/fr/format")]).then(
       ([app, source, format]) => ({ app: app.fr, source: source.source, format: format.messages }),

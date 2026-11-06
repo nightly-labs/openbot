@@ -35,6 +35,8 @@ const BUILT_IN_RULES: Readonly<Record<string, PluralRule>> = {
     if (absolute === 1) return "one";
     return absolute !== 0 && Number.isInteger(absolute) && absolute % 1_000_000 === 0 ? "many" : "other";
   },
+  // CLDR Persian: one when the integer part is 0 or the number is 1.
+  fa: (count) => (Math.abs(count) <= 1 ? "one" : "other"),
   // CLDR: one is every number from 0 up to, but not including, 2.
   fr: (count) => (count >= 0 && count < 2 ? "one" : "other"),
   // CLDR Italian: one for 1; many for nonzero integer multiples of one million.

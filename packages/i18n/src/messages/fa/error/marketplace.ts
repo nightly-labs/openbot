@@ -1,0 +1,35 @@
+import { defineMessages } from "../../../message";
+
+export const messages = defineMessages("error.marketplace", {
+  // Agent marketplace and agent link errors.
+  "error.marketplace.timezoneInvalid": "منطقهٔ زمانی محلی معتبر نیست.",
+  "error.marketplace.installedAgentMissing": "عامل نصب‌شده دیگر وجود ندارد.",
+  "error.marketplace.differentListing": "این عامل محلی از فهرست عامل دیگری در بازارچه نصب شده است.",
+  "error.marketplace.marketplaceAvatarInvalid": "تصویر عامل در بازارچه معتبر نیست.",
+  "error.marketplace.shareCardInvalid": "کارت اشتراک‌گذاری معتبر نیست.",
+  "error.marketplace.cannotPublish": "این عامل را نمی‌توان منتشر کرد.",
+  "error.marketplace.templateName": { one: "برای این عامل نامی با طولی از 1 تا {count} نویسه بگذارید.", other: "برای این عامل نامی با طولی از 1 تا {count} نویسه بگذارید." },
+  "error.marketplace.templateRole": { one: "توضیح نقش بیش از {count} نویسه است. آن را کوتاه‌تر کنید.", other: "توضیح نقش بیش از {count} نویسه است. آن را کوتاه‌تر کنید." },
+  "error.marketplace.templateNoInstructions": "پیش از انتشار، برای این عامل دستورالعمل اضافه کنید.",
+  "error.marketplace.templateInstructions": { one: "دستورالعمل‌ها بیش از {count} نویسه‌اند. آن‌ها را کوتاه‌تر کنید.", other: "دستورالعمل‌ها بیش از {count} نویسه‌اند. آن‌ها را کوتاه‌تر کنید." },
+  "error.marketplace.templateAvatar": "تصویر این عامل معتبر نیست. آن را دوباره از تنظیمات عامل انتخاب کنید.",
+  "error.marketplace.templateSkills": { one: "یک عامل می‌تواند حداکثر {count} مهارت منتشر کند. چند مورد را حذف کنید.", other: "یک عامل می‌تواند حداکثر {count} مهارت منتشر کند. چند مورد را حذف کنید." },
+  "error.marketplace.templateLocalSkills": { one: "یک عامل می‌تواند حداکثر {count} مهارت محلی منتشر کند. چند مورد را حذف کنید.", other: "یک عامل می‌تواند حداکثر {count} مهارت محلی منتشر کند. چند مورد را حذف کنید." },
+  "error.marketplace.templateSkill": 'مهارت «{name}» را نمی‌توان منتشر کرد. نام و فایل SKILL.md آن را بررسی کنید.',
+  "error.marketplace.templateRoutines": { one: "یک عامل می‌تواند حداکثر {count} روتین منتشر کند. چند مورد را حذف کنید.", other: "یک عامل می‌تواند حداکثر {count} روتین منتشر کند. چند مورد را حذف کنید." },
+  "error.marketplace.templateRoutine": { one: 'روتین «{name}» باید نامی حداکثر {count} نویسه‌ای و یک دستورالعمل داشته باشد.', other: 'روتین «{name}» باید نامی حداکثر {count} نویسه‌ای و یک دستورالعمل داشته باشد.' },
+  // Fills `{name}` above when the routine has no name.
+  "error.marketplace.templateRoutineNoName": "بدون نام",
+  "error.marketplace.templateTooLarge": "این عامل برای انتشار بیش از حد بزرگ است. دستورالعمل‌ها، مهارت‌ها یا روتین‌هایش را کوتاه‌تر کنید.",
+  "error.marketplace.linkInvalid": "پیوند عامل معتبر نیست.",
+  "error.marketplace.changedSinceOpened": "این عامل پس از بازکردن تغییر کرده است. برای دیدن نسخهٔ تازه، پیوند را دوباره باز کنید.",
+  "error.marketplace.skillNameConflict": 'از قبل مهارت محلی دیگری با نام «{name}» دارید. نامش را عوض یا آن را حذف کنید و سپس دوباره این عامل را اضافه کنید.',
+  "error.marketplace.avatarInvalid": "تصویر عامل معتبر نیست.",
+  "error.marketplace.secretInName": "پیش از انتشار، اطلاعات محرمانه یا نشانی ایمیل را از نام حذف کنید.",
+  "error.marketplace.secretInTitle": "پیش از انتشار، اطلاعات محرمانه یا نشانی ایمیل را از عنوان حذف کنید.",
+  "error.marketplace.secretInInstructions": "پیش از انتشار، اطلاعات محرمانه یا نشانی ایمیل را از دستورالعمل‌ها حذف کنید.",
+  "error.marketplace.secretInRoutine": 'پیش از انتشار، اطلاعات محرمانه یا نشانی ایمیل را از روتین «{name}» حذف کنید.',
+  "error.marketplace.secretInSkill": 'پیش از انتشار، اطلاعات محرمانه یا نشانی ایمیل را از مهارت «{name}» حذف کنید.',
+  "error.marketplace.catalogLoadFailed": "بارگیری بازارچه ناموفق بود. دوباره تلاش کنید.",
+  "error.marketplace.templateUnreadable": "خواندن این عامل اشتراکی ممکن نشد. شاید مالک آن را حذف کرده باشد.",
+});

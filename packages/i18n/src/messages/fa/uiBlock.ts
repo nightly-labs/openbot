@@ -1,0 +1,31 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/uiBlock";
+
+export const messages = {
+  "uiBlock.status.answered": "پاسخ داده شد",
+  "uiBlock.outcome.expired": "در مهلت مقرر پاسخی داده نشد",
+  "uiBlock.outcome.closed": "بدون پاسخ بسته شد",
+  "uiBlock.outcome.autoAnswered": "{outcome} (تا پایان مهلت کسی پاسخ نداد)",
+  "uiBlock.confirm.holdHint": "برای تأیید، دکمه را نگه دارید؛ یا آن را فشار دهید تا در مرحلهٔ بعد تأیید کنید",
+  "uiBlock.confirm.prompt": "تأیید می‌کنید: {action}؟",
+  "uiBlock.confirm.accept": "تأیید",
+  "uiBlock.confirm.autoActionLabel": "{action} · {seconds} ثانیه",
+  "uiBlock.confirm.autoActionClock": "{action} · {time}",
+  "uiBlock.confirm.previewLabel": "پیش‌نمایش",
+  "uiBlock.confirm.showFullPreview": "نمایش همه",
+  "uiBlock.confirm.hideFullPreview": "نمایش کمتر",
+  "uiBlock.choice.submit": "ارسال",
+  "uiBlock.choice.shortcutHint": "برای انتخاب، {first} تا {last} را فشار دهید",
+  "uiBlock.quick.label": "پاسخ‌های سریع",
+  "uiBlock.quick.textLabel": "پاسخ دلخواه شما",
+  "uiBlock.quick.textPlaceholder": "یا پاسخ دلخواهتان را بنویسید",
+  "uiBlock.quick.send": "ارسال",
+  "uiBlock.form.submit": "ثبت",
+  "uiBlock.form.required": "پرکردن این فیلد الزامی است",
+  "uiBlock.form.choose": "یک گزینه انتخاب کنید",
+  "uiBlock.form.notSet": "تنظیم نشده",
+  "uiBlock.form.invalid": "بعضی پاسخ‌ها درست نیستند. آن‌ها را بررسی کنید و دوباره تلاش کنید.",
+  "uiBlock.form.hiddenValue": "پنهان",
+  "uiBlock.skip": "رد کردن",
+  "uiBlock.error.answerFailed": "ارسال پاسخ ممکن نشد. دوباره تلاش کنید.",
+} as const satisfies PartialTranslation<typeof source>;
