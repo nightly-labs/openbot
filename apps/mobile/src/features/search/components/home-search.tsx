@@ -629,14 +629,35 @@ export function HomeSearchBar({
   // clears it first.
   const touched = useRef(false);
   // A quick action of the app icon opens the search with the keyboard. The field registers it, so a
-  // request that comes while the list loads waits until the field and its input are mounted.
+  // request that comes while the list loads waits until the field and its input are mounted. A request
+  // that closes the screens over home comes before home shows again, and a hidden field takes no
+  // focus, so the field waits for home to have focus.
+  const navigation = useNavigation();
   useEffect(() => {
-    setHomeSearchOpener(() => {
+    let removeFocusListener: (() => void) | null = null;
+    const focusField = () => {
       touched.current = false;
       input.current?.focus();
+    };
+    setHomeSearchOpener(() => {
+      removeFocusListener?.();
+      removeFocusListener = null;
+      if (navigation.isFocused()) {
+        focusField();
+        return;
+      }
+      const remove = navigation.addListener("focus", () => {
+        remove();
+        removeFocusListener = null;
+        focusField();
+      });
+      removeFocusListener = remove;
     });
-    return () => setHomeSearchOpener(null);
-  }, [input]);
+    return () => {
+      removeFocusListener?.();
+      setHomeSearchOpener(null);
+    };
+  }, [input, navigation]);
   const insets = useSafeAreaInsets();
   const liquidGlass = useLiquidGlass();
   const reduced = useReducedMotion();
