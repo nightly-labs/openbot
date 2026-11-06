@@ -17,6 +17,7 @@ import {
   OPENCODE_FREE_MODEL_FALLBACKS,
   PREFERRED_MODEL_ORDER,
 } from "./provider-models";
+import { PROVIDER_FAST_TIMEOUT_MS } from "./provider-request-policy";
 import { isProviderTimeout } from "./provider-status";
 import { providerLabel } from "./thread-items";
 
@@ -27,13 +28,19 @@ const MODEL_METADATA_FALLBACKS = [...FALLBACK_MODELS, ...OPENCODE_FREE_MODEL_FAL
 
 export interface ModelCatalogOptions {
   /** The running client of a provider, if it has one. */
-  client(provider: AgentProvider): AgentClient | undefined;
+  client(provider: AgentProvider): ModelCatalogClient | undefined;
   /** True while the provider's row says that the user must sign in. */
   isSignedOut(provider: AgentProvider): boolean;
   credentials: ProviderClientContext;
   requestTimeoutMs: number;
   /** Keeps a failed model list on the provider row. */
   recordProviderError(provider: AgentProvider, error: unknown): void;
+}
+
+/** The calls the catalogue makes on a client, so a test can provide them without a whole client. */
+export interface ModelCatalogClient {
+  readonly provider: AgentProvider;
+  readonly request: AgentClient["request"];
 }
 
 /**
@@ -58,7 +65,7 @@ export class ModelCatalog {
    */
   readonly read = Effect.fn("ModelCatalog.read")(function* (
     this: ModelCatalog,
-    client: AgentClient,
+    client: ModelCatalogClient,
     catalog: ProviderModelCatalog = {},
     hasStoredKey = false,
   ) {
@@ -72,7 +79,7 @@ export class ModelCatalog {
         decodeModelListResponse,
         // A slow list answers inside the normal request timeout, and a list that timed out
         // kept that agent out of the catalogue.
-        catalog.slowList ? this.#options.requestTimeoutMs : 5_000,
+        catalog.slowList ? this.#options.requestTimeoutMs : PROVIDER_FAST_TIMEOUT_MS,
       );
       // Every model the CLI reports is offered, the ones it marks hidden included; only the
       // stored-key drop below keeps a model out. A CLI hides a model it still accepts -- a new release such
