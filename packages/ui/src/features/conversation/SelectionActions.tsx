@@ -9,7 +9,7 @@ import { Button, Input, TextQuote } from "@openbot/ui";
 import { clamp } from "@openbot/ui/utils";
 import { Portal } from "@solidjs/web";
 import type { Element as SolidElement } from "solid-js";
-import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show } from "solid-js";
 import { useText } from "../../text";
 
 const MESSAGE_TEXT_SELECTOR = "[data-selection-message-id]";
@@ -245,6 +245,10 @@ export function SelectionActionsBar(props: {
   let previousSelectionKey = "";
   // Counts selection changes. A send that ends after one applies its result to no selection.
   let selectionGeneration = 0;
+  // A new mouse selection dismisses this bar on `pointerdown` and mounts a new one on `pointerup`.
+  onCleanup(() => {
+    selectionGeneration += 1;
+  });
 
   const hasPrompt = createMemo(() => prompt().trim().length > 0);
   const selectionBody = (instruction: string) =>
@@ -375,7 +379,8 @@ export function SelectionActionsBar(props: {
     } catch {
       sent = false;
     }
-    // The user selected other text while it sent: the bar now belongs to that selection.
+    // The user selected other text while it sent: the bar now belongs to that selection, or a new bar
+    // shows it. The late reply must not dismiss that selection.
     if (generation !== selectionGeneration) return;
     if (sent) props.onDismiss();
     else setMode("error");
