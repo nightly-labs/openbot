@@ -130,14 +130,6 @@ export function useServerBrowserProxies(serverId: string) {
     /** `profileIds`: the profiles that the person saw use it. They change to Automatic. */
     async remove(proxyId: string, profileIds: readonly string[]): Promise<void> {
       await actions.deleteBrowserProxy({ proxyId, profileIds: [...profileIds] }, serverId);
-      queryClient.setQueryData<BrowserProxyList>(queryKey, (current) =>
-        current
-          ? {
-              proxies: current.proxies.filter((proxy) => proxy.id !== proxyId),
-              computers: current.computers.filter((computer) => computer.id !== proxyId),
-            }
-          : current,
-      );
       await changed();
     },
     /** Null: Automatic. The host closes the open tabs of the profile. */
