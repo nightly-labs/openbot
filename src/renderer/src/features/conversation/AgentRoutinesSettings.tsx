@@ -86,7 +86,7 @@ type PendingRoutineExit =
   | "close"
   | "new"
   | { kind: "routine-selection"; routine: RoutineEditorRecord | null; routineName: string }
-  | { kind: "conversation-message"; messageId: string }
+  | { kind: "conversation-message"; messageId: string; routineId: string | null }
   | { kind: "routine-thread"; routineId: string };
 
 interface RoutineDraft {
@@ -132,7 +132,8 @@ interface AgentRoutinesSettingsProps {
   onClose?: (() => void) | undefined;
   selectionRequest?: RoutineSelectionRequest | null | undefined;
   onSelectionRequestHandled?: ((nonce: number) => void) | undefined;
-  onOpenRun?: ((messageId: string) => void) | undefined;
+  /** `routineId` names the routine of the run, so a run in the routine's side thread opens there. */
+  onOpenRun?: ((messageId: string, routineId?: string) => void) | undefined;
   /**
    * Opens the side thread where the routine runs. Resolves false when the routine has no thread, for
    * example on a host that runs routines in the agent's own chat.
@@ -452,7 +453,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   }
 
   function requestOpenRun(messageId: string): void {
-    requestExit({ kind: "conversation-message", messageId });
+    requestExit({ kind: "conversation-message", messageId, routineId: draft()?.id ?? null });
   }
 
   function performExit(target: PendingRoutineExit): void {
@@ -470,7 +471,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       return;
     }
     if (target.kind === "conversation-message") {
-      props.onOpenRun?.(target.messageId);
+      props.onOpenRun?.(target.messageId, target.routineId ?? undefined);
       return;
     }
     if (target.kind === "routine-thread") {

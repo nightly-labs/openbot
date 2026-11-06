@@ -204,6 +204,20 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
       if (task) tabs.open(agentId, task.id);
       return task !== undefined;
     },
+    onOpenRoutineRun: async (routineId, messageId) => {
+      // An archived thread of the routine keeps its runs too. `openAt` restores it.
+      const listed = () =>
+        (tasks.snapshot(agentId)?.tasks ?? [])
+          .filter((task) => task.routineId === routineId)
+          .sort((left, right) => Number(left.state === "closed") - Number(right.state === "closed"));
+      if (listed().length === 0) await tasks.loadTasks(agentId);
+      for (const task of listed()) {
+        if (!(await tasks.taskHasMessage(agentId, task.id, messageId))) continue;
+        await tabs.openAt(agentId, task.id, messageId);
+        return true;
+      }
+      return false;
+    },
     focusMessage: focus && list.some((task) => task.id === focus.taskId) ? focus : null,
   };
 }

@@ -349,7 +349,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 )
           : undefined,
       onPreviewFile: (file) => void previewAttachment(file),
-      onShowMessage: (messageId) => openRoutineRunMessage(messageId),
+      onShowMessage: (messageId) => void openRoutineRunMessage(messageId),
       // The agent's chat is behind the settings, so closing them opens it.
       onOpenConversation: () => setActiveRightPanel("none"),
     };

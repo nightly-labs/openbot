@@ -520,8 +520,8 @@ with `listTaskReads` (`agent:tasks:reads` over IPC, or the `reads` route for a j
 a dot on the tab and the menu row of an idle thread with unread agent messages, and adds those
 messages to the unread count of the agent's sidebar row (`agentUnreadReplies` in
 `conversation-context.tsx`). The Dynamic Island keeps the chat-only count: it shows and opens a
-message of the agent's chat, and a side thread's messages are not in it. "Mark all read" still reads
-only the agent's chat. The desktop reads the marks of an agent only after it reads that agent's thread
+message of the agent's chat, and a side thread's messages are not in it. "Mark all read" reads the
+agent's chat and each open side thread that the count includes, such as a routine's thread. The desktop reads the marks of an agent only after it reads that agent's thread
 list, so after a start an agent that is not open adds no thread messages to its count until a thread
 event arrives or the person opens it. The host sends no event when
 a mark moves; a client reads the marks again when `agent-tasks-changed` arrives with a thread whose state, outcome or

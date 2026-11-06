@@ -490,6 +490,11 @@ export interface ConversationThreads {
    * when the thread is not in it. Resolves false when the routine has no open thread.
    */
   onOpenRoutineThread: (routineId: string) => Promise<boolean>;
+  /**
+   * Opens the routine's side thread at the message of a run. Resolves false when the run is not in
+   * that thread: the run was in the agent's chat.
+   */
+  onOpenRoutineRun: (routineId: string, messageId: string) => Promise<boolean>;
   /** The message that a side thread scrolls to once, after a click on "Branched from". */
   focusMessage: { taskId: string; messageId: string; nonce: number } | null;
 }
