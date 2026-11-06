@@ -33,7 +33,12 @@ import { NewerDatabaseError } from "../backend/openbot-database-schema";
 import { OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
 import { watchAppArchive } from "./app-archive-watch";
 import { readAppVariant, resolveAppIconPath, resolveLogoColorIconPath, resolveMenuBarIconPath } from "./app-icon";
-import { type ApplicationServices, createApplicationServices } from "./application-services";
+import { readSavedTransparentWindow } from "./appearance-service";
+import {
+  APPEARANCE_PREFERENCE_FILE,
+  type ApplicationServices,
+  createApplicationServices,
+} from "./application-services";
 import { type BackgroundTray, createBackgroundTray } from "./background-tray";
 import { removeClaudeCodeSessionEnvironment } from "./claude-session-environment";
 import { type DeepLink, findDeepLink, parseDeepLink } from "./deep-link-router";
@@ -142,7 +147,7 @@ import { TeardownRegistry } from "./teardown-registry";
 import type { TraceFile } from "./trace-file";
 import { setIpcCallObserver } from "./trusted-ipc";
 import { UPDATE_INSTALL_TIMEOUT_MS } from "./update-service";
-import { setWindowAppearance } from "./window-appearance";
+import { setInitialWindowGlass, setWindowAppearance } from "./window-appearance";
 import { placeWindowButtons } from "./window-buttons";
 
 const logger = createOpenBotLogger("main");
@@ -1288,6 +1293,11 @@ if (!hasSingleInstanceLock) {
       configureRendererPermissions();
       // A local server keeps a window that never loads: the agent browser and the services attach to it.
       if (!localServerChild) await Effect.runPromise(windows.restoreMainWindowBounds());
+      // The window takes its blur when it is built: see `glassWindowOptions`.
+      if (process.platform === "darwin" && !localServerChild)
+        setInitialWindowGlass(
+          await runCauseEffect(readSavedTransparentWindow(join(app.getPath("userData"), APPEARANCE_PREFERENCE_FILE))),
+        );
       const mainWindow = windows.openMainWindow();
 
       const built = await createApplicationServices({
