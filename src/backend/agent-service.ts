@@ -188,7 +188,7 @@ import {
   startingModel,
   workflowProvider,
 } from "./agent/model-choice";
-import { OpenBotToolRouter } from "./agent/openbot-tool-router";
+import { type BackgroundTaskHost, OpenBotToolRouter } from "./agent/openbot-tool-router";
 import { PlanContinuation } from "./agent/plan-continuation";
 import { ProfileClients } from "./agent/profile-clients";
 import {
@@ -418,6 +418,8 @@ export interface AgentServiceOptions {
   passwordVault?: PasswordVault | null;
   /** The cards and contact info of the Vault, or `null`. The browser fills cards from it. */
   vaultItems?: VaultItems | null;
+  /** The programs OpenBot starts in the background for an agent, or `null` where nobody can start one. */
+  backgroundTasks?: BackgroundTaskHost | null;
   /** The Link account of this computer, or `null`. Agents ask it for one-time cards. */
   linkWallet?: LinkWallet | null;
   /** Where the API keys that users enter through `request_api_key` are saved, or `null`. */
@@ -1656,6 +1658,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
       apiKeys: options.agentApiKeys ?? null,
       vaultItems: options.vaultItems ?? null,
+      backgroundTasks: options.backgroundTasks ?? null,
       hooks: {
         listAgents: () => this.listAgents(),
         listModels: () => this.listModels(),

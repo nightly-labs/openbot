@@ -151,6 +151,7 @@ import type {
   AppInfo,
   AppSetupState,
   BackgroundProcess,
+  BackgroundTask,
   CentralAuthState,
   ChatWindowTarget,
   CompanySignInScimToken,
@@ -998,6 +999,13 @@ export const IPC_ENDPOINTS = {
   backgroundProcesses: {
     list: request<undefined, BackgroundProcess[] | null>()("background-processes:list"),
     stop: request<string, void>()("background-processes:stop"),
+  },
+  // The programs OpenBot started for an agent: `list` answers the tasks of one agent, `tail` reads
+  // the end of one log, and `stop` ends a running task with its children.
+  backgroundTasks: {
+    list: request<string, BackgroundTask[]>()("background-tasks:list"),
+    tail: request<{ id: string; maxBytes: number }, string | null>()("background-tasks:tail"),
+    stop: request<string, void>()("background-tasks:stop"),
   },
   skills: {
     localList: request<undefined, MarketplaceSkillDetail[]>()("skills:local-list"),
@@ -2147,6 +2155,7 @@ export const IPC_GROUP_PATHS = {
   computerUse: "computerUse",
   macAutomation: "macAutomation",
   backgroundProcesses: "backgroundProcesses",
+  backgroundTasks: "backgroundTasks",
   skills: "skills",
   customProviders: "customProviders",
   providerDetection: "providerDetection",
