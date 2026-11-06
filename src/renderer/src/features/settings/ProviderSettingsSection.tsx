@@ -427,11 +427,15 @@ function createProviderKeyState(props: { readonly open: boolean; readonly provid
     claudeKeyStatus,
     /**
      * Only the providers whose sign-in can be a pasted key are served: OpenCode, Muse, Gemini, Claude
-     * and, on this computer, Codex. Claude's Sign in also lands here on an older host, which would
-     * store the key and never read it.
+     * and Codex. Claude's and Codex's Sign in also land here on an older host, which would store the
+     * key and never read it.
      */
     openKeyDialog(provider: AgentProviderId): void {
-      if (isKeyDialogProvider(provider) && (provider !== "claude" || props.providerKeys?.readsClaudeKey)) {
+      if (
+        isKeyDialogProvider(provider) &&
+        (provider !== "claude" || props.providerKeys?.readsClaudeKey) &&
+        (provider !== "codex" || props.providerKeys?.readsCodexKey)
+      ) {
         setKeyProvider(provider);
         setKeyDialogOpen(true);
       }
@@ -566,6 +570,9 @@ export function HostProviderSettingsPanel(
     },
     openCodeKeyStatus: keys.openCodeKeyStatus,
     claudeKeyStatus: keys.claudeKeyStatus,
+    get readsCodexKey() {
+      return props.providerKeys?.readsCodexKey === true;
+    },
     get providerHostName() {
       return props.hostName;
     },

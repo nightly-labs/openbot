@@ -52,7 +52,7 @@ import { AgentLifecycleFailed } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { parseProviderId } from "../ipc/app-inputs";
 import { parseDeleteCustomProvider, parseSaveCustomProvider } from "../ipc/custom-provider-inputs";
-import { parseProviderApiKeyInput } from "../ipc/provider-handlers";
+import { parseProviderApiKeyInput, signInCodexWithApiKey } from "../ipc/provider-handlers";
 import { isObject } from "../ipc/validation";
 import type { TeamApiAdmin } from "./dependencies";
 import { HttpError } from "./http-error";
@@ -197,6 +197,11 @@ export async function routeProviders(
               : wireApiKeyInput,
           body,
         );
+        // `codex-api-key-v1`: Codex keeps the key in its own login, as on this computer, not in the key store.
+        if (input.provider === "codex") {
+          await signInCodexWithApiKey(service, input.key);
+          return json(200, {});
+        }
         const save = () =>
           credentials
             .set(input.provider, input.key)

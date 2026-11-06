@@ -508,6 +508,7 @@ interface TeamApiProviders {
     | "cancelProviderCodeLogin"
     | "changeProviderCredential"
     | "clearProviderCredential"
+    | "signInCodexWithApiKey"
   >;
   credentials: Pick<ProviderCredentialStore, "status" | "set" | "clear">;
   runtimes: Pick<

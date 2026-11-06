@@ -14,6 +14,7 @@ import { Toaster, toast } from "@openbot/ui";
 import type { ProviderAccountActions } from "@openbot/ui/components/provider-accounts";
 import type { ProviderDetection } from "@openbot/ui/features/custom-providers/detected-providers";
 import type { ProviderDetectionSettingsValue } from "@openbot/ui/features/custom-providers/ProviderDetectionSettings";
+import type { ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import { createSignal, onCleanup } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -27,6 +28,7 @@ import { createFakeConnection } from "./provider-connection-fixture";
 import { SettingsPageStory } from "./settings-page-story";
 
 const localServer = localStoryServer();
+const teamServer = STORY_SERVERS.find((candidate) => candidate.kind === "remote") ?? localServer;
 
 const providerAgentStatus: AgentStatus = {
   phase: "blocked",
@@ -123,6 +125,22 @@ const codeSignInAgentStatus: AgentStatus = {
       : provider,
   ),
 };
+/** Codex on a joined server with `codex-api-key-v1`, logged in with an OpenAI API key. */
+const hostCodexKeyAgentStatus: AgentStatus = {
+  ...codeSignInAgentStatus,
+  providers: (codeSignInAgentStatus.providers ?? []).map((provider) =>
+    provider.id === "codex" ? { ...provider, state: "available", message: null, apiKeyInUse: true } : provider,
+  ),
+};
+/** The key routes of a joined server's host that logs Codex in with a pasted OpenAI key. */
+const hostCodexKeys: ProviderKeyApi = {
+  readsCodexKey: true,
+  onHost: true,
+  getProviderApiKeyState: async (provider) => ({ provider, status: "missing" }),
+  setProviderApiKey: fn(async () => undefined),
+  clearProviderApiKey: fn(async () => undefined),
+  openExternal: fn(async () => undefined),
+};
 /** Two saved endpoints: one with a key of its own, one on this computer that asks for none. */
 const STORY_CUSTOM_PROVIDERS: readonly CustomProviderSummary[] = [
   {
@@ -181,6 +199,8 @@ function ServerProvidersStory(props: {
    * guide. A status is the Download, its progress, or an installed Hermes that offers Connect.
    */
   hermes?: ProviderRuntimeStatus | null;
+  /** A joined server whose host logs Codex in with an OpenAI key: before the key, or with it. */
+  hostCodexKey?: "missing" | "saved";
 }) {
   const usageResetAccounts = props.usageReset ? createUsageResetAccounts() : undefined;
   const hermes = props.hermes;
@@ -279,6 +299,7 @@ function ServerProvidersStory(props: {
   // compiled ternary prop cannot create its memo.
   const switchToManageProviders = props.inactive ? fn() : undefined;
   function storyServer(): ServerSummary {
+    if (props.hostCodexKey) return { ...teamServer, active: true };
     return props.inactive ? { ...localServer, active: false } : localServer;
   }
 
@@ -302,6 +323,7 @@ function ServerProvidersStory(props: {
       },
       get agentStatus() {
         if (hermesAgentStatus) return hermesAgentStatus;
+        if (props.hostCodexKey) return props.hostCodexKey === "saved" ? hostCodexKeyAgentStatus : codeSignInAgentStatus;
         return props.usageReset
           ? usageResetAgentStatus
           : props.codeSignIn
@@ -341,6 +363,7 @@ function ServerProvidersStory(props: {
           ? fn()
           : undefined,
       accountActions: usageResetAccounts,
+      providerKeys: props.hostCodexKey ? hostCodexKeys : undefined,
       onAddCustomProvider: addCustomProvider,
       onDeleteCustomProvider: deleteCustomProvider,
       onUpdateCustomProvider: updateCustomProvider,
@@ -519,6 +542,16 @@ export const CustomProviderList: Story = {
  */
 export const CodeSignIn: Story = {
   render: () => <ServerProvidersStory codeSignIn />,
+};
+
+/** A joined server with `codex-api-key-v1`: the signed-out Codex row offers API key next to Connect. */
+export const HostCodexKey: Story = {
+  render: () => <ServerProvidersStory hostCodexKey="missing" />,
+};
+
+/** The same server after the key: Codex on the host uses the OpenAI API key. */
+export const HostCodexKeySaved: Story = {
+  render: () => <ServerProvidersStory hostCodexKey="saved" />,
 };
 
 export const ProviderDownloads: Story = {

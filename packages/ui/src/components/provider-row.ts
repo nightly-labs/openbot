@@ -223,7 +223,8 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
    * stays reachable in every state, Connected included: a refused key must stay replaceable and
    * removable. A released host stores a Gemini key but never reads it, so only this computer offers it.
    * Claude's key works the same way. Its row has a key status only where the host reads the key.
-   * Codex's key is a login on this computer, so its row has a key status only here.
+   * Codex's key is a login on the host, so its row has a key status only where the host makes that
+   * login: this computer, or a joined server with `codex-api-key-v1`.
    */
   const apiKeyOffered = () =>
     Boolean(host.onSignInProvider) &&

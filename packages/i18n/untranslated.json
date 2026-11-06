@@ -1151,6 +1151,7 @@
   "provider.claudeKey.label": ["zh"],
   "provider.claudeKey.title": ["zh"],
   "provider.codexKey.description": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
+  "provider.codexKey.descriptionHost": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "provider.codexKey.label": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "provider.codexKey.title": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "provider.settings.accountBlocked": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],

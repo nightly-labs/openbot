@@ -26,6 +26,8 @@ interface GeneralStoreProps {
   openCodeKeyStatus?: () => ProviderApiKeyStatus | undefined;
   /** Whether a Claude key is saved, read the same way. Absent where the host does not read the key. */
   claudeKeyStatus?: () => ProviderApiKeyStatus | undefined;
+  /** Whether a joined server's host logs Codex in with a pasted OpenAI key (`codex-api-key-v1`). */
+  readsCodexKey?: boolean | undefined;
   /** The joined server whose host runs these providers. Absent when this computer runs them. */
   providerHostName?: string | undefined;
   /** The providers that the user turned off in OpenBot. */
@@ -81,8 +83,8 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
               runtime.phase === "not-downloaded" &&
               !runtime.availableVersion),
       );
-      // The Gemini status says only whether a saved key serves the turns. A Codex key is a login on
-      // this computer, so only this computer offers one. Released hosts do not report a Muse key.
+      // The Gemini status says only whether a saved key serves the turns. A Codex key is a login on the
+      // host, which a released host does not make. Released hosts do not report a Muse key.
       const keyStatus =
         provider === "opencode"
           ? props.openCodeKeyStatus?.()
@@ -90,7 +92,8 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
             ? props.claudeKeyStatus?.()
             : provider === "antigravity" && agent?.apiKeyInUse
               ? ("saved" as const)
-              : (provider === "codex" || provider === "muse") && !props.providerHostName
+              : (provider === "codex" || provider === "muse") &&
+                  (!props.providerHostName || (provider === "codex" && props.readsCodexKey))
                 ? agent?.apiKeyInUse
                   ? ("saved" as const)
                   : ("missing" as const)

@@ -182,6 +182,8 @@ export const messages = {
   "provider.codexKey.title": "تسجيل الدخول بمفتاح OpenAI API",
   "provider.codexKey.description":
     "يحفظ Codex المفتاح على هذا الحاسوب. تحتسب OpenAI كل طلب على المفتاح، لا على خطة ChatGPT. لاستخدام الخطة مرة أخرى، افصل الحساب ووصّل ChatGPT.",
+  "provider.codexKey.descriptionHost":
+    "يحفظ Codex المفتاح على المضيف. تحتسب OpenAI كل طلب على المفتاح، لا على خطة ChatGPT. لاستخدام الخطة مرة أخرى، افصل الحساب ووصّل ChatGPT.",
   "provider.codexKey.label": "مفتاح OpenAI API",
   "provider.inceptionKey.title": "مفتاح Inception API",
   "provider.inceptionKey.description":
