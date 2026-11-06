@@ -7,6 +7,88 @@ the [root changelog](../../CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.4.8] - In review
+
+### Added
+
+- Type `@` in an agent's chat or side thread to tag one of the agent's browser tabs or side threads,
+  as on the desktop. The agent gets the tab and can use it, and it can read the tagged thread. A tagged
+  browser tab shows as a badge in the message. Tap it to open that tab. The host computer must have
+  OpenBot 0.62.0 or later.
+- A tap on a file name in a chat message now opens the file from the agent's workspace or the shared
+  folder. Text, Markdown, code, PDF and spreadsheet files open in the preview, and images open in a
+  sheet. Other files open in the share sheet, where you can save them to Files or open them in
+  another app (#5227).
+- Manage the proxies of browser profiles in the mobile app. In Server settings > Browser profiles,
+  an owner or admin can add, change and delete a proxy, such as `socks5://user:password@host:1080`,
+  and choose the proxy of each named profile, or Automatic. A saved password shows only as a mask.
+  The list also shows the computers that members share from the desktop app, and shows when a proxy
+  does not answer, refuses the sign-in, or when a computer is offline. Before a change closes open
+  tabs, the app asks. The phone cannot share its own internet connection.
+- You can change the order of the tools in the server drawer, such as Threads, Schedule and
+  Workflows. Hold a tool and select **Edit sidebar**, then drag the handles. The order is saved on
+  this device.
+- You can unpin a tool to hide it from the server drawer. Hold the tool and select **Unpin**. In
+  edit mode, the pin button shows or hides each tool.
+- Control a computer from the phone. Open the server menu and tap **Control computer** to see the
+  computer's screen and use it like a trackpad. Pinch to zoom, type with the phone keyboard and the
+  keys above it (Esc, Tab, Ctrl, Option or Alt, Cmd, arrows), and paste text from the phone. The
+  ••• menu has Trackpad mode, Fit to screen, the computer's displays, the quality (Fast at 120 fps,
+  Smooth at 60 fps or Data saver) and connection stats, and the help button shows each gesture.
+  The phone asks for Face ID, Touch ID or the phone unlock first, and stops the stream when you
+  leave the app. The computer must run OpenBot with remote desktop set up.
+- On iPhone, the OpenBot share sheet has a message field. Type a message to send with the link,
+  text or file that you share. The message goes before the shared content. If the share sheet
+  cannot send and you open the app, the message is in the chat's message field.
+- A server admin can select which models of a provider the model picker shows. Open **Server
+  settings › Providers**, select a provider, then select **Models**. The page has a search, **Show
+  all**, **Hide all** and **Reset to default**. Agents can still use every model.
+- On the Claude page, a server admin can set how long Claude keeps the prompt cache.
+- A server admin can disconnect the server's own sign-in of a provider, such as Claude or Codex.
+- A server admin can reset the usage of a Codex account that has usage reset credits.
+- The provider pages update when a change comes from the desktop app or another admin, such as
+  the models of the model picker, the prompt cache time or a sign-in. You do not have to open the
+  page again.
+
+### Changed
+
+- The ChatGPT code sign-in of a server now tells you to turn on device code sign-in for Codex in the
+  ChatGPT security settings first. For a work account, the workspace admin turns it on.
+- When a plan card waits a minute or more before it starts the work, its Start button counts down in minutes, such as "Start · 4:59", not in seconds.
+- The Instructions file page of an agent now shows about 14 lines of the file instead of 4.
+- On Android 12 and later, the bar at the top of sheets and pages now blurs the content that scrolls
+  under it, and the blur fades out smoothly below the bar. Before, the bar was a solid color. This applies to
+  home, Marketplace, Routines, Usage, Tasks, Workflows, Settings, Create agent and the other sheets.
+- The icons for Threads, Schedule, Workflows, Usage and Marketplace in the server drawer and in
+  search are now the same as in the desktop app.
+- The Routines page of a server is now called **Schedule**, as in the desktop app. It shows the
+  calendar of routine runs. You still manage routines in the info of each agent and channel.
+- Server settings is now one page. The sections are Server (updates, timezone and memories per
+  agent), People (your role, members, roles and audit log), AI and tools, Data, and Import and
+  transfer. Refresh, Restart and Leave, Delete or Remove come next, and Server key is at the
+  bottom. General and Maintenance are not separate pages any more. A row that is not available for your role does not
+  show.
+- The top of Server settings shows the server logo beside its name, with the connection status and
+  the OpenBot version under the name. Owners and admins tap the logo to change it, and tap the name
+  to edit it in place.
+- The rows of Server settings and Settings have icons. Where the desktop app has a tab for the same
+  setting, the row uses its icon.
+- Profile has the same layout as Server settings: your photo beside your name, with your email
+  under it. Tap the photo to change it, and tap the name to edit it in place.
+
+### Fixed
+
+- A tap on a chat in the home list now always opens the chat. Before, after the app opened from a
+  notification or connected to a server, a tap on a chat could do nothing until you restarted the app.
+- A tap on a notification now opens its chat. Before, it could stop on the home list.
+- An attachment download from a server that the server stops, or that arrives damaged, now fails at once. Before, it waited one minute for a timeout.
+- Leaving a chat while dictation stops no longer leaves the voice action waiting.
+- The back button of a chat always goes back to the chat list. Before, after a swipe back that you
+  started and did not finish, the back button did nothing until you opened the chat again.
+- When the selected server does not answer at start, the app no longer stops on the "Connecting to
+  server" screen for up to 30 seconds. After 5 seconds the home shows the server as offline, and you
+  can open the drawer or select another server while the app continues to connect.
+
 ## [1.4.7] - 2026-11-06 (iOS)
 
 ### Added
