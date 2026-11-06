@@ -7,7 +7,7 @@ import { isAbsolute, resolve } from "node:path";
 import { agentProviderName, type KeyOnlyProviderId } from "@openbot/contracts/agent-providers";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger, redactText } from "@openbot/logging";
+import { createOpenBotLogger, type LogValue, redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure, httpStatusCause, structuredCause } from "@openbot/telemetry";
 import { Cause, Effect, Exit, Option, Schema, Scope, Semaphore } from "effect";
 import { secretElicitationField } from "./agent/prompts";
@@ -857,10 +857,15 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
 
   #notify(method: string, thread: PiThread, params: DynamicRecord): void {
     // Usage contains only validated numeric counters. Generic secret-name matching masks `*Tokens`.
+    // A turn notice holds only OpenBot's own `{ turn: { id, status } }`. A short saved secret could
+    // mask its `turn` key or its status, and the turn would then not end (#5390).
     const safe =
-      method === "openbot/usage" || method === "thread/tokenUsage/updated"
+      method === "openbot/usage" ||
+      method === "thread/tokenUsage/updated" ||
+      method === "turn/started" ||
+      method === "turn/completed"
         ? params
-        : redactMcpRecord(params, this.#secretValues());
+        : withOwnIds(redactMcpRecord(params, this.#secretValues()), params);
     this.emit("notification", {
       method,
       params: {
@@ -1122,10 +1127,25 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
   #safeItems(items: ThreadItem[]): ThreadItem[] {
     const values = this.#secretValues();
     return items.flatMap((item) => {
-      const value = redactMcpRecord(item, values);
+      const value = withOwnIds(redactMcpRecord(item, values), item);
       return isRecord(value) && isString(value.type) ? [{ ...value, type: value.type }] : [];
     });
   }
+}
+
+/**
+ * Puts back the ids of the items of a turn after the secret masking. The masking hides the whole
+ * token around a saved value, and a short saved password can occur in a UUID (#5390). OpenBot and
+ * Pi make these ids; they hold no text from the model or a tool.
+ */
+function withOwnIds(safe: LogValue, original: DynamicRecord | ThreadItem): LogValue {
+  if (!isRecord(safe)) return safe;
+  const restored = { ...safe };
+  if (isString(original.id)) restored.id = original.id;
+  if (isString(original.itemId)) restored.itemId = original.itemId;
+  const itemId = getString(getRecord(original, "item"), "id");
+  if (itemId !== undefined && isRecord(restored.item)) restored.item = { ...restored.item, id: itemId };
+  return restored;
 }
 
 function isNamespace(value: unknown): value is DynamicToolNamespace {
