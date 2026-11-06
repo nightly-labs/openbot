@@ -16,8 +16,8 @@ function createElapsed(since: () => number | undefined) {
   const [now, setNow] = createSignal(Date.now());
   createEffect(
     () => since(),
-    (from) => {
-      if (from === undefined) return;
+    () => {
+      if (since() === undefined) return;
       setNow(Date.now());
       const clock = window.setInterval(() => setNow(Date.now()), 1_000);
       return () => window.clearInterval(clock);
