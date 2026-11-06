@@ -18,10 +18,12 @@ electronFuses:
   onlyLoadAppFromAsar: true
   loadBrowserProcessSpecificV8Snapshot: false
   grantFileProtocolExtraPrivileges: false
+# Updates come from the releases of this fork, so a build of it does not update itself to the
+# official OpenBot (and lose this design). Publish a release here to ship an update.
 publish:
   provider: github
-  owner: nightly-labs
-  repo: openbot
+  owner: sumitttt4
+  repo: openbot-sumit
 files:
   - out/**/*
   - package.json
