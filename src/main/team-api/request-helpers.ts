@@ -79,6 +79,8 @@ export function messageTextCut(
   // A message that is also a reply reference is in the page twice, so its size counts twice.
   const ascending = messages.map((message) => sizes.get(message) ?? 0).sort((left, right) => left - right);
   let remaining = ascending.reduce((sum, size) => sum + size, 0) - excessBytes;
+  // The rest of the page alone is too large: a cut cannot help, so every text stays whole.
+  if (remaining <= 0) return (message) => message;
   let cap = Number.POSITIVE_INFINITY;
   for (const [index, size] of ascending.entries()) {
     const left = ascending.length - index;

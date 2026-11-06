@@ -369,6 +369,11 @@ export function MessageBody(props: {
   const longMessage = createMemo(
     () => props.message.streaming !== true && !streamingBody.revealing() && fullText().length > LONG_MESSAGE_CHARACTERS,
   );
+  // A reply that the reader saw stream stays open when it ends, so the text under the reader does not
+  // fold away. Only a message that arrives finished starts folded.
+  untrack(() => {
+    if (props.message.streaming === true || streamingBody.revealing()) expandedLongMessages.add(props.message.id);
+  });
   const [expanded, setExpanded] = createSignal(() => expandedLongMessages.has(props.message.id));
   const toggleExpanded = () => {
     const next = !expanded();
@@ -486,12 +491,16 @@ export function MessageBody(props: {
     standaloneAttachments().filter((attachment) => !isLightboxImage(attachment)),
   );
   const contentBlocks = createMemo<MessageContentBlock[]>((previous) => {
-    const text = longMessage() && !expanded() ? messagePreview(fullText()) : fullText();
+    const folded = longMessage() && !expanded();
+    const text = folded ? messagePreview(fullText()) : fullText();
     return reuseUnchangedBlocks(
       previous ?? [],
-      props.message.author === "agent"
-        ? sharedContentBlocks(text, streamingBody.revealing())
-        : [{ type: "text", text }],
+      props.message.author !== "agent"
+        ? [{ type: "text", text }]
+        : // The preview stays out of the shared cache, which the bubble variant fills with the full body.
+          folded
+          ? messageContentBlocks(text, false)
+          : sharedContentBlocks(text, streamingBody.revealing()),
     );
   });
   const textTailAfter = createMemo(
