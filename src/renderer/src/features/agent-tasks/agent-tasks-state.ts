@@ -56,12 +56,15 @@ const OLDER_PAGE_SIZE = 50;
 
 /**
  * A new conversation of a thread that read older pages keeps the messages before its first message.
- * The newest messages move on as messages arrive, so without them a gap opens between the pages.
+ * The newest messages move on as messages arrive, so without them a gap opens between the pages. Null
+ * when the new conversation does not start inside the held messages: the pages no longer join it.
  */
-function withOlderMessages(held: ConversationSnapshot, snapshot: ConversationSnapshot): ConversationSnapshot {
+function withOlderMessages(held: ConversationSnapshot, snapshot: ConversationSnapshot): ConversationSnapshot | null {
   const first = snapshot.messages[0];
-  const index = first ? held.messages.findIndex((message) => message.id === first.id) : -1;
-  if (index <= 0) return snapshot;
+  if (!first) return snapshot;
+  const index = held.messages.findIndex((message) => message.id === first.id);
+  if (index < 0) return null;
+  if (index === 0) return snapshot;
   const ids = new Set(snapshot.messages.map((message) => message.id));
   const older = held.messages.slice(0, index).filter((message) => !ids.has(message.id));
   return { ...snapshot, messages: [...older, ...snapshot.messages] };
@@ -176,7 +179,12 @@ export function createAgentTasks(options: AgentTasksOptions) {
       const held = current.conversations[taskId];
       const history = current.history[taskId];
       if (held && history?.paged) {
-        current.conversations[taskId] = withOlderMessages(held, snapshot);
+        const joined = withOlderMessages(held, snapshot);
+        current.conversations[taskId] = joined ?? snapshot;
+        if (joined) return;
+        // The thread reads its older messages again from the new first message.
+        history.paged = false;
+        history.hasOlder = true;
         return;
       }
       current.conversations[taskId] = snapshot;

@@ -4675,25 +4675,36 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /**
    * The older messages of a task: the page before a message that its panel holds. A limit of 0 reads
-   * only whether there are any. A message that the thread does not hold has none.
+   * only whether there are any. A message that the thread does not hold has none. `exclusions` leave out
+   * the markers that a remote reader cannot show, so they do not count either.
    */
-  readTaskPage(input: ReadAgentTaskPageInput): AgentTaskPage {
+  readTaskPage(input: ReadAgentTaskPageInput, exclusions: ConversationMarkerExclusions = {}): AgentTaskPage {
     const { threadId } = this.#tasks.require(input.agentId, input.taskId);
     const database = this.#store.database;
-    const before = database.conversationBefore(threadId, input.beforeMessageId);
-    const page =
-      before && before.count > 0 && input.limit > 0
-        ? database.readConversationPage(input.agentId, threadId, { type: "before", cursor: before.cursor }, input.limit)
-        : undefined;
+    const none = (hasOlder: boolean): AgentTaskPage => ({
+      conversation: { agentId: input.agentId, threadId, activeTurnId: null, revision: 0, messages: [] },
+      hasOlder,
+    });
+    if (input.limit === 0)
+      return none(database.conversationCountBefore(threadId, input.beforeMessageId, exclusions) > 0);
+    const cursor = database.conversationCursorAt(threadId, input.beforeMessageId);
+    if (!cursor) return none(false);
+    const page = database.readConversationPage(
+      input.agentId,
+      threadId,
+      { type: "before", cursor },
+      input.limit,
+      exclusions,
+    );
     return {
       conversation: {
         agentId: input.agentId,
         threadId,
-        activeTurnId: page?.activeTurnId ?? null,
-        revision: page?.revision ?? 0,
-        messages: page?.messages ?? [],
+        activeTurnId: page.activeTurnId,
+        revision: page.revision,
+        messages: page.messages,
       },
-      hasOlder: page ? page.pageInfo.hasOlder : (before?.count ?? 0) > 0,
+      hasOlder: page.pageInfo.hasOlder,
     };
   }
 

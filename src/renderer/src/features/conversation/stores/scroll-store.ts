@@ -96,7 +96,12 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   const shownMessages = createMemo(() => {
     const shown = deps.props.messages.filter(
       (message) =>
-        !(message.kind === "thinking" && (!message.turnId || thinkingRowHiddenTurns().has(message.turnId))) &&
+        !(
+          message.kind === "thinking" &&
+          (!message.turnId ||
+            thinkingRowHiddenTurns().has(message.turnId) ||
+            !message.items?.some((item) => item.trim()))
+        ) &&
         !(message.kind === "memory-changes" && answeredTurns().has(message.turnId)) &&
         !silentAgentAnswer(message),
     );

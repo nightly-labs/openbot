@@ -295,6 +295,23 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   const otherThreads = createMemo(() => props.threads?.filter((thread) => thread.id !== props.task?.id));
   let scroller: HTMLElement | undefined;
   let atEnd = true;
+  /**
+   * The place of the reader when they asked for older messages: the first message then, and the
+   * distance from the end. The page goes in above, and the view keeps the reader at the same message.
+   */
+  let olderAnchor: { firstId: string | undefined; fromEnd: number } | undefined;
+  function loadOlder(older: AgentThreadOlderMessages): void {
+    if (scroller) olderAnchor = { firstId: props.messages[0]?.id, fromEnd: scroller.scrollHeight - scroller.scrollTop };
+    older.onLoad();
+  }
+  // A read that ends with no new messages leaves no place to keep.
+  createEffect(
+    () => props.olderMessages?.loading === true,
+    (loading) => {
+      if (!loading && olderAnchor && untrack(() => props.messages[0]?.id) === olderAnchor.firstId)
+        olderAnchor = undefined;
+    },
+  );
   let shownTaskId = untrack(() => props.task?.id);
   const activityLabel = nextAgentActivityLabel();
   const fades = createScrollFades();
@@ -325,6 +342,12 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       lastHeight = scrollHeight;
     };
     const follow = new ResizeObserver(() => {
+      const anchor = olderAnchor;
+      if (anchor && untrack(() => props.messages[0]?.id) !== anchor.firstId) {
+        olderAnchor = undefined;
+        element.scrollTop = element.scrollHeight - anchor.fromEnd;
+        return;
+      }
       if (atEnd) element.scrollTop = element.scrollHeight;
     });
     follow.observe(list);
@@ -592,7 +615,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                   variant="ghost"
                   size="xs"
                   disabled={older().loading}
-                  onClick={() => older().onLoad()}
+                  onClick={() => loadOlder(older())}
                 >
                   {older().loading ? t("chat.history.loadingOlder") : t("conversation.threads.view.loadOlder")}
                 </Button>

@@ -247,7 +247,7 @@ export async function routeAgentThreadPages(
   requireListedAgent(tasks, agentId);
   const input = { agentId, taskId: stringField(body, "taskId"), beforeMessageId: stringField(body, "beforeMessageId") };
   for (let limit = typeof body.limit === "number" ? body.limit : 50; ; limit = Math.floor(limit / 2)) {
-    const page = tasks.readTaskPage({ ...input, limit });
+    const page = tasks.readTaskPage({ ...input, limit }, markerExclusionsForCapabilities(capabilities));
     const answer = { ...page, conversation: conversationSnapshotForCapabilities(page.conversation, capabilities) };
     if (Buffer.byteLength(JSON.stringify(answer)) <= WEBRTC_FRAME_BODY_BUDGET) return json(200, answer);
     if (limit <= 1) throw new HttpError(413, sourceText("error.team.conversationPageTooLarge"));

@@ -229,8 +229,12 @@ export class OpenBotDatabase {
     return this.#conversations.readConversationRecoveryMessages(agentId, threadId, activeTurnId);
   }
 
-  conversationBefore(threadId: string, messageId: string): { cursor: string; count: number } | null {
-    return this.#conversations.conversationBefore(threadId, messageId);
+  conversationCursorAt(threadId: string, messageId: string): string | null {
+    return this.#conversations.conversationCursorAt(threadId, messageId);
+  }
+
+  conversationCountBefore(threadId: string, messageId: string, options: ConversationMarkerExclusions = {}): number {
+    return this.#conversations.conversationCountBefore(threadId, messageId, options);
   }
 
   readConversationPage(
