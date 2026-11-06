@@ -23,9 +23,11 @@ import {
   AGENT_PROVIDERS,
   accountUsageCoversModel,
   agentProviderDescriptor,
+  COMPUTER_USE_MCP_SERVER_ID,
   CUSTOM_AGENT_DEFAULT_MODEL,
   CUSTOM_AGENT_LIMITS,
   DEFAULT_PROVIDER_ACCOUNT_ID,
+  GITHUB_CONNECTOR_MCP_SERVER_ID,
   isAgentProvider,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
@@ -3722,7 +3724,8 @@ export class ProviderRuntime implements ProviderPort {
       // what it sent, so an API key or an inherited credential is in the line that is about to be
       // logged or turned into a renderer error event. Shortened after that, because a value cut in
       // half is a value the redactor does not match.
-      const message = shortenDiagnostic(this.#redactMcp(raw));
+      const redacted = this.#redactMcp(raw);
+      const message = shortenDiagnostic(redacted);
       // An agent that tears down its sessions while OpenBot stops it (idle release, restart, quit)
       // can write an error for each one. It is not a failure the user can act on, so it goes to the log.
       if (origin?.duringStop) {
@@ -3732,10 +3735,16 @@ export class ProviderRuntime implements ProviderPort {
         });
         return;
       }
-      if (isMcpSubsystemDiagnostic(message)) {
-        const server = this.#configuredMcpServerIn(message);
+      // A failed tool call names its server too, but is not a server that did not start. A built-in
+      // server is not in the MCP settings, and its failure stays the provider's error, as before.
+      const mcpServer =
+        isMcpSubsystemDiagnostic(message) && !isToolCallDiagnostic(message)
+          ? this.#configuredMcpServerIn(redacted)
+          : undefined;
+      if (mcpServer !== undefined && !mcpServer?.builtIn) {
+        const server = mcpServer?.name ?? null;
         stderrLogger.warn("A provider reported an MCP server failure.", { provider: client.provider, server, message });
-        if (server) this.#reportMcpServerFailure(client.provider, server, message);
+        if (server) this.#reportMcpServerFailure(client.provider, server, redacted);
         return;
       }
       if (isTelemetryExportDiagnostic(message)) {
@@ -4052,28 +4061,37 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   /**
-   * The name of the MCP server from this app's list that a provider's MCP line is about, or null
-   * for a server from the user's own provider files, which goes to the log only.
+   * The MCP server from this app's list that a provider's MCP line is about, or null for a server
+   * from the user's own provider files, which goes to the log only. The line is read whole, before
+   * it is shortened, because a long line can quote the URL near its end.
    *
    * A line can name the server by its URL rather than its name: Grok's `rmcp` worker quotes only the
    * OAuth metadata address, `https://<host>/.well-known/oauth-protected-resource/<path>`, so the host
-   * is what the two forms share. The URL is read first, because a short name such as `mcp` is in
-   * every MCP line. A name the provider was given counts too; one with no letter or digit, such as
-   * `__`, would match every `mcp__server__tool` line.
+   * is what the two forms share, and the longest path that matches picks between two servers on one
+   * host. The URL is read first. A name counts only as a whole word, so `git` is not in `github`; a
+   * name the provider was given counts too, and one with no letter or digit, such as `__`, would
+   * match every `mcp__server__tool` line.
    */
-  #configuredMcpServerIn(message: string): string | null {
+  #configuredMcpServerIn(message: string): { name: string; builtIn: boolean } | null {
     const configs = this.#credentials.mcpServers();
-    const byHost = configs.flatMap((config) => {
-      const url = config.transport === "http" ? URL.parse(config.url) : null;
-      return url?.host && message.includes(url.host) ? [{ name: config.name, path: url.pathname }] : [];
-    });
+    const builtIn = (id: string) => id === COMPUTER_USE_MCP_SERVER_ID || id === GITHUB_CONNECTOR_MCP_SERVER_ID;
+    const byHost = configs
+      .flatMap((config) => {
+        const url = config.transport === "http" ? URL.parse(config.url) : null;
+        return url?.host && message.includes(url.host) ? [{ config, path: url.pathname }] : [];
+      })
+      .sort((a, b) => b.path.length - a.path.length);
     const byUrl = byHost.find((row) => row.path !== "/" && message.includes(row.path)) ?? byHost[0];
-    if (byUrl) return byUrl.name;
+    if (byUrl) return { name: byUrl.config.name, builtIn: builtIn(byUrl.config.id) };
+    const word = (text: string) => new RegExp(`(?<![\\w-])${RegExp.escape(text)}(?![\\w-])`, "u").test(message);
     const named = (name: string) => {
       const given = providerMcpServerName(name);
-      return (name !== "" && message.includes(name)) || (/[A-Za-z0-9]/u.test(given) && message.includes(given));
+      return (name !== "" && word(name)) || (/[A-Za-z0-9]/u.test(given) && word(given));
     };
-    return [...configs.map((config) => config.name), ...this.#mcpHandoff.names()].find(named) ?? null;
+    const config = configs.find((row) => named(row.name));
+    if (config) return { name: config.name, builtIn: builtIn(config.id) };
+    const handedOff = this.#mcpHandoff.names().find(named);
+    return handedOff ? { name: handedOff, builtIn: false } : null;
   }
 
   /**
