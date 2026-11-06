@@ -6,12 +6,13 @@ const SLACK_CHUNK_CHARACTERS = 3_900;
 /**
  * Markdown as Slack `mrkdwn`. Content `&`, `<` and `>` are escaped, also in code, as Slack
  * requires. That also makes `<!channel>`, `<!here>` and `<!subteam^…>` inert: an answer cannot ping a
- * workspace or a group. Only a user mention `<@U…>` or `<@W…>` is made live again, so it pings that user.
+ * workspace or a group. Only a user mention `<@U…>` or `<@W…>` outside code and links is made live
+ * again, so it pings that user.
  */
 export function slackMrkdwn(markdown: string): string {
   const lines = escapeSlack(markdown).split("\n");
   let inFence = false;
-  const mrkdwn = lines
+  return lines
     .map((line) => {
       if (line.trimStart().startsWith(FENCE)) {
         inFence = !inFence;
@@ -20,7 +21,6 @@ export function slackMrkdwn(markdown: string): string {
       return inFence ? line : inlineMrkdwn(blockMrkdwn(line));
     })
     .join("\n");
-  return mrkdwn.replace(/&lt;@([UW][A-Z0-9]+)&gt;/g, "<@$1>");
 }
 
 function escapeSlack(text: string): string {
@@ -44,15 +44,21 @@ function inlineMrkdwn(line: string): string {
     .map((part) => {
       if (part.startsWith("`") && part.endsWith("`") && part.length > 1) return part;
       const bold: string[] = [];
-      return part
-        .replace(/\*\*(.+?)\*\*|__(.+?)__/g, (_match, a: string | undefined, b: string | undefined) => {
-          bold.push(a ?? b ?? "");
-          return `\uE001${bold.length - 1}\uE001`;
-        })
-        .replace(/(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])/g, "_$1_")
-        .replace(/~~(.+?)~~/g, "~$1~")
-        .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, "<$2|$1>")
-        .replace(/\uE001(\d+)\uE001/g, (_match, index: string) => `*${bold[Number(index)]}*`);
+      return (
+        part
+          .replace(/\*\*(.+?)\*\*|__(.+?)__/g, (_match, a: string | undefined, b: string | undefined) => {
+            bold.push(a ?? b ?? "");
+            return `\uE001${bold.length - 1}\uE001`;
+          })
+          .replace(/(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])/g, "_$1_")
+          .replace(/~~(.+?)~~/g, "~$1~")
+          .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, "<$2|$1>")
+          .replace(/\uE001(\d+)\uE001/g, (_match, index: string) => `*${bold[Number(index)]}*`)
+          // Content `<` is escaped, so each `<…>` here is a link that this function made.
+          .split(/(<[^>]*>)/)
+          .map((text) => (text.startsWith("<") ? text : text.replace(/&lt;@([UW][A-Z0-9]+)&gt;/g, "<@$1>")))
+          .join("")
+      );
     })
     .join("");
 }

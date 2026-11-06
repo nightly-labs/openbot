@@ -56,7 +56,7 @@ browser. A joined server shows no Slack page.
 - The agent can read more of the channel or thread when a message refers to something earlier.
 - 👀 means the message arrived. "Working on it…" is replaced by the answer. ✅, ❌ or ⏹ shows the end.
   Every post comes from OpenBot and names no agent.
-- A post that mentions a person as `<@user ID>` pings that person. A post never pings a channel,
+- A new post that mentions a person as `<@user ID>` pings that person. A post never pings a channel,
   `@here`, `@everyone` or a user group.
 - An approval appears in the thread with **Approve** and **Deny**. Only the person who wrote the
   message can answer it there. The OpenBot host can always answer it.
