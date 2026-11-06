@@ -30,6 +30,8 @@ files:
   - "!node_modules/@anthropic-ai/claude-agent-sdk-darwin-*/**/*"
   - "!node_modules/@anthropic-ai/claude-agent-sdk-linux-*/**/*"
   - "!node_modules/@anthropic-ai/claude-agent-sdk-win32-*/**/*"
+  # The TypeScript source of Effect. Its package exports point only to `dist`.
+  - "!node_modules/effect/src/**/*"
 asarUnpack:
   # The database host is loaded by path as a separate process, not required into the main bundle.
   - out/main/agent-database-host.js
