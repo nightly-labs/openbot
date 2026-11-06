@@ -1938,6 +1938,14 @@ export class MailboxStore {
     return null;
   }
 
+  /** Whether the id names a stored message, or a delivery of one, as an agent's history shows it. */
+  hasMessage(id: string): boolean {
+    return (
+      this.#state.messages.some((message) => message.id === id) ||
+      this.#state.deliveries.some((delivery) => delivery.id === id)
+    );
+  }
+
   /** Whether the message's sender waits for an answer. Unknown messages count as expecting one. */
   expectsReply(messageId: string): boolean {
     return this.#state.messages.find((message) => message.id === messageId)?.expectsReply !== false;

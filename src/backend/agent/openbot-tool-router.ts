@@ -2078,6 +2078,20 @@ export class OpenBotToolRouter {
           ?.trim()
           .replace(/^"(.*)"$/s, "$1")
           .trim() || null;
+      // An id that names no message would store the answer outside the thread that asked, and stop the
+      // automatic result for the request (#5452). Nothing is written, so the agent can send it again.
+      if (replyTo && !this.#mailbox.hasMessage(replyTo)) {
+        const requestIds = turnDeliveries
+          .filter(
+            ({ delivery }) => delivery.sender.kind === "agent" && recipientValues.includes(delivery.sender.agentId),
+          )
+          .map(({ delivery }) => delivery.messageId);
+        throw new Error(
+          `replyToMessageId ${replyTo} names no message. Use the Message ID of the message that you answer${
+            requestIds.length > 0 ? ` (${requestIds.join(", ")})` : ""
+          }, or leave replyToMessageId out.`,
+        );
+      }
       // An answer to a request from a side thread runs in that thread. When the thread is archived, the
       // answer goes to the recipient's own chat, so it is not lost. A message without replyToMessageId,
       // such as a question back, goes to the thread of the requests from its recipient that this turn
