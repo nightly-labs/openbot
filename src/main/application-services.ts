@@ -3544,10 +3544,14 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.updater, "the update service", () => Effect.runPromise(updater.stop()));
   const agentInitialization = new AgentInitializationGate((rosterLoaded) =>
     Effect.gen(function* () {
-      yield* Fiber.join(computerUseWarmUp);
-      yield* service.initialize({ heldRoutines: takeRoutineHold(routineHoldFile, (message) => logger.warn(message)) });
-      // A client's agent list waits only until here. The steps below do not change the roster.
-      yield* rosterLoaded;
+      // A client's agent list waits only until the agents are restored, not for the provider starts.
+      // The providers start after the computer-use warm-up: it decides whether the MCP entry is
+      // there, and a session made while it still probes would keep a command that it can stop.
+      yield* service.initialize({
+        heldRoutines: takeRoutineHold(routineHoldFile, (message) => logger.warn(message)),
+        rosterLoaded,
+        beforeProviderStart: Fiber.join(computerUseWarmUp).pipe(Effect.asVoid),
+      });
       yield* eventsRuntime.start();
       yield* automation.sync();
       // Picks up the flows a restart stopped between one agent's answer and the next agent's message.
