@@ -151,7 +151,9 @@ function isPortInUse(port: number): Promise<boolean> {
 
 function findWorktreeDesktop(): DevInstanceRecord | null {
   const selection = selectDevInstance(readDevInstanceRecords(), { projectRoot, service: "app" });
-  if (selection.kind === "ambiguous") {
+  // Apps of other worktrees are also "ambiguous" when this worktree runs none. Only extra apps of
+  // this worktree stop the start.
+  if (selection.kind === "ambiguous" && selection.candidates.some((record) => record.projectRoot === projectRoot)) {
     throw new Error("This worktree runs more than one dev app. Stop the extra one with `bun run dev:stop`.");
   }
   return selection.kind === "selected" && selection.match === "worktree" ? selection.record : null;
