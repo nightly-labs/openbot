@@ -93,6 +93,12 @@
       "detailSha256": "414a33dd79f7318638bc68e56ecaeb81c77762666a9bd6f11a0e228c0323fcf1"
     },
     {
+      "slug": "gitlab",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "bc2e946ad9f54d21a16c8fe618ed2ad7734fe4a023dec71d341193f15ed8a23c"
+    },
+    {
       "slug": "vercel",
       "version": "1.0.0",
       "featured": false,

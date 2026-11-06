@@ -225,6 +225,14 @@ export const messages = {
   "marketplace.plugin.sentry.prompt.newErrors": "昨天发布之后出现了哪些新错误？",
   "marketplace.plugin.sentry.prompt.topCrash": "解释移动端项目中最严重的崩溃及其可能原因。",
   "marketplace.plugin.sentry.prompt.releaseHealth": "当前版本的健康状况与上一个版本相比如何？",
+  "marketplace.plugin.gitlab.tagline": "Issue、合并请求和流水线",
+  "marketplace.plugin.gitlab.description":
+    "GitLab 让助手在 GitLab.com 上搜索项目、阅读和创建 Issue、审查和更新合并请求、阅读仓库文件和提交，并检查 CI 流水线和作业。每位用户通过浏览器登录自己的 GitLab 账号。助手拥有与用户相同的权限：可以推送提交、修改 Issue 和合并请求，并执行合并。对于自托管的 GitLab，请在 MCP 服务器设置中添加一个服务器，地址为你的 GitLab 地址加上 /api/v4/mcp，然后在那里登录。",
+  "marketplace.plugin.gitlab.app":
+    "通过 GitLab 的 MCP 服务器和浏览器登录，提供项目、Issue、合并请求、仓库和 CI 流水线。",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "哪些合并请求在等我审查？",
+  "marketplace.plugin.gitlab.prompt.failedPipeline": "默认分支上最近一次流水线为什么失败了？",
+  "marketplace.plugin.gitlab.prompt.newIssue": "为同步队列的崩溃建一个 Issue，附上复现步骤。",
   "marketplace.plugin.vercel.tagline": "部署、构建日志与项目",
   "marketplace.plugin.vercel.description":
     "Vercel 让助手列出项目和最近的部署、读取构建与运行时日志，并查明构建失败的原因。每位用户通过浏览器登录自己的 Vercel 账号，并选择助手可用的团队。在这些团队中，助手拥有与该账号相同的权限，还可以修改环境变量、域名、DNS 记录和部署，以及购买域名。",

@@ -220,6 +220,14 @@ export const messages = {
   "marketplace.plugin.sentry.prompt.newErrors": "어제 배포 이후 새로 나타난 오류가 뭐야?",
   "marketplace.plugin.sentry.prompt.topCrash": "모바일 프로젝트에서 가장 많은 크래시와 그 추정 원인을 설명해 줘.",
   "marketplace.plugin.sentry.prompt.releaseHealth": "현재 릴리스는 지난 릴리스와 비교해서 얼마나 안정적이야?",
+  "marketplace.plugin.gitlab.tagline": "이슈, 머지 리퀘스트, 파이프라인",
+  "marketplace.plugin.gitlab.description":
+    "GitLab을 사용하면 에이전트가 GitLab.com에서 프로젝트를 검색하고, 이슈를 읽고 만들고, 머지 리퀘스트를 리뷰하고 업데이트하고, 저장소의 파일과 커밋을 읽고, CI 파이프라인과 작업을 확인할 수 있어요. 사용자는 각자 브라우저에서 자신의 GitLab 계정으로 로그인해요. 에이전트는 사용자와 같은 권한을 가져요. 커밋을 푸시하고, 이슈와 머지 리퀘스트를 변경하고, 머지할 수 있어요. 자체 호스팅 GitLab은 MCP 서버 설정에서 GitLab 주소 뒤에 /api/v4/mcp를 붙인 서버를 추가하고 거기서 로그인하세요.",
+  "marketplace.plugin.gitlab.app":
+    "프로젝트, 이슈, 머지 리퀘스트, 저장소, CI 파이프라인을 브라우저 로그인 방식의 GitLab MCP 서버로 제공해요.",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "내 리뷰를 기다리는 머지 리퀘스트는 뭐야?",
+  "marketplace.plugin.gitlab.prompt.failedPipeline": "기본 브랜치의 마지막 파이프라인은 왜 실패했어?",
+  "marketplace.plugin.gitlab.prompt.newIssue": "동기화 대기열 충돌 건을 재현 단계와 함께 이슈로 등록해 줘.",
   "marketplace.plugin.vercel.tagline": "배포, 빌드 로그, 프로젝트",
   "marketplace.plugin.vercel.description":
     "Vercel을 사용하면 에이전트가 프로젝트와 최근 배포를 나열하고, 빌드 및 런타임 로그를 읽고, 빌드가 실패한 이유를 찾을 수 있어요. 사용자는 각자 브라우저에서 자신의 Vercel 계정으로 로그인하고 에이전트가 사용할 수 있는 팀을 선택해요. 해당 팀에서 에이전트는 사용자 계정과 같은 권한을 가져요. 환경 변수, 도메인, DNS 레코드, 배포를 변경하고 도메인을 구매할 수도 있어요.",

@@ -261,6 +261,15 @@ export const messages = {
   "marketplace.plugin.sentry.prompt.newErrors": "Dünkü dağıtımdan bu yana hangi yeni hatalar çıktı?",
   "marketplace.plugin.sentry.prompt.topCrash": "Mobil projedeki en sık çökmeyi ve olası nedenini açıkla.",
   "marketplace.plugin.sentry.prompt.releaseHealth": "Güncel sürüm bir öncekine göre ne kadar sağlıklı?",
+  "marketplace.plugin.gitlab.tagline": "Sorunlar, birleştirme istekleri ve işlem hatları",
+  "marketplace.plugin.gitlab.description":
+    "GitLab, ajanların GitLab.com'da projeleri aramasına, sorunları okuyup oluşturmasına, birleştirme isteklerini incelemesine ve güncellemesine, depo dosyalarını ve commit'leri okumasına, CI işlem hatlarını ve işlerini kontrol etmesine olanak tanır. Her kullanıcı tarayıcı üzerinden kendi GitLab hesabında oturum açar. Ajanlar kullanıcıyla aynı izinlere sahiptir: commit gönderebilir, sorunları ve birleştirme isteklerini değiştirebilir ve bunları birleştirebilir. Kendi sunucunuzdaki GitLab için MCP sunucuları ayarlarında GitLab adresinizin sonuna /api/v4/mcp eklenmiş bir sunucu ekleyin ve orada oturum açın.",
+  "marketplace.plugin.gitlab.app":
+    "Projeler, sorunlar, birleştirme istekleri, depolar ve CI işlem hatları, tarayıcıda oturum açmayla GitLab'in MCP sunucusu üzerinden.",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "Hangi birleştirme istekleri incelememi bekliyor?",
+  "marketplace.plugin.gitlab.prompt.failedPipeline": "Varsayılan daldaki son işlem hattı neden başarısız oldu?",
+  "marketplace.plugin.gitlab.prompt.newIssue":
+    "Eşitleme kuyruğundaki çökme için yeniden oluşturma adımlarıyla bir sorun kaydı aç.",
   "marketplace.plugin.vercel.tagline": "Dağıtımlar, derleme günlükleri ve projeler",
   "marketplace.plugin.vercel.description":
     "Vercel, ajanların projeleri ve son dağıtımları listelemesine, derleme ve çalışma zamanı günlüklerini okumasına ve bir derlemenin neden başarısız olduğunu bulmasına olanak tanır. Her kullanıcı tarayıcı üzerinden kendi Vercel hesabında oturum açar ve ajanların kullanabileceği ekipleri seçer. Bu ekiplerde ajanlar, kullanıcının hesabıyla aynı yetkilere sahiptir. Ortam değişkenlerini, alan adlarını, DNS kayıtlarını ve dağıtımları da değiştirebilir, alan adı da satın alabilirler.",

@@ -242,6 +242,15 @@ export const messages = {
   "marketplace.plugin.sentry.prompt.topCrash":
     "Spiega il crash principale del progetto mobile e la sua causa probabile.",
   "marketplace.plugin.sentry.prompt.releaseHealth": "Quanto è stabile la versione attuale rispetto alla precedente?",
+  "marketplace.plugin.gitlab.tagline": "Issue, merge request e pipeline",
+  "marketplace.plugin.gitlab.description":
+    "GitLab permette agli agenti di cercare progetti, leggere e creare issue, revisionare e aggiornare merge request, leggere file e commit del repository e controllare pipeline e job CI su GitLab.com. Ogni utente accede al proprio account GitLab dal browser. Gli agenti hanno gli stessi permessi dell'utente: possono fare push di commit, modificare issue e merge request ed eseguirne il merge. Per un GitLab self-hosted, aggiungi un server MCP con il tuo indirizzo GitLab seguito da /api/v4/mcp nelle impostazioni dei server MCP e accedi da lì.",
+  "marketplace.plugin.gitlab.app":
+    "Progetti, issue, merge request, repository e pipeline CI, tramite il server MCP di GitLab con accesso dal browser.",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "Quali merge request aspettano la mia revisione?",
+  "marketplace.plugin.gitlab.prompt.failedPipeline": "Perché è fallita l'ultima pipeline sul branch predefinito?",
+  "marketplace.plugin.gitlab.prompt.newIssue":
+    "Apri una issue per il crash nella coda di sincronizzazione, con i passaggi per riprodurlo.",
   "marketplace.plugin.vercel.tagline": "Deploy, log di build e progetti",
   "marketplace.plugin.vercel.description":
     "Vercel consente agli agenti di elencare i progetti e i deploy recenti, leggere i log di build e di runtime e capire perché una build non è riuscita. Ogni utente accede al proprio account Vercel dal browser e sceglie i team che gli agenti possono usare. In quei team gli agenti hanno gli stessi permessi dell'account dell'utente. Possono anche modificare variabili d'ambiente, domini, record DNS e deploy, e acquistare domini.",

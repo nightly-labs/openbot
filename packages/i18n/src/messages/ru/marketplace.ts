@@ -264,6 +264,15 @@ export const messages = {
   "marketplace.plugin.sentry.prompt.topCrash":
     "Объясните самый частый сбой в мобильном проекте и его вероятную причину.",
   "marketplace.plugin.sentry.prompt.releaseHealth": "Насколько стабилен текущий релиз по сравнению с предыдущим?",
+  "marketplace.plugin.gitlab.tagline": "Задачи, merge requests и пайплайны",
+  "marketplace.plugin.gitlab.description":
+    "GitLab позволяет агентам искать проекты, читать и создавать задачи, проверять и обновлять merge requests, читать файлы и коммиты репозитория и проверять пайплайны и задания CI на GitLab.com. Каждый пользователь входит в свой аккаунт GitLab через браузер. У агентов те же права, что у пользователя: они могут отправлять коммиты, менять задачи и merge requests и сливать их. Для GitLab на своём сервере добавьте в настройках серверов MCP сервер с адресом вашего GitLab и /api/v4/mcp в конце, и войдите там.",
+  "marketplace.plugin.gitlab.app":
+    "Проекты, задачи, merge requests, репозитории и пайплайны CI через сервер MCP GitLab со входом через браузер.",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "Какие merge requests ждут моего ревью?",
+  "marketplace.plugin.gitlab.prompt.failedPipeline": "Почему упал последний пайплайн в основной ветке?",
+  "marketplace.plugin.gitlab.prompt.newIssue":
+    "Заведите задачу о сбое в очереди синхронизации с шагами воспроизведения.",
   "marketplace.plugin.vercel.tagline": "Деплои, логи сборки и проекты",
   "marketplace.plugin.vercel.description":
     "Vercel позволяет агентам просматривать проекты и последние деплои, читать логи сборки и выполнения и выяснять, почему сборка не удалась. Каждый пользователь входит в свой аккаунт Vercel через браузер и выбирает команды, которые могут использовать агенты. В этих командах у агентов те же права, что и у аккаунта пользователя. Они также могут изменять переменные окружения, домены, DNS-записи и деплои, а также покупать домены.",

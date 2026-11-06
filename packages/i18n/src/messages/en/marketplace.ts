@@ -263,6 +263,14 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.sentry.prompt.newErrors": "What new errors appeared since yesterday's deploy?",
   "marketplace.plugin.sentry.prompt.topCrash": "Explain the top crash in the mobile project and its likely cause.",
   "marketplace.plugin.sentry.prompt.releaseHealth": "How healthy is the current release compared to the last one?",
+  "marketplace.plugin.gitlab.tagline": "Issues, merge requests and pipelines",
+  "marketplace.plugin.gitlab.description":
+    "GitLab lets agents search projects, read and create issues, review and update merge requests, read repository files and commits, and check CI pipelines and jobs on GitLab.com. Each user signs in to their own GitLab account through the browser. Agents get the same permissions as the user: they can push commits, change issues and merge requests, and merge them. For a self-hosted GitLab, add an MCP server with your GitLab address followed by /api/v4/mcp in the MCP servers settings, and sign in there.",
+  "marketplace.plugin.gitlab.app":
+    "Projects, issues, merge requests, repositories and CI pipelines, over GitLab's MCP server with browser sign-in.",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "Which merge requests wait for my review?",
+  "marketplace.plugin.gitlab.prompt.failedPipeline": "Why did the last pipeline on the default branch fail?",
+  "marketplace.plugin.gitlab.prompt.newIssue": "File an issue for the crash in the sync queue with reproduction steps.",
   "marketplace.plugin.vercel.tagline": "Deployments, build logs and projects",
   "marketplace.plugin.vercel.description":
     "Vercel lets agents list projects and recent deployments, read build and runtime logs, and find why a build failed. Each user signs in to their own Vercel account through the browser and chooses the teams that agents can use. In those teams, agents get the same rights as the user's account. They can also change environment variables, domains, DNS records and deployments, and buy domains.",

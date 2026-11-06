@@ -141,6 +141,18 @@ const PLUGIN_TEXT = {
       "prompt-release-health": "marketplace.plugin.sentry.prompt.releaseHealth",
     },
   },
+  gitlab: {
+    tagline: "marketplace.plugin.gitlab.tagline",
+    description: "marketplace.plugin.gitlab.description",
+    apps: {
+      "app-gitlab-mcp": "marketplace.plugin.gitlab.app",
+    },
+    prompts: {
+      "prompt-review-queue": "marketplace.plugin.gitlab.prompt.reviewQueue",
+      "prompt-failed-pipeline": "marketplace.plugin.gitlab.prompt.failedPipeline",
+      "prompt-new-issue": "marketplace.plugin.gitlab.prompt.newIssue",
+    },
+  },
   vercel: {
     tagline: "marketplace.plugin.vercel.tagline",
     description: "marketplace.plugin.vercel.description",
