@@ -2073,23 +2073,27 @@ export class OpenBotToolRouter {
         .find((taskId) => taskId !== null);
       // An agent can send "" for no reply. Every reader rejects an empty id. A model can also copy the
       // quotes around the id in the delivery prompt; such an id refers to no message.
-      const replyTo =
+      const replyReference =
         replyToMessageId
           ?.trim()
           .replace(/^"(.*)"$/s, "$1")
           .trim() || null;
+      const replyTo = replyReference && this.#mailbox.replyReferenceMessageId(replyReference);
       // An id that names no message would store the answer outside the thread that asked, and stop the
       // automatic result for the request (#5452). Nothing is written, so the agent can send it again. The
       // agent corrects its own call, so the user gets no error for it.
-      if (replyTo && !this.#mailbox.hasMessage(replyTo)) {
+      if (replyReference && !replyTo) {
         const requestIds = turnDeliveries
           .filter(
-            ({ delivery }) => delivery.sender.kind === "agent" && recipientValues.includes(delivery.sender.agentId),
+            ({ delivery }) =>
+              delivery.sender.kind === "agent" &&
+              recipientValues.includes(delivery.sender.agentId) &&
+              delivery.expectsReply !== false,
           )
           .map(({ delivery }) => delivery.messageId);
         return openBotToolFailure(
           [
-            sourceText("error.backend.replyReferenceUnknown", { id: replyTo }),
+            sourceText("error.backend.replyReferenceUnknown", { id: replyReference }),
             ...(requestIds.length > 0
               ? [sourceText("error.backend.replyReferenceRequests", { ids: requestIds.join(", ") })]
               : []),
