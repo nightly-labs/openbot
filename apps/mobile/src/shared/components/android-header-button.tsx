@@ -43,7 +43,7 @@ export function AndroidHeaderButton({
   onPress: () => void;
 } & ({ icon: LucideIcon; text?: undefined } | { icon?: undefined; text: string })) {
   const foreground = String(useThemeColor("foreground"));
-  const glass = useChromeGlass();
+  const glass = useChromeGlass({ shadow: false });
   const press = useRef(onPress);
   useLayoutEffect(() => {
     press.current = onPress;
@@ -83,7 +83,7 @@ export function AndroidHeaderButton({
 function AndroidStackBackButton({ glass: hasGlass, onPress }: { glass: boolean; onPress: () => void }) {
   const { t } = useText();
   const foreground = useThemeColor("foreground");
-  const glass = useChromeGlass();
+  const glass = useChromeGlass({ shadow: false });
   return (
     <Pressable
       accessibilityRole="button"

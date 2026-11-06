@@ -399,7 +399,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   );
   const [foreground, muted] = useThemeColor(["foreground", "muted"]);
   // The Android header buttons have the glass of the search field.
-  const buttonGlass = useChromeGlass();
+  const buttonGlass = useChromeGlass({ shadow: isIOS });
   const searchBlurTarget = useRef<ViewInstance>(null);
   const iconColor = String(foreground);
   const mutedColor = String(muted);
