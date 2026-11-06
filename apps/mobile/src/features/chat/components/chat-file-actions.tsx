@@ -45,15 +45,22 @@ export function useMessageFileOpener(serverId: string) {
   const opening = useRef(false);
 
   const open = useCallback(
-    async (target: MessageFileTarget) => {
+    async (target: MessageFileTarget, written: MessageFileTarget | null) => {
       if (opening.current) return;
       opening.current = true;
       void haptics.selection();
       try {
-        const data = await downloadMessageFile(serverId, target);
+        // When nothing is at the path joined to the message's folder, the name opens as written.
+        const [source, data] = await downloadMessageFile(serverId, target).then(
+          (found) => [target, found] as const,
+          async (error: unknown) => {
+            if (!written) throw error;
+            return [written, await downloadMessageFile(serverId, written)] as const;
+          },
+        );
         // The host sends every workspace file as `application/octet-stream`.
         const mimeType = attachmentMimeTypeForName(data.name);
-        const copy = messageFileCopy(serverId, JSON.stringify(target), data.name);
+        const copy = messageFileCopy(serverId, JSON.stringify(source), data.name);
         copy.parentDirectory.create({ intermediates: true, idempotent: true });
         copy.writeSync(data.base64, { encoding: "base64" });
         const file = { uri: copy.uri, name: data.name, mimeType, size: copy.size };

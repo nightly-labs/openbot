@@ -36,22 +36,26 @@ export function messageFileDirectory(body: string): MessageFileDirectory | null 
 }
 
 /**
- * The file that the text of a file chip names, as desktop `mentionedFileTarget` resolves it. A
- * workspace file needs the agent that wrote the message: null without one.
+ * The file that the text of a file chip names, as desktop `mentionedFileTarget` resolves it, and the
+ * name as written when the chip joins it to the message's folder. When nothing is at the joined path,
+ * desktop opens the written name from the agent's workspace (#5270). A workspace file needs the agent
+ * that wrote the message: null without one.
  */
 export function messageFileTarget(
   text: string,
   directory: MessageFileDirectory | null,
   agentId: string | undefined,
-): MessageFileTarget | null {
-  let path = text.trim();
-  if (!isFileReference(path)) return null;
-  let kind: MessageFileDirectory["kind"] = isSharedPath(path) ? "shared" : "workspace";
-  if (kind === "workspace" && directory && !/^(?:~[/\\]|[/\\]|[A-Za-z]:[/\\])/u.test(path)) {
-    const separator = directory.path.includes("\\") && !directory.path.includes("/") ? "\\" : "/";
-    path = `${directory.path.replace(/[/\\]+$/u, "")}${separator}${path}`;
-    kind = directory.kind;
+): { file: MessageFileTarget; written: MessageFileTarget | null } | null {
+  const written = text.trim();
+  if (!isFileReference(written)) return null;
+  const shared = isSharedPath(written);
+  if (shared || !directory || /^(?:~[/\\]|[/\\]|[A-Za-z]:[/\\])/u.test(written)) {
+    if (shared) return { file: { kind: "shared", path: written }, written: null };
+    return agentId ? { file: { kind: "workspace", agentId, path: written }, written: null } : null;
   }
-  if (kind === "shared") return { kind, path };
-  return agentId ? { kind, agentId, path } : null;
+  const separator = directory.path.includes("\\") && !directory.path.includes("/") ? "\\" : "/";
+  const path = `${directory.path.replace(/[/\\]+$/u, "")}${separator}${written}`;
+  const fallback: MessageFileTarget | null = agentId ? { kind: "workspace", agentId, path: written } : null;
+  if (directory.kind === "shared") return { file: { kind: "shared", path }, written: fallback };
+  return agentId ? { file: { kind: "workspace", agentId, path }, written: fallback } : null;
 }

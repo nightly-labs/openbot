@@ -383,7 +383,7 @@ interface MessageRowShared {
   listWidth: number;
   /** The agent of an agent chat. A workspace file that a message of no agent names is in its workspace. */
   fileAgentId: string | undefined;
-  openFile: (file: MessageFileTarget) => Promise<void>;
+  openFile: (file: MessageFileTarget, written: MessageFileTarget | null) => Promise<void>;
   actions: {
     reply: (message: ChatBubbleMessage) => void;
     branch: (message: ChatBubbleMessage) => void;
@@ -726,8 +726,8 @@ const MessageRow = memo(function MessageRow({
   const openMessageFile = useMemo<OpenMessageFile>(() => {
     const directory = messageFileDirectory(fileBody);
     return (text) => {
-      const file = messageFileTarget(text, directory, fileAgentId);
-      return file ? () => void openFile(file) : null;
+      const target = messageFileTarget(text, directory, fileAgentId);
+      return target ? () => void openFile(target.file, target.written) : null;
     };
   }, [fileBody, fileAgentId, openFile]);
   // Another person in an agent chat: a person's bubble in their own colour, seeded by the member id
