@@ -1,8 +1,10 @@
 import { createSignal, For, onSettled } from "solid-js";
-import { LANDING_TEAMS_OFFERS, type LandingTeamsOfferId } from "../../lib/landing-content";
+import { LANDING_TEAMS_OFFER_IDS, type LandingTeamsOfferId } from "../../lib/landing-content";
 import { TEAMS_ROUTE } from "../../lib/teams-page";
 import { ButtonLink } from "../ui/button";
 import { LandingIcon, type LandingIconName } from "./LandingIcon";
+import { useLandingText } from "./LandingText";
+import { useSitePath } from "./SiteText";
 
 const OFFER_ICONS: Record<LandingTeamsOfferId, LandingIconName> = {
   servers: "cloud",
@@ -17,6 +19,9 @@ const pad = (value: number) => String(value).padStart(2, "0");
 export function TeamsSection() {
   // The card on top of the stack. The list on the left marks it.
   const [active, setActive] = createSignal(0);
+  const landing = useLandingText();
+  const path = useSitePath();
+  const text = () => landing().teams;
   let stack: HTMLOListElement | undefined;
 
   onSettled(() => {
@@ -59,49 +64,47 @@ export function TeamsSection() {
       <div class="landing-section-inner landing-teams-layout">
         <header class="landing-section-heading landing-teams-aside">
           <h2 id="teams-title" class="landing-teams-title">
-            OpenBot for Teams
+            {text().title}
           </h2>
-          <p class="landing-teams-statement">AI coworkers for your whole company.</p>
-          <p class="landing-teams-description">
-            We run OpenBot on managed servers and set it up around your team and tools.
-          </p>
+          <p class="landing-teams-statement">{text().statement}</p>
+          <p class="landing-teams-description">{text().description}</p>
           <div class="landing-teams-actions">
-            <ButtonLink to="/contact" variant="primary" size="lg" icon="contact">
-              Contact us
+            <ButtonLink to={path("/contact")} variant="primary" size="lg" icon="contact">
+              {text().contact}
             </ButtonLink>
-            <ButtonLink to={TEAMS_ROUTE} variant="secondary" size="lg" icon="arrow-right">
-              Learn about Teams
+            <ButtonLink to={path(TEAMS_ROUTE)} variant="secondary" size="lg" icon="arrow-right">
+              {text().learn}
             </ButtonLink>
           </div>
           <ol class="landing-teams-progress" aria-hidden="true">
-            <For each={LANDING_TEAMS_OFFERS}>
+            <For each={LANDING_TEAMS_OFFER_IDS}>
               {(offer, index) => (
                 <li
                   class="landing-teams-progress-item"
-                  data-offer={offer.id}
+                  data-offer={offer}
                   data-active={active() === index() ? "" : undefined}
                 >
                   <span class="landing-teams-progress-number">{pad(index() + 1)}</span>
-                  {offer.label}
+                  {text().offers[offer].label}
                 </li>
               )}
             </For>
           </ol>
         </header>
         <ol ref={stack} class="landing-teams-stack">
-          <For each={LANDING_TEAMS_OFFERS}>
+          <For each={LANDING_TEAMS_OFFER_IDS}>
             {(offer, index) => (
-              <li class="landing-teams-card" data-offer={offer.id} style={{ "--landing-teams-card": index() }}>
+              <li class="landing-teams-card" data-offer={offer} style={{ "--landing-teams-card": index() }}>
                 <span class="landing-teams-card-top">
-                  <span class="landing-download-status">{offer.label}</span>
+                  <span class="landing-download-status">{text().offers[offer].label}</span>
                   <span class="landing-teams-card-number" aria-hidden="true">
-                    {pad(index() + 1)} / {pad(LANDING_TEAMS_OFFERS.length)}
+                    {pad(index() + 1)} / {pad(LANDING_TEAMS_OFFER_IDS.length)}
                   </span>
                 </span>
-                <LandingIcon name={OFFER_ICONS[offer.id]} class="landing-teams-card-icon" />
+                <LandingIcon name={OFFER_ICONS[offer]} class="landing-teams-card-icon" />
                 <div class="landing-teams-card-copy">
-                  <h3 class="landing-teams-card-title">{offer.title}</h3>
-                  <p class="landing-teams-card-description">{offer.description}</p>
+                  <h3 class="landing-teams-card-title">{text().offers[offer].title}</h3>
+                  <p class="landing-teams-card-description">{text().offers[offer].description}</p>
                 </div>
               </li>
             )}

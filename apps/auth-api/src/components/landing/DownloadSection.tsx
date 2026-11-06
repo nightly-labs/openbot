@@ -6,6 +6,7 @@ import { EXTERNAL_LINK_REL } from "../../lib/landing-links";
 import { MOBILE_APP_ORDER, MOBILE_APPS } from "../../lib/mobile-apps";
 import { createLandingReveal } from "./createLandingReveal";
 import { LandingIcon } from "./LandingIcon";
+import { useLandingText } from "./LandingText";
 
 interface DownloadCardContentProps {
   action?: string;
@@ -40,6 +41,8 @@ export function DownloadSection() {
   let sectionRef: HTMLElement | undefined;
   const revealed = createLandingReveal(() => sectionRef);
   const revealState = () => (revealed() ? "true" : "false");
+  const landing = useLandingText();
+  const text = () => landing().download;
   const macos = DOWNLOAD_PLATFORMS.macos;
   const windows = DOWNLOAD_PLATFORMS.windows;
   const linux = DOWNLOAD_PLATFORMS.linux;
@@ -48,11 +51,8 @@ export function DownloadSection() {
     <section ref={sectionRef} id="download" class="landing-download" aria-labelledby="download-title">
       <div class="landing-download-inner">
         <header class="landing-download-heading" data-revealed={revealState()}>
-          <h2 id="download-title">Download OpenBot</h2>
-          <p>
-            Choose your platform. Run Codex, Claude, Gemini, Grok, OpenCode, Muse Code, Pi or your own model from one
-            desktop app, and talk to your agents from your phone.
-          </p>
+          <h2 id="download-title">{text().title}</h2>
+          <p>{text().description}</p>
         </header>
 
         <div class="landing-download-grid">
@@ -65,10 +65,10 @@ export function DownloadSection() {
           >
             <DownloadCardContent
               platform="macos"
-              status={macos.status}
+              status={text().available}
               title={macos.label}
               description={macos.description}
-              action={macos.action}
+              action={text().desktop.macos}
             />
           </a>
 
@@ -81,10 +81,10 @@ export function DownloadSection() {
           >
             <DownloadCardContent
               platform="windows"
-              status={windows.status}
+              status={text().available}
               title={windows.label}
               description={windows.description}
-              action={windows.action}
+              action={text().desktop.windows}
             />
           </a>
 
@@ -99,10 +99,10 @@ export function DownloadSection() {
           >
             <DownloadCardContent
               platform="linux"
-              status={linux.status}
+              status={text().available}
               title={linux.label}
               description={linux.description}
-              action={linux.action}
+              action={text().desktop.linux}
             />
           </a>
         </div>
@@ -123,10 +123,10 @@ export function DownloadSection() {
                 >
                   <DownloadCardContent
                     platform={platform}
-                    status={app.status}
+                    status={text().available}
                     title={app.label}
-                    description={app.description}
-                    action={app.action}
+                    description={text().phone[platform].description}
+                    action={text().phone[platform].action}
                   />
                 </a>
               );
@@ -138,7 +138,7 @@ export function DownloadSection() {
             links. They are also how a crawler finds those pages from the home page. The phone apps
             are a separate group after a rule, as their cards are a separate row. */}
         <p class="landing-download-pages">
-          System requirements and install steps:
+          {text().pages}
           <For each={DOWNLOAD_PLATFORM_ORDER}>
             {(platform) => (
               <Link to="/download/$platform" params={{ platform }}>

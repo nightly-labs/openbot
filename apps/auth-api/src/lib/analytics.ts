@@ -111,6 +111,12 @@ type LandingDestination =
   | "teams"
   | "pricing"
   | "x"
+  | "threads"
+  | "linkedin"
+  | "reddit"
+  | "instagram"
+  | "tiktok"
+  | "facebook"
   | "discord"
   | "repository"
   | "releases"
@@ -240,6 +246,12 @@ const LINK_DESTINATIONS = new Map<string, LandingDestination>([
   [TEAMS_ROUTE, "teams"],
   [PRICING_ROUTE, "pricing"],
   [OPENBOT_LINKS.x, "x"],
+  [OPENBOT_LINKS.threads, "threads"],
+  [OPENBOT_LINKS.linkedin, "linkedin"],
+  [OPENBOT_LINKS.reddit, "reddit"],
+  [OPENBOT_LINKS.instagram, "instagram"],
+  [OPENBOT_LINKS.tiktok, "tiktok"],
+  [OPENBOT_LINKS.facebook, "facebook"],
   [OPENBOT_LINKS.discord, "discord"],
   [OPENBOT_LINKS.repository, "repository"],
   [OPENBOT_LINKS.releases, "releases"],

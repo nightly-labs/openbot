@@ -1,9 +1,17 @@
 import { createFileRoute } from "@tanstack/solid-router";
 import { LandingPage } from "../components/landing/LandingPage";
-import { openBotHomeHead } from "../lib/site-metadata";
-import { OPENBOT_SOFTWARE_APPLICATION } from "../lib/software-application";
+import { landingHead, loadLandingPage } from "../lib/landing-route";
+import { siteLocale } from "../lib/site-locale";
 
+// The home page in the language of the request: Polish for Polish, English for all others. `/pl`
+// always shows Polish. The root route sends `Vary: Accept-Language`.
 export const Route = createFileRoute("/")({
-  head: ({ match }) => openBotHomeHead(OPENBOT_SOFTWARE_APPLICATION, match.context.siteUrl),
-  component: LandingPage,
+  loader: ({ context }) => loadLandingPage(siteLocale(context.locale)),
+  head: ({ match, loaderData }) => landingHead(match.context.siteUrl, "/", loaderData),
+  component: Home,
 });
+
+function Home() {
+  const page = Route.useLoaderData();
+  return <LandingPage text={page().text} />;
+}
