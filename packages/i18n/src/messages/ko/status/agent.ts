@@ -70,4 +70,7 @@ export const messages = {
   "status.agent.nextStepContinues": "에이전트가 다음 단계 전에 멈췄어요. 계속해요 ({current}/{limit}).",
   "status.agent.planContinues": "계획에 남은 단계가 있어요. 에이전트가 계속해요 ({current}/{limit}).",
   "status.agent.branchTitle": "분기된 채팅",
+  "status.agent.toolStepFailedWithExit":
+    "도구 단계가 실패했습니다. 결과를 확인하고 다음에 시도할 작업을 결정하는 중… · 종료 코드 {code}",
+  "status.agent.commandFinished": "명령 완료 · 종료 코드 {code}",
 } as const satisfies PartialTranslation<typeof source>;

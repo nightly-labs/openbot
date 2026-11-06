@@ -102,4 +102,7 @@ export const messages = {
   "status.agent.nextStepContinues": "توقف الوكيل قبل خطوته التالية. سيتابع ({current} من {limit}).",
   "status.agent.planContinues": "في الخطة خطوات مفتوحة. سيتابع الوكيل ({current} من {limit}).",
   "status.agent.branchTitle": "دردشة متفرعة",
+  "status.agent.toolStepFailedWithExit":
+    "فشلت خطوة أداة؛ جارٍ مراجعة النتيجة وتحديد ما يجب تجربته بعد ذلك… · رمز الخروج {code}",
+  "status.agent.commandFinished": "اكتمل الأمر · رمز الخروج {code}",
 } as const satisfies PartialTranslation<typeof source>;

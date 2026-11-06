@@ -101,4 +101,7 @@ export const messages = {
   "status.agent.nextStepContinues": "De agent stopte vóór de volgende stap en gaat verder ({current} van {limit}).",
   "status.agent.planContinues": "Het plan heeft open stappen. De agent gaat verder ({current} van {limit}).",
   "status.agent.branchTitle": "Afgetakte chat",
+  "status.agent.toolStepFailedWithExit":
+    "Een toolstap is mislukt; het resultaat wordt bekeken en bepaald wat ik daarna probeer… · exit {code}",
+  "status.agent.commandFinished": "Opdracht voltooid · exit {code}",
 } as const satisfies PartialTranslation<typeof source>;

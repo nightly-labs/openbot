@@ -63,4 +63,7 @@ export const messages = {
   "status.agent.nextStepContinues": "L’agent s’est arrêté avant l’étape suivante. Il continue ({current} sur {limit}).",
   "status.agent.planContinues": "Le plan a des étapes en cours. L’agent continue ({current} sur {limit}).",
   "status.agent.branchTitle": "Chat dérivé",
+  "status.agent.toolStepFailedWithExit":
+    "Une étape d’outil a échoué ; analyse du résultat et recherche de la prochaine tentative… · code de sortie {code}",
+  "status.agent.commandFinished": "Commande terminée · code de sortie {code}",
 } as const satisfies PartialTranslation<typeof source>;

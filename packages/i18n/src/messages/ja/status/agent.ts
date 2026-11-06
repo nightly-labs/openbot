@@ -61,4 +61,7 @@ export const messages = {
   "status.agent.nextStepContinues": "エージェントが次のステップの前で止まりました。続けます（{current}/{limit}）。",
   "status.agent.planContinues": "プランに未完了のステップがあります。エージェントが続けます（{current}/{limit}）。",
   "status.agent.branchTitle": "分岐したチャット",
+  "status.agent.toolStepFailedWithExit":
+    "ツールのステップが失敗しました。結果を確認し、次に試すことを判断しています… · 終了コード {code}",
+  "status.agent.commandFinished": "コマンド完了 · 終了コード {code}",
 } as const satisfies PartialTranslation<typeof source>;

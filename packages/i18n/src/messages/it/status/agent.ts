@@ -68,4 +68,7 @@ export const messages = {
     "L'agente si è fermato prima del passaggio successivo. Continua ({current} di {limit}).",
   "status.agent.planContinues": "Il piano ha passaggi aperti. L'agente continua ({current} di {limit}).",
   "status.agent.branchTitle": "Chat ramificata",
+  "status.agent.toolStepFailedWithExit":
+    "Un passaggio dello strumento è fallito; analisi del risultato e scelta del prossimo tentativo… · uscita {code}",
+  "status.agent.commandFinished": "Comando completato · uscita {code}",
 } as const satisfies PartialTranslation<typeof source>;

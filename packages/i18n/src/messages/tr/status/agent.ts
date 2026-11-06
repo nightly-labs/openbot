@@ -63,4 +63,7 @@ export const messages = {
   "status.agent.nextStepContinues": "Ajan bir sonraki adımdan önce durdu. Devam ediyor ({current}/{limit}).",
   "status.agent.planContinues": "Planda açık adımlar var. Ajan devam ediyor ({current}/{limit}).",
   "status.agent.branchTitle": "Dallandırılmış sohbet",
+  "status.agent.toolStepFailedWithExit":
+    "Bir araç adımı başarısız oldu; sonucu inceliyor ve sırada neyi deneyeceğine karar veriyor… · çıkış kodu {code}",
+  "status.agent.commandFinished": "Komut tamamlandı · çıkış kodu {code}",
 } as const satisfies PartialTranslation<typeof source>;

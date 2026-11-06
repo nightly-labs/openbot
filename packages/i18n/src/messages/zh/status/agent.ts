@@ -91,4 +91,6 @@ export const messages = {
   "status.agent.nextStepContinues": "助手在下一步之前停下了。继续工作（{current}/{limit}）。",
   "status.agent.planContinues": "计划还有未完成的步骤。助手继续工作（{current}/{limit}）。",
   "status.agent.branchTitle": "分支聊天",
+  "status.agent.toolStepFailedWithExit": "工具步骤失败；正在查看结果并决定下一步… · 退出码 {code}",
+  "status.agent.commandFinished": "命令完成 · 退出码 {code}",
 } as const satisfies PartialTranslation<typeof source>;
