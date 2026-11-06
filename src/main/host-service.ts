@@ -959,7 +959,13 @@ export class HostService extends EventEmitter<HostEvents> {
 
   /** `automatic` is a publish with no user action: at launch, after sign-in, or a retry after a failure. */
   readonly start = Effect.fn("HostService.start")(function* (this: HostService, automatic = false) {
-    if (this.#startOperation) return yield* Fiber.join(this.#startOperation);
+    if (this.#startOperation) {
+      const joined = yield* Fiber.join(this.#startOperation);
+      // A publish by the user that joins an automatic start does not take its removal refusal (#5273).
+      if (automatic || joined.message !== sourceText("status.host.removed")) return joined;
+      // Another publish by the user can have started again first.
+      if (this.#startOperation) return yield* Fiber.join(this.#startOperation);
+    }
     const operation = yield* Effect.forkIn(this.#provide(this.#startRuntimeOperation(automatic)), this.#runtime.scope, {
       startImmediately: false,
     });
@@ -1058,8 +1064,11 @@ export class HostService extends EventEmitter<HostEvents> {
       // The owner removed this host on another device. It stays private, as after Stop, until the user
       // publishes it again here (#5273).
       if (automatic && isHostRemovedRefusal(error)) {
+        // A newer start or stop owns the status and the launch setting.
+        if (generation !== this.#runtimeGeneration) return this.getStatus();
         const serverId = this.#options.store.getIdentity()?.serverId;
         if (serverId) yield* this.#options.store.setEnabledOnLaunch(serverId, false);
+        if (generation !== this.#runtimeGeneration) return this.getStatus();
         this.#setStatus({
           phase: "idle",
           enabledOnLaunch: false,
