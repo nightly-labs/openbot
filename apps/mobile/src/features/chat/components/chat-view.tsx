@@ -623,6 +623,20 @@ export function ChatView({
     catchingUp,
   );
   const atLatest = motion.atLatest;
+  // When the connection is back, the latest page replaces the messages (a catch-up), and the list
+  // kept a stale anchor: it drew the rows out of view, and the chat stayed blank until the user
+  // opened it again. A shown chat takes its place at the latest message again after a catch-up,
+  // and when the history is back after it was gone.
+  const lastCatchingUp = useRef(catchingUp);
+  const lastReady = useRef(ready);
+  const { historyVisible, returnToLatest } = motion;
+  useEffect(() => {
+    const caughtUp = lastCatchingUp.current && !catchingUp;
+    const historyBack = !lastReady.current && ready;
+    lastCatchingUp.current = catchingUp;
+    lastReady.current = ready;
+    if ((caughtUp || historyBack) && historyVisible) returnToLatest();
+  }, [catchingUp, ready, historyVisible, returnToLatest]);
   // The end of a window around a searched message is not the latest message.
   const showLatest = () => {
     if (!detached || !showLatestMessages) {
