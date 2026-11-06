@@ -7,7 +7,8 @@
 // first, in the frozen `agent-tasks-v1` conversation shape, and `hasOlder` says if the thread has more
 // before them. `limit` (0 to 100) is a target, not a bound: the host sends whole turns, and adds turns
 // until the page has `limit` messages or the next turn does not fit. A page can thus have more or fewer
-// messages than `limit`, and never more than 100. The host can also send fewer so that the answer fits
+// messages than `limit`, and never more than 100. A turn of more than 100 messages is split over
+// pages. The host can also send fewer so that the answer fits
 // one WebRTC frame. A limit of 0 asks only for `hasOlder`. A message that the thread does not hold gives
 // no messages and `hasOlder: false`. A host that grants this also grants `agent-tasks-v1`. The host does not ask for a
 // role, as for `agent-tasks-v1` reads. A hidden agent, or an agent that the peer cannot see, is not

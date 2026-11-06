@@ -154,7 +154,7 @@ export interface ReadAgentTaskPageInput extends AgentTaskInput {
   beforeMessageId: string;
   /**
    * 0 to 100: a target. The page has whole turns, so it can have more or fewer messages, and never more
-   * than 100. With 0, the page has no messages and tells only whether the thread has older ones.
+   * than 100; a turn of more than 100 messages is split over pages. With 0, the page has no messages and tells only whether the thread has older ones.
    */
   limit: number;
 }

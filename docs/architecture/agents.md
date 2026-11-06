@@ -559,7 +559,7 @@ newest 100 messages of the thread. The optional `agent-thread-pages-v1` capabili
 `{agentId, taskId, beforeMessageId, limit}`. It answers `{conversation, hasOlder}`: the messages from before that message, oldest first, in the
 frozen `agent-tasks-v1` conversation shape. The page has whole turns: the host adds turns until it has
 `limit` (0 to 100) messages or the next turn does not fit, so it can have more or fewer than `limit`, and
-never more than 100. A limit of 0
+never more than 100. A turn of more than 100 messages is split over pages. A limit of 0
 asks only for `hasOlder`, and a message that the thread does not hold has none. The host makes a page smaller
 until it fits one WebRTC frame. A thread tab on desktop and the web asks once after its read, and shows "Load older
 messages" when the thread has more; a new conversation of the thread keeps the pages that it read
