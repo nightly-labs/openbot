@@ -43,6 +43,7 @@ export function useProviderModels(serverId: string, provider: AgentProviderId | 
     if (!models || !provider || saving.current) return;
     saving.current = true;
     const key = keys.current;
+    let failed = false;
     try {
       while (queued.current) {
         const { shown } = queued.current;
@@ -52,12 +53,13 @@ export function useProviderModels(serverId: string, provider: AgentProviderId | 
       }
     } catch (cause) {
       queued.current = null;
-      saving.current = false;
+      failed = true;
       setError(errorMessage(cause, t("mobile.server.providers.modelsFailed")));
-      // The page shows the change that failed; the host has the list that is true.
-      await queryClient.invalidateQueries({ queryKey: key, exact: true });
     } finally {
       saving.current = false;
+      // The page shows the change that failed; the host has the list that is true. The read starts
+      // after the flag is reset, so it asks the host and a new change can start its own save.
+      if (failed) void queryClient.invalidateQueries({ queryKey: key, exact: true });
       // The model pickers of this server read the list that the host now gives.
       void queryClient.invalidateQueries({ queryKey: queryKeys.agentModels(queryScope, serverId) });
     }
