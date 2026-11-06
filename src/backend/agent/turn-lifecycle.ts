@@ -882,10 +882,10 @@ export class TurnLifecycle {
         return;
       }
       case "openbot/context-compaction": {
-        if (!threadId || !agentId || this.#conversation.loadedClientFor(threadId) !== source) return;
+        if (!threadId || !agentId || this.#conversation.openClientFor(threadId) !== source) return;
         const status = getString(params, "status");
         if (status !== "running" && status !== "completed" && status !== "failed") return;
-        // Native Claude compaction does not report comparable full-context counts.
+        // Native compaction status does not report comparable full-context counts.
         this.#compaction.observeCompaction(threadId, status, "none");
         return;
       }

@@ -118,10 +118,15 @@ const answer = (message) => {
         write({ method: "turn/completed", params: { threadId: params.threadId, turn: { id: turnId, status: "completed" } } });
       };
       if (editMemory && !memoryWasEdited) {
+        const deadline = Date.now() + 10_000;
         const timer = setInterval(() => {
-          if (!fs.existsSync(memorySaved)) return;
-          clearInterval(timer);
-          finish();
+          if (fs.existsSync(memorySaved)) {
+            clearInterval(timer);
+            finish();
+          } else if (Date.now() >= deadline) {
+            clearInterval(timer);
+            log({ fixtureError: "Fake Codex timed out waiting for the test to save agent memory." });
+          }
         }, 20);
       } else setTimeout(finish, 50);
       return;
@@ -187,6 +192,7 @@ interface ProtocolEntry {
   turnId: string | null;
   refused: string | null;
   compactionEnded: string | null;
+  fixtureError: string | null;
   status: string | null;
   usageOnStop: number | null;
 }
@@ -252,6 +258,7 @@ function protocolEntry(value: unknown): ProtocolEntry {
     turnId: getString(params, "turnId"),
     refused: getString(entry, "refused"),
     compactionEnded: getString(entry, "compactionEnded"),
+    fixtureError: getString(entry, "fixtureError"),
     status: getString(entry, "status"),
     usageOnStop: typeof entry.usageOnStop === "number" ? entry.usageOnStop : null,
   };
@@ -341,7 +348,10 @@ try {
     }
     const threadId = await waitFor("the first turn to end", () => {
       const session = store.activeProviderSession(agent.id)?.externalSessionId;
-      const started = protocol().some((line) => line.method === "turn/start" && line.threadId === session);
+      const entries = protocol();
+      const fixtureError = entries.find((line) => line.fixtureError)?.fixtureError;
+      if (fixtureError) throw new Error(fixtureError);
+      const started = entries.some((line) => line.method === "turn/start" && line.threadId === session);
       const busy = agents
         .listQueue(agent.id)
         .deliveries.some((delivery) => ["queued", "starting", "running"].includes(delivery.status));
