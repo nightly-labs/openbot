@@ -355,6 +355,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const [serverDirectoryError, setServerDirectoryError] = useState<string | null>(null);
   const serversRef = useRef(servers);
   serversRef.current = servers;
+  /** One timer for each server whose first attempt runs in the foreground: it ends the first connection state. */
+  const firstConnectionTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const [sidebarByServer, setSidebarByServer] = useState<
     Record<string, { layout: SidebarLayoutSnapshot | null; error: string | null }>
   >({});
@@ -537,6 +539,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       const removedAgentIds = new Set<string>();
       for (const serverId of serverIds) {
         removedServers.current.add(serverId);
+        clearTimeout(firstConnectionTimers.current.get(serverId));
+        firstConnectionTimers.current.delete(serverId);
         deleteServerAvatars(serverId);
         connectionWaits.drop(serverId, new Error(currentText().t("mobile.workspace.error.transportNotReady")));
         readRefresh.invalidate(serverId);
@@ -1297,16 +1301,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   }, []);
   const wakeReconnect = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(wakeReconnect.current), []);
-  /** One timer for each server whose attempt runs: it ends the first connection state. */
-  const firstConnectionTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
-  useEffect(() => {
-    const timers = firstConnectionTimers.current;
-    return () => {
-      for (const timer of timers.values()) clearTimeout(timer);
-    };
-  }, []);
   const limitFirstConnection = useCallback((hostId: string) => {
-    if (firstConnectionTimers.current.has(hostId)) return;
+    if (
+      !foregroundRef.current ||
+      firstConnectionTimers.current.has(hostId) ||
+      !serversRef.current.some((server) => server.id === hostId && server.initialConnectionPending)
+    )
+      return;
     firstConnectionTimers.current.set(
       hostId,
       setTimeout(() => {
@@ -1323,6 +1324,20 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       }, FIRST_CONNECTION_WAIT_MS),
     );
   }, []);
+  // The wait counts only time in the foreground. On a return, an attempt from the last visit can
+  // continue with no new status, so the wait starts again for each server that still connects.
+  useEffect(() => {
+    const timers = firstConnectionTimers.current;
+    if (foreground) {
+      for (const server of serversRef.current) {
+        if (server.state === "connecting") limitFirstConnection(server.id);
+      }
+    }
+    return () => {
+      for (const timer of timers.values()) clearTimeout(timer);
+      timers.clear();
+    };
+  }, [foreground, limitFirstConnection]);
   /** The account server says that the hosted server starts, so the app connects to it again soon. */
   const hostedServerStarting = useCallback((hostId: string) => {
     clearTimeout(wakeReconnect.current);
@@ -1346,7 +1361,6 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const handleConnectionStatus = useCallback(
     (hostId: string, status: RemoteRecoveryStatus, failure: RemoteConnectionFailure | null, resuming: boolean) => {
       recoveryCountdowns.publish(hostId, { status, message: remoteRecoveryMessage(status, failure?.message ?? null) });
-      // An attempt starts only in the foreground, so the wait counts time that the user waits.
       if (status.phase === "connecting") limitFirstConnection(hostId);
       setServers((current) => {
         const index = current.findIndex((server) => server.id === hostId);

@@ -13,6 +13,7 @@ import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-
 import { createOpenBotLogger } from "@openbot/logging";
 import { connectToDevApp } from "./dev-automation/cdp-client";
 import { type DevInstanceRecord, readDevInstanceRecords, selectDevInstance } from "./dev-automation/instance-registry";
+import { isSameWorktree } from "./dev-automation/stack-registry";
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const MOBILE_BUNDLE_ID = "run.openbot.mobile";
@@ -153,7 +154,7 @@ function findWorktreeDesktop(): DevInstanceRecord | null {
   const selection = selectDevInstance(readDevInstanceRecords(), { projectRoot, service: "app" });
   // Apps of other worktrees are also "ambiguous" when this worktree runs none. Only extra apps of
   // this worktree stop the start.
-  if (selection.kind === "ambiguous" && selection.candidates.some((record) => record.projectRoot === projectRoot)) {
+  if (selection.kind === "ambiguous" && selection.candidates.some((record) => isSameWorktree(record, projectRoot))) {
     throw new Error("This worktree runs more than one dev app. Stop the extra one with `bun run dev:stop`.");
   }
   return selection.kind === "selected" && selection.match === "worktree" ? selection.record : null;
