@@ -1,0 +1,268 @@
+name: Fork macOS release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions: {}
+
+concurrency:
+  group: fork-macos-release
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  validate:
+    name: Validate fork release
+    if: github.repository == 'its-bash33r-here/openbot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      release_version: ${{ steps.release.outputs.version }}
+      release_tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require release commit on main
+        shell: bash
+        run: |
+          git fetch origin main --no-tags
+          release_commit="$(git rev-list -n 1 "$GITHUB_REF_NAME")"
+          if ! git merge-base --is-ancestor "$release_commit" origin/main; then
+            echo "Release tag $GITHUB_REF_NAME does not point to a commit on fork main." >&2
+            exit 1
+          fi
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: none
+
+      - name: Validate release version and notes
+        id: release
+        shell: bash
+        run: |
+          package_version="$(bun -p 'require("./package.json").version')"
+          tag_version="${GITHUB_REF_NAME#v}"
+          if [[ "$package_version" != "$tag_version" ]]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $package_version." >&2
+            exit 1
+          fi
+          bun scripts/check-release-notes.ts
+          echo "version=$package_version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$package_version" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build and sign macOS ARM64
+    needs: validate
+    runs-on: macos-15
+    timeout-minutes: 120
+    environment: fork-release
+    permissions:
+      contents: read
+    env:
+      RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: none
+
+      - name: Require fork signing and notarization secrets
+        shell: bash
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: |
+          missing=()
+          for name in APPLE_TEAM_ID APPLE_ID APPLE_APP_SPECIFIC_PASSWORD CSC_LINK CSC_KEY_PASSWORD; do
+            if [[ -z "${!name}" ]]; then missing+=("$name"); fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            echo "Missing release environment secrets: ${missing[*]}" >&2
+            exit 1
+          fi
+          if [[ "$APPLE_TEAM_ID" != "QC5HNMH72Y" ]]; then
+            echo "APPLE_TEAM_ID must match the signing identity used by the installed fork app." >&2
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check desktop and account service
+        run: |
+          bun run check:desktop
+          bun run test:desktop -- --maxWorkers=2
+          NODE_OPTIONS=--max-old-space-size=4096 bun run check:api
+
+      - name: Prepare packaged runtimes
+        run: |
+          bun run voice:prepare-runtime
+          bun run prepare:remote-desktop-runtime
+          bun run verify:remote-desktop-runtime
+          bun run prepare:cua-driver
+          bun run build
+
+      - name: Build, sign, and notarize fork update artifacts
+        shell: bash
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: |
+          log="$RUNNER_TEMP/electron-builder-mac.log"
+          for attempt in 1 2 3; do
+            if bun x electron-builder --mac --arm64 --publish never 2>&1 | tee "$log"; then
+              exit 0
+            fi
+            if grep -Eq 'hdiutil: create failed - (Device not configured|Resource busy)' "$log"; then
+              echo "::warning::hdiutil could not create the DMG (attempt $attempt of 3)."
+              hdiutil info || true
+            elif grep -Eq 'The network connection was lost|getaddrinfo ENOTFOUND' "$log"; then
+              echo "::warning::A network connection failed during the build (attempt $attempt of 3)."
+            else
+              exit 1
+            fi
+          done
+          exit 1
+
+      - name: Verify the packaged application
+        run: bun run verify:package
+
+      - name: Verify signature, fork entitlements, and notarization
+        shell: bash
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          app_path="dist/mac-arm64/OpenBot.app"
+          test -d "$app_path"
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+          codesign -d --verbose=4 "$app_path" 2>&1 | grep -Fx "TeamIdentifier=$APPLE_TEAM_ID"
+          plutil -extract ElectronTeamID raw "$app_path/Contents/Info.plist" | grep -Fx "$APPLE_TEAM_ID"
+          codesign -d --entitlements :- "$app_path" > "$RUNNER_TEMP/fork-entitlements.plist"
+          plutil -lint "$RUNNER_TEMP/fork-entitlements.plist"
+          if /usr/libexec/PlistBuddy -c 'Print :com.apple.developer.associated-domains' \
+            "$RUNNER_TEMP/fork-entitlements.plist" >/dev/null 2>&1; then
+            echo "The fork must not claim upstream openbot.run links." >&2
+            exit 1
+          fi
+          test ! -e "$app_path/Contents/embedded.provisionprofile"
+          for path in \
+            "$app_path/Contents/Resources/remote-desktop-runtime/darwin/arm64/Sunshine.app" \
+            "$app_path/Contents/Resources/remote-desktop-runtime/darwin/arm64/web-server" \
+            "$app_path/Contents/Resources/remote-desktop-runtime/darwin/arm64/streamer"; do
+            codesign --verify --deep --strict --verbose=2 "$path"
+          done
+          spctl --assess --type execute --verbose=2 "$app_path"
+          for attempt in 1 2 3 4 5; do
+            xcrun stapler validate "$app_path" && break
+            if (( attempt == 5 )); then exit 1; fi
+            echo "::warning::stapler could not validate the ticket (attempt $attempt of 5)."
+            sleep 30
+          done
+
+      - name: Verify update artifacts and generate checksums
+        shell: bash
+        run: |
+          shopt -s nullglob
+          dmgs=(dist/*.dmg)
+          zips=(dist/*.zip)
+          manifests=(dist/latest-mac.yml)
+          if (( ${#dmgs[@]} != 1 || ${#zips[@]} != 1 || ${#manifests[@]} != 1 )); then
+            echo "Expected one DMG, one ZIP, and latest-mac.yml." >&2
+            find dist -maxdepth 1 -type f -print
+            exit 1
+          fi
+          grep -F "version: $RELEASE_VERSION" dist/latest-mac.yml
+          grep -F '.zip' dist/latest-mac.yml
+          bun run verify:update-artifacts macos
+          cd dist
+          shasum -a 256 "OpenBot-$RELEASE_VERSION-arm64.dmg" "OpenBot-$RELEASE_VERSION-arm64.zip" \
+            > SHA256SUMS-macos.txt
+
+      - name: Upload fork release artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fork-release-macos
+          path: |
+            dist/OpenBot-*.dmg
+            dist/OpenBot-*.zip
+            dist/latest-mac.yml
+            dist/*.blockmap
+            dist/SHA256SUMS-macos.txt
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish fork macOS update
+    needs: [validate, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}
+      RELEASE_TAG: ${{ needs.validate.outputs.release_tag }}
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: none
+
+      - name: Download signed macOS assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: fork-release-macos
+          path: release-assets
+
+      - name: Create or update the GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          awk -v heading="## [$RELEASE_VERSION] -" '
+            index($0, heading) == 1 { reading = 1; next }
+            reading && /^## / { exit }
+            reading { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
+          test -s "$RUNNER_TEMP/release-notes.md"
+          shopt -s nullglob
+          artifacts=(release-assets/*)
+          if (( ${#artifacts[@]} < 5 )); then
+            echo "The signed release assets are incomplete." >&2
+            exit 1
+          fi
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "${artifacts[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit "$RELEASE_TAG" --title "OpenBot $RELEASE_TAG" \
+              --notes-file "$RUNNER_TEMP/release-notes.md" --latest --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$RELEASE_TAG" "${artifacts[@]}" \
+              --notes-file "$RUNNER_TEMP/release-notes.md" --latest \
+              --repo "$GITHUB_REPOSITORY" --title "OpenBot $RELEASE_TAG"
+          fi

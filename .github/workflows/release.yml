@@ -1,5 +1,8 @@
 name: Release desktop
 
+# This is the canonical project's multi-platform release workflow. The fork uses
+# fork-macos-release.yml so a fork tag cannot reach upstream services or announcements.
+
 on:
   push:
     tags:
@@ -38,7 +41,7 @@ jobs:
     name: Validate release tag
     # Gating the one job every build and the publish depend on keeps a host signing run off the
     # release path entirely, rather than relying on each of them to opt out.
-    if: github.event_name == 'push' || inputs.mode == 'dry-run'
+    if: github.repository == 'nightly-labs/openbot' && (github.event_name == 'push' || inputs.mode == 'dry-run')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -83,7 +86,7 @@ jobs:
             exit 1
           fi
           bun scripts/check-release-notes.ts
-          # Fork releases publish only the desktop package and do not announce on Discord.
+          # The fork uses its own macOS workflow and has no Discord announcement step.
           if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REPOSITORY" == "nightly-labs/openbot" && -z "$DISCORD_RELEASE_ROLE_ID" ]]; then
             echo "DISCORD_RELEASE_ROLE_ID is not set. See docs/RELEASING.md#discord-announcement." >&2
             exit 1
@@ -116,7 +119,7 @@ jobs:
 
   host-signing:
     name: Check Host signing keychain
-    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'host-signing'
+    if: github.repository == 'nightly-labs/openbot' && github.event_name == 'workflow_dispatch' && inputs.mode == 'host-signing'
     runs-on: macos-15
     timeout-minutes: 20
     environment: release
@@ -179,7 +182,7 @@ jobs:
 
   windows-signing:
     name: Check Windows Artifact Signing
-    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'windows-signing'
+    if: github.repository == 'nightly-labs/openbot' && github.event_name == 'workflow_dispatch' && inputs.mode == 'windows-signing'
     runs-on: windows-2025
     timeout-minutes: 45
     environment: release

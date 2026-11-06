@@ -133,7 +133,7 @@ expectEqual(plist.CFBundleIdentifier, "app.openbot.desktop", "bundle identifier"
 expectEqual(plist.CFBundleIconFile, "icon.icns", "application icon");
 expectEqual(plist.CFBundleIconName, "Icon", "macOS 26 application icon");
 expectEqual(plist.LSMinimumSystemVersion, "13.0", "minimum macOS version");
-expectEqual(plist.ElectronTeamID, "ZTRDTUL87R", "Apple Team ID");
+expectEqual(plist.ElectronTeamID, "QC5HNMH72Y", "Apple Team ID");
 if (!Array.isArray(plist.NSUserActivityTypes) || !plist.NSUserActivityTypes.includes("NSUserActivityTypeBrowsingWeb")) {
   throw new Error("The Universal Links activity type is missing.");
 }

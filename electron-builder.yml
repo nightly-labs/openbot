@@ -1,5 +1,8 @@
 appId: app.openbot.desktop
 productName: OpenBot
+# Keep the fork updater cache separate from the upstream OpenBot profile.
+extraMetadata:
+  name: openbot-fork
 copyright: Copyright © 2026 Synthetify Labs spółka z ograniczoną odpowiedzialnością
 protocols:
   - name: OpenBot invitations
@@ -20,7 +23,7 @@ electronFuses:
   grantFileProtocolExtraPrivileges: false
 publish:
   provider: github
-  owner: nightly-labs
+  owner: its-bash33r-here
   repo: openbot
 files:
   - out/**/*
@@ -131,12 +134,12 @@ mac:
   # Developer ID signature is kept. Notarization accepts a nested binary signed by another team.
   signIgnore:
     - Contents/Resources/cua-driver/
-  entitlements: build/entitlements.mac.plist
+  entitlements: build/entitlements.mac.fork.plist
   entitlementsInherit: build/entitlements.mac.inherit.plist
   darkModeSupport: true
   extendInfo:
     CFBundleIconName: Icon
-    ElectronTeamID: ZTRDTUL87R
+    ElectronTeamID: QC5HNMH72Y
     NSMicrophoneUsageDescription: OpenBot uses the microphone to transcribe voice prompts locally on this Mac.
     # Computer Use runs the driver as a child process, so macOS asks for both grants in OpenBot's
     # name and shows these sentences. Under the hardened runtime, macOS shows the Automation prompt
