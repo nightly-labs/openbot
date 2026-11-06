@@ -166,8 +166,8 @@ const findLeftProcesses = Effect.fn("BackgroundProcesses.find")(function* (
     candidates.map((row) => row.pid),
   );
   // macOS hides the environment of Apple system programs, such as `/bin/sleep` and `/usr/bin/curl`.
-  // Such a program is still left by an agent when it runs in that agent's workspace: another user
-  // cannot put a process there.
+  // Candidates are already limited to this user, so a workspace cwd is enough to attribute a
+  // program that has no marker to that workspace's agent.
   const unmarked = candidates.filter((row) => !marked.has(row.pid));
   const workspaces = platform === "darwin" && unmarked.length > 0 ? yield* resolveWorkspaces(agents) : [];
   const cwds =
