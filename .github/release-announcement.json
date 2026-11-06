@@ -1,10 +1,10 @@
 {
-  "version": "0.62.0",
+  "version": "0.63.0",
   "highlights": [
-    "Give each browser profile its own proxy, or send its pages out through your own computer.",
-    "Connect Proton Pass in the Marketplace, and the browser fills the logins of its shared vault.",
-    "Type @ in a chat to give the agent one of its browser tabs or side threads.",
-    "Settings → Voice has two new local dictation models: Parakeet Unified EN and Cohere Transcribe.",
-    "Routines run in the agent's chat again. A new switch keeps a routine in its own thread."
+    "Claude stays signed in after a restart or an update, and Claude agents use less of the 5-hour usage window.",
+    "Choose when the plan card starts a long task by itself, or let it start only when you press Start.",
+    "Choose the provider account when you create an agent.",
+    "The Usage page shows how often your agents load each skill and what it costs.",
+    "Connect Higgsfield in the Marketplace to make images, videos and audio."
   ]
 }
