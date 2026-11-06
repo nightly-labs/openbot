@@ -526,7 +526,10 @@ function ProviderPage(props: PageProps) {
     Boolean(props.onSignInProvider) &&
     (props.option.id === "opencode" || props.option.id === "muse" || row.apiKeyOffered());
   // The source can arrive after the page opens, such as when the host's capabilities load.
-  const models = createMemo(() => props.modelVisibility?.(props.option.id));
+  // Each status makes a new option, so the section keeps its list until the provider or the source changes.
+  const provider = createMemo(() => props.option.id);
+  const modelVisibility = createMemo(() => props.modelVisibility);
+  const models = createMemo(() => modelVisibility()?.(provider()));
   return (
     <>
       <DetailHeader
