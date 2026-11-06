@@ -15,6 +15,8 @@ afterEach(() => {
 const PROFILE = "a".repeat(32);
 const PROXY = "b".repeat(32);
 const PROXY_TABLES = { browser_profile_proxies: [], browser_proxies: [] };
+// Migration 58 runs after 56 and adds this empty table.
+const LATER_TABLES = { agent_usage_skill_loads: [] };
 
 function databaseAt(version: number): DatabaseSync {
   const db = new DatabaseSync(":memory:");
@@ -59,7 +61,7 @@ function proxyTables(db: DatabaseSync) {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 57 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 58 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -105,7 +107,7 @@ describe("browser proxy migration", () => {
       if (version < 55) migrateUpTo(db, 55);
       const before = contents(db);
       migrateOpenBotDatabase(db);
-      expect(contents(db)).toEqual({ ...before, ...PROXY_TABLES });
+      expect(contents(db)).toEqual({ ...before, ...PROXY_TABLES, ...LATER_TABLES });
       expectHealthy(db);
     },
   );
@@ -123,7 +125,7 @@ describe("browser proxy migration", () => {
     expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
     db.exec("DROP TRIGGER fail_marker");
     migrateOpenBotDatabase(db);
-    expect(contents(db)).toEqual({ ...before, ...PROXY_TABLES });
+    expect(contents(db)).toEqual({ ...before, ...PROXY_TABLES, ...LATER_TABLES });
     expectHealthy(db);
   });
 
@@ -131,9 +133,9 @@ describe("browser proxy migration", () => {
     const db = databaseAt(55);
     seed(db, 55);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(58,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(59,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=58; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=59; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(proxyTables(db)).toEqual([]);

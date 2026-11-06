@@ -302,8 +302,9 @@ export function decodeAgentAnalyticsFromHost(value: unknown) {
   return decodeAgentAnalytics(value);
 }
 
+/** A remote report has no skills: the frozen wire has no such field, so one that a host sends is not read. */
 export function decodeHostAnalyticsFromHost(value: unknown) {
-  return decodeHostAnalytics(value);
+  return decodeHostAnalytics(isDynamicRecord(value) ? { ...value, skills: undefined } : value);
 }
 
 export function decodeAgentSessionSettingsFromHost(value: unknown): AgentSessionSettings {

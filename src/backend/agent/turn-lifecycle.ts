@@ -65,6 +65,7 @@ import {
 } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
 import { isNoUpdateAnswer, settleQuietRoutineTurn } from "./routine-quiet-runs";
+import { type SkillLoad, skillLoads, skillLoadTokens } from "./skill-loads";
 import {
   foldCodexChildItem,
   foldCodexSubagentItem,
@@ -608,15 +609,21 @@ export class TurnLifecycle {
 
   /** Shows a provider error that was held for a failover that did not happen, as it shows with no backup. */
   #showFailoverError(agentId: string, threadId: string, failover: HeldProviderError): void {
-    if (failover.quiet) {
-      this.#hooks.emitFailure?.({ code: "agent_error", agentId, ...failover.context });
+    const taskId = this.#taskForThread(agentId, threadId);
+    if (taskId === null && !failover.quiet) {
+      this.#hooks.emitError("agent_error", failover.message, agentId, failover.context);
       return;
     }
-    const taskId = this.#taskForThread(agentId, threadId);
-    if (taskId !== null) {
-      this.#hooks.emitFailure?.({ code: "agent_error", agentId, ...failover.context });
-      this.#hooks.taskFailed(taskId, failover.message);
-    } else this.#hooks.emitError("agent_error", failover.message, agentId, failover.context);
+    this.#hooks.emitFailure?.({ code: "agent_error", agentId, ...failover.context });
+    // A thread shows no usage notice, so its failed turn keeps the provider's text (#5220).
+    if (taskId !== null) this.#hooks.taskFailed(taskId, failover.message);
+  }
+
+  /** Passes over the model that a held provider error failed. A spent balance names no reset (#5220). */
+  #markFailed(agentId: string, model: string | null, failover: HeldProviderError): void {
+    const resetDelayMs = providerResetDelayMs(failover.message);
+    const spent = failover.quiet === true && resetDelayMs === null && isBalanceDiagnostic(failover.message);
+    this.#usageLimits.failed(agentId, model, resetDelayMs, spent);
   }
 
   readonly handleNotification = Effect.fn("TurnLifecycle.handleNotification")(function* (
@@ -634,20 +641,10 @@ export class TurnLifecycle {
       agentId &&
       ["turn/started", "thread/tokenUsage/updated", "openbot/usage", "model/rerouted"].includes(notification.method)
     ) {
-      const agent = this.#store.list().find((entry) => entry.id === agentId);
-      // A task or other side thread keeps its provider sessions under its own thread, not the agent's.
-      // A routine run's own session is not saved, so its usage has its own session id.
-      const session = agent
-        ? (this.#store.database
-            .listProviderSessions(this.#conversation.publicThreadId(agentId, threadId))
-            .find((entry) => entry.externalSessionId === threadId && entry.provider === source.provider) ??
-          (this.#conversation.isRoutineSession(threadId)
-            ? { id: `routine:${threadId}`, provider: source.provider, createdAt: new Date().toISOString() }
-            : undefined))
-        : undefined;
-      if (agent && session) {
+      const usage = this.#usageSession(agentId, threadId, source);
+      if (usage) {
         try {
-          collectProviderUsage(this.#store.database.usage, agent, session, notification.method, params);
+          collectProviderUsage(this.#store.database.usage, usage.agent, usage.session, notification.method, params);
         } catch {
           this.#hooks.emitError("usage_collection_failed", new Error("Usage data could not be saved."), agentId);
         }
@@ -741,6 +738,17 @@ export class TurnLifecycle {
         }
         if (notification.method === "item/completed" && itemId) {
           this.#deltas.flush(`${threadId}:${turnId}:${itemId}`);
+          const loads = skillLoads(item, getArray(params, "filePaths"));
+          if (loads.length > 0)
+            yield* this.#recordSkillLoads(
+              agentId,
+              threadId,
+              turnId,
+              itemId,
+              getString(item, "cwd"),
+              loads,
+              source,
+            ).pipe(Effect.forkIn(this.#scope, { startImmediately: true }));
         }
         if (item.type === "collabAgentToolCall") this.#applyCodexSubagents(agentId, threadId, turnId, item);
         const threadItem = toThreadItem(item);
@@ -987,6 +995,14 @@ export class TurnLifecycle {
             return;
           }
           this.#hooks.emitFailure?.({ code: "agent_error", ...(agentId !== undefined ? { agentId } : {}), ...context });
+          // A thread shows no usage notice, so its failed turn keeps the provider's text (#5220). A turn
+          // that a plan limit holds waits in the queue for the reset, so it has not failed.
+          const held = planLimit || (errorTurnId !== null && this.#limitedTurns.has(errorTurnId));
+          const taskId =
+            !held && notification.method === "error" && agentId && threadId
+              ? this.#taskForThread(agentId, threadId)
+              : null;
+          if (taskId !== null) this.#hooks.taskFailed(taskId, message);
           return;
         }
         const context = {
@@ -1277,10 +1293,13 @@ export class TurnLifecycle {
           this.#failoverRetries.set(delivery.id, failed.add(failedKey));
         }
         yield* this.#requeueTurn(agentId, threadId, turnId, snapshot, deliveries);
-        this.#usageLimits.failed(agentId, model, providerResetDelayMs(failover.message));
+        this.#markFailed(agentId, model, failover);
         this.#hooks.scheduleDrain(agentId);
         return;
       }
+      // A thread turn does not run again, but the agent leaves the failing model before its next turn (#5220).
+      if (failover && mayRunAgain && taskTurn && failedKey !== null && this.#hooks.mayFailOver(agentId))
+        this.#markFailed(agentId, model, failover);
       // The turn did work, or nothing waits to run again: the error shows as it does with no backup.
       if (failover) this.#showFailoverError(agentId, threadId, failover);
       if (limited) yield* this.#usageLimits.reached(agentId, resetsAt, model);
@@ -1760,6 +1779,69 @@ export class TurnLifecycle {
     this.#mailboxSync.emitQueue(recipientAgentId);
     this.#hooks.scheduleDrain(recipientAgentId);
   }, Effect.uninterruptible);
+
+  /** The agent and provider session that own the usage of a provider thread. */
+  #usageSession(agentId: string, threadId: string, source: AgentClient) {
+    const agent = this.#store.list().find((entry) => entry.id === agentId);
+    if (!agent) return undefined;
+    // A task or other side thread keeps its provider sessions under its own thread, not the agent's.
+    // A routine run's own session is not saved, so its usage has its own session id.
+    const session =
+      this.#store.database
+        .listProviderSessions(this.#conversation.publicThreadId(agentId, threadId))
+        .find((entry) => entry.externalSessionId === threadId && entry.provider === source.provider) ??
+      (this.#conversation.isRoutineSession(threadId)
+        ? { id: `routine:${threadId}`, provider: source.provider, createdAt: new Date().toISOString() }
+        : undefined);
+    return session ? { agent, session } : undefined;
+  }
+
+  /** Saves the skills that a finished tool step loaded, with the estimated tokens of each skill file. */
+  readonly #recordSkillLoads = Effect.fn("TurnLifecycle.recordSkillLoads")(function* (
+    this: TurnLifecycle,
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    itemId: string,
+    cwd: string | null,
+    loads: readonly SkillLoad[],
+    source: AgentClient,
+  ) {
+    const found = this.#usageSession(agentId, threadId, source);
+    if (!found) return;
+    const sizes: (number | null)[] = [];
+    for (const load of loads)
+      sizes.push(
+        yield* skillLoadTokens(load, {
+          cwd,
+          workspace: found.agent.workspacePath ?? null,
+          provider: found.session.provider,
+        }),
+      );
+    // The file reads wait, so the agent can be gone now. Find it again and save all loads at once.
+    const owner = this.#usageSession(agentId, threadId, source);
+    if (!owner) return;
+    const { agent, session } = owner;
+    const usage = this.#store.database.usage;
+    const model = usage.turnModel(agent.id, session.id, turnId) ?? agent.model;
+    const occurredAt = new Date().toISOString();
+    try {
+      for (const [index, load] of loads.entries())
+        usage.recordSkillLoad({
+          agentId: agent.id,
+          sessionId: session.id,
+          turnId,
+          itemId,
+          provider: session.provider,
+          model,
+          skill: load.skill,
+          tokens: sizes[index] ?? null,
+          occurredAt,
+        });
+    } catch {
+      this.#hooks.emitError("usage_collection_failed", new Error("Usage data could not be saved."), agentId);
+    }
+  });
 
   readonly #applyItem = Effect.fn("TurnLifecycle.applyItem")(function* (
     this: TurnLifecycle,

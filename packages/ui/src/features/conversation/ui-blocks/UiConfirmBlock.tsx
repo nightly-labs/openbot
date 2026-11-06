@@ -100,6 +100,14 @@ function UiConfirmPreview(props: { children: JSX.Element }) {
   );
 }
 
+/** A countdown of a minute or more, as m:ss or h:mm:ss. */
+function countdownClock(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = String(totalSeconds % 60).padStart(2, "0");
+  return hours > 0 ? `${hours}:${String(minutes).padStart(2, "0")}:${seconds}` : `${minutes}:${seconds}`;
+}
+
 export function UiConfirmBlock(props: UiConfirmBlockProps) {
   const { t } = useText();
   const hintId = createUniqueId();
@@ -127,10 +135,14 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
     const at = autoAnswer()?.at;
     return at ? Math.max(0, Math.ceil((Date.parse(at) - now()) / 1_000)) : 0;
   };
-  const actionLabel = (action: UiAction) =>
-    autoAnswer()?.actionId === action.id && secondsLeft() > 0
-      ? t("uiBlock.confirm.autoActionLabel", { action: action.label, seconds: secondsLeft() })
-      : action.label;
+  const actionLabel = (action: UiAction) => {
+    const left = secondsLeft();
+    if (autoAnswer()?.actionId !== action.id || left <= 0) return action.label;
+    // The wait can be minutes or hours long.
+    return left < 60
+      ? t("uiBlock.confirm.autoActionLabel", { action: action.label, seconds: left })
+      : t("uiBlock.confirm.autoActionClock", { action: action.label, time: countdownClock(left) });
+  };
   const outcome = () =>
     autoAnswer()?.done && state().outcome
       ? t("uiBlock.outcome.autoAnswered", { outcome: state().outcome ?? "" })

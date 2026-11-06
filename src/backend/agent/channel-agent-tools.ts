@@ -13,11 +13,11 @@ import { z } from "zod";
 import type { ChannelService } from "../channel-service";
 import type { DynamicToolCallParams } from "../protocol";
 import { loadAvatarFile } from "./avatar-file";
-import { type OpenBotToolResponse, openBotToolResult } from "./routine-tools";
+import { openBotToolResult } from "./routine-tools";
 import { toolCallIdempotencyKey } from "./tool-call-idempotency";
 import { ToolOperationFailed, toToolOperationFailed } from "./tool-operation";
 
-/** The tools an agent creates and changes channels with from its own chat. */
+/** The tools an agent creates and changes channels with, from its own chat or a channel task that a person started. */
 export const CHANNEL_AGENT_TOOL_NAMES: ReadonlySet<string> = new Set(["create_channel", "update_channel"]);
 
 const agentId = z.string().trim().min(1).max(INPUT_LIMITS.identifier);
@@ -103,6 +103,8 @@ type CreateChannelArgs = z.infer<typeof createChannelToolSchema>;
 type UpdateChannelArgs = z.infer<typeof updateChannelToolSchema>;
 
 const UNKNOWN_CHANNEL = "No channel has that channelId. Call openbot.list_channels.";
+const OWN_CHANNEL_IN_TASK =
+  "update_channel does not change the channel of your current task. For this channel, use channel_add_member, channel_remove_member and channel_set_instructions.";
 
 /** An agent that a channel can take: one that exists and that the user has not hidden. */
 function requireAvailable(agents: readonly AgentSummary[], id: string): AgentSummary {
@@ -205,6 +207,11 @@ function channelResult(channel: Channel, agents: readonly AgentSummary[]) {
 export interface ChannelAgentToolDependencies {
   channels: ChannelService;
   listAgents(): AgentSummary[];
+  /**
+   * The channel of the channel task that makes the call, if any. `update_channel` does not change it:
+   * the channel tools change it, write the change note, and do not stop the work of the caller.
+   */
+  taskChannelId?: string | null;
 }
 
 /**
@@ -217,7 +224,7 @@ export const handleChannelAgentTool = Effect.fn("ChannelAgentTool.handle")(funct
   senderAgentId: string,
   dependencies: ChannelAgentToolDependencies,
 ) {
-  const { channels, listAgents } = dependencies;
+  const { channels, listAgents, taskChannelId } = dependencies;
   // The drafts read the agents again at their turn in the queue. The sender and the member names
   // of the result come from this one read.
   const agents = listAgents();
@@ -255,6 +262,7 @@ export const handleChannelAgentTool = Effect.fn("ChannelAgentTool.handle")(funct
 
   const args = updateChannelToolSchema.parse(params.arguments, { reportInput: true });
   const { channelId, archived, imagePath, ...draftChange } = args;
+  if (channelId === taskChannelId) throw new Error(OWN_CHANNEL_IN_TASK);
   const image = yield* picture(imagePath);
   if (!channels.store.exists(channelId)) throw new Error(UNKNOWN_CHANNEL);
   const actor = channels.agentActor(senderAgentId);
@@ -280,15 +288,6 @@ export const handleChannelAgentTool = Effect.fn("ChannelAgentTool.handle")(funct
   return openBotToolResult({ status: "updated", channel: channelResult(channel, agents) });
 });
 
-/** The response to a call from a channel task: there, only a person's request changes the channel. */
-export function channelAgentToolInChannelTask(): OpenBotToolResponse {
-  return {
-    success: false,
-    contentItems: [
-      {
-        type: "inputText",
-        text: "create_channel and update_channel work only in your own chats, not in a channel task. In a channel task, use channel_add_member, channel_remove_member and channel_set_instructions when a person asks.",
-      },
-    ],
-  };
-}
+/** The refusal in a channel task that a routine run, an agent, a member reply or a team member started. */
+export const CHANNEL_AGENT_TOOL_NEEDS_LOCAL_PERSON =
+  "In a channel task, create_channel and update_channel work only when this computer's user made the request that started the task. This task started from a routine run, an agent, a member reply or a team member. Ask the user to request it in your own chat.";

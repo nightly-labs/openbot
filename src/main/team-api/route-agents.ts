@@ -129,7 +129,8 @@ export async function routeAgents(
       !agents.listAgents().some((agent) => agent.id === input.agentId)
     )
       throw new HttpError(404, sourceText("error.team.agentNotFound"));
-    const report = agents.getHostAnalytics(input);
+    // The frozen host analytics wire has no skills: only the local Usage page shows them.
+    const { skills: _localOnly, ...report } = agents.getHostAnalytics(input);
     return json(
       200,
       workflows ? report : { ...report, agents: report.agents.filter((row) => row.agentId !== WORKFLOWS_USAGE_ID) },

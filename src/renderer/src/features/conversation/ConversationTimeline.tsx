@@ -806,6 +806,17 @@ export function ConversationTimeline() {
                   const current = message();
                   return current?.author === "agent" ? current.senderAgentId : undefined;
                 };
+                // A bare file name can be a file that the same turn attached, from a subfolder or a tool
+                // that reports no path. It opens when the workspace has no such file (#5189).
+                const turnAttachment = (path: string) => {
+                  const turnId = message()?.turnId;
+                  if (!turnId || /[/\\]/u.test(path)) return undefined;
+                  const matches = timelineMessages()
+                    .filter((candidate) => candidate.turnId === turnId)
+                    .flatMap((candidate) => candidate.attachments ?? [])
+                    .filter((attachment) => attachment.name === path);
+                  return matches.length === 1 ? matches[0] : undefined;
+                };
                 // A row the host has not drawn yet has no reactions, replies or menu: its id is not the
                 // host's, even after the host answered.
                 const hostless = createMemo(() => message()?.id.startsWith(PENDING_SEND_ID_PREFIX) === true);
@@ -1330,7 +1341,8 @@ export function ConversationTimeline() {
                             onOpenSharedFile={openSharedFile}
                             onOpenWorkspaceFile={
                               workspaceAgentId()
-                                ? (path) => openWorkspaceFile(path, undefined, workspaceAgentId())
+                                ? (path) =>
+                                    openWorkspaceFile(path, undefined, workspaceAgentId(), "tab", turnAttachment(path))
                                 : undefined
                             }
                             onOpenQuote={openQuote}

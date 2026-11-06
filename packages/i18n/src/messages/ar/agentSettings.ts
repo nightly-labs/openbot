@@ -278,8 +278,7 @@ export const messages = {
   "agentSettings.agentNewChat.title": "الوكيل يبدأ دردشات جديدة",
   "agentSettings.agentNewChat.description": "السماح للوكيل ببدء دردشة جديدة عندما تطول دردشته. يحفظ ملاحظات أولًا.",
   "agentSettings.quickAcknowledgement.title": "عرض الخطة قبل المهام الطويلة",
-  "agentSettings.quickAcknowledgement.description":
-    "قبل مهمة طويلة، يعرض الوكيل خطته. ويبدأ بعد 10 ثوانٍ، أو عند الضغط على «بدء».",
+  "agentSettings.quickAcknowledgement.description": "قبل مهمة طويلة، يعرض الوكيل خطته.",
   "agentSettings.browserProfile.label": "ملف تعريف المتصفح",
   "agentSettings.browserProfile.shared": "مشترك",
   "agentSettings.browserProfile.agent": "هذا الوكيل فقط",

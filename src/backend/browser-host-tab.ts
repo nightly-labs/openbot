@@ -41,6 +41,18 @@ export interface BrowserHostTab {
    */
   filledCard?: boolean;
   /**
+   * The origins whose agent code can run in the current document: the agent ran `evaluate` in it,
+   * or a scripted page of a connected tab could reach it. While it is set, no page of the origin in
+   * the session fills. A main-frame navigation replaces the document and clears this.
+   */
+  scriptedOrigins?: Set<string>;
+  /**
+   * The origins whose service worker could have served code from a script to the current document:
+   * it was open while agent code ran on the origin in its session. Only this document waits for a
+   * navigation; it does not block the other pages of the origin.
+   */
+  workerExposedOrigins?: Set<string>;
+  /**
    * A session of this tab and its popups only, kept in memory: a sign-in page that the host opened
    * for someone else. Such a tab is not saved, and its cookies go when it closes.
    */

@@ -302,7 +302,11 @@ const Settings = createSimpleContext({
           (preference) => preference.mode,
         );
       }
-      if (AGENT_DEFAULT_KEYS.some((key) => previous.agentDefaults[key] !== value.agentDefaults[key])) {
+      if (
+        AGENT_DEFAULT_KEYS.some((key) => previous.agentDefaults[key] !== value.agentDefaults[key]) ||
+        previous.agentDefaults.planStartAfterMs !== value.agentDefaults.planStartAfterMs ||
+        previous.agentDefaults.automationRunsPerHour !== value.agentDefaults.automationRunsPerHour
+      ) {
         agentDefaultsChanged = true;
         persistField("agentDefaults", settingsPort().setAgentDefaults({ ...value.agentDefaults }), (saved) => saved);
       }

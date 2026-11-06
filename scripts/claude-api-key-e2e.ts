@@ -136,6 +136,7 @@ function accountsHost(key: Pick<ProviderAccountsHost, "apiKey" | "defaultUsesApi
     isAccountBusy: () => false,
     stopAgentClients: unused("stopAgentClients"),
     readUsage: unused("readUsage"),
+    readModels: unused("readModels"),
     resetCredits: () => undefined,
     consumeUsageReset: unused("consumeUsageReset"),
     changed: () => {},

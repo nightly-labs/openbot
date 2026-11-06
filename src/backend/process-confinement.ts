@@ -551,7 +551,7 @@ export function confineSpawnTarget(
       PROJECT_SETTINGS.filter((name) => name.includes("/")).map((name) => join(root, name)),
     ),
   ];
-  if (platform === "darwin") {
+  if (canConfineProcesses(platform)) {
     if (!existsSync(SANDBOX_EXEC)) throw new ProcessConfinementUnavailableError(unavailable("macOS sandbox-exec"));
     return {
       command: SANDBOX_EXEC,
@@ -574,6 +574,11 @@ export function confineSpawnTarget(
   // bubblewrap on Linux cannot deny a protected file that does not exist yet, such as a new
   // `opencode.json`, so Linux fails closed until it can.
   throw new ProcessConfinementUnavailableError(sourceText("error.agent.workspaceOnlyMacOnly"));
+}
+
+/** Whether `confineSpawnTarget` can make a sandbox on this platform. Only macOS has one now. */
+export function canConfineProcesses(platform: NodeJS.Platform = process.platform): boolean {
+  return platform === "darwin";
 }
 
 function unavailable(tool: string): string {
