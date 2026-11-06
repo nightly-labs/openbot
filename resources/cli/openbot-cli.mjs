@@ -4,15 +4,17 @@
 // API (docs/automation.md). It needs only Node 18 or later. It reads the URL and the token from the
 // automation folder each time it runs and sends the token only in a request header, so the token is
 // never in a command line, in the output or in a log.
-import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { link, mkdir, open, readFile, unlink } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 const USAGE = `Usage:
   openbot-cli list [--json]
   openbot-cli run <agent> <task|-> [--wait] [--timeout 30m] [--id <key>] [--json]
-  openbot-cli status <agent> <deliveryId> [--json]
+  openbot-cli handoff <agent> <task|-> --id <assignment> [--wait] [--timeout 30m] [--json]
+  openbot-cli resume <assignment> [--wait] [--timeout 30m] [--json]
+  openbot-cli status <agent> <deliveryId> [--wait] [--timeout 30m] [--json]
   openbot-cli agent set-account <agent> <accountId|default> [--json]
   openbot-cli agent set-model <agent> <model> [--effort <effort>] [--provider <provider>] [--json]
   openbot-cli agent new-chat <agent> [--json]
@@ -28,6 +30,8 @@ When OpenBot restarts during a wait, the CLI reads the new URL and token and con
 
 const EXIT = { done: 0, failed: 1, usage: 2, needsPerson: 3, timedOut: 4, unreachable: 5 };
 const POLL_MS = 2000;
+// Leave room for a slow POST and its one connection retry before the server forgets the key.
+const HANDOFF_RETRY_MS = (24 * 60 - 2) * 60_000;
 const ENDED = new Set(["completed", "failed", "interrupted", "cancelled"]);
 
 class CliError extends Error {
@@ -226,6 +230,54 @@ async function waitForDelivery(target, agent, deliveryId, timeoutMs) {
   }
 }
 
+/** @param {string} value */
+function hash(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+/** Receipts belong to the current Codex chat, OpenBot profile and assignment. @param {string} assignment */
+function receiptFolder(assignment) {
+  const thread = process.env.CODEX_THREAD_ID;
+  if (!thread || !assignment.trim() || assignment.length > 128)
+    throw new CliError("A Codex chat and a 1–128 character assignment ID are required.", EXIT.usage);
+  const state = process.env.XDG_STATE_HOME || join(homedir(), ".local", "state");
+  return join(state, "openbot-handoffs", hash(JSON.stringify([thread, resolve(automationDir()), assignment])));
+}
+
+/** @param {string} path */
+async function readRecord(path) {
+  try {
+    return JSON.parse(await readFile(path, "utf8"));
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return null;
+    throw new CliError("Cannot read the saved handoff. Inspect it before sending again.", EXIT.failed);
+  }
+}
+
+/** Publish a complete record only if absent. Concurrent callers use the same winning record.
+ * @param {string} folder @param {string} name @param {object} data */
+async function remember(folder, name, data) {
+  await mkdir(folder, { recursive: true, mode: 0o700 });
+  const temporary = join(folder, randomUUID());
+  const file = await open(temporary, "wx", 0o600);
+  try {
+    try {
+      await file.writeFile(JSON.stringify(data));
+      await file.sync();
+    } finally {
+      await file.close();
+    }
+    try {
+      await link(temporary, join(folder, name));
+    } catch (error) {
+      if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) throw error;
+    }
+    return await readRecord(join(folder, name));
+  } finally {
+    await unlink(temporary);
+  }
+}
+
 /**
  * @param {string[]} positional
  * @param {Map<string, string | true>} flags
@@ -248,45 +300,83 @@ async function main(positional, flags) {
       text: agents.map((/** @type {{ id: string, name: string }} */ agent) => `${agent.id}\t${agent.name}`).join("\n"),
     };
   }
-  if (command === "run") {
+  if (command === "run" || command === "handoff") {
     const [reference, task] = rest;
     if (!reference || task === undefined || rest.length > 2) throw new CliError(USAGE, EXIT.usage);
     const text = task === "-" ? await readStdin() : task;
     if (!text.trim()) throw new CliError("The task is empty.", EXIT.usage);
-    const target = await connection();
-    const agent = await findAgent(target, reference);
     const id = flags.get("--id");
-    const receipt = await request(target, "POST", `/v1/agents/${encodeURIComponent(agent.id)}/messages`, {
-      text,
-      clientMessageId: typeof id === "string" ? id : `cli-${randomUUID()}`,
-    });
-    const delivery = receipt.deliveries.find((/** @type {{ recipientAgentId: string }} */ item) => {
-      return item.recipientAgentId === agent.id;
-    });
-    if (!delivery) throw new CliError("OpenBot did not queue the message.", EXIT.failed);
-    if (!flags.has("--wait")) {
-      return {
-        result: { agent, messageId: receipt.messageId, deliveryId: delivery.id, status: delivery.status },
-        exitCode: EXIT.done,
-        text: `Queued for ${agent.name}: delivery ${delivery.id} (${delivery.status}).`,
-      };
+    if (command === "handoff" && typeof id !== "string") throw new CliError(USAGE, EXIT.usage);
+    const folder = command === "handoff" && typeof id === "string" ? receiptFolder(id) : null;
+    const target = await connection();
+    let intent = folder ? await readRecord(join(folder, "intent.json")) : null;
+    const agent = await findAgent(target, intent?.agentId ?? reference);
+    if (folder) {
+      intent ??= await remember(folder, "intent.json", {
+        agentId: agent.id,
+        reference,
+        taskHash: hash(text),
+        key: randomUUID(),
+        createdAt: Date.now(),
+      });
+      if (intent.taskHash !== hash(text) || (reference !== intent.reference && reference !== intent.agentId))
+        throw new CliError("This assignment ID belongs to another task or employee.", EXIT.usage);
+      if (agent.id !== intent.agentId || typeof intent.key !== "string" || !intent.key)
+        throw new CliError("Cannot verify the original handoff recipient or retry key.", EXIT.failed);
     }
-    const waited = await waitForDelivery(target, agent, delivery.id, timeoutMs);
-    return {
-      result: { agent, messageId: receipt.messageId, deliveryId: delivery.id, ...waited.result },
-      exitCode: waited.exitCode,
-      text: describeDelivery(agent, waited.result),
-    };
+    let saved = folder ? await readRecord(join(folder, "delivery.json")) : null;
+    if (!saved) {
+      if (intent && !(Date.now() >= intent.createdAt && Date.now() - intent.createdAt < HANDOFF_RETRY_MS))
+        throw new CliError(
+          "The receipt is missing and the safe retry window has closed. Check the employee chat.",
+          EXIT.failed,
+        );
+      const receipt = await request(target, "POST", `/v1/agents/${encodeURIComponent(agent.id)}/messages`, {
+        text,
+        clientMessageId: intent?.key ?? (typeof id === "string" ? id : `cli-${randomUUID()}`),
+      });
+      const delivery = receipt.deliveries.find(
+        (/** @type {{ recipientAgentId: string }} */ item) => item.recipientAgentId === agent.id,
+      );
+      if (!delivery?.id || !receipt.messageId)
+        throw new CliError("OpenBot did not return a delivery receipt.", EXIT.failed);
+      saved = { messageId: receipt.messageId, deliveryId: delivery.id };
+      if (folder) {
+        const stored = await remember(folder, "delivery.json", saved);
+        if (saved.messageId !== stored.messageId || saved.deliveryId !== stored.deliveryId)
+          throw new CliError("OpenBot returned conflicting receipts for this assignment.", EXIT.failed);
+      }
+      if (!flags.has("--wait"))
+        return {
+          result: { agent, ...saved, status: delivery.status },
+          exitCode: EXIT.done,
+          text: `Queued for ${agent.name}: delivery ${delivery.id} (${delivery.status}).`,
+        };
+    }
+    return readDelivery(target, agent, saved.deliveryId, flags.has("--wait"), timeoutMs, saved);
   }
-  if (command === "status") {
-    const [reference, deliveryId] = rest;
-    if (!reference || !deliveryId || rest.length > 2) throw new CliError(USAGE, EXIT.usage);
+  if (command === "status" || command === "resume") {
+    let [reference, deliveryId] = rest;
+    let receipt;
+    if (command === "resume") {
+      if (rest.length !== 1) throw new CliError(USAGE, EXIT.usage);
+      const folder = receiptFolder(reference);
+      const intent = await readRecord(join(folder, "intent.json"));
+      if (!intent) throw new CliError("No such assignment in this Codex chat and OpenBot profile.", EXIT.failed);
+      receipt = await readRecord(join(folder, "delivery.json"));
+      if (!receipt)
+        throw new CliError(
+          "No delivery receipt yet. Repeat the original handoff with the same ID and text.",
+          EXIT.failed,
+        );
+      reference = intent.agentId;
+      deliveryId = receipt.deliveryId;
+    } else if (!reference || !deliveryId || rest.length !== 2) throw new CliError(USAGE, EXIT.usage);
     const target = await connection();
     const agent = await findAgent(target, reference);
-    const path = `/v1/agents/${encodeURIComponent(agent.id)}/deliveries/${encodeURIComponent(deliveryId)}`;
-    const delivery = await request(target, "GET", path);
-    const exitCode = !ENDED.has(delivery.status) || delivery.status === "completed" ? EXIT.done : EXIT.failed;
-    return { result: { agent, ...delivery }, exitCode, text: describeDelivery(agent, delivery) };
+    if (command === "resume" && agent.id !== reference)
+      throw new CliError("The original handoff recipient is no longer available.", EXIT.failed);
+    return readDelivery(target, agent, deliveryId, flags.has("--wait"), timeoutMs, receipt);
   }
   if (command === "agent") {
     const [action, reference, value] = rest;
@@ -324,6 +414,20 @@ async function main(positional, flags) {
     };
   }
   throw new CliError(USAGE, EXIT.usage);
+}
+
+/** @param {{url:string,token:string}} target @param {{id:string,name:string}} agent
+ * @param {string} id @param {boolean} wait @param {number} timeout @param {object} [receipt] */
+async function readDelivery(target, agent, id, wait, timeout, receipt) {
+  const result = wait ? await waitForDelivery(target, agent, id, timeout) : null;
+  const delivery = result
+    ? result.result
+    : await request(target, "GET", `/v1/agents/${encodeURIComponent(agent.id)}/deliveries/${encodeURIComponent(id)}`);
+  if (delivery.id !== undefined && delivery.id !== id)
+    throw new CliError("The delivery ID does not match.", EXIT.failed);
+  const exitCode =
+    result?.exitCode ?? (!ENDED.has(delivery.status) || delivery.status === "completed" ? EXIT.done : EXIT.failed);
+  return { result: { agent, ...receipt, ...delivery }, exitCode, text: describeDelivery(agent, delivery) };
 }
 
 /**

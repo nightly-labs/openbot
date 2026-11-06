@@ -5,7 +5,7 @@
 // Writes .openbot-build/automation-cli-e2e/report.json. Run: `bun scripts/automation-cli-e2e.ts`.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
@@ -71,6 +71,9 @@ const models = [
   model("codex", "gpt-5.5", "medium", ["low", "medium"]),
 ];
 const deliveries = new Map<string, FakeDelivery>();
+const receipts = new Map<string, QueuedMessageReceipt>();
+const accepted = Promise.withResolvers<void>();
+const releaseReply = Promise.withResolvers<void>();
 const updates: UpdateAgentInput[] = [];
 const cleared: string[] = [];
 let busy = false;
@@ -100,6 +103,9 @@ const options: ConstructorParameters<typeof AutomationServer>[0] = {
   listRoutines: () => [],
   runRoutine: () => Effect.die(new Error("No routine runs in this test.")),
   sendMessage: (input) => {
+    const key = JSON.stringify([input.agentId, input.clientMessageId]);
+    const previous = receipts.get(key);
+    if (previous) return Effect.succeed(previous);
     const id = `delivery-${deliveries.size + 1}`;
     const outcome: Outcome =
       input.text === "please fail"
@@ -118,6 +124,14 @@ const options: ConstructorParameters<typeof AutomationServer>[0] = {
       messageId: `message-${id}`,
       deliveries: [{ id, recipientAgentId: input.agentId, status: "queued", position: 1 }],
     };
+    receipts.set(key, receipt);
+    if (input.text === "ABC backwards") {
+      accepted.resolve();
+      return Effect.promise(async () => {
+        await releaseReply.promise;
+        return receipt;
+      });
+    }
     return Effect.succeed(receipt);
   },
   getLocalAttention: (agentId) => {
@@ -171,13 +185,17 @@ interface Run {
   stderr: string;
 }
 
-function cli(args: string[], stdin?: string): Promise<Run> {
+const originatingChat = "fixture-origin";
+function startCli(args: string[], thread = originatingChat) {
+  return spawn("node", [CLI, ...args], {
+    env: { ...process.env, OPENBOT_AUTOMATION_DIR: root, XDG_STATE_HOME: join(root, "state"), CODEX_THREAD_ID: thread },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+}
+function cli(args: string[], stdin?: string, thread = originatingChat): Promise<Run> {
   return new Promise((done, fail) => {
     // The CLI is for Node, which is what users have; Bun runs only this script.
-    const child = spawn("node", [CLI, ...args], {
-      env: { ...process.env, OPENBOT_AUTOMATION_DIR: root },
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    const child = startCli(args, thread);
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk: Buffer) => {
@@ -332,6 +350,68 @@ try {
     return run.stderr.includes("Wait for the active turn to finish.") && cleared.length === 1;
   });
   busy = false;
+  const retry = ["handoff", "Ada", "-", "--id", "reverse-abc", "--wait", "--json"];
+  const previousCount = deliveries.size;
+  const interrupted = startCli(retry);
+  const exited = new Promise<void>((resolve) => interrupted.once("close", () => resolve()));
+  interrupted.stdin.end("ABC backwards");
+  try {
+    await Promise.race([
+      accepted.promise,
+      exited.then(() => {
+        throw new Error("CLI exited before the queue accepted the task");
+      }),
+    ]);
+    interrupted.kill("SIGTERM");
+    await exited;
+  } finally {
+    releaseReply.resolve();
+  }
+  const recovered = parsed(await cli(retry, "ABC backwards"));
+  const resumed = parsed(await cli(["resume", "reverse-abc", "--wait", "--json"]));
+  const wrongChat = await cli(["resume", "reverse-abc", "--wait", "--json"], undefined, "another-chat");
+  const changedTask = await cli(retry, "DEF backwards");
+  checks.push({
+    name: "a chat resumes its own accepted assignment after a lost response without creating a second delivery",
+    passed:
+      recovered.status === "completed" &&
+      recovered.agent.id === "agent-ada" &&
+      recovered.answer === `Answer of ${recovered.turnId}` &&
+      resumed.deliveryId === recovered.deliveryId &&
+      resumed.messageId === recovered.messageId &&
+      resumed.turnId === recovered.turnId &&
+      resumed.answer === recovered.answer &&
+      wrongChat.code === 1 &&
+      changedTask.code === 2 &&
+      deliveries.size === previousCount + 1,
+    detail: {
+      deliveryId: recovered.deliveryId,
+      turnId: recovered.turnId,
+      answer: resumed.answer,
+      accepted: deliveries.size - previousCount,
+    },
+  });
+  const stateRoot = join(root, "state", "openbot-handoffs");
+  const [savedFolder] = readdirSync(stateRoot);
+  assert.ok(savedFolder);
+  const intentPath = join(stateRoot, savedFolder, "intent.json");
+  const intent = JSON.parse(readFileSync(intentPath, "utf8"));
+  intent.createdAt = Date.now() - 24 * 60 * 60 * 1000;
+  writeFileSync(intentPath, JSON.stringify(intent));
+  const oldReceipt = parsed(await cli(["resume", "reverse-abc", "--json"]));
+  rmSync(join(stateRoot, savedFolder, "delivery.json"));
+  // Simulate expiry on both sides; a new POST would now enqueue a second task.
+  receipts.clear();
+  const expired = await cli(retry, "ABC backwards");
+  checks.push({
+    name: "old receipts can be read but unacknowledged work is never resent after the deduplication window",
+    passed:
+      oldReceipt.id === recovered.id &&
+      expired.code === 1 &&
+      parsed(expired).error.includes("retry window") &&
+      deliveries.size === previousCount + 1,
+    detail: { oldDelivery: oldReceipt.id, expiredExit: expired.code },
+  });
   await Effect.runPromise(server.stop());
   await check("a stopped app exits 5", ["list"], 5, (run) => run.stderr.includes("OpenBot is not running"));
   await check("a wrong command line exits 2 also when the app is stopped", ["agent", "foo", "Ada"], 2, (run) =>

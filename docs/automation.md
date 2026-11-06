@@ -54,6 +54,19 @@ The command reads the files below each time and sends the token only in a reques
 OpenBot restarts during a wait, the command reads the new files and continues the wait.
 Set `OPENBOT_AUTOMATION_DIR` to use another folder, for example the one of a development profile.
 
+## Hand a task to an employee from Codex
+
+Use the `openbot-employee` Codex skill in this checkout. The owner can name an employee or give an outcome for an employee whose role is already known. The CLI needs **Local scripts** enabled for that employee. Codex can also use the signed-in OpenBot window to send a task and read the reply, create or delete an employee, or manage an employee's skills. Desktop actions use the signed-in user's permissions. Only the CLI issues the handoff receipts described below.
+
+```sh
+node resources/cli/openbot-cli.mjs handoff "Copy Editor" - --id edit-title-1 --wait --json < task.txt
+node resources/cli/openbot-cli.mjs resume edit-title-1 --wait --json
+```
+
+Use a new assignment ID for new work. The CLI binds the ID to the current `CODEX_THREAD_ID`, the local automation folder, the chosen employee and a hash of the task. It saves private receipts under `$XDG_STATE_HOME/openbot-handoffs` or `~/.local/state/openbot-handoffs`. A receipt contains IDs and the hash. Task text, tokens and answers stay out of these files.
+
+If the sender stops before it saves the delivery ID, repeat the original command with exactly the same input. The CLI uses the same server retry key. It stops two minutes before the server’s 24-hour limit if it still has no delivery ID. After the receipt is saved, `resume` reads that delivery without sending work. A stopped Codex chat gets its answer when it resumes. A question, approval or browser takeover still needs the owner.
+
 ## Turn it on
 
 The setting is per agent and is off by default. Open the agent's settings, select **Permissions**,
