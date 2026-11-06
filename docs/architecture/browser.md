@@ -96,10 +96,11 @@ policy. The browser client shows an SVG thumbnail from a `data:` URL, never from
 object URL has the origin of the app. Remote support is additive through the
 `svg-attachments` capability, which only protocol 9 peers get.
 
-A file whose name has no known type is stored with `kind: "file"` and `previewKind: "none"`, unless
-the importer supplies a text MIME type. Its MIME type is `application/octet-stream`, or the type that
-the importer supplies. Import drops a supplied `image/*` type for such a name, so a HEIC or TIFF never
-becomes an image block that a provider refuses. Delivery sends the path as a mention. The desktop app
+A file whose name has no known type is stored as `application/octet-stream` with `kind: "file"` and
+`previewKind: "none"`. Import drops a MIME type that the importer supplies for such a name, because a
+sent attachment takes its type from the name, and because a HEIC or TIFF must not become an image
+block that a provider refuses. Only the voice recording keeps its `audio/webm` type. Delivery sends
+the path as a mention. The desktop app
 never opens such a file with the default app (`OPENABLE_ATTACHMENT_EXTENSIONS`). Remote support is
 additive through the `any-file-attachments` capability, which only protocol 9 peers get. Clients keep
 the extension list for a host without it.

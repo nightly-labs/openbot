@@ -202,6 +202,8 @@ export class AttachmentFiles {
     this: AttachmentFiles,
     paths: string[],
     data: AttachmentDataInput[],
+    /** A voice recording is a WebM file. It keeps its audio type, so the message can replay it. */
+    options: { voiceRecording?: boolean } = {},
   ): Effect.fn.Return<StoredDraft[], AttachmentOperationError> {
     if (paths.some((path) => !path || path.length > INPUT_LIMITS.path)) {
       return yield* attachmentFailure(new Error("An attachment path is invalid."));
@@ -267,12 +269,10 @@ export class AttachmentFiles {
           const targetDirectory = join(this.#draftsRoot, id);
           preparedRoots.push(targetDirectory);
           const name = sanitizeName(item.name || "pasted-image.png");
-          // A name with no known type is a file. The sender's image type would make it an image block,
-          // and a provider refuses types such as HEIC or TIFF.
-          const mimeType =
-            !isSupportedAttachmentName(name) && item.mimeType.trim().toLowerCase().startsWith("image/")
-              ? undefined
-              : item.mimeType;
+          // A name with no known type is an opaque file, as it is after the message is sent: a sent
+          // attachment takes its type from the name. A sender's image type would also make it an image
+          // block, and a provider refuses types such as HEIC or TIFF.
+          const mimeType = options.voiceRecording || isSupportedAttachmentName(name) ? item.mimeType : undefined;
           const targetPath = join(targetDirectory, name);
           yield* attachmentCall(() => mkdir(targetDirectory, { recursive: true, mode: 0o700 })).pipe(
             Effect.uninterruptible,

@@ -347,7 +347,6 @@ export function ConversationComposer() {
       zip: capabilities.includes(TEAM_ZIP_ATTACHMENTS_CAPABILITY),
       mp4: capabilities.includes(TEAM_MP4_ATTACHMENTS_CAPABILITY),
       svg: capabilities.includes(TEAM_SVG_ATTACHMENTS_CAPABILITY),
-      anyFile: false,
     })
       .map((extension) => `.${extension}`)
       .join(",");

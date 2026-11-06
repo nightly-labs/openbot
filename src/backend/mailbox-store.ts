@@ -340,6 +340,7 @@ export class MailboxStore {
     this: MailboxStore,
     paths: string[],
     data: AttachmentDataInput[],
+    options: { voiceRecording?: boolean } = {},
   ): Effect.fn.Return<DraftAttachment[], StoredStateFailure> {
     try {
       if (paths.length + data.length === 0) return [];
@@ -350,7 +351,7 @@ export class MailboxStore {
         throw new Error(sourceText("error.backend.draftAttachmentLimit", { limit: INPUT_LIMITS.draftAttachments }));
       }
       const prepared = yield* this.#files
-        .prepareDrafts(paths, data)
+        .prepareDrafts(paths, data, options)
         .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
       this.#state.drafts.push(...prepared);
       for (const draft of prepared) this.#changes.draftIds.add(draft.id);

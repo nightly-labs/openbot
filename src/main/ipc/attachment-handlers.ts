@@ -182,7 +182,6 @@ export function attachmentIpcHandlers({
                 zip: supportsZip,
                 mp4: supportsMp4,
                 svg: supportsSvg,
-                anyFile: false,
               }),
             },
           ];
@@ -506,7 +505,7 @@ const uploadRemoteImports = Effect.fn("AttachmentIpc.uploadRemoteImports")(funct
 });
 
 /**
- * Checks the names and sizes, then uploads every file at once, as one import. With `requestId`, the
+ * Checks the sizes, then uploads every file at once, as one import. With `requestId`, the
  * import reports the bytes of a single file; several files at once would mix their progress.
  */
 function uploadRemoteFiles(
@@ -517,11 +516,6 @@ function uploadRemoteFiles(
 ) {
   const progressId = files.length === 1 ? requestId : undefined;
   return remoteDecode(() => {
-    assertRemoteAttachmentNames(
-      remoteServers,
-      serverId,
-      files.map((file) => file.name),
-    );
     if (files.some((file) => file.bytes.byteLength > ATTACHMENT_LIMITS.fileBytes)) {
       throw new Error(sourceText("error.attachment.fileTooLarge"));
     }

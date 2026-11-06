@@ -132,7 +132,8 @@ export interface AttachmentSupport {
   anyFile: boolean;
 }
 
-export function supportedAttachmentExtensions(support: AttachmentSupport): string[] {
+/** The extensions of the picker filter for a host without `anyFile`. A host with it gets no filter. */
+export function supportedAttachmentExtensions(support: Omit<AttachmentSupport, "anyFile">): string[] {
   return ATTACHMENT_FILE_EXTENSIONS.filter(
     (extension) =>
       (support.eml || extension !== "eml") &&

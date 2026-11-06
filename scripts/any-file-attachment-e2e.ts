@@ -80,9 +80,9 @@ async function run() {
       assert.equal(isOpenableAttachmentName(file.name), false);
     }
 
-    // A browser or a remote member sends the bytes with its own MIME type. With an unknown name, an
-    // image type is dropped, so a HEIC never becomes an image block that a provider refuses. Other
-    // types, and every type of a known name, stay as before.
+    // A browser or a remote member sends the bytes with its own MIME type. With an unknown name, the
+    // type is dropped: the sent message takes its type from the name, so the draft must match it, and
+    // a HEIC must not become an image block that a provider refuses. A known name keeps its type.
     const uploads = [
       { name: "IMG_0001.HEIC", mimeType: "image/heic", bytes: png, kind: "file", stored: "application/octet-stream" },
       {
@@ -90,9 +90,9 @@ async function run() {
         mimeType: "application/x-openvpn-profile",
         bytes: profile,
         kind: "file",
-        stored: "application/x-openvpn-profile",
+        stored: "application/octet-stream",
       },
-      { name: "voice.webm", mimeType: "audio/webm", bytes: binary, kind: "file", stored: "audio/webm" },
+      { name: "song.ogg", mimeType: "audio/ogg", bytes: binary, kind: "file", stored: "application/octet-stream" },
       { name: "screenshot.png", mimeType: "image/png", bytes: png, kind: "image", stored: "image/png" },
     ];
     const uploaded = await Effect.runPromise(
@@ -101,13 +101,35 @@ async function run() {
         uploads.map(({ name, mimeType, bytes }) => ({ name, mimeType, bytes })),
       ),
     );
+    const uploadedSent = await Effect.runPromise(
+      files.commitMessageTransfer(
+        "upload-transfer",
+        { kind: "user" },
+        ["recipient"],
+        "upload-message",
+        new Date().toISOString(),
+        uploaded.map((draft) => draft.path),
+      ),
+    );
     for (const [index, upload] of uploads.entries()) {
       const draft = uploaded[index];
-      assert.ok(draft);
+      const sentUpload = uploadedSent[index];
+      assert.ok(draft && sentUpload);
       assert.equal(draft.name, upload.name);
       assert.equal(draft.kind, upload.kind, upload.name);
       assert.equal(draft.mimeType, upload.stored, upload.name);
+      assert.equal(sentUpload.kind, draft.kind, upload.name);
+      assert.equal(sentUpload.mimeType, draft.mimeType, upload.name);
+      assert.equal(sentUpload.previewKind, draft.previewKind, upload.name);
     }
+
+    // The voice recording keeps its audio type, so the message can replay it.
+    const [voice] = await Effect.runPromise(
+      files.prepareDrafts([], [{ name: "voice.webm", mimeType: "audio/webm", bytes: binary }], {
+        voiceRecording: true,
+      }),
+    );
+    assert.equal(voice?.mimeType, "audio/webm");
 
     // The agent returns a file with an unknown type with attach_files_to_response.
     const agentFile = join(root, "sources", "main.tf");
@@ -158,7 +180,9 @@ async function run() {
         sent: upload.mimeType,
         stored: uploaded[index]?.mimeType,
         kind: uploaded[index]?.kind,
+        sentMimeType: uploadedSent[index]?.mimeType,
       })),
+      voice: voice?.mimeType,
       outbound: { name: outbound.name, kind: outbound.kind, mimeType: outbound.mimeType },
     };
   } finally {
