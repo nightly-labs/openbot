@@ -176,6 +176,7 @@ export const messages = {
   "error.remote.memberLimitReached": "该主机已达到成员上限，请让所有者腾出位置。",
   "error.remote.hostNotRegistered": "该主机已不再注册于 OpenBot 服务。",
   "error.remote.membershipEnded": "你已不再是该主机的成员，请向所有者申请新的邀请。",
+  "error.remote.membershipChanged": "有人同时更改了该成员。请重新加载成员列表后重试。",
   "error.remote.accountSessionInactive": "你的登录已失效，请重新登录。",
   "error.remote.hostOtherAccount": "该主机属于另一个账号。",
   "error.remote.remoteNotConfigured": "该 OpenBot 服务未配置远程连接。",

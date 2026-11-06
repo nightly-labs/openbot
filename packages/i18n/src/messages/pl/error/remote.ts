@@ -185,6 +185,8 @@ export const messages = {
   "error.remote.memberLimitReached": "Ten host osiągnął limit członków. Poproś właściciela o zwolnienie miejsca.",
   "error.remote.hostNotRegistered": "Ten host nie jest już zarejestrowany w usłudze OpenBot.",
   "error.remote.membershipEnded": "Nie jesteś już członkiem tego hosta. Poproś właściciela o nowe zaproszenie.",
+  "error.remote.membershipChanged":
+    "Ktoś inny zmienił tego członka w tym samym czasie. Wczytaj członków ponownie i spróbuj jeszcze raz.",
   "error.remote.accountSessionInactive": "Twoje logowanie nie jest już aktywne. Zaloguj się ponownie.",
   "error.remote.hostOtherAccount": "Ten host należy do innego konta.",
   "error.remote.remoteNotConfigured": "Zdalne połączenia nie są skonfigurowane w tej usłudze OpenBot.",

@@ -415,6 +415,7 @@ let pendingDeepLink: RendererDeepLink | null = takeRendererDeepLink(findDeepLink
 let deepLinkReceiverReady = false;
 
 const MAIN_WINDOW_STATE_FILE = "openbot-main-window-state-v1.json";
+const WM_ENDSESSION = 0x0016;
 
 // A server is stopped with SIGTERM (systemd, Docker). Without a handler, Electron ends at once and its
 // services do not stop. A hosted server's boat pre-stop hook stops it this way before the disk save
@@ -608,6 +609,17 @@ function attachWindowsSessionEndHandlers(window: BrowserWindow): void {
       void runCauseEffect(services.browser.flushPersistentStorage()).catch((error) =>
         logger.error("Unable to flush browser storage before Windows session end:", toLogValue(error)),
       );
+  });
+  // Windows sends WM_ENDSESSION with a zero wParam when another app cancels the session end. Electron
+  // has no event for it. Without this reset, closing the window later quits instead of hiding, and the
+  // next quit skips `prepareForShutdown`.
+  window.hookWindowMessage(WM_ENDSESSION, (wParam) => {
+    if (quitStarted || !systemSessionEnding || wParam.some((byte) => byte !== 0)) return;
+    systemSessionEnding = false;
+    systemSessionEndFlushStarted = false;
+    isQuitting = false;
+    // The query stopped the update checks.
+    services?.updater.resume();
   });
   window.on("session-end", () => {
     recordExit("session_end");

@@ -225,6 +225,8 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #checkTimer: ReturnType<typeof setTimeout> | null = null;
   #phaseTimer: ReturnType<typeof setTimeout> | null = null;
   #started = false;
+  /** False for a start that checks only on request, such as the newer-database recovery. */
+  #checksScheduled = false;
   #installStarted = false;
   #pendingInstallRequests = 0;
   #installHandedOver = false;
@@ -331,9 +333,19 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       this.#fork(pruneInstalledUpdate(this.#options.updaterCacheDirectory, this.#options.currentVersion));
     }
 
+    this.#checksScheduled = scheduleChecks;
     if (scheduleChecks && this.#options.enabled) {
       this.#scheduleCheck(this.#options.initialCheckDelayMs);
     }
+  }
+
+  /** Schedules the checks that `stop` cleared, for an app that keeps running after it, such as after a Windows session end that another app cancels. */
+  resume(): void {
+    if (!this.#started) return;
+    // `stop` cleared the deadline of a busy phase, and a download keeps running after it.
+    if (!this.#phaseTimer) this.#armPhaseTimer();
+    if (!this.#checksScheduled || !this.#options.enabled || this.#checkTimer) return;
+    this.#scheduleCheck(this.#options.initialCheckDelayMs);
   }
 
   getStatus(): UpdateStatus {

@@ -396,6 +396,9 @@ function useSystemDictation({
 
   useEffect(
     () => () => {
+      // No recognizer event reaches this hook after it unmounts, so a `finish` that waits would wait
+      // forever. The draft already holds the last result.
+      for (const resolve of finished.current.splice(0)) resolve();
       if (owner !== id) return;
       // The draft already holds the last result, so leaving the chat keeps it.
       speechRecognition?.abort();

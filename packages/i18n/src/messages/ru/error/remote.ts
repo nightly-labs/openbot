@@ -186,6 +186,8 @@ export const messages = {
   "error.remote.memberLimitReached": "На этом хосте достигнут лимит участников. Попросите владельца освободить место.",
   "error.remote.hostNotRegistered": "Этот хост больше не зарегистрирован в службе OpenBot.",
   "error.remote.membershipEnded": "Вы больше не участник этого хоста. Попросите у владельца новое приглашение.",
+  "error.remote.membershipChanged":
+    "Кто-то другой изменил этого участника в то же время. Загрузите участников заново и повторите попытку.",
   "error.remote.accountSessionInactive": "Ваш вход больше не активен. Войдите снова.",
   "error.remote.hostOtherAccount": "Этот хост принадлежит другому аккаунту.",
   "error.remote.remoteNotConfigured": "Удалённые подключения не настроены в этой службе OpenBot.",

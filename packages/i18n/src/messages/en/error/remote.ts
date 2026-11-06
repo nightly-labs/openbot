@@ -184,6 +184,8 @@ export const messages = defineMessages("error.remote", {
   "error.remote.memberLimitReached": "This host has reached its member limit. Ask the owner to make space.",
   "error.remote.hostNotRegistered": "This host is no longer registered with the OpenBot service.",
   "error.remote.membershipEnded": "You are no longer a member of this host. Ask the owner for a new invitation.",
+  "error.remote.membershipChanged":
+    "Someone changed this member at the same time. Load the members again and try again.",
   "error.remote.accountSessionInactive": "Your sign-in is no longer active. Sign in again.",
   "error.remote.hostOtherAccount": "This host belongs to another account.",
   "error.remote.remoteNotConfigured": "Remote connections are not set up on this OpenBot service.",

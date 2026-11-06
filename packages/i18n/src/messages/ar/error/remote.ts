@@ -179,6 +179,7 @@ export const messages = {
   "error.remote.memberLimitReached": "وصل هذا المضيف إلى الحد الأقصى للأعضاء. اطلب من المالك إتاحة مكان.",
   "error.remote.hostNotRegistered": "لم يعد هذا المضيف مسجّلًا في خدمة OpenBot.",
   "error.remote.membershipEnded": "لم تعد عضوًا في هذا المضيف. اطلب دعوة جديدة من المالك.",
+  "error.remote.membershipChanged": "غيّر شخص آخر هذا العضو في الوقت نفسه. حمّل الأعضاء مجددًا ثم حاول مرة أخرى.",
   "error.remote.accountSessionInactive": "لم يعد تسجيل دخولك نشطًا. سجّل الدخول مرة أخرى.",
   "error.remote.hostOtherAccount": "ينتمي هذا المضيف إلى حساب آخر.",
   "error.remote.remoteNotConfigured": "الاتصالات البعيدة غير مُعدّة في خدمة OpenBot هذه.",
