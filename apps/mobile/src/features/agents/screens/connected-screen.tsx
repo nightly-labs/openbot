@@ -523,6 +523,9 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   const scroll = useLargeTitleScroll(pane ? { headerHeight: barTop + PANE_BAR_HEIGHT } : undefined);
   const { headerHeight } = scroll;
   const search = useHomeSearch();
+  // In the vertical bar of iPhone Duo, the native items stay while the list loads or reconnects,
+  // disabled. Hidden and shown again, iOS placed them at the middle of the bar.
+  const barItemsHidden = search.open || (!headerActions && !verticalBar);
   // Search has no bar: the list and the results move up by the bar's height as it opens.
   const searchBarOffset = Math.max(0, headerHeight - insets.top);
   // A new server shows a new list at its top, which sends no scroll event.
@@ -1097,7 +1100,12 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
               moves; the custom views leave the toolbar while it shows, as in the chat header. */}
           <Stack.Toolbar key={`left-${verticalBarEdge ?? "none"}`} placement="left">
             {/* The search takes the screen, so the bar buttons go while it is open. */}
-            <Stack.Toolbar.Button icon="sidebar.leading" hidden={!headerActions || search.open} onPress={openDrawer} />
+            <Stack.Toolbar.Button
+              icon="sidebar.leading"
+              hidden={barItemsHidden}
+              disabled={!headerActions}
+              onPress={openDrawer}
+            />
             {verticalBar ? null : (
               <Stack.Toolbar.View hidesSharedBackground hidden={!headerActions || search.open}>
                 <ConnectionHeaderStatus server={hasSelectedServer ? activeServer : undefined} />
@@ -1114,7 +1122,8 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
               icon="ellipsis"
               accessibilityLabel={t("mobile.agent.home.chatOptions")}
               separateBackground
-              hidden={!headerActions || search.open}
+              hidden={barItemsHidden}
+              disabled={!headerActions}
             >
               {/* Add actions come first, then a divider and the actions on existing chats. */}
               <Stack.Toolbar.Menu inline>
