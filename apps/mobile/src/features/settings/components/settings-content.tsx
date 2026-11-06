@@ -13,9 +13,14 @@ import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
-export function SettingsContent({ children }: PropsWithChildren) {
+/** `androidNativeHeader`: the page keeps the native Android header, for a `Stack.SearchBar`. */
+export function SettingsContent({
+  children,
+  androidNativeHeader,
+}: PropsWithChildren<{ androidNativeHeader?: boolean }>) {
   return (
     <SheetScrollView
+      androidNativeHeader={androidNativeHeader}
       scrollEdgeEffect={false}
       contentContainerClassName="gap-7 px-4 pb-safe-offset-5 pt-5"
       keyboardDismissMode="interactive"

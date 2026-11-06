@@ -119,9 +119,9 @@ export function OpenBot101() {
 
       <h2>Full access, and what that means</h2>
       <p>
-        OpenBot is a development preview. After you consent once at first launch, agents run with{" "}
-        <code>danger-full-access</code> and <code>approvalPolicy: never</code>. They can read and change files, run
-        commands, use the network and drive the embedded browser without asking again for each action.
+        After you consent once at first launch, agents run with <code>danger-full-access</code> and{" "}
+        <code>approvalPolicy: never</code>. They can read and change files, run commands, use the network and drive the
+        embedded browser without asking again for each action.
       </p>
       <p>
         <strong>This is a product decision, not a security boundary.</strong> An agent starts in its own workspace, but
