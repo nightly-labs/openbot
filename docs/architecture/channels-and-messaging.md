@@ -472,6 +472,11 @@ channel, so the host's row replaces the phone's own; a failed read is not a fail
 channel reads its history when it opens. A channel message that an app before channels came back
 kept aside in `messages.unreadable-<time>.json` stays there.
 
+On a host with `channel-isolation-v1`, each channel record and the draft of a `save` carry `isolated`,
+the "Keep memories in this channel" setting. The channels-v1 codec drops the field, so a joined
+server or the browser client shows the switch only when the host advertises the capability (#5380).
+A save without the field keeps the stored value, so a phone or an older client does not turn it off.
+
 On a host with `channel-attention-v1`, each channel summary names the threads of its members. The
 channel then shows the approvals and browser steps of those threads, and the agent's own chat does
 not. An older host gives no threads: the channel shows the approvals of the members that run one of

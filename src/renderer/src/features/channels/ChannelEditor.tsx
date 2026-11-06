@@ -179,6 +179,9 @@ export function ChannelEditor(props: ChannelEditorProps) {
    * is deliberate: removing a member commits the instructions the user can see, rather than
    * reviving the stored ones. Instructions over the limit are the exception: they stay in the field,
    * unsaved, and the stored ones go with the other fields until the user shortens them.
+   *
+   * `isolated` is not in the draft: only its switch sends it. A draft without it keeps the stored
+   * value, so a rename here cannot undo a change that another client or an agent made (#5380).
    */
   function draftFrom(current: Channel): ChannelDraft {
     return {
@@ -187,7 +190,6 @@ export function ChannelEditor(props: ChannelEditorProps) {
       instructions: instructionsTooLong(fields.instructions) ? current.instructions : fields.instructions,
       members: current.members.map((member) => ({ agentId: member.agentId })),
       leadAgentId: current.leadAgentId,
-      isolated: current.isolated === true,
     };
   }
 
@@ -371,16 +373,18 @@ export function ChannelEditor(props: ChannelEditorProps) {
         />
         <InstructionsLimit text={fields.instructions} />
       </SettingsField>
-      <SwitchField
-        checked={channel()?.isolated === true}
-        onChange={(isolated) =>
-          void commit((draft) => {
-            draft.isolated = isolated;
-          })
-        }
-        label={t("channel.settings.isolated")}
-        description={t("channel.settings.isolatedDescription")}
-      />
+      <Show when={channels.isolationSupported()}>
+        <SwitchField
+          checked={channel()?.isolated === true}
+          onChange={(isolated) =>
+            void commit((draft) => {
+              draft.isolated = isolated;
+            })
+          }
+          label={t("channel.settings.isolated")}
+          description={t("channel.settings.isolatedDescription")}
+        />
+      </Show>
       <SettingsLinkGroup>
         <SettingsLinkRow
           label={t("channel.settings.memories")}
