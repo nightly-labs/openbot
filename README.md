@@ -11,10 +11,12 @@ OpenCode, Gemini, [Cursor CLI](https://cursor.com/cli), [Cline CLI](https://clin
 conversation, and provides local queues, file transfers, an embedded browser, and agent-to-agent
 messaging in one desktop app.
 
+OpenBot is ready for production use. A new release ships almost every day.
+
 > [!WARNING]
-> OpenBot is a development preview. Agents currently run with `danger-full-access` and
-> `approvalPolicy: never`. They can read and modify files, run commands, use the network, and control
-> the embedded browser without per-action confirmations after the explicit first-launch consent.
+> Agents run with `danger-full-access` and `approvalPolicy: never`. They can read and modify files,
+> run commands, use the network, and control the embedded browser without per-action confirmations
+> after the explicit first-launch consent.
 > Run only agents and tasks you trust, keep backups, and review [Security](#security) before use.
 
 ## What works

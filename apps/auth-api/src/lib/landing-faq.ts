@@ -54,7 +54,7 @@ export const LANDING_FAQ: readonly LandingQuestion[] = [
   {
     question: "Is it safe to let agents work on my computer?",
     answer:
-      "OpenBot is a development preview. Agents can read and change files, run commands, use the network and control the built-in browser without asking each time. Give them only tasks you trust, and keep backups.",
+      "Agents can read and change files, run commands, use the network and control the built-in browser without asking each time. Give them only tasks you trust, and keep backups.",
   },
 ];
 
