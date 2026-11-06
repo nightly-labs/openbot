@@ -50,6 +50,13 @@ const INEFFECTIVE_COMPACTION_LIMIT = 2;
 const RETRY_COMPACTION_SHARE = 0.5;
 /** About four characters of text make one token. Only the compaction estimate uses it. */
 const CHARACTERS_PER_TOKEN = 4;
+/**
+ * A session that grew by less than this share of its window since the last compaction compacts again
+ * for nothing: the next compaction removes about the same fixed part (#3905).
+ */
+function minimumGrowth(contextWindow: number): number {
+  return Math.max(1_024, Math.floor(contextWindow * 0.05));
+}
 const CONTEXT_COMPACTION_TIMEOUT_MS = 120_000;
 /**
  * A started compaction of a long thread can take minutes (#3466). Its deadline is this many times
@@ -119,6 +126,12 @@ export class ContextCompaction {
   readonly #rotatesSession: ContextCompactionOptions["rotatesSession"];
   readonly #isStopping: () => boolean;
   readonly #budgets = new Map<string, ThreadContextBudget>();
+  /**
+   * The post-compaction fill of a native compaction that arrived before this thread had a budget.
+   * A first turn can compact before `thread/tokenUsage/updated` creates the budget; the next budget
+   * takes this value instead of losing it.
+   */
+  readonly #pendingNativeCompacted = new Map<string, number>();
   /**
    * The agent of each provider thread that compacts, and the client that runs it once `request` sends it.
    * `turnId`: the turn whose end made the `reserve` hold, until `request` takes the hold.
@@ -293,13 +306,15 @@ export class ContextCompaction {
     const contextWindow = finiteNumberOrNull(usage?.modelContextWindow);
     if (usedTokens === null || usedTokens < 0 || contextWindow === null || contextWindow <= 0) return;
 
+    const lastCompactedTokens = this.#pendingNativeCompacted.get(threadId) ?? null;
+    this.#pendingNativeCompacted.delete(threadId);
     const budget = this.#budgets.get(threadId) ?? {
       usedTokens,
       contextWindow,
       pending: false,
       phase: "idle" as const,
       compactionTurnId: null,
-      lastCompactedTokens: null,
+      lastCompactedTokens,
       ineffectiveCompactions: 0,
       awaitingUsage: false,
     };
@@ -326,8 +341,7 @@ export class ContextCompaction {
       return;
     }
 
-    const minimumGrowth = Math.max(1_024, Math.floor(contextWindow * 0.05));
-    if (budget.lastCompactedTokens !== null && usedTokens < budget.lastCompactedTokens + minimumGrowth) {
+    if (budget.lastCompactedTokens !== null && usedTokens < budget.lastCompactedTokens + minimumGrowth(contextWindow)) {
       return;
     }
     budget.pending = true;
@@ -365,12 +379,20 @@ export class ContextCompaction {
       budget.pending ||
       budget.phase !== "idle" ||
       budget.contextWindow <= 1 ||
-      budget.ineffectiveCompactions >= INEFFECTIVE_COMPACTION_LIMIT ||
-      // The usage is from before the last compaction: the provider reports the new size later.
-      (budget.lastCompactedTokens !== null && budget.usedTokens <= budget.lastCompactedTokens)
+      budget.ineffectiveCompactions >= INEFFECTIVE_COMPACTION_LIMIT
     )
       return;
     const estimated = budget.usedTokens + Math.ceil(characters / CHARACTERS_PER_TOKEN);
+    // A compaction that just ended cannot remove anything until the session grows past the growth
+    // rule, and it would compact again at the same fill. Usage from before the compaction counts as
+    // that fill: the provider reports the new size later. Only an input that would not fit the
+    // window at all still compacts first, so that the provider does not refuse the request.
+    if (
+      budget.lastCompactedTokens !== null &&
+      budget.usedTokens < budget.lastCompactedTokens + minimumGrowth(budget.contextWindow) &&
+      estimated <= budget.contextWindow
+    )
+      return;
     if (estimated / budget.contextWindow < CONTEXT_COMPACTION_THRESHOLD) return;
     budget.pending = true;
     logger.info("The next input fills the session, so it compacts first.", {
@@ -529,11 +551,17 @@ export class ContextCompaction {
     return this.#budgets.get(threadId)?.compactionTurnId === turnId;
   }
 
-  markCompacted(threadId: string): void {
+  markCompacted(threadId: string, usedTokens?: number): void {
+    const afterTokens =
+      usedTokens !== undefined && Number.isFinite(usedTokens) && usedTokens > 0 ? usedTokens : undefined;
     const budget = this.#budgets.get(threadId);
-    if (!budget) return;
+    if (!budget) {
+      if (afterTokens !== undefined) this.#pendingNativeCompacted.set(threadId, afterTokens);
+      return;
+    }
+    this.#pendingNativeCompacted.delete(threadId);
     budget.pending = false;
-    budget.lastCompactedTokens = budget.usedTokens;
+    budget.lastCompactedTokens = afterTokens ?? budget.usedTokens;
     budget.awaitingUsage = true;
   }
 
@@ -553,6 +581,7 @@ export class ContextCompaction {
   /** Drops a retired provider thread's budget. The agent keeps compacting until `forgetAgent`. */
   forgetThread(threadId: string): void {
     this.#budgets.delete(threadId);
+    this.#pendingNativeCompacted.delete(threadId);
     const displayed = this.#display.delete(threadId);
     this.#durations.delete(threadId);
     this.#awaitingPostCompaction.delete(threadId);
@@ -615,6 +644,7 @@ export class ContextCompaction {
     for (const hold of this.#refusals.values()) clearTimeout(hold.timer);
     this.#refusals.clear();
     this.#budgets.clear();
+    this.#pendingNativeCompacted.clear();
     this.#display.clear();
     this.#durations.clear();
     this.#awaitingPostCompaction.clear();
