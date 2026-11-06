@@ -223,7 +223,7 @@ import { createGitHubRest, type WorkflowGitHubDirectory, workflowGitHubDirectory
 import { HermesImportService } from "./hermes-import-service";
 import { HermesInstaller } from "./hermes-installer";
 import { HostEventsRuntime } from "./host-events-runtime";
-import { agentWebhookRoutineWriter, HostEventsService } from "./host-events-service";
+import { agentWebhookRoutineWriter, HostEventsService, type WebhookDeliveryReport } from "./host-events-service";
 import { HostService } from "./host-service";
 import { HostUpdateCoordinator } from "./host-update-coordinator";
 import { CLIENT_USE_WINDOW_MS, HostedServerActivity } from "./hosted-server-activity";
@@ -2407,6 +2407,8 @@ export async function createApplicationServices({
     ingress: signalIngress,
     hostId: () => teamStore.getIdentity()?.serverId ?? null,
   });
+  // Analytics starts later in this function. A request before then is not reported.
+  let reportWebhookDelivery: ((report: WebhookDeliveryReport) => void) | null = null;
   const events = new HostEventsService({
     routines: service.routineRecords,
     workflows: {
@@ -2419,6 +2421,7 @@ export async function createApplicationServices({
       const state = centralAuth.getState();
       return state.status === "signed_in" ? state.user.id : null;
     },
+    onDelivery: (report) => reportWebhookDelivery?.(report),
   });
   const eventsRuntime = new HostEventsRuntime(events);
   signalIngress.handleWebhooks((input) => events.receive(input));
@@ -3056,13 +3059,24 @@ export async function createApplicationServices({
     },
     resolveRoutineRun: (agentId, routineId, runId) => {
       const run = service.listRoutineRuns({ agentId, routineId }).find((item) => item.id === runId);
-      const routine = service.listRoutines(agentId).find((item) => item.id === routineId);
-      return run && routine ? { runKind: run.kind, triggerType: routine.trigger.schedule.kind } : null;
+      // The records include webhook routines, which the schedule list leaves out.
+      const routine = service.routineRecords.get({ kind: "agent", id: agentId }, routineId);
+      if (!run || !routine) return null;
+      return {
+        runKind: run.kind,
+        runSource: run.source ?? null,
+        triggerType: routine.trigger.kind === "webhook" ? "webhook" : routine.trigger.schedule.kind,
+      };
     },
     resolveInventory: () =>
       collectAnalyticsInventory({
         agents: () => service.listAgents(),
         routines: (agentId) => service.listRoutines(agentId),
+        enabledWebhookRoutineCount: (agentId) =>
+          service.routineRecords
+            .list({ kind: "agent", id: agentId })
+            .filter((routine) => routine.active && routine.trigger.kind === "webhook").length,
+        webhookRouteCount: () => service.routineRecords.routes.list().length,
         workflowCount: () => workflowStore.list().length,
         // The local read: `listInstalled` asks the marketplace for each skill's latest version.
         skills: (agentId) => skills.listInstalledForChatTags(agentId),
@@ -3088,6 +3102,7 @@ export async function createApplicationServices({
   // than flushing a queue, so a later call would attribute them to nobody.
   analytics.flushPending();
   service.on("failure", (failure) => analytics.handleFailure(failure));
+  reportWebhookDelivery = (report) => analytics.handleWebhookDelivery(report);
   resourceMonitor.start(() => analytics.checkResources());
   const startup = localServerChild
     ? null

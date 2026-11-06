@@ -94,8 +94,9 @@ message, a welcome email for a server plan, or a license email), it sends OpenPa
 event has no account ID, email address, name or message content.
 
 Every 5 minutes, each Signal host sends OpenPanel one event with the number of TURN relay allocations
-and the number of Signal connections. It has no account ID, address, session or
-message content.
+and the number of Signal connections. It also has the number of webhook requests that Signal answered
+in those 5 minutes, by HTTP status, and the average time it waited for a host. It has no account ID,
+address, session, route, or message content.
 
 The account service also records a return from Checkout without payment and later payment
 recovery. Verified paid invoices produce a revenue event in USD, with the original amount,
@@ -180,7 +181,10 @@ application-version-change actions. Plans and license events send the plan, bill
 currency, where the plans were opened, and whether a license user count went up or down; they do
 not send a price, a payment detail or a Stripe ID. Connector events name only the connector type,
 such as Slack; channel events send no channel name. Message events can send the kinds of the
-attached files (image, document, spreadsheet, ZIP or other), never their names or types. Event properties are limited to metadata such as counts, result states, timing, provider,
+attached files (image, document, spreadsheet, ZIP or other), never their names or types. For each
+webhook request that reaches the computer, the app records the kind of owner (agent, channel or
+workflow), the result, the HTTP status, the body size and the times, at most 60 each minute; it
+never sends the URL, a route or delivery ID, the secret, the event type or the body. Event properties are limited to metadata such as counts, result states, timing, provider,
 model, reasoning effort, application version, operating system, and coarse failure codes. Voice events
 send only lengths, times, counts, the chosen voice (for example `F1`), whether the server is local or
 remote, and whether speech recognition runs on the computer or in the cloud. They never send what

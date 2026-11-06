@@ -150,6 +150,12 @@ interface ActiveConnection {
   host: SignalSocket;
 }
 
+/** Every status that Signal can answer to a generic webhook request. */
+export const WEBHOOK_ANSWER_STATUSES = [200, 202, 400, 401, 404, 413, 415, 429, 503] as const;
+export type WebhookAnswerStatus = (typeof WEBHOOK_ANSWER_STATUSES)[number];
+/** A host answer slower than this counts as slow. */
+const SLOW_WEBHOOK_WAIT_MILLISECONDS = 5_000;
+
 export interface SignalMetrics {
   acceptedConnections: number;
   authenticationFailures: number;
@@ -171,6 +177,12 @@ export interface SignalMetrics {
   discordApiFailures: number;
   webhookDeliveries: number;
   webhookDeliveriesUnavailable: number;
+  /** The answers to generic webhook requests, by HTTP status. */
+  webhookAnswers: Record<WebhookAnswerStatus, number>;
+  /** The requests that Signal passed on, and the sum of the time it waited for their answers. */
+  webhookWaits: number;
+  webhookWaitMilliseconds: number;
+  webhookSlowWaits: number;
   githubDeliveries: number;
   githubDeliveriesUnavailable: number;
   // Slack, Discord and Telegram events kept for a hosted server that starts, and sent to it later.
@@ -414,6 +426,10 @@ export class SignalService {
     discordApiFailures: 0,
     webhookDeliveries: 0,
     webhookDeliveriesUnavailable: 0,
+    webhookAnswers: { 200: 0, 202: 0, 400: 0, 401: 0, 404: 0, 413: 0, 415: 0, 429: 0, 503: 0 },
+    webhookWaits: 0,
+    webhookWaitMilliseconds: 0,
+    webhookSlowWaits: 0,
     githubDeliveries: 0,
     githubDeliveriesUnavailable: 0,
     queuedDeliveries: 0,
@@ -775,6 +791,18 @@ export class SignalService {
   /** Applies the generic webhook rate limit by route or source address. */
   acceptWebhookRequest(key: string): boolean {
     return this.#acceptRateKey(`webhook:${key}`, Date.now());
+  }
+
+  /**
+   * Counts one answer to a generic webhook request. `waitMilliseconds` is the time from the
+   * delivery frame to the answer, for a request that Signal passed on.
+   */
+  recordWebhookAnswer(status: WebhookAnswerStatus, waitMilliseconds?: number): void {
+    this.#metrics.webhookAnswers[status] += 1;
+    if (waitMilliseconds === undefined) return;
+    this.#metrics.webhookWaits += 1;
+    this.#metrics.webhookWaitMilliseconds += Math.max(0, Math.round(waitMilliseconds));
+    if (waitMilliseconds > SLOW_WEBHOOK_WAIT_MILLISECONDS) this.#metrics.webhookSlowWaits += 1;
   }
 
   recordDiscordCall(succeeded: boolean): void {
@@ -1259,7 +1287,12 @@ export class SignalService {
 
   metrics(): SignalMetrics {
     this.#pruneReplayCache();
-    return { ...this.#metrics, activeSockets: this.#sockets.size, activePeerConnections: this.#connections.size };
+    return {
+      ...this.#metrics,
+      webhookAnswers: { ...this.#metrics.webhookAnswers },
+      activeSockets: this.#sockets.size,
+      activePeerConnections: this.#connections.size,
+    };
   }
 
   readonly #authenticate = Effect.fn("Signal.authenticate")(
