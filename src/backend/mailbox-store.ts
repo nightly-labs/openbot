@@ -87,7 +87,7 @@ interface StoredMessage {
   taskId?: string;
   /**
    * The side thread an agent sent this message from. An answer to it runs in that thread, and the
-   * sender's own chat does not show it. Never sent to a client.
+   * sender's own chat does not show it. The recipient's chat gets it, so the sender link opens that thread.
    */
   senderTaskId?: string;
   id: string;
@@ -1421,6 +1421,7 @@ export class MailboxStore {
                   recipientAgentIds: deliveries.map((item) => item.recipientAgentId),
                   replyToMessageId: message.replyToMessageId,
                   ...(message.expectsReply === false ? { expectsReply: false } : {}),
+                  ...(message.senderTaskId ? { senderTaskId: message.senderTaskId } : {}),
                   deliveries: deliveries.map((item) => {
                     const publicItem = this.#publicDelivery(item, positions, message);
                     return {
