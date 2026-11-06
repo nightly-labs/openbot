@@ -387,28 +387,10 @@ boot() {
   apply
 }
 
-# While boat restores the disk, OpenBot reads its database and about 30 small files of its profile
-# one after the other before it publishes, and each first read waits for the network. This reads
-# them in parallel while the release is restored, as the service user, so root opens no path that
-# the user controls. It does not wait: OpenBot reads what is not complete yet as before.
-prefetch_profile() {
-  local user home
-  if self_hosted || ! restoring || [ ! -r "$INSTALL/hosted/service-user" ]; then return 0; fi
-  user=$(<"$INSTALL/hosted/service-user")
-  [[ $user =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]] || return 1
-  home=$(getent passwd "$user" | cut -d: -f6)
-  [ -d "$home/.config/OpenBot" ] || return 0
-  # -type f skips links and FIFOs. The larger files of Chromium wait for their first read.
-  runuser -u "$user" -- timeout 300 find "$home/.config/OpenBot" -maxdepth 2 -type f \
-    \( -path "$home/.config/OpenBot/openbot.db*" -o -size -1024k \) -print0 2>/dev/null |
-    runuser -u "$user" -- timeout 300 xargs -0 -r -n 8 -P 8 cat >/dev/null 2>&1 &
-}
-
 # A release that an older script moved into place has the units of `request`, but that script
 # installed only the units that it knew. The start of OpenBot does not wait for the update lock.
 trigger() {
   local source=$INSTALL/app/resources/hosting unit changed=0
-  prefetch_profile || echo "The OpenBot profile is not read ahead." >&2
   repair_release_modes || echo "The modes of the release are not repaired." >&2
   for unit in "${REQUEST_UNITS[@]}"; do
     if [ ! -e "$UNIT_DIRECTORY/$unit" ] && [ -f "$source/$unit" ]; then
