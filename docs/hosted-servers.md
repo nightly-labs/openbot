@@ -183,8 +183,9 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    next try. boat reports these tries as `stop.status: "failing"` and keeps the sandbox state
    `idle`. On 2026-11-05 a save failed this way for 18 hours, while the restore of the disk stalled,
    and the start command failed with `sandbox_restoring`. Thus the Worker reads a failing stop as
-   `stopping`, not `running`, and logs `Hosted server stop is failing.` at each check. A client wake
-   still sends `FAILED_STOP_START_COMMAND`. The Worker does not end the stop. Only a resume ends it
+   `stopping`, not `running`, and logs `Hosted server stop is failing.` at each check. A `sandbox.ready`
+   webhook for a stopping server makes the Worker read the sandbox again, so the webhook does not hide
+   the failing stop. Each client wake and connector event still sends `FAILED_STOP_START_COMMAND`. The Worker does not end the stop. Only a resume ends it
    (`superseded`), but boat does not say if that resume keeps the disk or restores the last saved
    disk. A forced stop keeps only the last saved disk and loses what was written after it. An
    operator decides: compare `snapshotCompletedAt` with the last writes of OpenBot before a force,

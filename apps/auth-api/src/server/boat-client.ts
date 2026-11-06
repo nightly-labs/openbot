@@ -27,16 +27,11 @@ const BoatSandboxState = Schema.Literals([
   "cancelled",
 ]);
 export type BoatSandboxState = typeof BoatSandboxState.Type;
-/**
- * The last stop of the sandbox. `failing`: boat could not save the disk, and it tries again until the
- * save works. The sandbox keeps its usable state for this time. Only a resume ends the stop
- * (`superseded`). Other values are `pending`, `completed` and `superseded`.
- */
-const BoatStop = Schema.Struct({ status: Schema.String });
 const BoatSandbox = Schema.Struct({
   id: Schema.String,
   state: BoatSandboxState,
-  stop: Schema.optional(Schema.NullOr(BoatStop)),
+  // Read only by `isStopFailing`. A stop with an unknown form must not stop the read of the state.
+  stop: Schema.optional(Schema.Unknown),
 });
 const BoatCommandResult = Schema.Struct({ exitCode: Schema.NullOr(Schema.Number), stdout: Schema.String });
 
@@ -212,6 +207,15 @@ export class BoatClient {
 }
 
 export const isBoatState = Schema.is(BoatSandboxState);
+
+/**
+ * True while boat cannot save the disk for the last stop of the sandbox (`stop.status: "failing"`). boat
+ * tries the stop again until a save works, and the sandbox keeps its usable state for this time. Only a
+ * resume ends the stop (`superseded`). Other values are `pending`, `completed` and `superseded`.
+ */
+export function isStopFailing(sandbox: { readonly stop?: unknown }): boolean {
+  return isDynamicRecord(sandbox.stop) && sandbox.stop.status === "failing";
+}
 
 /** Checks a boat webhook signature: hex HMAC-SHA256 of `delivery.timestamp.body`. */
 export const verifyBoatWebhookSignature = Effect.fn("verifyBoatWebhookSignature")(function* (input: {
