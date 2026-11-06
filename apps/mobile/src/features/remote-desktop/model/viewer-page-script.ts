@@ -10,10 +10,16 @@ import type { RemoteDesktopDisplay } from "./remote-desktop-api";
 //   ("Unicode input not yet implemented for MacOS"). Only a character with no key goes as text,
 //   which Sunshine types on Windows and Linux.
 // - Zoom: a transform of Moonlight's video element. It is `position: fixed`, so a transform of a
-//   parent would move it. Moonlight maps a touch through the video's bounding box, which includes
-//   the transform, so the pointer lands where the finger is at any zoom.
-// - Two fingers that pinch zoom the view; while zoomed in, two fingers also move it. Moonlight keeps
-//   the other gestures: a two-finger drag at full size scrolls, and a two-finger tap right-clicks.
+//   parent would move it. Moonlight's page animates every transform for 0.25 s, so the video's
+//   transition is turned off: a pan reads the video's place, and a place in mid-animation is wrong.
+//   Moonlight maps a touch through the video's bounding box, which includes the transform.
+// - Trackpad mode is Moonlight's `localCursor` mode: the finger moves the pointer as with
+//   `mouseRelative`, but the page knows where the pointer is and sends it as a position. While zoomed
+//   in, the view follows the pointer. Moonlight's own drawing of that pointer is hidden, because the
+//   computer's pointer is in the video.
+// - A two-finger pinch zooms, and moves the view with the fingers. Three fingers move the view.
+//   Moonlight keeps the other gestures at any zoom: a two-finger drag scrolls, and a two-finger tap
+//   right-clicks.
 
 /**
  * `fast` for a computer display of 120 Hz or more: Sunshine captures no faster than the display, so
@@ -29,7 +35,7 @@ const QUALITY = {
   saver: { fps: 30, bitrate: 3_000, maxWidth: 1280 },
 } as const satisfies Record<ViewerQuality, { fps: number; bitrate: number; maxWidth: number }>;
 
-const TOUCH_MODE = { trackpad: "mouseRelative", direct: "pointAndDrag" } as const satisfies Record<
+const TOUCH_MODE = { trackpad: "localCursor", direct: "pointAndDrag" } as const satisfies Record<
   ViewerTouchMode,
   string
 >;
@@ -94,6 +100,8 @@ export function viewerPageScript(
   touchMode: ViewerTouchMode,
   display: RemoteDesktopDisplay | undefined,
   background: string,
+  /** The space that the app's bars cover at the top and the bottom of the page. */
+  covered: { top: number; bottom: number },
 ): string {
   const preset = QUALITY[quality];
   const settings = {
@@ -117,7 +125,7 @@ try {
 try {
   const background = ${JSON.stringify(cssColor(background))};
   const style = document.createElement("style");
-  style.textContent = "html,body,#root,.video-stream{background:" + background + " !important}body::before{display:none !important}.video-stats{display:none !important}";
+  style.textContent = "html,body,#root,.video-stream{background:" + background + " !important}body::before{display:none !important}.video-stats{display:none !important}.video-stream{transition:none !important}.local-touch-cursor{display:none !important}";
   (document.head || document.documentElement).appendChild(style);
 } catch {}
 if (window.__openbotRemote) return;
@@ -138,6 +146,7 @@ const tap = (code, key, shift) => {
 };
 const input = () => { const app = window.app; return app && app.stream && app.stream.getInput ? app.stream.getInput() : null; };
 const view = { scale: 1, x: 0, y: 0 };
+const COVERED = ${JSON.stringify({ top: Math.max(0, Math.round(covered.top)), bottom: Math.max(0, Math.round(covered.bottom)) })};
 const videos = () => Array.from(document.querySelectorAll(".video-stream"));
 const apply = () => {
   for (const video of videos())
@@ -215,16 +224,21 @@ window.__openbotRemote = {
     statsTimer = setInterval(send, 1000);
   },
 };
-// A gesture that the view owns from its second finger to its last lift. Moonlight forgets the touches
-// it had, so a finger it saw first does not click or stay down.
+// A gesture that the view owns from its start to its last lift: a pinch, or three fingers. Moonlight
+// forgets the touches it had, so a finger it saw first does not click or stay down.
 let gesture = null;
 let pending = null;
-const measure = (touches) => ({
-  x: (touches[0].clientX + touches[1].clientX) / 2,
-  y: (touches[0].clientY + touches[1].clientY) / 2,
-  d: Math.max(1, Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY)),
-});
-// From a pinch that started at full size, the view counts from where the fingers first touched.
+const measure = (touches) => {
+  let x = 0;
+  let y = 0;
+  for (const touch of touches) { x += touch.clientX; y += touch.clientY; }
+  return {
+    count: touches.length,
+    x: x / touches.length,
+    y: y / touches.length,
+    d: touches.length < 2 ? 1 : Math.max(1, Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY)),
+  };
+};
 const own = (touches, from) => {
   pending = null;
   gesture = { last: from || measure(touches) };
@@ -234,10 +248,9 @@ const own = (touches, from) => {
 };
 const swallow = (event) => { event.stopImmediatePropagation(); if (event.cancelable) event.preventDefault(); };
 addEventListener("touchstart", (event) => {
-  if (gesture) return swallow(event);
-  if (event.touches.length !== 2) return;
-  if (view.scale > 1) { own(event.touches); swallow(event); }
-  else pending = measure(event.touches);
+  if (gesture) { gesture.last = measure(event.touches); return swallow(event); }
+  if (event.touches.length >= 3) { own(event.touches); return swallow(event); }
+  pending = event.touches.length === 2 ? measure(event.touches) : null;
 }, { capture: true, passive: false });
 addEventListener("touchmove", (event) => {
   if (!gesture && pending && event.touches.length === 2) {
@@ -249,7 +262,10 @@ addEventListener("touchmove", (event) => {
   swallow(event);
   if (event.touches.length < 2) return;
   const now = measure(event.touches);
-  zoomAt(view.scale * (now.d / gesture.last.d), now.x, now.y, now.x - gesture.last.x, now.y - gesture.last.y);
+  // A change of fingers starts the count again, so the view does not jump.
+  if (now.count !== gesture.last.count) { gesture.last = now; return; }
+  const scale = now.count === 2 ? view.scale * (now.d / gesture.last.d) : view.scale;
+  zoomAt(scale, now.x, now.y, now.x - gesture.last.x, now.y - gesture.last.y);
   gesture.last = now;
 }, { capture: true, passive: false });
 const lift = (event) => {
@@ -257,18 +273,46 @@ const lift = (event) => {
   if (!gesture) return;
   swallow(event);
   if (event.touches.length === 0) gesture = null;
-  else if (event.touches.length >= 2) gesture.last = measure(event.touches);
+  else gesture.last = measure(event.touches);
 };
 addEventListener("touchend", lift, { capture: true, passive: false });
 addEventListener("touchcancel", lift, { capture: true, passive: false });
+// While zoomed in, the view follows the pointer: a pointer that moves near an edge, or under the
+// app's bars, moves the view until the pointer is in view again. Only a move of the pointer does
+// this, so a view that the fingers moved away from the pointer stays where they left it.
+const EDGE = 40;
+let lastCursor = null;
+const follow = () => {
+  requestAnimationFrame(follow);
+  const target = input();
+  const app = window.app;
+  if (!target || !target.getLocalCursorState || !app || !app.getStreamRect) return;
+  const cursor = target.getLocalCursorState();
+  if (!cursor || !cursor.visible) return;
+  const moved = !lastCursor || lastCursor.x !== cursor.x || lastCursor.y !== cursor.y;
+  lastCursor = { x: cursor.x, y: cursor.y };
+  if (!moved || view.scale === 1 || gesture) return;
+  const rect = app.getStreamRect();
+  if (!rect || rect.width <= 0) return;
+  const px = rect.left + cursor.x * rect.width;
+  const py = rect.top + cursor.y * rect.height;
+  const left = EDGE;
+  const right = innerWidth - EDGE;
+  const top = COVERED.top + EDGE;
+  const bottom = innerHeight - COVERED.bottom - EDGE;
+  const dx = px < left ? left - px : px > right ? right - px : 0;
+  const dy = py < top ? top - py : py > bottom ? bottom - py : 0;
+  if (dx !== 0 || dy !== 0) zoomAt(view.scale, 0, 0, dx, dy);
+};
+requestAnimationFrame(follow);
 })();
 true;`;
 }
 
-/** A call into the page's script. Each value is JSON, so no value can end the call early. */
 /** The file name that the page posts its stats to. The proxy answers it and sends it to no host. */
 export const VIEWER_STATS_FILE = "openbot-phone-stats";
 
+/** A call into the page's script. Each value is JSON, so no value can end the call early. */
 export function viewerCall(
   method: "key" | "modifier" | "type" | "touchMode" | "fit" | "stats",
   ...values: unknown[]

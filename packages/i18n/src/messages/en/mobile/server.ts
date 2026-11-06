@@ -61,7 +61,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.remoteDesktop.help.view": "View",
   "mobile.server.remoteDesktop.help.zoom.title": "Zoom",
   "mobile.server.remoteDesktop.help.zoom.body":
-    "Pinch to zoom in. When zoomed in, slide two fingers to move the view. Fit to screen in the ••• menu shows all of it again.",
+    "Pinch to zoom in. When zoomed in, the view follows the pointer, and three fingers move the view. Two fingers still scroll. Fit to screen in the ••• menu shows all of it again.",
   "mobile.server.remoteDesktop.help.display.title": "Display and quality",
   "mobile.server.remoteDesktop.help.display.body":
     "Choose another display of the computer, or a quality, in the ••• menu. Fast helps only when the computer's display shows 120 frames a second. Use Data saver on a mobile network.",

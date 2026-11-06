@@ -227,7 +227,10 @@ export function RemoteDesktopScreen() {
         setPhase({
           type: "viewing",
           url: proxy.viewerUrl(session.viewerGrant),
-          script: viewerPageScript(chosenQuality, chosenTouchMode, display, String(background)),
+          script: viewerPageScript(chosenQuality, chosenTouchMode, display, String(background), {
+            top: insets.top + (isIOS ? NATIVE_BAR_HEIGHT : CONTROL_OFFSET + CONTROL_SIZE),
+            bottom: insets.bottom + CONTROL_OFFSET + CONTROL_SIZE,
+          }),
           host,
           session,
         });
@@ -236,7 +239,7 @@ export function RemoteDesktopScreen() {
           setPhase({ type: "failed", message: failureText(error) ?? t("mobile.server.remoteDesktop.failed") });
       }
     },
-    [stop, canControlComputer, remoteDesktopConnection, serverId, t, background],
+    [stop, canControlComputer, remoteDesktopConnection, serverId, t, background, insets.top, insets.bottom],
   );
 
   // Starts once, and ends the session when the screen closes. The workspace gives new functions on

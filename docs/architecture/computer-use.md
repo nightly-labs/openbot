@@ -192,11 +192,18 @@ only its loopback address, and cannot call the app. The app calls the page with 
   Sunshine on macOS does not type text ("Unicode input not yet implemented for MacOS"), so only a
   character with no key goes through Moonlight's `sendText`, which Windows and Linux hosts type.
 - Zoom is a transform of Moonlight's `.video-stream` element. That element is `position: fixed`, so
-  a transform of a parent would move it out of view. Moonlight maps a touch through the video's
-  bounding box, so a touch lands where the finger is. A two-finger pinch zooms; while zoomed in, two
-  fingers also move the view. The script then calls Moonlight's `onTouchCancel`, so a finger that
-  Moonlight saw first does not click. At full size, a two-finger drag still scrolls and a two-finger
-  tap still right-clicks.
+  a transform of a parent would move it out of view. Moonlight's page animates every transform for
+  0.25 s, so the script turns off the video's transition: each pan step reads the video's place,
+  and a place in mid-animation made the view drift. Moonlight maps a touch through the video's
+  bounding box, so a touch lands where the finger is.
+- Trackpad mode is Moonlight's `localCursor` touch mode: the finger moves the pointer as on a
+  trackpad, and Moonlight sends the pointer's position, so the page knows it. While zoomed in, the
+  view follows the pointer when the pointer moves near an edge or under the app's bars. A view that
+  the fingers moved away from the pointer stays there until the pointer moves. Moonlight's own pointer drawing is hidden, because
+  the computer's pointer is in the video. A pinch zooms and moves the view with the fingers; three
+  fingers move the view. For a gesture that the view takes, the script calls Moonlight's
+  `onTouchCancel`, so a finger that Moonlight saw first does not click. At any zoom, a two-finger
+  drag scrolls the computer and a two-finger tap right-clicks.
 - Before a session the phone asks for Face ID, Touch ID or the phone unlock. It ends the session
   when the app leaves the foreground, covers the screen in the app switcher, keeps the phone awake,
   and sets `FLAG_SECURE` on Android.
