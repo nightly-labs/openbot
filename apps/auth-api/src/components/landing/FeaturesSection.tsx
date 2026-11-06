@@ -3,12 +3,12 @@ import type { JSX } from "@solidjs/web";
 import { Link } from "@tanstack/solid-router";
 import { createSignal, For, lazy, onSettled, Show } from "solid-js";
 import {
+  ADA,
   LANDING_FEATURE_IDS,
   LANDING_MULTIPLAYER_AGENTS,
   LANDING_MULTIPLAYER_INVITED,
   LANDING_MULTIPLAYER_PEOPLE,
   LANDING_MULTIPLAYER_SENDERS,
-  LANDING_PERSIST_AGENT,
   LANDING_PERSIST_SENDERS,
   LANDING_PROVIDERS,
   LANDING_TEAM,
@@ -294,8 +294,8 @@ export function FeaturesSection() {
     persist: () => (
       <div class="landing-window landing-persist-window">
         <div class="landing-window-bar">
-          {avatar(LANDING_PERSIST_AGENT, "small")}
-          <span class="landing-team-name">{LANDING_PERSIST_AGENT.name}</span>
+          {avatar(ADA, "small")}
+          <span class="landing-team-name">{ADA.name}</span>
           <span class="landing-persist-select">
             <span class="landing-persist-swap">
               <For each={[LANDING_PERSIST_SENDERS.before, LANDING_PERSIST_SENDERS.after]}>

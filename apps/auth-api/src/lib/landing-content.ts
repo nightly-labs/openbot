@@ -28,13 +28,11 @@ export interface LandingTeammate {
   avatarHue: AvatarHue;
 }
 
+/** Also the agent who moves to a different provider in the persist picture. */
 export const ADA: LandingTeammate = { name: "Ada", avatarSeed: "landing-ada", avatarHue: 245 };
 export const LINUS: LandingTeammate = { name: "Linus", avatarSeed: "landing-linus", avatarHue: 150 };
 const GRACE: LandingTeammate = { name: "Grace", avatarSeed: "landing-grace", avatarHue: 30 };
 const ALAN: LandingTeammate = { name: "Alan", avatarSeed: "landing-alan", avatarHue: 185 };
-
-/** The agent who moves to a different provider in the persist picture. */
-export const LANDING_PERSIST_AGENT = ADA;
 
 /** The members of the channel in the team picture. */
 export const LANDING_TEAM: readonly LandingTeammate[] = [ADA, LINUS, GRACE];
@@ -59,7 +57,7 @@ export const LANDING_TEAM_REPLY_SENDER: LandingTeamSender = { from: ADA, time: "
 export type LandingHair = "long" | "short" | "curly";
 
 /** One more detail that makes a drawn face easy to tell apart at a small size. */
-export type LandingFaceDetail = "none" | "glasses" | "freckles";
+type LandingFaceDetail = "none" | "glasses" | "freckles";
 
 /**
  * A person in the multiplayer picture. A person has a drawn face, not an agent avatar. `id` selects
@@ -98,7 +96,7 @@ export const LANDING_MULTIPLAYER_INVITED: LandingPerson = {
 };
 
 /** The agent steps of the workflow picture. The text of each step is `picture.workflows.<id>`. */
-export type LandingWorkflowAgentId = "issues" | "usage" | "report" | "charts";
+type LandingWorkflowAgentId = "issues" | "usage" | "report" | "charts";
 export type LandingWorkflowStepId = "trigger" | LandingWorkflowAgentId | "approval";
 
 export interface LandingWorkflowAgent {

@@ -124,9 +124,8 @@ export function siteText(t: AppTranslate) {
   };
 }
 
-export type SiteText = ReturnType<typeof siteText>;
+type SiteText = ReturnType<typeof siteText>;
 
-export type SiteSectionId = keyof SiteText["sections"];
 export type SiteResourceId = keyof SiteText["resources"];
 export type SiteLinkId = keyof SiteText["links"];
 export type FooterColumnId = keyof SiteText["footer"]["columns"];

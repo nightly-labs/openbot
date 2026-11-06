@@ -1,14 +1,7 @@
 import type { ProviderLogoVariant } from "@openbot/brand";
 import type { AppTranslate } from "@openbot/i18n";
 import { DOWNLOAD_PLATFORMS, type DownloadPlatform } from "./download-platforms";
-import {
-  ADA,
-  CLAUDE_CODE,
-  LANDING_PERSIST_AGENT,
-  type LandingFeatureId,
-  type LandingTeamsOfferId,
-  LINUS,
-} from "./landing-content";
+import { ADA, CLAUDE_CODE, type LandingFeatureId, type LandingTeamsOfferId, LINUS } from "./landing-content";
 import type { LandingQuestion } from "./landing-faq";
 import type { MobilePlatform } from "./mobile-apps";
 import { slot, slotted } from "./text-slots";
@@ -28,7 +21,7 @@ export interface HeroProviderPart {
 }
 
 /** Words of a feature sentence that link to a page under /providers. */
-export interface FeatureLinkPart {
+interface FeatureLinkPart {
   text: string;
   slug: string;
 }
@@ -264,7 +257,7 @@ export function landingPageText(t: AppTranslate) {
         request: t("sitePage.landing.picture.persist.request"),
         before: t("sitePage.landing.picture.persist.before"),
         switch: t("sitePage.landing.picture.persist.switch", {
-          agent: LANDING_PERSIST_AGENT.name,
+          agent: ADA.name,
           provider: CLAUDE_CODE.name,
         }),
         after: t("sitePage.landing.picture.persist.after"),

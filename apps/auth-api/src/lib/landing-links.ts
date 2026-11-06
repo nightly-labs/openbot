@@ -64,7 +64,7 @@ export const OPENBOT_LINKS = {
  * The name of a footer entry: a product or page name that stays the same in every language, or the
  * id of its text in `SiteText`.
  */
-export type FooterLabel = string | { readonly text: FooterTextId };
+type FooterLabel = string | { readonly text: FooterTextId };
 
 /**
  * One entry in a footer column. An internal entry carries a route, not a string,
