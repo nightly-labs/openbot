@@ -3,7 +3,7 @@ import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
 
 /** The tools of the drawer that the user can move and unpin. Server settings stays last and always shows. */
-export const DRAWER_TOOL_IDS = ["tasks", "routines", "workflows", "marketplace", "usage", "members"] as const;
+const DRAWER_TOOL_IDS = ["tasks", "routines", "workflows", "marketplace", "usage", "members"] as const;
 
 export type DrawerToolId = (typeof DRAWER_TOOL_IDS)[number];
 
