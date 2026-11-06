@@ -1,6 +1,7 @@
 import type { AppTranslate } from "@openbot/i18n";
 import { appLanguageOption } from "@openbot/i18n/languages";
 import type { SiteLocale } from "./site-paths";
+import { slot } from "./text-slots";
 
 /*
  * The text of the header, the menu, the footer and the last call to action of the public site, built
@@ -9,11 +10,9 @@ import type { SiteLocale } from "./site-paths";
  * catalogs, so the components do not pull them into the browser bundle.
  */
 
-/** A private-use character that marks where the heart icon goes in the "Made with" sentence. */
-const LOVE_MARKER = "";
-
 export function siteText(t: AppTranslate) {
-  const [madeBefore = "", madeAfter = ""] = t("sitePage.site.footer.made", { love: LOVE_MARKER }).split(LOVE_MARKER);
+  const love = slot("love");
+  const [madeBefore = "", madeAfter = ""] = t("sitePage.site.footer.made", { love }).split(love);
   const download = t("sitePage.site.download");
   const sourceCode = t("sitePage.site.sourceCode");
   const brand = t("sitePage.site.brand");

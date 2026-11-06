@@ -1,17 +1,11 @@
-import { landingPageText } from "./landing-page-text";
-import { loadPageText } from "./page-text";
-import { loadSiteChrome, SITE_OPEN_GRAPH_LOCALES } from "./site-locale";
+import type { landingPageText } from "./landing-page-text";
+import { type loadSitePage, SITE_OPEN_GRAPH_LOCALES } from "./site-locale";
 import { type HomePageHead, OPENBOT_SITE_URL, openBotHomeHead } from "./site-metadata";
-import { pagePaths, SITE_LOCALES, type SiteLocale } from "./site-paths";
+import { pagePaths, SITE_LOCALES } from "./site-paths";
 import { OPENBOT_SOFTWARE_APPLICATION } from "./software-application";
 
-/** The text of the home page and of its header and footer in `locale`, for the loaders of `/` and `/pl`. */
-export async function loadLandingPage(locale: SiteLocale) {
-  const [page, site] = await Promise.all([loadPageText(locale, landingPageText), loadSiteChrome(locale)]);
-  return { ...page, site };
-}
-
-type LandingPageData = Awaited<ReturnType<typeof loadLandingPage>>;
+/** What the loaders of `/` and `/pl` return: `loadSitePage(locale, landingPageText)`. */
+type LandingPageData = Awaited<ReturnType<typeof loadSitePage<ReturnType<typeof landingPageText>>>>;
 
 /**
  * The head of the home page. `path` is the address of this route; `/` shows the language of the

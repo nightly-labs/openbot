@@ -3,6 +3,7 @@ import type { AppTranslate } from "@openbot/i18n";
 import { DOWNLOAD_PLATFORMS, type DownloadPlatform } from "./download-platforms";
 import { ADA, CLAUDE_CODE, type LandingFeatureId, type LandingTeamsOfferId, LINUS } from "./landing-content";
 import type { LandingQuestion } from "./landing-faq";
+import { OPENBOT_LINKS } from "./landing-links";
 import type { MobilePlatform } from "./mobile-apps";
 import { slot, slotted } from "./text-slots";
 
@@ -94,15 +95,13 @@ function providersDescription(t: AppTranslate): FeatureDescriptionPart[] {
 /** One line of the list on each row. */
 const lines = (text: string) => text.split("\n").filter((line) => line.trim() !== "");
 
-const SOURCE_CODE_URL = "https://github.com/nightly-labs/openbot";
-
 function questions(t: AppTranslate): LandingQuestion[] {
   return [
     { question: t("sitePage.landing.faq.free.question"), answer: t("sitePage.landing.faq.free.answer") },
     {
       question: t("sitePage.landing.faq.source.question"),
       answer: t("sitePage.landing.faq.source.answer"),
-      link: { label: t("sitePage.landing.faq.source.link"), href: SOURCE_CODE_URL },
+      link: { label: t("sitePage.landing.faq.source.link"), href: OPENBOT_LINKS.repository },
     },
     { question: t("sitePage.landing.faq.plans.question"), answer: t("sitePage.landing.faq.plans.answer") },
     { question: t("sitePage.landing.faq.models.question"), answer: t("sitePage.landing.faq.models.answer") },
