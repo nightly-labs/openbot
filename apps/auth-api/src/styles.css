@@ -1135,6 +1135,11 @@ a {
   justify-content: center;
 }
 
+/* The action waits hidden until the page has the link for it. */
+.join-card-actions[hidden] {
+  display: none;
+}
+
 /* The one action on the join page fills the card. */
 .join-card-actions-full {
   grid-template-columns: 1fr;
