@@ -113,7 +113,7 @@ again.
   An approval has **Approve** and **Deny** buttons, and a status post has **Stop**. Only the person
   who wrote the request can press them; another person gets a reply that only they see. A reply to
   an OpenBot post with only `stop` or `cancel` stops the request of the person who sends it.
-- A post never pings anyone, also when it names a person.
+- A new post that mentions a person pings that person. A post never pings a role or `@everyone`.
 - An answer longer than 2,000 characters is sent in more than one post. A file larger than 10 MB is
   not sent, and the conversation says which files were not sent.
 
