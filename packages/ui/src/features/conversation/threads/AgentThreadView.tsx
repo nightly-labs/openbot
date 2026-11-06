@@ -114,6 +114,13 @@ export interface AgentThreadVoice {
   onSend: () => void;
 }
 
+/** A thread's messages before the loaded ones, which it reads page by page. */
+export interface AgentThreadOlderMessages {
+  /** A page read is in progress. */
+  loading: boolean;
+  onLoad: () => void;
+}
+
 /** The queue of a thread, with the actions of the queue in the agent's own chat. */
 export interface AgentThreadQueue {
   /** The messages that wait to start in the thread, in queue order. */
@@ -201,6 +208,11 @@ export interface AgentThreadViewProps {
   waitsForAnswer?: boolean | undefined;
   /** Another card that the thread shows, such as a question or a browser takeover. The app builds it. */
   attention?: JSX.Element | undefined;
+  /**
+   * The thread has messages before the loaded ones. Missing when it has none, when it is not known yet,
+   * or when the server cannot read them.
+   */
+  olderMessages?: AgentThreadOlderMessages | undefined;
   /** The card that the app draws in the place of a message row, such as an MCP sign-in. Undefined keeps the row. */
   messageCard?: ((message: AgentMessage) => JSX.Element | undefined) | undefined;
   /**
@@ -572,7 +584,23 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         onScroll={fades.measure}
       >
         <div class="virtual-chat-list virtual-chat-list-static" ref={fades.watch}>
-          <Show when={props.task?.origin === "agent"}>
+          <Show when={props.olderMessages}>
+            {(older) => (
+              <div class="conversation-history-status">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  disabled={older().loading}
+                  onClick={() => older().onLoad()}
+                >
+                  {older().loading ? t("chat.history.loadingOlder") : t("conversation.threads.view.loadOlder")}
+                </Button>
+              </div>
+            )}
+          </Show>
+          {/* The start of the thread shows once its first message is loaded. */}
+          <Show when={props.task?.origin === "agent" && !props.olderMessages}>
             <p class="agent-thread-origin">
               {t("conversation.threads.view.startedByAgent", { name: props.agent.name })}
             </p>

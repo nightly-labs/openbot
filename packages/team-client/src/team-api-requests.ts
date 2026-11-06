@@ -11,6 +11,7 @@ import {
   type AgentMemorySelectionState,
   type AgentTask,
   type AgentTaskInput,
+  type AgentTaskPage,
   type AgentTaskReadState,
   type AgentTasksSnapshot,
   type ApplyAgentImportInput,
@@ -42,6 +43,7 @@ import {
   isAgentMemory,
   isAgentMemorySelectionState,
   isAgentTask,
+  isAgentTaskPage,
   isAgentTaskReadState,
   isAgentTasksSnapshot,
   isAttachmentSummary,
@@ -55,6 +57,7 @@ import {
   type MarkAgentTaskReadInput,
   type OpenBotDesktopApi,
   type QueuedMessageReceipt,
+  type ReadAgentTaskPageInput,
   type RemoteAgentImportResult,
   type RemoteInstanceTransferResult,
   type RenameAgentTaskInput,
@@ -84,6 +87,7 @@ import {
   isAgentThreadBranchLinks,
 } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
 import { AGENT_THREAD_FILES_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
+import { AGENT_THREAD_PAGES_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-pages-v1";
 import { AGENT_THREAD_READS_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_THREAD_REPLIES_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
 import { AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-threads-v1";
@@ -195,6 +199,7 @@ export const clearAgentContext = Effect.fn("TeamClient.clearAgentContext")(funct
 const decodeAgentTasks = guardedDecoder(isAgentTasksSnapshot, "agent tasks response");
 const decodeAgentTask = guardedDecoder(isAgentTask, "agent task response");
 const decodeTaskConversation = guardedDecoder(isConversationSnapshot, "task conversation response");
+const decodeTaskPage = guardedDecoder(isAgentTaskPage, "thread page response");
 const decodeTaskReceipt = guardedDecoder(isQueuedMessageReceipt, "task message receipt");
 
 /**
@@ -213,6 +218,16 @@ export const readAgentTask = Effect.fn("TeamClient.readAgentTask")(function* (
   { agentId, taskId }: AgentTaskInput,
 ): Effect.fn.Return<ConversationSnapshot, TeamRequestError> {
   return yield* teamCall(() => request("POST", AGENT_TASKS_ROUTES.read, decodeTaskConversation, { agentId, taskId }));
+});
+
+/** Older messages of a task, before a message that the client holds. Send it only to a host with `agent-thread-pages-v1`. */
+export const readAgentThreadPage = Effect.fn("TeamClient.readAgentThreadPage")(function* (
+  request: TeamApiRequest,
+  { agentId, taskId, beforeMessageId, limit }: ReadAgentTaskPageInput,
+): Effect.fn.Return<AgentTaskPage, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", AGENT_THREAD_PAGES_ROUTES.readOlder, decodeTaskPage, { agentId, taskId, beforeMessageId, limit }),
+  );
 });
 
 /**

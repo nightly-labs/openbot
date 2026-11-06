@@ -82,6 +82,7 @@ export const messages = {
   },
   "conversation.threads.view.label": "Thread {title}",
   "conversation.threads.view.startedByAgent": "{name} hat diesen Thread gestartet.",
+  "conversation.threads.view.loadOlder": "Ältere Nachrichten laden",
   "conversation.threads.branch.from": "Abgezweigt von {title}",
   "conversation.threads.branch.fromDeleted": "Abgezweigt von einem gelöschten Thread",
   "conversation.threads.view.newPlaceholder": "Neuer Thread mit {name}",

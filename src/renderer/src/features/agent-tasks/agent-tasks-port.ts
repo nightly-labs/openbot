@@ -30,6 +30,8 @@ export interface AgentTasksPort
   ): Promise<unknown>;
   /** Missing where the server cannot move a queued message of the agent's own chat to a new thread. */
   runQueuedMessageAsTask?: OpenBotDesktopApi["agent"]["runQueuedMessageAsTask"];
+  /** The older messages of a thread, page by page. Missing where the server cannot read them. */
+  readTaskPage?: OpenBotDesktopApi["agent"]["readTaskPage"];
   /** Missing where the server cannot branch a conversation. The branch actions then do not show. */
   branchTask?: OpenBotDesktopApi["agent"]["branchTask"];
   /** Deletes one message of a thread. Missing where the server cannot delete messages. */
@@ -51,6 +53,7 @@ export function agentTasksPort(): AgentTasksPort {
   return {
     listTasks: (agentId) => agent.listTasks(agentId),
     readTask: (input) => agent.readTask(input),
+    readTaskPage: (input) => agent.readTaskPage(input),
     startTask: (input) => agent.startTask(input),
     sendToTask: (input) => agent.sendMessage(input),
     runQueuedMessageAsTask: (input) => agent.runQueuedMessageAsTask(input),

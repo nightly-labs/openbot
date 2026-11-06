@@ -20,6 +20,7 @@ import type {
   AgentSummary,
   AgentTask,
   AgentTaskInput,
+  AgentTaskPage,
   AgentTaskReadState,
   AgentTasksSnapshot,
   AgentWaitsSnapshot,
@@ -73,6 +74,7 @@ import type {
   ProviderUsageResets,
   QueuedMessageReceipt,
   QueueSnapshot,
+  ReadAgentTaskPageInput,
   RemoveMcpServerInput,
   ReorderQueueInput,
   ResetAgentSessionSettingInput,
@@ -4669,6 +4671,30 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** The conversation of one task, for its panel. */
   readTask(agentId: string, taskId: string): ConversationSnapshot {
     return structuredClone(this.#tasks.read(agentId, taskId));
+  }
+
+  /**
+   * The older messages of a task: the page before a message that its panel holds. A limit of 0 reads
+   * only whether there are any. A message that the thread does not hold has none.
+   */
+  readTaskPage(input: ReadAgentTaskPageInput): AgentTaskPage {
+    const { threadId } = this.#tasks.require(input.agentId, input.taskId);
+    const database = this.#store.database;
+    const before = database.conversationBefore(threadId, input.beforeMessageId);
+    const page =
+      before && before.count > 0 && input.limit > 0
+        ? database.readConversationPage(input.agentId, threadId, { type: "before", cursor: before.cursor }, input.limit)
+        : undefined;
+    return {
+      conversation: {
+        agentId: input.agentId,
+        threadId,
+        activeTurnId: page?.activeTurnId ?? null,
+        revision: page?.revision ?? 0,
+        messages: page?.messages ?? [],
+      },
+      hasOlder: page ? page.pageInfo.hasOlder : (before?.count ?? 0) > 0,
+    };
   }
 
   /** Starts a task of the agent with its first message. The task runs beside the agent's own chat. */

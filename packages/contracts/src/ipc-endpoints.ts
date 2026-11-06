@@ -120,10 +120,12 @@ import type {
 import type {
   AgentTask,
   AgentTaskInput,
+  AgentTaskPage,
   AgentTaskReadState,
   AgentTasksSnapshot,
   BranchAgentTaskInput,
   MarkAgentTaskReadInput,
+  ReadAgentTaskPageInput,
   RenameAgentTaskInput,
   RunQueuedMessageAsTaskInput,
   StartAgentTaskInput,
@@ -1624,6 +1626,8 @@ export const IPC_ENDPOINTS = {
     // A joined server takes these through `agent-tasks-v1`, except `runQueuedMessageAsTask`, which is local only.
     listTasks: scopedRequest<string, AgentTasksSnapshot>()("agent:tasks:list"),
     readTask: scopedRequest<AgentTaskInput, ConversationSnapshot>()("agent:tasks:read"),
+    // A joined server takes this through `agent-thread-pages-v1`.
+    readTaskPage: scopedRequest<ReadAgentTaskPageInput, AgentTaskPage>()("agent:tasks:read-page"),
     startTask: scopedRequest<StartAgentTaskInput, AgentTask>()("agent:tasks:start"),
     runQueuedMessageAsTask: scopedRequest<RunQueuedMessageAsTaskInput, AgentTask>()("agent:tasks:run-queued-message"),
     // A joined server takes this through `agent-thread-branches-v1`.

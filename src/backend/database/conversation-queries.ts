@@ -349,6 +349,24 @@ export class ConversationQueries {
     };
   }
 
+  /**
+   * The cursor of the page before a message of the thread, and how many messages come before it. Null
+   * when the thread does not hold the message.
+   */
+  conversationBefore(threadId: string, messageId: string): { cursor: string; count: number } | null {
+    const row = databaseRow(
+      this.#core.connection
+        .prepare(
+          `${ORDERED_THREAD_MESSAGES}
+           SELECT ${ORDER_KEY_COLUMNS} FROM ordered WHERE message_id = ?`,
+        )
+        .get(threadId, messageId),
+    );
+    if (!row) return null;
+    const cursor = conversationRowCursor(row);
+    return { cursor: encodePageCursor(cursor), count: this.#conversationRowsBefore(threadId, cursor, {}).count };
+  }
+
   supportedConversationCursor(
     threadId: string,
     throughMessageId: string | null,
