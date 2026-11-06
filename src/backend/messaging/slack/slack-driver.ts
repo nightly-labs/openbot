@@ -190,7 +190,7 @@ class SlackAdapter implements MessagingAdapter {
     markdown: string,
     replaceMessageId: string | null,
   ) {
-    const [first = "", ...rest] = slackChunks(slackMrkdwn(markdown));
+    const [first = "", ...rest] = slackChunks(slackMrkdwn(markdown, true));
     let firstId: string;
     if (replaceMessageId) {
       firstId = replaceMessageId;
@@ -472,9 +472,8 @@ class SlackAdapter implements MessagingAdapter {
   });
 
   /**
-   * A marker, not Slack markup: status text is escaped as a whole, which would make `<@U…>` inert.
-   * `#statusText` turns the marker back into a mention after the escape. The answer of an agent never
-   * goes through it, so an answer cannot mention anyone.
+   * A marker, not Slack markup: status text is escaped as a whole. `#statusText` turns the marker back
+   * into a mention after the escape.
    */
   mention(userId: string): string {
     return /^[A-Z0-9]+$/.test(userId) ? `\uE000@${userId}\uE000` : userId;
