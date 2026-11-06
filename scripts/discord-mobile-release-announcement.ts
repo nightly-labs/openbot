@@ -101,8 +101,14 @@ export function announcedTag(version: string, store: MobileStore): string {
 /** What stops `announcement` from being posted for `version`. Empty when it is ready. */
 export function mobileAnnouncementProblems(announcement: string, version: string): string[] {
   return announcementFileProblems(announcement, version, MOBILE_ANNOUNCEMENT_FILE, (highlights) =>
-    // The longest form: one store, the other one still in review.
-    announcementMessage({ highlights, version, stores: ["android"], dates: {}, roleId: LONGEST_ROLE_ID }),
+    // The longest form: the second store, with the line about the first one and both store links.
+    announcementMessage({
+      highlights,
+      version,
+      stores: ["android"],
+      dates: { ios: "2000-01-01" },
+      roleId: LONGEST_ROLE_ID,
+    }),
   );
 }
 
