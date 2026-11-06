@@ -21,6 +21,7 @@ import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-marke
 import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { ReplyReturnButton, ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
 import { DeleteMessageDialog, MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
+import { countableTimelineMessage } from "@openbot/ui/features/conversation/new-message-tally";
 import { PendingSendStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
 import { SubagentDock, SubagentGroup } from "@openbot/ui/features/conversation/Subagents";
 import { TaskList } from "@openbot/ui/features/conversation/TaskList";
@@ -553,7 +554,9 @@ export function ConversationTimeline() {
     // In a shared chat, a message from another member is theirs.
     question: (message) =>
       message.author === "you" && !message.actionMarker && !otherSender(message) ? message.body : undefined,
-    reply: (message) => (message.author === "agent" && !message.actionMarker ? message.body : undefined),
+    // The first answer the reader would call a message: not thinking, a plan, a tool exchange or a quiet run.
+    reply: (message) =>
+      countableTimelineMessage(message) && (message.kind ?? "text") === "text" ? message.body : undefined,
     storedCount: () => props.messages.length,
     unloaded: () => props.unloadedHistory,
     virtualizer: messageVirtualizer,

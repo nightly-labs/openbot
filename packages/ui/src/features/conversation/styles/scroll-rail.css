@@ -2,7 +2,7 @@
  * Where the reader is in a long chat, on the end edge of the transcript (right in LTR, left in RTL).
  *
  * One tick per message the reader wrote, at the same spacing for each. The ticks the reader has passed
- * are lighter, and the tick of the current section is the longest. With a mouse, the ticks fade in
+ * are stronger, and the tick of the current section is the longest. With a mouse, the ticks fade in
  * small when the pointer comes near, and grow when it is on the rail. Pointing at a tick brings in a
  * card through a blur, over a blur of the transcript, with the message and the start of its reply.
  *

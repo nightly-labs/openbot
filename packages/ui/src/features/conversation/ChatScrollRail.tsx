@@ -9,8 +9,8 @@ import type { ChatVirtualizer } from "./createChatVirtualizer";
 
 /**
  * How long the rail's place takes to reach the opened section after a jump from the rail. A fixed
- * length, not a decay: the place passes each section's start, and so moves the count, at the same
- * moment as the head.
+ * length, not a decay: the place passes each section's start in order, so the current tick runs
+ * through the sections between.
  */
 const JUMP_MS = 450;
 
@@ -88,17 +88,19 @@ export function chatScrollQuestions<Row extends ChatScrollRow>(
     next.set(text, label);
     return label || undefined;
   };
+  // The message the next reply answers. A message with no section has no card, so its reply goes to none.
+  let current: ChatScrollQuestion | undefined;
   rows.forEach((row, index) => {
     const text = question(row);
     if (text !== undefined) {
       const label = plain(text);
-      if (label) questions.push({ index, key: row.id, label });
+      current = label ? { index, key: row.id, label } : undefined;
+      if (current) questions.push(current);
       return;
     }
-    const last = questions.at(-1);
-    if (!reply || !last || last.reply) return;
+    if (!reply || !current || current.reply) return;
     const answer = plain(reply(row));
-    if (answer) last.reply = answer;
+    if (answer) current.reply = answer;
   });
   return { questions, labels: next };
 }
@@ -154,7 +156,8 @@ export function chatScrollSections(input: {
 
 /** Where an open card stands: its tick's middle and the rail's edges, in the window. */
 interface CardPlace {
-  index: number;
+  /** The section's key, not its index: a page that loads above it moves its index. */
+  key: string;
   top: number;
   left: number;
   right: number;
@@ -236,7 +239,7 @@ export function createChatScrollRail<Row extends ChatScrollRow>(options: {
  * its right edge gives the reader's place in the transcript.
  *
  * One tick per message the reader wrote, at the same spacing for each. The ticks above the reader's
- * place are lighter, and the tick of the current section is the longest. With a mouse, the ticks show
+ * place are stronger, and the tick of the current section is the longest. With a mouse, the ticks show
  * only when the pointer comes near the rail, and grow when it is on the rail. A jump from the rail eases the
  * place there, so the current tick runs through the sections between. Pointing at a tick, or focusing
  * it, opens a card over a blur of the transcript with the message and the start of its reply, and the
@@ -302,9 +305,14 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
       // The container's side padding, read again only on a resize: it reads the computed style.
       let inset: number | undefined;
 
+      // The rail's box in the window, for the pointer's distance to it. The rail sticks to the top of the
+      // container, so a scroll does not move it; a resize or a new layout reads it again.
+      let nearBox: DOMRect | undefined;
+
       // Where each section starts and ends, read again only when the layout or the sections change.
       let geometry: { starts: number[]; ends: number[]; lastScroll: number; height: number } | undefined;
       const layout = () => {
+        nearBox = undefined;
         const height = element.clientHeight;
         const content = element.scrollHeight;
         const lastScroll = Math.max(0, content - height);
@@ -392,7 +400,8 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
       // A touch has no pointer to come near the rail, so only a mouse or a pen shows and hides it.
       const onPointerMove = (event: PointerEvent) => {
         if (event.pointerType === "touch" || !nav) return;
-        const box = nav.getBoundingClientRect();
+        nearBox ??= nav.getBoundingClientRect();
+        const box = nearBox;
         const dx = Math.max(box.left - event.clientX, 0, event.clientX - box.right);
         const dy = Math.max(box.top - event.clientY, 0, event.clientY - box.bottom);
         setNear(dx <= NEAR_PX && dy <= NEAR_PX);
@@ -411,6 +420,7 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
       element.addEventListener("pointerleave", onPointerLeave);
       const resizes = new ResizeObserver(() => {
         inset = undefined;
+        nearBox = undefined;
         schedule(true);
       });
       resizes.observe(element);
@@ -455,19 +465,49 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
    * The card stands level with the tick it belongs to, beside the rail. It is in a portal: the mask that
    * fades the transcript's edges would otherwise stop its backdrop blur.
    */
-  const openCard = (index: number, item: HTMLElement) => {
-    if (!nav) return;
+  const placeCard = (key: string) => {
+    const index = props.sections().findIndex((section) => section.key === key);
+    const item = list?.children[index];
+    if (!nav || !(item instanceof HTMLElement)) {
+      setCard(undefined);
+      return;
+    }
     const tick = item.getBoundingClientRect();
     const box = nav.getBoundingClientRect();
-    setCard({ index, top: tick.top + tick.height / 2, left: box.left, right: box.right });
+    setCard({ key, top: tick.top + tick.height / 2, left: box.left, right: box.right });
   };
-  const closeCard = (index: number) => {
-    if (card()?.index === index) setCard(undefined);
+  const closeCard = (key: string) => {
+    if (card()?.key === key) setCard(undefined);
   };
+  // When the ticks scroll, also when the focus or the current tick scrolls them, the card follows its tick.
+  const followCard = () => {
+    const open = card();
+    if (open) placeCard(open.key);
+  };
+  // The pointer leaves the rail, but a tick can still have the keyboard focus: its card stays.
+  const leaveRail = () => {
+    setHeld(false);
+    const focused = list ? [...list.children].findIndex((item) => item.matches(":has(:focus-visible)")) : -1;
+    const key = props.sections()[focused]?.key;
+    if (key) placeCard(key);
+    else setCard(undefined);
+  };
+  // Escape closes the card, also when the pointer stays on its tick.
+  createEffect(
+    () => card() !== undefined,
+    (open) => {
+      if (!open) return;
+      const onKey = (event: KeyboardEvent) => {
+        if (event.key === "Escape") setCard(undefined);
+      };
+      document.addEventListener("keydown", onKey);
+      return () => document.removeEventListener("keydown", onKey);
+    },
+  );
   // A closed card keeps its last text while it fades out.
   const shownCard = createMemo<(CardPlace & { label: string; reply: string | undefined }) | undefined>((last) => {
     const open = card();
-    const section = open ? props.sections()[open.index] : undefined;
+    const section = open ? props.sections().find((item) => item.key === open.key) : undefined;
     return open && section ? { ...open, label: section.label, reply: section.reply } : last;
   });
   const state = (index: number) => {
@@ -493,17 +533,14 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
           class="chat-scroll-rail-nav"
           aria-label={t("chat.scrollRail.label")}
           onPointerEnter={() => setHeld(true)}
-          onPointerLeave={() => {
-            setHeld(false);
-            setCard(undefined);
-          }}
+          onPointerLeave={leaveRail}
         >
           <div
             ref={(element) => {
               track = element;
             }}
             class="chat-scroll-rail-track"
-            onScroll={() => setCard(undefined)}
+            onScroll={followCard}
           >
             <ol
               ref={(element) => {
@@ -516,7 +553,7 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
                   <li
                     class="chat-scroll-rail-item"
                     data-state={state(index)}
-                    data-open={card()?.index === index ? "" : undefined}
+                    data-open={card()?.key === section().key ? "" : undefined}
                   >
                     <Button
                       variant="link"
@@ -524,9 +561,9 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
                       class="chat-scroll-rail-link"
                       aria-label={section().label}
                       aria-current={index === rail.active ? "location" : undefined}
-                      onPointerEnter={(event) => openCard(index, event.currentTarget)}
-                      onFocus={(event) => openCard(index, event.currentTarget)}
-                      onBlur={() => closeCard(index)}
+                      onPointerEnter={() => placeCard(section().key)}
+                      onFocus={() => placeCard(section().key)}
+                      onBlur={() => closeCard(section().key)}
                       onClick={() => {
                         opened = section().key;
                         jump =
