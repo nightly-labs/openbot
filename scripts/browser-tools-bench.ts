@@ -23,7 +23,7 @@
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { createServer } from "node:http";
+import { createServer, type ServerResponse } from "node:http";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -75,6 +75,8 @@ interface BenchTask {
   score: (answer: string, truth: string) => boolean;
   /** Serves the start page from the loopback lesson calendar, which is reset before each run. */
   calendar?: true;
+  /** Starts behind a cookie banner. These tasks run only by id, and the report logs the choice made. */
+  consent?: true;
 }
 
 async function fetchText(url: string): Promise<string> {
@@ -127,12 +129,54 @@ async function pages(first: string, next: RegExp, limit = 20): Promise<string[]>
 // The loopback lesson calendar. `main` starts it only when a selected task needs it.
 const lessonCalendar = new LessonCalendar();
 const lessonCalendarServer = createServer((request, response) => {
+  if (handleConsentPage(request.url ?? "", response)) return;
   if (!lessonCalendar.handle(request, response)) {
     response.statusCode = 404;
     response.end();
   }
 });
 let lessonCalendarUrl = "";
+let consentPageUrl = "";
+
+const CONSENT_CODE = "K7-4129";
+/** The choices that the loopback cookie banner received, in run order. */
+const consentChoices: string[] = [];
+
+/**
+ * A page behind a modal cookie banner, as a consent platform shows it: the banner appears after the
+ * document, and its backdrop covers the page, so a click on the page does not reach it.
+ */
+function handleConsentPage(url: string, response: ServerResponse): boolean {
+  const path = new URL(url, "http://127.0.0.1").pathname;
+  if (path === "/consent-choice") {
+    consentChoices.push(new URL(url, "http://127.0.0.1").searchParams.get("value") ?? "");
+    response.statusCode = 204;
+    response.end();
+    return true;
+  }
+  if (path !== "/consent") return false;
+  const banner = `<div id="consent" style="position:fixed;inset:0;z-index:10;background:rgba(0,0,0,.5);display:grid;place-items:center">
+    <div role="dialog" aria-modal="true" aria-label="Privacy" style="background:#fff;padding:24px;max-width:480px">
+      <h2>We value your privacy</h2>
+      <p>We and our partners use cookies to improve your experience and to show personalised advertising.</p>
+      <button onclick="choose('accepted')">Accept all</button>
+      <button onclick="choose('rejected')">Reject all</button>
+      <button onclick="choose('settings')">Settings</button>
+    </div></div>`;
+  response.setHeader("content-type", "text/html; charset=utf-8");
+  response.end(`<!doctype html><title>Order lookup</title>
+    <main><h1>Order lookup</h1><p>Your discount code is ready.</p>
+    <button onclick="document.querySelector('output').textContent = 'Code: ${CONSENT_CODE}'">Show the code</button>
+    <output></output></main>
+    <script>
+      function choose(value) {
+        fetch("/consent-choice?value=" + value);
+        if (value !== "settings") document.getElementById("consent").remove();
+      }
+      setTimeout(() => document.body.insertAdjacentHTML("beforeend", ${JSON.stringify(banner)}), 600);
+    </script>`);
+  return true;
+}
 
 const CALENDAR_REQUEST = `Register me for the ${TARGET_LESSON.title} lesson on ${TARGET_LESSON.day} at ${TARGET_LESSON.time.slice(0, 5)} in ${TARGET_LESSON.location}. Register only once, and do not register for any other lesson. Then answer with the confirmation that the page shows.`;
 // Correct only when the server recorded exactly one registration, for the requested lesson.
@@ -170,6 +214,28 @@ const TASKS: BenchTask[] = [
     truth: async () => TARGET_LESSON.id,
     score: registeredOnce,
     calendar: true,
+  },
+  {
+    id: "consent-overlay",
+    get startUrl() {
+      return consentPageUrl;
+    },
+    question: "Click 'Show the code' and answer with the code that appears.",
+    truth: async () => CONSENT_CODE,
+    score: (answer, truth) => answer.includes(truth),
+    consent: true,
+  },
+  {
+    // iubenda shows a modal banner made of web components, so the Pricing link is covered.
+    id: "consent-iubenda-pricing",
+    startUrl: "https://www.iubenda.com/en/",
+    question: "Open the Pricing page from the top menu of this site. Answer with the URL of the page that opens.",
+    truth: async () => {
+      const html = await fetchText("https://www.iubenda.com/en/");
+      return /<a class="iub-mm-item__link" href="([^"]+)">Pricing/u.exec(html)?.[1] ?? "";
+    },
+    score: (answer, truth) => truth !== "" && answer.replace(/\/$/u, "").includes(truth.replace(/\/$/u, "")),
+    consent: true,
   },
   {
     id: "books-travel",
@@ -838,6 +904,7 @@ async function runOnce(
     const uses = entries === null ? null : toolUses(entries);
     row.ambiguousRefusals = entries === null ? 0 : ambiguousRefusals(entries);
     if (task.calendar) row.registrations = [...lessonCalendar.registrations];
+    if (task.consent) logger.info(`consent ${task.id}: ${json(consentChoices.splice(0))}`);
     row.toolNamesKnown = uses !== null;
     row.toolCalls = uses?.length ?? reply.toolSteps;
     for (const use of uses ?? []) {
@@ -950,7 +1017,7 @@ function harnessInstalled(): boolean {
 function selectTasks(raw: string | undefined): BenchTask[] {
   // The calendar tasks measure one recovery path and run only by id, so the default and a number
   // select the same public-site tasks as before.
-  const publicTasks = TASKS.filter((task) => !task.calendar);
+  const publicTasks = TASKS.filter((task) => !task.calendar && !task.consent);
   if (raw === undefined) return publicTasks;
   if (/^\d+$/u.test(raw)) return publicTasks.slice(0, Number(raw));
   const wanted = raw.split(",").map((part) => part.trim());
@@ -977,7 +1044,7 @@ async function main(): Promise<void> {
 
   await mkdir(OUTPUT_ROOT, { recursive: true });
   const reportPath = join(OUTPUT_ROOT, "report.json");
-  if (tasks.some((task) => task.calendar)) {
+  if (tasks.some((task) => task.calendar || task.consent)) {
     await new Promise<void>((resolveListen, rejectListen) => {
       lessonCalendarServer.once("error", rejectListen);
       lessonCalendarServer.listen(0, "127.0.0.1", resolveListen);
@@ -988,6 +1055,7 @@ async function main(): Promise<void> {
     const address = lessonCalendarServer.address();
     if (address === null || typeof address === "string") throw new Error("The lesson calendar has no port.");
     lessonCalendarUrl = `http://127.0.0.1:${address.port}/calendar`;
+    consentPageUrl = `http://127.0.0.1:${address.port}/consent`;
   }
   const truths = new Map<string, string>();
   for (const task of tasks) {

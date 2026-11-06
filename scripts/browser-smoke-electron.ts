@@ -19,6 +19,7 @@ import {
 } from "electron";
 import { BrowserUploads } from "../src/backend/agent/browser-uploads";
 import { attachmentCall } from "../src/backend/attachment-effects";
+import { CONSENT_WORLD } from "../src/backend/browser-consent";
 import { BrowserHost } from "../src/backend/browser-host";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { type DynamicToolResult, getString } from "../src/backend/protocol";
@@ -198,6 +199,49 @@ const server = createServer((request, response) => {
       <script>document.querySelector('textarea').addEventListener('paste', event => {
         window.__pasteEvent = event.clipboardData.getData('text/plain');
       });</script>`);
+    return;
+  }
+  if (url.pathname === "/cookie-banner") {
+    // No platform selector knows this banner, so only the text rule can refuse it. By default the
+    // banner appears after the document, as a consent platform shows it; "accept-only" shows a
+    // banner with no reject button at once. "shadow" builds the banner from web components: the
+    // text and the buttons are in two shadow roots, so no light DOM ancestor shows cookie text.
+    // "manual" shows no banner.
+    const acceptOnly = url.searchParams.has("accept-only");
+    const manual = url.searchParams.has("manual");
+    const shadow = url.searchParams.has("shadow");
+    const banner = shadow
+      ? `<div id="notice" style="position:fixed;bottom:0;left:0;right:0;padding:16px;background:#eee">
+        <banner-text></banner-text><banner-actions></banner-actions>
+      </div>`
+      : `<div id="notice" style="position:fixed;bottom:0;left:0;right:0;padding:16px;background:#eee">
+        <p>We use cookies to improve this site. Read more about how we use cookies.</p>
+        <button onclick="decide('accepted')">Accept all</button>
+        ${acceptOnly ? "" : `<button onclick="decide('rejected')">Reject all</button>`}
+      </div>`;
+    const components = `
+        customElements.define("banner-text", class extends HTMLElement {
+          connectedCallback() { this.attachShadow({ mode: "open" }).innerHTML = "<p>We use cookies to improve this site.</p>"; }
+        });
+        customElements.define("banner-actions", class extends HTMLElement {
+          connectedCallback() {
+            this.attachShadow({ mode: "open" }).innerHTML =
+              "<button onclick=\\"decide('accepted')\\">Accept all</button><button onclick=\\"decide('rejected')\\">Reject all</button>";
+          }
+        });`;
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(`<!doctype html>
+      <title>Cookie banner</title>
+      <main><output>banner</output></main>
+      ${acceptOnly ? banner : ""}
+      <script>
+        function decide(value) {
+          document.querySelector("output").textContent = value;
+          document.getElementById("notice").remove();
+        }
+        ${shadow ? components : ""}
+        ${acceptOnly || manual ? "" : `setTimeout(() => document.body.insertAdjacentHTML("beforeend", ${JSON.stringify(banner)}), 300);`}
+      </script>`);
     return;
   }
   if (url.pathname === "/frame") {
@@ -456,6 +500,7 @@ const SCENARIOS = [
   "secret-handoff",
   "popups",
   "redirect-navigation",
+  "cookie-banner",
 ];
 
 void main().catch((error) => {
@@ -545,6 +590,8 @@ async function main(): Promise<void> {
           await runRedirectNavigationScenario(browser, origin);
         } else if (scenario === "typing-focus") {
           await runTypingFocusScenario(browser, origin);
+        } else if (scenario === "cookie-banner") {
+          await runCookieBannerScenario(browser, origin);
         } else {
           const { tab, contents } = await openTabWithContents(browser, `${origin}/v2`, "smoke-thread", "smoke-bot");
           try {
@@ -1968,6 +2015,7 @@ async function main(): Promise<void> {
     await runToolBoundaryScenario(browser, origin);
     await runPopupScenario(browser, origin);
     await runSecretHandoffScenario(browser, origin);
+    await runCookieBannerScenario(browser, origin);
     if (!controlPhases.includes("open:acting") || !controlPhases.includes("open:waiting")) {
       throw new Error(`Browser control lifecycle was not reported: ${controlPhases.join(", ")}`);
     }
@@ -4025,6 +4073,69 @@ async function runPopupScenario(browser: BrowserHost, origin: string): Promise<v
     await runCauseEffect(browser.close(post.id));
   } finally {
     await runCauseEffect(browser.close(parent.id));
+  }
+}
+
+/**
+ * An agent tab refuses a cookie banner that appears late, also one made of web components, and keeps
+ * a banner that has no reject button. A tab that a person opened keeps the banner, and its document
+ * never gets the script. A takeover stops the script, so a banner that appears after it stays.
+ */
+async function runCookieBannerScenario(browser: BrowserHost, origin: string): Promise<void> {
+  const agent = await openTabWithContents(browser, `${origin}/cookie-banner`, "smoke-thread", "smoke-bot");
+  const shadow = await openTabWithContents(browser, `${origin}/cookie-banner?shadow`, "smoke-thread", "smoke-bot");
+  const acceptOnly = await openTabWithContents(
+    browser,
+    `${origin}/cookie-banner?accept-only`,
+    "smoke-thread",
+    "smoke-bot",
+  );
+  const takeover = await openTabWithContents(browser, `${origin}/cookie-banner?manual`, "smoke-thread", "smoke-bot");
+  const existingIds = new Set(webContents.getAllWebContents().map((contents) => contents.id));
+  const personTab = await runCauseEffect(browser.open(`${origin}/cookie-banner`));
+  const person = webContents
+    .getAllWebContents()
+    .find((candidate) => !existingIds.has(candidate.id) && !candidate.isDestroyed());
+  if (!person) throw new Error("Browser contents were not created for the person's tab.");
+  try {
+    const output = (contents: WebContents) =>
+      contents.executeJavaScript("document.querySelector('output')?.textContent ?? ''", true);
+    const consentScript = (contents: WebContents) =>
+      contents.executeJavaScriptInIsolatedWorld(CONSENT_WORLD, [{ code: "globalThis.__openbotConsent ?? null" }]);
+    await waitFor(async () => (await output(agent.contents)) === "rejected", "the agent tab to refuse cookies");
+    await waitFor(async () => (await output(shadow.contents)) === "rejected", "the shadow banner to be refused");
+    // The script scans the document when it starts, so the banner that was there is checked.
+    await waitFor(async () => (await consentScript(acceptOnly.contents)) !== null, "the script in the accept-only tab");
+    const acceptOnlyOutput = await output(acceptOnly.contents);
+    await waitFor(async () => (await consentScript(takeover.contents)) === true, "the script in the takeover tab");
+    await runCauseEffect(browser.beginTakeover(takeover.tab.id));
+    // A stopped script has no observer, so a banner that appears later stays.
+    await waitFor(
+      async () => (await consentScript(takeover.contents)) === "stopped",
+      "the takeover to stop the script",
+    );
+    browser.endTakeover(takeover.tab.id);
+    await waitFor(async () => !person.isLoading() && person.getURL().endsWith("/cookie-banner"), "the person's tab");
+    const personScript = await consentScript(person);
+    const personOutput = await output(person);
+    const report = {
+      status:
+        acceptOnlyOutput === "banner" && personScript === null && personOutput === "banner" ? "passed" : "issues_found",
+      agentTab: "rejected",
+      shadowTab: "rejected",
+      acceptOnlyTab: acceptOnlyOutput,
+      takeoverTab: "stopped",
+      personTab: { output: personOutput, consentScript: personScript },
+    };
+    await mkdir(".openbot-build", { recursive: true });
+    await writeFile(".openbot-build/browser-cookie-banner.json", JSON.stringify(report, null, 2));
+    if (report.status !== "passed") throw new Error(`A cookie banner was changed: ${JSON.stringify(report)}`);
+  } finally {
+    await runCauseEffect(browser.close(agent.tab.id));
+    await runCauseEffect(browser.close(shadow.tab.id));
+    await runCauseEffect(browser.close(acceptOnly.tab.id));
+    await runCauseEffect(browser.close(takeover.tab.id));
+    await runCauseEffect(browser.close(personTab.id));
   }
 }
 
