@@ -23,6 +23,7 @@ export function SheetFormField({
   label,
   maxLength,
   multiline = false,
+  tall = false,
   appearance = "default",
   hideLabel = false,
   textAlign,
@@ -38,7 +39,9 @@ export function SheetFormField({
   useEffect(() => {
     nativeValue.set(value);
   }, [nativeValue, value]);
-  const height = multiline ? 108 : 54;
+  const lines = multiline ? (tall ? 14 : 4) : 1;
+  // A tall field takes the height of its lines, so the lines fill it.
+  const height = tall && multiline ? undefined : multiline ? 108 : 54;
 
   return (
     <View className="gap-2">
@@ -61,11 +64,15 @@ export function SheetFormField({
           alignItems: "center",
         }}
       >
-        <Host ignoreSafeArea="all" style={{ height, flex: 1 }}>
+        <Host
+          ignoreSafeArea="all"
+          matchContents={height === undefined ? { vertical: true } : undefined}
+          style={{ height, flex: 1 }}
+        >
           <TextInput
             modifiers={[accessibilityLabel(label)]}
             multiline={multiline}
-            numberOfLines={multiline ? 4 : 1}
+            numberOfLines={lines}
             // SwiftUI aligns to the leading or trailing side of the layout. Text in the other
             // direction than the layout goes to the trailing side.
             textAlign={textAlign ?? (textDirection(value, layoutDirection()) === layoutDirection() ? "left" : "right")}
@@ -80,7 +87,9 @@ export function SheetFormField({
             returnKeyType={returnKeyType}
             secureTextEntry={secureTextEntry}
             selectionColor={foreground}
-            style={{ height, paddingHorizontal: 16 }}
+            style={
+              height === undefined ? { paddingHorizontal: 16, paddingVertical: 12 } : { height, paddingHorizontal: 16 }
+            }
             textStyle={{ color: String(foreground), fontFamily: APP_FONT, fontSize: 16 }}
             value={nativeValue}
             onChangeText={onChangeText}
