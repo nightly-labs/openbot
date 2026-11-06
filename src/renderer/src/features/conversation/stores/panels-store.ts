@@ -297,9 +297,12 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     setRoutineSettingsRequest(null);
   }
 
-  function openRoutineRunMessage(messageId: string): void {
+  /** Opens the message of a routine run: in the routine's side thread when the run ran there, else in the chat. */
+  async function openRoutineRunMessage(messageId: string, routineId?: string): Promise<void> {
     setActiveRightPanel("none");
-    void deps.props.onOpenSearchMessage?.(messageId);
+    const threads = deps.props.threads;
+    if (routineId && threads && (await threads.onOpenRoutineRun(routineId, messageId).catch(() => false))) return;
+    await deps.props.onOpenSearchMessage?.(messageId);
   }
 
   function showBrowserPip() {

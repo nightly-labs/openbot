@@ -96,7 +96,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
     activeServerSupportsCapability(AGENT_HIDDEN_CAPABILITY) && serverRoleCanAdminister(activeServer());
   const { activeTurns, subagentTurns, queues, failedTurns, usageLimits, pendingPrompts, pendingApprovals, approvals } =
     useTurns();
-  const { unreadReplies, agentUnreadReplies, recentReplies, markAllAgentMessagesRead } = useConversation();
+  const { agentUnreadReplies, recentReplies, markAllAgentMessagesRead } = useConversation();
   const { directPeople, teamPresence } = usePresence();
   const { activeDirectMember, activeDirectMemberId, directThreads } = useDirectMessages();
   const { selectAgent, selectDirectMember, setGlobalSearchVisibility, chatHistory } = useNavigation();
@@ -277,8 +277,9 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
           void channels.markAllRead();
         }}
         hasUnread={
-          agentList().some((agent) => !userHiddenAgentIds().has(agent.id) && (unreadReplies()[agent.id] ?? 0) > 0) ||
-          channels.hasUnread()
+          agentList().some(
+            (agent) => !userHiddenAgentIds().has(agent.id) && (agentUnreadReplies()[agent.id] ?? 0) > 0,
+          ) || channels.hasUnread()
         }
         view={layout.sidebarView()}
         serverName={activeServer()?.name ?? t("sidebar.topbar.localServer")}

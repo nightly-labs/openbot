@@ -17,7 +17,8 @@ export function readerCanDeleteMessage(
   message: AgentMessage,
   access: { deleteAny: boolean; isOwnSender: (senderId: string) => boolean },
 ): boolean {
-  if (message.streaming || message.id.startsWith(PENDING_SEND_ID_PREFIX)) return false;
+  // A `ui-` row is an error that only this window shows.
+  if (message.streaming || message.id.startsWith(PENDING_SEND_ID_PREFIX) || message.id.startsWith("ui-")) return false;
   if (access.deleteAny) return true;
   const sender = message.author === "you" ? message.senderMember : undefined;
   return sender !== undefined && access.isOwnSender(sender.id);

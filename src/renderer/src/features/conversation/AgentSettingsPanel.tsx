@@ -71,7 +71,7 @@ interface AgentSettingsPanelProps
   instructionsRequest?: { agentId: string } | null | undefined;
   routineSelectionRequest?: RoutineSelectionRequest | null | undefined;
   onRoutineSelectionRequestHandled?: ((nonce: number) => void) | undefined;
-  onOpenRoutineRun?: ((messageId: string) => void) | undefined;
+  onOpenRoutineRun?: ((messageId: string, routineId?: string) => void) | undefined;
   /** Opens the side thread where a routine runs. Resolves false when the routine has no thread. */
   onOpenRoutineThread?: ((routineId: string) => Promise<boolean>) | undefined;
   skillsMode?: AgentSkillsMode | undefined;

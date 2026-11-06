@@ -204,6 +204,14 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
       if (task) tabs.open(agentId, task.id);
       return task !== undefined;
     },
+    onOpenRoutineRun: async (routineId, messageId) => {
+      const listed = () => routineTask(tasks.snapshot(agentId)?.tasks ?? [], routineId);
+      if (!listed()) await tasks.loadTasks(agentId);
+      const task = listed();
+      if (!task || !(await tasks.taskHasMessage(agentId, task.id, messageId))) return false;
+      await tabs.openAt(agentId, task.id, messageId);
+      return true;
+    },
     focusMessage: focus && list.some((task) => task.id === focus.taskId) ? focus : null,
   };
 }
