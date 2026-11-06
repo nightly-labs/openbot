@@ -2580,11 +2580,13 @@ a {
 
 /* A line is drawn by a clip that opens in the direction of the run. A dash
    offset cannot draw it: the stroke does not scale, so its dashes are in
-   pixels and not in lengths of the path. The clip goes 4px out of the line's
-   box on the other axis: a straight line has a box with no width, and a clip
-   in that box hides all of the line. */
+   pixels and not in lengths of the path. The clip goes 4 units out of the
+   line's box on the other axis only: a straight line has a box with no width,
+   and a clip in that box hides all of the line. On the axis of the run, the
+   clip stops at the box, so the line ends when its step ends. */
 .landing-workflow-edges {
   --landing-workflow-clip: inset(-4px 100% -4px 0);
+  --landing-workflow-clip-end: inset(-4px 0);
   position: absolute;
   inset: 0;
   width: 100%;
@@ -2594,6 +2596,7 @@ a {
 
 .landing-workflow-edges-tall {
   --landing-workflow-clip: inset(0 -4px 100% -4px);
+  --landing-workflow-clip-end: inset(0 -4px);
   display: none;
 }
 
@@ -2855,7 +2858,7 @@ a {
   }
 
   to {
-    clip-path: inset(-4px);
+    clip-path: var(--landing-workflow-clip-end);
   }
 }
 
