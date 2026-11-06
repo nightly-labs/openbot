@@ -742,6 +742,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:grok-steer
 
+      - name: Run the Grok partial model list E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:grok-partial-model-list
+
       - name: Run the Pi steer E2E test
         if: ${{ !cancelled() }}
         run: bun run test:pi-steer
@@ -811,6 +815,7 @@ jobs:
             .openbot-build/acp-instructions-once-e2e/
             .openbot-build/acp-audio-input-e2e/
             .openbot-build/grok-steer-e2e/
+            .openbot-build/grok-partial-model-list-e2e/
             .openbot-build/pi-steer-e2e/
             .openbot-build/muse-instructions-once-e2e/
             .openbot-build/provider-conformance-e2e/
