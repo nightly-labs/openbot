@@ -113,10 +113,10 @@ function routineMarkerAvailable(
   return availableRoutineIds?.includes(marker.routineId) === true;
 }
 
-/** @internal Stable HMR boundary for conversation timeline. */
 /** The message kinds that can be the reply on a rail card. */
 const REPLY_KINDS: ReadonlySet<MessageKind> = new Set(["text", "question"]);
 
+/** @internal Stable HMR boundary for conversation timeline. */
 export function ConversationTimeline() {
   const {
     activeChatSearchIndex,
