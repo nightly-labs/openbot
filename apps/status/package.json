@@ -11,7 +11,7 @@
     "update": "bun scripts/update.ts"
   },
   "dependencies": {
-    "@fontsource-variable/inter": "catalog:",
+    "@fontsource-variable/figtree": "catalog:",
     "@openbot/brand": "workspace:*",
     "@openbot/logging": "workspace:*",
     "@solidjs/web": "catalog:",

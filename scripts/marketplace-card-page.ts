@@ -36,7 +36,7 @@ declare global {
 
 const WIDTH = 1200;
 const HEIGHT = 630;
-const FONT_FAMILY = '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+const FONT_FAMILY = '"Figtree Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
 /** `tokens.css`, dark theme: `--openbot-bg-canvas`, `--openbot-text-primary`, `--openbot-text-secondary`. */
 const CANVAS = "#1a1a1a";

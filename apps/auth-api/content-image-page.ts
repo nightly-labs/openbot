@@ -25,7 +25,7 @@ const TITLE_MAX_LINES_WITH_LOCKUP = 2;
 /** `--openbot-logo-production` and `--openbot-logo-eye`. */
 const LOGO_BACKGROUND = "#d6adf2";
 const LOGO_EYE = "#040007";
-const FONT_FAMILY = '"Inter Variable", Inter, system-ui, sans-serif';
+const FONT_FAMILY = '"Figtree Variable", Figtree, system-ui, sans-serif';
 
 window.openBotContentImage = { render: renderContentImage };
 

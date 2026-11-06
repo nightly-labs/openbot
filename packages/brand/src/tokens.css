@@ -16,40 +16,40 @@
   --openbot-provider-current: currentcolor;
   /* Main screen canvas and drawer, used by the native app. The desktop also uses the sidebar, the
      sheet (its menus) and the grouped tokens, so tokens-light.css sets them too. */
-  --openbot-bg-native-canvas: #141414;
-  --openbot-bg-native-sidebar: #141414;
+  --openbot-bg-native-canvas: #000000;
+  --openbot-bg-native-sidebar: #000000;
   /* Grouped sheet surfaces, used by the native app. */
-  --openbot-bg-sheet: #141414;
-  --openbot-bg-grouped: #212121;
-  --openbot-text-grouped-secondary: #96969b;
-  --openbot-border-grouped: #333335;
+  --openbot-bg-sheet: #111111;
+  --openbot-bg-grouped: #0a0a0a;
+  --openbot-text-grouped-secondary: #a1a1a1;
+  --openbot-border-grouped: #1f1f1f;
   --openbot-radius-grouped: 16px;
   /* The milky chrome of the native app where it has no Liquid Glass: the search field and bar buttons. */
-  --openbot-bg-chrome-glass: rgba(38, 38, 40, 0.96);
+  --openbot-bg-chrome-glass: rgba(17, 17, 17, 0.96);
   --openbot-border-chrome-glass: rgba(255, 255, 255, 0.08);
   /* The fill of that chrome over a real blur, lighter than the solid glass. */
-  --openbot-bg-chrome-blur: rgba(26, 26, 28, 0.62);
+  --openbot-bg-chrome-blur: rgba(10, 10, 10, 0.62);
 
   /* Neutral color system. Keep UI colors here, not in components. */
-  --openbot-bg-canvas: #1a1a1a;
+  --openbot-bg-canvas: #000000;
   /* The window frame around the page card, darker than the card, so the card comes forward. */
-  --openbot-bg-frame: #0d0d0d;
+  --openbot-bg-frame: #000000;
   /* A rail inside a menu, a step darker than the menu sheet. */
-  --openbot-bg-sheet-inset: #101010;
-  --openbot-bg-canvas-clear: rgba(26, 26, 26, 0);
-  --openbot-bg-sidebar: #1a1a1a;
-  --openbot-marketplace-detail-bg: #111111;
-  --openbot-bg-surface: #212121;
-  --openbot-bg-surface-raised: #242424;
-  --openbot-bg-control: #212121;
-  --openbot-bg-control-hover: #242424;
-  --openbot-bg-control-active: #2a2a2a;
-  --openbot-tabs-bar-bg: #212121;
-  --openbot-tabs-pill-bg: #2a2a2a;
-  --openbot-bg-overlay: rgba(26, 26, 26, 0.92);
+  --openbot-bg-sheet-inset: #0a0a0a;
+  --openbot-bg-canvas-clear: rgba(0, 0, 0, 0);
+  --openbot-bg-sidebar: #000000;
+  --openbot-marketplace-detail-bg: #050505;
+  --openbot-bg-surface: #0a0a0a;
+  --openbot-bg-surface-raised: #111111;
+  --openbot-bg-control: #111111;
+  --openbot-bg-control-hover: #1a1a1a;
+  --openbot-bg-control-active: #222222;
+  --openbot-tabs-bar-bg: #0a0a0a;
+  --openbot-tabs-pill-bg: #1f1f1f;
+  --openbot-bg-overlay: rgba(0, 0, 0, 0.92);
   --openbot-dialog-overlay: rgba(0, 0, 0, 0.1);
   --openbot-dialog-ring: rgba(255, 255, 255, 0.1);
-  --openbot-bg-glass: rgba(33, 33, 33, 0.76);
+  --openbot-bg-glass: rgba(10, 10, 10, 0.76);
 
   /* Translucent glass surfaces: the landing page, and the browser dock and previews of the desktop. */
   --openbot-glass-surface: rgba(255, 255, 255, 0.07);
@@ -103,18 +103,18 @@
   --openbot-queue-border: var(--openbot-border-strong);
   --openbot-queue-text: var(--openbot-text-primary);
   --openbot-queue-action: var(--openbot-text-muted);
-  --openbot-border: rgba(255, 255, 255, 0.035);
-  --openbot-border-strong: rgba(255, 255, 255, 0.045);
+  --openbot-border: #1f1f1f;
+  --openbot-border-strong: #2e2e2e;
   --openbot-image-outline: rgba(255, 255, 255, 0.1);
   /* Focus is neutral: a grey border or a thin grey ring, never blue and never a halo. */
   --openbot-border-focus: var(--openbot-text-muted);
-  --openbot-text-primary: #ffffff;
+  --openbot-text-primary: #ededed;
   --openbot-text-on-light: #141414;
-  --openbot-surface-light: #f0f0f0;
+  --openbot-surface-light: #ededed;
   /* Not a duplicate of surface-light/text-on-light: tokens-native.css swaps this pair
      between the mobile light and dark themes, so it is the high-contrast button that
      inverts with the theme. Only mobile's uniwind mapping reads it. */
-  --openbot-action: #f0f0f0;
+  --openbot-action: #ededed;
   --openbot-action-foreground: #141414;
   --openbot-qr-background: #ffffff;
   /* Ink on paper that is always light, in both themes: a QR code, the onboarding drawing of a
@@ -129,29 +129,29 @@
   --openbot-onboarding-desktop-blue: #7eb4f2;
   --openbot-onboarding-desktop-indigo: #6f7de8;
   --openbot-onboarding-window: #f3f5f8;
-  --openbot-text-secondary: #dcdcdc;
-  --openbot-text-muted: #979797;
-  --openbot-text-dim: #6a6a6a;
-  --openbot-text-readable: rgba(255, 255, 255, 0.52);
+  --openbot-text-secondary: #d4d4d4;
+  --openbot-text-muted: #a1a1a1;
+  --openbot-text-dim: #737373;
+  --openbot-text-readable: rgba(237, 237, 237, 0.56);
   --openbot-text-muted-on-light: rgba(20, 20, 20, 0.52);
   --openbot-text-dim-on-light: rgba(20, 20, 20, 0.36);
   --openbot-download-card-muted: rgba(20, 20, 20, 0.68);
   --openbot-download-card-chip: rgba(20, 20, 20, 0.1);
   --openbot-download-card-border: rgba(20, 20, 20, 0.16);
   --openbot-download-card-focus: rgba(242, 242, 242, 0.86);
-  --openbot-text-placeholder: #bfbfbf;
+  --openbot-text-placeholder: #8a8a8a;
   --openbot-text-on-accent: #ffffff;
   --openbot-text-on-status: #07130c;
   /* Hue 210, sampled from the reference UIs rather than picked: their status dot is
      #007cf7 and their link and section headings are #42a0ff, both hue 210. The palette
      sat at hue 206, which reads cyan next to them, and accent-text was 71% light,
      which reads washed out. */
-  --openbot-accent: #007cf7;
-  --openbot-accent-hover: #1f8fff;
-  --openbot-accent-text: #42a0ff;
-  --openbot-accent-soft: rgba(0, 124, 247, 0.16);
-  --openbot-accent-strong: rgba(0, 124, 247, 0.34);
-  --openbot-settings-text-muted: rgba(255, 255, 255, 0.59);
+  --openbot-accent: #4f6bff;
+  --openbot-accent-hover: #6f86ff;
+  --openbot-accent-text: #8c9bff;
+  --openbot-accent-soft: rgba(79, 107, 255, 0.16);
+  --openbot-accent-strong: rgba(79, 107, 255, 0.34);
+  --openbot-settings-text-muted: rgba(237, 237, 237, 0.6);
   --openbot-provider-codex: var(--openbot-text-primary);
   --openbot-provider-claude: #d97757;
   --openbot-provider-grok: var(--openbot-text-primary);
@@ -194,8 +194,8 @@
      colors: a change to warning or success does not change them. */
   --openbot-logo-dev: #e3b866;
   --openbot-logo-preview: #61c985;
-  --openbot-unread-surface: #74b9ff;
-  --openbot-unread-text: #07131f;
+  --openbot-unread-surface: #6f86ff;
+  --openbot-unread-text: #ffffff;
   /* The last hue that had not been retuned with the rest. #61c985 was OKLCH chroma
      0.139 while accent, warning and danger now average 0.205, so green was the one
      family member that still read as a disabled tint beside them. Matching 0.205 is
@@ -203,13 +203,13 @@
      (#00d271) is a neon with no headroom, which every renderer clips differently.
      0.180 is the usable step, and lightness is held at the old 0.756 so contrast on
      the canvas is unchanged at 8.5:1 and no text legibility moves. */
-  --openbot-success: #31cf76;
+  --openbot-success: #4fd1a5;
   /* Status text sits on neutral surfaces; status fills have separate contrast needs. */
-  --openbot-success-text: #31cf76;
+  --openbot-success-text: #4fd1a5;
   --openbot-warning-text: #ff9412;
   --openbot-danger-text: #ff6069;
-  --openbot-success-soft: rgba(49, 207, 118, 0.12);
-  --openbot-success-wash: rgba(49, 207, 118, 0.045);
+  --openbot-success-soft: rgba(79, 209, 165, 0.12);
+  --openbot-success-wash: rgba(79, 209, 165, 0.045);
   /* Both warning marks in the reference measure hue 33 at full saturation (#ff9917 on
      the triangle, #ff9412 on the heading). The palette's #e3b866 was a desaturated gold
      at hue 39, which reads as a disabled state rather than as something needing attention. */
@@ -222,8 +222,8 @@
   --openbot-island-identity-name: var(--openbot-text-primary);
   --openbot-question-badge-text: #8bdee8;
   --openbot-question-badge-soft: rgba(107, 199, 217, 0.16);
-  --openbot-message-badge-text: #91c8ff;
-  --openbot-message-badge-soft: rgba(116, 185, 255, 0.16);
+  --openbot-message-badge-text: #a9b4ff;
+  --openbot-message-badge-soft: rgba(79, 107, 255, 0.16);
   /* The "new thing is available" pill. It is deliberately not --openbot-accent: an
      announcement is not an action. */
   --openbot-badge-new: #ff1e5e;
@@ -267,19 +267,20 @@
   --openbot-file-pink-soft: rgba(217, 138, 201, 0.14);
   --openbot-file-default: #42a0ff;
   --openbot-file-default-soft: rgba(0, 124, 247, 0.14);
-  --openbot-data-table-border: #303030;
+  --openbot-data-table-border: #1f1f1f;
   --openbot-data-table-header-text: #a1a1a1;
-  --openbot-data-table-text: #f5f5f5;
+  --openbot-data-table-text: #ededed;
   --openbot-data-table-outer-border: rgba(255, 255, 255, 0);
   --openbot-data-table-ring: rgba(255, 255, 255, 0.12);
   --openbot-shadow-popover-ambient: rgba(0, 0, 0, 0.1);
-  --openbot-shadow-dialog: rgba(0, 0, 0, 0.48);
-  --openbot-shadow-menu: rgba(0, 0, 0, 0.45);
+  --openbot-shadow-dialog: rgba(0, 0, 0, 0.6);
+  --openbot-shadow-menu: rgba(0, 0, 0, 0.6);
   --openbot-shadow-dynamic-island: rgba(0, 0, 0, 0.6);
-  --openbot-shadow-ring: rgba(228, 228, 228, 0.04);
+  --openbot-shadow-ring: rgba(255, 255, 255, 0.06);
   --openbot-border-on-light: rgba(20, 20, 20, 0.14);
   --openbot-hover: rgba(255, 255, 255, 0.06);
-  --openbot-font-sans: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --openbot-font-sans:
+    "Figtree Variable", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --openbot-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace;
   /* Six steps, one line-height each, named for the step it pairs with. The scale had
    * sixteen sizes and eight line-heights, four of them a single call site, which is how
@@ -331,13 +332,13 @@
   --openbot-scrollbar-size: 8px;
   --openbot-radius-xs: 4px;
   --openbot-radius-sm: 6px;
-  --openbot-radius-md: 8px;
-  --openbot-radius-lg: 12px;
-  --openbot-radius-card: 14px;
+  --openbot-radius-md: 10px;
+  --openbot-radius-lg: 14px;
+  --openbot-radius-card: 16px;
   --openbot-radius-xl: 20px;
-  --openbot-radius-bubble: 22px;
+  --openbot-radius-bubble: 20px;
   --openbot-radius-bubble-inset: calc(var(--openbot-radius-bubble) - var(--openbot-space-3) - 1px);
-  --openbot-radius-modal: 30px;
+  --openbot-radius-modal: 24px;
   --openbot-radius-media-preview: calc(var(--openbot-radius-lg) - 1px);
   --openbot-radius-pill: 999px;
   --openbot-radius-logo: 20%;

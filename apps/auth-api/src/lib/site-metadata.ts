@@ -180,14 +180,14 @@ export const OPENBOT_SECURITY_HEADERS = {
 } as const;
 
 /**
- * @param interLatinFont The hashed URL of Inter's upright latin range, the one font
+ * @param figtreeLatinFont The hashed URL of Figtree's upright latin range, the one font
  * file this site downloads. It is reached through two levels of CSS `@import`, so a
  * browser only learns of it after the stylesheet has parsed. That is late enough
- * that the first paint uses a fallback face and every line of text moves when Inter
+ * that the first paint uses a fallback face and every line of text moves when Figtree
  * replaces it. The caller passes the same hashed asset the `@font-face` rule asks
  * for, so the preload below is that request and not a second one.
  */
-export function openBotRootHead(interLatinFont: string) {
+export function openBotRootHead(figtreeLatinFont: string) {
   return {
     meta: [
       { charSet: "utf-8" },
@@ -203,7 +203,7 @@ export function openBotRootHead(interLatinFont: string) {
         rel: "preload",
         as: "font" as const,
         type: "font/woff2",
-        href: interLatinFont,
+        href: figtreeLatinFont,
         crossorigin: "anonymous" as const,
       },
       { rel: "icon", href: "/favicon.ico", sizes: "any" },

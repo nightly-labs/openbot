@@ -3,7 +3,7 @@
 //
 // The outlines are "Open" in Inter Light (300) and "BOT" in Inter Medium (500), as in the Figma "Logo"
 // board, set with the font's kerning. They were drawn from the variable Inter that
-// `@fontsource-variable/inter` ships. To change them, draw them again from the font: do not edit
+// `@fontsource-variable/inter` shipped (Inter, the earlier product font). To change them, draw them again from the font: do not edit
 // the numbers by hand.
 
 /** The ink of the name is this wide, in the units of `APP_LOGO_SIZE`: four marks. */

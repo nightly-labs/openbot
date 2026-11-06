@@ -22,7 +22,7 @@
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
-    "@fontsource-variable/inter": "catalog:",
+    "@fontsource-variable/figtree": "catalog:",
     "@kobalte/core": "catalog:",
     "@openbot/brand": "workspace:*",
     "@openbot/contracts": "workspace:*",

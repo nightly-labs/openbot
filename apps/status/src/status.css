@@ -1,4 +1,4 @@
-@import "@fontsource-variable/inter";
+@import "@fontsource-variable/figtree";
 @import "@openbot/brand/tokens.css";
 @import "@openbot/brand/logo.css";
 
@@ -18,7 +18,7 @@
   min-height: 100vh;
   background: var(--openbot-bg-canvas);
   color: var(--openbot-text-primary);
-  font-family: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Figtree Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
 }

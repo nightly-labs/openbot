@@ -303,10 +303,10 @@ async function bundlePageScript(workspace: string): Promise<string> {
 
 /** Inter may not be installed, so the font travels into the page as a data URL. */
 async function buildFontScript(): Promise<string> {
-  const fontPath = require.resolve("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2");
+  const fontPath = require.resolve("@fontsource-variable/figtree/files/figtree-latin-wght-normal.woff2");
   const font = await readFile(fontPath, "base64");
   return `(async () => {
-    const face = new FontFace("Inter Variable", "url(data:font/woff2;base64,${font}) format('woff2')", { weight: "100 900" });
+    const face = new FontFace("Figtree Variable", "url(data:font/woff2;base64,${font}) format('woff2')", { weight: "100 900" });
     await face.load();
     document.fonts.add(face);
   })()`;

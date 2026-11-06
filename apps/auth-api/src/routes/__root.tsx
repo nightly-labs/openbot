@@ -1,4 +1,4 @@
-import interLatinFont from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
+import figtreeLatinFont from "@fontsource-variable/figtree/files/figtree-latin-wght-normal.woff2?url";
 import type { JSX } from "@solidjs/web";
 import { createRootRoute, type ErrorComponentProps, HeadContent, Outlet, Scripts } from "@tanstack/solid-router";
 import { createSignal, onSettled, Show } from "solid-js";
@@ -25,7 +25,7 @@ export const Route = createRootRoute({
   // its own, so the root head gives it its title. A child route's own title still wins. The 404 page
   // is English only, so its title is English too.
   head: ({ matches }) => {
-    const head = openBotRootHead(interLatinFont);
+    const head = openBotRootHead(figtreeLatinFont);
     if (!matches.some((match) => match._notFound)) return head;
     return { ...head, meta: head.meta.map((tag) => ("title" in tag ? { title: NOT_FOUND_TITLE } : tag)) };
   },

@@ -20,7 +20,7 @@ const { width: WIDTH, height: HEIGHT } = AGENT_TEMPLATE_CARD;
 const HERO = { x: 40, y: 40, size: 550, radius: 40 };
 const AVATAR_SIZE = 300;
 const COLUMN = { x: 650, width: 490 };
-export const FONT = '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+export const FONT = '"Figtree Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
 export async function renderAgentTemplateCard(preview: AgentTemplatePreview): Promise<Uint8Array> {
   const canvas = document.createElement("canvas");

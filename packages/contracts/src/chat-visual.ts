@@ -127,7 +127,7 @@ const SHARED_APP_THEME: ChatVisualTheme = {
   "--chart-5": "#d6adf2",
   "--chart-6": "#6bc7d9",
   "--radius": "12px",
-  "--font-sans": '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  "--font-sans": '"Figtree Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   "--font-mono": 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace',
 };
 

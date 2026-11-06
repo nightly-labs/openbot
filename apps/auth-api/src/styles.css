@@ -1,5 +1,5 @@
-@import "@fontsource-variable/inter";
-@import "@fontsource-variable/inter/wght-italic.css";
+@import "@fontsource-variable/figtree";
+@import "@fontsource-variable/figtree/wght-italic.css";
 @import "tailwindcss";
 @import "@openbot/brand/tokens.css";
 /* Only the web client at /app sets the attribute that turns it on. The public pages stay dark. */
@@ -7,32 +7,31 @@
 @import "@openbot/ui/stagger.css";
 @import "@openbot/ui/styles/sr-only.css";
 
-/* Arial with the size and line metrics of Inter. Until Inter loads, the text takes the same space,
-   so the hero does not move when the font changes. Inter is wider than the system font, and on a
-   slow phone the description wrapped to one more line and pushed the buttons down. */
+/* Arial with the size and line metrics of Figtree. Until Figtree loads, the text takes the same space,
+   so the hero does not move when the font changes. */
 @font-face {
-  font-family: "Inter Variable Fallback";
+  font-family: "Figtree Variable Fallback";
   src: local("Arial"), local("ArialMT");
-  size-adjust: 107.12%;
-  ascent-override: 90.44%;
-  descent-override: 22.52%;
+  size-adjust: 100%;
+  ascent-override: 95%;
+  descent-override: 25%;
   line-gap-override: 0%;
 }
 
 @font-face {
-  font-family: "Inter Variable Fallback";
+  font-family: "Figtree Variable Fallback";
   font-weight: 600 900;
   src: local("Arial Bold"), local("Arial-BoldMT");
-  size-adjust: 107.12%;
-  ascent-override: 90.44%;
-  descent-override: 22.52%;
+  size-adjust: 100%;
+  ascent-override: 95%;
+  descent-override: 25%;
   line-gap-override: 0%;
 }
 
 :root {
   color-scheme: dark;
   --openbot-font-sans:
-    "Inter Variable", "Inter Variable Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    "Figtree Variable", "Figtree Variable Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --pulse-dur: 1000ms;
   --pulse-count: 1;
   --pulse-min: 0.5;

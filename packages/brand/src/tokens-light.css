@@ -22,53 +22,53 @@
 :root[data-openbot-color-scheme="light"] {
   color-scheme: light;
 
-  --openbot-bg-canvas: #f5f5f6;
-  --openbot-bg-canvas-clear: rgba(245, 245, 246, 0);
-  --openbot-bg-frame: #e8e8eb;
-  --openbot-bg-sidebar: #f5f5f6;
-  --openbot-bg-native-sidebar: #f5f5f6;
+  --openbot-bg-canvas: #ffffff;
+  --openbot-bg-canvas-clear: rgba(255, 255, 255, 0);
+  --openbot-bg-frame: #ffffff;
+  --openbot-bg-sidebar: #ffffff;
+  --openbot-bg-native-sidebar: #ffffff;
   --openbot-bg-sheet: #ffffff;
-  --openbot-bg-sheet-inset: #f0f0f2;
+  --openbot-bg-sheet-inset: #f7f8fa;
   --openbot-bg-grouped: #ffffff;
-  --openbot-text-grouped-secondary: #6b6b70;
-  --openbot-border-grouped: #e3e3e6;
-  --openbot-marketplace-detail-bg: #ececee;
-  --openbot-bg-surface: #ffffff;
-  --openbot-bg-surface-raised: #fcfcfc;
-  --openbot-bg-control: #ffffff;
-  --openbot-bg-control-hover: #f0f0f2;
-  --openbot-bg-control-active: #e8e8eb;
-  --openbot-tabs-bar-bg: #ececee;
+  --openbot-text-grouped-secondary: #5b6270;
+  --openbot-border-grouped: #e6e8ec;
+  --openbot-marketplace-detail-bg: #f7f8fa;
+  --openbot-bg-surface: #f4f5f7;
+  --openbot-bg-surface-raised: #f4f5f7;
+  --openbot-bg-control: #f4f5f7;
+  --openbot-bg-control-hover: #eceff3;
+  --openbot-bg-control-active: #e4e8ed;
+  --openbot-tabs-bar-bg: #f3f5f7;
   --openbot-tabs-pill-bg: #ffffff;
-  --openbot-bg-overlay: rgba(245, 245, 246, 0.92);
-  --openbot-dialog-overlay: rgba(20, 20, 20, 0.12);
-  --openbot-dialog-ring: rgba(20, 20, 20, 0.1);
-  --openbot-bg-glass: rgba(255, 255, 255, 0.76);
+  --openbot-bg-overlay: rgba(255, 255, 255, 0.92);
+  --openbot-dialog-overlay: rgba(21, 23, 28, 0.16);
+  --openbot-dialog-ring: rgba(21, 23, 28, 0.08);
+  --openbot-bg-glass: rgba(255, 255, 255, 0.8);
   --openbot-glass-surface: rgba(20, 20, 20, 0.04);
   --openbot-glass-surface-hover: rgba(20, 20, 20, 0.07);
   --openbot-glass-border: rgba(20, 20, 20, 0.12);
   --openbot-glass-highlight: rgba(255, 255, 255, 0.6);
   --openbot-glass-shadow: transparent;
-  --openbot-scroll-edge-overlay: rgba(245, 245, 246, 0.72);
+  --openbot-scroll-edge-overlay: rgba(255, 255, 255, 0.72);
 
-  --openbot-border: rgba(20, 20, 20, 0.07);
-  --openbot-border-strong: rgba(20, 20, 20, 0.1);
-  --openbot-image-outline: rgba(20, 20, 20, 0.1);
-  --openbot-hover: rgba(20, 20, 20, 0.05);
+  --openbot-border: #e6e8ec;
+  --openbot-border-strong: #dfe3e9;
+  --openbot-image-outline: rgba(21, 23, 28, 0.08);
+  --openbot-hover: rgba(21, 23, 28, 0.05);
 
   /* Contrast on the canvas: primary 17:1, secondary 10:1, muted 4.9:1. Dim is for
      marks and disabled text, as in the dark palette. */
-  --openbot-text-primary: #141414;
-  --openbot-text-secondary: #3a3a3c;
-  --openbot-text-muted: #6b6b70;
-  --openbot-text-dim: #8e8e93;
-  --openbot-text-placeholder: #5c5c61;
-  --openbot-text-readable: rgba(20, 20, 20, 0.6);
-  --openbot-settings-text-muted: rgba(20, 20, 20, 0.6);
+  --openbot-text-primary: #15171c;
+  --openbot-text-secondary: #2c3038;
+  --openbot-text-muted: #5b6270;
+  --openbot-text-dim: #8a909c;
+  --openbot-text-placeholder: #8a909c;
+  --openbot-text-readable: rgba(21, 23, 28, 0.6);
+  --openbot-settings-text-muted: rgba(21, 23, 28, 0.6);
 
   /* The on-light family is the high-contrast inverted element: the default button, a checked
      switch, the user's bubble, the light tooltip. On a light canvas it turns dark. */
-  --openbot-surface-light: #1c1c1e;
+  --openbot-surface-light: #15171c;
   --openbot-text-on-light: #ffffff;
   --openbot-text-muted-on-light: rgba(255, 255, 255, 0.64);
   --openbot-text-dim-on-light: rgba(255, 255, 255, 0.4);
@@ -76,10 +76,11 @@
 
   /* The same hue 210 as the dark accent. The fill keeps its value, so a button looks the same
      in both themes; text and hover go darker for contrast (accent-text 5.3:1 on the canvas). */
-  --openbot-accent-hover: #006ad4;
-  --openbot-accent-text: #0064c8;
-  --openbot-accent-soft: rgba(0, 124, 247, 0.12);
-  --openbot-accent-strong: rgba(0, 124, 247, 0.26);
+  --openbot-accent: #2445e6;
+  --openbot-accent-hover: #1c36b8;
+  --openbot-accent-text: #2445e6;
+  --openbot-accent-soft: rgba(36, 69, 230, 0.1);
+  --openbot-accent-strong: rgba(36, 69, 230, 0.22);
 
   /* Chart series: darker steps of the dark-palette hues, so each series reads on white.
      Not yet checked with the dataviz palette validator in light mode. */
@@ -92,10 +93,10 @@
   --openbot-chart-storage-runtimes: #a86f00;
 
   /* Status fills keep their hue. Status text is darker, for AA on white. */
-  --openbot-success: #1fa85a;
-  --openbot-success-text: #187a41;
-  --openbot-success-soft: rgba(31, 168, 90, 0.12);
-  --openbot-success-wash: rgba(31, 168, 90, 0.06);
+  --openbot-success: #17795e;
+  --openbot-success-text: #17795e;
+  --openbot-success-soft: rgba(23, 121, 94, 0.1);
+  --openbot-success-wash: rgba(23, 121, 94, 0.05);
   --openbot-warning: #f08a00;
   --openbot-warning-text: #9c5200;
   --openbot-warning-soft: rgba(240, 138, 0, 0.14);
@@ -114,8 +115,8 @@
   --openbot-question-option-pressed: rgba(22, 132, 155, 0.24);
   --openbot-question-badge-text: #0f6a7d;
   --openbot-question-badge-soft: rgba(22, 132, 155, 0.14);
-  --openbot-message-badge-text: #0a5fb8;
-  --openbot-message-badge-soft: rgba(0, 124, 247, 0.12);
+  --openbot-message-badge-text: #1c36b8;
+  --openbot-message-badge-soft: rgba(36, 69, 230, 0.1);
   --openbot-badge-new: #e0004a;
   --openbot-badge-new-soft: rgba(224, 0, 74, 0.12);
 
@@ -137,17 +138,17 @@
   --openbot-file-default: #0064c8;
   --openbot-file-default-soft: rgba(0, 124, 247, 0.12);
 
-  --openbot-data-table-border: #e3e3e6;
-  --openbot-data-table-header-text: #6b6b70;
-  --openbot-data-table-text: #1c1c1e;
+  --openbot-data-table-border: #e6e8ec;
+  --openbot-data-table-header-text: #5b6270;
+  --openbot-data-table-text: #15171c;
   --openbot-data-table-outer-border: rgba(20, 20, 20, 0);
   --openbot-data-table-ring: rgba(20, 20, 20, 0.1);
 
   /* No drop shadows: on the dark canvas they do not show, but on white they read as a halo.
      A raised surface keeps its 1px ring. */
-  --openbot-shadow-popover-ambient: transparent;
-  --openbot-shadow-dialog: transparent;
-  --openbot-shadow-menu: transparent;
-  --openbot-shadow-ring: rgba(20, 20, 20, 0.04);
-  --openbot-shadow-overlay: 0 0 0 transparent;
+  --openbot-shadow-popover-ambient: rgba(21, 23, 28, 0.08);
+  --openbot-shadow-dialog: rgba(21, 23, 28, 0.18);
+  --openbot-shadow-menu: rgba(21, 23, 28, 0.12);
+  --openbot-shadow-ring: rgba(21, 23, 28, 0.06);
+  --openbot-shadow-overlay: 0 16px 36px -12px rgba(21, 23, 28, 0.18), 0 4px 10px -4px rgba(21, 23, 28, 0.07);
 }
