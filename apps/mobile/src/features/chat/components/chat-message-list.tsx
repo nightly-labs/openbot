@@ -1351,11 +1351,12 @@ export const ChatMessageList = memo(function ChatMessageList({
 
   const visibleMessages = useMemo(
     () =>
-      groupRoutineRunMarkers(
-        groupExchangeMarkers(messages.filter((message) => message.kind !== "thinking")),
-        unreadLineMessageIds,
-      ),
-    [messages, unreadLineMessageIds],
+      groupRoutineRunMarkers(groupExchangeMarkers(messages.filter((message) => message.kind !== "thinking")), {
+        unreadMessageIds: unreadLineMessageIds,
+        focusMessageId,
+        branchRowId: branchDivider?.afterId,
+      }),
+    [messages, unreadLineMessageIds, focusMessageId, branchDivider?.afterId],
   );
   // One pass over the loaded rows when they change; the rows read their label from the context.
   const dayLabels = useMemo(() => chatDayLabels(visibleMessages, { t, format }), [visibleMessages, t, format]);

@@ -59,6 +59,8 @@ export type ChatMessage =
       label: MobileTextKey;
       routineId: string;
       routineName: string;
+      /** When the host stored the marker. Not `createdAt`: a marker gets no day label. */
+      storedAt?: string;
     }
   | {
       id: string;
@@ -256,6 +258,7 @@ function projectRoutineMarker(message: ConversationMessage, latestRuns: Readonly
     label: marker.label,
     routineId: marker.routineId,
     routineName: marker.routineName,
+    storedAt: message.createdAt,
   }));
 }
 const aliasedMessages = new WeakMap<ChatMessage, ChatMessage>();
@@ -489,16 +492,37 @@ function rowMarkers(row: ChatRow): readonly { id: string }[] {
 
 const routineRunGroups = new WeakMap<RoutineMarker, RoutineRunGroup>();
 
+/** The rows where a routine run group must stop, so a line or a focused run keeps a row of its own. */
+export interface RoutineRunGroupStops {
+  /** The NEW line shows above the first row of these messages. */
+  unreadMessageIds?: ReadonlySet<string> | null;
+  /** The message that the chat opens at, from a search result. */
+  focusMessageId?: string | null;
+  /** The row that the branch divider follows. */
+  branchRowId?: string | null;
+}
+
 /**
  * Joins consecutive completed runs of one routine into one row, as desktop does, so a routine that
  * runs often does not fill the chat. Any other row stops the group, and so does a run that did not
- * complete. A group also stops at the first unread row, so the NEW line keeps its place.
+ * complete. A group also stops at a new day, at the first unread row, at the branch divider, and
+ * around the run that the chat opens at.
  */
 export function groupRoutineRunMarkers<T extends ChatRow>(
   rows: readonly T[],
-  unreadMessageIds: ReadonlySet<string> | null = null,
+  { unreadMessageIds = null, focusMessageId = null, branchRowId = null }: RoutineRunGroupStops = {},
 ): (T | RoutineRunGroup)[] {
-  const unreadIndex = unreadMessageIds ? firstChatRowOf(rows, unreadMessageIds) : -1;
+  // A new group starts at each of these rows.
+  const starts = new Set<number>();
+  if (unreadMessageIds) starts.add(firstChatRowOf(rows, unreadMessageIds));
+  if (focusMessageId) {
+    const focus = chatRowIndex(rows, focusMessageId);
+    if (focus >= 0) starts.add(focus).add(focus + 1);
+  }
+  if (branchRowId) {
+    const branch = chatRowHolding(rows, branchRowId);
+    if (branch >= 0) starts.add(branch + 1);
+  }
   const result: (T | RoutineRunGroup)[] = [];
   let run: (T & RoutineMarker)[] = [];
   const closeRun = () => {
@@ -512,11 +536,24 @@ export function groupRoutineRunMarkers<T extends ChatRow>(
       result.push(row);
       return;
     }
-    if (index === unreadIndex || (run[0] && run[0].routineId !== row.routineId)) closeRun();
+    const previous = run.at(-1);
+    if (
+      previous &&
+      (starts.has(index) || previous.routineId !== row.routineId || startsDay(previous.storedAt, row.storedAt))
+    )
+      closeRun();
     run.push(row);
   });
   closeRun();
   return result;
+}
+
+/** Whether `current` is on a later local day than `previous`. A marker with no time starts no day. */
+function startsDay(previous: string | undefined, current: string | undefined): boolean {
+  if (!previous || !current) return false;
+  const [before, after] = [new Date(previous), new Date(current)];
+  if (Number.isNaN(before.getTime()) || Number.isNaN(after.getTime())) return false;
+  return before.toDateString() !== after.toDateString();
 }
 
 function completedRun<T extends ChatRow>(row: T): row is T & RoutineMarker {
@@ -640,6 +677,7 @@ function projectChannelMessage(
       label: routine.label,
       routineId: routine.routineId,
       routineName: routine.routineName,
+      storedAt: entry.message.createdAt,
     };
   }
   if (entry.message.questionPrompt) {
