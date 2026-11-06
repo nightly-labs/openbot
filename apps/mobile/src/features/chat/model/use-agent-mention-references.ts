@@ -1,11 +1,31 @@
-import { useMemo } from "react";
-import { browserTabHost, browserTabTitle } from "@/features/browser/model/browser-tabs";
-import { useAgentBrowserTabs } from "@/features/workspace/components/use-live-workspace";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { agentBrowserTabs, browserTabHost, browserTabTitle } from "@/features/browser/model/browser-tabs";
+import { selectLiveState } from "@/features/workspace/components/use-live-workspace";
+import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { useText } from "@/shared/lib/text";
 import type { MentionReference } from "../components/chat-composer";
 import { useOpenAgentTasks } from "../components/use-open-agent-tasks";
 
 const NO_REFERENCES: readonly MentionReference[] = [];
+
+/** The longest tag name, as the desktop composer writes it (`referenceName` in `@openbot/ui`). */
+const REFERENCE_NAME_LIMIT = 80;
+
+/** One line, at most `REFERENCE_NAME_LIMIT` characters, so a tag from the phone matches a desktop tag. */
+function referenceName(name: string): string {
+  const characters = Array.from(name.replace(/\s+/gu, " ").trim());
+  return characters.length > REFERENCE_NAME_LIMIT
+    ? `${characters
+        .slice(0, REFERENCE_NAME_LIMIT - 1)
+        .join("")
+        .trimEnd()}…`
+    : characters.join("");
+}
+
+/** The address without the scheme and `www.`, as the desktop picker matches it. */
+function displayUrl(url: string): string {
+  return url.replace(/^https?:\/\/(www\.)?/i, "").replace(/\/$/, "");
+}
 
 /**
  * What `@` in one agent's chat can tag beside the agents, as the desktop composer: the agent's own
@@ -20,23 +40,36 @@ export function useAgentMentionReferences(
   currentTaskId: string | null = null,
 ): readonly MentionReference[] {
   const { t } = useText();
-  const tabs = useAgentBrowserTabs(serverId, agentId);
-  const tasks = useOpenAgentTasks(serverId, agentId);
   const untitled = t("mobile.browser.tabs.untitled");
+  const liveState = useMobileWorkspaceSelector(selectLiveState);
+  // A text key of this agent's tabs: a change to another agent's tab does not draw the chat again.
+  const selectTabs = useCallback(
+    () =>
+      JSON.stringify(
+        agentBrowserTabs(liveState.get().browserTabs[serverId], agentId).map((tab) => [
+          tab.id,
+          referenceName(browserTabTitle(tab, untitled)),
+          browserTabHost(tab),
+          displayUrl(tab.url),
+        ]),
+      ),
+    [liveState, serverId, agentId, untitled],
+  );
+  const tabsKey = useSyncExternalStore(liveState.subscribe, selectTabs);
+  const tasks = useOpenAgentTasks(serverId, agentId);
   return useMemo(() => {
+    const tabs: [string, string, string, string][] = JSON.parse(tabsKey);
     const references: MentionReference[] = [
-      ...[...tabs].reverse().map((tab) => ({
-        kind: "tab" as const,
-        id: tab.id,
-        name: browserTabTitle(tab, untitled),
-        detail: browserTabHost(tab),
-      })),
+      ...tabs.reverse().map(([id, name, host, url]) => ({ kind: "tab" as const, id, name, detail: host, search: url })),
       ...tasks
-        .filter((task) => task.id !== currentTaskId)
+        .filter((task) => task.id !== currentTaskId && referenceName(task.title))
         // Hermes has no `toSorted`. `filter` already made a new array, so `sort` changes no shared list.
         .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-        .map((task) => ({ kind: "thread" as const, id: task.id, name: task.title, detail: "" })),
+        .map((task) => {
+          const name = referenceName(task.title);
+          return { kind: "thread" as const, id: task.id, name, detail: "", search: "" };
+        }),
     ];
     return references.length > 0 ? references : NO_REFERENCES;
-  }, [tabs, tasks, currentTaskId, untitled]);
+  }, [tabsKey, tasks, currentTaskId]);
 }

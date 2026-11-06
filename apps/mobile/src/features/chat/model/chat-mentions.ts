@@ -13,7 +13,7 @@ export function mentionDraft(source: string) {
     const start = text.length;
     // A quote keeps its marker through an edit, as a mention does. The phone cannot jump to its source.
     // A skill or an app reads as its name after @, as the desktop chip does; its marker goes to the host.
-    // A browser tab or a thread of the agent is on the host only, so it reads as its name.
+    // A browser tab or a thread of the agent reads as its name, as the desktop chip does.
     text += mentionText(reference);
     mentions.push({ start, end: text.length, reference, wire: source.slice(reference.start, reference.end) });
     cursor = reference.end;

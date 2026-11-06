@@ -222,13 +222,15 @@ export interface MentionSkill {
 /**
  * A browser tab or a side thread of the chat's agent, as `@[name](tab:id)` or `@[name](thread:id)`,
  * the tags the desktop composer writes. The host gives the agent its id and current state when it
- * delivers the message. `detail` is the site of a tab, which a query also matches.
+ * delivers the message. `detail` is the site of a tab. `search` is its address, which a query also
+ * matches, as on the desktop.
  */
 export interface MentionReference {
   kind: "tab" | "thread";
   id: string;
   name: string;
   detail: string;
+  search: string;
 }
 
 /** The groups of the `@` list after the agents, in the desktop order: tabs and threads, then skills and apps. */
@@ -344,7 +346,7 @@ export const ChatComposer = memo(function ChatComposer({
     query && !skillsOnly
       ? mentionReferences
           .filter((reference) =>
-            `${reference.name} ${reference.detail}`.toLocaleLowerCase().includes(query.query.trim()),
+            `${reference.name} ${reference.search}`.toLocaleLowerCase().includes(query.query.trim()),
           )
           .slice(0, 8)
       : [];
