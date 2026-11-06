@@ -171,6 +171,21 @@ const OPENBOT_CLAUDE_CLIENT = {
   CLAUDE_CODE_ARTIFACT: "0",
   CLAUDE_CODE_ENTRYPOINT: "openbot",
 };
+/**
+ * A session on the saved Anthropic API key keeps the SDK's `sdk-ts` label. The API refuses API key
+ * requests labelled `openbot` with a 400 `billing_error`, "Credit balance is too low", while the same
+ * key and request labelled `sdk-ts` get an answer. The 5-hour window that the label is for belongs to
+ * claude.ai accounts, not to API keys.
+ */
+const OPENBOT_CLAUDE_API_KEY_CLIENT = {
+  CLAUDE_AGENT_SDK_CLIENT_APP: OPENBOT_CLAUDE_CLIENT.CLAUDE_AGENT_SDK_CLIENT_APP,
+  CLAUDE_CODE_ARTIFACT: OPENBOT_CLAUDE_CLIENT.CLAUDE_CODE_ARTIFACT,
+};
+
+/** The variables that name OpenBot to Claude for a session on a claude.ai account or on the API key. */
+function openbotClaudeClient(onApiKey: boolean) {
+  return onApiKey ? OPENBOT_CLAUDE_API_KEY_CLIENT : OPENBOT_CLAUDE_CLIENT;
+}
 
 interface ClientEvents {
   notification: [notification: AppServerNotification];
@@ -637,7 +652,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       env: {
         ...claudeEnvironment(this.#cli),
         ...this.#environment(this.#onApiKey),
-        ...OPENBOT_CLAUDE_CLIENT,
+        ...openbotClaudeClient(this.#onApiKey),
       },
     };
   }
@@ -1042,7 +1057,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             // tools when Finder starts OpenBot. An `env.PATH` in the Claude settings still wins.
             ...(launchPath ? { PATH: launchPath } : {}),
             ...this.#environment(this.#onApiKey),
-            ...OPENBOT_CLAUDE_CLIENT,
+            ...openbotClaudeClient(this.#onApiKey),
             // Without a terminal, the CLI gives the newer models no TodoWrite or task tools, so the
             // agent has no plan for OpenBot to show as a task list.
             CLAUDE_CODE_ENABLE_TODO_TOOLS: "1",
