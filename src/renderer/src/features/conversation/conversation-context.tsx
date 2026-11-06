@@ -211,7 +211,20 @@ const Conversation = createSimpleContext({
         serverState: activeServer()?.state,
         sequence: activeServer()?.connectionSequence,
       }),
-      ({ agentId }) => {
+      (next, previous) => {
+        // Each provider status update gives a new source, also when these values do not change. A read
+        // of the latest page replaces the older pages that the reader scrolled up to load.
+        if (
+          previous &&
+          next.agentId === previous.agentId &&
+          next.agentPhase === previous.agentPhase &&
+          next.openRevision === previous.openRevision &&
+          next.serverState === previous.serverState &&
+          next.sequence === previous.sequence
+        ) {
+          return;
+        }
+        const { agentId } = next;
         if (!agentId) return;
         const serverId = untrack(activeServerId);
         const trackingKey = agentConversationKey(serverId, agentId);
