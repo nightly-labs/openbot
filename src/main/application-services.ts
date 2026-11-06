@@ -1176,6 +1176,7 @@ export async function createApplicationServices({
   );
   const sidebarLayout = new SidebarLayoutStore(join(app.getPath("userData"), SIDEBAR_LAYOUT_FILE));
   await runCauseEffect(sidebarLayout.initialize());
+  teardown.push(TEARDOWN_ORDER.service - 1, "the sidebar layout file watcher", () => sidebarLayout.unwatch());
   const mailbox = new MailboxStore(app.getPath("userData"), store.sharedRoot, store.database);
   await runCauseEffect(mailbox.initialize());
   configureApplicationProtocol();

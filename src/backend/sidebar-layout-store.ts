@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
+import { type FSWatcher, watch } from "node:fs";
 import { mkdir, readFile, rename } from "node:fs/promises";
-import { dirname } from "node:path";
+import { basename, dirname } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   isCompleteSectionOrder,
@@ -48,6 +49,9 @@ export class SidebarLayoutStore extends EventEmitter<SidebarLayoutStoreEvents> {
   readonly #path: string;
   #layout = structuredClone(DEFAULT_LAYOUT);
   readonly #operationQueue = Semaphore.makeUnsafe(1);
+  #watcher: FSWatcher | null = null;
+  #reloadTimer: ReturnType<typeof setTimeout> | null = null;
+  #writing = false;
 
   constructor(path: string) {
     super();
@@ -57,6 +61,13 @@ export class SidebarLayoutStore extends EventEmitter<SidebarLayoutStoreEvents> {
   initialize() {
     return Effect.gen({ self: this }, function* () {
       yield* storedIO(() => mkdir(dirname(this.#path), { recursive: true, mode: 0o700 }));
+      yield* this.#readFromDisk();
+      this.watch();
+    });
+  }
+
+  #readFromDisk() {
+    return Effect.gen({ self: this }, function* () {
       const loaded = yield* Effect.result(
         Effect.gen({ self: this }, function* () {
           const contents = yield* storedIO(() => readFile(this.#path, "utf8"));
@@ -78,6 +89,52 @@ export class SidebarLayoutStore extends EventEmitter<SidebarLayoutStoreEvents> {
       yield* storedIO(() => rename(this.#path, backupPath)).pipe(Effect.catch(() => Effect.void));
       this.#layout = structuredClone(DEFAULT_LAYOUT);
     });
+  }
+
+  watch(): () => void {
+    if (this.#watcher !== null) return () => this.unwatch();
+    try {
+      const parentDir = dirname(this.#path);
+      const targetFilename = basename(this.#path);
+      this.#watcher = watch(parentDir, (_eventType, filename) => {
+        if (filename && filename !== targetFilename) return;
+        if (this.#writing) return;
+        if (this.#reloadTimer !== null) clearTimeout(this.#reloadTimer);
+        this.#reloadTimer = setTimeout(() => {
+          this.#reloadTimer = null;
+          if (this.#writing) return;
+          void Effect.runPromise(this.reload().pipe(Effect.catch(() => Effect.void)));
+        }, 100);
+      });
+      this.#watcher.on("error", () => {});
+    } catch {
+      // Watching is a best-effort improvement for local file edits.
+    }
+    return () => this.unwatch();
+  }
+
+  unwatch(): void {
+    if (this.#reloadTimer !== null) {
+      clearTimeout(this.#reloadTimer);
+      this.#reloadTimer = null;
+    }
+    if (this.#watcher !== null) {
+      this.#watcher.close();
+      this.#watcher = null;
+    }
+  }
+
+  reload(): Effect.Effect<SidebarLayoutSnapshot, StoredStateFailure> {
+    return this.#enqueue(
+      Effect.gen({ self: this }, function* () {
+        const previousRevision = this.#layout.revision;
+        yield* this.#readFromDisk();
+        if (this.#layout.revision !== previousRevision) {
+          this.emit("changed", this.getSnapshot());
+        }
+        return this.getSnapshot();
+      }),
+    );
   }
 
   getSnapshot(): SidebarLayoutSnapshot {
@@ -236,11 +293,19 @@ export class SidebarLayoutStore extends EventEmitter<SidebarLayoutStoreEvents> {
 
   #commit = Effect.fn("SidebarLayout.commit")(function* (this: SidebarLayoutStore, next: SidebarLayoutSnapshot) {
     const stored: StoredSidebarLayout = { version: 2, ...next };
-    yield* writeFileAtomically(this.#path, `${JSON.stringify(stored)}\n`).pipe(
-      Effect.mapError(({ cause }) => new StoredStateFailure({ cause })),
-    );
-    this.#layout = next;
-    this.emit("changed", this.getSnapshot());
+    this.#writing = true;
+    try {
+      yield* writeFileAtomically(this.#path, `${JSON.stringify(stored)}\n`).pipe(
+        Effect.mapError(({ cause }) => new StoredStateFailure({ cause })),
+      );
+      this.#layout = next;
+      this.emit("changed", this.getSnapshot());
+    } finally {
+      // Keep #writing set for a brief tick so atomic rename/unlink events settle
+      setTimeout(() => {
+        this.#writing = false;
+      }, 50);
+    }
   });
 }
 
