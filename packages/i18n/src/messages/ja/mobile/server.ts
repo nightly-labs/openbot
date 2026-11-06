@@ -4,7 +4,6 @@ import type { messages as source } from "../../en/mobile/server";
 export const messages = {
   "mobile.server.drawer.local": "ローカル",
   "mobile.server.drawer.remote": "リモート",
-  "mobile.server.drawer.routines": "ルーティン",
   "mobile.server.drawer.usage": "使用量",
   "mobile.server.drawer.editOrder": "順序を編集",
   "mobile.server.drawer.leaveFailed": "{name} から退出できませんでした",
@@ -20,6 +19,14 @@ export const messages = {
   "mobile.server.drawer.kindMembers": "{kind} · {members}",
   "mobile.server.drawer.memberCount": { other: "メンバー {count} 人" },
   "mobile.server.drawer.doneEditing": "順序の編集を完了",
+  "mobile.server.drawer.editSidebar": "サイドバーを編集",
+  "mobile.server.drawer.unpinTool": "固定を解除",
+  "mobile.server.drawer.pinToolNamed": "{name} を固定",
+  "mobile.server.drawer.unpinToolNamed": "{name} の固定を解除",
+  "mobile.server.drawer.unpinnedTool": "{name}、固定解除",
+  "mobile.server.drawer.toolsHint":
+    "ハンドルをドラッグしてツールを移動します。固定を解除したツールは編集中にのみ表示されます。順序はこのデバイスに保存されます。",
+  "mobile.server.drawer.doneEditingSidebar": "編集を完了",
   "mobile.server.drawer.join": "サーバーに参加",
   "mobile.server.drawer.add": "サーバーを追加",
   "mobile.server.drawer.settings": "設定",

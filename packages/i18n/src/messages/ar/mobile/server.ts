@@ -4,7 +4,6 @@ import type { messages as source } from "../../en/mobile/server";
 export const messages = {
   "mobile.server.drawer.local": "محلي",
   "mobile.server.drawer.remote": "بعيد",
-  "mobile.server.drawer.routines": "المهام الدورية",
   "mobile.server.drawer.usage": "الاستخدام",
   "mobile.server.drawer.editOrder": "تعديل الترتيب",
   "mobile.server.drawer.leaveFailed": "تعذّرت مغادرة {name}",
@@ -27,6 +26,14 @@ export const messages = {
     other: "{count} عضو",
   },
   "mobile.server.drawer.doneEditing": "إنهاء تعديل الترتيب",
+  "mobile.server.drawer.editSidebar": "تعديل الشريط الجانبي",
+  "mobile.server.drawer.unpinTool": "إلغاء التثبيت",
+  "mobile.server.drawer.pinToolNamed": "تثبيت {name}",
+  "mobile.server.drawer.unpinToolNamed": "إلغاء تثبيت {name}",
+  "mobile.server.drawer.unpinnedTool": "{name}، غير مثبت",
+  "mobile.server.drawer.toolsHint":
+    "اسحب المقابض لنقل الأدوات. تظهر الأدوات غير المثبتة أثناء التعديل فقط. يُحفظ الترتيب على هذا الجهاز.",
+  "mobile.server.drawer.doneEditingSidebar": "إنهاء التعديل",
   "mobile.server.drawer.join": "الانضمام إلى خادم",
   "mobile.server.drawer.add": "إضافة خادم",
   "mobile.server.drawer.settings": "الإعدادات",

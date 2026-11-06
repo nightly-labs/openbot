@@ -26,7 +26,7 @@ export const messages = {
   "mobile.app.route.members": "成员",
   "mobile.app.route.hostedServerPlans": "云服务器",
   "mobile.app.route.hostedServerSetup": "配置",
-  "mobile.app.route.routines": "自动化任务",
+  "mobile.app.route.schedule": "日程",
   "mobile.app.route.workflows": "工作流",
   "mobile.app.route.workflow": "工作流",
   "mobile.app.route.workflowRun": "运行",
@@ -35,7 +35,6 @@ export const messages = {
   "mobile.app.route.usage": "用量",
   "mobile.app.route.marketplace": "市场",
   // The quick actions of the app icon, which the phone shows when the icon is held.
-  "mobile.app.quickAction.routines": "自动化任务",
   "mobile.app.quickAction.search": "搜索",
   "mobile.app.update.title": "OpenBot {version} 来了",
   "mobile.app.update.readyTitle": "新版 OpenBot 已就绪",

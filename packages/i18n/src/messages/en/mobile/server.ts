@@ -3,7 +3,6 @@ import { defineMessages } from "../../../message";
 export const messages = defineMessages("mobile.server", {
   "mobile.server.drawer.local": "Local",
   "mobile.server.drawer.remote": "Remote",
-  "mobile.server.drawer.routines": "Routines",
   "mobile.server.drawer.usage": "Usage",
   "mobile.server.drawer.editOrder": "Edit order",
   "mobile.server.drawer.leaveFailed": "Could not leave {name}",
@@ -19,6 +18,14 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.drawer.kindMembers": "{kind} · {members}",
   "mobile.server.drawer.memberCount": { one: "{count} member", other: "{count} members" },
   "mobile.server.drawer.doneEditing": "Done editing order",
+  "mobile.server.drawer.editSidebar": "Edit sidebar",
+  "mobile.server.drawer.unpinTool": "Unpin",
+  "mobile.server.drawer.pinToolNamed": "Pin {name}",
+  "mobile.server.drawer.unpinToolNamed": "Unpin {name}",
+  "mobile.server.drawer.unpinnedTool": "{name}, unpinned",
+  "mobile.server.drawer.toolsHint":
+    "Drag the handles to move tools. Unpinned tools show only while you edit. The order is saved on this device.",
+  "mobile.server.drawer.doneEditingSidebar": "Done editing sidebar",
   "mobile.server.drawer.join": "Join a server",
   "mobile.server.drawer.add": "Add a server",
   "mobile.server.drawer.settings": "Settings",

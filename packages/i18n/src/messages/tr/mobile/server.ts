@@ -4,7 +4,6 @@ import type { messages as source } from "../../en/mobile/server";
 export const messages = {
   "mobile.server.drawer.local": "Yerel",
   "mobile.server.drawer.remote": "Uzak",
-  "mobile.server.drawer.routines": "Rutinler",
   "mobile.server.drawer.usage": "Kullanım",
   "mobile.server.drawer.editOrder": "Sırayı düzenle",
   "mobile.server.drawer.leaveFailed": "{name} sunucusundan ayrılınamadı",
@@ -20,6 +19,14 @@ export const messages = {
   "mobile.server.drawer.kindMembers": "{kind} · {members}",
   "mobile.server.drawer.memberCount": { one: "{count} üye", other: "{count} üye" },
   "mobile.server.drawer.doneEditing": "Sıra düzenlemeyi bitir",
+  "mobile.server.drawer.editSidebar": "Kenar çubuğunu düzenle",
+  "mobile.server.drawer.unpinTool": "Sabitlemeyi kaldır",
+  "mobile.server.drawer.pinToolNamed": "{name} öğesini sabitle",
+  "mobile.server.drawer.unpinToolNamed": "{name} sabitlemesini kaldır",
+  "mobile.server.drawer.unpinnedTool": "{name}, sabitlenmemiş",
+  "mobile.server.drawer.toolsHint":
+    "Araçları taşımak için tutamaçları sürükleyin. Sabitlenmemiş araçlar yalnızca düzenlerken görünür. Sıra bu cihazda kaydedilir.",
+  "mobile.server.drawer.doneEditingSidebar": "Düzenlemeyi bitir",
   "mobile.server.drawer.join": "Bir sunucuya katıl",
   "mobile.server.drawer.add": "Sunucu ekle",
   "mobile.server.drawer.settings": "Ayarlar",

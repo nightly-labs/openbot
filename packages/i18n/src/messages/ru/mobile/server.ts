@@ -4,7 +4,6 @@ import type { messages as source } from "../../en/mobile/server";
 export const messages = {
   "mobile.server.drawer.local": "Локальные",
   "mobile.server.drawer.remote": "Удалённые",
-  "mobile.server.drawer.routines": "Регулярные задачи",
   "mobile.server.drawer.usage": "Использование",
   "mobile.server.drawer.editOrder": "Изменить порядок",
   "mobile.server.drawer.leaveFailed": "Не удалось покинуть {name}",
@@ -25,6 +24,14 @@ export const messages = {
     other: "{count} участника",
   },
   "mobile.server.drawer.doneEditing": "Завершить изменение порядка",
+  "mobile.server.drawer.editSidebar": "Изменить боковую панель",
+  "mobile.server.drawer.unpinTool": "Открепить",
+  "mobile.server.drawer.pinToolNamed": "Закрепить {name}",
+  "mobile.server.drawer.unpinToolNamed": "Открепить {name}",
+  "mobile.server.drawer.unpinnedTool": "{name}, откреплено",
+  "mobile.server.drawer.toolsHint":
+    "Перетащите маркеры, чтобы переместить инструменты. Откреплённые инструменты видны только при изменении. Порядок сохраняется на этом устройстве.",
+  "mobile.server.drawer.doneEditingSidebar": "Завершить изменение",
   "mobile.server.drawer.join": "Присоединиться к серверу",
   "mobile.server.drawer.add": "Добавить сервер",
   "mobile.server.drawer.settings": "Настройки",

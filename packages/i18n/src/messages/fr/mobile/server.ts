@@ -4,7 +4,6 @@ import type { messages as source } from "../../en/mobile/server";
 export const messages = {
   "mobile.server.drawer.local": "Local",
   "mobile.server.drawer.remote": "Distant",
-  "mobile.server.drawer.routines": "Routines",
   "mobile.server.drawer.usage": "Utilisation",
   "mobile.server.drawer.editOrder": "Modifier l’ordre",
   "mobile.server.drawer.leaveFailed": "Impossible de quitter {name}",
@@ -20,6 +19,14 @@ export const messages = {
   "mobile.server.drawer.kindMembers": "{kind} · {members}",
   "mobile.server.drawer.memberCount": { one: "{count} membre", other: "{count} membres" },
   "mobile.server.drawer.doneEditing": "Terminer la modification de l’ordre",
+  "mobile.server.drawer.editSidebar": "Modifier la barre latérale",
+  "mobile.server.drawer.unpinTool": "Désépingler",
+  "mobile.server.drawer.pinToolNamed": "Épingler {name}",
+  "mobile.server.drawer.unpinToolNamed": "Désépingler {name}",
+  "mobile.server.drawer.unpinnedTool": "{name}, désépinglé",
+  "mobile.server.drawer.toolsHint":
+    "Faites glisser les poignées pour déplacer les outils. Les outils désépinglés n'apparaissent qu'en modification. L'ordre est enregistré sur cet appareil.",
+  "mobile.server.drawer.doneEditingSidebar": "Terminer la modification",
   "mobile.server.drawer.join": "Rejoindre un serveur",
   "mobile.server.drawer.add": "Ajouter un serveur",
   "mobile.server.drawer.settings": "Réglages",
