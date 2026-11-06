@@ -7,7 +7,7 @@ import { isAbsolute, resolve } from "node:path";
 import { agentProviderName, type KeyOnlyProviderId } from "@openbot/contracts/agent-providers";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger, redactText } from "@openbot/logging";
+import { createOpenBotLogger, type LogValue, redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure, httpStatusCause, structuredCause } from "@openbot/telemetry";
 import { Cause, Effect, Exit, Option, Schema, Scope, Semaphore } from "effect";
 import { secretElicitationField } from "./agent/prompts";
@@ -860,7 +860,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     const safe =
       method === "openbot/usage" || method === "thread/tokenUsage/updated"
         ? params
-        : redactMcpRecord(params, this.#secretValues());
+        : withOwnIds(redactMcpRecord(params, this.#secretValues()), params);
     this.emit("notification", {
       method,
       params: {
@@ -1122,10 +1122,29 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
   #safeItems(items: ThreadItem[]): ThreadItem[] {
     const values = this.#secretValues();
     return items.flatMap((item) => {
-      const value = redactMcpRecord(item, values);
+      const value = withOwnIds(redactMcpRecord(item, values), item);
       return isRecord(value) && isString(value.type) ? [{ ...value, type: value.type }] : [];
     });
   }
+}
+
+/**
+ * Puts back the ids of a turn and its items after the secret masking. The masking hides the whole
+ * token around a saved value, and a short saved password can occur in a UUID. The engine then ended
+ * a turn named `[redacted]`, and the real turn ran on (#5390). OpenBot and Pi make these ids; they
+ * hold no text from the model or a tool.
+ */
+function withOwnIds(safe: LogValue, original: DynamicRecord | ThreadItem): LogValue {
+  if (!isRecord(safe)) return safe;
+  const restored = { ...safe };
+  if (isString(original.id)) restored.id = original.id;
+  if (isString(original.itemId)) restored.itemId = original.itemId;
+  for (const key of ["turn", "item"]) {
+    const id = getString(getRecord(original, key), "id");
+    const value = restored[key];
+    if (id !== undefined && isRecord(value)) restored[key] = { ...value, id };
+  }
+  return restored;
 }
 
 function isNamespace(value: unknown): value is DynamicToolNamespace {
