@@ -481,7 +481,15 @@ type HostRequestActions = Pick<
   | "setMessageReaction"
   | "deleteMessage"
   | "downloadAttachment"
+  | "downloadMessageFile"
 >;
+
+/** A file that the host sends, such as an attachment or a workspace file. */
+function decodeHostFile(value: unknown): RemoteFileUpload {
+  if (!isDynamicRecord(value) || !isString(value.name) || !isString(value.mimeType) || !isString(value.base64))
+    throw new Error("The host returned an invalid file.");
+  return { name: value.name, mimeType: value.mimeType, base64: value.base64 };
+}
 
 /** A host that serves `agent-hidden-v1` owns the hidden agents of its members. */
 function hidesAgentsOnHost(capabilities: readonly string[] | undefined): boolean {
@@ -1317,22 +1325,7 @@ export function createHostRequestActions({
     },
     downloadAttachment: (serverId, attachmentId) => {
       const download = () =>
-        request(
-          "GET",
-          TEAM_API_ROUTES.attachment(attachmentId),
-          (value) => {
-            if (
-              !isDynamicRecord(value) ||
-              !isString(value.name) ||
-              !isString(value.mimeType) ||
-              !isString(value.base64)
-            )
-              throw new Error("The host returned an invalid file.");
-            return { name: value.name, mimeType: value.mimeType, base64: value.base64 };
-          },
-          undefined,
-          serverId,
-        );
+        request("GET", TEAM_API_ROUTES.attachment(attachmentId), decodeHostFile, undefined, serverId);
       // Limit native/DOM copies when a message contains several large images.
       const result = attachmentDownloads.current.then(download);
       attachmentDownloads.current = result.then(
@@ -1341,6 +1334,18 @@ export function createHostRequestActions({
       );
       return result;
     },
+    // The user waits for this one file, so it does not wait behind the images of the chat.
+    downloadMessageFile: (serverId, file) =>
+      request(
+        "GET",
+        file.kind === "shared"
+          ? `${TEAM_API_ROUTES.sharedFiles}?${new URLSearchParams({ path: file.path })}`
+          : // The released URL spells the agent `botId`.
+            `${TEAM_API_ROUTES.workspaceFiles}?${new URLSearchParams({ botId: file.agentId, path: file.path })}`,
+        decodeHostFile,
+        undefined,
+        serverId,
+      ),
   };
   return { checks, actions };
 }

@@ -59,6 +59,7 @@ import { plainMentionParts } from "../model/chat-mentions";
 import { createReplyReveal, finishedReplyReveal } from "../model/reply-reveal";
 import { ChatCodeBlock } from "./chat-code-block";
 import { ChatCodePreview } from "./chat-code-preview";
+import { useOpenMessageFile } from "./chat-file-actions";
 import { ChatMath } from "./chat-math";
 import { useOpenTaggedTab } from "./chat-tag-actions";
 import { CHAT_CODE_STYLES, CHAT_HEADING_RAMP, CHAT_TEXT_STYLES, type ChatTextType } from "./chat-text-styles";
@@ -225,7 +226,7 @@ const FILE_TONE_COLORS: Record<FileReferenceTone, [string, string]> = {
 
 /**
  * Inline code that names a file, drawn as the desktop file reference: a type badge and the name
- * in the colour of its file family. Mobile cannot open workspace files, so it is not a control.
+ * in the colour of its file family. In a chat message, a tap opens the file, as on desktop.
  */
 function FileReference({
   text,
@@ -238,31 +239,45 @@ function FileReference({
 }) {
   const name = fileReferenceName(text.trim());
   const [color, soft] = useCSSVariable(FILE_TONE_COLORS[fileReferenceTone(name)]);
+  const open = useOpenMessageFile()?.(text);
   const small = presentation.type === "body-sm";
+  // A chip that opens nothing stays a view, so it does not take the touch from the message.
+  const Chip = open ? Pressable : View;
+  const control = open
+    ? {
+        accessibilityRole: "button" as const,
+        accessibilityLabel: presentation.t("mobile.chat.markdown.openFile", { name }),
+        onPress: open,
+      }
+    : null;
   if (Platform.OS === "android") {
     // Android does not move a view that is wider than the rest of the line to the next line, so a long
     // path was cut at the edge of the message. Only the small badge is a view; the name is text of the
     // paragraph and wraps as text does.
     return (
       <>
-        <View
+        {/* The name is the one button that a screen reader finds; the badge only takes the tap. */}
+        <Chip
           collapsable={false}
           className="pl-0.5 pr-1"
           style={{ transform: [{ translateY: presentation.mentionOffset }] }}
+          accessible={false}
+          {...(control ? { onPress: control.onPress } : null)}
         >
           <FileBadge name={name} color={String(color)} soft={String(soft)} />
-        </View>
-        <Text style={{ color: String(color), fontWeight: "600", ...(small ? { fontSize: 12 } : null) }}>
+        </Chip>
+        <Text style={{ color: String(color), fontWeight: "600", ...(small ? { fontSize: 12 } : null) }} {...control}>
           {`${WORD_JOINER}${text.trim()}`}
         </Text>
       </>
     );
   }
   return (
-    <View
+    <Chip
       collapsable={false}
       className="max-w-full shrink flex-row items-center gap-1 self-start px-0.5"
       style={inlineChipStyle(presentation, small ? 16 : CHAT_TEXT_STYLES[presentation.type].lineHeight, inRow)}
+      {...control}
     >
       <FileBadge name={name} color={String(color)} soft={String(soft)} />
       <Text
@@ -277,7 +292,7 @@ function FileReference({
       >
         {text.trim()}
       </Text>
-    </View>
+    </Chip>
   );
 }
 

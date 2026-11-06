@@ -219,6 +219,8 @@ export const messages = {
   "mobile.chat.markdown.linkFailedTitle": "تعذّر فتح الرابط",
   "mobile.chat.markdown.linkFailedMessage": "يمكنك تحديد الرابط ونسخه بدلًا من ذلك.",
   "mobile.chat.markdown.openBrowserTab": "إظهار علامة تبويب المتصفح {name}",
+  "mobile.chat.markdown.openFile": "فتح الملف {name}",
+  "mobile.chat.markdown.openFileFailed": "تعذر فتح الملف",
   "mobile.chat.message.reply": "رد",
   "mobile.chat.message.branch": "التفرّع من هنا",
   "mobile.chat.message.branchFailed": "تعذّر تفريع المحادثة.",

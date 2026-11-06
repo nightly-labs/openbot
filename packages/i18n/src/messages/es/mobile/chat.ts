@@ -212,6 +212,8 @@ export const messages = {
   "mobile.chat.markdown.linkFailedTitle": "No se pudo abrir el enlace",
   "mobile.chat.markdown.linkFailedMessage": "En su lugar, puedes seleccionar y copiar el enlace.",
   "mobile.chat.markdown.openBrowserTab": "Mostrar la pestaña del navegador {name}",
+  "mobile.chat.markdown.openFile": "Abrir el archivo {name}",
+  "mobile.chat.markdown.openFileFailed": "No se pudo abrir el archivo",
   "mobile.chat.message.reply": "Responder",
   "mobile.chat.message.branch": "Ramificar desde aquí",
   "mobile.chat.message.branchFailed": "No se pudo ramificar el chat.",

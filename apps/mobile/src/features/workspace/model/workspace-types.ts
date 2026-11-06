@@ -184,6 +184,7 @@ import type {
 import type { MobileBrowserTab } from "@/features/browser/model/browser-tabs";
 import type { BrowserViewBridgeEvent, RemoteBrowserViewSession } from "@/features/browser/model/browser-view-bridge";
 import type { MobileChannelStore } from "@/features/channels/model/channel-store";
+import type { MessageFileTarget } from "@/features/chat/model/message-file-target";
 import type { ProviderAdmin } from "@/features/servers/model/provider-admin";
 import type { MobileConversationStore } from "./conversation-store";
 import type { LiveWorkspaceStore } from "./live-workspace-store";
@@ -1004,6 +1005,11 @@ export interface MobileWorkspaceContextValue {
     onProgress?: (fraction: number) => void,
   ) => Promise<DraftAttachment>;
   downloadAttachment: (serverId: string, attachmentId: string) => Promise<RemoteFileUpload>;
+  /**
+   * A file that a message names, from the agent's workspace or from the shared folder. Any member
+   * reads it; the host keeps the path inside the folder.
+   */
+  downloadMessageFile: (serverId: string, file: MessageFileTarget) => Promise<RemoteFileUpload>;
   discardAttachment: (agentId: string, attachmentId: string, serverId?: string) => Promise<void>;
   /**
    * True when a hide goes to the host (`agent-hidden-v1`, and the user is an owner or admin), so each

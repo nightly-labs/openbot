@@ -204,6 +204,8 @@ export const messages = {
   "mobile.chat.markdown.linkFailedTitle": "无法打开链接",
   "mobile.chat.markdown.linkFailedMessage": "你可以改为选中并复制该链接。",
   "mobile.chat.markdown.openBrowserTab": "显示浏览器标签页 {name}",
+  "mobile.chat.markdown.openFile": "打开文件 {name}",
+  "mobile.chat.markdown.openFileFailed": "无法打开文件",
   "mobile.chat.message.reply": "回复",
   "mobile.chat.message.branch": "从这里分支",
   "mobile.chat.message.branchFailed": "无法为聊天创建分支。",

@@ -503,6 +503,16 @@ const fakeAgents: TeamApiAgents = {
         ? { path: workspacePath, name: "big.bin", size: ATTACHMENT_LIMITS.fileBytes + 1, insideWorkspace: true }
         : { path: workspacePath, name: "notes.md", size: readFileSync(workspacePath).length, insideWorkspace: true };
     }),
+  resolveLocalWorkspaceFile: (agentId, path) =>
+    Effect.sync(() => {
+      record("resolveLocalWorkspaceFile", agentId, path);
+      return {
+        path: workspacePath,
+        name: "notes.md",
+        size: readFileSync(workspacePath).length,
+        insideWorkspace: false,
+      };
+    }),
   deleteAgent: (agentId) => Effect.sync(() => record("deleteAgent", agentId)),
   getRuntimeSnapshot: unused("getRuntimeSnapshot"),
   getUsage: unused("getUsage"),
@@ -6217,6 +6227,22 @@ try {
         workspace.text === "# workspace notes\n" &&
         errorIs(workspaceBig, 413, sourceText("error.team.workspaceFileTooLarge")),
       [summary(workspaceMissing), summary(workspace), summary(workspaceBig)],
+    );
+    const outsidePath = `${TEAM_API_ROUTES.workspaceFiles}?botId=agent-ada&path=${encodeURIComponent("~/Desktop/notes.md")}`;
+    const localReads = callsOf("resolveLocalWorkspaceFile").length;
+    const memberOutside = await call("GET", outsidePath, { token: bobToken });
+    const memberLocalReads = callsOf("resolveLocalWorkspaceFile").length - localReads;
+    const ownerOutside = await call("GET", outsidePath, { token: adaToken });
+    check(
+      "workspace files: a member reads with the workspace limit, and the owner reads as the local user does",
+      memberOutside.status === 200 &&
+        memberLocalReads === 0 &&
+        isDeepStrictEqual(callsOf("resolveWorkspaceFile").at(-1), ["agent-ada", "~/Desktop/notes.md"]) &&
+        ownerOutside.status === 200 &&
+        ownerOutside.text === "# workspace notes\n" &&
+        callsOf("resolveLocalWorkspaceFile").length === localReads + 1 &&
+        isDeepStrictEqual(callsOf("resolveLocalWorkspaceFile").at(-1), ["agent-ada", "~/Desktop/notes.md"]),
+      [summary(memberOutside), summary(ownerOutside), callsOf("resolveLocalWorkspaceFile")],
     );
   }
 

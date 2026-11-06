@@ -211,6 +211,8 @@ export const messages = {
   "mobile.chat.markdown.linkFailedTitle": "Bağlantı açılamadı",
   "mobile.chat.markdown.linkFailedMessage": "Bunun yerine bağlantıyı seçip kopyalayabilirsiniz.",
   "mobile.chat.markdown.openBrowserTab": "{name} tarayıcı sekmesini göster",
+  "mobile.chat.markdown.openFile": "{name} dosyasını aç",
+  "mobile.chat.markdown.openFileFailed": "Dosya açılamadı",
   "mobile.chat.message.reply": "Yanıtla",
   "mobile.chat.message.branch": "Buradan dallandır",
   "mobile.chat.message.branchFailed": "Sohbet dallandırılamadı.",

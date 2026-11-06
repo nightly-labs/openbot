@@ -183,6 +183,8 @@ export const messages = {
   "mobile.chat.markdown.linkFailedTitle": "Kan link niet openen",
   "mobile.chat.markdown.linkFailedMessage": "Je kunt de link selecteren en kopiëren.",
   "mobile.chat.markdown.openBrowserTab": "Browsertabblad {name} tonen",
+  "mobile.chat.markdown.openFile": "Bestand {name} openen",
+  "mobile.chat.markdown.openFileFailed": "Kan bestand niet openen",
   "mobile.chat.message.reply": "Antwoorden",
   "mobile.chat.message.branch": "Hier aftakken",
   "mobile.chat.message.branchFailed": "Kan de chat niet aftakken.",

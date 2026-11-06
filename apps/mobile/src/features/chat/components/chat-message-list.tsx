@@ -92,9 +92,11 @@ import { END_X, lineDirectionStyle, MIRROR_IN_RTL } from "@/shared/lib/text-dire
 import { chatDayLabels } from "../model/chat-day-markers";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
+import { type MessageFileTarget, messageFileDirectory, messageFileTarget } from "../model/message-file-target";
 import { isStreamingReply } from "../model/reply-reveal";
 import { uploadProgressAt } from "../model/upload-progress";
 import { type AttachmentTint, ChatAttachmentView } from "./chat-attachment";
+import { ChatFileActionsContext, type OpenMessageFile, useMessageFileOpener } from "./chat-file-actions";
 import { ChatImageGallery } from "./chat-image-gallery";
 import { ChatImageGeneration, imageGenerationStatus } from "./chat-image-generation";
 import { ChatImageViewerProvider, isStackImage, isViewableImage } from "./chat-image-viewer";
@@ -379,6 +381,9 @@ interface MessageRowShared {
   branchPoints: ReadonlySet<string>;
   /** The width inside the list padding. The iOS menu of a queued message does not limit its width. */
   listWidth: number;
+  /** The agent of an agent chat. A workspace file that a message of no agent names is in its workspace. */
+  fileAgentId: string | undefined;
+  openFile: (file: MessageFileTarget, written: MessageFileTarget | null) => Promise<void>;
   actions: {
     reply: (message: ChatBubbleMessage) => void;
     branch: (message: ChatBubbleMessage) => void;
@@ -713,6 +718,18 @@ const MessageRow = memo(function MessageRow({
   );
   // The author of a channel message: its agent, or a person.
   const speaker = message.kind === "message" && message.speaker ? agentsById.get(message.speaker.id) : undefined;
+  // A workspace file is in the workspace of the agent that wrote the message, as on desktop. A person's
+  // message in a channel names shared files only.
+  const fileAgentId = message.kind !== "message" ? undefined : message.speaker ? speaker?.id : shared.fileAgentId;
+  const fileBody = message.kind === "message" ? message.body : "";
+  const openFile = shared.openFile;
+  const openMessageFile = useMemo<OpenMessageFile>(() => {
+    const directory = messageFileDirectory(fileBody);
+    return (text) => {
+      const target = messageFileTarget(text, directory, fileAgentId);
+      return target ? () => void openFile(target.file, target.written) : null;
+    };
+  }, [fileBody, fileAgentId, openFile]);
   // Another person in an agent chat: a person's bubble in their own colour, seeded by the member id
   // as on desktop, so it does not read as the reader's own.
   const memberColor =
@@ -860,15 +877,17 @@ const MessageRow = memo(function MessageRow({
                 accessibilityElementsHidden={selecting}
                 importantForAccessibility={selecting ? "no-hide-descendants" : "auto"}
               >
-                <ChatMarkdown
-                  agents={agents}
-                  body={message.body}
-                  finished={!isStreamingReply(message)}
-                  selectable={message.author === "user" && !bubble}
-                  color={textColor}
-                  playback={playback}
-                  animationEnabled={shared.animationActive && arriving}
-                />
+                <ChatFileActionsContext value={openMessageFile}>
+                  <ChatMarkdown
+                    agents={agents}
+                    body={message.body}
+                    finished={!isStreamingReply(message)}
+                    selectable={message.author === "user" && !bubble}
+                    color={textColor}
+                    playback={playback}
+                    animationEnabled={shared.animationActive && arriving}
+                  />
+                </ChatFileActionsContext>
               </View>
               {selecting ? (
                 <ChatSelectableText
@@ -1421,6 +1440,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   const shownBranchPoints = onBranch ? branchPoints : NO_IDS;
   // The rows keep clear of the side insets: the rail of iPhone Duo and the edges in landscape.
   const listWidth = columnWidth - insets.left - insets.right - LIST_PADDING * 2;
+  const messageFiles = useMessageFileOpener(target.serverId);
   const shared = useMemo<MessageRowShared>(
     () => ({
       agents,
@@ -1455,6 +1475,8 @@ export const ChatMessageList = memo(function ChatMessageList({
       canSelectQuestion,
       branchPoints: shownBranchPoints,
       listWidth,
+      fileAgentId: target.kind === "agent" ? target.id : undefined,
+      openFile: messageFiles.open,
       actions,
     }),
     [
@@ -1487,6 +1509,8 @@ export const ChatMessageList = memo(function ChatMessageList({
       canSelectQuestion,
       shownBranchPoints,
       listWidth,
+      target.id,
+      messageFiles.open,
       actions,
     ],
   );
@@ -1800,6 +1824,7 @@ export const ChatMessageList = memo(function ChatMessageList({
           </HistoryShownContext>
         </ChatTagActionsContext>
       </ChatImageViewerProvider>
+      {messageFiles.sheet}
     </Animated.View>
   );
 }, sameListProps);
