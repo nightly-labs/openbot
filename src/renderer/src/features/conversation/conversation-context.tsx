@@ -583,6 +583,8 @@ const Conversation = createSimpleContext({
         inactive && windowMode === "latest" && snapshot.messages.length > INACTIVE_SNAPSHOT_TAIL
           ? snapshot.messages.slice(-INACTIVE_SNAPSHOT_TAIL)
           : snapshot.messages;
+      // A snapshot that comes after the turn's end event can still name the turn as active.
+      const activeTurnId = completedTurnByAgent.get(agentId) === snapshot.activeTurnId ? null : snapshot.activeTurnId;
       updateConversation(agentId, (conversation) => {
         conversation.revision = snapshot.revision;
         conversation.loaded = true;
@@ -597,6 +599,7 @@ const Conversation = createSimpleContext({
             capped:
               snapshot.messages.length >= CONVERSATION_SNAPSHOT_MESSAGE_LIMIT || conversation.page?.hasOlder === true,
           }),
+          activeTurnId,
         );
         const next = mappedMessages.map((mapped) => {
           const existing = previousById.get(mapped.id);
@@ -647,7 +650,7 @@ const Conversation = createSimpleContext({
       }
       setActiveTurns((current) => ({
         ...current,
-        [agentId]: completedTurnByAgent.get(agentId) === snapshot.activeTurnId ? null : snapshot.activeTurnId,
+        [agentId]: activeTurnId,
       }));
       setTurnProgress((current) => {
         const progress = current[agentId];

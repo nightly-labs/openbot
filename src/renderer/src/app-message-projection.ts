@@ -436,11 +436,21 @@ function deliveryStatus(status: QueueDeliveryStatus | undefined): Exclude<AgentD
   return status;
 }
 
-export function retainThinkingMessages(previous: AgentMessage[], next: AgentMessage[]): AgentMessage[] {
+/**
+ * Keeps the steps of the running turn that a snapshot does not hold yet. A turn that ended is
+ * not kept: its last snapshot is what the thread stores, and a quiet routine run removes its
+ * steps there on purpose, so a kept copy would show text that a reload no longer shows.
+ */
+export function retainThinkingMessages(
+  previous: AgentMessage[],
+  next: AgentMessage[],
+  activeTurnId: string | null,
+): AgentMessage[] {
   const result = [...next];
   const nextIds = new Set(result.map((message) => message.id));
   for (const thinking of previous) {
     if (thinking.kind !== "thinking" || nextIds.has(thinking.id) || !thinking.turnId) continue;
+    if (thinking.turnId !== activeTurnId) continue;
     const sameTurnIndexes = result.flatMap((message, index) => (message.turnId === thinking.turnId ? [index] : []));
     if (sameTurnIndexes.length === 0) continue;
     const finalAnswerIndex = result.findIndex(
