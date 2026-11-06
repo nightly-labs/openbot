@@ -432,9 +432,12 @@ it, `bun run mobile:release:published ios` (or `android`) writes the date of tha
 `## [x.y.z] - 2026-10-14 (Android)`. Run it again for the other store:
 `## [x.y.z] - 2026-10-14 (Android), 2026-10-16 (iOS)`. A date with no store is the date of both
 stores. `/changelog` shows each store, and a store that does not have the version as "In review".
+A store that a newer version replaced is `Skipped (Android)`, and `/changelog` shows it as skipped.
+`bun run mobile:release` does each step from a menu and opens the pull request
+(`apps/mobile/README.md#release-menu`).
 
-When a store makes a version available, also set that version for the store in
-`MOBILE_LATEST_VERSIONS` in `apps/auth-api/src/server/mobile-features-config.ts` and deploy the account
+The same step sets that version for the store in `MOBILE_LATEST_VERSIONS` and in the `upTo` of each
+feature in `apps/auth-api/src/server/mobile-features-config.ts`. The merge deploys the account
 service. An app with an older version then shows the update header on home. Set it only after the
 store has the build: before, Update opens a store page that cannot install the version.
 

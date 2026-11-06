@@ -50,7 +50,7 @@ const MOBILE: ReleaseTarget = {
   versionFiles: MOBILE_VERSION_FILES,
   lockWorkspace: "apps/mobile",
   inReview: true,
-  next: "commit the files, merge them to main, then run bun run mobile:ios:release:testflight and bun run mobile:android:release:play. When a store makes the build available, run bun run mobile:release:published ios (or android), and again for the other store. Before the second store, write the Discord highlights in apps/mobile/release-announcement.json (apps/mobile/README.md#discord-announcement)",
+  next: "commit the files, merge them to main, then build with bun run mobile:release (step 2). When a store makes the build available, mark it with step 3, and again for the other store. Before the first store, write the Discord highlights in apps/mobile/release-announcement.json (apps/mobile/README.md#discord-announcement)",
 };
 
 /** The first `"version"` in the file, which is the top-level one in each file that this script changes. */
