@@ -802,7 +802,7 @@ export class SignalService {
     if (waitMilliseconds === undefined) return;
     this.#metrics.webhookWaits += 1;
     this.#metrics.webhookWaitMilliseconds += Math.max(0, Math.round(waitMilliseconds));
-    if (waitMilliseconds > SLOW_WEBHOOK_WAIT_MILLISECONDS) this.#metrics.webhookSlowWaits += 1;
+    if (waitMilliseconds >= SLOW_WEBHOOK_WAIT_MILLISECONDS) this.#metrics.webhookSlowWaits += 1;
   }
 
   recordDiscordCall(succeeded: boolean): void {
