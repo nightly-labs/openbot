@@ -221,6 +221,8 @@ export const messages = {
   "mobile.chat.markdown.linkFailedTitle": "Nie udało się otworzyć linku",
   "mobile.chat.markdown.linkFailedMessage": "Możesz zaznaczyć i skopiować link.",
   "mobile.chat.markdown.openBrowserTab": "Pokaż kartę przeglądarki {name}",
+  "mobile.chat.markdown.openFile": "Otwórz plik {name}",
+  "mobile.chat.markdown.openFileFailed": "Nie udało się otworzyć pliku",
   "mobile.chat.message.reply": "Odpowiedz",
   "mobile.chat.message.branch": "Odgałęź stąd",
   "mobile.chat.message.branchFailed": "Nie udało się utworzyć odgałęzienia czatu.",

@@ -215,6 +215,8 @@ export const messages = {
   "mobile.chat.markdown.linkFailedTitle": "Impossible d’ouvrir le lien",
   "mobile.chat.markdown.linkFailedMessage": "Vous pouvez sélectionner et copier le lien à la place.",
   "mobile.chat.markdown.openBrowserTab": "Afficher l’onglet du navigateur {name}",
+  "mobile.chat.markdown.openFile": "Ouvrir le fichier {name}",
+  "mobile.chat.markdown.openFileFailed": "Impossible d’ouvrir le fichier",
   "mobile.chat.message.reply": "Répondre",
   "mobile.chat.message.branch": "Dériver d’ici",
   "mobile.chat.message.branchFailed": "Impossible de dériver le chat.",

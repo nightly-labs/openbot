@@ -209,6 +209,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.markdown.linkFailedTitle": "Couldn’t open link",
   "mobile.chat.markdown.linkFailedMessage": "You can select and copy the link instead.",
   "mobile.chat.markdown.openBrowserTab": "Show browser tab {name}",
+  "mobile.chat.markdown.openFile": "Open file {name}",
+  "mobile.chat.markdown.openFileFailed": "Could not open file",
   "mobile.chat.message.reply": "Reply",
   "mobile.chat.message.branch": "Branch from here",
   "mobile.chat.message.branchFailed": "Could not branch the chat.",

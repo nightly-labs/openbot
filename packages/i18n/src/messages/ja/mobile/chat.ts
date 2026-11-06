@@ -211,6 +211,8 @@ export const messages = {
   "mobile.chat.markdown.linkFailedTitle": "リンクを開けませんでした",
   "mobile.chat.markdown.linkFailedMessage": "代わりにリンクを選択してコピーできます。",
   "mobile.chat.markdown.openBrowserTab": "ブラウザーのタブ {name} を表示",
+  "mobile.chat.markdown.openFile": "ファイル {name} を開く",
+  "mobile.chat.markdown.openFileFailed": "ファイルを開けませんでした",
   "mobile.chat.message.reply": "返信",
   "mobile.chat.message.branch": "ここから分岐",
   "mobile.chat.message.branchFailed": "チャットを分岐できませんでした。",

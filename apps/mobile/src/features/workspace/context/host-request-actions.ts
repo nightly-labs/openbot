@@ -481,7 +481,15 @@ type HostRequestActions = Pick<
   | "setMessageReaction"
   | "deleteMessage"
   | "downloadAttachment"
+  | "downloadMessageFile"
 >;
+
+/** A file that the host sends, such as an attachment or a workspace file. */
+function decodeHostFile(value: unknown): RemoteFileUpload {
+  if (!isDynamicRecord(value) || !isString(value.name) || !isString(value.mimeType) || !isString(value.base64))
+    throw new Error("The host returned an invalid file.");
+  return { name: value.name, mimeType: value.mimeType, base64: value.base64 };
+}
 
 /** A host that serves `agent-hidden-v1` owns the hidden agents of its members. */
 function hidesAgentsOnHost(capabilities: readonly string[] | undefined): boolean {
@@ -699,6 +707,15 @@ export function createHostRequestActions({
         svg: advertised.includes(TEAM_SVG_ATTACHMENTS_CAPABILITY),
       };
     },
+  };
+  // Limit native/DOM copies when a message contains several large images.
+  const downloadHostFile = (route: string, serverId: string) => {
+    const result = attachmentDownloads.current.then(() => request("GET", route, decodeHostFile, undefined, serverId));
+    attachmentDownloads.current = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
   };
   const actions: HostRequestActions = {
     // Async, so a host without the capability rejects the promise and does not throw at the call.
@@ -1315,32 +1332,16 @@ export function createHostRequestActions({
         await request("POST", MESSAGE_DELETE_ROUTES.agent, ignoreResponse, body, serverId);
       }
     },
-    downloadAttachment: (serverId, attachmentId) => {
-      const download = () =>
-        request(
-          "GET",
-          TEAM_API_ROUTES.attachment(attachmentId),
-          (value) => {
-            if (
-              !isDynamicRecord(value) ||
-              !isString(value.name) ||
-              !isString(value.mimeType) ||
-              !isString(value.base64)
-            )
-              throw new Error("The host returned an invalid file.");
-            return { name: value.name, mimeType: value.mimeType, base64: value.base64 };
-          },
-          undefined,
-          serverId,
-        );
-      // Limit native/DOM copies when a message contains several large images.
-      const result = attachmentDownloads.current.then(download);
-      attachmentDownloads.current = result.then(
-        () => {},
-        () => {},
-      );
-      return result;
-    },
+    downloadAttachment: (serverId, attachmentId) =>
+      downloadHostFile(TEAM_API_ROUTES.attachment(attachmentId), serverId),
+    downloadMessageFile: (serverId, file) =>
+      downloadHostFile(
+        file.kind === "shared"
+          ? `${TEAM_API_ROUTES.sharedFiles}?${new URLSearchParams({ path: file.path })}`
+          : // The released URL spells the agent `botId`.
+            `${TEAM_API_ROUTES.workspaceFiles}?${new URLSearchParams({ botId: file.agentId, path: file.path })}`,
+        serverId,
+      ),
   };
   return { checks, actions };
 }

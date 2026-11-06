@@ -503,6 +503,16 @@ const fakeAgents: TeamApiAgents = {
         ? { path: workspacePath, name: "big.bin", size: ATTACHMENT_LIMITS.fileBytes + 1, insideWorkspace: true }
         : { path: workspacePath, name: "notes.md", size: readFileSync(workspacePath).length, insideWorkspace: true };
     }),
+  resolveLocalWorkspaceFile: (agentId, path) =>
+    Effect.sync(() => {
+      record("resolveLocalWorkspaceFile", agentId, path);
+      return {
+        path: workspacePath,
+        name: "notes.md",
+        size: readFileSync(workspacePath).length,
+        insideWorkspace: false,
+      };
+    }),
   deleteAgent: (agentId) => Effect.sync(() => record("deleteAgent", agentId)),
   getRuntimeSnapshot: unused("getRuntimeSnapshot"),
   getUsage: unused("getUsage"),
@@ -6217,6 +6227,20 @@ try {
         workspace.text === "# workspace notes\n" &&
         errorIs(workspaceBig, 413, sourceText("error.team.workspaceFileTooLarge")),
       [summary(workspaceMissing), summary(workspace), summary(workspaceBig)],
+    );
+    const memberLocalReads = callsOf("resolveLocalWorkspaceFile").length;
+    const ownerOutside = await call(
+      "GET",
+      `${TEAM_API_ROUTES.workspaceFiles}?botId=agent-ada&path=${encodeURIComponent("~/Desktop/notes.md")}`,
+      { token: adaToken },
+    );
+    check(
+      "workspace files: a member reads with the workspace limit, and the owner reads as the local user does",
+      memberLocalReads === 0 &&
+        ownerOutside.status === 200 &&
+        ownerOutside.text === "# workspace notes\n" &&
+        isDeepStrictEqual(callsOf("resolveLocalWorkspaceFile").at(-1), ["agent-ada", "~/Desktop/notes.md"]),
+      [summary(ownerOutside), callsOf("resolveLocalWorkspaceFile")],
     );
   }
 
