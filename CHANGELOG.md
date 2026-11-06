@@ -6,6 +6,102 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.62.1] - 2026-11-06
+
+### Added
+
+- TrueSMAC development desktop test mode uses fresh temporary data and refuses provider, tool, account and external startup actions while retaining the normal desktop renderer.
+- Connect Higgsfield from the Apps marketplace with browser sign-in to generate images, videos and audio, and check credits and assets. Each generation uses Higgsfield credits.
+- You can now choose when the plan card starts a long task by itself. Go to Settings › Agents › Show the plan before long tasks, and set "Start the work": after 10 s, 30 s, 1 min or 5 min, after a time that you enter, or only when you press Start. When the plan waits for you, you get a notification. The time applies to all agents on this computer. The default is still 10 s.
+- When a plan card waits a minute or more, its Start button counts down in minutes, such as "Start · 4:59".
+- You can choose the provider account when you create an agent. When a provider, such as Claude, has more than one account connected, the model picker of the new-agent form shows each account. Before, a new agent always started on the provider's own sign-in, and you had to change the account after creation.
+- You can now change how many messages and routine runs local scripts can send each agent in one hour. Go to Settings › Agents › Local scripts, and set "Requests an hour": 30, 60, 120, 300 or 1,000. The limit applies to all agents on this computer. The default is still 30. Before, a voice agent or another script that sends many messages stopped at 30 requests an hour.
+- The Usage page has a Skill tab in its Breakdown. It shows how many times your agents loaded each skill, the estimated tokens and cost of the skill text, its share of the tokens of all skill loads, and how many agents used it. OpenBot counts skill loads from this version on.
+- A Codex chat can assign a task to an enabled OpenBot employee and resume the same delivery after an interruption.
+- The project’s Codex skill can also use the signed-in desktop app to manage employees, change their skills, and delegate through their chats.
+
+### Changed
+
+- TrueSMAC reads a native iOS simulator screen in the main chat through Appium, without a manually started WebDriverAgent. The agent creates its own session on an approved, booted simulator and deletes only sessions it created.
+- TrueSMAC permits explicitly scoped native mobile QA through registered Appium MCP tools in the main chat when Computer Use is enabled. Desktop and embedded-browser routing, device ownership, approvals and secret-handling rules remain in force.
+- The web client reads the latest messages of the 3 agents that you opened last, after the open agent loads. The first switch to one of them after a page load shows its messages at once.
+- When you mark a chat read or unread on a team server, the web clients, phones and joined desktops of other members no longer load the chat again. Only your own devices do.
+- The ChatGPT code sign-in now tells you to turn on device code sign-in for Codex in the ChatGPT
+  security settings first. For a work account, the workspace admin turns it on. Before, the sign-in
+  waited with no hint when this setting was off.
+- When you ask in a channel for a new channel or a change to another channel, the agent now makes it there. Before, you had to ask again in the agent's own chat. Requests from routines, agents and team members on other computers still cannot do this.
+- OpenBot now measures how long a hosted server takes to start and how long the app takes to connect to a remote server, so slow starts and slow connection steps can be found and fixed. Only times, fixed step names and counts are sent, never a server ID, address or key. The Privacy page lists the new values.
+- Show a short line of context under an agent question. The `ask_user` tool can now send it, and a
+  plugin form that asks for a value shows its request message under the first field.
+- The chat color picker has 11 new preset colors. They have the same lightness, so each bubble tint has the same weight. A color that you saved before stays as it is.
+- In the dark theme, a bubble with a chat color shows more of the color. Before, the tint was dull.
+- Update OpenBot to version 0.62.0. Add new agent, voice, browser, connector, and mobile features, plus fixes from upstream.
+
+### Fixed
+
+- The registered Appium MCP server is no longer given to an agent whose Computer Use is off. Before, the agent could still reach a simulator or device through Appium, because only Computer Use was removed from its tools.
+- A deleted server on this computer keeps its pending account removal when an older OpenBot build saves the same server list. Before, that build could drop the pending removal, so the account kept listing a server that was already deleted here.
+- A server on this computer whose list cannot be read is no longer started, deleted, restarted or changed. Before, a damaged list could still start the servers, and a delete could move a server's folders to the Trash before the list refused the change. Those folders stay where they are.
+- Create the private crash directory before configuring Electron paths in TrueSMAC desktop test mode.
+- An agent chat no longer shows an old reply at the bottom, below newer routine runs. Before, when
+  routine runs pushed the latest reply out of the loaded page, a routine run moved that reply to the
+  end of the open chat until you opened the chat again.
+- Find `npx` and other MCP server commands on your `PATH` when your shell profile is slow, exits
+  with an error, or has an alias of the same name. Before, the Apple apps server and other MCP
+  servers showed "Command not found: npx" until you typed the full path.
+- On Linux, show how to fix a real-time CPU limit of 0 when the system stops a provider because of it:
+  install and start rtkit, then restart xdg-desktop-portal and OpenBot. Before, the provider showed
+  only "stopped before it answered (signal SIGKILL)", and each Retry removed the downloaded provider
+  and downloaded it again. While the limit stays at 0, a provider update also does not download a new
+  copy that the system would stop in the same way.
+- Claude stays signed in after OpenBot restarts or updates. Before, the Claude sign-in check at start
+  could use up the sign-in, and you had to connect your Claude subscription again.
+- Claude agents use less of the Claude 5-hour usage window. OpenBot now names itself to Claude, so its requests are no longer counted as Agent SDK requests, which the 5-hour window counts about twice as heavily.
+- A saved login or card now fills again after an agent runs a script on a site, as soon as the agent
+  reloads the page, or closes it and opens the site in a new tab. Before, the fill stayed blocked
+  until OpenBot restarted, and the message did not say how to restore it.
+- The browser can now fill saved logins from Proton Pass. Before, `list_logins` always failed with
+  "The shared password vault could not be read", because OpenBot listed the logins without naming
+  a vault. OpenBot now lists the logins of each vault that the access key can read.
+- On Windows and Linux, OpenBot now refuses Workspace only for a provider that it can only confine on macOS, such as a custom ACP agent, with the message to choose Full access. It also refuses a move of a Workspace only agent to such a provider. Before, the change was saved, and then each message to the agent failed until the user changed the access back.
+- In the sidebar, chats that scroll under a folder name now fade out, so you no longer see a chat cut in half below the folder name.
+- When you close the last tab of the browser in a conversation, the Browser pane now closes too, also from the full view. The next pane of the side panel shows, or the list of panes when no pane is open. Before, the side panel stayed open and showed "No browser tabs".
+- A teammate's question or answer now comes back to the side thread that asked, also when the
+  teammate sends it without the id of the request. Before, it went to the agent's own chat, and the
+  side thread waited without an answer.
+- When an agent showed "The agent could not continue. Try again.", the reason was not saved anywhere, so it could not be found later. The provider log (`logs/providers/providers.log`) now keeps the reason, the provider, the model and the turn of each agent error, with secrets removed.
+- Stop the console warnings that each shared button wrote when it appeared, for example the Back
+  button in an agent question.
+- In a bubble with a chat color, code blocks, inline code, tables, file chips and cards now take the color of the bubble. Before, they stayed grey on the color.
+- Agents no longer read a "medium" effort for a model that has no effort setting, such as Cursor
+  Composer. The model list that agents read now shows no effort for these models.
+- A chat with many answered agent questions opens faster. Before, each question card laid out the whole window again when the chat opened.
+- The Usage Breakdown no longer leaves empty space under a short table.
+- A thread that fails on a spent credit balance or quota now shows the provider's reason, for example "Credit balance is too low". Before, it showed "The provider gave no reason".
+- An agent that moved to a backup model because a credit balance was spent no longer goes back to that model after a restart or after 10 minutes. Before, its next turn failed again on the same balance.
+- A thread turn that fails on a provider error before it does work now moves an agent set to switch automatically to its backup model, as a failed chat turn does.
+- A file name in an agent answer, such as `screenshot.png`, now opens the file with that name that
+  the agent attached in the same turn when the workspace has no file at that path. Before, the chip
+  showed "Nothing exists at …", although the attached file was in the chat.
+- A Gemini agent on a second Google account can use the models of that account's plan. Before, the
+  model menu showed the models of the first account for every account, so a Pro account had only
+  the models of a free first account.
+- A hosted server whose stop the cloud provider cancelled starts OpenBot again. Before, the server ran with OpenBot stopped, and apps waited on "Starting" until the next stop.
+- GPT voice now works with every agent on this computer, also when the agent uses a Codex model. The
+  voice gives each request to the agent's own provider and speaks the answer. A switch of the agent's
+  model no longer stops the voice, and a start failure shows an error.
+- Text that you select in a side thread now gets Quote, Explain and the other selection actions of that thread. Before, a quote went to the agent's main chat box, and a sent instruction went to the main chat as a reply to a message that the main chat does not have.
+- A hosted or self-hosted server in an LXC container, for example on Proxmox, installs updates again. The update no longer stops when the container cannot load the AppArmor profile of OpenBot.
+- When an agent tries to remove an API key that is in the Vault, it now tells you to delete the key in Server settings > Vault. Before, it said that the key was not found, and the key stayed.
+- A message that you steer into a running side thread now shows in that thread at once. Before, it showed only after a restart of the app.
+- Stop asking for automatic compactions of a ChatGPT (Codex), Muse, Pi or Antigravity chat after 2
+  compactions in a row fail or time out. Before, each failed compaction let the next turn ask for
+  another one. One chat compacted every 19 seconds for 7 hours overnight and used up the plan limit.
+  OpenBot now shows a notice and stops. "Compact now" and "New chat" stay available. A compaction
+  that completes, or a chat that falls below 80% of its window, starts the count again.
+- A message sent after OpenBot stopped a compaction that Codex did not stop no longer asks for a new
+  compaction at once. It waits for the running compaction to end.
+
 ## [0.62.0] - 2026-11-05
 
 ### Added
