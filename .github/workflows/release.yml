@@ -74,6 +74,7 @@ jobs:
         shell: bash
         env:
           DISCORD_RELEASE_ROLE_ID: ${{ vars.DISCORD_RELEASE_ROLE_ID }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           package_version="$(bun -p 'require("./package.json").version')"
           tag_version="${GITHUB_REF_NAME#v}"
@@ -82,12 +83,14 @@ jobs:
             exit 1
           fi
           bun scripts/check-release-notes.ts
-          # The `discord-announce` job of a tag push needs the role, so stop before the release.
-          if [[ "$GITHUB_EVENT_NAME" == "push" && -z "$DISCORD_RELEASE_ROLE_ID" ]]; then
+          # Fork releases publish only the desktop package and do not announce on Discord.
+          if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REPOSITORY" == "nightly-labs/openbot" && -z "$DISCORD_RELEASE_ROLE_ID" ]]; then
             echo "DISCORD_RELEASE_ROLE_ID is not set. See docs/RELEASING.md#discord-announcement." >&2
             exit 1
           fi
-          bun scripts/discord-release-announcement.ts check "$package_version"
+          if [[ "$GITHUB_REPOSITORY" == "nightly-labs/openbot" ]]; then
+            bun scripts/discord-release-announcement.ts check "$package_version"
+          fi
           echo "version=$package_version" >> "$GITHUB_OUTPUT"
           echo "tag=v$package_version" >> "$GITHUB_OUTPUT"
 
@@ -1083,7 +1086,7 @@ jobs:
   discord-announce:
     name: Announce the release on Discord
     needs: [validate, publish, docker-publish, hosted-release]
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.repository == 'nightly-labs/openbot'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: release
@@ -1110,7 +1113,7 @@ jobs:
   hosted-release:
     name: Publish boat server snapshot
     needs: [validate, publish]
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.repository == 'nightly-labs/openbot'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     environment: cloudflare-production
@@ -1147,7 +1150,7 @@ jobs:
   docker-publish:
     name: Publish Docker image
     needs: [validate, docker, publish]
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.repository == 'nightly-labs/openbot'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -1225,7 +1228,7 @@ jobs:
   nix-sources:
     name: Open Nix sources PR
     needs: [validate, publish]
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.repository == 'nightly-labs/openbot'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

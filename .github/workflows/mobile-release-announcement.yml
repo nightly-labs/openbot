@@ -75,7 +75,7 @@ jobs:
   announce:
     name: Post on Discord
     needs: detect
-    if: needs.detect.outputs.version != ''
+    if: needs.detect.outputs.version != '' && github.repository == 'nightly-labs/openbot'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: release-mobile
