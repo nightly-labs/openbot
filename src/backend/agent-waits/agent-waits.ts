@@ -126,7 +126,15 @@ export class AgentWaits {
 
   #awaitEvent(params: DynamicToolCallParams, caller: AgentWaitCaller): OpenBotToolResponse {
     const parsed = awaitEventToolSchema.safeParse(params.arguments);
-    if (!parsed.success) return openBotToolFailure(sourceText("error.backend.agentWaitNoteRequired"));
+    if (!parsed.success) {
+      // A note over the limit is there, so the refusal names the limit and does not ask for a note.
+      const tooLong = parsed.error.issues.some((issue) => issue.path[0] === "note" && issue.code === "too_big");
+      return openBotToolFailure(
+        tooLong
+          ? sourceText("error.backend.agentWaitNoteTooLong", { max: INPUT_LIMITS.agentWaitNote })
+          : sourceText("error.backend.agentWaitNoteRequired"),
+      );
+    }
     const { note, routineId } = parsed.data;
     if (caller.inExecutionThread) return openBotToolFailure(sourceText("error.backend.agentWaitOwnChatOnly"));
     const deliveries = this.#mailbox.findDeliveriesByTurn(caller.agentId, params.turnId);
