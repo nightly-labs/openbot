@@ -7,7 +7,7 @@ import type {
   UiFormBlock as UiFormSpec,
   UiQuickRepliesBlock as UiQuickRepliesSpec,
 } from "@openbot/contracts/ui-blocks";
-import { uiBlockOutcomeText } from "@openbot/contracts/ui-blocks";
+import { UI_API_KEY_SCOPE_FIELD_ID, uiBlockOutcomeText } from "@openbot/contracts/ui-blocks";
 import { UiChoiceBlock } from "@openbot/ui/features/conversation/ui-blocks/UiChoiceBlock";
 import { UiConfirmBlock } from "@openbot/ui/features/conversation/ui-blocks/UiConfirmBlock";
 import { UiFormBlock } from "@openbot/ui/features/conversation/ui-blocks/UiFormBlock";
@@ -130,6 +130,8 @@ interface LiveProps<Spec extends UiBlockSpec> {
   onRespond: (response: UiBlockResponse) => void;
   disabled?: boolean;
   busy?: boolean;
+  onSkip?: () => void;
+  footerFieldId?: string | undefined;
 }
 
 /** Keeps the answer in the story, so a pending card freezes the way it does in the chat. */
@@ -144,10 +146,12 @@ function live<Spec extends UiBlockSpec>(
         state={state()}
         disabled={props.disabled ?? false}
         busy={props.busy ?? false}
+        footerFieldId={props.footerFieldId}
         onRespond={(response) => {
           props.onRespond(response);
           setState(answered(props.spec, response));
         }}
+        onSkip={() => setState({ status: "closed" })}
       />
     );
   };
@@ -306,6 +310,28 @@ export const SecretFormAnswered: Story = {
       onRespond={args.onRespond}
     />
   ),
+};
+
+/** The form of `request_api_key` with `vault`: the key, and who can use it, small next to the submit button. */
+const apiKeySpec: UiFormSpec = {
+  type: "form",
+  title: "PrivateMail app password for the CRM sync",
+  fields: [
+    { id: "key", kind: "text", label: "PRIVATEMAIL_APP_PASSWORD", required: true, secret: true },
+    {
+      id: UI_API_KEY_SCOPE_FIELD_ID,
+      kind: "segmented",
+      label: "Save for",
+      options: ["All agents (Vault)", "Only this agent"],
+      required: true,
+      value: "All agents (Vault)",
+    },
+  ],
+  submit: "Save securely",
+};
+
+export const ApiKeyPending: Story = {
+  render: (args) => <LiveForm spec={apiKeySpec} footerFieldId={UI_API_KEY_SCOPE_FIELD_ID} onRespond={args.onRespond} />,
 };
 
 export const Narrow: Story = {
