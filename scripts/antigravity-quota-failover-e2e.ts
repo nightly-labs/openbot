@@ -1,13 +1,15 @@
 // Checks that a spent Gemini quota moves an agent to its backup model, also after the turn started
 // work. Runs the real agent service on a temporary profile with a fake Antigravity 1.4.5 ACP server.
 // A prompt with `QUOTA-NOW` on a `gemini-quota-*` model gets Antigravity's quota text as answer text
-// and the stop reason `refusal`; with `ACT-FIRST` it runs a tool step before that. `gemini-flash`
-// always answers. Each case has its own primary model: a spent quota holds its model for all agents.
+// and the stop reason `refusal`; with `ACT-FIRST` it runs a tool step before that. `gemini-spent`
+// gets the quota text before any step. `gemini-flash` always answers. Each case has its own primary
+// model: a spent quota holds its model for all agents.
 // Checks:
 //   1. Quota before work, set to switch without asking: the message runs again on the backup.
 //   2. Quota after a tool step, set to switch without asking: the backup continues the work, with
 //      the work steps and no error.
 //   3. Quota after a tool step, set to ask: the backup continues the work too, as after a plan limit.
+//   4. As 3, but the first backup's quota is spent too: the next backup continues the same work.
 // `bun run test:antigravity-quota-failover`. Writes .openbot-build/antigravity-quota-failover-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -47,7 +49,7 @@ const fs = require("node:fs");
 const NL = String.fromCharCode(10);
 const log = (entry) => fs.appendFileSync(process.env.FAKE_AGY_LOG, JSON.stringify(entry) + NL);
 const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
-const MODELS = ["gemini-quota-a", "gemini-quota-b", "gemini-quota-c", "gemini-flash"];
+const MODELS = ["gemini-quota-a", "gemini-quota-b", "gemini-quota-c", "gemini-quota-d", "gemini-spent", "gemini-flash"];
 const models = { availableModels: MODELS.map((modelId) => ({ modelId, name: modelId })) };
 const current = new Map();
 const setup = (sessionId) => ({ sessionId, models: { ...models, currentModelId: current.get(sessionId) ?? MODELS[0] } });
@@ -67,10 +69,10 @@ function handle(message) {
   if (message.method === "session/prompt") {
     const text = params.prompt.map((block) => block.text ?? "").join("");
     const model = current.get(params.sessionId) ?? MODELS[0];
-    const quota = model.startsWith("gemini-quota-") && text.includes("QUOTA-NOW");
+    const quota = (model.startsWith("gemini-quota-") || model === "gemini-spent") && text.includes("QUOTA-NOW");
     log({ model, quota, text });
     if (quota) {
-      if (text.includes("ACT-FIRST"))
+      if (text.includes("ACT-FIRST") && model !== "gemini-spent")
         update(params.sessionId, { sessionUpdate: "tool_call", toolCallId: "read-" + Date.now(), title: "Read notes.txt", kind: "read", status: "completed", rawInput: { path: "notes.txt" } });
       update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Usage Limit Reached" + NL + NL + "You have reached your current quota for this period. Your limit will reset in 6 days, 22 hours." } });
       return write({ id: message.id, result: { stopReason: "refusal" } });
@@ -104,7 +106,7 @@ interface CaseReport {
   name: string;
   status: string;
   model: string | undefined;
-  prompts: { model: string; quota: boolean; continuation: boolean }[];
+  prompts: { model: string; quota: boolean; continuation: boolean; workSteps: boolean }[];
   errors: number;
   passed: boolean;
 }
@@ -177,8 +179,14 @@ const idle = (agentId: string) =>
     .listQueue(agentId)
     .deliveries.every((delivery) => !["queued", "starting", "running"].includes(delivery.status));
 
-/** Makes an agent on `model` with the backup model, and sends `text` after its first turn. */
-async function runCase(name: string, model: string, automatic: boolean, text: string): Promise<CaseReport> {
+/** Makes an agent on `model` with the backup models in `order`, and sends `text` after its first turn. */
+async function runCase(
+  name: string,
+  model: string,
+  automatic: boolean,
+  text: string,
+  order: readonly string[] = [BACKUP],
+): Promise<CaseReport> {
   const agent = await runCauseEffect(
     agents.createAgent({
       name,
@@ -194,7 +202,7 @@ async function runCase(name: string, model: string, automatic: boolean, text: st
   await runCauseEffect(
     agents.updateAgent({
       agentId: agent.id,
-      backupModels: { automatic, order: [{ provider: "antigravity", model: BACKUP }] },
+      backupModels: { automatic, order: order.map((backup) => ({ provider: "antigravity", model: backup })) },
     }),
   );
   const since = events.length;
@@ -216,6 +224,7 @@ async function runCase(name: string, model: string, automatic: boolean, text: st
         model: prompt.model,
         quota: prompt.quota,
         continuation: prompt.text.includes(CONTINUATION),
+        workSteps: prompt.text.includes("Read notes.txt"),
       })),
     errors: events.slice(since).filter((event) => event.type === "error" && event.agentId === agent.id).length,
     passed: false,
@@ -256,6 +265,24 @@ try {
     );
     after.passed = true;
   }
+
+  const chained = await runCase(
+    "quota after work, first backup spent too, ask before switching",
+    "gemini-quota-d",
+    false,
+    "ACT-FIRST QUOTA-NOW",
+    ["gemini-spent", BACKUP],
+  );
+  assert.deepEqual(
+    chained.prompts.map((prompt) => [prompt.model, prompt.continuation, prompt.workSteps]),
+    [
+      ["gemini-quota-d", false, false],
+      ["gemini-spent", true, true],
+      [BACKUP, true, true],
+    ],
+    "The next backup continues the work that the first provider started.",
+  );
+  chained.passed = true;
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

@@ -621,14 +621,25 @@ export class TurnLifecycle {
 
   /**
    * Whether a provider error waits for the end of its turn, which can move the turn to a backup
-   * model. A spent quota after the turn did work waits also when the agent is set to ask.
+   * model. A spent quota after work started waits also when the agent is set to ask.
    */
   #mayHoldError(agentId: string, turnId: string, causeCode: CauseCode): boolean {
     return (
       this.#hooks.mayFailOver(agentId) ||
       (causeCode === "usage_limit" &&
-        this.#runningTurns.get(turnId)?.acted === true &&
+        this.#carriesWork(agentId, turnId, this.#runningTurns.get(turnId)) &&
         this.#hooks.mayContinueOnBackup(agentId))
+    );
+  }
+
+  /** The turn did work, or continues work that an earlier provider started before its usage limit. */
+  #carriesWork(agentId: string, turnId: string, running: { acted: boolean } | undefined): boolean {
+    return (
+      running !== undefined &&
+      (running.acted ||
+        this.#mailbox
+          .findDeliveriesByTurn(agentId, turnId)
+          .some((context) => context.resumeAfterUsageLimit !== undefined))
     );
   }
 
@@ -1180,11 +1191,12 @@ export class TurnLifecycle {
       // neither is compacted.
       // A routine run's own session closes after this turn, so it is not compacted either. Nor is a
       // turn that a provider error ended before it did work: it can run again on a backup model. Nor
-      // is a turn that a spent quota ended after it did work: a backup model can continue it.
+      // is a turn that a spent quota ended after work started: a backup model can continue it.
       const routineSession = this.#conversation.isRoutineSession(threadId);
       const failedOnProvider = failover !== undefined && !limited && status === "failed" && running !== undefined;
       const mayRunAgain = failedOnProvider && !running.acted;
-      const mayContinue = failedOnProvider && running.acted && failover.context.causeCode === "usage_limit";
+      const mayContinue =
+        failedOnProvider && failover.context.causeCode === "usage_limit" && this.#carriesWork(agentId, turnId, running);
       const shouldCompact =
         !refused &&
         !limited &&
@@ -1213,9 +1225,7 @@ export class TurnLifecycle {
       // After work started, only a ready backup in the agent's order continues it. A turn refused before
       // work still waits for the reset when no backup is ready. A continuation that a backup refused
       // before work keeps the earlier provider's work.
-      const carriesWork =
-        running !== undefined &&
-        (running.acted || deliveries.some((context) => context.resumeAfterUsageLimit !== undefined));
+      const carriesWork = this.#carriesWork(agentId, turnId, running);
       let continuing = limited && carriesWork && deliveries.length > 0 && this.#hooks.mayContinueOnBackup(agentId);
       if (continuing) {
         for (const { delivery, channelId } of deliveries) {
@@ -1232,7 +1242,7 @@ export class TurnLifecycle {
       // The same for a provider error, when the agent moves to a backup model. Only the agent's own
       // chat moves it: a task or a channel task fails as before. A message runs again once for each
       // provider account and model that failed it, so a move that does not happen cannot run it on
-      // the same one again. A turn that a spent quota ended after it did work continues on a backup,
+      // the same one again. A turn that a spent quota ended after work started continues on a backup,
       // as after a plan limit, also when the agent is set to ask: there is no moment to ask.
       const failedKey = this.#usageLimits.failureKey(agentId, model);
       const failedOver =
@@ -1242,7 +1252,8 @@ export class TurnLifecycle {
         !taskTurn &&
         !channelTurn &&
         deliveries.every(({ delivery }) => !this.#failoverRetries.get(delivery.id)?.has(failedKey)) &&
-        (mayRunAgain ? this.#hooks.mayFailOver(agentId) : this.#hooks.mayContinueOnBackup(agentId));
+        ((mayRunAgain && this.#hooks.mayFailOver(agentId)) ||
+          (mayContinue && this.#hooks.mayContinueOnBackup(agentId)));
       // The work that this turn did, so that the backup model continues it and does not do it again.
       const continuedWork = Effect.gen({ self: this }, function* () {
         const workSteps = running
