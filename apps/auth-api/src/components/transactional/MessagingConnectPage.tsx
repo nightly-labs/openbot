@@ -98,11 +98,12 @@ function deepLink(provider: MessagingProvider, fragment: URLSearchParams): strin
  * client tab started, as `handOffToWebClient` does. It only sets the link: the bundle opens the app.
  * Hydration keeps the server's attributes, so the bundle does not undo it.
  */
-function openLinkScript(actionsId: string, provider: MessagingProvider): string {
+function openLinkScript(actionsId: string, platform: WebMessagingInstallPlatform, provider: MessagingProvider): string {
   const id = JSON.stringify(actionsId);
   const host = JSON.stringify(`openbot://${provider.deepLinkHost}?`);
   const prefix = JSON.stringify(WEB_MESSAGING_INSTALL_KEY_PREFIX);
-  return `(()=>{const f=new URLSearchParams(location.hash.slice(1)),n=f.get("nonce"),g=f.get("grant"),e=document.getElementById(${id}),a=e&&e.querySelector("a");if(!a||!n||!g)return;try{if(localStorage.getItem(${prefix}+n)!==null)return}catch{}a.href=${host}+new URLSearchParams({nonce:n,grant:g});e.hidden=false})()`;
+  // The mark test is `decodeWebMessagingInstallMark`: this platform, and not expired.
+  return `(()=>{const f=new URLSearchParams(location.hash.slice(1)),n=f.get("nonce"),g=f.get("grant"),e=document.getElementById(${id}),a=e&&e.querySelector("a");if(!a||!n||!g)return;try{const m=JSON.parse(localStorage.getItem(${prefix}+n));if(m&&m.platform===${JSON.stringify(platform)}&&m.expiresAt>Date.now())return}catch{}a.href=${host}+new URLSearchParams({nonce:n,grant:g});e.hidden=false})()`;
 }
 
 /**
@@ -182,13 +183,14 @@ export function MessagingConnectView(props: {
           <>
             <h1 id={titleId()}>{props.text.title}</h1>
             <p class="join-card-copy">{props.webClient ? props.text.doneInWebClient : props.text.doneInApp}</p>
-            {/* The server renders the button hidden, so the script below can show it without the bundle. */}
+            {/* The server renders the button hidden, so the script below can show it without the bundle.
+                The default link makes it a link, not a button, when it hydrates. */}
             <div id={actionsId()} class="join-card-actions join-card-actions-single" hidden={!props.openUrl}>
-              <Button href={props.openUrl || undefined} variant="primary" size="lg" icon="open" onClick={fallback.arm}>
+              <Button href={props.openUrl || APP_URL} variant="primary" size="lg" icon="open" onClick={fallback.arm}>
                 {props.text.openApp}
               </Button>
             </div>
-            <script innerHTML={openLinkScript(actionsId(), provider())} />
+            <script innerHTML={openLinkScript(actionsId(), props.provider, provider())} />
           </>
         }
       >

@@ -1212,7 +1212,9 @@ function receiveMessagingInstall(link: Extract<DeepLink, { kind: "slack-workspac
   )
     .then((accepted) => {
       if (!accepted) {
-        logger.warn(`A ${platform} install link arrived, but no install of this run waits for it.`);
+        logger.warn(
+          `A ${platform} install link was not accepted: no install of this run waits for it, or the joined server refused it.`,
+        );
         return;
       }
       const window = windowHolder.current;
