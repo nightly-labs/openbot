@@ -285,8 +285,8 @@ export function createRemoteApiApp(
     .post(
       `${WEBHOOK_EVENTS_PATH}/:routeId`,
       async ({ request, params, server }) => {
-        const answer = (status: WebhookAnswerStatus, waitMilliseconds?: number) => {
-          signal.recordWebhookAnswer(status, waitMilliseconds);
+        const answer = (status: WebhookAnswerStatus) => {
+          signal.recordWebhookAnswer(status);
           return webhookResponse(status);
         };
         if (!entry.isEntry) return answer(503);
@@ -311,11 +311,10 @@ export function createRemoteApiApp(
         if (!signal.acceptWebhookRequest(`${routeId}:${address}`)) return answer(429);
         const body = await readBounded(request, WEBHOOK_DELIVERY_BODY_BYTES_LIMIT);
         if (!body) return answer(413);
-        const sentAt = performance.now();
         const result = await runtime.runPromise(signal.deliverWebhook(routeId, { ...signed, body }), {
           signal: request.signal,
         });
-        return answer(result.status, performance.now() - sentAt);
+        return answer(result.status);
       },
       { parse: "none" },
     )

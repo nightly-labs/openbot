@@ -793,13 +793,16 @@ export class SignalService {
     return this.#acceptRateKey(`webhook:${key}`, Date.now());
   }
 
-  /**
-   * Counts one answer to a generic webhook request. `waitMilliseconds` is the time from the
-   * delivery frame to the answer, for a request that Signal passed on.
-   */
-  recordWebhookAnswer(status: WebhookAnswerStatus, waitMilliseconds?: number): void {
+  /** Counts one answer to a generic webhook request. */
+  recordWebhookAnswer(status: WebhookAnswerStatus): void {
     this.#metrics.webhookAnswers[status] += 1;
-    if (waitMilliseconds === undefined) return;
+  }
+
+  /**
+   * Counts the time from one webhook delivery frame to the host's answer, its timeout or the sender's
+   * cancel. A request that Signal did not send to a host has no wait.
+   */
+  #recordWebhookWait(waitMilliseconds: number): void {
     this.#metrics.webhookWaits += 1;
     this.#metrics.webhookWaitMilliseconds += Math.max(0, Math.round(waitMilliseconds));
     if (waitMilliseconds >= SLOW_WEBHOOK_WAIT_MILLISECONDS) this.#metrics.webhookSlowWaits += 1;
@@ -989,6 +992,7 @@ export class SignalService {
           return this.#undelivered(kind);
         }
         const requestId = randomIdentifier();
+        const sentAt = performance.now();
         return yield* Effect.callback<IngressDeliveryResult | null>((resume) => {
           const resolve = (result: IngressDeliveryResult | null) => resume(Effect.succeed(result));
           const timer = setTimeout(
@@ -1007,6 +1011,7 @@ export class SignalService {
                 clearTimeout(pending.timer);
                 this.#pendingDeliveries.delete(requestId);
               }
+              if (kind === "webhook") this.#recordWebhookWait(performance.now() - sentAt);
             }),
           ),
         );

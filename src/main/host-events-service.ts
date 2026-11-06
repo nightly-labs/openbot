@@ -69,7 +69,7 @@ interface HostWorkflowWebhooks {
 }
 
 /** What happened to one inbound webhook request. It holds no ID, body, or secret. */
-export type WebhookDeliveryResult =
+type WebhookDeliveryResult =
   | "started"
   | "ignored"
   | "duplicate"
@@ -83,7 +83,7 @@ export type WebhookDeliveryResult =
   | "bad_body"
   | "failed";
 
-export type WebhookIgnoredReason = "event-type" | "filter" | "inactive" | "busy" | "refused";
+type WebhookIgnoredReason = "event-type" | "filter" | "inactive" | "busy" | "refused";
 
 /** One inbound webhook request, for usage analytics. */
 export interface WebhookDeliveryReport {
