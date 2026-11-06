@@ -26,6 +26,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
+  TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
   TEAM_MP4_ATTACHMENTS_CAPABILITY,
@@ -164,24 +165,28 @@ export function attachmentIpcHandlers({
           serverId === LOCAL_SERVER_ID || remoteServers.supportsCapability(serverId, TEAM_MP4_ATTACHMENTS_CAPABILITY);
         const supportsSvg =
           serverId === LOCAL_SERVER_ID || remoteServers.supportsCapability(serverId, TEAM_SVG_ATTACHMENTS_CAPABILITY);
-        const options: OpenDialogOptions = {
-          properties: ["openFile", "multiSelections"],
-          filters:
-            filter === "images"
-              ? [{ name: translate("dialog.filter.images"), extensions: [...IMAGE_ATTACHMENT_EXTENSIONS] }]
-              : [
-                  {
-                    name: translate("dialog.filter.supportedFiles"),
-                    extensions: supportedAttachmentExtensions({
-                      eml: supportsEml,
-                      media: supportsMedia,
-                      zip: supportsZip,
-                      mp4: supportsMp4,
-                      svg: supportsSvg,
-                    }),
-                  },
-                ],
-        };
+        const supportsAnyFile =
+          serverId === LOCAL_SERVER_ID ||
+          remoteServers.supportsCapability(serverId, TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY);
+        const options: OpenDialogOptions = { properties: ["openFile", "multiSelections"] };
+        // A host that takes any file gets no file filter, so the dialog shows every file.
+        if (filter === "images") {
+          options.filters = [{ name: translate("dialog.filter.images"), extensions: [...IMAGE_ATTACHMENT_EXTENSIONS] }];
+        } else if (!supportsAnyFile) {
+          options.filters = [
+            {
+              name: translate("dialog.filter.supportedFiles"),
+              extensions: supportedAttachmentExtensions({
+                eml: supportsEml,
+                media: supportsMedia,
+                zip: supportsZip,
+                mp4: supportsMp4,
+                svg: supportsSvg,
+                anyFile: false,
+              }),
+            },
+          ];
+        }
         const result = mainWindow
           ? await dialog.showOpenDialog(mainWindow, options)
           : await dialog.showOpenDialog(options);
@@ -447,7 +452,6 @@ const uploadRemotePaths = Effect.fn("AttachmentIpc.uploadRemotePaths")(function*
       serverId,
       paths.map((path) => basename(path)),
     );
-    for (const path of paths) assertSupportedAttachmentName(basename(path));
   });
   const files = yield* Effect.forEach(
     paths,
@@ -513,7 +517,11 @@ function uploadRemoteFiles(
 ) {
   const progressId = files.length === 1 ? requestId : undefined;
   return remoteDecode(() => {
-    for (const file of files) assertSupportedAttachmentName(file.name);
+    assertRemoteAttachmentNames(
+      remoteServers,
+      serverId,
+      files.map((file) => file.name),
+    );
     if (files.some((file) => file.bytes.byteLength > ATTACHMENT_LIMITS.fileBytes)) {
       throw new Error(sourceText("error.attachment.fileTooLarge"));
     }
@@ -531,11 +539,22 @@ function uploadRemoteFiles(
   );
 }
 
+/** A host without `any-file-attachments` refuses a name with no known type. */
+function assertRemoteAttachmentNames(
+  remoteServers: AttachmentIpcDependencies["remoteServers"],
+  serverId: string,
+  names: readonly string[],
+): void {
+  if (remoteServers.supportsCapability(serverId, TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY)) return;
+  for (const name of names) assertSupportedAttachmentName(name);
+}
+
 function assertRemoteAttachmentSupport(
   remoteServers: AttachmentIpcDependencies["remoteServers"],
   serverId: string,
   names: readonly string[],
 ): void {
+  assertRemoteAttachmentNames(remoteServers, serverId, names);
   if (
     names.some((name) =>
       MEDIA_ATTACHMENT_EXTENSIONS.some((extension) => extension === attachmentFileExtension(name)),

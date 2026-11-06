@@ -14,7 +14,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, join, relative } from "node:path";
-import { assertSupportedAttachmentName, attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
+import { attachmentMimeTypeForName, isSupportedAttachmentName } from "@openbot/contracts/attachment-files";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AttachmentDataInput,
@@ -202,8 +202,6 @@ export class AttachmentFiles {
     this: AttachmentFiles,
     paths: string[],
     data: AttachmentDataInput[],
-    /** A voice recording is a WebM file, which the user cannot attach. It never reaches a provider. */
-    options: { voiceRecording?: boolean } = {},
   ): Effect.fn.Return<StoredDraft[], AttachmentOperationError> {
     if (paths.some((path) => !path || path.length > INPUT_LIMITS.path)) {
       return yield* attachmentFailure(new Error("An attachment path is invalid."));
@@ -228,7 +226,6 @@ export class AttachmentFiles {
           const targetDirectory = join(this.#draftsRoot, id);
           preparedRoots.push(targetDirectory);
           const name = sanitizeName(source.path);
-          assertSupportedAttachmentName(name);
           const targetPath = join(targetDirectory, name);
           yield* attachmentCall(() => mkdir(targetDirectory, { recursive: true, mode: 0o700 })).pipe(
             Effect.uninterruptible,
@@ -270,7 +267,12 @@ export class AttachmentFiles {
           const targetDirectory = join(this.#draftsRoot, id);
           preparedRoots.push(targetDirectory);
           const name = sanitizeName(item.name || "pasted-image.png");
-          if (!options.voiceRecording) assertSupportedAttachmentName(name);
+          // A name with no known type is a file. The sender's image type would make it an image block,
+          // and a provider refuses types such as HEIC or TIFF.
+          const mimeType =
+            !isSupportedAttachmentName(name) && item.mimeType.trim().toLowerCase().startsWith("image/")
+              ? undefined
+              : item.mimeType;
           const targetPath = join(targetDirectory, name);
           yield* attachmentCall(() => mkdir(targetDirectory, { recursive: true, mode: 0o700 })).pipe(
             Effect.uninterruptible,
@@ -283,7 +285,7 @@ export class AttachmentFiles {
               bytes.byteLength,
               targetPath,
               createHash("sha256").update(bytes).digest("hex"),
-              item.mimeType,
+              mimeType,
             ),
             createdAt: new Date().toISOString(),
           });
@@ -407,7 +409,6 @@ export class AttachmentFiles {
             );
           if (metadata.size > MAX_FILE_BYTES)
             return yield* attachmentFailure(new Error(`${basename(source.path)} exceeds the 100 MB limit.`));
-          yield* attachmentSync(() => assertSupportedAttachmentName(source.path));
           return { ...source, size: metadata.size };
         }),
       { concurrency: "unbounded" },

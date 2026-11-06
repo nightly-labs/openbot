@@ -506,6 +506,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:svg-attachments
 
+      - name: Run the any file attachment E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:any-file-attachments
+
       - name: Run the channel notifications and channel settings E2E test
         if: ${{ !cancelled() }}
         run: bun run test:channel-notifications
@@ -645,6 +649,7 @@ jobs:
             .openbot-build/zip-attachment-e2e/
             .openbot-build/mp4-attachment-e2e/
             .openbot-build/svg-attachment-e2e/
+            .openbot-build/any-file-attachment-e2e/
             .openbot-build/agent-mcp-tools-e2e/
             .openbot-build/mcp-server-unreadable-row-e2e/
             .openbot-build/agent-update-agents-e2e/
