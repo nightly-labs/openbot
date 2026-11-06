@@ -24,9 +24,8 @@
 import type { AvatarColor } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { type JSX, Portal } from "@solidjs/web";
-import ChevronsUpDown from "lucide-solid/icons/chevrons-up-down";
-import Pipette from "lucide-solid/icons/pipette";
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
+import { ChevronsUpDown, Pipette } from "./icons";
 import { type Spring, springKeyframes, springProgress } from "./spring-motion";
 import { useText } from "./text";
 

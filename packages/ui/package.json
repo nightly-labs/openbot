@@ -497,6 +497,7 @@
     "@openbot/contracts": "workspace:*",
     "@kobalte/core": "catalog:",
     "class-variance-authority": "catalog:",
+    "@hugeicons/core-free-icons": "catalog:",
     "lucide-solid": "catalog:",
     "solid-sonner": "catalog:",
     "solid-recharts": "catalog:",

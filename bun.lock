@@ -329,6 +329,7 @@
       "name": "@openbot/ui",
       "version": "0.0.0",
       "dependencies": {
+        "@hugeicons/core-free-icons": "catalog:",
         "@kobalte/core": "catalog:",
         "@norbert_bodziony/bloub": "catalog:",
         "@openbot/brand": "workspace:*",
@@ -438,6 +439,7 @@
     "@cloudflare/workers-types": "5.20261023.1",
     "@fontsource-variable/figtree": "5.3.0",
     "@hapi/boom": "9.1.4",
+    "@hugeicons/core-free-icons": "4.3.5",
     "@kobalte/core": "2.0.0-alpha.0",
     "@noble/curves": "2.4.0",
     "@noble/hashes": "2.4.0",
@@ -923,6 +925,8 @@
     "@hapi/hoek": ["@hapi/hoek@9.3.0", "", {}, "sha512-/c6rf4UJlmHlC9b5BaNvzAcFv7HZ2QHaV0D4/HNlBdvFnvQq8RI4kYdhyPCl7Xj+oWvTWQ8ujhqS53LIgAe6KQ=="],
 
     "@hono/node-server": ["@hono/node-server@2.1.0", "", { "peerDependencies": { "hono": "^4" } }, "sha512-XovyyCCnBzW+zKu+z/zq8hwNs4KOR5rEMAOxo2f40Q5xoOI37IMm6MIg2COOUtUApo0i6850MTBKH2u4QLGIqg=="],
+
+    "@hugeicons/core-free-icons": ["@hugeicons/core-free-icons@4.3.5", "", {}, "sha512-Sv+NjHRPnQk+yZsGCMcGznCHdTfJR9PMMOEKcJYAQU4gy90dmlc9PwdtvYOImBZIjiheMsTLL5eMn2DmHxUiUg=="],
 
     "@iconify/types": ["@iconify/types@2.0.0", "", {}, "sha512-+wluvCrRhXrhyOmRDJ3q8mux9JkKy5SJ/v8ol2tu4FVjyYvtEzkc/3pK15ET6RKg4b4w4BmTk1+gsCUhf21Ykg=="],
 

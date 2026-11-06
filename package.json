@@ -65,6 +65,7 @@
       "wrangler": "4.152.0",
       "yaml": "2.9.1",
       "zod": "4.6.7",
+      "@hugeicons/core-free-icons": "4.3.5",
       "lucide-solid": "1.33.0",
       "solid-sonner": "0.3.2",
       "solid-recharts": "1.0.1",

@@ -376,8 +376,11 @@
    * this: the hand-written icons under src/renderer/src/features draw on a 16- or 20-unit
    * viewBox, so the same number paints a different device weight there; the onboarding
    * computer is a drawing, not an icon; and the checkbox tick would come out at 0.75
-   * device px inside its 12px box. Every lucide icon in the renderer reads this token. */
-  --openbot-icon-stroke: 2;
+   * device px inside its 12px box. Every icon in the renderer reads this token.
+   *
+   * The icons are Hugeicons now. They are drawn for a 1.5 line with round joins, so 2 makes them
+   * heavy; 1.75 paints 1.17 px at 16px, close to the old weight without filling the counters. */
+  --openbot-icon-stroke: 1.75;
   --openbot-icon-stroke-lg: 1.5;
   --openbot-icon-xs: 12px;
   --openbot-icon-sm: 14px;

@@ -3,12 +3,10 @@ import type { PolymorphicProps } from "@kobalte/core/polymorphic";
 import type { PopoverRootProps } from "@kobalte/core/popover";
 import * as SelectPrimitive from "@kobalte/core/select";
 import type { ComponentProps, JSX, ValidComponent } from "@solidjs/web";
-import Check from "lucide-solid/icons/check";
-import ChevronsUpDown from "lucide-solid/icons/chevrons-up-down";
-import Search from "lucide-solid/icons/search";
 import { children, createMemo, createSignal, createUniqueId, omit, onSettled, Show } from "solid-js";
 import { Combobox, Popover } from "./complex";
 import { Input } from "./form";
+import { Check, ChevronsUpDown, Search } from "./icons";
 import { useText } from "./text";
 import { createPressedPopupCue, cx } from "./utils";
 
