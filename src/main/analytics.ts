@@ -796,16 +796,16 @@ export class HostAnalytics {
     const skipped = this.#webhookSkipped;
     this.#webhookSkipped = 0;
     this.#track("system_webhook_delivery", {
-      owner_kind: report.ownerKind ?? undefined,
+      ...(report.ownerKind ? { owner_kind: report.ownerKind } : {}),
       format: report.format,
       result: report.result,
-      ignored_reason: report.ignoredReason ?? undefined,
+      ...(report.ignoredReason ? { ignored_reason: report.ignoredReason } : {}),
       status_code: report.status,
       body_bytes: report.bodyBytes,
       handle_ms: Math.round(report.handleMs),
-      delivery_age_ms: report.ageMs === null ? undefined : Math.round(report.ageMs),
+      ...(report.ageMs === null ? {} : { delivery_age_ms: Math.round(report.ageMs) }),
       test: report.test,
-      skipped_count: skipped > 0 ? skipped : undefined,
+      ...(skipped > 0 ? { skipped_count: skipped } : {}),
     });
   }
 
@@ -958,7 +958,11 @@ export class HostAnalytics {
           ...this.#agentProperties(agentId),
           status: event.status,
           ...(run
-            ? { run_kind: run.runKind, run_source: run.runSource ?? undefined, trigger_type: run.triggerType }
+            ? {
+                run_kind: run.runKind,
+                ...(run.runSource ? { run_source: run.runSource } : {}),
+                trigger_type: run.triggerType,
+              }
             : {}),
         },
         owner,
