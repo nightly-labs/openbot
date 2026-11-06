@@ -1,3 +1,5 @@
+import { prefersReducedMotion } from "@openbot/ui/utils";
+
 /**
  * A theme change as a soft wash of brand colors that moves across the window, as glimm does it. A
  * change from dark to light goes down from the top; other changes go up from the bottom. The old
@@ -319,24 +321,25 @@ interface Ripple {
   draw(radius: number, progress: number): void;
 }
 
+/** An SVG element with these attributes. */
+function svgElement<K extends keyof SVGElementTagNameMap>(name: K, attributes: Record<string, string>) {
+  const element = document.createElementNS("http://www.w3.org/2000/svg", name);
+  for (const [key, value] of Object.entries(attributes)) element.setAttribute(key, value);
+  return element;
+}
+
 /**
  * The ripple filter, as glimm's page ripple: the pictures move ahead at the crest and back in the
  * trough after it, blur after the crest, and split their colors at it. Outside the ripple the
  * filter shows the pictures as they are, so the interface does not move there.
  */
 function createRipple(): Ripple {
-  const namespace = "http://www.w3.org/2000/svg";
-  const create = <K extends keyof SVGElementTagNameMap>(name: K, attributes: Record<string, string>) => {
-    const element = document.createElementNS(namespace, name);
-    for (const [key, value] of Object.entries(attributes)) element.setAttribute(key, value);
-    return element;
-  };
   const matrix = (input: string, values: string, result: string) =>
-    create("feColorMatrix", { in: input, type: "matrix", values, result });
+    svgElement("feColorMatrix", { in: input, type: "matrix", values, result });
   const composite = (input: string, mask: string, result: string) =>
-    create("feComposite", { in: input, in2: mask, operator: "in", result });
-  const element = create("svg", { class: "theme-sweep-ripple", "aria-hidden": "true", width: "0", height: "0" });
-  const filter = create("filter", {
+    svgElement("feComposite", { in: input, in2: mask, operator: "in", result });
+  const element = svgElement("svg", { class: "theme-sweep-ripple", "aria-hidden": "true", width: "0", height: "0" });
+  const filter = svgElement("filter", {
     id: RIPPLE_ID,
     // Each step's result is cut to this region. At the middle the arch reads the ripple's images
     // past the window's far edge, by up to ARCH_DROP times END_RADIUS window heights, so they must
@@ -350,11 +353,11 @@ function createRipple(): Ripple {
   // Each image changes in one direction only. A thin strip of it repeats across the window, because
   // the filter's time grows with the area of its images.
   const image = (href: string, result: string) =>
-    create("feImage", { href, preserveAspectRatio: "none", x: "0", y: "0", result: `${result}Strip` });
-  const tile = (result: string) => create("feTile", { in: `${result}Strip`, result });
+    svgElement("feImage", { href, preserveAspectRatio: "none", x: "0", y: "0", result: `${result}Strip` });
+  const tile = (result: string) => svgElement("feTile", { in: `${result}Strip`, result });
   // The images are the same across the window, so the bend can move them across too.
   const bend = (input: string, result: string) =>
-    create("feDisplacementMap", { in: input, in2: "arch", xChannelSelector: "A", yChannelSelector: "A", result });
+    svgElement("feDisplacementMap", { in: input, in2: "arch", xChannelSelector: "A", yChannelSelector: "A", result });
   const images = [image(RIPPLE_IMAGES.up[0], "moveImage"), image(RIPPLE_IMAGES.up[1], "blurImage")];
   let ahead = -1;
   const arch = image(RIPPLE_ARCH, "arch");
@@ -362,7 +365,7 @@ function createRipple(): Ripple {
   // The ripple's distance from one half, times the strength across the window, which goes from
   // 1 / EDGE_GAIN at the middle to 1 at the sides.
   const middle = 1 / EDGE_GAIN;
-  const edgeMove = create("feComposite", {
+  const edgeMove = svgElement("feComposite", {
     in: "ripple",
     in2: "edge",
     operator: "arithmetic",
@@ -377,21 +380,21 @@ function createRipple(): Ripple {
   // The display's color profile changes a map's colors before the move reads them, but not its
   // opacity or white. So the move reads the opacity for up and down, and white for across. White
   // moves the pictures half the scale to the left, and the offset after it puts them back.
-  const moved = create("feDisplacementMap", {
+  const moved = svgElement("feDisplacementMap", {
     in: "SourceGraphic",
     in2: "map",
     xChannelSelector: "R",
     yChannelSelector: "A",
     result: "movedLeft",
   });
-  const back = create("feOffset", { in: "movedLeft", dy: "0", result: "moved" });
-  const blurred = create("feGaussianBlur", { in: "moved", result: "blurred" });
-  const shifted = create("feOffset", { in: "moved", dx: "0", result: "shifted" });
+  const back = svgElement("feOffset", { in: "movedLeft", dy: "0", result: "moved" });
+  const blurred = svgElement("feGaussianBlur", { in: "moved", result: "blurred" });
+  const shifted = svgElement("feOffset", { in: "moved", dx: "0", result: "shifted" });
   // Outside the ripple the map is exactly one half, so the moved pictures are the pictures as they
   // are. Under them, the pictures fill what the move takes in from outside the window.
-  const merge = create("feMerge", {});
+  const merge = svgElement("feMerge", {});
   merge.append(
-    ...["SourceGraphic", "moved", "splitCrest", "blurredBand"].map((input) => create("feMergeNode", { in: input })),
+    ...["SourceGraphic", "moved", "splitCrest", "blurredBand"].map((input) => svgElement("feMergeNode", { in: input })),
   );
   filter.append(
     ...images,
@@ -411,7 +414,14 @@ function createRipple(): Ripple {
     shifted,
     matrix("shifted", "1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0", "red"),
     matrix("moved", "0 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0", "greenBlue"),
-    create("feComposite", { in: "red", in2: "greenBlue", operator: "arithmetic", k2: "1", k3: "1", result: "split" }),
+    svgElement("feComposite", {
+      in: "red",
+      in2: "greenBlue",
+      operator: "arithmetic",
+      k2: "1",
+      k3: "1",
+      result: "split",
+    }),
     matrix("ripple", "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2 -1.01", "crest"),
     composite("split", "crest", "splitCrest"),
     blurred,
@@ -461,7 +471,7 @@ function createRipple(): Ripple {
 
 /** False in a hidden window or with reduced motion. */
 function canAnimate(): boolean {
-  return document.visibilityState === "visible" && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  return document.visibilityState === "visible" && !prefersReducedMotion();
 }
 
 /** The sweep that is on screen, so a newer change stops its frame loop. */
@@ -484,6 +494,7 @@ export function sweepTheme(apply: () => void): void {
   const root = document.documentElement;
   let frame = 0;
   let stopped = false;
+  let transition: ViewTransition | undefined;
   // A change from dark to light goes down the window, as light falls from above. Others go up.
   const before = root.dataset.openbotColorScheme;
   let down = false;
@@ -493,6 +504,8 @@ export function sweepTheme(apply: () => void): void {
   const stop = () => {
     if (stopped) return;
     stopped = true;
+    // A newer change can stop this sweep before its transition ends. The page then shows itself at once.
+    transition?.skipTransition();
     cancelAnimationFrame(frame);
     band.dispose();
     ripple.element.remove();
@@ -503,10 +516,12 @@ export function sweepTheme(apply: () => void): void {
   const radiusAt = (progress: number) => Math.max(0.001, END_RADIUS * easeInOut(progress));
   show(radiusAt(0));
 
-  const transition = document.startViewTransition({
+  transition = document.startViewTransition({
     types: [SWEEP_TYPE],
     update: () => {
       apply();
+      // A skipped transition still runs its update. A stopped sweep adds nothing to the page.
+      if (stopped) return;
       down = before === "dark" && root.dataset.openbotColorScheme === "light";
       show(radiusAt(0));
       band.setDown(down);
@@ -607,30 +622,24 @@ interface RingRipple {
  * ripple the filter shows the page as it is.
  */
 function createRingRipple(direction: RingDirection, x: number, y: number): RingRipple {
-  const namespace = "http://www.w3.org/2000/svg";
-  const create = <K extends keyof SVGElementTagNameMap>(name: K, attributes: Record<string, string>) => {
-    const element = document.createElementNS(namespace, name);
-    for (const [key, value] of Object.entries(attributes)) element.setAttribute(key, value);
-    return element;
-  };
   const images = ringImageCache.get(direction) ?? ringImages(direction);
   ringImageCache.set(direction, images);
   const reach = ringReach(direction);
-  const element = create("svg", { class: "theme-sweep-ripple", "aria-hidden": "true", width: "0", height: "0" });
-  const filter = create("filter", {
+  const element = svgElement("svg", { class: "theme-sweep-ripple", "aria-hidden": "true", width: "0", height: "0" });
+  const filter = svgElement("filter", {
     id: RING_RIPPLE_ID,
     filterUnits: "userSpaceOnUse",
     x: "0",
     y: "0",
     "color-interpolation-filters": "sRGB",
   });
-  const image = (href: string, result: string) => create("feImage", { href, preserveAspectRatio: "none", result });
+  const image = (href: string, result: string) => svgElement("feImage", { href, preserveAspectRatio: "none", result });
   const round = [image(images[0], "push"), image(images[1], "pull"), image(images[2], "blurBand")];
   // Strips that go from 0 to 1 across the ripple's box, left to right and top to bottom.
   const across = image(gradientImage(false, [stop(0, 0), stop(1, 1)]), "acrossStrip");
   const down = image(gradientImage(true, [stop(0, 0), stop(1, 1)]), "downStrip");
   // The ripple as one half plus the push less the pull. Outside its images both are zero.
-  const ripple = create("feComposite", {
+  const ripple = svgElement("feComposite", {
     in: "push",
     in2: "pull",
     operator: "arithmetic",
@@ -641,7 +650,7 @@ function createRingRipple(direction: RingDirection, x: number, y: number): RingR
   });
   // Each map is one half plus the ripple times the distance from the ring's center along one axis.
   const axis = (input: string, result: string) =>
-    create("feComposite", {
+    svgElement("feComposite", {
       in: "ripple",
       in2: input,
       operator: "arithmetic",
@@ -652,33 +661,38 @@ function createRingRipple(direction: RingDirection, x: number, y: number): RingR
       result,
     });
   const white = (input: string, result: string) =>
-    create("feColorMatrix", { in: input, type: "matrix", values: "0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0", result });
+    svgElement("feColorMatrix", {
+      in: input,
+      type: "matrix",
+      values: "0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0",
+      result,
+    });
   // White moves the page half the scale on the other axis, and each offset puts it back.
-  const movedDown = create("feDisplacementMap", {
+  const movedDown = svgElement("feDisplacementMap", {
     in: "SourceGraphic",
     in2: "mapDown",
     xChannelSelector: "R",
     yChannelSelector: "A",
     result: "movedDownShifted",
   });
-  const backDown = create("feOffset", { in: "movedDownShifted", result: "movedDown" });
-  const movedAcross = create("feDisplacementMap", {
+  const backDown = svgElement("feOffset", { in: "movedDownShifted", result: "movedDown" });
+  const movedAcross = svgElement("feDisplacementMap", {
     in: "movedDown",
     in2: "mapAcross",
     xChannelSelector: "A",
     yChannelSelector: "R",
     result: "movedShifted",
   });
-  const backAcross = create("feOffset", { in: "movedShifted", result: "moved" });
-  const blurred = create("feGaussianBlur", { in: "moved", result: "blurred" });
-  const merge = create("feMerge", {});
-  merge.append(...["SourceGraphic", "moved", "blurredRing"].map((input) => create("feMergeNode", { in: input })));
+  const backAcross = svgElement("feOffset", { in: "movedShifted", result: "moved" });
+  const blurred = svgElement("feGaussianBlur", { in: "moved", result: "blurred" });
+  const merge = svgElement("feMerge", {});
+  merge.append(...["SourceGraphic", "moved", "blurredRing"].map((input) => svgElement("feMergeNode", { in: input })));
   filter.append(
     ...round,
     across,
-    create("feTile", { in: "acrossStrip", result: "across" }),
+    svgElement("feTile", { in: "acrossStrip", result: "across" }),
     down,
-    create("feTile", { in: "downStrip", result: "down" }),
+    svgElement("feTile", { in: "downStrip", result: "down" }),
     ripple,
     axis("across", "acrossRaw"),
     axis("down", "downRaw"),
@@ -689,7 +703,7 @@ function createRingRipple(direction: RingDirection, x: number, y: number): RingR
     movedAcross,
     backAcross,
     blurred,
-    create("feComposite", { in: "blurred", in2: "blurBand", operator: "in", result: "blurredRing" }),
+    svgElement("feComposite", { in: "blurred", in2: "blurBand", operator: "in", result: "blurredRing" }),
     merge,
   );
   element.append(filter);
