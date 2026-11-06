@@ -11,8 +11,9 @@ export const IDENTITY_PICTURE_SIZE = 72;
 
 /**
  * The top of a settings page for a thing with a picture and a name, such as a server or a profile:
- * the picture on the left, the name beside it, and a line under the name. The name field has a soft
- * fill and is as wide as the name, so the pencil follows the last letter. Without `onPicturePress` and `onNameChange` the header only shows.
+ * the picture on the left, the name beside it, and a line under the name. The name field is as wide as
+ * the name, so the pencil follows the last letter, and has a soft fill while the name changes. Without
+ * `onPicturePress` and `onNameChange` the header only shows.
  */
 export function SettingsIdentityHeader({
   picture,
@@ -78,10 +79,10 @@ export function SettingsIdentityHeader({
               editable={!disabled}
               returnKeyType="done"
               variant="primary"
-              // A soft rounded fill shows the size of the field. HeroUI gives an Android field its own
-              // fill and elevation; the style replaces them, so the field looks the same on both platforms.
+              // While the name changes, a soft rounded fill shows the size of the field. HeroUI gives an
+              // Android field its own fill and elevation; the style replaces them on both platforms.
               background={null}
-              style={{ backgroundColor: grouped, borderRadius: 12, elevation: 0 }}
+              style={{ backgroundColor: editing ? grouped : "transparent", borderRadius: 12, elevation: 0 }}
               className={`min-h-10 min-w-16 ${editing ? "flex-1" : "shrink"} border-0 bg-transparent px-2 font-sans text-title font-semibold shadow-none ios:shadow-none ios:outline-transparent ios:focus:outline-transparent android:border-0 android:focus:border-transparent`}
               onFocus={() => setEditing(true)}
               onBlur={() => setEditing(false)}
