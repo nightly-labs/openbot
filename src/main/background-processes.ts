@@ -7,7 +7,8 @@
 // again. A provider process that OpenBot runs has OpenBot as its parent, so it is never one.
 //
 // macOS shows the environment of a program, but not of an Apple system program such as `/bin/sleep`.
-// Such a program is not found. The environment stays in memory: it can hold secrets.
+// There a program is a left program too when its working directory is an agent workspace. The
+// environment stays in memory: it can hold secrets, so this fallback reads only the directory.
 
 import { execFile } from "node:child_process";
 import { readFile, realpath } from "node:fs/promises";
@@ -125,8 +126,26 @@ const markedProcesses = Effect.fn("BackgroundProcesses.marked")(function* (
   return marked;
 });
 
+/** The workspace of each agent as the system sees it, because lsof writes a real path. */
+const resolveWorkspaces = Effect.fn("BackgroundProcesses.workspaces")(function* (
+  agents: readonly BackgroundProcessAgent[],
+) {
+  return yield* Effect.forEach(
+    agents,
+    (agent) =>
+      io(() => realpath(agent.workspacePath)).pipe(
+        Effect.orElseSucceed(() => agent.workspacePath),
+        Effect.map((workspacePath) => ({ id: agent.id, workspacePath })),
+      ),
+    { concurrency: 16 },
+  );
+});
+
 /** The left programs of this user, each with its descendants. */
-const findLeftProcesses = Effect.fn("BackgroundProcesses.find")(function* (platform: NodeJS.Platform) {
+const findLeftProcesses = Effect.fn("BackgroundProcesses.find")(function* (
+  platform: NodeJS.Platform,
+  agents: readonly BackgroundProcessAgent[],
+) {
   const rows = yield* readProcessTable;
   const uid = process.getuid?.() ?? -1;
   const children = new Map<number, ProcessRow[]>();
@@ -146,9 +165,19 @@ const findLeftProcesses = Effect.fn("BackgroundProcesses.find")(function* (platf
     platform,
     candidates.map((row) => row.pid),
   );
+  // macOS hides the environment of Apple system programs, such as `/bin/sleep` and `/usr/bin/curl`.
+  // Such a program is still left by an agent when it runs in that agent's workspace: another user
+  // cannot put a process there.
+  const unmarked = candidates.filter((row) => !marked.has(row.pid));
+  const workspaces = platform === "darwin" && unmarked.length > 0 ? yield* resolveWorkspaces(agents) : [];
+  const cwds =
+    workspaces.length > 0
+      ? yield* lsof(["-a", "-d", "cwd", "-p", unmarked.map((row) => row.pid).join(",")])
+      : new Map<number, string[]>();
   const left: LeftProcess[] = [];
   for (const root of candidates) {
-    if (!marked.has(root.pid)) continue;
+    const inWorkspace = ownerOf(cwds.get(root.pid)?.[0], workspaces) !== null;
+    if (!marked.has(root.pid) && !inWorkspace) continue;
     const tree = [root];
     for (let index = 0; index < tree.length; index++) tree.push(...(children.get(tree[index]?.pid ?? -1) ?? []));
     // An OpenBot that an agent started is never stopped from this one.
@@ -199,7 +228,7 @@ export const listBackgroundProcesses = Effect.fn("BackgroundProcesses.list")(fun
   agents: readonly BackgroundProcessAgent[],
 ) {
   if (platform === "win32") return null;
-  const left = yield* findLeftProcesses(platform);
+  const left = yield* findLeftProcesses(platform, agents);
   if (left.length === 0) return [];
   const roots = left.map(({ root }) => root.pid).join(",");
   const everyPid = left.flatMap(({ tree }) => tree.map((row) => row.pid)).join(",");
@@ -208,15 +237,7 @@ export const listBackgroundProcesses = Effect.fn("BackgroundProcesses.list")(fun
     { concurrency: 2 },
   );
   // lsof gives the real path of a folder, such as `/private/tmp` for `/tmp` on macOS.
-  const workspaces = yield* Effect.forEach(
-    agents,
-    (agent) =>
-      io(() => realpath(agent.workspacePath)).pipe(
-        Effect.orElseSucceed(() => agent.workspacePath),
-        Effect.map((workspacePath) => ({ id: agent.id, workspacePath })),
-      ),
-    { concurrency: 16 },
-  );
+  const workspaces = yield* resolveWorkspaces(agents);
   return left
     .map(({ root, tree }): BackgroundProcess => {
       const ports = new Set<number>();
@@ -254,9 +275,10 @@ function signal(pid: number, name: NodeJS.Signals | 0): boolean {
 export const stopBackgroundProcess = Effect.fn("BackgroundProcesses.stop")(function* (
   platform: NodeJS.Platform,
   id: string,
+  agents: readonly BackgroundProcessAgent[],
 ) {
   if (platform === "win32") return;
-  const found = (yield* findLeftProcesses(platform)).find(({ root }) => processId(root) === id);
+  const found = (yield* findLeftProcesses(platform, agents)).find(({ root }) => processId(root) === id);
   if (!found) return;
   const pids = found.tree.map((row) => row.pid);
   for (const pid of pids) signal(pid, "SIGTERM");

@@ -21,7 +21,7 @@ export function backgroundProcessIpcHandlers({
       list: handler(() => runCauseEffect(listBackgroundProcesses(platform, agents()))),
       stop: payloadHandler(
         (value) => requireString(value, "id", INPUT_LIMITS.identifier),
-        (id) => runCauseEffect(stopBackgroundProcess(platform, id)),
+        (id) => runCauseEffect(stopBackgroundProcess(platform, id, agents())),
       ),
     },
   };
