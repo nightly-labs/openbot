@@ -1,5 +1,40 @@
 [
   {
+    "version": "0.63.0",
+    "date": "2026-11-06",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Choose when the plan card starts a long task by itself in Settings → Agents, or let it start only when you press Start.",
+          "Choose the provider account when you create an agent, if the provider has more than one account connected.",
+          "Change how many requests local scripts can send each agent in one hour in Settings → Agents → Local scripts.",
+          "The Usage page has a Skill tab that shows how often your agents load each skill and what it costs.",
+          "Connect Higgsfield in the Marketplace to make images, videos and audio."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "The chat color picker has 11 new preset colors, and code, tables and cards in a colored bubble take its color.",
+          "Cards where an agent asks for an answer, such as an API key form, look like the agent's questions.",
+          "Ask an agent in a channel to make a new channel or change another channel, and it does it there."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Claude stays signed in after OpenBot restarts or updates, and Claude agents use less of the 5-hour usage window.",
+          "Older messages that you load in a long chat stay loaded. The chat no longer jumps back to the latest messages.",
+          "Automatic compactions of a ChatGPT (Codex), Muse, Pi or Antigravity chat stop after 2 fail in a row, so the chat no longer uses up the plan limit.",
+          "GPT voice works with every agent, also when the agent uses a Codex model.",
+          "The browser fills saved logins from Proton Pass."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.62.0",
     "date": "2026-11-05",
     "notices": [],
