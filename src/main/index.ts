@@ -1086,7 +1086,7 @@ function forwardCentralAuth(state: CentralAuthState): void {
         // A self-hosted server exists to be a host, so its first sign-in names and starts it too.
         if (host && services?.serverMode) yield* services.serverMode.publish();
         else if (host && shouldAutoStartHost({ ...host.getStatus(), remoteRole: developmentRemoteRole }))
-          yield* host.start();
+          yield* host.start(true);
       }),
     ),
   ).catch((error) => {
@@ -1612,7 +1612,7 @@ if (!hasSingleInstanceLock) {
       if (built.serverMode) {
         const serverModeControl = built.serverMode;
         void runCauseEffect(
-          built.centralAuthInitialization.pipe(Effect.flatMap(() => serverModeControl.publish())),
+          built.centralAuthInitialization.pipe(Effect.flatMap(() => serverModeControl.publish(true))),
         ).catch((error) => logger.error("Unable to publish this server:", toLogValue(error)));
       } else if (
         shouldAutoStartHost({
@@ -1621,8 +1621,8 @@ if (!hasSingleInstanceLock) {
           remoteRole: developmentRemoteRole,
         })
       ) {
-        void runCauseEffect(built.centralAuthInitialization.pipe(Effect.flatMap(() => host.start()))).catch((error) =>
-          logger.error("Unable to republish this OpenBot:", toLogValue(error)),
+        void runCauseEffect(built.centralAuthInitialization.pipe(Effect.flatMap(() => host.start(true)))).catch(
+          (error) => logger.error("Unable to republish this OpenBot:", toLogValue(error)),
         );
       }
       void runCauseEffect(built.agentInitialization.start()).catch((error) => {

@@ -611,6 +611,8 @@ export class RemoteControlPlane {
         devicePublicKey?: string | null | undefined;
         rotateCredential?: boolean | undefined;
         machineToken?: string | undefined;
+        /** The host publishes itself again with no user action, such as at launch or after a failure. */
+        automatic?: boolean | undefined;
       },
     ) {
       const dependencies = yield* RemoteDependencies;
@@ -622,6 +624,20 @@ export class RemoteControlPlane {
       const existing = yield* this.#host(hostId);
       if (existing && existing.owner_user_id !== user.id) {
         return yield* new RemoteControlPlaneError(403, "host_owner_mismatch", "This host belongs to another account.");
+      }
+      // An owner removal keeps the host row with no machine token and no memberships (`deleteHost`). The
+      // host can still run, and its automatic publish put the server back in every list (#5273). A
+      // publish that the user starts on that computer registers it again. A host copied from a team
+      // tunnel can also have no token, but it keeps its owner membership.
+      if (input.automatic && existing && !existing.machine_token_hash) {
+        const ownerMembership = yield* remoteCall(() =>
+          dependencies.database
+            .prepare("SELECT 1 FROM remote_memberships WHERE host_id = ? AND user_id = ? AND status = 'active' LIMIT 1")
+            .bind(hostId, user.id)
+            .first(),
+        );
+        if (!ownerMembership)
+          return yield* new RemoteControlPlaneError(409, "host_removed", sourceText("error.remote.hostRemoved"));
       }
       yield* this.#requireHostReservation(hostId, user.id);
       const now = dependencies.now();
