@@ -43,4 +43,7 @@ export const messages = defineMessages("status.remote", {
     other: "Reconnecting {attempt}/{count}\n{detail}",
   },
   "status.remote.reconnecting": { one: "Reconnecting {attempt}/{count}", other: "Reconnecting {attempt}/{count}" },
+  // The host writes this in the middle of a message that is too large to send to a remote client.
+  "status.remote.messageCut":
+    "[{size} MB of this message is not shown on this device. Open it on the computer that runs the server to read all of it.]",
 });

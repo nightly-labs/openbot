@@ -12,6 +12,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentAccessLevel,
   agentAccessRank,
+  type ConversationMessage,
   type ConversationMessageSender,
   type ConversationPageAnchor,
   type ConversationSnapshot,
@@ -59,6 +60,64 @@ import type { TeamApiRequestContext } from "./request-context";
 export const JSON_LIMIT = 1024 * 1024;
 /** A response body leaves room in one WebRTC frame for the response envelope around it. */
 export const WEBRTC_FRAME_BODY_BUDGET = Math.floor(TEAM_PROTOCOL_V2_MAX_JSON_FRAME_BYTES * 0.75);
+
+/**
+ * A page of one message can still be larger than one WebRTC frame, and a remote client could then not
+ * open the chat or read the history behind that message. The texts of `messages` give up
+ * `excessBytes` of their JSON size: the largest texts are cut to one size, and the smaller texts stay
+ * whole. The start and the end of a cut text stay, with a note between them. The host keeps the whole
+ * text.
+ */
+export function messageTextCut(
+  messages: readonly ConversationMessage[],
+  excessBytes: number,
+): (message: ConversationMessage) => ConversationMessage {
+  const sizes = new Map(messages.map((message) => [message, jsonBytes(message.text)]));
+  // A message that is also a reply reference is in the page twice, so its size counts twice.
+  const ascending = messages.map((message) => sizes.get(message) ?? 0).sort((left, right) => left - right);
+  let remaining = ascending.reduce((sum, size) => sum + size, 0) - excessBytes;
+  let cap = Number.POSITIVE_INFINITY;
+  for (const [index, size] of ascending.entries()) {
+    const left = ascending.length - index;
+    if (size * left > remaining) {
+      cap = Math.max(0, Math.floor(remaining / left));
+      break;
+    }
+    remaining -= size;
+  }
+  return (message) => ((sizes.get(message) ?? 0) > cap ? { ...message, text: cutText(message.text, cap) } : message);
+}
+
+function cutText(text: string, maxBytes: number): string {
+  const textBytes = Buffer.byteLength(text);
+  for (let keep = Math.floor(text.length / 2); ; ) {
+    // Do not split a surrogate pair at either cut.
+    const end = isHighSurrogate(text.charCodeAt(keep - 1)) ? keep - 1 : keep;
+    const start = isLowSurrogate(text.charCodeAt(text.length - keep)) ? text.length - keep + 1 : text.length - keep;
+    const head = text.slice(0, end);
+    const tail = text.slice(start);
+    // Rounded up to 0.1 MB, so a cut never reads as 0.0 MB.
+    const size = (Math.ceil((textBytes - Buffer.byteLength(head) - Buffer.byteLength(tail)) / 104_857.6) / 10).toFixed(
+      1,
+    );
+    const cut = `${head}\n\n${sourceText("status.remote.messageCut", { size })}\n\n${tail}`;
+    const bytes = jsonBytes(cut);
+    if (bytes <= maxBytes || keep === 0) return cut;
+    keep = Math.floor(keep * Math.min(0.99, maxBytes / bytes));
+  }
+}
+
+function jsonBytes(value: string): number {
+  return Buffer.byteLength(JSON.stringify(value));
+}
+
+function isHighSurrogate(code: number): boolean {
+  return code >= 0xd800 && code <= 0xdbff;
+}
+
+function isLowSurrogate(code: number): boolean {
+  return code >= 0xdc00 && code <= 0xdfff;
+}
 
 export function requestCapabilities(request: IncomingMessage): Set<string> {
   const header = request.headers[TEAM_CAPABILITIES_HEADER.toLowerCase()];
