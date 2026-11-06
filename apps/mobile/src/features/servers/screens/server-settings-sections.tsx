@@ -1,7 +1,7 @@
 import { DEFAULT_TEAM_MEMBER_LIMIT } from "@openbot/contracts/input-limits";
 import { WAKE_RECONNECT_STATES } from "@openbot/team-client/hosted-server-wake";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { router, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
@@ -9,10 +9,9 @@ import { useUniwind } from "uniwind";
 import { confirmOwner } from "@/features/app-lock/model/app-lock";
 import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { hostedServerCalls } from "@/features/servers/api/hosted-servers";
-import { ServerStatusLabel } from "@/features/servers/components/server-status-label";
 import { TrailingValue } from "@/features/servers/components/trailing-value";
 import { SERVER_ROLE_LABEL_KEYS } from "@/features/servers/model/server-role";
-import { canRestartServer, useOwnerHostedServerIds } from "@/features/servers/model/server-settings-categories";
+import { canRestartServer } from "@/features/servers/model/server-settings-access";
 import { timeZoneLabel } from "@/features/servers/model/time-zones";
 import { useLockedAction } from "@/features/servers/model/use-locked-action";
 import { useServerBrowserProfiles } from "@/features/servers/model/use-server-browser-profiles";
@@ -21,32 +20,13 @@ import { useServerProviders } from "@/features/servers/model/use-server-provider
 import { useServerSites } from "@/features/servers/model/use-server-sites";
 import { useServerTimezone } from "@/features/servers/model/use-server-timezone";
 import { updateAvailable, useServerUpdate } from "@/features/servers/model/use-server-update";
-import {
-  SettingsContent,
-  SettingsNote,
-  SettingsRow,
-  SettingsSection,
-} from "@/features/settings/components/settings-content";
+import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
-import { useLiveServerRecovery } from "@/features/workspace/context/server-recovery-countdown";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
-
-/** Shows the page of the server in the route, or a note when this app no longer has the server. */
-function ServerSettingsPage({ children }: { children: (server: MobileServer) => ReactNode }) {
-  const { t } = useText();
-  const { serverId } = useLocalSearchParams<{ serverId: string }>();
-  const { servers } = useMobileWorkspace();
-  const server = useLiveServerRecovery(servers.find((item) => item.id === serverId));
-  return (
-    <SettingsContent>
-      {server ? children(server) : <SettingsNote>{t("mobile.server.unavailable")}</SettingsNote>}
-    </SettingsContent>
-  );
-}
 
 function LinkRow({ label, pathname, serverId, trailing }: LinkRowProps) {
   return (
@@ -70,71 +50,45 @@ interface LinkRowProps {
   trailing?: ReactNode;
 }
 
-/** The status and role of this member, the server preferences, and the server key. */
-export function ServerSettingsGeneralScreen() {
-  const { t, sourceText } = useText();
-  return (
-    <ServerSettingsPage>
-      {(server) => (
-        <>
-          <SettingsSection footer={server.connectionMessage ? sourceText(server.connectionMessage) : undefined}>
-            <SettingsRow disclosure={false} trailing={<ServerStatusLabel server={server} />}>
-              <Typography.Paragraph>{t("mobile.server.settings.status")}</Typography.Paragraph>
-            </SettingsRow>
-            <SettingsRow
-              disclosure={false}
-              trailing={
-                <Typography.Paragraph className="text-grouped-secondary">
-                  {t(SERVER_ROLE_LABEL_KEYS[server.role])}
-                </Typography.Paragraph>
-              }
-            >
-              <Typography.Paragraph>{t("mobile.server.settings.yourRole")}</Typography.Paragraph>
-            </SettingsRow>
-          </SettingsSection>
-          <ServerPreferences serverId={server.id} />
-          <ServerKeySettings server={server} />
-        </>
-      )}
-    </ServerSettingsPage>
-  );
-}
-
-/** The members, and the roles and the audit log for a role that the host serves them to. */
-export function ServerSettingsPeopleScreen() {
+/** The role of this member, the members, and the roles and the audit log for a role that the host serves them to. */
+export function ServerPeopleSection({ server }: { server: MobileServer }) {
   const { t } = useText();
   const { memberCountByServer, canManageServerRoles, canReadServerAudit } = useMobileWorkspace();
+  const memberCount = memberCountByServer[server.id];
   return (
-    <ServerSettingsPage>
-      {(server) => {
-        const memberCount = memberCountByServer[server.id];
-        return (
-          <SettingsSection>
-            <LinkRow
-              label={t("mobile.server.settings.members")}
-              pathname="/server-settings/members"
-              serverId={server.id}
-              trailing={
-                memberCount === undefined ? undefined : (
-                  <TrailingValue
-                    value={t("mobile.server.settings.memberCount", {
-                      count: memberCount,
-                      limit: server.memberLimit ?? DEFAULT_TEAM_MEMBER_LIMIT,
-                    })}
-                  />
-                )
-              }
+    <SettingsSection title={t("mobile.server.settings.peopleSection")}>
+      <SettingsRow
+        disclosure={false}
+        trailing={
+          <Typography.Paragraph className="text-grouped-secondary">
+            {t(SERVER_ROLE_LABEL_KEYS[server.role])}
+          </Typography.Paragraph>
+        }
+      >
+        <Typography.Paragraph>{t("mobile.server.settings.yourRole")}</Typography.Paragraph>
+      </SettingsRow>
+      <LinkRow
+        label={t("mobile.server.settings.members")}
+        pathname="/server-settings/members"
+        serverId={server.id}
+        trailing={
+          memberCount === undefined ? undefined : (
+            <TrailingValue
+              value={t("mobile.server.settings.memberCount", {
+                count: memberCount,
+                limit: server.memberLimit ?? DEFAULT_TEAM_MEMBER_LIMIT,
+              })}
             />
-            {canManageServerRoles(server.id) ? (
-              <LinkRow label={t("mobile.server.route.roles")} pathname="/server-settings/roles" serverId={server.id} />
-            ) : null}
-            {canReadServerAudit(server.id) ? (
-              <LinkRow label={t("mobile.server.route.audit")} pathname="/server-settings/audit" serverId={server.id} />
-            ) : null}
-          </SettingsSection>
-        );
-      }}
-    </ServerSettingsPage>
+          )
+        }
+      />
+      {canManageServerRoles(server.id) ? (
+        <LinkRow label={t("mobile.server.route.roles")} pathname="/server-settings/roles" serverId={server.id} />
+      ) : null}
+      {canReadServerAudit(server.id) ? (
+        <LinkRow label={t("mobile.server.route.audit")} pathname="/server-settings/audit" serverId={server.id} />
+      ) : null}
+    </SettingsSection>
   );
 }
 
@@ -142,22 +96,20 @@ export function ServerSettingsPeopleScreen() {
  * The AI providers and MCP servers of the computer that runs the server. Its connectors are apps of the
  * Marketplace, as on the desktop.
  */
-export function ServerSettingsAiScreen() {
+export function ServerAiSection({ serverId }: { serverId: string }) {
+  const { t } = useText();
   const { canManageProviders, canManageMcpServers } = useMobileWorkspace();
+  if (!canManageProviders(serverId) && !canManageMcpServers(serverId)) return null;
   return (
-    <ServerSettingsPage>
-      {({ id: serverId }) => (
-        <SettingsSection>
-          {canManageProviders(serverId) ? <ServerProvidersRow serverId={serverId} /> : null}
-          {canManageMcpServers(serverId) ? <ServerMcpRow serverId={serverId} /> : null}
-        </SettingsSection>
-      )}
-    </ServerSettingsPage>
+    <SettingsSection title={t("mobile.server.settings.aiSection")}>
+      {canManageProviders(serverId) ? <ServerProvidersRow serverId={serverId} /> : null}
+      {canManageMcpServers(serverId) ? <ServerMcpRow serverId={serverId} /> : null}
+    </SettingsSection>
   );
 }
 
 /** The data that the server keeps, and the moves of agents and servers into and out of it. */
-export function ServerSettingsDataScreen() {
+export function ServerDataSections({ serverId }: { serverId: string }) {
   const { t } = useText();
   const {
     canManageVault,
@@ -168,68 +120,60 @@ export function ServerSettingsDataScreen() {
     canTransferServer,
   } = useMobileWorkspace();
   return (
-    <ServerSettingsPage>
-      {({ id: serverId }) => (
-        <>
-          {canManageVault(serverId) ||
-          canManageBrowserProfiles(serverId) ||
-          canViewHostedSites(serverId) ||
-          canReadServerStorage(serverId) ? (
-            <SettingsSection>
-              {canManageVault(serverId) ? (
-                <LinkRow
-                  label={t("mobile.server.settings.vault")}
-                  pathname="/server-settings/vault"
-                  serverId={serverId}
-                />
-              ) : null}
-              {canManageBrowserProfiles(serverId) ? <ServerBrowserProfilesRow serverId={serverId} /> : null}
-              {canViewHostedSites(serverId) ? <ServerSitesRow serverId={serverId} /> : null}
-              {canReadServerStorage(serverId) ? (
-                <LinkRow
-                  label={t("mobile.server.settings.storage")}
-                  pathname="/server-settings/storage"
-                  serverId={serverId}
-                />
-              ) : null}
-            </SettingsSection>
+    <>
+      {canManageVault(serverId) ||
+      canManageBrowserProfiles(serverId) ||
+      canViewHostedSites(serverId) ||
+      canReadServerStorage(serverId) ? (
+        <SettingsSection title={t("mobile.server.settings.dataSection")}>
+          {canManageVault(serverId) ? (
+            <LinkRow label={t("mobile.server.settings.vault")} pathname="/server-settings/vault" serverId={serverId} />
           ) : null}
-          {canImportAgents(serverId) || canTransferServer(serverId) ? (
-            <SettingsSection title={t("mobile.server.settings.moveSection")}>
-              {canImportAgents(serverId) ? (
-                <LinkRow
-                  label={t("mobile.server.settings.importAgents")}
-                  pathname="/server-settings/import"
-                  serverId={serverId}
-                />
-              ) : null}
-              {canTransferServer(serverId) ? (
-                <LinkRow
-                  label={t("mobile.server.settings.transfer")}
-                  pathname="/server-settings/transfer"
-                  serverId={serverId}
-                />
-              ) : null}
-            </SettingsSection>
+          {canManageBrowserProfiles(serverId) ? <ServerBrowserProfilesRow serverId={serverId} /> : null}
+          {canViewHostedSites(serverId) ? <ServerSitesRow serverId={serverId} /> : null}
+          {canReadServerStorage(serverId) ? (
+            <LinkRow
+              label={t("mobile.server.settings.storage")}
+              pathname="/server-settings/storage"
+              serverId={serverId}
+            />
           ) : null}
-        </>
-      )}
-    </ServerSettingsPage>
+        </SettingsSection>
+      ) : null}
+      {canImportAgents(serverId) || canTransferServer(serverId) ? (
+        <SettingsSection title={t("mobile.server.settings.moveSection")}>
+          {canImportAgents(serverId) ? (
+            <LinkRow
+              label={t("mobile.server.settings.importAgents")}
+              pathname="/server-settings/import"
+              serverId={serverId}
+            />
+          ) : null}
+          {canTransferServer(serverId) ? (
+            <LinkRow
+              label={t("mobile.server.settings.transfer")}
+              pathname="/server-settings/transfer"
+              serverId={serverId}
+            />
+          ) : null}
+        </SettingsSection>
+      ) : null}
+    </>
   );
 }
 
-/** The OpenBot update of the host, and the refresh and restart actions. */
-export function ServerSettingsMaintenanceScreen() {
-  return <ServerSettingsPage>{(server) => <ServerMaintenance server={server} />}</ServerSettingsPage>;
-}
-
-function ServerMaintenance({ server }: { server: MobileServer }) {
+/** The refresh and restart actions. */
+export function ServerConnectionSection({
+  server,
+  hostedServerIds,
+}: {
+  server: MobileServer;
+  hostedServerIds: ReadonlySet<string> | null;
+}) {
   const { t } = useText();
   const serverId = server.id;
   const { refreshServer, hostedServerStarting } = useMobileWorkspace();
   const { session } = useMobileSession();
-  const update = useServerUpdate(serverId, { poll: false });
-  const hostedServerIds = useOwnerHostedServerIds(server);
   const action = useLockedAction();
   const { busy, error } = action;
   const [restarting, setRestarting] = useState(false);
@@ -239,71 +183,64 @@ function ServerMaintenance({ server }: { server: MobileServer }) {
     return action.perform(operation, failure);
   }
   return (
-    <>
-      {update.access || update.query.data ? (
-        <SettingsSection>
-          <ServerUpdatesRow serverId={serverId} update={update} />
-        </SettingsSection>
-      ) : null}
-      <SettingsSection footer={error ?? restarted}>
-        <SettingsRow disclosure={false} disabled={busy} onPress={() => void perform(() => refreshServer(serverId))}>
+    <SettingsSection footer={error ?? restarted}>
+      <SettingsRow disclosure={false} disabled={busy} onPress={() => void perform(() => refreshServer(serverId))}>
+        <Typography.Paragraph className="text-accent">
+          {busy && !restarting ? t("mobile.server.settings.refreshing") : t("mobile.server.settings.refresh")}
+        </Typography.Paragraph>
+      </SettingsRow>
+      {canRestartServer(server, hostedServerIds) ? (
+        // The account server stops the hosted server and starts it again. The app connects again after it.
+        <SettingsRow
+          disclosure={false}
+          disabled={busy}
+          onPress={() =>
+            Alert.alert(
+              t("mobile.server.settings.restartTitle", { name: server.name }),
+              t("mobile.server.settings.restartBody"),
+              [
+                { text: t("common.cancel"), style: "cancel" },
+                {
+                  text: t("mobile.server.settings.restartConfirm"),
+                  onPress: () =>
+                    void perform(
+                      async () => {
+                        if (!session) throw new Error(currentText().t("mobile.server.hosted.restartFailed"));
+                        setRestarting(true);
+                        try {
+                          const hosted = await hostedServerCalls(session).restart(serverId);
+                          // The connection drops when the server stops. The app connects again, as after a wake.
+                          if (WAKE_RECONNECT_STATES.has(hosted.state)) hostedServerStarting(serverId);
+                        } finally {
+                          setRestarting(false);
+                        }
+                        setRestarted(currentText().t("mobile.server.settings.restarted", { name: server.name }));
+                      },
+                      // The account server explains a refusal, such as a server that cannot restart now.
+                      (caught) => {
+                        const text = currentText();
+                        return text.errorMessage(caught, text.t("mobile.server.hosted.restartFailed"));
+                      },
+                    ),
+                },
+              ],
+            )
+          }
+        >
           <Typography.Paragraph className="text-accent">
-            {busy && !restarting ? t("mobile.server.settings.refreshing") : t("mobile.server.settings.refresh")}
+            {restarting ? t("mobile.server.settings.restarting") : t("mobile.server.settings.restart")}
           </Typography.Paragraph>
         </SettingsRow>
-        {canRestartServer(server, hostedServerIds) ? (
-          // The account server stops the hosted server and starts it again. The app connects again after it.
-          <SettingsRow
-            disclosure={false}
-            disabled={busy}
-            onPress={() =>
-              Alert.alert(
-                t("mobile.server.settings.restartTitle", { name: server.name }),
-                t("mobile.server.settings.restartBody"),
-                [
-                  { text: t("common.cancel"), style: "cancel" },
-                  {
-                    text: t("mobile.server.settings.restartConfirm"),
-                    onPress: () =>
-                      void perform(
-                        async () => {
-                          if (!session) throw new Error(currentText().t("mobile.server.hosted.restartFailed"));
-                          setRestarting(true);
-                          try {
-                            const hosted = await hostedServerCalls(session).restart(serverId);
-                            // The connection drops when the server stops. The app connects again, as after a wake.
-                            if (WAKE_RECONNECT_STATES.has(hosted.state)) hostedServerStarting(serverId);
-                          } finally {
-                            setRestarting(false);
-                          }
-                          setRestarted(currentText().t("mobile.server.settings.restarted", { name: server.name }));
-                        },
-                        // The account server explains a refusal, such as a server that cannot restart now.
-                        (caught) => {
-                          const text = currentText();
-                          return text.errorMessage(caught, text.t("mobile.server.hosted.restartFailed"));
-                        },
-                      ),
-                  },
-                ],
-              )
-            }
-          >
-            <Typography.Paragraph className="text-accent">
-              {restarting ? t("mobile.server.settings.restarting") : t("mobile.server.settings.restart")}
-            </Typography.Paragraph>
-          </SettingsRow>
-        ) : null}
-      </SettingsSection>
-    </>
+      ) : null}
+    </SettingsSection>
   );
 }
 
 /**
- * The server timezone and the memories per agent, for an owner or admin of a host that serves them.
- * The host checks the role and the value again.
+ * The OpenBot update of the host, and the server timezone and the memories per agent, for an owner or
+ * admin of a host that serves them. The host checks the role and the value again.
  */
-function ServerPreferences({ serverId }: { serverId: string }) {
+export function ServerGeneralSection({ serverId }: { serverId: string }) {
   const { t, errorMessage } = useText();
   const { theme } = useUniwind();
   const queryScope = useQueryScope();
@@ -311,6 +248,8 @@ function ServerPreferences({ serverId }: { serverId: string }) {
   const { canManageAgentMemoryLimit } = useMobileWorkspace();
   const { loadAgentMemoryLimit, setAgentMemoryLimit } = useMobileWorkspaceActions();
   const timezone = useServerTimezone(serverId);
+  const update = useServerUpdate(serverId, { poll: false });
+  const updateShown = Boolean(update.access || update.query.data);
   const memoryLimitKey = queryKeys.agentMemoryLimit(queryScope, serverId);
   const memoryLimitAvailable = canManageAgentMemoryLimit(serverId);
   const memoryLimit = useQuery({
@@ -323,7 +262,7 @@ function ServerPreferences({ serverId }: { serverId: string }) {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  if (!timezone.available && !memoryLimitAvailable) return null;
+  if (!updateShown && !timezone.available && !memoryLimitAvailable) return null;
   const zone = timezone.query.data;
   const limit = memoryLimit.data;
 
@@ -347,6 +286,7 @@ function ServerPreferences({ serverId }: { serverId: string }) {
 
   return (
     <SettingsSection
+      title={t("mobile.server.settings.serverSection")}
       footer={
         error ??
         (memoryLimit.isError
@@ -358,6 +298,7 @@ function ServerPreferences({ serverId }: { serverId: string }) {
               : undefined)
       }
     >
+      {updateShown ? <ServerUpdatesRow serverId={serverId} update={update} /> : null}
       {timezone.available ? (
         <SettingsRow
           trailing={
@@ -405,7 +346,7 @@ function ServerPreferences({ serverId }: { serverId: string }) {
  * this app trusts the new key only when the server list brings that handover. The host checks the
  * role again; the app lock, when it is on, confirms the owner first.
  */
-function ServerKeySettings({ server }: { server: MobileServer }) {
+export function ServerKeySettings({ server }: { server: MobileServer }) {
   const { t, format } = useText();
   const { canRotateServerKey } = useMobileWorkspace();
   const { rotateServerKey, reloadServerList } = useMobileWorkspaceActions();
