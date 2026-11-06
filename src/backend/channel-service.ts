@@ -2635,7 +2635,10 @@ export class ChannelService {
         messages.push(value);
     }
     if (messages.length) {
-      this.store.update(this.store.get(channelId), { messages });
+      const channel = this.store.get(channelId);
+      const [only] = messages;
+      if (messages.length === 1 && only) this.store.captureMessage(channel, only);
+      else this.store.update(channel, { messages });
       this.publish(channelId);
     }
     return true;

@@ -78,6 +78,10 @@ import {
   AGENT_THREAD_FILES_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import {
+  AGENT_THREAD_PAGES_CAPABILITY,
+  AGENT_THREAD_PAGES_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-thread-pages-v1";
+import {
   AGENT_THREAD_READS_CAPABILITY,
   AGENT_THREAD_READS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
@@ -134,6 +138,7 @@ import {
   decodeRemoteAgentTasks,
   decodeRemoteAgentThreadBranches,
   decodeRemoteTaskConversation,
+  decodeRemoteTaskPage,
   decodeRemoteTaskReadState,
   decodeRemoteTaskReadStates,
   decodeSidebarLayoutSnapshot,
@@ -168,6 +173,7 @@ import {
   parsePasteMessageLink,
   parsePromptResponse,
   parseQueueEdit,
+  parseReadAgentTaskPage,
   parseReadConversationPage,
   parseRenameAgentTask,
   parseReorderQueue,
@@ -960,6 +966,23 @@ export function agentIpcHandlers({
         local: (parsed) => service.readTask(parsed.agentId, parsed.taskId),
         remote: (parsed, serverId) =>
           remoteTaskRequest(serverId, AGENT_TASKS_ROUTES.read, decodeRemoteTaskConversation, agentTaskBody(parsed)),
+      }),
+      readTaskPage: scopedHandler(parseReadAgentTaskPage, {
+        local: (parsed) => service.readTaskPage(parsed),
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_THREAD_PAGES_CAPABILITY)) taskRemoteUnsupported();
+          return runCauseEffect(
+            remoteServers.request(serverId, AGENT_THREAD_PAGES_ROUTES.readOlder, decodeRemoteTaskPage, {
+              method: "POST",
+              body: {
+                agentId: parsed.agentId,
+                taskId: parsed.taskId,
+                beforeMessageId: parsed.beforeMessageId,
+                limit: parsed.limit,
+              },
+            }),
+          );
+        },
       }),
       startTask: scopedHandler(parseStartAgentTask, {
         local: (input) => runCauseEffect(service.startTask(input, host.conversationSender())),

@@ -31,9 +31,10 @@ export const messages = defineMessages("error.import", {
   "error.import.fileRenamed": "{name}: {file} already exists, so this copy is saved as {saved}.",
   "error.import.fileSkipped": "{name}: the file {file} is skipped. {reason}",
   "error.import.chooseZip": "Choose a .zip file.",
-  "error.import.zipTooLarge": "The export must be a .zip under 500 MB.",
+  "error.import.zipTooLarge": "The export must be a .zip under 2 GB.",
   "error.import.unsafeFile": "The export contains an unsafe file: {name}",
-  "error.import.expandedTooLarge": "The export must expand to under 500 MB and {limit} files.",
+  "error.import.expandedTooLarge": "The export must expand to under 2 GB and {limit} files.",
+  "error.import.remoteExpandedTooLarge": "The export must expand to under 500 MB and {limit} files.",
   "error.import.zipInvalid":
     "The selected file is not a valid .zip. If Grok Bot is still saving it, wait and choose it again.",
   "error.import.empty": "The export is empty.",

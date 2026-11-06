@@ -400,6 +400,7 @@
     "./features/files/files-view": "./src/features/files/files-view.ts",
     "./features/github-star/GitHubStarToast": "./src/features/github-star/GitHubStarToast.tsx",
     "./features/social-follow/SocialFollowToast": "./src/features/social-follow/SocialFollowToast.tsx",
+    "./features/social-follow/social-marks": "./src/features/social-follow/social-marks.tsx",
     "./features/social-follow/social-networks": "./src/features/social-follow/social-networks.ts",
     "./features/import/AgentImportSources": "./src/features/import/AgentImportSources.tsx",
     "./features/import/AgentImportView": "./src/features/import/AgentImportView.tsx",

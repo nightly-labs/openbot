@@ -445,7 +445,13 @@ export function ComposerEditor(props: ComposerEditorProps) {
       const skillsChanged = skillKey !== lastSkillKey;
       const mcpChanged = mcpKey !== lastMcpKey;
       const referencesChanged = referenceKey !== lastReferenceKey;
-      const editorChanges = contentChanged || attachmentsChanged || skillsChanged || mcpChanged || referencesChanged;
+      // A list change redraws only its own tags in the draft. With none of them, the draft does not change.
+      const tagsChange =
+        (attachmentsChanged && renderedAttachments.size > 0) ||
+        (skillsChanged && editor.querySelector("[data-skill-id]") !== null) ||
+        (mcpChanged && editor.querySelector("[data-mcp-id]") !== null) ||
+        (referencesChanged && editor.querySelector("[data-tab-id], [data-thread-id]") !== null);
+      const editorChanges = contentChanged || tagsChange;
       // Only a change of the editor's content can move its caret or scroll position. A read of either
       // lays out the page, and this effect runs for each list that loads while a conversation opens.
       const selection =

@@ -114,6 +114,13 @@ export interface AgentThreadVoice {
   onSend: () => void;
 }
 
+/** A thread's messages before the loaded ones, which it reads page by page. */
+export interface AgentThreadOlderMessages {
+  /** A page read is in progress. */
+  loading: boolean;
+  onLoad: () => void;
+}
+
 /** The queue of a thread, with the actions of the queue in the agent's own chat. */
 export interface AgentThreadQueue {
   /** The messages that wait to start in the thread, in queue order. */
@@ -201,9 +208,17 @@ export interface AgentThreadViewProps {
   waitsForAnswer?: boolean | undefined;
   /** Another card that the thread shows, such as a question or a browser takeover. The app builds it. */
   attention?: JSX.Element | undefined;
+  /**
+   * The thread has messages before the loaded ones. Missing when it has none, when it is not known yet,
+   * or when the server cannot read them.
+   */
+  olderMessages?: AgentThreadOlderMessages | undefined;
   /** The card that the app draws in the place of a message row, such as an MCP sign-in. Undefined keeps the row. */
   messageCard?: ((message: AgentMessage) => JSX.Element | undefined) | undefined;
-  /** The steps of the finished turn above an answer, or undefined for a message that has none. */
+  /**
+   * The steps of the finished turn above an answer, or on the thinking row of a finished turn with no
+   * answer. Undefined for a message that has none.
+   */
   stepsAbove?: ((messageId: string) => AgentStep[] | undefined) | undefined;
   /** The time that the turn of an answer took, and how many of its steps failed. */
   factsAbove?: ((messageId: string) => AgentStepsFacts | undefined) | undefined;
@@ -213,6 +228,8 @@ export interface AgentThreadViewProps {
   stepsOpenByDefault?: boolean | undefined;
   /** Receives the message list, where the app searches the thread. */
   scrollRef?: ((element: HTMLElement) => void) | undefined;
+  /** Whether a long message draws in full, with no fold: the app searches the drawn text of the thread. */
+  showFullMessage?: ((message: AgentMessage) => boolean) | undefined;
   /** The user's send shortcut. Enter when absent. */
   sendShortcut?: SendShortcut | undefined;
   /** Copies a message. Without it, the messages have no action row and no right-click menu. */
@@ -280,6 +297,24 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   const otherThreads = createMemo(() => props.threads?.filter((thread) => thread.id !== props.task?.id));
   let scroller: HTMLElement | undefined;
   let atEnd = true;
+  /**
+   * The place of the reader when they asked for older messages: the first message then, and where its
+   * row was. The page goes in above, and the view keeps that row in its place.
+   */
+  let olderAnchor: { firstId: string | undefined; row: Element; top: number } | undefined;
+  function loadOlder(older: AgentThreadOlderMessages): void {
+    const row = scroller?.querySelector(".virtual-chat-row");
+    if (row) olderAnchor = { firstId: props.messages[0]?.id, row, top: row.getBoundingClientRect().top };
+    older.onLoad();
+  }
+  // A read that ends with no new messages leaves no place to keep.
+  createEffect(
+    () => props.olderMessages?.loading === true,
+    (loading) => {
+      if (!loading && olderAnchor && untrack(() => props.messages[0]?.id) === olderAnchor.firstId)
+        olderAnchor = undefined;
+    },
+  );
   let shownTaskId = untrack(() => props.task?.id);
   const activityLabel = nextAgentActivityLabel();
   const fades = createScrollFades();
@@ -310,6 +345,12 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       lastHeight = scrollHeight;
     };
     const follow = new ResizeObserver(() => {
+      const anchor = olderAnchor;
+      if (anchor && untrack(() => props.messages[0]?.id) !== anchor.firstId) {
+        olderAnchor = undefined;
+        element.scrollTop += anchor.row.getBoundingClientRect().top - anchor.top;
+        return;
+      }
       if (atEnd) element.scrollTop = element.scrollHeight;
     });
     follow.observe(list);
@@ -461,6 +502,9 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       />
     );
   }
+  /** A finished turn with no answer shows its steps on its thinking row, with no message under them. */
+  const shownRow = (message: AgentMessage) =>
+    shownInThread(message) || (message.kind === "thinking" && props.stepsAbove?.(message.id) !== undefined);
   /**
    * The row that the branch line follows: the last message that the branch copied. That message can be
    * one that the thread does not show as a row, such as a thought in the steps of a turn. Then the line
@@ -469,7 +513,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   const branchDividerId = createMemo(() => {
     const source = props.branchSource;
     if (!source) return undefined;
-    const shown = props.messages.filter(shownInThread);
+    const shown = props.messages.filter(shownRow);
     if (shown.some((message) => message.id === source.throughMessageId)) return source.throughMessageId;
     const branchedAt = props.task ? Date.parse(props.task.createdAt) : Number.NaN;
     if (Number.isNaN(branchedAt)) return undefined;
@@ -566,12 +610,28 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         onScroll={fades.measure}
       >
         <div class="virtual-chat-list virtual-chat-list-static" ref={fades.watch}>
-          <Show when={props.task?.origin === "agent"}>
+          <Show when={props.olderMessages}>
+            {(older) => (
+              <div class="conversation-history-status">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  disabled={older().loading}
+                  onClick={() => loadOlder(older())}
+                >
+                  {older().loading ? t("chat.history.loadingOlder") : t("conversation.threads.view.loadOlder")}
+                </Button>
+              </div>
+            )}
+          </Show>
+          {/* The start of the thread shows once its first message is loaded. */}
+          <Show when={props.task?.origin === "agent" && !props.olderMessages}>
             <p class="agent-thread-origin">
               {t("conversation.threads.view.startedByAgent", { name: props.agent.name })}
             </p>
           </Show>
-          <For each={props.messages.filter(shownInThread)} keyed={(message) => message.id}>
+          <For each={props.messages.filter(shownRow)} keyed={(message) => message.id}>
             {(message) => {
               const card = createMemo(() => props.messageCard?.(message()));
               return (
@@ -585,35 +645,38 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                       />
                     )}
                   </Show>
-                  <Show
-                    when={card()}
-                    fallback={
-                      <ChatMessageRow
-                        message={message()}
-                        author={author(message())}
-                        agents={props.agents}
-                        skills={props.skills}
-                        onSelectAgent={() => undefined}
-                        onOpenTag={props.onOpenTag}
-                        onOpenLink={props.onOpenLink}
-                        onPreview={props.onPreview}
-                        onAttachmentAction={props.onAttachmentAction}
-                        mediaSource={props.mediaSource}
-                        downloads={props.downloads}
-                        onDownload={(attachment) => props.onAttachmentAction(attachment, "download")}
-                        macWindowControls={props.macWindowControls}
-                        referencedMessage={referenced(message())}
-                        onOpenReference={() => {
-                          const id = message().replyToMessageId;
-                          if (id) showMessage(id);
-                        }}
-                        actions={messageActions(message())}
-                        menu={messageMenu(message())}
-                        data-chat-search-message={message().id}
-                      />
-                    }
-                  >
-                    {card()}
+                  <Show when={message().kind !== "thinking"}>
+                    <Show
+                      when={card()}
+                      fallback={
+                        <ChatMessageRow
+                          message={message()}
+                          author={author(message())}
+                          showFull={props.showFullMessage?.(message())}
+                          agents={props.agents}
+                          skills={props.skills}
+                          onSelectAgent={() => undefined}
+                          onOpenTag={props.onOpenTag}
+                          onOpenLink={props.onOpenLink}
+                          onPreview={props.onPreview}
+                          onAttachmentAction={props.onAttachmentAction}
+                          mediaSource={props.mediaSource}
+                          downloads={props.downloads}
+                          onDownload={(attachment) => props.onAttachmentAction(attachment, "download")}
+                          macWindowControls={props.macWindowControls}
+                          referencedMessage={referenced(message())}
+                          onOpenReference={() => {
+                            const id = message().replyToMessageId;
+                            if (id) showMessage(id);
+                          }}
+                          actions={messageActions(message())}
+                          menu={messageMenu(message())}
+                          data-chat-search-message={message().id}
+                        />
+                      }
+                    >
+                      {card()}
+                    </Show>
                   </Show>
                   <Show when={branchDividerAfter(message().id)}>{(source) => <BranchDivider source={source()} />}</Show>
                 </div>

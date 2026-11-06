@@ -2,10 +2,10 @@ import { DEFAULT_APP_LANGUAGE } from "@openbot/contracts/app-language";
 import { loadLocale, resolveLocale } from "@openbot/i18n";
 import { createLazyFileRoute } from "@tanstack/solid-router";
 import { createSignal, lazy, onSettled, Show } from "solid-js";
-import "../../../../src/renderer/src/preview/preview.css";
 
 // The demo follows the visitor's language. Its catalogs load with the code, so the demo does not
-// start in English; if they fail, the demo shows English.
+// start in English; if they fail, the demo shows English. The route in `app-preview.tsx` links the
+// app stylesheet.
 const OpenBotPlayground = lazy(() =>
   Promise.all([
     import("@openbot/renderer-preview"),

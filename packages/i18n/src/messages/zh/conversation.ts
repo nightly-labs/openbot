@@ -79,6 +79,7 @@ export const messages = {
   "conversation.threads.hold.threadLimit": { other: "正在等待空位。当前有 {count} 个话题在运行。" },
   "conversation.threads.view.label": "话题 {title}",
   "conversation.threads.view.startedByAgent": "该话题由 {name} 发起。",
+  "conversation.threads.view.loadOlder": "加载更早的消息",
   "conversation.threads.branch.from": "分支自 {title}",
   "conversation.threads.branch.fromDeleted": "分支自已删除的话题",
   "conversation.threads.view.newPlaceholder": "与 {name} 的新话题",

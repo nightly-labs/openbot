@@ -114,7 +114,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "عندما يبلغ {model} حد الاستخدام قبل أن يبدأ {name} بالكتابة، يسألك {name} عن النموذج الذي يستخدمه.",
   "agentSettings.backupModels.introAutomatic":
-    "عندما يبلغ {model} حد الاستخدام أو يفشل بخطأ من المزوّد قبل أن يبدأ {name} بالكتابة، ينتقل {name} إلى أول نموذج متاح في الترتيب.",
+    "عندما يبلغ {model} حد الاستخدام، ينتقل {name} إلى أول نموذج متاح في الترتيب. وينتقل {name} أيضًا عندما يفشل {model} بخطأ من المزوّد قبل أن يبدأ {name} بالكتابة.",
   "agentSettings.backupModels.ask": "السؤال قبل التبديل",
   "agentSettings.backupModels.order": "الترتيب",
   "agentSettings.backupModels.listLabel": "النماذج الاحتياطية بالترتيب",

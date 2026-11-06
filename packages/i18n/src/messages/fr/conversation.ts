@@ -82,6 +82,7 @@ export const messages = {
   },
   "conversation.threads.view.label": "Fil {title}",
   "conversation.threads.view.startedByAgent": "{name} a démarré ce fil.",
+  "conversation.threads.view.loadOlder": "Charger les messages plus anciens",
   "conversation.threads.branch.from": "Dérivé de {title}",
   "conversation.threads.branch.fromDeleted": "Dérivé d’un fil supprimé",
   "conversation.threads.view.newPlaceholder": "Nouveau fil avec {name}",

@@ -319,6 +319,8 @@ export const messages = defineMessages("chat", {
   "chat.message.agentFallback": "Agent",
   "chat.message.memberFallback": "Team member",
   "chat.message.attachment": "Attachment",
+  "chat.message.showFull": "Show full message",
+  "chat.message.showLess": "Show less",
   "chat.actions.userLabel": "User message actions",
   "chat.actions.label": "{name} message actions",
   "chat.actions.addReaction": "Add reaction",

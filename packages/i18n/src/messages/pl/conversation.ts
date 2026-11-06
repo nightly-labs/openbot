@@ -84,6 +84,7 @@ export const messages = {
   },
   "conversation.threads.view.label": "Wątek {title}",
   "conversation.threads.view.startedByAgent": "{name} rozpoczął ten wątek.",
+  "conversation.threads.view.loadOlder": "Wczytaj starsze wiadomości",
   "conversation.threads.branch.from": "Odgałęzienie z: {title}",
   "conversation.threads.branch.fromDeleted": "Odgałęzienie z usuniętego wątku",
   "conversation.threads.view.newPlaceholder": "Nowy wątek z: {name}",

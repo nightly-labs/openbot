@@ -230,6 +230,17 @@ export const messages = {
     "Erstelle mit Higgsfield ein Produktfoto einer Keramiktasse auf einem Holztisch.",
   "marketplace.plugin.higgsfield.prompt.clip":
     "Erstelle mit Higgsfield ein 5-Sekunden-Video von Wellen bei Sonnenuntergang.",
+  "marketplace.plugin.elevenlabs.tagline": "Sprache, Stimmen und Sprachagenten",
+  "marketplace.plugin.elevenlabs.description":
+    "Mit ElevenLabs wandeln Agenten Text in Sprache um, arbeiten mit Stimmen und erstellen, testen und prüfen ElevenLabs-Sprachagenten und ihre Gespräche. Erzeugtes Audio kommt als kurzlebiger Download-Link zurück. Jeder Benutzer meldet sich im Browser bei seinem eigenen ElevenLabs-Konto an, und jede Erzeugung verbraucht Credits dieses Kontos.",
+  "marketplace.plugin.elevenlabs.app":
+    "Text zu Sprache, Stimmen und Verwaltung von Sprachagenten, über den MCP-Server von ElevenLabs mit Anmeldung im Browser.",
+  "marketplace.plugin.elevenlabs.prompt.speech":
+    "Lies diesen Absatz mit einer ruhigen ElevenLabs-Stimme vor und gib mir das Audio.",
+  "marketplace.plugin.elevenlabs.prompt.agents":
+    "Liste meine ElevenLabs-Sprachagenten und die Stimme, die jeder nutzt.",
+  "marketplace.plugin.elevenlabs.prompt.conversations":
+    "Fasse die letzten zehn Gespräche meines Support-Sprachagenten zusammen.",
   "marketplace.plugin.appleApps.tagline": "Mail, Kalender und mehr auf deinem Mac",
   "marketplace.plugin.appleApps.description":
     "Mit Apple apps nutzen Agenten Mail, Kalender, Kontakte, Erinnerungen, Notizen, Nachrichten und Safari auf diesem Mac. Es funktioniert nur unter macOS. OpenBot startet mcp-icloud, einen Community-Server, der nicht von Apple oder OpenBot stammt. Der Server steuert die Apps über AppleScript auf diesem Computer und braucht kein Konto und keinen Schlüssel. Bei der Installation kann OpenBot macOS auf einmal um Zugriff auf alle diese Apps bitten, mit einer Abfrage pro App. Sonst fragt macOS, wenn ein Agent eine App zum ersten Mal nutzt. Um das später zu ändern, öffne Systemeinstellungen › Datenschutz & Sicherheit › Automation. Agenten können E-Mails und iMessages senden und Termine, Kontakte und Erinnerungen ändern oder löschen, prüfe also jeden Schreibvorgang, bevor du ihn genehmigst. Was die Werkzeuge lesen, etwa E-Mail-Text, geht an den Modellanbieter des Agenten.",
@@ -248,6 +259,16 @@ export const messages = {
   "marketplace.plugin.sentry.prompt.topCrash":
     "Erkläre den häufigsten Absturz im Mobile-Projekt und seine wahrscheinliche Ursache.",
   "marketplace.plugin.sentry.prompt.releaseHealth": "Wie stabil ist das aktuelle Release im Vergleich zum letzten?",
+  "marketplace.plugin.gitlab.tagline": "Issues, Merge Requests und Pipelines",
+  "marketplace.plugin.gitlab.description":
+    "Mit GitLab durchsuchen Agenten Projekte, lesen und erstellen Issues, prüfen und aktualisieren Merge Requests, lesen Dateien und Commits im Repository und prüfen CI-Pipelines und Jobs auf GitLab.com. Jeder Nutzer meldet sich im Browser bei seinem eigenen GitLab-Konto an. Agenten haben dieselben Berechtigungen wie der Nutzer: Sie können Commits pushen, Issues und Merge Requests ändern und Merge Requests mergen. Für ein selbst gehostetes GitLab fügst du in den Einstellungen für MCP-Server einen Server mit deiner GitLab-Adresse und /api/v4/mcp hinzu und meldest dich dort an.",
+  "marketplace.plugin.gitlab.app":
+    "Projekte, Issues, Merge Requests, Repositorys und CI-Pipelines über den MCP-Server von GitLab mit Anmeldung im Browser.",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "Welche Merge Requests warten auf mein Review?",
+  "marketplace.plugin.gitlab.prompt.failedPipeline":
+    "Warum ist die letzte Pipeline auf dem Standard-Branch fehlgeschlagen?",
+  "marketplace.plugin.gitlab.prompt.newIssue":
+    "Erstelle ein Issue für den Absturz in der Sync-Warteschlange mit Schritten zur Reproduktion.",
   "marketplace.plugin.vercel.tagline": "Deployments, Build-Logs und Projekte",
   "marketplace.plugin.vercel.description":
     "Mit Vercel listen Agenten Projekte und aktuelle Deployments auf, lesen Build- und Laufzeit-Logs und finden heraus, warum ein Build fehlgeschlagen ist. Jeder Nutzer meldet sich im Browser bei seinem eigenen Vercel-Konto an und wählt die Teams, die Agenten nutzen dürfen. In diesen Teams haben Agenten dieselben Rechte wie das Konto des Nutzers. Sie können auch Umgebungsvariablen, Domains, DNS-Einträge und Deployments ändern und Domains kaufen.",
@@ -356,6 +377,17 @@ export const messages = {
   "marketplace.plugin.resend.prompt.status": "Hat die Rechnungs-E-Mail den Kunden erreicht?",
   "marketplace.plugin.resend.prompt.template":
     "Entwirf eine E-Mail zum Zurücksetzen des Passworts für den neuen Ablauf.",
+  "marketplace.plugin.omnisend.tagline": "E-Mail- und SMS-Marketing",
+  "marketplace.plugin.omnisend.description":
+    "Mit Omnisend lesen Agenten Kampagnen- und Formularberichte, finden Kontakte und Segmente und erstellen und bearbeiten Kampagnen, Automatisierungen, E-Mail-Vorlagen, Formulare und Produkte. Jede Person meldet sich im Browser bei ihrem eigenen Omnisend-Konto an und wählt die Zugriffsstufe auf der Zustimmungsseite. Mit Schreibzugriff können Agenten auch Kampagnen senden und Daten löschen. Wähle Nur-Lese-Zugriff, wenn Agenten nur Berichte brauchen.",
+  "marketplace.plugin.omnisend.app":
+    "Kampagnen, Automatisierungen, Kontakte, Segmente, Formulare und Berichte über den MCP-Server von Omnisend mit Anmeldung im Browser.",
+  "marketplace.plugin.omnisend.prompt.lastCampaign":
+    "Wie haben die Kampagnen der letzten Woche im Vergleich zur Woche davor abgeschnitten?",
+  "marketplace.plugin.omnisend.prompt.segment":
+    "Wie viele Kontakte sind im VIP-Segment, und wie hat es sich diesen Monat verändert?",
+  "marketplace.plugin.omnisend.prompt.draftCampaign":
+    "Entwirf eine Kampagne für die neue Kollektion, aber sende sie nicht.",
   "marketplace.plugin.composio.tagline": "Viele Apps über deinen eigenen Composio-Link",
   "marketplace.plugin.composio.description":
     "Composio verbindet Agenten über einen MCP-Server mit Gmail, Slack, GitHub und Hunderten weiterer Apps. Verbinde die gewünschten Apps in deinem Composio-Konto und füge dann hier seine MCP-URL und seinen API-Schlüssel ein.",

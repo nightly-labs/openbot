@@ -82,6 +82,7 @@ export const messages = {
   },
   "conversation.threads.view.label": "Hilo {title}",
   "conversation.threads.view.startedByAgent": "{name} inició este hilo.",
+  "conversation.threads.view.loadOlder": "Cargar mensajes anteriores",
   "conversation.threads.branch.from": "Ramificado de {title}",
   "conversation.threads.branch.fromDeleted": "Ramificado de un hilo eliminado",
   "conversation.threads.view.newPlaceholder": "Nuevo hilo con {name}",

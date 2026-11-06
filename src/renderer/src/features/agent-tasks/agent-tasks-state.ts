@@ -34,6 +34,40 @@ interface AgentTasksState {
   conversations: Record<string, ConversationSnapshot>;
   /** The number of agent messages that the person has not read in each open thread, by agent id and task id. */
   unread: Record<string, Record<string, number>>;
+  /** What each opened thread knows of its messages before the loaded ones, by task id. */
+  history: Record<string, TaskHistory>;
+}
+
+/**
+ * A thread's messages before the loaded ones. The read of a thread gives only its newest messages,
+ * so a long thread reads the older ones page by page.
+ */
+interface TaskHistory {
+  /** The server has messages before the oldest loaded one. */
+  hasOlder: boolean;
+  /** A page read is in progress. */
+  loading: boolean;
+  /** The thread holds pages that it read, before the newest messages. */
+  paged: boolean;
+}
+
+/** The most messages that one press of Load older messages reads. */
+const OLDER_PAGE_SIZE = 50;
+
+/**
+ * A new conversation of a thread that read older pages keeps the messages before its first message.
+ * The newest messages move on as messages arrive, so without them a gap opens between the pages. Null
+ * when the new conversation does not start inside the held messages: the pages no longer join it.
+ */
+function withOlderMessages(held: ConversationSnapshot, snapshot: ConversationSnapshot): ConversationSnapshot | null {
+  const first = snapshot.messages[0];
+  if (!first) return snapshot;
+  const index = held.messages.findIndex((message) => message.id === first.id);
+  if (index < 0) return null;
+  if (index === 0) return snapshot;
+  const ids = new Set(snapshot.messages.map((message) => message.id));
+  const older = held.messages.slice(0, index).filter((message) => !ids.has(message.id));
+  return { ...snapshot, messages: [...older, ...snapshot.messages] };
 }
 
 export interface AgentTasksOptions {
@@ -59,6 +93,8 @@ export interface AgentTasksOptions {
   repliable: () => boolean;
   /** The server deletes a message of a side thread: this computer, or the `message-delete-v1` routes. */
   messageDeletable: () => boolean;
+  /** The server reads the older messages of a side thread: this computer, or the `agent-thread-pages-v1` route. */
+  pageable: () => boolean;
   /**
    * A change of this value reads the lists of the active agent and of each agent with a running thread
    * again, for example when the agent starts again.
@@ -84,9 +120,10 @@ export function createAgentTasks(options: AgentTasksOptions) {
     filesAccepted,
     repliable,
     messageDeletable,
+    pageable,
   } = options;
   const scopeIsCurrent = createScopeGuard();
-  const [state, setState] = createStore<AgentTasksState>({ snapshots: {}, conversations: {}, unread: {} });
+  const [state, setState] = createStore<AgentTasksState>({ snapshots: {}, conversations: {}, unread: {}, history: {} });
   const listRequests = new Map<string, number>();
   const readRequests = new Map<string, number>();
   const unreadRequests = new Map<string, number>();
@@ -117,7 +154,10 @@ export function createAgentTasks(options: AgentTasksOptions) {
     setState((current) => {
       current.snapshots[snapshot.agentId] = { ...snapshot, tasks };
       for (const [taskId, conversation] of Object.entries(current.conversations)) {
-        if (conversation.agentId === snapshot.agentId && !ids.has(taskId)) delete current.conversations[taskId];
+        if (conversation.agentId === snapshot.agentId && !ids.has(taskId)) {
+          delete current.conversations[taskId];
+          delete current.history[taskId];
+        }
       }
     });
   }
@@ -127,13 +167,91 @@ export function createAgentTasks(options: AgentTasksOptions) {
     setSnapshot(snapshot);
   }
 
-  /** Keeps the newest conversation of a task. A delta raises the revision, so an older snapshot loses. */
+  /**
+   * Keeps the newest conversation of a task. A delta raises the revision, so an older snapshot loses. A
+   * thread that read older pages keeps them. When its first messages leave the newest ones, the thread
+   * has older messages from then on.
+   */
   function applyConversation(taskId: string, snapshot: ConversationSnapshot): void {
     const stored = state.conversations[taskId];
     if (stored && snapshot.revision < stored.revision) return;
     setState((current) => {
+      const held = current.conversations[taskId];
+      const history = current.history[taskId];
+      if (held && history?.paged) {
+        const joined = withOlderMessages(held, snapshot);
+        current.conversations[taskId] = joined ?? snapshot;
+        if (joined) return;
+        // The thread reads its older messages again from the new first message.
+        history.paged = false;
+        history.hasOlder = true;
+        return;
+      }
       current.conversations[taskId] = snapshot;
+      const first = snapshot.messages[0];
+      const moved = held && first ? held.messages.findIndex((message) => message.id === first.id) > 0 : false;
+      if (!moved || !pageable()) return;
+      if (history) history.hasOlder = true;
+      else current.history[taskId] = { hasOlder: true, loading: false, paged: false };
     });
+  }
+
+  /**
+   * Asks the server whether a thread has messages before the loaded ones, once its tab has read the
+   * newest. A server without the page route shows only the newest messages.
+   */
+  function readHistory(agentId: string, taskId: string, snapshot: ConversationSnapshot): void {
+    const read = port().readTaskPage;
+    const oldest = snapshot.messages[0];
+    if (!read || !pageable() || !oldest || state.history[taskId]) return;
+    void read({ agentId, taskId, beforeMessageId: oldest.id, limit: 0 })
+      .then((page) => {
+        if (!scopeIsCurrent() || !state.conversations[taskId] || state.history[taskId]) return;
+        setState((current) => {
+          current.history[taskId] = { hasOlder: page.hasOlder, loading: false, paged: false };
+        });
+      })
+      // The thread still shows its newest messages.
+      .catch(() => undefined);
+  }
+
+  /** Reads the page of a thread's messages before the oldest loaded one, and puts it in front of them. */
+  async function loadOlderMessages(agentId: string, taskId: string): Promise<void> {
+    const read = port().readTaskPage;
+    const oldest = state.conversations[taskId]?.messages[0];
+    const history = state.history[taskId];
+    if (!read || !oldest || !history?.hasOlder || history.loading) return;
+    setState((current) => {
+      const entry = current.history[taskId];
+      if (entry) entry.loading = true;
+    });
+    try {
+      const page = await read({ agentId, taskId, beforeMessageId: oldest.id, limit: OLDER_PAGE_SIZE });
+      if (!scopeIsCurrent()) return;
+      setState((current) => {
+        const conversation = current.conversations[taskId];
+        const entry = current.history[taskId];
+        if (!conversation || !entry) return;
+        entry.loading = false;
+        // A new conversation can have come in meanwhile. The page goes before the message that it was read for.
+        if (conversation.messages[0]?.id !== oldest.id) return;
+        const ids = new Set(conversation.messages.map((message) => message.id));
+        conversation.messages = [
+          ...page.conversation.messages.filter((message) => !ids.has(message.id)),
+          ...conversation.messages,
+        ];
+        entry.hasOlder = page.hasOlder;
+        entry.paged = true;
+      });
+    } catch (error) {
+      if (!scopeIsCurrent()) return;
+      setState((current) => {
+        const entry = current.history[taskId];
+        if (entry) entry.loading = false;
+      });
+      const { t, errorMessage } = currentText();
+      actionToast.error(errorMessage(error, t("chat.history.olderFailed")));
+    }
   }
 
   function applyDelta(event: Extract<AgentTaskEvent, { type: "agent-task-conversation-delta" }>): void {
@@ -293,6 +411,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
       .then((snapshot) => {
         if (!scopeIsCurrent() || readRequests.get(taskId) !== request) return;
         applyConversation(taskId, snapshot);
+        readHistory(agentId, taskId, snapshot);
       })
       .catch((error) => {
         if (!scopeIsCurrent() || readRequests.get(taskId) !== request) return;
@@ -472,6 +591,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
     if (done === null || !scopeIsCurrent()) return false;
     setState((current) => {
       delete current.conversations[taskId];
+      delete current.history[taskId];
     });
     return true;
   }
@@ -574,6 +694,12 @@ export function createAgentTasks(options: AgentTasksOptions) {
     repliable,
     snapshot: (agentId: string): AgentTasksSnapshot | undefined => state.snapshots[agentId],
     conversation: (taskId: string): ConversationSnapshot | undefined => state.conversations[taskId],
+    /** The thread has messages before the loaded ones, and whether it reads them now. Undefined while it is not known. */
+    olderMessages: (taskId: string): { loading: boolean } | undefined => {
+      const history = state.history[taskId];
+      return history?.hasOlder ? { loading: history.loading } : undefined;
+    },
+    loadOlderMessages,
     applyEvent,
     reload,
     loadTasks,

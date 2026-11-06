@@ -155,7 +155,7 @@ Channel field rules:
 
 A channel has no folder in the archive. Up to 100 channels.
 
-The whole archive must be 500 MB and 5,000 files or fewer.
+The whole archive must be under 2 GB and 50,000 files or fewer.
 
 ### Schedules
 

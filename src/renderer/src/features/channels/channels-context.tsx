@@ -1,4 +1,5 @@
 import { CHANNEL_CHATS_CAPABILITY, CHANNEL_TASK_CANCEL_CAPABILITY } from "@openbot/contracts/ipc";
+import { CHANNEL_ISOLATION_CAPABILITY } from "@openbot/contracts/team-protocol/channel-isolation-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { createContext, type ParentProps, untrack, useContext } from "solid-js";
 import { useAuth } from "../account/account-context";
@@ -56,6 +57,7 @@ export function ChannelsProvider(props: ParentProps) {
     supported: () => activeServerSupportsCapability(CHANNEL_CHATS_CAPABILITY),
     deletionSupported: () => activeServer()?.kind !== "remote" || serverRoleCanAdminister(activeServer()),
     taskCancelSupported: () => activeServerSupportsCapability(CHANNEL_TASK_CANCEL_CAPABILITY),
+    isolationSupported: () => activeServerSupportsCapability(CHANNEL_ISOLATION_CAPABILITY),
     messageDeletionSupported: () => activeServerSupportsCapability(MESSAGE_DELETE_CAPABILITY),
     deletesAnyMessage: () => activeServer()?.kind === "local" || serverRoleCanAdminister(activeServer()),
     // The picture is a file on this computer. Until the server is known, the editor stays hidden.

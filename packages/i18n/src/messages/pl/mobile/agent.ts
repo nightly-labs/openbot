@@ -378,7 +378,7 @@ export const messages = {
   "mobile.agent.backupModels.intro":
     "Gdy {model} osiągnie limit użycia, zanim {name} zacznie pisać, {name} zapyta cię, którego modelu użyć.",
   "mobile.agent.backupModels.introAutomatic":
-    "Gdy {model} osiągnie limit użycia lub zawiedzie z powodu błędu dostawcy, zanim {name} zacznie pisać, {name} przełączy się na pierwszy dostępny model w kolejności.",
+    "Gdy {model} osiągnie limit użycia, {name} przełączy się na pierwszy dostępny model w kolejności. {name} przełączy się też, gdy {model} zawiedzie z powodu błędu dostawcy, zanim {name} zacznie pisać.",
   "mobile.agent.backupModels.ask": "Pytaj przed przełączeniem",
   "mobile.agent.backupModels.order": "Kolejność",
   "mobile.agent.backupModels.empty": "Nie ustawiono kolejności. {name} proponuje każdy dostępny model.",

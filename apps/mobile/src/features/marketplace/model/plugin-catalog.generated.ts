@@ -522,6 +522,39 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "elevenlabs",
+    name: "ElevenLabs",
+    tagline: "Speech, voices and voice agents",
+    description:
+      "ElevenLabs lets agents turn text into speech, work with voices, and create, test and review ElevenLabs voice agents and their conversations. Generated audio comes back as a short-lived download link. Each user signs in to their own ElevenLabs account through the browser, and each generation uses credits of that account.",
+    category: "design",
+    creatorName: "ElevenLabs",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-speech", text: "Read this paragraph aloud with a calm ElevenLabs voice and give me the audio." },
+      { id: "prompt-agents", text: "List my ElevenLabs voice agents and the voice each one uses." },
+      { id: "prompt-conversations", text: "Summarize the last ten conversations of my support voice agent." },
+    ],
+    websiteUrl: "https://elevenlabs.io",
+    privacyPolicyUrl: "https://elevenlabs.io/privacy-policy",
+    termsUrl: "https://elevenlabs.io/terms-of-use",
+    featured: false,
+    apps: [
+      {
+        id: "app-elevenlabs-mcp",
+        name: "ElevenLabs",
+        description:
+          "Text to speech, voices, and voice agent management, over ElevenLabs' MCP server with browser sign-in.",
+        server: {
+          name: "elevenlabs",
+          transport: "http",
+          url: "https://api.elevenlabs.io/v1/mcp",
+          auth: [{ id: "elevenlabs-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
     slug: "apple-apps",
     name: "Apple apps",
     tagline: "Mail, Calendar and more on your Mac",
@@ -581,6 +614,39 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
           transport: "http",
           url: "https://mcp.sentry.dev/mcp",
           auth: [{ id: "sentry-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
+    slug: "gitlab",
+    name: "GitLab",
+    tagline: "Issues, merge requests and pipelines",
+    description:
+      "GitLab lets agents search projects, read and create issues, review and update merge requests, read repository files and commits, and check CI pipelines and jobs on GitLab.com. Each user signs in to their own GitLab account through the browser. Agents get the same permissions as the user: they can push commits, change issues and merge requests, and merge them. For a self-hosted GitLab, add an MCP server with your GitLab address followed by /api/v4/mcp in the MCP servers settings, and sign in there.",
+    category: "coding",
+    creatorName: "GitLab",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-review-queue", text: "Which merge requests wait for my review?" },
+      { id: "prompt-failed-pipeline", text: "Why did the last pipeline on the default branch fail?" },
+      { id: "prompt-new-issue", text: "File an issue for the crash in the sync queue with reproduction steps." },
+    ],
+    websiteUrl: "https://about.gitlab.com",
+    privacyPolicyUrl: "https://about.gitlab.com/privacy/",
+    termsUrl: "https://about.gitlab.com/terms/",
+    featured: false,
+    apps: [
+      {
+        id: "app-gitlab-mcp",
+        name: "GitLab",
+        description:
+          "Projects, issues, merge requests, repositories and CI pipelines, over GitLab's MCP server with browser sign-in.",
+        server: {
+          name: "gitlab",
+          transport: "http",
+          url: "https://gitlab.com/api/v4/mcp",
+          auth: [{ id: "gitlab-oauth", kind: "link", label: "Sign in" }],
         },
       },
     ],
@@ -1236,6 +1302,39 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
               docsLabel: "Get a key",
             },
           ],
+        },
+      },
+    ],
+  },
+  {
+    slug: "omnisend",
+    name: "Omnisend",
+    tagline: "Email and SMS marketing",
+    description:
+      "Omnisend lets agents read campaign and form reports, find contacts and segments, and create and edit campaigns, automations, email templates, forms and products. Each user signs in to their own Omnisend account through the browser and selects the access level on the consent screen. With write access, agents can also send campaigns and delete data. Select read-only access when agents only need reports.",
+    category: "automation",
+    creatorName: "Omnisend",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-last-campaign", text: "How did last week's campaigns perform compared to the week before?" },
+      { id: "prompt-segment", text: "How many contacts are in the VIP segment, and how did it change this month?" },
+      { id: "prompt-draft-campaign", text: "Draft a campaign for the new collection, but do not send it." },
+    ],
+    websiteUrl: "https://www.omnisend.com",
+    privacyPolicyUrl: "https://www.omnisend.com/privacy/",
+    termsUrl: "https://www.omnisend.com/terms/",
+    featured: false,
+    apps: [
+      {
+        id: "app-omnisend-mcp",
+        name: "Omnisend",
+        description:
+          "Campaigns, automations, contacts, segments, forms and reports, over Omnisend's MCP server with browser sign-in.",
+        server: {
+          name: "omnisend",
+          transport: "http",
+          url: "https://mcp.omnisend.com/mcp",
+          auth: [{ id: "omnisend-oauth", kind: "link", label: "Sign in" }],
         },
       },
     ],

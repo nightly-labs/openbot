@@ -69,7 +69,7 @@ export class AtomicFileWriteError extends Schema.TaggedError<AtomicFileWriteErro
  */
 const HELD_TARGET_WAITS_MS: readonly number[] = [10, 50, 100, 250, 500];
 
-function isHeldTargetError(cause: unknown): boolean {
+export function isHeldTargetError(cause: unknown): boolean {
   if (process.platform !== "win32") return false;
   const code = cause instanceof Error && "code" in cause ? cause.code : null;
   return code === "EPERM" || code === "EACCES" || code === "EBUSY";

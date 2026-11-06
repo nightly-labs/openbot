@@ -83,6 +83,10 @@ import {
   AGENT_TASK_LIMIT_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import {
+  AGENT_THREAD_PAGES_CAPABILITY,
+  AGENT_THREAD_PAGES_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-thread-pages-v1";
+import {
   AGENT_THREAD_REPLIES_CAPABILITY,
   AGENT_THREAD_REPLIES_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
@@ -654,11 +658,37 @@ const fakeAgents: TeamApiAgents = {
   respondToBrowserTakeover: unused("respondToBrowserTakeover"),
 };
 
-// Only a reply in a side thread (`agent-thread-replies-v1`) reaches the side threads in this run.
+// Only a reply in a side thread (`agent-thread-replies-v1`) and a page of its older messages
+// (`agent-thread-pages-v1`) reach the side threads in this run. The thread holds one message before
+// `message-7`, and no other message.
 const fakeAgentTasks: TeamApiAgentTasks = {
   listAgents: () => agents,
   listTasks: unused("listTasks"),
   readTask: unused("readTask"),
+  readTaskPage: (input) => {
+    record("readTaskPage", input);
+    return {
+      conversation: {
+        agentId: input.agentId,
+        threadId: `thread-${input.taskId}`,
+        activeTurnId: null,
+        revision: 3,
+        messages:
+          input.beforeMessageId === "message-7"
+            ? [
+                {
+                  id: "message-older",
+                  author: "assistant",
+                  text: "Older reply",
+                  createdAt: "2026-11-05T07:00:00.000Z",
+                  status: "completed",
+                },
+              ]
+            : [],
+      },
+      hasOlder: false,
+    };
+  },
   startTask: unused("startTask"),
   sendMessage: (input, sender) =>
     Effect.sync(() => {
@@ -3638,6 +3668,84 @@ try {
       errorIs(hidden, 404, sourceText("error.team.agentNotFound")) &&
         errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
         callsOf("sendTaskMessage").length === 1,
+      [summary(hidden), summary(missing)],
+    );
+  }
+
+  // ---- Older messages of a side thread (agent-thread-pages-v1) ----
+  {
+    const capabilities = [AGENT_HIDDEN_CAPABILITY, AGENT_THREAD_PAGES_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-thread-pages-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_THREAD_PAGES_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(AGENT_THREAD_PAGES_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const request = { agentId: "agent-ada", taskId: "task-1", beforeMessageId: "message-7", limit: 50 };
+    const unsupported = await call("POST", AGENT_THREAD_PAGES_ROUTES.readOlder, { token: bobToken, json: request });
+    check(
+      "the page route without the capability gets 400 threadRemoteUnsupported, and reads nothing",
+      errorIs(unsupported, 400, sourceText("error.backend.threadRemoteUnsupported")) &&
+        callsOf("readTaskPage").length === 0,
+      summary(unsupported),
+    );
+    const page = await call("POST", AGENT_THREAD_PAGES_ROUTES.readOlder, {
+      token: bobToken,
+      json: request,
+      capabilities,
+    });
+    const conversation = field(page.body, "conversation");
+    const messages = list(field(conversation, "messages"));
+    check(
+      "a member reads the older messages of a side thread: the host gets the task, the message and the limit, and answers the page",
+      page.status === 200 &&
+        field(page.body, "hasOlder") === false &&
+        messages.length === 1 &&
+        field(messages[0], "id") === "message-older" &&
+        isDeepStrictEqual(callsOf("readTaskPage")[0], [request]),
+      [summary(page), callsOf("readTaskPage")],
+    );
+    const extra = await call("POST", AGENT_THREAD_PAGES_ROUTES.readOlder, {
+      token: bobToken,
+      json: { ...request, anchor: "latest" },
+      capabilities,
+    });
+    const tooMany = await call("POST", AGENT_THREAD_PAGES_ROUTES.readOlder, {
+      token: bobToken,
+      json: { ...request, limit: 101 },
+      capabilities,
+    });
+    const noMessage = await call("POST", AGENT_THREAD_PAGES_ROUTES.readOlder, {
+      token: bobToken,
+      json: { ...request, beforeMessageId: "" },
+      capabilities,
+    });
+    check(
+      "the frozen codec refuses an unknown field, a limit over 100, and an empty message id",
+      extra.status === 400 &&
+        tooMany.status === 400 &&
+        noMessage.status === 400 &&
+        callsOf("readTaskPage").length === 1,
+      [summary(extra), summary(tooMany), summary(noMessage)],
+    );
+    const hidden = await call("POST", AGENT_THREAD_PAGES_ROUTES.readOlder, {
+      token: bobToken,
+      json: { ...request, agentId: "agent-pi" },
+      capabilities,
+      protocol: 6,
+    });
+    const missing = await call("POST", AGENT_THREAD_PAGES_ROUTES.readOlder, {
+      token: bobToken,
+      json: { ...request, agentId: "agent-none" },
+      capabilities,
+    });
+    check(
+      "an unknown agent, and an agent that the client protocol does not show, get 404 and read nothing",
+      errorIs(hidden, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("readTaskPage").length === 1,
       [summary(hidden), summary(missing)],
     );
   }

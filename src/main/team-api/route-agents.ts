@@ -49,6 +49,7 @@ import {
   browserTakeoverDecision,
   markerExclusionsForCapabilities,
   memberSender,
+  messageTextCut,
   pageLimit,
   pathIdentifier,
   promptAnswers,
@@ -58,6 +59,7 @@ import {
   requireAdmin,
   requireAgentLevel,
   stringField,
+  WEBRTC_FRAME_BODY_BUDGET,
 } from "./request-helpers";
 import { routeAgentConversation } from "./route-agent-conversation";
 import { routeAgentMemories } from "./route-agent-memories";
@@ -166,17 +168,33 @@ export async function routeAgents(
     if (!query.trim() || query.length > INPUT_LIMITS.messageText) {
       throw new HttpError(400, sourceText("error.team.searchQueryRequired"));
     }
-    return json(
-      200,
-      agents.searchConversationMessages(
-        query,
-        // A query parameter is part of the released URL, and the versioned adapters translate JSON
-        // bodies only. `botId` is what every shipped client sends and what every shipped host reads.
-        url.searchParams.get("botId") ?? undefined,
-        url.searchParams.get("cursor") ?? undefined,
-        pageLimit(url),
-      ),
+    // A query parameter is part of the released URL, and the versioned adapters translate JSON
+    // bodies only. `botId` is what every shipped client sends and what every shipped host reads.
+    const agentId = url.searchParams.get("botId") ?? undefined;
+    const cursor = url.searchParams.get("cursor") ?? undefined;
+    // Each result holds its whole message, so a page can be larger than one WebRTC frame. Then the
+    // page keeps the results that fit, and one result alone that is too large is cut. The text filter
+    // reads every stored message, so the search runs at most twice: the second time at the kept
+    // count, which gives the cursor of the next page.
+    let page = agents.searchConversationMessages(query, agentId, cursor, pageLimit(url));
+    let bytes = Buffer.byteLength(JSON.stringify(page));
+    if (bytes > WEBRTC_FRAME_BODY_BUDGET) {
+      let kept = 0;
+      let size = Buffer.byteLength(JSON.stringify({ ...page, results: [] }));
+      for (const result of page.results) {
+        size += Buffer.byteLength(JSON.stringify(result)) + 1;
+        if (size > WEBRTC_FRAME_BODY_BUDGET) break;
+        kept += 1;
+      }
+      page = agents.searchConversationMessages(query, agentId, cursor, Math.max(1, kept));
+      bytes = Buffer.byteLength(JSON.stringify(page));
+    }
+    if (bytes <= WEBRTC_FRAME_BODY_BUDGET) return json(200, page);
+    const cut = messageTextCut(
+      page.results.map((result) => result.message),
+      bytes - WEBRTC_FRAME_BODY_BUDGET,
     );
+    return json(200, { ...page, results: page.results.map((result) => ({ ...result, message: cut(result.message) })) });
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.status) {
     return json(200, agents.getStatus());

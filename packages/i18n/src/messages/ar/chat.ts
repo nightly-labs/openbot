@@ -479,6 +479,8 @@ export const messages = {
   "chat.message.agentFallback": "وكيل",
   "chat.message.memberFallback": "عضو في الفريق",
   "chat.message.attachment": "مرفق",
+  "chat.message.showFull": "عرض الرسالة كاملة",
+  "chat.message.showLess": "عرض أقل",
   "chat.actions.userLabel": "إجراءات رسالة المستخدم",
   "chat.actions.label": "إجراءات رسالة {name}",
   "chat.actions.addReaction": "إضافة تفاعل",

@@ -1,8 +1,7 @@
 import {
   assertSupportedAttachmentName,
-  attachmentFileExtension,
+  isSupportedAttachmentNameFor,
   rasterImageMimeType,
-  supportedAttachmentExtensions,
 } from "@openbot/contracts/attachment-files";
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import type {
@@ -1229,16 +1228,17 @@ export function createWebWorkspaceRuntime(
     async upload(file) {
       const uploadHostGeneration = generation;
       const currentUpload = ++uploadGeneration;
-      assertSupportedAttachmentName(file.name);
-      const extension = attachmentFileExtension(file.name);
-      const supported = supportedAttachmentExtensions({
+      const support = {
         eml: capabilities.includes("eml-attachments"),
         media: capabilities.includes("media-attachments"),
         zip: capabilities.includes("zip-attachments"),
         mp4: capabilities.includes("mp4-attachments"),
         svg: capabilities.includes("svg-attachments"),
-      });
-      if (extension && !supported.includes(extension)) throw new Error(currentText().t("webClient.error.fileType"));
+        anyFile: capabilities.includes("any-file-attachments"),
+      };
+      if (!support.anyFile) assertSupportedAttachmentName(file.name);
+      if (!isSupportedAttachmentNameFor(file.name, support))
+        throw new Error(currentText().t("webClient.error.fileType"));
       if (file.size > MOBILE_ATTACHMENT_BYTES) throw new Error(currentText().t("error.remote.attachmentTooLarge"));
       const bytes = new Uint8Array(await file.arrayBuffer());
       if (currentUpload !== uploadGeneration || uploadHostGeneration !== generation)

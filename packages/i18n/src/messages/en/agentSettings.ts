@@ -80,7 +80,7 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.backupModels.intro":
     "When {model} reaches its usage limit before {name} starts to write, {name} asks you which model to use.",
   "agentSettings.backupModels.introAutomatic":
-    "When {model} reaches its usage limit or fails with a provider error before {name} starts to write, {name} switches to the first available model in the order.",
+    "When {model} reaches its usage limit, {name} switches to the first available model in the order. {name} also switches when {model} fails with a provider error before {name} starts to write.",
   "agentSettings.backupModels.ask": "Ask before switching",
   "agentSettings.backupModels.order": "Order",
   "agentSettings.backupModels.listLabel": "Backup models, in order",

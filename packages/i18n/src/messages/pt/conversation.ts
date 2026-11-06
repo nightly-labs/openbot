@@ -82,6 +82,7 @@ export const messages = {
   },
   "conversation.threads.view.label": "Tópico {title}",
   "conversation.threads.view.startedByAgent": "{name} iniciou este tópico.",
+  "conversation.threads.view.loadOlder": "Carregar mensagens anteriores",
   "conversation.threads.branch.from": "Ramificado de {title}",
   "conversation.threads.branch.fromDeleted": "Ramificado de um tópico excluído",
   "conversation.threads.view.newPlaceholder": "Novo tópico com {name}",

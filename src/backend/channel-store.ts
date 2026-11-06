@@ -19,7 +19,7 @@ import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { changesModelContent } from "./channel-history";
-import { deleteAggregateHistory, deleteThreadAttachments } from "./database/database-core";
+import { deleteAggregateHistory, deleteReceiptsOf, deleteThreadAttachments } from "./database/database-core";
 import {
   databaseRow,
   databaseRows,
@@ -439,7 +439,7 @@ export class ChannelStore {
     return { olderCount: row ? requiredNumberColumn(row, "older_count") : 0, ...(oldestAt ? { oldestAt } : {}) };
   }
 
-  commit(operationId: string, change: ChannelChange): Channel {
+  commit(operationId: string, change: ChannelChange, written?: (db: DatabaseSync, sequence: number) => void): Channel {
     const commandId = `channels:${operationId}`;
     const previous = this.database.commandResult(commandId);
     if (previous !== undefined) return decodeChannel(previous);
@@ -456,9 +456,42 @@ export class ChannelStore {
     return this.database.dispatch(
       commandId,
       [{ aggregateType: "channel", aggregateId: channel.id, eventType: "channel.changed", payload }],
-      (db) => {
+      (db, sequences) => {
         this.project(db, payload);
+        const sequence = sequences[0];
+        if (written && sequence !== undefined) written(db, sequence);
         return channel;
+      },
+    );
+  }
+
+  /**
+   * Writes one message that a member's turn changed. A streaming turn writes it on each delta, and
+   * each event holds the whole message, so the log grew with the square of its length (#5392). The
+   * first event of the message stays: a rebuild gives the message its place from it. The events
+   * between that one and the newest go, with their receipts.
+   */
+  captureMessage(channel: Channel, message: ChannelMessage): Channel {
+    // The id is JSON so that one message id is never the start of another: ids can hold ":".
+    const operationPrefix = `capture:${channel.id}:${JSON.stringify(message.id)}:`;
+    const commandPrefix = `channels:${operationPrefix}`;
+    return this.commit(
+      `${operationPrefix}${randomUUID()}`,
+      { channel, messages: [message], tasks: [], assignments: [] },
+      (db, sequence) => {
+        // The range reads the command index, not the payloads: they hold the long text.
+        const match = "command_id > ? AND command_id < ?";
+        const range = [commandPrefix, `${commandPrefix}\uffff`] as const;
+        const superseded = databaseRows(
+          db
+            .prepare(
+              `DELETE FROM orchestration_events WHERE ${match} AND sequence < ?
+                 AND sequence > (SELECT MIN(sequence) FROM orchestration_events WHERE ${match})
+               RETURNING command_id`,
+            )
+            .all(...range, sequence, ...range),
+        ).map((row) => requiredStringColumn(row, "command_id"));
+        deleteReceiptsOf(db, superseded);
       },
     );
   }

@@ -4,7 +4,7 @@
 // released app does, because these pages are what a search engine shows for "OpenBot for Linux".
 
 import { DOWNLOAD_PLATFORM_ORDER, type DownloadPlatform } from "./download-platforms";
-import { LANDING_FAQ, type LandingQuestion } from "./landing-faq";
+import { faqStructuredData, type LandingQuestion } from "./landing-faq";
 import { OPENBOT_ALTERNATE_DOWNLOAD_LINKS, OPENBOT_DOWNLOAD_LINKS, OPENBOT_DOWNLOAD_PAGE_LINKS } from "./landing-links";
 import { MOBILE_APP_ORDER, MOBILE_APPS, type MobilePlatform } from "./mobile-apps";
 import { OPENBOT_SITE_URL, OPENBOT_X_HANDLE, type PageSocialImage, pageSocialImageMeta } from "./site-metadata";
@@ -67,7 +67,9 @@ export interface DownloadPageContent {
   operatingSystem: string;
 }
 
-const PROVIDERS_ANSWER = LANDING_FAQ.find((entry) => entry.question === "Which AI models can OpenBot use?")?.answer;
+/** The English answer of the home page question "Which AI models can OpenBot use?". */
+const PROVIDERS_ANSWER =
+  "Codex, Claude Code, Gemini, Grok, OpenCode, Cursor, Cline, Muse Code and Pi, and Inception's Mercury models. You can also run any agent that speaks the Agent Client Protocol, such as Goose or Qwen Code, connect any OpenAI-compatible endpoint, and use local models in Ollama or LM Studio.";
 const FREE_ANSWER =
   "Yes, for personal and other noncommercial use. The app costs $0, with no locked features. You pay only your AI provider, through the plan or API key you already have. Commercial use needs a license.";
 const CONNECT_STEP: DownloadStep = {
@@ -100,9 +102,7 @@ const PHONE_FREE_ANSWER =
 function providersQuestion(system: string): LandingQuestion {
   return {
     question: `Which AI agents can I run on ${system}?`,
-    answer:
-      PROVIDERS_ANSWER ??
-      "Codex, Claude Code, Gemini, Grok and OpenCode, and any OpenAI-compatible endpoint, also one on your own computer.",
+    answer: PROVIDERS_ANSWER,
   };
 }
 
@@ -420,18 +420,6 @@ function breadcrumbData(platform: DownloadPagePlatform | "hub", siteUrl: string)
   };
 }
 
-function faqData(faq: readonly LandingQuestion[]) {
-  return {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: faq.map((entry) => ({
-      "@type": "Question",
-      name: entry.question,
-      acceptedAnswer: { "@type": "Answer", text: entry.answer },
-    })),
-  };
-}
-
 export function downloadPageHead(platform: DownloadPagePlatform | "hub", siteUrl: string) {
   const page = platform === "hub" ? undefined : DOWNLOAD_PAGES[platform];
   const title = page?.title ?? DOWNLOAD_HUB.title;
@@ -464,7 +452,7 @@ export function downloadPageHead(platform: DownloadPagePlatform | "hub", siteUrl
       ...image.twitter,
       { "script:ld+json": application },
       { "script:ld+json": breadcrumbData(platform, siteUrl) },
-      ...(page ? [{ "script:ld+json": faqData(page.faq) }] : []),
+      ...(page ? [{ "script:ld+json": faqStructuredData(page.faq) }] : []),
     ],
     links: [{ rel: "canonical", href: url }],
   };

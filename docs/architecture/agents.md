@@ -552,7 +552,19 @@ the links among the listed tasks. `sourceTitle` is null for the agent's own chat
 list can leave out an archived source, so the divider takes its title from the link. The `agent-tasks-v1` task and its events stay without the link: a joined desktop and
 the web read `branches` after the task list and add the links, and read the list again when an event names a task
 that they do not know. A server without the capability does not show "Branch from here", and a joined desktop
-refuses a branch with `error.backend.branchRemoteUnsupported`. The phone does not branch. A server without either shows only
+refuses a branch with `error.backend.branchRemoteUnsupported`. The phone does not branch. A thread read has the
+newest 100 messages of the thread. The optional `agent-thread-pages-v1` capability
+(`packages/contracts/src/team-protocol/agent-thread-pages-v1.ts`, host route `routeAgentThreadPages` in
+`src/main/team-api/route-agent-threads.ts`) adds `POST /v1/agent-threads/read-older` with
+`{agentId, taskId, beforeMessageId, limit}`. It answers `{conversation, hasOlder}`: the messages from before that message, oldest first, in the
+frozen `agent-tasks-v1` conversation shape. The page has whole turns: the host adds turns until it has
+`limit` (0 to 100) messages or the next turn does not fit, so it can have more or fewer than `limit`, and
+never more than 100. A turn of more than 100 messages is split over pages. A limit of 0
+asks only for `hasOlder`, and a message that the thread does not hold has none. The host makes a page smaller
+until it fits one WebRTC frame. A thread tab on desktop and the web asks once after its read, and shows "Load older
+messages" when the thread has more; a new conversation of the thread keeps the pages that it read
+(`src/renderer/src/features/agent-tasks/agent-tasks-state.ts`). A server without the capability shows only the
+newest messages. The Tasks rail page and the phone do not read older pages. A server without either shows only
 the main thread, and a task control there fails with `error.backend.taskRemoteUnsupported`. Prompts, approvals and warnings of a task turn show in the main chat. On desktop and the web, the
 approval of a side thread turn also shows in that thread. A provider
 error of a task turn goes to the task: `AgentTasks` stores the redacted text in the task's `error`

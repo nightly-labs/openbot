@@ -22,6 +22,9 @@ installPointerFocusGuard();
 
 const query = new URLSearchParams(window.location.search);
 const surface = query.get("surface");
+// The surface styles size the page by this attribute. A `:has()` rule on the page root would restyle the
+// whole page on each change, and the main window loads the same styles.
+if (surface) document.documentElement.dataset.surface = surface;
 // The Dynamic Island imitates the camera housing, so it stays dark in the light theme.
 if (surface !== "dynamic-island") syncAppearance();
 syncLogoColor();

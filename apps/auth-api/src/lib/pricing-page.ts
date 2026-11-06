@@ -3,14 +3,11 @@
 
 import { BILLING_PLANS, type BillingPlanId, billingListPrices } from "@openbot/contracts/billing";
 import type { HostedServerCatalogPlan } from "@openbot/contracts/hosted-servers";
-import type { PageSocialImage } from "./site-metadata";
 
 export const PRICING_ROUTE = "/pricing";
 
-export const PRICING_SOCIAL_IMAGE: PageSocialImage = {
-  path: "/social/pricing.jpg",
-  alt: "Small team. Bright ideas. Three OpenBot agents under a glass dome",
-};
+/** The social image. Its alt text is the `sitePage.pricing.imageAlt` key. */
+export const PRICING_SOCIAL_IMAGE_PATH = "/social/pricing.jpg";
 
 /** The plans that no new server can take. Servers that have one keep it. */
 export const SOLD_OUT_PLANS: ReadonlySet<BillingPlanId> = new Set(["starter"]);

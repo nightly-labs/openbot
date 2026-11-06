@@ -58,6 +58,15 @@ const MAXIMUM_TIMER_DELAY_MILLISECONDS = 2_147_483_647;
 const CONNECT_RETRY_START_MILLISECONDS = 500;
 const CONNECT_RETRY_LIMIT_MILLISECONDS = 30_000;
 
+/** An attempt that has the Signal socket must have the connection in this time. */
+const CONNECT_LIMIT_MILLISECONDS = 30_000;
+/**
+ * The longest time that Signal holds an attempt for a hosted server that starts. Then the attempt
+ * fails with `host_unavailable`, as it did at once before, and the next attempt gets a new ticket.
+ * That ticket names the Signal machine of the host now, and its socket is new.
+ */
+const HOST_WAIT_LIMIT_MILLISECONDS = 60_000;
+
 interface TeamWebRtcClientTransportEvents {
   connected: [hostId: string];
   disconnected: [hostId: string];
@@ -207,6 +216,8 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
   #hostKeySync: Deferred.Deferred<void> | null = null;
   /** The Signal address of the last ticket of this run. */
   #signalUrl: string | null = null;
+  /** Hosted servers that start. Signal holds an attempt for them until the host connects. */
+  readonly #waitForHost = new Set<string>();
 
   constructor(options: TeamWebRtcClientTransportOptions) {
     super();
@@ -254,6 +265,16 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
   ): Effect.fn.Return<RemoteHostSummary[], RemoteWorkflowError> {
     return yield* this.#owned(this.#options.listHosts().pipe(toRemoteWorkflowError));
   }).bind(this);
+
+  /**
+   * While a hosted server starts, an attempt waits on Signal for the host, and the host's hello
+   * starts the connection at once. Without it, each retry got a new ticket and failed until the host
+   * was there. An attempt reads the value when it starts.
+   */
+  setWaitForHost(hostId: string, wait: boolean): void {
+    if (wait) this.#waitForHost.add(hostId);
+    else this.#waitForHost.delete(hostId);
+  }
 
   pinHostKey(hostId: string, publicKey: string): void {
     this.#hostPublicKeys.set(hostId, publicKey);
@@ -516,7 +537,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
               body: binary
                 ? null
                 : sideRoute
-                  ? sideRoute.request(path, init.body)
+                  ? sideRoute.request(path, init.body, { channelIsolation: true })
                   : encodeTeamProtocolV8WebRtcHttpRequest(method, path, init.body, {
                       ...(init.preserveSemanticTags === undefined
                         ? {}
@@ -583,6 +604,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                     historyExtent: true,
                     channelAttention: true,
                     agentTaskUiBlocks: true,
+                    channelIsolation: true,
                   })
                 : decodeTeamProtocolV9WebRtcHttpResponse(method, path, status, envelope.body),
             ).pipe(
@@ -1001,9 +1023,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         bootstrap.signalUrl,
       );
     let cleanupConnectionWait: () => void = () => undefined;
+    const waitForHost = this.#waitForHost.has(hostId);
     // Subscribe before bridge.connect: a bridge can deliver authentication events before it resolves.
     const connected = Deferred.makeUnsafe<void, RemoteWorkflowError>();
     {
+      const bridge = this.#options.bridge;
       const resolve = () => {
         Deferred.doneUnsafe(connected, Effect.void);
       };
@@ -1014,16 +1038,38 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         clearTimeout(timer);
         this.off("connected", onConnected);
         this.off("error", onError);
+        bridge.off("hostWaiting", onHostWaiting);
+        bridge.off("signalReady", onSignalReady);
       };
       cleanupConnectionWait = cleanup;
       active.cancelConnectionWait = (cause = new Error(sourceText("error.remote.connectionCancelled"))) => {
         cleanup();
         reject(cause);
       };
-      const timer = setTimeout(() => {
+      const timeOut = () => {
         cleanup();
         reject(new Error(sourceText("error.remote.hostDidNotConnect")));
-      }, 30_000);
+      };
+      let timer = setTimeout(timeOut, CONNECT_LIMIT_MILLISECONDS);
+      let hostWaited = false;
+      // Signal holds the attempt. The manager gets the same error as when Signal refused it at once.
+      const onHostWaiting = (waitingHostId: string) => {
+        // A Signal socket that opens again says it again. The first one sets the limit.
+        if (waitingHostId !== hostId || hostWaited) return;
+        hostWaited = true;
+        clearTimeout(timer);
+        timer = setTimeout(
+          () => this.#onError(hostId, "host_unavailable", sourceText("error.remote.hostOffline")),
+          HOST_WAIT_LIMIT_MILLISECONDS,
+        );
+      };
+      // The host connected to Signal. The connection has the usual time from now.
+      const onSignalReady = (readyHostId: string) => {
+        if (readyHostId !== hostId || !hostWaited) return;
+        hostWaited = false;
+        clearTimeout(timer);
+        timer = setTimeout(timeOut, CONNECT_LIMIT_MILLISECONDS);
+      };
       const onConnected = (connectedHostId: string) => {
         if (connectedHostId !== hostId) return;
         cleanup();
@@ -1036,6 +1082,10 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       };
       this.on("connected", onConnected);
       this.on("error", onError);
+      if (waitForHost) {
+        bridge.on("hostWaiting", onHostWaiting);
+        bridge.on("signalReady", onSignalReady);
+      }
     }
     active.authentication = {
       ticket: bootstrap.ticket,
@@ -1055,6 +1105,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
           signalUrl: bootstrap.signalUrl,
           token: bootstrap.ticket,
           peer: "client",
+          ...(waitForHost ? { waitForHost: true } : {}),
         }),
       );
       yield* this.#assertCurrentEffect(hostId, active, connectedSessionId);

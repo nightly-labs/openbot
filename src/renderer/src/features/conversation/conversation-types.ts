@@ -37,6 +37,7 @@ import type { AwaitingReplyItem } from "@openbot/ui/features/conversation/Awaiti
 import type { UsageLimitAskCardProps } from "@openbot/ui/features/conversation/BackupModels";
 import type { ChatMessageAuthor } from "@openbot/ui/features/conversation/ChatMessageRow";
 import type { UnloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
+import type { AgentThreadOlderMessages } from "@openbot/ui/features/conversation/threads/AgentThreadView";
 import type { ThreadHeaderProps, ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
 import type { SidebarAgentWait } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import type { JSX } from "@solidjs/web";
@@ -275,7 +276,8 @@ export interface ConversationProps {
   usageLimited?: ((choice: AgentModelChoice) => boolean) | undefined;
   /** The takeover of the open thread: of a side thread while one is open, else of the agent's own chat. */
   browserTakeover: BrowserTakeoverRequest | undefined;
-  onSelectAgent: (agentId: string) => void;
+  /** Opens an agent. With `tabId`, the agent opens at that thread tab, not at the tab it showed last. */
+  onSelectAgent: (agentId: string, tabId?: string) => void;
   /**
    * What stops each agent in its own chat: a question, an approval, a browser takeover or a usage
    * limit. The waiting block names it for each agent that this agent asked.
@@ -446,6 +448,8 @@ export interface ConversationThreads {
   running: number;
   /** The conversation of the open side thread, when it loaded. */
   conversation: ConversationSnapshot | undefined;
+  /** The open side thread has messages before the loaded ones. */
+  olderMessages: AgentThreadOlderMessages | undefined;
   /** The approval that the open side thread's turn waits for. */
   approval: AgentApproval | undefined;
   /** The thread takes files. Only this computer sends them: `agent-tasks-v1` carries text only. */
@@ -536,6 +540,8 @@ interface SideThreads {
 export interface SideThread {
   task: AgentTask;
   conversation: ConversationSnapshot | undefined;
+  /** The thread has messages before the loaded ones. */
+  olderMessages: AgentThreadOlderMessages | undefined;
   approval: AgentApproval | undefined;
   onSend: (text: string, attachmentDraftIds: string[], replyToMessageId?: string | null) => Promise<boolean>;
   onStop: () => void;

@@ -142,6 +142,9 @@ export const messages = defineMessages("error.backend", {
     "Mailbox state is corrupt or from a newer OpenBot version; refusing to overwrite it.",
   "error.backend.recipientDeleting": "The recipient is being deleted. Retry after deletion finishes.",
   "error.backend.recipientHidden": "This agent is hidden. Restore it to send messages.",
+  "error.backend.replyReferenceUnknown":
+    "replyToMessageId {id} names no message. Use the Message ID of the message that you answer, or leave replyToMessageId out.",
+  "error.backend.replyReferenceRequests": "Messages from these recipients in this turn: {ids}.",
   "error.backend.attachBetween": "Attach between 1 and {limit} files.",
   "error.backend.attachmentNotFile": "Attachment is not a file: {path}",
   "error.backend.generatedImageTooLarge": "Generated image exceeds the 100 MB limit.",
@@ -230,6 +233,10 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpServerExited":
     "The server stopped before it answered. Run the command in a terminal to see its error.",
   "error.backend.mcpServerFailedToStart": "The server did not start: {reason}",
+  "error.backend.mcpServerSignInForProvider":
+    "{provider} could not use the MCP server {name}, because the server asks for a sign-in. Open the MCP settings and choose Sign in.",
+  "error.backend.mcpServerFailedForProvider":
+    "{provider} could not start the MCP server {name}. Open the MCP settings and choose Test connection to see the cause.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot could not start its local sign-in connection for this server. Restart OpenBot, then try again.",
   "error.backend.mcpOAuthSignInNeeded":

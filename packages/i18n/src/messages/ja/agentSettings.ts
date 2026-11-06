@@ -78,7 +78,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "{name} が書き始める前に {model} が使用量の上限に達した場合、{name} はどのモデルを使うかを確認します。",
   "agentSettings.backupModels.introAutomatic":
-    "{name} が書き始める前に {model} が使用量の上限に達した場合、またはプロバイダーのエラーで失敗した場合、{name} は順番の中で最初に使えるモデルに切り替えます。",
+    "{model} が使用量の上限に達した場合、{name} は順番の中で最初に使えるモデルに切り替えます。{name} が書き始める前に {model} がプロバイダーのエラーで失敗した場合も切り替えます。",
   "agentSettings.backupModels.ask": "切り替える前に確認",
   "agentSettings.backupModels.order": "順番",
   "agentSettings.backupModels.listLabel": "バックアップモデル（順番）",

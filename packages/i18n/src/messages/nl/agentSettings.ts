@@ -84,7 +84,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "Als {model} de gebruikslimiet bereikt voordat {name} begint te schrijven, vraagt {name} je welk model het moet gebruiken.",
   "agentSettings.backupModels.introAutomatic":
-    "Als {model} de gebruikslimiet bereikt of een fout van de aanbieder geeft voordat {name} begint te schrijven, schakelt {name} over op het eerste beschikbare model in de volgorde.",
+    "Als {model} de gebruikslimiet bereikt, schakelt {name} over op het eerste beschikbare model in de volgorde. {name} schakelt ook over als {model} een fout van de aanbieder geeft voordat {name} begint te schrijven.",
   "agentSettings.backupModels.ask": "Vragen voor overschakelen",
   "agentSettings.backupModels.order": "Volgorde",
   "agentSettings.backupModels.listLabel": "Reservemodellen, op volgorde",

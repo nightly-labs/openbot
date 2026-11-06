@@ -69,6 +69,18 @@ const IMPORT_ARCHIVE: ArchiveLimits = {
   expandedTooLarge: sourceText("error.import.expandedTooLarge", { limit: AGENT_IMPORT_LIMITS.files }),
   invalid: sourceText("error.import.zipInvalid"),
 };
+/**
+ * A member's export, sent to this host. `agent-import-v1` limits the upload to 100 MB, and its
+ * expanded size keeps the limits it had before, so a small upload cannot inflate up to 2 GB.
+ */
+const REMOTE_IMPORT_FILES = 5_000;
+const REMOTE_IMPORT_ARCHIVE: ArchiveLimits = {
+  archiveBytes: 500 * 1024 * 1024,
+  files: REMOTE_IMPORT_FILES,
+  tooLarge: sourceText("error.import.remoteZipTooLarge"),
+  expandedTooLarge: sourceText("error.import.remoteExpandedTooLarge", { limit: REMOTE_IMPORT_FILES }),
+  invalid: sourceText("error.import.zipInvalid"),
+};
 
 export interface AgentImportAgents {
   listAgents(): AgentSummary[];
@@ -110,6 +122,8 @@ interface StagedImport {
   path: string;
   /** The archive `apply` reads must be the one the preview checked. */
   sha256: string;
+  /** The limits the preview checked, which `apply` checks again. */
+  limits: ArchiveLimits;
   agents: ImportAgent[];
   channels: ImportChannel[];
   wrapper: string;
@@ -235,8 +249,9 @@ export class AgentImportService {
     owner: string,
     temporary: boolean,
   ): Effect.fn.Return<AgentImportPreview, ArchiveOperationError> {
-    const bytes = yield* readArchiveEffect(path, IMPORT_ARCHIVE);
-    const entries = yield* archiveSync(() => listEntries(bytes, IMPORT_ARCHIVE));
+    const limits = temporary ? REMOTE_IMPORT_ARCHIVE : IMPORT_ARCHIVE;
+    const bytes = yield* readArchiveEffect(path, limits);
+    const entries = yield* archiveSync(() => listEntries(bytes, limits));
     const wrapper = wrapperFolder([...entries.keys()]);
     const inner = new Map([...entries].map(([name, entry]) => [name.slice(wrapper.length), entry]));
     const manifestName = `${wrapper}${AGENT_IMPORT_MANIFEST}`;
@@ -273,7 +288,15 @@ export class AgentImportService {
     yield* this.#release(owner);
     const slot: StagedSlot = {
       owner,
-      value: { path, sha256: sha256(bytes), agents: manifest.agents, channels: manifest.channels, wrapper, avatars },
+      value: {
+        path,
+        sha256: sha256(bytes),
+        limits,
+        agents: manifest.agents,
+        channels: manifest.channels,
+        wrapper,
+        avatars,
+      },
       temporary,
       expiry: null,
     };
@@ -392,7 +415,7 @@ export class AgentImportService {
 
     // The archive is read again rather than held since `stage`: an export can be hundreds of MB.
     // The file can change in between, so only the same bytes are accepted.
-    const bytes = yield* readArchiveEffect(staged.path, IMPORT_ARCHIVE);
+    const bytes = yield* readArchiveEffect(staged.path, staged.limits);
     if (sha256(bytes) !== staged.sha256)
       return yield* archiveFailure(new Error(sourceText("error.import.exportChanged")));
     const imported: AgentSummary[] = [];

@@ -21,6 +21,7 @@ import { type CodeToken, fileCodeLanguage, highlightedCodeLines } from "@openbot
 import { MarkdownFilePreview } from "@openbot/ui/features/conversation/MarkdownFilePreview";
 import { SpreadsheetFilePreview } from "@openbot/ui/features/conversation/SpreadsheetFilePreview";
 import { useText } from "@openbot/ui/text";
+import { holdFlag } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
 
@@ -174,7 +175,15 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
     if (revealFrame !== undefined) cancelAnimationFrame(revealFrame);
   });
 
-  const revealPanel = () => {
+  let panel!: HTMLElement;
+  // The chat beside the panel makes room for it (`panel-layout.css`).
+  onSettled(() => {
+    const conversation = panel.closest(".conversation-panel");
+    return conversation ? holdFlag(conversation, "file-preview-panel") : undefined;
+  });
+
+  const revealPanel = (element: HTMLElement) => {
+    panel = element;
     revealFrame = requestAnimationFrame(() => {
       revealFrame = requestAnimationFrame(() => {
         setRevealed(true);
