@@ -372,6 +372,15 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "Отправьте черновик анонса запуска списку бета-тестеров.",
   "marketplace.plugin.resend.prompt.status": "Дошло ли письмо со счётом до клиента?",
   "marketplace.plugin.resend.prompt.template": "Составьте письмо для сброса пароля для нового сценария.",
+  "marketplace.plugin.omnisend.tagline": "Email- и SMS-маркетинг",
+  "marketplace.plugin.omnisend.description":
+    "Omnisend позволяет агентам читать отчёты по кампаниям и формам, находить контакты и сегменты, а также создавать и изменять кампании, автоматизации, шаблоны писем, формы и товары. Каждый пользователь входит в свой аккаунт Omnisend в браузере и выбирает уровень доступа на экране согласия. С доступом на запись агенты также могут отправлять кампании и удалять данные. Выберите доступ только для чтения, если агентам нужны только отчёты.",
+  "marketplace.plugin.omnisend.app":
+    "Кампании, автоматизации, контакты, сегменты, формы и отчёты через MCP-сервер Omnisend со входом в браузере.",
+  "marketplace.plugin.omnisend.prompt.lastCampaign": "Как прошли кампании прошлой недели по сравнению с позапрошлой?",
+  "marketplace.plugin.omnisend.prompt.segment": "Сколько контактов в сегменте VIP и как он изменился за этот месяц?",
+  "marketplace.plugin.omnisend.prompt.draftCampaign":
+    "Подготовь черновик кампании для новой коллекции, но не отправляй его.",
   "marketplace.plugin.composio.tagline": "Множество приложений по вашей ссылке Composio",
   "marketplace.plugin.composio.description":
     "Composio подключает агентов к Gmail, Slack, GitHub и сотням других приложений через один сервер MCP. Подключите нужные приложения в своём аккаунте Composio и вставьте сюда его URL MCP и ключ API.",

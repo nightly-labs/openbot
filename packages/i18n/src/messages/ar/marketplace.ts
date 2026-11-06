@@ -360,6 +360,14 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "أرسل مسودة إعلان الإطلاق إلى قائمة الإصدار التجريبي.",
   "marketplace.plugin.resend.prompt.status": "هل وصل بريد الفاتورة إلى العميل؟",
   "marketplace.plugin.resend.prompt.template": "صُغ رسالة بريد لإعادة تعيين كلمة المرور للمسار الجديد.",
+  "marketplace.plugin.omnisend.tagline": "التسويق عبر البريد الإلكتروني والرسائل النصية",
+  "marketplace.plugin.omnisend.description":
+    "يتيح Omnisend للوكلاء قراءة تقارير الحملات والنماذج، والعثور على جهات الاتصال والشرائح، وإنشاء الحملات والأتمتة وقوالب البريد والنماذج والمنتجات وتعديلها. يسجّل كل مستخدم الدخول إلى حسابه في Omnisend عبر المتصفح ويختار مستوى الوصول في شاشة الموافقة. مع صلاحية الكتابة، يستطيع الوكلاء أيضًا إرسال الحملات وحذف البيانات. اختر الوصول للقراءة فقط إذا كان الوكلاء يحتاجون إلى التقارير فقط.",
+  "marketplace.plugin.omnisend.app":
+    "الحملات والأتمتة وجهات الاتصال والشرائح والنماذج والتقارير، عبر خادم MCP الخاص بـ Omnisend مع تسجيل الدخول في المتصفح.",
+  "marketplace.plugin.omnisend.prompt.lastCampaign": "كيف كان أداء حملات الأسبوع الماضي مقارنة بالأسبوع الذي قبله؟",
+  "marketplace.plugin.omnisend.prompt.segment": "كم عدد جهات الاتصال في شريحة VIP، وكيف تغيّرت هذا الشهر؟",
+  "marketplace.plugin.omnisend.prompt.draftCampaign": "اكتب مسودة حملة للمجموعة الجديدة، لكن لا ترسلها.",
   "marketplace.plugin.composio.tagline": "تطبيقات كثيرة عبر رابط Composio الخاص بك",
   "marketplace.plugin.composio.description":
     "يربط Composio الوكلاء بـ Gmail وSlack وGitHub ومئات التطبيقات الأخرى عبر خادم MCP واحد. اربط التطبيقات التي تريدها في حساب Composio، ثم الصق عنوان MCP URL ومفتاح API هنا.",

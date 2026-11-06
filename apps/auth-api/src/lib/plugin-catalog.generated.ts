@@ -217,6 +217,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "9bd3408ca7d9f8bc7169e8cb2515e3e6302007cbb38db7a777972f87b0563d24",
     },
     {
+      slug: "omnisend",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "73cd8cb3312090709f3c048b6c4b912c8dff27f96eb530cf36fcaf461eae7d80",
+    },
+    {
       slug: "composio",
       version: "1.1.0",
       featured: false,
@@ -1546,6 +1552,41 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://resend.com",
     privacyPolicyUrl: "https://resend.com/legal/privacy-policy",
     termsUrl: "https://resend.com/legal/terms",
+    skills: [],
+  },
+  omnisend: {
+    slug: "omnisend",
+    name: "Omnisend",
+    tagline: "Email and SMS marketing",
+    description:
+      "Omnisend lets agents read campaign and form reports, find contacts and segments, and create and edit campaigns, automations, email templates, forms and products. Each user signs in to their own Omnisend account through the browser and selects the access level on the consent screen. With write access, agents can also send campaigns and delete data. Select read-only access when agents only need reports.",
+    category: "automation",
+    creatorName: "Omnisend",
+    iconUrl: "https://www.omnisend.com/wp-content/uploads/2022/07/cropped-favi-192x192.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-last-campaign", text: "How did last week's campaigns perform compared to the week before?" },
+      { id: "prompt-segment", text: "How many contacts are in the VIP segment, and how did it change this month?" },
+      { id: "prompt-draft-campaign", text: "Draft a campaign for the new collection, but do not send it." },
+    ],
+    apps: [
+      {
+        id: "app-omnisend-mcp",
+        name: "Omnisend",
+        description:
+          "Campaigns, automations, contacts, segments, forms and reports, over Omnisend's MCP server with browser sign-in.",
+        iconUrl: "https://www.omnisend.com/wp-content/uploads/2022/07/cropped-favi-192x192.png",
+        server: {
+          name: "omnisend",
+          transport: "http",
+          url: "https://mcp.omnisend.com/mcp",
+          auth: [{ id: "omnisend-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://www.omnisend.com",
+    privacyPolicyUrl: "https://www.omnisend.com/privacy/",
+    termsUrl: "https://www.omnisend.com/terms/",
     skills: [],
   },
   composio: {
