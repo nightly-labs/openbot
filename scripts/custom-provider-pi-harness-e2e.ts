@@ -5,6 +5,8 @@
 // key and the header value must not reach the extension file or an error message. A saved output
 // limit must reach the request as the model's budget (#4234). A model with saved efforts must list
 // exactly those efforts and send the effort of the turn; a model with none must not reason (#4154).
+// A model saved with image input must send an attached image to the endpoint; a text-only model
+// must not (#5332).
 // `PI_CLI=<pi> bun run test:custom-provider-pi`. Writes .openbot-build/custom-provider-pi-harness/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -32,6 +34,13 @@ const FAILING_MODEL = "fake-broken";
 /** #4154: an endpoint that accepts None, Low and Max for this model, and no other effort. */
 const EFFORT_MODEL = "fake-thinker";
 const SAVED_EFFORTS = ["none", "low", "max"] as const;
+/** #5332: a vision model behind the endpoint, saved with image input. */
+const VISION_MODEL = "fake-vision";
+/** A 1×1 PNG. */
+const PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+  "base64",
+);
 
 interface Request {
   path: string;
@@ -42,6 +51,8 @@ interface Request {
   budget: number | null;
   /** The `reasoning_effort` that the request sent, or null. */
   reasoningEffort: string | null;
+  /** The `image_url` content parts of the request's messages. */
+  images: number;
 }
 
 interface Report {
@@ -71,14 +82,17 @@ function header(request: IncomingMessage, name: string): string | null {
 /** The model that a chat completion request names, and the output budget that it asks for. */
 async function requestedModel(
   request: IncomingMessage,
-): Promise<Pick<Request, "model" | "budget" | "reasoningEffort">> {
+): Promise<Pick<Request, "model" | "budget" | "reasoningEffort" | "images">> {
   const chunks: Buffer[] = [];
   for await (const part of request) chunks.push(Buffer.from(part));
   const text = Buffer.concat(chunks).toString("utf8");
   const value = text ? JSON.parse(text) : null;
   const sent = isRecord(value) ? (value.max_completion_tokens ?? value.max_tokens) : null;
   const budget = typeof sent === "number" ? sent : null;
-  return { model: getString(value, "model"), budget, reasoningEffort: getString(value, "reasoning_effort") };
+  const images = getArray(value, "messages")
+    .flatMap((message) => getArray(message, "content"))
+    .filter((part) => getString(part, "type") === "image_url").length;
+  return { model: getString(value, "model"), budget, reasoningEffort: getString(value, "reasoning_effort"), images };
 }
 
 /** One server-sent event of a streamed chat completion: the reply text, or the end of the reply. */
@@ -152,6 +166,8 @@ try {
       { id: "fake-coder", name: "Fake coder", contextWindow: 32_768, maxOutput: 12_000 },
       { id: FAILING_MODEL, name: "Fake broken" },
       { id: EFFORT_MODEL, name: "Fake thinker", reasoningEfforts: [...SAVED_EFFORTS] },
+      // `pdf` is saved too: Pi cannot send a PDF, so it must ignore it.
+      { id: VISION_MODEL, name: "Fake vision", inputs: ["image", "pdf"] },
     ],
     harness: "pi",
   };
@@ -238,6 +254,32 @@ try {
     assert.equal(effortTurn.error, null, `The turn at ${effort} failed: ${effortTurn.error}`);
     const last = report.requests.filter((request) => request.model === EFFORT_MODEL).at(-1);
     assert.equal(last?.reasoningEffort, effort, `Pi must send the effort ${effort}.`);
+  }
+
+  // #5332: an attached image reaches a model saved with image input, and not a text-only model.
+  const image = join(workspace, "pixel.png");
+  await writeFile(image, PNG);
+  const visionTurn = await runTurn(client, thread, {
+    model: `spark-e2e/${VISION_MODEL}`,
+    text: "What is in the image?",
+    images: [image],
+    timeoutMs: 60_000,
+  });
+  assert.equal(visionTurn.error, null, `The turn with an image failed: ${visionTurn.error}`);
+  const visionRequest = report.requests.filter((request) => request.model === VISION_MODEL).at(-1);
+  assert.ok(visionRequest, `The endpoint got no request for ${VISION_MODEL}.`);
+  assert.equal(visionRequest.images, 1, "Pi must send the image to a model saved with image input.");
+  const textTurns = report.requests.filter((request) => request.model === "fake-coder").length;
+  await runTurn(client, thread, {
+    model: "spark-e2e/fake-coder",
+    text: "What is in the image?",
+    images: [image],
+    timeoutMs: 60_000,
+  });
+  const textRequests = report.requests.filter((request) => request.model === "fake-coder").slice(textTurns);
+  assert.ok(textRequests.length > 0, "The endpoint got no request for the text-only model.");
+  for (const request of textRequests) {
+    assert.equal(request.images, 0, "Pi must not send an image to a text-only model.");
   }
 
   // A refused request: the error reaches the user, but not the key.

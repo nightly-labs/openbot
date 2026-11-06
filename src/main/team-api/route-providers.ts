@@ -332,6 +332,7 @@ function releasedSaveBody({ harness: _harness, ...body }: DynamicRecord): Dynami
         contextWindow: _contextWindow,
         maxOutput: _maxOutput,
         reasoningEfforts: _reasoningEfforts,
+        inputs: _inputs,
         ...released
       } = model;
       return released;

@@ -106,6 +106,7 @@ export const messages = {
   "error.provider.maxOutputInvalid":
     "De maximale output van een model moet een geheel aantal tokens zijn van {min} tot {max}.",
   "error.provider.reasoningEffortsInvalid": "De redeneerniveaus van een model zijn niet geldig.",
+  "error.provider.inputsInvalid": "De invoersoorten van een model zijn niet geldig.",
   "error.provider.headersTooMany": "Er zijn te veel headers.",
   "error.provider.headerNameCharacter": "Een headernaam bevat een teken dat HTTP niet toestaat.",
   "error.provider.headerNameTooLong": "Een headernaam is te lang.",

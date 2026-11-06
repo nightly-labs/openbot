@@ -29,6 +29,8 @@ interface PiModelPayload {
   readonly maxTokens: number;
   /** Absent: the model does not reason. */
   readonly thinkingLevelMap?: PiThinkingLevelMap;
+  /** Pi's `input`: text, and images when the user says the model takes them. */
+  readonly input: readonly ("text" | "image")[];
 }
 
 type PiThinkingLevelMap = Readonly<
@@ -80,7 +82,7 @@ const SOURCE = `export default function (pi) {
         name: model.name,
         reasoning: model.thinkingLevelMap !== undefined,
         ...(model.thinkingLevelMap ? { thinkingLevelMap: model.thinkingLevelMap } : {}),
-        input: ["text"],
+        input: model.input,
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         contextWindow: model.contextWindow,
         maxTokens: model.maxTokens,
@@ -108,6 +110,8 @@ function payload(endpoint: CustomProviderConfig): EndpointPayload {
         contextWindow,
         maxTokens: customModelOutputLimit(model, contextWindow),
         ...(model.reasoningEfforts ? { thinkingLevelMap: thinkingLevelMap(model.reasoningEfforts) } : {}),
+        // Pi's model `input` is `("text" | "image")[]` (Pi 1.1.0 `packages/ai/src/types.ts`), so it has no PDF.
+        input: model.inputs?.includes("image") ? ["text", "image"] : ["text"],
       };
     }),
   };

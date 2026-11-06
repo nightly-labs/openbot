@@ -108,6 +108,7 @@ export const messages = {
   "error.provider.maxOutputInvalid":
     "L’output massimo di un modello deve essere un numero intero di token tra {min} e {max}.",
   "error.provider.reasoningEffortsInvalid": "I livelli di impegno di un modello non sono validi.",
+  "error.provider.inputsInvalid": "I tipi di input di un modello non sono validi.",
   "error.provider.headersTooMany": "Ci sono troppi header.",
   "error.provider.headerNameCharacter": "Il nome di un header contiene un carattere non consentito da HTTP.",
   "error.provider.headerNameTooLong": "Il nome di un header è troppo lungo.",
