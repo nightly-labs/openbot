@@ -45,7 +45,6 @@ import {
   type BoatFetch,
   type BoatSandboxState,
   isBoatState,
-  isStopFailing,
   verifyBoatWebhookSignature,
 } from "./boat-client";
 import { constantTimeEqual, deriveSecret, hmacSha256, randomToken, sha256 } from "./crypto";
@@ -1839,7 +1838,7 @@ export class HostedServerService {
     const sandboxId = row.provider_sandbox_id;
     if (!boat || !sandboxId) return false;
     const sandbox = yield* boat.getSandbox(sandboxId).pipe(
-      Effect.map((value) => ({ state: value.state, stopFailing: isStopFailing(value) })),
+      Effect.map((value) => ({ state: value.state, stopFailing: value.stopFailing })),
       Effect.catch((error) =>
         error.status === 404 ? Effect.succeed({ state: "cancelled" as const, stopFailing: false }) : Effect.fail(error),
       ),
