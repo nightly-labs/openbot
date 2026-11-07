@@ -97,6 +97,7 @@ import {
 import type { BrowserProxyConnection } from "./browser-profiles/browser-proxy-store";
 import { BrowserRecorder } from "./browser-recorder";
 import {
+  BROWSER_PAGE_CRASH_KEPT,
   BROWSER_PAGE_CRASH_RELOADED,
   BROWSER_SCRIPT_USER_CONTROL_ERROR,
   type BrowserScriptResult,
@@ -2265,12 +2266,16 @@ export class BrowserHost {
                   this.#rendererGone(tabId),
                 ),
         });
-        let result: BrowserScriptResult = run;
+        // A secret, a typed card, or a person's control keeps the crashed page, and a snapshot of it
+        // gets no answer.
+        const crashKept = run.status === "page_crashed" && this.#tabs.get(tabId)?.pendingRestore === undefined;
+        let result: BrowserScriptResult = crashKept ? { ...run, error: BROWSER_PAGE_CRASH_KEPT } : run;
         let snapshot: BrowserSnapshot | undefined;
         let snapshotError: string | undefined;
         // The page waits for its dialog, so a snapshot would wait too.
         if (
           args.finalSnapshot !== false &&
+          !crashKept &&
           run.status !== "user_control" &&
           run.status !== "tab_closed" &&
           run.status !== "dialog"
@@ -3416,7 +3421,7 @@ export class BrowserHost {
       tab.diagnostics.add({
         kind: "load",
         level: "error",
-        message: reload ? BROWSER_PAGE_CRASH_RELOADED : "The page crashed. OpenBot did not reload it.",
+        message: reload ? BROWSER_PAGE_CRASH_RELOADED : BROWSER_PAGE_CRASH_KEPT,
       });
       if (reload) tab.pendingRestore = () => reloadCrashedPage(tab);
       this.#emitChanged();

@@ -158,11 +158,18 @@ export function passImageOn(tab: BrowserHostTab): void {
   if (tab.image) tab.image.operation = tab.operations ?? 0;
 }
 
+/** The time for one snapshot read when the caller gives no timeout. */
+const SNAPSHOT_READ_TIMEOUT_MS = 10_000;
+
+/** The time that a bot check wait leaves for the last read. */
+const SNAPSHOT_READ_RESERVE_MS = 2_000;
+
 export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function* (
   tab: BrowserHostTab,
   revision: number,
   keepQueueBlocked: KeepQueueBlocked,
-  timeoutMs = 10_000,
+  /** The time for the whole read, the bot check wait included. Without it, each read gets 10 s. */
+  timeoutMs?: number,
   timeoutMessage = "Browser snapshot timed out.",
   /**
    * The last work before the snapshot reaches the agent, such as a policy check or its image. When it
@@ -171,9 +178,11 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
   release?: (result: SnapshotReadResult) => Effect.Effect<void, BrowserOperationError>,
 ) {
   const heldByUser = yield* BrowserToolHold;
+  const deadline = timeoutMs === undefined ? undefined : Date.now() + timeoutMs;
   const read = (readRevision: number) =>
     Effect.gen(function* () {
       const history = tab.diagnostics.snapshot();
+      const readTimeout = deadline === undefined ? SNAPSHOT_READ_TIMEOUT_MS : Math.max(1, deadline - Date.now());
       const result = yield* boundEngineOperation(
         tab,
         tab.engine.snapshot({
@@ -182,8 +191,9 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
           environment: tab.environment,
           diagnostics: history.diagnostics,
           actions: history.actions,
+          deadline: Date.now() + readTimeout,
         }),
-        timeoutMs,
+        readTimeout,
         timeoutMessage,
         keepQueueBlocked,
       );
@@ -200,6 +210,8 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
   while (
     current.result.challenge?.kind === "non-interactive" &&
     Date.now() - waitStarted < CHALLENGE_WAIT_MS &&
+    // A caller with its own timeout gets the check result, not a timeout.
+    (deadline === undefined || deadline - Date.now() > CHALLENGE_POLL_MS + SNAPSHOT_READ_RESERVE_MS) &&
     !tab.secret &&
     !tab.closing &&
     !tab.contents.isDestroyed() &&

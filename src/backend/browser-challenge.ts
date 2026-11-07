@@ -51,9 +51,12 @@ const CHALLENGE_SCRIPT = String.raw`(() => {
 
   if ((has("#cf-error-details") || has(".cf-error-code")) && /blocked|error 10(0[0-9]|20)|access denied/i.test(text))
     return found("cloudflare", "block", "cloudflare-error-page");
-  if (has("#challenge-form, #challenge-running, #challenge-stage, #cf-challenge-running, .cf-browser-verification, #cf-please-wait"))
+  // Ordinary pages use ids such as "challenge-form" too, so a Cloudflare id counts only with a
+  // Cloudflare script or frame, or on a short page.
+  const cloudflare = frame(/challenges\.cloudflare\.com/) || has("script[src*='/cdn-cgi/challenge-platform/']");
+  if ((cloudflare || short) && has("#challenge-form, #challenge-running, #challenge-stage, #cf-challenge-running, .cf-browser-verification, #cf-please-wait"))
     return found("cloudflare", "non-interactive", "cloudflare-challenge-markup");
-  if (/^(just a moment|one more step|attention required)/i.test(title) && (short || frame(/challenges\.cloudflare\.com/)))
+  if ((/^(just a moment|attention required)/i.test(title) && short) || (/^one more step/i.test(title) && cloudflare))
     return found("cloudflare", "non-interactive", "cloudflare-title");
   if (frame(/captcha-delivery\.com/)) return found("datadome", "interactive", "datadome-frame");
   if (has("#px-captcha")) return found("perimeterx", "interactive", "px-captcha");
@@ -61,7 +64,8 @@ const CHALLENGE_SCRIPT = String.raw`(() => {
   if (short && frame(/_Incapsula_Resource/)) return found("imperva", "interactive", "incapsula-frame");
   if (/^access denied/i.test(title) && /reference #\s*\d+\.[0-9a-f]+/i.test(text))
     return found("akamai", "block", "akamai-reference");
-  if (has("#sec-if-cpt-container, #sec-cpt-if, #sec-container")) return found("akamai", "non-interactive", "akamai-sec-cpt");
+  if (has("#sec-if-cpt-container, #sec-cpt-if") || (short && has("#sec-container")))
+    return found("akamai", "non-interactive", "akamai-sec-cpt");
   if (short && has("script[src*='awswaf.com'], script[src*='captcha.awswaf']")) {
     return has("#captcha-container, awswaf-captcha")
       ? found("aws-waf", "interactive", "aws-waf-captcha")
@@ -93,8 +97,9 @@ function readChallenge(value: unknown): DetectedChallenge | null {
 
 /** Reads the main frame for a bot check. A failure or a non-web page gives `null`. */
 export const detectChallenge = Effect.fn("Browser.detectChallenge")(function* (contents: WebContents) {
+  if (contents.isDestroyed()) return null;
   const url = contents.getURL();
-  if (contents.isDestroyed() || (!url.startsWith("https://") && !url.startsWith("http://"))) return null;
+  if (!url.startsWith("https://") && !url.startsWith("http://")) return null;
   return yield* Effect.tryPromise(() =>
     contents.executeJavaScriptInIsolatedWorld(CHALLENGE_WORLD, [{ code: CHALLENGE_SCRIPT }]),
   ).pipe(

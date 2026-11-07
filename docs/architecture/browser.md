@@ -230,6 +230,9 @@ All 20 runs were correct in each column. With the schemas in the first result, 1
 waits again; that cost did not change. The helpers did not change a median. The forms that they
 accept come from failed scripts in the bench transcripts.
 
+On the 10 default tasks (3 runs each), all 30 runs were correct before and after. Tool calls went
+from 97 to 84 and input tokens from 1.12M to 0.97M; 23 of 30 runs made no `tool_search`.
+
 ### Fill inspected ordinary fields
 
 `openbot_browser.fill_fields` is a deferred tool in the original browser catalog. It replaces

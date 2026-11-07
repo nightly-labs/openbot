@@ -14,6 +14,9 @@ export const SETTLE_BUSY_WAIT_MS = 2_000;
 /** The longest wait for a new document without controls to put content on the page. */
 export const SETTLE_EMPTY_WAIT_MS = 1_000;
 
+/** The time that a settle wait leaves before the read's deadline for the second collect. */
+export const SETTLE_RESERVE_MS = 1_000;
+
 /** A document younger than this, with no controls, is probably still rendering. */
 export const SETTLE_YOUNG_DOCUMENT_MS = 2_500;
 

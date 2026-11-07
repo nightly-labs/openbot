@@ -34,6 +34,8 @@ export type BrowserStepOutcome =
 export const BROWSER_PAGE_CRASH_RELOADED =
   "The page crashed and OpenBot loaded it again. Refs from before the crash are stale.";
 
+export const BROWSER_PAGE_CRASH_KEPT = "The page crashed. OpenBot did not reload it.";
+
 export const BROWSER_SCRIPT_USER_CONTROL_ERROR =
   "A person took control of the tab. Wait for the release, then take a fresh snapshot.";
 
@@ -284,8 +286,8 @@ function errorText(error: unknown): string {
 
 /**
  * Runs an agent's script in a QuickJS WebAssembly sandbox. The script has no network, files, modules, or
- * process; it can only ask the host to run browser steps, one at a time (a timer is a sleep step). Memory, stack,
- * total time, and step count are limited.
+ * process; it can only ask the host to run browser steps, one at a time. A sleep or setTimeout is a host timer that
+ * does not hold the steps after it. Memory, stack, total time, and step count are limited.
  */
 export const runBrowserScript = Effect.fn("BrowserScript.run")(function* (options: BrowserScriptOptions) {
   const module = yield* loadQuickJs();
@@ -307,7 +309,18 @@ export const runBrowserScript = Effect.fn("BrowserScript.run")(function* (option
         const timedOut = () => result("timeout", { error: "The script ran past its timeout." });
         const startError = sandbox.start(options.script);
         if (startError !== undefined) return result("failed", { error: errorText(startError) });
+        // A sleep, and so a setTimeout, is a timer here and not a step: the steps after it run at once,
+        // as they would next to a timer in a page.
+        const timers: { due: number; deferred: QuickJSDeferredPromise }[] = [];
+        const fireDueTimers = () => {
+          const now = Date.now();
+          for (const timer of timers.filter((item) => item.due <= now)) {
+            timers.splice(timers.indexOf(timer), 1);
+            sandbox.resolve(timer.deferred, { status: "ok" });
+          }
+        };
         for (;;) {
+          fireDueTimers();
           const state = sandbox.advance();
           if (state.kind === "fulfilled") {
             const text = JSON.stringify(state.value);
@@ -319,6 +332,12 @@ export const runBrowserScript = Effect.fn("BrowserScript.run")(function* (option
           }
           if (state.kind === "rejected")
             return Date.now() >= deadline ? timedOut() : result("failed", { error: errorText(state.error) });
+          if (state.kind === "stuck" && timers.length > 0) {
+            const wait = Math.min(...timers.map((timer) => timer.due)) - Date.now();
+            if (Date.now() + wait >= deadline) return timedOut();
+            yield* Effect.sleep(Math.max(0, wait));
+            continue;
+          }
           if (state.kind === "stuck")
             return result("failed", {
               error: "The script waits for a promise that no helper settles. Await only the browser helpers.",
@@ -329,6 +348,10 @@ export const runBrowserScript = Effect.fn("BrowserScript.run")(function* (option
           const parsed = Result.try(() => parseBrowserStep(JSON.parse(state.request)));
           if (Result.isFailure(parsed)) {
             sandbox.reject(state.deferred, errorText(parsed.failure));
+            continue;
+          }
+          if (parsed.success.action === "sleep") {
+            timers.push({ due: Date.now() + parsed.success.ms, deferred: state.deferred });
             continue;
           }
           const remaining = deadline - Date.now();

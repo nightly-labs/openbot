@@ -91,6 +91,7 @@ import {
   probeSettle,
   SETTLE_BUSY_WAIT_MS,
   SETTLE_EMPTY_WAIT_MS,
+  SETTLE_RESERVE_MS,
   SETTLE_YOUNG_DOCUMENT_MS,
   waitForSettle,
 } from "./browser-settle";
@@ -133,6 +134,8 @@ export interface SnapshotContext {
   environment: BrowserEnvironment;
   diagnostics: BrowserDiagnosticEntry[];
   actions: BrowserActionHistoryEntry[];
+  /** The time, as `Date.now()`, at which the read times out. A settle wait ends before it. */
+  deadline: number;
 }
 
 export interface BrowserScreencastOptions {
@@ -338,8 +341,10 @@ export class BrowserCdpEngine {
   /** The page sizes of the open views that asked for one. The newest one applies. */
   readonly #viewViewports: Array<{ width: number; height: number }> = [];
   #navigationGeneration = 0;
+  /** Counts new documents only. A same-document navigation, such as `history.replaceState`, keeps it. */
+  #documentGeneration = 0;
   /** The document whose loading markers stayed for a full settle wait. Its snapshots do not wait again. */
-  #settleTimedOutGeneration = -1;
+  #settleTimedOutDocument = -1;
   readonly #cardScrub: CardValueScrub;
 
   readonly prepareSecret = Effect.fn("BrowserCdp.prepareSecret")(function* (
@@ -741,6 +746,7 @@ export class BrowserCdpEngine {
     });
     contents.on("did-start-navigation", (details) => {
       if (details.isMainFrame) this.#navigationGeneration += 1;
+      if (details.isMainFrame && !details.isSameDocument) this.#documentGeneration += 1;
       this.#targets.clear();
       this.#lastSnapshot = null;
     });
@@ -775,7 +781,8 @@ export class BrowserCdpEngine {
   ): Effect.fn.Return<SnapshotReadResult, BrowserOperationError> {
     return yield* this.#leaseEffect((send) =>
       Effect.gen({ self: this }, function* () {
-        const navigationGeneration = this.#navigationGeneration;
+        let navigationGeneration = this.#navigationGeneration;
+        const documentGeneration = this.#documentGeneration;
         const collect = () =>
           Effect.all(
             [
@@ -791,12 +798,23 @@ export class BrowserCdpEngine {
         // A page that still shows loading placeholders, or a new page with no controls yet, would
         // make the agent take a second snapshot. Wait a short time in this one instead. A bot check
         // has its own wait in the tab read.
-        const busyWait = settle?.busy === true && this.#settleTimedOutGeneration !== navigationGeneration;
+        const busyWait = settle?.busy === true && this.#settleTimedOutDocument !== documentGeneration;
         const emptyWait =
           settle !== null && !settle.busy && parsed.elements.length === 0 && settle.ageMs < SETTLE_YOUNG_DOCUMENT_MS;
-        if (challenge === null && (busyWait || emptyWait) && navigationGeneration === this.#navigationGeneration) {
-          const settled = yield* waitForSettle(send, emptyWait, busyWait ? SETTLE_BUSY_WAIT_MS : SETTLE_EMPTY_WAIT_MS);
-          if (!settled && busyWait) this.#settleTimedOutGeneration = navigationGeneration;
+        // The second collect needs time before the read's deadline.
+        const settleBudget =
+          Math.min(busyWait ? SETTLE_BUSY_WAIT_MS : SETTLE_EMPTY_WAIT_MS, context.deadline - Date.now()) -
+          SETTLE_RESERVE_MS;
+        if (
+          challenge === null &&
+          (busyWait || emptyWait) &&
+          settleBudget > 0 &&
+          navigationGeneration === this.#navigationGeneration
+        ) {
+          const settled = yield* waitForSettle(send, emptyWait, settleBudget);
+          if (!settled && busyWait) this.#settleTimedOutDocument = documentGeneration;
+          // A page that loads often sets its URL with history.replaceState. That keeps the document.
+          if (documentGeneration === this.#documentGeneration) navigationGeneration = this.#navigationGeneration;
           if (navigationGeneration === this.#navigationGeneration) [parsed, focus] = yield* collect();
         }
         if (navigationGeneration !== this.#navigationGeneration) {
