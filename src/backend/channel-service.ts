@@ -398,24 +398,45 @@ export class ChannelService {
    * starts the history that a model reads, and the summary starts again after it. The messages stay
    * for the reader, and the members, instructions, memories and routines do not change. It waits
    * for the commands queued before it, and work that still runs or waits refuses it, because that
-   * work belongs to the old conversation. Returns the execution thread of each member, whose
-   * provider session the caller ends; a second request after the marker changes nothing else.
+   * work belongs to the old conversation. `members.busy` refuses it while a member session still
+   * runs a turn or compacts, and `members.end` ends the provider session of each member's execution
+   * thread before the next command of the channel runs, so no turn starts on an old session. A second
+   * request after the marker only repairs a summary that a failed first request left.
    */
   readonly clearContext = Effect.fn("ChannelService.clearContext")(function* (
     this: ChannelService,
     channelId: string,
     person: { id: string; name: string },
+    members: {
+      busy: (contexts: ReadonlyArray<{ agentId: string; threadId: string }>) => boolean;
+      end: (threadIds: readonly string[]) => Effect.Effect<void>;
+    },
   ) {
-    let threads: string[] = [];
     yield* this.#serialize(
       channelId,
       Effect.gen({ self: this }, function* () {
         const channel = yield* channelSync(() => this.store.get(channelId));
         if (channel.archived) return yield* channelFailure(new Error(sourceText("error.backend.channelArchived")));
         yield* this.#requireIdle(channelId, "error.backend.channelWaitBeforeNewConversation");
-        threads = yield* channelSync(() => this.store.contextThreads(channelId));
+        const contexts = yield* channelSync(() => this.store.contexts(channelId));
+        if (members.busy(contexts))
+          return yield* channelFailure(new Error(sourceText("error.backend.channelWaitBeforeNewConversation")));
+        const threads = contexts.map((context) => context.threadId);
         const last = (yield* channelSync(() => this.store.messages(channelId, undefined, 1)))[0];
-        if (!last || isContextResetMarker(last.message)) return;
+        if (!last) return;
+        if (isContextResetMarker(last.message)) {
+          // The marker and the summary are two writes. A request after a failure between them repairs the summary.
+          yield* channelSync(() => {
+            const summary = this.store.summary(channelId);
+            if (summary.throughSequence < last.sequence)
+              this.store.saveSummary(channelId, {
+                version: summary.version + 1,
+                throughSequence: last.sequence,
+                text: "",
+              });
+          });
+          return yield* members.end(threads);
+        }
         const id = `context-reset-${randomUUID()}`;
         const marker: ChannelMessage = {
           id,
@@ -440,10 +461,10 @@ export class ChannelService {
           const summary = this.store.summary(channelId);
           this.store.saveSummary(channelId, { version: summary.version + 1, throughSequence: sequence, text: "" });
         });
+        yield* members.end(threads);
       }).pipe(Effect.uninterruptible),
     );
     this.publish(channelId);
-    return threads;
   });
 
   /**

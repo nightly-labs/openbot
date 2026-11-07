@@ -398,7 +398,8 @@ export function ChannelEditor(props: ChannelEditorProps) {
           onClick={props.onOpenRoutines}
         />
       </SettingsLinkGroup>
-      <Show when={channels.contextActionsSupported() && channel()}>
+      {/* The host refuses both for an archived channel. */}
+      <Show when={channels.contextActionsSupported() && !channel()?.archived && channel()}>
         {(current) => (
           <ChannelContextActions
             channelName={current().name}

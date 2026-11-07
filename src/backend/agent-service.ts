@@ -3706,9 +3706,27 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     channelId: string,
     person: { id: string; name: string },
   ) {
-    const threads = yield* this.channels.clearContext(channelId, person);
-    yield* Effect.forEach(threads, (threadId) => this.#threads.endThreadContext(threadId), { discard: true });
+    yield* this.channels.clearContext(channelId, person, {
+      busy: (contexts) => {
+        const agents = new Map(this.#store.list().map((agent) => [agent.id, agent]));
+        return contexts.some(({ agentId, threadId }) => this.#channelSessionBusy(agents.get(agentId), threadId));
+      },
+      end: (threadIds) =>
+        Effect.forEach(threadIds, (threadId) => this.#threads.endThreadContext(threadId), { discard: true }),
+    });
   }, Effect.uninterruptible).bind(this);
+
+  /** Whether a member's channel session runs a turn, or a compaction or a refused start holds it. */
+  #channelSessionBusy(agent: AgentSummary | undefined, threadId: string): boolean {
+    if (!agent) return false;
+    if (
+      this.#conversation.loadedExecutionSnapshot(threadId)?.activeTurnId ||
+      this.#store.database.readActiveTurnId(agent.id, threadId)
+    )
+      return true;
+    const session = this.#store.database.activeProviderSession(threadId, agent.provider);
+    return session !== null && this.#compaction.heldThreads(agent.id).includes(session.externalSessionId);
+  }
 
   /**
    * Compacts the channel session of each member now, as `compactAgentContext` does for an agent's
@@ -3727,15 +3745,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
         return agent && session ? [{ agentId, threadId, externalSessionId: session.externalSessionId }] : [];
       });
-      // A compaction that still runs, or a start that the provider refused, holds the session too.
-      if (
-        candidates.some(
-          ({ agentId, threadId, externalSessionId }) =>
-            this.#conversation.loadedExecutionSnapshot(threadId)?.activeTurnId ||
-            this.#store.database.readActiveTurnId(agentId, threadId) ||
-            this.#compaction.heldThreads(agentId).includes(externalSessionId),
-        )
-      )
+      if (candidates.some(({ agentId, threadId }) => this.#channelSessionBusy(agents.get(agentId), threadId)))
         throw new ContextCompactRefusedError(sourceText("error.backend.channelWaitBeforeCompact"));
       const reserved = candidates.filter(({ agentId, externalSessionId }) =>
         this.#compaction.reserve(agentId, externalSessionId, true),

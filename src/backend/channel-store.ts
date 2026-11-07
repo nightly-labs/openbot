@@ -192,6 +192,7 @@ export class ChannelStore {
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'plan'
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'subagents'
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'channel-change'
+                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'context-reset'
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'commentary'
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?) AS unread,
             (SELECT COUNT(*) FROM projection_channel_tasks AS t
@@ -680,7 +681,9 @@ export class ChannelStore {
     const row = databaseRow(
       this.database.connection
         .prepare(
-          `SELECT MAX(sequence) AS sequence FROM projection_channel_messages WHERE channel_id = ? AND ${SHOWN_MESSAGE_SQL}
+          // The id range reads the marker rows through the primary key, not every message of the channel.
+          `SELECT MAX(sequence) AS sequence FROM projection_channel_messages
+             WHERE channel_id = ? AND message_id >= 'context-reset-' AND message_id < 'context-reset.' AND ${SHOWN_MESSAGE_SQL}
              AND json_extract(message_json, '$.message.itemType') = ?
              AND json_extract(message_json, '$.message.author') = 'system'
              AND json_extract(message_json, '$.message.source') = 'system'`,

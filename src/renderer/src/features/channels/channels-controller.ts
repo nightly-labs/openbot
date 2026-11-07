@@ -509,7 +509,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
       const clearChannelContext = env.port().agent.clearChannelContext;
       if (!clearChannelContext) throw new Error(currentText().t("channel.error.action"));
       await clearChannelContext(channelId);
-      await refresh();
+      await refreshAfter();
     },
     /** Compacts the channel session of each member now. A failure rejects, for the row to show. */
     compactContext: async (channelId: string) => {
