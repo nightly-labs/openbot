@@ -539,6 +539,8 @@ const windows = createMainWindowController({
   },
   reportError: (message, error) => logger.error(message, toLogValue(error)),
   quitFromShortcut: () => quitFor("shortcut"),
+  // Before the services start, no agent can work.
+  workingAgents: () => services?.service.workingAgents() ?? [],
 });
 
 let appIconColorImage: NativeImage | undefined;

@@ -795,8 +795,9 @@ export const IPC_ENDPOINTS = {
     // The main window marks each chat that has a window, so main tells it when one opens or closes.
     chatWindows: event<ChatWindowTarget[]>()("app:chat-windows"),
     // Main reads `Cmd + Q` before the page does, so it tells the window when to show the hint that
-    // the key must be held or pressed twice. True shows the hint, and false removes it.
-    quitShortcutHint: event<boolean>()("app:quit-shortcut-hint"),
+    // the key must be held or pressed twice. The hint names the local agents that work, which a quit
+    // stops. An empty list removes it.
+    quitShortcutHint: event<ClientAgentSummary[]>()("app:quit-shortcut-hint"),
   },
   maintenance: {
     exportData: request<undefined, ExportResult>()("maintenance:export-data"),

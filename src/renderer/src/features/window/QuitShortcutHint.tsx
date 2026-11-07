@@ -1,21 +1,48 @@
+import type { ClientAgentSummary } from "@openbot/contracts/ipc";
+import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
+import { channelActivitySentence } from "@openbot/ui/features/channels/ChannelActivityIndicator";
 import { useText } from "@openbot/ui/text";
-import { onSettled, Show } from "solid-js";
-import { quitShortcutHintShown, watchQuitShortcutHint } from "../../quit-shortcut-hint";
+import { For, onSettled, Show } from "solid-js";
+import { quitShortcutHintAgents, quitShortcutHintShown, watchQuitShortcutHint } from "../../quit-shortcut-hint";
+
+/** More faces than this make the pill wide, and the names already list every agent. */
+const MAX_AVATARS = 3;
+
+/** How to quit, with the agents that the quit stops. */
+export function QuitShortcutHintView(props: { agents: ClientAgentSummary[] }) {
+  const { t } = useText();
+  return (
+    <div class="quit-shortcut-backdrop">
+      <div class="quit-shortcut-hint" role="status">
+        <span class="quit-shortcut-avatars" aria-hidden="true">
+          <For each={props.agents.slice(0, MAX_AVATARS)}>
+            {(agent) => <AgentAvatar agent={agent} motion="idle" mood="working" workingFaces />}
+          </For>
+        </span>
+        <span class="quit-shortcut-copy">
+          <span class="quit-shortcut-agents">
+            {channelActivitySentence(
+              props.agents.map((agent) => agent.name),
+              t,
+            )}
+          </span>
+          <span class="quit-shortcut-instruction">{t("menu.quitHint")}</span>
+        </span>
+      </div>
+    </div>
+  );
+}
 
 /**
- * On a Mac, one press of `Cmd + Q` does not quit. Main reads the key before the page does and tells
- * this window when to show how to quit: hold the keys, or press them twice.
+ * On a Mac, while an agent works, one press of `Cmd + Q` does not quit. Main reads the key before the
+ * page does and tells this window when to show which agents work and how to quit: hold the keys, or
+ * press them twice. With no agent at work, one press quits and no hint shows.
  */
 export function QuitShortcutHint() {
-  const { t } = useText();
   onSettled(watchQuitShortcutHint);
   return (
     <Show when={quitShortcutHintShown()}>
-      <div class="quit-shortcut-backdrop">
-        <div class="quit-shortcut-hint" role="status">
-          {t("menu.quitHint")}
-        </div>
-      </div>
+      <QuitShortcutHintView agents={quitShortcutHintAgents()} />
     </Show>
   );
 }

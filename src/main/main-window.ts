@@ -12,6 +12,7 @@ import { Effect } from "effect";
 
 import { join } from "node:path";
 import {
+  type AgentSummary,
   type AppVariant,
   type CentralAuthState,
   type ChatWindowTarget,
@@ -163,6 +164,8 @@ export interface MainWindowContext {
   reportError: (message: string, error: unknown) => void;
   /** Quits after `Cmd + Q` was held or pressed twice in a window. See `createQuitShortcut`. */
   quitFromShortcut: () => void;
+  /** The local agents that a quit stops. See `createQuitShortcut`. */
+  workingAgents: () => AgentSummary[];
 }
 
 export interface MainWindowController {
@@ -201,13 +204,15 @@ export function createMainWindowController({
   onMainWindowCreated,
   reportError,
   quitFromShortcut,
+  workingAgents,
 }: MainWindowContext): MainWindowController {
   const quitShortcut =
     process.platform === "darwin"
       ? createQuitShortcut({
           quit: quitFromShortcut,
           isQuitting,
-          showHint: (window, visible) => sendToRenderer(window, IPC_ENDPOINTS.app.quitShortcutHint, visible),
+          workingAgents,
+          showHint: (window, agents) => sendToRenderer(window, IPC_ENDPOINTS.app.quitShortcutHint, agents),
         })
       : null;
   const { restoreMainWindowBounds, currentMainWindowBounds, rememberMainWindowBounds, flushMainWindowBounds } =
@@ -948,12 +953,18 @@ let quitConfirmationOpen = false;
  * asks. A click on
  * the item, the Dock, a system logout and an update still quit at once.
  */
-function macQuitItem(translate: AppTranslate, quit: (source: MenuQuitSource) => void): MenuItemConstructorOptions {
+function macQuitItem(
+  translate: AppTranslate,
+  agentsWork: () => boolean,
+  quit: (source: MenuQuitSource) => void,
+): MenuItemConstructorOptions {
   return {
     label: translate("menu.quit"),
     accelerator: "Command+Q",
     click: (_item, _window, event) => {
       if (!event.triggeredByAccelerator) return quit("menu");
+      // With no agent at work, a quit stops nothing, so the keys quit at once.
+      if (!agentsWork()) return quit("shortcut");
       // A second press while the question is open does not open another one, and a quit that has
       // started hid every window and needs no question.
       if (quitConfirmationOpen || windowsKeptHidden) return;
@@ -1041,7 +1052,9 @@ export function configureApplicationMenu(
           { role: "hideOthers" },
           { role: "unhide" },
           { type: "separator" },
-          process.platform === "darwin" ? macQuitItem(translate, quit) : { role: "quit" },
+          process.platform === "darwin"
+            ? macQuitItem(translate, () => service.workingAgents().length > 0, quit)
+            : { role: "quit" },
         ],
       },
       { role: "editMenu" },
