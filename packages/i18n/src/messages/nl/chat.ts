@@ -22,6 +22,8 @@ export const messages = {
   "chat.activity.current": "Huidige activiteit",
   "chat.steps.show": "Stappen tonen",
   "chat.steps.hide": "Stappen verbergen",
+  "chat.steps.showError": "Fout tonen",
+  "chat.steps.hideError": "Fout verbergen",
   "chat.steps.list": "Stappen van de agent",
   "chat.steps.count": { one: "{count} stap", other: "{count} stappen" },
   "chat.steps.failed": { one: "{count} mislukt", other: "{count} mislukt" },

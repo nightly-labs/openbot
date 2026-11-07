@@ -82,6 +82,7 @@ import {
   type ToolUsageSignal,
   toolActivity,
   toolFailed,
+  toolFailureText,
   toolProgressText,
   toolTraceDetail,
   toolUsage,
@@ -1915,7 +1916,9 @@ export class TurnLifecycle {
       if (completed) lastToolClosed = openTools.delete(item.id) && openTools.size === 0;
       else openTools.add(item.id);
     }
-    this.#observeTraceStep(turnId, item, completed, toolProgress);
+    // MCP credentials and the shared secret patterns come out before the text leaves the agent service.
+    const failure = completed ? toolFailureText(item, (text) => this.#hooks.redactMcp(text)) : null;
+    this.#observeTraceStep(turnId, item, completed, toolProgress, failure);
     if (toolProgress) {
       const activity = toolActivity(item, completed);
       this.#emitTurnProgress(
@@ -1924,6 +1927,7 @@ export class TurnLifecycle {
         turnId,
         toolProgress,
         activity,
+        failure,
       );
       return;
     }
@@ -2075,7 +2079,13 @@ export class TurnLifecycle {
   }
 
   /** Records a step for the trace: a tool step, a thought or an answer. Other items have no step. */
-  #observeTraceStep(turnId: string, item: ThreadItem, completed: boolean, toolProgress: string | null): void {
+  #observeTraceStep(
+    turnId: string,
+    item: ThreadItem,
+    completed: boolean,
+    toolProgress: string | null,
+    failure: string | null,
+  ): void {
     if (!isString(item.id)) return;
     if (isToolItem(item)) {
       const failed = completed && toolFailed(item);
@@ -2083,6 +2093,7 @@ export class TurnLifecycle {
         completed,
         failed,
         text: toolProgress,
+        error: failure,
         ...toolTraceDetail(item),
       });
     } else if (item.type === "agentMessage")
@@ -2119,6 +2130,7 @@ export class TurnLifecycle {
     turnId: string,
     text: string,
     activity: AgentStepActivity | null = null,
+    error: string | null = null,
   ): void {
     const running = (this.#runningTurns.get(turnId)?.openTools.size ?? 0) > 0;
     this.#hooks.emit({
@@ -2129,6 +2141,7 @@ export class TurnLifecycle {
       detail: text,
       ...(running ? { running } : {}),
       ...(activity ? { activity } : {}),
+      ...(error ? { error } : {}),
     });
   }
 }
