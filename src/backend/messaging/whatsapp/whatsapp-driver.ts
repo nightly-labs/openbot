@@ -209,10 +209,12 @@ class WhatsAppAdapter implements MessagingAdapter {
   ) {
     yield* this.#checkPlace(target.platformChannelId);
     const [first = "", ...rest] = whatsAppChunks(markdown).map((chunk) => this.#layout(target, chunk));
+    const firstMentions = this.#mentions(first);
     let firstId: string | null = null;
     if (replaceMessageId) {
       const sentAt = this.#sentAt.get(replaceMessageId);
-      if (sentAt !== undefined && Date.now() - sentAt <= EDIT_WINDOW_MS) {
+      // An edit notifies nobody, so an answer that mentions a person replaces the status post with a new one.
+      if (!firstMentions.mentions && sentAt !== undefined && Date.now() - sentAt <= EDIT_WINDOW_MS) {
         const edited = yield* Effect.result(
           this.#session().send(target.platformChannelId, { text: first, edit: this.#ownKey(target, replaceMessageId) }),
         );
@@ -224,8 +226,8 @@ class WhatsAppAdapter implements MessagingAdapter {
           .send(target.platformChannelId, { delete: this.#ownKey(target, replaceMessageId) })
           .pipe(Effect.catch(() => Effect.void));
     }
-    firstId ??= yield* this.#send(target, { text: first });
-    for (const chunk of rest) yield* this.#send(target, { text: chunk });
+    firstId ??= yield* this.#send(target, { text: first, ...firstMentions });
+    for (const chunk of rest) yield* this.#send(target, { text: chunk, ...this.#mentions(chunk) });
     return firstId;
   });
 

@@ -40,6 +40,13 @@ const PLATFORM_WORDS: Record<MessagingPlatform, { name: string; workspace: strin
   telegram: { name: "Telegram", workspace: "Telegram chat", conversation: "in a reply chain" },
   whatsapp: { name: "WhatsApp", workspace: "WhatsApp number", conversation: "in a reply chain" },
 };
+/** How an answer mentions a person so that the platform notifies them. */
+const MENTION_GUIDANCE: Partial<Record<MessagingPlatform, string>> = {
+  telegram:
+    "To mention a person so that Telegram notifies them, write their @username, or @ and their Telegram user id, such as @123456789.",
+  whatsapp:
+    "To mention a person so that WhatsApp notifies them, write @ and their WhatsApp user id, such as @15551234567.",
+};
 const CONTEXT_MESSAGES = 30;
 const CONTEXT_CHARACTERS = 12_000;
 const REPLY_CHARACTERS = 4_000;
@@ -96,6 +103,8 @@ function guidanceLines(input: MessagingPromptInput, words: (typeof PLATFORM_WORD
     "To send files, call openbot.attach_files_to_response. When you ask an OpenBot teammate, ask one teammate and end this turn: its reply comes back to this conversation, and your answer to it is posted here.",
     `Through openbot.tool_call: openbot.messaging_history reads more of this place; openbot.messaging_remember saves a fact that every conversation of this ${words.workspace} sees; openbot.messaging_forget_memory deletes one by its id; openbot.messaging_post posts to another place. Keep facts about this ${words.workspace} there, not in openbot.remember: your own memories are private to the OpenBot user.`,
   ];
+  const mention = MENTION_GUIDANCE[input.platform];
+  if (mention) lines.push(mention);
   // A direct message is private, so `messaging_remember` refuses to save from it.
   if (!input.isDirect)
     lines.push(
