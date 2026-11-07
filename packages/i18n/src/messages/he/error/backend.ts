@@ -327,6 +327,8 @@ export const messages = {
   "error.backend.browserPreviewPageChanged": "דף הדפדפן השתנה במהלך התצוגה המקדימה. יש לנסות שוב.",
   "error.backend.browserInputProtected": "קלט הדפדפן מוגן בזמן אימות.",
   "error.backend.browserTypingFocusMoved": "הדף העביר את המוקד מהיעד לפני ההקלדה. לא הוקלד דבר. יש לצלם snapshot חדש.",
+  "error.backend.browserTypingFocusMovedWhileTyping":
+    "הדף העביר את המוקד לפני שכל הטקסט הוקלד. רק החלק הראשון של הטקסט נמצא בשדה. יש לצלם snapshot חדש ולבדוק את השדה לפני הקלדה נוספת.",
   "error.backend.browserTypingSubmitSkipped":
     "הטקסט נמצא בשדה, אבל הדף העביר את המוקד, ולכן Enter לא נשלח. אין להקליד את הטקסט שוב. יש לצלם snapshot חדש.",
   "error.backend.mcpServerHttpCredentials": "השרת ענה {status}. יש לבדוק את מפתח ה-API או פרטי גישה אחרים.",
