@@ -250,6 +250,8 @@ interface AcpTurn {
   /** The ACP `messageId` of the last text in `text`, and where that message's text starts in it. */
   textMessageId: string | null;
   textMessageStart: number;
+  /** The ACP `messageId` of the last reasoning part in `thought`. */
+  thoughtMessageId: string | null;
 }
 
 /** The parts of a `session/load` request that open this session as it was opened. */
@@ -352,6 +354,8 @@ interface HistoryReplay {
   currentUserMessageId: string | null;
   currentUserItemId: string | null;
   currentAgentItemId: string | null;
+  /** The `messageId` of the reasoning part that the current `${turnId}:thought` item holds. */
+  currentThoughtMessageId: string | null;
   turnHasOutput: boolean;
   turnSequence: number;
   currentTurnStartedAt: number | undefined;
@@ -723,6 +727,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       currentUserMessageId: null,
       currentUserItemId: null,
       currentAgentItemId: null,
+      currentThoughtMessageId: null,
       turnHasOutput: false,
       turnSequence: 0,
       currentTurnStartedAt: undefined,
@@ -1878,6 +1883,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       replay.currentUserMessageId = messageId;
       replay.currentUserItemId = null;
       replay.currentAgentItemId = null;
+      replay.currentThoughtMessageId = null;
     } else if (replay.currentTurnId === null) {
       replay.turnSequence += 1;
       replay.currentTurnId = `${notification.sessionId}:history:${String(replay.turnSequence).padStart(12, "0")}`;
@@ -1885,6 +1891,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       replay.currentUserMessageId = update.sessionUpdate === "user_message_chunk" ? messageId : null;
       replay.currentUserItemId = null;
       replay.currentAgentItemId = null;
+      replay.currentThoughtMessageId = null;
     } else if (update.sessionUpdate === "user_message_chunk" && replay.currentUserMessageId === null) {
       replay.currentUserMessageId = messageId;
     }
@@ -1941,12 +1948,23 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       replay.currentAgentItemId = null;
       const id = `${turnId}:thought`;
       const previous = replay.itemsById.get(id);
+      const previousText = previous?.text ?? "";
+      /* A stored turn keeps the parts of one reasoning message, and each part has its own ID.
+         Without a break, two parts replay as one line (#5481). */
+      const breaks =
+        this.#flavor.messagePerId &&
+        messageId !== null &&
+        replay.currentThoughtMessageId !== null &&
+        messageId !== replay.currentThoughtMessageId &&
+        previousText.length > 0;
+      const text = breaks ? `${partBreak(previousText)}${update.content.text}` : update.content.text;
+      if (messageId) replay.currentThoughtMessageId = messageId;
       replay.itemsById.set(id, {
         ...(previous ?? {}),
         id,
         type: "agentMessage",
         phase: "commentary",
-        text: `${previous?.text ?? ""}${update.content.text}`,
+        text: `${previousText}${text}`,
       });
       return;
     }
@@ -1995,6 +2013,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     replay.currentUserMessageId = null;
     replay.currentUserItemId = null;
     replay.currentAgentItemId = null;
+    replay.currentThoughtMessageId = null;
     replay.turnHasOutput = false;
     replay.currentTurnStartedAt = undefined;
     return true;
@@ -2198,6 +2217,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       unprompted,
       textMessageId: null,
       textMessageStart: 0,
+      thoughtMessageId: null,
     };
     thread.activeTurn = turn;
     this.#threads.holdForTurn(thread);
@@ -2547,7 +2567,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         messageId !== turn.textMessageId &&
         turn.text
       ) {
-        text = `${turn.text.endsWith("\n\n") ? "" : turn.text.endsWith("\n") ? "\n" : "\n\n"}${text}`;
+        text = `${partBreak(turn.text)}${text}`;
         turn.textMessageStart = turn.text.length + text.length - update.content.text.length;
       }
       if (messageId && (text || !turn.textMessageId)) turn.textMessageId = messageId;
@@ -2582,7 +2602,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
     if (update.sessionUpdate === "agent_thought_chunk" && update.content.type === "text") {
       if (update.content.text.trim()) turn.reasoned = true;
-      this.#appendThought(thread, turn, update.content.text);
+      this.#appendThought(thread, turn, update.content.text, contentMessageId(update));
       return;
     }
     if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update") {
@@ -2652,8 +2672,19 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     turn.itemId = `${turn.id}:assistant:${turn.messages.length}`;
   }
 
-  #appendThought(thread: AcpThread, turn: AcpTurn, text: string): void {
+  #appendThought(thread: AcpThread, turn: AcpTurn, text: string, messageId: string | null = null): void {
     if (!this.#flavor.thoughtsInsideAnswer) this.#completeMessage(thread, turn, "commentary");
+    /* ACP cannot mark the end of a reasoning part, and OpenCode gives each part its own `messageId`.
+       Parts joined as they came showed as one line, such as "**Scanning****Checking**" (#5481). */
+    const breaks =
+      this.#flavor.messagePerId &&
+      text.length > 0 &&
+      messageId !== null &&
+      turn.thoughtMessageId !== null &&
+      messageId !== turn.thoughtMessageId &&
+      turn.thought.length > 0;
+    const delta = breaks ? `${partBreak(turn.thought)}${text}` : text;
+    if (messageId && (delta || !turn.thoughtMessageId)) turn.thoughtMessageId = messageId;
     /* A delta carries no phase, so the item has to be opened as `commentary` first — otherwise the
        thought lands in an ordinary agentMessage and renders as a chat bubble. */
     if (!turn.thoughtStarted) {
@@ -2667,10 +2698,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         },
       });
     }
-    turn.thought += text;
+    turn.thought += delta;
     this.emit("notification", {
       method: "item/agentMessage/delta",
-      params: { threadId: thread.id, turnId: turn.id, itemId: turn.thoughtItemId, delta: text },
+      params: { threadId: thread.id, turnId: turn.id, itemId: turn.thoughtItemId, delta },
     });
   }
 
@@ -2686,6 +2717,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.emit("notification", { method: "item/completed", params: { threadId: thread.id, turnId: turn.id, item } });
     turn.thought = "";
     turn.thoughtStarted = false;
+    turn.thoughtMessageId = null;
     turn.thoughtItemId = `${turn.id}:thought:${turn.messages.length}`;
   }
 
@@ -3366,6 +3398,14 @@ class MissingAcpSessionError extends Error {
     super(message, { cause });
     this.name = "MissingAcpSessionError";
   }
+}
+
+/**
+ * The break that separates two parts of one item. A part that already ends a paragraph keeps it, so
+ * the text never gains more than one blank line.
+ */
+function partBreak(text: string): "" | "\n" | "\n\n" {
+  return text.endsWith("\n\n") ? "" : text.endsWith("\n") ? "\n" : "\n\n";
 }
 
 function contentMessageId(update: SessionNotification["update"]): string | null {
