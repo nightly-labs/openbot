@@ -318,6 +318,18 @@ that release, and check its SHA-256 against the asset `digest`. Set `url`, `asse
 `downloadBytes`, `installedBytes` (the size of the extracted `copilot` or `copilot.exe`) and the
 SHA-256 of `bin/copilot` (`bin/copilot.exe` on Windows).
 
+## Pin Mistral Vibe
+
+`native-runtime.lock.json` pins Mistral Vibe's ACP server by hand. Read the tag of
+`https://api.github.com/repos/mistralai/mistral-vibe/releases/latest` and set `version` without its
+`v`, and `licenseUrl` to `LICENSE` at that tag. For each target, download
+`vibe-acp-<triple>-<version>.tar.gz` (`.zip` on Windows) from that release, and check its SHA-256
+against the asset `digest`. Set `url`, `assetSha256`, `downloadBytes`, `installedBytes` above the
+extracted size, and the SHA-256 of each file in `files`: `bin/vibe-acp` (`bin/vibe-acp.exe` on
+Windows), `bin/_internal/base_library.zip`, the Python library, and
+`bin/_internal/mistral_vibe-<version>.dist-info/licenses/LICENSE`. Do not follow or copy the symbolic
+links in the archive.
+
 ## Pin the OpenCode CLI
 
 `native-runtime.lock.json` also pins the OpenCode CLI that OpenBot downloads for the OpenCode

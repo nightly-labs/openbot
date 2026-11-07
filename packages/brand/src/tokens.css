@@ -471,6 +471,10 @@
   --openbot-provider-current: var(--openbot-text-primary);
 }
 
+[data-provider="mistral"] {
+  --openbot-provider-current: var(--openbot-text-primary);
+}
+
 [data-provider="acp"] {
   --openbot-provider-current: var(--openbot-text-primary);
 }

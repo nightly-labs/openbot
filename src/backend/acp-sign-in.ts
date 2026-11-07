@@ -11,8 +11,11 @@ import { stopProcessTree } from "./windows-process-tree";
 
 /** The messages this client sends: its requests, and a refusal for each request the server makes. */
 type AcpMessage =
-  | { id: number; method: "initialize" | "logout" | "authenticate"; params: DynamicRecord }
+  | { id: number; method: "initialize" | "logout" | "authenticate" | AcpExtensionMethod; params: DynamicRecord }
   | { id: unknown; error: { code: number; message: string } };
+
+/** A method of the agent's own, outside ACP. Its name starts with `_`. */
+export type AcpExtensionMethod = `_${string}`;
 
 /** The most characters of the server's own reason that a failed sign-in shows. */
 const SERVER_REASON_LIMIT = 200;
@@ -70,6 +73,11 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
    * `logout`, with no `authenticate` after it. It rejects when the server does not advertise `logout`.
    */
   logoutOnly?: boolean;
+  /**
+   * With `logoutOnly`, the agent's own sign-out method, which it does not advertise, in place of ACP
+   * `logout`.
+   */
+  signOutMethod?: AcpExtensionMethod | undefined;
   /**
    * Gemini prints its Google page instead of opening it, and OpenBot opens it, so a launch that fails
    * shows an error. When the server opened it itself, a failure showed nothing (#3520). Without it,
@@ -204,7 +212,8 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
           const capabilities = isDynamicRecord(result?.agentCapabilities) ? result.agentCapabilities : undefined;
           const auth = isDynamicRecord(capabilities?.auth) ? capabilities.auth : undefined;
           const canLogOut = isDynamicRecord(auth?.logout);
-          if (options.logoutOnly && !canLogOut) signInFailed(sourceText("error.provider.acpSignOutFailed"));
+          if (options.logoutOnly && options.signOutMethod) send({ id: 3, method: options.signOutMethod, params: {} });
+          else if (options.logoutOnly && !canLogOut) signInFailed(sourceText("error.provider.acpSignOutFailed"));
           else if ((options.logout || options.logoutOnly) && canLogOut) send({ id: 3, method: "logout", params: {} });
           else send({ id: 2, method: "authenticate", params: { methodId: options.methodId } });
         } else if (message.id === 3) {

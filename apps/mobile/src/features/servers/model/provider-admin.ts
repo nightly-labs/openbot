@@ -190,7 +190,15 @@ function providerHasApiKey(provider: AgentProviderId, capabilities: readonly str
  * as the desktop page offers Disconnect. Muse is left out: its key state decides, and a joined
  * server's desktop page does not offer it either.
  */
-const SIGN_OUT_PROVIDERS: readonly AgentProviderId[] = ["claude", "codex", "grok", "cursor", "devin", "copilot"];
+const SIGN_OUT_PROVIDERS: readonly AgentProviderId[] = [
+  "claude",
+  "codex",
+  "grok",
+  "cursor",
+  "devin",
+  "copilot",
+  "mistral",
+];
 
 /** Whether the phone can sign the host's own sign-in of the provider out. A saved key keeps it connected. */
 export function providerSignOutOffered(row: ProviderRow): boolean {

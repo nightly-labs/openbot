@@ -286,6 +286,7 @@ export const messages = {
   "error.provider.kimiSignIn": "Inicia sesión con Kimi Code para usar Kimi.",
   "error.provider.devinSignIn": "Inicia sesión con Devin para usar Devin.",
   "error.provider.copilotSignIn": "Inicia sesión con GitHub o define COPILOT_GITHUB_TOKEN para usar GitHub Copilot.",
+  "error.provider.mistralSignIn": "Inicia sesión con Mistral o define MISTRAL_API_KEY para usar Mistral.",
   "error.provider.hermesMissing": "Hermes Agent no está instalado. Instálalo y vuelve a intentarlo.",
   "error.provider.hermesNotStarted": "Hermes Agent no se pudo iniciar. Ejecuta `hermes --version` en una terminal.",
   "error.provider.hermesVersionUnreadable": "No se puede leer la versión de Hermes Agent.",

@@ -44,6 +44,7 @@ export const messages = {
   "onboarding.provider.kimiAccount": "Kimi-modellen met een Kimi Code-account",
   "onboarding.provider.devinAccount": "Veel modellen met een Devin-account",
   "onboarding.provider.copilotAccount": "Veel modellen met een Copilot-abonnement",
+  "onboarding.provider.mistralAccount": "Mistral-modellen met een Mistral-account",
   "onboarding.provider.hermesNous": "Nous Portal-abonnement of je Hermes-configuratie",
   "onboarding.provider.inceptionKey": "Mercury-modellen met een Inception-API-sleutel",
   "onboarding.provider.deepseekKey": "DeepSeek-modellen met een DeepSeek-API-sleutel",

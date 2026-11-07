@@ -260,6 +260,7 @@ export const messages = {
   "error.provider.kimiSignIn": "יש להתחבר עם Kimi Code כדי להשתמש ב-Kimi.",
   "error.provider.devinSignIn": "יש להתחבר עם Devin כדי להשתמש ב-Devin.",
   "error.provider.copilotSignIn": "יש להתחבר עם GitHub או להגדיר COPILOT_GITHUB_TOKEN כדי להשתמש ב-GitHub Copilot.",
+  "error.provider.mistralSignIn": "יש להתחבר עם Mistral או להגדיר MISTRAL_API_KEY כדי להשתמש ב-Mistral.",
   "error.provider.hermesMissing": "Hermes Agent אינו מותקן. יש להתקין אותו ואז לנסות שוב.",
   "error.provider.hermesNotStarted": "Hermes Agent לא הצליח לפעול. יש להריץ `hermes --version` בטרמינל.",
   "error.provider.hermesVersionUnreadable": "לא ניתן לקרוא את הגרסה של Hermes Agent.",
