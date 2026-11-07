@@ -14,6 +14,9 @@ export const messages = {
   "queue.item.steerTooltip": "Indirizza il messaggio",
   "queue.item.steering": "Indirizzamento",
   "queue.item.steer": "Indirizza",
+  "queue.item.sendNowLabel": "Ferma l’agente e invia ora il messaggio in coda {position}",
+  "queue.item.sendNowTooltip": "Ferma l’agente e invia ora questo messaggio",
+  "queue.item.sendNow": "Invia ora",
   "queue.item.notSteered": "Non indirizzato",
   "queue.item.steerFallback.providerUnsupported":
     "Questo provider non può indirizzare un turno in corso, quindi il messaggio resta in coda.",

@@ -14,6 +14,9 @@ export const messages = {
   "queue.item.steerTooltip": "Nachricht steuern",
   "queue.item.steering": "Wird gesteuert",
   "queue.item.steer": "Steuern",
+  "queue.item.sendNowLabel": "Agent stoppen und Nachricht {position} aus der Warteschlange jetzt senden",
+  "queue.item.sendNowTooltip": "Agent stoppen und diese Nachricht jetzt senden",
+  "queue.item.sendNow": "Jetzt senden",
   "queue.item.notSteered": "Nicht gesteuert",
   "queue.item.steerFallback.providerUnsupported":
     "Dieser Anbieter kann einen laufenden Durchlauf nicht steuern. Die Nachricht wartet daher in der Warteschlange.",

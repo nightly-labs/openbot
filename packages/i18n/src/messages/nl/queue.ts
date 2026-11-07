@@ -14,6 +14,9 @@ export const messages = {
   "queue.item.steerTooltip": "Bijsturen met bericht",
   "queue.item.steering": "Bijsturen",
   "queue.item.steer": "Bijsturen",
+  "queue.item.sendNowLabel": "Stop de agent en verzend wachtrijbericht {position} nu",
+  "queue.item.sendNowTooltip": "Stop de agent en verzend dit bericht nu",
+  "queue.item.sendNow": "Nu verzenden",
   "queue.item.notSteered": "Niet bijgestuurd",
   "queue.item.steerFallback.providerUnsupported":
     "Deze aanbieder kan een lopende beurt niet bijsturen, dus het bericht wacht in de wachtrij.",
