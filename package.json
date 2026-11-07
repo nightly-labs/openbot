@@ -314,6 +314,8 @@
     "test:claude-late-steer": "bun scripts/claude-late-steer-e2e.ts",
     "test:provider-session-reuse": "bun scripts/provider-session-reuse-e2e.ts",
     "test:claude-cache": "bun scripts/claude-cache-e2e.ts",
+    "bench:claude-prompt-settings": "bun scripts/claude-prompt-settings-bench.ts",
+    "smoke:claude-agent": "bun scripts/claude-agent-smoke.ts",
     "test:token-usage": "bun scripts/token-usage-e2e.ts",
     "test:backup-model-failover": "bun scripts/backup-model-failover-e2e.ts",
     "test:zip-attachments": "bun scripts/zip-attachment-e2e.ts",

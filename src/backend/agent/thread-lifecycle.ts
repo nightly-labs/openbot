@@ -1186,9 +1186,9 @@ export class ThreadLifecycle {
   });
 
   /**
-   * The developer instructions of a session start or resume, with what is connected now. Claude
-   * gets the memories and the section-mates apart, and its client sends them with the turns: see
-   * `memoriesInTurns`. A change in the system prompt writes the full conversation to the cache again.
+   * The developer instructions of a session start or resume, with what is connected now. A client
+   * with `turnContext` gets the memories and the section-mates apart, and sends them with the turns:
+   * see `memoriesInTurns`. A change in the system prompt writes the full conversation to the cache again.
    */
   #instructions(
     agent: AgentSummary,
@@ -1210,8 +1210,8 @@ export class ThreadLifecycle {
       responseStyle: this.#responseStyle(),
       memoryLimit: this.#memories.limit(),
       storedMemoryCount: this.#memories.listFor(agent.id).length,
-      memoriesInTurns: client.provider === "claude",
-      teammatesInTurns: client.provider === "claude",
+      memoriesInTurns: client.turnContext === true,
+      teammatesInTurns: client.turnContext === true,
       sectionTeammates: section,
       homeSkills,
       httpMcpServers: mcpServers.some((config) => config.transport === "http"),
@@ -1233,7 +1233,8 @@ export class ThreadLifecycle {
           developerInstructions: instructions,
           memoryContext: memoryContext(memories, options),
           sectionTeammates: section,
-          ...(options.responseStyle === "natural" ? { turnStyleReminder: true } : {}),
+          // Measured for Claude only: deep in a long thread, it skipped the natural style's first line.
+          ...(options.responseStyle === "natural" && client.provider === "claude" ? { turnStyleReminder: true } : {}),
         }
       : { developerInstructions: instructions };
   }
