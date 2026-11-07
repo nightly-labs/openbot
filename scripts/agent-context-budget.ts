@@ -34,16 +34,18 @@ const agent: AgentSummary = {
   avatarUrl: null,
 };
 
-/** The options that `ThreadLifecycle.#instructions` passes, with nothing connected and no section. */
+/**
+ * The options that `ThreadLifecycle.#instructions` passes, with nothing connected and no section.
+ * Both clients send the memories and the section-mates with the turns (`AgentClient.turnContext`).
+ */
 function instructions(provider: "claude" | "codex"): string {
-  const inTurns = provider === "claude";
   return developerInstructions({ ...agent, provider }, "/shared", [], "/automation", DEFAULT_AGENT_DEFAULTS, {
     computerUseInOwnChat: false,
     sideThread: false,
     passwordVault: false,
     storedMemoryCount: 0,
-    memoriesInTurns: inTurns,
-    teammatesInTurns: inTurns,
+    memoriesInTurns: true,
+    teammatesInTurns: true,
     sectionTeammates: null,
     homeSkills: [],
   });

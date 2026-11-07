@@ -674,7 +674,6 @@ export class ThreadLifecycle {
     const own = yield* this.codexOwnServersEffect(client, mcpServers, toolRuntimes);
     // The same single reading, so the manifest records the variables this session was started with.
     const environment = this.#agentEnvironment();
-    // The same single reading, so the manifest records the section-mates these instructions name.
     const section = this.#sectionTeammates(agent.id);
     // Read before the configuration, which starts the same listener: both see one port.
     const proxy = client.provider === "codex" ? yield* this.#proxyFingerprint(mcpServers) : null;
@@ -705,7 +704,7 @@ export class ThreadLifecycle {
       serviceName: "openbot",
       dynamicTools: VISIBLE_DYNAMIC_TOOLS,
     };
-    return { agent, mcpServers, toolRuntimes, own, environment, section, proxy, instructionsFile, params };
+    return { agent, mcpServers, toolRuntimes, own, environment, proxy, instructionsFile, params };
   });
 
   readonly #startProviderThread = Effect.fn("ThreadLifecycle.prepareProviderThread")(function* (
@@ -715,7 +714,7 @@ export class ThreadLifecycle {
     publicThreadId: string,
     reason?: "configuration-change" | "missing-session",
   ) {
-    const { agent, mcpServers, toolRuntimes, own, environment, section, proxy, instructionsFile, params } =
+    const { agent, mcpServers, toolRuntimes, own, environment, proxy, instructionsFile, params } =
       yield* this.#startParams(owner, client, publicThreadId);
     const response = yield* client
       .request("thread/start", { ...params, ephemeral: false }, decodeThreadResponse)
@@ -743,17 +742,7 @@ export class ThreadLifecycle {
           const approvals = this.#toolApprovals(mcpServers, own);
           yield* this.#writeToolManifest(
             externalThreadId,
-            this.toolFingerprint(
-              agent,
-              mcpServers,
-              own,
-              approvals,
-              toolRuntimes,
-              environment,
-              section,
-              proxy,
-              instructionsFile,
-            ),
+            this.toolFingerprint(agent, mcpServers, own, approvals, toolRuntimes, environment, proxy, instructionsFile),
             approvals,
           );
         }
@@ -997,10 +986,9 @@ export class ThreadLifecycle {
    * of a resumed session. It holds paths only. It is added only when it is not empty, so a
    * computer with no GitHub connection keeps the fingerprints it had.
    *
-   * The section-mates go in for the same reason as the profile: they are in the instructions. Only
-   * their sorted ids go in, so a reorder or a rename in the section does not drop the history of
-   * each agent in it; a member who joins or leaves does. An agent with no section adds no value and
-   * keeps its fingerprint.
+   * The section-mates and the memories stay out: they go with the turns (`turnContext`), so a change
+   * keeps the session. `legacySection` gives the fingerprint of a session from before that change,
+   * which had the sorted ids of its section-mates: `hasCurrentToolsEffect` accepts it once.
    *
    * The OAuth proxy goes in for the same reason as the MCP set: a session keeps the proxy address it
    * was given, and a row that gains a sign-in moves from its own URL to a proxy route. Only a set
@@ -1013,9 +1001,9 @@ export class ThreadLifecycle {
     approvals: CodexToolApprovals,
     toolRuntimes: McpToolRuntimes,
     environment: Readonly<Record<string, string>>,
-    section: SectionTeammates | null,
     proxy: string | null,
     instructionsFile: InstructionsFileInPrompt,
+    legacySection: SectionTeammates | null = null,
   ): string {
     const folders = existingAgentFolders(agent);
     const excluded = workspaceExcludedFolders(agent);
@@ -1044,7 +1032,7 @@ export class ThreadLifecycle {
             ...(agentQuickAcknowledgementEnabled(agent, this.#store.agentDefaults()) ? ["quick-acknowledgement"] : []),
           ],
           ...(Object.keys(environment).length > 0 ? [Object.entries(environment).sort()] : []),
-          ...(section ? [section.members.map((member) => member.id).sort()] : []),
+          ...(legacySection ? [legacySection.members.map((member) => member.id).sort()] : []),
           ...(proxy ? [proxy] : []),
           // A loaded session keeps the instruction file that it read or got at its start, so a change
           // to the file adds a new value. Only another file name, or a file with text, adds a value.
@@ -1155,10 +1143,34 @@ export class ThreadLifecycle {
     const instructionsFile = yield* this.#instructionsFile(agent, client);
     const newline = stored.success.indexOf("\n");
     const storedFingerprint = newline < 0 ? stored.success : stored.success.slice(0, newline);
+    // Also the form of a session from before the section-mates went with the turns, with their ids.
+    // That session keeps the old list in its instructions, and its first turn sends the current one.
+    const matches = (sessionApprovals: CodexToolApprovals) =>
+      threadStep(() =>
+        (section ? [null, section] : [null]).some(
+          (legacySection) =>
+            storedFingerprint ===
+            this.toolFingerprint(
+              agent,
+              configs,
+              own,
+              sessionApprovals,
+              toolRuntimes,
+              environment,
+              proxy,
+              instructionsFile,
+              legacySection,
+            ),
+        ),
+      );
     const fingerprint = yield* threadStep(() =>
-      this.toolFingerprint(agent, configs, own, approvals, toolRuntimes, environment, section, proxy, instructionsFile),
+      this.toolFingerprint(agent, configs, own, approvals, toolRuntimes, environment, proxy, instructionsFile),
     );
     if (storedFingerprint === fingerprint) return true;
+    if (section && (yield* matches(approvals))) {
+      yield* this.#writeToolManifest(sessionId, fingerprint, approvals);
+      return true;
+    }
     if (newline < 0) return false;
     // An approval given since the start is in the loaded session already: Codex saved it from that
     // session's answer. Only a revoked one needs a new session. The manifest takes the new approvals,
@@ -1167,20 +1179,7 @@ export class ThreadLifecycle {
       decodeToolApprovals(JSON.parse(stored.success.slice(newline + 1))),
     ).pipe(Effect.orElseSucceed(() => null));
     if (!sessionApprovals || approvalRevoked(sessionApprovals, approvals)) return false;
-    const sessionFingerprint = yield* threadStep(() =>
-      this.toolFingerprint(
-        agent,
-        configs,
-        own,
-        sessionApprovals,
-        toolRuntimes,
-        environment,
-        section,
-        proxy,
-        instructionsFile,
-      ),
-    );
-    if (storedFingerprint !== sessionFingerprint) return false;
+    if (!(yield* matches(sessionApprovals))) return false;
     yield* this.#writeToolManifest(sessionId, fingerprint, approvals);
     return true;
   });

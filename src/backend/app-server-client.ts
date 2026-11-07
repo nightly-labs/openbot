@@ -4,7 +4,9 @@ import { EventEmitter } from "node:events";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Fiber } from "effect";
+import { isTurnContextBlock } from "./agent/developer-instructions";
 import { LOG_TIMESTAMP_PREFIX } from "./agent/provider-diagnostics";
+import { TurnContext } from "./agent/turn-context";
 import { AgentProcessExitError, type AgentProvider, RequestTimeoutError } from "./agent-client";
 import { cliSpawnTarget } from "./cli";
 import { JsonLineDecoder, LineTooLongError } from "./jsonl";
@@ -66,6 +68,18 @@ export class AppServerError extends Error {
 export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   readonly contextCompaction = "events";
   readonly provider: AgentProvider = "codex";
+  /**
+   * The memories and section-mates go with the turns. Codex keeps the developer instructions that a
+   * session started with, also on `thread/resume`, so in the instructions a change reached only a
+   * new session, which writes the full conversation to the cache again.
+   */
+  readonly turnContext = true;
+  /**
+   * Kept by thread across process restarts and `thread/unsubscribe`: a resumed thread holds the
+   * blocks that it was sent. An ephemeral thread (a routine run) ends with its unsubscribe.
+   */
+  readonly #turnContext = new TurnContext();
+  readonly #ephemeralThreads = new Set<string>();
   readonly #executable: string;
   readonly #requestTimeoutMs: number;
   #decoder = new JsonLineDecoder();
@@ -312,22 +326,32 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     const child = this.#process;
     return yield* Effect.callback<T, ProviderClientOperationError>((resume) => {
       this.#pending.set(id, {
-        resolve: (value) =>
+        resolve: (value) => {
+          this.#trackTurnContext(method, params, value);
           resume(
             Effect.try({
               try: () => decoder(value),
               catch: (cause) => new ProviderClientOperationError({ cause }),
             }),
-          ),
-        reject: (cause) => resume(Effect.fail(new ProviderClientOperationError({ cause }))),
+          );
+        },
+        reject: (cause) => {
+          // A refused turn is not in the history, so the next turn sends its blocks again.
+          if (method === "turn/start") this.#resendTurnContext(params);
+          resume(Effect.fail(new ProviderClientOperationError({ cause })));
+        },
       });
       try {
-        this.#write({ method, id, params: method === "thread/resume" ? metadataOnlyResumeParams(params) : params });
+        this.#write({ method, id, params: this.#wireParams(method, params) });
+        // Also when Codex answers `NotSubscribed`: nothing resumes an ephemeral thread.
+        if (method === "thread/unsubscribe" && isRecord(params) && isString(params.threadId))
+          if (this.#ephemeralThreads.has(params.threadId)) this.#forgetTurnContext(params.threadId);
         if (method === "turn/interrupt" && isRecord(params) && isString(params.threadId) && isString(params.turnId)) {
           this.#interruptedTurns.add(JSON.stringify([params.threadId, params.turnId]));
           this.#cancelToolRequests(params.threadId, params.turnId);
         }
       } catch (cause) {
+        if (method === "turn/start") this.#resendTurnContext(params);
         resume(Effect.fail(new ProviderClientOperationError({ cause })));
       }
       return Effect.sync(() => this.#pending.delete(id));
@@ -357,6 +381,57 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   respondError(id: RequestId, error: RpcError): void {
     const codexId = this.#takeServerRequestId(id);
     if (codexId !== undefined) this.#write({ id: codexId, error });
+  }
+
+  /**
+   * The params as Codex gets them. The turn context fields stay on this side, and a turn takes its
+   * blocks in front of the user's input, each a text item of its own, so that history readers can
+   * tell them from the user's text.
+   */
+  #wireParams(method: string, params: unknown): unknown {
+    if (method === "thread/start") return withoutTurnContextParams(params);
+    if (method === "thread/resume") return { ...withoutTurnContextParams(params), excludeTurns: true };
+    if (method !== "turn/start" || !isRecord(params) || !isString(params.threadId) || !Array.isArray(params.input))
+      return params;
+    const blocks = this.#turnContext.take(params.threadId);
+    if (blocks.length === 0) return params;
+    return { ...params, input: [...blocks.map((text) => ({ type: "text", text })), ...params.input] };
+  }
+
+  /** Takes the turn context of a thread that Codex started or resumed, and drops it with the thread. */
+  #trackTurnContext(method: string, params: unknown, result: unknown): void {
+    if (method === "thread/start") {
+      const thread = isRecord(result) ? result.thread : undefined;
+      if (!isRecord(thread) || !isString(thread.id)) return;
+      this.#turnContext.set(thread.id, params, false);
+      if (isRecord(params) && params.ephemeral === true) this.#ephemeralThreads.add(thread.id);
+      return;
+    }
+    if (!isRecord(params) || !isString(params.threadId)) return;
+    if (method === "thread/resume") this.#turnContext.set(params.threadId, params, true);
+    else if (method === "thread/archive" || method === "thread/delete") this.#forgetTurnContext(params.threadId);
+  }
+
+  #forgetTurnContext(threadId: string): void {
+    this.#turnContext.forget(threadId);
+    this.#ephemeralThreads.delete(threadId);
+  }
+
+  #resendTurnContext(params: unknown): void {
+    if (isRecord(params) && isString(params.threadId)) this.#turnContext.resend(params.threadId);
+  }
+
+  /**
+   * A failed turn may not be kept, and a compaction summary can leave the blocks out. The next turn
+   * of the thread sends them in full.
+   */
+  #observeTurnContext(method: string, params: unknown): void {
+    if (!isRecord(params) || !isString(params.threadId)) return;
+    const failed = method === "turn/completed" && isRecord(params.turn) && params.turn.status === "failed";
+    const compacted =
+      method === "thread/compacted" ||
+      (method === "item/completed" && isRecord(params.item) && params.item.type === "contextCompaction");
+    if (failed || compacted) this.#turnContext.resend(params.threadId);
   }
 
   #takeServerRequestId(id: RequestId): RequestId | undefined {
@@ -415,6 +490,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
           this.#cancelToolRequests(message.params.threadId, message.params.turn.id);
           this.#interruptedTurns.delete(JSON.stringify([message.params.threadId, message.params.turn.id]));
         }
+        this.#observeTurnContext(message.method, message.params);
         this.emit("notification", { method: message.method, params: message.params });
       }
       return;
@@ -506,8 +582,11 @@ interface HistoryItemPage {
   nextCursor: string | null;
 }
 
-function metadataOnlyResumeParams(params: unknown): DynamicRecord {
-  return { ...(isRecord(params) ? params : {}), excludeTurns: true };
+/** The params without the fields that `ThreadLifecycle` adds for a client with `turnContext`. */
+function withoutTurnContextParams(params: unknown): DynamicRecord {
+  if (!isRecord(params)) return {};
+  const { memoryContext: _memories, sectionTeammates: _section, turnStyleReminder: _style, ...rest } = params;
+  return rest;
 }
 
 function decodeTurnHistoryPage(value: unknown): HistoryTurnPage {
@@ -547,7 +626,13 @@ function decodeHistoryItemEntry(value: unknown): { turnId: string; item: ThreadI
   }
   // Preserve provider item fields (tool output, image metadata, command status, and so on) while
   // validating the discriminator at the untrusted app-server boundary.
-  return { turnId: value.turnId, item: { ...value.item, type: value.item.type } };
+  const item: ThreadItem = { ...value.item, type: value.item.type };
+  // The turn context blocks are text items of their own in front of the user's text.
+  if (item.type === "userMessage" && Array.isArray(item.content))
+    item.content = item.content.filter(
+      (part) => !(part.type === "text" && isString(part.text) && isTurnContextBlock(part.text)),
+    );
+  return { turnId: value.turnId, item };
 }
 
 function nullableString(value: unknown, label: string): string | null {
