@@ -389,8 +389,10 @@ export function AgentEventBridge() {
           const provider = event.provider ? providerDisplayName(event.provider) : null;
           const run =
             provider && event.model ? currentText().t("agent.error.run", { provider, model: event.model }) : provider;
+          // Google asks the user to verify the account in a browser before Gemini answers (#2419).
+          const link = event.link;
           setConversationErrorRuns((current) => {
-            if (run) return { ...current, [key]: { message, run } };
+            if (run || link) return { ...current, [key]: { message, run, ...(link ? { link } : {}) } };
             if (!(key in current)) return current;
             const { [key]: _replaced, ...next } = current;
             return next;

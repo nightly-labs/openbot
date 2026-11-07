@@ -15,6 +15,7 @@ export const messages = {
   "composer.signIn.label": "Войти в {provider}",
   "composer.signIn.action": "Войти",
   "composer.updateKey.action": "Сменить ключ",
+  "composer.verifyAccount.action": "Подтвердить аккаунт",
   "composer.update.body": "Обновите {provider}, чтобы продолжить.",
   "composer.update.manual": "Обновите {provider} на компьютере, где он запущен, чтобы продолжить.",
   "composer.update.pending": "Обновление…",

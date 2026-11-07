@@ -399,14 +399,18 @@ export function createConversationViewScope(props: ConversationProps) {
     const entry = composerErrorReferences()[composerDraftKey(target)];
     return entry?.message === message ? entry.reference : null;
   });
-  /** The provider and model of the run behind the shown error. A later error of another run shows none. */
-  const currentChatErrorRun = createMemo(() => {
+  /** The run and account page behind the shown error. A later error of another run shows neither. */
+  const currentChatErrorEntry = createMemo(() => {
     const target = currentTarget();
     const message = currentChatError();
     if (!target || !message) return null;
     const entry = conversationErrorRuns()[composerDraftKey(target)];
-    return entry?.message === message ? entry.run : null;
+    return entry?.message === message ? entry : null;
   });
+  /** The provider and model of the run behind the shown error. */
+  const currentChatErrorRun = () => currentChatErrorEntry()?.run ?? null;
+  /** The page that fixes the account behind the shown error (#2419). */
+  const currentChatErrorLink = () => currentChatErrorEntry()?.link ?? null;
   /** True while a file import for the chat waits. An import for another chat does not stop this one. */
   const attachmentBusy = (target = currentTarget()) =>
     target !== undefined && importingDrafts().has(composerDraftKey(target));
@@ -2067,7 +2071,11 @@ export function createConversationViewScope(props: ConversationProps) {
     }
   });
 
-  async function openExternalMessageUrl(url: string) {
+  /**
+   * `ownBrowser` skips the built-in browser: an account page, such as Google's verification page,
+   * must open where the user signed in to the provider (#2419).
+   */
+  async function openExternalMessageUrl(url: string, options: { ownBrowser?: boolean } = {}) {
     const target = currentTarget();
     const runtime = conversationRuntime(props);
     try {
@@ -2075,6 +2083,7 @@ export function createConversationViewScope(props: ConversationProps) {
       // A joined server's browser runs on its host, and the other members see its tabs.
       // When no tab opens, the link opens as it does with no setting.
       if (
+        !options.ownBrowser &&
         props.openLinksInBrowser &&
         props.server?.kind !== "remote" &&
         props.browserEnabled !== false &&
@@ -2413,6 +2422,7 @@ export function createConversationViewScope(props: ConversationProps) {
     currentChatError,
     currentChatErrorReference,
     currentChatErrorRun,
+    currentChatErrorLink,
     currentChatConversationKey,
     dismissCurrentChatErrors,
     dismissAwaitingReplies,

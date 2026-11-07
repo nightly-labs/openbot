@@ -14,6 +14,7 @@ export const messages = {
   "composer.signIn.label": "登录 {provider}",
   "composer.signIn.action": "登录",
   "composer.updateKey.action": "更新密钥",
+  "composer.verifyAccount.action": "验证账号",
   "composer.update.body": "请更新 {provider} 后继续。",
   "composer.update.manual": "请在运行它的电脑上更新 {provider} 后继续。",
   "composer.update.pending": "正在更新…",

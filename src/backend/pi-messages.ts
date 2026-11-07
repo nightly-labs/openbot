@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import { isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
+import { withoutTurnContext } from "./agent/developer-instructions";
 import { getArray, getString, isRecord, type ThreadItem } from "./protocol";
 import { providerCall, providerFailure } from "./provider-client-effects";
 
@@ -21,7 +22,7 @@ export function piMessageItems(message: unknown, id: string): ThreadItem[] {
       {
         id,
         type: "userMessage",
-        content: [{ type: "text", text: piText(isRecord(message) ? message.content : null) }],
+        content: [{ type: "text", text: withoutTurnContext(piText(isRecord(message) ? message.content : null)) }],
       },
     ];
   if (role === "toolResult")

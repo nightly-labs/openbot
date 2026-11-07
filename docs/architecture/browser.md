@@ -348,7 +348,8 @@ profile, so they share its sign-ins; a profile has no owner agent, and the tab r
 change. The name is a label only and never becomes a path or a partition, so a rename keeps the
 data. An agent with `browserProfileId` also has `ownBrowserSession: true`. After a downgrade, an
 older build thus opens such an agent in a session of its own, never in the shared one. A duplicate
-and an imported agent start with Shared. The user's tabs in an agent's panel use the agent's partition, so
+keeps the named profile of its source. Other duplicates and imported agents start with Shared, because
+an "Only this agent" copy would get a new, empty partition. The user's tabs in an agent's panel use the agent's partition, so
 the user can sign in for the agent there.
 
 `openPrivate` opens a sign-in page for another person in an in-memory partition. The tab is not

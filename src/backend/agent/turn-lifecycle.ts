@@ -119,6 +119,19 @@ interface HeldProviderError {
   context: FailureContext & { causeCode: CauseCode };
   /** A spent balance or quota: the usage notice explains it, so a turn that does not move shows no banner. */
   quiet?: boolean;
+  /** The Google page where the user fixes the account that failed the turn. */
+  link?: string;
+}
+
+/**
+ * The page that an ACP client names for an account the user must fix (#2419). Only a Google sign-in
+ * page: the error banner opens it, and the other clients pass their provider's fields through.
+ */
+function accountLink(params: unknown): string | undefined {
+  const link = getString(params, "link");
+  if (!link || !URL.canParse(link)) return undefined;
+  const url = new URL(link);
+  return url.protocol === "https:" && url.hostname === "accounts.google.com" ? link : undefined;
 }
 
 export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTarget {
@@ -155,7 +168,8 @@ export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTar
 export interface TurnHooks {
   emitFailure?(failure: FailureSignal): void;
   emit(event: AgentEvent): void;
-  emitError(code: string, error: unknown, agentId?: string, context?: FailureContext): void;
+  /** `link` is a page that the error banner opens. It is not part of the failure report. */
+  emitError(code: string, error: unknown, agentId?: string, context?: FailureContext, link?: string): void;
   emitRuntimeSnapshot(): void;
   scheduleDrain(agentId: string): void;
   /**
@@ -616,7 +630,7 @@ export class TurnLifecycle {
   #showFailoverError(agentId: string, threadId: string, failover: HeldProviderError): void {
     const taskId = this.#taskForThread(agentId, threadId);
     if (taskId === null && !failover.quiet) {
-      this.#hooks.emitError("agent_error", failover.message, agentId, failover.context);
+      this.#hooks.emitError("agent_error", failover.message, agentId, failover.context, failover.link);
       return;
     }
     this.#hooks.emitFailure?.({ code: "agent_error", agentId, ...failover.context });
@@ -1041,6 +1055,7 @@ export class TurnLifecycle {
           turnId: errorTurnId,
           severity: notification.method === "warning" ? ("warning" as const) : ("error" as const),
         };
+        const link = notification.method === "error" ? accountLink(params) : undefined;
         // A provider error moves an agent set to switch without asking to its next backup model. The
         // error waits for the end of the turn: a turn that did nothing yet runs again there instead.
         if (
@@ -1051,7 +1066,7 @@ export class TurnLifecycle {
           FAILOVER_CAUSES.has(context.causeCode) &&
           this.#mayHoldError(agentId, errorTurnId, context.causeCode)
         ) {
-          this.#failoverTurns.set(errorTurnId, { message, context });
+          this.#failoverTurns.set(errorTurnId, { message, context, ...(link ? { link } : {}) });
           return;
         }
         const taskId =
@@ -1059,7 +1074,7 @@ export class TurnLifecycle {
         if (taskId !== null) {
           this.#hooks.emitFailure?.({ code: "agent_error", ...(agentId ? { agentId } : {}), ...context });
           this.#hooks.taskFailed(taskId, message);
-        } else this.#hooks.emitError(`agent_${notification.method}`, message, agentId, context);
+        } else this.#hooks.emitError(`agent_${notification.method}`, message, agentId, context, link);
       }
     }
   }).bind(this);
