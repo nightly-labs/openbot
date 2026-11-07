@@ -1,3 +1,4 @@
+import { basename, dirname } from "node:path";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { getArray, getRecord, getString, isRecord } from "../protocol";
 
@@ -15,8 +16,8 @@ export const CODEX_UNFIT_SKILLS = [
   "work-pets:update-pet",
 ] as const;
 
-/** One `[[skills.config]]` entry: Codex selects the skill by `name` or by `path`. */
-export type CodexSkillConfig = DynamicRecord & { enabled: boolean };
+/** One `[[skills.config]]` entry: Codex selects the skill by `name` or by the `path` of its `SKILL.md`. */
+export type CodexSkillConfig = DynamicRecord;
 
 export interface CodexPromptSettings {
   /**
@@ -35,8 +36,9 @@ export interface CodexPromptSettings {
  *
  * The merged `features` table also holds values that no file sets, so a feature counts as the
  * user's only when a file layer (the user's `config.toml` or the system one) sets it. A thread value
- * for `skills.config` replaces the whole merged list, so the user's entries go first and OpenBot
- * adds only the skills that no entry names.
+ * for `skills.config` replaces the whole merged list, so the user's entries go first, as they are,
+ * and OpenBot adds only the skills that no entry names. An entry by `path` names the skill of its
+ * folder, as `…/create-pet/SKILL.md` names `work-pets:create-pet`.
  */
 export function codexPromptSettings(read: DynamicRecord | null): CodexPromptSettings {
   if (!read) return {};
@@ -45,11 +47,14 @@ export function codexPromptSettings(read: DynamicRecord | null): CodexPromptSett
   const userSets = (feature: string) =>
     layers.some((layer) => typeof getRecord(getRecord(layer, "config"), "features")?.[feature] === "boolean");
   if (!userSets("tool_suggest")) settings["features.tool_suggest"] = false;
-  const own = getArray(getRecord(getRecord(read, "config"), "skills"), "config").filter(
-    (entry): entry is CodexSkillConfig => isRecord(entry) && typeof entry.enabled === "boolean",
-  );
+  const own = getArray(getRecord(getRecord(read, "config"), "skills"), "config").filter(isRecord);
   const named = new Set(own.map((entry) => getString(entry, "name")));
-  const added = CODEX_UNFIT_SKILLS.filter((name) => !named.has(name)).map((name) => ({ name, enabled: false }));
+  const folders = new Set(
+    own.flatMap((entry) => getString(entry, "path") ?? []).map((path) => basename(dirname(path))),
+  );
+  const added = CODEX_UNFIT_SKILLS.filter(
+    (name) => !named.has(name) && !folders.has(name.slice(name.lastIndexOf(":") + 1)),
+  ).map((name) => ({ name, enabled: false }));
   if (added.length > 0) settings["skills.config"] = [...own, ...added];
   return settings;
 }

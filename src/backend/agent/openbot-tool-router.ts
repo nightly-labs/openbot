@@ -162,6 +162,19 @@ const API_KEY_TOOLS: ReadonlySet<string> = new Set([
   "save_api_key",
 ]);
 
+/**
+ * Interrupts the operation it races when the provider cancels the tool request, as on Stop. The
+ * interruption runs the operation's finalizers, which stop a browser action or a side Codex process.
+ */
+function requestAborted(signal: AbortSignal | undefined) {
+  return Effect.callback<never>((resume) => {
+    const abort = () => resume(Effect.interrupt);
+    if (signal?.aborted) abort();
+    else signal?.addEventListener("abort", abort, { once: true });
+    return Effect.sync(() => signal?.removeEventListener("abort", abort));
+  });
+}
+
 /** The characters of an agent description that `list_agents` returns. `read_agent` returns all of it. */
 const LISTED_DESCRIPTION_LENGTH = 300;
 
@@ -564,15 +577,9 @@ export class OpenBotToolRouter {
               }
             });
             const signal = toolRequest.signal;
-            const cancelled = Effect.callback<never>((resume) => {
-              const abort = () => resume(Effect.interrupt);
-              if (signal?.aborted) abort();
-              else signal?.addEventListener("abort", abort, { once: true });
-              return Effect.sync(() => signal?.removeEventListener("abort", abort));
-            });
             if (signal?.aborted) return;
             const result = yield* operation.pipe(
-              Effect.raceFirst(cancelled),
+              Effect.raceFirst(requestAborted(signal)),
               Effect.onInterrupt(() => Effect.sync(() => this.#browser.endControl(params.threadId, params.turnId))),
             );
             if (signal?.aborted || !client.running) return;
@@ -655,9 +662,12 @@ export class OpenBotToolRouter {
               Effect.tap((result) => Effect.sync(() => client.respond(toolRequest.id, result))),
             );
             // Both store a file and then add the message that names it.
-            yield* tool === "attach_files_to_response" || tool === "html_render"
-              ? Effect.uninterruptible(response)
-              : response;
+            if (tool === "attach_files_to_response" || tool === "html_render") yield* Effect.uninterruptible(response);
+            // A side Codex search can take up to two minutes on the user's ChatGPT quota, so Stop ends it.
+            else if (tool === "web_search") {
+              if (toolRequest.signal?.aborted) return;
+              yield* response.pipe(Effect.raceFirst(requestAborted(toolRequest.signal)));
+            } else yield* response;
             return;
           }
           throw new Error(`Unsupported dynamic tool namespace: ${toolRequest.params.namespace}`);

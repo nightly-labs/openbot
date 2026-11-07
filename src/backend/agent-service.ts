@@ -4806,7 +4806,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * Answers `openbot.web_search` with one turn on a new Codex thread whose only tool is live web
    * search, on the Codex sign-in of this computer. Only agents on a provider with no web search of
    * its own get the tool (`tool-catalog.ts`). The search model only reads the results, so it is the
-   * small default model, with low effort. The usage counts for the agent.
+   * small default model, with low effort. The usage counts for the agent. Like other background
+   * work, a search leaves one generation slot for the user's own.
    */
   readonly #searchWeb = Effect.fn("AgentService.searchWeb")(function* (
     this: AgentService,
@@ -4817,10 +4818,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const agent = this.listAgents().find((candidate) => candidate.id === agentId);
     if (!agent) return yield* failed(sourceText("error.agent.gone"));
     if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
-    if (this.#profileClients.busy()) return yield* failed(sourceText("error.agent.webSearchBusy"));
-    yield* this.#providers
-      .ensureProvider("codex")
-      .pipe(Effect.mapError(() => failed(sourceText("error.agent.webSearchSignIn"))));
+    if (!this.#profileClients.hasSpare()) return yield* failed(sourceText("error.agent.webSearchBusy"));
+    yield* this.#providers.ensureProvider("codex").pipe(
+      Effect.tapError((failure) =>
+        Effect.sync(() => logger.warn("Codex is not ready for a web search.", { agentId, error: failure })),
+      ),
+      Effect.mapError(() => failed(sourceText("error.agent.webSearchSignIn"))),
+    );
+    // Codex can take a while to start, and a shutdown or other generations can begin in that time.
+    if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
+    if (!this.#profileClients.hasSpare()) return yield* failed(sourceText("error.agent.webSearchBusy"));
     const models = this.#endpoints.available().filter((model) => model.provider === "codex");
     const model =
       models.find((candidate) => candidate.id === agentProviderDescriptor("codex").defaultModel) ?? models[0];
