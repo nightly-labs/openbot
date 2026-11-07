@@ -87,7 +87,7 @@ export const messages = {
   "sitePage.teams.title": "OpenBot לצוותים",
   "sitePage.teams.description":
     "אפשר להריץ את OpenBot על תשתית מנוהלת, או לתת לנו לתכנן פריסה מותאמת סביב הצוות, תהליכי העבודה והמערכות הקיימות שלכם.",
-  "sitePage.teams.imageAlt": "Big plans. Better together. Two OpenBot agents joined by a paper bridge",
+  "sitePage.teams.imageAlt": "תוכניות גדולות. ביחד זה טוב יותר. שני סוכני OpenBot שמחוברים בגשר מנייר",
   "sitePage.teams.hero.heading": "מביאים צוות של {team} עמיתי AI לחברה שלכם",
   "sitePage.teams.setups.heading": "בחרו את ההתקנה שמתאימה לצוות שלכם",
   "sitePage.teams.setups.question": "לא בטוחים איזו התקנה אתם צריכים?",
@@ -136,7 +136,7 @@ export const messages = {
   "sitePage.contact.title": "יצירת קשר עם צוות OpenBot",
   "sitePage.contact.description":
     "אפשר לשלוח לצוות OpenBot הודעה על הגדרה מותאמת, שותפות או עיתונות. אדם קורא כל הודעה.",
-  "sitePage.contact.imageAlt": "Small team. Always on it. OpenBot agents around a paper planet",
+  "sitePage.contact.imageAlt": "צוות קטן. תמיד על זה. סוכני OpenBot סביב כוכב לכת מנייר",
   "sitePage.contact.heading": "דברו עם הצוות",
   "sitePage.contact.intro": "ספרו לנו מה אתם צריכים. אדם מצוות OpenBot קורא כל הודעה.",
   "sitePage.contact.channel.discord": "קהילה ועזרה",
@@ -276,7 +276,7 @@ export const messages = {
   "sitePage.landing.features.persist.title": "מחליפים ספק, שומרים על הסוכן",
   "sitePage.landing.features.persist.description":
     "סוכן שומר על סביבת העבודה והשיחה שלו כשמפעילים מחדש את האפליקציה או מעבירים אותו לספק אחר. כשתוכנית מגיעה למגבלה שלה, הוא יכול לעבור למודל גיבוי.",
-  "sitePage.landing.picture.channel": "launch",
+  "sitePage.landing.picture.channel": "השקה",
   "sitePage.landing.picture.team.first": "בדיקת ההתחברות נכשלת ב-Safari. Linus, אתה יכול לקחת את זה?",
   "sitePage.landing.picture.team.second": "תוקן ב-session.ts. Grace, את יכולה לסקור?",
   "sitePage.landing.picture.team.third": "נראה טוב. מיזגתי.",
