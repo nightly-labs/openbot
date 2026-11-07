@@ -25,7 +25,7 @@ import { formatMessageTime } from "../../../app-message-projection";
 import { groupAgentMessageMarkers, markOpenAgentMessages } from "../agent-message-timeline";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
 import { summarizeHostedSiteMessages } from "../hosted-site-timeline";
-import { narrationRows } from "../narration-rows";
+import { narrationRows, placeTurnRowsByTime } from "../narration-rows";
 import {
   expandRoutineRunGroups,
   groupRoutineRunMarkers,
@@ -97,12 +97,19 @@ export function createScrollStore(deps: ScrollStoreDeps) {
       ]),
   );
   // A channel folds the text that a member writes after its answer into the steps, such as a "Done."
-  // (channel-service). It is not progress, so it stays in the steps.
+  // (channel-service). It is not progress, so it stays in the steps. A file that the agent attaches
+  // while it works has no text and does not end the turn.
   const channelAnswerTimes = createMemo(() => {
     const times = new Map<string, string>();
     if (!deps.props.channel) return times;
     for (const message of deps.props.messages)
-      if (message.turnId && message.createdAt && isTurnAnswer(message) && !times.has(message.turnId))
+      if (
+        message.turnId &&
+        message.createdAt &&
+        message.body.trim() &&
+        isTurnAnswer(message) &&
+        !times.has(message.turnId)
+      )
         times.set(message.turnId, message.createdAt);
     return times;
   });
@@ -117,16 +124,22 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   };
   const shownMessages = createMemo(() => {
     const progressUpdates = deps.props.responseStyle === "natural";
-    const shown = deps.props.messages.flatMap((message) => {
+    const channelTurnRows: AgentMessage[][] = [];
+    const listed = deps.props.messages.flatMap((message) => {
       if (message.kind === "thinking") {
         const rows = progressUpdates ? progressRows(message) : [];
         const showsSteps =
           message.turnId && !thinkingRowHiddenTurns().has(message.turnId) && message.items?.some((item) => item.trim());
-        return showsSteps ? [...rows, message] : rows;
+        const turnRows = showsSteps ? [...rows, message] : rows;
+        if (!deps.props.channel) return turnRows;
+        channelTurnRows.push(turnRows);
+        return [];
       }
       if (message.kind === "memory-changes" && answeredTurns().has(message.turnId)) return [];
       return silentAgentAnswer(message) ? [] : [message];
     });
+    // Members of a channel work at the same time, so each update goes where its time puts it.
+    const shown = deps.props.channel ? placeTurnRowsByTime(listed, channelTurnRows) : listed;
     // Natural shows an agent's text once it is complete, as one bubble, while the activity line
     // names the step. A bubble that grows as the text arrives moves the chat at each line. A channel
     // has no such activity line, so its members' text shows as it arrives.
