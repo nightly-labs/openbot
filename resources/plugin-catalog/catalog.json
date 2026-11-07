@@ -58,9 +58,9 @@
     },
     {
       "slug": "cobrain",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "featured": false,
-      "detailSha256": "223912ea4e10146bc8518f7d6cfa45cd19f52de7f76cee37e11c9e8c3be2dde5"
+      "detailSha256": "8e118bd0e95cba265b14bb9e30ea8509fda05721b095a12ad503cc5aaf8ff550"
     },
     {
       "slug": "figma",

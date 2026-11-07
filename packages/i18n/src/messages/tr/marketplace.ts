@@ -209,11 +209,11 @@ export const messages = {
   "marketplace.plugin.notion.prompt.updateDoc": "Katılım belgesini yeni sürüm kontrol listesiyle güncelle.",
   "marketplace.plugin.cobrain.tagline": "AI ajanlarınız için ortak bellek",
   "marketplace.plugin.cobrain.description":
-    "Cobrain, OpenBot’un dışında duran ve size ait olan bir Markdown belleğidir: aynı notlar Claude, ChatGPT, Codex ve bağladığınız diğer tüm yapay zekâlarda çalışır. Tek bir uygulamadan uzun yaşaması gerekenler için OpenBot’un kendi belleğinin yanında kullanın. “Bu müşteriyi Cobrain’e kaydet” ya da “Dün X projesi hakkında ne karar verdik?” deyin; ertesi gün Claude veya ChatGPT aynı notları okur. Her kullanıcı kendi Cobrain hesabıyla giriş yapar.",
+    "Cobrain, OpenBot'un dışında duran ve size ait olan bir Markdown belleğidir: aynı notlar Claude, ChatGPT, Codex ve bağladığınız diğer tüm yapay zekâlarda çalışır. Tek bir uygulamadan uzun yaşaması gerekenler için OpenBot'un kendi belleğinin yanında kullanın. “Bu müşteriyi Cobrain'e kaydet” ya da “Dün X projesi hakkında ne karar verdik?” deyin; ertesi gün Claude veya ChatGPT aynı notları okur. Her kullanıcı kendi Cobrain hesabıyla giriş yapar.",
   "marketplace.plugin.cobrain.app":
     "Tek bir MCP sunucusu üzerinden Cobrain beyninizdeki notları okuma, arama ve yazma.",
   "marketplace.plugin.cobrain.prompt.firstNote":
-    "Benim ve işim hakkında zaten bildiklerini klasörlere düzenleyerek Cobrain’e kaydet, sonra eksik olanları bana sor.",
+    "Bu proje hakkında Cobrain'e kısa bir not kaydet: hedef, şimdiye kadarki kararlar ve sonraki adım.",
   "marketplace.plugin.cobrain.prompt.whatYouKnow": "Cobrain'den benim hakkımda ne biliyorsun?",
   "marketplace.plugin.cobrain.prompt.saveNote": "Bugün ne yaptığımızı ve neyin kaldığını Cobrain'e not olarak kaydet.",
   "marketplace.plugin.figma.tagline": "Tasarımlar ve prototipler",

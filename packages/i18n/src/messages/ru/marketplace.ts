@@ -213,7 +213,7 @@ export const messages = {
     "Cobrain — это ваша собственная память в формате Markdown вне OpenBot: одни и те же заметки работают в Claude, ChatGPT, Codex и любом другом подключённом ИИ. Используйте её рядом с памятью OpenBot для того, что должно пережить одно приложение. Попросите «Сохрани этого клиента в Cobrain» или «Что мы вчера решили по проекту X?», и завтра Claude или ChatGPT прочитают те же заметки. Каждый пользователь входит в свой аккаунт Cobrain.",
   "marketplace.plugin.cobrain.app": "Чтение, поиск и запись заметок в вашем Cobrain через один сервер MCP.",
   "marketplace.plugin.cobrain.prompt.firstNote":
-    "Сохраните в Cobrain то, что вы уже знаете обо мне и моей работе, разложив по папкам, а потом спросите, чего не хватает.",
+    "Сохраните в Cobrain короткую заметку об этом проекте: цель, принятые решения и следующий шаг.",
   "marketplace.plugin.cobrain.prompt.whatYouKnow": "Что вы знаете обо мне из Cobrain?",
   "marketplace.plugin.cobrain.prompt.saveNote":
     "Сохраните в Cobrain заметку о том, что мы сделали сегодня и что осталось.",
