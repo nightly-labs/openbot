@@ -42,7 +42,7 @@ const CONTEXT_COMPACTION_THRESHOLD = 0.8;
  * compacted it without end (#5150). A session left just below the threshold reached it again after
  * one turn: one chat compacted 25 times in 27 minutes.
  */
-const INEFFECTIVE_COMPACTION_SHARE = 0.7;
+const INEFFECTIVE_COMPACTION_SHARE = CONTEXT_COMPACTION_THRESHOLD - 0.1;
 /** After this many such compactions in a row, OpenBot stops asking for more and tells the user. */
 const INEFFECTIVE_COMPACTION_LIMIT = 2;
 /**
@@ -330,12 +330,13 @@ export class ContextCompaction {
     if (afterCompaction) this.#checkCompaction(budget, agentId);
 
     const pressured = usedTokens / contextWindow >= CONTEXT_COMPACTION_THRESHOLD;
-    // Only a compaction that helps starts the ineffective count again: a session below the threshold
-    // can be one that a compaction left just below it.
     if (!pressured) {
       budget.pending = false;
       budget.lastCompactedTokens = null;
       budget.failedCompactions = 0;
+      // A session that a compaction left just below the threshold keeps its count. One that became
+      // smaller in another way, such as with fewer tools, compacts again.
+      if (usedTokens / contextWindow < INEFFECTIVE_COMPACTION_SHARE) budget.ineffectiveCompactions = 0;
       return;
     }
     if (budget.phase !== "idle") return;
