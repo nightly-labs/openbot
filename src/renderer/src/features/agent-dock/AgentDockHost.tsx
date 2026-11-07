@@ -30,6 +30,7 @@ import { agentDockPort } from "./agent-dock-port";
 import {
   type AgentDockPlacement,
   agentDockSeats,
+  sameAgentDockSeats,
   saveAgentDockOffset,
   setAgentDockSeats,
   useAgentDockPreference,
@@ -98,15 +99,19 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
   const { workingTurns, agentStates, agentMoods } = createAgentActivity();
   const { sidebarLayout, pinnedSidebarItems } = useSidebar();
   const preference = useAgentDockPreference();
-  const seatIds = createMemo(() =>
-    agentDockSeats(
-      serverId,
-      sidebarAgentOrder(agentList(), {
-        layout: sidebarLayout(),
-        pinnedItems: pinnedSidebarItems(),
-        hiddenAgentIds: userHiddenAgentIds(),
-      }).map((agent) => agent.id),
-    ),
+  const seatIds = createMemo(
+    () =>
+      agentDockSeats(
+        serverId,
+        () =>
+          sidebarAgentOrder(agentList(), {
+            layout: sidebarLayout(),
+            pinnedItems: pinnedSidebarItems(),
+            hiddenAgentIds: userHiddenAgentIds(),
+          }).map((agent) => agent.id),
+        userHiddenAgentIds(),
+      ),
+    { equals: sameAgentDockSeats },
   );
   const [openAgentId, setOpenAgentId] = createSignal<string | null>(null);
 

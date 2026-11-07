@@ -614,16 +614,19 @@ export function AgentDock(props: AgentDockProps) {
     layout(seats, true);
   }
 
-  /* The seats follow the props. One change moves; more at once, such as the first load, jump. */
+  /* The seats follow the props, in their order. One change moves: an added seat comes in at the
+     bottom. More at once, such as the first load, or a new order, jump. */
   createEffect(
     () => props.seats.map((seat) => seat.agent.id),
     (ids) =>
       untrack(() => {
         const removed = state.seats.filter((id) => !leaving.has(id) && !ids.includes(id));
         const added = ids.filter((id) => !state.seats.includes(id));
-        if (removed.length + added.length === 0) return;
-        if (removed.length + added.length > 1) {
-          setSeats([...state.seats.filter((id) => !removed.includes(id)), ...added]);
+        const moved = [...state.seats.filter((id) => !leaving.has(id) && !removed.includes(id)), ...added];
+        const inOrder = moved.length === ids.length && moved.every((id, index) => id === ids[index]);
+        if (inOrder && removed.length + added.length === 0) return;
+        if (!inOrder || removed.length + added.length > 1) {
+          setSeats(ids);
           return;
         }
         for (const id of removed) takeAgent(id);

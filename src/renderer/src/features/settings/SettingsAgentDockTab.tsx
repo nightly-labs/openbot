@@ -35,6 +35,7 @@ import {
 export interface AgentDockSettingsModel {
   server: { id: string; name: string } | null;
   agents: readonly ComposerAgent[];
+  hiddenAgentIds: ReadonlySet<string>;
 }
 
 const PLACEMENT_LABEL = {
@@ -55,10 +56,7 @@ export function SettingsAgentDockTab(props: { model: AgentDockSettingsModel; sel
   const seats = createMemo(() => {
     const server = props.model.server;
     return server
-      ? agentDockSeats(
-          server.id,
-          props.model.agents.map((agent) => agent.id),
-        )
+      ? agentDockSeats(server.id, () => props.model.agents.map((agent) => agent.id), props.model.hiddenAgentIds)
       : [];
   });
 

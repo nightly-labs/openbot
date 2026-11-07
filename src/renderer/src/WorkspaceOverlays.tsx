@@ -888,6 +888,7 @@ function AppSettings(props: AccountProps) {
         pinnedItems: pinnedSidebarItems(),
         hiddenAgentIds: userHiddenAgentIds(),
       }),
+      hiddenAgentIds: userHiddenAgentIds(),
     };
   });
   /** Live voice runs on this computer's Codex, whose status shows only while this computer is active. */

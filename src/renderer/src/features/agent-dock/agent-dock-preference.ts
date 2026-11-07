@@ -85,7 +85,8 @@ function readSeats(serverId: string): string[] | null {
     const parsed = seatsSchema.parse(JSON.parse(raw));
     return [...new Set(parsed.flatMap((id) => (id ? [id] : [])))];
   } catch {
-    return [];
+    // Blocked storage or a damaged value: the dock shows the default agents.
+    return null;
   }
 }
 
@@ -142,12 +143,26 @@ const AGENT_DOCK_DEFAULT_SEATS = 3;
 
 /**
  * The agents on the dock of a server, in order. Until the user adds or removes an agent, the dock
- * shows the first agents of `agentOrder`, the sidebar order without hidden agents. Read it in a memo:
- * each read parses the saved list.
+ * shows the first agents of the sidebar that the user did not hide. `sidebarOrder` runs only then.
+ * Read it in a memo: each read parses the saved list.
  */
-export function agentDockSeats(serverId: string, agentOrder: readonly string[]): string[] {
+export function agentDockSeats(
+  serverId: string,
+  sidebarOrder: () => readonly string[],
+  hiddenAgentIds: ReadonlySet<string>,
+): string[] {
   seatsVersion();
-  return readSeats(serverId) ?? agentOrder.slice(0, AGENT_DOCK_DEFAULT_SEATS);
+  return (
+    readSeats(serverId) ??
+    sidebarOrder()
+      .filter((id) => !hiddenAgentIds.has(id))
+      .slice(0, AGENT_DOCK_DEFAULT_SEATS)
+  );
+}
+
+/** Two seat lists with the same agents in the same order. */
+export function sameAgentDockSeats(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((id, index) => id === b[index]);
 }
 
 export function setAgentDockSeats(serverId: string, seats: readonly string[]): void {
