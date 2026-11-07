@@ -177,6 +177,11 @@ export class AgentTasks implements TaskLanes {
     return task;
   }
 
+  /** The side threads of this agent, open and archived, with activity at or after `after`. The latest first. */
+  recent(agentId: string, after: string | null, limit: number): AgentThreadRecord[] {
+    return this.#store.recent(agentId, after, limit);
+  }
+
   /** Whether this agent has the task, open or closed. */
   has(agentId: string, taskId: string): boolean {
     return this.#store.task(taskId)?.agentId === agentId;
