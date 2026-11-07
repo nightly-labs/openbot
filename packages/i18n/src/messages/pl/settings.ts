@@ -645,6 +645,10 @@ export const messages = {
   "settings.voice.removeFailed": "Nie udało się usunąć modelu. Spróbuj ponownie.",
   "settings.voice.model.elevenlabs.description":
     "Przesyła twój głos do ElevenLabs. Tekst pojawia się w trakcie mówienia i się nie zmienia. Używa twojego klucza API, a ElevenLabs nalicza opłatę za każde użycie.",
+  "settings.voice.model.groqTurbo.description":
+    "Wysyła każde nagranie do Groq po zatrzymaniu. Szybki i obsługuje wiele języków. Używa twojego klucza API, a Groq nalicza opłatę za każde użycie.",
+  "settings.voice.model.groqLarge.description":
+    "Wysyła każde nagranie do Groq po zatrzymaniu. Dokładniejszy niż turbo, ale wolniejszy. Używa twojego klucza API, a Groq nalicza opłatę za każde użycie.",
   "settings.voice.apiKey.placeholder": "Wklej klucz",
   "settings.voice.apiKey.save": "Zapisz klucz",
   "settings.voice.apiKey.remove": "Usuń klucz",

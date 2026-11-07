@@ -804,6 +804,10 @@ server can change it.
   `~/Library/Application Support/OpenBot/voice-api-key.json`, encrypted by the operating system's
   secret storage. The app window never receives the key back. Remove key in **Settings → Voice**
   deletes the file. The key is redacted from logs, exports and diagnostics.
+- The Groq API key for dictation is kept in
+  `~/Library/Application Support/OpenBot/groq-api-key.json`, encrypted by the operating system's
+  secret storage. The app window never receives the key back. Remove key in **Settings → Voice**
+  deletes the file. The key is redacted from logs, exports and diagnostics.
 - The xAI API key for spoken replies is kept in
   `~/Library/Application Support/OpenBot/xai-api-key.json`, encrypted by the operating system's
   secret storage. The app window never receives the key back. Remove key in **Settings → Voice**
@@ -1034,6 +1038,12 @@ Network traffic can also occur when:
   text. Nothing else is sent: no conversation, file or agent instruction. ElevenLabs handles the
   audio and the text under its own policy and the user's ElevenLabs plan. The local models send
   nothing;
+- the user selects Groq Whisper large-v3 turbo or Groq Whisper large-v3 in **Settings → Voice** and
+  dictates or talks in the Voice pane. When the recording stops, or when a Voice pane turn ends,
+  OpenBot sends the recorded audio, the chosen model and, when the user set one, the language to
+  `api.groq.com` with the user's own API key, and receives the text. Nothing else is sent: no
+  conversation, file or agent instruction. Groq handles the audio and the text under its own policy
+  and the user's Groq plan;
 - the user sets up a voice server in **Settings → Voice**. OpenBot sends requests only to the address
   that the user enters, with the user's API key when there is one. To connect, it lists the server's
   models and voices. When the server does dictation, OpenBot sends the recorded audio, the chosen
@@ -1055,7 +1065,7 @@ Network traffic can also occur when:
   provider handles the text and the audio under its own policy and the user's plan.
   In the Voice pane, the spoken reply runs on this
   computer, also for an agent on a remote server. Speech recognition uses the model chosen in
-  **Settings → Voice**: a local model runs on this computer, and ElevenLabs gets the audio as
+  **Settings → Voice**: a local model runs on this computer, and ElevenLabs or Groq gets the audio as
   described above. A message that the user speaks to an agent on this computer keeps its recording,
   a WebM/Opus file in the message's own transfer folder, so that the user can play it again in the
   chat. The agent, its provider and team members get only the text. A remote server gets only the

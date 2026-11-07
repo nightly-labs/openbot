@@ -634,6 +634,10 @@ export const messages = defineMessages("settings", {
   "settings.voice.removeFailed": "Could not remove the model. Try again.",
   "settings.voice.model.elevenlabs.description":
     "Streams your voice to ElevenLabs. Text shows while you speak and stays fixed. Uses your own API key, and ElevenLabs bills each use.",
+  "settings.voice.model.groqTurbo.description":
+    "Sends each recording to Groq when you stop. Fast, and knows many languages. Uses your own API key, and Groq bills each use.",
+  "settings.voice.model.groqLarge.description":
+    "Sends each recording to Groq when you stop. More accurate than turbo, but slower. Uses your own API key, and Groq bills each use.",
   "settings.voice.apiKey.placeholder": "Paste the key",
   "settings.voice.apiKey.save": "Save key",
   "settings.voice.apiKey.remove": "Remove key",

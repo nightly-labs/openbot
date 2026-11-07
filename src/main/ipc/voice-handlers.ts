@@ -112,8 +112,8 @@ export function voiceIpcHandlers({
           ),
       ),
       // ElevenLabs reads replies aloud with the same key, so the speech status changes too.
-      setApiKey: payloadHandler(parseVoiceApiKey, async ({ key }): Promise<VoiceModelStatus> => {
-        const status = await runCauseEffect(voice.setApiKey(key));
+      setApiKey: payloadHandler(parseVoiceApiKey, async ({ provider, key }): Promise<VoiceModelStatus> => {
+        const status = await runCauseEffect(voice.setApiKey(provider, key));
         await runCauseEffect(speech.announceStatus());
         return status;
       }),
@@ -135,7 +135,7 @@ export function voiceIpcHandlers({
       getSpeechModelStatus: handler((): Promise<SpeechModelStatus> => runCauseEffect(speech.getModelStatus())),
       setSpeechApiKey: payloadHandler(parseSpeechApiKey, async ({ provider, key }): Promise<SpeechModelStatus> => {
         if (provider === "xai") return runCauseEffect(speech.setXaiApiKey(key));
-        await runCauseEffect(voice.setApiKey(key));
+        await runCauseEffect(voice.setApiKey("elevenlabs", key));
         return runCauseEffect(speech.announceStatus());
       }),
       downloadSpeechModel: handler((): Promise<SpeechModelStatus> => runCauseEffect(speech.downloadModel())),

@@ -129,6 +129,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   let ready = false;
   let livePreview = false;
   let streamed = false;
+  /** A cloud model takes the dictation: ElevenLabs streams, Groq takes each whole turn. */
+  let cloud = false;
   // The logic reads these copies: a store read shows a write only after the next flush.
   let step: VoiceConversationStep = "starting";
   let muted = false;
@@ -141,7 +143,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   let ownServer = false;
   const transcription = () => {
     if (ownServer) return "server";
-    return streamed ? "cloud" : "local";
+    return cloud ? "cloud" : "local";
   };
   const elapsedMs = (since: number) => Math.max(0, Math.round(performance.now() - since));
 
@@ -226,7 +228,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       const selected = VOICE_MODELS.find((candidate) => candidate.id === settings.modelId);
       // The user's own server takes the whole recording once: it has no live preview or stream.
       ownServer = server?.routes.dictation === true;
-      streamed = !ownServer && selected?.kind === "cloud";
+      cloud = !ownServer && selected?.kind === "cloud";
+      streamed = cloud && selected?.kind === "cloud" && selected.provider === "elevenlabs";
       livePreview = !ownServer && !streamed && (selected?.livePreview ?? true);
       ready = true;
       analytics.track("voice_conversation_action", {

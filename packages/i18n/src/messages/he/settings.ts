@@ -603,6 +603,10 @@ export const messages = {
   "settings.voice.removeFailed": "לא ניתן להסיר את המודל. יש לנסות שוב.",
   "settings.voice.model.elevenlabs.description":
     "משדר את הקול שלך אל ElevenLabs. הטקסט מוצג בזמן הדיבור ואינו משתנה. משתמש במפתח ה-API שלך, ו-ElevenLabs מחייבת על כל שימוש.",
+  "settings.voice.model.groqTurbo.description":
+    "שולח כל הקלטה אל Groq כשמפסיקים. מהיר ותומך בשפות רבות. משתמש במפתח ה-API שלך, ו-Groq מחייבת על כל שימוש.",
+  "settings.voice.model.groqLarge.description":
+    "שולח כל הקלטה אל Groq כשמפסיקים. מדויק יותר מ-turbo, אבל איטי יותר. משתמש במפתח ה-API שלך, ו-Groq מחייבת על כל שימוש.",
   "settings.voice.apiKey.placeholder": "הדבקת המפתח",
   "settings.voice.apiKey.save": "שמירת מפתח",
   "settings.voice.apiKey.remove": "הסרת מפתח",

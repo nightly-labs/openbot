@@ -618,6 +618,10 @@ export const messages = {
   "settings.voice.removeFailed": "Model kaldırılamadı. Tekrar deneyin.",
   "settings.voice.model.elevenlabs.description":
     "Sesinizi ElevenLabs'e gönderir. Metin siz konuşurken görünür ve değişmez. Kendi API anahtarınızı kullanır ve ElevenLabs her kullanımı ücretlendirir.",
+  "settings.voice.model.groqTurbo.description":
+    "Durdurduğunuzda her kaydı Groq'a gönderir. Hızlıdır ve birçok dili bilir. Kendi API anahtarınızı kullanır ve Groq her kullanımı ücretlendirir.",
+  "settings.voice.model.groqLarge.description":
+    "Durdurduğunuzda her kaydı Groq'a gönderir. turbo'dan daha doğrudur ama daha yavaştır. Kendi API anahtarınızı kullanır ve Groq her kullanımı ücretlendirir.",
   "settings.voice.apiKey.placeholder": "Anahtarı yapıştırın",
   "settings.voice.apiKey.save": "Anahtarı kaydet",
   "settings.voice.apiKey.remove": "Anahtarı kaldır",

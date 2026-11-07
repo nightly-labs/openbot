@@ -3512,6 +3512,12 @@ export async function createApplicationServices({
     cipher: secretCipher,
   });
   await runCauseEffect(voiceApiKeys.load());
+  // The Groq key for Groq dictation. It is a file of its own, apart from the ElevenLabs key.
+  const groqVoiceKeys = new VoiceApiKeyStore({
+    path: join(app.getPath("userData"), "groq-api-key.json"),
+    cipher: secretCipher,
+  });
+  await runCauseEffect(groqVoiceKeys.load());
   const voice = new VoiceTranscriptionService({
     resourcesRoot: app.isPackaged ? join(process.resourcesPath, "voice") : resolve(".openbot-build/voice"),
     // `voice:prepare` puts Parakeet in `.openbot-build/voice/model` for development. In development
@@ -3534,7 +3540,7 @@ export async function createApplicationServices({
         : resolve(".openbot-build/voice", COHERE_TRANSCRIBE_MODEL_DIRECTORY),
     },
     preferences: voicePreferences,
-    apiKeys: voiceApiKeys,
+    apiKeys: { elevenlabs: voiceApiKeys, groq: groqVoiceKeys },
     spawnHost: spawnVoiceTranscriptionHost,
     openStreamSocket: openScribeSocket,
   });

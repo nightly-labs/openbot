@@ -643,6 +643,10 @@ export const messages = {
   "settings.voice.removeFailed": "تعذّرت إزالة النموذج. حاول مرة أخرى.",
   "settings.voice.model.elevenlabs.description":
     "يبث صوتك إلى ElevenLabs. يظهر النص أثناء حديثك ويبقى ثابتًا. يستخدم مفتاح API الخاص بك، وتحتسب ElevenLabs كل استخدام.",
+  "settings.voice.model.groqTurbo.description":
+    "يرسل كل تسجيل إلى Groq عند الإيقاف. سريع ويدعم لغات كثيرة. يستخدم مفتاح API الخاص بك، وتحتسب Groq كل استخدام.",
+  "settings.voice.model.groqLarge.description":
+    "يرسل كل تسجيل إلى Groq عند الإيقاف. أدق من turbo لكنه أبطأ. يستخدم مفتاح API الخاص بك، وتحتسب Groq كل استخدام.",
   "settings.voice.apiKey.placeholder": "الصق المفتاح",
   "settings.voice.apiKey.save": "حفظ المفتاح",
   "settings.voice.apiKey.remove": "إزالة المفتاح",

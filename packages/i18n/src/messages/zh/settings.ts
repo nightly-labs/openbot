@@ -597,6 +597,10 @@ export const messages = {
   "settings.voice.removeFailed": "无法移除该模型，请重试。",
   "settings.voice.model.elevenlabs.description":
     "将你的语音实时传给 ElevenLabs。说话时文字会同步显示并保持固定。使用你自己的 API 密钥，ElevenLabs 会按次计费。",
+  "settings.voice.model.groqTurbo.description":
+    "停止后将每段录音发送给 Groq。速度快，支持多种语言。使用你自己的 API 密钥，Groq 会按次计费。",
+  "settings.voice.model.groqLarge.description":
+    "停止后将每段录音发送给 Groq。比 turbo 更准确，但更慢。使用你自己的 API 密钥，Groq 会按次计费。",
   "settings.voice.apiKey.placeholder": "粘贴密钥",
   "settings.voice.apiKey.save": "保存密钥",
   "settings.voice.apiKey.remove": "移除密钥",

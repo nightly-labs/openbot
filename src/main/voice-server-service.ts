@@ -164,31 +164,13 @@ export class VoiceServerService extends EventEmitter<VoiceServerEvents> {
     const { server } = this.#preferences.get();
     const model = server?.routes.dictation ? server.routes.transcriptionModel : null;
     if (!server || !model) return yield* routeOff();
-    const form = new FormData();
-    form.set("file", new Blob([new Uint8Array(wav)], { type: "audio/wav" }), "audio.wav");
-    form.set("model", model);
-    form.set("response_format", "json");
-    if (language !== AUTOMATIC_VOICE_LANGUAGE) form.set("language", language);
-    const startedAt = Date.now();
-    const text = yield* exchange(
+    return yield* transcribeRecording(
       this.#fetch,
       { address: server.address, apiKey: this.#apiKeys.get() },
-      "audio/transcriptions",
-      { method: "POST", body: form },
-      TRANSCRIPTION_TIMEOUT_MS,
-      (response, host) => readJson(response, host, LIST_BODY_LIMIT),
-    ).pipe(
-      Effect.flatMap((body) =>
-        isDynamicRecord(body) && isString(body.text)
-          ? Effect.succeed(body.text)
-          : Effect.fail(invalidAnswer(server.address)),
-      ),
-      Effect.mapError((failure) => {
-        logger.warn(`Voice server transcription failed after ${Date.now() - startedAt}ms.`);
-        return new VoiceOperationError({ cause: new Error(failure.message) });
-      }),
+      model,
+      wav,
+      language,
     );
-    return { text: text.trim() } satisfies VoiceTranscriptionResult;
   }).bind(this);
 
   /** Reads one part of a reply with the server's speech route, as 16-bit mono PCM. */
@@ -232,6 +214,43 @@ export class VoiceServerService extends EventEmitter<VoiceServerEvents> {
 interface ServerTarget {
   address: string;
   apiKey: string | null;
+}
+
+/**
+ * Sends a 16 kHz mono WAV recording to `POST {address}/audio/transcriptions` of an OpenAI-compatible
+ * API. The user's own server and Groq dictation use it.
+ */
+export function transcribeRecording(
+  fetcher: typeof fetch,
+  target: ServerTarget,
+  model: string,
+  wav: Uint8Array,
+  language: VoiceLanguage,
+): Effect.Effect<VoiceTranscriptionResult, VoiceOperationError> {
+  const form = new FormData();
+  form.set("file", new Blob([new Uint8Array(wav)], { type: "audio/wav" }), "audio.wav");
+  form.set("model", model);
+  form.set("response_format", "json");
+  if (language !== AUTOMATIC_VOICE_LANGUAGE) form.set("language", language);
+  const startedAt = Date.now();
+  return exchange(
+    fetcher,
+    target,
+    "audio/transcriptions",
+    { method: "POST", body: form },
+    TRANSCRIPTION_TIMEOUT_MS,
+    (response, host) => readJson(response, host, LIST_BODY_LIMIT),
+  ).pipe(
+    Effect.flatMap((body) =>
+      isDynamicRecord(body) && isString(body.text)
+        ? Effect.succeed({ text: body.text.trim() } satisfies VoiceTranscriptionResult)
+        : Effect.fail(invalidAnswer(target.address)),
+    ),
+    Effect.mapError((failure) => {
+      logger.warn(`OpenAI-compatible transcription failed after ${Date.now() - startedAt}ms.`);
+      return new VoiceOperationError({ cause: new Error(failure.message) });
+    }),
+  );
 }
 
 /** The part of an address that an error may name. */
@@ -295,6 +314,8 @@ function exchange<A>(
           return yield* fail("address", sourceText("error.provider.discoveryRedirect", { host }));
         if (response.status === 401 || response.status === 403)
           return yield* fail("apiKey", sourceText("error.voice.server.keyRefused", { host }));
+        if (response.status === 429)
+          return yield* fail("address", sourceText("error.voice.cloud.rateLimited", { provider: host }));
         if (!response.ok)
           return yield* fail(
             "address",
