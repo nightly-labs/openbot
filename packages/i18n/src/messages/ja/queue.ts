@@ -14,6 +14,9 @@ export const messages = {
   "queue.item.steerTooltip": "メッセージで方向を修正",
   "queue.item.steering": "修正中",
   "queue.item.steer": "方向を修正",
+  "queue.item.sendNowLabel": "エージェントを停止して、キューのメッセージ {position} を今すぐ送信",
+  "queue.item.sendNowTooltip": "エージェントを停止して、このメッセージを今すぐ送信",
+  "queue.item.sendNow": "今すぐ送信",
   "queue.item.notSteered": "未修正",
   "queue.item.steerFallback.providerUnsupported":
     "このプロバイダーは実行中のターンの方向を修正できないため、メッセージはキューで待ちます。",

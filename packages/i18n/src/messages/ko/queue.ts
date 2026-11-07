@@ -14,6 +14,9 @@ export const messages = {
   "queue.item.steerTooltip": "메시지로 방향 지시",
   "queue.item.steering": "방향 지시 중",
   "queue.item.steer": "방향 지시",
+  "queue.item.sendNowLabel": "에이전트를 멈추고 대기 중인 메시지 {position}을(를) 지금 보내기",
+  "queue.item.sendNowTooltip": "에이전트를 멈추고 이 메시지를 지금 보내기",
+  "queue.item.sendNow": "지금 보내기",
   "queue.item.notSteered": "방향 지시 안 됨",
   "queue.item.steerFallback.providerUnsupported":
     "이 제공자는 실행 중인 턴에 방향 지시를 할 수 없어서 메시지가 대기열에서 기다려요.",

@@ -1,4 +1,9 @@
-import { type AgentEvent, latestTurnAnswer, type SpeechLanguage } from "@openbot/contracts/ipc";
+import {
+  type AgentEvent,
+  type ConversationMessage,
+  latestTurnAnswer,
+  type SpeechLanguage,
+} from "@openbot/contracts/ipc";
 import { speechLanguageOf } from "@openbot/contracts/speech-language";
 import { speechTextFromMarkdown } from "@openbot/contracts/speech-text";
 import { toast } from "@openbot/ui";
@@ -43,10 +48,12 @@ interface DictatedMessage {
   continuedTurnId: string | undefined;
   /** A voice conversation reads its replies also when the setting is off. */
   always: boolean;
+  /** Whether a step of the reply is a progress update: text that the agent writes to the user while it works. */
+  progressUpdate: ((message: ConversationMessage) => boolean) | undefined;
 }
 
-/** What started a reading: a voice conversation, a dictated message, or the Read aloud control. */
-type SpeechTrigger = "voice_conversation" | "dictation" | "read_aloud";
+/** What started a reading: a voice conversation, its progress updates, a dictated message, or the Read aloud control. */
+type SpeechTrigger = "voice_conversation" | "progress_update" | "dictation" | "read_aloud";
 
 /** An agent on one server. Agent ids repeat across servers. */
 export type SpeechAgent = Pick<SpeechSource, "serverId" | "agentId">;
@@ -63,6 +70,23 @@ let spoken: SpeechAgent | undefined;
 const loading = new Set<SpeechAgent>();
 /** Told when the reply to a dictated message was read, was not read, or will not come. */
 const replyEndListeners = new Set<(agent: SpeechAgent) => void>();
+/** The readings of replies, in order: the progress updates of a turn come before its answer. */
+let readings: Promise<void> = Promise.resolve();
+/** Changes when the user stops the readings, so the readings that wait are not read. */
+let readingsGeneration = 0;
+/**
+ * The progress updates read aloud in the newest turn of each agent, by `agentKey`. It outlives the
+ * dictated message: words that steer the running turn do not read its earlier updates again.
+ */
+const readUpdates = new Map<string, { turnId: string; ids: Set<string> }>();
+
+/** Starts `read` when the readings before it end, unless the user stops the readings first. */
+function afterReadings(read: () => Promise<void>): Promise<void> {
+  const own = readingsGeneration;
+  const next = readings.then(() => (own === readingsGeneration ? read() : undefined));
+  readings = next.catch(() => undefined);
+  return next;
+}
 
 function isSpoken(agent: SpeechAgent): boolean {
   return spoken?.serverId === agent.serverId && spoken.agentId === agent.agentId;
@@ -73,8 +97,13 @@ function isSpoken(agent: SpeechAgent): boolean {
  * aloud when the setting is on, or always for a voice conversation. Call it before the message is
  * sent: its turn can start first.
  */
-export function noteDictatedMessage(agent: SpeechAgent, transcript: string, options?: { always: boolean }): void {
-  dictated.set(agentKey(agent), {
+export function noteDictatedMessage(
+  agent: SpeechAgent,
+  transcript: string,
+  options?: { always: boolean; progressUpdate?: (message: ConversationMessage) => boolean },
+): void {
+  const key = agentKey(agent);
+  dictated.set(key, {
     dictatedAt: Date.now(),
     language: speechLanguageOf(transcript, "en") ?? "en",
     turnId: undefined,
@@ -83,6 +112,7 @@ export function noteDictatedMessage(agent: SpeechAgent, transcript: string, opti
     deliveryTurns: new Map(),
     continuedTurnId: undefined,
     always: options?.always ?? false,
+    progressUpdate: options?.progressUpdate,
   });
   void warmSpeech(options?.always ?? false);
 }
@@ -130,8 +160,17 @@ export function dropDictatedReply(agent: SpeechAgent): void {
   if (isSpoken(agent)) stopSpokenReply();
 }
 
+/**
+ * The user starts a reading or a recording: the readings that wait are not read after it, and do
+ * not stop it.
+ */
+function skipWaitingReadings(): void {
+  readingsGeneration += 1;
+}
+
 /** Stops the reply that is read aloud, and the replies that load: the user speaks again. */
 export function stopSpokenReply(): void {
+  readingsGeneration += 1;
   loading.clear();
   spoken = undefined;
   stopSpeech();
@@ -149,10 +188,21 @@ function replyEnded(agent: SpeechAgent): void {
 
 /**
  * Follows the turns of each agent: a user turn after a dictation takes the dictation, as does the
- * running turn that the dictated message steers. The completed answer of that turn is read aloud. A new user turn of the agent that is read aloud stops the reading.
+ * running turn that the dictated message steers. The completed answer of that turn is read aloud, and
+ * in a voice conversation each progress update too, when it is complete. A new user turn of the agent
+ * that is read aloud stops the reading.
  * `serverId` is the server that sent the event.
  */
 export function readDictatedReplies(event: AgentEvent, serverId: string): void {
+  if (event.type === "conversation") {
+    readProgressUpdates(event.snapshot.messages, { serverId, agentId: event.snapshot.agentId });
+    return;
+  }
+  // A remote server sends the newest page of the chat in place of the whole chat.
+  if (event.type === "conversation-page") {
+    readProgressUpdates(event.page.messages, { serverId, agentId: event.page.agentId });
+    return;
+  }
   if (event.type === "queue-changed") {
     const message = dictated.get(agentKey({ serverId, agentId: event.snapshot.agentId }));
     if (!message || message.turnId) return;
@@ -193,7 +243,36 @@ export function readDictatedReplies(event: AgentEvent, serverId: string): void {
   }
   dictated.delete(key);
   if (event.status === "completed" && !event.quiet) void readReply(agent, event.turnId, message);
-  else replyEnded(agent);
+  // The progress updates of the turn play to their end before the pane listens again.
+  else void afterReadings(async () => {}).finally(() => replyEnded(agent));
+}
+
+function readProgressUpdates(messages: readonly ConversationMessage[], agent: SpeechAgent): void {
+  const key = agentKey(agent);
+  const message = dictated.get(key);
+  const progressUpdate = message?.progressUpdate;
+  const turnId = message?.turnId;
+  if (!message || !turnId || !progressUpdate) return;
+  let read = readUpdates.get(key);
+  if (read?.turnId !== turnId) {
+    read = { turnId, ids: new Set() };
+    readUpdates.set(key, read);
+  }
+  for (const update of messages) {
+    // A stopped or failed turn ends its open update part way, so only a completed one is read.
+    if (
+      update.turnId !== turnId ||
+      update.author !== "assistant" ||
+      update.itemType !== "commentary" ||
+      update.status !== "completed" ||
+      read.ids.has(update.id) ||
+      !progressUpdate(update)
+    )
+      continue;
+    read.ids.add(update.id);
+    const source = { ...agent, messageId: update.id };
+    void afterReadings(() => speak(update.text, source, message.language, "progress_update"));
+  }
 }
 
 async function readReply(agent: SpeechAgent, turnId: string, message: DictatedMessage): Promise<void> {
@@ -210,11 +289,13 @@ async function readReply(agent: SpeechAgent, turnId: string, message: DictatedMe
     if (!loading.has(own)) return;
     loading.delete(own);
     const answer = latestTurnAnswer(page.messages, turnId);
-    await speak(
-      answer?.text ?? "",
-      { ...agent, messageId: answer?.id ?? null },
-      message.language,
-      message.always ? "voice_conversation" : "dictation",
+    await afterReadings(() =>
+      speak(
+        answer?.text ?? "",
+        { ...agent, messageId: answer?.id ?? null },
+        message.language,
+        message.always ? "voice_conversation" : "dictation",
+      ),
     );
   } catch (error) {
     if (!loading.has(own)) return;
@@ -236,6 +317,7 @@ export function toggleReadAloud(source: SpeechSource & { messageId: string }, ma
     stopSpokenReply();
     return;
   }
+  skipWaitingReadings();
   void speak(markdown, source, "en", "read_aloud");
 }
 
@@ -254,6 +336,7 @@ function pauseOrResumeSpeech(messageId: string): boolean {
 /** Plays the recording of a spoken message, or pauses or resumes it when it is the one that plays. */
 export function toggleRecording(messageId: string, url: string): void {
   if (pauseOrResumeSpeech(messageId)) return;
+  skipWaitingReadings();
   startRecording(messageId, url, 0);
 }
 
@@ -263,19 +346,26 @@ export function toggleRecording(messageId: string, url: string): void {
  */
 export function toggleSpokenReply(source: SpeechSource & { messageId: string }, markdown: string): void {
   if (pauseOrResumeSpeech(source.messageId)) return;
+  skipWaitingReadings();
   if (!playSpokenReply(source.messageId)) void speak(markdown, source, "en", "read_aloud");
 }
 
 /** Moves the kept audio of a reply to a position, in seconds, and plays it from there. */
 export function seekSpokenReply(messageId: string, seconds: number): void {
   if (speechReading()?.messageId === messageId) seekSpeech(seconds);
-  else playSpokenReply(messageId, seconds);
+  else {
+    skipWaitingReadings();
+    playSpokenReply(messageId, seconds);
+  }
 }
 
 /** Moves the recording of a spoken message to a position, in seconds, and plays it from there. */
 export function seekRecording(messageId: string, url: string, seconds: number): void {
   if (speechReading()?.messageId === messageId) seekSpeech(seconds);
-  else startRecording(messageId, url, seconds);
+  else {
+    skipWaitingReadings();
+    startRecording(messageId, url, seconds);
+  }
 }
 
 /**

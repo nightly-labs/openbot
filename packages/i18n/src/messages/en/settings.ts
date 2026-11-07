@@ -104,7 +104,7 @@ export const messages = defineMessages("settings", {
     "Show React, Reply and More beside a message, and the time between messages. When this is off, every action and the time show under each message.",
   "settings.busyMessage.title": "Steer agents while they work",
   "settings.busyMessage.description":
-    "New messages join the agent’s current work, not the queue. Works with ChatGPT and Claude.",
+    "New messages join the agent’s current work, not the queue. Agents that cannot do this keep new messages in the queue.",
   // The Agents tab: the defaults of the agents on this computer.
   "settings.agentDefaults.title": "Defaults",
   "settings.agentDefaults.description": "Agents follow these defaults, unless you change them for an agent.",
