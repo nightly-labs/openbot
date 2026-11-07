@@ -170,6 +170,7 @@ import {
   parseBrowserToolCall,
 } from "./browser-tools";
 import { runCauseEffect } from "./effect-boundary";
+import { BROWSER_VALUE_MORE, BROWSER_VALUE_TEXT_LIMIT, cutModelText } from "./model-text-limit";
 import type { DynamicToolCallParams, DynamicToolResult } from "./protocol";
 import { isRecord } from "./protocol";
 import type { VaultCardSecret } from "./vault-items";
@@ -1864,7 +1865,7 @@ export class BrowserHost {
         yield* browserSync(() => this.#requireNoFilledCard(tab, "Browser screenshot"));
         const image = yield* boundEngineOperation(
           tab,
-          tab.engine.screenshot(target, Date.now() + 10_000),
+          tab.engine.screenshot(target, Date.now() + 10_000, true),
           10_000,
           "Browser screenshot timed out.",
           keepQueueBlocked,
@@ -2142,7 +2143,7 @@ export class BrowserHost {
                   }
                   const image = yield* boundEngineOperation(
                     tab,
-                    tab.engine.screenshot(),
+                    tab.engine.screenshot(undefined, undefined, true),
                     10_000,
                     "Browser screenshot timed out.",
                     keepQueueBlocked,
@@ -2217,7 +2218,7 @@ export class BrowserHost {
     evaluate: ({ args }, params) =>
       Effect.gen({ self: this }, function* () {
         yield* browserSync(() => this.#requireToolTab(params, args.tabId));
-        return textResult(
+        return valueTextResult(
           yield* this.#runEvaluation(
             args.tabId,
             args.expression,
@@ -2339,6 +2340,7 @@ export class BrowserHost {
           ...snapshotTextResult({
             tabId,
             ...result,
+            ...boundedScriptValue(result.value),
             ...(result.error === undefined ? {} : { error: redactText(result.error) }),
             ...(snapshotError === undefined ? {} : { snapshotError }),
             // A page can put a typed card value in its address, as in the tab list.
@@ -4246,6 +4248,34 @@ function textResult(value: unknown): DynamicToolResult {
   };
 }
 
+/** An evaluated value as JSON text. Text past the model limit is cut, with a note that says how to read more. */
+function valueTextResult(value: BrowserJsonValue): DynamicToolResult {
+  const text = JSON.stringify(value);
+  const cut = cutModelText(text, BROWSER_VALUE_TEXT_LIMIT, BROWSER_VALUE_MORE);
+  return {
+    success: true,
+    contentItems: [{ type: "inputText", text: cut ? `${cut.text}\n${cut.note}` : text }],
+  };
+}
+
+/**
+ * A script value whose JSON is past the model limit becomes the start of that JSON as a string, and
+ * `valueCut` says so. The limit counts the escaped string, which is what the model reads.
+ */
+function boundedScriptValue(value: BrowserJsonValue | undefined): { value?: string; valueCut?: string } {
+  if (value === undefined) return {};
+  const json = JSON.stringify(value);
+  let cut = cutModelText(json, BROWSER_VALUE_TEXT_LIMIT, BROWSER_VALUE_MORE);
+  if (!cut) return {};
+  for (let escaped = JSON.stringify(cut.text).length; escaped > BROWSER_VALUE_TEXT_LIMIT; ) {
+    const shorter = cutModelText(json, cut.text.length - (escaped - BROWSER_VALUE_TEXT_LIMIT), BROWSER_VALUE_MORE);
+    if (!shorter) break;
+    cut = shorter;
+    escaped = JSON.stringify(cut.text).length;
+  }
+  return { value: cut.text, valueCut: cut.note };
+}
+
 /** An action that closed its tab returns this in place of a snapshot. */
 type ClosedTabResult = { tabId: string; closed: true; openerTabId?: string };
 
@@ -4259,7 +4289,13 @@ type SnapshotToolPayload =
       Partial<Pick<BrowserCardFillResult, "unconfirmed">> & {
         snapshot: BrowserSnapshot | ClosedTabResult | DialogTabResult | null;
       })
-  | (BrowserScriptResult & { tabId: string; snapshotError?: string; url?: string; snapshot?: BrowserSnapshot });
+  | (BrowserScriptResult & {
+      tabId: string;
+      valueCut?: string;
+      snapshotError?: string;
+      url?: string;
+      snapshot?: BrowserSnapshot;
+    });
 
 function snapshotTextResult(value: SnapshotToolPayload): DynamicToolResult {
   return {

@@ -2151,13 +2151,20 @@ export class BrowserCdpEngine {
     this: BrowserCdpEngine,
     target?: BrowserTarget,
     deadline?: number,
+    /**
+     * Scale the image to CSS pixels, for the model. A pixel of the image is then a CSS pixel of a
+     * point target and of snapshot bounds, and a 2x display does not make the image four times larger.
+     * The user's preview keeps the full resolution.
+     */
+    cssPixels = false,
   ): Effect.fn.Return<NativeImage, BrowserOperationError> {
     return yield* this.#leaseEffect((send) =>
       Effect.gen({ self: this }, function* () {
         const clip = target ? yield* this.#elementClipEffect(send, target, deadline) : undefined;
         const environment = this.#appliedEnvironment(this.#environment);
         const fill = !environment || environment.viewport.mode === "fill";
-        if (fill) {
+        let cssSize: { width: number; height: number } | undefined;
+        if (fill || (cssPixels && !clip)) {
           // Hidden views need a capture surface. Preserve the page's full viewport,
           // including scrollbars: layoutViewport.clientWidth would shrink it and
           // can dispose a responsive page's OAuth callback during preview capture.
@@ -2168,15 +2175,26 @@ export class BrowserCdpEngine {
             returnByValue: true,
           });
           const viewport = recordValue(recordValue(result.result)?.value);
-          yield* send("Emulation.setDeviceMetricsOverride", {
-            width: numberValue(viewport?.width),
-            height: numberValue(viewport?.height),
-            deviceScaleFactor: numberValue(viewport?.scale),
-            mobile: false,
-          });
+          cssSize = { width: numberValue(viewport?.width), height: numberValue(viewport?.height) };
+          if (fill) {
+            yield* send("Emulation.setDeviceMetricsOverride", {
+              ...cssSize,
+              deviceScaleFactor: numberValue(viewport?.scale),
+              mobile: false,
+            });
+          }
+        }
+        if (clip) {
+          // The clip is in view pixels, which page zoom scales.
+          const zoom = this.#contents.getZoomFactor();
+          cssSize = { width: Math.round(clip.width / zoom), height: Math.round(clip.height / zoom) };
         }
         return yield* Effect.gen({ self: this }, function* () {
-          return yield* browserCall(() => this.#contents.capturePage(clip));
+          const image = yield* browserCall(() => this.#contents.capturePage(clip));
+          if (!cssPixels || !cssSize || cssSize.width < 1 || cssSize.height < 1) return image;
+          const size = image.getSize();
+          if (size.width <= cssSize.width && size.height <= cssSize.height) return image;
+          return image.resize({ ...cssSize, quality: "good" });
         }).pipe(
           Effect.ensuring(
             Effect.gen({ self: this }, function* () {
