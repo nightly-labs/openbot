@@ -206,6 +206,42 @@ async function main(): Promise<void> {
       script: `return '"'.repeat(20000);`,
     });
     measurements.runScriptQuotedResultChars = text(quoted).length;
+    // A string value is cut in its own characters, so the note counts what the script returned.
+    const quotedPayload = z.object({ value: z.string(), valueCut: z.string() }).safeParse(JSON.parse(text(quoted)));
+    measurements.runScriptStringNoteCountsString =
+      quotedPayload.success &&
+      quotedPayload.data.valueCut.includes(`first ${quotedPayload.data.value.length} of 20000 characters`);
+
+    // The agent reads a large value in slices of 16,000 characters and follows each note. The escaped
+    // form of a slice is longer than the limit, so each slice is cut again. The parts must join to the value.
+    const fullJson = JSON.stringify(await page.contents.executeJavaScript(LARGE_VALUE));
+    let joined = "";
+    let partReads = 0;
+    let partCuts = 0;
+    let notesAgree = true;
+    for (let start: number | null = 0; start !== null && partReads < 20; ) {
+      partReads += 1;
+      const part = text(
+        await call("evaluate", {
+          tabId: page.tab.id,
+          expression: `JSON.stringify(${LARGE_VALUE}).slice(${start}, ${start + 16_000})`,
+        }),
+      );
+      const newline = part.indexOf("\n");
+      const got = z.string().parse(JSON.parse(newline < 0 ? part : part.slice(0, newline)));
+      joined += got;
+      if (newline < 0) start = got.length === 16_000 ? start + got.length : null;
+      else {
+        const note = part.slice(newline + 1);
+        partCuts += 1;
+        notesAgree &&= note.includes(`first ${got.length} of 16000 characters`) && note.includes(`N + ${got.length}`);
+        start += got.length;
+      }
+    }
+    measurements.partReads = partReads;
+    measurements.partCuts = partCuts;
+    measurements.partNotesCountTheSlice = notesAgree;
+    measurements.partsJoinToValue = joined === fullJson;
 
     const long = await open("/long");
     measurements.longSnapshotResultChars = text(await call("snapshot", { tabId: long.tab.id, image: "never" })).length;

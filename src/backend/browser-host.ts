@@ -170,7 +170,14 @@ import {
   parseBrowserToolCall,
 } from "./browser-tools";
 import { runCauseEffect } from "./effect-boundary";
-import { BROWSER_VALUE_MORE, BROWSER_VALUE_TEXT_LIMIT, cutModelText } from "./model-text-limit";
+import {
+  BROWSER_STRING_MORE,
+  BROWSER_VALUE_MORE,
+  BROWSER_VALUE_TEXT_LIMIT,
+  cutModelText,
+  jsonStringFit,
+  type ModelTextCut,
+} from "./model-text-limit";
 import type { DynamicToolCallParams, DynamicToolResult } from "./protocol";
 import { isRecord } from "./protocol";
 import type { VaultCardSecret } from "./vault-items";
@@ -4248,34 +4255,43 @@ function textResult(value: unknown): DynamicToolResult {
   };
 }
 
-/** An evaluated value as JSON text. Text past the model limit is cut, with a note that says how to read more. */
+/**
+ * An evaluated value as JSON text. Text past the model limit is cut, with a note that says how to read
+ * more. A string is cut in its own characters, so that the note counts what the model returned.
+ */
 function valueTextResult(value: BrowserJsonValue): DynamicToolResult {
   const text = JSON.stringify(value);
-  const cut = cutModelText(text, BROWSER_VALUE_TEXT_LIMIT, BROWSER_VALUE_MORE);
-  return {
-    success: true,
-    contentItems: [{ type: "inputText", text: cut ? `${cut.text}\n${cut.note}` : text }],
-  };
+  let shown = text;
+  if (isString(value)) {
+    const cut = cutStringValue(value);
+    if (cut) shown = `${JSON.stringify(cut.text)}\n${cut.note}`;
+  } else {
+    const cut = cutModelText(text, BROWSER_VALUE_TEXT_LIMIT, BROWSER_VALUE_MORE);
+    if (cut) shown = `${cut.text}\n${cut.note}`;
+  }
+  return { success: true, contentItems: [{ type: "inputText", text: shown }] };
+}
+
+/** The start of a string whose JSON form is past the model limit, and a note in characters of the string. */
+function cutStringValue(value: string): ModelTextCut | null {
+  if (JSON.stringify(value).length <= BROWSER_VALUE_TEXT_LIMIT) return null;
+  return cutModelText(value, jsonStringFit(value, BROWSER_VALUE_TEXT_LIMIT), BROWSER_STRING_MORE);
 }
 
 /**
- * A script value whose JSON is past the model limit becomes the start of that JSON as a string, and
- * `valueCut` says so. The limit counts the escaped string, which is what the model reads: the cut is
- * the longest start of the JSON whose escaped form fits.
+ * A script value whose JSON is past the model limit becomes a string, and `valueCut` says so. The model
+ * reads that string with its escapes, so the cut is the longest start whose escaped form fits. A string
+ * value is cut in its own characters; another value is cut in characters of its JSON.
  */
 function boundedScriptValue(value: BrowserJsonValue | undefined): { value?: string; valueCut?: string } {
   if (value === undefined) return {};
+  if (isString(value)) {
+    const cut = cutStringValue(value);
+    return cut ? { value: cut.text, valueCut: cut.note } : {};
+  }
   const json = JSON.stringify(value);
   if (json.length <= BROWSER_VALUE_TEXT_LIMIT) return {};
-  // The escaped length grows with the length of the start, and one character always fits.
-  let fits = 1;
-  let tooLong = BROWSER_VALUE_TEXT_LIMIT + 1;
-  while (tooLong - fits > 1) {
-    const middle = Math.floor((fits + tooLong) / 2);
-    if (JSON.stringify(json.slice(0, middle)).length <= BROWSER_VALUE_TEXT_LIMIT) fits = middle;
-    else tooLong = middle;
-  }
-  const cut = cutModelText(json, fits, BROWSER_VALUE_MORE);
+  const cut = cutModelText(json, jsonStringFit(json, BROWSER_VALUE_TEXT_LIMIT), BROWSER_VALUE_MORE);
   return cut ? { value: cut.text, valueCut: cut.note } : {};
 }
 

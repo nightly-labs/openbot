@@ -11,12 +11,22 @@ export const BROWSER_VALUE_TEXT_LIMIT = 16_000;
 /** A text item of a proxied MCP result: about 10k tokens, the default tool output limit of Codex. */
 export const MCP_RESULT_TEXT_LIMIT = 40_000;
 
+/**
+ * The size of a part that a note asks for. A part is a string, and its JSON form with the escapes is
+ * longer, so a part of this size usually fits in the limit.
+ */
+const BROWSER_VALUE_PART = 12_000;
+
 /** Says how to get a value in parts, from `start`. */
 const returnLess = (start: number): string =>
-  `return less: select only the fields that you need, filter, or return a slice, such as JSON.stringify(value).slice(${start}, ${start + BROWSER_VALUE_TEXT_LIMIT}). In run_script, work on the data in the script and return only the answer.`;
+  `return less: select only the fields that you need, filter, or return a slice, such as JSON.stringify(value).slice(${start}, ${start + BROWSER_VALUE_PART}). In run_script, work on the data in the script and return only the answer.`;
 
-/** Says how to read the rest of a value; `end` is the length of the start that the model got. */
+/** Says how to read the rest of a value; `end` is the length of the start of its JSON that the model got. */
 export const BROWSER_VALUE_MORE = (end: number): string => `To read more, ${returnLess(end)}`;
+
+/** Says how to read the rest of a string value; `end` counts characters of that string. */
+export const BROWSER_STRING_MORE = (end: number): string =>
+  `To read more, return the same string from its character ${end}. When the string was a slice from offset N, the next slice starts at N + ${end}.`;
 
 /** Says how to get a value that is larger than the engine limit, which gives no part of it. */
 export const BROWSER_VALUE_TOO_LARGE = `To get it, ${returnLess(0)}`;
@@ -41,4 +51,20 @@ export function cutModelText(text: string, limit: number, more: (end: number) =>
     text: text.slice(0, end),
     note: `[OpenBot cut this result: you got the first ${end} of ${text.length} characters. ${more(end)}]`,
   };
+}
+
+/**
+ * The length of the longest start of `text` whose JSON string form, with quotes and escapes, has at
+ * most `limit` characters. That form is what the model reads of a string value.
+ */
+export function jsonStringFit(text: string, limit: number): number {
+  // The escaped length grows with the length of the start, and one character always fits.
+  let fits = 1;
+  let tooLong = Math.min(text.length, limit) + 1;
+  while (tooLong - fits > 1) {
+    const middle = Math.floor((fits + tooLong) / 2);
+    if (JSON.stringify(text.slice(0, middle)).length <= limit) fits = middle;
+    else tooLong = middle;
+  }
+  return fits;
 }

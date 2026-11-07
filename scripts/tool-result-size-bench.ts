@@ -19,6 +19,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { Effect } from "effect";
 import { z } from "zod";
@@ -99,6 +100,11 @@ function expectations(measurements: Record<string, Measurement>): string[] {
     evaluateOver64KbSaysHow: measurements.evaluateOver64KbSaysHow === true,
     runScriptResultChars: under("runScriptResultChars", 16_500),
     runScriptQuotedResultChars: under("runScriptQuotedResultChars", 16_500),
+    runScriptStringNoteCountsString: measurements.runScriptStringNoteCountsString === true,
+    // The notes lead the agent through the whole value, with no part read twice or skipped.
+    partCuts: typeof measurements.partCuts === "number" && measurements.partCuts > 0,
+    partNotesCountTheSlice: measurements.partNotesCountTheSlice === true,
+    partsJoinToValue: measurements.partsJoinToValue === true,
     githubMcpProxiedTextChars: under("githubMcpProxiedTextChars", 40_500),
   };
   return Object.entries(checks)
@@ -119,7 +125,7 @@ async function measureGitHubProxy(): Promise<Record<string, number>> {
       void transport.close();
       void mcp.close();
     });
-    void mcp.connect(transport).then(() => transport.handleRequest(request, response));
+    void mcp.connect(asTransport(transport)).then(() => transport.handleRequest(request, response));
   });
   const proxy = new GitHubMcpProxy({
     upstreamUrl: `http://127.0.0.1:${await listen(upstream)}/mcp`,
@@ -133,9 +139,11 @@ async function measureGitHubProxy(): Promise<Record<string, number>> {
     const url = proxy.url();
     if (!url) throw new Error("The GitHub MCP proxy has no URL.");
     await client.connect(
-      new StreamableHTTPClientTransport(new URL(url), {
-        requestInit: { headers: { Authorization: "Bearer bench-secret" } },
-      }),
+      asTransport(
+        new StreamableHTTPClientTransport(new URL(url), {
+          requestInit: { headers: { Authorization: "Bearer bench-secret" } },
+        }),
+      ),
     );
     const result = await client.callTool({ name: "list_issues", arguments: {} });
     const items = z.array(z.object({ type: z.string(), text: z.string().optional() })).parse(result.content);
@@ -197,4 +205,31 @@ async function output(command: string, args: string[]): Promise<string> {
     child.once("error", reject);
     child.once("exit", (code) => (code === 0 ? resolve(text) : reject(new Error("Unable to read the source SHA."))));
   });
+}
+
+/**
+ * The SDK transport classes declare their handlers and `sessionId` as `T | undefined`, which
+ * `exactOptionalPropertyTypes` does not accept as a `Transport`. This one forwards to such a class.
+ */
+function asTransport(inner: {
+  start(): Promise<void>;
+  send: Transport["send"];
+  close(): Promise<void>;
+  onclose?: (() => void) | undefined;
+  onerror?: ((error: Error) => void) | undefined;
+  onmessage?: Transport["onmessage"] | undefined;
+  setProtocolVersion?: ((version: string) => void) | undefined;
+}): Transport {
+  const transport: Transport = {
+    start: () => {
+      inner.onclose = () => transport.onclose?.();
+      inner.onerror = (error) => transport.onerror?.(error);
+      inner.onmessage = (message, extra) => transport.onmessage?.(message, extra);
+      return inner.start();
+    },
+    send: (message, options) => inner.send(message, options),
+    close: () => inner.close(),
+    setProtocolVersion: (version) => inner.setProtocolVersion?.(version),
+  };
+  return transport;
 }
