@@ -75,11 +75,11 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
    */
   readonly turnContext = true;
   /**
-   * Kept by thread across process restarts and `thread/unsubscribe`: a resumed thread holds the
-   * blocks that it was sent. An ephemeral thread (a routine run) ends with its unsubscribe.
+   * Kept by thread across process restarts: a resumed thread holds the blocks that it was sent.
+   * `releaseThread` ends it, as the Claude client does: a released session that comes back gets
+   * the blocks in full.
    */
   readonly #turnContext = new TurnContext();
-  readonly #ephemeralThreads = new Set<string>();
   readonly #executable: string;
   readonly #requestTimeoutMs: number;
   #decoder = new JsonLineDecoder();
@@ -211,6 +211,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     this: CodexAppServerClient,
     threadId: string,
   ) {
+    this.#turnContext.forget(threadId);
     if (!this.running) return;
     yield* this.request("thread/unsubscribe", { threadId }, decodeRecordResponse);
   });
@@ -324,9 +325,11 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   ) {
     const id = this.#nextId++;
     const child = this.#process;
+    let answered = false;
     return yield* Effect.callback<T, ProviderClientOperationError>((resume) => {
       this.#pending.set(id, {
         resolve: (value) => {
+          answered = true;
           this.#trackTurnContext(method, params, value);
           resume(
             Effect.try({
@@ -335,23 +338,15 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
             }),
           );
         },
-        reject: (cause) => {
-          // A refused turn is not in the history, so the next turn sends its blocks again.
-          if (method === "turn/start") this.#resendTurnContext(params);
-          resume(Effect.fail(new ProviderClientOperationError({ cause })));
-        },
+        reject: (cause) => resume(Effect.fail(new ProviderClientOperationError({ cause }))),
       });
       try {
         this.#write({ method, id, params: this.#wireParams(method, params) });
-        // Also when Codex answers `NotSubscribed`: nothing resumes an ephemeral thread.
-        if (method === "thread/unsubscribe" && isRecord(params) && isString(params.threadId))
-          if (this.#ephemeralThreads.has(params.threadId)) this.#forgetTurnContext(params.threadId);
         if (method === "turn/interrupt" && isRecord(params) && isString(params.threadId) && isString(params.turnId)) {
           this.#interruptedTurns.add(JSON.stringify([params.threadId, params.turnId]));
           this.#cancelToolRequests(params.threadId, params.turnId);
         }
       } catch (cause) {
-        if (method === "turn/start") this.#resendTurnContext(params);
         resume(Effect.fail(new ProviderClientOperationError({ cause })));
       }
       return Effect.sync(() => this.#pending.delete(id));
@@ -365,7 +360,15 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
             ),
           ),
       }),
-      Effect.ensuring(Effect.sync(() => this.#pending.delete(id))),
+      Effect.ensuring(
+        Effect.sync(() => {
+          this.#pending.delete(id);
+          // A turn that was refused, timed out or interrupted may not be in the history, so the
+          // next turn sends its blocks again.
+          if (method === "turn/start" && !answered && isRecord(params) && isString(params.threadId))
+            this.#turnContext.resend(params.threadId);
+        }),
+      ),
     );
   });
 
@@ -404,21 +407,11 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
       const thread = isRecord(result) ? result.thread : undefined;
       if (!isRecord(thread) || !isString(thread.id)) return;
       this.#turnContext.set(thread.id, params, false);
-      if (isRecord(params) && params.ephemeral === true) this.#ephemeralThreads.add(thread.id);
       return;
     }
     if (!isRecord(params) || !isString(params.threadId)) return;
     if (method === "thread/resume") this.#turnContext.set(params.threadId, params, true);
-    else if (method === "thread/archive" || method === "thread/delete") this.#forgetTurnContext(params.threadId);
-  }
-
-  #forgetTurnContext(threadId: string): void {
-    this.#turnContext.forget(threadId);
-    this.#ephemeralThreads.delete(threadId);
-  }
-
-  #resendTurnContext(params: unknown): void {
-    if (isRecord(params) && isString(params.threadId)) this.#turnContext.resend(params.threadId);
+    else if (method === "thread/archive" || method === "thread/delete") this.#turnContext.forget(params.threadId);
   }
 
   /**
@@ -627,11 +620,15 @@ function decodeHistoryItemEntry(value: unknown): { turnId: string; item: ThreadI
   // Preserve provider item fields (tool output, image metadata, command status, and so on) while
   // validating the discriminator at the untrusted app-server boundary.
   const item: ThreadItem = { ...value.item, type: value.item.type };
-  // The turn context blocks are text items of their own in front of the user's text.
-  if (item.type === "userMessage" && Array.isArray(item.content))
+  // The turn context blocks are text items of their own in front of the user's input. The last
+  // item is always the user's, also when the user wrote text that starts like a block.
+  if (item.type === "userMessage" && Array.isArray(item.content)) {
+    const last = item.content.length - 1;
     item.content = item.content.filter(
-      (part) => !(part.type === "text" && isString(part.text) && isTurnContextBlock(part.text)),
+      (part, index) =>
+        index === last || !(part.type === "text" && isString(part.text) && isTurnContextBlock(part.text)),
     );
+  }
   return { turnId: value.turnId, item };
 }
 

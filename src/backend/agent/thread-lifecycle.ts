@@ -748,7 +748,6 @@ export class ThreadLifecycle {
     this.#sessionStarts.set(key, count);
     logger.info("Started a provider session.", { provider: client.provider, reason: startReason, count });
     const externalThreadId = response.thread.id;
-    this.#rememberSection(client, externalThreadId, givenSection);
     const prepared = yield* Effect.result(
       Effect.gen({ self: this }, function* () {
         if (client.provider === "codex") {
@@ -799,6 +798,7 @@ export class ThreadLifecycle {
         });
       return yield* prepared.failure;
     }
+    this.#rememberSection(client, externalThreadId, givenSection);
     this.#conversation.bindThread(externalThreadId, agent.id, publicThreadId);
     this.#conversation.markThreadLoaded(externalThreadId, client);
     this.#conversation.ensureSnapshot(agent.id, publicThreadId);
@@ -1172,9 +1172,9 @@ export class ThreadLifecycle {
     const storedFingerprint = newline < 0 ? stored.success : stored.success.slice(0, newline);
     // Also the form of a session from before the section-mates went with the turns, with their ids.
     // That session keeps the old list in its instructions, and its first turn sends the current one.
-    const matches = (sessionApprovals: CodexToolApprovals) =>
+    const matches = (sessionApprovals: CodexToolApprovals, sections: readonly (SectionTeammates | null)[]) =>
       threadStep(() =>
-        (section ? [null, section] : [null]).some(
+        sections.some(
           (legacySection) =>
             storedFingerprint ===
             this.toolFingerprint(
@@ -1194,7 +1194,7 @@ export class ThreadLifecycle {
       this.toolFingerprint(agent, configs, own, approvals, toolRuntimes, environment, proxy, instructionsFile),
     );
     if (storedFingerprint === fingerprint) return true;
-    if (section && (yield* matches(approvals))) {
+    if (section && (yield* matches(approvals, [section]))) {
       yield* this.#writeToolManifest(sessionId, fingerprint, approvals);
       return true;
     }
@@ -1206,7 +1206,7 @@ export class ThreadLifecycle {
       decodeToolApprovals(JSON.parse(stored.success.slice(newline + 1))),
     ).pipe(Effect.orElseSucceed(() => null));
     if (!sessionApprovals || approvalRevoked(sessionApprovals, approvals)) return false;
-    if (!(yield* matches(sessionApprovals))) return false;
+    if (!(yield* matches(sessionApprovals, section ? [null, section] : [null]))) return false;
     yield* this.#writeToolManifest(sessionId, fingerprint, approvals);
     return true;
   });
@@ -1609,6 +1609,7 @@ export class ThreadLifecycle {
     externalThreadId: string,
     client: AgentClient | undefined = this.#conversation.openClientFor(externalThreadId),
   ) {
+    this.#givenSections.delete(externalThreadId);
     if (!client?.releaseThread) return;
     yield* client
       .releaseThread(externalThreadId)
