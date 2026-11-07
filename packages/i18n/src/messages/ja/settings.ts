@@ -29,6 +29,11 @@ export const messages = {
   "settings.logoColor.beige": "ベージュ",
   "settings.logoColor.gray": "グレー",
   "settings.logoColor.white": "ホワイト",
+  "settings.chatBackground.title": "チャットの背景",
+  "settings.chatBackground.description": "テーマごとに色を保持します。文字が読みにくい色は、暗くまたは明るくなります。",
+  "settings.chatBackground.light": "ライトテーマのチャットの背景",
+  "settings.chatBackground.dark": "ダークテーマのチャットの背景",
+  "settings.chatBackground.default": "デフォルト",
   "settings.chatColor.title": "チャットの色",
   "settings.chatColor.description":
     "自分のメッセージの吹き出しに色を付けます。サーバーの他のメンバーにも表示されます。",

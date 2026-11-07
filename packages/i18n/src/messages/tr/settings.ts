@@ -29,6 +29,12 @@ export const messages = {
   "settings.logoColor.beige": "Bej",
   "settings.logoColor.gray": "Gri",
   "settings.logoColor.white": "Beyaz",
+  "settings.chatBackground.title": "Sohbet arka planı",
+  "settings.chatBackground.description":
+    "Her tema kendi rengini korur. Metnin okunmasını zorlaştıran bir renk koyulaşır veya açılır.",
+  "settings.chatBackground.light": "Açık temada sohbet arka planı",
+  "settings.chatBackground.dark": "Koyu temada sohbet arka planı",
+  "settings.chatBackground.default": "Varsayılan",
   "settings.chatColor.title": "Sohbet rengi",
   "settings.chatColor.description": "Mesaj balonlarınızı renklendirir. Sunucularınızdaki kişiler de görür.",
   "settings.chatColor.yours": "Sohbet renginiz",

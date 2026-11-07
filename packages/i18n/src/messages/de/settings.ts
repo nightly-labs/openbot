@@ -30,6 +30,12 @@ export const messages = {
   "settings.logoColor.beige": "Beige",
   "settings.logoColor.gray": "Grau",
   "settings.logoColor.white": "Weiß",
+  "settings.chatBackground.title": "Chathintergrund",
+  "settings.chatBackground.description":
+    "Jedes Design behält seine eigene Farbe. Eine Farbe, die Text schwer lesbar macht, wird dunkler oder heller.",
+  "settings.chatBackground.light": "Chathintergrund im Design Hell",
+  "settings.chatBackground.dark": "Chathintergrund im Design Dunkel",
+  "settings.chatBackground.default": "Standard",
   "settings.chatColor.title": "Chatfarbe",
   "settings.chatColor.description":
     "Färbt die Blasen deiner Nachrichten ein. Personen auf deinen Servern sehen sie auch.",

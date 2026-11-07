@@ -29,6 +29,12 @@ export const messages = {
   "settings.logoColor.beige": "Beige",
   "settings.logoColor.gray": "Grijs",
   "settings.logoColor.white": "Wit",
+  "settings.chatBackground.title": "Chatachtergrond",
+  "settings.chatBackground.description":
+    "Elk thema houdt een eigen kleur. Een kleur die tekst moeilijk leesbaar maakt, wordt donkerder of lichter.",
+  "settings.chatBackground.light": "Chatachtergrond in Licht",
+  "settings.chatBackground.dark": "Chatachtergrond in Donker",
+  "settings.chatBackground.default": "Standaard",
   "settings.chatColor.title": "Chatkleur",
   "settings.chatColor.description": "Geeft de ballonnen van je berichten een tint. Mensen op je servers zien hem ook.",
   "settings.chatColor.yours": "Jouw chatkleur",

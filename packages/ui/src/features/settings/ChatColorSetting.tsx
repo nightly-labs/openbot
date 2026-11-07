@@ -8,7 +8,8 @@
  */
 
 import type { AvatarColor } from "@openbot/contracts/ipc";
-import { createEffect, createSignal, onSettled, Show } from "solid-js";
+import type { JSX } from "@solidjs/web";
+import { createEffect, createSignal, onSettled, Show, untrack } from "solid-js";
 import { type ColorPickerAnchor, ColorPickerPopover, ColorPickerTrigger } from "../../color-picker";
 import { SettingsLinkGroup, SettingsLinkRow } from "../../components/SettingsPanel";
 import { Palette } from "../../icons";
@@ -33,26 +34,51 @@ export function ChatColorDot(props: {
   );
 }
 
+/**
+ * The picker in a popup: the chat color picker, or another one with its own presets. The popup calls
+ * it once and gives getters, so a draft change updates the picker and does not build it again.
+ */
+export type ColorPopupPicker = (props: {
+  label: string;
+  value: AvatarColor | null;
+  onChange: (value: AvatarColor | null) => void;
+}) => JSX.Element;
+
 function ChatColorPopup(props: {
   anchor: ColorPickerAnchor;
   label: string;
   value: AvatarColor | null;
+  picker: ColorPopupPicker;
   onDraft: (value: AvatarColor | null) => void;
   onClose: () => void;
   controls: (close: () => void) => void;
 }) {
   return (
     <ColorPickerPopover anchor={props.anchor} label={props.label} onClose={props.onClose} controls={props.controls}>
-      <ChatColorPicker label={props.label} value={props.value} onChange={props.onDraft} />
+      {untrack(() =>
+        props.picker({
+          get label() {
+            return props.label;
+          },
+          get value() {
+            return props.value;
+          },
+          onChange: props.onDraft,
+        }),
+      )}
     </ColorPickerPopover>
   );
 }
 
 /**
- * The open state of a Chat color popup: the draft color and the trigger it opens from. The draft is
- * saved through `save` when the popup closes or the row goes away, and only when it changed.
+ * The open state of a color popup: the draft color and the trigger it opens from. The draft is saved
+ * through `save` when the popup closes or the row goes away, and only when it changed.
  */
-function createChatColorPopup(value: () => AvatarColor | null, save: (value: AvatarColor | null) => void) {
+export function createChatColorPopup(
+  value: () => AvatarColor | null,
+  save: (value: AvatarColor | null) => void,
+  picker: ColorPopupPicker = ChatColorPicker,
+) {
   const [anchor, setAnchor] = createSignal<ColorPickerAnchor | null>(null);
   const [draft, setDraft] = createSignal<AvatarColor | null>(null);
   let close: (() => void) | undefined;
@@ -88,6 +114,7 @@ function createChatColorPopup(value: () => AvatarColor | null, save: (value: Ava
             anchor={open}
             label={label}
             value={draft()}
+            picker={picker}
             onDraft={setDraft}
             onClose={() => {
               commit();

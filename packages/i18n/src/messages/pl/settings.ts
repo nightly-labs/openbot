@@ -29,6 +29,12 @@ export const messages = {
   "settings.logoColor.beige": "Beżowy",
   "settings.logoColor.gray": "Szary",
   "settings.logoColor.white": "Biały",
+  "settings.chatBackground.title": "Tło czatu",
+  "settings.chatBackground.description":
+    "Każdy motyw ma własny kolor. Kolor, przy którym tekst trudno czytać, staje się ciemniejszy lub jaśniejszy.",
+  "settings.chatBackground.light": "Tło czatu w motywie Jasny",
+  "settings.chatBackground.dark": "Tło czatu w motywie Ciemny",
+  "settings.chatBackground.default": "Domyślne",
   "settings.chatColor.title": "Kolor czatu",
   "settings.chatColor.description": "Barwi dymki twoich wiadomości. Widzą go też osoby na twoich serwerach.",
   "settings.chatColor.yours": "Twój kolor czatu",

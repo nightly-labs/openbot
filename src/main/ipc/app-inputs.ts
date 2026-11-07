@@ -12,6 +12,7 @@ import type {
   BrowserDockFrame,
   BrowserDockPresentation,
   BusyMessageModePreference,
+  ChatBackgroundColor,
   ChatWindowTarget,
   DeleteHostedSiteInput,
   DynamicIslandAction,
@@ -71,6 +72,7 @@ import {
   isBrowserDockFrame,
   isBrowserDockPresentation,
   isBusyMessageMode,
+  isChatBackgroundColor,
   isDynamicIslandAction,
   isDynamicIslandInteractive,
   isDynamicIslandPreference,
@@ -196,20 +198,33 @@ export function parseAppLogoColorPreference(input: unknown): SetAppLogoColorPref
   return { color: input.color };
 }
 
+function parseChatBackground(value: unknown): ChatBackgroundColor | null {
+  if (value !== null && !isChatBackgroundColor(value)) throw new Error("Chat background is invalid.");
+  return value;
+}
+
 export function parseAppAppearancePreference(input: unknown): SetAppAppearancePreferenceInput {
   if (!isDynamicRecord(input)) throw new Error("Appearance is required.");
-  const { appearance, transparentWindow, palette } = input;
+  const { appearance, transparentWindow, palette, chatBackgroundLight, chatBackgroundDark } = input;
   if (appearance !== undefined && !isAppAppearance(appearance)) throw new Error("Appearance is invalid.");
   if (transparentWindow !== undefined && typeof transparentWindow !== "boolean")
     throw new Error("Transparent window must be true or false.");
   if (palette !== undefined && palette !== null && !isAppThemePaletteId(palette))
     throw new Error("Theme palette is invalid.");
-  if (appearance === undefined && transparentWindow === undefined && palette === undefined)
+  if (
+    appearance === undefined &&
+    transparentWindow === undefined &&
+    palette === undefined &&
+    chatBackgroundLight === undefined &&
+    chatBackgroundDark === undefined
+  )
     throw new Error("Appearance is required.");
   return {
     ...(appearance === undefined ? {} : { appearance }),
     ...(transparentWindow === undefined ? {} : { transparentWindow }),
     ...(palette === undefined ? {} : { palette }),
+    ...(chatBackgroundLight === undefined ? {} : { chatBackgroundLight: parseChatBackground(chatBackgroundLight) }),
+    ...(chatBackgroundDark === undefined ? {} : { chatBackgroundDark: parseChatBackground(chatBackgroundDark) }),
   };
 }
 

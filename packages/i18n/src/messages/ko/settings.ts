@@ -29,6 +29,12 @@ export const messages = {
   "settings.logoColor.beige": "베이지",
   "settings.logoColor.gray": "회색",
   "settings.logoColor.white": "흰색",
+  "settings.chatBackground.title": "채팅 배경",
+  "settings.chatBackground.description":
+    "테마마다 고유한 색상을 유지합니다. 글자를 읽기 어려운 색상은 더 어둡거나 밝아집니다.",
+  "settings.chatBackground.light": "라이트 테마의 채팅 배경",
+  "settings.chatBackground.dark": "다크 테마의 채팅 배경",
+  "settings.chatBackground.default": "기본값",
   "settings.chatColor.title": "채팅 색상",
   "settings.chatColor.description": "내 메시지 말풍선에 색을 입혀요. 내 서버의 사람들에게도 보여요.",
   "settings.chatColor.yours": "내 채팅 색상",

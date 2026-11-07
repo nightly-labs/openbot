@@ -30,6 +30,12 @@ export const messages = {
   "settings.logoColor.beige": "Бежевый",
   "settings.logoColor.gray": "Серый",
   "settings.logoColor.white": "Белый",
+  "settings.chatBackground.title": "Фон чата",
+  "settings.chatBackground.description":
+    "Каждая тема хранит свой цвет. Цвет, на котором текст трудно читать, становится темнее или светлее.",
+  "settings.chatBackground.light": "Фон чата в светлой теме",
+  "settings.chatBackground.dark": "Фон чата в тёмной теме",
+  "settings.chatBackground.default": "По умолчанию",
   "settings.chatColor.title": "Цвет чата",
   "settings.chatColor.description": "Подкрашивает пузыри ваших сообщений. Люди на ваших серверах тоже его видят.",
   "settings.chatColor.yours": "Ваш цвет чата",
