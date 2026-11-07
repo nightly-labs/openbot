@@ -364,7 +364,7 @@ try {
     assert.equal(starts().length, 2, "The next turn starts one new process.");
     assert.equal(resumed?.resume, first.sessionId, "The new process resumes the saved session.");
   });
-  report.resumedSession = resumed?.resume ?? undefined;
+  if (resumed?.resume) report.resumedSession = resumed.resume;
   report.passed = report.steps.every((entry) => entry.passed);
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
