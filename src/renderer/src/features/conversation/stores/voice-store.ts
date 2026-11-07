@@ -173,7 +173,8 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
           // The user's own server takes the whole recording once: it has no live preview or stream.
           const own = server?.routes.dictation === true;
           livePreview = !own && (model?.livePreview ?? true);
-          streamed = !own && model?.kind === "cloud";
+          // Only ElevenLabs streams. Groq takes the whole recording after Stop, as a server does.
+          streamed = !own && model?.kind === "cloud" && model.provider === "elevenlabs";
         }),
         voice.prepareModel(),
       ]);

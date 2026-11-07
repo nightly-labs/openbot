@@ -1,5 +1,6 @@
 import {
   type CodexLiveVoice,
+  type DictationKeyProvider,
   ELEVENLABS_VOICE_MODEL_ID,
   type ElevenLabsSpeechVoice,
   isSpeechLanguage,
@@ -46,6 +47,8 @@ const EMPTY_STATUSES: SettingsVoiceState["statuses"] = {
   "whisper-turbo": null,
   "cohere-transcribe-03-2026": null,
   [ELEVENLABS_VOICE_MODEL_ID]: null,
+  "groq-whisper-large-v3-turbo": null,
+  "groq-whisper-large-v3": null,
 };
 
 type FailureKey =
@@ -308,6 +311,20 @@ export function createSettingsVoiceStore(active: () => boolean) {
       });
   }
 
+  /** Saves or removes the key of a dictation provider. Main announces the status of each of its models. */
+  function setDictationApiKey(provider: DictationKeyProvider, key: string | null): Promise<boolean> {
+    return voicePort()
+      .voice.setApiKey({ provider, key })
+      .then((status) => {
+        setStatus(status);
+        return true;
+      })
+      .catch((error: unknown) => {
+        fail(error, key === null ? "settings.voice.apiKey.removeFailed" : "settings.voice.apiKey.saveFailed");
+        return false;
+      });
+  }
+
   /** Turning it on downloads the model, as the first dictation does, unless the server reads replies. */
   function setReadReplies(readReplies: boolean): void {
     void saveSpeech({ readReplies }).then((saved) => {
@@ -355,6 +372,8 @@ export function createSettingsVoiceStore(active: () => boolean) {
     setSpeechModel,
     saveSpeechApiKey: (provider: SpeechKeyProvider, key: string) => setSpeechApiKey(provider, key),
     removeSpeechApiKey: (provider: SpeechKeyProvider) => setSpeechApiKey(provider, null),
+    saveDictationApiKey: (provider: DictationKeyProvider, key: string) => setDictationApiKey(provider, key),
+    removeDictationApiKey: (provider: DictationKeyProvider) => setDictationApiKey(provider, null),
     setElevenLabsVoice: (elevenLabsVoice: ElevenLabsSpeechVoice) => void saveSpeech({ elevenLabsVoice }),
     setXaiVoice: (xaiVoice: XaiSpeechVoice) => void saveSpeech({ xaiVoice }),
     setReadReplies,

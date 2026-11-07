@@ -254,7 +254,7 @@ export const messages = {
   "settings.tab.notifications.description": "OpenBot'un sizi nasıl uyaracağını seçin.",
   "settings.tab.voice.title": "Ses",
   "settings.tab.voice.description":
-    "Mesaj kutusunda dikte. Yerel modeller bu bilgisayarda, ElevenLabs ise bulutta çalışır.",
+    "Mesaj kutusunda dikte. Yerel modeller bu bilgisayarda, ElevenLabs ve Groq ise bulutta çalışır.",
   "settings.tab.computerUse.title": "Bilgisayar Kullanımı",
   "settings.tab.computerUse.description":
     "Bu bilgisayardaki OpenBot ajanlarının buradaki uygulamaları görmesine ve kullanmasına izin verin. Başka bir sunucudaki ajanlar o sunucunun bilgisayarını kullanır.",
@@ -624,6 +624,10 @@ export const messages = {
   "settings.voice.removeFailed": "Model kaldırılamadı. Tekrar deneyin.",
   "settings.voice.model.elevenlabs.description":
     "Sesinizi ElevenLabs'e gönderir. Metin siz konuşurken görünür ve değişmez. Kendi API anahtarınızı kullanır ve ElevenLabs her kullanımı ücretlendirir.",
+  "settings.voice.model.groqTurbo.description":
+    "Durdurduğunuzda her kaydı Groq'a gönderir. Hızlıdır ve birçok dili bilir. Kendi API anahtarınızı kullanır ve Groq her kullanımı ücretlendirir.",
+  "settings.voice.model.groqLarge.description":
+    "Durdurduğunuzda her kaydı Groq'a gönderir. turbo'dan daha doğrudur ama daha yavaştır. Kendi API anahtarınızı kullanır ve Groq her kullanımı ücretlendirir.",
   "settings.voice.apiKey.placeholder": "Anahtarı yapıştırın",
   "settings.voice.apiKey.save": "Anahtarı kaydet",
   "settings.voice.apiKey.remove": "Anahtarı kaldır",

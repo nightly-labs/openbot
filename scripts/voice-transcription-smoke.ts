@@ -214,11 +214,17 @@ async function main(): Promise<void> {
     resourcesRoot: RESOURCES_ROOT,
     modelDirectories: MODEL_DIRECTORIES,
     preferences: new VoicePreferenceStore(join(temporary, "voice-preference.json")),
-    // ElevenLabs is not used: the key store is never loaded and nothing is encrypted.
-    apiKeys: new VoiceApiKeyStore({
-      path: join(temporary, "voice-api-key.json"),
-      cipher: { canPersist: () => false, encrypt: () => Buffer.alloc(0), decrypt: () => "" },
-    }),
+    // Cloud dictation is not used: the key stores are never loaded and nothing is encrypted.
+    apiKeys: {
+      elevenlabs: new VoiceApiKeyStore({
+        path: join(temporary, "voice-api-key.json"),
+        cipher: { canPersist: () => false, encrypt: () => Buffer.alloc(0), decrypt: () => "" },
+      }),
+      groq: new VoiceApiKeyStore({
+        path: join(temporary, "groq-api-key.json"),
+        cipher: { canPersist: () => false, encrypt: () => Buffer.alloc(0), decrypt: () => "" },
+      }),
+    },
     spawnHost,
     openStreamSocket: openScribeSocket,
   });
