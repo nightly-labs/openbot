@@ -155,12 +155,16 @@ interface LocalServerAccount {
 
 /**
  * The account service reads that a child may ask for: what adding or updating an agent from a listing
- * reads (`AgentMarketplaceService.install`), and its install counts. Any other read is refused, so a
- * child cannot use the account session for anything else.
+ * reads (`AgentMarketplaceService.install`), what adding or listing a Marketplace skill reads
+ * (`SkillMarketplaceService`), and their install counts. Any other read is refused, so a child cannot
+ * use the account session for anything else.
  */
 const MARKETPLACE_READS: ReadonlyArray<{ method: "GET" | "POST"; download: boolean; path: RegExp }> = [
   { method: "GET", download: false, path: /^\/v1\/marketplace\/agents\/[^/]+\/listing$/u },
   { method: "GET", download: true, path: /^\/v1\/marketplace\/agents\/[^/]+\/avatar$/u },
+  // A skill, not the list of the user's own submissions.
+  { method: "GET", download: false, path: /^\/v1\/skills\/(?!mine$)[^/]+$/u },
+  { method: "GET", download: true, path: /^\/v1\/skills\/[^/]+\/content$/u },
   { method: "GET", download: false, path: /^\/v1\/skills\/[^/]+\/versions\/[^/]+$/u },
   { method: "GET", download: true, path: /^\/v1\/skills\/[^/]+\/versions\/[^/]+\/content$/u },
   { method: "POST", download: false, path: /^\/v1\/marketplace\/agents\/[^/]+\/install$/u },
@@ -181,7 +185,8 @@ function allowedMarketplaceRead(
   } catch {
     return null;
   }
-  if (url.origin !== apiOrigin) return null;
+  // An id never holds `%`, so an encoded `/` cannot move a read to another route.
+  if (url.origin !== apiOrigin || url.pathname.includes("%")) return null;
   const allowed = MARKETPLACE_READS.some(
     (read) => read.method === request.method && read.download === request.download && read.path.test(url.pathname),
   );
@@ -503,6 +508,12 @@ export class LocalServers {
    */
   #readMarketplace(id: string, running: RunningChild, request: LocalServerMarketplaceRequest): void {
     const read = allowedMarketplaceRead(request, this.#options.account.apiOrigin);
+    // The request holds the read and its ids only, no secret.
+    if (!read)
+      this.#options.log.warn("A server on this computer asked for an account read that is not allowed.", {
+        method: request.method,
+        path: request.path,
+      });
     const answer: Effect.Effect<LocalServerCommand, RemoteWorkflowError> = !read
       ? Effect.succeed({ type: "marketplace", id: request.id, error: sourceText("error.team.requestFailed") })
       : request.download

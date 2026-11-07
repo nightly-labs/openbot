@@ -215,6 +215,10 @@ export class LocalServerMembers {
 
 type LocalServerMarketplaceAnswer = Extract<LocalServerCommand, { type: "marketplace" }>;
 
+function requestFailed(): CentralAuthOperationError {
+  return new CentralAuthOperationError({ cause: new Error(sourceText("error.team.requestFailed")) });
+}
+
 /**
  * The Marketplace reads of this server, which the parent makes with its account session: the listing
  * of an agent to add, its avatar and skills, and the install counts. The parent refuses other reads.
@@ -248,7 +252,11 @@ export class LocalServerMarketplace {
 
   downloadAuthorized(path: string): Effect.Effect<Uint8Array, CentralAuthOperationError> {
     return this.#ask(path, { method: "GET" }, true).pipe(
-      Effect.map((answer) => new Uint8Array(Buffer.from(answer.bytes ?? "", "base64"))),
+      Effect.flatMap((answer) =>
+        answer.bytes === undefined
+          ? Effect.fail(requestFailed())
+          : Effect.succeed(new Uint8Array(Buffer.from(answer.bytes, "base64"))),
+      ),
     );
   }
 
@@ -272,12 +280,15 @@ export class LocalServerMarketplace {
     download: boolean,
   ): Effect.Effect<LocalServerMarketplaceAnswer, CentralAuthOperationError> {
     return Effect.suspend(() => {
+      const method = init.method ?? "GET";
+      // The parent makes only GET and POST reads.
+      if (method !== "GET" && method !== "POST") return Effect.fail(requestFailed());
       const id = randomUUID();
       const pending = Deferred.makeUnsafe<LocalServerMarketplaceAnswer, CentralAuthOperationError>();
       this.#pending.set(id, pending);
       const request: LocalServerMarketplaceRequest = {
         id,
-        method: init.method === "POST" ? "POST" : "GET",
+        method,
         path,
         download,
         ...(typeof init.body === "string" ? { body: init.body } : {}),
@@ -286,8 +297,7 @@ export class LocalServerMarketplace {
       return Deferred.await(pending).pipe(
         Effect.timeoutOrElse({
           duration: LOCAL_SERVER_MARKETPLACE_TIMEOUT_MS,
-          orElse: () =>
-            Effect.fail(new CentralAuthOperationError({ cause: new Error(sourceText("error.team.requestFailed")) })),
+          orElse: () => Effect.fail(requestFailed()),
         }),
         Effect.ensuring(Effect.sync(() => this.#pending.delete(id))),
       );
