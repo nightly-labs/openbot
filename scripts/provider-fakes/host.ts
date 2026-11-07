@@ -2,6 +2,7 @@
 // the real `AgentClient` through a thread and a turn.
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import type { MemoryContext } from "../../src/backend/agent/developer-instructions";
 import type { AgentClient } from "../../src/backend/agent-client";
 import { runCauseEffect } from "../../src/backend/effect-boundary";
 import { type AppServerNotification, getRecord, getString, isRecord } from "../../src/backend/protocol";
@@ -46,6 +47,7 @@ export interface ThreadStartParams {
   model?: string;
   runtimeWorkspaceRoots?: string[];
   developerInstructions?: string;
+  memoryContext?: MemoryContext;
 }
 
 export async function startThread(client: AgentClient, params: ThreadStartParams): Promise<string> {

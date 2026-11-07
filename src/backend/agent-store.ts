@@ -431,6 +431,11 @@ export class AgentStore {
       if (source.busyMessageMode) record.busyMessageMode = source.busyMessageMode;
       if (source.taskLimit !== undefined) record.taskLimit = source.taskLimit;
       if (source.backupModels) record.backupModels = structuredClone(source.backupModels);
+      // A named profile carries over; "Only this agent" would give the copy a new, empty session.
+      if (source.browserProfileId !== undefined) {
+        record.browserProfileId = source.browserProfileId;
+        record.ownBrowserSession = true;
+      }
       record.avatarSeed = source.avatarSeed;
       record.avatarHue = source.avatarHue;
       if (source.avatarColor) record.avatarColor = source.avatarColor;

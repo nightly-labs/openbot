@@ -322,7 +322,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       `Run type: ${runKind}`,
       `Scheduled for: ${delivery.sender.scheduledFor}`,
       "The routine already exists, and its schedule is already configured.",
-      "Do not create, update, delete, list, or test routines during this run.",
+      "Do not create, update, delete, or test routines during this run.",
       "Perform the task below now. Do not answer only that the routine or monitoring is active.",
       "A task can tell you to remind the user or to send the user a message. When it names no other place, write that message as your final answer. OpenBot shows your final answer to the user in this chat. openbot.send_message sends to other agents, not to the user.",
       testRun

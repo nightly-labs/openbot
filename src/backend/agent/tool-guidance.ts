@@ -155,7 +155,7 @@ function openbotGuidance(namespace: string, tool: string): string {
         "openbot.save_mcp_server connects to the server before it saves it. On ready, give the user the tool names. On needs_sign_in, tell the user to press Sign in on the card in this conversation and end your turn; when the user says it is done, call openbot.test_mcp_server. On needs_key, tell the user to enter the key in Server settings, MCP, then test again; never put a key in a URL or an argument. On error, report it and what to change. The new tools reach the agents from the next turn.",
       ].join("\n");
     case "suggest_marketplace_app":
-      return "openbot.suggest_marketplace_app is a direct tool. Use the next field of its result for the end of your answer. When no plugin applies, give the needed sign-in or Computer Use setting.";
+      return "Use the next field of its result for the end of your answer. When no plugin applies, give the needed sign-in or Computer Use setting.";
     case "messaging_remember":
     case "messaging_forget_memory":
     case "messaging_history":

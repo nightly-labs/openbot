@@ -10,6 +10,23 @@ const GEMINI_SDK_FAILURE = /\bAntigravity SDK error processing prompt for sessio
 /** `format_execution_error` of Antigravity 1.3.0 when the failure is not a Google API error. */
 const GEMINI_EXECUTION_ERROR_ANSWER = /^\s*Agent execution error: /u;
 /**
+ * Google refuses a request until the user verifies the account (`VALIDATION_REQUIRED`, #2419).
+ * Antigravity 1.4.5 `format_execution_error` then sends Google's message, an empty line, and
+ * `<link text>: <validation_url>` as the answer, with no `Agent execution error:` prefix. The link
+ * is a Google sign-in page that continues to the Gemini Code Assist success page.
+ */
+const GEMINI_VERIFICATION_ANSWER =
+  /(?:^|\n)[^\n]*: (https:\/\/accounts\.google\.com\/signin\/[^\s]*auth_success_gemini[^\s]*)\s*$/u;
+/** The answers that are the server's failure text, not a reply of the model. */
+const GEMINI_FAILURE_ANSWER = new RegExp(
+  `${GEMINI_EXECUTION_ERROR_ANSWER.source}|${GEMINI_VERIFICATION_ANSWER.source}`,
+  "u",
+);
+
+function geminiAccountLink(text: string): string | null {
+  return GEMINI_VERIFICATION_ANSWER.exec(text)?.[1] ?? null;
+}
+/**
  * Antigravity's SDK error when a model step returns neither text nor a tool call, as when an agent
  * ends its turn silently after a tool call or on a message that asks for no reply (#4505).
  */
@@ -68,6 +85,8 @@ const GEMINI_REQUEST_FAILURES = [
 
 /** The message of a Gemini turn that the server failed but reported as answer text. */
 function geminiTurnFailure(text: string): string {
+  // The account, not the request, is the problem: no key or model change helps.
+  if (geminiAccountLink(text) !== null) return sourceText("error.provider.geminiVerificationRequired");
   // Google's API answer for a refused key. The key is the user's to fix, not the request.
   if (/\bAPI key not valid\b|\bAPI_KEY_INVALID\b/u.test(text)) return sourceText("error.provider.geminiKeyRefused");
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(text))?.[0];
@@ -106,9 +125,10 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   failureCause: (error) => (error === "refusal" ? "usage_limit" : null),
   sdkHarness: {
     failedSession: (stderrLine) => GEMINI_SDK_FAILURE.exec(stderrLine)?.[1],
-    answerIsFailure: GEMINI_EXECUTION_ERROR_ANSWER,
+    answerIsFailure: GEMINI_FAILURE_ANSWER,
     emptyOutputFailure: GEMINI_EMPTY_OUTPUT_FAILURE,
     turnFailure: geminiTurnFailure,
+    accountLink: geminiAccountLink,
     // Antigravity reports an exhausted quota as answer text and ends the turn as a success. Google
     // sends it only for a spent quota, which resets in days, not for a request-rate limit. The
     // server names no bucket, and the usage page of the plan can still show room.

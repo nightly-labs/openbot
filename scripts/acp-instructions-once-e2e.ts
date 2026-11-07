@@ -3,6 +3,8 @@
 // prompt that repeats them costs thousands of input tokens. The "context" agent reports its context
 // size as OpenCode does: the instructions must come again after a change, a compaction, a failed
 // prompt and a restart. The "silent" agent reports nothing: the instructions come every 10 prompts.
+// The "memory" agent is a "context" agent whose thread has saved memories: a memory edit sends one
+// small update block with the next prompt, not the instructions again.
 // `bun run test:acp-instructions-once`. Writes .openbot-build/acp-instructions-once-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -15,7 +17,7 @@ import { CustomAgentStore } from "../src/main/custom-agent-store";
 import { installFakeAgent, readJsonl, runTurn, startThread, stopClients, xorCipher } from "./provider-fakes/host";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/acp-instructions-once-e2e");
-const MODES = ["context", "silent"] as const;
+const MODES = ["context", "silent", "memory"] as const;
 type Mode = (typeof MODES)[number];
 
 const INSTRUCTIONS = "You are a teammate in OpenBot. Memory: the user likes short answers.";
@@ -25,6 +27,7 @@ interface Prompt {
   sessionId: string;
   instructions: boolean;
   instructionsText: string | null;
+  context: string[];
   text: string;
 }
 
@@ -59,7 +62,7 @@ try {
         command: executable,
         args: [],
         env: [
-          { name: "FAKE_MODE", value: mode },
+          { name: "FAKE_MODE", value: mode === "memory" ? "context" : mode },
           { name: "FAKE_LOG", value: join(root, `${mode}.jsonl`) },
         ],
         usagePrompt: null,
@@ -155,6 +158,81 @@ try {
     const prompts = await readJsonl<Prompt>(join(root, "silent.jsonl"));
     report.agents.silent = { steps, prompts };
     check("silent", steps, prompts);
+  }
+
+  // The memory agent: a memory edit keeps the instructions, so the session cache stays valid.
+  {
+    const model = "memory/default";
+    const steps: Step[] = [];
+    const client = open();
+    const memory = (id: string, text: string) => ({ id, text, origin: "manual" as const });
+    // Enough memories that an update block is shorter than the full list, as in a real agent.
+    const facts = [
+      "The user likes short answers.",
+      "The user writes TypeScript and reviews pull requests every morning.",
+      "The team ships a desktop release every second Thursday.",
+      "The user prefers metric units and 24-hour times.",
+      "The staging server is called staging-eu and must not be restarted on Fridays.",
+      "The user reads changelogs before each upgrade.",
+    ];
+    const first = { memories: facts.map((text, index) => memory(`m-${index}`, text)), storedCount: 6, limit: 20 };
+    const edited = {
+      memories: [...first.memories, memory("m-new", "The user works in Kraków.")],
+      storedCount: 7,
+      limit: 20,
+    };
+    const thread = await startThread(client, { ...threadParams(model, INSTRUCTIONS), memoryContext: first });
+    const turn = async (text: string, instructions: boolean) => {
+      const result = await runTurn(client, thread, { model, text });
+      steps.push({ text, instructions, status: result.status });
+    };
+    await turn("one", true);
+    await turn("two", false);
+    await runCauseEffect(
+      client.request(
+        "thread/resume",
+        { threadId: thread, ...threadParams(model, INSTRUCTIONS), memoryContext: edited },
+        (v) => v,
+      ),
+    );
+    await turn("three", false);
+    await turn("four", false);
+    // A slash command must start the prompt, and it can clear the context.
+    await turn("/review", false);
+    await turn("after-command", false);
+    await turn("compact-now", false);
+    await turn("five", true);
+    await runCauseEffect(client.stop());
+
+    const prompts = await readJsonl<Prompt>(join(root, "memory.jsonl"));
+    report.agents.memory = { steps, prompts };
+    check("memory", steps, prompts);
+    const contextOf = (text: string) => prompts.find((prompt) => prompt.text === text)?.context ?? [];
+    const full = contextOf("one")[0] ?? "";
+    assert.ok(full.startsWith("<openbot_saved_memories>"), "memory: the first prompt has all memories.");
+    assert.ok(
+      full.includes("short answers") && !full.includes("Kraków"),
+      "memory: the first block has the first list.",
+    );
+    assert.deepEqual(contextOf("two"), [], "memory: an unchanged list sends no block.");
+    const [update = "", ...others] = contextOf("three");
+    assert.equal(others.length, 0, "memory: the edit sends one block.");
+    assert.ok(update.startsWith("<openbot_saved_memories_update>"), "memory: the edit sends an update block.");
+    assert.ok(
+      update.includes("Kraków") && !update.includes("short answers"),
+      "memory: the update has only the change.",
+    );
+    assert.deepEqual(contextOf("four"), [], "memory: the update is sent once.");
+    assert.deepEqual(contextOf("/review"), [], "memory: a slash command gets no blocks.");
+    assert.ok(
+      contextOf("after-command")[0]?.startsWith("<openbot_saved_memories>"),
+      "memory: the prompt after a slash command has all memories.",
+    );
+    const again = contextOf("five")[0] ?? "";
+    assert.ok(
+      again.startsWith("<openbot_saved_memories>") && again.includes("short answers") && again.includes("Kraków"),
+      "memory: after a compaction, the prompt has all memories again.",
+    );
   }
 
   report.passed = true;

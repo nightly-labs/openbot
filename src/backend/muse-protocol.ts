@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import { withoutTurnContext } from "./agent/developer-instructions";
 import type { ThreadItem } from "./protocol";
 
 const text = Schema.String;
@@ -89,7 +90,12 @@ export function museThreadItem(item: MuseItem): ThreadItem {
     case "agentMessage":
       return { ...common, type: "agentMessage", text: item.text ?? "" };
     case "userMessage":
-      return { ...common, type: "userMessage", content: [{ type: "inputText", text: item.text ?? "" }] };
+      // OpenBot's memory and section-mate blocks are not text that the user wrote.
+      return {
+        ...common,
+        type: "userMessage",
+        content: [{ type: "inputText", text: withoutTurnContext(item.text ?? "") }],
+      };
     case "reasoning":
       return {
         ...common,

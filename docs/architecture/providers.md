@@ -56,6 +56,33 @@ catalog, and the guidance in bytes, and fails when one of them grows. See
 later add context and can add model steps. Provider prompts, external plugins, caching, billing, and
 native model serialization are outside this measurement.
 
+Claude Code adds its own system prompt, tools, and skill listing to each Claude request.
+`claude-client.ts` turns off the bundled skills that cannot work in an OpenBot agent, lists the
+bundled coding skills by name only, and turns off Remote Control, commit attribution, and the tools and
+agent types made for a Claude Code host (`CLAUDE_HOST_TOOLS`). These flag settings come before the
+user, project and local settings, so the client leaves out a skill override for a user or project skill
+of the same name, and each key that a settings file that the query loads sets. Git instructions and the built-in
+`general-purpose`, `Explore`, `Plan` and `web-fetch` agents stay. `bun run bench:claude-prompt-settings`
+runs real Haiku turns and reports the prompt tokens, tools, and skills of each settings variant in
+`.openbot-build/claude-prompt-settings-bench/report.json`. `bun run smoke:claude-agent` runs one agent
+session through the core tools, a subagent, a skill, a deferred tool, and a commit, and writes
+`.openbot-build/claude-agent-smoke/report-setup-<on|off>.json`.
+
+Pi adds its own system prompt, tools, and skill listing to each request of the Pi-based providers
+(`pi`, `inception`, `deepseek`, `openrouter`). The MCP extension of `pi-mcp.ts` removes Pi's `<docs>`
+section, which gives the paths of Pi's own documentation, from the copy of the messages that each
+request gets (`context_with_system`). A prompt returned from `before_agent_start` would also drop the
+`<mcp_servers>` section that names the user's deferred servers. The OpenBot bridge hides
+`request_api_key` and `suggest_marketplace_app` from Pi (`PI_SEARCH_ONLY_OPENBOT_TOOLS`). The agent
+finds and runs these two tools through OpenBot's `tool_search` and `tool_call`. They are `hidden`, not
+`deferred`: a deferred tool adds Pi's own `tool_search` and an `<mcp_servers>` line. `ask_ui` stays
+declared for its confirm card. The user's Pi settings, extensions, and skills stay, and a user extension
+can still change the prompt. `bun run bench:pi-prompt-settings`
+runs real Mercury turns and reports the system prompt sections, tools, and prompt tokens of each
+variant in `.openbot-build/pi-prompt-settings-bench/report.json`. `bun run smoke:pi-agent` runs one
+agent session through the core tools, a commit, and a hidden tool, checks each request, and writes
+`.openbot-build/pi-agent-smoke/report.json`.
+
 ## History retrieval and replacement sessions
 
 A replacement provider session receives a handoff of at most 32,000 characters, including headers
