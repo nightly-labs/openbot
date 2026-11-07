@@ -1049,7 +1049,10 @@ export async function createApplicationServices({
   const dynamicIsland = new DynamicIslandWindowController({
     platform: process.platform,
     preferencePath: join(app.getPath("userData"), DYNAMIC_ISLAND_PREFERENCE_FILE),
-    ...(app.isPackaged ? {} : { defaultPreference: { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE, enabled: false } }),
+    // Only the dev server build starts with the island off, the same builds as the agent dock default.
+    ...(process.env.ELECTRON_RENDERER_URL
+      ? { defaultPreference: { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE, enabled: false } }
+      : {}),
     createWindow: createDynamicIslandWindow,
     loadWindow: (window, display) => loadDynamicIslandRenderer(window, display, appVariant),
     getDisplays: () => screen.getAllDisplays(),
