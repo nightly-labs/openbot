@@ -60,7 +60,7 @@ import { createComposerActions } from "./stores/composer-actions";
 import { conversationOwnerId, createComposerStore, currentConversationTarget } from "./stores/composer-store";
 import { createMcpServersStore } from "./stores/mcp-servers-store";
 import { createMessageActions } from "./stores/message-actions";
-import { createPanelsStore, SIDE_PANEL_MODES } from "./stores/panels-store";
+import { createPanelsStore } from "./stores/panels-store";
 import { PENDING_SEND_ID_PREFIX, pendingSendMessage } from "./stores/pending-send-store";
 import { createQueueStore } from "./stores/queue-store";
 import { createReplyJumpStore } from "./stores/reply-jump-store";
@@ -506,9 +506,20 @@ export function createConversationViewScope(props: ConversationProps) {
     setActiveRightPanel("browser");
     if (browserTabs().length === 0) void openBrowserAddress();
   }
+  /**
+   * The work of a pane when its tab opens or closes, beyond the tab. A pane with no entry shows its mode
+   * when it opens, and the feature that owns it releases its state. See docs/architecture/side-panel.md.
+   */
+  const sidePanelPaneActions: { [Pane in SidePanelPane]?: { open?: () => void; release?: () => void } } = {
+    // The pane starts a tab, so it does not open empty.
+    browser: { open: showBrowserPanel },
+    // Closing the pane deletes the side question.
+    question: { release: () => deleteSideQuestion() },
+  };
   function openSidePanelPane(pane: SidePanelPane) {
-    if (pane === "browser") showBrowserPanel();
-    else setActiveRightPanel(SIDE_PANEL_MODES[pane]);
+    const open = sidePanelPaneActions[pane]?.open;
+    if (open) open();
+    else setActiveRightPanel(pane);
   }
   const sideThreadIds = () => props.threads?.side.tabs.map((thread) => thread.id) ?? [];
   /** The side thread that the side panel shows, or null when its tab is gone. */
@@ -604,7 +615,7 @@ export function createConversationViewScope(props: ConversationProps) {
   }
   /** Closes the tab of a pane. The next tab takes its place; with no tab, the panel lists the panes. */
   function closeSidePanelPane(pane: SidePanelPane) {
-    if (pane === "question") deleteSideQuestion();
+    sidePanelPaneActions[pane]?.release?.();
     const shown = sidePanelOpen() && sidePanel().selected === pane;
     const next = removeSidePanelPane(pane);
     if (shown) showSidePanelInPlaceOf(next);
