@@ -2194,12 +2194,13 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
           "formatted input",
           "End redirected focus",
           "replaced focus target",
+          "redirected input append",
         );
       for (const name of names) {
         const frameTransfer = name.endsWith("frame focus transfer");
         const siblingTransfer = name === "sibling frame focus transfer";
         const redirectFocus = name.includes("redirected focus") && name !== "End redirected focus";
-        const redirectInput = name === "redirected input" || name === "replaced target" || frameTransfer;
+        const redirectInput = name.startsWith("redirected input") || name === "replaced target" || frameTransfer;
         const replace = [
           "normal replace submit",
           "redirected focus replace",
@@ -2208,7 +2209,7 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
           "formatted input",
         ].includes(name);
         const empty = name.startsWith("empty");
-        const submit = name !== "normal append" && name !== "empty replacement" && name !== "readonly";
+        const submit = !["normal append", "empty replacement", "readonly", "redirected input append"].includes(name);
         const changedBeforeInput = redirectFocus || name === "End redirected focus" || name === "replaced focus target";
         const expectedSuccess = !changedBeforeInput && !redirectInput;
         await frame.executeJavaScript(
@@ -2234,7 +2235,7 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
               if (event.key === 'Enter') event.preventDefault();
             });
             ${redirectFocus ? "intended.onfocus = () => other.focus();" : ""}
-            ${name === "redirected input" ? "intended.addEventListener('input', () => other.focus());" : ""}
+            ${name.startsWith("redirected input") ? "intended.addEventListener('input', () => other.focus());" : ""}
             ${name === "replaced target" ? "intended.addEventListener('input', () => { const replacement = intended.cloneNode(true); intended.replaceWith(replacement); replacement.focus(); });" : ""}
             ${name === "replaced focus target" ? "intended.onfocus = () => { const replacement = intended.cloneNode(true); intended.replaceWith(replacement); replacement.focus(); };" : ""}
             ${
@@ -2337,7 +2338,13 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
             : [...(changedBeforeInput || empty ? [] : ["X"]), ...(expectedSuccess && submit ? ["Enter"] : [])];
         const expectedInputs = changedBeforeInput || name === "readonly" ? 0 : 1;
         // The error tells the agent whether the text is already in the field.
-        const expectedError = expectedSuccess ? "" : changedBeforeInput ? "Nothing was typed" : "Enter was not sent";
+        const expectedError = expectedSuccess
+          ? ""
+          : changedBeforeInput
+            ? "Nothing was typed"
+            : submit
+              ? "Enter was not sent"
+              : "Part of the text can be in another element";
         const safe =
           result.success === expectedSuccess &&
           (result.success || toolError(result).includes(expectedError)) &&

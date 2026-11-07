@@ -864,7 +864,10 @@ export class BrowserCdpEngine {
         // A frame in another process can keep its own active element after the page takes focus, so
         // each frame element on the way up must hold focus too.
         const checkFocus = (
-          key: "error.backend.browserTypingFocusMoved" | "error.backend.browserTypingSubmitSkipped",
+          key:
+            | "error.backend.browserTypingFocusMoved"
+            | "error.backend.browserTypingFocusMovedWhileTyping"
+            | "error.backend.browserTypingSubmitSkipped",
         ) =>
           Effect.forEach(
             chain,
@@ -920,12 +923,17 @@ export class BrowserCdpEngine {
         yield* checkFocus("error.backend.browserTypingFocusMoved");
         yield* browserSync(() => assertBeforeDeadline(deadline));
         yield* dispatchText(send, text, resolved.sessionId);
+        // Short text arrives one key at a time, and a key handler can move focus to another element.
+        yield* checkFocus(
+          options.submit === true
+            ? "error.backend.browserTypingSubmitSkipped"
+            : "error.backend.browserTypingFocusMovedWhileTyping",
+        );
         // Submitting is part of typing rather than a second action, because it has to reach the node
         // this lease already resolved. Re-resolving a snapshot ref here would fingerprint the element
         // against its pre-typing text, so a contenteditable would fail with "The target changed after
         // the snapshot" and `submit: true` would insert the text without ever submitting it.
         if (options.submit === true) {
-          yield* checkFocus("error.backend.browserTypingSubmitSkipped");
           yield* browserSync(() => assertBeforeDeadline(deadline));
           yield* dispatchShortcut(send, "Enter", resolved.sessionId);
         }

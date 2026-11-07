@@ -128,6 +128,20 @@
   "error.auth.companySignInUnavailable": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "error.backend.approvalOwnerOnly": ["de", "es", "fr", "it", "ja", "ko", "pl", "pt", "ru", "tr"],
   "error.backend.browserTypingFocusMoved": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
+  "error.backend.browserTypingFocusMovedWhileTyping": [
+    "de",
+    "es",
+    "fr",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ru",
+    "tr",
+    "zh"
+  ],
   "error.backend.browserTypingSubmitSkipped": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "error.backend.replyReferenceRequests": [
     "ar",
