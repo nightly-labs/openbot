@@ -9,6 +9,11 @@
  * answer. A due node with incoming edges and no active one is skipped, so a failure or the other
  * branch never leaves a run waiting.
  *
+ * A join is a node with more than one edge from the nodes before it, apart from loop edges. When a
+ * node before a join failed or was stopped, the join still runs on the other answers, and that node
+ * keeps its place in the inputs with the reason it has no answer. So a step after a fan-out can see
+ * that a branch is missing. An output posts its input, so it gets only the answers.
+ *
  * A loop edge (`workflowLoopEdges`) goes back to an earlier node. It does not hold that node back.
  * When it is active and newer than the node's own step, the node is due again with the loop edge's
  * answer as one more input: that is the next pass of the loop, and the nodes after it follow. A loop
@@ -97,6 +102,7 @@ export function nextActions(
   const loops = workflowLoopEdges(graph.nodes, graph.edges);
   const forward = graph.edges.filter((edge) => !loops.has(edge.id));
   const before = incoming(graph.edges);
+  const kinds = new Map(graph.nodes.map((node) => [node.id, node.kind]));
   const due = new Set<string>();
   const actions: WalkAction[] = [];
   for (const nodeId of graphOrder(graph.nodes, forward, scope)) {
@@ -118,15 +124,15 @@ export function nextActions(
     if (ahead.some((edge) => due.has(edge.from) || isWaiting(latest.get(edge.from)))) continue;
     // Another trigger's edge never becomes active in this run.
     const outside = (before.get(nodeId) ?? []).length > edges.length;
-    const inputs = edges.flatMap((edge) => {
+    const answered = edges.some((edge) => {
       const source = latest.get(edge.from);
-      return source && edgeActive(edge, source) ? [source.output ?? ""] : [];
+      return source !== undefined && edgeActive(edge, source);
     });
-    if (inputs.length === 0 && (ahead.length > 0 || outside)) {
+    if (!answered && (ahead.length > 0 || outside)) {
       actions.push({ nodeId, action: "skip" });
       continue;
     }
-    actions.push({ nodeId, action: "run", inputs });
+    actions.push({ nodeId, action: "run", inputs: edgeInputs(kinds.get(nodeId), edges, loops, latest) });
   }
   return actions;
 }
@@ -137,10 +143,36 @@ export function soloInputs(
   nodeId: string,
   answered: ReadonlyMap<string, StoredWorkflowStep>,
 ): string[] {
-  return (incoming(graph.edges).get(nodeId) ?? []).flatMap((edge) => {
-    const source = answered.get(edge.from);
-    return source && edgeActive(edge, source) ? [source.output ?? ""] : [];
+  const kind = graph.nodes.find((node) => node.id === nodeId)?.kind;
+  const loops = workflowLoopEdges(graph.nodes, graph.edges);
+  return edgeInputs(kind, incoming(graph.edges).get(nodeId) ?? [], loops, answered);
+}
+
+/**
+ * The inputs of a node by its edges, in edge order: the answer of each active edge, and at a join,
+ * the reason for each node before it that failed or was stopped.
+ */
+function edgeInputs(
+  kind: WorkflowNode["kind"] | undefined,
+  edges: readonly WorkflowEdge[],
+  loops: ReadonlySet<string>,
+  latest: ReadonlyMap<string, StoredWorkflowStep>,
+): string[] {
+  const join = kind !== "output" && edges.filter((edge) => !loops.has(edge.id)).length > 1;
+  return edges.flatMap((edge) => {
+    const source = latest.get(edge.from);
+    if (!source) return [];
+    if (edgeActive(edge, source)) return [source.output ?? ""];
+    return join && !loops.has(edge.id) ? missingAnswer(source) : [];
   });
+}
+
+/** Why a node before a join has no answer. A provider reads it, so the words stay English. */
+function missingAnswer(source: StoredWorkflowStep): string[] {
+  if (source.status === "stopped") return ["No answer: this step was stopped."];
+  if (source.status !== "failed") return [];
+  const error = source.error?.trim();
+  return [error ? `No answer: this step failed. Error: ${error}` : "No answer: this step failed."];
 }
 
 function edgeActive(edge: WorkflowEdge, source: StoredWorkflowStep): boolean {
