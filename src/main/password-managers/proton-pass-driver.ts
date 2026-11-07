@@ -282,6 +282,29 @@ function loginDetails(value: unknown): Pick<IndexedLogin, "username" | "urls" | 
   return { username: username ?? email, urls, hasTotp };
 }
 
+/**
+ * The password in `item view --output json`, found by name as in `loginDetails`, or null. A login
+ * with an empty password, for example one with only a passkey, gives null: `item view` of its
+ * `/password` field exits 1, which reads as a failed session.
+ */
+function loginPassword(node: unknown, depth = 0): string | null {
+  if (depth > 8) return null;
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = loginPassword(child, depth + 1);
+      if (found !== null) return found;
+    }
+    return null;
+  }
+  if (!isDynamicRecord(node)) return null;
+  for (const [key, child] of Object.entries(node)) {
+    if (key === "password") return typeof child === "string" && child ? child : null;
+    const found = loginPassword(child, depth + 1);
+    if (found !== null) return found;
+  }
+  return null;
+}
+
 function matchesOrigin(login: IndexedLogin, origin: string): boolean {
   // Proton Pass has no fill rule for each website; only the same host and port is filled.
   return login.urls.some((url) => websiteMatchesOrigin({ url, autofill: "exact" }, origin));
@@ -491,11 +514,19 @@ export class ProtonPassDriver implements PasswordManagerDriver, PasswordVault {
     const logins = yield* this.#logins().pipe(Effect.mapError(({ cause }) => new PasswordVaultError({ cause })));
     const login = logins.get(id);
     if (!login || !matchesOrigin(login, origin) || (kind === "totp" && !login.hasTotp)) return null;
-    const field = kind === "password" ? "password" : "totp?totp=code";
-    const output = yield* this.#agentCall(["item", "view", `pass://${login.shareId}/${login.itemId}/${field}`]).pipe(
-      Effect.mapError(({ cause }) => new PasswordVaultError({ cause })),
-    );
-    const value = output.trim();
+    const item = `pass://${login.shareId}/${login.itemId}`;
+    const value = yield* (
+      kind === "password"
+        ? this.#agentCall(["item", "view", item, "--output", "json"]).pipe(
+            Effect.flatMap((output) =>
+              Effect.try({
+                try: () => loginPassword(JSON.parse(output)),
+                catch: () => fail(sourceText("error.connector.protonPassFailed")),
+              }),
+            ),
+          )
+        : this.#agentCall(["item", "view", `${item}/totp?totp=code`]).pipe(Effect.map((output) => output.trim()))
+    ).pipe(Effect.mapError(({ cause }) => new PasswordVaultError({ cause })));
     if (!value) return null;
     registerSecretValue(value, { allowShort: true });
     return value;
