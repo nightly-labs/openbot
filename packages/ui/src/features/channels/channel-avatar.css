@@ -168,8 +168,19 @@
 .sidebar .channel-avatar-cluster .agent-avatar:has(> .bloub-avatar-svg image) > .bloub-avatar-svg {
   filter: none;
 }
-.sidebar :is(.agent-row:hover, .agent-row-active) .channel-avatar-cluster .agent-avatar:has(> .bloub-avatar-svg image) {
+.sidebar .agent-row-active .channel-avatar-cluster .agent-avatar:has(> .bloub-avatar-svg image) {
+  filter: url("#sidebar-plush-ring-selected");
+}
+.sidebar .agent-row:hover .channel-avatar-cluster .agent-avatar:has(> .bloub-avatar-svg image) {
   filter: url("#sidebar-plush-ring-raised");
+}
+/* In the light theme, a selected row keeps its fill on hover (`app-shell.css`), so its faces keep its ring. */
+:root[data-openbot-color-scheme="light"]
+  .sidebar
+  .agent-row-active
+  .channel-avatar-cluster
+  .agent-avatar:has(> .bloub-avatar-svg image) {
+  filter: url("#sidebar-plush-ring-selected");
 }
 /* With a fine pointer, a hovered row takes the ghost button hover fill (`primitives.css`). */
 @media (hover: hover) and (pointer: fine) and (min-width: 601px) {
