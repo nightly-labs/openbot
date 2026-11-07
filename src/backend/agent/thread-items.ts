@@ -159,6 +159,7 @@ export function isMissingProviderSessionError(error: unknown, provider: AgentPro
       provider !== "kimi" &&
       provider !== "devin" &&
       provider !== "copilot" &&
+      provider !== "mistral" &&
       provider !== "hermes" &&
       provider !== "acp") ||
     !(error instanceof Error)

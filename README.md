@@ -7,7 +7,7 @@ OpenBot is a local-first desktop workspace for persistent AI teammates. It suppo
 [Codex App Server](https://learn.chatgpt.com/docs/app-server) and
 [Claude Code](https://code.claude.com/docs/en/overview), plus [Grok CLI](https://docs.x.ai/build/overview),
 OpenCode, Gemini, [Cursor CLI](https://cursor.com/cli), [Cline CLI](https://cline.bot/cli), [Kimi Code CLI](https://github.com/MoonshotAI/kimi-cli),
-[Devin CLI](https://cli.devin.ai), [GitHub Copilot CLI](https://github.com/github/copilot-cli), and [Hermes Agent](https://hermes-agent.nousresearch.com) through ACP. It gives every agent its own workspace and
+[Devin CLI](https://cli.devin.ai), [GitHub Copilot CLI](https://github.com/github/copilot-cli), [Mistral Vibe](https://github.com/mistralai/mistral-vibe), and [Hermes Agent](https://hermes-agent.nousresearch.com) through ACP. It gives every agent its own workspace and
 conversation, and provides local queues, file transfers, an embedded browser, and agent-to-agent
 messaging in one desktop app.
 
@@ -22,7 +22,7 @@ OpenBot is ready for production use. A new release ships almost every day.
 ## What works
 
 - Prompt-driven agent creation and editing on desktop and mobile, with editable instructions, avatar, and section review before saving.
-- Persistent agents backed by independent Codex, Claude, Grok, OpenCode, Gemini, Cursor, Cline, Kimi, Devin, GitHub Copilot, or Hermes sessions and local workspaces.
+- Persistent agents backed by independent Codex, Claude, Grok, OpenCode, Gemini, Cursor, Cline, Kimi, Devin, GitHub Copilot, Mistral, or Hermes sessions and local workspaces.
 - Custom OpenAI-compatible endpoints and custom ACP agents, with detection of local model servers (Ollama, LM Studio) and installed agents.
 - Per-agent context monitoring with automatic compaction before long threads exhaust the model window.
 - FIFO message queues with pause, resume, cancellation, and crash-safe persistence.
@@ -36,7 +36,7 @@ OpenBot is ready for production use. A new release ships almost every day.
 
 OpenBot is local-first, not offline-only. Codex connects to OpenAI, Claude connects to Anthropic,
 Grok connects to xAI, Gemini connects to Google, Cursor connects to Cursor, Cline connects to Cline,
-Kimi connects to Moonshot AI, Devin connects to Cognition, GitHub Copilot connects to GitHub, Hermes connects to Nous Portal and to the providers you set up in Hermes,
+Kimi connects to Moonshot AI, Devin connects to Cognition, GitHub Copilot connects to GitHub, Mistral connects to Mistral AI, Hermes connects to Nous Portal and to the providers you set up in Hermes,
 visited pages use the network, and installed plugins may connect to their own services.
 
 ## Install
@@ -260,6 +260,16 @@ for OpenBot, the CLI uses that token instead, and Disconnect cannot remove it. I
 `copilot` yourself, OpenBot uses it until a download exists. Set `OPENBOT_COPILOT_PATH` to select
 an executable yourself. Copilot agents run on this computer. Team members see them when their app
 supports GitHub Copilot.
+
+Mistral uses a Mistral account or a Mistral API key. OpenBot downloads and pins Mistral Vibe's ACP
+server (`vibe-acp`) when you select Download on the Mistral row in More providers. Sign in opens
+Mistral's sign-in page in your browser. Vibe saves an API key in the system keychain, or in
+`~/.vibe/.env` when there is no keychain. If `MISTRAL_API_KEY` is set for OpenBot, Vibe uses that key,
+and Disconnect cannot remove it. OpenBot turns off Vibe's telemetry. If you installed `vibe-acp`
+yourself, OpenBot uses it until a download exists. Set `OPENBOT_MISTRAL_PATH` to select an executable
+yourself. When a Full access Mistral agent changes its model or thinking level, Vibe saves it as its
+default in `~/.vibe/config.toml`. Mistral agents run on this computer. Team members see them when
+their app supports Mistral.
 
 Hermes uses the Hermes Agent (`hermes`) that you install yourself, with your own `~/.hermes` (or
 `$HERMES_HOME`): its memories, skills, sign-ins and `SOUL.md` apply to OpenBot agents too. OpenBot
@@ -649,6 +659,9 @@ list of documents, text, data, and source files.
   session history managed exclusively by the Devin CLI.
 - `~/.copilot` (or `$COPILOT_HOME`) — settings and session history managed exclusively by the GitHub
   Copilot CLI. Its sign-in is in the system keychain.
+- `~/.vibe` (or `$VIBE_HOME`) — settings, logs and session history managed exclusively by Mistral
+  Vibe. OpenBot makes an empty `trusted_folders.toml` there when it is missing. The sign-in is in the
+  system keychain, or in `.env`.
 - `~/.hermes` (or `$HERMES_HOME`) — your own Hermes Agent settings, memories, skills, sign-ins and
   session history. OpenBot reads only the change time of `auth.json`, `.env` and `config.yaml`, to
   see a sign-in.

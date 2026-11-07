@@ -286,6 +286,8 @@ export const messages = {
   "error.provider.devinSignIn": "Devin を使うには Devin でサインインしてください。",
   "error.provider.copilotSignIn":
     "GitHub Copilot を使うには GitHub でサインインするか、COPILOT_GITHUB_TOKEN を設定してください。",
+  "error.provider.mistralSignIn":
+    "Mistral を使うには、Mistral でサインインするか、MISTRAL_API_KEY を設定してください。",
   "error.provider.hermesMissing":
     "Hermes Agent がインストールされていません。インストールしてから、もう一度お試しください。",
   "error.provider.hermesNotStarted":

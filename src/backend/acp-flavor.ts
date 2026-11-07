@@ -64,6 +64,11 @@ export interface AcpFlavor {
    */
   modelSetUnsaved?(error: RequestError): boolean;
   /**
+   * A `session/set_config_option` failure after which the session already has the new value. The
+   * agent changes the session first and then fails to save the value as its default.
+   */
+  configSetUnsaved?(error: RequestError): boolean;
+  /**
    * The agent frees what a session holds only when its process ends, not at `session/close`. Model
    * discovery then resumes one probe session for each process rather than opening another.
    */
@@ -145,6 +150,13 @@ export interface AcpFlavor {
   signInLostChunk?: RegExp;
   /** The `_meta` of each `session/new`, `session/load` and `session/resume` request. */
   sessionMeta?: NewSessionRequest["_meta"];
+  /**
+   * The agent reads the project files (instructions, skills, hooks) only of a folder that the user
+   * trusted or that the session adds. OpenBot puts the workspace first in `additionalDirectories` of
+   * each `session/new`, `session/load` and `session/resume`, and sends them although the agent does
+   * not advertise them.
+   */
+  workspaceAsAdditionalDirectory?: true;
   /**
    * OpenBot opens a saved session with `session/load`, also when the agent advertises
    * `session/resume`, and this tells from a successful load reply that the session is missing.
@@ -231,6 +243,25 @@ export const KIMI_ACP_FLAVOR: AcpFlavor = {
 export const DEVIN_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: (error) =>
     error.code === -32016 ? isRecord(error.data) && error.data["cognition.ai/errorKind"] === "session_not_found" : null,
+};
+
+/**
+ * Mistral Vibe 3.1.0 refuses `session/load` and `session/resume` of a session that it does not have
+ * with "Invalid params", the message `Session not found: <id>` and `{ session_id: <id> }`. Only that
+ * session counts: a wrong config value is also "Invalid params".
+ */
+export const MISTRAL_ACP_FLAVOR: AcpFlavor = {
+  sessionNotFound: (error, sessionId) =>
+    error.code === -32602 ? isRecord(error.data) && error.data.session_id === sessionId : null,
+  // Vibe 3.1.0 reads no `AGENTS.md`, `.vibe` or `.agents/skills` in a folder that the user did not
+  // trust. A folder in `additionalDirectories` counts as trusted for that session only, so the
+  // workspace goes there, and nothing goes to the user's `trusted_folders.toml`. Its ACP trust
+  // decision would write that file: Vibe 3.1.0 takes only `trust_cwd`, `trust_repo` and `decline`.
+  workspaceAsAdditionalDirectory: true,
+  // Vibe 3.1.0 changes the session's model or thinking level, and then saves it as the default in
+  // `config.toml`. In a confined process that file is protected, and the save fails with "Invalid
+  // params" and "Layer 'user-toml': cannot write config file at <path>".
+  configSetUnsaved: (error) => error.code === -32602 && error.message.includes("cannot write config file"),
 };
 
 /**

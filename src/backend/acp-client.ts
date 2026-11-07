@@ -614,6 +614,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       discoveryCwd: options.discoveryCwd,
       processWideModel: options.flavor.processWideModel === true,
       modelSetUnsaved: options.flavor.modelSetUnsaved,
+      configSetUnsaved: options.flavor.configSetUnsaved,
       keepProbeSession: () => options.flavor.closeKeepsSession === true && this.#supportsSessionResume,
     });
   }
@@ -1495,9 +1496,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return this.#initialization?.agentCapabilities?.sessionCapabilities?.resume != null;
   }
 
-  /** Whether the agent advertises `additionalDirectories`. Grok refuses them unadvertised (#1729). */
+  /**
+   * Whether the agent takes `additionalDirectories`: it advertises them, or its flavor names the
+   * workspace in them. Grok refuses them unadvertised (#1729).
+   */
   get #acceptsAdditionalDirectories(): boolean {
-    return this.#initialization?.agentCapabilities?.sessionCapabilities?.additionalDirectories != null;
+    return (
+      this.#flavor.workspaceAsAdditionalDirectory === true ||
+      this.#initialization?.agentCapabilities?.sessionCapabilities?.additionalDirectories != null
+    );
   }
 
   /**
@@ -1604,9 +1611,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             const connection = () =>
               sessionTransport ? sessionTransport.requireConnection() : this.#requireConnection();
             const additionalDirectories = getArray(params, "runtimeWorkspaceRoots").filter(isString);
-            // Sent only to an agent that advertises them: Grok 1.0.60 refuses them on every session
-            // request, so each new Grok session failed.
-            const directories = this.#acceptsAdditionalDirectories ? { additionalDirectories } : {};
+            // Sent only to an agent that advertises them, or whose flavor sets
+            // `workspaceAsAdditionalDirectory`: Grok 1.0.60 refuses them on every session request,
+            // so each new Grok session failed.
+            const directories = this.#acceptsAdditionalDirectories
+              ? {
+                  additionalDirectories: this.#flavor.workspaceAsAdditionalDirectory
+                    ? [cwd, ...additionalDirectories.filter((root) => root !== cwd)]
+                    : additionalDirectories,
+                }
+              : {};
             const meta = this.#flavor.sessionMeta ? { _meta: this.#flavor.sessionMeta } : {};
             let id: string;
             let configOptions: SessionConfigOption[];

@@ -175,12 +175,12 @@ adds its rule there, not in the catalog.
 
 The runtime manager offers the latest upstream release of each provider CLI. It checks at startup,
 every hour, and when the user selects `Check for updates` (`provider-runtime-releases.ts`): GitHub
-`releases/latest` for Codex, Pi, Kimi and GitHub Copilot, the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
+`releases/latest` for Codex, Pi, Kimi, GitHub Copilot and Mistral, the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
 for Grok, the `muse-stable` channel for Muse, Cognition's `cli/current` manifest for Devin, and the ACP registry entries `antigravity-acp` for Gemini and `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
 answered, and Bun, which is a tool runtime and not a provider, stays on it.
 
 Every upstream download is checked against its source's own hash: the GitHub asset `digest` for
-Codex, Pi, Kimi and GitHub Copilot, the manifest `checksum` for Muse, the manifest `sha256` for Devin, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
+Codex, Pi, Kimi, GitHub Copilot and Mistral, the manifest `checksum` for Muse, the manifest `sha256` for Devin, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
 so a Grok, Gemini or Cursor release is trusted on TLS alone. A Gemini release must stay on
 `dl.google.com/agy-extensions/releases` and keep the pinned command name. A Cursor release must use
 the pinned `downloads.cursor.com/lab` path for its target, with a build that starts with the
@@ -823,6 +823,57 @@ renamed or removed, so the rules stay on those paths. The CLI reads `.github/ins
 No frozen Team API protocol knows `copilot`. The host hides Copilot agents, models, status, and
 sign-in state from peers below protocol 8, as for Devin.
 
+### Mistral
+
+The Mistral provider (id `mistral`) starts `vibe-acp`, the ACP server of Mistral Vibe. The runtime
+manager reads `releases/latest` of `mistralai/mistral-vibe` and downloads
+`vibe-acp-<triple>-<version>.tar.gz` (`.zip` on Windows). Each archive is a PyInstaller onedir build:
+`vibe-acp` and its `_internal` folder both go to `bin/`, and the macOS and Linux links stay links, as
+for Kimi. The licence is Apache-2.0. The archive holds it in
+`_internal/mistral_vibe-<version>.dist-info/licenses/LICENSE`, so the lock pins its hash in `files`.
+`OPENBOT_MISTRAL_PATH` selects another executable. The `vibe` command is the terminal app, not the
+ACP server, so the system search looks for `vibe-acp`.
+
+Every Mistral process gets `VIBE_ENABLE_TELEMETRY=false` (`MISTRAL_ENV` in `provider-drivers.ts`).
+In Vibe 3.1.0 this stops its usage events, its OpenTelemetry traces and its experiment fetch. An
+organization's managed configuration from Mistral is a higher layer, so it can turn telemetry on
+again. Only the terminal app checks for updates; `vibe-acp` does not update itself (from the source,
+not confirmed in a run).
+
+Vibe 3.1.0 lists one ACP auth method, `browser-auth`. Sign in calls `authenticate` with it: the CLI
+opens Mistral's sign-in page in the browser of the host and polls Mistral until the sign-in ends. It
+has no `127.0.0.1` callback and no code sign-in for a joined computer (`localCodeSignIn: null`). The
+sign-in saves an API key in the system keychain (`ai.mistral.vibe`, `MISTRAL_API_KEY`), or in
+`$VIBE_HOME/.env` when there is no keychain, and can write the provider and console address to
+`config.toml`. `MISTRAL_API_KEY` in OpenBot's environment also signs in. A signed-out process answers
+`session/new` with `-32000` and "Missing API key for mistral provider.". Sign out starts the ACP
+server and calls `_auth/signOut` (`acpLogout`). It cannot sign out a key from the environment:
+Vibe refuses with `-32602`. The keychain item is global, so Mistral has no added accounts.
+
+`mistralStatePaths` lets a confined process write `$VIBE_HOME` (`~/.vibe`) for its logs, locks,
+history and caches. Its settings stay read-only, because every other Vibe process loads them:
+`config.toml`, `.env`, `trusted_folders.toml`, `hooks.toml`, `AGENTS.md`, `tools`, `skills`,
+`skills.toml`, `skills-registry-cache`, `agents`, `prompts`, `plugins`, `projects.toml`,
+`local_projects.toml`, `managed_config_cache.json` and `connector_bootstrap_cache.json`. Vibe writes
+`trusted_folders.toml` at startup when it is missing, and stops when it cannot. So OpenBot makes an
+empty file first (`makeMistralTrustedFolders`), and never changes one that exists. `.vibe` in a
+workspace is project settings, so a confined process cannot write it.
+
+Vibe 3.1.0 reads `AGENTS.md`, `.vibe` and `.agents/skills` only in a trusted folder. Its ACP trust
+decision writes `trusted_folders.toml`, so OpenBot sends the workspace in the session's
+`additionalDirectories` instead (`workspaceAsAdditionalDirectory` in `MISTRAL_ACP_FLAVOR`). A folder
+there is trusted for that session only.
+
+A model or thinking change with `session/set_config_option` applies to the session, and then Vibe
+saves it as the default in `config.toml`. A confined process cannot write that file, and the save
+fails with `-32602` and "Layer 'user-toml': cannot write config file". `AcpFlavor.configSetUnsaved`
+reads that failure as a change that applied. A Full access Mistral agent saves the value, so it
+becomes the default of each new Vibe session, also in a terminal. Vibe answers a lost session with
+`-32602` and `{ session_id: <id> }`, which `MISTRAL_ACP_FLAVOR` reads as a missing session.
+
+No frozen Team API protocol knows `mistral`. The host hides Mistral agents, models, status, and
+sign-in state from peers below protocol 8, and `providers-v8` carries it.
+
 ### Kimi
 
 The Kimi provider (id `kimi`) starts the Kimi Code CLI with `kimi acp`. The runtime manager
@@ -1107,10 +1158,11 @@ uses the optional `provider-usage-reset-v1` routes (see [Admin capabilities](ser
 ### Disconnect the own sign-in
 
 Settings > Providers shows **Disconnect** in the ⋯ menu of the connected own sign-in of Claude,
-Codex, Grok, Muse, Cursor, Devin and GitHub Copilot (issue #3487). Claude and Codex have an `accounts.signOut` command
+Codex, Grok, Muse, Cursor, Devin, GitHub Copilot and Mistral (issue #3487). Claude and Codex have an `accounts.signOut` command
 (`claude auth logout`, `codex logout`), which also signs out an account folder before its removal.
-Grok, Muse, Cursor, Devin and GitHub Copilot have a driver `signOut` (`grok logout`, `muse logout`,
-`cursor-agent logout`, `devin auth logout`, and the ACP `logout` method of `copilot --acp`)
+Grok, Muse, Cursor, Devin, GitHub Copilot and Mistral have a driver `signOut` (`grok logout`, `muse logout`,
+`cursor-agent logout`, `devin auth logout`, the ACP `logout` method of `copilot --acp`, and the
+`_auth/signOut` extension method of `vibe-acp`)
 for the own sign-in only. Muse offers it only on this computer with no OpenBot key saved
 (`apiKeyInUse`): the key keeps Muse connected, and the key dialog removes it. Cline, Gemini and Pi have no sign-out command.
 `ProviderRuntime.signOutProvider` refuses while the provider runs a turn, cancels a

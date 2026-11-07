@@ -43,6 +43,7 @@ export const messages = {
   "onboarding.provider.kimiAccount": "מודלים של Kimi עם חשבון Kimi Code",
   "onboarding.provider.devinAccount": "מודלים רבים עם חשבון Devin",
   "onboarding.provider.copilotAccount": "מודלים רבים עם תוכנית Copilot",
+  "onboarding.provider.mistralAccount": "מודלים של Mistral עם חשבון Mistral",
   "onboarding.provider.hermesNous": "תוכנית Nous Portal או ההגדרה שלך ב-Hermes",
   "onboarding.provider.inceptionKey": "מודלים של Mercury עם מפתח API של Inception",
   "onboarding.provider.deepseekKey": "מודלים של DeepSeek עם מפתח API של DeepSeek",

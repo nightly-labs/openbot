@@ -275,6 +275,7 @@ export const messages = {
   "error.provider.devinSignIn": "Devin을 사용하려면 Devin으로 로그인하세요.",
   "error.provider.copilotSignIn":
     "GitHub Copilot을 사용하려면 GitHub로 로그인하거나 COPILOT_GITHUB_TOKEN을 설정하세요.",
+  "error.provider.mistralSignIn": "Mistral을 사용하려면 Mistral로 로그인하거나 MISTRAL_API_KEY를 설정하세요.",
   "error.provider.hermesMissing": "Hermes Agent가 설치되어 있지 않습니다. 설치한 후 다시 시도하세요.",
   "error.provider.hermesNotStarted": "Hermes Agent를 시작할 수 없습니다. 터미널에서 `hermes --version`을 실행하세요.",
   "error.provider.hermesVersionUnreadable": "Hermes Agent 버전을 읽을 수 없습니다.",

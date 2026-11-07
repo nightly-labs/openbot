@@ -249,6 +249,7 @@ export const messages = {
   "error.provider.kimiSignIn": "请使用 Kimi Code 登录以使用 Kimi。",
   "error.provider.devinSignIn": "请使用 Devin 登录以使用 Devin。",
   "error.provider.copilotSignIn": "请使用 GitHub 登录，或设置 COPILOT_GITHUB_TOKEN 以使用 GitHub Copilot。",
+  "error.provider.mistralSignIn": "请使用 Mistral 登录，或设置 MISTRAL_API_KEY 以使用 Mistral。",
   "error.provider.hermesMissing": "未安装 Hermes Agent。请安装后重试。",
   "error.provider.hermesNotStarted": "无法启动 Hermes Agent。请在终端中运行 `hermes --version`。",
   "error.provider.hermesVersionUnreadable": "无法读取 Hermes Agent 的版本。",

@@ -260,6 +260,7 @@ export const messages = {
   "error.provider.kimiSignIn": "سجّل الدخول باستخدام Kimi Code لاستخدام Kimi.",
   "error.provider.devinSignIn": "سجّل الدخول باستخدام Devin لاستخدام Devin.",
   "error.provider.copilotSignIn": "سجّل الدخول باستخدام GitHub أو عيّن COPILOT_GITHUB_TOKEN لاستخدام GitHub Copilot.",
+  "error.provider.mistralSignIn": "سجّل الدخول باستخدام Mistral أو عيّن MISTRAL_API_KEY لاستخدام Mistral.",
   "error.provider.hermesMissing": "Hermes Agent غير مثبت. ثبّته، ثم أعد المحاولة.",
   "error.provider.hermesNotStarted": "تعذّر تشغيل Hermes Agent. شغّل `hermes --version` في نافذة طرفية.",
   "error.provider.hermesVersionUnreadable": "تتعذّر قراءة إصدار Hermes Agent.",

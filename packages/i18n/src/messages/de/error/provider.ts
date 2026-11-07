@@ -292,6 +292,7 @@ export const messages = {
   "error.provider.devinSignIn": "Melde dich mit Devin an, um Devin zu verwenden.",
   "error.provider.copilotSignIn":
     "Melde dich mit GitHub an oder setze COPILOT_GITHUB_TOKEN, um GitHub Copilot zu verwenden.",
+  "error.provider.mistralSignIn": "Melde dich mit Mistral an oder setze MISTRAL_API_KEY, um Mistral zu verwenden.",
   "error.provider.hermesMissing": "Hermes Agent ist nicht installiert. Installiere ihn und versuche es erneut.",
   "error.provider.hermesNotStarted":
     "Hermes Agent konnte nicht starten. Führe `hermes --version` in einem Terminal aus.",
