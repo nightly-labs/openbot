@@ -76,13 +76,6 @@ function geminiRequestFailure(error: unknown, detail: string): string {
   return key ? sourceText(key, { detail: shownFailureDetail(reason) }) : detail;
 }
 
-/**
- * Not on Windows: there each process start unpacks about 310 MB (`antigravityTemp`), which every
- * new or reopened session would wait for.
- */
-const SESSION_PROCESSES: Pick<AcpFlavor, "sessionProcesses"> =
-  process.platform === "win32" ? {} : { sessionProcesses: true };
-
 export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   // Antigravity 1.4.3 offers its Claude and GPT models only to a client named `zed`, `xcode`,
   // `jetbrains.*` or `android studio*` (`supports_third_party_models`). Any other client gets the
@@ -136,5 +129,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   // Antigravity 1.4.4 starts a `localharness_external` of about 100 MB for each session and keeps it
   // after `session/close`, which it does not advertise, until its process ends (#3925).
   closeKeepsSession: true,
-  ...SESSION_PROCESSES,
+  // Also on Windows, where each process start unpacks about 310 MB (`antigravityTemp`) that a new or
+  // reopened session waits for. One shared process kept a harness for each session it opened (#5497).
+  sessionProcesses: true,
 };
