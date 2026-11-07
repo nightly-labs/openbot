@@ -143,11 +143,11 @@ export const messages = {
   "mcp.panel.appSaved": "App opgeslagen. Log in om hem te gebruiken.",
   "mcp.panel.appRemoved": "App verwijderd.",
   "mcp.signIn.relayDescription":
-    "Controleer of de inlogpagina op {page} staat en open hem daarna in je browser. Als je klaar bent, stuurt OpenBot de login naar {host}.",
+    "Log in je browser in op {page}. Als je klaar bent, stuurt OpenBot de login naar {host}.",
   "mcp.signIn.relayOpenDescription":
-    "Open de inlogpagina van {page} in je browser. Als je klaar bent, plak je hier het adres dat de browser toont. OpenBot stuurt de login daarna naar {host}.",
+    "Log in je browser in op {page}. Als je klaar bent, plak je hier het adres dat de browser toont. OpenBot stuurt de login daarna naar {host}.",
   "mcp.signIn.relayDeviceDescription":
-    "Controleer of de inlogpagina op {page} staat, open hem daarna in je browser en rond het daar af. {host} ziet de login vanzelf.",
+    "Log in je browser in op {page} en rond het daar af. {host} ziet de login vanzelf.",
   "mcp.signIn.relayOpen": "Inlogpagina openen",
   "mcp.signIn.relayPasteHint":
     "Als de browser niet terugkeert naar OpenBot, kopieer dan het adres dat hij toont en plak het hier.",

@@ -146,11 +146,11 @@ export const messages = {
   "mcp.panel.appSaved": "App gespeichert. Melde dich an, um sie zu verwenden.",
   "mcp.panel.appRemoved": "App entfernt.",
   "mcp.signIn.relayDescription":
-    "Prüfe, ob die Anmeldeseite auf {page} liegt, und öffne sie dann in deinem Browser. Wenn du fertig bist, sendet OpenBot die Anmeldung an {host}.",
+    "Melde dich in deinem Browser auf {page} an. Wenn du fertig bist, sendet OpenBot die Anmeldung an {host}.",
   "mcp.signIn.relayOpenDescription":
-    "Öffne die Anmeldeseite von {page} in deinem Browser. Wenn du fertig bist, füge die angezeigte Adresse hier ein. OpenBot sendet die Anmeldung dann an {host}.",
+    "Melde dich in deinem Browser auf {page} an. Wenn du fertig bist, füge die angezeigte Adresse hier ein. OpenBot sendet die Anmeldung dann an {host}.",
   "mcp.signIn.relayDeviceDescription":
-    "Prüfe, ob die Anmeldeseite auf {page} liegt, öffne sie dann in deinem Browser und schließe die Anmeldung dort ab. {host} erkennt die Anmeldung selbst.",
+    "Melde dich in deinem Browser auf {page} an und schließe die Anmeldung dort ab. {host} erkennt die Anmeldung selbst.",
   "mcp.signIn.relayOpen": "Anmeldeseite öffnen",
   "mcp.signIn.relayPasteHint":
     "Wenn der Browser nicht zu OpenBot zurückkehrt, kopiere die angezeigte Adresse und füge sie hier ein.",

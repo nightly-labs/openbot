@@ -2,7 +2,7 @@
 // go (#3243). A callback came back, by the listener or by a paste, and the host completes the sign-in:
 // a paste of the same sign-in then must not say that the sign-in ended, must not send a second grant,
 // and the host's result must still arrive. A paste before the callback, and after the end, keep their
-// errors.
+// errors. The page opens with no click, also when no link chose it.
 // `bun run test:sign-in-relay-paste`. Writes .openbot-build/sign-in-relay-paste-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -25,6 +25,7 @@ const SUCCESS: McpTestResult = { toolCount: 1, error: null };
 
 interface CaseResult {
   name: string;
+  opened: string[];
   wrongStateBefore: string | null;
   pageWhileCompleting: unknown;
   pasteWhileCompleting: string | null;
@@ -49,17 +50,32 @@ function thrown(action: () => void): string | null {
   }
 }
 
-/** One sign-in on a fake host. The callback comes back by `accept`. */
-async function runCase(name: string, accept: (client: SignInRelayClient) => void): Promise<CaseResult> {
+/**
+ * One sign-in on a fake host. The callback comes back by `accept`. With `chosen`, a link chose the
+ * page, as in a conversation; without it, the sign-in started from a dialog.
+ */
+async function runCase(
+  name: string,
+  accept: (client: SignInRelayClient) => void,
+  chosen: boolean,
+): Promise<CaseResult> {
+  const opened: string[] = [];
   const completeQueries: string[] = [];
   const completing = Promise.withResolvers<void>();
   const release = Deferred.makeUnsafe<void>();
   const waiting = Promise.withResolvers<void>();
   let result: McpTestResult | null = null;
+  let statusReads = 0;
   const status = (): SignInRelayStatus => ({ authorizeUrl: result ? null : PAGE, callback: null, result });
   const remote: SignInRelayRemote<never> = {
     start: Effect.succeed({ flowId: "flow-1" }),
-    status: () => Effect.sync(status),
+    // The first read gives the page. The client reads again only after the sign-in waits for its callback.
+    status: () =>
+      Effect.sync(() => {
+        statusReads += 1;
+        if (!chosen && statusReads === 2) waiting.resolve();
+        return status();
+      }),
     complete: (_flowId, query) =>
       Effect.gen(function* () {
         completeQueries.push(query);
@@ -71,11 +87,15 @@ async function runCase(name: string, accept: (client: SignInRelayClient) => void
     cancel: () => Effect.void,
   };
   const client = new SignInRelayClient({
-    openExternal: async () => undefined,
+    openExternal: async (url) => {
+      opened.push(url);
+    },
     language: { locale: "en", translate: translateFor("en") },
     ownListener: () => null,
   });
-  const run = Effect.runPromise(client.run(KEY, remote, { page: PAGE, onWaiting: () => waiting.resolve() }));
+  const run = Effect.runPromise(
+    client.run(KEY, remote, chosen ? { page: PAGE, onWaiting: () => waiting.resolve() } : null),
+  );
   await waiting.promise;
 
   const wrongStateBefore = thrown(() => client.paste(KEY, WRONG_STATE_CALLBACK));
@@ -88,6 +108,7 @@ async function runCase(name: string, accept: (client: SignInRelayClient) => void
   const ended = await run;
   return {
     name,
+    opened,
     wrongStateBefore,
     pageWhileCompleting,
     pasteWhileCompleting,
@@ -100,13 +121,18 @@ async function runCase(name: string, accept: (client: SignInRelayClient) => void
 
 const report: Report = { passed: false, cases: [] };
 try {
-  const cases: [string, (client: SignInRelayClient) => void][] = [
-    ["listener callback, then paste", (client) => assert.ok(client.deliver(STATE, new URL(CALLBACK).search.slice(1)))],
-    ["paste, then second paste", (client) => client.paste(KEY, CALLBACK)],
+  const deliver = (client: SignInRelayClient) => assert.ok(client.deliver(STATE, new URL(CALLBACK).search.slice(1)));
+  const paste = (client: SignInRelayClient) => client.paste(KEY, CALLBACK);
+  const cases: [string, (client: SignInRelayClient) => void, boolean][] = [
+    ["listener callback, then paste", deliver, true],
+    ["paste, then second paste", paste, true],
+    ["dialog sign-in: listener callback, then paste", deliver, false],
+    ["dialog sign-in: paste, then second paste", paste, false],
   ];
-  for (const [name, accept] of cases) {
-    const result = await runCase(name, accept);
+  for (const [name, accept, chosen] of cases) {
+    const result = await runCase(name, accept, chosen);
     report.cases.push(result);
+    assert.deepEqual(result.opened, [PAGE], `${result.name}: the page opens once, with no click.`);
     assert.equal(result.wrongStateBefore, sourceText("error.mcp.relayAddressInvalid"), `${result.name}: wrong state.`);
     assert.equal(result.pageWhileCompleting, null, `${result.name}: no page while the host completes.`);
     assert.equal(result.pasteWhileCompleting, null, `${result.name}: a paste while the host completes is no error.`);

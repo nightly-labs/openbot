@@ -143,6 +143,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "אימות מאובטח אינו נתמך בלקוח הזה.",
   "error.team.agentSettingsUnsupported": "הגדרות סוכן אינן נתמכות בחיבור הזה.",
   "error.team.adminRequired": "נדרשת גישת מנהל.",
+  "error.team.mcpServerNotYours": "רק מי שהוסיף את שרת ה-MCP הזה, או מנהל, יכול לשנות אותו.",
   "error.team.ownerRequired": "רק הבעלים של השרת הזה יכול לבצע זאת.",
   "error.team.requestTooLarge": "גוף הבקשה גדול מדי.",
   "error.team.signInRelayUnsupported": "השרת הזה אינו יכול להעביר התחברויות. יש לעדכן את OpenBot במארח.",

@@ -144,6 +144,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "المصادقة الآمنة غير مدعومة في هذا العميل.",
   "error.team.agentSettingsUnsupported": "إعدادات الوكيل غير مدعومة في هذا الاتصال.",
   "error.team.adminRequired": "يلزم وصول المسؤول.",
+  "error.team.mcpServerNotYours": "لا يمكن تغيير خادم MCP هذا إلا للشخص الذي أضافه أو لمسؤول.",
   "error.team.ownerRequired": "لا يمكن إلا لمالك هذا الخادم فعل ذلك.",
   "error.team.requestTooLarge": "نص الطلب كبير جدًا.",
   "error.team.signInRelayUnsupported": "لا يمكن لهذا الخادم تمرير عمليات تسجيل الدخول. حدّث OpenBot على المضيف.",

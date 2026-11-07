@@ -1,12 +1,12 @@
 import { SITE_OPEN_GRAPH_LOCALES } from "./site-locale";
 import { OPENBOT_X_HANDLE, type PageSocialImage, pageSocialImageMeta } from "./site-metadata";
-import { type EnglishPagePath, pagePaths, SITE_LOCALES, type SiteLocale } from "./site-paths";
+import { type EnglishPagePath, pagePaths, SITE_LOCALES, type SiteLocale, siteHreflang } from "./site-paths";
 
-/** The head of a page that has a Polish copy, in one language. */
+/** The head of a page that has localized copies, in one language. */
 export interface SitePageHead {
   /** The English address of the page. */
   page: EnglishPagePath;
-  /** The address of this route: the English address, or the Polish one. */
+  /** The address of this route: the English address, or a localized one. */
   path: string;
   locale: SiteLocale;
   title: string;
@@ -15,9 +15,9 @@ export interface SitePageHead {
 }
 
 /**
- * The head tags of a page with a Polish copy. The English address shows the language of the request,
- * so its canonical address stays the English address. The `hreflang` links name the English address
- * for English and as `x-default`, and the Polish address for Polish.
+ * The head tags of a page with localized copies. The English address shows the language of the
+ * request, so its canonical address stays the English address. The `hreflang` links name the English
+ * address for English and as `x-default`, and the localized address for each other language.
  */
 export function sitePageHead(siteUrl: string, head: SitePageHead) {
   const url = new URL(head.path, siteUrl).toString();
@@ -44,7 +44,7 @@ export function sitePageHead(siteUrl: string, head: SitePageHead) {
       { rel: "canonical", href: url },
       ...SITE_LOCALES.map((locale) => ({
         rel: "alternate",
-        hreflang: locale,
+        hreflang: siteHreflang(locale),
         href: new URL(paths[locale], siteUrl).toString(),
       })),
       { rel: "alternate", hreflang: "x-default", href: new URL(paths.en, siteUrl).toString() },

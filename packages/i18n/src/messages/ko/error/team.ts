@@ -143,6 +143,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "이 클라이언트는 보안 인증을 지원하지 않아요.",
   "error.team.agentSettingsUnsupported": "이 연결에서는 에이전트 설정을 지원하지 않아요.",
   "error.team.adminRequired": "관리자 권한이 필요해요.",
+  "error.team.mcpServerNotYours": "이 MCP 서버는 추가한 사람이나 관리자만 변경할 수 있어요.",
   "error.team.ownerRequired": "이 서버의 소유자만 할 수 있어요.",
   "error.team.requestTooLarge": "요청 본문이 너무 커요.",
   "error.team.signInRelayUnsupported": "이 서버는 로그인을 중계할 수 없어요. 호스트의 OpenBot을 업데이트해 주세요.",

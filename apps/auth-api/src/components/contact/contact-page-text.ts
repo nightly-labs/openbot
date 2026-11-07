@@ -2,8 +2,8 @@ import type { AppTranslate } from "@openbot/i18n";
 import { slot } from "../../lib/text-slots";
 
 /*
- * The text of the /contact page, built from `sitePage.contact.*` catalog keys. The routes `/contact` and
- * `/pl/contact` run `contactPageText` with `loadPageText`. This module has only a type import of the
+ * The text of the /contact page, built from `sitePage.contact.*` catalog keys. The routes `/contact`,
+ * `/pl/contact` and `/pt/contact` run `contactPageText` with `loadPageText`. This module has only a type import of the
  * catalogs, so the page does not pull them into the browser bundle.
  */
 

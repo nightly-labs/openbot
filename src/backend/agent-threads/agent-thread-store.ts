@@ -136,6 +136,20 @@ export class AgentThreadStore {
     ).map(decodeThread);
   }
 
+  /**
+   * The threads of this agent, open and archived, with activity (`updated_at`: a turn start, a close
+   * or a reopen) at or after `after`. The latest activity first.
+   */
+  recent(agentId: string, after: string | null, limit: number): AgentThreadRecord[] {
+    return databaseRows(
+      this.#database.connection
+        .prepare(
+          `${SELECT_THREAD} WHERE agent_id = ? AND (? IS NULL OR updated_at >= ?) ORDER BY updated_at DESC, thread_id LIMIT ?`,
+        )
+        .all(agentId, after, after, limit),
+    ).map(decodeThread);
+  }
+
   /** The agent id and thread id of every side thread, for boot recovery. */
   executionThreads(): Array<{ id: string; threadId: string }> {
     return databaseRows(

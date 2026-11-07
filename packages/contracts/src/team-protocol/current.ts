@@ -164,6 +164,15 @@ export const TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY = "any-file-attachments";
  */
 export const MCP_ACCOUNTS_CAPABILITY = "mcp-accounts-v1";
 /**
+ * A host that lets a member, and not only an owner or admin, use the routes of `mcp-servers-v1`,
+ * `mcp-sign-in-v1`, `mcp-sign-in-app-v1` and the MCP start of `sign-in-relay-v1`. A member can read
+ * the list, test, and add a server. A member can change, sign in, sign out, or remove only a server
+ * that the member added; the host refuses any other row with 403. The host lets a member in only
+ * when the client also sends this capability, so a released client sees no change. Each server
+ * still has one sign-in, which every agent of the host uses.
+ */
+export const MCP_MEMBER_ACCESS_CAPABILITY = "mcp-member-access-v1";
+/**
  * Frozen optional member-leave-v1 contract: a bodyless `POST /v1/team/leave` answered with 204. The
  * caller, a member or an admin, removes their own membership with the same effects as an admin's
  * `DELETE /v1/team/members/:id`: the member row and every session of it go, on every device. The
@@ -471,6 +480,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
   ROUTINE_RUN_PLACE_CAPABILITY,
   HOST_PERSONALITY_CAPABILITY,
+  MCP_MEMBER_ACCESS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -644,7 +654,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== AGENT_THREAD_PAGES_CAPABILITY &&
     capability !== TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY &&
     capability !== ROUTINE_RUN_PLACE_CAPABILITY &&
-    capability !== HOST_PERSONALITY_CAPABILITY,
+    capability !== HOST_PERSONALITY_CAPABILITY &&
+    capability !== MCP_MEMBER_ACCESS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -694,6 +705,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
   ROUTINE_RUN_PLACE_CAPABILITY,
   HOST_PERSONALITY_CAPABILITY,
+  MCP_MEMBER_ACCESS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -826,6 +838,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== AGENT_THREAD_PAGES_CAPABILITY &&
       capability !== TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY &&
       capability !== ROUTINE_RUN_PLACE_CAPABILITY &&
-      capability !== HOST_PERSONALITY_CAPABILITY,
+      capability !== HOST_PERSONALITY_CAPABILITY &&
+      capability !== MCP_MEMBER_ACCESS_CAPABILITY,
   );
 }
