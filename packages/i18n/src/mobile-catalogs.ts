@@ -5,6 +5,7 @@ import { deMobile } from "./messages/de/mobile";
 import { type AppMobileMessages, enMobile } from "./messages/en/mobile";
 import { esMobile } from "./messages/es/mobile";
 import { frMobile } from "./messages/fr/mobile";
+import { heMobile } from "./messages/he/mobile";
 import { itMobile } from "./messages/it/mobile";
 import { jaMobile } from "./messages/ja/mobile";
 import { koMobile } from "./messages/ko/mobile";
@@ -21,6 +22,7 @@ const catalogs = {
   es: esMobile,
   en: enMobile,
   fr: frMobile,
+  he: heMobile,
   it: itMobile,
   ja: jaMobile,
   ko: koMobile,
