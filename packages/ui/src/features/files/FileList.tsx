@@ -167,19 +167,7 @@ export function FileList(props: FileListProps) {
         emptyTitle={props.emptyTitle}
         emptyDescription={props.emptyDescription}
       >
-        <Show
-          when={visible().length > 0}
-          fallback={
-            <div class="file-list-message">
-              <p class="file-list-message-title">{t("files.list.noMatches")}</p>
-              <Show when={filtered()}>
-                <Button type="button" size="sm" variant="secondary" onClick={clearFilters}>
-                  {t("files.list.clearFilters")}
-                </Button>
-              </Show>
-            </div>
-          }
-        >
+        <Show when={visible().length > 0} fallback={<FileNoMatches filtered={filtered()} onClear={clearFilters} />}>
           <Show when={!props.query}>
             <p class="file-list-summary" aria-live="polite">
               {fileCountLabel(visible().length, t)} ·{" "}
@@ -234,7 +222,6 @@ export function FileList(props: FileListProps) {
   );
 }
 
-/** The loading, error and empty states of a file list. The children show when there are files. */
 /** The search box of a file list. */
 export function FileSearch(props: { label: string; value: string; onChange: (value: string) => void; class?: string }) {
   return (
@@ -282,6 +269,22 @@ export function FileTypeFilters(props: {
   );
 }
 
+/** The message when no file matches the search and type. "Clear filters" shows only when a filter is set. */
+export function FileNoMatches(props: { filtered: boolean; onClear: () => void }) {
+  const { t } = useText();
+  return (
+    <div class="file-list-message">
+      <p class="file-list-message-title">{t("files.list.noMatches")}</p>
+      <Show when={props.filtered}>
+        <Button type="button" size="sm" variant="secondary" onClick={props.onClear}>
+          {t("files.list.clearFilters")}
+        </Button>
+      </Show>
+    </div>
+  );
+}
+
+/** The loading, error and empty states of a file list. The children show when there are files. */
 export function FileListStatus(props: {
   loading?: boolean | undefined;
   error?: string | null | undefined;

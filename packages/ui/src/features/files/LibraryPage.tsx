@@ -5,7 +5,15 @@ import { createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-j
 import { fileBadge } from "../conversation/AttachmentCards";
 import { attachmentReferenceBadge, attachmentReferenceTone } from "../conversation/AttachmentReference";
 import { ImageLightbox, type ImageLightboxOpening, isLightboxImage } from "../conversation/ImageLightbox";
-import { FileDeleteDialog, FileList, FileListStatus, FileRowMenu, FileSearch, FileTypeFilters } from "./FileList";
+import {
+  FileDeleteDialog,
+  FileList,
+  FileListStatus,
+  FileNoMatches,
+  FileRowMenu,
+  FileSearch,
+  FileTypeFilters,
+} from "./FileList";
 import {
   type FileTypeFilter,
   fileTypeCounts,
@@ -116,19 +124,7 @@ export function LibraryPage(props: LibraryPageProps) {
       </header>
       <FileListStatus loading={props.loading} error={props.error} onRetry={props.onRetry} empty={files().length === 0}>
         <FileTypeFilters counts={counts()} value={type()} onChange={setType} />
-        <Show
-          when={shown().length > 0}
-          fallback={
-            <div class="file-list-message">
-              <p class="file-list-message-title">{t("files.list.noMatches")}</p>
-              <Show when={filtered()}>
-                <Button type="button" size="sm" variant="secondary" onClick={clearFilters}>
-                  {t("files.list.clearFilters")}
-                </Button>
-              </Show>
-            </div>
-          }
-        >
+        <Show when={shown().length > 0} fallback={<FileNoMatches filtered={filtered()} onClear={clearFilters} />}>
           <Show
             when={view() === "grid"}
             fallback={

@@ -113,7 +113,6 @@ function LibraryViewer(props: {
   document.addEventListener("keydown", onKeyDown);
   onCleanup(() => document.removeEventListener("keydown", onKeyDown));
   const file = () => props.viewing.file;
-  const available = () => file().status === "available";
   return (
     // The page under the viewer is inert, so the viewer is the only part that takes input.
     <section
@@ -133,11 +132,10 @@ function LibraryViewer(props: {
           onWidthChange={() => undefined}
           onOpenLink={(url) => void appPort().openUrl(url)}
           onOpenSharedFile={() => undefined}
-          // A file on a joined server has no copy on this computer to open or show.
-          allowExternalOpen={available()}
+          allowExternalOpen
           onOpenExternally={() => void props.onAction(file(), "open")}
           onDownload={() => void props.onAction(file(), "download")}
-          onReveal={available() ? () => void props.onAction(file(), "reveal") : undefined}
+          onReveal={() => void props.onAction(file(), "reveal")}
           onClose={props.onClose}
         />
       </Loading>
