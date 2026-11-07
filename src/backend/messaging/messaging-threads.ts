@@ -267,7 +267,10 @@ export class MessagingThreads {
   readonly #listeners = new Set<(activity: MessagingActivity) => void>();
   readonly #admissions = new Map<string, Deferred.Deferred<void>>();
   /** The external message each running turn answers, by turn id. */
-  readonly #turnOrigins = new Map<string, { linkId: string; origin: MessagingOrigin | null; followUp: boolean }>();
+  readonly #turnOrigins = new Map<
+    string,
+    { deliveryIds: readonly string[]; origin: MessagingOrigin | null; followUp: boolean }
+  >();
   /** The deliveries whose requester stopped them while they were starting, so their turn stops when it starts. */
   readonly #stopsBeforeStart = new Set<string>();
   /**
@@ -787,19 +790,18 @@ export class MessagingThreads {
       case "turn-started": {
         const link = this.store.linkForThread(event.threadId);
         if (!link) return false;
-        const running = this.#mailbox
+        const active = this.#mailbox
           .unresolvedMessagingDeliveries(link.linkId)
-          .find((context) => context.delivery.status !== "queued");
+          .filter((context) => context.delivery.status !== "queued");
+        const running = active[0];
         const origin = running ? this.#mailbox.messagingOrigin(running.delivery.id) : null;
         const followUp = running?.delivery.sender.kind === "agent";
-        this.#turnOrigins.set(event.turnId, { linkId: link.linkId, origin, followUp });
+        const deliveryIds = active.map((context) => context.delivery.id);
+        this.#turnOrigins.set(event.turnId, { deliveryIds, origin, followUp });
         this.#publish({ type: "started", link, turnId: event.turnId, origin, followUp });
-        const stopped = this.#mailbox
-          .unresolvedMessagingDeliveries(link.linkId)
-          .filter(
-            (context) => context.delivery.status !== "queued" && this.#stopsBeforeStart.delete(context.delivery.id),
-          );
-        if (stopped.length > 0)
+        let stopped = false;
+        for (const deliveryId of deliveryIds) if (this.#stopsBeforeStart.delete(deliveryId)) stopped = true;
+        if (stopped)
           Effect.runFork(
             this.#hooks
               .interrupt(link.agentId, event.turnId, link.threadId)
@@ -914,9 +916,10 @@ export class MessagingThreads {
         stopped = true;
       } else if (context.delivery.status === "starting") {
         // The turn has no id yet. When it already started, stop it now; else stop it when it starts (#5516).
-        const started = [...this.#turnOrigins].find(([, turn]) => turn.linkId === linkId)?.[0];
+        const deliveryId = context.delivery.id;
+        const started = [...this.#turnOrigins].find(([, turn]) => turn.deliveryIds.includes(deliveryId))?.[0];
         if (started) yield* this.#hooks.interrupt(link.agentId, started, link.threadId).pipe(toMessagingThreadFailed);
-        else this.#stopsBeforeStart.add(context.delivery.id);
+        else this.#stopsBeforeStart.add(deliveryId);
         stopped = true;
       }
     }
