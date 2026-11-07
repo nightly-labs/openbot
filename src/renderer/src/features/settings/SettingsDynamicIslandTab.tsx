@@ -1,4 +1,5 @@
 import {
+  type AppInfo,
   type AppVariant,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   DYNAMIC_ISLAND_SIZE_LIMITS,
@@ -40,6 +41,8 @@ export interface SettingsDynamicIslandTabProps {
   value: GeneralSettingsValue;
   /** The previews draw the logo in the color of this build, as the real island does. */
   variant: AppVariant;
+  /** Windows has no notch and no Force Touch trackpad, so its text and switches differ. */
+  platform: AppInfo["platform"] | undefined;
   /**
    * The built-in display's notch, or null when it has none: the built-in preview then draws the
    * island that display shows. Undefined before main answers, and the preview draws a notch.
@@ -60,6 +63,7 @@ export interface SettingsDynamicIslandTabProps {
  */
 export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
   const i18n = useI18n();
+  const isMac = () => props.platform === "darwin";
   const widthPercent = () => props.value.macBookNotchWidthPercent;
   const heightPercent = () => props.value.macBookNotchHeightPercent;
   const widestBuiltInWidth = () =>
@@ -103,10 +107,10 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
       <SettingsSection title={i18n.t("settings.notch.title")}>
         <ItemGroup class="settings-modal-card">
           <SwitchField
-            data-settings-row="settings.notch.show.title"
+            data-settings-row={isMac() ? "settings.notch.show.title" : "settings.notch.show.titleTopOfScreen"}
             checked={props.value.macBookNotch}
             onChange={(checked) => props.onUpdateSetting("macBookNotch", checked)}
-            label={i18n.t("settings.notch.show.title")}
+            label={isMac() ? i18n.t("settings.notch.show.title") : i18n.t("settings.notch.show.titleTopOfScreen")}
             description={i18n.t("settings.notch.show.description")}
           />
           <SwitchField
@@ -125,14 +129,16 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
             label={i18n.t("settings.notch.displays.title")}
             description={i18n.t("settings.notch.displays.description")}
           />
-          <SwitchField
-            data-settings-row="settings.notch.haptics.title"
-            checked={props.value.macBookNotchHaptics}
-            disabled={!props.value.macBookNotch}
-            onChange={(checked) => props.onUpdateSetting("macBookNotchHaptics", checked)}
-            label={i18n.t("settings.notch.haptics.title")}
-            description={i18n.t("settings.notch.haptics.description")}
-          />
+          <Show when={isMac()}>
+            <SwitchField
+              data-settings-row="settings.notch.haptics.title"
+              checked={props.value.macBookNotchHaptics}
+              disabled={!props.value.macBookNotch}
+              onChange={(checked) => props.onUpdateSetting("macBookNotchHaptics", checked)}
+              label={i18n.t("settings.notch.haptics.title")}
+              description={i18n.t("settings.notch.haptics.description")}
+            />
+          </Show>
         </ItemGroup>
       </SettingsSection>
 

@@ -192,6 +192,7 @@ export const messages = {
   "settings.soundTheme.play": "Écouter {name}",
   "settings.notch.title": "Comportement",
   "settings.notch.show.title": "Afficher l’état dans l’encoche du MacBook",
+  "settings.notch.show.titleTopOfScreen": "Afficher l’état en haut de l’écran",
   "settings.notch.show.description":
     "Afficher l’activité des agents et les éléments nécessitant votre attention en haut de chaque écran.",
   "settings.notch.idle.title": "Afficher l’îlot au repos",

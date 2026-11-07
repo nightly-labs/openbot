@@ -143,10 +143,15 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     descriptionKey: "settings.tab.dynamicIsland.description",
     icon: PanelTop,
     rows: [
-      { titleKey: "settings.notch.show.title", descriptionKey: "settings.notch.show.description" },
+      { titleKey: "settings.notch.show.title", descriptionKey: "settings.notch.show.description", macOS: true },
+      {
+        titleKey: "settings.notch.show.titleTopOfScreen",
+        descriptionKey: "settings.notch.show.description",
+        macOS: false,
+      },
       { titleKey: "settings.notch.idle.title", descriptionKey: "settings.notch.idle.description" },
       { titleKey: "settings.notch.displays.title", descriptionKey: "settings.notch.displays.description" },
-      { titleKey: "settings.notch.haptics.title", descriptionKey: "settings.notch.haptics.description" },
+      { titleKey: "settings.notch.haptics.title", descriptionKey: "settings.notch.haptics.description", macOS: true },
       { titleKey: "settings.notch.servers.title", descriptionKey: "settings.notch.servers.description" },
       { titleKey: "settings.notch.size.title", descriptionKey: "settings.notch.size.description" },
     ],
@@ -222,9 +227,9 @@ export function settingsTabShown(tab: SettingsTab, dynamicIslandShown: boolean):
 }
 
 /**
- * The Dynamic Island exists only on macOS, and only the main window owns it: main rejects its calls
- * from a chat window.
+ * The Dynamic Island exists only on macOS and Windows, and only the main window owns it: main
+ * rejects its calls from a chat window.
  */
 export function dynamicIslandSettingsShown(platform: AppInfo["platform"] | undefined, chatWindow: boolean): boolean {
-  return platform === "darwin" && !chatWindow;
+  return (platform === "darwin" || platform === "win32") && !chatWindow;
 }

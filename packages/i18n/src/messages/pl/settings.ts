@@ -187,6 +187,7 @@ export const messages = {
   "settings.soundTheme.play": "Odtwórz {name}",
   "settings.notch.title": "Działanie",
   "settings.notch.show.title": "Pokazuj status w wycięciu MacBooka",
+  "settings.notch.show.titleTopOfScreen": "Pokazuj status u góry ekranu",
   "settings.notch.show.description": "Pokazuj aktywność agentów i elementy wymagające uwagi u góry każdego ekranu.",
   "settings.notch.idle.title": "Pokazuj bezczynną wyspę",
   "settings.notch.idle.description": "Pokazuj logo OpenBot i powitanie, gdy żaden status nie jest aktywny.",

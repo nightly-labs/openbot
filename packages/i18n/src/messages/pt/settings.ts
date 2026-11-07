@@ -183,6 +183,7 @@ export const messages = {
   "settings.soundTheme.play": "Tocar {name}",
   "settings.notch.title": "Comportamento",
   "settings.notch.show.title": "Mostrar status no recorte da tela do MacBook",
+  "settings.notch.show.titleTopOfScreen": "Mostrar o status no topo da tela",
   "settings.notch.show.description":
     "Mostre a atividade dos agentes e os itens que precisam de atenção na parte superior de cada tela.",
   "settings.notch.idle.title": "Mostrar ilha ociosa",

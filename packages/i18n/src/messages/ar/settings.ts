@@ -186,6 +186,7 @@ export const messages = {
   "settings.soundTheme.play": "تشغيل {name}",
   "settings.notch.title": "السلوك",
   "settings.notch.show.title": "عرض الحالة في نتوء MacBook",
+  "settings.notch.show.titleTopOfScreen": "عرض الحالة في أعلى الشاشة",
   "settings.notch.show.description": "عرض نشاط الوكلاء والعناصر التي تحتاج إلى انتباهك أعلى كل شاشة.",
   "settings.notch.idle.title": "عرض الجزيرة في وضع الخمول",
   "settings.notch.idle.description": "عرض شعار OpenBot والتحية عند عدم وجود حالة نشطة.",

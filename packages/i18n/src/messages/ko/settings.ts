@@ -180,6 +180,7 @@ export const messages = {
   "settings.soundTheme.play": "{name} 재생",
   "settings.notch.title": "동작",
   "settings.notch.show.title": "MacBook 노치에 상태 표시",
+  "settings.notch.show.titleTopOfScreen": "화면 상단에 상태 표시",
   "settings.notch.show.description": "각 디스플레이 상단에 에이전트 활동과 확인이 필요한 항목을 표시해요.",
   "settings.notch.idle.title": "대기 상태 아일랜드 표시",
   "settings.notch.idle.description": "활성 상태가 없을 때 OpenBot 로고와 인사말을 표시해요.",

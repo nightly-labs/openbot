@@ -186,6 +186,7 @@ export const messages = {
   "settings.soundTheme.play": "{name} abspielen",
   "settings.notch.title": "Verhalten",
   "settings.notch.show.title": "Status in der MacBook-Aussparung anzeigen",
+  "settings.notch.show.titleTopOfScreen": "Status oben auf dem Bildschirm anzeigen",
   "settings.notch.show.description":
     "Agentenaktivität und Elemente, die Aufmerksamkeit benötigen, am oberen Rand jedes Displays anzeigen.",
   "settings.notch.idle.title": "Insel im Ruhezustand anzeigen",
