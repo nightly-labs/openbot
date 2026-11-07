@@ -16,17 +16,38 @@ export type TurnStepLines = Readonly<Record<string, readonly TurnStepLine[]>>;
 const TURN_LIMIT = 50;
 const LINE_LIMIT = 200;
 
-/** `lines` with `text` added to the turn. A line the same as the turn's last one is not added again. */
-export function appendTurnStepLine(lines: TurnStepLines, turnId: string, text: string, at = Date.now()): TurnStepLines {
+/**
+ * `lines` with `text` added to the turn. A line the same as the turn's last one is not added again.
+ * A line with a `stepId` replaces the earlier line of that tool step, so live output does not grow
+ * the list by one line per update.
+ */
+export function appendTurnStepLine(
+  lines: TurnStepLines,
+  turnId: string,
+  text: string,
+  stepId?: string,
+  at = Date.now(),
+): TurnStepLines {
   const turn = lines[turnId] ?? [];
-  const last = turn.at(-1);
-  if (!text.trim() || last?.text === text) return lines;
-  const sequence = last ? Number(last.id.slice(last.id.lastIndexOf(":") + 1)) + 1 : 0;
+  if (!text.trim()) return lines;
+  const existing = stepId === undefined ? undefined : turn.find((line) => line.id === stepId);
+  if (existing) {
+    if (existing.text === text) return lines;
+    const next: Record<string, readonly TurnStepLine[]> = { ...lines };
+    next[turnId] = turn.map((line) => (line.id === stepId ? { ...line, text } : line));
+    return next;
+  }
+  if (turn.at(-1)?.text === text) return lines;
+  // A step id can contain colons, so read the sequence from the numeric suffix only.
+  const sequence = turn.reduce((next, line) => {
+    const match = /:(\d+)$/u.exec(line.id);
+    return match ? Math.max(next, Number(match[1]) + 1) : next;
+  }, turn.length);
   // The turn moves to the end, so the limit drops the turns that got no line for the longest time,
   // and not a long turn that started first.
   const next: Record<string, readonly TurnStepLine[]> = { ...lines };
   delete next[turnId];
-  next[turnId] = [...turn, { id: `${turnId}:${sequence}`, text, at }].slice(-LINE_LIMIT);
+  next[turnId] = [...turn, { id: stepId ?? `${turnId}:${sequence}`, text, at }].slice(-LINE_LIMIT);
   const turns = Object.keys(next);
   for (const old of turns.slice(0, Math.max(0, turns.length - TURN_LIMIT))) delete next[old];
   return next;

@@ -65,4 +65,7 @@ export const messages = {
   "status.agent.nextStepContinues": "Agent zatrzymał się przed następnym krokiem. Kontynuuje ({current} z {limit}).",
   "status.agent.planContinues": "Plan ma otwarte kroki. Agent kontynuuje ({current} z {limit}).",
   "status.agent.branchTitle": "Odgałęziony czat",
+  "status.agent.toolStepFailedWithExit":
+    "Krok narzędzia nie powiódł się; sprawdzam wynik i decyduję, co spróbuję dalej… · kod wyjścia {code}",
+  "status.agent.commandFinished": "Polecenie zakończone · kod wyjścia {code}",
 } as const satisfies PartialTranslation<typeof source>;

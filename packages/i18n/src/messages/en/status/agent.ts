@@ -98,4 +98,7 @@ export const messages = defineMessages("status.agent", {
   "status.agent.nextStepContinues": "The agent stopped before its next step. It continues ({current} of {limit}).",
   "status.agent.planContinues": "The plan has open steps. The agent continues ({current} of {limit}).",
   "status.agent.branchTitle": "Branched chat",
+  "status.agent.toolStepFailedWithExit":
+    "A tool step failed; reviewing the result and deciding what to try next… · exit {code}",
+  "status.agent.commandFinished": "Command finished · exit {code}",
 });

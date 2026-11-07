@@ -141,7 +141,15 @@ export type AgentEvent =
       createdAt: string;
       revision: number;
     }
-  | { type: "turn-progress"; agentId: string; threadId: string; turnId: string; detail: string }
+  | {
+      type: "turn-progress";
+      agentId: string;
+      threadId: string;
+      turnId: string;
+      detail: string;
+      /** The tool step that this line belongs to. A later line replaces the earlier one. */
+      stepId?: string;
+    }
   | { type: "turn-started"; agentId: string; threadId: string; turnId: string; origin?: AgentTurnOrigin }
   | AgentTurnCompletedEvent
   /**

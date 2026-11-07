@@ -85,6 +85,7 @@ import {
   toolUsage,
   toThreadItem,
 } from "./thread-items";
+import { CommandProgressThrottle, isCommandTool, toolCommandProgress } from "./tool-output";
 import { TurnTraces, traceMessage } from "./turn-traces";
 import { collectProviderUsage } from "./usage-collection";
 import { USAGE_LIMIT_METHOD, type UsageLimitGate } from "./usage-limit-gate";
@@ -304,6 +305,8 @@ export class TurnLifecycle {
   readonly #failedTurns = new Map<string, string>();
   readonly #observedCompactions = new Map<string, string>();
   readonly #itemTurns = new Map<string, string>();
+  /** The last live command line of each running tool step, for the once-a-second update. */
+  readonly #commandProgress = new CommandProgressThrottle();
   /** The real start and end of each step of a running turn, for the trace of the finished turn. */
   readonly #traces = new TurnTraces();
   #scope = Scope.makeUnsafe();
@@ -496,6 +499,7 @@ export class TurnLifecycle {
     this.#lastEventAt.clear();
     this.#codexChildren.clear();
     this.#itemTurns.clear();
+    this.#commandProgress.clear();
     this.#traces.clear();
     this.#observedCompactions.clear();
   }).bind(this);
@@ -1889,9 +1893,22 @@ export class TurnLifecycle {
     if (usage) this.#hooks.emitToolUsage({ ...usage, agentId, turnId });
     if (yield* this.#images.handleItem(agentId, threadId, turnId, item, completed)) return;
     const toolProgress = toolProgressText(item, completed);
+    // The trace keeps the generic text. Command output is transient and must not be written to it.
     this.#observeTraceStep(turnId, item, completed, toolProgress);
-    if (toolProgress) {
-      this.#emitTurnProgress(agentId, this.#conversation.publicThreadId(agentId, threadId), turnId, toolProgress);
+    const command = isCommandTool(item);
+    const commandText = command ? toolCommandProgress(item, completed) : null;
+    let progress = toolProgress;
+    let stepId: string | undefined;
+    if (command && isString(item.id)) {
+      stepId = `tool:${item.id}`;
+      if (commandText !== null) {
+        const live = this.#commandProgress.next(`${turnId}:${item.id}`, commandText, completed);
+        if (live === null) return;
+        progress = live;
+      }
+    }
+    if (progress) {
+      this.#emitTurnProgress(agentId, this.#conversation.publicThreadId(agentId, threadId), turnId, progress, stepId);
       return;
     }
     if (item.type !== "agentMessage" || !isString(item.id)) return;
@@ -2068,13 +2085,14 @@ export class TurnLifecycle {
     return message;
   }
 
-  #emitTurnProgress(agentId: string, threadId: string, turnId: string, text: string): void {
+  #emitTurnProgress(agentId: string, threadId: string, turnId: string, text: string, stepId?: string): void {
     this.#hooks.emit({
       type: "turn-progress",
       agentId,
       threadId,
       turnId,
       detail: text,
+      ...(stepId === undefined ? {} : { stepId }),
     });
   }
 }

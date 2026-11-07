@@ -64,4 +64,7 @@ export const messages = {
   "status.agent.nextStepContinues": "Агент остановился перед следующим шагом. Он продолжает ({current} из {limit}).",
   "status.agent.planContinues": "В плане есть незавершённые шаги. Агент продолжает ({current} из {limit}).",
   "status.agent.branchTitle": "Ответвлённый чат",
+  "status.agent.toolStepFailedWithExit":
+    "Шаг инструмента завершился ошибкой; просмотр результата и выбор следующего действия… · код выхода {code}",
+  "status.agent.commandFinished": "Команда завершена · код выхода {code}",
 } as const satisfies PartialTranslation<typeof source>;

@@ -36,6 +36,23 @@ export interface TurnRuntime {
   providerAccountId?: string | undefined;
 }
 
+/**
+ * The start of the shown step. The detail of a tool step changes as its output grows, and that
+ * must not restart the clock; only another activity is a new step.
+ */
+export function activityStartedAt(current: RenderedAgentActivity | null, activityId: string, now = Date.now()): number {
+  return current?.activityId === activityId ? current.since : now;
+}
+
+/** The same activity with a new detail line, or the same value when nothing changes. */
+export function withActivityDetail(
+  current: RenderedAgentActivity | null,
+  activityId: string,
+  detail: string | null,
+): RenderedAgentActivity | null {
+  return current?.activityId === activityId && current.detail !== detail ? { ...current, detail } : current;
+}
+
 export interface ActivityStoreDeps {
   props: ConversationProps;
   activeDeliveries: () => Array<{ id: string }>;
@@ -173,15 +190,15 @@ export function createActivityStore(deps: ActivityStoreDeps) {
       clearAgentActivityExitDelayTimer();
       clearAgentActivityExitTimer();
       if (activityId && label) {
+        const current = untrack(renderedAgentActivity);
         const nextActivity = {
           activityId,
           agent,
           detail: untrack(activeActivityDetail),
-          since: Date.now(),
+          since: activityStartedAt(current, activityId),
           phase: "active" as const,
           label,
         };
-        const current = untrack(renderedAgentActivity);
         if (current?.agent?.id === agent?.id) {
           setAgentActivitySpaceReserved(true);
           setRenderedAgentActivity(nextActivity);
@@ -230,11 +247,7 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     () => ({ activityId: activeActivityId(), detail: activeActivityDetail() }),
     ({ activityId, detail }) => {
       if (!activityId) return;
-      setRenderedAgentActivity((current) =>
-        current?.activityId === activityId && current.detail !== detail
-          ? { ...current, detail, since: Date.now() }
-          : current,
-      );
+      setRenderedAgentActivity((current) => withActivityDetail(current, activityId, detail));
     },
   );
   /**
