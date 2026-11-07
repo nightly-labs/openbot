@@ -295,6 +295,9 @@ All notable changes to OpenBot will be documented here. The project follows
   before. Text with a line break, a bracket or a quote is still entered in one piece, so code
   editors do not add closing brackets to it.
 - On a phone, the website language menu went past the left edge of the screen. It now stays on the screen.
+- The agent pages of the Marketplace on openbot.run open again. Before, a click on an agent showed
+  "Not in the Marketplace", because the site accepted only agent ids in one form, and the agents that
+  OpenBot curates use a different form. Links to these agents in the app work again too.
 
 ## [0.63.0] - 2026-11-06
 
