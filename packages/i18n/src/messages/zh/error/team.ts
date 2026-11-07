@@ -83,6 +83,7 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "当前连接不支持显示文件夹。",
   "error.team.conversationFileSearchUnsupported": "当前连接不支持搜索文件。",
   "error.team.sideQuestionUnsupported": "当前连接不支持旁问。",
+  "error.team.liveVoiceUnsupported": "该服务器不支持 Codex 实时语音，请更新运行它的电脑上的 OpenBot。",
   "error.team.routineFlowsUnsupported": "该服务器不支持自动化任务流程，请更新运行它的电脑上的 OpenBot。",
   "error.team.routineCanvasTooLarge":
     "该自动化任务画布过大，无法发送到这台设备。请在运行服务器的电脑上精简自动化任务指令。",

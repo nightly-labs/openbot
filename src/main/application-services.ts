@@ -2817,6 +2817,15 @@ export async function createApplicationServices({
     storage: storageUsage,
     // Present, so the host advertises `machine-resources-v1`. The routes are admin-only.
     machine: machineAlerts,
+    // Present, so the host advertises `live-voice-v1`. A member's voice uses the Codex sign-in of this host.
+    liveVoice: {
+      startLiveVoice: (input, voice, owner) => service.startLiveVoice(input, voice, owner),
+      stopLiveVoice: (sessionId, memberId) => service.stopLiveVoice(sessionId, memberId),
+      subscribe: (listener) => {
+        service.on("liveVoice", listener);
+        return () => service.off("liveVoice", listener);
+      },
+    },
     // Present, so the host advertises `hosted-sites-v1`. Members list; only admins delete.
     hostedSites,
     // Present, so the host advertises `agent-import-v1`. Any member can import.

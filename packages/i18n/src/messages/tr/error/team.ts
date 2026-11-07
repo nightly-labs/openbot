@@ -85,6 +85,8 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "Klasörleri gösterme bu bağlantı tarafından desteklenmiyor.",
   "error.team.conversationFileSearchUnsupported": "Dosya arama bu bağlantı tarafından desteklenmiyor.",
   "error.team.sideQuestionUnsupported": "Yan sorular bu bağlantı tarafından desteklenmiyor.",
+  "error.team.liveVoiceUnsupported":
+    "Bu sunucu Codex canlı sesi desteklemiyor. Sunucuyu çalıştıran bilgisayardaki OpenBot'u güncelleyin.",
   "error.team.routineFlowsUnsupported":
     "Bu sunucu rutin akışlarını desteklemiyor. Sunucuyu çalıştıran bilgisayardaki OpenBot'u güncelleyin.",
   "error.team.routineCanvasTooLarge":

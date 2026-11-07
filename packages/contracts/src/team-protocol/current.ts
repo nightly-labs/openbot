@@ -77,6 +77,7 @@ import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "./instance-transfer-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
+import { LIVE_VOICE_CAPABILITY } from "./live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY } from "./local-servers-v1";
 import { MACHINE_RESOURCES_CAPABILITY } from "./machine-resources-v1";
 import { MCP_SIGN_IN_APP_CAPABILITY } from "./mcp-sign-in-app-v1";
@@ -481,6 +482,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   ROUTINE_RUN_PLACE_CAPABILITY,
   HOST_PERSONALITY_CAPABILITY,
   MCP_MEMBER_ACCESS_CAPABILITY,
+  LIVE_VOICE_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -655,7 +657,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY &&
     capability !== ROUTINE_RUN_PLACE_CAPABILITY &&
     capability !== HOST_PERSONALITY_CAPABILITY &&
-    capability !== MCP_MEMBER_ACCESS_CAPABILITY,
+    capability !== MCP_MEMBER_ACCESS_CAPABILITY &&
+    capability !== LIVE_VOICE_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -706,6 +709,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   ROUTINE_RUN_PLACE_CAPABILITY,
   HOST_PERSONALITY_CAPABILITY,
   MCP_MEMBER_ACCESS_CAPABILITY,
+  LIVE_VOICE_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -839,6 +843,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY &&
       capability !== ROUTINE_RUN_PLACE_CAPABILITY &&
       capability !== HOST_PERSONALITY_CAPABILITY &&
-      capability !== MCP_MEMBER_ACCESS_CAPABILITY,
+      capability !== MCP_MEMBER_ACCESS_CAPABILITY &&
+      capability !== LIVE_VOICE_CAPABILITY,
   );
 }
