@@ -934,12 +934,10 @@
 }
 
 .quit-shortcut-agents {
-  overflow: hidden;
   font-size: var(--openbot-text-xl);
   font-weight: 500;
   line-height: var(--openbot-leading-xl);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-wrap: balance;
 }
 
 .quit-shortcut-instruction {

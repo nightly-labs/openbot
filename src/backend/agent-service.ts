@@ -1883,15 +1883,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
-   * The agents that run a turn now, in any thread: their chat, a channel, a routine or a task. A quit
-   * stops these turns, so `Cmd + Q` asks for a hold or a second press only while this is not empty.
+   * The agents that run a turn now, in any thread (their chat, a channel, a routine or a task), and
+   * the agents with a delivery whose turn has not started. A quit stops this work, so `Cmd + Q` asks
+   * for a hold or a second press only while this is not empty.
    */
   workingAgents(): AgentSummary[] {
     const working = new Set<string>();
     for (const [agentId, snapshot] of this.#conversation.activeSnapshots()) {
       if (snapshot.activeTurnId) working.add(agentId);
     }
-    return working.size === 0 ? [] : this.listAgents().filter((agent) => working.has(agent.id));
+    return this.listAgents().filter((agent) => working.has(agent.id) || this.#mailbox.hasUnfinishedDelivery(agent.id));
   }
 
   hasActiveWork(): string[] {

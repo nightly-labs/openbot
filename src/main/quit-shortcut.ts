@@ -56,6 +56,7 @@ export function createQuitShortcut({ quit, isQuitting, workingAgents, showHint }
   let lastPress: { window: BrowserWindow; at: number } | null = null;
   let hold: Hold | null = null;
   let hintWindow: BrowserWindow | null = null;
+  let hintAgents: AgentSummary[] = [];
   let hintTimer: ReturnType<typeof setTimeout> | null = null;
   let releaseTimer: ReturnType<typeof setTimeout> | null = null;
   let waitingForRelease = false;
@@ -69,9 +70,11 @@ export function createQuitShortcut({ quit, isQuitting, workingAgents, showHint }
   }
 
   function keepHint(window: BrowserWindow, agents: AgentSummary[]): void {
-    if (hintWindow !== window) {
-      hideHint();
+    // The repeats of one hold send the same list. A new hold in the same window can name other agents.
+    if (hintWindow !== window) hideHint();
+    if (hintWindow !== window || hintAgents !== agents) {
       hintWindow = window;
+      hintAgents = agents;
       showHint(window, agents);
     }
     if (hintTimer) clearTimeout(hintTimer);
