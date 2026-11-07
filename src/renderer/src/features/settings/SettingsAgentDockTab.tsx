@@ -216,7 +216,7 @@ function ChoiceSelect<T extends string>(props: {
       options={options()}
       optionValue="id"
       optionTextValue={(option) => label(option.id)}
-      value={options().find((option) => option.id === props.value)}
+      value={options().find((option) => option.id === props.value) ?? null}
       disabled={props.disabled}
       onChange={(option) => option && props.onChange(option.id)}
       placement="bottom-end"
