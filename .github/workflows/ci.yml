@@ -577,6 +577,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:workflow-slack
 
+      - name: Run the workflow channel output E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-channel-output
+
       - name: Run the workflow agent tools E2E test
         if: ${{ !cancelled() }}
         run: bun run test:workflow-agent-tools
@@ -686,6 +690,7 @@ jobs:
             .openbot-build/workflow-discord-e2e/
             .openbot-build/workflow-telegram-e2e/
             .openbot-build/workflow-slack-e2e/
+            .openbot-build/workflow-channel-output-e2e/
             .openbot-build/workflow-agent-tools-e2e/
             .openbot-build/workflow-join-e2e/
             .openbot-build/discord-github-files-e2e/

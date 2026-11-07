@@ -164,6 +164,8 @@ export const messages = {
 
   "workflow.output.title": "출력",
   "workflow.output.name": "출력",
+  "workflow.output.target.messagingChannel": "메시지 채널",
+  "workflow.output.target.chatChannel": "OpenBot 채널",
   "workflow.output.target.file": "파일",
   "workflow.output.target.notify": "알림",
   "workflow.output.path": "파일 경로",

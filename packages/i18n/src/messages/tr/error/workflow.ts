@@ -25,6 +25,8 @@ export const messages = {
   "error.workflow.notRetryable": "Yalnızca başarısız olan veya durdurulan bir adım yeniden çalışabilir.",
   "error.workflow.noDecision": "Bu adım bir karar beklemiyor.",
   "error.workflow.outputPlaceMissing": "Bu çıktı için bir mesajlaşma yeri seçin.",
+  "error.workflow.outputChannelMissing": "Bu çıktı için bir kanal seçin.",
+  "error.workflow.outputChannelFailed": "OpenBot sonucu kanalda paylaşamadı. Adımı yeniden çalıştırın.",
   "error.workflow.discordNoMessage":
     "Bu çıktı, çalıştırmayı başlatan Discord mesajı üzerinde çalışır. Çalıştırmayı bir Discord anmasından başlatın veya Kanala gönder'i seçin.",
   "error.workflow.slackNoMessage":

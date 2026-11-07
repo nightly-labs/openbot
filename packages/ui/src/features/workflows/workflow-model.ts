@@ -72,6 +72,12 @@ export interface WorkflowSlackWorkspace {
   channels: readonly { id: string; name: string }[];
 }
 
+/** An OpenBot channel that an output posts its result to. */
+export interface WorkflowChannel {
+  id: string;
+  name: string;
+}
+
 /** A model that an image step can draw with. */
 export interface WorkflowImageModel {
   id: string;
@@ -98,6 +104,8 @@ export interface WorkflowCatalogs {
   telegram?: readonly WorkflowTelegramChat[] | undefined;
   /** The Slack workspaces of the host. Only the host that runs the workflow has them. */
   slack?: readonly WorkflowSlackWorkspace[] | undefined;
+  /** The open OpenBot channels of the host. Only this computer gives them. */
+  channels?: readonly WorkflowChannel[] | undefined;
   imageModels: readonly WorkflowImageModel[];
   /** The workspace files that an asset node can take, and the images that image steps made. */
   files: readonly StoredFileRow[];

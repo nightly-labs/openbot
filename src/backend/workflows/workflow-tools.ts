@@ -157,6 +157,7 @@ const RUNTIME_FIELDS: Record<WorkflowNodeKind, readonly string[]> = {
     "target",
     "connectionId",
     "placeId",
+    "channelId",
     "repository",
     "item",
     "action",
