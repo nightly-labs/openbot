@@ -26,7 +26,8 @@ interface Download {
 
 interface DownloadAllowance {
   maxBytes: number;
-  mimeType: string;
+  /** Without a type, the allowance takes a larger file of any type. */
+  mimeType: string | undefined;
   taken: boolean;
 }
 
@@ -40,6 +41,10 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
     string,
     { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
   >();
+  // The reason of each file that ended before its request read it. The host sends the file before it
+  // answers the request, so a refused file usually has no waiter yet. Its request then fails with this
+  // reason at once, not with a timeout a minute later.
+  const ended = new Map<string, string>();
   function remove(id: string) {
     const entry = downloads.get(id);
     if (entry) clearTimeout(entry.timer);
@@ -53,6 +58,12 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
       clearTimeout(waiter.timer);
       waiters.delete(id);
       waiter.reject(new Error(message));
+      return;
+    }
+    ended.set(id, message);
+    for (const old of ended.keys()) {
+      if (ended.size <= 32) break;
+      ended.delete(old);
     }
   }
   function expire(id: string) {
@@ -72,6 +83,11 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
   }
   const sendFrame = (data: string) => send(data).pipe(Effect.mapError(fileTransferError));
   const take = Effect.fn("RemoteFileReceiver.take")(function* (id: string) {
+    const reason = ended.get(id);
+    if (reason !== undefined) {
+      ended.delete(id);
+      return yield* transferFailure(reason);
+    }
     if (!downloads.get(id)?.complete) {
       if (waiters.has(id) || waiters.size >= 10)
         return yield* transferFailure(sourceText("error.remote.tooManyDownloads"));
@@ -138,12 +154,11 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
       const total = [...downloads.values()]
         .filter((entry) => !entry.allowed)
         .reduce((sum, entry) => sum + entry.bytes.length, 0);
+      const open = [...allowances].filter(
+        (entry) => !entry.taken && (entry.mimeType === undefined || entry.mimeType === frame.mimeType),
+      );
       const allowance =
-        frame.size > MOBILE_ATTACHMENT_BYTES
-          ? [...allowances].find(
-              (entry) => !entry.taken && entry.mimeType === frame.mimeType && frame.size <= entry.maxBytes,
-            )
-          : undefined;
+        frame.size > MOBILE_ATTACHMENT_BYTES ? open.find((entry) => frame.size <= entry.maxBytes) : undefined;
       if (allowance) allowance.taken = true;
       else if (
         frame.size > MOBILE_ATTACHMENT_BYTES ||
@@ -158,11 +173,16 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
             reason: "Attachments must be 10 MB or smaller. Download fewer files at once.",
           }),
         );
-        // A request can wait for this file before it starts. It ends now, not at the timeout.
+        // A request can wait for this file before it starts. It ends now, not at the timeout. A request
+        // that allows a larger file gets the limit that it allows.
         fail(
           frame.transferId,
           sourceText(
-            frame.size > MOBILE_ATTACHMENT_BYTES ? "error.remote.attachmentTooLarge" : "error.remote.tooManyDownloads",
+            frame.size <= MOBILE_ATTACHMENT_BYTES
+              ? "error.remote.tooManyDownloads"
+              : open.length > 0
+                ? "error.remote.fileTooLarge"
+                : "error.remote.attachmentTooLarge",
           ),
         );
         return true;
@@ -214,10 +234,10 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
   });
   return {
     /**
-     * Lets one file of `mimeType` and up to `maxBytes` arrive while a request waits for it. Call the
+     * Lets one file of `mimeType` (any type without it) and up to `maxBytes` arrive while a request waits for it. Call the
      * answer when the request ends; a file still arriving then keeps its place.
      */
-    allow(maxBytes: number, mimeType: string) {
+    allow(maxBytes: number, mimeType?: string) {
       const allowance: DownloadAllowance = { maxBytes, mimeType, taken: false };
       allowances.add(allowance);
       return () => {
@@ -226,6 +246,7 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
     },
     clear() {
       for (const id of downloads.keys()) remove(id);
+      ended.clear();
       for (const waiter of waiters.values()) {
         clearTimeout(waiter.timer);
         waiter.reject(new Error(sourceText("error.remote.attachmentConnectionClosed")));

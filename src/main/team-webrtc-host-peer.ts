@@ -99,7 +99,7 @@ import {
 import { RemoteWorkflowError, remoteCall, remoteDecode } from "./remote-service-effects";
 import type { TeamStore } from "./team-store";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
-import { type ReceivedWebRtcFile, TeamWebRtcFileTransfer } from "./team-webrtc-file-transfer";
+import { type ReceivedWebRtcFile, TeamFileTooLargeError, TeamWebRtcFileTransfer } from "./team-webrtc-file-transfer";
 import { rawDataBytes, sendableCloseCode } from "./ws-raw-data";
 
 const requireModule = createRequire(import.meta.url);
@@ -601,14 +601,21 @@ export class TeamWebRtcHostPeer {
     }).pipe(
       Effect.catch(({ cause: error }) =>
         Effect.gen({ self: this }, function* () {
-          const status = error instanceof GatewayError ? error.status : 500;
+          // A file above the protocol limit is a refusal that the peer can show, not a host failure.
+          const status =
+            error instanceof GatewayError ? error.status : error instanceof TeamFileTooLargeError ? 413 : 500;
           return yield* remoteDecode(() =>
             decodeTeamProtocolV2RpcFrame({
               version: 2,
               type: "response",
               requestId: request.requestId,
               error: {
-                code: error instanceof GatewayError ? error.code : "host_error",
+                code:
+                  error instanceof GatewayError
+                    ? error.code
+                    : error instanceof TeamFileTooLargeError
+                      ? "file_too_large"
+                      : "host_error",
                 message: error instanceof Error ? error.message : sourceText("error.remote.hostRequestFailed"),
                 retryable: status >= 500,
                 status,

@@ -92,7 +92,8 @@ import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./webrtc-fram
 // A type, not an interface: the command crosses the native/DOM bridge as JSON.
 export type RemoteLargeDownload = {
   maxBytes: number;
-  mimeType: string;
+  /** Without a type, a larger file of any type can answer. */
+  mimeType?: string | undefined;
 };
 
 export type RemoteTeamCommand =
@@ -186,8 +187,9 @@ function decodeRemoteFileUpload(value: unknown): RemoteFileUpload | null {
  * a command; `commandId` is then its ID when it has one, so the page can still answer it.
  */
 function decodeRemoteLargeDownload(value: unknown): RemoteLargeDownload | null {
-  if (!isDynamicRecord(value) || !isNumber(value.maxBytes) || !isString(value.mimeType)) return null;
-  return { maxBytes: value.maxBytes, mimeType: value.mimeType };
+  if (!isDynamicRecord(value) || !isNumber(value.maxBytes)) return null;
+  if (value.mimeType === undefined) return { maxBytes: value.maxBytes };
+  return isString(value.mimeType) ? { maxBytes: value.maxBytes, mimeType: value.mimeType } : null;
 }
 
 export function decodeRemoteTeamCommand(value: unknown): {
