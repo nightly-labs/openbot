@@ -183,7 +183,8 @@ async function runChat(variant: Variant, run: number) {
     for (const prompt of prompts) {
       const question = QUESTIONS.findIndex((candidate) => prompt.startsWith(candidate.prompt));
       current = { prompt, reply: "", items: [], requests: [], searches: [], ms: 0 };
-      if (question >= 0) current.expected = expected[question];
+      const answer = expected[question];
+      if (answer !== undefined) current.expected = answer;
       const started = Date.now();
       try {
         current.requests = await agent.runTurn(thread.id, prompt, 300_000);
