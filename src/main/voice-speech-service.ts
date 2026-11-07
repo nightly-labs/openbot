@@ -15,7 +15,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Exit, Scope, Semaphore } from "effect";
 import type { SpeechPreferenceStore } from "./speech-preference-store";
-import type { VoiceApiKeyStore } from "./voice-api-key-store";
+import { savedKeyError, type VoiceApiKeyStore } from "./voice-api-key-store";
 import { type SpeechFetch, speakInCloud } from "./voice-cloud-speech";
 import {
   SPEECH_HOST_THREADS,
@@ -383,15 +383,6 @@ function errorCategory(error: unknown): VoiceSpeechFailure | "host-exited" | "ti
   if (error instanceof HostFailure) return error.category;
   if (error instanceof Error && error.message === sourceText("error.voice.speech.timedOut")) return "timeout";
   return "unknown";
-}
-
-function savedKeyError(cause: unknown, provider: "xai"): Error {
-  const unavailable = sourceText("error.app.secretStorageUnavailable");
-  return new Error(
-    cause instanceof Error && cause.message === unavailable
-      ? unavailable
-      : sourceText("error.voice.cloud.keySaveFailed", { provider: SPEECH_KEY_PROVIDER_NAMES[provider] }),
-  );
 }
 
 function userFacingError(error: unknown): Error {
