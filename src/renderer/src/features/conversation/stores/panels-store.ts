@@ -694,15 +694,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     const agent = conversationRuntime(deps.props).agent;
     let request: Promise<void>;
     if (file.kind === "shared") request = agent.openSharedFile({ path: file.path, action: "download" });
-    else if (agentId)
-      request = agent
-        .openWorkspaceFile({ agentId, path: file.path, action: "download" })
-        // The image showed from the shared folder when the workspace has no such file (#5657).
-        .catch((error: unknown) =>
-          SHARED_FOLDER_PATH.test(file.path)
-            ? agent.openSharedFile({ path: file.path, action: "download" })
-            : Promise.reject(error),
-        );
+    else if (agentId) request = agent.openWorkspaceFile({ agentId, path: file.path, action: "download" });
     else return;
     void request.catch((error) => deps.setComposerError(errorMessage(error, t("attachment.error.download")), target));
   }
