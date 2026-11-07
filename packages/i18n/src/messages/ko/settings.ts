@@ -253,7 +253,7 @@ export const messages = {
   "settings.tab.notifications.description": "OpenBot이 알려주는 방식을 선택해요.",
   "settings.tab.voice.title": "음성",
   "settings.tab.voice.description":
-    "메시지 입력란의 음성 받아쓰기예요. 로컬 모델은 이 컴퓨터에서, ElevenLabs는 클라우드에서 실행돼요.",
+    "메시지 입력란의 음성 받아쓰기예요. 로컬 모델은 이 컴퓨터에서, ElevenLabs와 Groq는 클라우드에서 실행돼요.",
   "settings.tab.computerUse.title": "컴퓨터 제어",
   "settings.tab.computerUse.description":
     "이 컴퓨터의 OpenBot 에이전트가 이 컴퓨터의 앱을 보고 조작하도록 허용해요. 다른 서버의 에이전트는 그 서버의 컴퓨터를 사용해요.",
@@ -605,6 +605,10 @@ export const messages = {
   "settings.voice.removeFailed": "모델을 삭제할 수 없어요. 다시 시도해 주세요.",
   "settings.voice.model.elevenlabs.description":
     "음성을 ElevenLabs로 스트리밍해요. 말하는 동안 텍스트가 표시되고 바뀌지 않아요. 내 API 키를 사용하며, 사용할 때마다 ElevenLabs에서 요금이 청구돼요.",
+  "settings.voice.model.groqTurbo.description":
+    "멈추면 녹음을 Groq로 보내요. 빠르고 여러 언어를 지원해요. 내 API 키를 사용하며, 사용할 때마다 Groq에서 요금이 청구돼요.",
+  "settings.voice.model.groqLarge.description":
+    "멈추면 녹음을 Groq로 보내요. turbo보다 정확하지만 더 느려요. 내 API 키를 사용하며, 사용할 때마다 Groq에서 요금이 청구돼요.",
   "settings.voice.apiKey.placeholder": "키를 붙여넣으세요",
   "settings.voice.apiKey.save": "키 저장",
   "settings.voice.apiKey.remove": "키 삭제",

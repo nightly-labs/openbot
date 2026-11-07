@@ -68,17 +68,43 @@ export const LIQUID_PAD = 40;
 export const LIQUID_WIDTH = STAGE_WIDTH + LIQUID_PAD + 60;
 export const LIQUID_HEIGHT = PANEL_HEIGHT + LIQUID_PAD * 2;
 
+/** The distance from one seat to the next. */
+export const SEAT_PITCH = SEAT + SEAT_GAP;
+/**
+ * The seats show this tall at most: eight seats and half of the next one. More seats scroll, and the
+ * half seat at the faded edge shows that the list goes on. The dock then fits in the window.
+ */
+const MAX_SEAT_VIEW = 8 * SEAT_PITCH + SEAT / 2;
+/** The seat view starts this far above the first seat, so an open or hovered seat, which is larger, is not cut. */
+export const SEAT_VIEW_INSET = 4;
+
+/** The height of all seats and the gap below each one. */
+export function seatsHeight(seats: number): number {
+  return seats * SEAT_PITCH;
+}
+
+/** The part of `seatsHeight` that the dock shows. The rest scrolls. */
+export function seatView(seats: number): number {
+  return Math.min(seatsHeight(seats), MAX_SEAT_VIEW);
+}
+
 export function dockHeight(seats: number): number {
-  return DOCK_PAD * 2 + (seats + 1) * SEAT + seats * SEAT_GAP;
+  return DOCK_PAD * 2 + seatView(seats) + SEAT;
 }
 
-function dockTop(seats: number): number {
-  return (PANEL_HEIGHT - dockHeight(seats)) / 2;
+/** The top of the seat view for a dock of this height, before the stretch of a drag. */
+export function seatViewTop(height: number): number {
+  return (PANEL_HEIGHT - height) / 2 + DOCK_PAD - SEAT_VIEW_INSET;
 }
 
-/** The centre y of a seat. Index `seats` is the add button. */
+/** The centre y of a seat when the seat view is not scrolled. */
 export function seatCenterY(index: number, seats: number): number {
-  return dockTop(seats) + DOCK_PAD + index * (SEAT + SEAT_GAP) + SEAT / 2;
+  return seatViewTop(dockHeight(seats)) + SEAT_VIEW_INSET + index * SEAT_PITCH + SEAT / 2;
+}
+
+/** The centre y of the add button, below the seat view. */
+export function addCenterY(seats: number): number {
+  return seatViewTop(dockHeight(seats)) + SEAT_VIEW_INSET + seatView(seats) + SEAT / 2;
 }
 
 /**

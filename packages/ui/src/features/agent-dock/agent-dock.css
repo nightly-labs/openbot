@@ -138,6 +138,55 @@
   transform-origin: 50% 50%;
 }
 
+/* The seats scroll when the dock is full. The motion loop sets the top and the height. */
+.agent-dock-seat-scroll {
+  position: absolute;
+  top: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  scrollbar-width: none;
+  --agent-dock-seat-fade-top: 0px;
+  --agent-dock-seat-fade-bottom: 0px;
+}
+
+.agent-dock-seat-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* The motion loop sets the height, which springs down when a seat goes. */
+.agent-dock-seat-list {
+  position: relative;
+  overflow: clip;
+}
+
+/* An edge with more seats behind it fades out. The selectors outrank the global .scroll-fade-* masks. */
+.agent-dock-seats .agent-dock-seat-scroll:is(.scroll-fade-top, .scroll-fade-bottom) {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    var(--openbot-text-primary) var(--agent-dock-seat-fade-top),
+    var(--openbot-text-primary) calc(100% - var(--agent-dock-seat-fade-bottom)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    var(--openbot-text-primary) var(--agent-dock-seat-fade-top),
+    var(--openbot-text-primary) calc(100% - var(--agent-dock-seat-fade-bottom)),
+    transparent
+  );
+}
+
+.agent-dock-seat-scroll.scroll-fade-top {
+  --agent-dock-seat-fade-top: var(--agent-dock-seat-fade);
+}
+
+.agent-dock-seat-scroll.scroll-fade-bottom {
+  --agent-dock-seat-fade-bottom: var(--agent-dock-seat-fade);
+}
+
 .agent-dock-seat-button {
   position: relative;
   display: grid;

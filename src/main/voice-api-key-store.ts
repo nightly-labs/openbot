@@ -1,5 +1,5 @@
 import { rm } from "node:fs/promises";
-import { SPEECH_KEY_PROVIDER_NAMES, type SpeechKeyProvider } from "@openbot/contracts/ipc";
+import { VOICE_KEY_PROVIDER_NAMES, type VoiceKeyProvider } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
@@ -15,7 +15,7 @@ export interface VoiceApiKeyCipher {
 }
 
 /**
- * The ElevenLabs API key for cloud dictation, encrypted with the system cipher. The plaintext stays
+ * The API key of one voice provider, such as ElevenLabs or Groq, encrypted with the system cipher. The plaintext stays
  * in this process: the renderer learns only whether a key is saved.
  *
  * A key that this computer cannot decrypt, for example after the keychain changed, reads as no key.
@@ -83,11 +83,11 @@ export class VoiceApiKeyStore {
 }
 
 /** The error that the user sees when a provider's key is not saved. A locked keychain keeps its own text. */
-export function savedKeyError(cause: unknown, provider: SpeechKeyProvider): Error {
+export function savedKeyError(cause: unknown, provider: VoiceKeyProvider): Error {
   const unavailable = sourceText("error.app.secretStorageUnavailable");
   return new Error(
     cause instanceof Error && cause.message === unavailable
       ? unavailable
-      : sourceText("error.voice.cloud.keySaveFailed", { provider: SPEECH_KEY_PROVIDER_NAMES[provider] }),
+      : sourceText("error.voice.cloud.keySaveFailed", { provider: VOICE_KEY_PROVIDER_NAMES[provider] }),
   );
 }

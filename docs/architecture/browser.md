@@ -165,6 +165,80 @@ later tab on that site in the same profile shows no banner either. Banners in fr
 Sourcepoint) are not handled. `bun run test:browser --scenario=cookie-banner` covers it and writes
 `.openbot-build/browser-cookie-banner.json`.
 
+Each snapshot also looks for a bot check (`browser-challenge.ts`). It reads the DOM of the main frame
+in an isolated world: vendor markers of the interstitial page (Cloudflare, DataDome, PerimeterX,
+Imperva, Akamai, AWS WAF) and, only on a short page, captcha frames and phrases such as "verify you
+are human". A long page that only mentions a captcha does not count. A check that passes by itself
+(`non-interactive`) makes the tab read wait: it reads the page again every second for up to 15
+seconds, and stops at once when the tab closes, a person takes control, or the tab holds a secret.
+All reads of one document share the 15 seconds: a read with a shorter timeout, such as `navigate`,
+leaves the rest for the next read and reports `checking`, whose `next` asks for a snapshot. A
+check that stays after the full wait reads as `needs-user` at once.
+The snapshot then has a `challenge` field with `status` (`cleared`, `checking`, `needs-user` or `blocked`), the
+vendor, the wait, and `next`, the step that the agent takes. A check that needs a person asks for
+`request_takeover` (in a routine run, a report). A block asks for a report. Each `next` also tells
+the agent not to solve, reload, or retry the check, so the guidance needs no separate rule. The idea and the vendor
+list come from anomalyco/browse; the code is our own.
+
+`bun run bench:browser-tools --tasks=challenge-interstitial,challenge-interactive` measures it with
+loopback pages (Haiku, 5 runs each, 2026-11-07). On a check that needs a person, the agent before
+clicked "I am human" and read the page again: median 7 tool calls, $0.033 for 5 runs. With the
+`challenge` field, it stopped at once in every run: median 2 calls, $0.016. On a check that passes
+after 4 seconds, the agent opens the page with `navigate`. Before, it waited and read again: median
+4 calls and 129k input tokens. After, `navigate` returned the page behind the check: median 2 calls
+and 75k tokens.
+
+When the first read of a snapshot finds a loading marker that a person can see (`aria-busy="true"`,
+or a class that contains `skeleton` or `shimmer`), the snapshot waits in the page until the markers
+go and the DOM is unchanged for 150 ms, for up to 2 seconds, and reads again (`browser-settle.ts`).
+A page that keeps its marker for the full wait does not wait again until its next document. A
+document younger than 2.5 seconds with no controls waits for its first change: for up to 1 second
+while it loads, and only until 500 ms after its load event once it has loaded. A loaded static page
+without controls, or a document that already waited for its first change, does not wait. Each
+wait ends 1 second before the read's timeout.
+Without this wait, the agent read the placeholders and took a second snapshot. Chromium already
+leaves the content outside a modal dialog (`showModal()`) out of the accessibility tree, so the
+snapshot has no modal-first order.
+
+`bun run bench:browser-tools --tasks=spa-skeleton` opens a page that shows a skeleton for 1.5 seconds.
+Before, `navigate` returned only the heading, and the agent took a second snapshot in all 5 runs:
+3 calls and 101k input tokens. After, `navigate` returned the prices: 2 calls and 75k tokens in all
+5 runs.
+
+Three changes remove agent turns at the start of a browser task:
+
+- `open` returns the first snapshot of the new tab, as `navigate` does. A failed read returns the tab
+  and a redacted `snapshotError`.
+- The first browser result in a thread brings the schemas and guidance of `open`, `snapshot`,
+  `navigate`, `click`, `type`, `wait_for` and `run_script` (`browserToolsPrimer` in
+  `tool-catalog.ts`), unless a search or describe result already gave them. The developer
+  instructions show the exact `tool_call` form for `open`, `list_tabs` and `snapshot`, so the agent
+  can call one before any `tool_search`. Without the exact form, the agent guessed the argument shape.
+- The `run_script` helpers accept the forms that models write from other libraries:
+  `waitFor("text", "x")`, `waitFor({ selector })`, `waitFor(cond, 5000)`, `{ timeout }`, the states
+  `visible`, `attached` (a target wait already waits for a box) and `networkidle` (as `dom-quiet`),
+  and `role("button", { name })`. `sleep(ms)`, `setTimeout` and `waitFor(ms)` run a `sleep` step of
+  at most 25 seconds. An unknown form throws a message with the accepted forms.
+
+`bun run bench:browser-tools --tasks=open-order,open-quotes,click-wait,herokuapp-dynamic` measures
+them (Haiku, 5 runs each, 2026-11-07; `open-order` and `open-quotes` start with no tab). Medians:
+
+| Task | Before | `open` snapshot + helpers | + first-result schemas |
+| --- | --- | --- | --- |
+| open-order | 3 calls, 101k tokens | 2 calls, 74k | 1 call, 51k |
+| open-quotes | 4 calls, 129k | 2 calls, 76k | 1–2 calls, 52–76k |
+| click-wait | 4 calls, 129k | 4 calls, 129k | 5 calls, 138k |
+| herokuapp-dynamic | 4 calls, 131k | 4 calls, 131k | 3 calls, 104k |
+
+All 20 runs were correct in each column. With the schemas in the first result, 19 of 30 runs (with
+`consent-overlay` and `spa-skeleton`) made no `tool_search`; before, every run made one. On
+`click-wait`, `wait_for` with `dom-quiet` returns before the 3-second timer of the page, so the agent
+waits again; that cost did not change. The helpers did not change a median. The forms that they
+accept come from failed scripts in the bench transcripts.
+
+On the 10 default tasks (3 runs each), all 30 runs were correct before and after. Tool calls went
+from 97 to 84 and input tokens from 1.12M to 0.97M; 23 of 30 runs made no `tool_search`.
+
 ### Fill inspected ordinary fields
 
 `openbot_browser.fill_fields` is a deferred tool in the original browser catalog. It replaces
@@ -389,12 +463,23 @@ refusal in `AgentService` stays beside it rather than being folded in: it also c
 | Browser profile changed | That agent's tabs are closed. Its next tab opens in the profile it chose. Both profiles keep their data. |
 | Profile cleared or deleted | Every tab in that profile is closed, then its data is cleared. |
 | Takeover held | No agent tool touches that tab, `close_tab` included. |
+| Renderer crashed | Stays open. The next browser call loads the page again (see below). |
 
 Deleting an agent is the one sweep, and it exists because those tabs are otherwise unreachable: no
 agent passes the owner check for them, and the renderer lists tabs per agent, so they would hold a
 view the user cannot see to close, across restarts. Closing is idempotent -- `close()` returns early
 on an id it does not hold -- and tab ids are UUIDs with no reorder feature at any layer, so a stale id
 can never name a tab that took its place.
+
+When the renderer of an agent tab crashes (`render-process-gone`), the host adds a `load` diagnostic
+and keeps the tab. The next browser call on the tab loads the same address again with `loadURL`
+before it runs, because a CDP command to the crashed page gets no answer. The next snapshot reports
+the crash and says that refs from before it are stale. A `run_script` that runs during the crash
+stops at once with `page_crashed`, and its final snapshot loads the page again. Before, the step
+waited for its timeout. A tab with a secret, a typed card, a takeover or user control is not loaded
+again, because a reload could send a form again or lose the work of the person.
+`bun run test:browser-steps` covers the crash, the settle wait and the bot check, and writes
+`.openbot-build/browser-steps-e2e/report.json`.
 
 ### Page dialogs
 

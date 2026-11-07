@@ -175,7 +175,9 @@ if [ "$mode" = hosted ]; then
 fi
 
 # The outer xvfb-run starts the agent display, at the display size. The inner one starts the OpenBot
-# display and adds its key to the same authority file.
-exec xvfb-run -a -s "-screen 0 $(display_size "$requested_size")x24 -nolisten tcp" \
+# display and adds its key to the same authority file. The agent display has a white root (`-wr`):
+# remote desktop shows it before an agent opens a window, and the default black root looks like no
+# video (#3554).
+exec xvfb-run -a -s "-screen 0 $(display_size "$requested_size")x24 -nolisten tcp -wr" \
   bash -c 'export OPENBOT_AGENT_DISPLAY=$DISPLAY; exec xvfb-run -a -f "$XAUTHORITY" -s "-screen 0 1280x800x24 -nolisten tcp" "$@"' \
   openbot-hosted-server "${openbot[@]}"

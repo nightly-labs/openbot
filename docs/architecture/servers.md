@@ -183,6 +183,25 @@ member. The capability is advertised only to protocol 7
 clients. The desktop on a joined server and the web client show the side question only when the host
 advertises it.
 
+### Live voice
+
+`live-voice-v1` (`team-protocol/live-voice-v1.ts`) lets a member talk to an agent of the host by Codex
+live voice. `POST /v1/live-voice/start` takes `{ agentId, sdp, voice? }`: the client's WebRTC offer of
+one audio track and the `oai-events` data channel. The host starts a Codex process with its own Codex
+sign-in, or the Codex account of the agent, and answers `{ sessionId, sdp }` with the answer of OpenAI.
+Audio goes between the client and OpenAI, never through the host. The member must be able to chat with
+the agent, because each spoken request goes to the agent as the member's message. The start needs an
+open event connection of the same logical session, or it answers 409. A missing Codex sign-in, a
+timeout or a refused call also answers 409 with a sentence for the member.
+
+Each member has at most one session; a new start ends the earlier one of that member, and the local
+user's session stays. The host sends the `live-voice` event (transcript parts and the end) only to the
+connections of that member. `POST /v1/live-voice/stop` with `{ sessionId }` stops a session of the
+caller only. The host also stops it when the last event connection of the logical session that started
+it closes. The capability is advertised only to protocol 9 clients. The desktop on a joined server
+uses live voice only when the host advertises it and the user turned it on in Settings → Voice;
+otherwise the voice transcribes. The web client and the mobile app do not use it yet.
+
 ### Agent import from a joined server
 
 `agent-import-v1` lets any member, not only an owner or admin, import a Grok Bot export into the host.
@@ -580,6 +599,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `memory-review-v1` | Read and set how often the host's agents review their memories in the background, or Off | `hostAdmin` |
 | `agent-notification-levels-v1` | Read and set the member's own notification level of the server and of each agent | none: each member, own levels only |
 | `sidebar-pins-v1` | Read, replace and seed the member's own ordered list of pinned agents and channels | none: each member, own pins only |
+| `live-voice-v1` | Start and stop Codex live voice with an agent, with the host's Codex sign-in; the `live-voice` event goes to the member who started it. Protocol 9 only | none: each member who can chat with the agent |
 | `machine-resources-v1` | Read the disk, memory and CPU use of the host machine; read and set the alert levels and the owner or admin who gets the `machine-alert` event | `storage`, `hostAdmin` |
 | `prompt-cache-ttl-v1` | Read and set how long Claude keeps the prompt cache of the host's agents | `hostAdmin` |
 | `model-visibility-v1` | Read every model of one provider of the host, and set which of them the model picker shows. Every member reads which models the picker folds under Older models or labels New. Protocol 9 only | `hostAdmin` |

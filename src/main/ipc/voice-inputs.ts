@@ -1,5 +1,6 @@
 import {
   isCodexLiveVoice,
+  isDictationKeyProvider,
   isElevenLabsSpeechVoice,
   isSpeechKeyProvider,
   isSpeechLanguage,
@@ -95,22 +96,27 @@ export function parseVoiceSettings(input: unknown): VoiceSettings {
   return { modelId: input.modelId, language: input.language };
 }
 
-/** The one place an ElevenLabs key from the renderer enters main. Null removes the saved key. */
+/** The one place a dictation provider's key from the renderer enters main. Null removes the saved key. */
 export function parseVoiceApiKey(input: unknown): VoiceApiKeyInput {
-  if (!isObject(input)) throw new Error(sourceText("error.provider.keyRequired"));
-  if (input.key === null) return { key: null };
-  if (typeof input.key !== "string" || !input.key.trim()) throw new Error(sourceText("error.provider.keyRequired"));
-  if (input.key.length > VOICE_API_KEY_MAX_LENGTH) throw new Error(sourceText("error.provider.keyTooLong"));
-  const key = input.key.trim();
+  if (!isObject(input) || !isDictationKeyProvider(input.provider)) throw new Error("A dictation provider is required.");
+  return { provider: input.provider, key: parseApiKey(input.key) };
+}
+
+/** A provider API key, or null. Every voice key goes through these checks. */
+function parseApiKey(value: unknown): string | null {
+  if (value === null) return null;
+  if (typeof value !== "string" || !value.trim()) throw new Error(sourceText("error.provider.keyRequired"));
+  if (value.length > VOICE_API_KEY_MAX_LENGTH) throw new Error(sourceText("error.provider.keyTooLong"));
+  const key = value.trim();
   // The key goes into an HTTP header, which refuses other characters when the socket opens.
   if (!/^[\x21-\x7e]+$/u.test(key)) throw new Error(sourceText("error.provider.keyInvalidCharacters"));
-  return { key };
+  return key;
 }
 
 /** A key of a provider that reads replies aloud, with the same checks as `parseVoiceApiKey`. */
 export function parseSpeechApiKey(input: unknown): SpeechApiKeyInput {
   if (!isObject(input) || !isSpeechKeyProvider(input.provider)) throw new Error("A speech provider is required.");
-  return { provider: input.provider, key: parseVoiceApiKey(input).key };
+  return { provider: input.provider, key: parseApiKey(input.key) };
 }
 
 export function parseVoiceStream(input: unknown): VoiceStream {

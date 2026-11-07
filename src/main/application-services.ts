@@ -2817,6 +2817,15 @@ export async function createApplicationServices({
     storage: storageUsage,
     // Present, so the host advertises `machine-resources-v1`. The routes are admin-only.
     machine: machineAlerts,
+    // Present, so the host advertises `live-voice-v1`. A member's voice uses the Codex sign-in of this host.
+    liveVoice: {
+      startLiveVoice: (input, voice, owner) => service.startLiveVoice(input, voice, owner),
+      stopLiveVoice: (sessionId, memberId) => service.stopLiveVoice(sessionId, memberId),
+      subscribe: (listener) => {
+        service.on("liveVoice", listener);
+        return () => service.off("liveVoice", listener);
+      },
+    },
     // Present, so the host advertises `hosted-sites-v1`. Members list; only admins delete.
     hostedSites,
     // Present, so the host advertises `agent-import-v1`. Any member can import.
@@ -3512,6 +3521,12 @@ export async function createApplicationServices({
     cipher: secretCipher,
   });
   await runCauseEffect(voiceApiKeys.load());
+  // The Groq key for Groq dictation. It is a file of its own, apart from the ElevenLabs key.
+  const groqVoiceKeys = new VoiceApiKeyStore({
+    path: join(app.getPath("userData"), "groq-api-key.json"),
+    cipher: secretCipher,
+  });
+  await runCauseEffect(groqVoiceKeys.load());
   const voice = new VoiceTranscriptionService({
     resourcesRoot: app.isPackaged ? join(process.resourcesPath, "voice") : resolve(".openbot-build/voice"),
     // `voice:prepare` puts Parakeet in `.openbot-build/voice/model` for development. In development
@@ -3534,7 +3549,7 @@ export async function createApplicationServices({
         : resolve(".openbot-build/voice", COHERE_TRANSCRIBE_MODEL_DIRECTORY),
     },
     preferences: voicePreferences,
-    apiKeys: voiceApiKeys,
+    apiKeys: { elevenlabs: voiceApiKeys, groq: groqVoiceKeys },
     spawnHost: spawnVoiceTranscriptionHost,
     openStreamSocket: openScribeSocket,
   });
@@ -3581,7 +3596,8 @@ export async function createApplicationServices({
   const updateMetadataAvailable = app.isPackaged && existsSync(join(process.resourcesPath, "app-update.yml"));
   // A hosted or self-installed server runs a release that root owns. Root installs updates for it
   // when openbot-hosted-update has installed its request units. A container of openbot-instance asks
-  // the host instead, which pulls the image. Other containers have neither.
+  // the host instead, which pulls the image. Other containers have neither. The mode file names the
+  // whole computer, so a desktop AppImage beside a self-installed server keeps its own updater.
   const containerInstaller =
     app.isPackaged &&
     process.platform === "linux" &&
@@ -3591,7 +3607,7 @@ export async function createApplicationServices({
     containerInstaller ||
     (app.isPackaged &&
       process.platform === "linux" &&
-      (process.env.OPENBOT_HOSTED_SERVER === "1" || installationMode === "self") &&
+      (process.env.OPENBOT_HOSTED_SERVER === "1" || (serverModeEnvironment !== null && installationMode === "self")) &&
       existsSync(HOSTED_UPDATE_TRIGGER));
   // A local server is the same application as its parent, which installs the update for both.
   const updatesEnabled =

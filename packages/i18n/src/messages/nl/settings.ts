@@ -258,7 +258,7 @@ export const messages = {
   "settings.tab.notifications.description": "Kies hoe OpenBot je waarschuwt.",
   "settings.tab.voice.title": "Spraak",
   "settings.tab.voice.description":
-    "Dicteren in het berichtvak. Lokale modellen draaien op deze computer; ElevenLabs draait in de cloud.",
+    "Dicteren in het berichtvak. Lokale modellen draaien op deze computer; ElevenLabs en Groq draaien in de cloud.",
   "settings.tab.computerUse.title": "PC-besturing",
   "settings.tab.computerUse.description":
     "Laat agents in de OpenBot van deze computer de apps ervan zien en gebruiken. Agents op een andere server gebruiken de computer van die server.",
@@ -617,6 +617,10 @@ export const messages = {
   "settings.voice.removeFailed": "Kan het model niet verwijderen. Probeer het opnieuw.",
   "settings.voice.model.elevenlabs.description":
     "Streamt je stem naar ElevenLabs. Tekst verschijnt terwijl je spreekt en blijft staan. Gebruikt je eigen API-sleutel, en ElevenLabs rekent elk gebruik af.",
+  "settings.voice.model.groqTurbo.description":
+    "Stuurt elke opname naar Groq als je stopt. Snel, en kent veel talen. Gebruikt je eigen API-sleutel, en Groq rekent elk gebruik af.",
+  "settings.voice.model.groqLarge.description":
+    "Stuurt elke opname naar Groq als je stopt. Nauwkeuriger dan turbo, maar trager. Gebruikt je eigen API-sleutel, en Groq rekent elk gebruik af.",
   "settings.voice.apiKey.placeholder": "Plak de sleutel",
   "settings.voice.apiKey.save": "Sleutel opslaan",
   "settings.voice.apiKey.remove": "Sleutel verwijderen",

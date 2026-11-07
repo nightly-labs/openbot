@@ -259,7 +259,7 @@ export const messages = {
   "settings.tab.notifications.description": "Scegli come OpenBot ti avvisa.",
   "settings.tab.voice.title": "Voce",
   "settings.tab.voice.description":
-    "Dettatura nella casella del messaggio. I modelli locali funzionano su questo computer; ElevenLabs funziona nel cloud.",
+    "Dettatura nella casella del messaggio. I modelli locali funzionano su questo computer; ElevenLabs e Groq funzionano nel cloud.",
   "settings.tab.computerUse.title": "Controllo PC",
   "settings.tab.computerUse.description":
     "Consenti agli agenti dell'OpenBot di questo computer di vedere e usare le sue app. Gli agenti su un altro server usano il computer di quel server.",
@@ -623,6 +623,10 @@ export const messages = {
   "settings.voice.removeFailed": "Impossibile rimuovere il modello. Riprova.",
   "settings.voice.model.elevenlabs.description":
     "Invia la tua voce in streaming a ElevenLabs. Il testo compare mentre parli e non cambia più. Usa la tua chiave API, ed ElevenLabs addebita ogni utilizzo.",
+  "settings.voice.model.groqTurbo.description":
+    "Invia ogni registrazione a Groq quando ti fermi. Veloce e con molte lingue. Usa la tua chiave API, e Groq addebita ogni utilizzo.",
+  "settings.voice.model.groqLarge.description":
+    "Invia ogni registrazione a Groq quando ti fermi. Più preciso di turbo, ma più lento. Usa la tua chiave API, e Groq addebita ogni utilizzo.",
   "settings.voice.apiKey.placeholder": "Incolla la chiave",
   "settings.voice.apiKey.save": "Salva chiave",
   "settings.voice.apiKey.remove": "Rimuovi chiave",

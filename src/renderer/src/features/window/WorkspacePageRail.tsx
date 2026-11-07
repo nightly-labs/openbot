@@ -8,6 +8,7 @@ import { useLayout } from "../../layout";
 import { usePlatform } from "../../platform";
 import { useChannels } from "../channels/channels-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
+import { serverHasStorage } from "../files/storage-usage";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
@@ -18,8 +19,8 @@ import { RailHelpMenu } from "./RailHelpMenu";
 import { useWindowPage } from "./window-page-context";
 
 /**
- * The page rail of the desktop window. Agents, Routines, Workflows, Schedule, Usage, Marketplace and
- * Settings change the page in the card.
+ * The page rail of the desktop window. Agents, Routines, Workflows, Schedule, Usage, Library,
+ * Marketplace and Settings change the page in the card.
  */
 export function WorkspacePageRail(props: { hidden: boolean }) {
   const text = useText();
@@ -78,6 +79,8 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
       onSchedule={windowPage.openSchedule}
       onTasks={tasksAvailable() ? windowPage.openTasks : undefined}
       onUsage={windowPage.openUsage}
+      // An older joined server has no storage routes, so it has no Library.
+      onLibrary={serverHasStorage(activeServer()) ? windowPage.openLibrary : undefined}
       onMarketplace={() => setSkillsMarketplaceOpen(true)}
       onSettings={(button) => (updateNotice() ? openAppSettings(button, "updates") : windowPage.openSettings(button))}
       settingsNotice={updateNotice()}

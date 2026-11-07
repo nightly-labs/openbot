@@ -12,7 +12,7 @@ import {
 } from "quickjs-emscripten-core";
 import { browserCall, browserSync } from "./browser-effects";
 import type { DialogTabResult } from "./browser-tab-operations";
-import { type BrowserStep, parseBrowserStep } from "./browser-tools";
+import { BROWSER_SCRIPT_MAX_SLEEP_MS, type BrowserStep, parseBrowserStep } from "./browser-tools";
 import { withTimeout } from "./with-timeout";
 
 const MEMORY_LIMIT_BYTES = 64 * 1024 * 1024;
@@ -28,13 +28,19 @@ export type BrowserStepOutcome =
   | { status: "error"; error: string }
   | { status: "user_control" }
   | { status: "tab_closed" }
+  | { status: "page_crashed" }
   | { status: "dialog"; dialog: DialogTabResult };
+
+export const BROWSER_PAGE_CRASH_RELOADED =
+  "The page crashed and OpenBot loaded it again. Refs from before the crash are stale.";
+
+export const BROWSER_PAGE_CRASH_KEPT = "The page crashed. OpenBot did not reload it.";
 
 export const BROWSER_SCRIPT_USER_CONTROL_ERROR =
   "A person took control of the tab. Wait for the release, then take a fresh snapshot.";
 
 export interface BrowserScriptResult {
-  status: "completed" | "failed" | "timeout" | "step_limit" | "user_control" | "tab_closed" | "dialog";
+  status: "completed" | "failed" | "timeout" | "step_limit" | "user_control" | "tab_closed" | "page_crashed" | "dialog";
   value?: BrowserJsonValue;
   error?: string;
   /** The page dialog that a step opened. The script stops, and the agent answers it with `handle_dialog`. */
@@ -56,11 +62,26 @@ interface BrowserScriptOptions {
 // for itself.
 const PRELUDE = `
 const __target = (target) => (typeof target === "string" ? { kind: "css", selector: target } : target);
-const __with = (step, options) => ({ ...step, ...(options ?? {}) });
+// Models often pass timeout, as other browser libraries name it, or the timeout as a bare number.
+const __with = (step, options) => {
+  const { timeout, ...rest } = typeof options === "number" ? { timeoutMs: options } : (options ?? {});
+  return { ...step, ...(timeout === undefined || rest.timeoutMs !== undefined ? {} : { timeoutMs: timeout }), ...rest };
+};
+// waitFor("text", "Hello") and waitFor("selector", "#done"): the forms that models write by mistake.
+const __waitFields = { text: "text", url: "url", state: "state", selector: "target", css: "target" };
+// Playwright and Puppeteer state names. A target wait already waits until the element has a box.
+const __waitStates = { networkidle: "dom-quiet", networkidle0: "dom-quiet", networkidle2: "dom-quiet",
+  idle: "dom-quiet", quiet: "dom-quiet", complete: "load", interactive: "domcontentloaded" };
+const __targetStates = new Set(["visible", "attached"]);
 globalThis.css = (selector) => ({ kind: "css", selector });
-globalThis.role = (role, name, exact) => ({
-  kind: "role", role, ...(name === undefined ? {} : { name }), ...(exact === undefined ? {} : { exact }),
-});
+globalThis.role = (role, name, exact) => {
+  // role("button", { name: "Start", exact: true }), as Playwright writes it.
+  if (name !== null && typeof name === "object") {
+    exact = name.exact ?? exact;
+    name = name.name;
+  }
+  return { kind: "role", role, ...(name === undefined ? {} : { name }), ...(exact === undefined ? {} : { exact }) };
+};
 globalThis.text = (text, exact) => ({ kind: "text", text, ...(exact === undefined ? {} : { exact }) });
 globalThis.step = async (step) => {
   const result = await __step(JSON.stringify(step));
@@ -80,10 +101,27 @@ globalThis.selectOption = (target, values, options) =>
   step(__with({ action: "select_option", target: __target(target), values: [].concat(values) }, options));
 globalThis.setChecked = (target, checked = true, options) =>
   step(__with({ action: "set_checked", target: __target(target), checked }, options));
+globalThis.sleep = (ms) =>
+  step({ action: "sleep", ms: Math.max(0, Math.min(Math.round(Number(ms) || 0), ${BROWSER_SCRIPT_MAX_SLEEP_MS})) });
+let __timer = 0;
+const __cancelled = new Set();
+globalThis.setTimeout = (callback, ms, ...args) => {
+  const id = ++__timer;
+  sleep(ms).then(() => { if (!__cancelled.delete(id)) callback(...args); });
+  return id;
+};
+globalThis.clearTimeout = (id) => { __cancelled.add(id); };
 globalThis.waitFor = (condition, options) => {
+  if (typeof condition === "number") return sleep(condition);
+  if (typeof condition === "string" && typeof options === "string") {
+    const field = __waitFields[condition];
+    if (field === undefined) throw new Error('waitFor takes waitFor("text"), waitFor({ text | url | target | state }), or waitFor(() => condition).');
+    return waitFor(field === "target" ? { target: css(options) } : { [field]: options });
+  }
   // A page function is polled in the page until it returns a truthy value, as one evaluate step.
   if (typeof condition === "function") {
-    const timeoutMs = Math.min(options?.timeoutMs ?? 10000, 25000);
+    const { timeoutMs: requested = 10000 } = __with({}, options);
+    const timeoutMs = Math.min(requested, 25000);
     return evaluate(
       "new Promise((resolve, reject) => { const end = Date.now() + " + timeoutMs + "; const check = async () => {" +
         " try { if (await (" + String(condition) + ")()) return resolve(true); } catch (error) { return reject(error); }" +
@@ -93,8 +131,15 @@ globalThis.waitFor = (condition, options) => {
     );
   }
   const fields = typeof condition === "string" ? { text: condition } : { ...condition };
-  if (fields.target !== undefined) fields.target = __target(fields.target);
-  return step(__with({ action: "wait_for", ...fields }, options));
+  if (fields.selector !== undefined) {
+    fields.target = fields.selector;
+    delete fields.selector;
+  }
+  const { state, ...rest } = __with(fields, options);
+  if (rest.target !== undefined) rest.target = __target(rest.target);
+  const mapped = __waitStates[state] ?? state;
+  const keepState = mapped !== undefined && !(rest.target !== undefined && __targetStates.has(mapped));
+  return step({ action: "wait_for", ...rest, ...(keepState ? { state: mapped } : {}) });
 };
 globalThis.evaluate = (expression, options) =>
   step(__with({
@@ -240,9 +285,9 @@ function errorText(error: unknown): string {
 }
 
 /**
- * Runs an agent's script in a QuickJS WebAssembly sandbox. The script has no network, files, modules,
- * timers, or process; it can only ask the host to run browser steps, one at a time. Memory, stack,
- * total time, and step count are limited.
+ * Runs an agent's script in a QuickJS WebAssembly sandbox. The script has no network, files, modules, or
+ * process; it can only ask the host to run browser steps, one at a time. A sleep or setTimeout is a host timer that
+ * does not hold the steps after it. Memory, stack, total time, and step count are limited.
  */
 export const runBrowserScript = Effect.fn("BrowserScript.run")(function* (options: BrowserScriptOptions) {
   const module = yield* loadQuickJs();
@@ -264,7 +309,18 @@ export const runBrowserScript = Effect.fn("BrowserScript.run")(function* (option
         const timedOut = () => result("timeout", { error: "The script ran past its timeout." });
         const startError = sandbox.start(options.script);
         if (startError !== undefined) return result("failed", { error: errorText(startError) });
+        // A sleep, and so a setTimeout, is a timer here and not a step: the steps after it run at once,
+        // as they would next to a timer in a page.
+        const timers: { due: number; deferred: QuickJSDeferredPromise }[] = [];
+        const fireDueTimers = () => {
+          const now = Date.now();
+          for (const timer of timers.filter((item) => item.due <= now)) {
+            timers.splice(timers.indexOf(timer), 1);
+            sandbox.resolve(timer.deferred, { status: "ok" });
+          }
+        };
         for (;;) {
+          fireDueTimers();
           const state = sandbox.advance();
           if (state.kind === "fulfilled") {
             const text = JSON.stringify(state.value);
@@ -276,6 +332,12 @@ export const runBrowserScript = Effect.fn("BrowserScript.run")(function* (option
           }
           if (state.kind === "rejected")
             return Date.now() >= deadline ? timedOut() : result("failed", { error: errorText(state.error) });
+          if (state.kind === "stuck" && timers.length > 0) {
+            const wait = Math.min(...timers.map((timer) => timer.due)) - Date.now();
+            if (Date.now() + wait >= deadline) return timedOut();
+            yield* Effect.sleep(Math.max(0, wait));
+            continue;
+          }
           if (state.kind === "stuck")
             return result("failed", {
               error: "The script waits for a promise that no helper settles. Await only the browser helpers.",
@@ -286,6 +348,10 @@ export const runBrowserScript = Effect.fn("BrowserScript.run")(function* (option
           const parsed = Result.try(() => parseBrowserStep(JSON.parse(state.request)));
           if (Result.isFailure(parsed)) {
             sandbox.reject(state.deferred, errorText(parsed.failure));
+            continue;
+          }
+          if (parsed.success.action === "sleep") {
+            timers.push({ due: Date.now() + parsed.success.ms, deferred: state.deferred });
             continue;
           }
           const remaining = deadline - Date.now();
@@ -305,6 +371,8 @@ export const runBrowserScript = Effect.fn("BrowserScript.run")(function* (option
               });
             case "tab_closed":
               return result("tab_closed", { error: "A step closed the tab." });
+            case "page_crashed":
+              return result("page_crashed", { error: BROWSER_PAGE_CRASH_RELOADED });
             case "dialog":
               return result("dialog", {
                 error: `A step opened a page dialog. ${outcome.success.dialog.note}`,

@@ -136,9 +136,11 @@ import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool }
 import { isDynamicToolCall } from "./thread-items";
 import { toolCallIdempotencyKey } from "./tool-call-idempotency";
 import {
+  browserToolsPrimer,
   CODEX_DEFERRED_MCP_NOTE,
   DEFERRED_MCP_NOTE,
   discoverTools,
+  givesBrowserSchemas,
   namesInSearch,
   resolveDeferredTool,
 } from "./tool-catalog";
@@ -291,6 +293,8 @@ export class OpenBotToolRouter {
   readonly #vaultItems: VaultItems | null;
   readonly #hooks: OpenBotToolRouterHooks;
   readonly #interruptTool: AgentInterruptTool;
+  /** Provider threads whose agent has the browser schemas, from a search or from a first browser result. */
+  readonly #browserSchemasGiven = new Set<string>();
 
   constructor(options: OpenBotToolRouterOptions) {
     this.#history = new HistoryTools({
@@ -396,6 +400,7 @@ export class OpenBotToolRouter {
                 client.respond(request.id, openBotToolFailure(invalid));
                 return;
               }
+              if (givesBrowserSchemas(result)) this.#browserSchemasGiven.add(params.threadId);
               const signIns = yield* this.#searchSignIns(agentId, params);
               if (request.signal?.aborted || !client.running) return;
               const found =
@@ -567,7 +572,19 @@ export class OpenBotToolRouter {
               Effect.raceFirst(cancelled),
               Effect.onInterrupt(() => Effect.sync(() => this.#browser.endControl(params.threadId, params.turnId))),
             );
-            if (!signal?.aborted && client.running) client.respond(toolRequest.id, result);
+            if (signal?.aborted || !client.running) return;
+            const threadId = toolRequest.params.threadId;
+            if (this.#browserSchemasGiven.has(threadId)) client.respond(toolRequest.id, result);
+            else {
+              this.#browserSchemasGiven.add(threadId);
+              client.respond(toolRequest.id, {
+                ...result,
+                contentItems: [
+                  ...result.contentItems,
+                  { type: "inputText", text: JSON.stringify({ browserTools: browserToolsPrimer() }) },
+                ],
+              });
+            }
             return;
           }
           if (toolRequest.params.namespace === "openbot") {

@@ -84,6 +84,8 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "이 연결에서는 폴더 표시를 지원하지 않아요.",
   "error.team.conversationFileSearchUnsupported": "이 연결에서는 파일 검색을 지원하지 않아요.",
   "error.team.sideQuestionUnsupported": "이 연결에서는 사이드 질문을 지원하지 않아요.",
+  "error.team.liveVoiceUnsupported":
+    "이 서버는 Codex 라이브 음성을 지원하지 않아요. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트해 주세요.",
   "error.team.routineFlowsUnsupported":
     "이 서버는 루틴 플로우를 지원하지 않아요. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트해 주세요.",
   "error.team.routineCanvasTooLarge":

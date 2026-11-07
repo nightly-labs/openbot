@@ -837,7 +837,14 @@ function registerIpcHandlers({
       claudeUserSetup,
       openLink,
     }),
-    ...voiceIpcHandlers({ voice, speech, server: voiceServer, service }),
+    ...voiceIpcHandlers({
+      voice,
+      speech,
+      server: voiceServer,
+      service,
+      remoteServers,
+      forwardLiveEvent: forwardVoiceLiveEvent,
+    }),
     ...accountIpcHandlers({ centralAuth, host }),
     ...skillIpcHandlers({ skills, getMainWindow: getDialogParent, translate: language.translate }),
     ...agentFolderIpcHandlers({

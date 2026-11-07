@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { access, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { isAbsolute, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { agentProviderName, type KeyOnlyProviderId } from "@openbot/contracts/agent-providers";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -627,7 +627,13 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
           : ["--extension", extension.path]),
       );
       const instructions = getString(params, "developerInstructions");
-      if (instructions) args.push("--append-system-prompt", instructions);
+      if (instructions) {
+        // Pi reads the instructions from a file. The path keeps the launch line short: a `.cmd`
+        // wrapper starts through cmd.exe, which stops at 8191 characters (#3738).
+        const path = join(dirname(extension.path), "instructions.md");
+        yield* providerCall(() => writeFile(path, instructions, { mode: 0o600 }));
+        args.push("--append-system-prompt", path);
+      }
       if (!this.#running) return yield* providerFailure(new Error(sourceText("error.provider.piStopped")));
       const environment = { ...extension?.environment, ...keyExtension?.environment };
       yield* providerSync(() => this.#spawn(rpc, cwd, args, environment));

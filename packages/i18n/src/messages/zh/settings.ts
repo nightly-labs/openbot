@@ -248,7 +248,7 @@ export const messages = {
   "settings.tab.notifications.title": "通知",
   "settings.tab.notifications.description": "选择 OpenBot 提醒你的方式。",
   "settings.tab.voice.title": "语音",
-  "settings.tab.voice.description": "消息框中的听写。本地模型在本机运行，ElevenLabs 在云端运行。",
+  "settings.tab.voice.description": "消息框中的听写。本地模型在本机运行，ElevenLabs 和 Groq 在云端运行。",
   "settings.tab.computerUse.title": "Computer Use",
   "settings.tab.computerUse.description":
     "允许这台电脑上 OpenBot 的助手查看并操作这台电脑上的应用。其他服务器上的助手使用那台服务器的电脑。",
@@ -602,6 +602,10 @@ export const messages = {
   "settings.voice.removeFailed": "无法移除该模型，请重试。",
   "settings.voice.model.elevenlabs.description":
     "将你的语音实时传给 ElevenLabs。说话时文字会同步显示并保持固定。使用你自己的 API 密钥，ElevenLabs 会按次计费。",
+  "settings.voice.model.groqTurbo.description":
+    "停止后将每段录音发送给 Groq。速度快，支持多种语言。使用你自己的 API 密钥，Groq 会按次计费。",
+  "settings.voice.model.groqLarge.description":
+    "停止后将每段录音发送给 Groq。比 turbo 更准确，但更慢。使用你自己的 API 密钥，Groq 会按次计费。",
   "settings.voice.apiKey.placeholder": "粘贴密钥",
   "settings.voice.apiKey.save": "保存密钥",
   "settings.voice.apiKey.remove": "移除密钥",

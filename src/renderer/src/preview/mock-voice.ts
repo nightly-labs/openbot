@@ -2,13 +2,16 @@ import {
   cloudSpeechModel,
   DEFAULT_SPEECH_SETTINGS,
   DEFAULT_VOICE_SETTINGS,
+  type DictationKeyProvider,
   ELEVENLABS_VOICE_MODEL_ID,
+  isLocalVoiceModelId,
   type OpenBotDesktopApi,
   SPEECH_MODEL_ID,
   type SpeechKeyProvider,
   type SpeechModelStatus,
   type SpeechSettings,
   VOICE_MODEL_IDS,
+  VOICE_MODELS,
   type VoiceLiveEvent,
   type VoiceModelId,
   type VoiceModelStatus,
@@ -21,7 +24,7 @@ import {
 import { clone, type Listener, type MockRuntime } from "./mock-support";
 
 export interface MockVoiceOptions {
-  /** The models already downloaded, and ElevenLabs when its key is saved. Parakeet when not given. */
+  /** The models already downloaded, and each cloud model whose key is saved. Parakeet when not given. */
   voiceModelsReady?: readonly VoiceModelId[];
   voiceSettings?: VoiceSettings;
   /** True when the speech model is downloaded. */
@@ -135,8 +138,8 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
   const download = (modelId: VoiceModelId) =>
     new Promise<VoiceModelStatus>((resolve) => {
       const current = status(modelId);
-      // The cloud model has nothing to download: its key makes it ready.
-      if (current.phase === "ready" || modelId === ELEVENLABS_VOICE_MODEL_ID) return resolve(current);
+      // A cloud model has nothing to download: its key makes it ready.
+      if (current.phase === "ready" || !isLocalVoiceModelId(modelId)) return resolve(current);
       const transfer = { settle: resolve };
       transfers.set(modelId, transfer);
       setStatus({ modelId, phase: "downloading", progress: 0, message: null });
@@ -153,15 +156,19 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
       schedule(() => advance(5), 200);
     });
 
-  const setElevenLabsKey = (key: string | null) => {
-    if (key === null) ready.delete(ELEVENLABS_VOICE_MODEL_ID);
-    else ready.add(ELEVENLABS_VOICE_MODEL_ID);
-    setStatus({
-      modelId: ELEVENLABS_VOICE_MODEL_ID,
-      phase: key === null ? "missing" : "ready",
-      progress: key === null ? null : 100,
-      message: null,
-    });
+  /** A key makes each model of its provider ready. */
+  const setDictationKey = (provider: DictationKeyProvider, key: string | null) => {
+    for (const model of VOICE_MODELS) {
+      if (model.kind !== "cloud" || model.provider !== provider) continue;
+      if (key === null) ready.delete(model.id);
+      else ready.add(model.id);
+      setStatus({
+        modelId: model.id,
+        phase: key === null ? "missing" : "ready",
+        progress: key === null ? null : 100,
+        message: null,
+      });
+    }
   };
 
   const voice: OpenBotDesktopApi["voice"] = {
@@ -178,7 +185,7 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
       return status(modelId);
     },
     removeModel: async ({ modelId }) => {
-      if (modelId === ELEVENLABS_VOICE_MODEL_ID) throw new Error("A cloud model has no files to remove.");
+      if (!isLocalVoiceModelId(modelId)) throw new Error("A cloud model has no files to remove.");
       transfers.get(modelId)?.settle({ modelId, phase: "missing", progress: null, message: null });
       transfers.delete(modelId);
       setStatus({ modelId, phase: "missing", progress: null, message: null });
@@ -190,10 +197,13 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
       return clone(settings);
     },
     transcribe: async () => ({ text: "Mock voice transcript" }),
-    setApiKey: async ({ key }) => {
-      setElevenLabsKey(key);
+    setApiKey: async ({ provider, key }) => {
+      setDictationKey(provider, key);
       announceSpeech();
-      return status(ELEVENLABS_VOICE_MODEL_ID);
+      const inUse = VOICE_MODELS.find((model) => model.id === settings.modelId);
+      if (inUse?.kind === "cloud" && inUse.provider === provider) return status(inUse.id);
+      const first = VOICE_MODELS.find((model) => model.kind === "cloud" && model.provider === provider);
+      return status(first?.id ?? ELEVENLABS_VOICE_MODEL_ID);
     },
     startStream: async () => ({ streamId: crypto.randomUUID() }),
     appendStream: async ({ streamId }) => emit(transcriptListeners, { streamId, text: "Mock voice transcript" }),
@@ -224,7 +234,7 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
     getSpeechModelStatus: async () => speechStatus(),
     setSpeechApiKey: async ({ provider, key }) => {
       if (provider === "xai") xaiKeySaved = key !== null;
-      else setElevenLabsKey(key);
+      else setDictationKey("elevenlabs", key);
       return announceSpeech();
     },
     downloadSpeechModel: downloadSpeech,

@@ -135,6 +135,7 @@ interface HostServiceOptions {
   mcpToolRuntimePreparation?: ForwardedApiOptions["mcpToolRuntimePreparation"];
   storage?: ForwardedApiOptions["storage"];
   machine?: ForwardedApiOptions["machine"];
+  liveVoice?: ForwardedApiOptions["liveVoice"];
   hostedSites?: ForwardedApiOptions["hostedSites"];
   events?: ForwardedApiOptions["events"];
   agentImport?: ForwardedApiOptions["agentImport"];
@@ -494,6 +495,7 @@ export class HostService extends EventEmitter<HostEvents> {
         : { mcpToolRuntimePreparation: options.mcpToolRuntimePreparation }),
       ...(options.storage === undefined ? {} : { storage: options.storage }),
       ...(options.machine === undefined ? {} : { machine: options.machine }),
+      ...(options.liveVoice === undefined ? {} : { liveVoice: options.liveVoice }),
       ...(options.hostedSites === undefined ? {} : { hostedSites: options.hostedSites }),
       ...(options.events === undefined ? {} : { events: options.events }),
       ...(options.agentImport === undefined ? {} : { agentImport: options.agentImport }),
@@ -572,6 +574,14 @@ export class HostService extends EventEmitter<HostEvents> {
               apiOnline: false,
               message: error.message,
             });
+          },
+          // Only the text changes: a restart would drop the devices that are connected now.
+          onSignalLost: (lost) => {
+            if (this.#status.phase !== "online") return;
+            const lostMessage = sourceText("status.host.signalLost");
+            if (lost) this.#setStatus({ message: lostMessage });
+            else if (this.#status.message === lostMessage)
+              this.#setStatus({ message: sourceText("status.host.ready") });
           },
           closeSession: (sessionId) =>
             Effect.gen({ self: this }, function* () {

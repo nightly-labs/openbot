@@ -1197,8 +1197,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       ? {}
       : yield* claudeFlagSettings(configDirectory, config.cwd, settingSources);
     const flagSettings: Settings = { ...openBotSettings, ...nodeOptionsSettings };
+    const sandbox = config.workspaceOnly
+      ? claudeWorkspaceSandbox(config.additionalDirectories, config.excludedFolders)
+      : null;
     // The sign-in settings can hold keys, so they go in a file that only this user can read, not on
-    // the command line, where `ps` shows them to other users.
+    // the command line, where `ps` shows them to other users. The SDK refuses a settings file path
+    // together with its `sandbox` option, so a Workspace only sandbox goes in the same file (#5583).
     const settingsFile =
       Object.keys(signInSettings).length > 0
         ? stateDirectory
@@ -1206,6 +1210,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
               ...signInSettings,
               ...openBotSettings,
               env: { ...signInSettings.env, ...nodeOptionsSettings.env },
+              ...(sandbox ? { sandbox } : {}),
             }).pipe(
               Effect.catch((error) =>
                 Effect.sync(() => {
@@ -1272,9 +1277,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             : Object.keys(flagSettings).length > 0
               ? { settings: flagSettings }
               : {}),
+          ...(sandbox && !settingsFile ? { sandbox } : {}),
           ...(config.workspaceOnly
             ? {
-                sandbox: claudeWorkspaceSandbox(config.additionalDirectories, config.excludedFolders),
                 hooks: claudeWorkspaceHooks(config.cwd, config.additionalDirectories, config.excludedFolders),
                 managedSettings: CLAUDE_WORKSPACE_MANAGED_SETTINGS,
               }
