@@ -12,7 +12,7 @@ import { extractJsonObject } from "../structured-output";
 import type { AgentMemories } from "./agent-memories";
 import { backgroundModel } from "./background-model";
 import { memoryChangesMessage } from "./memory-changes-message";
-import type { MemoryReviewCursors } from "./memory-review-cursors";
+import { conversationKey, type MemoryReviewCursors } from "./memory-review-cursors";
 import { MemoryReviewResult, memoryReviewPrompt } from "./memory-review-prompt";
 import type { ProfileClients } from "./profile-clients";
 import { type GenerationObserver, GenerationUsageLimitError, generateTextWithoutTools } from "./profile-generation";
@@ -119,7 +119,8 @@ export class MemoryReview {
         Effect.orElseSucceed(() => []),
       );
       this.#moveCursor(conversation, messages);
-      yield* this.#saveCursor(conversation);
+      // The turn end does not wait for the disk: the next delivery starts at once.
+      yield* this.#saveCursor(conversation).pipe(Effect.forkIn(this.#scope));
       return;
     }
     if (counts) conversation.turns += 1;
@@ -386,10 +387,6 @@ export class MemoryReview {
       logger.warn("Could not show the memory review's changes.", { error });
     }
   }
-}
-
-function conversationKey(agentId: string, threadId: string | null): string {
-  return threadId === null ? agentId : `${agentId}\u0000${threadId}`;
 }
 
 /**
