@@ -50,7 +50,7 @@ const WORK_VERB = String.raw`(?:run|re-?run|check|test|fix|update|edit|write|cre
 /** A character inside a sentence. A period inside a word, as in "parser.ts" or "v1.2", does not end it. */
 const SENTENCE_CHAR = String.raw`(?:[^.!?\n]|\.(?=\S))`;
 const ANNOUNCES_WORK = new RegExp(
-  String.raw`(?:^|[.!:\u2026\u2013\u2014]\s+|\s-\s+|\n\s*)(?:(?:ok(?:ay)?|now|next|first|then|so)[,:]?\s+)*(?:let\s+me|i['\u2019]ll|i\s+will|i['\u2019]m\s+going\s+to|i\s+am\s+going\s+to)\s+(?:(?:now|first|next|then|also|quickly)\s+)?${WORK_VERB}\b(?!${SENTENCE_CHAR}*\b(?:(?:if|when|once|after|unless|until|as\s+soon\s+as)\s+(?:you|your)|(?:when|once|until)\s+(?:it|the|this)|update\s+you|get\s+back|approv\w*|confirm\w*|permission|later|tomorrow|next\s+(?:week|month|time)|back\s+in)\b)${SENTENCE_CHAR}{0,120}[.:\u2026]?\s*$`,
+  String.raw`(?:^|[.!:\u2026\u2013\u2014]\s+|\s-\s+|\n\s*)(?:(?:ok(?:ay)?|now|next|first|then|so)[,:]?\s+)*(?:let\s+me|i['\u2019]ll|i\s+will|i['\u2019]m\s+going\s+to|i\s+am\s+going\s+to)\s+(?:(?:now|first|next|then|also|quickly)\s+)?${WORK_VERB}\b(?!\s+you\b)(?!${SENTENCE_CHAR}*\b(?:(?:if|when|once|after|unless|until|as\s+soon\s+as)\s+(?:you|your)|(?:when|once|until)\s+(?:it|the|this)|get\s+back|approv\w*|confirm\w*|permission|later|tomorrow|next\s+(?:week|month|time)|back\s+in)\b)${SENTENCE_CHAR}{0,120}[.:\u2026]?\s*$`,
   "i",
 );
 
