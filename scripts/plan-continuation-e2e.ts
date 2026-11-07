@@ -471,6 +471,7 @@ try {
       "I'll implement it after your confirmation.",
       "I'll update you when the build finishes.",
       "I'll update you on the progress.",
+      "Next, I'll implement it after your confirmation.",
       "Let me check with the team and get back to you.",
     ];
     // Each request opens a new step, so a step left open by an earlier answer does not hide the plan.

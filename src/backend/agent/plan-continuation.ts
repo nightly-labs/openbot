@@ -29,12 +29,21 @@ const ASKS_TO_CONTINUE = new RegExp(
   String.raw`^(?:[^?？]*[.!]\s+)?(?:(?:(?:shall|should|can|may)\s+i|(?:do\s+you\s+)?want\s+me\s+to|would\s+you\s+like\s+me\s+to|ok(?:ay)?\s+(?:if\s+i|to))\s+)?${CONTINUE_VERB}${REST_OF_WORK}\s*\?+$`,
   "i",
 );
+/** A character inside a sentence. A period inside a word, as in "parser.ts" or "v1.2", does not end it. */
+const SENTENCE_CHAR = String.raw`(?:[^.!?\n]|\.(?=\S))`;
+/**
+ * The rest of a next-step sentence must not wait for someone or something: an offer to the user
+ * ("… if you want"), an approval, a later time, or an outside event ("… when the build finishes").
+ */
+const NOT_WAITING = String.raw`(?!${SENTENCE_CHAR}*\b(?:(?:if|when|once|after|unless|until|as\s+soon\s+as)\s+(?:you|your)|(?:when|once|until)\s+(?:it|the|this)|get\s+back|approv\w*|confirm\w*|permission|later|tomorrow|next\s+(?:week|month|time)|back\s+in)\b)`;
 /**
  * A short answer whose last words name the agent's next step, such as "I'll now run the tests." An
  * answer that says the agent waits, holds or stops does not match.
  */
-const NAMES_NEXT_STEP =
-  /(?:\blet me now\b|\bnow let me\b|\bi['\u2019]ll now\b|\bi will now\b|\bnow i(?:['\u2019]ll| will)\b|\bnext,?\s+i(?:['\u2019]ll| will)\b)(?!\s+(?:wait|hold|pause|stop)\b)[^.!?\n]{0,100}[.:\u2026]?\s*$/i;
+const NAMES_NEXT_STEP = new RegExp(
+  String.raw`(?:\blet me now\b|\bnow let me\b|\bi['’]ll now\b|\bi will now\b|\bnow i(?:['’]ll| will)\b|\bnext,?\s+i(?:['’]ll| will)\b)(?!\s+(?:wait|hold|pause|stop)\b)${NOT_WAITING}[^.!?\n]{0,100}[.:…]?\s*$`,
+  "i",
+);
 
 /**
  * Work verbs that a stopped turn names for its next step. Verbs such as deploy or delete are not in it.
@@ -43,14 +52,11 @@ const NAMES_NEXT_STEP =
 const WORK_VERB = String.raw`(?:run|re-?run|check|test|fix|update|edit|write|create|add|build|install|open|read|look|search|inspect|review|verify|start|try|apply|implement|rename|move|refactor|debug|finish|continue|configure|set\s+up|generate|download|compile|patch)`;
 /**
  * A last sentence in which the agent says that it does the next work, such as "Let me run the tests."
- * or "I'm going to fix the parser.". It must name a work verb, so "Let me know …" and "I'll keep an eye
- * on it." do not match. An offer to the user ("… if you want"), an approval, a later time,
- * or a wait for an outside event ("… when the build finishes") does not match either.
+ * or "I'm going to fix the parser.". It must name a work verb, so "Let me know …", "I'll keep an eye on
+ * it." and "I'll update you …" do not match.
  */
-/** A character inside a sentence. A period inside a word, as in "parser.ts" or "v1.2", does not end it. */
-const SENTENCE_CHAR = String.raw`(?:[^.!?\n]|\.(?=\S))`;
 const ANNOUNCES_WORK = new RegExp(
-  String.raw`(?:^|[.!:\u2026\u2013\u2014]\s+|\s-\s+|\n\s*)(?:(?:ok(?:ay)?|now|next|first|then|so)[,:]?\s+)*(?:let\s+me|i['\u2019]ll|i\s+will|i['\u2019]m\s+going\s+to|i\s+am\s+going\s+to)\s+(?:(?:now|first|next|then|also|quickly)\s+)?${WORK_VERB}\b(?!\s+you\b)(?!${SENTENCE_CHAR}*\b(?:(?:if|when|once|after|unless|until|as\s+soon\s+as)\s+(?:you|your)|(?:when|once|until)\s+(?:it|the|this)|get\s+back|approv\w*|confirm\w*|permission|later|tomorrow|next\s+(?:week|month|time)|back\s+in)\b)${SENTENCE_CHAR}{0,120}[.:\u2026]?\s*$`,
+  String.raw`(?:^|[.!:…–—]\s+|\s-\s+|\n\s*)(?:(?:ok(?:ay)?|now|next|first|then|so)[,:]?\s+)*(?:let\s+me|i['’]ll|i\s+will|i['’]m\s+going\s+to|i\s+am\s+going\s+to)\s+(?:(?:now|first|next|then|also|quickly)\s+)?${WORK_VERB}\b(?!\s+you\b)${NOT_WAITING}${SENTENCE_CHAR}{0,120}[.:…]?\s*$`,
   "i",
 );
 
