@@ -1552,7 +1552,7 @@ export class ThreadLifecycle {
     const sessions = this.#store.database.listProviderSessions(threadId).filter((one) => one.state === "active");
     if (reloadProvider && sessions.length > 0 && sessions.every((one) => one.provider === reloadProvider)) {
       for (const session of sessions) {
-        yield* this.#releaseProviderSession(session.externalSessionId);
+        yield* this.#releaseProviderSession(session.externalSessionId, undefined, true);
         this.#conversation.unloadThread(session.externalSessionId);
       }
       return;
@@ -1579,10 +1579,11 @@ export class ThreadLifecycle {
     this: ThreadLifecycle,
     externalThreadId: string,
     client: AgentClient | undefined = this.#conversation.openClientFor(externalThreadId),
+    resumes = false,
   ) {
     if (!client?.releaseThread) return;
     yield* client
-      .releaseThread(externalThreadId)
+      .releaseThread(externalThreadId, resumes)
       .pipe(
         Effect.catch((failure) => Effect.sync(() => this.#hooks.logReleaseFailure(client.provider, failure.cause))),
       );
