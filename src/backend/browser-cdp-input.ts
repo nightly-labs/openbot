@@ -282,10 +282,12 @@ interface TextChecks {
    */
   readonly saveText?: Effect.Effect<void, BrowserOperationError>;
   /**
-   * Runs before each key or insert after the first one, and fails when a key handler moved focus.
-   * Focus that moves after the last character, as in a one-time code box, is not a failure.
+   * Runs before each key or insert after the first one, with the count of characters that the page
+   * already has. It fails when a key handler moved focus or the deadline passed, so that the error
+   * can tell the caller that part of the text is in the field. Focus that moves after the last
+   * character, as in a one-time code box, is not a failure.
    */
-  readonly beforeNext?: Effect.Effect<void, BrowserOperationError>;
+  readonly beforeNext?: (typed: number, total: number) => Effect.Effect<void, BrowserOperationError>;
 }
 
 export const dispatchText = Effect.fn("Browser.dispatchText")(function* (
@@ -298,14 +300,20 @@ export const dispatchText = Effect.fn("Browser.dispatchText")(function* (
     yield* send("Input.insertText", { text }, sessionId);
     return;
   }
-  let sent = false;
-  const beforePiece = Effect.gen(function* () {
-    if (sent && checks.beforeNext) yield* checks.beforeNext;
-    sent = true;
-  });
-  const insert = (piece: string) =>
-    beforePiece.pipe(Effect.andThen(send("Input.insertText", { text: piece }, sessionId)));
   const characters = [...text];
+  let typed = 0;
+  const beforePiece = Effect.suspend(() =>
+    typed > 0 && checks.beforeNext ? checks.beforeNext(typed, characters.length) : Effect.void,
+  );
+  const insert = (piece: string) =>
+    beforePiece.pipe(
+      Effect.andThen(send("Input.insertText", { text: piece }, sessionId)),
+      Effect.andThen(
+        Effect.sync(() => {
+          typed += [...piece].length;
+        }),
+      ),
+    );
   let pending = "";
   let keyed = false;
   for (const [index, character] of characters.entries()) {
@@ -319,6 +327,7 @@ export const dispatchText = Effect.fn("Browser.dispatchText")(function* (
     // The characters before the first key have no US key, so they were inserted.
     if (!keyed && index > 0 && checks.saveText) yield* checks.saveText;
     yield* dispatchTextKey(send, character, sessionId);
+    typed += 1;
     if (!keyed && checks.keyArrived && !(yield* checks.keyArrived)) {
       yield* insert(characters.slice(index).join(""));
       return;

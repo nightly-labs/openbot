@@ -966,8 +966,12 @@ export class BrowserCdpEngine {
             [],
             resolved.sessionId,
           ).pipe(Effect.asVoid),
-          // Short text arrives one key at a time, and a key handler can move focus to another element.
-          beforeNext: checkFocus("error.backend.browserTypingFocusMovedWhileTyping"),
+          // Short text arrives one key at a time. The deadline can pass, or a key handler can move focus
+          // to another element, after the page already has part of the text.
+          beforeNext: (typed, total) =>
+            browserSync(() => assertTypingProgressBeforeDeadline(deadline, typed, total)).pipe(
+              Effect.andThen(checkFocus("error.backend.browserTypingFocusMovedWhileTyping")),
+            ),
         });
         // Submitting is part of typing rather than a second action, because it has to reach the node
         // this lease already resolved. Re-resolving a snapshot ref here would fingerprint the element
@@ -975,7 +979,8 @@ export class BrowserCdpEngine {
         // the snapshot" and `submit: true` would insert the text without ever submitting it.
         if (options.submit === true) {
           yield* checkFocus("error.backend.browserTypingSubmitSkipped");
-          yield* browserSync(() => assertBeforeDeadline(deadline));
+          const total = [...text].length;
+          yield* browserSync(() => assertTypingProgressBeforeDeadline(deadline, total, total));
           yield* dispatchShortcut(send, "Enter", resolved.sessionId);
         }
       }),
