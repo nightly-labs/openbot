@@ -48,15 +48,17 @@ export async function routeMcpServers(
   // and bounded before the IPC parsers see it.
   const body = mcpRequest(url.pathname, await readJson(request));
   if (save) {
-    // The local save starts the runtime download; the host route shares it, or a first server
-    // added remotely never gets the runtime its test and its spawn need.
     const input = parseSaveMcpServer(body);
     const before = new Set(mcpServers.listMcpServers().map((server) => server.id));
     if (before.has(input.config.id)) requireOwnMcpServer(access, input.config.id);
+    // The local save starts the runtime download; the host route shares it, or a first server
+    // added remotely never gets the runtime its test and its spawn need.
     toolRuntimes?.startToolRuntimes();
     const saved = await runCauseEffect(mcpServers.saveMcpServer(input));
-    // The new row is the one the list did not have. Who added it is kept for `mcp-member-access-v1`.
-    const added = saved.find((server) => !before.has(server.id));
+    // The new row is the one the list did not have, by its name: another save can add a row at the
+    // same time, and a name is unique. Who added it is kept for `mcp-member-access-v1`.
+    const name = input.config.name.trim();
+    const added = saved.find((server) => !before.has(server.id) && server.name === name);
     if (added && owners) await runCauseEffect(owners.add(added.id, member.id));
     return json(200, saved);
   }

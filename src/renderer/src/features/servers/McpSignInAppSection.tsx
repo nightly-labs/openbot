@@ -40,7 +40,7 @@ export function McpSignInAppSection(props: {
   relayed?: boolean | undefined;
   disabled: boolean;
 }) {
-  const { t, sourceText } = useText();
+  const { t, errorMessage } = useText();
   const [state, setState] = createStore<AppFormState>({
     stored: null,
     loadError: "",
@@ -77,7 +77,7 @@ export function McpSignInAppSection(props: {
         (error: unknown) => {
           if (run !== loadRun) return;
           setState((current) => {
-            current.loadError = error instanceof Error ? sourceText(error.message) : t("mcp.panel.appLoadFailed");
+            current.loadError = errorMessage(error, t("mcp.panel.appLoadFailed"));
           });
         },
       );
@@ -111,7 +111,7 @@ export function McpSignInAppSection(props: {
       });
     } catch (error) {
       setState((current) => {
-        current.error = error instanceof Error ? sourceText(error.message) : t("mcp.panel.saveFailed");
+        current.error = errorMessage(error, t("mcp.panel.saveFailed"));
       });
     } finally {
       setState((current) => {
