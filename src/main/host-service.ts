@@ -575,6 +575,14 @@ export class HostService extends EventEmitter<HostEvents> {
               message: error.message,
             });
           },
+          // Only the text changes: a restart would drop the devices that are connected now.
+          onSignalLost: (lost) => {
+            if (this.#status.phase !== "online") return;
+            const lostMessage = sourceText("status.host.signalLost");
+            if (lost) this.#setStatus({ message: lostMessage });
+            else if (this.#status.message === lostMessage)
+              this.#setStatus({ message: sourceText("status.host.ready") });
+          },
           closeSession: (sessionId) =>
             Effect.gen({ self: this }, function* () {
               this.#liveActivityPush?.remove(sessionId);
