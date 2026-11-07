@@ -2562,6 +2562,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         turn.providerError = sourceText("error.provider.acpSignInLost", { provider: this.#label });
         return;
       }
+      if (this.#flavor.planUsedUpChunk?.test(update.content.text)) {
+        turn.receivedOutput = true;
+        turn.failureCause = "usage_limit";
+        turn.providerError = sourceText("error.provider.acpPlanUsedUp", { provider: this.#label });
+        return;
+      }
       // An exhausted quota sent as answer text, and a turn then ended as a success (Antigravity).
       const quota = this.#flavor.sdkHarness?.quota(update.content.text) ?? null;
       if (quota !== null) {
