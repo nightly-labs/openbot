@@ -202,10 +202,30 @@ const FOCUSED_FRAME_SCRIPT = `(() => {${FOCUSED_SELECTION}
 /** Frames inside frames. Past this the focus is treated as in the last frame reached. */
 const MAX_FOCUSED_FRAME_DEPTH = 8;
 
+// Counts the key events that reach the target's window, in the automation world, so the page does
+// not see the listener. `TYPED_KEY_ARRIVED_FUNCTION` reads the count and removes the listener. A key
+// also arrived when the text changed: a page listener that stops the event can hide it from the count.
+const COUNT_TYPED_KEYS = `
+  globalThis.openbotTypedKeys?.view.removeEventListener('keydown', globalThis.openbotTypedKeys.listener, true);
+  const typedKeys = {
+    view: this.ownerDocument.defaultView, count: 0, text: 'value' in this ? String(this.value) : this.textContent,
+    listener: () => { typedKeys.count += 1; },
+  };
+  typedKeys.view.addEventListener('keydown', typedKeys.listener, true);
+  globalThis.openbotTypedKeys = typedKeys;`;
+const TYPED_KEY_ARRIVED_FUNCTION = `function(expected) {
+  const typedKeys = globalThis.openbotTypedKeys;
+  if (!typedKeys) return true;
+  typedKeys.view.removeEventListener('keydown', typedKeys.listener, true);
+  globalThis.openbotTypedKeys = undefined;
+  const text = 'value' in this ? String(this.value) : this.textContent;
+  return typedKeys.count >= expected || text !== typedKeys.text;
+}`;
 /**
  * True when this node holds focus in its own document: every shadow root on the way up names it or
  * its host as active. It starts inside the node, so a closed shadow root does not hide it.
  */
+
 const HOLDS_FOCUS_FUNCTION = `function() {
   if (!this.isConnected) return false;
   for (let node = this;;) {
@@ -895,6 +915,7 @@ export class BrowserCdpEngine {
           resolved.backendNodeId,
           `function(mode) {
           if (!('value' in this) && !this.isContentEditable) throw new Error('Target does not accept text.');
+          ${COUNT_TYPED_KEYS}
           if (mode === 'replace') {
             if ('select' in this && typeof this.select === 'function') this.select();
             else {
@@ -922,7 +943,18 @@ export class BrowserCdpEngine {
         }
         yield* checkFocus("error.backend.browserTypingFocusMoved");
         yield* browserSync(() => assertBeforeDeadline(deadline));
-        yield* dispatchText(send, text, resolved.sessionId);
+        const keyArrived = this.#callOnNode(
+          send,
+          resolved.backendNodeId,
+          TYPED_KEY_ARRIVED_FUNCTION,
+          [useEndKey === true ? 2 : 1],
+          resolved.sessionId,
+        ).pipe(
+          Effect.map((arrived) => arrived !== false),
+          // A handler that removed the target after the key shows that the key arrived.
+          Effect.catch(() => Effect.succeed(true)),
+        );
+        yield* dispatchText(send, text, resolved.sessionId, keyArrived);
         // Short text arrives one key at a time, and a key handler can move focus to another element.
         yield* checkFocus(
           options.submit === true

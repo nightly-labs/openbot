@@ -1,6 +1,6 @@
 import { Effect, Option } from "effect";
 import type { SendCommand } from "./browser-cdp-values";
-import { browserFailure, browserSync } from "./browser-effects";
+import { type BrowserOperationError, browserFailure, browserSync } from "./browser-effects";
 
 export interface PointerPoint {
   readonly x: number;
@@ -269,17 +269,25 @@ const MAX_KEYED_TEXT = 128;
  */
 const EDITOR_COMPLETED_TEXT = /[\n\r([{'"`<]/;
 
+/**
+ * `keyArrived` tells whether the first key event reached the page. Chromium can drop key events
+ * for a tab that it accepts inserted text for, as for a hidden tab under Xvfb, and drops them with
+ * no error. The text is then inserted, as it was before keys.
+ */
 export const dispatchText = Effect.fn("Browser.dispatchText")(function* (
   send: SendCommand,
   text: string,
   sessionId?: string,
+  keyArrived?: Effect.Effect<boolean, BrowserOperationError>,
 ) {
   if (text.length === 0 || text.length > MAX_KEYED_TEXT || EDITOR_COMPLETED_TEXT.test(text)) {
     yield* send("Input.insertText", { text }, sessionId);
     return;
   }
+  const characters = [...text];
   let pending = "";
-  for (const character of text) {
+  let keyed = false;
+  for (const [index, character] of characters.entries()) {
     if (!US_KEYS.has(character)) {
       pending += character;
       continue;
@@ -287,6 +295,11 @@ export const dispatchText = Effect.fn("Browser.dispatchText")(function* (
     if (pending) yield* send("Input.insertText", { text: pending }, sessionId);
     pending = "";
     yield* dispatchTextKey(send, character, sessionId);
+    if (!keyed && keyArrived && !(yield* keyArrived)) {
+      yield* send("Input.insertText", { text: characters.slice(index).join("") }, sessionId);
+      return;
+    }
+    keyed = true;
   }
   if (pending) yield* send("Input.insertText", { text: pending }, sessionId);
 });
