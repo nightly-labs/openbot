@@ -20,7 +20,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { type AgentSummary, DEFAULT_AGENT_DEFAULTS } from "@openbot/contracts/ipc";
 import { developerInstructions } from "../src/backend/agent/developer-instructions";
 import { CODEX_FEATURES_CONFIG } from "../src/backend/agent/thread-lifecycle";
-import { discoverTools, VISIBLE_DYNAMIC_TOOLS } from "../src/backend/agent/tool-catalog";
+import { discoverTools, visibleDynamicTools } from "../src/backend/agent/tool-catalog";
 import { CodexAppServerClient } from "../src/backend/app-server-client";
 import { claudeOpenBotTools } from "../src/backend/claude-client";
 import { resolveCodexCli } from "../src/backend/cli";
@@ -165,7 +165,7 @@ function deadline(what: string): Promise<never> {
   });
 }
 
-const OPENBOT_NAMES = new Set(VISIBLE_DYNAMIC_TOOLS.flatMap((namespace) => [namespace.name]));
+const OPENBOT_NAMES = new Set(visibleDynamicTools("codex").flatMap((namespace) => [namespace.name]));
 
 /** One Codex turn with OpenBot's visible tools and instructions; returns the largest request. */
 async function codexRequest(root: string) {
@@ -217,7 +217,7 @@ async function codexRequest(root: string) {
             config: CODEX_FEATURES_CONFIG,
             developerInstructions: instructions("codex"),
             serviceName: "openbot",
-            dynamicTools: VISIBLE_DYNAMIC_TOOLS,
+            dynamicTools: visibleDynamicTools("codex"),
           },
           decodeRecordResponse,
         ),
@@ -282,14 +282,17 @@ function searchResults() {
     SEARCHES.map((query) => [
       query,
       count(
-        discoverTools({
-          threadId: "t",
-          turnId: "t",
-          callId: "c",
-          namespace: "openbot",
-          tool: "tool_search",
-          arguments: { query },
-        }),
+        discoverTools(
+          {
+            threadId: "t",
+            turnId: "t",
+            callId: "c",
+            namespace: "openbot",
+            tool: "tool_search",
+            arguments: { query },
+          },
+          "codex",
+        ),
       ),
     ]),
   );
@@ -311,7 +314,7 @@ const report: {
   error?: string;
 } = { passed: false, encoding: encode ? "o200k_base" : null };
 try {
-  const visible = VISIBLE_DYNAMIC_TOOLS[0];
+  const visible = visibleDynamicTools("codex")[0];
   assert(visible, "No visible tools.");
   report.visibleTools = Object.fromEntries(
     visible.tools.map((tool) => [tool.name, count({ description: tool.description, inputSchema: tool.inputSchema })]),

@@ -107,6 +107,9 @@ export const messages = {
   "error.agent.quickAcknowledgementLocalOnly": "Só o computador que executa o agente pode alterar esta configuração.",
   "error.agent.sideQuestionBusy": "Há perguntas à parte demais em andamento. Tente novamente em instantes.",
   "error.agent.sideQuestionFailed": "O agente não conseguiu responder à pergunta à parte. Tente novamente.",
+  "error.agent.webSearchSignIn": "A pesquisa na web precisa de login no Codex com uma conta do ChatGPT.",
+  "error.agent.webSearchBusy": "Há pesquisas e perguntas paralelas demais em andamento. Tente de novo em instantes.",
+  "error.agent.webSearchFailed": "A pesquisa na web não terminou. Tente de novo.",
   "error.agent.busyMessageModeLocalOnly":
     "O que as mensagens fazem enquanto o agente trabalha só pode ser definido no computador que executa o agente.",
   "error.agent.backupModelsLocalOnly":

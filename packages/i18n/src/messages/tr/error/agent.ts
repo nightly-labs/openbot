@@ -105,6 +105,9 @@ export const messages = {
   "error.agent.quickAcknowledgementLocalOnly": "Bu ayarı yalnızca ajanı çalıştıran bilgisayar değiştirebilir.",
   "error.agent.sideQuestionBusy": "Çok fazla yan soru çalışıyor. Kısa bir süre sonra tekrar deneyin.",
   "error.agent.sideQuestionFailed": "Ajan yan soruyu yanıtlayamadı. Tekrar deneyin.",
+  "error.agent.webSearchSignIn": "Web araması için bir ChatGPT hesabıyla Codex'te oturum açmanız gerekir.",
+  "error.agent.webSearchBusy": "Çalışan çok fazla arama ve yan soru var. Biraz sonra yeniden deneyin.",
+  "error.agent.webSearchFailed": "Web araması tamamlanmadı. Yeniden deneyin.",
   "error.agent.busyMessageModeLocalOnly":
     "Ajan çalışırken mesajların ne yapacağı yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",
   "error.agent.backupModelsLocalOnly": "Yedek modeller yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",

@@ -1084,6 +1084,12 @@ Network traffic can also occur when:
   transcript is not added to the chat; no recording is kept. OpenAI handles the audio and the text
   under its own policy and the user's ChatGPT plan. The setting is saved in `speech-preference.json`
   in the application data folder. It is off by default;
+- an agent uses the `openbot.web_search` tool. Only agents on a provider with no web search tool of
+  its own get it. OpenBot starts a separate Codex App Server process, which sends the agent's question
+  to OpenAI through the default Codex sign-in of this computer. OpenAI searches the web and returns a
+  short answer with source URLs to the agent. Only the question and short OpenBot instructions go to
+  OpenAI, not the agent's chat, files or instructions, and not the agent's own provider account.
+  OpenAI handles the question under its own policy and the user's ChatGPT plan;
 - the user connects Bitwarden. OpenBot runs the installed `bw` CLI to sync with the server already
   configured in that CLI, including a self-hosted server. It syncs before listing or filling logins.
   These calls send no OpenBot conversations, files, or agent instructions to Bitwarden. For a

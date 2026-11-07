@@ -118,6 +118,9 @@ export const messages = {
   "error.agent.quickAcknowledgementLocalOnly": "Seul l’ordinateur qui exécute l’agent peut modifier ce réglage.",
   "error.agent.sideQuestionBusy": "Trop de questions annexes sont en cours. Réessayez dans un instant.",
   "error.agent.sideQuestionFailed": "L’agent n’a pas pu répondre à la question annexe. Réessayez.",
+  "error.agent.webSearchSignIn": "La recherche web nécessite une connexion à Codex avec un compte ChatGPT.",
+  "error.agent.webSearchBusy": "Trop de recherches et de questions annexes sont en cours. Réessayez dans un instant.",
+  "error.agent.webSearchFailed": "La recherche web n’a pas abouti. Réessayez.",
   "error.agent.busyMessageModeLocalOnly":
     "Le comportement des messages pendant le travail de l’agent ne peut être réglé que sur l’ordinateur qui exécute l’agent.",
   "error.agent.backupModelsLocalOnly":

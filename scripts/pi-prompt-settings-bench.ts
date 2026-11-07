@@ -20,7 +20,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { VISIBLE_DYNAMIC_TOOLS } from "../src/backend/agent/tool-catalog";
+import { visibleDynamicTools } from "../src/backend/agent/tool-catalog";
 import { resolvePiCli } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { type AppServerNotification, getRecord, getString } from "../src/backend/protocol";
@@ -319,7 +319,7 @@ for (const variant of variants) {
           cwd: workspace,
           model: MODEL,
           developerInstructions: "You are Ada, a careful assistant in an end-to-end benchmark.",
-          dynamicTools: VISIBLE_DYNAMIC_TOOLS,
+          dynamicTools: visibleDynamicTools("pi"),
         },
         (value) => getString(getRecord(value, "thread"), "id"),
       ),

@@ -39,7 +39,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, delimiter, dirname, join, resolve } from "node:path";
 import { stringify as stringifyYaml } from "yaml";
-import { VISIBLE_DYNAMIC_TOOLS } from "../src/backend/agent/tool-catalog";
+import { visibleDynamicTools } from "../src/backend/agent/tool-catalog";
 import type { AgentClient } from "../src/backend/agent-client";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { HERMES_AGENT_SETTINGS, type HermesAgentSettings } from "../src/backend/hermes-settings";
@@ -211,7 +211,12 @@ async function measureTurn(
   const started = await runCauseEffect(
     client.request(
       "thread/start",
-      { cwd: workspace, model, developerInstructions: DEVELOPER_INSTRUCTIONS, dynamicTools: VISIBLE_DYNAMIC_TOOLS },
+      {
+        cwd: workspace,
+        model,
+        developerInstructions: DEVELOPER_INSTRUCTIONS,
+        dynamicTools: visibleDynamicTools("hermes"),
+      },
       (value) => value,
     ),
   );

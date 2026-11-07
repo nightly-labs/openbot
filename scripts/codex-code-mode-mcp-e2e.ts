@@ -22,7 +22,7 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { COMPUTER_USE_MCP_SERVER_ID, COMPUTER_USE_MCP_SERVER_NAME, type McpServerConfig } from "@openbot/contracts/ipc";
 import { readCodexMcpConfig } from "../src/backend/agent/codex-mcp-config";
-import { VISIBLE_DYNAMIC_TOOLS } from "../src/backend/agent/tool-catalog";
+import { visibleDynamicTools } from "../src/backend/agent/tool-catalog";
 import { CodexAppServerClient } from "../src/backend/app-server-client";
 import { resolveCodexCli } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
@@ -366,7 +366,7 @@ async function run(test: Case): Promise<Outcome> {
       codexDisabledServers(() => readCodexMcpConfig(session.client, keyed).pipe(toMcpShapeFailed)),
     );
     const servers = keyed(own.transports);
-    const openbot = VISIBLE_DYNAMIC_TOOLS.map((namespace) => namespace.name);
+    const openbot = visibleDynamicTools("codex").map((namespace) => namespace.name);
     const current = [...openbot, ...codexDirectMcpNamespaces(servers)];
     // The list from #2897 to #4468: Codex's name for each server key.
     const everyServer = [
@@ -382,7 +382,7 @@ async function run(test: Case): Promise<Outcome> {
         mcp_servers: codexThreadMcpServers(own.disabled, servers),
         "features.code_mode.direct_only_tool_namespaces": directOnly,
       },
-      dynamicTools: VISIBLE_DYNAMIC_TOOLS,
+      dynamicTools: visibleDynamicTools("codex"),
     });
     const started = await runCauseEffect(
       session.client.request("thread/start", params(test.resume ? everyServer : current), decodeRecordResponse),

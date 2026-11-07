@@ -295,6 +295,11 @@ export const saveApiKeyToolSchema = z.strictObject({
     .describe("What the key is for. Never a secret. Omit it to keep the saved notes."),
 });
 
+/** `openbot.web_search`: one search turn on a ChatGPT account (`AgentService.searchWeb`). */
+export const webSearchToolSchema = z.strictObject({
+  query: z.string().trim().min(1).max(1_000).describe("The whole question, with its context."),
+});
+
 export const sendToChannelToolSchema = z.strictObject({
   channelId: z.string().min(1).max(INPUT_LIMITS.identifier),
   text: z.string().trim().min(1).max(INPUT_LIMITS.messageText),
@@ -379,6 +384,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     description:
       "Capture one display, one window, or a region of one display of this computer, and get the image. The user approves each capture first, and sees the image in this conversation. In a channel, each member who reads the channel sees it. Call list_capture_sources first to get ids and bounds. A region uses desktop points.",
     shape: captureScreenToolShape,
+  },
+  {
+    name: "web_search",
+    description:
+      "Search the web for current facts. Returns a short answer with source URLs. One question per call. To read or use a page, use openbot_browser.",
+    shape: webSearchToolSchema.shape,
   },
   {
     name: "list_sections",

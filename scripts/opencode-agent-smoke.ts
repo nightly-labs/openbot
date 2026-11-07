@@ -10,7 +10,7 @@
 import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { VISIBLE_DYNAMIC_TOOLS } from "../src/backend/agent/tool-catalog";
+import { visibleDynamicTools } from "../src/backend/agent/tool-catalog";
 import type { AgentClient } from "../src/backend/agent-client";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { getArray, getRecord, getString, isRecord } from "../src/backend/protocol";
@@ -104,7 +104,7 @@ async function startAgentThread(client: AgentClient): Promise<string> {
         cwd: workspace,
         model: OPENCODE_MODEL,
         developerInstructions: "You are Ada, a careful assistant in an end-to-end smoke test.",
-        dynamicTools: VISIBLE_DYNAMIC_TOOLS,
+        dynamicTools: visibleDynamicTools("opencode"),
       },
       (value) => value,
     ),

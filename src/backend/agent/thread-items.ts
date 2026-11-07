@@ -576,6 +576,7 @@ export function toolActivity(item: ThreadItem, completed: boolean): AgentStepAct
   if (browserTool(item) !== null) return "browsing";
   const openBot = openBotTool(item);
   if (openBot === "send_message") return "delegating";
+  if (openBot === "web_search") return "searching";
   if (READING_OPENBOT_TOOLS.has(openBot ?? "")) return "reading";
   return TOOL_USAGE_ACTIVITIES[toolUsage(item)?.kind ?? "other"];
 }

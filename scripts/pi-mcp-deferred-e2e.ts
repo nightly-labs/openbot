@@ -12,7 +12,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
-import { VISIBLE_DYNAMIC_TOOLS } from "../src/backend/agent/tool-catalog";
+import { visibleDynamicTools } from "../src/backend/agent/tool-catalog";
 import type { AgentClient } from "../src/backend/agent-client";
 import { resolvePiCli } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
@@ -174,7 +174,7 @@ try {
   const started = await runCauseEffect(
     client.request(
       "thread/start",
-      { cwd: workspace, model: "spark-e2e/fake-coder", dynamicTools: VISIBLE_DYNAMIC_TOOLS },
+      { cwd: workspace, model: "spark-e2e/fake-coder", dynamicTools: visibleDynamicTools("pi") },
       (value) => value,
     ),
   );

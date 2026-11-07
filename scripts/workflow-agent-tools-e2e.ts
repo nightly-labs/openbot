@@ -150,7 +150,7 @@ async function call(
   callKey = `call-${++calls}`,
 ): Promise<{ ok: boolean; value: unknown }> {
   assert.ok(workflows);
-  const resolved = resolveDeferredTool(params("tool_call", { name: `openbot.${name}`, arguments: args }));
+  const resolved = resolveDeferredTool(params("tool_call", { name: `openbot.${name}`, arguments: args }), "codex");
   assert.ok(resolved, `tool_call refused openbot.${name}`);
   const response = await runCauseEffect(
     handleWorkflowTool(resolved.tool, resolved.arguments, workflows, CALLER, callKey, AGENTS, confirmDelete),
@@ -188,7 +188,7 @@ try {
   // 1. Search finds the tools with their schemas and guidance.
   // The query names no tool in full, as a model's first search often does. It also names a routine,
   // as a model that reads "every morning" does, but only the workflow tools come with schemas.
-  const search = discoverTools(params("tool_search", { query: "create workflow routine with approval" }));
+  const search = discoverTools(params("tool_search", { query: "create workflow routine with approval" }), "codex");
   report.bytes.search = Buffer.byteLength(JSON.stringify(search));
   const ready = search.tools.filter((tool) => "inputSchema" in tool).map((tool) => tool.name);
   check(
@@ -203,7 +203,7 @@ try {
       !(search.guidance ?? []).some((text) => text.includes("Manage scheduled work")),
     { ready, guidance: search.guidance },
   );
-  const mixed = discoverTools(params("tool_search", { queries: ["workflow", "openbot_browser.snapshot"] }));
+  const mixed = discoverTools(params("tool_search", { queries: ["workflow", "openbot_browser.snapshot"] }), "codex");
   check(
     "a workflow search keeps the schema of a tool that another query names exactly",
     mixed.tools.some((tool) => tool.name === "openbot_browser.snapshot" && "inputSchema" in tool),
@@ -215,7 +215,7 @@ try {
     search.call?.includes("tool_call") === true && !("note" in search),
     search,
   );
-  const alias = resolveDeferredTool(params("tool_call", { tool: "openbot.list_workflows", arguments: {} }));
+  const alias = resolveDeferredTool(params("tool_call", { tool: "openbot.list_workflows", arguments: {} }), "codex");
   check("tool_call accepts the qualified name as tool", alias?.tool === "list_workflows", alias);
 
   // 2. One call builds a workflow with refs.

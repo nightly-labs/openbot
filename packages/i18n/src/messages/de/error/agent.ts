@@ -125,6 +125,9 @@ export const messages = {
     "Nur der Computer, auf dem der Agent läuft, kann diese Einstellung ändern.",
   "error.agent.sideQuestionBusy": "Es laufen zu viele Nebenfragen. Versuche es gleich noch einmal.",
   "error.agent.sideQuestionFailed": "Der Agent konnte die Nebenfrage nicht beantworten. Versuche es erneut.",
+  "error.agent.webSearchSignIn": "Die Websuche braucht eine Codex-Anmeldung mit einem ChatGPT-Konto.",
+  "error.agent.webSearchBusy": "Es laufen zu viele Suchen und Nebenfragen. Versuche es gleich noch einmal.",
+  "error.agent.webSearchFailed": "Die Websuche wurde nicht abgeschlossen. Versuche es erneut.",
   "error.agent.busyMessageModeLocalOnly":
     "Das Verhalten von Nachrichten während der Arbeit des Agenten kann nur auf dem Computer eingestellt werden, auf dem der Agent läuft.",
   "error.agent.backupModelsLocalOnly":

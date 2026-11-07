@@ -112,6 +112,9 @@ export const messages = {
     "Solo il computer che esegue l'agente può modificare questa impostazione.",
   "error.agent.sideQuestionBusy": "Ci sono troppe domande a parte in corso. Riprova tra poco.",
   "error.agent.sideQuestionFailed": "L'agente non è riuscito a rispondere alla domanda a parte. Riprova.",
+  "error.agent.webSearchSignIn": "La ricerca web richiede l’accesso a Codex con un account ChatGPT.",
+  "error.agent.webSearchBusy": "Sono in corso troppe ricerche e domande laterali. Riprova tra poco.",
+  "error.agent.webSearchFailed": "La ricerca web non è terminata. Riprova.",
   "error.agent.busyMessageModeLocalOnly":
     "Cosa fanno i messaggi mentre l'agente lavora si può impostare solo sul computer che lo esegue.",
   "error.agent.backupModelsLocalOnly":
