@@ -178,11 +178,13 @@ async function main(): Promise<void> {
     measurements.evaluateResultChars = text(evaluated).length;
     measurements.evaluateSuccess = evaluated.success;
     const oversize = await call("evaluate", { tabId: page.tab.id, expression: OVERSIZE_VALUE }).then(
-      (result) => ({ success: result.success, chars: text(result).length }),
-      (error: unknown) => ({ success: false, chars: String(error).length }),
+      (result) => ({ success: result.success, text: text(result) }),
+      (error: unknown) => ({ success: false, text: String(error) }),
     );
     measurements.evaluateOver64KbSuccess = oversize.success;
-    measurements.evaluateOver64KbResultChars = oversize.chars;
+    measurements.evaluateOver64KbResultChars = oversize.text.length;
+    // The engine gives no part of this value, so the error must say how to get it.
+    measurements.evaluateOver64KbSaysHow = oversize.text.includes("JSON.stringify(value).slice(0, ");
 
     const script = await call("run_script", {
       tabId: page.tab.id,

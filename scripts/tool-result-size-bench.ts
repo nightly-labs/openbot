@@ -96,6 +96,7 @@ function expectations(measurements: Record<string, Measurement>): string[] {
     emulatedMobilePreset: hits("emulatedMobilePreset"),
     // The cap, plus the note.
     evaluateResultChars: under("evaluateResultChars", 16_500),
+    evaluateOver64KbSaysHow: measurements.evaluateOver64KbSaysHow === true,
     runScriptResultChars: under("runScriptResultChars", 16_500),
     runScriptQuotedResultChars: under("runScriptQuotedResultChars", 16_500),
     githubMcpProxiedTextChars: under("githubMcpProxiedTextChars", 40_500),

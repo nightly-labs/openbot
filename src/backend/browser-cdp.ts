@@ -88,6 +88,7 @@ import {
 import { describeBrowserTarget, stopLoadingAndWait, waitForLoading } from "./browser-navigation";
 import { createFramePacer } from "./browser-screencast-pacing";
 import { probeSettle, SETTLE_BUSY_WAIT_MS, SETTLE_RESERVE_MS, waitForSettle } from "./browser-settle";
+import { BROWSER_VALUE_TOO_LARGE } from "./model-text-limit";
 import type { VaultCardSecret } from "./vault-items";
 
 const ACTION_TIMEOUT_MS = 10_000;
@@ -2729,7 +2730,9 @@ export class BrowserCdpEngine {
           return yield* browserFailure(new Error("Browser evaluation result is not JSON-serializable."));
         const bytes = Buffer.byteLength(serialized, "utf8");
         if (bytes > MAX_RESULT_BYTES) {
-          return yield* browserFailure(new Error(`Browser evaluation result exceeds 64 KB (${bytes} bytes).`));
+          return yield* browserFailure(
+            new Error(`Browser evaluation result exceeds 64 KB (${bytes} bytes). ${BROWSER_VALUE_TOO_LARGE}`),
+          );
         }
         // `serialized` is the value the caller receives, so parse that rather than asserting over
         // `value`: JSON.stringify already dropped anything a JSON value cannot hold.

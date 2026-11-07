@@ -11,9 +11,15 @@ export const BROWSER_VALUE_TEXT_LIMIT = 16_000;
 /** A text item of a proxied MCP result: about 10k tokens, the default tool output limit of Codex. */
 export const MCP_RESULT_TEXT_LIMIT = 40_000;
 
+/** Says how to get a value in parts, from `start`. */
+const returnLess = (start: number): string =>
+  `return less: select only the fields that you need, filter, or return a slice, such as JSON.stringify(value).slice(${start}, ${start + BROWSER_VALUE_TEXT_LIMIT}). In run_script, work on the data in the script and return only the answer.`;
+
 /** Says how to read the rest of a value; `end` is the length of the start that the model got. */
-export const BROWSER_VALUE_MORE = (end: number): string =>
-  `To read more, return less: select only the fields that you need, filter, or return a slice, such as JSON.stringify(value).slice(${end}, ${end + BROWSER_VALUE_TEXT_LIMIT}). In run_script, work on the data in the script and return only the answer.`;
+export const BROWSER_VALUE_MORE = (end: number): string => `To read more, ${returnLess(end)}`;
+
+/** Says how to get a value that is larger than the engine limit, which gives no part of it. */
+export const BROWSER_VALUE_TOO_LARGE = `To get it, ${returnLess(0)}`;
 
 export const MCP_RESULT_MORE = (): string =>
   "To read more, call the tool again with its pagination or filter arguments, such as a smaller page size or the next page. For a large file, clone the repository and read the file there.";
