@@ -269,6 +269,11 @@ export const messages = {
   "provider.settings.promptCacheHour": "1 uur",
   "provider.settings.promptCacheDefault": "Standaard van Claude Code",
   "provider.settings.promptCacheLoadFailed": "Kan de promptcachetijd van deze server niet laden.",
+  "provider.settings.claudeSetup": "Claude Code",
+  "provider.settings.claudeUserSetup": "Mijn Claude Code-configuratie gebruiken",
+  "provider.settings.claudeUserSetupDescription":
+    "Agents laden je CLAUDE.md, skills, agents, hooks en plug-ins uit ~/.claude. Uit: elke beurt stuurt een kortere prompt. Bestanden van de werkruimte worden nog steeds geladen.",
+  "provider.settings.claudeUserSetupLoadFailed": "Kan de Claude Code-instelling niet laden.",
   "provider.settings.models": "Modellen",
   "provider.settings.modelsDescription": {
     one: "{shown} van {count} model staat in de modelkiezer.",

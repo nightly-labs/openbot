@@ -56,6 +56,7 @@ export const messages = {
   "error.team.providersUnsupported": "当前连接不支持服务商设置。",
   "error.team.providerNotManaged": "OpenBot 不管理该服务商的 CLI。",
   "error.team.channelsUnsupported": "当前连接不支持频道聊天。",
+  "error.team.channelContextUnsupported": "此连接不支持在频道中开始新对话或压缩。",
   "error.team.channelPictureUnsupported": "当前连接不支持频道图片。",
   "error.team.channelDeleteUnsupported": "当前连接不支持删除频道。",
   "error.team.channelTaskCancelUnsupported": "当前连接不支持取消频道任务。",

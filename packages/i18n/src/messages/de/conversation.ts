@@ -134,6 +134,7 @@ export const messages = {
   "conversation.voice.speakNow": "Sprich jetzt",
   "conversation.voice.mute": "Mikrofon stummschalten",
   "conversation.voice.interrupt": "Unterbrechen",
+  "conversation.voice.start": "Sprachgespräch starten",
   "conversation.voice.end": "Sprachgespräch beenden",
   "conversation.voice.error": "Das Sprachgespräch konnte nicht starten.",
   "conversation.voice.notSent": "Die Nachricht wurde nicht gesendet. Sprich noch einmal.",

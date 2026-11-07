@@ -130,6 +130,7 @@ export const messages = {
   "conversation.voice.speakNow": "話してください",
   "conversation.voice.mute": "マイクをミュート",
   "conversation.voice.interrupt": "中断",
+  "conversation.voice.start": "音声会話を開始",
   "conversation.voice.end": "音声会話を終了",
   "conversation.voice.error": "音声会話を開始できませんでした。",
   "conversation.voice.notSent": "メッセージを送信できませんでした。もう一度話してください。",

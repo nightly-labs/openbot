@@ -56,6 +56,8 @@ export const messages = defineMessages("error.team", {
   "error.team.providersUnsupported": "Provider settings are not supported by this connection.",
   "error.team.providerNotManaged": "OpenBot does not manage this provider's CLI.",
   "error.team.channelsUnsupported": "Channel chats are not supported by this connection.",
+  "error.team.channelContextUnsupported":
+    "This connection does not support a new conversation or compaction in a channel.",
   "error.team.channelPictureUnsupported": "Channel pictures are not supported by this connection.",
   "error.team.channelDeleteUnsupported": "Channel deletion is not supported by this connection.",
   "error.team.channelTaskCancelUnsupported": "Cancelling channel tasks is not supported by this connection.",

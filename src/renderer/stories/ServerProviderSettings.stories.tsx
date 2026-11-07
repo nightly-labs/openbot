@@ -434,6 +434,7 @@ function ServerProvidersStory(props: {
             onRecheckScreenRecording={fn(async () => undefined)}
             initialSection="providers"
             hostPromptCacheTtl={{}}
+            claudeUserSetup
             hostModelVisibility={{}}
             onSwitchToManageProviders={switchToManageProviders}
             providers={providerOptions()}

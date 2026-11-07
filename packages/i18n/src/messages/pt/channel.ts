@@ -21,6 +21,18 @@ export const messages = {
   "channel.settings.isolatedDescription":
     "Os agentes guardam o que aprendem aqui como memórias do canal. As outras conversas deles não as veem.",
   "channel.settings.memoryCount": { one: "{count} salva", other: "{count} salvas" },
+  "channel.settings.newConversation.title": "Nova conversa",
+  "channel.settings.newConversation.description":
+    "Os membros esquecem as mensagens anteriores. A configuração do canal permanece.",
+  "channel.settings.newConversation.button": "Iniciar",
+  "channel.settings.newConversation.confirmTitle": "Iniciar uma nova conversa em {name}?",
+  "channel.settings.newConversation.confirmDescription":
+    "Os membros esquecem as mensagens anteriores deste canal. As mensagens continuam visíveis acima de um divisor. Os membros, as instruções, as memórias e as rotinas não mudam.",
+  "channel.settings.newConversation.confirm": "Iniciar nova conversa",
+  "channel.settings.newConversation.failed": "Não foi possível iniciar uma nova conversa.",
+  "channel.settings.compact.title": "Compactar contexto",
+  "channel.settings.compact.description": "Os membros mantêm um resumo curto da sessão do canal e usam menos tokens.",
+  "channel.settings.compact.failed": "Não foi possível compactar o contexto do canal.",
   "channel.settings.routines": "Rotinas",
   "channel.settings.routineCount": { one: "{count} configurada", other: "{count} configuradas" },
   "channel.create.close": "Fechar novo canal",

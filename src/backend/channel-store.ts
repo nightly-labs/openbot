@@ -10,6 +10,7 @@ import {
   type ChannelSummary,
   type ChannelTask,
   type ChannelThread,
+  CONTEXT_RESET_ITEM_TYPE,
   decodeChannel,
   isChannelMessage,
   isChannelTask,
@@ -191,6 +192,7 @@ export class ChannelStore {
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'plan'
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'subagents'
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'channel-change'
+                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'context-reset'
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'commentary'
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?) AS unread,
             (SELECT COUNT(*) FROM projection_channel_tasks AS t
@@ -656,6 +658,39 @@ export class ChannelStore {
         .prepare("SELECT thread_id FROM projection_channel_contexts WHERE channel_id = ? ORDER BY agent_id")
         .all(channelId),
     ).map((row) => requiredStringColumn(row, "thread_id"));
+  }
+
+  /** The agent and execution thread of each member context of one channel. */
+  contexts(channelId: string): Array<{ agentId: string; threadId: string }> {
+    return databaseRows(
+      this.database.connection
+        .prepare("SELECT agent_id, thread_id FROM projection_channel_contexts WHERE channel_id = ? ORDER BY agent_id")
+        .all(channelId),
+    ).map((row) => ({
+      agentId: requiredStringColumn(row, "agent_id"),
+      threadId: requiredStringColumn(row, "thread_id"),
+    }));
+  }
+
+  /**
+   * The sequence of the newest "New conversation" marker of a channel, or 0. A model reads no
+   * message at or before it. The marker is an ordinary message row, so a deleted marker ends the
+   * boundary and no event type or migration is needed.
+   */
+  contextResetSequence(channelId: string): number {
+    const row = databaseRow(
+      this.database.connection
+        .prepare(
+          // The id range reads the marker rows through the primary key, not every message of the channel.
+          `SELECT MAX(sequence) AS sequence FROM projection_channel_messages
+             WHERE channel_id = ? AND message_id >= 'context-reset-' AND message_id < 'context-reset.' AND ${SHOWN_MESSAGE_SQL}
+             AND json_extract(message_json, '$.message.itemType') = ?
+             AND json_extract(message_json, '$.message.author') = 'system'
+             AND json_extract(message_json, '$.message.source') = 'system'`,
+        )
+        .get(channelId, CONTEXT_RESET_ITEM_TYPE),
+    );
+    return row && typeof row.sequence === "number" ? row.sequence : 0;
   }
 
   /** The execution threads of one agent, one for each channel it works in. */

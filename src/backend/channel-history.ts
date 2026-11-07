@@ -5,6 +5,7 @@ import {
   type ChannelTask,
   channelRoutingConversationEvent,
   isChannelChangeMarker,
+  isContextResetMarker,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -132,8 +133,13 @@ function newest(messages: ChannelMessage[], limit: number): { kept: ChannelMessa
  * exception: the result is its answer, and its commentary, such as "Result submitted to the shared
  * chat." or the result again, only repeats it. A turn that posted a member reply is the same: it
  * continues with the answer, so a note such as "I will report back" tells the next model nothing.
+ *
+ * A "New conversation" marker starts the history: the messages before it, and the marker, stay in
+ * the channel for the reader, and no model reads them.
  */
-function conversation(messages: ChannelMessage[]): ChannelMessage[] {
+function conversation(all: ChannelMessage[]): ChannelMessage[] {
+  const reset = all.findLastIndex((message) => isContextResetMarker(message.message));
+  const messages = reset < 0 ? all : all.slice(reset + 1);
   const resultTurns = new Set(
     messages.flatMap((message) =>
       (message.id.startsWith("channel-result-") || message.id.startsWith(CHANNEL_REPLY_ID_PREFIX)) &&
@@ -641,7 +647,8 @@ export class ChannelHistory {
         const referenced = withoutAssignment(messages.filter((message) => isSource(message) && !shown.has(message.id)));
         const first = omitted[0];
         const last = omitted.at(-1);
-        const summaryShown = summary.throughSequence > (seen ?? 0);
+        // A new conversation leaves a summary with no text.
+        const summaryShown = summary.throughSequence > (seen ?? 0) && summary.text.trim() !== "";
         const parts = {
           assignmentCharacters: assignment.length,
           memoryCharacters: memories.reduce((total, memory) => total + memory.text.length, 0),

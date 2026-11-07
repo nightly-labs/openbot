@@ -26,6 +26,19 @@ export const messages = {
     many: "{count} zapisanych",
     other: "{count} zapisanego",
   },
+  "channel.settings.newConversation.title": "Nowa rozmowa",
+  "channel.settings.newConversation.description":
+    "Członkowie zapominają wcześniejsze wiadomości. Ustawienia kanału zostają.",
+  "channel.settings.newConversation.button": "Rozpocznij",
+  "channel.settings.newConversation.confirmTitle": "Rozpocząć nową rozmowę w {name}?",
+  "channel.settings.newConversation.confirmDescription":
+    "Członkowie zapominają wcześniejsze wiadomości tego kanału. Wiadomości zostają widoczne nad separatorem. Członkowie, instrukcje, wspomnienia i rutyny się nie zmieniają.",
+  "channel.settings.newConversation.confirm": "Rozpocznij nową rozmowę",
+  "channel.settings.newConversation.failed": "Nie udało się rozpocząć nowej rozmowy.",
+  "channel.settings.compact.title": "Kompaktuj kontekst",
+  "channel.settings.compact.description":
+    "Członkowie zachowują krótkie podsumowanie sesji kanału i zużywają mniej tokenów.",
+  "channel.settings.compact.failed": "Nie udało się skompaktować kontekstu kanału.",
   "channel.settings.routines": "Rutyny",
   "channel.settings.routineCount": {
     one: "{count} skonfigurowana",

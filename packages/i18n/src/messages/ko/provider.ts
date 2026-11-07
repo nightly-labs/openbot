@@ -269,6 +269,11 @@ export const messages = {
   "provider.settings.update": "업데이트",
   "provider.settings.downloadLabel": "{name} 다운로드",
   "provider.settings.diagnostics": "진단",
+  "provider.settings.claudeSetup": "Claude Code",
+  "provider.settings.claudeUserSetup": "내 Claude Code 설정 사용",
+  "provider.settings.claudeUserSetupDescription":
+    "에이전트가 ~/.claude에서 CLAUDE.md, 스킬, 에이전트, 훅, 플러그인을 불러옵니다. 끄면 각 턴에서 더 짧은 프롬프트를 보냅니다. 작업 공간 파일은 계속 불러옵니다.",
+  "provider.settings.claudeUserSetupLoadFailed": "Claude Code 설정을 불러오지 못했습니다.",
   "provider.settings.models": "모델",
   "provider.settings.modelsDescription": { other: "모델 {count}개 중 {shown}개가 모델 선택에 보여요." },
   "provider.settings.modelsSearch": "모델 검색",

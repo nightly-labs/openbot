@@ -67,6 +67,10 @@ export const messages = {
   "error.backend.channelUnconfirmedStart": "该频道有一项未确认的派活启动，请在删除前确认其结果。",
   "error.backend.channelNotFound": "未找到该频道。",
   "error.backend.channelMemberUnavailable": "有频道成员不可用。",
+  "error.backend.channelWaitBeforeNewConversation": "请等此频道中的工作停止后再开始新对话。",
+  "error.backend.channelWaitBeforeCompact": "请等此频道中的工作停止后再压缩。",
+  "error.backend.channelCompactUnavailable":
+    "此频道现在没有成员可以压缩上下文。成员必须先在频道中回答,且其提供方必须支持压缩。",
   "error.backend.channelArchived": "请先恢复该频道，再发送消息或更改任务。",
   "error.backend.channelReferenceUnavailable": "引用的频道消息不可用。",
   "error.backend.channelTaskNotFound": "未找到该频道任务。",

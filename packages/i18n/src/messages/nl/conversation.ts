@@ -132,6 +132,7 @@ export const messages = {
   "conversation.voice.speakNow": "Spreek nu",
   "conversation.voice.mute": "Microfoon dempen",
   "conversation.voice.interrupt": "Onderbreken",
+  "conversation.voice.start": "Spraakgesprek starten",
   "conversation.voice.end": "Spraakgesprek beëindigen",
   "conversation.voice.error": "Het spraakgesprek kan niet starten.",
   "conversation.voice.notSent": "Het bericht is niet verstuurd. Spreek opnieuw.",

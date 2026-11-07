@@ -131,6 +131,7 @@ export const messages = {
   "conversation.voice.speakNow": "지금 말씀하세요",
   "conversation.voice.mute": "마이크 음소거",
   "conversation.voice.interrupt": "끼어들기",
+  "conversation.voice.start": "음성 대화 시작",
   "conversation.voice.end": "음성 대화 종료",
   "conversation.voice.error": "음성 대화를 시작할 수 없어요.",
   "conversation.voice.notSent": "메시지를 보내지 못했어요. 다시 말씀해 주세요.",

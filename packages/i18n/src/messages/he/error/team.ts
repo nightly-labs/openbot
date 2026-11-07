@@ -56,6 +56,7 @@ export const messages = {
   "error.team.providersUnsupported": "הגדרות ספקים אינן נתמכות בחיבור הזה.",
   "error.team.providerNotManaged": "OpenBot אינו מנהל את ה-CLI של הספק הזה.",
   "error.team.channelsUnsupported": "צ'אטים של ערוצים אינם נתמכים בחיבור הזה.",
+  "error.team.channelContextUnsupported": "החיבור הזה אינו תומך בשיחה חדשה או בדחיסה בערוץ.",
   "error.team.channelPictureUnsupported": "תמונות ערוץ אינן נתמכות בחיבור הזה.",
   "error.team.channelDeleteUnsupported": "מחיקת ערוצים אינה נתמכת בחיבור הזה.",
   "error.team.channelTaskCancelUnsupported": "ביטול משימות ערוץ אינו נתמך בחיבור הזה.",

@@ -71,6 +71,11 @@ export const messages = {
     "У канала есть неподтверждённый запуск назначения. Проверьте его результат, прежде чем удалять канал.",
   "error.backend.channelNotFound": "Канал не найден.",
   "error.backend.channelMemberUnavailable": "Участник канала недоступен.",
+  "error.backend.channelWaitBeforeNewConversation":
+    "Дождитесь окончания работы в этом канале, затем начните новый разговор.",
+  "error.backend.channelWaitBeforeCompact": "Дождитесь окончания работы в этом канале, затем сожмите его.",
+  "error.backend.channelCompactUnavailable":
+    "Сейчас ни один участник этого канала не может сжать контекст. Сначала участник должен ответить в канале, а его провайдер должен поддерживать сжатие.",
   "error.backend.channelArchived": "Восстановите этот канал, прежде чем отправлять сообщения или менять задачи.",
   "error.backend.channelReferenceUnavailable": "Сообщение канала, на которое сделана ссылка, недоступно.",
   "error.backend.channelTaskNotFound": "Задача канала не найдена.",

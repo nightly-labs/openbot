@@ -57,6 +57,7 @@ export const messages = {
   "error.team.providersUnsupported": "To połączenie nie obsługuje ustawień dostawców.",
   "error.team.providerNotManaged": "OpenBot nie zarządza CLI tego dostawcy.",
   "error.team.channelsUnsupported": "To połączenie nie obsługuje czatów kanałów.",
+  "error.team.channelContextUnsupported": "To połączenie nie obsługuje nowej rozmowy ani kompaktowania w kanale.",
   "error.team.channelPictureUnsupported": "To połączenie nie obsługuje obrazów kanałów.",
   "error.team.channelDeleteUnsupported": "To połączenie nie obsługuje usuwania kanałów.",
   "error.team.channelTaskCancelUnsupported": "To połączenie nie obsługuje anulowania zadań kanałów.",

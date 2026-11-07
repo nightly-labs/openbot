@@ -134,6 +134,7 @@ export const messages = {
   "conversation.voice.speakNow": "Говорите",
   "conversation.voice.mute": "Выключить микрофон",
   "conversation.voice.interrupt": "Прервать",
+  "conversation.voice.start": "Начать голосовой разговор",
   "conversation.voice.end": "Завершить голосовой разговор",
   "conversation.voice.error": "Не удалось начать голосовой разговор.",
   "conversation.voice.notSent": "Сообщение не отправлено. Скажите ещё раз.",

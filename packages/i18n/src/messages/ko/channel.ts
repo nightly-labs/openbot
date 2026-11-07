@@ -21,6 +21,17 @@ export const messages = {
   "channel.settings.isolatedDescription":
     "에이전트가 여기서 배운 내용은 채널 메모리로 저장되며, 다른 채팅에서는 보이지 않습니다.",
   "channel.settings.memoryCount": { other: "{count}개 저장됨" },
+  "channel.settings.newConversation.title": "새 대화",
+  "channel.settings.newConversation.description": "멤버가 이전 메시지를 잊습니다. 채널 설정은 그대로입니다.",
+  "channel.settings.newConversation.button": "시작",
+  "channel.settings.newConversation.confirmTitle": "{name}에서 새 대화를 시작할까요?",
+  "channel.settings.newConversation.confirmDescription":
+    "멤버가 이 채널의 이전 메시지를 잊습니다. 메시지는 구분선 위에 계속 보입니다. 멤버, 지침, 메모리, 루틴은 바뀌지 않습니다.",
+  "channel.settings.newConversation.confirm": "새 대화 시작",
+  "channel.settings.newConversation.failed": "새 대화를 시작할 수 없습니다.",
+  "channel.settings.compact.title": "컨텍스트 압축",
+  "channel.settings.compact.description": "멤버가 채널 세션의 짧은 요약을 유지하고 토큰을 덜 사용합니다.",
+  "channel.settings.compact.failed": "채널 컨텍스트를 압축할 수 없습니다.",
   "channel.settings.routines": "루틴",
   "channel.settings.routineCount": { other: "{count}개 설정됨" },
   "channel.create.close": "새 채널 닫기",

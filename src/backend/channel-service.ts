@@ -18,11 +18,13 @@ import {
   type ChannelMessage,
   type ChannelRoutingConversationEventAction,
   type ChannelTask,
+  CONTEXT_RESET_ITEM_TYPE,
   type ConversationSnapshot,
   type CreateChannelMemoryInput,
   channelRoutingConversationEventItemType,
   type DeleteChannelMemoryInput,
   type DeleteChannelMessageInput,
+  isContextResetMarker,
   type QueueHold,
   type UpdateChannelMemoryInput,
 } from "@openbot/contracts/ipc";
@@ -390,6 +392,108 @@ export class ChannelService {
       }).pipe(Effect.uninterruptible),
     ),
   );
+
+  /**
+   * "New conversation": the members forget the earlier messages of the channel. A marker message
+   * starts the history that a model reads, and the summary starts again after it. The messages stay
+   * for the reader, and the members, instructions, memories and routines do not change. It waits
+   * for the commands queued before it, and work that still runs or waits refuses it, because that
+   * work belongs to the old conversation. `members.busy` refuses it while a member session still
+   * runs a turn or compacts, and `members.end` ends the provider session of each member's execution
+   * thread before the next command of the channel runs, so no turn starts on an old session. A second
+   * request after the marker only repairs a summary that a failed first request left.
+   */
+  readonly clearContext = Effect.fn("ChannelService.clearContext")(function* (
+    this: ChannelService,
+    channelId: string,
+    person: { id: string; name: string },
+    members: {
+      busy: (contexts: ReadonlyArray<{ agentId: string; threadId: string }>) => boolean;
+      end: (threadIds: readonly string[]) => Effect.Effect<void>;
+    },
+  ) {
+    yield* this.#serialize(
+      channelId,
+      Effect.gen({ self: this }, function* () {
+        const channel = yield* channelSync(() => this.store.get(channelId));
+        if (channel.archived) return yield* channelFailure(new Error(sourceText("error.backend.channelArchived")));
+        yield* this.#requireIdle(channelId, "error.backend.channelWaitBeforeNewConversation");
+        const contexts = yield* channelSync(() => this.store.contexts(channelId));
+        if (members.busy(contexts))
+          return yield* channelFailure(new Error(sourceText("error.backend.channelWaitBeforeNewConversation")));
+        const threads = contexts.map((context) => context.threadId);
+        const last = (yield* channelSync(() => this.store.messages(channelId, undefined, 1)))[0];
+        if (!last) return;
+        if (isContextResetMarker(last.message)) {
+          // The marker and the summary are two writes. A request after a failure between them repairs the summary.
+          yield* channelSync(() => {
+            const summary = this.store.summary(channelId);
+            if (summary.throughSequence < last.sequence)
+              this.store.saveSummary(channelId, {
+                version: summary.version + 1,
+                throughSequence: last.sequence,
+                text: "",
+              });
+          });
+          return yield* members.end(threads);
+        }
+        const id = `context-reset-${randomUUID()}`;
+        const marker: ChannelMessage = {
+          id,
+          channelId,
+          taskId: null,
+          author: { kind: "member", id: person.id, name: person.name },
+          sequence: 0,
+          superseded: false,
+          message: {
+            id,
+            text: sourceText("status.agent.contextCleared"),
+            author: "system",
+            source: "system",
+            createdAt: new Date().toISOString(),
+            status: "completed",
+            itemType: CONTEXT_RESET_ITEM_TYPE,
+          },
+        };
+        yield* channelSync(() => {
+          this.store.update(channel, { messages: [marker] }, `context-reset:${channelId}:${id}`);
+          const sequence = this.store.message(channelId, id)?.sequence ?? 0;
+          const summary = this.store.summary(channelId);
+          this.store.saveSummary(channelId, { version: summary.version + 1, throughSequence: sequence, text: "" });
+        });
+        yield* members.end(threads);
+      }).pipe(Effect.uninterruptible),
+    );
+    this.publish(channelId);
+  });
+
+  /**
+   * The member sessions that "Compact now" compacts: the execution thread of each member with an
+   * active provider session. Work that still runs or waits refuses it, as for a new conversation.
+   */
+  readonly compactTargets = Effect.fn("ChannelService.compactTargets")(function* (
+    this: ChannelService,
+    channelId: string,
+  ) {
+    const channel = yield* channelSync(() => this.store.get(channelId));
+    if (channel.archived) return yield* channelFailure(new Error(sourceText("error.backend.channelArchived")));
+    yield* this.#requireIdle(channelId, "error.backend.channelWaitBeforeCompact");
+    return yield* channelSync(() => this.store.contexts(channelId));
+  });
+
+  /** Refuses while a task of the channel is queued, running, or waits for other work. */
+  #requireIdle(
+    channelId: string,
+    key: "error.backend.channelWaitBeforeNewConversation" | "error.backend.channelWaitBeforeCompact",
+  ): Effect.Effect<void, ChannelOperationError> {
+    return channelSync(() => this.store.tasks(channelId)).pipe(
+      Effect.flatMap((tasks) =>
+        tasks.some((task) => task.state === "queued" || task.state === "running" || task.state === "waiting")
+          ? channelFailure(new Error(sourceText(key)))
+          : Effect.void,
+      ),
+    );
+  }
 
   /**
    * A channel that an agent creates or changes from its own chat (`create_channel`, `update_channel`).
@@ -1318,6 +1422,10 @@ export class ChannelService {
           // The channel summary that member turns already maintain stands in for the transcript.
           // Only the messages it does not yet cover are sent whole, and only the last few of those.
           const summary = channelResult(yield* Effect.result(channelSync(() => this.store.summary(channelId))));
+          // After "New conversation", routing reads only the messages after its marker, as the members do.
+          const reset = channelResult(
+            yield* Effect.result(channelSync(() => this.store.contextResetSequence(channelId))),
+          );
           const agents = this.hooks
             .agents()
             .filter(
@@ -1332,7 +1440,7 @@ export class ChannelService {
             .filter(
               (item) =>
                 item.id !== task?.requestMessageId &&
-                item.sequence > summary.throughSequence &&
+                item.sequence > Math.max(summary.throughSequence, reset) &&
                 !isMemberThinking(item),
             )
             .slice(-ROUTING_RECENT_MESSAGES)
@@ -3020,10 +3128,14 @@ export class ChannelService {
       return yield* this.#manage(channelId, task.id, agentId, `tool:${turnId}:${callId}`, person, tool, args);
     }
     if (tool === "channel_history") {
+      // After "New conversation", the history starts after its marker, as the packet does.
+      const reset = yield* channelSync(() => this.store.contextResetSequence(channelId));
       if (isString(args.attachmentId)) {
         if (
-          !(yield* channelSync(() => this.store.messages(channelId))).some((entry) =>
-            entry.message.attachments?.some((attachment) => attachment.id === args.attachmentId),
+          !(yield* channelSync(() => this.store.messages(channelId))).some(
+            (entry) =>
+              entry.sequence > reset &&
+              entry.message.attachments?.some((attachment) => attachment.id === args.attachmentId),
           )
         )
           return yield* channelFailure(new Error("Attachment not found in this channel."));
@@ -3035,7 +3147,7 @@ export class ChannelService {
       if (isString(args.messageId)) {
         const messageId = args.messageId;
         const message = yield* channelSync(() => this.store.message(channelId, messageId));
-        if (!message || isMemberThinking(message))
+        if (!message || message.sequence <= reset || isMemberThinking(message))
           return yield* channelFailure(new Error("Message not found in this channel."));
         const offset =
           typeof args.offset === "number" && Number.isSafeInteger(args.offset) && args.offset >= 0 ? args.offset : 0;
@@ -3052,9 +3164,11 @@ export class ChannelService {
         ),
       );
       // The cursors still count every row, so the next page starts where this one ended.
+      const shown = page.messages.filter((message) => message.sequence > reset);
       return boundedHistoryPage({
         ...page,
-        messages: page.messages.filter((message) => !isMemberThinking(message)),
+        messages: shown.filter((message) => !isMemberThinking(message)),
+        olderCursor: shown.length < page.messages.length ? null : page.olderCursor,
       });
     }
     const operationId = `tool:${turnId}:${callId}`;

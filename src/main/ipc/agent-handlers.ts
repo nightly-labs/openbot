@@ -552,6 +552,19 @@ export function agentIpcHandlers({
           throw new Error(sourceText("error.team.channelPictureUnsupported"));
         },
       }),
+      // Team API has no route for these yet; the channel editor offers them only for this computer.
+      clearChannelContext: scopedHandler(parseChannelId, {
+        local: (channelId) => runCauseEffect(service.clearChannelContext(channelId, host.channelActor())),
+        remote: () => {
+          throw new Error(sourceText("error.team.channelContextUnsupported"));
+        },
+      }),
+      compactChannelContext: scopedHandler(parseChannelId, {
+        local: (channelId) => runCauseEffect(service.compactChannelContext(channelId)),
+        remote: () => {
+          throw new Error(sourceText("error.team.channelContextUnsupported"));
+        },
+      }),
       getSidebarLayout: scopedQueryHandler({
         local: () => sidebarLayout.getSnapshot(),
         remote: (serverId) =>

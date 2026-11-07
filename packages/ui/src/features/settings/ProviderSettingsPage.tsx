@@ -110,6 +110,15 @@ export interface ProviderPromptCache {
   onChange: (ttl: PromptCacheTtl) => void;
 }
 
+/** Whether Claude loads the user's own Claude Code setup. `value` is null until main answers. */
+export interface ProviderClaudeUserSetup {
+  value: boolean | null;
+  pending: boolean;
+  /** A load or a save that failed. */
+  error: string | null;
+  onChange: (enabled: boolean) => void;
+}
+
 /** The models of one provider, and the ones the model picker shows. `list` is null until the host answers. */
 export interface ProviderModelVisibilityControl {
   list: ProviderModelVisibility | null;
@@ -162,6 +171,8 @@ export interface ProviderSettingsPageProps extends ProviderRowHost {
   onDetailChange?: ((detail: ProviderSettingsDetail | null) => void) | undefined;
   /** On the Claude page. Only for a host with `prompt-cache-ttl-v1` that this account administers. */
   promptCache?: ProviderPromptCache | undefined;
+  /** On the Claude page. This computer only: a joined server has no route for it. */
+  claudeUserSetup?: ProviderClaudeUserSetup | undefined;
   /**
    * The model list of one provider page. Called once when the page opens, so the control lives as
    * long as the page. Only for a host with `model-visibility-v1` that this account administers.
@@ -549,6 +560,9 @@ function ProviderPage(props: PageProps) {
         <RuntimeSection {...props} row={row} />
         <Show when={props.option.id === "claude" && props.promptCache}>
           {(cache) => <PromptCacheSection cache={cache()} disabled={props.disabled} menuMount={props.menuMount} />}
+        </Show>
+        <Show when={props.option.id === "claude" && props.claudeUserSetup}>
+          {(setup) => <ClaudeUserSetupSection setup={setup()} disabled={props.disabled} />}
         </Show>
         <Show when={models()}>{(control) => <ModelsSection control={control()} />}</Show>
       </Show>
@@ -1529,6 +1543,49 @@ function PromptCacheSection(props: {
                 </Select>
               </ItemActions>
             )}
+          </Show>
+        </Item>
+      </ItemGroup>
+    </SettingsSection>
+  );
+}
+
+/* ---------------------------------------------- Claude Code setup */
+
+/**
+ * Claude only. Off, the agents load no user settings, CLAUDE.md, skills, agents, hooks or plugins
+ * from the user's own Claude Code, so each turn sends a shorter prompt. A change applies to the next
+ * Claude process.
+ */
+function ClaudeUserSetupSection(props: { setup: ProviderClaudeUserSetup; disabled: boolean | undefined }) {
+  const { t } = useText();
+  return (
+    <SettingsSection title={t("provider.settings.claudeSetup")}>
+      <ItemGroup class="settings-modal-card">
+        <Item class="settings-modal-row">
+          <ItemContent>
+            <ItemTitle id="provider-settings-claude-setup-label">{t("provider.settings.claudeUserSetup")}</ItemTitle>
+            <Show
+              when={props.setup.error}
+              fallback={<ItemDescription>{t("provider.settings.claudeUserSetupDescription")}</ItemDescription>}
+            >
+              {(message) => (
+                <ItemDescription class="provider-settings-error" role="alert">
+                  {message()}
+                </ItemDescription>
+              )}
+            </Show>
+          </ItemContent>
+          <Show when={props.setup.value !== null}>
+            <ItemActions>
+              <Switch
+                checked={props.setup.value === true}
+                disabled={Boolean(props.disabled || props.setup.pending)}
+                aria-busy={props.setup.pending ? "true" : "false"}
+                aria-labelledby="provider-settings-claude-setup-label"
+                onChange={(enabled: boolean) => props.setup.onChange(enabled)}
+              />
+            </ItemActions>
           </Show>
         </Item>
       </ItemGroup>

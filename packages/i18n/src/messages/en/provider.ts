@@ -299,6 +299,11 @@ export const messages = defineMessages("provider", {
   "provider.settings.promptCacheHour": "1 hour",
   "provider.settings.promptCacheDefault": "Claude Code default",
   "provider.settings.promptCacheLoadFailed": "Could not load the prompt cache time of this server.",
+  "provider.settings.claudeSetup": "Claude Code",
+  "provider.settings.claudeUserSetup": "Use my Claude Code setup",
+  "provider.settings.claudeUserSetupDescription":
+    "Agents load your CLAUDE.md, skills, agents, hooks and plugins from ~/.claude. Off, each turn sends a shorter prompt. Workspace files still load.",
+  "provider.settings.claudeUserSetupLoadFailed": "Could not load the Claude Code setting.",
   "provider.settings.models": "Models",
   "provider.settings.modelsDescription": {
     one: "{shown} of {count} model shows in the model picker.",
