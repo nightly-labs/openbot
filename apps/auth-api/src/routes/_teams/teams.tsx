@@ -1,13 +1,12 @@
 import { createFileRoute } from "@tanstack/solid-router";
-import { TeamsPage } from "../components/teams/TeamsPage";
-import { teamsPageText } from "../components/teams/teams-page-text";
-import { loadSitePage, siteLocale } from "../lib/site-locale";
-import { sitePageHead } from "../lib/site-page-head";
-import { TEAMS_ROUTE, TEAMS_SOCIAL_IMAGE_PATH } from "../lib/teams-page";
+import { teamsPageText } from "../../components/teams/teams-page-text";
+import { loadSitePage, siteLocale } from "../../lib/site-locale";
+import { sitePageHead } from "../../lib/site-page-head";
+import { TEAMS_ROUTE, TEAMS_SOCIAL_IMAGE_PATH } from "../../lib/teams-page";
 
 // The Teams page in the language of the request: Polish for Polish, Brazilian Portuguese for
 // Portuguese, English for all others. `/pl/teams` always shows Polish, and `/pt/teams` Portuguese.
-export const Route = createFileRoute("/teams")({
+export const Route = createFileRoute("/_teams/teams")({
   loader: ({ context }) => loadSitePage(siteLocale(context.locale), teamsPageText),
   head: ({ match, loaderData }) => {
     if (!loaderData)
@@ -21,10 +20,4 @@ export const Route = createFileRoute("/teams")({
       image: { path: TEAMS_SOCIAL_IMAGE_PATH, alt: loaderData.text.imageAlt },
     });
   },
-  component: Teams,
 });
-
-function Teams() {
-  const page = Route.useLoaderData();
-  return <TeamsPage lang={page().lang} text={page().text} />;
-}

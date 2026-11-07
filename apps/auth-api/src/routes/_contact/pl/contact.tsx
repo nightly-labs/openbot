@@ -1,13 +1,12 @@
 import { createFileRoute } from "@tanstack/solid-router";
-import { ContactPage } from "../../components/contact/ContactPage";
-import { contactPageText } from "../../components/contact/contact-page-text";
-import { CONTACT_ROUTE, CONTACT_SOCIAL_IMAGE_PATH } from "../../lib/contact";
-import { loadSitePage } from "../../lib/site-locale";
-import { sitePageHead } from "../../lib/site-page-head";
-import { LOCALIZED_PAGE_PATHS } from "../../lib/site-paths";
+import { contactPageText } from "../../../components/contact/contact-page-text";
+import { CONTACT_ROUTE, CONTACT_SOCIAL_IMAGE_PATH } from "../../../lib/contact";
+import { loadSitePage } from "../../../lib/site-locale";
+import { sitePageHead } from "../../../lib/site-page-head";
+import { LOCALIZED_PAGE_PATHS } from "../../../lib/site-paths";
 
 // The contact page in Polish, whatever the language of the request.
-export const Route = createFileRoute("/pl_/contact")({
+export const Route = createFileRoute("/_contact/pl/contact")({
   loader: () => loadSitePage("pl", contactPageText),
   head: ({ match, loaderData }) => {
     const path = LOCALIZED_PAGE_PATHS.pl[CONTACT_ROUTE];
@@ -21,10 +20,4 @@ export const Route = createFileRoute("/pl_/contact")({
       image: { path: CONTACT_SOCIAL_IMAGE_PATH, alt: loaderData.text.imageAlt },
     });
   },
-  component: PolishContact,
 });
-
-function PolishContact() {
-  const page = Route.useLoaderData();
-  return <ContactPage lang={page().lang} text={page().text} />;
-}
