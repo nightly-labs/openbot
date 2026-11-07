@@ -2330,7 +2330,11 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
                 : replace
                   ? "X"
                   : "alphaX";
-        const expectedKeys = name === "End redirected focus" ? ["End"] : expectedSuccess && submit ? ["Enter"] : [];
+        // Typed text arrives as key events, so each typed character has a keydown on the intended field.
+        const expectedKeys =
+          name === "End redirected focus"
+            ? ["End"]
+            : [...(changedBeforeInput || empty ? [] : ["X"]), ...(expectedSuccess && submit ? ["Enter"] : [])];
         const expectedInputs = changedBeforeInput || name === "readonly" ? 0 : 1;
         // The error tells the agent whether the text is already in the field.
         const expectedError = expectedSuccess ? "" : changedBeforeInput ? "Nothing was typed" : "Enter was not sent";
@@ -2601,8 +2605,8 @@ async function runBackgroundScenario(browser: BrowserHost, origin: string): Prom
     // a hidden view has no compositor surface under xvfb, so `capturePage`
     // reports UnknownVizError and a mouse event is hit-tested by the browser
     // process against surface data this view does not have. Typing takes
-    // neither path, because `DOM.focus` and `Input.insertText` are routed
-    // straight to the renderer, so it is the half of native input a background
+    // neither path, because `DOM.focus` and key events go to the focused
+    // widget and are not hit-tested, so it is the half of native input a background
     // tab can prove. Captures and clicks on displayed tabs are proven in the
     // main flow.
     try {

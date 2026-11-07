@@ -1236,6 +1236,7 @@ export async function createApplicationServices({
     onProxyStatusChanged: () => browserProxyStatusChanged(),
     computerExit: (memberId) => browserEgress.exit(memberId),
     quitShortcut: (input) => windows.handleQuitShortcut(mainWindow, input),
+    pagePreload: join(__dirname, "../preload/browserPage.cjs"),
   });
   teardown.push(TEARDOWN_ORDER.browser, "the browser", () => runCauseEffect(browser.destroy()));
   await runCauseEffect(browser.restore(store.list().map((agent) => ({ id: agent.id, threadId: agent.threadId }))));

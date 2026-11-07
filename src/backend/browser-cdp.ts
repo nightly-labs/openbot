@@ -33,10 +33,13 @@ import {
 import {
   buttonMask,
   dispatchMouseClick,
+  dispatchPointerMove,
   dispatchShortcut,
+  dispatchText,
   dispatchTextKey,
   modifierMask,
   namedKey,
+  type PointerPoint,
   SHIFT_MODIFIER,
 } from "./browser-cdp-input";
 import {
@@ -294,6 +297,8 @@ export class BrowserCdpEngine {
    * move between a press and a release names this one.
    */
   #viewButton: "left" | "middle" | "right" | null = null;
+  /** Where the last mouse event put the pointer, so the next agent move starts there. */
+  #pointer: { point: PointerPoint; sessionId: string | undefined } | null = null;
   #targets = new Map<string, TargetRecord>();
   #lastSnapshot: BrowserSnapshot | null = null;
   #environment: BrowserEnvironment | null = null;
@@ -814,7 +819,9 @@ export class BrowserCdpEngine {
         const modifiers = modifierMask(options.modifiers ?? []);
         yield* browserSync(() => assertBeforeDeadline(deadline));
         onDispatch?.();
-        yield* dispatchMouseClick(send, coordinates, button, totalClicks, modifiers, sessionId);
+        const from = this.#pointerIn(sessionId);
+        this.#pointer = { point: coordinates, sessionId };
+        yield* dispatchMouseClick(send, coordinates, button, totalClicks, modifiers, sessionId, from);
       }),
     );
   });
@@ -831,7 +838,9 @@ export class BrowserCdpEngine {
         const { sessionId, ...coordinates } = point;
         yield* browserSync(() => assertBeforeDeadline(deadline));
         onDispatch?.();
-        yield* send("Input.dispatchMouseEvent", { type: "mouseMoved", ...coordinates }, sessionId);
+        const from = this.#pointerIn(sessionId);
+        this.#pointer = { point: coordinates, sessionId };
+        yield* dispatchPointerMove(send, from, coordinates, 0, sessionId);
       }),
     );
   });
@@ -910,7 +919,7 @@ export class BrowserCdpEngine {
         }
         yield* checkFocus("error.backend.browserTypingFocusMoved");
         yield* browserSync(() => assertBeforeDeadline(deadline));
-        yield* send("Input.insertText", { text }, resolved.sessionId);
+        yield* dispatchText(send, text, resolved.sessionId);
         // Submitting is part of typing rather than a second action, because it has to reach the node
         // this lease already resolved. Re-resolving a snapshot ref here would fingerprint the element
         // against its pre-typing text, so a contenteditable would fail with "The target changed after
@@ -2283,6 +2292,7 @@ export class BrowserCdpEngine {
             return;
           }
           const held = this.#viewButton;
+          this.#pointer = { point: { x: input.x, y: input.y }, sessionId: undefined };
           if (input.action === "down") this.#viewButton = input.button;
           if (input.action === "up") this.#viewButton = null;
           yield* send("Input.dispatchMouseEvent", {
@@ -2428,6 +2438,12 @@ export class BrowserCdpEngine {
    */
   releaseViewButton(): void {
     this.#viewButton = null;
+  }
+
+  /** The pointer's last point, when it is in the coordinates of the frame of `sessionId`. */
+  #pointerIn(sessionId: string | undefined): PointerPoint | undefined {
+    const pointer = this.#pointer;
+    return pointer && pointer.sessionId === sessionId ? pointer.point : undefined;
   }
 
   readonly navigate = Effect.fn("BrowserCdp.navigate")(function* (

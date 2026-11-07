@@ -41,6 +41,7 @@ import {
   type BrowserWindowConstructorOptions,
   clipboard,
   type Event as ElectronEvent,
+  screen as electronScreen,
   type Input,
   Menu,
   type NativeImage,
@@ -330,7 +331,26 @@ const BROWSER_WEB_PREFERENCES = {
   webviewTag: false,
   webSecurity: true,
   allowRunningInsecureContent: false,
+  // An agent works in tabs that the panel does not show. A throttled tab waits up to a few seconds
+  // for each pointer move, because Chromium sends the move with the next frame, and it tells the
+  // page that it is hidden. A tab that is not in use goes to sleep, so this costs no idle work.
+  backgroundThrottling: false,
 };
+
+/** A smaller panel size is not used for a hidden tab: a page lays out for a phone below it. */
+const MIN_HIDDEN_VIEWPORT = { width: 800, height: 600 };
+/** The height of the tab strip and toolbar of a Chrome window with no bookmarks bar. */
+const CHROME_TOOLBAR_HEIGHT = 85;
+
+/**
+ * The tab preload also runs in frames, because a bot check reads `window.chrome` in a new frame.
+ * The sandbox keeps Node out of each frame; the preload has no IPC.
+ */
+function browserWebPreferences(preload: string | undefined) {
+  return preload === undefined
+    ? BROWSER_WEB_PREFERENCES
+    : { ...BROWSER_WEB_PREFERENCES, preload, nodeIntegrationInSubFrames: true };
+}
 
 export interface PreparedBrowserSecret {
   request: BrowserSecretRequest;
@@ -501,6 +521,7 @@ export class BrowserHost {
   /** Whether the machine is too low on memory for one more tab. Only a server has a reading. */
   readonly #memoryLow: () => boolean;
   readonly #idleTabSweep: NodeJS.Timeout;
+  readonly #webPreferences: ReturnType<typeof browserWebPreferences>;
 
   constructor(
     window: BrowserWindow,
@@ -529,6 +550,8 @@ export class BrowserHost {
       computerExit?: (memberId: string) => RelayExit;
       /** True when the key is part of the Mac quit shortcut, which a focused tab must not give to the menu. */
       quitShortcut?: (input: Input) => boolean;
+      /** The tab preload, which makes the page values that bot checks read agree with Chrome. */
+      pagePreload?: string;
     } = {},
   ) {
     this.#window = window;
@@ -539,6 +562,7 @@ export class BrowserHost {
     this.#onProxyStatusChanged = options.onProxyStatusChanged ?? (() => {});
     this.#computerExit = options.computerExit ?? (() => () => Promise.reject(new Error("No computer exit")));
     this.#quitShortcut = options.quitShortcut ?? (() => false);
+    this.#webPreferences = browserWebPreferences(options.pagePreload);
     this.#downloadsRoot = downloadsRoot;
     this.#statePath = statePath;
     this.#session = session.fromPartition("persist:openbot-browser", { cache: true });
@@ -3062,7 +3086,7 @@ export class BrowserHost {
         ...popupOptions?.webPreferences,
 
         session: tabSession,
-        ...BROWSER_WEB_PREFERENCES,
+        ...this.#webPreferences,
       },
     });
     view.webContents.setAudioMuted(true);
@@ -3442,7 +3466,7 @@ export class BrowserHost {
         // The host owns cleanup. Electron otherwise destroys children on opener reload too.
         outlivesOpener: true,
         overrideBrowserWindowOptions: {
-          webPreferences: { ...BROWSER_WEB_PREFERENCES, session: this.#tabSession(tab) },
+          webPreferences: { ...this.#webPreferences, session: this.#tabSession(tab) },
         },
         createWindow: (options) => {
           if (popup) return popup.contents;
@@ -3676,9 +3700,35 @@ export class BrowserHost {
     window.contentView.addChildView(view);
     // Initialize the native viewport before hiding a tab that has never been shown.
     view.setVisible(true);
-    view.setBounds({ x: 0, y: 0, width: 1200, height: 800 });
+    view.setBounds(this.#hiddenViewBounds(window));
     view.setVisible(false);
     this.#mountedViews.set(view, window);
+  }
+
+  /**
+   * The viewport of a tab that the panel does not show. It is the panel's size, so the page does not
+   * lay out again when the tab is shown. Before the panel has a size, it is the viewport of a
+   * maximized Chrome window on the main display: a fixed size such as 1200x800 is a bot signal.
+   */
+  #hiddenViewBounds(window: BrowserWindow): Rectangle {
+    if (this.#bounds && window === this.#window) {
+      const zoomFactor = window.webContents.getZoomFactor();
+      const { width, height } = validateBounds({
+        x: 0,
+        y: 0,
+        width: this.#bounds.width * zoomFactor,
+        height: this.#bounds.height * zoomFactor,
+      });
+      if (width >= MIN_HIDDEN_VIEWPORT.width && height >= MIN_HIDDEN_VIEWPORT.height)
+        return { x: 0, y: 0, width, height };
+    }
+    const { width, height } = electronScreen.getPrimaryDisplay().workAreaSize;
+    return {
+      x: 0,
+      y: 0,
+      width: Math.max(MIN_HIDDEN_VIEWPORT.width, width),
+      height: Math.max(MIN_HIDDEN_VIEWPORT.height, height - CHROME_TOOLBAR_HEIGHT),
+    };
   }
 
   #unmountView(view: WebContentsView): void {
