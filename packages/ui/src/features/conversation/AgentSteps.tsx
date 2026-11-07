@@ -13,11 +13,12 @@ import { type TraceKeyboard, type TraceSpan, TraceWaterfallDialog } from "./Trac
 /**
  * One step of an agent's turn: a thought, a progress line of the host, or a memory change that the
  * turn committed. `memory-summary` is the count that a host without the changes sends instead.
- * The text of `progress` and `memory-summary` is the host's English source text.
+ * The text of `progress` and `memory-summary` is the host's English source text. The `error` of a
+ * `progress` step is the output of a failed tool step, which the line can open.
  */
 export type AgentStep =
   | { id: string; kind: "thinking"; text: string }
-  | { id: string; kind: "progress"; text: string }
+  | { id: string; kind: "progress"; text: string; error?: string | undefined }
   | { id: string; kind: "memory"; change: ConversationMemoryChange }
   | { id: string; kind: "memory-summary"; text: string };
 
@@ -122,7 +123,38 @@ function stepBody(step: AgentStep, newest: boolean, text: TextValue): JSX.Elemen
       </span>
     );
   }
+  if (step.kind === "progress" && step.error) {
+    return <FailedStep text={text.sourceText(step.text)} error={step.error} newest={newest} />;
+  }
   return <span class={["agent-step-text", { "agent-activity-label": newest }]}>{text.sourceText(step.text)}</span>;
+}
+
+/** The line of a failed tool step, with a closed toggle that shows its error. */
+function FailedStep(props: { text: string; error: string; newest: boolean }) {
+  const { t } = useText();
+  const outputId = createUniqueId();
+  const [open, setOpen] = createSignal(false);
+  return (
+    <div class="agent-step-failed">
+      <span class={["agent-step-text", { "agent-activity-label": props.newest }]}>{props.text}</span>
+      <Button
+        type="button"
+        variant="ghost"
+        class="agent-step-error-toggle"
+        aria-expanded={open() ? "true" : "false"}
+        aria-controls={open() ? outputId : undefined}
+        onClick={() => setOpen(!open())}
+      >
+        <ChevronRight class="agent-steps-chevron" aria-hidden="true" />
+        {t(open() ? "chat.steps.hideError" : "chat.steps.showError")}
+      </Button>
+      <Show when={open()}>
+        <pre id={outputId} class="agent-step-error" dir="auto">
+          {props.error}
+        </pre>
+      </Show>
+    </div>
+  );
 }
 
 function StepIcon(props: { kind: AgentStep["kind"] }) {

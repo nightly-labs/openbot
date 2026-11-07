@@ -1692,7 +1692,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         const call = turn.toolCalls.get(toolCallId);
         if (!call) continue;
         turn.toolCalls.delete(toolCallId);
-        this.#emitToolCall(runtime, toolCallId, call.name, true, call.input, isError);
+        this.#emitToolCall(runtime, toolCallId, call.name, true, call.input, isError ? text : null);
       }
       return;
     }
@@ -1816,14 +1816,17 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     });
   }
 
-  /** `failed` is the tool result's `is_error`, such as a shell command with a non-zero exit. */
+  /**
+   * `failure` is the text of a tool result with `is_error`, such as a shell command with a non-zero
+   * exit. The agent service redacts it before it shows it.
+   */
   #emitToolCall(
     runtime: ThreadRuntime,
     id: string,
     name: string,
     completed: boolean,
     input?: unknown,
-    failed = false,
+    failure: string | null = null,
   ): void {
     const turn = runtime.activeTurn;
     if (!turn) return;
@@ -1849,7 +1852,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           id,
           type: "toolCall",
           name,
-          status: completed ? (failed ? "failed" : "completed") : "in_progress",
+          status: completed ? (failure === null ? "completed" : "failed") : "in_progress",
+          ...(completed && failure ? { error: failure.slice(0, INPUT_LIMITS.messageText) } : {}),
           // The skill that a `Skill` call loads, for the turn's activity line.
           ...(name === "Skill" && isRecord(input) && typeof input.skill === "string"
             ? { skill: input.skill.slice(0, INPUT_LIMITS.identifier) }

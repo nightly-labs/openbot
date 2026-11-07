@@ -22,6 +22,8 @@ export const messages = {
   "chat.activity.current": "当前活动",
   "chat.steps.show": "显示步骤",
   "chat.steps.hide": "隐藏步骤",
+  "chat.steps.showError": "显示错误",
+  "chat.steps.hideError": "隐藏错误",
   "chat.steps.list": "助手步骤",
   "chat.steps.count": { other: "{count} 个步骤" },
   "chat.steps.failed": { other: "{count} 个失败" },

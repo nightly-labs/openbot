@@ -4,6 +4,7 @@ import {
   type AgentStepActivity,
   agentProviderName,
   COMPUTER_USE_MCP_SERVER_NAME,
+  CONVERSATION_TRACE_TEXT_LIMIT,
   DEFAULT_PROVIDER_ACCOUNT_ID,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
@@ -400,6 +401,50 @@ export function toolFailed(item: ThreadItem): boolean {
   const status = getString(item, "status");
   const exitCode = item.exitCode;
   return status === "failed" || status === "declined" || (typeof exitCode === "number" && exitCode !== 0);
+}
+
+/** The fields that hold the text of a tool result, in the order a failure is read from them. */
+const RESULT_TEXT_KEYS = [
+  "error",
+  "aggregatedOutput",
+  "stderr",
+  "message",
+  "output",
+  "text",
+  "content",
+  "contentItems",
+  "result",
+] as const;
+
+/** The readable text in a provider's tool result. Records and lists are read a few levels deep. */
+function resultText(value: unknown, depth = 0): string | null {
+  if (depth > 4) return null;
+  if (isString(value)) return value.trim() || null;
+  if (Array.isArray(value)) {
+    const parts = value.map((entry) => resultText(entry, depth + 1)).filter(isString);
+    return parts.length > 0 ? parts.join("\n") : null;
+  }
+  if (!isRecord(value)) return null;
+  for (const key of RESULT_TEXT_KEYS) {
+    const text = resultText(value[key], depth + 1);
+    if (text) return text;
+  }
+  return null;
+}
+
+/**
+ * The error text of a tool step that failed, for the step's "Show error" output. `redact` runs on the
+ * whole text before the cut, because a cut through a secret leaves a part that no rule recognizes.
+ * A command keeps the end of its output, where the error is; other tools keep the start.
+ */
+export function toolFailureText(item: ThreadItem, redact: (text: string) => string): string | null {
+  if (getString(item, "status") !== "failed") return null;
+  const raw = resultText(item);
+  if (!raw) return null;
+  const text = redact(raw).trim();
+  const limit = CONVERSATION_TRACE_TEXT_LIMIT;
+  if (text.length <= limit) return text || null;
+  return item.type === "commandExecution" ? `…${text.slice(1 - limit)}` : `${text.slice(0, limit - 1)}…`;
 }
 
 /** Whether an item is a tool step: a tool call, a command, a file change, a web search or a computer action. */

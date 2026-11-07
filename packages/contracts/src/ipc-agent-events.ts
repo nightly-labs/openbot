@@ -22,6 +22,7 @@ import type { BrowserControlState, BrowserTab } from "./ipc-browser";
 import { type AgentChatColorEntry, isChatColors, type MemberChatColorEntry } from "./ipc-chat-colors";
 import { type AgentPromptQuestion, isAgentPromptQuestion, isConversationMessage } from "./ipc-conversation-messages";
 import { CONVERSATION_SUBAGENT_TITLE_LIMIT } from "./ipc-conversation-subagents";
+import { CONVERSATION_TRACE_TEXT_LIMIT } from "./ipc-conversation-trace";
 import {
   type ConversationPage,
   type ConversationSnapshot,
@@ -177,6 +178,11 @@ export type AgentEvent =
       running?: boolean;
       /** An `AgentStepActivity`, read with `agentStepActivity`. */
       activity?: string;
+      /**
+       * On the line of a failed tool step: its error text, with known secrets removed. A host before
+       * this field leaves it out, and the client shows the line with no error.
+       */
+      error?: string;
     }
   | { type: "turn-started"; agentId: string; threadId: string; turnId: string; origin?: AgentTurnOrigin }
   | AgentTurnCompletedEvent
@@ -360,7 +366,8 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         value.detail.length > 0 &&
         value.detail.length <= INPUT_LIMITS.promptQuestion &&
         (value.running === undefined || typeof value.running === "boolean") &&
-        (value.activity === undefined || isBoundedString(value.activity, INPUT_LIMITS.identifier))
+        (value.activity === undefined || isBoundedString(value.activity, INPUT_LIMITS.identifier)) &&
+        (value.error === undefined || isBoundedString(value.error, CONVERSATION_TRACE_TEXT_LIMIT))
       );
     case "routine-thread-turn-completed":
       return (
