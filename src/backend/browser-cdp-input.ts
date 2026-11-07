@@ -277,6 +277,11 @@ interface TextChecks {
    */
   readonly keyArrived?: Effect.Effect<boolean, BrowserOperationError>;
   /**
+   * Saves the field text for `keyArrived` again. It runs when text was inserted before the first
+   * key, so that the inserted text does not read as a key that arrived.
+   */
+  readonly saveText?: Effect.Effect<void, BrowserOperationError>;
+  /**
    * Runs before each key or insert after the first one, and fails when a key handler moved focus.
    * Focus that moves after the last character, as in a one-time code box, is not a failure.
    */
@@ -311,6 +316,8 @@ export const dispatchText = Effect.fn("Browser.dispatchText")(function* (
     if (pending) yield* insert(pending);
     pending = "";
     yield* beforePiece;
+    // The characters before the first key have no US key, so they were inserted.
+    if (!keyed && index > 0 && checks.saveText) yield* checks.saveText;
     yield* dispatchTextKey(send, character, sessionId);
     if (!keyed && checks.keyArrived && !(yield* checks.keyArrived)) {
       yield* insert(characters.slice(index).join(""));

@@ -221,6 +221,9 @@ const TYPED_KEY_ARRIVED_FUNCTION = `function(expected) {
   const text = 'value' in this ? String(this.value) : this.textContent;
   return typedKeys.count >= expected || text !== typedKeys.text;
 }`;
+const SAVE_TYPED_TEXT_FUNCTION = `function() {
+  if (globalThis.openbotTypedKeys) globalThis.openbotTypedKeys.text = 'value' in this ? String(this.value) : this.textContent;
+}`;
 /**
  * True when this node holds focus in its own document: every shadow root on the way up names it or
  * its host as active. It starts inside the node, so a closed shadow root does not hide it.
@@ -956,6 +959,13 @@ export class BrowserCdpEngine {
         );
         yield* dispatchText(send, text, resolved.sessionId, {
           keyArrived,
+          saveText: this.#callOnNode(
+            send,
+            resolved.backendNodeId,
+            SAVE_TYPED_TEXT_FUNCTION,
+            [],
+            resolved.sessionId,
+          ).pipe(Effect.asVoid),
           // Short text arrives one key at a time, and a key handler can move focus to another element.
           beforeNext: checkFocus("error.backend.browserTypingFocusMovedWhileTyping"),
         });
