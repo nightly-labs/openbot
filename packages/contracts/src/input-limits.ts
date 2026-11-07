@@ -1,5 +1,10 @@
 export const INPUT_LIMITS = {
   identifier: 128,
+  /**
+   * A saved login id from `list_logins`: the manager's router prefix and that manager's own id.
+   * Proton Pass makes the longest, `proton:<share id>:<item id>` with ids of up to 256 characters.
+   */
+  vaultLoginId: 520,
   email: 254,
   accountName: 120,
   profileNameMin: 3,
