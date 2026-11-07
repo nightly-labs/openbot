@@ -385,6 +385,12 @@ interface PeerState {
   answeredRequest: boolean;
   /** The close code of the last Signal socket, so a connection timeout can name it. */
   lastSignalClose: number | null;
+  /**
+   * When the peer lost its Signal socket. Null after `ready` or `host-waiting`. iOS closes the socket
+   * of a suspended app and reports the close only at the return, so a close that arrives while the app
+   * is inactive counts from when the app became inactive.
+   */
+  signalLostAt: number | null;
   /** For the support log: when the current socket opened, and when and why the last offer went out. */
   signalOpenedAt: number;
   offerSentAt: number | null;
@@ -442,6 +448,12 @@ const ICE_CONSENT_TIMEOUT_MS = 30_000;
  * resumed. The margin covers the seconds before iOS suspends the app.
  */
 export const REMOTE_PEER_LOST_AFTER_MS = 160_000;
+/**
+ * Signal tells the host to drop the connection of a client socket that stays closed for 30 s. After
+ * this long without a Signal socket, the host has dropped this connection, so the peer is replaced at
+ * a return, not resumed. The margin covers the seconds before iOS suspends the app.
+ */
+const SIGNAL_LOST_AFTER_MS = 35_000;
 
 class RemotePeerIO extends Context.Service<
   RemotePeerIO,
@@ -599,8 +611,15 @@ export function createRemoteTeamPeer(
             "resume",
             `away ${Math.round(away / 1000)} s, ${state.connection?.connectionState ?? "no connection"}, ${decision}`,
           );
-        if (away >= REMOTE_PEER_LOST_AFTER_MS && state.authenticated) {
-          resumed("replace connection");
+        const signalLost = state.socket || state.signalLostAt === null ? 0 : now - state.signalLostAt;
+        // A path that is still online stays: the path can work while Signal is down.
+        const hostDropped = signalLost >= SIGNAL_LOST_AFTER_MS && !isPeerOnline(state);
+        if (state.authenticated && (away >= REMOTE_PEER_LOST_AFTER_MS || hostDropped)) {
+          resumed(
+            away >= REMOTE_PEER_LOST_AFTER_MS
+              ? "replace connection"
+              : `replace connection, no Signal for ${Math.round(signalLost / 1000)} s`,
+          );
           // The host has dropped this connection. Close it without an offline update: the consumer
           // connects on each return, and that connect starts the new peer on the same session. A
           // resume hello would only renew an expired token through the account service, and a read
@@ -1012,6 +1031,7 @@ export function createRemoteTeamPeer(
         signalReady: false,
         answeredRequest: false,
         lastSignalClose: null,
+        signalLostAt: null,
         signalOpenedAt: 0,
         offerSentAt: null,
         offerKind: null,
@@ -1105,6 +1125,7 @@ export function createRemoteTeamPeer(
       if (state.closed || peer !== state) return;
       if (!state.signalAnswered) state.failedOpens += 1;
       if (event) state.lastSignalClose = event.code;
+      state.signalLostAt ??= active || inactiveSince === null ? Date.now() : inactiveSince;
       if (event?.code === 1008 && (refusal === null || refusal === "rate_limited"))
         signalRetryAt = Date.now() + SIGNAL_RATE_LIMIT_MS;
       diagnose(
@@ -1187,6 +1208,7 @@ export function createRemoteTeamPeer(
         state.reconnectAttempt = 0;
         state.failedOpens = 0;
         state.signalAnswered = true;
+        state.signalLostAt = null;
         state.resumeToken = message.resumeToken;
         // The host can wait on another Signal machine: ask the account service after a short time.
         if (state.hostWaitingSince === null) {
@@ -1224,6 +1246,7 @@ export function createRemoteTeamPeer(
         state.reconnectAttempt = 0;
         state.failedOpens = 0;
         state.signalAnswered = true;
+        state.signalLostAt = null;
         state.hostWaitingSince = null;
         state.hostWaitTicketMs = HOST_WAIT_TICKET_MS;
         if (state.hostWaitTimer !== null) clearTimeout(state.hostWaitTimer);
