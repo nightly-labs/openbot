@@ -12,6 +12,7 @@ import { type CauseCode, classifyFailure, httpStatusCause, structuredCause } fro
 import { Cause, Effect, Exit, Option, Schema, Scope, Semaphore } from "effect";
 import { secretElicitationField } from "./agent/prompts";
 import { waitForSuccessfulProcess } from "./agent/provider-status";
+import { TurnContext } from "./agent/turn-context";
 import { type AgentClient, type DiagnosticOrigin, MissingPiSessionError, RequestTimeoutError } from "./agent-client";
 import { type AgentCliInfo, cliPathEnvironment, cliSpawnTarget } from "./cli";
 import { runCauseEffect } from "./effect-boundary";
@@ -192,6 +193,12 @@ interface ClientEvents {
 /** Owns Pi's native sessions. The database owns OpenBot history and agent identity. */
 export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentClient {
   readonly contextCompaction = "request";
+  /**
+   * The memories and section-mates go with the prompts, so the system prompt that a reopened
+   * session gets stays the same, and a live session gets a memory change too.
+   */
+  readonly turnContext = true;
+  readonly #turnContext = new TurnContext();
   readonly provider: "pi" | KeyOnlyProviderId;
   readonly #bridge = new LocalMcpBridge();
   readonly #requests = new PendingServerRequests((request) => this.emit("request", request));
@@ -275,12 +282,14 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     const thread = this.#threads.get(id);
     if (!thread) {
       this.#released.delete(id);
+      this.#turnContext.forget(id);
       return;
     }
     if (thread.turn) return yield* providerFailure(new Error(sourceText("error.provider.piSessionBusy")));
     yield* this.#close(thread);
     this.#threads.delete(id);
     this.#released.delete(id);
+    this.#turnContext.forget(id);
   });
 
   readonly releaseIdleThreads = Effect.fn("PiAgentClient.releaseIdleThreads")(function* (this: PiAgentClient) {
@@ -327,6 +336,9 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       case "thread/start":
       case "thread/resume": {
         const thread = yield* this.#opening.withPermit(this.#open(params, method === "thread/resume", true));
+        // A resume with no thread id opens a new session, which holds no context.
+        const resumed = method === "thread/resume" && getString(params, "threadId") === thread.id;
+        this.#turnContext.set(thread.id, params, resumed);
         response = { thread: { id: thread.id } };
         break;
       }
@@ -739,6 +751,9 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     if (thread.turn) return yield* providerFailure(new Error(sourceText("error.provider.piSessionBusy")));
     yield* this.#configure(thread, params);
     const prompt = yield* piPrompt(params);
+    // Pi takes one message, so the blocks go before the user's text; history readers remove them.
+    const context = this.#turnContext.take(thread.id, prompt.message.startsWith("/"));
+    const message = context.length > 0 ? [...context, prompt.message].join("\n\n") : prompt.message;
     const turn: PiTurn = {
       id: getString(params, "clientTurnId") ?? getString(params, "clientUserMessageId") ?? randomUUID(),
       startedAt: Date.now() / 1_000,
@@ -759,7 +774,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     this.#notify("turn/started", thread, { turn: { id: turn.id, status: "inProgress" } });
     // Subscribe before sending: a completed event can precede the prompt acknowledgement.
     yield* Effect.forkIn(
-      thread.rpc.request({ type: "prompt", ...prompt }, this.options.requestTimeoutMs).pipe(
+      thread.rpc.request({ type: "prompt", ...prompt, message }, this.options.requestTimeoutMs).pipe(
         Effect.flatMap((response) =>
           response.disposition === "handled" && thread.turn === turn ? this.#finish(thread, "completed") : Effect.void,
         ),
@@ -891,6 +906,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       this.#background(this.#ui(thread, record));
       return;
     }
+    // The summary can leave the blocks out, so the next prompt sends them in full.
+    if (record.type === "compaction_end") this.#turnContext.resend(thread.id);
     const turn = thread.turn;
     if (!turn || turn.finishing) return;
     turn.lastActivityAt = Date.now();
@@ -968,6 +985,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     const turn = thread.turn;
     if (!turn || turn.finishing) return;
     turn.finishing = true;
+    // Pi may not have kept the prompt of a failed turn, with its blocks.
+    if (status === "failed") this.#turnContext.resend(thread.id);
     if (failure)
       this.#notify("error", thread, {
         error: { message: this.#redact(failure) },

@@ -27,14 +27,7 @@ import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Option, Scope } from "effect";
-import {
-  isTurnContextBlock,
-  type MemoryContext,
-  memoryContextUpdate,
-  NATURAL_TURN_REMINDER,
-  type SectionTeammates,
-  sectionTeammatesUpdate,
-} from "./agent/developer-instructions";
+import { isTurnContextBlock } from "./agent/developer-instructions";
 import {
   type ClaudePlanState,
   foldClaudePlanCall,
@@ -58,6 +51,7 @@ import {
   stopSubagents,
 } from "./agent/subagent-updates";
 import { claudeBridgedToolName, VISIBLE_TOOL_DEFINITIONS } from "./agent/tool-catalog";
+import { TurnContext } from "./agent/turn-context";
 import { USAGE_LIMIT_METHOD } from "./agent/usage-limit-gate";
 import {
   type AgentProvider,
@@ -454,6 +448,7 @@ const claudeSignInSettings = Effect.fn("claudeSignInSettings")(function* (config
 
 export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly contextCompaction = "native";
+  readonly turnContext = true;
   #queryRestarts = 0;
   readonly provider: AgentProvider = "claude";
   readonly #cli: ClaudeCliInfo;
@@ -497,19 +492,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #modelEffortCapabilities = new Map<string, ClaudeEffortCapability>();
   readonly #modelSdkValues = new Map<string, string>();
   /**
-   * Each thread's essential memories: the latest that OpenBot gave, and the last that a turn sent.
-   * They go with the turns, not in the system prompt, so a memory change keeps the cached prefix
-   * and restarts no query. Kept by thread, not by query: a restarted or reopened query resumes a
-   * conversation that already holds the memories it was sent.
+   * The memories and section-mates of each thread. They go with the turns, not in the system
+   * prompt, so a memory change keeps the cached prefix and restarts no query.
    */
-  readonly #memoryContexts = new Map<string, { current: MemoryContext; delivered: MemoryContext | null }>();
-  /** The same for the section-mates. `undefined` as `delivered`: the context can hold any earlier list. */
-  readonly #teammates = new Map<
-    string,
-    { current: SectionTeammates | null; delivered: SectionTeammates | null | undefined }
-  >();
-  /** The threads whose turns repeat the natural style's first-line rule (`NATURAL_TURN_REMINDER`). */
-  readonly #styleReminders = new Set<string>();
+  readonly #turnContext = new TurnContext();
   /** Resumes of one thread run one after another: two at once would leave a query nobody closes. */
   readonly #threadResumes = new Map<string, Deferred.Deferred<void, ProviderClientOperationError>>();
   #running = false;
@@ -616,9 +602,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     threadId: string,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     this.#threads.forget(threadId);
-    this.#memoryContexts.delete(threadId);
-    this.#teammates.delete(threadId);
-    this.#styleReminders.delete(threadId);
+    this.#turnContext.forget(threadId);
     const runtime = this.#threads.get(threadId);
     if (!runtime) return;
     yield* this.#threads.close(runtime).pipe(toProviderClientOperationError);
@@ -669,7 +653,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       case "thread/start": {
         const threadId = randomUUID();
         yield* this.#startThread(threadId, readThreadConfig(params), false);
-        this.#setTurnContext(threadId, params, false);
+        this.#turnContext.set(threadId, params, false);
         return yield* providerSync(() => decoder({ thread: { id: threadId } }));
       }
       case "thread/resume": {
@@ -678,7 +662,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         // turn with it in `--resume` would fail, so the caller opens a new session instead (#2475).
         if (!isUuid(threadId)) return yield* providerFailure(new MissingClaudeSessionError(threadId));
         const config = readThreadConfig(params);
-        this.#setTurnContext(threadId, params, true);
+        this.#turnContext.set(threadId, params, true);
         const previous = this.#threadResumes.get(threadId);
         const completion = Deferred.makeUnsafe<void, ProviderClientOperationError>();
         this.#threadResumes.set(threadId, completion);
@@ -950,23 +934,6 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   #environment(withApiKey: boolean): Readonly<Record<string, string>> {
     const key = withApiKey ? this.#fallbackApiKey?.() : null;
     return { ...this.#agentEnvironment?.(), ...(key ? { ANTHROPIC_API_KEY: key } : {}) };
-  }
-
-  #setTurnContext(threadId: string, params: unknown, resume: boolean): void {
-    if (isRecord(params) && params.turnStyleReminder === true) this.#styleReminders.add(threadId);
-    else this.#styleReminders.delete(threadId);
-    const current = readMemoryContext(params);
-    if (current) {
-      const memory = this.#memoryContexts.get(threadId);
-      if (memory) memory.current = current;
-      else this.#memoryContexts.set(threadId, { current, delivered: null });
-    }
-    if (!isRecord(params) || !("sectionTeammates" in params)) return;
-    const section = readSectionTeammates(params.sectionTeammates);
-    const teammates = this.#teammates.get(threadId);
-    if (teammates) teammates.current = section;
-    // A new conversation holds no list, so no section needs no block.
-    else this.#teammates.set(threadId, { current: section, delivered: resume ? undefined : null });
   }
 
   readonly #resumeThread = Effect.fn("ClaudeAgentClient.resumeThread")(function* (
@@ -1281,16 +1248,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // Blocks of their own, so that history readers can tell them from the text of the turn. A slash
     // command gets none: the CLI can drop the blocks before it, and `/clear` empties the context,
     // so the next turn sends the full blocks.
-    const memory = this.#memoryContexts.get(threadId);
-    const teammates = this.#teammates.get(threadId);
-    const command = text.startsWith("/");
-    const context = command
-      ? []
-      : [
-          memory ? memoryContextUpdate(memory.delivered, memory.current) : null,
-          teammates ? sectionTeammatesUpdate(teammates.delivered, teammates.current) : null,
-          this.#styleReminders.has(threadId) ? NATURAL_TURN_REMINDER : null,
-        ].filter((block): block is string => block !== null);
+    const context = this.#turnContext.take(threadId, text.startsWith("/"));
     runtime.input.push({
       type: "user",
       message: {
@@ -1304,8 +1262,6 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       uuid: turnId,
       session_id: threadId,
     });
-    if (memory) memory.delivered = command ? null : memory.current;
-    if (teammates) teammates.delivered = command ? undefined : teammates.current;
     return { turn: { id: turnId, status: "inProgress" } };
   });
 
@@ -1518,10 +1474,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (message.type === "system" && message.subtype === "compact_boundary") {
       runtime.compacting = false;
       // The summary can leave the context blocks out, so the next turn sends the full blocks again.
-      const memory = this.#memoryContexts.get(runtime.id);
-      if (memory) memory.delivered = null;
-      const teammates = this.#teammates.get(runtime.id);
-      if (teammates) teammates.delivered = undefined;
+      this.#turnContext.resend(runtime.id);
       // Claude's post_tokens counts messages only, not the full context.
       this.emit("notification", {
         method: "openbot/context-compaction",
@@ -2640,29 +2593,6 @@ function threadConfigKey(config: ThreadConfig, withModel: boolean): string {
     effort: withModel ? (config.effort ?? null) : null,
   };
   return JSON.stringify(Object.entries(fields).sort(([a], [b]) => (a < b ? -1 : 1)));
-}
-
-function readMemoryContext(params: unknown): MemoryContext | null {
-  const context = isRecord(params) ? params.memoryContext : undefined;
-  if (!isRecord(context) || !Array.isArray(context.memories)) return null;
-  if (!isNumber(context.storedCount) || !isNumber(context.limit)) return null;
-  const memories = context.memories.filter(
-    (memory): memory is MemoryContext["memories"][number] =>
-      isRecord(memory) &&
-      isString(memory.id) &&
-      isString(memory.text) &&
-      isOneOf(["automatic", "manual"] as const, memory.origin),
-  );
-  return { memories, storedCount: context.storedCount, limit: context.limit };
-}
-
-function readSectionTeammates(value: unknown): SectionTeammates | null {
-  if (!isRecord(value) || !isString(value.name) || !Array.isArray(value.members)) return null;
-  const members = value.members.filter(
-    (member): member is SectionTeammates["members"][number] =>
-      isRecord(member) && isString(member.id) && isString(member.name) && isString(member.title),
-  );
-  return members.length > 0 ? { name: value.name, members } : null;
 }
 
 function parseAuthStatus(stdout: unknown): DynamicRecord | null {

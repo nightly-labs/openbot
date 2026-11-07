@@ -47,6 +47,7 @@ import {
   OPENCODE_CHILD_UPDATE_METHOD,
   type OpenCodeLaunches,
 } from "./agent/acp-subagent-updates";
+import { isTurnContextBlock, withoutTurnContext } from "./agent/developer-instructions";
 import { acpPlanSteps, PLAN_UPDATED_METHOD } from "./agent/plan-updates";
 import { elicitationFieldQuestions, elicitationValue } from "./agent/prompts";
 import {
@@ -56,6 +57,7 @@ import {
   type SubagentChange,
   stopSubagents,
 } from "./agent/subagent-updates";
+import { TurnContext } from "./agent/turn-context";
 import {
   AgentProcessExitError,
   type AgentProvider,
@@ -508,6 +510,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   get provider(): AgentProvider {
     return this.options.provider;
   }
+  /** The memories and section-mates go with the prompts, so a memory change sends no instructions again. */
+  readonly turnContext = true;
+  readonly #turnContext = new TurnContext();
   readonly #flavor: AcpFlavor;
   readonly #transport: AcpConnection;
   readonly #configuration: AcpConfiguration;
@@ -882,6 +887,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    */
   #compacted(thread: AcpThread): void {
     thread.instructionsSent = null;
+    this.#turnContext.resend(thread.id);
     this.emit("notification", {
       method: "openbot/context-compaction",
       params: { threadId: thread.id, status: "completed" },
@@ -910,6 +916,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     sessionId: string,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     this.#threads.forget(sessionId);
+    this.#turnContext.forget(sessionId);
     const thread = this.#threads.get(sessionId);
     if (!thread) return;
     yield* this.#threads.close(thread).pipe(toProviderClientOperationError);
@@ -918,6 +925,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   /** The provider already removed this session. Do not wait for another remote cleanup request. */
   #forgetMissingSession(sessionId: string): void {
     this.#threads.forget(sessionId);
+    this.#turnContext.forget(sessionId);
     const thread = this.#threads.get(sessionId);
     if (!thread) return;
     this.#threads.detach(thread);
@@ -1118,12 +1126,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         );
       case "plugin/list":
         return yield* providerSync(() => decoder({ marketplaces: [] }));
-      case "thread/start": {
-        const response = yield* this.#startThread(params, false);
-        return yield* providerSync(() => decoder(response));
-      }
+      case "thread/start":
       case "thread/resume": {
-        const response = yield* this.#startThread(params, true);
+        const response = yield* this.#startThread(params, method === "thread/resume");
+        // A resume with no thread id opens a new session, which holds no context.
+        const resumed = method === "thread/resume" && getString(params, "threadId") === response.thread.id;
+        this.#turnContext.set(response.thread.id, params, resumed);
         return yield* providerSync(() => decoder(response));
       }
       case "thread/read": {
@@ -1863,7 +1871,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   /** Converts ACP replay notifications into storage fragments, with no live turn side effects. */
   #historyUpdate(replay: HistoryReplay, notification: SessionNotification): void {
     replay.hasUpdates = true;
-    const update = notification.update;
+    let update = notification.update;
     const messageId = contentMessageId(update);
     const startsTurn =
       update.sessionUpdate === "user_message_chunk" &&
@@ -1897,6 +1905,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       replay.turnHasOutput = true;
     }
     if (replay.items === "none") return;
+    // OpenBot's memory and section-mate blocks are not text that the user wrote. An agent can replay
+    // them as chunks of their own or joined with the user's text.
+    if (
+      update.sessionUpdate === "user_message_chunk" &&
+      update.content.type === "text" &&
+      isTurnContextBlock(update.content.text)
+    ) {
+      const text = withoutTurnContext(update.content.text);
+      if (!text) return;
+      update = { ...update, content: { ...update.content, text } };
+    }
     if (
       (update.sessionUpdate === "agent_message_chunk" || update.sessionUpdate === "user_message_chunk") &&
       update.content.type === "text" &&
@@ -2098,11 +2117,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // session lacks them. An agent that reports no context size cannot show a compaction, so it
     // gets them again after a number of prompts.
     thread.promptsSinceInstructions += 1;
-    if (
+    const sendInstructions =
       thread.developerInstructions &&
       (thread.instructionsSent !== thread.developerInstructions ||
-        (thread.contextUsed === null && thread.promptsSinceInstructions > ACP_INSTRUCTIONS_REFRESH_PROMPTS))
-    ) {
+        (thread.contextUsed === null && thread.promptsSinceInstructions > ACP_INSTRUCTIONS_REFRESH_PROMPTS));
+    // With the instructions again, the memories and section-mates go in full too.
+    if (sendInstructions) this.#turnContext.resend(thread.id);
+    // A slash command gets no blocks: the agent reads a command only at the start of the prompt.
+    const first = blocks[0];
+    const command = first?.type === "text" && first.text.startsWith("/");
+    blocks.unshift(...this.#turnContext.take(thread.id, command).map((text) => ({ type: "text" as const, text })));
+    if (sendInstructions) {
       blocks.unshift({
         type: "text",
         text: `<openbot-developer-instructions>\n${thread.developerInstructions}\n</openbot-developer-instructions>`,
@@ -3070,7 +3095,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // OpenCode's child updates that came before the prompt's result can still be on their way.
     if (this.#flavor.childSessionUpdates) yield* Effect.promise(() => new Promise<void>((next) => setImmediate(next)));
     // The agent may not have kept a prompt that failed.
-    if (status === "failed") thread.instructionsSent = null;
+    if (status === "failed") {
+      thread.instructionsSent = null;
+      this.#turnContext.resend(thread.id);
+    }
     // The agent can still store the rest of a turn that did not complete. A replay does not show it.
     if (status !== "completed") thread.backgroundSkipUntil = Date.now() + ACP_STOPPED_OUTPUT_MS;
     // A prompt can have run tools. Never replay it. Drop the handle before publishing completion
