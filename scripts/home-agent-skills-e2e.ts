@@ -9,7 +9,7 @@
 // `bun run test:home-skills`; exit 0 = all pass. Writes .openbot-build/home-agent-skills-e2e/report.json.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmod, mkdir, mkdtemp, readdir, readFile, readlink, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, readlink, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { type AgentSummary, DEFAULT_AGENT_DEFAULTS } from "@openbot/contracts/ipc";
@@ -20,6 +20,7 @@ import { runCauseEffect } from "../src/backend/effect-boundary";
 import { listHomeSkills } from "../src/backend/home-skills";
 import { listHomeFolderSkills } from "../src/main/skill-folder-discovery";
 
+const SIGN_IN_TOKEN = "e2e-sign-in-token";
 const OUT = resolve(import.meta.dirname, "../.openbot-build/home-agent-skills-e2e");
 const ROOT_VARIABLE = "OPENBOT_HOME_SKILLS_E2E_ROOT";
 
@@ -37,7 +38,7 @@ if (!process.env[ROOT_VARIABLE]) {
 interface Report {
   passed: boolean;
   checks: {
-    signInSettings?: { apiKeyHelper?: string; env?: Record<string, string> };
+    signInSettings?: { apiKeyHelper: string; env: string[] };
     claudePlugin?: { plugin: string; linked: string[] };
     claudeCli?: { version: string; skills: string[] } | "skipped: no claude on PATH";
     instructions?: string;
@@ -76,7 +77,7 @@ try {
   await writeFile(
     join(home, ".claude", "settings.json"),
     JSON.stringify({
-      env: { ANTHROPIC_BASE_URL: "https://gateway.example", SPEND_LIMIT: 5 },
+      env: { ANTHROPIC_BASE_URL: "https://gateway.example", ANTHROPIC_AUTH_TOKEN: SIGN_IN_TOKEN, SPEND_LIMIT: 5 },
       apiKeyHelper: "/usr/local/bin/key-helper",
       forceLoginMethod: "unknown-method",
       enabledPlugins: { "personal@market": true },
@@ -148,17 +149,26 @@ try {
   const offSources = flagValues(offArgv, "--setting-sources");
   assert.equal(offSources.length, 1, "The session names its setting sources.");
   assert.ok(!offSources.some((value) => value.split(",").includes("user")), "The user settings file is not a source.");
+  // The settings can hold keys: they go in a file that only this user can read, never on the command line.
+  assert.ok(!offArgv.some((value) => value.includes(SIGN_IN_TOKEN)), "No sign-in key is on the command line.");
   const offSettings = flagValues(offArgv, "--settings");
-  assert.equal(offSettings.length, 1, "The sign-in settings go to the session as flag settings.");
+  assert.equal(offSettings.length, 1, "The sign-in settings go to the session as a flag settings file.");
+  const settingsFile = offSettings[0] ?? "";
+  assert.equal((await stat(settingsFile)).mode & 0o777, 0o600, "Only this user can read the settings file.");
+  const signInSettings = JSON.parse(await readFile(settingsFile, "utf8"));
   assert.deepEqual(
-    JSON.parse(offSettings[0] ?? "{}"),
-    { apiKeyHelper: "/usr/local/bin/key-helper", env: { ANTHROPIC_BASE_URL: "https://gateway.example" } },
+    signInSettings,
+    {
+      apiKeyHelper: "/usr/local/bin/key-helper",
+      env: { ANTHROPIC_BASE_URL: "https://gateway.example", ANTHROPIC_AUTH_TOKEN: SIGN_IN_TOKEN },
+    },
     "Only the sign-in keys pass: no plugins, no hooks, no invalid login method, no value that is not text.",
   );
-  report.checks.signInSettings = JSON.parse(offSettings[0] ?? "{}");
+  report.checks.signInSettings = { apiKeyHelper: signInSettings.apiKeyHelper, env: Object.keys(signInSettings.env) };
 
   // The Claude session with the user's setup gets a plugin with the skill that `~/.claude/skills` does not hold.
   const argv = await claudeArguments(true);
+  await assert.rejects(stat(settingsFile), "The settings file is deleted when its query closes.");
   assert.deepEqual(flagValues(argv, "--settings"), [], "The user's setup loads the settings file itself.");
   const pluginDirectories = flagValues(argv, "--plugin-dir");
   assert.equal(pluginDirectories.length, 1, "A Full access Claude session gets one plugin: the home skills.");

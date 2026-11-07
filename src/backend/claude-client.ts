@@ -295,6 +295,8 @@ interface ThreadRuntime {
   streamMessage: { id: string | null; thinkingBlocks: Map<number, string> };
   /** The `--mcp-config` file of this query until the CLI has read it. See `writeClaudeMcpConfig`. */
   mcpConfigFile: string | null;
+  /** The `--settings` file of this query until it closes. See `writeClaudeFlagSettings`. */
+  settingsFile: string | null;
 }
 
 /** The limit of `claude auth status` when the caller names none. */
@@ -566,7 +568,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       runtime.input.close();
       runtime.query.close();
     }
-    yield* Effect.forEach(runtimes, (runtime) => removeClaudeMcpConfig(runtime.mcpConfigFile), { discard: true });
+    yield* Effect.forEach(
+      runtimes,
+      (runtime) =>
+        Effect.all([removeClaudeQueryFile(runtime.mcpConfigFile), removeClaudeQueryFile(runtime.settingsFile)]),
+      { discard: true },
+    );
     yield* Effect.forEach(
       runtimes,
       (runtime) => (runtime.consume ? Fiber.join(runtime.consume).pipe(Effect.ignore) : Effect.void),
@@ -610,7 +617,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     runtime.input.close();
     runtime.query.close();
-    yield* removeClaudeMcpConfig(runtime.mcpConfigFile);
+    yield* removeClaudeQueryFile(runtime.mcpConfigFile);
+    yield* removeClaudeQueryFile(runtime.settingsFile);
     // A background subagent ends with the process (#1870).
     for (const change of stopSubagents(runtime.subagents, new Date().toISOString()))
       this.#emitSubagents(runtime, change);
@@ -1067,9 +1075,34 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             ),
           )
         : null;
+    // The SDK deletes NODE_OPTIONS from the environment of the CLI. On a server the agent
+    // environment has the CPU limit module there (`agentProcessEnvironment`), so it goes into
+    // the flag settings, whose `env` the CLI gives to the Bash tool and its hooks.
+    const nodeOptionsSettings: Settings = nodeOptions ? { env: { NODE_OPTIONS: nodeOptions } } : {};
+    // The sign-in settings can hold keys, so they go in a file that only this user can read, not on
+    // the command line, where `ps` shows them to other users.
+    const settingsFile =
+      Object.keys(signInSettings).length > 0
+        ? stateDirectory
+          ? yield* writeClaudeFlagSettings(stateDirectory, threadId, {
+              ...signInSettings,
+              env: { ...signInSettings.env, ...nodeOptionsSettings.env },
+            }).pipe(
+              Effect.catch((error) =>
+                Effect.sync(() => {
+                  queryLogger.warn("Claude starts without the sign-in settings of its settings file.", {
+                    error: error.cause,
+                  });
+                  return null;
+                }),
+              ),
+            )
+          : null
+        : null;
+    const removeQueryFiles = Effect.all([removeClaudeQueryFile(mcpConfigFile), removeClaudeQueryFile(settingsFile)]);
     // `stop()` may have run during the awaits: a query created now would outlive the client.
     if (!this.#running) {
-      yield* removeClaudeMcpConfig(mcpConfigFile);
+      yield* removeQueryFiles;
       return yield* providerFailure(new Error("Claude Agent SDK is not running."));
     }
     if (handoff) this.#reportMcpDrops?.(this.provider, handoff.dropped);
@@ -1115,20 +1148,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           persistSession: config.persistSession,
           additionalDirectories: config.additionalDirectories,
           canUseTool,
-          // The SDK deletes NODE_OPTIONS from the environment of the CLI. On a server the agent
-          // environment has the CPU limit module there (`agentProcessEnvironment`), so it goes into
-          // the flag settings, whose `env` the CLI gives to the Bash tool and its hooks.
-          // The sign-in settings of the user settings file join it there when the user settings do not load.
-          ...(nodeOptions || Object.keys(signInSettings).length > 0
-            ? {
-                settings: {
-                  ...signInSettings,
-                  ...(nodeOptions || signInSettings.env
-                    ? { env: { ...signInSettings.env, ...(nodeOptions ? { NODE_OPTIONS: nodeOptions } : {}) } }
-                    : {}),
-                },
-              }
-            : {}),
+          ...(settingsFile
+            ? { settings: settingsFile }
+            : Object.keys(nodeOptionsSettings).length > 0
+              ? { settings: nodeOptionsSettings }
+              : {}),
           ...(config.workspaceOnly
             ? {
                 sandbox: claudeWorkspaceSandbox(config.additionalDirectories, config.excludedFolders),
@@ -1155,7 +1179,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           },
         },
       }),
-    ).pipe(Effect.onError(() => removeClaudeMcpConfig(mcpConfigFile)));
+    ).pipe(Effect.onError(() => removeQueryFiles));
     const runtime: ThreadRuntime = {
       id: threadId,
       usageCounterId: randomUUID(),
@@ -1178,13 +1202,14 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       nextTurnId: null,
       streamMessage: { id: null, thinkingBlocks: new Map<number, string>() },
       mcpConfigFile,
+      settingsFile,
     };
     runtime.consume = yield* Effect.forkIn(this.#consume(runtime), this.#scope, { startImmediately: true });
     // The CLI reads the file once at its start and keeps the servers in memory, also to reconnect one.
     const initialization = mcpConfigFile ? claudeQuery.initializationResult?.() : undefined;
     if (initialization)
       yield* Effect.forkIn(
-        providerCall(() => initialization).pipe(Effect.ignore, Effect.andThen(removeClaudeMcpConfig(mcpConfigFile))),
+        providerCall(() => initialization).pipe(Effect.ignore, Effect.andThen(removeClaudeQueryFile(mcpConfigFile))),
         this.#scope,
       );
     this.#threads.add(runtime);
@@ -2334,8 +2359,25 @@ const writeClaudeMcpConfig = Effect.fn("ClaudeAgentClient.writeMcpConfig")(funct
   return file;
 });
 
+/**
+ * Writes the flag settings of a query to a file for `--settings`. They hold the sign-in settings of
+ * the user settings file, which can be keys, so only this user can read the file. It stays until the
+ * query closes or cannot start, because the CLI can read its settings again during a session.
+ */
+const writeClaudeFlagSettings = Effect.fn("ClaudeAgentClient.writeFlagSettings")(function* (
+  stateDirectory: string,
+  threadId: string,
+  settings: Settings,
+) {
+  const directory = join(stateDirectory, "claude-settings");
+  const file = join(directory, `${threadId}-${randomUUID()}.json`);
+  yield* providerCall(() => mkdir(directory, { recursive: true, mode: 0o700 }));
+  yield* providerCall(() => writeFile(file, JSON.stringify(settings), { mode: 0o600 }));
+  return file;
+});
+
 /** A file that cannot be deleted must not stop the close. */
-function removeClaudeMcpConfig(file: string | null): Effect.Effect<void> {
+function removeClaudeQueryFile(file: string | null): Effect.Effect<void> {
   return file ? providerCall(() => rm(file, { force: true })).pipe(Effect.ignore) : Effect.void;
 }
 
