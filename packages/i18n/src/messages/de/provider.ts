@@ -164,7 +164,7 @@ export const messages = {
   "provider.geminiKey.label": "Gemini-API-Schlüssel",
   "provider.claudeKey.title": "Anthropic-API-Schlüssel",
   "provider.claudeKey.description":
-    "Speichere einen Anthropic-API-Schlüssel auf dem Host. Anthropic berechnet jede Anfrage über den Schlüssel. Um ihn für einen Agenten zu verwenden, wähle das Konto „API-Schlüssel“ im Modellmenü des Agenten. Wenn Claude nicht angemeldet ist, verwenden alle Agenten den Schlüssel.",
+    "Speichere einen Anthropic-API-Schlüssel auf dem Host. Anthropic berechnet jede Anfrage über das API-Guthaben des Schlüssels, nicht über dein Claude-Abo. Um ihn für einen Agenten zu verwenden, wähle das Konto „API-Schlüssel“ im Modellmenü des Agenten. Wenn Claude nicht angemeldet ist, verwenden alle Agenten den Schlüssel.",
   "provider.claudeKey.label": "Anthropic-API-Schlüssel",
   "provider.inceptionKey.title": "Inception-API-Schlüssel",
   "provider.inceptionKey.description":

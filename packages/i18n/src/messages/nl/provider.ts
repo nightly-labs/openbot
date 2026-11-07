@@ -153,7 +153,7 @@ export const messages = {
   "provider.geminiKey.label": "Gemini-API-sleutel",
   "provider.claudeKey.title": "Anthropic-API-sleutel",
   "provider.claudeKey.description":
-    "Sla een Anthropic-API-sleutel op de host op. Anthropic brengt elk verzoek in rekening op de sleutel. Om hem voor een agent te gebruiken, kies je het API-sleutelaccount in het modelmenu van de agent. Als Claude niet is ingelogd, gebruiken alle agents de sleutel.",
+    "Sla een Anthropic-API-sleutel op de host op. Anthropic brengt elk verzoek in rekening op het API-tegoed van de sleutel, niet op je Claude-abonnement. Om hem voor een agent te gebruiken, kies je het API-sleutelaccount in het modelmenu van de agent. Als Claude niet is ingelogd, gebruiken alle agents de sleutel.",
   "provider.claudeKey.label": "Anthropic-API-sleutel",
   "provider.inceptionKey.title": "Inception-API-sleutel",
   "provider.inceptionKey.description":
@@ -251,7 +251,7 @@ export const messages = {
   "provider.settings.geminiKeyInUse":
     "Gemini gebruikt deze sleutel, niet je Google AI-abonnement. Het gebruik van het abonnement wordt niet getoond.",
   "provider.settings.claudeKeyInUse":
-    "Kies het API-sleutelaccount in het modelmenu van een agent. Als Claude niet is ingelogd, gebruiken alle agents de sleutel.",
+    "Anthropic brengt het API-tegoed van de sleutel in rekening, niet je Claude-abonnement. Kies het API-sleutelaccount in het modelmenu van een agent. Als Claude niet is ingelogd, gebruiken alle agents de sleutel.",
   "provider.settings.addKey": "Sleutel toevoegen",
   "provider.settings.changeKey": "Sleutel wijzigen",
   "provider.settings.runtime": "Runtime",

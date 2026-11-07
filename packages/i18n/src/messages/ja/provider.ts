@@ -162,7 +162,7 @@ export const messages = {
   "provider.geminiKey.label": "Gemini API キー",
   "provider.claudeKey.title": "Anthropic API キー",
   "provider.claudeKey.description":
-    "ホストに Anthropic API キーを保存します。Anthropic は各リクエストをキーに請求します。エージェントで使うには、エージェントのモデルメニューで「APIキー」アカウントを選択します。Claude にサインインしていない場合、すべてのエージェントがキーを使います。",
+    "ホストに Anthropic API キーを保存します。Anthropic は各リクエストをキーの API クレジットに請求し、Claude のプランには請求しません。エージェントで使うには、エージェントのモデルメニューで「APIキー」アカウントを選択します。Claude にサインインしていない場合、すべてのエージェントがキーを使います。",
   "provider.claudeKey.label": "Anthropic API キー",
   "provider.inceptionKey.title": "Inception API キー",
   "provider.inceptionKey.description":
