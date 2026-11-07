@@ -515,6 +515,7 @@ const SAFE_FAILURE_CODES = new Set([
   "response_failed",
   "search_failed",
   "send_failed",
+  "send_now_failed",
   "server_select_failed",
   "sign_in_code_expired",
   "sign_out_failed",
@@ -564,7 +565,7 @@ const SAFE_FAILURE_CODES = new Set([
 const EVENT_ACTIONS: Partial<Record<AnalyticsEventName, readonly string[]>> = {
   agent_action: ["create", "update", "delete", "duplicate", "branch"],
   agent_input_action: ["prompt", "approval"],
-  queue_action: ["cancel", "steer", "edit", "reorder", "interrupt"],
+  queue_action: ["cancel", "steer", "send_now", "edit", "reorder", "interrupt"],
   routine_action: ["create", "update", "delete", "test"],
   workflow_action: WORKFLOW_ACTIONS,
   team_action: [

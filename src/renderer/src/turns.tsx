@@ -432,26 +432,45 @@ const Turns = createSimpleContext({
      * For an agent whose provider cannot steer: puts a queued message first and stops the running
      * turn, so the message runs as the next turn. A message just sent is not in the queue snapshot
      * yet; it is last in the queue, so first is still the correct place.
+     * Channel and messaging work that waits keeps its place before the message: it reserved the agent first.
      */
     function sendQueuedMessageNow(deliveryId: string) {
       const agent = activeAgent();
       const turnId = agent ? activeTurns()[agent.id] : null;
       if (!agent || !turnId) return;
+      const queued = queuedDeliveriesInOrder(queues()[agent.id]);
+      // An edited message keeps its place, and the queue starts nothing while it is first. A stop would
+      // then end the turn and start nothing, so the message waits as it did.
+      const head = queued[0];
+      if (head?.editing && head.id !== deliveryId) return;
       const serverId = activeServerId();
       const analytics = desktopAnalytics.scope();
-      const queued = queuedDeliveriesInOrder(queues()[agent.id]).map((delivery) => delivery.id);
-      const order = [deliveryId, ...queued.filter((id) => id !== deliveryId)];
+      const ids = queued.map((delivery) => delivery.id);
       const port = turnsPort().agent;
+      const failed = (error: unknown, status: string) => {
+        analytics.track("queue_action", { action: "send_now", result: "failed", failure_code: "send_now_failed" });
+        appendUiError(agent.id, error, status, serverId);
+      };
       const reorder =
-        queued[0] === deliveryId ? Promise.resolve() : port.reorderQueue({ agentId: agent.id, deliveryIds: order });
-      void reorder
+        ids[0] === deliveryId
+          ? Promise.resolve(true)
+          : port
+              .reorderQueue({ agentId: agent.id, deliveryIds: [deliveryId, ...ids.filter((id) => id !== deliveryId)] })
+              .then(
+                () => true,
+                (error: unknown) => {
+                  failed(error, currentText().t("app.errorStatus.reorder"));
+                  return false;
+                },
+              );
+      void reorder.then((moved) => {
         // A turn that ended in the meantime has nothing to stop: the message runs next already.
-        .then(() => (activeTurns()[agent.id] === turnId ? port.interrupt({ agentId: agent.id, turnId }) : undefined))
-        .then(() => analytics.track("queue_action", { action: "send_now", result: "succeeded" }))
-        .catch((error) => {
-          analytics.track("queue_action", { action: "send_now", result: "failed", failure_code: "send_now_failed" });
-          appendUiError(agent.id, error, currentText().t("app.errorStatus.stop"), serverId);
-        });
+        if (!moved || activeTurns()[agent.id] !== turnId) return;
+        return port
+          .interrupt({ agentId: agent.id, turnId })
+          .then(() => analytics.track("queue_action", { action: "send_now", result: "succeeded" }))
+          .catch((error: unknown) => failed(error, currentText().t("app.errorStatus.stop")));
+      });
     }
 
     async function updateQueuedMessage(
