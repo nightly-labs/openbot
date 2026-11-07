@@ -271,6 +271,7 @@
     "test:workflow-discord": "bun scripts/workflow-discord-e2e.ts",
     "test:workflow-telegram": "bun scripts/workflow-telegram-e2e.ts",
     "test:workflow-slack": "bun scripts/workflow-slack-e2e.ts",
+    "test:workflow-channel-output": "bun scripts/workflow-channel-output-e2e.ts",
     "test:workflow-agent-tools": "bun scripts/workflow-agent-tools-e2e.ts",
     "test:discord-github-files": "bun scripts/discord-github-files-e2e.ts",
     "test:antigravity-accounts": "bun scripts/antigravity-accounts-e2e.ts",

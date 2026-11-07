@@ -153,6 +153,8 @@ export const messages = {
   "workflow.condition.taken": "Gevolgd",
   "workflow.output.title": "Uitvoer",
   "workflow.output.name": "uitvoer",
+  "workflow.output.target.messagingChannel": "Slack-, Discord- of Telegram-kanaal",
+  "workflow.output.target.chatChannel": "OpenBot-kanaal",
   "workflow.output.target.file": "Bestand",
   "workflow.output.target.notify": "Melding",
   "workflow.output.path": "Bestandspad",

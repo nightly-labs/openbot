@@ -35,6 +35,10 @@ export const STORY_CATALOGS: WorkflowCatalogs = {
     placeId,
     label: `#${placeId}`,
   })),
+  channels: [
+    { id: "story-channel-launch", name: "launch" },
+    { id: "story-channel-support", name: "support" },
+  ],
   imageModels: [
     { id: "gpt-image", name: "GPT Image", provider: "codex", maker: "OpenAI" },
     { id: "nano-banana", name: "Nano Banana", provider: "antigravity", maker: "Google" },

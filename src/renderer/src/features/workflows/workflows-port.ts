@@ -5,6 +5,7 @@ import {
   type ServerSummary,
 } from "@openbot/contracts/ipc";
 import type {
+  WorkflowChannel,
   WorkflowDiscordServer,
   WorkflowPlace,
   WorkflowSlackWorkspace,
@@ -43,6 +44,8 @@ export interface WorkflowHost {
   onChanged(changed: (workflowId: string | null, agentId?: string) => void): () => void;
   /** Only this computer keeps messaging places; a joined server gives none. */
   places(): Promise<WorkflowPlace[]>;
+  /** The open channels that an output can post to. Only this computer gives them. */
+  channels(): Promise<WorkflowChannel[]>;
   /** Only this computer runs Discord triggers and outputs; a joined server gives none. */
   discordServers(): Promise<WorkflowDiscordServer[]>;
   /** Only this computer runs Telegram triggers and outputs; a joined server gives none. */
@@ -124,6 +127,11 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
           label: `${connection.connectionName} · ${place.name}`,
         })),
       );
+    },
+    async channels() {
+      if (!local()) return [];
+      const channels = await window.openbot.agent.listChannels(serverId);
+      return channels.filter((channel) => !channel.archived).map((channel) => ({ id: channel.id, name: channel.name }));
     },
     async discordServers() {
       if (!local()) return [];

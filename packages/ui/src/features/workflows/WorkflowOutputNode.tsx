@@ -1,7 +1,7 @@
 /** An output: the end of a branch, which sends the result. */
 
 import type { AppTranslate } from "@openbot/i18n";
-import { Bell, Button, CircleCheck, FileText, Hash, Play, Send, Skeleton } from "@openbot/ui";
+import { Bell, Button, CircleCheck, FileText, Hash, MessageSquare, Play, Send, Skeleton } from "@openbot/ui";
 import { Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { resultValue, useBoard, type WfnPortType } from "./workflow-board";
@@ -18,14 +18,19 @@ import {
   useStepRun,
   useTextField,
 } from "./workflow-node-parts";
-import { InputRow, PlaceRow, SettingRow, SettingRows } from "./workflow-setting-rows";
+import { ChannelRow, InputRow, PlaceRow, SettingRow, SettingRows } from "./workflow-setting-rows";
 import { SLACK_OUTPUT_DEFAULTS, SlackIcon, SlackOutputRows } from "./workflow-slack-parts";
 import { TELEGRAM_OUTPUT_DEFAULTS, TelegramIcon, TelegramOutputRows } from "./workflow-telegram-parts";
 
-type OutputTarget = "channel" | "file" | "notify" | "github" | "discord" | "telegram" | "slack";
+type OutputTarget = "channel" | "file" | "notify" | "github" | "discord" | "telegram" | "slack" | "chat-channel";
 
 const TARGETS = (t: AppTranslate): readonly Choice<OutputTarget>[] => [
-  { value: "channel", label: t("workflow.node.place.channel"), icon: () => <Hash aria-hidden="true" /> },
+  {
+    value: "channel",
+    label: t("workflow.output.target.messagingChannel"),
+    icon: () => <MessageSquare aria-hidden="true" />,
+  },
+  { value: "chat-channel", label: t("workflow.output.target.chatChannel"), icon: () => <Hash aria-hidden="true" /> },
   { value: "file", label: t("workflow.output.target.file"), icon: () => <FileText aria-hidden="true" /> },
   { value: "notify", label: t("workflow.output.target.notify"), icon: () => <Bell aria-hidden="true" /> },
   { value: "github", label: t("workflow.output.target.github"), icon: () => <GitHubIcon /> },
@@ -34,7 +39,16 @@ const TARGETS = (t: AppTranslate): readonly Choice<OutputTarget>[] => [
   { value: "slack", label: t("workflow.output.target.slack"), icon: () => <SlackIcon /> },
 ];
 
-const TARGET_TYPES: readonly OutputTarget[] = ["channel", "file", "notify", "github", "discord", "telegram", "slack"];
+const TARGET_TYPES: readonly OutputTarget[] = [
+  "channel",
+  "file",
+  "notify",
+  "github",
+  "discord",
+  "telegram",
+  "slack",
+  "chat-channel",
+];
 
 /** Targets that only an admin's host offers: they act as the host's GitHub App or messaging bot. */
 const HOST_TARGETS: readonly OutputTarget[] = ["github", "discord", "telegram", "slack"];
@@ -76,6 +90,10 @@ export function OutputNode(props: {
    * same. Each keeps an `action`, so a change from one to another writes the defaults again.
    */
   const chooseTarget = (value: OutputTarget) => {
+    // A channel output stores the first channel, as a new messaging output stores the first place.
+    const channel = board.catalogs().channels?.[0];
+    if (value === "chat-channel" && channel && board.field(props.id, "channelId") === undefined)
+      return board.setFields(props.id, { target: value, channelId: channel.id });
     const defaults = TARGET_DEFAULTS[value];
     const fromOther = target() !== value && HOST_TARGETS.includes(target());
     if (!defaults || (board.field(props.id, "action") !== undefined && !fromOther)) return setTarget(value);
@@ -147,6 +165,9 @@ export function OutputNode(props: {
             placeId={untrack(() => props.placeId)}
             disabled={locked()}
           />
+        </Show>
+        <Show when={target() === "chat-channel"}>
+          <ChannelRow id={props.id} disabled={locked()} />
         </Show>
         <Show when={target() === "file"}>
           <InputRow name={t("workflow.output.path")} value={path()} disabled={locked()} onChange={setPath} />

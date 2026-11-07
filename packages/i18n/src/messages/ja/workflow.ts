@@ -164,6 +164,8 @@ export const messages = {
 
   "workflow.output.title": "出力",
   "workflow.output.name": "出力",
+  "workflow.output.target.messagingChannel": "Slack・Discord・Telegram のチャンネル",
+  "workflow.output.target.chatChannel": "OpenBot のチャンネル",
   "workflow.output.target.file": "ファイル",
   "workflow.output.target.notify": "通知",
   "workflow.output.path": "ファイルのパス",

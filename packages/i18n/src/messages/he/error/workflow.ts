@@ -24,6 +24,8 @@ export const messages = {
   "error.workflow.notRetryable": "אפשר להריץ שוב רק שלב שנכשל או שנעצר.",
   "error.workflow.noDecision": "השלב הזה לא ממתין להחלטה.",
   "error.workflow.outputPlaceMissing": "יש לבחור מקום הודעות לפלט הזה.",
+  "error.workflow.outputChannelMissing": "בחרו ערוץ לפלט הזה.",
+  "error.workflow.outputChannelFailed": "OpenBot לא הצליח לפרסם את התוצאה בערוץ. הריצו את השלב שוב.",
   "error.workflow.discordNoMessage":
     "הפלט הזה פועל על הודעת Discord שהפעילה את ההרצה. יש להפעיל את ההרצה מאזכור ב-Discord, או לבחור ״פרסום בערוץ״.",
   "error.workflow.slackNoMessage":

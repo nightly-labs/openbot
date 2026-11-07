@@ -10,7 +10,7 @@ import { For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { type PickerGroup, PickerHeading, PickerMenu, PickerRow } from "./WorkflowPicker";
 import { useBoard, type WfnFieldValue } from "./workflow-board";
-import { type Choice, placeKey, useField, usePlace } from "./workflow-node-parts";
+import { asString, type Choice, placeKey, useField, usePlace } from "./workflow-node-parts";
 
 /** The settings of a card, on the field colour. */
 export function SettingRows(props: { head: JSX.Element; children?: JSX.Element }) {
@@ -281,6 +281,27 @@ export function PlaceRow(props: {
       placeholder={t("workflow.node.place.choose")}
       disabled={props.disabled}
       onChange={choose}
+    />
+  );
+}
+
+/** The OpenBot channel of an output. */
+export function ChannelRow(props: { id: string; disabled: boolean }) {
+  const board = useBoard();
+  const { t } = useText();
+  const [channelId, setChannelId] = useField<string>(() => props.id, "channelId", "", asString);
+  return (
+    <SettingRow
+      name={t("workflow.node.place.channel")}
+      value={channelId()}
+      choices={(board.catalogs().channels ?? []).map((channel) => ({
+        value: channel.id,
+        label: channel.name,
+        icon: () => <Hash aria-hidden="true" />,
+      }))}
+      placeholder={t("workflow.node.place.choose")}
+      disabled={props.disabled}
+      onChange={setChannelId}
     />
   );
 }

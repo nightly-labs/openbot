@@ -163,6 +163,8 @@ export const messages = defineMessages("workflow", {
 
   "workflow.output.title": "Output",
   "workflow.output.name": "output",
+  "workflow.output.target.messagingChannel": "Slack, Discord or Telegram channel",
+  "workflow.output.target.chatChannel": "OpenBot channel",
   "workflow.output.target.file": "File",
   "workflow.output.target.notify": "Notification",
   "workflow.output.path": "File path",
