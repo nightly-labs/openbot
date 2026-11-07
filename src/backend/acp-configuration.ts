@@ -469,10 +469,6 @@ export class AcpConfiguration {
   });
 
   /**
-   * A configuration request, which fails at the request timeout. A turn sends these before its
-   * prompt, so without the limit a process that stopped answering held the turn with no end (#3520).
-   */
-  /**
    * A `session/set_config_option`. After a failure that `configSetUnsaved` accepts, the session
    * already has the value and only its save as the default failed, so the option changes here.
    */
@@ -495,6 +491,10 @@ export class AcpConfiguration {
     );
   }
 
+  /**
+   * A configuration request, which fails at the request timeout. A turn sends these before its
+   * prompt, so without the limit a process that stopped answering held the turn with no end (#3520).
+   */
   #timed<T>(method: string, request: () => Promise<T>): Effect.Effect<T, ProviderClientOperationError> {
     return providerCall(request).pipe(
       Effect.timeoutOrElse({

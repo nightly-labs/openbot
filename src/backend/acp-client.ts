@@ -1611,8 +1611,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             const connection = () =>
               sessionTransport ? sessionTransport.requireConnection() : this.#requireConnection();
             const additionalDirectories = getArray(params, "runtimeWorkspaceRoots").filter(isString);
-            // Sent only to an agent that advertises them: Grok 1.0.60 refuses them on every session
-            // request, so each new Grok session failed.
+            // Sent only to an agent that advertises them, or whose flavor sets
+            // `workspaceAsAdditionalDirectory`: Grok 1.0.60 refuses them on every session request,
+            // so each new Grok session failed.
             const directories = this.#acceptsAdditionalDirectories
               ? {
                   additionalDirectories: this.#flavor.workspaceAsAdditionalDirectory
