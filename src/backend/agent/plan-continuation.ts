@@ -33,9 +33,9 @@ const ASKS_TO_CONTINUE = new RegExp(
 const SENTENCE_CHAR = String.raw`(?:[^.!?\n]|\.(?=\S))`;
 /**
  * The rest of a next-step sentence must not wait for someone or something: an offer to the user
- * ("… if you want"), an approval, a later time, or an outside event ("… when the build finishes").
+ * ("… if you want"), the user's approval, a later time, or another person ("… get back to you").
  */
-const NOT_WAITING = String.raw`(?!${SENTENCE_CHAR}*\b(?:(?:if|when|once|after|unless|until|as\s+soon\s+as)\s+(?:you|your)|(?:when|once|until)\s+(?:it|the|this)|get\s+back|approv\w*|confirm\w*|permission|later|tomorrow|next\s+(?:week|month|time)|back\s+in)\b)`;
+const NOT_WAITING = String.raw`(?!${SENTENCE_CHAR}*\b(?:(?:if|when|once|after|unless|until|as\s+soon\s+as)\s+(?:you|your)|get\s+back|once\s+approved|(?:your|the\s+user['’]s)\s+(?:approval|confirmation|permission)|later|tomorrow|next\s+(?:week|month|time)|back\s+in)\b)`;
 /**
  * A short answer whose last words name the agent's next step, such as "I'll now run the tests." An
  * answer that says the agent waits, holds or stops does not match.
