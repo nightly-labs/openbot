@@ -5,7 +5,7 @@ import type { ConversationMessage, ConversationSnapshot } from "@openbot/contrac
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { AgentRoster } from "./agent-roster";
 import { recordUsageMessage } from "./agent-usage";
-import { type DatabaseCore, deleteReceiptsOf } from "./database-core";
+import { type DatabaseCore, deleteReceiptsOf, deleteThreadAttachments } from "./database-core";
 import {
   databaseRow,
   databaseRows,
@@ -16,6 +16,7 @@ import {
 import {
   deletedThreadMessageIds,
   isDeletedThreadMessage,
+  recordDeletedThreadHistory,
   recordDeletedThreadMessage,
   withoutDeletedMessages,
 } from "./deleted-thread-messages";
@@ -629,6 +630,55 @@ export class ConversationWriter {
       },
     );
     return result.revision;
+  }
+
+  /**
+   * Deletes every shown message of a thread, for "Delete history": each one is recorded as deleted,
+   * so no later write, import or replay brings it back, and goes with its attachments. The earlier
+   * events of the thread lose their messages, and the compaction summaries of the thread go, because
+   * they hold the text of the deleted messages. Returns the stored revision and the deleted ids.
+   */
+  deleteThreadHistory(input: { agentId: string; threadId: string; activeTurnId: string | null; eventType: string }): {
+    revision: number;
+    messageIds: string[];
+  } {
+    return this.#core.dispatch(
+      `conversation:${input.eventType}:${randomUUID()}`,
+      [
+        {
+          aggregateType: "thread",
+          aggregateId: input.threadId,
+          eventType: input.eventType,
+          payload: { detail: {}, changedMessages: [], removedMessageIds: [], activeTurnId: input.activeTurnId },
+        },
+      ],
+      (db, sequences) => {
+        const sequence = sequences[0] ?? 0;
+        const threadOwner = databaseRow(
+          db.prepare("SELECT agent_id FROM projection_threads WHERE thread_id = ?").get(input.threadId),
+        );
+        if (!threadOwner || requiredStringColumn(threadOwner, "agent_id") !== input.agentId)
+          throw new Error(`Unknown agent for conversation changes: ${input.agentId}`);
+        const messageIds = recordDeletedThreadHistory(db, input.threadId, new Date().toISOString());
+        deleteThreadAttachments(db, input.threadId);
+        db.prepare("DELETE FROM projection_thread_messages WHERE thread_id = ?").run(input.threadId);
+        db.prepare("DELETE FROM projection_thread_summaries WHERE thread_id = ?").run(input.threadId);
+        // The receipt of a summary command holds the summary text too.
+        const summaryEvents =
+          "FROM orchestration_events WHERE aggregate_type = 'thread' AND aggregate_id = ? AND event_type = 'thread.summary-created'";
+        const summaryCommands = databaseRows(
+          db.prepare(`SELECT DISTINCT command_id ${summaryEvents}`).all(input.threadId),
+        ).map((row) => requiredStringColumn(row, "command_id"));
+        db.prepare(`DELETE ${summaryEvents}`).run(input.threadId);
+        deleteReceiptsOf(db, summaryCommands);
+        db.prepare("UPDATE projection_threads SET updated_at = ?, last_event_sequence = ? WHERE thread_id = ?").run(
+          new Date().toISOString(),
+          sequence,
+          input.threadId,
+        );
+        return { revision: sequence, messageIds };
+      },
+    );
   }
 
   /**

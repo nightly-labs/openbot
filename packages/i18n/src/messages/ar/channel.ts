@@ -38,6 +38,14 @@ export const messages = {
   "channel.settings.compact.title": "ضغط السياق",
   "channel.settings.compact.description": "يحتفظ الأعضاء بملخص قصير لجلسة القناة ويستخدمون رموزًا أقل.",
   "channel.settings.compact.failed": "تعذر ضغط سياق القناة.",
+  "channel.settings.deleteHistory.title": "حذف السجل",
+  "channel.settings.deleteHistory.description": "تُحذف الرسائل وينساها الأعضاء. يبقى إعداد القناة كما هو.",
+  "channel.settings.deleteHistory.button": "حذف",
+  "channel.settings.deleteHistory.confirmTitle": "هل تريد حذف سجل {name}؟",
+  "channel.settings.deleteHistory.confirmDescription":
+    "تُحذف كل رسائل هذه القناة وملفاتها من هذا الكمبيوتر وينساها الأعضاء. لا يمكن التراجع عن ذلك. لا يتغير الأعضاء والتعليمات والذكريات والروتينات والمهام.",
+  "channel.settings.deleteHistory.confirm": "حذف السجل",
+  "channel.settings.deleteHistory.failed": "تعذّر حذف السجل.",
   "channel.settings.routines": "المهام الدورية",
   "channel.settings.routineCount": {
     zero: "لا مهام مُعدّة",

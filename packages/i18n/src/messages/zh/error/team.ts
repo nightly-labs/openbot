@@ -59,6 +59,7 @@ export const messages = {
   "error.team.channelContextUnsupported": "此连接不支持在频道中开始新对话或压缩。",
   "error.team.channelPictureUnsupported": "当前连接不支持频道图片。",
   "error.team.channelDeleteUnsupported": "当前连接不支持删除频道。",
+  "error.team.historyDeleteUnsupported": "当前连接不支持删除历史记录。",
   "error.team.channelTaskCancelUnsupported": "当前连接不支持取消频道任务。",
   "error.team.membersCannotDeleteChannels": "成员不能删除频道。",
   "error.team.membersCannotArchiveChannels": "成员不能归档频道。",

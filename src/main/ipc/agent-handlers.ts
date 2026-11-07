@@ -559,6 +559,13 @@ export function agentIpcHandlers({
           throw new Error(sourceText("error.team.channelContextUnsupported"));
         },
       }),
+      // Only this computer deletes a channel history. Team API has no route for it.
+      deleteChannelHistory: scopedHandler(parseChannelId, {
+        local: (channelId) => runCauseEffect(service.deleteChannelHistory(channelId)),
+        remote: () => {
+          throw new Error(sourceText("error.team.historyDeleteUnsupported"));
+        },
+      }),
       compactChannelContext: scopedHandler(parseChannelId, {
         local: (channelId) => runCauseEffect(service.compactChannelContext(channelId)),
         remote: () => {
@@ -1184,6 +1191,13 @@ export function agentIpcHandlers({
               body: { agentId },
             }),
           );
+        },
+      }),
+      // Only this computer deletes an agent's history. Team API has no route for it.
+      deleteHistory: scopedHandler(parseAgentId, {
+        local: (agentId) => runCauseEffect(service.deleteAgentHistory(agentId)),
+        remote: () => {
+          throw new Error(sourceText("error.team.historyDeleteUnsupported"));
         },
       }),
       // A joined server compacts with `context-compact-v1`.

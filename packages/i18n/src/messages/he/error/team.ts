@@ -59,6 +59,7 @@ export const messages = {
   "error.team.channelContextUnsupported": "החיבור הזה אינו תומך בשיחה חדשה או בדחיסה בערוץ.",
   "error.team.channelPictureUnsupported": "תמונות ערוץ אינן נתמכות בחיבור הזה.",
   "error.team.channelDeleteUnsupported": "מחיקת ערוצים אינה נתמכת בחיבור הזה.",
+  "error.team.historyDeleteUnsupported": "מחיקת היסטוריה אינה נתמכת בחיבור הזה.",
   "error.team.channelTaskCancelUnsupported": "ביטול משימות ערוץ אינו נתמך בחיבור הזה.",
   "error.team.membersCannotDeleteChannels": "חברים אינם יכולים למחוק ערוצים.",
   "error.team.membersCannotArchiveChannels": "חברים אינם יכולים להעביר ערוצים לארכיון.",

@@ -33,6 +33,15 @@ export const messages = {
   "channel.settings.compact.title": "Compactar contexto",
   "channel.settings.compact.description": "Os membros mantêm um resumo curto da sessão do canal e usam menos tokens.",
   "channel.settings.compact.failed": "Não foi possível compactar o contexto do canal.",
+  "channel.settings.deleteHistory.title": "Excluir histórico",
+  "channel.settings.deleteHistory.description":
+    "As mensagens são excluídas e os membros as esquecem. A configuração do canal continua.",
+  "channel.settings.deleteHistory.button": "Excluir",
+  "channel.settings.deleteHistory.confirmTitle": "Excluir o histórico de {name}?",
+  "channel.settings.deleteHistory.confirmDescription":
+    "Todas as mensagens e arquivos deste canal são excluídos deste computador e os membros os esquecem. Não é possível desfazer. Membros, instruções, memórias, rotinas e tarefas não mudam.",
+  "channel.settings.deleteHistory.confirm": "Excluir histórico",
+  "channel.settings.deleteHistory.failed": "Não foi possível excluir o histórico.",
   "channel.settings.routines": "Rotinas",
   "channel.settings.routineCount": { one: "{count} configurada", other: "{count} configuradas" },
   "channel.create.close": "Fechar novo canal",

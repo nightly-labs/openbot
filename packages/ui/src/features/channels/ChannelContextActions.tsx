@@ -15,21 +15,26 @@ import { createSignal, Show } from "solid-js";
 import { useText } from "../../text";
 
 /**
- * "New conversation" and "Compact now" for a channel, as the agent settings offer them for an
- * agent's own chat. A new conversation asks first; its failure stays in the dialog. A compaction
- * failure shows under its row.
+ * "New conversation", "Compact now" and "Delete history" for a channel, as the agent settings offer
+ * them for an agent's own chat. A new conversation and a delete ask first; a failure stays in the
+ * dialog. A compaction failure shows under its row.
  */
 export function ChannelContextActions(props: {
   channelName: string;
   startNewConversation: () => Promise<void>;
   compact: () => Promise<void>;
+  /** Left out when the host cannot delete the history. */
+  deleteHistory?: (() => Promise<void>) | undefined;
 }) {
   const { t, errorMessage } = useText();
   const [confirmOpen, setConfirmOpen] = createSignal(false);
   const [confirmFailure, setConfirmFailure] = createSignal<UserErrorDetails | null>(null);
   const [compacting, setCompacting] = createSignal(false);
   const [compactFailure, setCompactFailure] = createSignal<UserErrorDetails | null>(null);
+  const [deleteOpen, setDeleteOpen] = createSignal(false);
+  const [deleteFailure, setDeleteFailure] = createSignal<UserErrorDetails | null>(null);
   let newConversationButton: HTMLButtonElement | undefined;
+  let deleteHistoryButton: HTMLButtonElement | undefined;
 
   async function confirm(): Promise<void> {
     setConfirmFailure(null);
@@ -39,6 +44,19 @@ export function ChannelContextActions(props: {
     } catch (error) {
       setConfirmFailure({
         message: errorMessage(error, t("channel.settings.newConversation.failed")),
+        reference: errorReference(error),
+      });
+    }
+  }
+
+  async function confirmDelete(remove: () => Promise<void>): Promise<void> {
+    setDeleteFailure(null);
+    try {
+      await remove();
+      setDeleteOpen(false);
+    } catch (error) {
+      setDeleteFailure({
+        message: errorMessage(error, t("channel.settings.deleteHistory.failed")),
         reference: errorReference(error),
       });
     }
@@ -92,6 +110,27 @@ export function ChannelContextActions(props: {
             </Button>
           </ItemActions>
         </Item>
+        <Show when={props.deleteHistory}>
+          <Item>
+            <ItemContent>
+              <ItemTitle>{t("channel.settings.deleteHistory.title")}</ItemTitle>
+              <ItemDescription>{t("channel.settings.deleteHistory.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Button
+                ref={deleteHistoryButton}
+                size="sm"
+                variant="destructive"
+                type="button"
+                aria-label={t("channel.settings.deleteHistory.confirm")}
+                aria-haspopup="dialog"
+                onClick={() => setDeleteOpen(true)}
+              >
+                {t("channel.settings.deleteHistory.button")}
+              </Button>
+            </ItemActions>
+          </Item>
+        </Show>
       </ItemGroup>
       <Show when={compactFailure()}>
         {(failure) => (
@@ -123,6 +162,31 @@ export function ChannelContextActions(props: {
         }}
         onConfirm={confirm}
       />
+      <Show when={props.deleteHistory}>
+        {(remove) => (
+          <ConfirmDialog
+            open={deleteOpen()}
+            initialFocus="cancel"
+            title={t("channel.settings.deleteHistory.confirmTitle", { name: props.channelName })}
+            description={t("channel.settings.deleteHistory.confirmDescription")}
+            confirmLabel={t("channel.settings.deleteHistory.confirm")}
+            error={
+              deleteFailure() ? (
+                <>
+                  {deleteFailure()?.message}
+                  <ErrorReference reference={deleteFailure()?.reference} />
+                </>
+              ) : undefined
+            }
+            restoreFocusTarget={deleteHistoryButton}
+            onCancel={() => {
+              setDeleteFailure(null);
+              setDeleteOpen(false);
+            }}
+            onConfirm={() => confirmDelete(remove())}
+          />
+        )}
+      </Show>
     </>
   );
 }

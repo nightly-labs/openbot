@@ -66,6 +66,8 @@ export const messages = {
     "Warte, bis der aktive Durchlauf und die Warteschlange abgeschlossen sind, bevor du einen neuen Chat beginnst.",
   "error.agent.waitBeforeCompactContext":
     "Warte, bis der aktive Durchlauf und die Warteschlange fertig sind, bevor du den Kontext komprimierst.",
+  "error.agent.waitBeforeDeleteHistory":
+    "Warte, bis der aktive Durchlauf und die Warteschlange abgeschlossen sind, bevor du den Verlauf löschst.",
   "error.agent.compactContextUnavailable": "Dieser Agent kann seinen Kontext jetzt nicht komprimieren.",
   "error.agent.unknown": "Unbekannter Agent: {id}",
   "error.agent.onlyUserWidensSettings":

@@ -62,6 +62,7 @@ export const messages = {
     "Deze verbinding ondersteunt geen nieuw gesprek of comprimeren in een kanaal.",
   "error.team.channelPictureUnsupported": "Deze verbinding ondersteunt geen kanaalafbeeldingen.",
   "error.team.channelDeleteUnsupported": "Deze verbinding ondersteunt het verwijderen van kanalen niet.",
+  "error.team.historyDeleteUnsupported": "Deze verbinding ondersteunt het wissen van de geschiedenis niet.",
   "error.team.channelTaskCancelUnsupported": "Deze verbinding ondersteunt het annuleren van kanaaltaken niet.",
   "error.team.membersCannotDeleteChannels": "Leden kunnen geen kanalen verwijderen.",
   "error.team.membersCannotArchiveChannels": "Leden kunnen geen kanalen archiveren.",

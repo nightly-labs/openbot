@@ -33,6 +33,14 @@ export const messages = {
   "channel.settings.compact.description":
     "Üyeler kanal oturumlarının kısa bir özetini tutar ve daha az token kullanır.",
   "channel.settings.compact.failed": "Kanal bağlamı sıkıştırılamadı.",
+  "channel.settings.deleteHistory.title": "Geçmişi sil",
+  "channel.settings.deleteHistory.description": "Mesajlar silinir ve üyeler onları unutur. Kanal kurulumu kalır.",
+  "channel.settings.deleteHistory.button": "Sil",
+  "channel.settings.deleteHistory.confirmTitle": "{name} geçmişi silinsin mi?",
+  "channel.settings.deleteHistory.confirmDescription":
+    "Bu kanalın tüm mesajları ve dosyaları bu bilgisayardan silinir ve üyeler onları unutur. Bu işlem geri alınamaz. Üyeler, talimatlar, anılar, rutinler ve görevler değişmez.",
+  "channel.settings.deleteHistory.confirm": "Geçmişi sil",
+  "channel.settings.deleteHistory.failed": "Geçmiş silinemedi.",
   "channel.settings.routines": "Rutinler",
   "channel.settings.routineCount": { one: "{count} yapılandırılmış", other: "{count} yapılandırılmış" },
   "channel.create.close": "Yeni kanalı kapat",

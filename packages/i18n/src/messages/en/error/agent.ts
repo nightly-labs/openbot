@@ -56,6 +56,7 @@ export const messages = defineMessages("error.agent", {
     "Tasks of this agent are running. Wait for them to finish, or stop them, before changing provider.",
   "error.agent.waitBeforeClearContext": "Wait for the active turn and queue to finish before starting a new chat.",
   "error.agent.waitBeforeCompactContext": "Wait for the active turn and queue to finish before compacting the context.",
+  "error.agent.waitBeforeDeleteHistory": "Wait for the active turn and queue to finish before deleting the history.",
   "error.agent.compactContextUnavailable": "This agent cannot compact its context now.",
   "error.agent.unknown": "Unknown agent: {id}",
   "error.agent.onlyUserWidensSettings":

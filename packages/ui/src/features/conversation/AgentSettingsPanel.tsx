@@ -115,6 +115,7 @@ import { useText } from "../../text";
 import { avatarColorChoiceLabel } from "../agents/avatar-hue-label";
 import { SERVER_NOTIFICATION_LEVEL_LABELS } from "../servers/ServerActionItems";
 import { AgentChatColorRow } from "../settings/ChatColorSetting";
+import { AgentDeleteHistoryDialog } from "./AgentDeleteHistoryDialog";
 import { type AgentFolderCalls, AgentFoldersPage, AgentFoldersRow, createAgentFolders } from "./AgentFolders";
 import { AgentNewChatDialog } from "./AgentNewChatDialog";
 import { BackupModelsPage } from "./BackupModels";
@@ -204,6 +205,11 @@ export interface AgentSettingsPanelProps {
    * it and keeps its setup. Left out when the host cannot do it.
    */
   onStartNewChat?: (() => Promise<void>) | undefined;
+  /**
+   * Deletes the messages of the agent's own chat after the user confirms, and the agent forgets them.
+   * Left out when the host cannot do it.
+   */
+  onDeleteHistory?: (() => Promise<void>) | undefined;
 }
 
 export interface AgentBrowserProfileOptions {
@@ -309,6 +315,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const { t, errorMessage, format } = useText();
   const agentDefaults = () => props.agentDefaults ?? DEFAULT_AGENT_DEFAULTS;
   const [newChatOpen, setNewChatOpen] = createSignal(false);
+  const [deleteHistoryOpen, setDeleteHistoryOpen] = createSignal(false);
   const [draft, setDraft] = createStore<AgentSettingsDraft>({
     avatar: {
       hue: null,
@@ -1658,6 +1665,24 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   </Button>
                 </div>
               </Show>
+              <Show when={props.onDeleteHistory}>
+                <div class="agent-settings-notifications">
+                  <div>
+                    <strong>{t("agentSettings.deleteHistory.title")}</strong>
+                    <span>{t("agentSettings.deleteHistory.description")}</span>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    type="button"
+                    aria-label={t("agentSettings.deleteHistory.confirm")}
+                    aria-haspopup="dialog"
+                    disabled={props.working}
+                    onClick={() => setDeleteHistoryOpen(true)}
+                  >
+                    {t("agentSettings.deleteHistory.button")}
+                  </Button>
+                </div>
+              </Show>
               <Show when={props.newChatEditable}>
                 <div class="agent-settings-notifications">
                   <div>
@@ -1721,6 +1746,16 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               open={newChatOpen()}
               onClose={() => setNewChatOpen(false)}
               start={() => start()()}
+            />
+          )}
+        </Show>
+        <Show when={props.onDeleteHistory}>
+          {(remove) => (
+            <AgentDeleteHistoryDialog
+              agent={props.agent}
+              open={deleteHistoryOpen()}
+              onClose={() => setDeleteHistoryOpen(false)}
+              remove={() => remove()()}
             />
           )}
         </Show>

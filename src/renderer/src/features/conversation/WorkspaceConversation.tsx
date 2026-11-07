@@ -266,6 +266,14 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     return () => turnsPort().agent.clearContext(agent.id, server.id);
   });
 
+  /** "Delete history" of the active agent's own chat. The Team API has no route for it. */
+  const deleteActiveAgentHistory = createMemo(() => {
+    const agent = activeAgent();
+    const server = activeServer();
+    if (!agent || server?.kind !== "local") return undefined;
+    return () => turnsPort().agent.deleteHistory(agent.id, server.id);
+  });
+
   /** "Compact now", on this computer or on a host that serves `context-compact-v1`. */
   const compactActiveAgentContext = createMemo(() => {
     const agent = activeAgent();
@@ -714,6 +722,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         agentDefaults={generalSettings().agentDefaults}
         agentMemoryLimit={generalSettings().agentMemoryLimit}
         onClearAgentContext={clearActiveAgentContext()}
+        onDeleteAgentHistory={deleteActiveAgentHistory()}
         onCompactAgentContext={compactActiveAgentContext()}
         onRespondToBrowserTakeover={(decision, options) => respondToBrowserTakeover(decision, openThreadId(), options)}
         onCancelQueuedMessage={cancelQueuedMessage}

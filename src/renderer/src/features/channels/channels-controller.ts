@@ -511,6 +511,16 @@ export function createChannelsController(env: ChannelsEnvironment) {
       await clearChannelContext(channelId);
       await refreshAfter();
     },
+    /** Whether the host deletes a channel history: as the context actions, from this computer only. */
+    historyDeletionSupported: () =>
+      supported() && env.contextActionsSupported() && env.port().agent.deleteChannelHistory !== undefined,
+    /** "Delete history": the messages go, and the members forget them. A failure rejects, for the dialog to show. */
+    deleteHistory: async (channelId: string) => {
+      const deleteChannelHistory = env.port().agent.deleteChannelHistory;
+      if (!deleteChannelHistory) throw new Error(currentText().t("channel.error.action"));
+      await deleteChannelHistory(channelId);
+      await refreshAfter();
+    },
     /** Compacts the channel session of each member now. A failure rejects, for the row to show. */
     compactContext: async (channelId: string) => {
       const compactChannelContext = env.port().agent.compactChannelContext;

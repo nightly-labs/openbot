@@ -60,6 +60,7 @@ export const messages = {
   "error.team.channelContextUnsupported": "هذا الاتصال لا يدعم محادثة جديدة أو الضغط في قناة.",
   "error.team.channelPictureUnsupported": "صور القنوات غير مدعومة في هذا الاتصال.",
   "error.team.channelDeleteUnsupported": "حذف القنوات غير مدعوم في هذا الاتصال.",
+  "error.team.historyDeleteUnsupported": "حذف السجل غير مدعوم في هذا الاتصال.",
   "error.team.channelTaskCancelUnsupported": "إلغاء مهام القنوات غير مدعوم في هذا الاتصال.",
   "error.team.membersCannotDeleteChannels": "لا يمكن للأعضاء حذف القنوات.",
   "error.team.membersCannotArchiveChannels": "لا يمكن للأعضاء أرشفة القنوات.",

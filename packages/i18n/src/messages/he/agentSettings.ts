@@ -192,6 +192,14 @@ export const messages = {
     "הסוכן שוכח את הצ'אט הזה. ההודעות נשארות גלויות מעל קו מפריד. ההנחיות, המודל, הכלים, הזיכרונות, סביבת העבודה והדפדפן לא משתנים.",
   "agentSettings.newChat.confirm": "התחלת צ'אט חדש",
   "agentSettings.newChat.failed": "לא ניתן להתחיל צ'אט חדש.",
+  "agentSettings.deleteHistory.title": "מחיקת היסטוריה",
+  "agentSettings.deleteHistory.description": "ההודעות בצ'אט הזה נמחקות והסוכן שוכח אותן. ההגדרות שלו נשארות.",
+  "agentSettings.deleteHistory.button": "מחיקה",
+  "agentSettings.deleteHistory.confirmTitle": "למחוק את היסטוריית הצ'אט עם {name}?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "כל ההודעות והקבצים של הצ'אט הזה יימחקו מהמחשב הזה, והסוכן ישכח אותם. אי אפשר לבטל את הפעולה. שרשורים צדדיים, הוראות, מודל, כלים, זיכרונות, סביבת עבודה ודפדפן לא משתנים.",
+  "agentSettings.deleteHistory.confirm": "מחיקת היסטוריה",
+  "agentSettings.deleteHistory.failed": "לא ניתן למחוק את ההיסטוריה.",
 
   "agentSettings.fullAccess.title": "לתת לסוכן הזה גישה מלאה?",
   "agentSettings.fullAccess.askTitle": "לאפשר לסוכן הזה לעבוד מחוץ לסביבת העבודה שלו?",

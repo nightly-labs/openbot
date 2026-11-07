@@ -3309,6 +3309,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           });
         });
       },
+      deleteHistory: async (agentId: string) => {
+        updateSnapshot(agentId, (snapshot) => {
+          snapshot.messages = [];
+        });
+      },
       compactContext: async () => undefined,
       compactTaskContext: async () => undefined,
       respondToPrompt: async (input: RespondToPromptInput) => {

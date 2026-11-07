@@ -57,6 +57,8 @@ export const messages = {
   "error.agent.waitBeforeClearContext":
     "Дождитесь, пока завершатся текущий ход и очередь, прежде чем начинать новый чат.",
   "error.agent.waitBeforeCompactContext": "Дождитесь завершения активного хода и очереди, прежде чем сжимать контекст.",
+  "error.agent.waitBeforeDeleteHistory":
+    "Дождитесь, пока завершатся текущий ход и очередь, прежде чем удалять историю.",
   "error.agent.compactContextUnavailable": "Этот агент сейчас не может сжать свой контекст.",
   "error.agent.unknown": "Неизвестный агент: {id}",
   "error.agent.onlyUserWidensSettings":

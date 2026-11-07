@@ -61,6 +61,8 @@ export const messages = {
     "Aspetta che il turno attivo e la coda finiscano prima di iniziare una nuova chat.",
   "error.agent.waitBeforeCompactContext":
     "Attendi la fine del turno attivo e della coda prima di compattare il contesto.",
+  "error.agent.waitBeforeDeleteHistory":
+    "Aspetta che il turno attivo e la coda finiscano prima di eliminare la cronologia.",
   "error.agent.compactContextUnavailable": "Questo agente non può compattare il suo contesto ora.",
   "error.agent.unknown": "Agente sconosciuto: {id}",
   "error.agent.onlyUserWidensSettings":

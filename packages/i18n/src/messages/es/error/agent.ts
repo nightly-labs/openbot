@@ -60,6 +60,8 @@ export const messages = {
     "Espera a que terminen el turno activo y la cola antes de iniciar un nuevo chat.",
   "error.agent.waitBeforeCompactContext":
     "Espera a que terminen el turno activo y la cola antes de compactar el contexto.",
+  "error.agent.waitBeforeDeleteHistory":
+    "Espera a que terminen el turno activo y la cola antes de eliminar el historial.",
   "error.agent.compactContextUnavailable": "Este agente no puede compactar su contexto ahora.",
   "error.agent.unknown": "Agente desconocido: {id}",
   "error.agent.onlyUserWidensSettings":

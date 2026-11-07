@@ -3643,6 +3643,66 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }, Effect.uninterruptible).bind(this);
 
   /**
+   * "Delete history": deletes every message of the agent's own chat, with the mailbox copies and the
+   * files that no other record uses, and ends its provider sessions, so the agent forgets the chat
+   * too. No restart, sync or provider import brings a message back. The side threads, the profile,
+   * memories, workspace and browser do not change. Work that still runs or waits refuses it.
+   */
+  readonly deleteAgentHistory = Effect.fn("AgentService.deleteAgentHistory")(function* (
+    this: AgentService,
+    agentId: string,
+  ) {
+    const busy = () => new ContextResetBusyError(sourceText("error.agent.waitBeforeDeleteHistory"));
+    const mainChatBusy = (agent: AgentSummary) =>
+      Boolean(
+        this.#conversation.workingSnapshot(agentId)?.activeTurnId ??
+          (agent.threadId ? this.#store.database.readActiveTurnId(agentId, agent.threadId) : null),
+      ) ||
+      this.#mailbox.hasUnfinishedDeliveryOutsideTasks(agentId) ||
+      this.#threads.mainContextBusy(agent);
+    const target = yield* lifecycleStep("delete agent history", () => {
+      const agent = this.#conversation.requireKnownAgent(agentId);
+      if (mainChatBusy(agent)) throw busy();
+      return agent.threadId
+        ? { threadId: agent.threadId, messageIds: this.#store.database.threadMessageIds(agent.threadId) }
+        : null;
+    });
+    if (!target) return;
+    // The history goes with the automatic plan continuation of the chat.
+    yield* this.#drain.endPlanContinuation(agentId, null);
+    // The mailbox copies go first, as for one message: a failure after them leaves the chat as it
+    // was, and a second request completes the work.
+    const mailbox = yield* this.#mailbox
+      .deleteShownMessages(agentId, target.messageIds)
+      .pipe(
+        Effect.catchTag("StoredStateFailure", ({ cause }) =>
+          Effect.fail(new AgentLifecycleFailed({ operation: "delete agent history", cause })),
+        ),
+      );
+    if (mailbox === "busy")
+      return yield* new AgentLifecycleFailed({ operation: "delete agent history", cause: busy() });
+    yield* lifecycleStep("delete agent history", () =>
+      this.#conversation.withConversationTransaction(agentId, ({ threadId, snapshot }) => {
+        // A turn or a move to another chat can start while the mailbox step waits.
+        const agent = this.#conversation.requireKnownAgent(agentId);
+        if (threadId !== target.threadId || snapshot.activeTurnId || mainChatBusy(agent)) throw busy();
+        const { revision } = this.#store.database.deleteThreadHistory({
+          agentId,
+          threadId,
+          activeTurnId: null,
+          eventType: "conversation.history-deleted",
+        });
+        this.#conversation.forgetDeletedHistory(threadId);
+        snapshot.messages = [];
+        snapshot.revision = revision;
+        return { result: undefined, snapshot };
+      }),
+    );
+    yield* this.#threads.endThreadContext(target.threadId);
+    yield* this.#memoryReview.chatCleared(agentId);
+  }, Effect.uninterruptible).bind(this);
+
+  /**
    * Compacts the context of the agent's own chat now, below the automatic threshold too. Only for a
    * provider that OpenBot can ask to compact, and only when no turn or queued message needs the session.
    */
@@ -3707,6 +3767,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     person: { id: string; name: string },
   ) {
     yield* this.channels.clearContext(channelId, person, {
+      busy: (contexts) => {
+        const agents = new Map(this.#store.list().map((agent) => [agent.id, agent]));
+        return contexts.some(({ agentId, threadId }) => this.#channelSessionBusy(agents.get(agentId), threadId));
+      },
+      end: (threadIds) =>
+        Effect.forEach(threadIds, (threadId) => this.#threads.endThreadContext(threadId), { discard: true }),
+    });
+  }, Effect.uninterruptible).bind(this);
+
+  /** "Delete history" of a channel. The members forget it, as for `clearChannelContext`. */
+  readonly deleteChannelHistory = Effect.fn("AgentService.deleteChannelHistory")(function* (
+    this: AgentService,
+    channelId: string,
+  ) {
+    yield* this.channels.deleteHistory(channelId, {
       busy: (contexts) => {
         const agents = new Map(this.#store.list().map((agent) => [agent.id, agent]));
         return contexts.some(({ agentId, threadId }) => this.#channelSessionBusy(agents.get(agentId), threadId));

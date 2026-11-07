@@ -39,6 +39,15 @@ export const messages = {
   "channel.settings.compact.description":
     "Członkowie zachowują krótkie podsumowanie sesji kanału i zużywają mniej tokenów.",
   "channel.settings.compact.failed": "Nie udało się skompaktować kontekstu kanału.",
+  "channel.settings.deleteHistory.title": "Usuń historię",
+  "channel.settings.deleteHistory.description":
+    "Wiadomości znikają, a członkowie o nich zapominają. Konfiguracja kanału zostaje.",
+  "channel.settings.deleteHistory.button": "Usuń",
+  "channel.settings.deleteHistory.confirmTitle": "Usunąć historię kanału {name}?",
+  "channel.settings.deleteHistory.confirmDescription":
+    "Wszystkie wiadomości i pliki tego kanału znikną z tego komputera, a członkowie o nich zapomną. Nie można tego cofnąć. Członkowie, instrukcje, wspomnienia, rutyny i zadania się nie zmienią.",
+  "channel.settings.deleteHistory.confirm": "Usuń historię",
+  "channel.settings.deleteHistory.failed": "Nie udało się usunąć historii.",
   "channel.settings.routines": "Rutyny",
   "channel.settings.routineCount": {
     one: "{count} skonfigurowana",
