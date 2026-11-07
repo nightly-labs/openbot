@@ -97,14 +97,15 @@ export function voiceIpcHandlers({
     if (event.kind === "ended") remoteSessions.delete(event.sessionId);
     forwardLiveEvent(voiceLiveEventFromWire(event));
   });
-  // The host ends the sessions of a closed event connection, but its end cannot arrive any more.
-  // "connecting" is left out: a retry of a connection that is still open shows it too.
+  // The host ends the sessions of a closed event connection, but its end cannot arrive any more. A
+  // removed server is not in the list. "connecting" is kept: a retry of a connection that is still
+  // open shows it too.
   remoteServers.on("changed", (servers) => {
-    const lost = new Set(
-      servers.filter((summary) => summary.state !== "online" && summary.state !== "connecting").map(({ id }) => id),
+    const reachable = new Set(
+      servers.filter((summary) => summary.state === "online" || summary.state === "connecting").map(({ id }) => id),
     );
     for (const [sessionId, serverId] of remoteSessions)
-      if (lost.has(serverId)) {
+      if (!reachable.has(serverId)) {
         remoteSessions.delete(sessionId);
         forwardLiveEvent({ type: "ended", sessionId, error: null });
       }
