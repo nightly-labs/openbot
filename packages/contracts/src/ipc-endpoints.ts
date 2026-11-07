@@ -562,6 +562,7 @@ import type {
 } from "./ipc-team-host";
 import type { VaultImportResult, VaultSaveInput, VaultSecretRequest, VaultState } from "./ipc-vault";
 import type {
+  SpeechApiKeyInput,
   SpeechAudio,
   SpeechInput,
   SpeechModelStatus,
@@ -806,8 +807,8 @@ export const IPC_ENDPOINTS = {
     chatWindows: event<ChatWindowTarget[]>()("app:chat-windows"),
     // Main reads `Cmd + Q` before the page does, so it tells the window when to show the hint that
     // the key must be held or pressed twice. The hint names the local agents that work, which a quit
-    // stops. An empty list removes it.
-    quitShortcutHint: event<ClientAgentSummary[]>()("app:quit-shortcut-hint"),
+    // stops, and is empty when the user guards every quit and no agent works. Null removes it.
+    quitShortcutHint: event<ClientAgentSummary[] | null>()("app:quit-shortcut-hint"),
   },
   maintenance: {
     exportData: request<undefined, ExportResult>()("maintenance:export-data"),
@@ -917,7 +918,10 @@ export const IPC_ENDPOINTS = {
     getSettings: request<undefined, VoiceSettings>()("voice:get-settings"),
     setSettings: request<VoiceSettings, VoiceSettings>()("voice:set-settings"),
     transcribe: request<VoiceTranscriptionInput, VoiceTranscriptionResult>()("voice:transcribe"),
-    /** Saves or removes the ElevenLabs API key. Answers the status of the ElevenLabs model. */
+    /**
+     * Saves or removes the API key of a dictation provider. Answers the status of that provider's
+     * model in use, or of its first model.
+     */
     setApiKey: request<VoiceApiKeyInput, VoiceModelStatus>()("voice:set-api-key"),
     /**
      * Opens a streamed dictation with the cloud model in use. Answers when the provider accepted it.
@@ -934,7 +938,13 @@ export const IPC_ENDPOINTS = {
     streamTranscript: event<VoiceStreamTranscript>()("voice:stream-transcript"),
     getSpeechSettings: request<undefined, SpeechSettings>()("voice:get-speech-settings"),
     setSpeechSettings: request<SpeechSettings, SpeechSettings>()("voice:set-speech-settings"),
+    /** The status of the model in the settings. A cloud model is ready when its provider's key is saved. */
     getSpeechModelStatus: request<undefined, SpeechModelStatus>()("voice:get-speech-model-status"),
+    /**
+     * Saves or removes (null) the key of a provider that reads replies aloud. The ElevenLabs key is
+     * the same key that ElevenLabs dictation uses. Answers the status of the model in the settings.
+     */
+    setSpeechApiKey: request<SpeechApiKeyInput, SpeechModelStatus>()("voice:set-speech-api-key"),
     /** Downloads the speech model. Answers when it is ready, failed, or cancelled. */
     downloadSpeechModel: request<undefined, SpeechModelStatus>()("voice:download-speech-model"),
     cancelSpeechModelDownload: request<undefined, SpeechModelStatus>()("voice:cancel-speech-model-download"),
@@ -1612,6 +1622,8 @@ export const IPC_ENDPOINTS = {
     setChannelImage: scopedRequest<SetChannelImageInput, Channel>()("agent:channels:set-image"),
     /** "New conversation": the members of the channel forget its earlier messages. */
     clearChannelContext: scopedRequest<string, void>()("agent:channels:clear-context"),
+    /** "Delete history": the messages of the channel go, and its members forget them. */
+    deleteChannelHistory: scopedRequest<string, void>()("agent:channels:delete-history"),
     /** Compacts the channel session of each member now. */
     compactChannelContext: scopedRequest<string, void>()("agent:channels:compact-context"),
     getSidebarLayout: scopedQuery<SidebarLayoutSnapshot>()("agent:get-sidebar-layout"),
@@ -1695,6 +1707,8 @@ export const IPC_ENDPOINTS = {
     reorderQueue: scopedRequest<ReorderQueueInput, void>()("agent:reorder-queue"),
     interrupt: scopedRequest<InterruptTurnInput, void>()("agent:interrupt"),
     clearContext: scopedRequest<string, void>()("agent:clear-context"),
+    /** "Delete history": the messages of the agent's own chat go, and the agent forgets them. */
+    deleteHistory: scopedRequest<string, void>()("agent:delete-history"),
     compactContext: scopedRequest<string, void>()("agent:compact-context"),
     compactTaskContext: scopedRequest<AgentTaskInput, void>()("agent:tasks:compact-context"),
     respondToPrompt: scopedRequest<RespondToPromptInput, void>()("agent:respond-to-prompt"),

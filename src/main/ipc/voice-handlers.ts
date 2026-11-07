@@ -24,6 +24,7 @@ import type { VoiceSpeechService } from "../voice-speech-service";
 import type { VoiceTranscriptionService } from "../voice-transcription-service";
 import { eventPayloadHandler, handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import {
+  parseSpeechApiKey,
   parseSpeechInput,
   parseSpeechSettings,
   parseVoiceApiKey,
@@ -110,10 +111,12 @@ export function voiceIpcHandlers({
             server.dictates() ? server.transcribe(audio, voice.getSettings().language) : voice.transcribe(audio),
           ),
       ),
-      setApiKey: payloadHandler(
-        parseVoiceApiKey,
-        ({ key }): Promise<VoiceModelStatus> => runCauseEffect(voice.setApiKey(key)),
-      ),
+      setApiKey: payloadHandler(parseVoiceApiKey, async ({ provider, key }): Promise<VoiceModelStatus> => {
+        const status = await runCauseEffect(voice.setApiKey(provider, key));
+        // ElevenLabs reads replies aloud with the same key, so the speech status changes too.
+        if (provider === "elevenlabs") await runCauseEffect(speech.announceStatus());
+        return status;
+      }),
       startStream: handler((): Promise<VoiceStream> => runCauseEffect(voice.startStream())),
       appendStream: payloadHandler(
         parseVoiceStreamAudio,
@@ -130,6 +133,11 @@ export function voiceIpcHandlers({
         (settings): Promise<SpeechSettings> => runCauseEffect(speech.setSettings(settings)),
       ),
       getSpeechModelStatus: handler((): Promise<SpeechModelStatus> => runCauseEffect(speech.getModelStatus())),
+      setSpeechApiKey: payloadHandler(parseSpeechApiKey, async ({ provider, key }): Promise<SpeechModelStatus> => {
+        if (provider === "xai") return runCauseEffect(speech.setXaiApiKey(key));
+        await runCauseEffect(voice.setApiKey("elevenlabs", key));
+        return runCauseEffect(speech.announceStatus());
+      }),
       downloadSpeechModel: handler((): Promise<SpeechModelStatus> => runCauseEffect(speech.downloadModel())),
       cancelSpeechModelDownload: handler(
         (): Promise<SpeechModelStatus> => runCauseEffect(speech.cancelModelDownload()),

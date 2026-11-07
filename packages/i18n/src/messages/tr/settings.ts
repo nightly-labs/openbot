@@ -29,6 +29,12 @@ export const messages = {
   "settings.logoColor.beige": "Bej",
   "settings.logoColor.gray": "Gri",
   "settings.logoColor.white": "Beyaz",
+  "settings.chatBackground.title": "Sohbet arka planı",
+  "settings.chatBackground.description":
+    "Her tema kendi rengini korur. Metnin okunmasını zorlaştıran bir renk koyulaşır veya açılır.",
+  "settings.chatBackground.light": "Açık temada sohbet arka planı",
+  "settings.chatBackground.dark": "Koyu temada sohbet arka planı",
+  "settings.chatBackground.default": "Varsayılan",
   "settings.chatColor.title": "Sohbet rengi",
   "settings.chatColor.description": "Mesaj balonlarınızı renklendirir. Sunucularınızdaki kişiler de görür.",
   "settings.chatColor.yours": "Sohbet renginiz",
@@ -63,6 +69,12 @@ export const messages = {
   "settings.keepAwakeOnBattery.description": "Bilgisayarı pildeyken de uyanık tut. Pil daha hızlı biter.",
   "settings.restoreWorkspace.title": "Başlangıçta son çalışma alanını geri yükle",
   "settings.restoreWorkspace.description": "Önceki oturumunuzdaki çalışma alanını ve görevleri açın.",
+  "settings.quitGuard.title": "Çıkmak için ⌘Q'yu basılı tut",
+  "settings.quitGuard.description":
+    "Çıkmak için ⌘Q'yu basılı tutun veya iki kez basın. “Asla” seçiliyken tek bir ⌘Q çıkar ve ajanları durdurur.",
+  "settings.quitGuard.working": "Ajanlar çalışırken",
+  "settings.quitGuard.always": "Her zaman",
+  "settings.quitGuard.never": "Asla",
   "settings.externalLinks.title": "Harici bağlantıları şurada aç",
   "settings.externalLinks.description":
     "Sohbetlerdeki, oturum açma ve faturalandırma sayfalarındaki bağlantılar burada açılır.",
@@ -242,7 +254,7 @@ export const messages = {
   "settings.tab.notifications.description": "OpenBot'un sizi nasıl uyaracağını seçin.",
   "settings.tab.voice.title": "Ses",
   "settings.tab.voice.description":
-    "Mesaj kutusunda dikte. Yerel modeller bu bilgisayarda, ElevenLabs ise bulutta çalışır.",
+    "Mesaj kutusunda dikte. Yerel modeller bu bilgisayarda, ElevenLabs ve Groq ise bulutta çalışır.",
   "settings.tab.computerUse.title": "Bilgisayar Kullanımı",
   "settings.tab.computerUse.description":
     "Bu bilgisayardaki OpenBot ajanlarının buradaki uygulamaları görmesine ve kullanmasına izin verin. Başka bir sunucudaki ajanlar o sunucunun bilgisayarını kullanır.",
@@ -587,13 +599,10 @@ export const messages = {
   "settings.voice.model.cohere.description":
     "Daha yavaş. 14 dil; konuşulan dili siz belirlersiniz. Yaklaşık 4 GB bellek kullanır.",
   "settings.voice.model.size": "İndirme boyutu: {size}",
-  "settings.voice.model.downloading": "İndiriliyor · {received} / {total}",
   "settings.voice.model.failed": "İndirme durdu. Bağlantıyı kontrol edip tekrar deneyin.",
   "settings.voice.model.progressLabel": "{name} indiriliyor",
   "settings.voice.model.use": "Kullan",
-  "settings.voice.model.inUse": "Kullanımda",
   "settings.voice.model.downloadLabel": "İndir: {name}",
-  "settings.voice.model.cancelLabel": "{name} indirmesini durdur",
   "settings.voice.model.retryLabel": "Tekrar indir: {name}",
   "settings.voice.model.useLabel": "Dikte için kullan: {name}",
   "settings.voice.model.removeLabel": "{name} modelini bu bilgisayardan kaldır",
@@ -615,9 +624,10 @@ export const messages = {
   "settings.voice.removeFailed": "Model kaldırılamadı. Tekrar deneyin.",
   "settings.voice.model.elevenlabs.description":
     "Sesinizi ElevenLabs'e gönderir. Metin siz konuşurken görünür ve değişmez. Kendi API anahtarınızı kullanır ve ElevenLabs her kullanımı ücretlendirir.",
-  "settings.voice.model.keySaved": "API anahtarı kaydedildi",
-  "settings.voice.model.keyMissing": "ElevenLabs API anahtarı gerekir",
-  "settings.voice.apiKey.label": "ElevenLabs API anahtarı",
+  "settings.voice.model.groqTurbo.description":
+    "Durdurduğunuzda her kaydı Groq'a gönderir. Hızlıdır ve birçok dili bilir. Kendi API anahtarınızı kullanır ve Groq her kullanımı ücretlendirir.",
+  "settings.voice.model.groqLarge.description":
+    "Durdurduğunuzda her kaydı Groq'a gönderir. turbo'dan daha doğrudur ama daha yavaştır. Kendi API anahtarınızı kullanır ve Groq her kullanımı ücretlendirir.",
   "settings.voice.apiKey.placeholder": "Anahtarı yapıştırın",
   "settings.voice.apiKey.save": "Anahtarı kaydet",
   "settings.voice.apiKey.remove": "Anahtarı kaldır",

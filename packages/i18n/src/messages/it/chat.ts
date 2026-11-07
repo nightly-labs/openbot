@@ -254,6 +254,7 @@ export const messages = {
   "chat.code.copy": "Copia il codice",
   "chat.visual.loadFailed": "Impossibile caricare {title}",
   "chat.visual.fullScreen": "Schermo intero",
+  "chat.visual.openInSidePanel": "Apri nel pannello laterale",
   "chat.visual.exitFullScreen": "Esci da schermo intero",
   "chat.preview.switchLabel": "Anteprima o codice",
   "chat.preview.code": "Codice",

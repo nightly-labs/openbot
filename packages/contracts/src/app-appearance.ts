@@ -1,3 +1,4 @@
+import { type AvatarColor, isAvatarColor } from "./ipc-agent-identity";
 import { isDynamicRecord } from "./runtime-values";
 
 /**
@@ -42,6 +43,16 @@ export const APP_THEME_PALETTE_COLORS = [
 
 export type AppThemePaletteColor = (typeof APP_THEME_PALETTE_COLORS)[number];
 
+/**
+ * The background color of conversations that the user picks for one scheme, as `#rrggbb` in lowercase,
+ * or null for the color of the theme. Light and Dark keep their own color; System shows the one of the
+ * scheme that it resolves to, and so does a theme palette.
+ */
+export type ChatBackgroundColor = AvatarColor;
+
+/** The same rule as an agent color, because the same color picker gives both. */
+export const isChatBackgroundColor: (value: unknown) => value is ChatBackgroundColor = isAvatarColor;
+
 /** The file name stem of a theme palette file, which is also its saved identifier. */
 export const APP_THEME_PALETTE_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u;
 
@@ -78,6 +89,9 @@ export interface AppAppearancePreference {
    * appearance too.
    */
   transparentWindow: boolean;
+  /** See `ChatBackgroundColor`. Each scheme has its own field, so a change to one keeps the other. */
+  chatBackgroundLight: ChatBackgroundColor | null;
+  chatBackgroundDark: ChatBackgroundColor | null;
 }
 
 /**
@@ -85,7 +99,10 @@ export interface AppAppearancePreference {
  * other. The theme control sends `palette: null` with a light, dark or system choice.
  */
 export type SetAppAppearancePreferenceInput = Partial<
-  Pick<AppAppearancePreference, "appearance" | "transparentWindow" | "palette">
+  Pick<
+    AppAppearancePreference,
+    "appearance" | "transparentWindow" | "palette" | "chatBackgroundLight" | "chatBackgroundDark"
+  >
 >;
 
 export function isAppAppearance(value: unknown): value is AppAppearance {

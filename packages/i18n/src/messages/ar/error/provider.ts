@@ -260,12 +260,15 @@ export const messages = {
   "error.provider.kimiSignIn": "سجّل الدخول باستخدام Kimi Code لاستخدام Kimi.",
   "error.provider.devinSignIn": "سجّل الدخول باستخدام Devin لاستخدام Devin.",
   "error.provider.copilotSignIn": "سجّل الدخول باستخدام GitHub أو عيّن COPILOT_GITHUB_TOKEN لاستخدام GitHub Copilot.",
+  "error.provider.mistralSignIn": "سجّل الدخول باستخدام Mistral أو عيّن MISTRAL_API_KEY لاستخدام Mistral.",
   "error.provider.hermesMissing": "Hermes Agent غير مثبت. ثبّته، ثم أعد المحاولة.",
   "error.provider.hermesNotStarted": "تعذّر تشغيل Hermes Agent. شغّل `hermes --version` في نافذة طرفية.",
   "error.provider.hermesVersionUnreadable": "تتعذّر قراءة إصدار Hermes Agent.",
   "error.provider.hermesSignIn":
     "سجّل الدخول باستخدام Nous Portal، أو شغّل `hermes setup` في نافذة طرفية، لاستخدام Hermes.",
   "error.provider.usageLimitReached": "بلغ الحساب حد الاستخدام.",
+  "error.provider.claudeApiKeyNoCredit":
+    "لا يوجد رصيد API في مفتاح Anthropic API. لا تدفع خطة Claude مقابل الطلبات التي تستخدم مفتاح API. أضف رصيدًا في Anthropic Console، أو سجّل الدخول إلى Claude في الإعدادات واختر حساب Claude في قائمة نموذج الوكيل.",
   "error.provider.foreignReasoning":
     "لم يقبل {provider} الاستدلال السابق في هذه الدردشة، لأن حسابًا أو مفتاح API مختلفًا استلمه. بدأ OpenBot جلسة {provider} جديدة بسجل الدردشة. أعد المحاولة.",
   "error.provider.opencodeSessionRejected":

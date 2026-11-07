@@ -15,6 +15,7 @@ import {
   decodeAccountSessions,
   decodeAnalyticsPreference,
   decodeAppAppearancePreference,
+  decodeAppBehaviorPreference,
   decodeAppInfo,
   decodeAppLanguagePreference,
   decodeApprovalAutomationPreference,
@@ -108,6 +109,22 @@ const voiceServer = {
 };
 
 const valid: [string, (value: unknown) => unknown, unknown][] = [
+  [
+    "app behavior with a quit guard",
+    decodeAppBehaviorPreference,
+    {
+      launchAtLogin: true,
+      keepRunningInBackground: false,
+      keepAwake: null,
+      keepAwakeOnBattery: null,
+      quitGuard: "always",
+    },
+  ],
+  [
+    "app behavior with no quit guard",
+    decodeAppBehaviorPreference,
+    { launchAtLogin: true, keepRunningInBackground: false, keepAwake: null, keepAwakeOnBattery: null, quitGuard: null },
+  ],
   ["a voice server", decodeVoiceServerSettings, voiceServer],
   ["no voice server", decodeVoiceServerSettings, null],
   [
@@ -167,12 +184,38 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
   [
     "appearance preference",
     decodeAppAppearancePreference,
-    { appearance: "light", transparentWindow: true, palette: null, palettes: [] } satisfies AppAppearancePreference,
+    {
+      appearance: "light",
+      transparentWindow: true,
+      palette: null,
+      palettes: [],
+      chatBackgroundLight: null,
+      chatBackgroundDark: null,
+    } satisfies AppAppearancePreference,
   ],
   [
     "appearance preference with a theme palette",
     decodeAppAppearancePreference,
-    { appearance: "dark", transparentWindow: false, palette: "omarchy", palettes: [omarchyPalette] },
+    {
+      appearance: "dark",
+      transparentWindow: false,
+      palette: "omarchy",
+      palettes: [omarchyPalette],
+      chatBackgroundLight: null,
+      chatBackgroundDark: null,
+    },
+  ],
+  [
+    "appearance preference with a chat background for each scheme",
+    decodeAppAppearancePreference,
+    {
+      appearance: "system",
+      transparentWindow: false,
+      palette: null,
+      palettes: [],
+      chatBackgroundLight: "#f1f2ff",
+      chatBackgroundDark: "#162232",
+    } satisfies AppAppearancePreference,
   ],
   ["signed out", decodeCentralAuthState, { status: "signed_out" } satisfies CentralAuthState],
   [
@@ -279,6 +322,22 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
 ];
 
 const malformed: [string, (value: unknown) => unknown, unknown][] = [
+  [
+    "an unknown quit guard",
+    decodeAppBehaviorPreference,
+    {
+      launchAtLogin: true,
+      keepRunningInBackground: false,
+      keepAwake: null,
+      keepAwakeOnBattery: null,
+      quitGuard: "sometimes",
+    },
+  ],
+  [
+    "a missing quit guard",
+    decodeAppBehaviorPreference,
+    { launchAtLogin: true, keepRunningInBackground: false, keepAwake: null, keepAwakeOnBattery: null },
+  ],
   ["sent message stats with a negative count", decodeSentMessageStats, { firstSentAt: null, sentCount: -1 }],
   [
     "app info with an install ID that is not text",
@@ -355,6 +414,35 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
       transparentWindow: false,
       palette: null,
       palettes: [{ ...omarchyPalette, colors: { canvas: "#1a1b26" } }],
+    },
+  ],
+  [
+    "appearance preference with no chat background",
+    decodeAppAppearancePreference,
+    { appearance: "dark", transparentWindow: false, palette: null, palettes: [] },
+  ],
+  [
+    "a chat background that is not a hex color",
+    decodeAppAppearancePreference,
+    {
+      appearance: "dark",
+      transparentWindow: false,
+      palette: null,
+      palettes: [],
+      chatBackgroundLight: null,
+      chatBackgroundDark: "red; background: url(x)",
+    },
+  ],
+  [
+    "a chat background with an alpha channel",
+    decodeAppAppearancePreference,
+    {
+      appearance: "light",
+      transparentWindow: false,
+      palette: null,
+      palettes: [],
+      chatBackgroundLight: "#f1f2ff00",
+      chatBackgroundDark: null,
     },
   ],
   ["an unknown account status", decodeCentralAuthState, { status: "banned" }],

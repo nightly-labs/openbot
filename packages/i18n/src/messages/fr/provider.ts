@@ -170,7 +170,7 @@ export const messages = {
   "provider.geminiKey.label": "Clé d’API Gemini",
   "provider.claudeKey.title": "Clé d’API Anthropic",
   "provider.claudeKey.description":
-    "Enregistrez une clé API Anthropic sur l'hôte. Anthropic facture chaque requête à la clé. Pour l'utiliser pour un agent, sélectionnez le compte « Clé API » dans le menu des modèles de l'agent. Si Claude n'est pas connecté, tous les agents utilisent la clé.",
+    "Enregistrez une clé API Anthropic sur l'hôte. Anthropic facture chaque requête au crédit API de la clé, pas à votre forfait Claude. Pour l'utiliser pour un agent, sélectionnez le compte « Clé API » dans le menu des modèles de l'agent. Si Claude n'est pas connecté, tous les agents utilisent la clé.",
   "provider.claudeKey.label": "Clé d’API Anthropic",
   "provider.inceptionKey.title": "Clé d’API Inception",
   "provider.inceptionKey.description":

@@ -30,6 +30,12 @@ export const messages = {
   "settings.logoColor.beige": "Beige",
   "settings.logoColor.gray": "Grigio",
   "settings.logoColor.white": "Bianco",
+  "settings.chatBackground.title": "Sfondo della chat",
+  "settings.chatBackground.description":
+    "Ogni tema mantiene il proprio colore. Un colore che rende il testo difficile da leggere diventa più scuro o più chiaro.",
+  "settings.chatBackground.light": "Sfondo della chat nel tema Chiaro",
+  "settings.chatBackground.dark": "Sfondo della chat nel tema Scuro",
+  "settings.chatBackground.default": "Predefinito",
   "settings.chatColor.title": "Colore della chat",
   "settings.chatColor.description": "Colora le bolle dei tuoi messaggi. Anche le persone sui tuoi server lo vedono.",
   "settings.chatColor.yours": "Il tuo colore della chat",
@@ -65,6 +71,12 @@ export const messages = {
     "Mantieni il computer attivo anche a batteria. La batteria si scarica più in fretta.",
   "settings.restoreWorkspace.title": "Ripristina l'ultimo workspace all'avvio",
   "settings.restoreWorkspace.description": "Apri il workspace e le attività della sessione precedente.",
+  "settings.quitGuard.title": "Tieni premuto ⌘Q per uscire",
+  "settings.quitGuard.description":
+    "Tieni premuto ⌘Q o premilo due volte per uscire. Con «Mai», un solo ⌘Q esce e ferma gli agenti.",
+  "settings.quitGuard.working": "Mentre gli agenti lavorano",
+  "settings.quitGuard.always": "Sempre",
+  "settings.quitGuard.never": "Mai",
   "settings.externalLinks.title": "Apri i link esterni in",
   "settings.externalLinks.description": "I link nelle chat, nelle pagine di accesso e di fatturazione si aprono qui.",
   "settings.externalLinks.defaultBrowser": "Browser predefinito",
@@ -247,7 +259,7 @@ export const messages = {
   "settings.tab.notifications.description": "Scegli come OpenBot ti avvisa.",
   "settings.tab.voice.title": "Voce",
   "settings.tab.voice.description":
-    "Dettatura nella casella del messaggio. I modelli locali funzionano su questo computer; ElevenLabs funziona nel cloud.",
+    "Dettatura nella casella del messaggio. I modelli locali funzionano su questo computer; ElevenLabs e Groq funzionano nel cloud.",
   "settings.tab.computerUse.title": "Controllo PC",
   "settings.tab.computerUse.description":
     "Consenti agli agenti dell'OpenBot di questo computer di vedere e usare le sue app. Gli agenti su un altro server usano il computer di quel server.",
@@ -586,13 +598,10 @@ export const messages = {
   "settings.voice.model.cohere.description":
     "Più lento. 14 lingue. Imposti tu la lingua parlata. Usa circa 4 GB di memoria.",
   "settings.voice.model.size": "Dimensione del download: {size}",
-  "settings.voice.model.downloading": "Download · {received} di {total}",
   "settings.voice.model.failed": "Il download si è interrotto. Controlla la connessione e riprova.",
   "settings.voice.model.progressLabel": "Download di {name}",
   "settings.voice.model.use": "Usa",
-  "settings.voice.model.inUse": "In uso",
   "settings.voice.model.downloadLabel": "Scarica {name}",
-  "settings.voice.model.cancelLabel": "Interrompi il download di {name}",
   "settings.voice.model.retryLabel": "Scarica di nuovo {name}",
   "settings.voice.model.useLabel": "Usa {name} per la dettatura",
   "settings.voice.model.removeLabel": "Rimuovi {name} da questo computer",
@@ -614,9 +623,10 @@ export const messages = {
   "settings.voice.removeFailed": "Impossibile rimuovere il modello. Riprova.",
   "settings.voice.model.elevenlabs.description":
     "Invia la tua voce in streaming a ElevenLabs. Il testo compare mentre parli e non cambia più. Usa la tua chiave API, ed ElevenLabs addebita ogni utilizzo.",
-  "settings.voice.model.keySaved": "Chiave API salvata",
-  "settings.voice.model.keyMissing": "Serve una chiave API di ElevenLabs",
-  "settings.voice.apiKey.label": "Chiave API di ElevenLabs",
+  "settings.voice.model.groqTurbo.description":
+    "Invia ogni registrazione a Groq quando ti fermi. Veloce e con molte lingue. Usa la tua chiave API, e Groq addebita ogni utilizzo.",
+  "settings.voice.model.groqLarge.description":
+    "Invia ogni registrazione a Groq quando ti fermi. Più preciso di turbo, ma più lento. Usa la tua chiave API, e Groq addebita ogni utilizzo.",
   "settings.voice.apiKey.placeholder": "Incolla la chiave",
   "settings.voice.apiKey.save": "Salva chiave",
   "settings.voice.apiKey.remove": "Rimuovi chiave",

@@ -51,6 +51,7 @@ export const messages = {
     "משימות של הסוכן הזה פועלות. יש להמתין לסיומן, או לעצור אותן, לפני החלפת ספק.",
   "error.agent.waitBeforeClearContext": "יש להמתין לסיום התור הפעיל ולריקון התור לפני תחילת צ'אט חדש.",
   "error.agent.waitBeforeCompactContext": "יש להמתין לסיום התור הפעיל ולריקון התור לפני דחיסת ההקשר.",
+  "error.agent.waitBeforeDeleteHistory": "יש להמתין לסיום התור הפעיל ולריקון התור לפני מחיקת ההיסטוריה.",
   "error.agent.compactContextUnavailable": "הסוכן הזה לא יכול לדחוס את ההקשר שלו כעת.",
   "error.agent.unknown": "סוכן לא מוכר: {id}",
   "error.agent.onlyUserWidensSettings":

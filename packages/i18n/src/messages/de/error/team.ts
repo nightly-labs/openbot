@@ -64,6 +64,7 @@ export const messages = {
     "Diese Verbindung unterstützt keine neue Unterhaltung und kein Komprimieren in einem Kanal.",
   "error.team.channelPictureUnsupported": "Diese Verbindung unterstützt keine Kanalbilder.",
   "error.team.channelDeleteUnsupported": "Diese Verbindung unterstützt das Löschen von Kanälen nicht.",
+  "error.team.historyDeleteUnsupported": "Diese Verbindung unterstützt das Löschen des Verlaufs nicht.",
   "error.team.channelTaskCancelUnsupported": "Diese Verbindung unterstützt das Abbrechen von Kanalaufgaben nicht.",
   "error.team.membersCannotDeleteChannels": "Mitglieder können keine Kanäle löschen.",
   "error.team.membersCannotArchiveChannels": "Mitglieder können keine Kanäle archivieren.",

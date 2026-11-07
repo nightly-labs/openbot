@@ -158,7 +158,7 @@ export const messages = {
   "provider.geminiKey.label": "מפתח Gemini API",
   "provider.claudeKey.title": "מפתח Anthropic API",
   "provider.claudeKey.description":
-    "אפשר לשמור מפתח Anthropic API במארח. Anthropic מחייבת כל בקשה במפתח. כדי להשתמש בו עבור סוכן, יש לבחור את חשבון מפתח ה-API בתפריט המודל של הסוכן. כש-Claude לא מחובר, כל הסוכנים משתמשים במפתח.",
+    "אפשר לשמור מפתח Anthropic API במארח. Anthropic מחייבת כל בקשה בקרדיט ה-API של המפתח, ולא במינוי Claude. כדי להשתמש בו עבור סוכן, יש לבחור את חשבון מפתח ה-API בתפריט המודל של הסוכן. כש-Claude לא מחובר, כל הסוכנים משתמשים במפתח.",
   "provider.claudeKey.label": "מפתח Anthropic API",
   "provider.codexKey.title": "התחברות עם מפתח OpenAI API",
   "provider.codexKey.description":
@@ -266,7 +266,7 @@ export const messages = {
   "provider.settings.keyAlternative": "או להדביק מפתח API של {name}.",
   "provider.settings.geminiKeyInUse": "Gemini משתמש במפתח הזה, ולא בתוכנית Google AI שלך. השימוש בתוכנית לא מוצג.",
   "provider.settings.claudeKeyInUse":
-    "יש לבחור את חשבון מפתח ה-API בתפריט המודל של סוכן. כש-Claude לא מחובר, כל הסוכנים משתמשים במפתח.",
+    "Anthropic מחייבת את קרדיט ה-API של המפתח, ולא את מינוי Claude. יש לבחור את חשבון מפתח ה-API בתפריט המודל של סוכן. כש-Claude לא מחובר, כל הסוכנים משתמשים במפתח.",
   "provider.settings.codexKeyInUse":
     "ChatGPT משתמש במפתח הזה, ולא בתוכנית ChatGPT שלך. OpenAI מחייבת כל בקשה במפתח. השימוש בתוכנית לא מוצג.",
   "provider.settings.codexKeyAlternative": "או להתחבר עם מפתח OpenAI API. OpenAI מחייבת כל בקשה במפתח.",

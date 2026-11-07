@@ -176,6 +176,7 @@ const Settings = createSimpleContext({
     let keepRunningInBackgroundChanged = false;
     let keepAwakeChanged = false;
     let keepAwakeOnBatteryChanged = false;
+    let quitGuardChanged = false;
 
     createEffect(
       () => ({
@@ -362,6 +363,14 @@ const Settings = createSimpleContext({
           "keepAwakeOnBattery",
           settingsPort().setAppBehaviorPreference({ keepAwakeOnBattery: value.keepAwakeOnBattery }),
           (preference) => preference.keepAwakeOnBattery,
+        );
+      }
+      if (value.quitGuard !== null && previous.quitGuard !== value.quitGuard) {
+        quitGuardChanged = true;
+        persistField(
+          "quitGuard",
+          settingsPort().setAppBehaviorPreference({ quitGuard: value.quitGuard }),
+          (preference) => preference.quitGuard,
         );
       }
       if (!sameExternalLinkTarget(previous.externalLinkTarget, value.externalLinkTarget)) {
@@ -592,6 +601,7 @@ const Settings = createSimpleContext({
               keepAwakeOnBattery: keepAwakeOnBatteryChanged
                 ? current.keepAwakeOnBattery
                 : preference.keepAwakeOnBattery,
+              quitGuard: quitGuardChanged ? current.quitGuard : preference.quitGuard,
             }));
           }),
         settingsPort()

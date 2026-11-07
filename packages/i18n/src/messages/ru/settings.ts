@@ -30,6 +30,12 @@ export const messages = {
   "settings.logoColor.beige": "Бежевый",
   "settings.logoColor.gray": "Серый",
   "settings.logoColor.white": "Белый",
+  "settings.chatBackground.title": "Фон чата",
+  "settings.chatBackground.description":
+    "Каждая тема хранит свой цвет. Цвет, на котором текст трудно читать, становится темнее или светлее.",
+  "settings.chatBackground.light": "Фон чата в светлой теме",
+  "settings.chatBackground.dark": "Фон чата в тёмной теме",
+  "settings.chatBackground.default": "По умолчанию",
   "settings.chatColor.title": "Цвет чата",
   "settings.chatColor.description": "Подкрашивает пузыри ваших сообщений. Люди на ваших серверах тоже его видят.",
   "settings.chatColor.yours": "Ваш цвет чата",
@@ -65,6 +71,12 @@ export const messages = {
     "Не давать компьютеру засыпать и при работе от батареи. Батарея разряжается быстрее.",
   "settings.restoreWorkspace.title": "Восстанавливать последнее рабочее пространство при запуске",
   "settings.restoreWorkspace.description": "Открывать рабочее пространство и задачи из предыдущего сеанса.",
+  "settings.quitGuard.title": "Удерживать ⌘Q для выхода",
+  "settings.quitGuard.description":
+    "Удерживайте ⌘Q или нажмите дважды, чтобы выйти. С вариантом «Никогда» одно нажатие ⌘Q закрывает приложение и останавливает агентов.",
+  "settings.quitGuard.working": "Пока агенты работают",
+  "settings.quitGuard.always": "Всегда",
+  "settings.quitGuard.never": "Никогда",
   "settings.externalLinks.title": "Открывать внешние ссылки в",
   "settings.externalLinks.description": "Здесь открываются ссылки из чатов, страниц входа и оплаты.",
   "settings.externalLinks.defaultBrowser": "Основной браузер",
@@ -249,7 +261,7 @@ export const messages = {
   "settings.tab.notifications.description": "Выберите, как OpenBot сообщает вам о событиях.",
   "settings.tab.voice.title": "Голос",
   "settings.tab.voice.description":
-    "Диктовка в поле сообщения. Локальные модели работают на этом компьютере, ElevenLabs — в облаке.",
+    "Диктовка в поле сообщения. Локальные модели работают на этом компьютере, ElevenLabs и Groq — в облаке.",
   "settings.tab.computerUse.title": "Управление ПК",
   "settings.tab.computerUse.description":
     "Разрешите агентам OpenBot на этом компьютере видеть его приложения и работать с ними. Агенты на другом сервере используют компьютер этого сервера.",
@@ -614,13 +626,10 @@ export const messages = {
   "settings.voice.model.cohere.description":
     "Медленнее. 14 языков. Язык речи вы задаёте сами. Использует около 4 ГБ памяти.",
   "settings.voice.model.size": "Размер загрузки: {size}",
-  "settings.voice.model.downloading": "Загрузка · {received} из {total}",
   "settings.voice.model.failed": "Загрузка прервана. Проверьте подключение и повторите попытку.",
   "settings.voice.model.progressLabel": "Загрузка {name}",
   "settings.voice.model.use": "Использовать",
-  "settings.voice.model.inUse": "Используется",
   "settings.voice.model.downloadLabel": "Скачать {name}",
-  "settings.voice.model.cancelLabel": "Остановить загрузку {name}",
   "settings.voice.model.retryLabel": "Скачать {name} снова",
   "settings.voice.model.useLabel": "Использовать {name} для диктовки",
   "settings.voice.model.removeLabel": "Удалить {name} с этого компьютера",
@@ -642,9 +651,10 @@ export const messages = {
   "settings.voice.removeFailed": "Не удалось удалить модель. Повторите попытку.",
   "settings.voice.model.elevenlabs.description":
     "Передаёт ваш голос в ElevenLabs. Текст появляется во время речи и не меняется. Использует ваш API-ключ, а ElevenLabs списывает плату за каждое использование.",
-  "settings.voice.model.keySaved": "API-ключ сохранён",
-  "settings.voice.model.keyMissing": "Нужен API-ключ ElevenLabs",
-  "settings.voice.apiKey.label": "API-ключ ElevenLabs",
+  "settings.voice.model.groqTurbo.description":
+    "Отправляет каждую запись в Groq после остановки. Быстрый и знает много языков. Использует ваш API-ключ, а Groq списывает плату за каждое использование.",
+  "settings.voice.model.groqLarge.description":
+    "Отправляет каждую запись в Groq после остановки. Точнее, чем turbo, но медленнее. Использует ваш API-ключ, а Groq списывает плату за каждое использование.",
   "settings.voice.apiKey.placeholder": "Вставьте ключ",
   "settings.voice.apiKey.save": "Сохранить ключ",
   "settings.voice.apiKey.remove": "Удалить ключ",

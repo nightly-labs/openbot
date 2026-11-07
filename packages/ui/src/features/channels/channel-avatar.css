@@ -177,6 +177,14 @@
     filter: url("#sidebar-plush-ring-hover");
   }
 }
+/* The light theme gives a selected row its own fill, which it keeps on hover (`app-shell.css`). */
+:root[data-openbot-color-scheme="light"]
+  .sidebar
+  .agent-row-active
+  .channel-avatar-cluster
+  .agent-avatar:has(> .bloub-avatar-svg image) {
+  filter: url("#sidebar-plush-ring-selected");
+}
 /* While an agent is dragged, the hovered row is not filled. */
 .sidebar
   .agent-list[data-sidebar-dragging]

@@ -177,6 +177,14 @@ export const messages = {
     "에이전트가 이 채팅을 잊어요. 메시지는 구분선 위에 계속 표시돼요. 지침, 모델, 도구, 메모리, 워크스페이스, 브라우저는 바뀌지 않아요.",
   "agentSettings.newChat.confirm": "새 채팅 시작",
   "agentSettings.newChat.failed": "새 채팅을 시작할 수 없어요.",
+  "agentSettings.deleteHistory.title": "기록 삭제",
+  "agentSettings.deleteHistory.description": "이 채팅의 메시지가 삭제되고 에이전트도 잊어요. 설정은 그대로예요.",
+  "agentSettings.deleteHistory.button": "삭제",
+  "agentSettings.deleteHistory.confirmTitle": "{name}님과의 채팅 기록을 삭제할까요?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "이 채팅의 모든 메시지와 파일이 OpenBot에서 삭제되고 에이전트도 잊어요. 되돌릴 수 없어요. 사이드 스레드, 지침, 모델, 도구, 메모리, 작업 공간, 브라우저는 바뀌지 않아요.",
+  "agentSettings.deleteHistory.confirm": "기록 삭제",
+  "agentSettings.deleteHistory.failed": "기록을 삭제할 수 없어요.",
   "agentSettings.fullAccess.title": "이 에이전트에 전체 접근 권한을 줄까요?",
   "agentSettings.fullAccess.askTitle": "이 에이전트가 워크스페이스 밖에서 작업하도록 허용할까요?",
   "agentSettings.fullAccess.description":

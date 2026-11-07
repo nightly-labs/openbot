@@ -60,6 +60,7 @@ export const messages = {
   "error.team.channelContextUnsupported": "To połączenie nie obsługuje nowej rozmowy ani kompaktowania w kanale.",
   "error.team.channelPictureUnsupported": "To połączenie nie obsługuje obrazów kanałów.",
   "error.team.channelDeleteUnsupported": "To połączenie nie obsługuje usuwania kanałów.",
+  "error.team.historyDeleteUnsupported": "To połączenie nie obsługuje usuwania historii.",
   "error.team.channelTaskCancelUnsupported": "To połączenie nie obsługuje anulowania zadań kanałów.",
   "error.team.membersCannotDeleteChannels": "Członkowie nie mogą usuwać kanałów.",
   "error.team.membersCannotArchiveChannels": "Członkowie nie mogą archiwizować kanałów.",

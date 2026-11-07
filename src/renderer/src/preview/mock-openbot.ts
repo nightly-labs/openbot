@@ -487,6 +487,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     keepRunningInBackground: false,
     keepAwake: false,
     keepAwakeOnBattery: false,
+    quitGuard: "working",
   };
   let languagePreference = clone<AppLanguagePreference>(options.languagePreference ?? { language: "system" });
   const languageListeners = new Set<(preference: AppLanguagePreference) => void>();
@@ -497,6 +498,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     transparentWindow: DEFAULT_TRANSPARENT_WINDOW,
     palette: null,
     palettes: [],
+    chatBackgroundLight: null,
+    chatBackgroundDark: null,
   };
   const appearanceListeners = new Set<(preference: AppAppearancePreference) => void>();
   let interfaceSizePreference: AppInterfaceSizePreference = { percent: DEFAULT_APP_INTERFACE_SIZE };
@@ -3306,6 +3309,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
             status: "completed",
             itemType: CONTEXT_RESET_ITEM_TYPE,
           });
+        });
+      },
+      deleteHistory: async (agentId: string) => {
+        updateSnapshot(agentId, (snapshot) => {
+          snapshot.messages = [];
         });
       },
       compactContext: async () => undefined,

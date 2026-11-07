@@ -74,6 +74,8 @@ export const messages = {
   "error.backend.channelWaitBeforeNewConversation":
     "Дождитесь окончания работы в этом канале, затем начните новый разговор.",
   "error.backend.channelWaitBeforeCompact": "Дождитесь окончания работы в этом канале, затем сожмите его.",
+  "error.backend.channelWaitBeforeDeleteHistory":
+    "Дождитесь окончания работы в этом канале, затем удалите его историю.",
   "error.backend.channelCompactUnavailable":
     "Сейчас ни один участник этого канала не может сжать контекст. Сначала участник должен ответить в канале, а его провайдер должен поддерживать сжатие.",
   "error.backend.channelArchived": "Восстановите этот канал, прежде чем отправлять сообщения или менять задачи.",

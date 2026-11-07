@@ -33,6 +33,7 @@ export function createMockProviderRuntimes(options: MockProviderRuntimeOptions, 
         muse: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
         devin: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
         copilot: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
+        mistral: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
       },
       // No `availableVersion`: a tool runtime is downloaded once and replaced by a release, so the
       // preview never offers an update for one.

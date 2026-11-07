@@ -29,6 +29,11 @@ export const messages = {
   "settings.logoColor.beige": "ベージュ",
   "settings.logoColor.gray": "グレー",
   "settings.logoColor.white": "ホワイト",
+  "settings.chatBackground.title": "チャットの背景",
+  "settings.chatBackground.description": "テーマごとに色を保持します。文字が読みにくい色は、暗くまたは明るくなります。",
+  "settings.chatBackground.light": "ライトテーマのチャットの背景",
+  "settings.chatBackground.dark": "ダークテーマのチャットの背景",
+  "settings.chatBackground.default": "デフォルト",
   "settings.chatColor.title": "チャットの色",
   "settings.chatColor.description":
     "自分のメッセージの吹き出しに色を付けます。サーバーの他のメンバーにも表示されます。",
@@ -64,6 +69,12 @@ export const messages = {
   "settings.keepAwakeOnBattery.description": "バッテリー駆動中もスリープさせません。バッテリーの消耗が早くなります。",
   "settings.restoreWorkspace.title": "起動時に前回のワークスペースを復元する",
   "settings.restoreWorkspace.description": "前回のセッションのワークスペースとタスクを開きます。",
+  "settings.quitGuard.title": "⌘Q の長押しで終了",
+  "settings.quitGuard.description":
+    "終了するには ⌘Q を長押しするか、2 回押します。「しない」では、⌘Q を 1 回押すと終了し、エージェントが停止します。",
+  "settings.quitGuard.working": "エージェントの作業中",
+  "settings.quitGuard.always": "常に",
+  "settings.quitGuard.never": "しない",
   "settings.externalLinks.title": "外部リンクの開き方",
   "settings.externalLinks.description": "チャット、サインインページ、請求ページのリンクをここで開きます。",
   "settings.externalLinks.defaultBrowser": "既定のブラウザー",
@@ -243,7 +254,7 @@ export const messages = {
   "settings.tab.notifications.description": "OpenBot からの知らせ方を選びます。",
   "settings.tab.voice.title": "音声",
   "settings.tab.voice.description":
-    "メッセージ欄での音声入力です。ローカルモデルはこのコンピューター上で、ElevenLabs はクラウドで動作します。",
+    "メッセージ欄での音声入力です。ローカルモデルはこのコンピューター上で、ElevenLabs と Groq はクラウドで動作します。",
   "settings.tab.computerUse.title": "Computer Use",
   "settings.tab.computerUse.description":
     "このコンピューターの OpenBot のエージェントが、このコンピューターのアプリを見て操作できるようにします。別のサーバーのエージェントは、そのサーバーのコンピューターを使います。",
@@ -580,13 +591,10 @@ export const messages = {
   "settings.voice.model.cohere.description":
     "低速です。14 言語に対応し、話す言語を指定します。約 4 GB のメモリを使用します。",
   "settings.voice.model.size": "ダウンロードサイズ: {size}",
-  "settings.voice.model.downloading": "ダウンロード中 · {received} / {total}",
   "settings.voice.model.failed": "ダウンロードが止まりました。接続を確認して、もう一度お試しください。",
   "settings.voice.model.progressLabel": "{name} をダウンロード中",
   "settings.voice.model.use": "使用",
-  "settings.voice.model.inUse": "使用中",
   "settings.voice.model.downloadLabel": "{name} をダウンロード",
-  "settings.voice.model.cancelLabel": "{name} のダウンロードを停止",
   "settings.voice.model.retryLabel": "{name} をもう一度ダウンロード",
   "settings.voice.model.useLabel": "音声入力に {name} を使用",
   "settings.voice.model.removeLabel": "{name} をこのコンピュータから削除",
@@ -608,9 +616,10 @@ export const messages = {
   "settings.voice.removeFailed": "モデルを削除できませんでした。もう一度お試しください。",
   "settings.voice.model.elevenlabs.description":
     "音声を ElevenLabs に送信します。話している間に文字が表示され、途中で変わりません。ご自身の API キーを使い、利用ごとに ElevenLabs から請求されます。",
-  "settings.voice.model.keySaved": "API キーを保存済み",
-  "settings.voice.model.keyMissing": "ElevenLabs の API キーが必要です",
-  "settings.voice.apiKey.label": "ElevenLabs の API キー",
+  "settings.voice.model.groqTurbo.description":
+    "停止すると録音を Groq に送信します。高速で、多くの言語に対応します。ご自身の API キーを使い、利用ごとに Groq から請求されます。",
+  "settings.voice.model.groqLarge.description":
+    "停止すると録音を Groq に送信します。turbo より正確ですが、時間がかかります。ご自身の API キーを使い、利用ごとに Groq から請求されます。",
   "settings.voice.apiKey.placeholder": "キーを貼り付け",
   "settings.voice.apiKey.save": "キーを保存",
   "settings.voice.apiKey.remove": "キーを削除",

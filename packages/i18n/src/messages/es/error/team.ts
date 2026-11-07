@@ -62,6 +62,7 @@ export const messages = {
     "Esta conexión no admite una nueva conversación ni la compactación en un canal.",
   "error.team.channelPictureUnsupported": "Esta conexión no admite imágenes de canal.",
   "error.team.channelDeleteUnsupported": "Esta conexión no admite la eliminación de canales.",
+  "error.team.historyDeleteUnsupported": "Esta conexión no admite la eliminación del historial.",
   "error.team.channelTaskCancelUnsupported": "Esta conexión no admite la cancelación de tareas de canales.",
   "error.team.membersCannotDeleteChannels": "Los miembros no pueden eliminar canales.",
   "error.team.membersCannotArchiveChannels": "Los miembros no pueden archivar canales.",

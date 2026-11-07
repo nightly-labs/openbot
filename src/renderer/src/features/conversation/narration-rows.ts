@@ -21,6 +21,7 @@ export function narrationRows(thinking: AgentMessage, provider: AgentProviderRef
       body,
       time: createdAt ? formatMessageTime(createdAt) : thinking.time,
       ...(createdAt ? { createdAt } : {}),
+      streaming: thinking.itemStreaming?.[index] === true,
       itemType: "commentary",
       kind: "text",
       // A row that arrives while the chat is open enters as a new message does. The timeline plays

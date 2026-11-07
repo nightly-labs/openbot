@@ -800,8 +800,16 @@ server can change it.
   Disconnect deletes the file and asks Link to revoke the sign-in. A one-time Link card is not
   stored: OpenBot reads it from Link for each fill and types it into the page. The tokens and the
   card number are redacted from logs, exports and diagnostics.
-- The ElevenLabs API key for dictation is kept in
+- The ElevenLabs API key for dictation and spoken replies is kept in
   `~/Library/Application Support/OpenBot/voice-api-key.json`, encrypted by the operating system's
+  secret storage. The app window never receives the key back. Remove key in **Settings → Voice**
+  deletes the file. The key is redacted from logs, exports and diagnostics.
+- The Groq API key for dictation is kept in
+  `~/Library/Application Support/OpenBot/groq-api-key.json`, encrypted by the operating system's
+  secret storage. The app window never receives the key back. Remove key in **Settings → Voice**
+  deletes the file. The key is redacted from logs, exports and diagnostics.
+- The xAI API key for spoken replies is kept in
+  `~/Library/Application Support/OpenBot/xai-api-key.json`, encrypted by the operating system's
   secret storage. The app window never receives the key back. Remove key in **Settings → Voice**
   deletes the file. The key is redacted from logs, exports and diagnostics.
 - The API key of the voice server is kept in
@@ -1030,6 +1038,12 @@ Network traffic can also occur when:
   text. Nothing else is sent: no conversation, file or agent instruction. ElevenLabs handles the
   audio and the text under its own policy and the user's ElevenLabs plan. The local models send
   nothing;
+- the user selects Groq Whisper large-v3 turbo or Groq Whisper large-v3 in **Settings → Voice** and
+  dictates or talks in the Voice pane. When the recording stops, or when a Voice pane turn ends,
+  OpenBot sends the recorded audio, the chosen model and, when the user set one, the language to
+  `api.groq.com` with the user's own API key, and receives the text. Nothing else is sent: no
+  conversation, file or agent instruction. Groq handles the audio and the text under its own policy
+  and the user's Groq plan;
 - the user sets up a voice server in **Settings → Voice**. OpenBot sends requests only to the address
   that the user enters, with the user's API key when there is one. To connect, it lists the server's
   models and voices. When the server does dictation, OpenBot sends the recorded audio, the chosen
@@ -1041,11 +1055,17 @@ Network traffic can also occur when:
 - the user turns on Read replies aloud, opens the Voice pane for the first time, or presses Download
   in the Spoken replies section of **Settings → Voice**. OpenBot downloads the Supertonic 3 voice
   model that it pins from `huggingface.co`, checks its size and SHA-256, and keeps it in `runtimes`
-  in the application data folder. The request carries no user data. The text of a reply that is read
-  aloud, and its audio, stay on the computer. The setting and the chosen voice are saved in
-  `speech-preference.json` in the same folder. In the Voice pane, the spoken reply runs on this
+  in the application data folder. The request carries no user data. When Supertonic reads a reply
+  aloud, the text and its audio stay on the computer. The setting and the chosen voice are saved in
+  `speech-preference.json` in the same folder. When the user selects an ElevenLabs model (Flash
+  v2.5, Multilingual v2 or Eleven v3) or xAI Text to Speech as the spoken replies model, OpenBot
+  sends the text of each reply that it reads, the chosen model, the voice and the speech language to
+  `api.elevenlabs.io` or `api.x.ai` with the user's own API key, and receives the audio. Listen
+  sends a short sample text. Nothing else is sent: no conversation, file or agent instruction. The
+  provider handles the text and the audio under its own policy and the user's plan.
+  In the Voice pane, the spoken reply runs on this
   computer, also for an agent on a remote server. Speech recognition uses the model chosen in
-  **Settings → Voice**: a local model runs on this computer, and ElevenLabs gets the audio as
+  **Settings → Voice**: a local model runs on this computer, and ElevenLabs or Groq gets the audio as
   described above. A message that the user speaks to an agent on this computer keeps its recording,
   a WebM/Opus file in the message's own transfer folder, so that the user can play it again in the
   chat. The agent, its provider and team members get only the text. A remote server gets only the
@@ -1099,7 +1119,7 @@ Network traffic can also occur when:
   user's agents, conversations or files is sent to Link;
 - an installed build checks GitHub Releases for updates;
 - OpenBot checks for new provider CLI releases when it starts, once an hour, and when you select
-  `Check for updates`. It asks `api.github.com` for Codex, Kimi and GitHub Copilot, `registry.npmjs.org` for Claude,
+  `Check for updates`. It asks `api.github.com` for Codex, Kimi, GitHub Copilot and Mistral, `registry.npmjs.org` for Claude,
   OpenCode and Cline, `x.ai/cli` for Grok, and `raw.githubusercontent.com/agentclientprotocol/registry` and
   `dl.google.com` (for the download size) for Gemini, and the same registry and
   `downloads.cursor.com` (for the download size) for Cursor, `static.devin.ai` (the manifest, and the
@@ -1633,6 +1653,22 @@ uses `COPILOT_GITHUB_TOKEN`, `GH_TOKEN` or `GITHUB_TOKEN` when OpenBot's environ
 does not log or export these values. The CLI sends its own usage data to GitHub, and OpenBot does not
 change that setting. GitHub's terms for Copilot apply. Team members see the host's Copilot agents
 when their app supports GitHub Copilot.
+
+### Mistral
+
+OpenBot downloads Mistral Vibe's ACP server from GitHub Releases (`github.com/mistralai/mistral-vibe`)
+when you select Download on the Mistral row. OpenBot starts it as a local process. Prompts,
+attachments, and tool results go to that process, and Vibe sends them to Mistral
+(`api.mistral.ai`). Vibe also asks Mistral for its model list, your account details, and the
+settings that your Mistral organization manages (`console.mistral.ai` and `chat.mistral.ai`). Sign in
+opens Mistral's sign-in page in your browser, and Vibe asks Mistral until the sign-in ends. Vibe
+keeps the API key of the sign-in in the system keychain, or in `~/.vibe/.env`, and its settings, logs
+and session files in `~/.vibe`, or in `$VIBE_HOME`. OpenBot does not read, copy, or upload them. Vibe
+uses `MISTRAL_API_KEY` when OpenBot's environment has it; OpenBot does not log or export this value.
+OpenBot starts Vibe with its telemetry off (`VIBE_ENABLE_TELEMETRY=false`), so it sends no usage
+events, traces or experiment requests, unless your Mistral organization's managed settings turn
+telemetry on. Mistral's terms apply. Team members see the host's Mistral agents when their app
+supports Mistral.
 
 ### Hermes
 

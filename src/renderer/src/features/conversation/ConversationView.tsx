@@ -28,7 +28,6 @@ export function ConversationView(props: ConversationProps) {
     browserSidebarOpen,
     dropActive,
     filePreviewOpen,
-    filesOpen,
     activeRightPanel,
     settingsOpen,
     sidePanel,
@@ -43,6 +42,13 @@ export function ConversationView(props: ConversationProps) {
     sideThreadOpen,
   } = scope;
   const { t } = useText();
+  /** Each view of the side panel has the width of the browser panel, except Agent settings, which has its own. */
+  const sidePanelUsesBrowserWidth = () => {
+    const mode = activeRightPanel();
+    if (mode === "browser") return browserSidebarOpen();
+    if (mode === "file-preview") return filePreviewOpen();
+    return sidePanelOpen() && mode !== "settings";
+  };
   const folderCalls = agentFolderCalls();
   /**
    * A local agent in Workspace only mode can get a folder from a drop on the chat. With wider access a
@@ -80,15 +86,7 @@ export function ConversationView(props: ConversationProps) {
           "conversation-panel",
           {
             "conversation-drop-active": dropActive(),
-            "browser-panel-active":
-              browserSidebarOpen() ||
-              filePreviewOpen() ||
-              filesOpen() ||
-              activeRightPanel() === "question" ||
-              activeRightPanel() === "voice" ||
-              activeRightPanel() === "subagent" ||
-              activeRightPanel() === "thread" ||
-              activeRightPanel() === "side-panel",
+            "browser-panel-active": sidePanelUsesBrowserWidth(),
             "side-panel-docked": sidePanelOpen(),
             "side-panel-maximized": sidePanelOpen() && sidePanel().maximized,
           },

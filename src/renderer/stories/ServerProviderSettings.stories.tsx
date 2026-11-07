@@ -57,6 +57,7 @@ const providerRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   muse: { phase: "not-downloaded", progress: null, message: null, version: null },
   devin: { phase: "not-downloaded", progress: null, message: null, version: null },
   copilot: { phase: "not-downloaded", progress: null, message: null, version: null },
+  mistral: { phase: "not-downloaded", progress: null, message: null, version: null },
 };
 
 /** Four connected runtimes, one of which has a newer version waiting. */
@@ -176,6 +177,7 @@ const providerUpdateRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   muse: { phase: "ready", progress: 100, message: null, version: "3.0.68" },
   devin: { phase: "ready", progress: 100, message: null, version: "3000.11.234" },
   copilot: { phase: "ready", progress: 100, message: null, version: "1.0.105" },
+  mistral: { phase: "ready", progress: 100, message: null, version: "3.1.0" },
 };
 
 /** The Providers section of Server settings, with the providers of this computer. */

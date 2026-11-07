@@ -35,8 +35,18 @@ export type LocalVoiceModelId = (typeof LOCAL_VOICE_MODEL_IDS)[number];
  */
 export const ELEVENLABS_VOICE_MODEL_ID = "elevenlabs-scribe-v2-realtime";
 
+/**
+ * Whisper at Groq. The whole recording goes to Groq after Stop, with the user's own API key, so
+ * neither is the default. Saved in `voice-preference.json`; never rename one.
+ */
+export const GROQ_VOICE_MODEL_IDS = ["groq-whisper-large-v3-turbo", "groq-whisper-large-v3"] as const;
+export type GroqVoiceModelId = (typeof GROQ_VOICE_MODEL_IDS)[number];
+
+/** The dictation models that run at a provider. */
+export type CloudVoiceModelId = typeof ELEVENLABS_VOICE_MODEL_ID | GroqVoiceModelId;
+
 /** Every dictation model, local ones first. */
-export const VOICE_MODEL_IDS = [...LOCAL_VOICE_MODEL_IDS, ELEVENLABS_VOICE_MODEL_ID] as const;
+export const VOICE_MODEL_IDS = [...LOCAL_VOICE_MODEL_IDS, ELEVENLABS_VOICE_MODEL_ID, ...GROQ_VOICE_MODEL_IDS] as const;
 export type VoiceModelId = (typeof VOICE_MODEL_IDS)[number];
 export const DEFAULT_VOICE_MODEL_ID: VoiceModelId = "parakeet-tdt-0.6b-v3";
 
@@ -73,10 +83,14 @@ export interface LocalVoiceModelInfo extends VoiceModelCapabilities {
   retired?: true;
 }
 
-/** A model that runs at a provider. It is ready when its API key is saved. */
+/**
+ * A model that runs at a provider. It is ready when its provider's API key is saved. ElevenLabs
+ * takes a stream while the user speaks; Groq takes the whole recording after Stop.
+ */
 export interface CloudVoiceModelInfo extends VoiceModelCapabilities {
   kind: "cloud";
-  id: typeof ELEVENLABS_VOICE_MODEL_ID;
+  id: CloudVoiceModelId;
+  provider: DictationKeyProvider;
 }
 
 export type VoiceModelInfo = LocalVoiceModelInfo | CloudVoiceModelInfo;
@@ -147,9 +161,26 @@ export const VOICE_MODELS: readonly VoiceModelInfo[] = [
   {
     kind: "cloud",
     id: ELEVENLABS_VOICE_MODEL_ID,
+    provider: "elevenlabs",
     name: "ElevenLabs Scribe v2 Realtime",
     supportsLanguage: true,
     livePreview: true,
+  },
+  {
+    kind: "cloud",
+    id: "groq-whisper-large-v3-turbo",
+    provider: "groq",
+    name: "Groq Whisper large-v3 turbo",
+    supportsLanguage: true,
+    livePreview: false,
+  },
+  {
+    kind: "cloud",
+    id: "groq-whisper-large-v3",
+    provider: "groq",
+    name: "Groq Whisper large-v3",
+    supportsLanguage: true,
+    livePreview: false,
   },
 ];
 
@@ -264,8 +295,9 @@ export interface VoiceModelRequest {
   modelId: VoiceModelId;
 }
 
-/** The ElevenLabs API key, or null to remove it. Main never sends a saved key back. */
+/** The API key of a dictation provider, or null to remove it. Main never sends a saved key back. */
 export interface VoiceApiKeyInput {
+  provider: DictationKeyProvider;
   key: string | null;
 }
 
@@ -306,6 +338,14 @@ export function isLocalVoiceModelId(value: unknown): value is LocalVoiceModelId 
   return isOneOf(LOCAL_VOICE_MODEL_IDS, value);
 }
 
+export function isGroqVoiceModelId(value: unknown): value is GroqVoiceModelId {
+  return isOneOf(GROQ_VOICE_MODEL_IDS, value);
+}
+
+export function isDictationKeyProvider(value: unknown): value is DictationKeyProvider {
+  return isOneOf(DICTATION_KEY_PROVIDERS, value);
+}
+
 export function isVoiceLanguage(value: unknown): value is VoiceLanguage {
   return value === AUTOMATIC_VOICE_LANGUAGE || isOneOf(WHISPER_LANGUAGES, value);
 }
@@ -325,7 +365,68 @@ export function modelLanguage(model: VoiceModelInfo, language: VoiceLanguage): V
  * named in model statuses; never rename it.
  */
 export const SPEECH_MODEL_ID = "supertonic-3";
-export type SpeechModelId = typeof SPEECH_MODEL_ID;
+export type LocalSpeechModelId = typeof SPEECH_MODEL_ID;
+
+/** The providers that read replies aloud with the user's own API key. */
+export const SPEECH_KEY_PROVIDERS = ["elevenlabs", "xai"] as const;
+export type SpeechKeyProvider = (typeof SPEECH_KEY_PROVIDERS)[number];
+
+/** The providers that transcribe dictation with the user's own API key. ElevenLabs has one key for both routes. */
+export const DICTATION_KEY_PROVIDERS = ["elevenlabs", "groq"] as const;
+export type DictationKeyProvider = (typeof DICTATION_KEY_PROVIDERS)[number];
+
+/** Each provider whose API key the Voice settings keep. */
+export type VoiceKeyProvider = SpeechKeyProvider | DictationKeyProvider;
+
+/** The product names of the providers. They are not translated. */
+export const VOICE_KEY_PROVIDER_NAMES: Record<VoiceKeyProvider, string> = {
+  elevenlabs: "ElevenLabs",
+  xai: "xAI",
+  groq: "Groq",
+};
+
+/**
+ * The models that read replies aloud at a provider. The reply text goes to the provider with the
+ * user's own API key, so none is the default. Saved in `speech-preference.json`; never rename one.
+ */
+export const CLOUD_SPEECH_MODEL_IDS = [
+  "elevenlabs-flash-v2.5",
+  "elevenlabs-multilingual-v2",
+  "elevenlabs-v3",
+  "xai-tts",
+] as const;
+export type CloudSpeechModelId = (typeof CLOUD_SPEECH_MODEL_IDS)[number];
+
+/** Every model that reads replies aloud, Supertonic first. */
+export const SPEECH_MODEL_IDS = [SPEECH_MODEL_ID, ...CLOUD_SPEECH_MODEL_IDS] as const;
+export type SpeechModelId = (typeof SPEECH_MODEL_IDS)[number];
+
+export interface CloudSpeechModelInfo {
+  id: CloudSpeechModelId;
+  provider: SpeechKeyProvider;
+  /** The product name. It is not translated. */
+  name: string;
+}
+
+export const CLOUD_SPEECH_MODELS: readonly CloudSpeechModelInfo[] = [
+  { id: "elevenlabs-flash-v2.5", provider: "elevenlabs", name: "Flash v2.5" },
+  { id: "elevenlabs-multilingual-v2", provider: "elevenlabs", name: "Multilingual v2" },
+  { id: "elevenlabs-v3", provider: "elevenlabs", name: "Eleven v3" },
+  { id: "xai-tts", provider: "xai", name: "Text to Speech" },
+];
+
+/** The cloud model of an ID, or undefined for Supertonic. */
+export function cloudSpeechModel(id: SpeechModelId): CloudSpeechModelInfo | undefined {
+  return CLOUD_SPEECH_MODELS.find((model) => model.id === id);
+}
+
+/** ElevenLabs default voices. The main process maps each name to its voice ID. Saved in `speech-preference.json`. */
+export const ELEVENLABS_SPEECH_VOICES = ["alice", "chris", "eric", "george", "jessica", "sarah"] as const;
+export type ElevenLabsSpeechVoice = (typeof ELEVENLABS_SPEECH_VOICES)[number];
+
+/** xAI voices. Each name is also the voice ID. Saved in `speech-preference.json`. */
+export const XAI_SPEECH_VOICES = ["eve", "ara", "leo", "rex", "sal"] as const;
+export type XaiSpeechVoice = (typeof XAI_SPEECH_VOICES)[number];
 
 export const SPEECH_MODEL = {
   id: SPEECH_MODEL_ID,
@@ -394,7 +495,12 @@ export function nextSpeechSpeed(speed: number): SpeechSpeed {
 export interface SpeechSettings {
   /** Read the reply to a dictated message aloud. */
   readReplies: boolean;
+  /** The model that reads replies aloud. */
+  modelId: SpeechModelId;
+  /** The Supertonic voice. */
   voice: SpeechVoice;
+  elevenLabsVoice: ElevenLabsSpeechVoice;
+  xaiVoice: XaiSpeechVoice;
   /** The speed of each reply that is read aloud. The pitch stays the same. */
   speed: SpeechSpeed;
   /**
@@ -409,7 +515,10 @@ export interface SpeechSettings {
 
 export const DEFAULT_SPEECH_SETTINGS: SpeechSettings = {
   readReplies: false,
+  modelId: SPEECH_MODEL_ID,
   voice: "F1",
+  elevenLabsVoice: "alice",
+  xaiVoice: "eve",
   speed: 1,
   codexLive: false,
   codexLiveVoice: null,
@@ -485,6 +594,12 @@ export interface SpeechModelStatus extends Omit<VoiceModelStatus, "modelId"> {
   modelId: SpeechModelId;
 }
 
+/** An API key for a provider that reads replies aloud. Null removes the saved key. */
+export interface SpeechApiKeyInput {
+  provider: SpeechKeyProvider;
+  key: string | null;
+}
+
 export const SPEECH_LIMITS = {
   /** The longest text of one `speak` request. The renderer sends a reply in parts. */
   maximumTextLength: 1_000,
@@ -504,6 +619,22 @@ export interface SpeechAudio {
 
 export function isSpeechVoice(value: unknown): value is SpeechVoice {
   return isOneOf(SPEECH_VOICES, value);
+}
+
+export function isSpeechModelId(value: unknown): value is SpeechModelId {
+  return isOneOf(SPEECH_MODEL_IDS, value);
+}
+
+export function isSpeechKeyProvider(value: unknown): value is SpeechKeyProvider {
+  return isOneOf(SPEECH_KEY_PROVIDERS, value);
+}
+
+export function isElevenLabsSpeechVoice(value: unknown): value is ElevenLabsSpeechVoice {
+  return isOneOf(ELEVENLABS_SPEECH_VOICES, value);
+}
+
+export function isXaiSpeechVoice(value: unknown): value is XaiSpeechVoice {
+  return isOneOf(XAI_SPEECH_VOICES, value);
 }
 
 export function isCodexLiveVoice(value: unknown): value is CodexLiveVoice {

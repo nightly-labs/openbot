@@ -163,7 +163,7 @@ export const messages = {
   "provider.geminiKey.label": "Clave de API de Gemini",
   "provider.claudeKey.title": "Clave de API de Anthropic",
   "provider.claudeKey.description":
-    "Guarda una clave de API de Anthropic en el host. Anthropic factura cada solicitud a la clave. Para usarla en un agente, selecciona la cuenta «Clave de API» en el menú de modelos del agente. Si Claude no tiene sesión iniciada, todos los agentes usan la clave.",
+    "Guarda una clave de API de Anthropic en el host. Anthropic factura cada solicitud al crédito de API de la clave, no a tu plan de Claude. Para usarla en un agente, selecciona la cuenta «Clave de API» en el menú de modelos del agente. Si Claude no tiene sesión iniciada, todos los agentes usan la clave.",
   "provider.claudeKey.label": "Clave de API de Anthropic",
   "provider.inceptionKey.title": "Clave de API de Inception",
   "provider.inceptionKey.description":

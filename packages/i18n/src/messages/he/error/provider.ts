@@ -260,11 +260,14 @@ export const messages = {
   "error.provider.kimiSignIn": "יש להתחבר עם Kimi Code כדי להשתמש ב-Kimi.",
   "error.provider.devinSignIn": "יש להתחבר עם Devin כדי להשתמש ב-Devin.",
   "error.provider.copilotSignIn": "יש להתחבר עם GitHub או להגדיר COPILOT_GITHUB_TOKEN כדי להשתמש ב-GitHub Copilot.",
+  "error.provider.mistralSignIn": "יש להתחבר עם Mistral או להגדיר MISTRAL_API_KEY כדי להשתמש ב-Mistral.",
   "error.provider.hermesMissing": "Hermes Agent אינו מותקן. יש להתקין אותו ואז לנסות שוב.",
   "error.provider.hermesNotStarted": "Hermes Agent לא הצליח לפעול. יש להריץ `hermes --version` בטרמינל.",
   "error.provider.hermesVersionUnreadable": "לא ניתן לקרוא את הגרסה של Hermes Agent.",
   "error.provider.hermesSignIn": "יש להתחבר עם Nous Portal, או להריץ `hermes setup` בטרמינל, כדי להשתמש ב-Hermes.",
   "error.provider.usageLimitReached": "החשבון הגיע למגבלת השימוש שלו.",
+  "error.provider.claudeApiKeyNoCredit":
+    "אין קרדיט API במפתח Anthropic API. מינוי Claude לא משלם על בקשות עם מפתח API. אפשר להוסיף קרדיט ב-Anthropic Console, או להתחבר ל-Claude בהגדרות ולבחור את חשבון Claude בתפריט המודל של הסוכן.",
   "error.provider.foreignReasoning":
     "{provider} לא קיבל את החשיבה הקודמת בצ'אט הזה, כי חשבון או מפתח API אחר קיבל אותה. OpenBot התחיל סשן חדש של {provider} עם היסטוריית הצ'אט. יש לנסות שוב.",
   "error.provider.opencodeSessionRejected":

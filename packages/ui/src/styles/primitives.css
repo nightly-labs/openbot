@@ -840,6 +840,15 @@ html.ui-textarea-resizing {
   padding: var(--openbot-space-1);
 }
 
+.ui-select-section {
+  padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-sm);
+  list-style: none;
+}
+
 .ui-select-item {
   position: relative;
   display: flex;
@@ -1749,27 +1758,31 @@ html.ui-textarea-resizing {
   --normal-border: var(--openbot-border);
   --normal-border-hover: var(--openbot-border-focus);
   --normal-text: var(--openbot-text-primary);
-  --border-radius: var(--openbot-radius-lg);
+  --border-radius: var(--openbot-radius-card);
 }
 
-/* Three columns and two rows: the mark, the words, and an action row under them. Sonner lays the
-   toast out as one flex line, which works until an action is present — the button then sits between
-   the description and the close control, and the description wraps early around it. Placing the
-   action on its own row gives the words the full width and puts the button where a reader looks for
-   it last. The columns are laid out by hand rather than by auto-placement because a toast without an
-   icon renders no `[data-icon]` element at all. */
+/* Four columns and two rows: the mark, the words, and an action row under them, with the secondary
+   action before the main one. Sonner lays the toast out as one flex line, which works until an action
+   is present — the button then sits between the description and the close control, and the
+   description wraps early around it. Placing the actions on their own row gives the words the full
+   width and puts the main action at the end, where a reader looks for it last. The columns are laid
+   out by hand rather than by auto-placement because a toast without an icon renders no `[data-icon]`
+   element at all. */
 .ui-toaster [data-sonner-toast][data-styled="true"] {
   --ui-toast-tone: transparent;
   --ui-toast-motion-duration: var(--openbot-duration-toast-enter);
+  /* Sonner pulls the icon 1px to the side; the mark sits on the padding edge instead. */
+  --toast-svg-margin-start: 0px;
+  --toast-svg-margin-end: 0px;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) max-content max-content;
   align-items: start;
   column-gap: 0;
-  row-gap: var(--openbot-space-2);
+  row-gap: var(--openbot-space-3);
   min-height: var(--openbot-control-xl);
   padding: var(--openbot-space-3) var(--openbot-space-4);
   border-color: transparent;
-  border-radius: var(--openbot-radius-lg);
+  border-radius: var(--openbot-radius-card);
   background: var(--openbot-bg-surface-raised);
   box-shadow: 0 0 0 1px var(--openbot-border);
   color: var(--openbot-text-primary);
@@ -1787,8 +1800,15 @@ html.ui-textarea-resizing {
   --ui-toast-motion-duration: var(--openbot-duration-toast-exit);
 }
 
+/* The button row sits 8px from the bottom and end edges, so the 6px button radius plus that space
+   gives the 14px card radius. */
+.ui-toaster [data-sonner-toast][data-styled="true"]:has([data-button]) {
+  padding-bottom: var(--openbot-space-2);
+}
+
 .ui-toaster [data-sonner-toast][data-styled="true"] [data-content] {
   grid-area: 1 / 2 / 2 / -1;
+  gap: var(--openbot-space-1);
 }
 
 .ui-toaster [data-sonner-toast][data-styled="true"] [data-button] {
@@ -1796,26 +1816,30 @@ html.ui-textarea-resizing {
 }
 
 .ui-toaster [data-sonner-toast][data-styled="true"] [data-cancel] {
-  grid-column: 2;
+  grid-column: 3;
   justify-self: end;
 }
 
 .ui-toaster [data-sonner-toast][data-styled="true"] [data-action] {
-  grid-column: 3;
+  grid-column: 4;
 }
 
-/* The close control floats over the top right corner, so only the words have to keep clear of it.
-   Reserving the room on the toast instead left a hole beside every action button, which is visible
-   even while the control itself is hidden. */
+.ui-toaster [data-sonner-toast][data-styled="true"]:has([data-cancel]) [data-action] {
+  margin-inline-start: var(--openbot-space-1);
+}
+
+/* The close control sits on the top right corner, mostly outside the card, so the words keep only a
+   small space from it. */
 .ui-toaster.ui-toaster-closeable [data-sonner-toast][data-styled="true"] [data-content],
 .ui-toaster [data-sonner-toast][data-styled="true"]:has([data-close-button]) [data-content] {
-  padding-inline-end: var(--openbot-space-6);
+  padding-inline-end: var(--openbot-space-1);
 }
 
 .ui-toaster [data-sonner-toast][data-styled="true"] [data-title] {
   color: var(--openbot-text-primary);
   font-weight: var(--openbot-weight-medium);
   line-height: var(--openbot-leading-md);
+  text-wrap: balance;
 }
 
 .ui-toaster [data-sonner-toast][data-styled="true"] [data-description] {
@@ -1889,23 +1913,34 @@ html.ui-textarea-resizing {
   animation: ui-spin 720ms linear infinite;
 }
 
+/* The action that continues the flow has the light fill of the default Button. The action that only
+   closes or undoes is text. */
 .ui-toaster [data-sonner-toast][data-styled="true"] [data-button] {
-  height: var(--openbot-control-md);
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-bg-control-hover);
-  box-shadow: inset 0 0 0 1px var(--openbot-border);
+  height: var(--openbot-control-sm);
+  margin: 0;
+  border: 1px solid transparent;
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-surface-light);
+  box-shadow: none;
   padding-inline: var(--openbot-space-3);
-  color: var(--openbot-text-primary);
+  color: var(--openbot-text-on-light);
   font-family: var(--openbot-font-sans);
   font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-medium);
   transition:
-    background-color var(--openbot-duration-normal) ease,
-    color var(--openbot-duration-normal) ease,
+    background-color var(--openbot-duration-hover) ease,
+    color var(--openbot-duration-hover) ease,
     transform var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-.ui-toaster [data-sonner-toast][data-styled="true"] [data-cancel] {
+/* The last button is 8px from the end edge, not at the 16px padding of the words. */
+.ui-toaster [data-sonner-toast][data-styled="true"] [data-button]:last-of-type {
+  margin-inline-end: calc(var(--openbot-space-2) - var(--openbot-space-4));
+}
+
+/* Sonner fills the cancel button in its dark theme with a selector of the same weight as the rules
+   above, so this one names the theme too. */
+.ui-toaster[data-sonner-toaster][data-sonner-theme] [data-sonner-toast][data-styled="true"] [data-cancel] {
   background: transparent;
   color: var(--openbot-text-secondary);
 }
@@ -1916,22 +1951,29 @@ html.ui-textarea-resizing {
   box-shadow: var(--openbot-focus-ring);
 }
 
-.ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button]:focus-visible {
+.ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button]:focus-visible,
+.ui-toast-card-close:focus-visible {
   outline: 0;
   box-shadow:
     inset 0 0 0 1px var(--openbot-border-strong),
     0 0 0 2px var(--openbot-border-strong);
 }
 
-.ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button] {
-  top: var(--openbot-space-1);
-  inset-inline-end: var(--openbot-space-1);
+/* A small round button on the top right corner of the card, with 6px of it outside the card. The 1px
+   ring separates it from the card; it has no drop shadow. A toast that its caller draws (an unstyled
+   sonner toast) uses the same control with the `ui-toast-card-close` class. */
+.ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button],
+.ui-toast-card-close {
+  position: absolute;
+  top: calc(-1 * var(--openbot-space-1-5));
+  inset-inline-end: calc(-1 * var(--openbot-space-1-5));
   inset-inline-start: auto;
-  width: var(--openbot-control-md);
-  height: var(--openbot-control-md);
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
   border: 0;
-  border-radius: var(--openbot-radius-md);
-  background: transparent;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-surface-raised);
+  box-shadow: 0 0 0 1px var(--openbot-border-strong);
   color: var(--openbot-text-muted);
   pointer-events: auto;
   opacity: 1;
@@ -1944,7 +1986,8 @@ html.ui-textarea-resizing {
     transform var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-.ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button]::after {
+.ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button]::after,
+.ui-toast-card-close::after {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -1955,25 +1998,35 @@ html.ui-textarea-resizing {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button] {
+  .ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button],
+  .ui-toast-card-close {
     pointer-events: none;
     opacity: 0;
   }
 
   .ui-toaster [data-sonner-toast][data-styled="true"]:hover [data-close-button],
   .ui-toaster [data-sonner-toast][data-styled="true"]:focus-within [data-close-button],
-  .ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button]:focus-visible {
+  .ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button]:focus-visible,
+  [data-sonner-toast]:hover .ui-toast-card-close,
+  [data-sonner-toast]:focus-within .ui-toast-card-close {
     pointer-events: auto;
     opacity: 1;
   }
 
-  .ui-toaster [data-sonner-toast][data-styled="true"] [data-button]:hover {
-    background: var(--openbot-bg-control-active);
+  .ui-toaster [data-sonner-toast][data-styled="true"] [data-action]:hover {
+    background: color-mix(in srgb, var(--openbot-surface-light) 82%, transparent);
   }
 
-  .ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button]:hover:not(:focus-visible) {
-    background: var(--openbot-danger-soft);
-    color: var(--openbot-danger);
+  .ui-toaster[data-sonner-toaster][data-sonner-theme] [data-sonner-toast][data-styled="true"] [data-cancel]:hover {
+    background: var(--openbot-bg-control-hover);
+    color: var(--openbot-text-primary);
+  }
+
+  /* Close is a calm action, not a destructive one. */
+  .ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button]:hover:not(:focus-visible),
+  .ui-toast-card-close:hover:not(:focus-visible) {
+    background: var(--openbot-bg-control-active);
+    color: var(--openbot-text-primary);
   }
 }
 
@@ -1989,8 +2042,52 @@ html.ui-textarea-resizing {
   transform: scale(0.96);
 }
 
-.ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button]:active {
+.ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button]:active,
+.ui-toast-card-close:active {
   transform: scale(0.96);
+}
+
+/* A toast that its caller draws (an unstyled sonner toast) uses the buttons of the shared toast. The
+   card has 16px of end padding; the button row sits 8px from the end edge. */
+.ui-toast-card-close > svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+.ui-toast-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--openbot-space-1);
+  margin-inline-end: calc(var(--openbot-space-2) - var(--openbot-space-4));
+}
+
+/* The Button transitions, with the press scale added. */
+.ui-toast-card-actions .ui-button {
+  height: var(--openbot-control-sm);
+  border-radius: var(--openbot-radius-sm);
+  transition:
+    background-color var(--openbot-duration-hover) ease,
+    border-color var(--openbot-duration-hover) ease,
+    color var(--openbot-duration-hover) ease,
+    box-shadow var(--openbot-duration-hover) ease,
+    opacity var(--openbot-duration-hover) ease,
+    transform var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.ui-toast-card-actions .ui-button-variant-ghost {
+  color: var(--openbot-text-secondary);
+}
+
+.ui-toast-card-actions .ui-button:active {
+  transform: scale(0.96);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ui-toast-card-actions .ui-button-variant-ghost:hover {
+    background: var(--openbot-bg-control-hover);
+    color: var(--openbot-text-primary);
+  }
 }
 
 .ui-separator[data-orientation="horizontal"] {

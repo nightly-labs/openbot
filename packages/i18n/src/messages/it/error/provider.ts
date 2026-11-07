@@ -282,11 +282,14 @@ export const messages = {
   "error.provider.kimiSignIn": "Accedi con Kimi Code per usare Kimi.",
   "error.provider.devinSignIn": "Accedi con Devin per usare Devin.",
   "error.provider.copilotSignIn": "Accedi con GitHub o imposta COPILOT_GITHUB_TOKEN per usare GitHub Copilot.",
+  "error.provider.mistralSignIn": "Accedi con Mistral o imposta MISTRAL_API_KEY per usare Mistral.",
   "error.provider.hermesMissing": "Hermes Agent non è installato. Installalo e riprova.",
   "error.provider.hermesNotStarted": "Impossibile avviare Hermes Agent. Esegui `hermes --version` in un terminale.",
   "error.provider.hermesVersionUnreadable": "Impossibile leggere la versione di Hermes Agent.",
   "error.provider.hermesSignIn": "Accedi con Nous Portal o esegui `hermes setup` in un terminale per usare Hermes.",
   "error.provider.usageLimitReached": "L'account ha raggiunto il limite di utilizzo.",
+  "error.provider.claudeApiKeyNoCredit":
+    "La chiave API di Anthropic non ha credito API. Un piano Claude non paga le richieste fatte con una chiave API. Aggiungi credito nella Anthropic Console, oppure accedi a Claude nelle Impostazioni e seleziona l'account Claude nel menu dei modelli dell'agente.",
   "error.provider.foreignReasoning":
     "{provider} non ha accettato il ragionamento precedente in questa chat, perché lo ha ricevuto un altro account o un'altra chiave API. OpenBot ha avviato una nuova sessione di {provider} con la cronologia della chat. Riprova.",
   "error.provider.opencodeSessionRejected":

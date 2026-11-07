@@ -246,6 +246,7 @@ export const messages = {
   "chat.code.copy": "Code kopiëren",
   "chat.visual.loadFailed": "Kan {title} niet laden",
   "chat.visual.fullScreen": "Volledig scherm",
+  "chat.visual.openInSidePanel": "Openen in zijpaneel",
   "chat.visual.exitFullScreen": "Volledig scherm sluiten",
   "chat.preview.switchLabel": "Voorvertoning of code",
   "chat.preview.code": "Code",

@@ -333,6 +333,7 @@ export const messages = {
   "chat.code.copy": "Kopiuj kod",
   "chat.visual.loadFailed": "Nie można wczytać: {title}",
   "chat.visual.fullScreen": "Pełny ekran",
+  "chat.visual.openInSidePanel": "Otwórz w panelu bocznym",
   "chat.visual.exitFullScreen": "Zamknij pełny ekran",
   "chat.preview.switchLabel": "Podgląd lub kod",
   "chat.preview.code": "Kod",

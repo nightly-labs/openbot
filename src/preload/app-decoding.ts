@@ -35,6 +35,7 @@ import {
   type CentralAuthIssue,
   type CentralAuthState,
   type CentralAuthUser,
+  type ChatBackgroundColor,
   type ChatWindowTarget,
   CUSTOM_AGENT_LIMITS,
   type CustomAgentCheckResult,
@@ -73,6 +74,7 @@ import {
   isAutomationRunsPerHour,
   isAvatarColor,
   isBusyMessageMode,
+  isChatBackgroundColor,
   isCodexLiveVoice,
   isCustomAgentCheckResult,
   isCustomAgentResult,
@@ -83,17 +85,20 @@ import {
   isDetectedAcpAgent,
   isDetectedModelServer,
   isDiscoverModelsResult,
+  isElevenLabsSpeechVoice,
   isPlanStartAfterMs,
   isProviderDetectionSettings,
   isRemoteDesktopSetupStatus,
   isRemoteDesktopTestStatus,
   isRemoteNetworkRoute,
+  isSpeechModelId,
   isSpeechSpeed,
   isSpeechVoice,
   isVoiceLanguage,
   isVoiceModelId,
   isVoiceServerProbe,
   isVoiceServerSettings,
+  isXaiSpeechVoice,
   type LinkAccountStatus,
   type MobileConnectedDevice,
   type MobileConnectLink,
@@ -106,12 +111,12 @@ import {
   parseGitHubConnectorStatus,
   parseLinkAccountStatus,
   parseOnePasswordConnectorStatus,
+  QUIT_GUARDS,
   type RemoteDesktopSetupStatus,
   type RemoteDesktopTestStatus,
   type RemoteNetworkRouteState,
   type RemoteSessionReusePreference,
   type SentMessageStats,
-  SPEECH_MODEL_ID,
   type SpeechAudio,
   type SpeechModelStatus,
   type SpeechSettings,
@@ -243,17 +248,26 @@ function decodeThemePalette(palette: DynamicRecord): AppThemePalette {
   return { id: palette.id, name: palette.name, scheme: palette.scheme, colors: { ...palette.colors } };
 }
 
+/** A chat background becomes a CSS property value in the page, so only a hex color or null passes. */
+function decodeChatBackground(value: unknown): ChatBackgroundColor | null {
+  if (value !== null && !isChatBackgroundColor(value)) throw new Error("Invalid chat background.");
+  return value;
+}
+
 export function decodeAppAppearancePreference(value: unknown): AppAppearancePreference {
   const preference = decodeRecord(value, "appearance preference");
   if (!isAppAppearance(preference.appearance)) throw new Error("Invalid appearance.");
   if (typeof preference.transparentWindow !== "boolean") throw new Error("Invalid transparent window.");
   if (preference.palette !== null && !isAppThemePaletteId(preference.palette))
     throw new Error("Invalid theme palette.");
+  const palettes = decodeList(preference.palettes, "theme palettes", decodeThemePalette);
   return {
     appearance: preference.appearance,
     transparentWindow: preference.transparentWindow,
     palette: preference.palette,
-    palettes: decodeList(preference.palettes, "theme palettes", decodeThemePalette),
+    palettes,
+    chatBackgroundLight: decodeChatBackground(preference.chatBackgroundLight),
+    chatBackgroundDark: decodeChatBackground(preference.chatBackgroundDark),
   };
 }
 
@@ -440,7 +454,14 @@ export function decodeAppBehaviorPreference(value: unknown): AppBehaviorPreferen
     keepRunningInBackground: nullableBoolean(preference, "keepRunningInBackground"),
     keepAwake: nullableBoolean(preference, "keepAwake"),
     keepAwakeOnBattery: nullableBoolean(preference, "keepAwakeOnBattery"),
+    quitGuard: decodeQuitGuard(preference.quitGuard),
   };
+}
+
+function decodeQuitGuard(value: unknown): AppBehaviorPreference["quitGuard"] {
+  if (value === null) return null;
+  if (!isOneOf(QUIT_GUARDS, value)) throw new Error("Invalid quitGuard.");
+  return value;
 }
 
 export function decodeExternalLinkPreference(value: unknown): ExternalLinkPreference {
@@ -538,11 +559,7 @@ export function decodeVoiceStreamTranscript(value: unknown): VoiceStreamTranscri
 export function decodeSpeechModelStatus(value: unknown): SpeechModelStatus {
   const status = decodeRecord(value, "speech model status");
   const { modelId, phase, progress } = status;
-  if (
-    modelId !== SPEECH_MODEL_ID ||
-    !isOneOf(VOICE_MODEL_PHASES, phase) ||
-    (progress !== null && !isNumber(progress))
-  ) {
+  if (!isSpeechModelId(modelId) || !isOneOf(VOICE_MODEL_PHASES, phase) || (progress !== null && !isNumber(progress))) {
     throw new Error("Invalid speech model status.");
   }
   return { modelId, phase, progress, message: nullableString(status, "message") };
@@ -550,12 +567,22 @@ export function decodeSpeechModelStatus(value: unknown): SpeechModelStatus {
 
 export function decodeSpeechSettings(value: unknown): SpeechSettings {
   const settings = decodeRecord(value, "speech settings");
-  const { voice, speed, codexLiveVoice } = settings;
-  if (!isSpeechVoice(voice) || !isSpeechSpeed(speed) || !(codexLiveVoice === null || isCodexLiveVoice(codexLiveVoice)))
+  const { modelId, voice, elevenLabsVoice, xaiVoice, speed, codexLiveVoice } = settings;
+  if (
+    !isSpeechModelId(modelId) ||
+    !isSpeechVoice(voice) ||
+    !isElevenLabsSpeechVoice(elevenLabsVoice) ||
+    !isXaiSpeechVoice(xaiVoice) ||
+    !isSpeechSpeed(speed) ||
+    !(codexLiveVoice === null || isCodexLiveVoice(codexLiveVoice))
+  )
     throw new Error("Invalid speech settings.");
   return {
     readReplies: requiredBoolean(settings, "readReplies"),
+    modelId,
     voice,
+    elevenLabsVoice,
+    xaiVoice,
     speed,
     codexLive: requiredBoolean(settings, "codexLive"),
     codexLiveVoice,

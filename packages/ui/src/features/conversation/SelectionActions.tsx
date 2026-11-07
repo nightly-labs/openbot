@@ -90,6 +90,23 @@ export function selectionActionsPosition(
   return { top: clamp(idealTop, VIEWPORT_MARGIN, maximumTop), left, placement };
 }
 
+/**
+ * Closes the selection action that shows. A press in a page frame reaches only that page, so the
+ * window listeners of the other actions, in the app or in a different page, do not see it.
+ */
+let closeShownAction: (() => void) | undefined;
+
+/** Makes `close` the one selection action that shows, and closes the action that showed before. */
+export function showSelectionAction(close: () => void): void {
+  if (closeShownAction !== close) closeShownAction?.();
+  closeShownAction = close;
+}
+
+/** Forgets `close` when its action goes away. */
+export function releaseSelectionAction(close: () => void): void {
+  if (closeShownAction === close) closeShownAction = undefined;
+}
+
 export function MessageSelectionActions(props: {
   contextKey: string | undefined;
   disabled: boolean;
@@ -136,6 +153,7 @@ export function MessageSelectionActions(props: {
       clearSelection();
       return;
     }
+    showSelectionAction(clearSelection);
     setSelection(next);
   };
 
@@ -202,6 +220,7 @@ export function MessageSelectionActions(props: {
       window.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("keydown", onKeyDown);
+      releaseSelectionAction(clearSelection);
       if (selection()) clearPersistentHighlight();
     };
   });
@@ -513,23 +532,7 @@ export function SelectionActionsBar(props: {
                 </Show>
                 <Show when={props.onQuote}>
                   {(onQuote) => (
-                    <Button
-                      variant="ghost"
-                      type="button"
-                      class="selection-actions-control"
-                      aria-label={t("chat.selection.quote")}
-                      aria-keyshortcuts={props.quoteShortcut === "meta" ? "Meta+Shift+Period" : "Control+Shift+Period"}
-                      title={t(
-                        props.quoteShortcut === "meta"
-                          ? "chat.selection.quoteShortcutMac"
-                          : "chat.selection.quoteShortcutOther",
-                      )}
-                      onPointerDown={(event) => event.preventDefault()}
-                      onClick={() => onQuote()()}
-                    >
-                      <TextQuote class="selection-actions-icon" aria-hidden="true" />
-                      <span class="selection-actions-label">{t("chat.selection.quote")}</span>
-                    </Button>
+                    <QuoteSelectionButton quoteShortcut={props.quoteShortcut} onQuote={() => onQuote()()} />
                   )}
                 </Show>
                 <PresetButton
@@ -616,10 +619,36 @@ function PresetButton(props: { label: string; icon: SolidElement; onSelect: () =
   );
 }
 
+/** The Quote action of a selection toolbar. A press keeps the selection, so the click can quote it. */
+export function QuoteSelectionButton(props: { quoteShortcut: QuoteShortcutModifier | undefined; onQuote: () => void }) {
+  const { t } = useText();
+  return (
+    <Button
+      variant="ghost"
+      type="button"
+      class="selection-actions-control"
+      aria-label={t("chat.selection.quote")}
+      aria-keyshortcuts={props.quoteShortcut === "meta" ? "Meta+Shift+Period" : "Control+Shift+Period"}
+      title={t(
+        props.quoteShortcut === "meta" ? "chat.selection.quoteShortcutMac" : "chat.selection.quoteShortcutOther",
+      )}
+      onPointerDown={(event) => event.preventDefault()}
+      onClick={() => props.onQuote()}
+    >
+      <TextQuote class="selection-actions-icon" aria-hidden="true" />
+      <span class="selection-actions-label">{t("chat.selection.quote")}</span>
+    </Button>
+  );
+}
+
 /* The Quote button, so the presets do not clip it. */
 const QUOTE_ACTION_WIDTH = 84;
 
-function isQuoteShortcut(event: KeyboardEvent, modifier: QuoteShortcutModifier): boolean {
+/** ⌘⇧. on macOS, Ctrl+Shift+. elsewhere. A key that a visual reply page gives to the app counts too. */
+export function isQuoteShortcut(
+  event: Pick<KeyboardEvent, "metaKey" | "ctrlKey" | "shiftKey" | "altKey" | "code">,
+  modifier: QuoteShortcutModifier,
+): boolean {
   const modifierDown = modifier === "meta" ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
   return modifierDown && event.shiftKey && !event.altKey && event.code === "Period";
 }

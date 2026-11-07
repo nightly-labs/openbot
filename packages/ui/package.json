@@ -253,6 +253,7 @@
     "./features/marketplace/marketplace-view": "./src/features/marketplace/marketplace-view.ts",
     "./features/settings/LogoColorPicker": "./src/features/settings/LogoColorPicker.tsx",
     "./features/settings/ChatColorPicker": "./src/features/settings/ChatColorPicker.tsx",
+    "./features/settings/ChatBackgroundSetting": "./src/features/settings/ChatBackgroundSetting.tsx",
     "./features/settings/ChatColorSetting": "./src/features/settings/ChatColorSetting.tsx",
     "./features/settings/SoundChoiceSelect": "./src/features/settings/SoundChoiceSelect.tsx",
     "./features/settings/NotificationMatrix": "./src/features/settings/NotificationMatrix.tsx",

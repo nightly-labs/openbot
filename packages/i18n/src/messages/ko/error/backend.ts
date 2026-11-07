@@ -73,6 +73,7 @@ export const messages = {
   "error.backend.channelMemberUnavailable": "채널 멤버를 사용할 수 없어요.",
   "error.backend.channelWaitBeforeNewConversation": "이 채널의 작업이 끝날 때까지 기다린 다음 새 대화를 시작하세요.",
   "error.backend.channelWaitBeforeCompact": "이 채널의 작업이 끝날 때까지 기다린 다음 압축하세요.",
+  "error.backend.channelWaitBeforeDeleteHistory": "이 채널의 작업이 끝날 때까지 기다린 다음 기록을 삭제하세요.",
   "error.backend.channelCompactUnavailable":
     "지금은 이 채널의 어떤 멤버도 컨텍스트를 압축할 수 없습니다. 먼저 멤버가 채널에서 답해야 하고, 그 제공자가 압축을 지원해야 합니다.",
   "error.backend.channelArchived": "메시지를 보내거나 작업을 변경하려면 먼저 이 채널을 복원하세요.",

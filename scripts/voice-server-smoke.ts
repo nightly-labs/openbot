@@ -276,8 +276,11 @@ try {
   );
 
   // 2. Tab.
-  const badges = await page.getByRole("tabpanel").getByText(t("settings.voice.model.inUse"), { exact: true }).count();
-  check("no local dictation model is in use", badges === 0, badges);
+  const notes = await page
+    .getByRole("tabpanel")
+    .getByText(t("settings.voice.model.serverDictates"), { exact: true })
+    .count();
+  check("the Model row says that the server takes dictation", notes === 1, notes);
   const language = page
     .locator('[data-settings-row="settings.voice.language.section"]')
     .getByRole("button", { name: t("settings.voice.language.section") });

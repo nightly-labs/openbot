@@ -278,12 +278,15 @@ export const messages = {
   "error.provider.kimiSignIn": "Log in met Kimi Code om Kimi te gebruiken.",
   "error.provider.devinSignIn": "Log in met Devin om Devin te gebruiken.",
   "error.provider.copilotSignIn": "Log in met GitHub of stel COPILOT_GITHUB_TOKEN in om GitHub Copilot te gebruiken.",
+  "error.provider.mistralSignIn": "Log in met Mistral of stel MISTRAL_API_KEY in om Mistral te gebruiken.",
   "error.provider.hermesMissing": "Hermes Agent is niet geïnstalleerd. Installeer het en probeer het opnieuw.",
   "error.provider.hermesNotStarted": "Hermes Agent kon niet starten. Voer `hermes --version` uit in een terminal.",
   "error.provider.hermesVersionUnreadable": "De versie van Hermes Agent kan niet worden gelezen.",
   "error.provider.hermesSignIn":
     "Log in met Nous Portal of voer `hermes setup` uit in een terminal om Hermes te gebruiken.",
   "error.provider.usageLimitReached": "Het account heeft de gebruikslimiet bereikt.",
+  "error.provider.claudeApiKeyNoCredit":
+    "De Anthropic-API-sleutel heeft geen API-tegoed. Een Claude-abonnement betaalt geen verzoeken met een API-sleutel. Voeg tegoed toe in de Anthropic Console, of log bij Instellingen in bij Claude en kies het Claude-account in het modelmenu van de agent.",
   "error.provider.foreignReasoning":
     "{provider} heeft het eerdere redeneren in deze chat niet geaccepteerd, omdat een ander account of een andere API-sleutel het heeft ontvangen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.opencodeSessionRejected":

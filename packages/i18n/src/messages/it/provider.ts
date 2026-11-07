@@ -160,7 +160,7 @@ export const messages = {
   "provider.geminiKey.label": "Chiave API di Gemini",
   "provider.claudeKey.title": "Chiave API di Anthropic",
   "provider.claudeKey.description":
-    "Salva una chiave API di Anthropic sull'host. Anthropic addebita ogni richiesta alla chiave. Per usarla per un agente, seleziona l'account «Chiave API» nel menu dei modelli dell'agente. Se Claude non ha un accesso, tutti gli agenti usano la chiave.",
+    "Salva una chiave API di Anthropic sull'host. Anthropic addebita ogni richiesta al credito API della chiave, non al tuo piano Claude. Per usarla per un agente, seleziona l'account «Chiave API» nel menu dei modelli dell'agente. Se Claude non ha un accesso, tutti gli agenti usano la chiave.",
   "provider.claudeKey.label": "Chiave API di Anthropic",
   "provider.inceptionKey.title": "Chiave API di Inception",
   "provider.inceptionKey.description":

@@ -58,6 +58,7 @@ export const messages = {
     "Há tarefas deste agente em execução. Aguarde que terminem ou pare-as antes de trocar de provedor.",
   "error.agent.waitBeforeClearContext": "Aguarde o turno ativo e a fila terminarem antes de iniciar um novo chat.",
   "error.agent.waitBeforeCompactContext": "Aguarde o turno ativo e a fila terminarem antes de compactar o contexto.",
+  "error.agent.waitBeforeDeleteHistory": "Aguarde o turno ativo e a fila terminarem antes de excluir o histórico.",
   "error.agent.compactContextUnavailable": "Este agente não pode compactar o contexto agora.",
   "error.agent.unknown": "Agente desconhecido: {id}",
   "error.agent.onlyUserWidensSettings":

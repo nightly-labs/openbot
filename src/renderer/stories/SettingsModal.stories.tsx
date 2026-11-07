@@ -27,6 +27,7 @@ const storyGeneralSettings: GeneralSettingsValue = {
   keepRunningInBackground: false,
   keepAwake: false,
   keepAwakeOnBattery: false,
+  quitGuard: "working",
 };
 
 const storyAppInfo = { name: "OpenBot", version: "0.2.1", platform: "darwin", variant: "dev" } as const;

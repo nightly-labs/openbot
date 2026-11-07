@@ -13,6 +13,7 @@ import type { IpcMainInvokeEvent } from "electron";
 import { describe, expect, it, vi } from "vitest";
 import { eventPayloadHandler, handler, payloadHandler, registerIpcGroup } from "./define-ipc-group";
 import {
+  parseSpeechApiKey,
   parseSpeechInput,
   parseSpeechSettings,
   parseVoiceApiKey,
@@ -90,6 +91,7 @@ function registerVoice(
     getSpeechSettings: handler(() => DEFAULT_SPEECH_SETTINGS),
     setSpeechSettings: payloadHandler(parseSpeechSettings, (settings) => settings),
     getSpeechModelStatus: handler(() => SPEECH_READY),
+    setSpeechApiKey: payloadHandler(parseSpeechApiKey, () => SPEECH_READY),
     downloadSpeechModel: handler(() => SPEECH_READY),
     cancelSpeechModelDownload: handler(() => SPEECH_READY),
     removeSpeechModel: handler(() => SPEECH_READY),

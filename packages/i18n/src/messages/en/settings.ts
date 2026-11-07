@@ -30,6 +30,12 @@ export const messages = defineMessages("settings", {
   "settings.logoColor.beige": "Beige",
   "settings.logoColor.gray": "Gray",
   "settings.logoColor.white": "White",
+  "settings.chatBackground.title": "Chat background",
+  "settings.chatBackground.description":
+    "Each theme keeps its own color. A color that makes text hard to read becomes darker or lighter.",
+  "settings.chatBackground.light": "Chat background in Light",
+  "settings.chatBackground.dark": "Chat background in Dark",
+  "settings.chatBackground.default": "Default",
   "settings.chatColor.title": "Chat color",
   "settings.chatColor.description": "Tints the bubbles of your messages. People on your servers see it too.",
   "settings.chatColor.yours": "Your chat color",
@@ -66,6 +72,11 @@ export const messages = defineMessages("settings", {
     "Keep the computer awake on battery power too. The battery runs down faster.",
   "settings.restoreWorkspace.title": "Restore the last workspace on launch",
   "settings.restoreWorkspace.description": "Open the workspace and tasks from your previous session.",
+  "settings.quitGuard.title": "Hold ⌘Q to quit",
+  "settings.quitGuard.description": "Hold ⌘Q or press it twice to quit. With Never, one ⌘Q quits and stops the agents.",
+  "settings.quitGuard.working": "While agents work",
+  "settings.quitGuard.always": "Always",
+  "settings.quitGuard.never": "Never",
   "settings.externalLinks.title": "Open external links in",
   "settings.externalLinks.description": "Links in chats, sign-in pages and billing pages open here.",
   // The two link targets. The saved value stays in English; only the label is translated.
@@ -249,7 +260,7 @@ export const messages = defineMessages("settings", {
   "settings.tab.notifications.description": "Choose how OpenBot alerts you.",
   "settings.tab.voice.title": "Voice",
   "settings.tab.voice.description":
-    "Dictation in the message box. Local models run on this computer; ElevenLabs runs in the cloud.",
+    "Dictation in the message box. Local models run on this computer; ElevenLabs and Groq run in the cloud.",
   "settings.tab.computerUse.title": "Computer Use",
   "settings.tab.computerUse.description":
     "Let agents on this computer's OpenBot see and use its apps. Agents on another server use that server's computer.",
@@ -604,13 +615,10 @@ export const messages = defineMessages("settings", {
   "settings.voice.model.cohere.description":
     "Slower. 14 languages. You set the spoken language. Uses about 4 GB of memory.",
   "settings.voice.model.size": "Download size: {size}",
-  "settings.voice.model.downloading": "Downloading · {received} of {total}",
   "settings.voice.model.failed": "The download stopped. Check the connection and try again.",
   "settings.voice.model.progressLabel": "Downloading {name}",
   "settings.voice.model.use": "Use",
-  "settings.voice.model.inUse": "In use",
   "settings.voice.model.downloadLabel": "Download {name}",
-  "settings.voice.model.cancelLabel": "Stop the download of {name}",
   "settings.voice.model.retryLabel": "Download {name} again",
   "settings.voice.model.useLabel": "Use {name} for dictation",
   "settings.voice.model.removeLabel": "Remove {name} from this computer",
@@ -632,14 +640,32 @@ export const messages = defineMessages("settings", {
   "settings.voice.removeFailed": "Could not remove the model. Try again.",
   "settings.voice.model.elevenlabs.description":
     "Streams your voice to ElevenLabs. Text shows while you speak and stays fixed. Uses your own API key, and ElevenLabs bills each use.",
-  "settings.voice.model.keySaved": "API key saved",
-  "settings.voice.model.keyMissing": "Needs an ElevenLabs API key",
-  "settings.voice.apiKey.label": "ElevenLabs API key",
+  "settings.voice.model.groqTurbo.description":
+    "Sends each recording to Groq when you stop. Fast, and knows many languages. Uses your own API key, and Groq bills each use.",
+  "settings.voice.model.groqLarge.description":
+    "Sends each recording to Groq when you stop. More accurate than turbo, but slower. Uses your own API key, and Groq bills each use.",
   "settings.voice.apiKey.placeholder": "Paste the key",
   "settings.voice.apiKey.save": "Save key",
   "settings.voice.apiKey.remove": "Remove key",
   "settings.voice.apiKey.saveFailed": "Could not save the API key. Try again.",
   "settings.voice.apiKey.removeFailed": "Could not remove the API key. Try again.",
+  "settings.voice.model.title": "Model",
+  "settings.voice.model.group.local": "On this computer",
+  "settings.voice.model.downloadingShort": "Downloading…",
+  "settings.voice.model.ready": "{name} is ready",
+  "settings.voice.model.serverDictates": "Your voice server takes dictation now.",
+  "settings.voice.apiKey.providerLabel": "{provider} API key",
+  "settings.voice.apiKey.needed": "Paste a key to use {provider}",
+  "settings.voice.apiKey.removeLabel": "Remove the {provider} API key",
+  "settings.voice.speech.model.flash.description":
+    "Fast. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
+  "settings.voice.speech.model.multilingual.description":
+    "More natural, and slower. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
+  "settings.voice.speech.model.v3.description":
+    "The most expressive, and the slowest. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
+  "settings.voice.speech.model.xai.description":
+    "Sends the reply text to xAI. Uses your own API key, and xAI bills each use.",
+  "settings.voice.speech.serverSpeaks": "Your voice server reads replies aloud now.",
   "settings.voice.speech.section": "Spoken replies",
   "settings.voice.speech.model.description": "Reads replies aloud on this computer, in 31 languages.",
   "settings.voice.speech.readReplies.title": "Read replies aloud",

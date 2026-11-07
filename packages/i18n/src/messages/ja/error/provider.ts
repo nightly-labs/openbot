@@ -286,6 +286,8 @@ export const messages = {
   "error.provider.devinSignIn": "Devin を使うには Devin でサインインしてください。",
   "error.provider.copilotSignIn":
     "GitHub Copilot を使うには GitHub でサインインするか、COPILOT_GITHUB_TOKEN を設定してください。",
+  "error.provider.mistralSignIn":
+    "Mistral を使うには、Mistral でサインインするか、MISTRAL_API_KEY を設定してください。",
   "error.provider.hermesMissing":
     "Hermes Agent がインストールされていません。インストールしてから、もう一度お試しください。",
   "error.provider.hermesNotStarted":
@@ -294,6 +296,8 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Hermes を使うには、Nous Portal でサインインするか、ターミナルで `hermes setup` を実行してください。",
   "error.provider.usageLimitReached": "アカウントが使用量の上限に達しました。",
+  "error.provider.claudeApiKeyNoCredit":
+    "Anthropic API キーに API クレジットがありません。Claude のプランは API キーでのリクエストには使われません。Anthropic Console でクレジットを追加するか、設定で Claude にサインインして、エージェントのモデルメニューで Claude アカウントを選択してください。",
   "error.provider.foreignReasoning":
     "別のアカウントまたは API キーが受け取ったため、{provider} はこのチャットの以前の推論を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.opencodeSessionRejected":

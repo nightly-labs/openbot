@@ -11,6 +11,7 @@ import { VoicePanel } from "@openbot/ui/features/conversation/VoicePanel";
 import { McpSignInRelayDialog } from "@openbot/ui/features/settings/McpSignInPage";
 import { useText } from "@openbot/ui/text";
 import { actionToast } from "../../action-toast";
+import { deviceQuoteShortcut } from "../../send-shortcut-preference";
 import { type AgentTemplatePublishCalls, agentTemplatesPort } from "../agent-templates/agent-templates-port";
 import { createPublishAgent } from "../agent-templates/PublishAgent";
 import { desktopBrowserProfileCalls } from "../browser/browser-profiles-port";
@@ -21,6 +22,7 @@ import { codexLiveAccess } from "../speech/codex-live-access";
 import { speechPort } from "../speech/speech-port";
 import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
 import { ConversationSideThread } from "./ConversationSideThread";
+import { isChatVisualAppShortcut } from "./chat-visual-shortcuts";
 import { htmlAttachmentPageHtml, htmlAttachmentPageUrl } from "./chat-visual-url";
 import { useConversationController } from "./conversation-controller-context";
 import { type AgentNotificationLevelCalls, conversationRuntime } from "./conversation-runtime";
@@ -143,6 +145,9 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     previewQuoteId,
     previewFileKey,
     previewWorkspaceAgentId,
+    quoteSelection,
+    addPageText,
+    setPageContext,
     sidebarFileBack,
     openSidebarFileBack,
     props,
@@ -474,6 +479,20 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 pageHtml={props.runtime?.visualPage ? htmlAttachmentPageHtml(attached(), file().preview) : undefined}
                 fileKey={previewFileKey()}
                 selectionQuoteId={previewQuoteId()}
+                // A page quotes as a passage of its file, so the quote opens the page again.
+                onPageQuote={(text) => {
+                  const quoteId = previewQuoteId();
+                  if (quoteId) quoteSelection(quoteId, text);
+                }}
+                // The page state goes with the message that holds the page, as in the chat.
+                onPageContext={(text) => {
+                  const id = attached()?.id;
+                  const message = id && props.messages.find((item) => item.attachments?.some((file) => file.id === id));
+                  if (message) setPageContext(message, text);
+                }}
+                onPageMessage={addPageText}
+                isPageAppShortcut={isChatVisualAppShortcut}
+                quoteShortcut={deviceQuoteShortcut(props.platform)}
                 onOpenExternally={openSidebarFileExternally}
                 onDownload={downloadSidebarFile}
                 /* A browser cannot show a file in the file manager. */
@@ -645,6 +664,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               memoryLimit={props.server?.kind === "local" ? props.agentMemoryLimit : undefined}
               agents={props.agents}
               onStartNewChat={props.onClearAgentContext}
+              onDeleteHistory={props.onDeleteAgentHistory}
               onCreateSkill={
                 serverCanAdminister(props.server, "skills-admin-v1") &&
                 agentReady() &&

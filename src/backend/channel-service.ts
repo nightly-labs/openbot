@@ -468,6 +468,40 @@ export class ChannelService {
   });
 
   /**
+   * "Delete history": every message of the channel leaves the view and the stored history, with its
+   * files, and the members forget the channel as after "New conversation". The members,
+   * instructions, memories, routines and tasks stay. Work that still runs or waits refuses it, and
+   * `members.busy` and `members.end` work as for `clearContext`.
+   */
+  readonly deleteHistory = Effect.fn("ChannelService.deleteHistory")(function* (
+    this: ChannelService,
+    channelId: string,
+    members: {
+      busy: (contexts: ReadonlyArray<{ agentId: string; threadId: string }>) => boolean;
+      end: (threadIds: readonly string[]) => Effect.Effect<void>;
+    },
+  ) {
+    yield* this.#serialize(
+      channelId,
+      Effect.gen({ self: this }, function* () {
+        if (this.#deletedChannels.has(channelId))
+          return yield* channelFailure(new Error(sourceText("error.backend.channelNotFound")));
+        const channel = yield* channelSync(() => this.store.get(channelId));
+        if (channel.archived) return yield* channelFailure(new Error(sourceText("error.backend.channelArchived")));
+        yield* this.#requireIdle(channelId, "error.backend.channelWaitBeforeDeleteHistory");
+        const contexts = yield* channelSync(() => this.store.contexts(channelId));
+        if (members.busy(contexts))
+          return yield* channelFailure(new Error(sourceText("error.backend.channelWaitBeforeDeleteHistory")));
+        yield* channelSync(() => this.store.deleteHistory(channel));
+        // A failure here leaves copies that no message shows; a second request removes them.
+        yield* this.mailbox.deleteChannelMessageCopies(channelId, "all").pipe(Effect.mapError(channelFailure));
+        yield* members.end(contexts.map((context) => context.threadId));
+      }).pipe(Effect.uninterruptible),
+    );
+    this.publish(channelId);
+  });
+
+  /**
    * The member sessions that "Compact now" compacts: the execution thread of each member with an
    * active provider session. Work that still runs or waits refuses it, as for a new conversation.
    */
@@ -484,7 +518,10 @@ export class ChannelService {
   /** Refuses while a task of the channel is queued, running, or waits for other work. */
   #requireIdle(
     channelId: string,
-    key: "error.backend.channelWaitBeforeNewConversation" | "error.backend.channelWaitBeforeCompact",
+    key:
+      | "error.backend.channelWaitBeforeNewConversation"
+      | "error.backend.channelWaitBeforeCompact"
+      | "error.backend.channelWaitBeforeDeleteHistory",
   ): Effect.Effect<void, ChannelOperationError> {
     return channelSync(() => this.store.tasks(channelId)).pipe(
       Effect.flatMap((tasks) =>

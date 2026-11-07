@@ -216,6 +216,14 @@ export const messages = {
     "ينسى الوكيل هذه الدردشة. تبقى الرسائل ظاهرة فوق فاصل. ولا تتغير التعليمات والنموذج والأدوات والذكريات ومساحة العمل والمتصفح.",
   "agentSettings.newChat.confirm": "بدء دردشة جديدة",
   "agentSettings.newChat.failed": "تعذّر بدء دردشة جديدة.",
+  "agentSettings.deleteHistory.title": "حذف السجل",
+  "agentSettings.deleteHistory.description": "تُحذف رسائل هذه الدردشة وينساها الوكيل. يبقى إعداده كما هو.",
+  "agentSettings.deleteHistory.button": "حذف",
+  "agentSettings.deleteHistory.confirmTitle": "هل تريد حذف سجل الدردشة مع {name}؟",
+  "agentSettings.deleteHistory.confirmDescription":
+    "تُحذف كل رسائل هذه الدردشة وملفاتها من OpenBot وينساها الوكيل. لا يمكن التراجع عن ذلك. لا تتغير المحادثات الجانبية والتعليمات والنموذج والأدوات والذكريات ومساحة العمل والمتصفح.",
+  "agentSettings.deleteHistory.confirm": "حذف السجل",
+  "agentSettings.deleteHistory.failed": "تعذّر حذف السجل.",
 
   "agentSettings.fullAccess.title": "هل تريد منح هذا الوكيل وصولًا كاملًا؟",
   "agentSettings.fullAccess.askTitle": "هل تسمح لهذا الوكيل بالعمل خارج مساحة عمله؟",

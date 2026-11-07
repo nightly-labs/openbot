@@ -75,6 +75,7 @@ export const messages = {
   "error.backend.channelWaitBeforeNewConversation":
     "Bu kanaldaki iş bitene kadar bekleyin, sonra yeni bir konuşma başlatın.",
   "error.backend.channelWaitBeforeCompact": "Bu kanaldaki iş bitene kadar bekleyin, sonra kanalı sıkıştırın.",
+  "error.backend.channelWaitBeforeDeleteHistory": "Bu kanaldaki iş bitene kadar bekleyin, sonra geçmişini silin.",
   "error.backend.channelCompactUnavailable":
     "Bu kanalın hiçbir üyesi şu anda bağlamını sıkıştıramıyor. Önce bir üyenin kanalda yanıt vermesi ve sağlayıcısının sıkıştırmayı desteklemesi gerekir.",
   "error.backend.channelArchived": "Mesaj göndermeden veya görevleri değiştirmeden önce bu kanalı geri yükleyin.",

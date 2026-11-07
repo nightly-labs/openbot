@@ -7,6 +7,7 @@ import {
   type WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import type { MessageImageFile } from "@openbot/ui/features/conversation/MarkdownMessageText";
+import { isSidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onCleanup, type Store, type StoreSetter, untrack } from "solid-js";
 import { createScopeGuard } from "../../../scope-lifetime";
@@ -82,28 +83,6 @@ const FILE_PREVIEW_REFRESH_BYTES = 8 * 1024 * 1024;
 
 const SIDE_PANEL_EMPTY: SidePanelState = { panes: [], selected: null, files: [], file: null, maximized: false };
 
-/** The panel mode of each pane. */
-export const SIDE_PANEL_MODES = {
-  browser: "browser",
-  files: "files",
-  settings: "settings",
-  question: "question",
-  voice: "voice",
-  subagent: "subagent",
-} as const satisfies Record<SidePanelPane, RightPanelMode>;
-
-function isSidePanelPane(value: string): value is SidePanelPane {
-  return value in SIDE_PANEL_MODES;
-}
-
-/** The pane that shows a panel mode, or null for a mode outside the side panel. */
-function paneOfMode(mode: RightPanelMode): SidePanelPane | null {
-  for (const [pane, paneMode] of Object.entries(SIDE_PANEL_MODES)) {
-    if (paneMode === mode && isSidePanelPane(pane)) return pane;
-  }
-  return null;
-}
-
 export interface PanelsStoreDeps {
   props: ConversationProps;
   rightPanels: () => Record<string, RightPanelMode>;
@@ -160,7 +139,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     activeRightPanel() === "side-panel" ||
     activeRightPanel() === "thread" ||
     activeRightPanel() === "file-preview" ||
-    paneOfMode(activeRightPanel()) !== null;
+    isSidePanelPane(activeRightPanel());
   function updateSidePanel(agentId: string, update: (state: SidePanelState) => SidePanelState) {
     setPanels((draft) => {
       draft.side[agentId] = update(draft.side[agentId] ?? SIDE_PANEL_EMPTY);
@@ -241,12 +220,11 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       setRoutineSettingsRequest((current) => (current?.agentId === agentId ? null : current));
     }
     deps.setRightPanels((current) => (current[agentId] === mode ? current : { ...current, [agentId]: mode }));
-    const pane = paneOfMode(mode);
-    if (pane)
+    if (isSidePanelPane(mode))
       updateSidePanel(agentId, (state) => ({
         ...state,
-        panes: state.panes.includes(pane) ? state.panes : [...state.panes, pane],
-        selected: pane,
+        panes: state.panes.includes(mode) ? state.panes : [...state.panes, mode],
+        selected: mode,
         file: null,
       }));
     else if (mode === "side-panel" || mode === "thread")

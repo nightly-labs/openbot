@@ -184,6 +184,15 @@ export const messages = {
     "エージェントはこのチャットを忘れます。メッセージは区切り線の上に表示されたままです。指示、モデル、ツール、メモリー、ワークスペース、ブラウザーは変わりません。",
   "agentSettings.newChat.confirm": "新しいチャットを開始",
   "agentSettings.newChat.failed": "新しいチャットを始められませんでした。",
+  "agentSettings.deleteHistory.title": "履歴を削除",
+  "agentSettings.deleteHistory.description":
+    "このチャットのメッセージを削除し、エージェントも忘れます。設定は残ります。",
+  "agentSettings.deleteHistory.button": "削除",
+  "agentSettings.deleteHistory.confirmTitle": "{name} とのチャット履歴を削除しますか？",
+  "agentSettings.deleteHistory.confirmDescription":
+    "このチャットのすべてのメッセージとファイルをOpenBotから削除し、エージェントも忘れます。元に戻せません。サイドスレッド、指示、モデル、ツール、メモリー、ワークスペース、ブラウザーは変わりません。",
+  "agentSettings.deleteHistory.confirm": "履歴を削除",
+  "agentSettings.deleteHistory.failed": "履歴を削除できませんでした。",
 
   "agentSettings.fullAccess.title": "このエージェントにフルアクセスを許可しますか？",
   "agentSettings.fullAccess.askTitle": "このエージェントにワークスペースの外での作業を許可しますか？",

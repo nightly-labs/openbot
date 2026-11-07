@@ -22,9 +22,11 @@ import {
   DEVIN_ACP_FLAVOR,
   HERMES_ACP_FLAVOR,
   KIMI_ACP_FLAVOR,
+  MISTRAL_ACP_FLAVOR,
 } from "./acp-flavor";
 import { ANTIGRAVITY_ACP_FLAVOR } from "./acp-flavor-antigravity";
 import { OPENCODE_ACP_FLAVOR } from "./acp-flavor-opencode";
+import type { AcpExtensionMethod } from "./acp-sign-in";
 import { readMuseAccount } from "./agent/muse-login";
 import {
   claudeModelName,
@@ -52,6 +54,7 @@ import {
   resolveGrokCli,
   resolveHermesCli,
   resolveKimiCli,
+  resolveMistralCli,
   resolveMuseCli,
   resolveOpencodeCli,
   resolvePiCli,
@@ -92,6 +95,8 @@ import {
   hermesHome,
   hermesStatePaths,
   kimiStatePaths,
+  mistralHomeDirectory,
+  mistralStatePaths,
   museStatePaths,
   OPENCODE_CONFINED_ENV,
   openCodeStatePaths,
@@ -116,9 +121,10 @@ interface ProviderCliCommand {
   readonly closeInput?: true;
   /**
    * `argv` starts the CLI's ACP server, which signs out with ACP `logout`: for a CLI that has a
-   * `logout` method and no sign-out command. Only for a sign-out.
+   * `logout` method and no sign-out command. A method name is the server's own sign-out method,
+   * which it calls in place of `logout`. Only for a sign-out.
    */
-  readonly acpLogout?: true;
+  readonly acpLogout?: true | AcpExtensionMethod;
 }
 
 /**
@@ -423,6 +429,15 @@ const COPILOT_ENV: Readonly<Record<string, string>> = { COPILOT_AUTO_UPDATE: "fa
 
 /** `copilot --acp` serves the Agent Client Protocol on stdio. */
 const COPILOT_ARGV: readonly string[] = ["--acp", "--no-auto-update"];
+
+/**
+ * Mistral Vibe 3.1.0 sends usage data to Mistral unless told not to (`PRIVACY.md`). Every process gets
+ * the variable, the sign-in and sign-out processes too.
+ */
+const MISTRAL_ENV: Readonly<Record<string, string>> = { VIBE_ENABLE_TELEMETRY: "false" };
+
+/** `vibe-acp` serves the Agent Client Protocol on stdio, with no argument. */
+const MISTRAL_ARGV: readonly string[] = [];
 
 /**
  * What a client needs from the app at spawn, beyond its own CLI: the stored secrets, and the user's
@@ -1314,6 +1329,59 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         servesModel: context.servesModel,
       }),
     authState: (account) => ({ kind: "copilot", email: account?.email ?? null }),
+    validateAccount: () => undefined,
+  },
+  {
+    id: "mistral",
+    // The ACP `browser-auth` method opens Mistral AI Studio in the system browser, and asks Mistral
+    // until the user finishes there. Mistral Vibe 3.1.0 saves the API key that the sign-in makes in
+    // the system keychain, or in `.env` of its home folder when it has no keychain.
+    signIn: {
+      kind: "acp-authenticate",
+      methodId: "browser-auth",
+      argv: MISTRAL_ARGV,
+      env: MISTRAL_ENV,
+      timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+    },
+    // The CLI has no sign-out command, and its ACP server has no `logout` method. Its own
+    // `_auth/signOut` removes the saved key. A key in the user's environment stays.
+    signOut: { argv: MISTRAL_ARGV, env: () => ({ ...MISTRAL_ENV }), timeoutMs: 30_000, acpLogout: "_auth/signOut" },
+    // A sign-in without a keychain writes the key in `.env`. A sign-in also writes the provider and
+    // console page in `config.toml` when they change. A key in the keychain changes no file.
+    signInFiles: () => [join(mistralHomeDirectory(), ".env"), join(mistralHomeDirectory(), "config.toml")],
+    resolveCli: resolveMistralCli,
+    createClient: (cli, timeout, context, confinement) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "mistral",
+        flavor: MISTRAL_ACP_FLAVOR,
+        argv: MISTRAL_ARGV,
+        env: { ...MISTRAL_ENV },
+        ...(confinement
+          ? {
+              confine: (target) =>
+                confineWithState(target, confinement, mistralStatePaths, context.agentEnvironment?.()),
+            }
+          : {}),
+        extraEnv: () => ({ ...context.agentEnvironment?.() }),
+        signInMessage: sourceText("error.provider.mistralSignIn"),
+        servesModel: context.servesModel,
+        mcpServers: context.mcpServers,
+        reportMcpDrops: context.reportMcpDrops,
+        mcpToolRuntimes: context.mcpToolRuntimes,
+        mcpEndpoint: context.mcpEndpoint,
+        history: context.history?.("mistral"),
+      }),
+    createProfileClient: (cli, timeout, context) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "mistral",
+        flavor: MISTRAL_ACP_FLAVOR,
+        argv: MISTRAL_ARGV,
+        profileGeneration: true,
+        env: { ...MISTRAL_ENV },
+        signInMessage: sourceText("error.provider.mistralSignIn"),
+        servesModel: context.servesModel,
+      }),
+    authState: (account) => ({ kind: "mistral", email: account?.email ?? null }),
     validateAccount: () => undefined,
   },
   {
