@@ -42,13 +42,13 @@ export function createMessageImageFiles(
   // Insertion order is the use order: the first entry is the least recently used.
   const cache = new Map<string, { job: Promise<string | null>; characters: number }>();
   // A workspace `Shared/…` image that showed from the shared folder, so its download saves the same file.
+  // A key stays after its cache entry goes, because the row still shows the image.
   const sharedFallbacks = new Set<string>();
   let total = 0;
   const drop = (key: string) => {
     const entry = cache.get(key);
     if (!entry) return;
     cache.delete(key);
-    sharedFallbacks.delete(key);
     total -= entry.characters;
   };
   const keyOf = (file: MessageImageFile, scope: MessageImageScope) =>
