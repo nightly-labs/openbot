@@ -82,6 +82,8 @@ export interface BrowserHostTab {
   crashes?: number;
   /** Main-frame documents the tab has loaded. A reload keeps the URL, so a saved preview checks this too. */
   documents: number;
+  /** How long reads of one document waited for its bot check. All reads of a document share one wait. */
+  challengeWait?: { document: number; waitedMs: number };
   /**
    * The last preview frame, with the page, document and capture generation it shows. A preview waits
    * behind the agent's actions, so the preview card shows this frame instead while the tab is busy.

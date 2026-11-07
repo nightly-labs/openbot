@@ -171,10 +171,13 @@ Imperva, Akamai, AWS WAF) and, only on a short page, captcha frames and phrases 
 are human". A long page that only mentions a captcha does not count. A check that passes by itself
 (`non-interactive`) makes the tab read wait: it reads the page again every second for up to 15
 seconds, and stops at once when the tab closes, a person takes control, or the tab holds a secret.
+All reads of one document share the 15 seconds: a read with a shorter timeout, such as `navigate`,
+leaves the rest for the next read, and a check that stays after the full wait reads as `needs-user`
+at once.
 The snapshot then has a `challenge` field with `status` (`cleared`, `needs-user` or `blocked`), the
 vendor, the wait, and `next`, the step that the agent takes. A check that needs a person asks for
-`request_takeover` (in a routine run, a report). A block asks for a report. The core guidance tells
-the agent to follow `next` and never to solve, reload, or retry a check. The idea and the vendor
+`request_takeover` (in a routine run, a report). A block asks for a report. Each `next` also tells
+the agent not to solve, reload, or retry the check, so the guidance needs no separate rule. The idea and the vendor
 list come from anomalyco/browse; the code is our own.
 
 `bun run bench:browser-tools --tasks=challenge-interstitial,challenge-interactive` measures it with
@@ -189,7 +192,9 @@ When the first read of a snapshot finds a loading marker that a person can see (
 or a class that contains `skeleton` or `shimmer`), the snapshot waits in the page until the markers
 go and the DOM is unchanged for 150 ms, for up to 2 seconds, and reads again (`browser-settle.ts`).
 A page that keeps its marker for the full wait does not wait again until its next document. A
-document younger than 2.5 seconds with no controls waits for its first change, for up to 1 second.
+document younger than 2.5 seconds with no controls waits for its first change: for up to 1 second
+while it loads, and only until 500 ms after its load event once it has loaded. A loaded static page
+without controls does not wait. Each wait ends 1 second before the read's timeout.
 Without this wait, the agent read the placeholders and took a second snapshot. Chromium already
 leaves the content outside a modal dialog (`showModal()`) out of the accessibility tree, so the
 snapshot has no modal-first order.

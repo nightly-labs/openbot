@@ -205,11 +205,13 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
   // here saves the agent the turns of a wait, a reload, and a retry. A person who takes the tab, a
   // secret entry, or a closed tab ends the wait at once.
   const waitStarted = Date.now();
+  const waitDocument = tab.documents;
+  const priorWaitMs = tab.challengeWait?.document === waitDocument ? tab.challengeWait.waitedMs : 0;
   let waitedVendor: string | null = null;
   let lastReadFailed = false;
   while (
     current.result.challenge?.kind === "non-interactive" &&
-    Date.now() - waitStarted < CHALLENGE_WAIT_MS &&
+    Date.now() - waitStarted < CHALLENGE_WAIT_MS - priorWaitMs &&
     // A caller with its own timeout gets the check result, not a timeout.
     (deadline === undefined || deadline - Date.now() > CHALLENGE_POLL_MS + SNAPSHOT_READ_RESERVE_MS) &&
     !tab.secret &&
@@ -228,6 +230,10 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
   }
   if (lastReadFailed) current = yield* read(tab.revision + 1);
   const { result, cursor } = current;
+  if (waitedVendor !== null && result.challenge?.kind === "non-interactive") {
+    const waitedMs = Date.now() - waitStarted + (tab.documents === waitDocument ? priorWaitMs : 0);
+    tab.challengeWait = { document: tab.documents, waitedMs };
+  }
   if (!tab.secret) {
     const challenge = describeChallenge(
       result.challenge,

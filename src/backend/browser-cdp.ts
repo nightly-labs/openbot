@@ -87,14 +87,7 @@ import {
 } from "./browser-fill-fields";
 import { describeBrowserTarget, stopLoadingAndWait, waitForLoading } from "./browser-navigation";
 import { createFramePacer } from "./browser-screencast-pacing";
-import {
-  probeSettle,
-  SETTLE_BUSY_WAIT_MS,
-  SETTLE_EMPTY_WAIT_MS,
-  SETTLE_RESERVE_MS,
-  SETTLE_YOUNG_DOCUMENT_MS,
-  waitForSettle,
-} from "./browser-settle";
+import { probeSettle, SETTLE_BUSY_WAIT_MS, SETTLE_RESERVE_MS, waitForSettle } from "./browser-settle";
 import type { VaultCardSecret } from "./vault-items";
 
 const ACTION_TIMEOUT_MS = 10_000;
@@ -799,12 +792,12 @@ export class BrowserCdpEngine {
         // make the agent take a second snapshot. Wait a short time in this one instead. A bot check
         // has its own wait in the tab read.
         const busyWait = settle?.busy === true && this.#settleTimedOutDocument !== documentGeneration;
-        const emptyWait =
-          settle !== null && !settle.busy && parsed.elements.length === 0 && settle.ageMs < SETTLE_YOUNG_DOCUMENT_MS;
+        const emptyWait = settle !== null && !settle.busy && parsed.elements.length === 0 && settle.emptyWaitMs > 0;
         // The second collect needs time before the read's deadline.
-        const settleBudget =
-          Math.min(busyWait ? SETTLE_BUSY_WAIT_MS : SETTLE_EMPTY_WAIT_MS, context.deadline - Date.now()) -
-          SETTLE_RESERVE_MS;
+        const settleBudget = Math.min(
+          busyWait ? SETTLE_BUSY_WAIT_MS : (settle?.emptyWaitMs ?? 0),
+          context.deadline - Date.now() - SETTLE_RESERVE_MS,
+        );
         if (
           challenge === null &&
           (busyWait || emptyWait) &&

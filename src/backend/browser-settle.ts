@@ -18,7 +18,14 @@ export const SETTLE_EMPTY_WAIT_MS = 1_000;
 export const SETTLE_RESERVE_MS = 1_000;
 
 /** A document younger than this, with no controls, is probably still rendering. */
-export const SETTLE_YOUNG_DOCUMENT_MS = 2_500;
+const SETTLE_YOUNG_DOCUMENT_MS = 2_500;
+
+/**
+ * A loaded document with no controls waits only this long after its load event. A script page shows its
+ * first content soon after load, and a static page without controls must not wait at all. A stopped
+ * document is complete with no load event, and does not wait.
+ */
+const SETTLE_AFTER_LOAD_MS = 500;
 
 /** The page must stay unchanged this long after the marker goes. */
 const SETTLE_QUIET_MS = 150;
@@ -30,8 +37,8 @@ const BUSY_FUNCTION = `() => [...document.querySelectorAll(${JSON.stringify(BUSY
 
 interface SettleProbe {
   busy: boolean;
-  /** Milliseconds since the main document started. */
-  ageMs: number;
+  /** How long a page without controls can wait for its first content. 0 means no wait. */
+  emptyWaitMs: number;
 }
 
 const evaluateMain = Effect.fn("Browser.evaluateSettle")(function* (
@@ -48,11 +55,22 @@ const evaluateMain = Effect.fn("Browser.evaluateSettle")(function* (
 export const probeSettle = Effect.fn("Browser.probeSettle")(function* (send: SendCommand) {
   const value = yield* evaluateMain(
     send,
-    `(() => ({ busy: (${BUSY_FUNCTION})(), ageMs: Math.round(performance.now()) }))()`,
+    `(() => {
+  const now = performance.now();
+  const loadEnd = performance.getEntriesByType("navigation")[0]?.loadEventEnd ?? 0;
+  const emptyWaitMs = now >= ${SETTLE_YOUNG_DOCUMENT_MS}
+    ? 0
+    : loadEnd > 0
+      ? Math.max(0, ${SETTLE_AFTER_LOAD_MS} - (now - loadEnd))
+      : document.readyState === "complete"
+        ? 0
+        : ${SETTLE_EMPTY_WAIT_MS};
+  return { busy: (${BUSY_FUNCTION})(), emptyWaitMs: Math.round(emptyWaitMs) };
+})()`,
     false,
   ).pipe(Effect.catch(() => Effect.succeed(undefined)));
-  if (!isDynamicRecord(value) || !isBoolean(value.busy) || !isNumber(value.ageMs)) return null;
-  return { busy: value.busy, ageMs: value.ageMs } satisfies SettleProbe;
+  if (!isDynamicRecord(value) || !isBoolean(value.busy) || !isNumber(value.emptyWaitMs)) return null;
+  return { busy: value.busy, emptyWaitMs: value.emptyWaitMs } satisfies SettleProbe;
 });
 
 /**

@@ -444,6 +444,19 @@ async function main(): Promise<void> {
     const ordinary = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/article` });
     assert.equal(ordinary.page.challenge, undefined, "A long page that mentions a captcha read as a check.");
     recordCases("snapshot-reports-interactive-check", "snapshot-ignores-long-page");
+    const stuckCheck = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/stuck-challenge` });
+    assert.equal(stuckCheck.page.challenge?.status, "needs-user", "A check that stayed did not ask for a person.");
+    // navigate stops its wait at its own timeout; the next read waits only the rest of the 15 s.
+    const stuckCheckRest = await readPage("snapshot", { tabId: settleTab.id, image: "never" });
+    assert(
+      stuckCheck.ms + stuckCheckRest.ms < 20_000,
+      `The reads of one check waited more than once: ${stuckCheck.ms} + ${stuckCheckRest.ms} ms.`,
+    );
+    const stuckCheckAgain = await readPage("snapshot", { tabId: settleTab.id, image: "never" });
+    assert.equal(stuckCheckAgain.page.challenge?.status, "needs-user");
+    assert(stuckCheckAgain.ms < 3_000, `A check that stayed waited again: ${stuckCheckAgain.ms} ms.`);
+    measurements.stuckChallengeSecondSnapshotMs = stuckCheckAgain.ms;
+    recordCases("snapshot-waits-for-check-once-per-document");
 
     phase("modal");
     const modal = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/modal` });
@@ -546,6 +559,8 @@ const PAGES: Record<string, string> = {
   "/challenge": `<!doctype html><meta charset="utf-8"><title>Just a moment...</title>
     <div id="challenge-running">Checking your browser before accessing the site.</div>
     <script>setTimeout(() => location.replace("/form"), 3000);</script>`,
+  "/stuck-challenge": `<!doctype html><meta charset="utf-8"><title>Just a moment...</title>
+    <div id="challenge-running">Checking your browser before accessing the site.</div>`,
   "/captcha": `<!doctype html><meta charset="utf-8"><title>Security check</title>
     <p>Please complete the security check to continue.</p>
     <iframe src="/hcaptcha.com/checkbox" style="width:300px;height:80px"></iframe>`,
