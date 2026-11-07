@@ -246,7 +246,9 @@ It saves no referrer, IP address or identifier. A later visit does not change it
 after 90 days. When you sign in on the web, or open the page after a desktop checkout in the same
 browser, the browser sends it to the account service. The account service keeps the first one that
 it gets on your account and sends it to OpenPanel with your account ID. To remove it from a
-browser, clear the site data of openbot.run. OpenPanel can also derive
+browser, clear the site data of openbot.run. When you choose a language on the website, it saves
+the language code, and nothing else, in the `openbot_lang` cookie for one year, so that the next
+pages open in that language. The browser sends this cookie only to openbot.run. OpenPanel can also derive
 session, device, browser, operating-system, network, and approximate geographic metadata from a
 request. The analytics service runs on OpenBot's self-hosted infrastructure and receives events
 through `analytics.openbot.run`.
@@ -1247,7 +1249,8 @@ message. The answers go from the computer to the Slack Web API directly.
   reason the provider gave, redacted. A failed request posts a fixed sentence, never the provider's
   error. Any agent, also in the user's own chat or a routine run, can post text, redacted, and
   files from its workspace or the OpenBot shared directory to a channel that OpenBot is a member of,
-  and list those channels' names.
+  and list those channels' names. A new post can ping a user that it mentions, never a channel,
+  `@here`, `@everyone` or a user group.
 
 Anyone who can post in the Slack workspace, guests and Slack Connect members included, can give the
 agents work. The agents run on the host with the access the user gave them. A hosted server that sleeps starts for a message that addresses OpenBot. Until it connects,
@@ -1295,7 +1298,8 @@ passes nothing on.
   author's role IDs are checked and not stored.
 - **Given to the Discord Orchestrator.** As for Slack.
 - **Sent to Discord.** As for Slack: the answers, attached files of at most 10 MB, status posts,
-  reactions, and redacted approval requests. A post never pings anyone. As for Slack, any agent can
+  reactions, and redacted approval requests. A post can ping a user that it mentions, never a role or
+  `@everyone`. As for Slack, any agent can
   post redacted text and files from its workspace or the OpenBot shared directory to a channel or
   thread of the server, and list their names through Signal.
 

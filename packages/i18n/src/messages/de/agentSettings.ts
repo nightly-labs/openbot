@@ -84,7 +84,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "Wenn {model} sein Nutzungslimit erreicht, bevor {name} zu schreiben beginnt, fragt {name} dich, welches Modell verwendet werden soll.",
   "agentSettings.backupModels.introAutomatic":
-    "Wenn {model} sein Nutzungslimit erreicht oder mit einem Anbieterfehler scheitert, bevor {name} zu schreiben beginnt, wechselt {name} zum ersten verfügbaren Modell in der Reihenfolge.",
+    "Wenn {model} sein Nutzungslimit erreicht, wechselt {name} zum ersten verfügbaren Modell in der Reihenfolge. {name} wechselt auch, wenn {model} mit einem Anbieterfehler scheitert, bevor {name} zu schreiben beginnt.",
   "agentSettings.backupModels.ask": "Vor dem Wechsel fragen",
   "agentSettings.backupModels.order": "Reihenfolge",
   "agentSettings.backupModels.listLabel": "Ersatzmodelle in Reihenfolge",

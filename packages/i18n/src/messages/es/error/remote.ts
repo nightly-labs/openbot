@@ -198,6 +198,7 @@ export const messages = {
   "error.remote.hostRefused": "El host rechazó la solicitud ({status}).",
   "error.remote.formUnavailable": "Este formulario ya no está disponible.",
   "error.remote.hostedServerRemoval": "Usa Facturación para eliminar un servidor alojado.",
+  "error.remote.hostRemoved": "El propietario quitó este servidor de la cuenta.",
   "error.remote.channelsUnsupported": "Actualiza este servidor de escritorio para usar canales.",
   "error.remote.channelDeleteUnsupported": "Actualiza este servidor de escritorio para eliminar canales.",
   "error.remote.historyRefreshFailed": "El mensaje se envió, pero no se pudo actualizar el historial del chat.",

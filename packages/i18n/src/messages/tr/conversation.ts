@@ -82,6 +82,7 @@ export const messages = {
   },
   "conversation.threads.view.label": "Mesaj dizisi {title}",
   "conversation.threads.view.startedByAgent": "{name} bu mesaj dizisini başlattı.",
+  "conversation.threads.view.loadOlder": "Daha eski mesajları yükle",
   "conversation.threads.branch.from": "Dallandırıldığı yer: {title}",
   "conversation.threads.branch.fromDeleted": "Silinmiş bir mesaj dizisinden dallandırıldı",
   "conversation.threads.view.newPlaceholder": "{name} ile yeni mesaj dizisi",

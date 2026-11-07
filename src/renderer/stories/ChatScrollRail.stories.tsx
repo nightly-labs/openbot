@@ -33,7 +33,7 @@ const TOPICS = [
   "the onboarding flow for a second provider account",
 ];
 
-/** Messages over several days, with a message from the reader on every third row, so the segments differ. */
+/** Messages over several days, with a message from the reader on every third row. */
 function storyRows(days: number[], start = 0): StoryRow[] {
   const rows: StoryRow[] = [];
   days.forEach((count, dayIndex) => {
@@ -74,6 +74,7 @@ function RailTranscript(props: { rows: StoryRow[]; unloaded?: UnloadedHistory })
   const rail = createChatScrollRail({
     rows: () => props.rows,
     question: (row) => (row.own ? row.text : undefined),
+    reply: (row) => (row.own ? undefined : row.text),
     unloaded: () => props.unloaded,
     virtualizer,
     onLoadOlder: () => {},
@@ -166,8 +167,8 @@ export const ShortHistory: Story = {
 };
 
 /**
- * Two days are loaded and 600 older messages are not, back to five days ago: the top segment stands
- * for them at the loaded rows' height, so the rail shows the whole chat.
+ * Two days are loaded and 600 older messages are not, back to five days ago: the top tick stands
+ * for them, so the rail shows the whole chat.
  */
 export const OlderHistoryNotLoaded: Story = {
   args: {

@@ -200,6 +200,7 @@ export const messages = {
   "error.remote.hostRefused": "De host heeft het verzoek geweigerd ({status}).",
   "error.remote.formUnavailable": "Dit formulier is niet meer beschikbaar.",
   "error.remote.hostedServerRemoval": "Gebruik Facturering om een gehoste server te verwijderen.",
+  "error.remote.hostRemoved": "De eigenaar heeft deze server uit het account verwijderd.",
   "error.remote.channelsUnsupported": "Werk deze desktopserver bij om kanalen te gebruiken.",
   "error.remote.channelDeleteUnsupported": "Werk deze desktopserver bij om kanalen te verwijderen.",
   "error.remote.historyRefreshFailed": "Het bericht is verstuurd, maar de chatgeschiedenis kon niet worden vernieuwd.",

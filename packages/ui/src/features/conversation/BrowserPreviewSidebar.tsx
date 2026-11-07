@@ -2,6 +2,7 @@ import type { BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import { Button, Maximize2, Monitor, Skeleton, X } from "@openbot/ui";
 import { PanelResizer } from "@openbot/ui/components/PanelResizer";
 import { useText } from "@openbot/ui/text";
+import { holdFlag } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, createStore, For, onSettled, Show, untrack } from "solid-js";
 
 const BROWSER_PANEL_MIN = 220;
@@ -27,6 +28,12 @@ interface BrowserPreviewSidebarProps {
 
 export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps) {
   const { t } = useText();
+  let panel!: HTMLElement;
+  // The chat beside the panel makes room for it, also while the full view hides it (`panel-layout.css`).
+  onSettled(() => {
+    const conversation = panel.closest(".conversation-panel");
+    return conversation ? holdFlag(conversation, "browser-side-panel") : undefined;
+  });
   const defaultPanelWidth = () =>
     Math.round(Math.min(BROWSER_PANEL_MAX, Math.max(BROWSER_PANEL_MIN, props.defaultWidth())));
   const storedPanelWidth = props.readCustomWidth();
@@ -67,6 +74,7 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
 
   return (
     <aside
+      ref={panel}
       id="browser-side-panel"
       class="browser-panel browser-preview-sidebar"
       aria-label={t("browser.previews.label")}

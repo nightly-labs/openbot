@@ -9,4 +9,5 @@ export const messages = {
   "status.host.ready": "Este OpenBot está listo para conexiones WebRTC.",
   "status.host.stopping": "Haciendo privado este OpenBot…",
   "status.host.private": "Este OpenBot es privado.",
+  "status.host.removed": "Este OpenBot se quitó de tu cuenta. Publícalo de nuevo para compartirlo.",
 } as const satisfies PartialTranslation<typeof source>;

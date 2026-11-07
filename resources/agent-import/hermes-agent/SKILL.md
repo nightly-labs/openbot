@@ -130,7 +130,7 @@ Field rules:
 | `memories` | Up to 64 strings, 500 characters or fewer each. |
 | `files` | `agents/<key>/files` or `null`. OpenBot copies it to `imported/` in the agent's workspace. |
 
-The whole archive must be 500 MB and 5,000 files or fewer.
+The whole archive must be under 2 GB and 50,000 files or fewer.
 
 ### Schedules
 

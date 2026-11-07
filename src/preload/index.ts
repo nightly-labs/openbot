@@ -249,6 +249,7 @@ import {
   decodeReadStates,
   decodeReceipt,
   decodeTaskConversation,
+  decodeTaskPage,
   decodeWaits,
 } from "./conversation-decoding";
 import {
@@ -632,6 +633,7 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   cancelWait: decodeVoid,
   listTasks: decodeAgentTasks,
   readTask: decodeTaskConversation,
+  readTaskPage: decodeTaskPage,
   startTask: decodeAgentTask,
   runQueuedMessageAsTask: decodeAgentTask,
   branchTask: decodeAgentTask,

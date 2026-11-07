@@ -76,14 +76,32 @@ export function createScrollStore(deps: ScrollStoreDeps) {
 
   const [openRoutineRuns, setOpenRoutineRuns] = createSignal<RoutineRunOpenState>(new Map());
   // The thinking and the memory changes of a turn show in the steps above its answer. A turn with
-  // no answer shows its memory changes in a row of their own.
+  // no answer shows its memory changes in a row of their own. A turn with no answer and no memory
+  // changes, such as a stopped one, shows its thinking in that row. A running turn shows its steps
+  // under the activity line, and a turn that ends with no text on purpose shows none.
   const answeredTurns = createMemo(
     () => new Set(deps.props.messages.flatMap((message) => (isTurnAnswer(message) ? [message.turnId] : []))),
+  );
+  const thinkingRowHiddenTurns = createMemo(
+    () =>
+      new Set([
+        ...answeredTurns(),
+        ...deps.props.messages.flatMap((message) =>
+          message.kind === "memory-changes" || silentAgentAnswer(message) ? [message.turnId] : [],
+        ),
+        deps.props.activeTurnId ?? undefined,
+        ...(deps.props.channel?.workingTurns() ?? []),
+      ]),
   );
   const shownMessages = createMemo(() => {
     const shown = deps.props.messages.filter(
       (message) =>
-        message.kind !== "thinking" &&
+        !(
+          message.kind === "thinking" &&
+          (!message.turnId ||
+            thinkingRowHiddenTurns().has(message.turnId) ||
+            !message.items?.some((item) => item.trim()))
+        ) &&
         !(message.kind === "memory-changes" && answeredTurns().has(message.turnId)) &&
         !silentAgentAnswer(message),
     );

@@ -714,9 +714,76 @@ a {
   display: none;
 }
 
+/* The language button and its list. Only pages with a copy in each language show it. The button
+   rules come after the `landing-button` rules, which they change. */
+.site-language-menu {
+  position: relative;
+}
+
+.site-language-list {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 2;
+  min-width: 200px;
+  margin: 0;
+  padding: 6px;
+  border-radius: 14px;
+  background: rgba(22, 22, 22, 0.8);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
+  list-style: none;
+  backdrop-filter: blur(40px) saturate(180%);
+}
+
+.site-language-list[hidden] {
+  display: none;
+}
+
+/* The rows match the header logo menu (`.site-logo-menu-item`). */
+.site-language-list a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  color: var(--openbot-text-primary);
+  font-size: 14px;
+}
+
+.site-language-list a:hover,
+.site-language-list a:focus-visible {
+  outline: 0;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.site-language-flag {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 14px;
+  overflow: hidden;
+  border-radius: 3px;
+}
+
+.site-language-flag svg {
+  width: 100%;
+  height: 100%;
+}
+
+.site-language-name {
+  flex: 1 1 auto;
+}
+
+.site-language-check {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  color: var(--openbot-text-secondary);
+}
+
 /* Just above the mobile header, the brand, the full menu and the buttons do not fit with the menu
    at the true centre. The menu centres between them, and the triggers are tighter. */
-@media (min-width: 901px) and (max-width: 1040px) {
+@media (min-width: 1101px) and (max-width: 1280px) {
   .landing-header {
     grid-template-columns: auto 1fr auto;
     gap: 12px;
@@ -762,8 +829,9 @@ a {
 }
 
 /* The header on a narrow screen: the brand, the download button and a menu
-   button that opens the sheet. 900px is MOBILE_HEADER_QUERY in SiteMobileMenu. */
-@media (max-width: 900px) {
+   button that opens the sheet. 1100px is MOBILE_HEADER_QUERY in SiteMobileMenu. Below it, the
+   full menu in Polish and the language button do not fit. */
+@media (max-width: 1100px) {
   .landing-header {
     display: flex;
     justify-content: space-between;
@@ -1067,6 +1135,11 @@ a {
   justify-content: center;
 }
 
+/* The action waits hidden until the page has the link for it. */
+.join-card-actions[hidden] {
+  display: none;
+}
+
 /* The one action on the join page fills the card. */
 .join-card-actions-full {
   grid-template-columns: 1fr;
@@ -1191,6 +1264,42 @@ a {
 
 .landing-button:active {
   transform: scale(0.97);
+}
+
+/* The language button of the header. See `.site-language-menu`. */
+.site-language-trigger {
+  gap: 6px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+/* The icons are children here, not the mask of `landing-button`. */
+.site-language-trigger::before {
+  content: none;
+}
+
+.site-language-trigger svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Below the full desktop header, there is room for one more round button only: the globe. */
+@media (max-width: 1280px) {
+  .site-language-trigger {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .site-language-trigger > :not(:first-child) {
+    display: none;
+  }
+
+  .site-language-trigger svg {
+    width: 18px;
+    height: 18px;
+  }
 }
 
 .landing-hero {
@@ -2030,19 +2139,21 @@ a {
   color: var(--openbot-text-on-light);
 }
 
+/* The second half mirrors the first, with the column line one column to the right: two wide
+   tiles on the left, and the workflow, whose steps go down, in a tall, narrow tile on the right. */
+.landing-feature[data-feature="multiplayer"] {
+  grid-column: 1 / 9;
+  grid-row: 3;
+}
+
 .landing-feature[data-feature="persist"] {
-  grid-column: 1 / 6;
-  grid-row: 3;
+  grid-column: 1 / 9;
+  grid-row: 4;
 }
 
-.landing-feature[data-feature="browser"] {
-  grid-column: 6 / 10;
-  grid-row: 3;
-}
-
-.landing-feature[data-feature="queue"] {
-  grid-column: 10 / 13;
-  grid-row: 3;
+.landing-feature[data-feature="workflows"] {
+  grid-column: 9 / 13;
+  grid-row: 3 / 5;
 }
 
 .landing-feature-visual {
@@ -2072,6 +2183,11 @@ a {
   font-size: 15px;
   line-height: 1.6;
   text-wrap: pretty;
+}
+
+/* The wide tiles have room for longer lines, so their text takes fewer lines and the tiles are lower. */
+.landing-feature:is([data-feature="team"], [data-feature="multiplayer"], [data-feature="persist"]) p {
+  max-width: 64ch;
 }
 
 .landing-feature[data-feature="local"] p {
@@ -2112,8 +2228,11 @@ a {
 }
 
 /* The channel runs off the right edge and fades out above the copy. */
+/* The window starts under the top padding and fills the tile down to the copy, so no gap is left
+   above it when the tiles on the right make the row taller. */
 .landing-feature[data-feature="team"] .landing-feature-visual {
   display: flex;
+  align-items: stretch;
   padding: 36px 0 0 36px;
 }
 
@@ -2291,6 +2410,620 @@ a {
   opacity: 1;
   transform: none;
   transition-delay: 120ms;
+}
+
+/* People and agents in one channel. A person has a drawn face in place of an
+   agent avatar. On hover, the invited person joins the stack. */
+/* As in the team tile, the channel starts at the left and runs off the right edge. */
+.landing-feature[data-feature="multiplayer"] .landing-feature-visual {
+  display: flex;
+  padding: 36px 0 0 36px;
+}
+
+/* People and agents side by side: an agent avatar is wider than its circle, so
+   an overlap would cover a face. */
+.landing-multiplayer-window .landing-team-stack {
+  padding-right: 0;
+}
+
+.landing-multiplayer-window .landing-team-stack > * + * {
+  margin-left: 4px;
+}
+
+/* A drawn face: each person has the colours of their skin, hair and shirt. The colours are light, so
+   the faces stay bright on the dark page. */
+.landing-feature .landing-face {
+  overflow: hidden;
+  background: var(--landing-face-background);
+}
+
+.landing-face-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.landing-face-skin {
+  fill: var(--landing-face-skin);
+}
+
+.landing-face-shade {
+  fill: var(--landing-face-shade);
+}
+
+.landing-face-hair {
+  fill: var(--landing-face-hair);
+}
+
+.landing-face-shirt {
+  fill: var(--landing-face-shirt);
+}
+
+.landing-face-brow {
+  fill: none;
+  stroke: var(--landing-face-brow);
+  stroke-linecap: round;
+  stroke-width: 1.1;
+}
+
+.landing-face-ink {
+  fill: #3a2a24;
+}
+
+.landing-face-blush {
+  fill: #ff7f8a;
+  opacity: 0.35;
+}
+
+.landing-face-freckle {
+  fill: #d98a5f;
+}
+
+.landing-face-glasses {
+  fill: none;
+  stroke: #3a2a24;
+  stroke-width: 0.85;
+}
+
+.landing-face-mouth {
+  fill: #c9524f;
+  stroke: #3a2a24;
+  stroke-linejoin: round;
+  stroke-width: 0.7;
+}
+
+.landing-face[data-person="maya"] {
+  --landing-face-background: #ffd6df;
+  --landing-face-skin: #f8d2b4;
+  --landing-face-shade: #ecb994;
+  --landing-face-hair: #c56d3e;
+  --landing-face-brow: #9c4f28;
+  --landing-face-shirt: #8b7cf6;
+}
+
+.landing-face[data-person="sam"] {
+  --landing-face-background: #cdeeff;
+  --landing-face-skin: #ebbb94;
+  --landing-face-shade: #d9a07a;
+  --landing-face-hair: #8a5634;
+  --landing-face-brow: #6e4127;
+  --landing-face-shirt: #ffb547;
+}
+
+.landing-face[data-person="theo"] {
+  --landing-face-background: #d6f5cc;
+  --landing-face-skin: #fde3cf;
+  --landing-face-shade: #f3c9ab;
+  --landing-face-hair: #ef8a45;
+  --landing-face-brow: #c8692d;
+  --landing-face-shirt: #5b95f7;
+}
+
+.landing-multiplayer-joined {
+  display: flex;
+  justify-content: flex-end;
+  width: 0;
+  opacity: 0;
+  transform: scale(0.6);
+  transition:
+    width 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 220ms ease,
+    transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.landing-multiplayer-window .landing-team-stack > .landing-multiplayer-joined {
+  margin-left: 0;
+}
+
+.landing-feature[data-feature="multiplayer"]:hover .landing-multiplayer-joined {
+  width: 32px;
+  opacity: 1;
+  transform: none;
+  transition-delay: 160ms;
+}
+
+.landing-multiplayer-invite {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  margin-right: 24px;
+  padding: 5px 10px;
+  border: 1px solid var(--landing-card-border);
+  border-radius: var(--openbot-radius-pill);
+  color: var(--openbot-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  transition: border-color 200ms ease;
+}
+
+.landing-feature[data-feature="multiplayer"]:hover .landing-multiplayer-invite {
+  border-color: var(--landing-card-border-hover);
+}
+
+.landing-multiplayer-invite-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* A workflow as on the app's canvas: a trigger, two agents that run at the
+   same time, two more that use their results, and an approval. On hover the
+   run goes along the lines. Each step starts when every step before it is
+   done, so the steps side by side finish at different times. The lines are
+   drawn from the same gap as `landing-workflow.ts`. */
+.landing-feature[data-feature="workflows"] .landing-feature-visual {
+  container: landing-workflow / inline-size;
+  place-items: center stretch;
+  padding: 36px 32px 4px;
+}
+
+.landing-workflow {
+  --landing-workflow-line: color-mix(in srgb, var(--openbot-text-primary) 26%, transparent);
+  --landing-workflow-line-done: color-mix(in srgb, var(--openbot-text-primary) 66%, transparent);
+  position: relative;
+}
+
+/* A line is drawn by a clip that opens in the direction of the run. A dash
+   offset cannot draw it: the stroke does not scale, so its dashes are in
+   pixels and not in lengths of the path. The clip goes 4 units out of the
+   line's box on the other axis only: a straight line has a box with no width,
+   and a clip in that box hides all of the line. On the axis of the run, the
+   clip stops at the box, so the line ends when its step ends. */
+.landing-workflow-edges {
+  --landing-workflow-clip: inset(-4px 100% -4px 0);
+  --landing-workflow-clip-end: inset(-4px 0);
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.landing-workflow-edges-tall {
+  --landing-workflow-clip: inset(0 -4px 100% -4px);
+  --landing-workflow-clip-end: inset(0 -4px);
+  display: none;
+}
+
+.landing-workflow-edge,
+.landing-workflow-edge-run {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.landing-workflow-edge {
+  stroke: var(--landing-workflow-line);
+  stroke-dasharray: 4 5;
+}
+
+.landing-workflow-edge-run {
+  stroke: var(--landing-workflow-line-done);
+  clip-path: var(--landing-workflow-clip);
+}
+
+.landing-feature[data-feature="workflows"]:hover .landing-workflow-edge-run {
+  animation: landing-workflow-draw var(--landing-workflow-edge) ease-in-out var(--landing-workflow-start) both;
+}
+
+.landing-workflow-steps {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  column-gap: 8%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A step alone in its column is at the middle. Two steps in one column share
+   it, and have the same height. */
+.landing-workflow-node {
+  position: relative;
+  grid-column: var(--landing-workflow-column);
+  grid-row: 1 / -1;
+  min-width: 0;
+  display: grid;
+  align-items: center;
+  padding-block: 9px;
+}
+
+.landing-workflow-node[data-lane] {
+  align-items: stretch;
+}
+
+.landing-workflow-node[data-lane="0"] {
+  grid-row: 1;
+}
+
+.landing-workflow-node[data-lane="1"] {
+  grid-row: 2;
+}
+
+/* The ports where the lines meet a card. */
+.landing-workflow-node:not([data-step="trigger"])::before,
+.landing-workflow-node:not([data-step="approval"])::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--landing-workflow-line);
+  border-radius: 50%;
+  background: var(--openbot-bg-canvas);
+  translate: 0 -50%;
+}
+
+.landing-workflow-node::before {
+  left: -4.5px;
+}
+
+.landing-workflow-node::after {
+  right: -4.5px;
+}
+
+.landing-feature[data-feature="workflows"]:hover .landing-workflow-node::before {
+  animation: landing-workflow-port 200ms ease var(--landing-workflow-start) both;
+}
+
+.landing-feature[data-feature="workflows"]:hover .landing-workflow-node::after {
+  animation: landing-workflow-port 200ms ease calc(var(--landing-workflow-start) + var(--landing-workflow-run)) both;
+}
+
+.landing-workflow-card {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  padding: 11px 12px 13px;
+  border: 1px solid var(--landing-card-border);
+  border-radius: 14px;
+  background: var(--openbot-bg-canvas);
+}
+
+/* The run of the step: a bar along the bottom of the card. */
+.landing-workflow-card::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(var(--openbot-text-secondary), var(--openbot-text-secondary)) left / 0 100% no-repeat;
+}
+
+.landing-feature[data-feature="workflows"]:hover .landing-workflow-card {
+  animation: landing-workflow-active var(--landing-workflow-run) var(--landing-workflow-start);
+}
+
+.landing-feature[data-feature="workflows"]:hover .landing-workflow-card::after {
+  animation: landing-workflow-progress var(--landing-workflow-run) linear var(--landing-workflow-start) both;
+}
+
+.landing-workflow-head {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--openbot-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.landing-workflow-head .landing-team-avatar-small {
+  --landing-team-avatar-size: 22px;
+  box-shadow: none;
+}
+
+.landing-workflow-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.landing-workflow-badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--openbot-text-primary) 9%, transparent);
+  color: var(--openbot-text-secondary);
+}
+
+.landing-workflow-icon {
+  flex: none;
+  width: 13px;
+  height: 13px;
+}
+
+.landing-workflow-provider {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+.landing-workflow-status {
+  flex: none;
+  display: grid;
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+}
+
+.landing-workflow-spinner,
+.landing-workflow-done {
+  grid-area: 1 / 1;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+}
+
+.landing-workflow-spinner {
+  border: 1.5px solid var(--landing-workflow-line);
+}
+
+.landing-feature[data-feature="workflows"]:hover .landing-workflow-spinner {
+  animation:
+    landing-workflow-spin 700ms linear infinite,
+    landing-workflow-running var(--landing-workflow-run) var(--landing-workflow-start),
+    landing-workflow-out 1ms calc(var(--landing-workflow-start) + var(--landing-workflow-run)) forwards;
+}
+
+.landing-workflow-done {
+  padding: 2.5px;
+  background: var(--openbot-text-primary);
+  color: var(--openbot-bg-canvas);
+  opacity: 0;
+}
+
+.landing-feature[data-feature="workflows"]:hover .landing-workflow-done {
+  animation: landing-workflow-pop 360ms cubic-bezier(0.34, 1.56, 0.64, 1)
+    calc(var(--landing-workflow-start) + var(--landing-workflow-run)) both;
+}
+
+.landing-workflow-text {
+  color: var(--openbot-text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.landing-workflow-decision {
+  display: grid;
+}
+
+.landing-workflow-approve,
+.landing-workflow-approved {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--openbot-radius-pill);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.landing-workflow-approve {
+  background: var(--openbot-text-primary);
+  color: var(--openbot-text-on-light);
+}
+
+.landing-workflow-approved {
+  padding-inline: 0;
+  color: var(--openbot-text-primary);
+  opacity: 0;
+}
+
+/* The person clicks Approve just before the run ends. */
+.landing-feature[data-feature="workflows"]:hover .landing-workflow-approve {
+  animation:
+    landing-workflow-press 240ms ease calc(var(--landing-workflow-start) + var(--landing-workflow-run) - 240ms),
+    landing-workflow-out 160ms ease calc(var(--landing-workflow-start) + var(--landing-workflow-run)) forwards;
+}
+
+.landing-feature[data-feature="workflows"]:hover .landing-workflow-approved {
+  animation: landing-workflow-rise 300ms cubic-bezier(0.22, 1, 0.36, 1)
+    calc(var(--landing-workflow-start) + var(--landing-workflow-run) + 80ms) both;
+}
+
+@keyframes landing-workflow-draw {
+  from {
+    clip-path: var(--landing-workflow-clip);
+  }
+
+  to {
+    clip-path: var(--landing-workflow-clip-end);
+  }
+}
+
+@keyframes landing-workflow-port {
+  from {
+    border-color: var(--landing-workflow-line);
+    background: var(--openbot-bg-canvas);
+  }
+
+  to {
+    border-color: var(--landing-workflow-line-done);
+    background: var(--landing-workflow-line-done);
+  }
+}
+
+/* Only while the animation runs: before and after it, the card is at rest. */
+@keyframes landing-workflow-active {
+  from,
+  to {
+    border-color: var(--landing-workflow-line-done);
+  }
+}
+
+@keyframes landing-workflow-progress {
+  from {
+    background-size: 0 100%;
+  }
+
+  to {
+    background-size: 100% 100%;
+  }
+}
+
+@keyframes landing-workflow-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes landing-workflow-running {
+  from,
+  to {
+    border-top-color: var(--openbot-text-primary);
+  }
+}
+
+@keyframes landing-workflow-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes landing-workflow-pop {
+  from {
+    opacity: 0;
+    scale: 0.5;
+  }
+
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@keyframes landing-workflow-press {
+  50% {
+    scale: 0.9;
+  }
+}
+
+@keyframes landing-workflow-rise {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+
+  to {
+    opacity: 1;
+    translate: none;
+  }
+}
+
+/* The run still goes step by step, but nothing turns, grows or moves. */
+@media (prefers-reduced-motion: reduce) {
+  .landing-feature[data-feature="workflows"]:hover .landing-workflow-spinner {
+    animation:
+      landing-workflow-running var(--landing-workflow-run) var(--landing-workflow-start),
+      landing-workflow-out 1ms calc(var(--landing-workflow-start) + var(--landing-workflow-run)) forwards;
+  }
+
+  .landing-feature[data-feature="workflows"]:hover .landing-workflow-done {
+    animation-timing-function: step-start;
+  }
+
+  .landing-feature[data-feature="workflows"]:hover .landing-workflow-approve {
+    animation: landing-workflow-out 1ms calc(var(--landing-workflow-start) + var(--landing-workflow-run)) forwards;
+  }
+
+  .landing-feature[data-feature="workflows"]:hover .landing-workflow-approved {
+    animation-timing-function: step-start;
+  }
+}
+
+@container landing-workflow (max-width: 640px) {
+  /* The steps go down the tile when four columns do not fit. The steps that run
+     at the same time stay side by side. The lines go from the middle of a card
+     to the middle of the next one, behind the cards. */
+  .landing-workflow-card {
+    padding-inline: 10px;
+  }
+
+  .landing-workflow-head {
+    gap: 6px;
+  }
+
+  .landing-workflow-edges-wide {
+    display: none;
+  }
+
+  .landing-workflow-edges-tall {
+    display: block;
+  }
+
+  .landing-workflow-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(4, minmax(0, 1fr));
+    column-gap: 0;
+  }
+
+  .landing-workflow-node {
+    grid-column: 1 / -1;
+    grid-row: var(--landing-workflow-column);
+    justify-items: center;
+    padding-block: 12px;
+  }
+
+  .landing-workflow-node[data-lane] {
+    align-items: center;
+    justify-items: stretch;
+    padding-inline: 5px;
+  }
+
+  .landing-workflow-node[data-lane="0"] {
+    grid-column: 1;
+    grid-row: var(--landing-workflow-column);
+  }
+
+  .landing-workflow-node[data-lane="1"] {
+    grid-column: 2;
+    grid-row: var(--landing-workflow-column);
+  }
+
+  .landing-workflow-node:not([data-lane]) .landing-workflow-card {
+    width: min(72%, 300px);
+  }
+
+  .landing-workflow-node:not([data-step="trigger"])::before,
+  .landing-workflow-node:not([data-step="approval"])::after {
+    content: none;
+  }
 }
 
 /* Two rows of providers that scroll the opposite way. Each track holds its
@@ -2586,404 +3319,6 @@ a {
   transition-delay: 160ms;
 }
 
-/* The app's browser panel: tabs, a toolbar and a light page. Grace controls the
-   first tab. On hover she types into the form and continues. */
-.landing-feature[data-feature="browser"] .landing-feature-visual {
-  place-items: end stretch;
-}
-
-.landing-browser {
-  position: relative;
-  border-radius: 16px;
-}
-
-/* The sizes of the app's tabs: 28px high, on the bottom line of a 34px header.
-   The open tab has the toolbar's colour, so the two read as one piece. */
-.landing-browser-tabs {
-  display: flex;
-  height: 34px;
-  align-items: flex-end;
-  gap: 2px;
-  padding: 0 8px;
-}
-
-.landing-browser-tab {
-  position: relative;
-  display: flex;
-  min-width: 0;
-  width: 148px;
-  height: 28px;
-  flex: 0 1 148px;
-  align-items: center;
-  gap: 6px;
-  padding: 0 8px;
-  border-radius: 8px 8px 0 0;
-  color: var(--openbot-text-muted);
-  font-size: 12px;
-}
-
-.landing-browser-tab[data-controlled] {
-  background: var(--openbot-bg-surface-raised);
-  color: var(--openbot-text-primary);
-}
-
-.landing-browser-tab-title {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.landing-browser-tab > svg,
-.landing-browser-new svg {
-  flex: none;
-  width: 12px;
-  height: 12px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-width: 1.5;
-}
-
-.landing-browser-new {
-  display: grid;
-  width: 24px;
-  height: 28px;
-  place-items: center;
-  color: var(--openbot-text-muted);
-}
-
-/* The agent's pointer takes the place of the page icon. */
-.landing-browser-control {
-  display: grid;
-  flex: none;
-  color: var(--openbot-accent-text);
-}
-
-.landing-browser-control svg {
-  width: 12px;
-  height: 12px;
-  fill: currentColor;
-}
-
-.landing-browser-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
-  background: var(--openbot-bg-surface-raised);
-  color: var(--openbot-text-muted);
-}
-
-.landing-browser-toolbar svg {
-  flex: none;
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.4;
-}
-
-.landing-browser-address {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  margin-left: 4px;
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: var(--openbot-bg-canvas);
-  color: var(--openbot-text-secondary);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.landing-browser-page {
-  display: grid;
-  justify-items: start;
-  padding: 18px 20px 22px;
-  background: var(--openbot-text-primary);
-  color: var(--openbot-text-on-light);
-}
-
-.landing-browser-heading {
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
-
-.landing-browser-label {
-  margin-top: 12px;
-  color: color-mix(in srgb, var(--openbot-text-on-light) 60%, transparent);
-  font-size: 11px;
-  font-weight: 500;
-}
-
-.landing-browser-input {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  height: 32px;
-  margin-top: 5px;
-  padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--openbot-text-on-light) 18%, transparent);
-  border-radius: 8px;
-  font-size: 13px;
-  transition: border-color 160ms ease;
-}
-
-.landing-browser-typed {
-  max-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-.landing-browser-caret {
-  width: 1px;
-  height: 15px;
-  margin-left: 1px;
-  background: currentColor;
-  opacity: 0;
-}
-
-.landing-browser-submit {
-  margin-top: 12px;
-  padding: 7px 14px;
-  border-radius: 8px;
-  background: var(--openbot-text-on-light);
-  color: var(--openbot-text-primary);
-  font-size: 12px;
-  font-weight: 600;
-  transition:
-    transform 140ms ease,
-    opacity 140ms ease;
-}
-
-.landing-feature[data-feature="browser"]:hover .landing-browser-input {
-  border-color: color-mix(in srgb, var(--openbot-text-on-light) 55%, transparent);
-}
-
-/* One step for each character, as if typed. */
-.landing-feature[data-feature="browser"]:hover .landing-browser-typed {
-  max-width: 16ch;
-  transition: max-width 900ms steps(15) 200ms;
-}
-
-.landing-feature[data-feature="browser"]:hover .landing-browser-caret {
-  animation: landing-caret 1s steps(1) infinite;
-}
-
-/* One press when the email is typed. */
-.landing-feature[data-feature="browser"]:hover .landing-browser-submit {
-  animation: landing-press 240ms ease 1200ms;
-}
-
-/* The app's queue panel on top of the composer. On hover, the message in the
-   composer joins the queue. The wrapper keeps room for the new row, so the
-   tile does not change size. */
-.landing-feature[data-feature="queue"] .landing-feature-visual {
-  place-items: end stretch;
-}
-
-.landing-queue {
-  min-width: 0;
-  min-height: 186px;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-}
-
-.landing-queue-panel {
-  position: relative;
-  margin: 0 10px -14px;
-  padding: 6px 5px 19px;
-  border: 1px solid var(--openbot-queue-border);
-  border-radius: 14px;
-  background: var(--openbot-queue-surface);
-}
-
-.landing-queue-hold {
-  display: block;
-  overflow: hidden;
-  padding: 0 8px 4px 9px;
-  color: var(--openbot-text-muted);
-  font-size: 12px;
-  line-height: 16px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.landing-queue-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.landing-queue-row {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 29px;
-  padding: 0 4px 0 8px;
-  border-radius: 8px;
-  color: var(--openbot-text-secondary);
-  font-size: 13px;
-  transition: background 140ms ease;
-}
-
-.landing-queue-row:hover {
-  background: var(--openbot-bg-surface-raised);
-}
-
-.landing-queue-row svg {
-  flex: none;
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.4;
-}
-
-.landing-queue-row > svg {
-  color: var(--openbot-text-muted);
-}
-
-.landing-queue-text {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* As in the app, a row's buttons show when the pointer is on the row. They sit
-   on top of the end of the text, so the text has all the width until then. */
-.landing-queue-actions {
-  position: absolute;
-  inset: 0 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 8px 0 24px;
-  border-radius: 0 8px 8px 0;
-  background: linear-gradient(to right, transparent, var(--openbot-bg-surface-raised) 20px);
-  color: var(--openbot-text-muted);
-  opacity: 0;
-  transition: opacity 140ms ease;
-}
-
-.landing-queue-row:hover .landing-queue-actions {
-  opacity: 1;
-}
-
-.landing-queue-steer {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--openbot-text-secondary);
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.landing-queue-added {
-  display: grid;
-  grid-template-rows: 0fr;
-  opacity: 0;
-  transition:
-    grid-template-rows 360ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 220ms ease;
-}
-
-.landing-queue-added > .landing-queue-row {
-  min-height: 0;
-  height: auto;
-  overflow: hidden;
-}
-
-.landing-queue-added > .landing-queue-row > * {
-  margin-block: 6.5px;
-}
-
-.landing-feature[data-feature="queue"]:hover .landing-queue-added {
-  grid-template-rows: 1fr;
-  opacity: 1;
-  transition-delay: 180ms;
-}
-
-.landing-queue-composer {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 10px 10px 14px;
-  border: 1px solid var(--landing-card-border);
-  border-radius: 16px;
-  background: var(--openbot-bg-canvas);
-  box-shadow: 0 18px 44px rgb(0 0 0 / 28%);
-}
-
-.landing-queue-input {
-  min-width: 0;
-  flex: 1;
-  display: grid;
-  font-size: 14px;
-}
-
-.landing-queue-input > * {
-  grid-area: 1 / 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  transition:
-    opacity 200ms ease,
-    transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.landing-queue-placeholder {
-  color: var(--openbot-text-muted);
-  opacity: 0;
-}
-
-.landing-feature[data-feature="queue"]:hover .landing-queue-draft {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-
-.landing-feature[data-feature="queue"]:hover .landing-queue-placeholder {
-  opacity: 1;
-  transition-delay: 200ms;
-}
-
-.landing-queue-send {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  flex: none;
-  place-items: center;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-text-primary);
-  color: var(--openbot-text-on-light);
-  transition:
-    transform 140ms ease,
-    opacity 200ms ease;
-}
-
-.landing-queue-send-icon {
-  width: 15px;
-  height: 15px;
-  rotate: -90deg;
-}
-
-.landing-feature[data-feature="queue"]:hover .landing-queue-send {
-  opacity: 0.4;
-  transform: scale(0.9);
-}
-
 /* The heading stays beside the questions while they open. */
 .landing-faq-layout {
   display: grid;
@@ -3139,7 +3474,7 @@ a {
     grid-row: auto;
   }
 
-  .landing-feature:is([data-feature="team"], [data-feature="local"]) {
+  .landing-feature:is([data-feature="team"], [data-feature="workflows"]) {
     grid-column: 1 / -1;
   }
 
@@ -3190,6 +3525,10 @@ a {
     padding: 24px 0 0 24px;
   }
 
+  .landing-feature[data-feature="multiplayer"] .landing-feature-visual {
+    padding: 24px 0 0 20px;
+  }
+
   .landing-faq-layout {
     grid-template-columns: minmax(0, 1fr);
     gap: 28px;
@@ -3201,6 +3540,10 @@ a {
 }
 
 @media (max-width: 600px) {
+  .landing-feature[data-feature="workflows"] .landing-feature-visual {
+    padding: 28px 16px 0;
+  }
+
   .landing-compare-links ul {
     grid-template-columns: minmax(0, 1fr);
     gap: 10px;
@@ -3312,6 +3655,7 @@ a {
 
 .landing-footer-socials {
   display: flex;
+  flex-wrap: wrap;
   gap: 7px;
   margin-top: 32px;
 }
@@ -3489,19 +3833,6 @@ a {
 
   75% {
     transform: translateY(1px);
-  }
-}
-
-@keyframes landing-press {
-  50% {
-    opacity: 0.85;
-    transform: scale(0.94);
-  }
-}
-
-@keyframes landing-caret {
-  50% {
-    opacity: 1;
   }
 }
 
@@ -3698,7 +4029,7 @@ a {
 }
 
 /* After the button rules, which it resizes. The sheet shows only below the header breakpoint. */
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .site-sheet-actions > .landing-button {
     flex: 1 1 0;
     height: 44px;
@@ -3976,8 +4307,7 @@ a {
 
   .landing-marquee-track,
   .landing-team-typing span,
-  .landing-feature[data-feature="local"]:hover .landing-lock-shackle,
-  .landing-feature[data-feature="browser"]:hover :is(.landing-browser-caret, .landing-browser-submit) {
+  .landing-feature[data-feature="local"]:hover .landing-lock-shackle {
     animation: none;
   }
 

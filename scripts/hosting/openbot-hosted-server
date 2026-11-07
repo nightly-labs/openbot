@@ -14,7 +14,13 @@ umask 077
 # database. So this gives the signal to OpenBot only and waits for it; the unit then stops the rest.
 if [ "${1:-}" = --stop ]; then
   pid=$(cat "$XDG_RUNTIME_DIR/openbot.pid" 2>/dev/null) || exit 0
-  [[ $pid =~ ^[1-9][0-9]*$ && /proc/$pid/exe -ef /opt/OpenBot/app/openbot ]] || exit 0
+  # The PID is still OpenBot when it is a process named openbot in the cgroup of this unit, as this
+  # script is. Do not compare /proc/$pid/exe with /opt/OpenBot/app/openbot: after a resume, OpenBot
+  # starts from the FUSE mount of /opt, and when boat moves /opt back to the disk, the two are
+  # different files. The stop then sent no signal, and OpenBot ended with its database open.
+  [[ $pid =~ ^[1-9][0-9]*$ ]] || exit 0
+  [ "$(cat "/proc/$pid/comm" 2>/dev/null)" = openbot ] || exit 0
+  [ "$(cat "/proc/$pid/cgroup" 2>/dev/null)" = "$(cat /proc/$$/cgroup)" ] || exit 0
   kill -TERM "$pid" 2>/dev/null || exit 0
   while [ -e "/proc/$pid" ]; do sleep 0.2; done
   exit 0

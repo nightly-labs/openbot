@@ -28,6 +28,7 @@ export function serverSupportsCapability(
       capability === "channel-chats-v1" ||
       capability === "channel-delete-v1" ||
       capability === "channel-attention-v1" ||
+      capability === "channel-isolation-v1" ||
       capability === "agent-duplication" ||
       capability === "model-scoped-usage" ||
       capability === "browser-navigation" ||
@@ -100,6 +101,7 @@ export function serverSupportsCapability(
       capability === "agent-threads-v1" ||
       capability === "agent-thread-reads-v1" ||
       capability === "agent-thread-branches-v1" ||
+      capability === "agent-thread-pages-v1" ||
       capability === "agent-thread-replies-v1" ||
       capability === "channel-task-cancel-v1" ||
       capability === "side-question-v1" ||

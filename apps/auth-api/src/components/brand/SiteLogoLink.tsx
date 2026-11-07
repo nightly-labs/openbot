@@ -2,7 +2,9 @@ import { ContextMenu } from "@kobalte/core/context-menu";
 import { AppLogo } from "@openbot/brand";
 import { Link, useRouter } from "@tanstack/solid-router";
 import { BRAND_ROUTE } from "../../lib/brand-page";
+import { localizedPath } from "../../lib/site-paths";
 import { LandingIcon } from "../landing/LandingIcon";
+import { useSiteChrome } from "../landing/SiteText";
 
 type BrandFiles = typeof import("./brand-files");
 
@@ -18,6 +20,8 @@ type BrandFiles = typeof import("./brand-files");
  */
 export function SiteLogoLink() {
   const router = useRouter();
+  const chrome = useSiteChrome();
+  const text = () => chrome().text;
   let link: HTMLAnchorElement | undefined;
   let trigger: HTMLSpanElement | undefined;
   let fromKeyboard = false;
@@ -59,28 +63,34 @@ export function SiteLogoLink() {
   return (
     <ContextMenu modal={false} onOpenChange={handleOpenChange}>
       <ContextMenu.Trigger as="span" ref={trigger} class="site-logo-trigger">
-        <Link ref={link} class="landing-brand" to="/" aria-label="OpenBot home" onKeyDown={handleKeyDown}>
+        <Link
+          ref={link}
+          class="landing-brand"
+          to={localizedPath("/", chrome().locale)}
+          aria-label={text().home}
+          onKeyDown={handleKeyDown}
+        >
           <AppLogo variant="production" class="landing-brand-logo" />
           <span>OpenBot</span>
         </Link>
       </ContextMenu.Trigger>
-      <ContextMenu.Content class="site-logo-menu" aria-label="Logo">
+      <ContextMenu.Content class="site-logo-menu" aria-label={text().logo.menu}>
         <ContextMenu.Item class="site-logo-menu-item" onSelect={() => run((module) => module.copyBrandIcon())}>
           <AppLogo variant="production" class="site-logo-menu-icon" />
-          Copy logo as SVG
+          {text().logo.copyIcon}
         </ContextMenu.Item>
         <ContextMenu.Item class="site-logo-menu-item" onSelect={() => run((module) => module.copyBrandLockup())}>
           <LandingIcon name="code" class="site-logo-menu-icon" />
-          Copy logo with name as SVG
+          {text().logo.copyLockup}
         </ContextMenu.Item>
         <ContextMenu.Item class="site-logo-menu-item" onSelect={() => run((module) => module.saveBrandZip())}>
           <LandingIcon name="download" class="site-logo-menu-icon" />
-          Download brand assets
+          {text().logo.downloadAssets}
         </ContextMenu.Item>
         <ContextMenu.Separator class="site-logo-menu-separator" />
         <ContextMenu.Item class="site-logo-menu-item" onSelect={() => void router.navigate({ to: BRAND_ROUTE })}>
           <LandingIcon name="arrow-right" class="site-logo-menu-icon" />
-          Open brand page
+          {text().logo.openBrand}
         </ContextMenu.Item>
       </ContextMenu.Content>
     </ContextMenu>

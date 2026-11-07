@@ -227,6 +227,14 @@ export const STORY_MODELS: ClientAgentModelOption[] = [
   },
   {
     provider: "grok",
+    id: "grok-4.7",
+    name: "Grok 4.7",
+    description: "Discovered from Grok CLI over ACP.",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["low", "medium", "high"],
+  },
+  {
+    provider: "grok",
     id: "grok-4.6",
     name: "Grok 4.6",
     description: "Discovered from Grok CLI over ACP.",

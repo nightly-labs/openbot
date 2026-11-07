@@ -32,9 +32,11 @@ export const messages = {
   "error.import.fileRenamed": "{name}: {file} esiste già, quindi questa copia viene salvata come {saved}.",
   "error.import.fileSkipped": "{name}: il file {file} viene saltato. {reason}",
   "error.import.chooseZip": "Scegli un file .zip.",
-  "error.import.zipTooLarge": "L'esportazione deve essere un file .zip sotto i 500 MB.",
+  "error.import.zipTooLarge": "L'esportazione deve essere un file .zip sotto i 2 GB.",
   "error.import.unsafeFile": "L'esportazione contiene un file non sicuro: {name}",
   "error.import.expandedTooLarge":
+    "L'esportazione, una volta estratta, deve occupare meno di 2 GB e contenere al massimo {limit} file.",
+  "error.import.remoteExpandedTooLarge":
     "L'esportazione, una volta estratta, deve occupare meno di 500 MB e contenere al massimo {limit} file.",
   "error.import.zipInvalid":
     "Il file selezionato non è un .zip valido. Se Grok Bot lo sta ancora salvando, attendi e sceglilo di nuovo.",

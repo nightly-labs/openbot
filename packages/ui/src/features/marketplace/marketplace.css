@@ -21,7 +21,8 @@
   z-index: calc(var(--openbot-layer-dialog-host) + 1);
 }
 
-body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wizard-dialog):not([data-nested]) {
+/* `MarketplacePage` sets the body attribute; a `body:has()` rule restyles the whole page on each chat change. */
+body[data-skills-marketplace] :is(.integration-dialog-backdrop, .integration-wizard-dialog):not([data-nested]) {
   z-index: calc(var(--openbot-layer-dialog-host) + 1);
 }
 

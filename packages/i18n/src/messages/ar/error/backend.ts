@@ -221,6 +221,10 @@ export const messages = {
     "تعذّر على OpenBot قراءة معلومات تسجيل الدخول لهذا الخادم. تحقق من عنوان الخادم وحاول مرة أخرى.",
   "error.backend.mcpServerExited": "توقف الخادم قبل أن يُجيب. شغّل الأمر في الطرفية لرؤية الخطأ.",
   "error.backend.mcpServerFailedToStart": "لم يبدأ الخادم: {reason}",
+  "error.backend.mcpServerSignInForProvider":
+    "تعذّر على {provider} استخدام خادم MCP {name}، لأن الخادم يطلب تسجيل الدخول. افتح إعدادات MCP واختر تسجيل الدخول.",
+  "error.backend.mcpServerFailedForProvider":
+    "تعذّر على {provider} تشغيل خادم MCP {name}. افتح إعدادات MCP واختر اختبار الاتصال لمعرفة السبب.",
   "error.backend.mcpOAuthProxyUnavailable":
     "تعذّر على OpenBot بدء اتصال تسجيل الدخول المحلي لهذا الخادم. أعد تشغيل OpenBot، ثم حاول مرة أخرى.",
   "error.backend.mcpOAuthSignInNeeded":

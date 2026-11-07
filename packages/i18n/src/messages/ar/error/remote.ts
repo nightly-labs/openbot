@@ -188,6 +188,7 @@ export const messages = {
   "error.remote.hostRefused": "رفض المضيف الطلب ({status}).",
   "error.remote.formUnavailable": "هذا النموذج لم يعد متاحًا.",
   "error.remote.hostedServerRemoval": "استخدم «الفوترة» لحذف خادم مستضاف.",
+  "error.remote.hostRemoved": "أزال المالك هذا الخادم من الحساب.",
   "error.remote.channelsUnsupported": "حدّث خادم الحاسوب المكتبي هذا لاستخدام القنوات.",
   "error.remote.channelDeleteUnsupported": "حدّث خادم الحاسوب المكتبي هذا لحذف القنوات.",
   "error.remote.historyRefreshFailed": "أُرسلت الرسالة، لكن تعذّر تحديث سجل الدردشة.",

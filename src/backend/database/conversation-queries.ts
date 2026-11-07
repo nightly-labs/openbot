@@ -349,6 +349,29 @@ export class ConversationQueries {
     };
   }
 
+  /** The cursor of the page before a message of the thread, or null when the thread does not hold it. */
+  conversationCursorAt(threadId: string, messageId: string): string | null {
+    const row = this.#messageOrderRow(threadId, messageId);
+    return row ? encodePageCursor(conversationRowCursor(row)) : null;
+  }
+
+  /** How many messages the reader can see before a message of the thread. 0 when the thread does not hold it. */
+  conversationCountBefore(threadId: string, messageId: string, options: ConversationMarkerExclusions = {}): number {
+    const row = this.#messageOrderRow(threadId, messageId);
+    return row ? this.#conversationRowsBefore(threadId, conversationRowCursor(row), options).count : 0;
+  }
+
+  #messageOrderRow(threadId: string, messageId: string): DynamicRecord | null {
+    return databaseRow(
+      this.#core.connection
+        .prepare(
+          `${ORDERED_THREAD_MESSAGES}
+           SELECT ${ORDER_KEY_COLUMNS} FROM ordered WHERE message_id = ?`,
+        )
+        .get(threadId, messageId),
+    );
+  }
+
   supportedConversationCursor(
     threadId: string,
     throughMessageId: string | null,

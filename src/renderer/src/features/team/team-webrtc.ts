@@ -34,6 +34,8 @@ export interface BridgeCommand {
   iceTransportPolicy?: "all" | "relay";
   /** For a host: devices connect only over a private network, with no STUN or TURN. */
   privateNetwork?: boolean;
+  /** For a client: Signal holds the attempt while the host is offline, and sends `ready` when it connects. */
+  waitForHost?: boolean;
   channel?: "rpc" | "events" | "files" | "desktop";
   data?: string | ArrayBuffer;
 }
@@ -76,6 +78,8 @@ interface PeerState {
   iceTransportPolicy: "all" | "relay";
   /** A host and its device connections use only private network candidates and no ICE servers. */
   privateNetwork: boolean;
+  /** A client hello asks Signal to wait for an offline host. Main asks for it while a hosted server starts. */
+  waitForHost: boolean;
   channels: Partial<Record<"rpc" | "events" | "files" | "desktop", RTCDataChannel>>;
   payloadDecoders: Partial<Record<"rpc" | "events" | "files" | "desktop", TeamWebRtcPayloadDecoder>>;
   /**
@@ -183,6 +187,7 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
         iceServers: [],
         iceTransportPolicy: command.iceTransportPolicy,
         privateNetwork: command.peer === "host" && command.privateNetwork === true,
+        waitForHost: command.peer === "client" && command.waitForHost === true,
         channels: {},
         payloadDecoders: {},
         egress: null,
@@ -353,6 +358,7 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
       peer: state.role,
       token: state.resumeToken ?? state.token,
       ...(state.role === "host" ? { multiplex: true } : {}),
+      ...(state.waitForHost ? { waitForHost: true } : {}),
     };
     socket.send(JSON.stringify(hello));
   };
@@ -405,10 +411,8 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
 
 async function handleSignal(state: PeerState, message: SignalServerMessage): Promise<void> {
   // Signal sends Slack, Discord, webhook, GitHub and Telegram messages only to the main process's `ingress`
-  // socket, never to this peer. `host-waiting` answers only a hello with `waitForHost`, which this
-  // peer does not send.
+  // socket, never to this peer.
   if (
-    message.type === "host-waiting" ||
     message.type === "slack-delivery" ||
     message.type === "discord-session" ||
     message.type === "discord-delivery" ||
@@ -421,6 +425,14 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     message.type === "queued-delivery"
   )
     return;
+  // Signal holds this attempt until the host says hello, and then sends `ready` on this socket. The
+  // resume token renews the socket with no new ticket. Main then waits longer for the connection.
+  if (message.type === "host-waiting") {
+    state.reconnectAttempt = 0;
+    state.resumeToken = message.resumeToken;
+    post({ type: "host-waiting", peerId: state.id });
+    return;
+  }
   if (message.type === "account-profile-changed") {
     post({ type: "account-profile-changed", peerId: state.id });
     return;

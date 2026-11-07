@@ -46,6 +46,11 @@ findings when it was turned on. `exactOptionalPropertyTypes` is not on yet: it h
 files of the projects that extend `tsconfig.base.json` on 2026-09-26. The type ratchet holds it to
 those counts.
 
+The root `dependencies` are what electron-builder copies into `app.asar`, and what the main and
+preload builds load from `node_modules` at run time. A package that the renderer uses, or that the
+main build bundles (the `@openbot/*` workspaces), goes in `devDependencies`: Vite puts its code in
+`out/`, and a copy in `app.asar` only makes each download and hosted server wake larger.
+
 The Signal Dockerfile installs from a pruned checkout with one manifest copy per workspace.
 CI does not build that image. When you change workspace dependencies, make sure that the copied
 manifests cover the workspace dependency graph.
@@ -108,7 +113,7 @@ Its main jobs are:
 | Signal E2E | `ubuntu-latest` | `bun run test:signal`, when `remote/` or `scripts/` changes |
 | Local scripts CLI E2E | `ubuntu-latest` | `bun run test:automation-cli` |
 | Team API routes E2E | `ubuntu-latest` | `bun run test:team-api-routes`, when desktop code changes |
-| Team API and reverse actions E2E | `ubuntu-latest` | `test:team-legacy-clients`, `test:team-session-revoke`, `test:sign-in-relay-paste`, `test:server-mute`, `test:routine-pause-resume`, `test:agent-hide-restore`, `test:messaging-pause-resume`, `test:messaging-discord-access`, `test:turn-input`, `test:provider-update-busy`, `test:provider-update-after-app-upgrade`, `test:provider-runtime-remove`, `test:provider-exit-session`, `test:acp-subagents`, `test:codex-subagent-steps`, `test:subagent-status`, `test:codex-hung-app-server`, `test:codex-missing-rollout`, `test:zip-attachments`, `test:mp4-attachments` and `test:svg-attachments`, each with `bun run` in its own step, when the `desktop` lane runs |
+| Team API and reverse actions E2E | `ubuntu-latest` | `test:team-legacy-clients`, `test:team-session-revoke`, `test:sign-in-relay-paste`, `test:server-mute`, `test:routine-pause-resume`, `test:agent-hide-restore`, `test:messaging-pause-resume`, `test:messaging-discord-access`, `test:turn-input`, `test:provider-update-busy`, `test:provider-update-after-app-upgrade`, `test:provider-runtime-remove`, `test:provider-exit-session`, `test:acp-subagents`, `test:codex-subagent-steps`, `test:subagent-status`, `test:codex-hung-app-server`, `test:codex-missing-rollout`, `test:zip-attachments`, `test:mp4-attachments`, `test:svg-attachments`, `test:any-file-attachments` and `test:channel-notifications`, each with `bun run` in its own step, when the `desktop` lane runs |
 | Provider fakes E2E | `ubuntu-latest` | `test:custom-agents`, `test:custom-agents:login-path`, `test:acp-directories`, `test:acp-flavors`, `test:acp-turn-stall`, `test:agent-database-host-start`, `test:acp-mcp-names`, `test:provider-conformance`, `test:opencode-expired-key`, `test:opencode-downgraded-session`, `test:cline-free-models` and `test:provider-transcript-replay`, each with `bun run` in its own step, when the `desktop` lane runs. The fake agents are in `scripts/provider-fakes/`; the replayed transcripts of released CLIs are in `scripts/provider-fakes/transcripts/`, and `bun scripts/record-provider-transcript.ts` records a new one |
 | Surfaces | `ubuntu-latest` | Parallel groups described below, then `bun run remote:check:compose` |
 | API | `ubuntu-latest` | `bun run check:api`, then, for a pull request from this repository, upload `apps/auth-api/dist` |

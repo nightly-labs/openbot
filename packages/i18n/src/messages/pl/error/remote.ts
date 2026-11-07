@@ -195,6 +195,7 @@ export const messages = {
   "error.remote.hostRefused": "Host odrzucił żądanie ({status}).",
   "error.remote.formUnavailable": "Ten formularz nie jest już dostępny.",
   "error.remote.hostedServerRemoval": "Użyj sekcji Rozliczenia, aby usunąć hostowany serwer.",
+  "error.remote.hostRemoved": "Właściciel usunął ten serwer z konta.",
   "error.remote.channelsUnsupported": "Zaktualizuj ten serwer desktopowy, aby używać kanałów.",
   "error.remote.channelDeleteUnsupported": "Zaktualizuj ten serwer desktopowy, aby usuwać kanały.",
   "error.remote.historyRefreshFailed": "Wiadomość została wysłana, ale nie udało się odświeżyć historii czatu.",

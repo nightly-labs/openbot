@@ -213,6 +213,16 @@ export const messages = {
     "Maak met Higgsfield een productfoto van een keramische mok op een houten tafel.",
   "marketplace.plugin.higgsfield.prompt.clip":
     "Maak met Higgsfield een video van 5 seconden met golven bij zonsondergang.",
+  "marketplace.plugin.elevenlabs.tagline": "Spraak, stemmen en spraakagenten",
+  "marketplace.plugin.elevenlabs.description":
+    "Met ElevenLabs zetten agenten tekst om in spraak, werken ze met stemmen, en maken, testen en bekijken ze ElevenLabs-spraakagenten en hun gesprekken. Gegenereerde audio komt terug als een kortlevende downloadlink. Elke gebruiker meldt zich in de browser aan bij een eigen ElevenLabs-account, en elke generatie gebruikt credits van dat account.",
+  "marketplace.plugin.elevenlabs.app":
+    "Tekst naar spraak, stemmen en beheer van spraakagenten, via de MCP-server van ElevenLabs met aanmelding in de browser.",
+  "marketplace.plugin.elevenlabs.prompt.speech":
+    "Lees deze alinea voor met een rustige ElevenLabs-stem en geef me de audio.",
+  "marketplace.plugin.elevenlabs.prompt.agents": "Toon mijn ElevenLabs-spraakagenten en de stem die elk gebruikt.",
+  "marketplace.plugin.elevenlabs.prompt.conversations":
+    "Vat de laatste tien gesprekken van mijn spraakagent voor support samen.",
   "marketplace.plugin.appleApps.tagline": "Mail, Agenda en meer op je Mac",
   "marketplace.plugin.appleApps.description":
     "Met Apple-apps kunnen agents Mail, Agenda, Contacten, Herinneringen, Notities, Berichten en Safari op deze Mac gebruiken. Het werkt alleen op macOS. OpenBot start mcp-icloud, een communityserver die niet van Apple of OpenBot is. De server bestuurt de apps via AppleScript op deze computer en heeft geen account en geen sleutel nodig. Bij de installatie kan OpenBot macOS in één keer om toegang tot al deze apps vragen, met één vraag per app. Anders vraagt macOS het de eerste keer dat een agent een app gebruikt. Om dit later te wijzigen, open je Systeeminstellingen › Privacy en beveiliging › Automatisering. Agents kunnen e-mail en iMessages versturen en afspraken, contacten en herinneringen wijzigen of verwijderen, dus controleer elke wijziging voordat je die goedkeurt. Wat de tools lezen, zoals de tekst van e-mails, gaat naar de modelaanbieder van de agent.",
@@ -231,6 +241,15 @@ export const messages = {
   "marketplace.plugin.sentry.prompt.topCrash":
     "Leg de meest voorkomende crash in het mobiele project uit en de waarschijnlijke oorzaak.",
   "marketplace.plugin.sentry.prompt.releaseHealth": "Hoe gezond is de huidige release vergeleken met de vorige?",
+  "marketplace.plugin.gitlab.tagline": "Issues, merge requests en pipelines",
+  "marketplace.plugin.gitlab.description":
+    "Met GitLab kunnen agents projecten zoeken, issues lezen en maken, merge requests reviewen en bijwerken, bestanden en commits in de repository lezen, en CI-pipelines en jobs op GitLab.com controleren. Elke gebruiker logt via de browser in met een eigen GitLab-account. Agents krijgen dezelfde rechten als de gebruiker: ze kunnen commits pushen, issues en merge requests wijzigen en ze mergen. Voor een zelfgehoste GitLab voeg je in de instellingen voor MCP-servers een server toe met je GitLab-adres gevolgd door /api/v4/mcp, en log je daar in.",
+  "marketplace.plugin.gitlab.app":
+    "Projecten, issues, merge requests, repository's en CI-pipelines, via de MCP-server van GitLab met inloggen in de browser.",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "Welke merge requests wachten op mijn review?",
+  "marketplace.plugin.gitlab.prompt.failedPipeline": "Waarom is de laatste pipeline op de standaardbranch mislukt?",
+  "marketplace.plugin.gitlab.prompt.newIssue":
+    "Maak een issue aan voor de crash in de sync-wachtrij, met stappen om die te reproduceren.",
   "marketplace.plugin.vercel.tagline": "Deployments, buildlogs en projecten",
   "marketplace.plugin.vercel.description":
     "Met Vercel kunnen agents projecten en recente deployments tonen, build- en runtimelogs lezen en uitzoeken waarom een build mislukte. Elke gebruiker logt via de browser in met een eigen Vercel-account en kiest de teams die agents mogen gebruiken. In die teams krijgen agents dezelfde rechten als het account van de gebruiker. Ze kunnen ook omgevingsvariabelen, domeinen, DNS-records en deployments wijzigen, en domeinen kopen.",
@@ -336,6 +355,17 @@ export const messages = {
   "marketplace.plugin.resend.prompt.status": "Is de factuurmail bij de klant aangekomen?",
   "marketplace.plugin.resend.prompt.template":
     "Stel een e-mail op voor het opnieuw instellen van een wachtwoord in de nieuwe flow.",
+  "marketplace.plugin.omnisend.tagline": "E-mail- en sms-marketing",
+  "marketplace.plugin.omnisend.description":
+    "Met Omnisend lezen agents rapporten van campagnes en formulieren, vinden ze contacten en segmenten, en maken en bewerken ze campagnes, automatiseringen, e-mailsjablonen, formulieren en producten. Elke gebruiker meldt zich in de browser aan bij een eigen Omnisend-account en kiest het toegangsniveau op het toestemmingsscherm. Met schrijftoegang kunnen agents ook campagnes versturen en gegevens verwijderen. Kies alleen-lezen toegang als agents alleen rapporten nodig hebben.",
+  "marketplace.plugin.omnisend.app":
+    "Campagnes, automatiseringen, contacten, segmenten, formulieren en rapporten, via de MCP-server van Omnisend met aanmelding in de browser.",
+  "marketplace.plugin.omnisend.prompt.lastCampaign":
+    "Hoe presteerden de campagnes van vorige week ten opzichte van de week ervoor?",
+  "marketplace.plugin.omnisend.prompt.segment":
+    "Hoeveel contacten zitten er in het VIP-segment, en hoe is dat deze maand veranderd?",
+  "marketplace.plugin.omnisend.prompt.draftCampaign":
+    "Maak een concept van een campagne voor de nieuwe collectie, maar verstuur die niet.",
   "marketplace.plugin.composio.tagline": "Veel apps via je eigen Composio-link",
   "marketplace.plugin.composio.description":
     "Composio koppelt agents met Gmail, Slack, GitHub en honderden andere apps via één MCP-server. Koppel de apps die je wilt in je Composio-account en plak hier de MCP-URL en API-sleutel ervan.",

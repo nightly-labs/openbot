@@ -78,7 +78,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "{name}이(가) 글을 쓰기 시작하기 전에 {model}의 사용 한도에 도달하면, 어떤 모델을 사용할지 {name}이(가) 물어봐요.",
   "agentSettings.backupModels.introAutomatic":
-    "{name}이(가) 글을 쓰기 시작하기 전에 {model}의 사용 한도에 도달하거나 제공자 오류로 실패하면, {name}이(가) 순서상 사용 가능한 첫 번째 모델로 전환해요.",
+    "{model}의 사용 한도에 도달하면 {name}이(가) 순서상 사용 가능한 첫 번째 모델로 전환해요. {name}이(가) 글을 쓰기 시작하기 전에 {model}이(가) 제공자 오류로 실패해도 전환해요.",
   "agentSettings.backupModels.ask": "전환 전에 묻기",
   "agentSettings.backupModels.order": "순서",
   "agentSettings.backupModels.listLabel": "백업 모델 (순서대로)",

@@ -506,6 +506,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:svg-attachments
 
+      - name: Run the any file attachment E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:any-file-attachments
+
+      - name: Run the channel notifications and channel settings E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:channel-notifications
+
       - name: Run the agent MCP server tools E2E test
         if: ${{ !cancelled() }}
         run: bun run test:agent-mcp-tools
@@ -513,6 +521,10 @@ jobs:
       - name: Run the MCP sign-in client refusal E2E test
         if: ${{ !cancelled() }}
         run: bun run test:mcp-sign-in-client-refused
+
+      - name: Run the MCP sign-in client metadata document E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:mcp-sign-in-client-metadata-document
 
       - name: Run the unreadable MCP server row E2E test
         if: ${{ !cancelled() }}
@@ -533,6 +545,10 @@ jobs:
       - name: Run the Gemini usage metering E2E test
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-usage-metering
+
+      - name: Run the Gemini quota failover E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:antigravity-quota-failover
 
       - name: Run the workflow model steps E2E test
         if: ${{ !cancelled() }}
@@ -641,12 +657,14 @@ jobs:
             .openbot-build/zip-attachment-e2e/
             .openbot-build/mp4-attachment-e2e/
             .openbot-build/svg-attachment-e2e/
+            .openbot-build/any-file-attachment-e2e/
             .openbot-build/agent-mcp-tools-e2e/
             .openbot-build/mcp-server-unreadable-row-e2e/
             .openbot-build/agent-update-agents-e2e/
             .openbot-build/antigravity-usage-e2e/
             .openbot-build/antigravity-accounts-e2e/
             .openbot-build/antigravity-usage-metering-e2e/
+            .openbot-build/antigravity-quota-failover-e2e/
             .openbot-build/workflow-model-steps-e2e/
             .openbot-build/workflow-discord-e2e/
             .openbot-build/workflow-telegram-e2e/

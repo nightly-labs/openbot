@@ -24,6 +24,12 @@ export const messages = {
   "mobile.chat.routine.created": "Routine gemaakt",
   "mobile.chat.routine.updated": "Routine bijgewerkt",
   "mobile.chat.routine.deleted": "Routine verwijderd",
+  "mobile.chat.routine.runGroup.count": { one: "{count} run", other: "{count} runs" },
+  "mobile.chat.routine.runGroup.show": { one: "{count} run van {name} tonen", other: "{count} runs van {name} tonen" },
+  "mobile.chat.routine.runGroup.hide": {
+    one: "{count} run van {name} verbergen",
+    other: "{count} runs van {name} verbergen",
+  },
   "mobile.chat.contextReset": "Nieuwe chat gestart",
   "mobile.chat.plan.title": "Taken",
   "mobile.chat.plan.stopped": "Gestopt",

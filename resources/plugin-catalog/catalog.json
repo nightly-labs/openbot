@@ -81,6 +81,12 @@
       "detailSha256": "d527206a8519ea548c3438fa2ee3c4c158a33c85557a650fc62686b257236271"
     },
     {
+      "slug": "elevenlabs",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "89647f4be8ae4d078a7c42cf3a2ccd1046c15454d2af9e60057b03208996fd77"
+    },
+    {
       "slug": "apple-apps",
       "version": "1.1.0",
       "featured": false,
@@ -91,6 +97,12 @@
       "version": "1.0.0",
       "featured": false,
       "detailSha256": "414a33dd79f7318638bc68e56ecaeb81c77762666a9bd6f11a0e228c0323fcf1"
+    },
+    {
+      "slug": "gitlab",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "bc2e946ad9f54d21a16c8fe618ed2ad7734fe4a023dec71d341193f15ed8a23c"
     },
     {
       "slug": "vercel",
@@ -193,6 +205,12 @@
       "version": "1.0.0",
       "featured": false,
       "detailSha256": "9bd3408ca7d9f8bc7169e8cb2515e3e6302007cbb38db7a777972f87b0563d24"
+    },
+    {
+      "slug": "omnisend",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "73cd8cb3312090709f3c048b6c4b912c8dff27f96eb530cf36fcaf461eae7d80"
     },
     {
       "slug": "composio",

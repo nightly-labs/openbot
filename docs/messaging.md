@@ -56,6 +56,8 @@ browser. A joined server shows no Slack page.
 - The agent can read more of the channel or thread when a message refers to something earlier.
 - 👀 means the message arrived. "Working on it…" is replaced by the answer. ✅, ❌ or ⏹ shows the end.
   Every post comes from OpenBot and names no agent.
+- A new post that mentions a person as `<@user ID>` pings that person. A post never pings a channel,
+  `@here`, `@everyone` or a user group.
 - An approval appears in the thread with **Approve** and **Deny**. Only the person who wrote the
   message can answer it there. The OpenBot host can always answer it.
 - `stop` or `cancel` in the thread, or the **Stop** button, stops the request of the person who
@@ -113,7 +115,7 @@ again.
   An approval has **Approve** and **Deny** buttons, and a status post has **Stop**. Only the person
   who wrote the request can press them; another person gets a reply that only they see. A reply to
   an OpenBot post with only `stop` or `cancel` stops the request of the person who sends it.
-- A post never pings anyone, also when it names a person.
+- A new post that mentions a person pings that person. A post never pings a role or `@everyone`.
 - An answer longer than 2,000 characters is sent in more than one post. A file larger than 10 MB is
   not sent, and the conversation says which files were not sent.
 
@@ -283,9 +285,9 @@ routine prompt, for example "post the summary to #bot-inflow on Discord".
   and post in, or the Telegram chat itself.
 - `openbot.messaging_post` posts markdown as OpenBot to `place`. `replyTo` puts the post in a
   thread: a Slack thread ts, a Discord message ID, a Telegram message ID, or `t<topic ID>` for a
-  Telegram forum topic. The text is redacted before it leaves this computer. A Discord post pings
-  nobody; a Telegram `@username` notifies that person. A Telegram connection posts only in its own
-  chat. The result has `messageId`, the ID of the first post, and for Discord a `url` to it.
+  Telegram forum topic. The text is redacted before it leaves this computer. A Slack or Discord
+  `<@user ID>` or a Telegram `@username` notifies that person. A Telegram connection posts only in
+  its own chat. The result has `messageId`, the ID of the first post, and for Discord a `url` to it.
 - A long text goes in more than one post. When a later part fails, the earlier parts stay posted.
 - A routine posts only when its run calls the tool. The scheduler does not post the run's answer.
 - A reply to the post reaches an agent only as usual: it must mention OpenBot, and it goes to the

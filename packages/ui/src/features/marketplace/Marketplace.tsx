@@ -1,6 +1,7 @@
 import { Button, ChevronRight, ErrorReference, IconButton, X } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { useText } from "@openbot/ui/text";
+import { holdFlag } from "@openbot/ui/utils";
 import { createEffect, For, Match, onCleanup, onSettled, Show, Switch } from "solid-js";
 import { MarketplaceAgentPage } from "./MarketplaceAgentPage";
 import { AgentGroupPage } from "./MarketplaceAgents";
@@ -281,6 +282,8 @@ function MarketplacePage(props: MarketplaceProps) {
   const nav = createMovingNavigation(props.nav);
   let root!: HTMLElement;
   const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  // Dialogs that the page opens stand above it (`marketplace.css`).
+  onCleanup(holdFlag(document.body, "skills-marketplace"));
   onSettled(() => {
     root.querySelector<HTMLElement>(".marketplace-nav-title")?.focus({ preventScroll: true });
     const closeOnEscape = (event: KeyboardEvent) => {

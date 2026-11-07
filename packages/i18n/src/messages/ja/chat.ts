@@ -312,6 +312,8 @@ export const messages = {
   "chat.message.agentFallback": "エージェント",
   "chat.message.memberFallback": "チームメンバー",
   "chat.message.attachment": "添付ファイル",
+  "chat.message.showFull": "メッセージ全体を表示",
+  "chat.message.showLess": "折りたたむ",
   "chat.actions.userLabel": "ユーザーのメッセージの操作",
   "chat.actions.label": "{name} のメッセージの操作",
   "chat.actions.addReaction": "リアクションを追加",

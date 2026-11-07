@@ -12,6 +12,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentAccessLevel,
   agentAccessRank,
+  type ConversationMessage,
   type ConversationMessageSender,
   type ConversationPageAnchor,
   type ConversationSnapshot,
@@ -37,6 +38,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import {
+  CHANNEL_ISOLATION_CAPABILITY,
   isTeamCurrentCapability,
   supportsTeamSemanticTags,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
@@ -58,6 +60,71 @@ import type { TeamApiRequestContext } from "./request-context";
 export const JSON_LIMIT = 1024 * 1024;
 /** A response body leaves room in one WebRTC frame for the response envelope around it. */
 export const WEBRTC_FRAME_BODY_BUDGET = Math.floor(TEAM_PROTOCOL_V2_MAX_JSON_FRAME_BYTES * 0.75);
+
+/** A client draws a text of a few megabytes for seconds, so a cut text keeps at most this much. */
+const CUT_TEXT_BYTES = 256 * 1024;
+
+/**
+ * A page of one message can still be larger than one WebRTC frame, and a remote client could then not
+ * open the chat or read the history behind that message. The texts of `messages` give up
+ * `excessBytes` of their JSON size: the largest texts are cut to one size, at most `CUT_TEXT_BYTES`,
+ * and the smaller texts stay whole. The start and the end of a cut text stay, with a note between
+ * them. The host keeps the whole text.
+ */
+export function messageTextCut(
+  messages: readonly ConversationMessage[],
+  excessBytes: number,
+): (message: ConversationMessage) => ConversationMessage {
+  const sizes = new Map(messages.map((message) => [message, jsonBytes(message.text)]));
+  // A message that is also a reply reference is in the page twice, so its size counts twice.
+  const ascending = messages.map((message) => sizes.get(message) ?? 0).sort((left, right) => left - right);
+  let remaining = ascending.reduce((sum, size) => sum + size, 0) - excessBytes;
+  // The rest of the page alone is too large: a cut cannot help, so every text stays whole.
+  if (remaining <= 0) return (message) => message;
+  let cap = Number.POSITIVE_INFINITY;
+  for (const [index, size] of ascending.entries()) {
+    const left = ascending.length - index;
+    if (size * left > remaining) {
+      cap = Math.max(0, Math.floor(remaining / left));
+      break;
+    }
+    remaining -= size;
+  }
+  const limit = Math.min(cap, CUT_TEXT_BYTES);
+  return (message) =>
+    (sizes.get(message) ?? 0) > limit ? { ...message, text: cutText(message.text, limit) } : message;
+}
+
+function cutText(text: string, maxBytes: number): string {
+  const textBytes = Buffer.byteLength(text);
+  for (let keep = Math.floor(text.length / 2); ; ) {
+    // Do not split a surrogate pair at either cut.
+    const end = isHighSurrogate(text.charCodeAt(keep - 1)) ? keep - 1 : keep;
+    const start = isLowSurrogate(text.charCodeAt(text.length - keep)) ? text.length - keep + 1 : text.length - keep;
+    const head = text.slice(0, end);
+    const tail = text.slice(start);
+    // Rounded up to 0.1 MB, so a cut never reads as 0.0 MB.
+    const size = (Math.ceil((textBytes - Buffer.byteLength(head) - Buffer.byteLength(tail)) / 104_857.6) / 10).toFixed(
+      1,
+    );
+    const cut = `${head}\n\n${sourceText("status.remote.messageCut", { size })}\n\n${tail}`;
+    const bytes = jsonBytes(cut);
+    if (bytes <= maxBytes || keep === 0) return cut;
+    keep = Math.floor(keep * Math.min(0.99, maxBytes / bytes));
+  }
+}
+
+function jsonBytes(value: string): number {
+  return Buffer.byteLength(JSON.stringify(value));
+}
+
+function isHighSurrogate(code: number): boolean {
+  return code >= 0xd800 && code <= 0xdbff;
+}
+
+function isLowSurrogate(code: number): boolean {
+  return code >= 0xdc00 && code <= 0xdfff;
+}
 
 export function requestCapabilities(request: IncomingMessage): Set<string> {
   const header = request.headers[TEAM_CAPABILITIES_HEADER.toLowerCase()];
@@ -256,12 +323,14 @@ export async function readJson(request: IncomingMessage): Promise<DynamicRecord>
     const value = JSON.parse(body.toString("utf8"));
     const path = request.url ?? "/";
     const sideRoute = teamSideRouteCodec(path);
+    const capabilities = requestCapabilities(request);
     if (sideRoute) {
-      const input = sideRoute.request(path, value);
+      const input = sideRoute.request(path, value, {
+        channelIsolation: capabilities.has(CHANNEL_ISOLATION_CAPABILITY),
+      });
       if (!isDynamicRecord(input)) throw new Error("Invalid side-protocol request.");
       return input;
     }
-    const capabilities = requestCapabilities(request);
     return teamHttpCodec(requestProtocol(request)).decodeRequest(request.method ?? "GET", path, value, {
       preserveSemanticTags: supportsTeamSemanticTags(capabilities),
       agentCreateModel: capabilities.has(TEAM_AGENT_CREATE_MODEL_CAPABILITY),

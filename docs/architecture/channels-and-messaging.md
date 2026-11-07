@@ -472,6 +472,11 @@ channel, so the host's row replaces the phone's own; a failed read is not a fail
 channel reads its history when it opens. A channel message that an app before channels came back
 kept aside in `messages.unreadable-<time>.json` stays there.
 
+On a host with `channel-isolation-v1`, each channel record and the draft of a `save` carry `isolated`,
+the "Keep memories in this channel" setting. The channels-v1 codec drops the field, so a joined
+server or the browser client shows the switch only when the host advertises the capability (#5380).
+A save without the field keeps the stored value, so a phone or an older client does not turn it off.
+
 On a host with `channel-attention-v1`, each channel summary names the threads of its members. The
 channel then shows the approvals and browser steps of those threads, and the agent's own chat does
 not. An older host gives no threads: the channel shows the approvals of the members that run one of
@@ -675,8 +680,9 @@ the token and does the platform work for the hosts:
   (`discord-driver.ts`) sends typed operations (`DiscordApiRequest`: post, edit, delete, react, list
   messages, names, a private reply to a button press, upload) to `POST /v1/discord/api` with that
   bearer. Signal accepts an operation only for a guild routed to that socket, and only for a channel
-  of that guild, and makes the call with `@discordjs/rest`. Every post has no allowed mention, so it
-  pings nobody. Attachments are signed CDN addresses, which the host downloads directly.
+  of that guild, and makes the call with `@discordjs/rest`. A new text post allows only user mentions,
+  so it pings each user that it mentions, never a role or `@everyone`. Other posts and edits ping
+  nobody. Attachments are signed CDN addresses, which the host downloads directly.
 - **Conversations.** A conversation is a reply chain, keyed by its first message. Every OpenBot post
   replies to that message, so a reply to an OpenBot post names the conversation through the replied
   post's own reference. A direct message has no guild, so Signal answers it once with a fixed line.

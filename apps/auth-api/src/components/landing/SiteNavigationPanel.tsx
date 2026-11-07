@@ -16,6 +16,7 @@ import { ArticleGradient } from "../content/ArticleGradient";
 import { PluginIcon } from "../plugins/PluginIcon";
 import { hasPluginLogo, PluginLogo } from "../plugins/PluginLogo";
 import { LandingIcon } from "./LandingIcon";
+import { useSiteChrome } from "./SiteText";
 
 // The contents of one header section. The desktop menu and the mobile sheet draw
 // the same component, and differ only in the frame around it.
@@ -36,6 +37,8 @@ export interface SiteNavigationPanelProps {
 }
 
 export function SiteNavigationPanel(props: SiteNavigationPanelProps) {
+  const chrome = useSiteChrome();
+  const text = () => chrome().text.sections[props.section.id];
   return (
     <div class="site-panel" data-kind={props.section.kind}>
       <Switch>
@@ -50,12 +53,12 @@ export function SiteNavigationPanel(props: SiteNavigationPanelProps) {
         </Match>
       </Switch>
       <div class="site-panel-footer">
-        <span class="site-panel-summary">{props.section.summary}</span>
+        <span class="site-panel-summary">{text().summary}</span>
         <Switch>
           <Match when={props.section.kind !== "resources" && props.section}>
             {(section) => (
               <Link class="site-panel-index" to={section().indexRoute}>
-                {section().indexLabel}
+                {text().index}
                 <LandingIcon name="arrow-right" />
               </Link>
             )}
@@ -63,7 +66,7 @@ export function SiteNavigationPanel(props: SiteNavigationPanelProps) {
           <Match when={props.section.kind === "resources" && props.section}>
             {(section) => (
               <a class="site-panel-index" href={section().footer.href} target="_blank" rel={EXTERNAL_LINK_REL}>
-                {section().footer.label}
+                {text().index}
                 <LandingIcon name="arrow-up-right" />
               </a>
             )}
@@ -79,6 +82,7 @@ function artwork(title: string): string {
 }
 
 function ArticlePanelBody(props: { section: ArticleNavigationSection; live: boolean }) {
+  const chrome = useSiteChrome();
   const featured = () => props.section.articles[0];
   const others = () => props.section.articles.slice(1);
 
@@ -97,7 +101,7 @@ function ArticlePanelBody(props: { section: ArticleNavigationSection; live: bool
             <Show when={props.live} fallback={<span class="site-panel-feature-art" aria-hidden="true" />}>
               <ArticleGradient title={article().title} mode="live" class="site-panel-feature-art" />
             </Show>
-            <span class="site-panel-feature-badge">Latest</span>
+            <span class="site-panel-feature-badge">{chrome().text.latest}</span>
             <span class="site-panel-feature-copy">
               <span class="site-panel-feature-title">{article().title}</span>
               <span class="site-panel-meta">{formatArticleDate(article().publishedAt)}</span>
@@ -207,13 +211,15 @@ function ResourceRow(props: { link: ResourceLink }) {
 
 // An icon sits on the same gradient as a plugin's mark. The Brand row shows the app icon itself.
 function ResourceRowContents(props: { link: ResourceLink }) {
+  const chrome = useSiteChrome();
+  const text = () => chrome().text.resources[props.link.id];
   const icon = () => (props.link.icon === "logo" ? undefined : props.link.icon);
   return (
     <>
       <Switch>
         <Match when={icon()}>
           {(name) => (
-            <span class="site-panel-plugin-mark" style={{ "--site-panel-art": artwork(props.link.label) }}>
+            <span class="site-panel-plugin-mark" style={{ "--site-panel-art": artwork(props.link.seed) }}>
               <LandingIcon name={name()} class="site-panel-resource-icon" />
             </span>
           )}
@@ -223,8 +229,8 @@ function ResourceRowContents(props: { link: ResourceLink }) {
         </Match>
       </Switch>
       <span class="site-panel-row-copy">
-        <span class="site-panel-row-title">{props.link.label}</span>
-        <span class="site-panel-meta">{props.link.description}</span>
+        <span class="site-panel-row-title">{text().label}</span>
+        <span class="site-panel-meta">{text().description}</span>
       </span>
     </>
   );

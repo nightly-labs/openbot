@@ -33,6 +33,18 @@ export const messages = {
   "mobile.chat.routine.created": "Routine erstellt",
   "mobile.chat.routine.updated": "Routine aktualisiert",
   "mobile.chat.routine.deleted": "Routine gelöscht",
+  "mobile.chat.routine.runGroup.count": {
+    one: "{count} Ausführung",
+    other: "{count} Ausführungen",
+  },
+  "mobile.chat.routine.runGroup.show": {
+    one: "{count} Ausführung von {name} anzeigen",
+    other: "{count} Ausführungen von {name} anzeigen",
+  },
+  "mobile.chat.routine.runGroup.hide": {
+    one: "{count} Ausführung von {name} ausblenden",
+    other: "{count} Ausführungen von {name} ausblenden",
+  },
   "mobile.chat.contextReset": "Neuer Chat gestartet",
   "mobile.chat.plan.title": "Aufgaben",
   "mobile.chat.plan.stopped": "Gestoppt",

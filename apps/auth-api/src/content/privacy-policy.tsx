@@ -906,6 +906,11 @@ export function PrivacyPolicy() {
         and ensure the proper operation and security of the Services. These cookies are essential for the functioning of
         the Platform and cannot be disabled without affecting its core functionality.
       </p>
+      <p>
+        When you choose a language on the openbot.run website, the website saves that choice in the{" "}
+        <code>openbot_lang</code> cookie for one year, so that the next pages open in the same language. The cookie
+        holds only the language code. To remove it, clear the site data of openbot.run.
+      </p>
 
       <h2>Children's Privacy</h2>
       <p>

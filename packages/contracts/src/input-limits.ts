@@ -1,5 +1,8 @@
 export const INPUT_LIMITS = {
   identifier: 128,
+  // A saved login id from `list_logins`. The longest is a Proton Pass id:
+  // `proton:` + share id (256) + `:` + item id (256).
+  vaultLoginId: 520,
   email: 254,
   accountName: 120,
   profileNameMin: 3,

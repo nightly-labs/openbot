@@ -1,8 +1,8 @@
 import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Minimize2, Tabs } from "@openbot/ui";
 import { CloseIcon, PlusIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { useText } from "@openbot/ui/text";
-import { clamp } from "@openbot/ui/utils";
-import { createEffect, createSignal, flush, onSettled, Show } from "solid-js";
+import { clamp, holdFlag } from "@openbot/ui/utils";
+import { createEffect, createSignal, flush, onCleanup, onSettled, Show } from "solid-js";
 import { BrowserAddressRow } from "./BrowserAddressRow";
 import BrowserLiveView from "./BrowserLiveView";
 import { BrowserTabStrip } from "./BrowserTabStrip";
@@ -33,6 +33,8 @@ function createNarrow() {
  */
 export default function BrowserFullView(props: BrowserFullViewProps) {
   const { t, sourceText } = useText();
+  // The app frame stays below the portaled view, also while it is hidden (`browser-full-view.css`).
+  onCleanup(holdFlag(document.body, "browser-full-view"));
   const narrow = createNarrow();
   const [dismissedPopupFailures, setDismissedPopupFailures] = createSignal<ReadonlySet<string>>(new Set());
   const popupFailure = () => props.activeTab?.popupFailure;

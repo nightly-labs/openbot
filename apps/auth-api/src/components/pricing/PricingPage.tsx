@@ -9,6 +9,7 @@ import { PRICING_ROUTE, type PricingOffer } from "../../lib/pricing-page";
 import { LandingFooter } from "../landing/LandingFooter";
 import { LandingGlow } from "../landing/LandingGlow";
 import { SiteHeader } from "../landing/SiteHeader";
+import { useSitePath } from "../landing/SiteText";
 import { ButtonLink } from "../ui/button";
 import type { PricingPageText } from "./pricing-page-text";
 import "./PricingPage.css";
@@ -68,8 +69,9 @@ function OrderAction(props: { order: Accessor<OrderFormOrder> }) {
 /** A team larger than the license allows talks to us about the price. */
 function ContactAction() {
   const { t } = useText();
+  const path = useSitePath();
   return (
-    <ButtonLink to="/contact" variant="primary" size="md" icon="contact" class="pricing-cta">
+    <ButtonLink to={path("/contact")} variant="primary" size="md" icon="contact" class="pricing-cta">
       {t("billing.license.contact.action")}
     </ButtonLink>
   );
@@ -85,6 +87,8 @@ export function PricingPage(props: {
     server: FIRST_SERVER,
     license: FIRST_LICENSE,
   });
+
+  const path = useSitePath();
 
   onSettled(() => landingAnalytics.start(document, window.location.hostname, PRICING_ROUTE));
 
@@ -143,7 +147,7 @@ export function PricingPage(props: {
               <h2 id="pricing-enterprise">{props.text.enterprise.title}</h2>
               <p class="pricing-enterprise-body">{props.text.enterprise.body}</p>
             </div>
-            <ButtonLink to="/contact" variant="primary" size="md" icon="contact">
+            <ButtonLink to={path("/contact")} variant="primary" size="md" icon="contact">
               {props.text.enterprise.contact}
             </ButtonLink>
           </section>

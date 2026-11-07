@@ -2,7 +2,7 @@ import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import type { ConversationMessageSender, MessageReaction } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 import { Button } from "@openbot/ui";
-import type { AgentMessage, ChatActionMarkerModel } from "@openbot/ui/data";
+import type { AgentMessage, ChatActionMarkerModel, MessageKind } from "@openbot/ui/data";
 import { ChannelActivityIndicator } from "@openbot/ui/features/channels/ChannelActivityIndicator";
 import { AgentActivityIndicator } from "@openbot/ui/features/conversation/AgentActivity";
 import { AgentChatEmptyState } from "@openbot/ui/features/conversation/AgentChatEmptyState";
@@ -21,9 +21,11 @@ import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-marke
 import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { ReplyReturnButton, ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
 import { DeleteMessageDialog, MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
+import { countableTimelineMessage } from "@openbot/ui/features/conversation/new-message-tally";
 import { PendingSendStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
 import { SubagentDock, SubagentGroup } from "@openbot/ui/features/conversation/Subagents";
 import { TaskList } from "@openbot/ui/features/conversation/TaskList";
+import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { UnreadMessagesBanner, UnreadMessagesDivider } from "@openbot/ui/features/conversation/UnreadMessages";
 import { VoicePlayer } from "@openbot/ui/features/conversation/VoicePlayer";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
@@ -49,6 +51,7 @@ import { groupedMessageIds } from "./agent-message-timeline";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
 import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
 import { continuesSenderRun } from "./chat-grouping";
+import { chatSearchCanOpen, chatSearchOpensMessage } from "./chat-search";
 import { isChatVisualAppShortcut } from "./chat-visual-shortcuts";
 import { chatVisualPageUrl } from "./chat-visual-url";
 import { isIncomingAgentMessage } from "./conversation-read-state";
@@ -93,6 +96,7 @@ function rowDrawsTime(message: AgentMessage): boolean {
     message.kind !== "plan" &&
     message.kind !== "subagents" &&
     message.kind !== "memory-changes" &&
+    message.kind !== "thinking" &&
     chatVisualReply(message) === null
   );
 }
@@ -112,6 +116,9 @@ function routineMarkerAvailable(
   return availableRoutineIds?.includes(marker.routineId) === true;
 }
 
+/** The message kinds that can be the reply on a rail card. */
+const REPLY_KINDS: ReadonlySet<MessageKind> = new Set(["text", "question"]);
+
 /** @internal Stable HMR boundary for conversation timeline. */
 export function ConversationTimeline() {
   const {
@@ -128,6 +135,7 @@ export function ConversationTimeline() {
     closeChatSearch,
     composerHasContent,
     copiedMessageId,
+    quotedMessageId,
     branchThread,
     dismissPendingSend,
     downloadMessageImageFile,
@@ -412,7 +420,13 @@ export function ConversationTimeline() {
             agents={props.agents}
             referencedMessage={quoted()}
             referencedAuthorName={quotedAuthorName()}
-            onSelectAgent={props.onSelectAgent}
+            // The sender's name opens the side thread that sent the message, or else the sender's own chat.
+            // Another agent, such as a mention in the text, opens as before.
+            onSelectAgent={(agentId) =>
+              agentId === current().exchange?.senderAgentId
+                ? props.onSelectAgent(agentId, current().exchange?.senderTaskId ?? MAIN_THREAD_ID)
+                : props.onSelectAgent(agentId)
+            }
             onOpenLink={(url) => void openExternalMessageUrl(url)}
             onPreview={(attachment) => void previewAttachment(attachment)}
             onAttachmentAction={attachmentAction}
@@ -553,6 +567,10 @@ export function ConversationTimeline() {
     // In a shared chat, a message from another member is theirs.
     question: (message) =>
       message.author === "you" && !message.actionMarker && !otherSender(message) ? message.body : undefined,
+    // The first answer the reader would call a message, or a question the agent asks: not thinking, a plan,
+    // a tool exchange, an error or a quiet run.
+    reply: (message) =>
+      countableTimelineMessage(message) && REPLY_KINDS.has(message.kind ?? "text") ? message.body : undefined,
     storedCount: () => props.messages.length,
     unloaded: () => props.unloadedHistory,
     virtualizer: messageVirtualizer,
@@ -1120,8 +1138,8 @@ export function ConversationTimeline() {
                     </div>
                   );
                 }
-                if (untrack(() => initialMessage.kind === "memory-changes")) {
-                  // Only a turn with no answer gets this row: an answer shows the changes in its steps.
+                if (untrack(() => initialMessage.kind === "memory-changes" || initialMessage.kind === "thinking")) {
+                  // Only a finished turn with no answer gets this row: an answer shows the steps above it.
                   return (
                     <div
                       data-index={virtualRow.index}
@@ -1320,6 +1338,10 @@ export function ConversationTimeline() {
                           <ChatMessageRow
                             message={message() ?? initialMessage}
                             author={author()}
+                            showFull={
+                              chatSearchOpen() && chatSearchOpensMessage(message()?.body ?? "", chatSearchQuery())
+                            }
+                            open={quotedMessageId() === message()?.id && chatSearchCanOpen(message()?.body ?? "")}
                             showAuthor={
                               author().kind === "member" || (channel && author().kind === "agent")
                                 ? !continuesRun()

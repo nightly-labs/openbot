@@ -263,7 +263,9 @@ const historySchema = z
   .max(DISCORD_LIST_MESSAGES_LIMIT);
 
 const BUTTON_STYLES = { primary: 1, secondary: 2, success: 3, danger: 4 } as const;
-// No post can ping anyone: not a user, a role, `@everyone`, or the author of the replied message.
+// A new post can ping a user that it mentions, but not a role, `@everyone`, or the author of the
+// replied message. Discord sends no ping for an edit.
+const USER_MENTIONS = { parse: ["users"], replied_user: false };
 const NO_MENTIONS = { parse: [], replied_user: false };
 
 function failure(status: number, code: DiscordApiErrorCode, retryAfterMs?: number): DiscordApiFailure {
@@ -337,7 +339,7 @@ export function makeDiscordApi(transport: DiscordTransport, state: DiscordState)
           route: `/channels/${request.channelId}/messages`,
           body: {
             content: request.content,
-            allowed_mentions: NO_MENTIONS,
+            allowed_mentions: USER_MENTIONS,
             ...messageReference(request.replyTo),
             components: components(request.buttons),
           },

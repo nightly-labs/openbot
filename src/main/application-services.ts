@@ -10,6 +10,7 @@ import { AgentApiKeys } from "../backend/agent-api-keys";
 import { AgentDatabaseSupervisor } from "../backend/agent-data/agent-database-supervisor";
 import { AgentTables } from "../backend/agent-data/agent-tables";
 import { AgentRoutineStore } from "../backend/agent-routine-store";
+import { diskRestoreEnded, diskRestoring } from "../backend/disk-restore";
 import { DiscordConnectFailed, toDiscordConnectFailed } from "../backend/messaging/discord/discord-connect";
 import { SlackConnectFailed, toSlackConnectFailed } from "../backend/messaging/slack/slack-connect";
 import { routineFlowRoutines } from "../backend/routine-flows/routine-flow-routines";
@@ -405,7 +406,7 @@ const ROUTINE_FEED_FILE = "openbot-routine-feed-v1.json";
 const LEGACY_APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v1.json";
 const LANGUAGE_PREFERENCE_FILE = "openbot-language-preference-v1.json";
 const LOGO_COLOR_PREFERENCE_FILE = "openbot-logo-color-preference-v1.json";
-const APPEARANCE_PREFERENCE_FILE = "openbot-appearance-preference-v1.json";
+export const APPEARANCE_PREFERENCE_FILE = "openbot-appearance-preference-v1.json";
 const INTERFACE_SIZE_PREFERENCE_FILE = "openbot-interface-size-preference-v1.json";
 const NOTIFICATION_PREFERENCE_FILE = "openbot-notification-preference-v1.json";
 const PUSH_NOTIFICATION_FILE = "openbot-push-notifications-v1.json";
@@ -1450,8 +1451,15 @@ export async function createApplicationServices({
         .pipe(Effect.asVoid, toProviderRuntimeFailure);
     },
   });
+  // A hosted server waits for its disk restore before its first update check; the stop ends the wait.
+  let updateCheckWait: Fiber.Fiber<void> | null = null;
   teardown.push(TEARDOWN_ORDER.providerRuntimes, "the provider runtimes", () =>
-    runCauseEffect(providerRuntimes.stop()),
+    runCauseEffect(
+      Effect.gen(function* () {
+        if (updateCheckWait) yield* Fiber.interrupt(updateCheckWait);
+        yield* providerRuntimes.stop();
+      }),
+    ),
   );
   // Before `new AgentService`, which reads every `executablePath` eagerly.
   await runCauseEffect(providerRuntimes.initialize());
@@ -2325,7 +2333,17 @@ export async function createApplicationServices({
   providerRuntimes.on("status", forwardProviderRuntimeStatus);
   // After the status forward, so the offer a check finds reaches the renderer.
   const appUpgraded = providerCliAppVersion.get().appVersion !== app.getVersion();
-  providerRuntimes.startUpdateChecks({ updateInstalled: appUpgraded });
+  // A hosted server checks after its disk restore: the check reads and removes CLI versions, and the
+  // start of the server waits for its own files first.
+  if (diskRestoring()) {
+    updateCheckWait = Effect.runFork(
+      diskRestoreEnded.pipe(
+        Effect.andThen(Effect.sync(() => providerRuntimes.startUpdateChecks({ updateInstalled: appUpgraded }))),
+      ),
+    );
+  } else {
+    providerRuntimes.startUpdateChecks({ updateInstalled: appUpgraded });
+  }
   if (appUpgraded)
     void runCauseEffect(providerCliAppVersion.set({ appVersion: app.getVersion() })).catch((error) =>
       logger.warn("The provider CLI app version did not save.", toLogValue(error)),
@@ -3544,10 +3562,14 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.updater, "the update service", () => Effect.runPromise(updater.stop()));
   const agentInitialization = new AgentInitializationGate((rosterLoaded) =>
     Effect.gen(function* () {
-      yield* Fiber.join(computerUseWarmUp);
-      yield* service.initialize({ heldRoutines: takeRoutineHold(routineHoldFile, (message) => logger.warn(message)) });
-      // A client's agent list waits only until here. The steps below do not change the roster.
-      yield* rosterLoaded;
+      // A client's agent list waits only until the agents are restored, not for the provider starts.
+      // The providers start after the computer-use warm-up: it decides whether the MCP entry is
+      // there, and a session made while it still probes would keep a command that it can stop.
+      yield* service.initialize({
+        heldRoutines: takeRoutineHold(routineHoldFile, (message) => logger.warn(message)),
+        rosterLoaded,
+        beforeProviderStart: Fiber.join(computerUseWarmUp).pipe(Effect.asVoid),
+      });
       yield* eventsRuntime.start();
       yield* automation.sync();
       // Picks up the flows a restart stopped between one agent's answer and the next agent's message.
@@ -3695,7 +3717,7 @@ export async function createApplicationServices({
           if (auth.status === "error" && auth.issue.code === "auth_api_unavailable")
             yield* centralAuth.retry().pipe(toRemoteWorkflowError);
           if (centralAuth.getState().status !== "signed_in") return;
-          return yield* host.start();
+          return yield* host.start(true);
         }),
       onError: (message, error) => logger.warn(message, toLogValue(error)),
     });
@@ -3724,8 +3746,10 @@ export async function createApplicationServices({
       hostPhase: () => host.getStatus().phase,
       startHost: () =>
         Effect.gen(function* () {
+          // The owner removed this server. It stays private until a sign-in or another publish (#5273).
+          if (host.getStatus().message === sourceText("status.host.removed")) return;
           if (centralAuth.getState().status === "error") yield* centralAuth.retry().pipe(toRemoteWorkflowError);
-          yield* serverMode.publish();
+          yield* serverMode.publish(true);
         }),
       onError: (message, error) => logger.warn(message, toLogValue(error)),
     });

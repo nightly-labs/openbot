@@ -23,9 +23,11 @@ import {
   AGENT_PROVIDERS,
   accountUsageCoversModel,
   agentProviderDescriptor,
+  COMPUTER_USE_MCP_SERVER_ID,
   CUSTOM_AGENT_DEFAULT_MODEL,
   CUSTOM_AGENT_LIMITS,
   DEFAULT_PROVIDER_ACCOUNT_ID,
+  GITHUB_CONNECTOR_MCP_SERVER_ID,
   isAgentProvider,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
@@ -47,6 +49,7 @@ import {
   resolveInstalledFirst,
 } from "./../cli";
 import { readCursorUsage } from "./../cursor-usage";
+import { DISK_RESTORE_WAIT_MS, diskRestoring, providerCheckTimeoutMs } from "../disk-restore";
 import { causeHelpers } from "../effect-boundary";
 import { isPythonKimiCli, type SignInRegion } from "../kimi-region";
 import { readKimiUsage } from "../kimi-usage";
@@ -96,6 +99,7 @@ import {
   isGitSpawnDiagnostic,
   isGlogBelowErrorDiagnostic,
   isIgnoredConfigDiagnostic,
+  isMcpSignInDiagnostic,
   isMcpSubsystemDiagnostic,
   isRustLogBelowErrorDiagnostic,
   isTelemetryExportDiagnostic,
@@ -450,6 +454,8 @@ export class ProviderRuntime implements ProviderPort {
    */
   readonly #lastErrors = new Map<AgentProvider, { message: string; at: number; serial: number }>();
   #errorSerial = 0;
+  /** The MCP server failures shown in this run, by provider, server and kind. */
+  readonly #reportedMcpFailures = new Set<string>();
   /** The last usage each provider reported, shown for a released provider instead of starting it. */
   readonly #lastUsage = new Map<AgentProvider, AccountUsage["limits"][number]>();
   /**
@@ -3511,7 +3517,7 @@ export class ProviderRuntime implements ProviderPort {
           stage = "account";
           stageStartedAt = performance.now();
           const account = yield* candidate
-            .request("account/read", { refreshToken: false }, decodeAccountReadResult, 5_000)
+            .request("account/read", { refreshToken: false }, decodeAccountReadResult, providerCheckTimeoutMs(5_000))
             .pipe(toProviderOperationFailed);
           if (!account.account) {
             const message = this.#signInRequiredMessage(provider);
@@ -3719,7 +3725,8 @@ export class ProviderRuntime implements ProviderPort {
       // what it sent, so an API key or an inherited credential is in the line that is about to be
       // logged or turned into a renderer error event. Shortened after that, because a value cut in
       // half is a value the redactor does not match.
-      const message = shortenDiagnostic(this.#redactMcp(raw));
+      const redacted = this.#redactMcp(raw);
+      const message = shortenDiagnostic(redacted);
       // An agent that tears down its sessions while OpenBot stops it (idle release, restart, quit)
       // can write an error for each one. It is not a failure the user can act on, so it goes to the log.
       if (origin?.duringStop) {
@@ -3729,18 +3736,16 @@ export class ProviderRuntime implements ProviderPort {
         });
         return;
       }
-      // Also the name a provider was given. One with no letter or digit, such as `__`, would match
-      // every `mcp__server__tool` line.
-      const names = new Set(
-        [...this.#credentials.mcpServers().map((config) => config.name), ...this.#mcpHandoff.names()].flatMap(
-          (name) => {
-            const given = providerMcpServerName(name);
-            return /[A-Za-z0-9]/u.test(given) ? [name, given] : [name];
-          },
-        ),
-      );
-      if (isMcpSubsystemDiagnostic(message, [...names])) {
-        stderrLogger.warn("A provider reported an MCP server failure.", { provider: client.provider, message });
+      // A failed tool call names its server too, but is not a server that did not start. A built-in
+      // server is not in the MCP settings, and its failure stays the provider's error, as before.
+      const mcpServer =
+        isMcpSubsystemDiagnostic(message) && !isToolCallDiagnostic(message)
+          ? this.#configuredMcpServerIn(redacted)
+          : undefined;
+      if (mcpServer !== undefined && !mcpServer?.builtIn) {
+        const server = mcpServer?.name ?? null;
+        stderrLogger.warn("A provider reported an MCP server failure.", { provider: client.provider, server, message });
+        if (server) this.#reportMcpServerFailure(client.provider, server, redacted);
         return;
       }
       if (isTelemetryExportDiagnostic(message)) {
@@ -3927,10 +3932,12 @@ export class ProviderRuntime implements ProviderPort {
    * The `initialize` wait of a start that has no wait of its own. Codex gets the long wait on each
    * start path: its first start after a restore can read its state database for longer than the
    * request timeout, and a stop in that step holds the database for 15 minutes, so each start in that
-   * time fails (#4995).
+   * time fails (#4995). While the disk of a hosted server is restored, the other CLIs wait longer too:
+   * their files arrive over the network on first read, and a start in the request timeout failed.
    */
   #defaultStartTimeoutMs(provider: AgentProvider): number | undefined {
-    return provider === "codex" ? this.#longStartTimeoutMs : undefined;
+    if (provider === "codex") return this.#longStartTimeoutMs;
+    return diskRestoring() ? Math.max(this.#requestTimeoutMs, DISK_RESTORE_WAIT_MS) : undefined;
   }
 
   /**
@@ -4054,6 +4061,63 @@ export class ProviderRuntime implements ProviderPort {
     }
     this.#emitError(`${provider}_${kind}`, error, agentId, context);
     this.#setStatus({});
+  }
+
+  /**
+   * The MCP server from this app's list that a provider's MCP line is about, or null for a server
+   * from the user's own provider files, which goes to the log only. The line is read whole, before
+   * it is shortened, because a long line can quote the URL near its end.
+   *
+   * A line can name the server by its URL rather than its name: Grok's `rmcp` worker quotes only the
+   * OAuth metadata address, `https://<host>/.well-known/oauth-protected-resource/<path>`, so the host
+   * is what the two forms share, and the longest path that matches picks between two servers on one
+   * host. The URL is read first. The host counts only as a whole URL authority, so `example.com` is
+   * not in `mcp.example.com` and `localhost:3000` is not in `localhost:30001`. A name counts only as
+   * a whole word, so `git` is not in `github`; a name the provider was given counts too, and one with
+   * no letter or digit, such as `__`, would match every `mcp__server__tool` line.
+   */
+  #configuredMcpServerIn(message: string): { name: string; builtIn: boolean } | null {
+    const configs = this.#credentials.mcpServers();
+    const builtIn = (id: string) => id === COMPUTER_USE_MCP_SERVER_ID || id === GITHUB_CONNECTOR_MCP_SERVER_ID;
+    const bounded = (text: string, before: string, after: string) =>
+      new RegExp(`${before}${RegExp.escape(text)}${after}`, "u").test(message);
+    const byHost = configs
+      .flatMap((config) => {
+        const url = config.transport === "http" ? URL.parse(config.url) : null;
+        return url?.host && bounded(url.host, "(?<=//|@)", "(?![\\w.-])") ? [{ config, path: url.pathname }] : [];
+      })
+      .sort((a, b) => b.path.length - a.path.length);
+    const byUrl = byHost.find((row) => row.path !== "/" && message.includes(row.path)) ?? byHost[0];
+    if (byUrl) return { name: byUrl.config.name, builtIn: builtIn(byUrl.config.id) };
+    const word = (text: string) => bounded(text, "(?<![\\w-])", "(?![\\w-])");
+    const named = (name: string) => {
+      const given = providerMcpServerName(name);
+      return (name !== "" && word(name)) || (/[A-Za-z0-9]/u.test(given) && word(given));
+    };
+    const config = configs.find((row) => named(row.name));
+    if (config) return { name: config.name, builtIn: builtIn(config.id) };
+    const handedOff = this.#mcpHandoff.names().find(named);
+    return handedOff ? { name: handedOff, builtIn: false } : null;
+  }
+
+  /**
+   * Shows that a provider could not use an MCP server from this app's list, once for each server and
+   * kind in this run: a server spawns for each session, so the same line arrives at every start. The
+   * provider works without the server, so its row keeps no error, and the toast sends the user to
+   * the MCP settings, where Sign in and Test connection give the cause.
+   */
+  #reportMcpServerFailure(provider: AgentProvider, server: string, message: string): void {
+    const signIn = isMcpSignInDiagnostic(message);
+    const key = [provider, server, signIn].join("\u0000");
+    if (this.#reportedMcpFailures.has(key)) return;
+    this.#reportedMcpFailures.add(key);
+    this.#emitError(
+      "mcp_server_not_started",
+      sourceText(signIn ? "error.backend.mcpServerSignInForProvider" : "error.backend.mcpServerFailedForProvider", {
+        provider: providerLabel(provider),
+        name: server,
+      }),
+    );
   }
 
   #recordProviderError(provider: AgentProvider, error: unknown): void {

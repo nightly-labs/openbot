@@ -187,6 +187,13 @@ function openbotClaudeClient(onApiKey: boolean) {
   return onApiKey ? OPENBOT_CLAUDE_API_KEY_CLIENT : OPENBOT_CLAUDE_CLIENT;
 }
 
+/**
+ * The name of a new Claude session. Without one, the CLI sends an extra model request at the first
+ * prompt to make a title (about 1.2k input tokens) that OpenBot never shows. Only a new session gets
+ * it: the CLI does not name a resumed session, and a title on resume would rename an older session.
+ */
+const CLAUDE_SESSION_TITLE = "OpenBot";
+
 interface ClientEvents {
   notification: [notification: AppServerNotification];
   request: [request: AppServerRequest];
@@ -297,6 +304,9 @@ interface ThreadRuntime {
   /** The `--mcp-config` file of this query until the CLI has read it. See `writeClaudeMcpConfig`. */
   mcpConfigFile: string | null;
 }
+
+/** The limit of `claude auth status` when the caller names none. */
+const AUTH_STATUS_TIMEOUT_MS = 5_000;
 
 /**
  * How long a thread with no turn keeps its `claude` process. Each process holds hundreds of MB with
@@ -558,7 +568,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       case "initialize":
         return yield* providerSync(() => decoder({}));
       case "account/read": {
-        const response = yield* this.#readAccountEffect();
+        const response = yield* this.#readAccountEffect(timeoutMs);
         return yield* providerSync(() => decoder(response));
       }
       case "account/rateLimits/read": {
@@ -761,10 +771,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
 
   readonly #readAccountEffect = Effect.fn("ClaudeAgentClient.readAccount")(function* (
     this: ClaudeAgentClient,
+    timeoutMs = AUTH_STATUS_TIMEOUT_MS,
   ): Effect.fn.Return<AccountReadResult, ProviderClientOperationError> {
-    let status = yield* this.#readAuthStatusEffect(false);
+    let status = yield* this.#readAuthStatusEffect(false, timeoutMs);
     const onApiKey = status.loggedIn !== true && Boolean(this.#fallbackApiKey?.());
-    if (onApiKey) status = yield* this.#readAuthStatusEffect(true);
+    if (onApiKey) status = yield* this.#readAuthStatusEffect(true, timeoutMs);
     this.#onApiKey = onApiKey && status.loggedIn === true;
     this.#accountRead = true;
     if (status.loggedIn !== true) return { account: null, requiresOpenaiAuth: false };
@@ -801,6 +812,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #readAuthStatusEffect = Effect.fn("ClaudeAgentClient.readAuthStatus")(function* (
     this: ClaudeAgentClient,
     withApiKey: boolean,
+    timeoutMs: number,
   ): Effect.fn.Return<DynamicRecord, ProviderClientOperationError> {
     if (!withApiKey) {
       const stored = yield* readClaudeStoredSignIn({ ...claudeEnvironment(this.#cli), ...this.#environment(false) });
@@ -817,7 +829,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         yield* Effect.result(
           providerCall(() =>
             execFileAsync(target.command, target.args, {
-              timeout: 5_000,
+              timeout: timeoutMs,
               maxBuffer: 64 * 1024,
               windowsVerbatimArguments: target.windowsVerbatimArguments,
               // The agent environment carries the account's `CLAUDE_CONFIG_DIR`, so this reads that account.
@@ -1011,7 +1023,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           ...this.#sdkLaunch,
           ...(config.model ? { model: this.#sdkModel(config.model) } : {}),
           ...(appliedEffort ? { effort: appliedEffort } : {}),
-          ...(resume ? { resume: threadId } : { sessionId: threadId }),
+          ...(resume ? { resume: threadId } : { sessionId: threadId, title: CLAUDE_SESSION_TITLE }),
           systemPrompt: {
             type: "preset",
             preset: "claude_code",

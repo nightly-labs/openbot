@@ -246,6 +246,16 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Make a Higgsfield product photo of a ceramic mug on a wooden table.",
   "marketplace.plugin.higgsfield.prompt.clip": "Make a 5-second Higgsfield video of waves at sunset.",
+  "marketplace.plugin.elevenlabs.tagline": "Speech, voices and voice agents",
+  "marketplace.plugin.elevenlabs.description":
+    "ElevenLabs lets agents turn text into speech, work with voices, and create, test and review ElevenLabs voice agents and their conversations. Generated audio comes back as a short-lived download link. Each user signs in to their own ElevenLabs account through the browser, and each generation uses credits of that account.",
+  "marketplace.plugin.elevenlabs.app":
+    "Text to speech, voices, and voice agent management, over ElevenLabs' MCP server with browser sign-in.",
+  "marketplace.plugin.elevenlabs.prompt.speech":
+    "Read this paragraph aloud with a calm ElevenLabs voice and give me the audio.",
+  "marketplace.plugin.elevenlabs.prompt.agents": "List my ElevenLabs voice agents and the voice each one uses.",
+  "marketplace.plugin.elevenlabs.prompt.conversations":
+    "Summarize the last ten conversations of my support voice agent.",
   "marketplace.plugin.appleApps.tagline": "Mail, Calendar and more on your Mac",
   "marketplace.plugin.appleApps.description":
     "Apple apps lets agents use Mail, Calendar, Contacts, Reminders, Notes, Messages and Safari on this Mac. It works on macOS only. OpenBot starts mcp-icloud, a community server that is not made by Apple or OpenBot. The server controls the apps through AppleScript, on this computer, and needs no account and no key. When you install it, OpenBot can ask macOS for access to all of these apps at once, with one prompt for each app. If you do not, macOS asks the first time an agent uses an app. To change this later, open System Settings › Privacy & Security › Automation. Agents can send email and iMessages, and change or delete events, contacts and reminders, so review each write before you approve it. What the tools read, such as email text, goes to the model provider of the agent.",
@@ -263,6 +273,14 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.sentry.prompt.newErrors": "What new errors appeared since yesterday's deploy?",
   "marketplace.plugin.sentry.prompt.topCrash": "Explain the top crash in the mobile project and its likely cause.",
   "marketplace.plugin.sentry.prompt.releaseHealth": "How healthy is the current release compared to the last one?",
+  "marketplace.plugin.gitlab.tagline": "Issues, merge requests and pipelines",
+  "marketplace.plugin.gitlab.description":
+    "GitLab lets agents search projects, read and create issues, review and update merge requests, read repository files and commits, and check CI pipelines and jobs on GitLab.com. Each user signs in to their own GitLab account through the browser. Agents get the same permissions as the user: they can push commits, change issues and merge requests, and merge them. For a self-hosted GitLab, add an MCP server with your GitLab address followed by /api/v4/mcp in the MCP servers settings, and sign in there.",
+  "marketplace.plugin.gitlab.app":
+    "Projects, issues, merge requests, repositories and CI pipelines, over GitLab's MCP server with browser sign-in.",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "Which merge requests wait for my review?",
+  "marketplace.plugin.gitlab.prompt.failedPipeline": "Why did the last pipeline on the default branch fail?",
+  "marketplace.plugin.gitlab.prompt.newIssue": "File an issue for the crash in the sync queue with reproduction steps.",
   "marketplace.plugin.vercel.tagline": "Deployments, build logs and projects",
   "marketplace.plugin.vercel.description":
     "Vercel lets agents list projects and recent deployments, read build and runtime logs, and find why a build failed. Each user signs in to their own Vercel account through the browser and chooses the teams that agents can use. In those teams, agents get the same rights as the user's account. They can also change environment variables, domains, DNS records and deployments, and buy domains.",
@@ -363,6 +381,16 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.resend.prompt.send": "Send the launch announcement draft to the beta list.",
   "marketplace.plugin.resend.prompt.status": "Did the invoice email reach the customer?",
   "marketplace.plugin.resend.prompt.template": "Draft a password-reset email for the new flow.",
+  "marketplace.plugin.omnisend.tagline": "Email and SMS marketing",
+  "marketplace.plugin.omnisend.description":
+    "Omnisend lets agents read campaign and form reports, find contacts and segments, and create and edit campaigns, automations, email templates, forms and products. Each user signs in to their own Omnisend account through the browser and selects the access level on the consent screen. With write access, agents can also send campaigns and delete data. Select read-only access when agents only need reports.",
+  "marketplace.plugin.omnisend.app":
+    "Campaigns, automations, contacts, segments, forms and reports, over Omnisend's MCP server with browser sign-in.",
+  "marketplace.plugin.omnisend.prompt.lastCampaign":
+    "How did last week's campaigns perform compared to the week before?",
+  "marketplace.plugin.omnisend.prompt.segment":
+    "How many contacts are in the VIP segment, and how did it change this month?",
+  "marketplace.plugin.omnisend.prompt.draftCampaign": "Draft a campaign for the new collection, but do not send it.",
   "marketplace.plugin.composio.tagline": "Many apps through your own Composio link",
   "marketplace.plugin.composio.description":
     "Composio connects agents to Gmail, Slack, GitHub, and hundreds of other apps through one MCP server. Connect the apps you want in your Composio account, then paste its MCP URL and API key here.",

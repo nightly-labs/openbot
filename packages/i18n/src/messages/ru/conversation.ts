@@ -84,6 +84,7 @@ export const messages = {
   },
   "conversation.threads.view.label": "Ветка {title}",
   "conversation.threads.view.startedByAgent": "{name} начал эту ветку.",
+  "conversation.threads.view.loadOlder": "Загрузить прежние сообщения",
   "conversation.threads.branch.from": "Ответвление от: {title}",
   "conversation.threads.branch.fromDeleted": "Ответвление от удалённой ветки",
   "conversation.threads.view.newPlaceholder": "Новая ветка с {name}",

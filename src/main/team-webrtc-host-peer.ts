@@ -9,6 +9,7 @@ import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "@openbot/contracts/team-protoco
 import { browserViewStreamSessionId } from "@openbot/contracts/team-protocol/browser-view-v1";
 import {
   BROWSER_SIGN_IN_CAPABILITY,
+  CHANNEL_ISOLATION_CAPABILITY,
   isAgentProfileRoute,
   supportsTeamSemanticTags,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
@@ -704,7 +705,12 @@ export class TeamWebRtcHostPeer {
           : input.body === null
             ? undefined
             : yield* remoteDecode(() => {
-                if (sideRoute) return JSON.stringify(sideRoute.request(input.path, input.body));
+                if (sideRoute)
+                  return JSON.stringify(
+                    sideRoute.request(input.path, input.body, {
+                      channelIsolation: peerCapabilities.has(CHANNEL_ISOLATION_CAPABILITY),
+                    }),
+                  );
                 const decoded = decodeRequest(input.method, input.path, input.body, {
                   preserveSemanticTags,
                   agentCreateModel: peerCapabilities.has(TEAM_AGENT_CREATE_MODEL_CAPABILITY),
@@ -778,6 +784,7 @@ export class TeamWebRtcHostPeer {
             preserveSemanticTags,
             historyExtent: peerCapabilities.has(TEAM_HISTORY_EXTENT_CAPABILITY),
             channelAttention: peerCapabilities.has(TEAM_CHANNEL_ATTENTION_CAPABILITY),
+            channelIsolation: peerCapabilities.has(CHANNEL_ISOLATION_CAPABILITY),
             agentTaskUiBlocks: peerCapabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
             uiBlocks: peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
             subagents: peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
