@@ -2,9 +2,10 @@
 // Then it installs the newest release of each provider that it can run with no account, and runs the
 // conformance cases on it: model list, turn, cancel and a turn after it, resume in a new process, and a
 // missing session. OpenCode uses a fake model on loopback: the shared free OpenCode models have a
-// usage limit that the runners of all GitHub users reach, so a turn on them fails for no CLI fault. A CLI release reaches users within an hour of
-// its publication, so a scheduled run finds a broken release before many users install it. Add the
-// version to `provider-runtime-blocklist.json` to stop the offer.
+// usage limit that the runners of all GitHub users reach, so a turn on them fails for no CLI fault.
+// A CLI release reaches users within an hour of its publication, so a scheduled run finds a broken
+// release before many users install it. Add the version to `provider-runtime-blocklist.json` to stop
+// the offer.
 // The run uses a new home folder, so it never reads the account of the person who runs it.
 // `bun run test:provider-cli-canary [-- opencode]`. Writes .openbot-build/provider-cli-canary/report.json.
 import assert from "node:assert/strict";
@@ -134,7 +135,7 @@ function answerFakeModel(request: IncomingMessage, response: ServerResponse, bod
     response.writeHead(404).end();
     return;
   }
-  const chunk = (delta: unknown, finish: string | null) =>
+  const chunk = (delta: { readonly role?: "assistant"; readonly content?: string }, finish: string | null) =>
     `data: ${JSON.stringify({ id: "canary", object: "chat.completion.chunk", created: 0, model: "fake", choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`;
   const end = () => {
     response.write(chunk({}, "stop"));
