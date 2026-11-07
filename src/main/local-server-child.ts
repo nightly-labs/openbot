@@ -42,7 +42,7 @@ export const LOCAL_SERVER_MEMBERS_REQUEST = "OPENBOT_LOCAL_SERVER_REQUEST member
 /** How long a read of the account directory waits for the parent's answer. */
 const LOCAL_SERVER_MEMBERS_TIMEOUT_MS = 30_000;
 /** The prefix of a stdout line that asks the parent for a Marketplace read. It holds no secret. */
-export const LOCAL_SERVER_MARKETPLACE_REQUEST_PREFIX = "OPENBOT_LOCAL_SERVER_REQUEST marketplace ";
+const LOCAL_SERVER_MARKETPLACE_REQUEST_PREFIX = "OPENBOT_LOCAL_SERVER_REQUEST marketplace ";
 /** How long a Marketplace read waits for the parent's answer: longer than the parent's 30 s download limit. */
 const LOCAL_SERVER_MARKETPLACE_TIMEOUT_MS = 60_000;
 
