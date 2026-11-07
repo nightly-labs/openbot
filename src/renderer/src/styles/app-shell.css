@@ -2331,6 +2331,24 @@ textarea {
   border-color: var(--openbot-bg-control);
 }
 
+/* In the light theme, a surface card on the light sidebar is hard to see (issue 4715), so the selected
+   row has an ink fill, and keeps it on hover. The dark theme keeps the card, and so does the first
+   agent button, which is the only row and needs its hover fill. The sidebar holds the colour,
+   because the ring filter of the channel faces reads it there (`SidebarFrame`). */
+:root[data-openbot-color-scheme="light"] .sidebar {
+  --sidebar-row-selected: color-mix(in srgb, var(--openbot-text-primary) 10%, var(--openbot-bg-sidebar));
+}
+
+:root[data-openbot-color-scheme="light"] .sidebar .agent-row.agent-row-active:not(.sidebar-first-agent-action) {
+  --agent-avatar-outline: var(--sidebar-row-selected);
+
+  background: var(--sidebar-row-selected);
+}
+
+:root[data-openbot-color-scheme="light"] .sidebar .agent-row-active .agent-row-agent-status {
+  border-color: var(--sidebar-row-selected);
+}
+
 /* The working badge, with its felt balls, is in `@openbot/ui/features/sidebar/sidebar-working-badge.css`. */
 
 /* The unread count, the failed routine mark and the badge of an agent that waits for the user are
