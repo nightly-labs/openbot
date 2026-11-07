@@ -551,7 +551,11 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       setDraft((latest) => (latest && latest.id === current.id ? { ...latest, id: saved.id } : latest));
       if (draft()?.id === current.id) draftBase = saved;
       const destinationSaved = await saveDestination(saved.id, current.destination);
-      if (draftRevision === savingRevision && destinationSaved) setDirty(false);
+      // A remote host can keep the new routine but not its place. The editor keeps the change, so Save
+      // tries again.
+      const placeSaved = !props.port.runIn || saved.runIn === current.runIn;
+      if (!placeSaved) setError(t("routine.settings.runInSaveFailed"));
+      if (draftRevision === savingRevision && destinationSaved && placeSaved) setDirty(false);
       if (!current.id) void loadRuns(saved.id);
       if (result.secret && draft()?.id === saved.id) {
         const secret = result.secret;
