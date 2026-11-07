@@ -69,6 +69,7 @@ export const messages = {
   "error.team.agentHideUnsupported": "Это подключение не поддерживает скрытие агентов.",
   "error.team.agentColorsUnsupported": "Это подключение не поддерживает цвета агентов.",
   "error.team.chatColorsUnsupported": "Это подключение не поддерживает цвета чата.",
+  "error.team.routineRunPlaceUnsupported": "Это подключение не может изменить, где выполняется регулярная задача.",
   "error.team.sidebarFoldersUnsupported": "Это подключение не поддерживает папки в папках.",
   "error.team.agentNotificationLevelsUnsupported":
     "Этот сервер не может хранить ваш уровень уведомлений для каждого агента. Обновите OpenBot на компьютере, где он работает.",

@@ -271,6 +271,9 @@ export type TeamApiHostedSites = Pick<HostedSiteDesktopService, "listServerSites
 /** Its presence is what `#protocolSupport` advertises `agent-hidden-v1` on. Any member can use it. */
 export type TeamApiHiddenAgents = Pick<AgentService, "listHiddenAgents" | "setAgentHidden">;
 
+/** `routine-run-place-v1`: the routine records of each agent, of every trigger kind. */
+export type TeamApiRoutineRunPlaces = Pick<AgentService["routineRecords"], "list" | "get" | "save">;
+
 /**
  * `agent-notification-levels-v1`: the level that each member chose for this server and for each agent.
  * The host keeps the levels of the owner under one key, so its desktop app and its phones read the
@@ -629,6 +632,7 @@ export interface TeamApiOptions {
   routineFlows?: TeamApiRoutineFlows;
   workflows?: TeamApiWorkflows;
   hiddenAgents?: TeamApiHiddenAgents;
+  routineRunPlaces?: TeamApiRoutineRunPlaces;
   agentNotificationLevels?: TeamApiAgentNotificationLevels;
   sidebarPins?: TeamApiSidebarPins;
   /** `agent-access-v1`: the roles that limit what a member can do with each agent. */
