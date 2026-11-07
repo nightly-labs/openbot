@@ -93,13 +93,14 @@ const answer = (message) => {
     case "turn/start": {
       // Unique across a restart, as Codex turn ids are: the service ignores the end of a turn id it saw end.
       const turnId = "turn-" + process.pid + "-" + (++turns);
-      if (!hit && JSON.stringify(params.input).includes("limit")) { hit = true; spent = true; }
-      if (JSON.stringify(params.input).includes("Exhaust")) spent = true;
+      // The user's message is the last input item. The turn context blocks in front of it have their own text.
+      const input = JSON.stringify(params.input[params.input.length - 1]);
+      if (!hit && input.includes("limit")) { hit = true; spent = true; }
+      if (input.includes("Exhaust")) spent = true;
       if (existsSync(${JSON.stringify(switchedFlag)})) { rmSync(${JSON.stringify(switchedFlag)}); spent = false; }
       appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify(params.input) + "\\n");
       // A refusal that the plan does not show, as when Codex counted a limit that ended since. Once per
       // message, also across a restart, so the retry of a released message runs.
-      const input = JSON.stringify(params.input);
       const refused = existsSync(${JSON.stringify(refusedLog)}) ? readFileSync(${JSON.stringify(refusedLog)}, "utf8").split("\\n") : [];
       const transient = input.includes("transient") && !refused.includes(input);
       if (transient) appendFileSync(${JSON.stringify(refusedLog)}, input + "\\n");
