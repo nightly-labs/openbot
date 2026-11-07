@@ -89,6 +89,7 @@ export { default as Link } from "lucide-solid/icons/link";
 export { default as Link2 } from "lucide-solid/icons/link-2";
 export { default as Link2Off } from "lucide-solid/icons/link-2-off";
 export { default as ListChecks } from "lucide-solid/icons/list-checks";
+export { default as ListTree } from "lucide-solid/icons/list-tree";
 export { default as LoaderCircle } from "lucide-solid/icons/loader-circle";
 export { default as Lock } from "lucide-solid/icons/lock";
 export { default as LockOpen } from "lucide-solid/icons/lock-open";

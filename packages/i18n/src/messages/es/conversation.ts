@@ -114,6 +114,7 @@ export const messages = {
   "conversation.sidePanel.pane.settings": "Ajustes del agente",
   "conversation.sidePanel.pane.question": "Pregunta aparte",
   "conversation.sidePanel.pane.voice": "Voz",
+  "conversation.sidePanel.pane.work": "Trabajo",
   "conversation.sidePanel.pane.subagent": "Subagente",
   "conversation.sideQuestion.emptyTitle": "Pregunta sobre este chat",
   "conversation.sideQuestion.emptyBody": "{name} lee este chat para responder. Nada de aquí vuelve al chat.",
@@ -201,4 +202,19 @@ export const messages = {
   "conversation.tasks.state.waitingApproval": "Esperando tu aprobación",
   "conversation.tasks.state.waitingAnswer": "Te espera",
   "conversation.tasks.title": "Tareas",
+  "conversation.tasks.work.failed": { one: "{count} con error", other: "{count} con error" },
+  "conversation.tasks.work.hide": {
+    one: "Ocultar la sesión de {title}",
+    other: "Ocultar las {count} sesiones de {title}",
+  },
+  "conversation.tasks.work.idle": "Nada en curso",
+  "conversation.tasks.work.mainChat": "Chat principal",
+  "conversation.tasks.work.replied": "Respondió",
+  "conversation.tasks.work.show": {
+    one: "Mostrar la sesión de {title}",
+    other: "Mostrar las {count} sesiones de {title}",
+  },
+  "conversation.tasks.work.startedBy": "Iniciado por {name}",
+  "conversation.tasks.work.title": "Trabajo de {name}",
+  "conversation.tasks.work.working": { one: "{count} trabajando", other: "{count} trabajando" },
 } as const satisfies PartialTranslation<typeof source>;

@@ -68,6 +68,7 @@ export const messages = {
   "sidebar.agentMenu.restoreTo": "{section} bölümüne geri yükle",
   "sidebar.agentMenu.openWindow": "Yeni pencerede aç",
   "sidebar.agentMenu.newThread": "Yeni mesaj dizisi",
+  "sidebar.agentMenu.showWork": "Çalışmayı göster",
   "sidebar.agentMenu.inWindow": "Kendi penceresinde açık",
   "sidebar.channelMenu.label": "Kanal işlemleri",
   "sidebar.channelMenu.edit": "Kanalı düzenle",

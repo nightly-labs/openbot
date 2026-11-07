@@ -111,6 +111,7 @@ export const messages = {
   "conversation.sidePanel.pane.settings": "エージェントの設定",
   "conversation.sidePanel.pane.question": "サイド質問",
   "conversation.sidePanel.pane.voice": "音声",
+  "conversation.sidePanel.pane.work": "作業",
   "conversation.sidePanel.pane.subagent": "サブエージェント",
   "conversation.sideQuestion.emptyTitle": "このチャットについて質問",
   "conversation.sideQuestion.emptyBody":
@@ -198,4 +199,19 @@ export const messages = {
   "conversation.tasks.state.waitingApproval": "承認を待っています",
   "conversation.tasks.state.waitingAnswer": "あなたを待っています",
   "conversation.tasks.title": "タスク",
+  "conversation.tasks.work.failed": { one: "{count} 件失敗", other: "{count} 件失敗" },
+  "conversation.tasks.work.hide": {
+    one: "{title} のセッションを非表示",
+    other: "{title} の {count} 件のセッションを非表示",
+  },
+  "conversation.tasks.work.idle": "作業中のものはありません",
+  "conversation.tasks.work.mainChat": "メインチャット",
+  "conversation.tasks.work.replied": "返信済み",
+  "conversation.tasks.work.show": {
+    one: "{title} のセッションを表示",
+    other: "{title} の {count} 件のセッションを表示",
+  },
+  "conversation.tasks.work.startedBy": "{name} が開始",
+  "conversation.tasks.work.title": "{name} の作業",
+  "conversation.tasks.work.working": { one: "{count} 件作業中", other: "{count} 件作業中" },
 } as const satisfies PartialTranslation<typeof source>;

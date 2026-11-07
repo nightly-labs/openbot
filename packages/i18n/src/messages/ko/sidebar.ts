@@ -68,6 +68,7 @@ export const messages = {
   "sidebar.agentMenu.restoreTo": "{section}(으)로 복원",
   "sidebar.agentMenu.openWindow": "새 창에서 열기",
   "sidebar.agentMenu.newThread": "새 스레드",
+  "sidebar.agentMenu.showWork": "작업 보기",
   "sidebar.agentMenu.inWindow": "별도 창에서 열기",
   "sidebar.channelMenu.label": "채널 작업",
   "sidebar.channelMenu.edit": "채널 편집",

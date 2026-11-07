@@ -112,6 +112,7 @@ export const messages = {
   "conversation.sidePanel.pane.settings": "에이전트 설정",
   "conversation.sidePanel.pane.question": "곁다리 질문",
   "conversation.sidePanel.pane.voice": "음성",
+  "conversation.sidePanel.pane.work": "작업",
   "conversation.sidePanel.pane.subagent": "하위 에이전트",
   "conversation.sideQuestion.emptyTitle": "이 채팅에 대해 물어보세요",
   "conversation.sideQuestion.emptyBody":
@@ -199,4 +200,13 @@ export const messages = {
   "conversation.tasks.state.waitingApproval": "승인 대기 중",
   "conversation.tasks.state.waitingAnswer": "내 응답 대기 중",
   "conversation.tasks.title": "작업",
+  "conversation.tasks.work.failed": { other: "{count}개 실패" },
+  "conversation.tasks.work.hide": { other: "{title}의 세션 {count}개 숨기기" },
+  "conversation.tasks.work.idle": "진행 중인 작업 없음",
+  "conversation.tasks.work.mainChat": "메인 채팅",
+  "conversation.tasks.work.replied": "답장함",
+  "conversation.tasks.work.show": { other: "{title}의 세션 {count}개 보기" },
+  "conversation.tasks.work.startedBy": "{name}이(가) 시작함",
+  "conversation.tasks.work.title": "{name}의 작업",
+  "conversation.tasks.work.working": { other: "{count}개 작업 중" },
 } as const satisfies PartialTranslation<typeof source>;

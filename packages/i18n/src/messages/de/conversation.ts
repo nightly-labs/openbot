@@ -115,6 +115,7 @@ export const messages = {
   "conversation.sidePanel.pane.settings": "Agenteneinstellungen",
   "conversation.sidePanel.pane.question": "Nebenfrage",
   "conversation.sidePanel.pane.voice": "Sprache",
+  "conversation.sidePanel.pane.work": "Arbeit",
   "conversation.sidePanel.pane.subagent": "Subagent",
   "conversation.sideQuestion.emptyTitle": "Frage zu diesem Chat",
   "conversation.sideQuestion.emptyBody":
@@ -203,4 +204,19 @@ export const messages = {
   "conversation.tasks.state.waitingApproval": "Wartet auf deine Genehmigung",
   "conversation.tasks.state.waitingAnswer": "Wartet auf dich",
   "conversation.tasks.title": "Aufgaben",
+  "conversation.tasks.work.failed": { one: "{count} fehlgeschlagen", other: "{count} fehlgeschlagen" },
+  "conversation.tasks.work.hide": {
+    one: "Sitzung von {title} ausblenden",
+    other: "{count} Sitzungen von {title} ausblenden",
+  },
+  "conversation.tasks.work.idle": "Nichts läuft",
+  "conversation.tasks.work.mainChat": "Hauptchat",
+  "conversation.tasks.work.replied": "Geantwortet",
+  "conversation.tasks.work.show": {
+    one: "Sitzung von {title} anzeigen",
+    other: "{count} Sitzungen von {title} anzeigen",
+  },
+  "conversation.tasks.work.startedBy": "Gestartet von {name}",
+  "conversation.tasks.work.title": "Arbeit von {name}",
+  "conversation.tasks.work.working": { one: "{count} arbeitet", other: "{count} arbeiten" },
 } as const satisfies PartialTranslation<typeof source>;

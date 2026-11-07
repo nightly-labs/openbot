@@ -1,0 +1,290 @@
+/*
+ * The work of one agent as a tree, in the Work pane of the side panel (`AgentWork.tsx`). The rows
+ * reuse the stem of the thread menu and the state mark of the task list.
+ */
+
+/* ------------------------------------------------------------ The pane */
+
+.agent-work-panel {
+  overflow: hidden;
+}
+
+.agent-work-pane {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.agent-work-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 var(--openbot-space-3) var(--openbot-space-3);
+}
+
+/* ------------------------------------------------------------ The head */
+
+/* The summary starts where the toggles of the tree start. */
+.agent-work-head {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: calc(52rem + 2 * var(--openbot-space-3));
+  margin-inline: auto;
+  padding: var(--openbot-space-3) var(--openbot-space-3) var(--openbot-space-2)
+    calc(var(--openbot-space-3) + var(--openbot-space-1));
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------ The tree */
+
+.agent-work-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The tree is a column in the middle of the pane, so a row and its time stay near each other. */
+.agent-work-scroll > .agent-work-list {
+  max-width: 52rem;
+  margin-inline: auto;
+}
+
+/* A small gap between the top branches, so each one reads as a group. */
+.agent-work-scroll > .agent-work-list > .agent-work-item + .agent-work-item {
+  margin-top: var(--openbot-space-1);
+}
+
+.agent-work-row {
+  display: flex;
+  min-width: 0;
+  min-height: 44px;
+  align-items: stretch;
+  border-radius: var(--openbot-radius-md);
+}
+
+.agent-work-row:hover {
+  background: var(--openbot-bg-control-hover);
+}
+
+.agent-work-row[data-selected] {
+  background: var(--openbot-bg-control-active);
+}
+
+/* The thread menu pulls its stem over the row padding. The tree rows have no padding. */
+.agent-work-row .agent-work-stem {
+  margin-block: 0;
+  padding-inline-start: var(--openbot-space-1);
+}
+
+/*
+ * The branch of a child meets the middle of its mark, on the first line of the row. It is one line,
+ * so the curve of the last branch has no seam. It meets the box of the toggle of the row, or stops a
+ * small gap before the mark when the row has no toggle. The chevron sits inside its box, so both gaps
+ * look the same.
+ */
+.agent-work-list .agent-threads-stem-elbow::after {
+  top: 16px;
+}
+
+/* A branch to a toggle is short, so its curve is smaller. */
+.agent-work-list .agent-threads-stem-last::before {
+  bottom: calc(100% - 16px);
+  border-end-start-radius: 4px;
+}
+
+.agent-work-stem[data-leaf] .agent-threads-stem-elbow::after {
+  inset-inline-end: calc(-16px - var(--openbot-space-1-5) + 3px);
+}
+
+.agent-work-stem[data-leaf] .agent-threads-stem-last::before {
+  inset-inline-end: calc(-16px - var(--openbot-space-1-5) + 3px);
+  border-end-start-radius: 6px;
+}
+
+/* The toggle, with the line of its open branch under it. */
+.agent-work-branch,
+.agent-work-toggle-space {
+  display: flex;
+  width: 16px;
+  flex: none;
+  flex-direction: column;
+  margin-inline-start: var(--openbot-space-1);
+}
+
+.agent-work-branch {
+  align-self: stretch;
+  padding-top: var(--openbot-space-2);
+}
+
+.agent-work-stem + :is(.agent-work-branch, .agent-work-toggle-space) {
+  margin-inline-start: 0;
+}
+
+.agent-work-branch[data-open]::after {
+  flex: 1;
+  margin-top: 2px;
+  margin-inline-start: 7px;
+  border-inline-start: 1px solid color-mix(in srgb, var(--openbot-text-muted) 60%, transparent);
+  content: "";
+}
+
+.agent-work-toggle.ui-button {
+  display: inline-grid;
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
+  flex: none;
+  place-items: center;
+  border-radius: var(--openbot-radius-sm);
+  padding: 0;
+  color: var(--openbot-text-muted);
+}
+
+.agent-work-toggle svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  transition: transform var(--openbot-duration-fast) ease;
+}
+
+.agent-work-toggle[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+
+/* The title on the first line, with the time; the state and tags under it. The row, not this button,
+ * shows the hover fill, so the fill also covers the tree lines. */
+.agent-work-open.ui-button {
+  display: grid;
+  height: auto;
+  min-width: 0;
+  flex: 1;
+  grid-template-areas:
+    "mark title time"
+    ". meta meta";
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  align-items: center;
+  justify-content: stretch;
+  gap: 0 var(--openbot-space-2);
+  border: 0;
+  padding: var(--openbot-space-1-5) var(--openbot-space-2) var(--openbot-space-1-5) var(--openbot-space-1-5);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-regular);
+  line-height: inherit;
+  text-align: start;
+  white-space: normal;
+  cursor: default;
+}
+
+.agent-work-row .agent-work-open.ui-button:hover {
+  background: none;
+}
+
+.agent-work-mark {
+  --task-list-glyph: 14px;
+  grid-area: mark;
+}
+
+.agent-work-title {
+  min-width: 0;
+  overflow: hidden;
+  grid-area: title;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The top rows are the chat and the threads of the agent. The rows under them are their parts. */
+.agent-work-row[data-top] .agent-work-title {
+  font-weight: var(--openbot-weight-medium);
+}
+
+.agent-work-row:is([data-state="completed"], [data-state="stopped"]) .agent-work-title {
+  color: var(--openbot-text-secondary);
+}
+
+/* The state, then who does the work, with a dot between them. */
+.agent-work-meta {
+  display: flex;
+  min-width: 0;
+  grid-area: meta;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+}
+
+.agent-work-tag {
+  display: inline-flex;
+  min-width: 0;
+  flex: none;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  white-space: nowrap;
+}
+
+.agent-work-tag::before {
+  content: "·";
+}
+
+/* The face sits low in its picture. The offset moves it to the middle of the text, as other avatars do. */
+.agent-work-avatar {
+  --agent-avatar-optical-offset: calc(16px * -0.14);
+  width: 16px;
+  height: 16px;
+}
+
+.agent-work-time {
+  min-width: 4.5ch;
+  grid-area: time;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  white-space: nowrap;
+}
+
+.agent-work-status {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------ A subagent */
+
+.agent-work-detail {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+/* The Back button starts where the title of a pane header starts. */
+.agent-work-detail-head {
+  padding-inline-start: var(--openbot-space-1);
+}
+
+.agent-work-back.ui-button {
+  gap: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-1-5) var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+}
+
+.agent-work-detail > .subagents-panel > .side-panel-pane-header {
+  display: none;
+}
+
+/* The subagent pane fills the side panel. Here it sits under the Back button, in the Work pane. */
+.agent-work-detail > .subagents-panel {
+  position: relative;
+  width: auto;
+  min-height: 0;
+  flex: 1;
+  border-inline-start: 0;
+  inset: auto;
+}

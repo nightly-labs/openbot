@@ -116,6 +116,7 @@ export const messages = {
   "conversation.sidePanel.pane.settings": "Réglages de l’agent",
   "conversation.sidePanel.pane.question": "Question annexe",
   "conversation.sidePanel.pane.voice": "Voix",
+  "conversation.sidePanel.pane.work": "Travail",
   "conversation.sidePanel.pane.subagent": "Sous-agent",
   "conversation.sideQuestion.emptyTitle": "Question sur ce chat",
   "conversation.sideQuestion.emptyBody": "{name} lit ce chat pour répondre. Rien d’ici n’est ajouté au chat.",
@@ -202,4 +203,19 @@ export const messages = {
   "conversation.tasks.state.waitingApproval": "Attend votre approbation",
   "conversation.tasks.state.waitingAnswer": "Vous attend",
   "conversation.tasks.title": "Tâches",
+  "conversation.tasks.work.failed": { one: "{count} en échec", other: "{count} en échec" },
+  "conversation.tasks.work.hide": {
+    one: "Masquer la session de {title}",
+    other: "Masquer les {count} sessions de {title}",
+  },
+  "conversation.tasks.work.idle": "Rien en cours",
+  "conversation.tasks.work.mainChat": "Chat principal",
+  "conversation.tasks.work.replied": "A répondu",
+  "conversation.tasks.work.show": {
+    one: "Afficher la session de {title}",
+    other: "Afficher les {count} sessions de {title}",
+  },
+  "conversation.tasks.work.startedBy": "Lancé par {name}",
+  "conversation.tasks.work.title": "Travail de {name}",
+  "conversation.tasks.work.working": { one: "{count} en cours", other: "{count} en cours" },
 } as const satisfies PartialTranslation<typeof source>;

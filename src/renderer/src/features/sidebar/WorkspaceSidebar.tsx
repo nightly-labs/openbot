@@ -25,7 +25,9 @@ import { agentThreadAttention } from "../agents/agent-thread-attention";
 import { useAgents } from "../agents/agents-context";
 import { useChannels } from "../channels/channels-context";
 import { useConversation } from "../conversation/conversation-context";
+import { useConversationController } from "../conversation/conversation-controller-context";
 import { useDirectMessages } from "../conversation/direct-messages-context";
+import { openAgentSidePanelPane } from "../conversation/stores/panels-store";
 import { useServerActions } from "../servers/server-actions";
 import { serverRoleCanAdminister } from "../servers/server-capabilities";
 import { useServerScope } from "../servers/server-scope";
@@ -102,6 +104,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   const { selectAgent, selectDirectMember, setGlobalSearchVisibility, chatHistory } = useNavigation();
   const agentTasks = useAgentTasks();
   const agentThreads = useAgentThreads();
+  const controller = useConversationController();
   /**
    * Opens the agent's chat with a new thread. A host without threads has no such item, and neither has a
    * chat window: another agent opens in a window of its own, which does not get the new thread.
@@ -110,6 +113,24 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
     agentTasks.available() && !platform.chatWindow
       ? (agentId: string) => {
           if (selectAgent(agentId)) agentThreads.startNew(agentId);
+        }
+      : undefined;
+  /**
+   * Opens the agent's chat with its Work pane in the side panel. As for a new thread, a chat window has no
+   * such item: another agent opens in a window of its own.
+   */
+  const showAgentWork = () =>
+    !platform.chatWindow
+      ? (agentId: string) => {
+          // The Routines view covers the chat.
+          layout.setSidebarView("agents");
+          if (selectAgent(agentId)) {
+            openAgentSidePanelPane(
+              { setRightPanels: controller.setRightPanels, setPanels: controller.setSidePanels },
+              agentId,
+              "work",
+            );
+          }
         }
       : undefined;
   /** What Back opens: the list of an open settings detail page, or else the previous chat. */
@@ -357,6 +378,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         onHideAgent={hideAllowed() ? (agentId) => void setAgentHiddenByUser(agentId, true) : undefined}
         onRestoreAgent={hideAllowed() ? (agentId) => void setAgentHiddenByUser(agentId, false) : undefined}
         onNewAgentThread={newAgentThread()}
+        onShowAgentWork={showAgentWork()}
         onOpenAgentWindow={
           platform.landingPreview
             ? undefined
