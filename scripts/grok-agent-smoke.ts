@@ -4,6 +4,7 @@
 // `grok-live-harness.ts`), Grok Build Fast and a temporary git workspace, and it checks that each
 // request leaves out the features that OpenBot turns off. A second session sets
 // `features.turn_summary = true` in `config.toml`, and checks that OpenBot keeps the user's value.
+// Each session has a second short turn, so that a late turn summary falls in its session.
 // Costs two Grok Build Fast sessions. `bun run smoke:grok-agent`; `--model=<id>` replaces Grok
 // Build Fast. Writes .openbot-build/grok-agent-smoke/report.json.
 import assert from "node:assert/strict";
@@ -39,6 +40,7 @@ const TASK = [
   "5. Spawn a subagent that reads notes.md and tells you its title.",
   "Then reply with one line: the garden word, the number and the title of notes.md.",
 ].join("\n");
+const FOLLOW_UP = "Reply with the single word DONE.";
 /** Tools that OpenBot turns off. */
 const REMOVED = ["send_feedback", "workflow"];
 
@@ -47,6 +49,7 @@ interface SessionReport {
   reply: string;
   status: string | null;
   error: string | null;
+  followUpStatus: string | null;
   requests: GrokRequest[];
   calls: string[];
   /** The methods of the requests that the agent sent to OpenBot, such as tool approvals. */
@@ -97,7 +100,12 @@ async function session(name: string, config: Record<string, boolean>, text: stri
     developerInstructions: "You are Ada, a careful assistant in an end-to-end smoke test.",
   });
   const turn = await runTurn(client, thread, { model: MODEL, text, timeoutMs: 300_000 });
+  // Grok sends the turn summary after the turn ends. A second turn holds the session open until it
+  // is sent, so that the requests of this session include it.
+  const next = await runTurn(client, thread, { model: MODEL, text: FOLLOW_UP, timeoutMs: 120_000 });
   await proxy.idle();
+  // Stop Grok before the next session changes the environment that the client reads at each spawn.
+  await stopClients([client]);
   process.env = { ...saved };
   const requests = proxy.requests.slice(first);
   const main = requests.filter((request) => request.kind === "main");
@@ -106,6 +114,7 @@ async function session(name: string, config: Record<string, boolean>, text: stri
     reply: turn.reply,
     status: turn.status,
     error: turn.error,
+    followUpStatus: next.status,
     requests,
     // The last main request of the agent holds the whole history; a subagent's requests hold their own.
     calls: [...new Set(main.flatMap((request) => request.calls))],
@@ -126,6 +135,7 @@ async function session(name: string, config: Record<string, boolean>, text: stri
 try {
   const work = await session("work", {}, TASK);
   assert.equal(work.status, "completed", `The turn ended ${work.status}: ${work.error ?? ""}`);
+  assert.equal(work.followUpStatus, "completed", `The second turn ended ${work.followUpStatus}.`);
   assert.match(work.result ?? "", new RegExp(`${WORD}\\s+42`), "result.txt has the garden word and the number.");
   assert.ok(work.commits?.includes("Add result"), "The agent committed result.txt.");
   assert.match(work.reply, new RegExp(WORD), "The reply has the garden word from the skill.");
@@ -141,6 +151,7 @@ try {
   // The user's own `config.toml` value wins over OpenBot's setting.
   const kept = await session("user-config", { "features.turn_summary": true }, "Reply with the single word OK.");
   assert.equal(kept.status, "completed", `The turn ended ${kept.status}: ${kept.error ?? ""}`);
+  assert.equal(kept.followUpStatus, "completed", `The second turn ended ${kept.followUpStatus}.`);
   assert.ok(
     kept.requests.some((request) => request.kind === "summary"),
     "Grok did not write the turn summary that the user's config.toml turns on.",

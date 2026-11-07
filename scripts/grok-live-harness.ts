@@ -10,6 +10,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { homedir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { brotliDecompressSync, gunzipSync, inflateSync, zstdDecompressSync } from "node:zlib";
+import { grokHomeDirectory } from "../src/backend/process-confinement";
 import { isRecord } from "../src/backend/protocol";
 
 const UPSTREAM = "https://cli-chat-proxy.grok.com/v1";
@@ -33,7 +34,7 @@ export interface GrokRequest {
 }
 
 const realHome = homedir();
-const realGrokHome = process.env.GROK_HOME?.trim() || join(realHome, ".grok");
+const realGrokHome = grokHomeDirectory(process.env, realHome);
 
 /** The user's Grok login without its refresh token. Fails when the token expires within 10 minutes. */
 function copiedLogin(): string {

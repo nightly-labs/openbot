@@ -65,9 +65,14 @@ class ProcessConfinementUnavailableError extends Error {
 
 const SANDBOX_EXEC = "/usr/bin/sandbox-exec";
 
+/** The state directory of the Grok CLI: `$GROK_HOME`, or `~/.grok`. */
+export function grokHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.GROK_HOME?.trim() || join(home, ".grok");
+}
+
 /** Grok keeps its sign-in, sessions and caches in `GROK_HOME`, and its hooks and settings too. */
 export function grokStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
-  const grokHome = env.GROK_HOME?.trim() || join(home, ".grok");
+  const grokHome = grokHomeDirectory(env, home);
   return {
     writable: [grokHome],
     protected: [

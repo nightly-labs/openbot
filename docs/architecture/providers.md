@@ -411,11 +411,13 @@ Grok `agent stdio` ignores `--tools` and `--disallowed-tools`, so only environme
 switches remove a Grok feature. At each spawn, `grok-client.ts` turns off four features that an
 OpenBot agent does not use: feedback (`GROK_FEEDBACK_ENABLED`), workflows (`GROK_WORKFLOWS`), the
 turn summary (`GROK_TURN_SUMMARY`) and the skills of `~/.claude/skills` (`GROK_CLAUDE_SKILLS_ENABLED`).
-An environment value wins over `config.toml`, so OpenBot sets a switch only when the user's
-environment and `$GROK_HOME/config.toml` both leave its key unset. A user can turn each feature back
-on in `config.toml`. On Grok CLI 1.0.70 and Grok Build Fast, feedback and workflows cost 1,707 prompt
-tokens in each request, the turn summary is one more request of about 1,600 after each turn, and one
-developer's Claude skills cost 2,811 in each request. The image, video, search, subagent and question
+An environment value wins over every Grok config layer, so OpenBot sets a switch only when the
+user's environment and the layers below it (`$GROK_HOME/managed_config.toml`, `$GROK_HOME/config.toml`,
+`GROK_CONFIG_PATH` and `GROK_CONFIG`) all leave its key unset. When a layer does not read or parse,
+OpenBot sets no switch. A user can turn each feature back on in `config.toml`. On Grok CLI 1.0.70
+and Grok Build Fast, feedback and workflows cost 1,707 prompt tokens in each request, the turn summary
+is one more request of about 1,600 after each turn, and one developer's Claude skills cost 2,811 in
+each request. The image, video, search, subagent and question
 tools stay: together they cost about 6,100, but an agent can use each of them. The session title
 request (about 500) has no switch. `bun run bench:grok-prompt-settings` measures these features
 through a local proxy and a copy of the user's Grok login without its refresh token.
