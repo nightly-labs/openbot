@@ -341,7 +341,7 @@ export class AgentDockWindowController {
             const bounds = this.#boundsFor(display);
             if (!isDeepStrictEqual(current.window.getBounds(), bounds)) current.window.setBounds(bounds, false);
             if (this.#filled.has(display.id)) {
-              if (current.window.isVisible()) current.window.hide();
+              if (current.window.isVisible()) this.#hideForFullScreenApp(current);
             } else if (!current.window.isVisible()) current.window.showInactive();
           }
           for (const entry of spare) this.#closeWindow(entry.window);
@@ -418,6 +418,13 @@ export class AgentDockWindowController {
     if (!apps || this.#destroyed || this.#presentation === null) return;
     if (isDeepStrictEqual(apps.filledDisplays(this.#targetDisplays()), this.#filled)) return;
     void Effect.runPromise(this.reconcileWindow());
+  }
+
+  /** A hidden dock closes its chat, so that the chat does not mark new answers as read. */
+  #hideForFullScreenApp(entry: DockWindow): void {
+    if (this.#chatOwner === entry.rendererId) sendToRenderer(entry.window, IPC_ENDPOINTS.agentDock.closeChat);
+    this.#release(entry);
+    entry.window.hide();
   }
 
   #setFilled(filled: ReadonlySet<number>): void {

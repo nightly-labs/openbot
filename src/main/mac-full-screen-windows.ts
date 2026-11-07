@@ -6,9 +6,11 @@ import type * as Koffi from "koffi";
 const logger = createOpenBotLogger("mac-full-screen-windows");
 const requireModule = createRequire(import.meta.url);
 
-/** `kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements`. */
-const ON_SCREEN_WITHOUT_DESKTOP = (1 << 0) | (1 << 4);
+/** `kCGWindowListOptionOnScreenOnly`. */
+const ON_SCREEN_ONLY = 1 << 0;
 const NORMAL_WINDOW_LAYER = 0;
+/** `kCGDesktopIconWindowLevelKey`. */
+const DESKTOP_ICON_LEVEL_KEY = 18;
 const CF_NUMBER_SINT64 = 4;
 const CF_STRING_ENCODING_UTF8 = 0x08000100;
 
@@ -20,10 +22,12 @@ interface WindowListRuntime {
   integer: (value: unknown) => number | null;
   rectangle: (dictionary: unknown) => Rectangle | null;
   release: (value: unknown) => void;
+  desktopIconLayer: number;
   keys: { layer: unknown; ownerPid: unknown; bounds: unknown };
 }
 
 let runtime: WindowListRuntime | null = null;
+let runtimeFailed = false;
 
 function windowListRuntime(): WindowListRuntime {
   if (runtime) return runtime;
@@ -40,7 +44,7 @@ function windowListRuntime(): WindowListRuntime {
   const getNumber = cf.func("bool CFNumberGetValue(void *number, long type, _Out_ int64_t *value)");
   const createString = cf.func("void *CFStringCreateWithCString(void *allocator, const char *text, uint32_t encoding)");
   runtime = {
-    copyOnScreenWindows: () => copyWindowInfo(ON_SCREEN_WITHOUT_DESKTOP, 0),
+    copyOnScreenWindows: () => copyWindowInfo(ON_SCREEN_ONLY, 0),
     count: cf.func("long CFArrayGetCount(void *array)"),
     at: cf.func("void *CFArrayGetValueAtIndex(void *array, long index)"),
     value: cf.func("void *CFDictionaryGetValue(void *dictionary, void *key)"),
@@ -53,6 +57,7 @@ function windowListRuntime(): WindowListRuntime {
       return dictionary && rectFromDictionary(dictionary, out) ? out : null;
     },
     release: cf.func("void CFRelease(void *value)"),
+    desktopIconLayer: cg.func("int CGWindowLevelForKey(int key)")(DESKTOP_ICON_LEVEL_KEY),
     // The key constants are CFStrings that hold their own names. They stay for the life of the process.
     keys: {
       layer: createString(null, "kCGWindowLayer", CF_STRING_ENCODING_UTF8),
@@ -73,31 +78,49 @@ function covers(window: Rectangle, display: Rectangle): boolean {
 }
 
 /**
- * The displays that a window of another application fills on the active Space, such as a video, a game
- * or slides in full screen. Only the window list is read: owner, level and bounds, which macOS gives
- * without the Screen Recording permission. When the list cannot be read, no display is filled.
+ * The displays that show a full-screen app of another application on the active Space, such as a video,
+ * a game or slides. A window of another application fills the display, and the desktop is not shown
+ * there: Finder's desktop window covers each display on a desktop Space and is absent from a full-screen
+ * Space, so a window that fills a desktop does not count. When Finder shows no desktop, the filling
+ * window alone decides. Only the window list is read: owner, level and bounds, which macOS gives without
+ * the Screen Recording permission. When the list cannot be read, no display is filled.
  */
 export function displaysFilledByOtherApps(displays: readonly Display[]): ReadonlySet<number> {
   const filled = new Set<number>();
-  if (process.platform !== "darwin" || displays.length === 0) return filled;
+  if (process.platform !== "darwin" || displays.length === 0 || runtimeFailed) return filled;
+  let cg: WindowListRuntime;
   try {
-    const cg = windowListRuntime();
+    cg = windowListRuntime();
+  } catch (error) {
+    runtimeFailed = true;
+    logger.warn("Unable to load the window list functions:", toLogValue(error));
+    return filled;
+  }
+  const desktops = new Set<number>();
+  try {
     const windows = cg.copyOnScreenWindows();
     if (!windows) return filled;
     try {
-      for (let index = 0; index < cg.count(windows); index += 1) {
+      const count = cg.count(windows);
+      for (let index = 0; index < count; index += 1) {
         const window = cg.at(windows, index);
-        if (cg.integer(cg.value(window, cg.keys.layer)) !== NORMAL_WINDOW_LAYER) continue;
-        if (cg.integer(cg.value(window, cg.keys.ownerPid)) === process.pid) continue;
+        const layer = cg.integer(cg.value(window, cg.keys.layer));
+        const desktop = layer === cg.desktopIconLayer;
+        if (!desktop && layer !== NORMAL_WINDOW_LAYER) continue;
+        if (!desktop && cg.integer(cg.value(window, cg.keys.ownerPid)) === process.pid) continue;
         const bounds = cg.rectangle(cg.value(window, cg.keys.bounds));
         if (!bounds) continue;
-        for (const display of displays) if (covers(bounds, display.bounds)) filled.add(display.id);
+        for (const display of displays) {
+          if (covers(bounds, display.bounds)) (desktop ? desktops : filled).add(display.id);
+        }
       }
     } finally {
       cg.release(windows);
     }
   } catch (error) {
     logger.warn("Unable to read the window list:", toLogValue(error));
+    return new Set();
   }
+  for (const id of desktops) filled.delete(id);
   return filled;
 }
