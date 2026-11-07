@@ -23,6 +23,12 @@ const logger = createOpenBotLogger("team-webrtc-host");
 // How long the host's Signal socket can stay closed before the host asks for another Signal machine.
 // The time starts at the first close and stops when Signal accepts the host again.
 const SIGNAL_MOVE_AFTER_MS = 20_000;
+// A host with no `ready` for this long reports the lost registration. The host leaves `online`, so
+// `openbot status` and the server list show it, and the start retry publishes it again with a new
+// ticket (#3749). It is longer than the reconnect backoff, so a Signal restart does not cause it.
+const SIGNAL_LOST_REPORT_AFTER_MS = 3 * 60_000;
+// The `signal-closed` code of a host socket that did not answer in time (`team-webrtc.ts`).
+const SIGNAL_NO_READY_CODE = "no-ready";
 
 class HostSignal extends Context.Service<
   HostSignal,
@@ -112,6 +118,7 @@ export class TeamWebRtcHostGateway {
   // The Signal URL of the host's registration, which a move names as the failed one.
   #signalUrl: string | null = null;
   #signalMoveTimer: ReturnType<typeof setTimeout> | null = null;
+  #signalLostTimer: ReturnType<typeof setTimeout> | null = null;
   // Set when the hidden window ends the host peer for good during a move, as it does after
   // `authentication_required` or close code 4000.
   #signalEnded = false;
@@ -193,6 +200,7 @@ export class TeamWebRtcHostGateway {
       this.#localApiPort = null;
       this.#signalUrl = null;
       this.#cancelSignalMove();
+      this.#cancelSignalLostReport();
       if (this.#connecting) yield* Fiber.interrupt(this.#connecting);
       if (this.#signalRecovery) yield* Fiber.interrupt(this.#signalRecovery);
       yield* this.#clearPeers();
@@ -280,6 +288,7 @@ export class TeamWebRtcHostGateway {
     if (peerId === this.#hostId) {
       this.#signalEnded = true;
       this.#cancelSignalMove();
+      this.#cancelSignalLostReport();
       const fiber = this.#runtime.runFork(this.#clearPeers());
       this.#operations.add(fiber);
       fiber.addObserver(() => this.#operations.delete(fiber));
@@ -305,14 +314,44 @@ export class TeamWebRtcHostGateway {
     if (terminal) {
       logger.warn(`Host Signal socket closed with code ${code}; it does not connect again.`);
       this.#cancelSignalMove();
+      this.#cancelSignalLostReport();
     } else {
-      logger.info(`Host Signal socket closed with code ${code}; it connects again.`);
+      if (code === SIGNAL_NO_READY_CODE) logger.warn("Host Signal socket did not answer in time; it connects again.");
+      else logger.info(`Host Signal socket closed with code ${code}; it connects again.`);
       this.#scheduleSignalMove();
+      this.#scheduleSignalLostReport();
     }
   };
 
   readonly #onSignalReady = (peerId: string): void => {
-    if (peerId === this.#hostId) this.#cancelSignalMove();
+    if (peerId !== this.#hostId) return;
+    this.#cancelSignalMove();
+    this.#cancelSignalLostReport();
+  };
+
+  // One timer for each outage, as for the move.
+  #scheduleSignalLostReport(): void {
+    if (this.#signalLostTimer !== null || !this.#hostId) return;
+    this.#signalLostTimer = setTimeout(this.#reportSignalLost, SIGNAL_LOST_REPORT_AFTER_MS);
+  }
+
+  #cancelSignalLostReport(): void {
+    if (this.#signalLostTimer !== null) clearTimeout(this.#signalLostTimer);
+    this.#signalLostTimer = null;
+  }
+
+  readonly #reportSignalLost = (): void => {
+    this.#signalLostTimer = null;
+    if (!this.#hostId) return;
+    // A start or a recovery reports its own failure.
+    if (this.#connecting || this.#signalRecovery) {
+      this.#scheduleSignalLostReport();
+      return;
+    }
+    this.#options.onSignalRecoveryFailure?.(
+      new Error(sourceText("error.remote.signalRecoveryFailed")),
+      `not ready ${SIGNAL_LOST_REPORT_AFTER_MS / 60_000} minutes after ${this.#lastSignalEnd ?? "a close"}`,
+    );
   };
 
   // One timer for each outage: a later close does not start the time again.
