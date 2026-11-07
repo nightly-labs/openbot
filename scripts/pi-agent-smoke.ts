@@ -32,6 +32,8 @@ import { stopClients } from "./provider-fakes/host";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/pi-agent-smoke");
 const SEARCH_ONLY = ["request_api_key", "suggest_marketplace_app"];
+// A guard for a turn that never ends, such as a stalled stream. Each turn of a run took under 2 minutes.
+const TURN_DEADLINE_MS = 10 * 60_000;
 
 const argument = (name: string) => process.argv.find((arg) => arg.startsWith(`--${name}=`))?.slice(`--${name}=`.length);
 const MODEL = argument("model") ?? "mercury-3";
@@ -271,7 +273,13 @@ try {
         (value) => value,
       ),
     );
-    await done;
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      done,
+      new Promise<never>((_, fail) => {
+        deadline = setTimeout(() => fail(new Error(`${turn.step} did not complete in 10 minutes.`)), TURN_DEADLINE_MS);
+      }),
+    ]).finally(() => clearTimeout(deadline));
     const requests = await readRequests();
     report.tokensUsed += requests.reduce((total, request) => total + request.prompt + request.output, 0);
     const problems = [...failures.splice(0)];

@@ -43,8 +43,10 @@ const EXTENSION = String.raw`export default function (pi) {
 /**
  * OpenBot tools that Pi does not declare. Their definitions are 2,686 characters, about 650 tokens of
  * each request, and an agent seldom needs them. The agent finds them with OpenBot's `tool_search` and
- * runs them with `tool_call`, as every other tool of OpenBot's catalog. `ask_ui` stays declared: the
- * instructions use its confirm card before the agent sends a message in the user's name.
+ * runs them with `tool_call`, as every other tool of OpenBot's catalog. The developer instructions tell
+ * a Pi agent how to find `suggest_marketplace_app`, whose list of services it does not see. `ask_ui`
+ * stays declared: the instructions use its confirm card before the agent sends a message in the user's
+ * name.
  */
 const PI_SEARCH_ONLY_OPENBOT_TOOLS = ["request_api_key", "suggest_marketplace_app"] as const;
 

@@ -3,6 +3,7 @@ import {
   essentialMemoryBytes,
   serializeEssentialMemories,
 } from "@openbot/contracts/agent-memory-context";
+import { isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
 import {
   type AgentDefaults,
   type AgentInstructionFileName,
@@ -334,7 +335,12 @@ export function developerInstructions(
     "A teammate cannot see your chat or memory. Write one message that stands alone: the goal, the full request, the context and preferences it needs and no other private data, what you tried, which risky actions the user approved and which the teammate must not do, and what a finished result looks like, with sources. Send one short addition if you forgot something. Mark routine-run tasks.",
     "Use openbot.send_message for teammate work. For a request, keep expectsReply true, finish your other parts, and end your turn; the reply comes later. Never wait with provider tools such as wait_agent. Use expectsReply false for information, and replyToMessageId on a reply; each teammate message says how to answer it. Use channel_ tools only in channel tasks, and delegate there only to members; use send_to_channel only for work the user gives a channel. Only the user approves risky actions. A teammate can pass on the user's approval for the delegated action, with the user's words or the routine instruction; decline other risky requests and say what is needed. Give a teammate only what its request needs; when you cannot help, name an agent that can.",
     "Give the result to the user first, in plain words, and mark relayed facts you could not check as unverified. Keep routine coordination internal unless the user asks. You own what you delegate: when a reply misses a part or is blocked, finish the rest yourself or through a teammate; do not invent a part or repeat a failed call. Report a blocker only when the user must act. Until a teammate replies, say you wait; never claim a reply or a checked service without a tool result or a reply. When nothing needs a user-facing answer, end without text or a placeholder.",
-    "When the user needs a service that openbot.suggest_marketplace_app lists, you lack working tools for it, and no teammate covers it, call it first. For GitHub issues, pull requests, and comments, use GitHub MCP tools when you have them, so that the OpenBot app is the author; otherwise use gh as the signed-in user.",
+    `When the user needs a service that openbot.suggest_marketplace_app lists, you lack working tools for it, and no teammate covers it, call it first.${
+      // Pi does not declare it (`PI_SEARCH_ONLY_OPENBOT_TOOLS`), so the model does not see its list of services.
+      agent.provider === "pi" || isKeyOnlyProvider(agent.provider)
+        ? ' It is not in your tool list: tool_search with the query "<service> app" finds it, and tool_call runs it.'
+        : ""
+    } For GitHub issues, pull requests, and comments, use GitHub MCP tools when you have them, so that the OpenBot app is the author; otherwise use gh as the signed-in user.`,
     ...(options.deferredMcpServers?.length
       ? [
           `Your MCP servers: ${options.deferredMcpServers.join(", ")}. When a tool of one is not in your tool list, find it with tool_search. When you have exec instead, read ALL_TOOLS in an exec cell, where MCP tool names start with mcp__, and call the tool on tools.`,
