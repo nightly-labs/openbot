@@ -196,6 +196,7 @@ export function toAgentMessages(
       existing.items = [...(existing.items ?? []), text];
       existing.itemIds = [...(existing.itemIds ?? []), message.id];
       existing.itemCreatedAt = [...(existing.itemCreatedAt ?? []), message.createdAt];
+      existing.itemStreaming = [...(existing.itemStreaming ?? []), message.status === "streaming"];
       existing.streaming = existing.streaming || message.status === "streaming";
       if (message.trace) existing.trace = message.trace;
       continue;
@@ -215,6 +216,7 @@ export function toAgentMessages(
       items: [text],
       itemIds: [message.id],
       itemCreatedAt: [message.createdAt],
+      itemStreaming: [message.status === "streaming"],
       ...(message.trace === undefined ? {} : { trace: message.trace }),
     };
     thinkingByTurn.set(key, thinking);
@@ -305,6 +307,7 @@ export function agentMessagesEqual(left: AgentMessage, right: AgentMessage): boo
     JSON.stringify(left.actionMarker) === JSON.stringify(right.actionMarker) &&
     JSON.stringify(left.items) === JSON.stringify(right.items) &&
     JSON.stringify(left.itemIds) === JSON.stringify(right.itemIds) &&
+    JSON.stringify(left.itemStreaming) === JSON.stringify(right.itemStreaming) &&
     JSON.stringify(left.plan) === JSON.stringify(right.plan) &&
     JSON.stringify(left.subagents) === JSON.stringify(right.subagents)
   );
@@ -457,7 +460,11 @@ export function retainThinkingMessages(
       (message) => message.turnId === thinking.turnId && message.author === "agent" && message.kind !== "thinking",
     );
     const insertionIndex = finalAnswerIndex >= 0 ? finalAnswerIndex : (sameTurnIndexes.at(-1) ?? result.length - 1) + 1;
-    result.splice(insertionIndex, 0, { ...thinking, streaming: false });
+    result.splice(insertionIndex, 0, {
+      ...thinking,
+      streaming: false,
+      ...(thinking.itemStreaming ? { itemStreaming: thinking.itemStreaming.map(() => false) } : {}),
+    });
     nextIds.add(thinking.id);
   }
   return result;

@@ -115,8 +115,20 @@
  * The keyframes alone hide a new row, so a row whose animation is off (reduced motion, which
  * Windows reports while its animation effects are off) still shows.
  */
+/* The row is as wide as the chat, so each bubble grows from its own side and does not move toward the middle. */
 .message-entry-animated {
-  animation: message-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) both;
+  transform-origin: left bottom;
+  animation: message-bubble-in 280ms cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+}
+
+.message-entry-animated.message-entry-user {
+  transform-origin: right bottom;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .message-entry-animated.message-entry-user {
+    animation: message-sent-in 240ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  }
 }
 
 .message-entry-agent {
@@ -607,7 +619,8 @@
 
 .chat-action-entry-animated {
   width: 100%;
-  animation: message-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) both;
+  transform-origin: left bottom;
+  animation: message-bubble-in 280ms cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
 }
 
 /* The line's padding, the 32px face, and its lower padding. */
@@ -631,6 +644,14 @@
 
 .agent-activity-entry[data-state="exiting"] {
   grid-template-rows: 0fr;
+}
+
+/* The slot keeps the room of a plain line, so that line enters and leaves in place: only its face and
+   text animate, and the messages above do not move. A line with steps is taller, so it still opens. */
+.agent-activity-slot[data-reserved="true"] > .agent-activity-entry[data-plain="true"],
+.agent-activity-slot[data-reserved="true"] > .agent-activity-entry[data-plain="true"][data-state="exiting"] {
+  grid-template-rows: 1fr;
+  transition: none;
 }
 
 .agent-activity-content {
@@ -680,14 +701,27 @@
   will-change: transform;
 }
 
-@starting-style {
-  .agent-activity-avatar {
-    transform: translateY(3px) scale(0.96);
+/* The face of a working agent pops in from half size, rises from its lower edge, and settles with a
+   small bounce, as a new bubble does. `backwards`, so the exit transition can shrink it afterwards. */
+.agent-activity-entry .agent-activity-avatar {
+  transform-origin: center bottom;
+  animation: agent-activity-avatar-in 420ms cubic-bezier(0.34, 1.45, 0.64, 1) backwards;
+}
+
+@keyframes agent-activity-avatar-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
+/* The face leaves the way it came: it shrinks to its lower edge while the line fades. */
 .agent-activity-entry[data-state="exiting"] .agent-activity-avatar {
-  transform: translateY(0) scale(0.98);
+  transform: translateY(4px) scale(0.6);
 }
 
 .agent-activity-label {
@@ -725,8 +759,8 @@
   -webkit-text-fill-color: currentColor;
 }
 
-/* The plain line draws a label as Grok Bot does: each new step label rises 4px into place, with no
-   exit, and a soft light runs over it in 60 steps. */
+/* The plain line draws a label as Grok Bot does: each new step label rises 5px into place in 350ms,
+   with no exit, and a soft light runs over it in 60 steps. */
 .agent-activity-entry[data-plain="true"]:not([data-waiting="true"]) .agent-activity-label {
   background: linear-gradient(
     90deg,
@@ -740,18 +774,18 @@
   background-clip: text;
   -webkit-background-clip: text;
   animation:
-    agent-activity-label-enter 180ms cubic-bezier(0.22, 1, 0.36, 1) backwards,
+    agent-activity-label-enter 350ms cubic-bezier(0.2, 0.8, 0.3, 1) backwards,
     agent-activity-label-shine 2.2s steps(60, end) infinite;
 }
 
 .agent-activity-entry[data-plain="true"][data-waiting="true"] .agent-activity-label {
-  animation: agent-activity-label-enter 180ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation: agent-activity-label-enter 350ms cubic-bezier(0.2, 0.8, 0.3, 1) backwards;
 }
 
 @keyframes agent-activity-label-enter {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(5px);
   }
 }
 

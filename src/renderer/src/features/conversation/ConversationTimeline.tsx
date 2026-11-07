@@ -1416,6 +1416,9 @@ export function ConversationTimeline() {
                             steps={stepsInRow() ? stepsDisclosure() : undefined}
                             actionsBeside={actionsBeside()}
                             animate={animateEntrance}
+                            // Natural shows a message once it is complete. Its bubble enters with all of its
+                            // text, so the height does not grow while the words fade in.
+                            textAtOnce={plainActivity()}
                             agents={props.agents}
                             skills={installedSkills()}
                             referencedMessage={referencedMessage()}

@@ -222,5 +222,7 @@ export function pendingSendMessage(send: PendingSend): AgentMessage {
     createdAt: send.createdAt,
     replyToMessageId: send.draft.replyToMessageId,
     attachments: send.draft.attachments,
+    // The user's own message rises into the chat when it is sent, as Grok Bot's does. Each id enters once.
+    animate: true,
   };
 }

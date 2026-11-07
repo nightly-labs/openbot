@@ -58,7 +58,9 @@ export default defineConfig({
     },
   },
   renderer: {
-    plugins: [solidPlugin(), tailwindcss({ optimize: false })],
+    // The Solid Performance panel tracks record each effect run under `vite dev`, and make a send
+    // in a chat drop frames that the built app does not drop. Set this to true for a trace.
+    plugins: [solidPlugin({ performanceTracks: false }), tailwindcss({ optimize: false })],
     optimizeDeps: {
       // bloub finds its plush images with `new URL(..., import.meta.url)`. A pre-bundle moves the
       // code away from the images, so Vite serves the package as it is.

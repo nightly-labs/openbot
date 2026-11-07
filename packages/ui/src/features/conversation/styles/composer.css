@@ -116,6 +116,42 @@
 }
 
 .composer {
+  /* Grok Bot's composer height curve (300ms): fast at the start, then a long, soft stop. */
+  --composer-resize-duration: 300ms;
+  --composer-resize-ease: linear(
+    0,
+    0.01588 2%,
+    0.05618 4%,
+    0.11201 6%,
+    0.1768 8%,
+    0.2458 10%,
+    0.31562 12%,
+    0.38392 14%,
+    0.44914 16%,
+    0.51029 18%,
+    0.56683 20%,
+    0.61852 22%,
+    0.66534 24%,
+    0.70743 26%,
+    0.74501 28%,
+    0.77838 30%,
+    0.80788 32%,
+    0.83383 34%,
+    0.85658 36%,
+    0.87645 38%,
+    0.89376 40%,
+    0.92183 44%,
+    0.94282 48%,
+    0.95838 52%,
+    0.96984 56%,
+    0.97823 60%,
+    0.98435 64%,
+    0.98878 68%,
+    0.99198 72%,
+    0.99594 80%,
+    0.99829 90%,
+    1
+  );
   position: relative;
   z-index: 11;
   display: grid;
@@ -130,7 +166,8 @@
   box-shadow: none;
   transition:
     border-color var(--openbot-duration-hover) var(--openbot-ease-out),
-    box-shadow var(--openbot-duration-hover) var(--openbot-ease-out);
+    box-shadow var(--openbot-duration-hover) var(--openbot-ease-out),
+    height var(--composer-resize-duration) var(--composer-resize-ease);
 }
 
 .composer[data-compact] {
@@ -493,7 +530,13 @@
 
 .composer-input-label,
 .composer-editor-root {
-  --composer-editor-max-height: max(48px, 33dvh);
+  --composer-editor-max-height: var(--composer-editor-limit, max(48px, 33dvh));
+}
+
+/* The chat composer shows at most 6 lines (120px and the 10px padding), as Grok Bot's does. A longer
+   draft scrolls inside the editor, so the chat keeps its space. */
+.composer-wrap {
+  --composer-editor-limit: max(48px, min(130px, 33dvh));
 }
 
 .composer-input-label {
@@ -702,6 +745,33 @@
 }
 
 /* The box comes from `.reference-chip`; this token only loses the chip fill and gains the outline. */
+/*
+ * `composer-resize.ts` sets a pixel height only while the composer moves between its one-line and
+ * full layouts. The text keeps its place at the top and the toolbar rides the bottom edge, as in
+ * Grok Bot. The one-line row rides the bottom edge when the composer closes.
+ */
+.composer[data-resizing] {
+  min-height: 0;
+  overflow: clip;
+}
+
+.composer[data-resizing][data-compact] {
+  align-content: end;
+}
+
+.composer[data-resizing]:not([data-compact]) .composer-input-label {
+  min-height: 0;
+  align-items: flex-start;
+  overflow: clip;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer {
+    --composer-resize-duration: 120ms;
+    --composer-resize-ease: ease;
+  }
+}
+
 .composer-mention-token.composer-tag-unavailable {
   border: 1px dashed var(--openbot-border-strong);
   background: transparent;
