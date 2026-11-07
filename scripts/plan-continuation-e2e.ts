@@ -469,6 +469,8 @@ try {
       "Next, I would restart the production service.",
       "The fix is in. Let me know if you need anything else.",
       "I'll implement it after your confirmation.",
+      "I'll update you when the build finishes.",
+      "Let me check with the team and get back to you.",
     ];
     // Each request opens a new step, so a step left open by an earlier answer does not hide the plan.
     for (const [index, answer] of answers.slice(0, 6).entries()) {
