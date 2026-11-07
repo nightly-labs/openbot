@@ -406,6 +406,22 @@ function createController({
     current.turnId ??= current.messageId ? liveReplyTurn(conversation.messages, deliveries, current.messageId) : null;
     const turnId = current.turnId;
     const active = turnId !== null && conversation.activeTurnId === turnId;
+    // A streamed message that a later step marks as commentary is not part of the spoken answer.
+    if (
+      readIds.length > 0 &&
+      readIds.some(
+        (id) =>
+          !conversation.messages.some(
+            (message) => message.id === id && message.turnId === turnId && isAgentAnswer(message),
+          ),
+      )
+    ) {
+      stopSpeaking();
+      if (phase === "speaking") {
+        setPhase("thinking");
+        setCaption("");
+      }
+    }
     const answer = turnId ? latestTurnAnswer(conversation.messages, turnId) : undefined;
     // The answer plays while it streams. It is complete when it is done and its turn has ended.
     if (answer && (answer.status === "streaming" || answer.status === "completed")) {
