@@ -262,7 +262,8 @@ export class TeamWebRtcFileTransfer {
       .filter((transfer) => transfer.peerId === peerId)
       .reduce((sum, transfer) => sum + transfer.size, 0);
     if (activeBytes + size > TEAM_PROTOCOL_V2_MAX_FILE_SET_BYTES) {
-      throw new TeamFileTooLargeError(sourceText("error.remote.fileSetTooLarge"));
+      // Other transfers end and free the set, so this stays a retryable host failure.
+      throw new Error(sourceText("error.remote.fileSetTooLarge"));
     }
   }
 
