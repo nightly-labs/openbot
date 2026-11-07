@@ -6,6 +6,7 @@ export const TRANSLATED_LOCALES = [
   "ar",
   "de",
   "es",
+  "fa",
   "fr",
   "it",
   "ja",
@@ -38,6 +39,14 @@ export function resolveLocale(language: AppLanguage, systemLocale: string): Tran
   return isTranslatedLocale(subtag) ? subtag : "en";
 }
 
+function withLatinDigits(locale: string): string {
+  try {
+    return new Intl.Locale(locale, { numberingSystem: "latn" }).toString();
+  } catch {
+    return `${locale.replace(/-u-.*/, "")}-u-nu-latn`;
+  }
+}
+
 /**
  * The locale for numbers and dates, given the same two values.
  *
@@ -48,12 +57,16 @@ export function resolveLocale(language: AppLanguage, systemLocale: string): Tran
 export function formatLocale(language: AppLanguage, systemLocale: string): string {
   const locale = resolveLocale(language, systemLocale);
   const subtag = systemLocale.split("-")[0]?.toLowerCase() ?? "";
-  if (language !== "system" && subtag !== locale) return locale;
+  let formattedLocale: string = locale;
   try {
-    return Intl.getCanonicalLocales(systemLocale)[0] ?? locale;
+    if (language === "system" || subtag === locale) {
+      formattedLocale = Intl.getCanonicalLocales(systemLocale)[0] ?? locale;
+    }
   } catch {
-    return locale;
+    formattedLocale = locale;
   }
+  // Persian digits were not requested; keep Latin digits while using Persian formatting rules.
+  return locale === "fa" ? withLatinDigits(formattedLocale) : formattedLocale;
 }
 
 /** The locales whose script runs from right to left. The interface mirrors for these. */

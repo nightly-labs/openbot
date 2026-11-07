@@ -4,6 +4,7 @@ import { ar } from "./messages/ar/index";
 import { de } from "./messages/de/index";
 import { type AppMessages, en } from "./messages/en/index";
 import { es } from "./messages/es/index";
+import { fa } from "./messages/fa/index";
 import { fr } from "./messages/fr/index";
 import { it } from "./messages/it/index";
 import { ja } from "./messages/ja/index";
@@ -15,7 +16,7 @@ import { ru } from "./messages/ru/index";
 import { tr } from "./messages/tr/index";
 import { zh } from "./messages/zh/index";
 
-const catalogs = { en, ar, de, es, fr, it, ja, ko, nl, pl, pt, ru, tr, zh } as const;
+const catalogs = { en, ar, de, es, fa, fr, it, ja, ko, nl, pl, pt, ru, tr, zh } as const;
 
 /**
  * The desktop catalog of `locale`, or `undefined` while it is not loaded.

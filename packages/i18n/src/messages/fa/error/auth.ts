@@ -1,0 +1,37 @@
+import { defineMessages } from "../../../message";
+
+export const messages = defineMessages("error.auth", {
+  // Errors from the OpenBot account service.
+  "error.auth.serviceUnavailable": "OpenBot نتوانست به سرویس حساب دسترسی پیدا کند. بررسی کنید API در حال اجرا باشد و دوباره تلاش کنید.",
+  "error.auth.networkBlocked": "فایروال یا پراکسی این شبکه مانع دسترسی OpenBot به {host} شد. از مدیر شبکه بخواهید دسترسی به {host} را مجاز کند و دوباره تلاش کنید.",
+  "error.auth.signInFirst": "ابتدا وارد OpenBot شوید.",
+  "error.auth.signInRequired": "باید وارد شوید.",
+  "error.auth.chatColorUnavailable": "سرویس حساب هنوز از رنگ‌های گفت‌وگو پشتیبانی نمی‌کند. بعداً دوباره تلاش کنید.",
+  "error.auth.accountChangedDuringRegister": "هنگام ثبت این سرور، حساب واردشده تغییر کرد.",
+  "error.auth.hostCredentialUnavailable": "اطلاعات ورود میزبان از راه دور در دسترس نیست. میزبان را دوباره ثبت کنید.",
+  "error.auth.codeNotVerified": "تأیید کد ورود ممکن نشد.",
+  "error.auth.serviceError": "سرویس حساب خطایی برگرداند.",
+  "error.auth.serviceUnreachable": "OpenBot نتوانست به سرویس حساب دسترسی پیدا کند. اتصال خود را بررسی و دوباره تلاش کنید.",
+  "error.auth.serviceTimeout": "سرویس حساب به‌موقع پاسخ نداد. دوباره تلاش کنید.",
+  "error.auth.serviceStatus": "سرویس حساب خطایی برگرداند ({status}). بعداً دوباره تلاش کنید.",
+  "error.auth.invalidHostedServer": "سرویس حساب، سرور میزبانی‌شدهٔ نامعتبری برگرداند.",
+  "error.auth.codeNotSent": "OpenBot نتوانست کد ورود را بفرستد.",
+  "error.auth.deliveryTimeout": "OpenBot نتوانست تحویل را به‌موقع تأیید کند. شاید کد هنوز برسد؛ پیش از فرستادن دوباره، وضعیت تحویل را بررسی کنید.",
+  "error.auth.deliveryInterrupted": "اتصال پیش از تأیید تحویل از سوی OpenBot پایان یافت. برای جلوگیری از فرستادن کد دیگری، وضعیت تحویل را بررسی کنید.",
+  "error.auth.deliveryUnknown": "OpenBot نتوانست مشخص کند کد ورود فرستاده شده است یا نه. پیش از فرستادن دوباره، وضعیت تحویل را بررسی کنید.",
+  // Company sign-in, which the company's provider does in the browser.
+  "error.auth.companySignInFailed": "ورود سازمانی کامل نشد. دوباره تلاش کنید.",
+  "error.auth.companySignInCancelled": "ورود سازمانی لغو شد.",
+  "error.auth.companySignInTimeout": "ورود سازمانی بیش از حد طول کشید. صفحهٔ ورود را دوباره باز کنید.",
+  "error.auth.companySignInRefused": "ورود به سازمان شما لغو یا رد شد.",
+  "error.auth.companySignInDomainMismatch": "نشانی ایمیل حساب سازمانی، دامنه‌ای دارد که در تنظیمات ثبت نشده است.",
+  "error.auth.companySignInAccountDisabled": "سازمان شما این حساب را غیرفعال کرده است. از مدیرتان کمک بخواهید.",
+  "error.auth.companySignInOff": "ورود سازمانی برای این ایمیل خاموش است.",
+  "error.auth.companySignInEmailMissing": "حساب سازمانی شما نشانی ایمیل تأییدشده‌ای ارائه نکرد.",
+  "error.auth.companySignInUnavailable": "این OpenBot نمی‌تواند برای ورود سازمانی مرورگر باز کند.",
+  "error.auth.companySignInProviderRejected": "ارائه‌دهنده شناسهٔ کارخواه یا راز را نپذیرفت.",
+  "error.auth.companySignInTokenInvalid": "ارائه‌دهنده اطلاعات ورودی‌ای داد که OpenBot نمی‌تواند بررسی کند.",
+  "error.auth.companySignInProviderUnreachable": "ارائه‌دهندهٔ ورود سازمانی پاسخ نداد.",
+  "error.auth.companySignInDomainTaken": "یکی از این دامنه‌ها از قبل از طریق سرور دیگری برای ورود استفاده می‌شود.",
+  "error.auth.companySignInNoServer": "پیش از راه‌اندازی ورود سازمانی، این سرور را اجرا کنید.",
+});
