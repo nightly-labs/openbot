@@ -83,6 +83,12 @@ const READER_INPUT_WINDOW_MS = 250;
  */
 const handledSettingsRequests = new WeakSet<AgentSettingsRequest>();
 
+/**
+ * Message focus requests that a chat has already scrolled to. The request also stays set, so a chat that
+ * mounts again, after a channel or another page, must not scroll back to the message that was picked before.
+ */
+const handledMessageFocusRequests = new WeakSet<NonNullable<ConversationProps["messageFocusRequest"]>>();
+
 /** An http or https page that the built-in browser can show. A relayed sign-in page needs this computer's browser. */
 function builtInBrowserPage(url: string): boolean {
   const page = URL.parse(url);
@@ -1132,7 +1138,6 @@ export function createConversationViewScope(props: ConversationProps) {
   let stickToLatest = true;
   let lastConversationIdentity: string | undefined;
   let lastPanelAgentId: string | undefined;
-  let lastHandledMessageFocusNonce: number | undefined;
   const [quoteRequest, setQuoteRequest] = createSignal<QuoteRequest | undefined>(undefined);
   let lastRuntimeSettingsSignature: string | undefined;
   async function saveAgentPatch(
@@ -1402,7 +1407,7 @@ export function createConversationViewScope(props: ConversationProps) {
       messageIds: props.messages.map((message) => message.id).join("\u0000"),
     }),
     ({ request, agentId, loaded }) => {
-      if (!request || request.agentId !== agentId || !loaded || request.nonce === lastHandledMessageFocusNonce) return;
+      if (!request || request.agentId !== agentId || !loaded || handledMessageFocusRequests.has(request)) return;
       requestAnimationFrame(() => {
         // A message in a group of agent messages has no row of its own, so the group row is the target.
         const messageId = CSS.escape(request.messageId);
@@ -1410,7 +1415,7 @@ export function createConversationViewScope(props: ConversationProps) {
           `[data-chat-search-message="${messageId}"], [data-chat-search-group~="${messageId}"]`,
         );
         if (!target) return;
-        lastHandledMessageFocusNonce = request.nonce;
+        handledMessageFocusRequests.add(request);
         // The message the user picked replaces the opening at the unread divider.
         unreadOpening = { ...unreadOpening, pending: false, holding: false };
         stickToLatest = false;
