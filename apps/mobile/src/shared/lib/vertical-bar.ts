@@ -13,6 +13,15 @@ export function useVerticalBarShown(): boolean {
 }
 
 /**
+ * The edge of the vertical bar, or null when iOS shows none. A change of edge needs the native bar
+ * items placed again, so screens key their toolbars by it.
+ */
+export function useVerticalBarEdge(): string | null {
+  const edge = useVerticalBarEdgeIOS();
+  return isIOS ? (edge ?? null) : null;
+}
+
+/**
  * Whether the window has the shape of iPhone Duo, folded or open. Other iPhones keep the app in a tall
  * portrait window. iPad and Android have their own layouts, so they never match.
  */

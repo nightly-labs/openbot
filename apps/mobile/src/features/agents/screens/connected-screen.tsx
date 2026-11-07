@@ -96,6 +96,7 @@ import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
+import { useVerticalBarEdge, useVerticalBarShown } from "@/shared/lib/vertical-bar";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const ONBOARDING_EXIT = FadeOut.duration(220).easing(EASE_OUT);
@@ -383,6 +384,15 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   const hasSelectedServer = servers.some((server) => server.id === activeServer.id);
   const planLimits = usePlanLimits(activeServer.id);
   const showsPlanLimits = hasSelectedServer && planLimits.rows.length > 0;
+  const planLimitsButton = (
+    <PlanLimitsHeaderButton
+      serverId={activeServer.id}
+      rows={planLimits.rows}
+      accounts={planLimits.accounts}
+      disabled={!planLimits.online}
+      androidGlass={buttonGlass}
+    />
+  );
   // A server that the phone shows from its cache has its list at once, while it connects.
   const showLoader =
     (serverDirectoryState === "loading" && servers.length === 0) ||
@@ -485,9 +495,14 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   );
   const insets = useSafeAreaInsets();
   const barTop = useBarTop();
+  const verticalBar = useVerticalBarShown();
+  const verticalBarEdge = useVerticalBarEdge();
   const scroll = useLargeTitleScroll(pane ? { headerHeight: barTop + PANE_BAR_HEIGHT } : undefined);
   const { headerHeight } = scroll;
   const search = useHomeSearch();
+  // In the vertical bar of iPhone Duo, the native items stay while the list loads or reconnects,
+  // disabled. Hidden and shown again, iOS placed them at the middle of the bar.
+  const barItemsHidden = search.open || (!headerActions && !verticalBar);
   // Search has no bar: the list and the results move up by the bar's height as it opens.
   const searchBarOffset = Math.max(0, headerHeight - insets.top);
   // A new server shows a new list at its top, which sends no scroll event.
@@ -1055,30 +1070,39 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         />
       )}
 
-      {isIOS && headerActions && !pane ? (
+      {isIOS && !pane ? (
         <>
-          <Stack.Toolbar placement="left">
+          {/* The toolbar stays mounted while the list loads or reconnects, and its items hide instead.
+              Removed and added again, the native items came back at the wrong place on iPhone Duo.
+              iOS moves the native bar buttons into the vertical bar of iPhone Duo and keeps custom views at
+              the top. Keyed by the bar's edge, the items are placed again when the bar shows, hides or
+              moves; the custom views leave the toolbar while it shows, as in the chat header. */}
+          <Stack.Toolbar key={`left-${verticalBarEdge ?? "none"}`} placement="left">
             {/* The search takes the screen, so the bar buttons go while it is open. */}
-            <Stack.Toolbar.Button icon="sidebar.leading" hidden={search.open} onPress={openDrawer} />
-            <Stack.Toolbar.View hidesSharedBackground hidden={search.open}>
-              <ConnectionHeaderStatus server={hasSelectedServer ? activeServer : undefined} />
-            </Stack.Toolbar.View>
+            <Stack.Toolbar.Button
+              icon="sidebar.leading"
+              hidden={barItemsHidden}
+              disabled={!headerActions}
+              onPress={openDrawer}
+            />
+            {verticalBar ? null : (
+              <Stack.Toolbar.View hidesSharedBackground hidden={!headerActions || search.open}>
+                <ConnectionHeaderStatus server={hasSelectedServer ? activeServer : undefined} />
+              </Stack.Toolbar.View>
+            )}
           </Stack.Toolbar>
-          <Stack.Toolbar placement="right">
-            <Stack.Toolbar.View hidden={search.open || !showsPlanLimits}>
-              <PlanLimitsHeaderButton
-                serverId={activeServer.id}
-                rows={planLimits.rows}
-                accounts={planLimits.accounts}
-                disabled={!planLimits.online}
-                androidGlass={buttonGlass}
-              />
-            </Stack.Toolbar.View>
+          <Stack.Toolbar key={`right-${verticalBarEdge ?? "none"}`} placement="right">
+            {verticalBar ? null : (
+              <Stack.Toolbar.View hidden={!headerActions || search.open || !showsPlanLimits}>
+                {planLimitsButton}
+              </Stack.Toolbar.View>
+            )}
             <Stack.Toolbar.Menu
               icon="ellipsis"
               accessibilityLabel={t("mobile.agent.home.chatOptions")}
               separateBackground
-              hidden={search.open}
+              hidden={barItemsHidden}
+              disabled={!headerActions}
             >
               {/* Add actions come first, then a divider and the actions on existing chats. */}
               <Stack.Toolbar.Menu inline>
@@ -1132,6 +1156,17 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
               ) : null}
             </Stack.Toolbar.Menu>
           </Stack.Toolbar>
+          {headerActions && verticalBar && !search.open ? (
+            // With the vertical bar, the status and the plan limits stay drawn at the top.
+            <View
+              className="absolute z-20 flex-row items-center justify-between gap-2"
+              pointerEvents="box-none"
+              style={{ top: barTop, left: insets.left + 16, right: insets.right + 16, height: BAR_BUTTON_SIZE }}
+            >
+              <ConnectionHeaderStatus server={hasSelectedServer ? activeServer : undefined} />
+              {showsPlanLimits ? planLimitsButton : null}
+            </View>
+          ) : null}
         </>
       ) : null}
     </View>
