@@ -445,9 +445,10 @@ async function main(): Promise<void> {
     assert.equal(ordinary.page.challenge, undefined, "A long page that mentions a captcha read as a check.");
     recordCases("snapshot-reports-interactive-check", "snapshot-ignores-long-page");
     const stuckCheck = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/stuck-challenge` });
-    assert.equal(stuckCheck.page.challenge?.status, "needs-user", "A check that stayed did not ask for a person.");
     // navigate stops its wait at its own timeout; the next read waits only the rest of the 15 s.
+    assert.equal(stuckCheck.page.challenge?.status, "checking", "A check with wait time left asked for a person.");
     const stuckCheckRest = await readPage("snapshot", { tabId: settleTab.id, image: "never" });
+    assert.equal(stuckCheckRest.page.challenge?.status, "needs-user", "A check that stayed did not ask for a person.");
     assert(
       stuckCheck.ms + stuckCheckRest.ms < 20_000,
       `The reads of one check waited more than once: ${stuckCheck.ms} + ${stuckCheckRest.ms} ms.`,

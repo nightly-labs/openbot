@@ -338,6 +338,8 @@ export class BrowserCdpEngine {
   #documentGeneration = 0;
   /** The document whose loading markers stayed for a full settle wait. Its snapshots do not wait again. */
   #settleTimedOutDocument = -1;
+  /** The `timeOrigin` of the document that already waited for its first content. It does not wait again. */
+  #emptyWaitedDocument = -1;
   readonly #cardScrub: CardValueScrub;
 
   readonly prepareSecret = Effect.fn("BrowserCdp.prepareSecret")(function* (
@@ -792,7 +794,12 @@ export class BrowserCdpEngine {
         // make the agent take a second snapshot. Wait a short time in this one instead. A bot check
         // has its own wait in the tab read.
         const busyWait = settle?.busy === true && this.#settleTimedOutDocument !== documentGeneration;
-        const emptyWait = settle !== null && !settle.busy && parsed.elements.length === 0 && settle.emptyWaitMs > 0;
+        const emptyWait =
+          settle !== null &&
+          !settle.busy &&
+          parsed.elements.length === 0 &&
+          settle.emptyWaitMs > 0 &&
+          settle.document !== this.#emptyWaitedDocument;
         // The second collect needs time before the read's deadline.
         const settleBudget = Math.min(
           busyWait ? SETTLE_BUSY_WAIT_MS : (settle?.emptyWaitMs ?? 0),
@@ -804,6 +811,7 @@ export class BrowserCdpEngine {
           settleBudget > 0 &&
           navigationGeneration === this.#navigationGeneration
         ) {
+          if (emptyWait && settle !== null) this.#emptyWaitedDocument = settle.document;
           const settled = yield* waitForSettle(send, emptyWait, settleBudget);
           if (!settled && busyWait) this.#settleTimedOutDocument = documentGeneration;
           // A page that loads often sets its URL with history.replaceState. That keeps the document.

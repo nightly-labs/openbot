@@ -118,6 +118,8 @@ export function describeChallenge(
   detected: DetectedChallenge | null,
   clearedVendor: string | null,
   waitedMs: number,
+  /** The check passes by itself, and its wait has time left for the next read. */
+  checking = false,
 ): BrowserChallenge | undefined {
   if (detected?.kind === "block")
     return {
@@ -125,6 +127,13 @@ export function describeChallenge(
       status: "blocked",
       waitedMs,
       next: "The site's bot protection refuses this browser. Do not reload or retry; report it to the user.",
+    };
+  if (detected?.kind === "non-interactive" && checking)
+    return {
+      vendor: detected.vendor,
+      status: "checking",
+      waitedMs,
+      next: "The security check is still running. Do not reload or click it; call snapshot, which waits for it.",
     };
   if (detected) return { vendor: detected.vendor, status: "needs-user", waitedMs, next: NEEDS_USER_NEXT };
   if (clearedVendor)

@@ -235,10 +235,17 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
     tab.challengeWait = { document: tab.documents, waitedMs };
   }
   if (!tab.secret) {
+    const sharedWaitMs =
+      tab.challengeWait?.document === tab.documents
+        ? tab.challengeWait.waitedMs
+        : tab.documents === waitDocument
+          ? priorWaitMs
+          : 0;
     const challenge = describeChallenge(
       result.challenge,
       waitedVendor,
       waitedVendor === null ? 0 : Date.now() - waitStarted,
+      CHALLENGE_WAIT_MS - sharedWaitMs > CHALLENGE_POLL_MS,
     );
     if (challenge) result.snapshot.challenge = challenge;
   }

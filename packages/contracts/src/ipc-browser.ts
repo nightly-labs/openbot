@@ -93,8 +93,11 @@ export interface BrowserActionHistoryEntry {
 /** A bot check that the snapshot found on the page, or one that passed while the snapshot waited. */
 export interface BrowserChallenge {
   vendor: string;
-  /** `needs-user`: a person must pass it. `blocked`: the site refuses this browser. */
-  status: "cleared" | "needs-user" | "blocked";
+  /**
+   * `checking`: a check that passes by itself is still running after this read's time ran out.
+   * `needs-user`: a person must pass it. `blocked`: the site refuses this browser.
+   */
+  status: "cleared" | "checking" | "needs-user" | "blocked";
   waitedMs: number;
   /** What the agent does next. */
   next: string;

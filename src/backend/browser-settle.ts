@@ -39,6 +39,8 @@ interface SettleProbe {
   busy: boolean;
   /** How long a page without controls can wait for its first content. 0 means no wait. */
   emptyWaitMs: number;
+  /** `performance.timeOrigin`: one value per document, also when a stopped navigation kept the old one. */
+  document: number;
 }
 
 const evaluateMain = Effect.fn("Browser.evaluateSettle")(function* (
@@ -65,12 +67,13 @@ export const probeSettle = Effect.fn("Browser.probeSettle")(function* (send: Sen
       : document.readyState === "complete"
         ? 0
         : ${SETTLE_EMPTY_WAIT_MS};
-  return { busy: (${BUSY_FUNCTION})(), emptyWaitMs: Math.round(emptyWaitMs) };
+  return { busy: (${BUSY_FUNCTION})(), emptyWaitMs: Math.round(emptyWaitMs), document: performance.timeOrigin };
 })()`,
     false,
   ).pipe(Effect.catch(() => Effect.succeed(undefined)));
-  if (!isDynamicRecord(value) || !isBoolean(value.busy) || !isNumber(value.emptyWaitMs)) return null;
-  return { busy: value.busy, emptyWaitMs: value.emptyWaitMs } satisfies SettleProbe;
+  if (!isDynamicRecord(value) || !isBoolean(value.busy) || !isNumber(value.emptyWaitMs) || !isNumber(value.document))
+    return null;
+  return { busy: value.busy, emptyWaitMs: value.emptyWaitMs, document: value.document } satisfies SettleProbe;
 });
 
 /**
