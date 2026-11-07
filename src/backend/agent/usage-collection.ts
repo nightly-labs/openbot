@@ -204,40 +204,23 @@ export function workflowUsageObserver(
 }
 
 /**
- * Collects the usage of one background memory review under its agent. The review is its own session,
- * so its counters never meet those of the agent's turns.
+ * Collects the usage of one background side session under its agent: a memory review, or an
+ * `openbot.web_search` turn. The side session has its own id, so its counters never meet those of
+ * the agent's turns.
  */
-export function memoryReviewUsageObserver(
+export function sideSessionUsageObserver(
+  kind: "memory-review" | "web-search",
   usage: AgentUsage,
   agentId: string,
   provider: ProviderSession["provider"],
   model: AgentSummary["model"],
 ): (notification: { method: string; params?: unknown }) => void {
-  const session = { id: `memory-review:${randomUUID()}`, provider, createdAt: new Date().toISOString() };
+  const session = { id: `${kind}:${randomUUID()}`, provider, createdAt: new Date().toISOString() };
   return ({ method, params }) => {
     try {
       collectProviderUsage(usage, { id: agentId, model }, session, method, params);
     } catch (error) {
-      logger.warn("Could not save the usage of a memory review.", { provider, error });
-    }
-  };
-}
-
-/**
- * Collects the usage of one `openbot.web_search` turn under the agent that searched. The search is
- * its own Codex session, so its counters never meet those of the agent's turns.
- */
-export function webSearchUsageObserver(
-  usage: AgentUsage,
-  agentId: string,
-  model: AgentSummary["model"],
-): (notification: { method: string; params?: unknown }) => void {
-  const session = { id: `web-search:${randomUUID()}`, provider: "codex" as const, createdAt: new Date().toISOString() };
-  return ({ method, params }) => {
-    try {
-      collectProviderUsage(usage, { id: agentId, model }, session, method, params);
-    } catch (error) {
-      logger.warn("Could not save the usage of a web search.", { error });
+      logger.warn("Could not save the usage of a side session.", { kind, provider, error });
     }
   };
 }

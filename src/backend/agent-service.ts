@@ -227,7 +227,7 @@ import {
 import { ThreadLifecycle } from "./agent/thread-lifecycle";
 import { ToolOperationFailed, toToolOperationFailed } from "./agent/tool-operation";
 import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
-import { memoryReviewUsageObserver, webSearchUsageObserver, workflowUsageObserver } from "./agent/usage-collection";
+import { sideSessionUsageObserver, workflowUsageObserver } from "./agent/usage-collection";
 import { toUsageReadFailed, UsageLimitGate, type UsageLimitKey } from "./agent/usage-limit-gate";
 import { WarmGenerations } from "./agent/warm-generations";
 import type { WebhookRoutineWriter } from "./agent/webhook-routine-tool";
@@ -666,7 +666,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         this.#providers.ensureProvider(agent.provider).pipe(Effect.map(() => this.#agentModels(agent))),
       createProfileClient: (agent) => this.#providers.createProfileClient(agent.provider, agent.providerAccountId),
       usageObserver: (agent, model) =>
-        memoryReviewUsageObserver(this.#store.database.usage, agent.id, agent.provider, model.id),
+        sideSessionUsageObserver("memory-review", this.#store.database.usage, agent.id, agent.provider, model.id),
       chat: (agentId, sideThreadId) => {
         const loaded = sideThreadId
           ? this.#conversation.loadedExecutionSnapshot(sideThreadId)
@@ -4846,7 +4846,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           { ...model, defaultReasoningEffort: effort },
           query,
           cancelled,
-          webSearchUsageObserver(this.#store.database.usage, agent.id, model.id),
+          sideSessionUsageObserver("web-search", this.#store.database.usage, agent.id, "codex", model.id),
           "webSearch",
         ),
       )

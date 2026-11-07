@@ -16,9 +16,6 @@ export const CODEX_UNFIT_SKILLS = [
   "work-pets:update-pet",
 ] as const;
 
-/** One `[[skills.config]]` entry: Codex selects the skill by `name` or by the `path` of its `SKILL.md`. */
-export type CodexSkillConfig = DynamicRecord;
-
 export interface CodexPromptSettings {
   /**
    * `tool_suggest` lists the account's plugins that are not installed and declares
@@ -26,7 +23,8 @@ export interface CodexPromptSettings {
    * plugin, and OpenBot only shows Accept and Decline, so the install never completes.
    */
   "features.tool_suggest"?: false;
-  "skills.config"?: CodexSkillConfig[];
+  /** `[[skills.config]]` entries: Codex selects a skill by `name` or by the `path` of its `SKILL.md`. */
+  "skills.config"?: DynamicRecord[];
 }
 
 /**
