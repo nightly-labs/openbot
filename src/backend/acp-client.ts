@@ -218,6 +218,8 @@ interface AcpTurn {
    * the turn ends with: that error is then a sentence for the user. Null: the error decides.
    */
   failureCause: CauseCode | null;
+  /** The page where the user fixes the account that failed this turn (`accountLink`), or null. */
+  accountLink: string | null;
   /**
    * Where the answer text stood when Antigravity logged that its SDK failed this prompt. The
    * server then sends the failure as answer text and ends the turn as a success.
@@ -2219,6 +2221,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       providerError: null,
       signInLost: false,
       failureCause: null,
+      accountLink: null,
       sdkFailureAt: null,
       answerOptional,
       messages: [],
@@ -2307,7 +2310,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           // A turn that already produced output (such as a tool call) or needs no answer can end on
           // an empty model step, which Antigravity's harness reports as an empty-output error (#4505).
           if (!((turn.receivedOutput || turn.answerOptional) && sdkHarness.emptyOutputFailure?.test(detail))) {
-            turn.failureCause = classifyFailure(detail);
+            turn.accountLink = sdkHarness.accountLink?.(detail) ?? null;
+            turn.failureCause = turn.accountLink ? "authentication" : classifyFailure(detail);
             turn.providerError = sdkHarness.turnFailure(detail);
           }
         }
@@ -3162,7 +3166,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       const causeCode = turn.failureCause ?? acpFailureCause(error, this.#flavor, message);
       this.emit("notification", {
         method: "error",
-        params: { threadId: thread.id, turnId: turn.id, message, causeCode },
+        params: {
+          threadId: thread.id,
+          turnId: turn.id,
+          message,
+          causeCode,
+          ...(turn.accountLink ? { link: turn.accountLink } : {}),
+        },
       });
     }
     const append = this.options.history?.append;
