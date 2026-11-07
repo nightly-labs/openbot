@@ -64,7 +64,8 @@ import { withTimeout } from "./with-timeout";
 
 /**
  * OpenBot's OAuth client metadata document. `apps/auth-api` serves it, and its `redirect_uris`
- * must hold every address that `redirectUrl` can be.
+ * must hold every address that `redirectUrl` can be for this document. The `localhost` form comes
+ * only from an RFC 7591 registration, never from this document.
  */
 const MCP_CLIENT_METADATA_URL = "https://openbot.run/oauth/mcp-client.json";
 
