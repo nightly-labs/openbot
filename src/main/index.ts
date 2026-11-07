@@ -60,6 +60,7 @@ import { takeHostingDeveloperKey } from "./hosted-server-service";
 import { accountIpcHandlers } from "./ipc/account-handlers";
 import { acpRegistryIpcHandlers } from "./ipc/acp-registry-handlers";
 import { agentAdminIpcHandlers } from "./ipc/agent-admin-handlers";
+import { agentDockIpcHandlers } from "./ipc/agent-dock-handlers";
 import { agentFolderIpcHandlers } from "./ipc/agent-folder-handlers";
 import { agentIpcHandlers } from "./ipc/agent-handlers";
 import { agentImportIpcHandlers } from "./ipc/agent-import-handlers";
@@ -734,6 +735,7 @@ function registerIpcHandlers({
   speech,
   voiceServer,
   dynamicIsland,
+  agentDock,
   cuaDriver,
   computerUsePermissionHelp,
   storageUsage,
@@ -795,6 +797,7 @@ function registerIpcHandlers({
       startup,
     }),
     ...dynamicIslandIpcHandlers({ dynamicIsland }),
+    ...agentDockIpcHandlers({ agentDock }),
     ...browserDockIpcHandlers({ browserDock }),
     ...computerUseIpcHandlers({
       cuaDriver,
@@ -1372,6 +1375,7 @@ if (!hasSingleInstanceLock) {
         remoteServers,
         updater,
         dynamicIsland,
+        agentDock,
         teamStore,
         language,
         logoColor,
@@ -1626,6 +1630,15 @@ if (!hasSingleInstanceLock) {
       screen.on("display-removed", reconcileDynamicIsland);
       screen.on("display-metrics-changed", reconcileDynamicIsland);
       powerMonitor.on("resume", reconcileDynamicIsland);
+      // The agent dock window opens when the main renderer publishes the dock; this only moves it.
+      const reconcileAgentDock = () =>
+        void Effect.runPromise(agentDock.reconcileWindow()).catch((error) =>
+          logger.error("Unable to place the agent dock:", toLogValue(error)),
+        );
+      screen.on("display-added", reconcileAgentDock);
+      screen.on("display-removed", reconcileAgentDock);
+      screen.on("display-metrics-changed", reconcileAgentDock);
+      powerMonitor.on("resume", reconcileAgentDock);
       powerMonitor.on("resume", () => void Effect.runPromise(remoteServers.wake()));
       // A Slack socket can be dead after sleep without knowing it; reconnect instead of waiting for a ping.
       powerMonitor.on("resume", () => built.messaging.resume());
@@ -1864,6 +1877,7 @@ async function prepareForShutdown(deadlineMs = SHUTDOWN_DEADLINE_MS): Promise<vo
   // After the bounds are saved.
   hideWindowsForQuit();
   services?.dynamicIsland.destroy();
+  services?.agentDock.destroy();
   macHapticFeedback.destroy();
   await teardown.runAll();
   runMarker?.clean();

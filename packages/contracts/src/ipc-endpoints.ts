@@ -59,6 +59,14 @@ import type {
   UpdateAgentTaskLimitInput,
 } from "./ipc-agent-admin";
 import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics";
+import type {
+  AgentDockAction,
+  AgentDockDisplayInfo,
+  AgentDockDragPhase,
+  AgentDockOffset,
+  AgentDockPresentation,
+  SetAgentDockInteractiveInput,
+} from "./ipc-agent-dock";
 import type { AgentIpcRequest, ScopedAgentEvent } from "./ipc-agent-events";
 import type {
   AddAgentFolderInput,
@@ -982,6 +990,27 @@ export const IPC_ENDPOINTS = {
     setFrame: request<BrowserDockFrame, void>()("browser-dock:set-frame"),
     /** Whether the overlay shows the dock over the page. While it does, the dock in the renderer is inert. */
     shown: event<boolean>()("browser-dock:shown"),
+  },
+  /**
+   * The agent dock in its own window at the right edge of the screen. The main renderer publishes it and
+   * does its actions; the dock window shows it and sends the actions back. Main sends the messages.
+   */
+  agentDock: {
+    /** Null hides the dock window. */
+    publishPresentation: request<AgentDockPresentation | null, void>()("agent-dock:publish-presentation"),
+    getPresentation: request<undefined, AgentDockPresentation | null>()("agent-dock:get-presentation"),
+    presentation: event<AgentDockPresentation | null>()("agent-dock:presentation"),
+    performAction: request<AgentDockAction, void>()("agent-dock:perform-action"),
+    action: event<AgentDockAction>()("agent-dock:action"),
+    setInteractive: request<SetAgentDockInteractiveInput, void>()("agent-dock:set-interactive"),
+    /** Closes the chat of a dock window, because the dock on another display opened a chat. */
+    closeChat: event<undefined>()("agent-dock:close-chat"),
+    /** The connected displays, for the display setting of the dock. */
+    listDisplays: request<undefined, AgentDockDisplayInfo[]>()("agent-dock:list-displays"),
+    /** A drag of the dock body moves its window up or down the screen edge. */
+    drag: request<AgentDockDragPhase, void>()("agent-dock:drag"),
+    /** The position where a drag left the dock, for the main renderer to save. */
+    moved: event<AgentDockOffset>()("agent-dock:moved"),
   },
   computerUse: {
     getState: request<undefined, ComputerUseState>()("computer-use:get-state"),
@@ -2154,6 +2183,7 @@ export const IPC_GROUP_PATHS = {
   voice: "voice",
   dynamicIsland: "dynamicIsland",
   browserDock: "browserDock",
+  agentDock: "agentDock",
   computerUse: "computerUse",
   macAutomation: "macAutomation",
   backgroundProcesses: "backgroundProcesses",

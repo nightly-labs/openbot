@@ -8,14 +8,7 @@ import { activeServerHasProviderSettings, serverSupportsCapability } from "../se
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
-import {
-  dynamicIslandSettingsShown,
-  navItem,
-  navItems,
-  type SettingsTab,
-  settingsRowShown,
-  settingsTabShown,
-} from "../settings/settings-tabs";
+import { navItem, navItems, type SettingsTab, settingsRowShown, settingsTabShown } from "../settings/settings-tabs";
 import { ServerSettingsPageTitle, SettingsPageFrame } from "./SettingsPageFrame";
 import { type SettingsKind, useWindowPage } from "./window-page-context";
 
@@ -85,7 +78,7 @@ export function SettingsPage(props: { kind: SettingsKind }) {
   const { activeServer } = useServers();
   const [query, setQuery] = createSignal("");
   const tabShown = (tab: SettingsTab) =>
-    settingsTabShown(tab, dynamicIslandSettingsShown(platform.appInfo()?.platform, platform.chatWindow !== null));
+    settingsTabShown(tab, { platform: platform.appInfo()?.platform, chatWindow: platform.chatWindow !== null });
   /** The rows of the tabs shown on this computer, then the sections that the active server's settings show. */
   const searchRows = (): SearchRow[] => {
     const server = activeServer();

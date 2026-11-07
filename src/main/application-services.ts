@@ -145,6 +145,7 @@ import {
   type AgentDefaultsPreferenceStore,
   createAgentDefaultsPreferenceStore,
 } from "./agent-defaults-preference-store";
+import { AgentDockFailed, AgentDockWindowController, toAgentDockFailed } from "./agent-dock-window";
 import { AgentImportService } from "./agent-import-service";
 import { AgentInitializationGate } from "./agent-initialization";
 import { AgentMarketplaceService } from "./agent-marketplace-service";
@@ -260,9 +261,11 @@ import {
   computerUseDesktopPoint,
   computerUseDesktopRect,
   computerUseDisplays,
+  createAgentDockWindow,
   createComputerUseHighlightWindow,
   createComputerUsePermissionHelpWindow,
   createDynamicIslandWindow,
+  loadAgentDockRenderer,
   loadBrowserDockRenderer,
   loadComputerUseHighlightRenderer,
   loadComputerUsePermissionHelpRenderer,
@@ -487,6 +490,7 @@ const TEARDOWN_ORDER = {
   computerUseHighlight: 18,
   computerUsePermissionHelp: 19,
   dynamicIsland: 20,
+  agentDock: 20.5,
   machineAlerts: 21,
   themePalettes: 22,
   // Before the browser, so no sign-in opens a tab while it stops.
@@ -708,6 +712,7 @@ export interface ApplicationServices {
   speech: VoiceSpeechService;
   voiceServer: VoiceServerService;
   dynamicIsland: DynamicIslandWindowController;
+  agentDock: AgentDockWindowController;
   cuaDriver: CuaDriverRuntime;
   computerUseHighlight: ComputerUseHighlightController;
   computerUsePermissionHelp: ComputerUsePermissionHelpWindowController;
@@ -1053,6 +1058,37 @@ export async function createApplicationServices({
       }),
   });
   teardown.push(TEARDOWN_ORDER.dynamicIsland, "the Dynamic Island", () => dynamicIsland.destroy());
+  const agentDock = new AgentDockWindowController({
+    platform: process.platform,
+    createWindow: createAgentDockWindow,
+    loadWindow: loadAgentDockRenderer,
+    screen,
+    getMainWindow: windows.getMainWindow,
+    ensureMainWindow: windows.ensureMainWindow,
+    presentMainWindow: showMainWindow,
+    // The same send as a reply from the Dynamic Island: main sends it to the local or the remote agent.
+    sendMessage: (action) =>
+      Effect.suspend(() => {
+        if (!criticalActionTargets) {
+          return Effect.fail(new AgentDockFailed({ cause: new Error(sourceText("error.app.notReady")) }));
+        }
+        const { agents, host, remoteServers } = criticalActionTargets;
+        return performDynamicIslandCriticalAction(
+          {
+            type: "send-message",
+            serverId: action.serverId,
+            agentId: action.agentId,
+            text: action.text,
+            clientMessageId: action.clientMessageId,
+          },
+          agents,
+          remoteServers,
+          { decodeVoid, decodeQueuedMessageReceipt },
+          () => host.conversationSender(),
+        ).pipe(toAgentDockFailed);
+      }),
+  });
+  teardown.push(TEARDOWN_ORDER.agentDock, "the agent dock", () => agentDock.destroy());
   const centralAuthApiUrl = readCentralAuthApiUrl(
     process.env.OPENBOT_AUTH_API_URL,
     app.isPackaged ? "https://api.openbot.run" : "http://127.0.0.1:3100",
@@ -3840,6 +3876,7 @@ export async function createApplicationServices({
     speech,
     voiceServer,
     dynamicIsland,
+    agentDock,
     cuaDriver,
     computerUseHighlight,
     computerUsePermissionHelp,

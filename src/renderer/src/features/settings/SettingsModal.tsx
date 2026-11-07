@@ -48,6 +48,7 @@ import { licenseContactUs, trackLicenseEvent } from "./license-analytics";
 import { createNotificationLevelsStore } from "./notification-levels-store";
 import { createProfileActivityStore } from "./profile-activity-store";
 import { renderProfileShareImage } from "./profile-share-image";
+import { type AgentDockSettingsModel, SettingsAgentDockTab } from "./SettingsAgentDockTab";
 import { createSettingsAgentsSection } from "./SettingsAgentsSection";
 import { SettingsDynamicIslandTab } from "./SettingsDynamicIslandTab";
 import { SettingsGeneralTab } from "./SettingsGeneralTab";
@@ -69,6 +70,8 @@ export interface SettingsModalProps {
   chatWindow?: boolean;
   /** The built-in display's notch, null when it has none, or undefined before main answers. */
   builtInDisplayGeometry?: DynamicIslandGeometry | undefined;
+  /** The agents of the active server for the Agent dock tab. Without it, the tab does not show. */
+  agentDock?: AgentDockSettingsModel | undefined;
   /** The servers that the Notifications and Dynamic Island tabs list. */
   servers?: readonly ServerSummary[];
   /** Writes the notification level of a server. Resolves after `servers` shows it. */
@@ -190,7 +193,14 @@ export function SettingsModal(props: SettingsModalProps) {
       agents.showList();
     },
   );
-  const visibleNavItems = () => navItems.filter((item) => settingsTabShown(item.value, dynamicIslandShown()));
+  const agentDockShown = () =>
+    props.appInfo?.platform === "darwin" && props.chatWindow !== true && props.agentDock !== undefined;
+  const visibleNavItems = () =>
+    navItems.filter(
+      (item) =>
+        settingsTabShown(item.value, { platform: props.appInfo?.platform, chatWindow: props.chatWindow === true }) &&
+        (item.value !== "agent-dock" || agentDockShown()),
+    );
 
   const title = () => i18n.t(navItem(activeTab()).titleKey);
   const agentsCrumb = () => (activeTab() === "agents" ? agents.crumb() : null);
@@ -207,6 +217,7 @@ export function SettingsModal(props: SettingsModalProps) {
         value === "notifications" ||
         value === "voice" ||
         (value === "dynamic-island" && dynamicIslandShown()) ||
+        (value === "agent-dock" && agentDockShown()) ||
         value === "computer-use" ||
         value === "profile" ||
         value === "billing" ||
@@ -345,6 +356,14 @@ export function SettingsModal(props: SettingsModalProps) {
               onUpdateSettings={updateSettings}
             />
           </Tabs.Content>
+        </Show>
+
+        <Show when={agentDockShown() && props.agentDock}>
+          {(model) => (
+            <Tabs.Content value="agent-dock" class="settings-modal-tab-panel" data-tab="agent-dock">
+              <SettingsAgentDockTab model={model()} selectMount={modalElement} />
+            </Tabs.Content>
+          )}
         </Show>
 
         <Tabs.Content value="computer-use" class="settings-modal-tab-panel" data-tab="computer-use">
