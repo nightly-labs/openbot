@@ -75,11 +75,14 @@ function readPreference(): AgentDockPreference {
   }
 }
 
-function readSeats(serverId: string): string[] {
+/** The saved agents of a server's dock. Null when the user never changed that dock. */
+function readSeats(serverId: string): string[] | null {
   const unsaved = unsavedSeats.get(serverId);
   if (unsaved) return unsaved;
   try {
-    const parsed = seatsSchema.parse(JSON.parse(window.localStorage.getItem(SEATS_PREFIX + serverId) ?? "[]"));
+    const raw = window.localStorage.getItem(SEATS_PREFIX + serverId);
+    if (raw === null) return null;
+    const parsed = seatsSchema.parse(JSON.parse(raw));
     return [...new Set(parsed.flatMap((id) => (id ? [id] : [])))];
   } catch {
     return [];
@@ -134,10 +137,17 @@ export function saveAgentDockOffset(moved: AgentDockOffset): void {
   });
 }
 
-/** The agents on the dock of a server, in order. Read it in a memo: each read parses the saved list. */
-export function agentDockSeats(serverId: string): string[] {
+/** The number of agents on a dock that the user never changed. */
+const AGENT_DOCK_DEFAULT_SEATS = 3;
+
+/**
+ * The agents on the dock of a server, in order. Until the user adds or removes an agent, the dock
+ * shows the first agents of `agentOrder`, the sidebar order without hidden agents. Read it in a memo:
+ * each read parses the saved list.
+ */
+export function agentDockSeats(serverId: string, agentOrder: readonly string[]): string[] {
   seatsVersion();
-  return readSeats(serverId);
+  return readSeats(serverId) ?? agentOrder.slice(0, AGENT_DOCK_DEFAULT_SEATS);
 }
 
 export function setAgentDockSeats(serverId: string, seats: readonly string[]): void {
