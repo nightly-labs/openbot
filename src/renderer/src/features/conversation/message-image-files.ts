@@ -41,16 +41,20 @@ export function createMessageImageFiles(
 
   async function read(file: MessageImageFile, agentId: string | undefined): Promise<string | null> {
     if (file.kind === "workspace" && !agentId) return null;
+    const shared = () => agent.previewSharedFile({ path: file.path, maxBytes: INLINE_IMAGE_BYTES });
     const preview =
       file.kind === "shared"
-        ? await agent.previewSharedFile({ path: file.path, maxBytes: INLINE_IMAGE_BYTES })
-        : await agent.previewWorkspaceFile({
-            agentId: agentId ?? "",
-            path: file.path,
-            maxBytes: INLINE_IMAGE_BYTES,
-            // An inline image shows only the file that the answer names, not an older file with the same name.
-            exactPath: true,
-          });
+        ? await shared()
+        : await agent
+            .previewWorkspaceFile({
+              agentId: agentId ?? "",
+              path: file.path,
+              maxBytes: INLINE_IMAGE_BYTES,
+              // An inline image shows only the file that the answer names, not an older file with the same name.
+              exactPath: true,
+            })
+            // The host reads `Shared/…` as a shared file, as the chip does when the workspace has none (#5657).
+            .catch((error: unknown) => (/^Shared[/\\]/u.test(file.path) ? shared() : Promise.reject(error)));
     releaseFilePreviewPage(preview.pageUrl);
     const type = preview.mimeType.split(";")[0]?.trim().toLowerCase() ?? "";
     if (preview.previewKind !== "image" || !preview.bytes || !INLINE_IMAGE_TYPES.has(type)) return null;
