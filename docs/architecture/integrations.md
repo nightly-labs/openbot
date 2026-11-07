@@ -204,10 +204,10 @@ capability answers that the sign-in must be done on the host.
 - The client sends only the query of the callback. The host checks `state` against the page address
   that its own sign-in made. A client can never choose a host port, host name or path.
 - The host names a callback only for `http:` on `127.0.0.1`, `localhost` or `[::1]`, with a port.
-- The host chooses the page, so a host that is not honest could ask for a grant of another account
-  in the user's browser. The client therefore:
-  - opens only an `https:` page, and only when the user clicks "Open sign-in page" in the dialog
-    that shows the page's host name;
+- The host chooses the page. The client therefore:
+  - opens only an `https:` page. The desktop app opens it as soon as the sign-in waits, and the
+    dialog shows the page's host name, with "Open sign-in page" to open it again. The browser client
+    opens it only on that click, because a browser blocks a page that no click opened;
   - reads the callback port and path from the page's `redirect_uri`, not from the host's `callback`;
   - refuses a page with no `state`, so its listener hands on only the callback of this sign-in.
 - The client listener refuses a request whose `Host` header is not a loopback name, a method that
@@ -234,7 +234,7 @@ capability answers that the sign-in must be done on the host.
 
 - [ ] The host builds the full callback address from its own record. The client sends only a query.
 - [ ] The host checks `state` before it delivers. The client refuses a page with no `state`.
-- [ ] Nothing opens the page before the user sees its host name and asks.
+- [ ] The client opens only an `https:` page, and the dialog shows its host name.
 - [ ] One flow completes once, for one member, before its deadline.
 - [ ] The code is registered with `registerSecretValue` and never logged.
 - [ ] The route uses `requireAdmin`, and its codec is in an optional capability (not in bootstrap).

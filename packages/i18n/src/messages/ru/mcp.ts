@@ -150,12 +150,10 @@ export const messages = {
   "mcp.panel.removeApp": "Удалить приложение",
   "mcp.panel.appSaved": "Приложение сохранено. Войдите, чтобы использовать его.",
   "mcp.panel.appRemoved": "Приложение удалено.",
-  "mcp.signIn.relayDescription":
-    "Убедитесь, что страница входа находится на {page}, затем откройте её в браузере. Когда вы закончите, OpenBot отправит вход на {host}.",
+  "mcp.signIn.relayDescription": "Войдите на {page} в браузере. Когда вы закончите, OpenBot отправит вход на {host}.",
   "mcp.signIn.relayOpenDescription":
-    "Откройте страницу входа {page} в своём браузере. Когда закончите, вставьте сюда показанный адрес. Затем OpenBot отправит вход на {host}.",
-  "mcp.signIn.relayDeviceDescription":
-    "Убедитесь, что страница входа находится на {page}, затем откройте её в браузере и завершите вход там. {host} сам обнаружит вход.",
+    "Войдите на {page} в браузере. Когда закончите, вставьте сюда показанный адрес. Затем OpenBot отправит вход на {host}.",
+  "mcp.signIn.relayDeviceDescription": "Войдите на {page} в браузере и завершите вход там. {host} сам обнаружит вход.",
   "mcp.signIn.relayOpen": "Открыть страницу входа",
   "mcp.signIn.relayPasteHint": "Если браузер не вернулся в OpenBot, скопируйте показанный адрес и вставьте его сюда.",
   "mcp.signIn.relayPasteRequired":
