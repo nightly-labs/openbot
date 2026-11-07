@@ -304,6 +304,8 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Connectez-vous avec Nous Portal ou exécutez `hermes setup` dans un terminal pour utiliser Hermes.",
   "error.provider.usageLimitReached": "Le compte a atteint sa limite d’utilisation.",
+  "error.provider.claudeApiKeyNoCredit":
+    "La clé API Anthropic n'a pas de crédit API. Un forfait Claude ne paie pas les requêtes faites avec une clé API. Ajoutez du crédit dans l'Anthropic Console, ou connectez-vous à Claude dans les réglages et sélectionnez le compte Claude dans le menu des modèles de l'agent.",
   "error.provider.foreignReasoning":
     "{provider} n’a pas accepté le raisonnement précédent de cette conversation, car un autre compte ou une autre clé API l’a reçu. OpenBot a ouvert une nouvelle session {provider} avec l’historique de la conversation. Réessayez.",
   "error.provider.opencodeSessionRejected":

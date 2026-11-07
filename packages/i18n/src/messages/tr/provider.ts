@@ -161,7 +161,7 @@ export const messages = {
   "provider.geminiKey.label": "Gemini API anahtarı",
   "provider.claudeKey.title": "Anthropic API anahtarı",
   "provider.claudeKey.description":
-    'Ana bilgisayara bir Anthropic API anahtarı kaydedin. Anthropic her isteği anahtara faturalar. Bir ajan için kullanmak üzere ajanın model menüsünde "API anahtarı" hesabını seçin. Claude\'da oturum açık değilse tüm ajanlar anahtarı kullanır.',
+    'Ana bilgisayara bir Anthropic API anahtarı kaydedin. Anthropic her isteği Claude planınıza değil, anahtarın API kredisine faturalar. Bir ajan için kullanmak üzere ajanın model menüsünde "API anahtarı" hesabını seçin. Claude\'da oturum açık değilse tüm ajanlar anahtarı kullanır.',
   "provider.claudeKey.label": "Anthropic API anahtarı",
   "provider.inceptionKey.title": "Inception API anahtarı",
   "provider.inceptionKey.description":

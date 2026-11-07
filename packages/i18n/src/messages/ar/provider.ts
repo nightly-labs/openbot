@@ -177,7 +177,7 @@ export const messages = {
   "provider.geminiKey.label": "مفتاح Gemini API",
   "provider.claudeKey.title": "مفتاح Anthropic API",
   "provider.claudeKey.description":
-    "احفظ مفتاح Anthropic API على المضيف. تحتسب Anthropic كل طلب على المفتاح. لاستخدامه لوكيل، اختر حساب مفتاح API في قائمة نموذج الوكيل. عندما لا يكون Claude مسجّل الدخول، يستخدم كل الوكلاء المفتاح.",
+    "احفظ مفتاح Anthropic API على المضيف. تحتسب Anthropic كل طلب على رصيد API للمفتاح، وليس على خطة Claude. لاستخدامه لوكيل، اختر حساب مفتاح API في قائمة نموذج الوكيل. عندما لا يكون Claude مسجّل الدخول، يستخدم كل الوكلاء المفتاح.",
   "provider.claudeKey.label": "مفتاح Anthropic API",
   "provider.codexKey.title": "تسجيل الدخول بمفتاح OpenAI API",
   "provider.codexKey.description":
@@ -301,7 +301,7 @@ export const messages = {
   "provider.settings.keyAlternative": "أو الصق مفتاح {name} API.",
   "provider.settings.geminiKeyInUse": "يستخدم Gemini هذا المفتاح، لا خطة Google AI. لا يُعرض استخدام الخطة.",
   "provider.settings.claudeKeyInUse":
-    "اختر حساب مفتاح API في قائمة نموذج الوكيل. عندما لا يكون Claude مسجّل الدخول، يستخدم كل الوكلاء المفتاح.",
+    "تحتسب Anthropic رصيد API للمفتاح، وليس خطة Claude. اختر حساب مفتاح API في قائمة نموذج الوكيل. عندما لا يكون Claude مسجّل الدخول، يستخدم كل الوكلاء المفتاح.",
   "provider.settings.codexKeyInUse":
     "يستخدم ChatGPT هذا المفتاح، لا خطة ChatGPT. تحتسب OpenAI كل طلب على المفتاح. لا يُعرض استخدام الخطة.",
   "provider.settings.codexKeyAlternative": "أو سجّل الدخول بمفتاح OpenAI API. تحتسب OpenAI كل طلب على المفتاح.",

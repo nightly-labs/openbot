@@ -288,6 +288,8 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Hermes'i kullanmak için Nous Portal ile oturum açın veya bir terminalde `hermes setup` komutunu çalıştırın.",
   "error.provider.usageLimitReached": "Hesap kullanım sınırına ulaştı.",
+  "error.provider.claudeApiKeyNoCredit":
+    "Anthropic API anahtarında API kredisi yok. Claude planı, API anahtarıyla yapılan istekleri ödemez. Anthropic Console'da kredi ekleyin ya da Ayarlar'da Claude'da oturum açıp ajanın model menüsünde Claude hesabını seçin.",
   "error.provider.foreignReasoning":
     "Farklı bir hesap veya API anahtarı aldığı için {provider} bu sohbetteki önceki akıl yürütmeyi kabul etmedi. OpenBot sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.opencodeSessionRejected":

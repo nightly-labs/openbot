@@ -172,7 +172,7 @@ export const messages = defineMessages("provider", {
   "provider.geminiKey.label": "Gemini API key",
   "provider.claudeKey.title": "Anthropic API key",
   "provider.claudeKey.description":
-    "Save an Anthropic API key on the host. Anthropic bills each request to the key. To use it for an agent, select the API key account in the agent's model menu. When Claude is not signed in, all agents use the key.",
+    "Save an Anthropic API key on the host. Anthropic bills each request to the key's API credit, not to your Claude plan. To use it for an agent, select the API key account in the agent's model menu. When Claude is not signed in, all agents use the key.",
   "provider.claudeKey.label": "Anthropic API key",
   "provider.codexKey.title": "Log in with an OpenAI API key",
   "provider.codexKey.description":
@@ -278,7 +278,7 @@ export const messages = defineMessages("provider", {
   "provider.settings.keyAlternative": "Or paste a {name} API key.",
   "provider.settings.geminiKeyInUse": "Gemini uses this key, not your Google AI plan. The plan's usage is not shown.",
   "provider.settings.claudeKeyInUse":
-    "Select the API key account in an agent's model menu. When Claude is not signed in, all agents use the key.",
+    "Anthropic bills the key's API credit, not your Claude plan. Select the API key account in an agent's model menu. When Claude is not signed in, all agents use the key.",
   "provider.settings.codexKeyInUse":
     "ChatGPT uses this key, not your ChatGPT plan. OpenAI bills each request to the key. The plan's usage is not shown.",
   "provider.settings.codexKeyAlternative": "Or log in with an OpenAI API key. OpenAI bills each request to the key.",

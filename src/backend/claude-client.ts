@@ -180,6 +180,19 @@ const OPENBOT_CLAUDE_CLIENT = {
   CLAUDE_CODE_ENTRYPOINT: "openbot",
 };
 /**
+ * The client labels for a CLI environment. Anthropic bills a request with a label other than `sdk-*`
+ * as Claude Code, and promotional API credit can leave Claude Code out: a key with $200 of such credit
+ * got "Credit balance is too low" with `openbot`, and an answer with `sdk-ts` (#5550). An API key has
+ * no 5-hour window, so a request with a key keeps the SDK label.
+ */
+function withClaudeClientLabels(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return {
+    ...environment,
+    ...OPENBOT_CLAUDE_CLIENT,
+    ...(environment.ANTHROPIC_API_KEY ? { CLAUDE_CODE_ENTRYPOINT: "sdk-ts" } : {}),
+  };
+}
+/**
  * The name of a new Claude session. Without one, the CLI sends an extra model request at the first
  * prompt to make a title (about 1.2k input tokens) that OpenBot never shows. Only a new session gets
  * it: the CLI does not name a resumed session, and a title on resume would rename an older session.
@@ -731,11 +744,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       mcpServers: {},
       strictMcpConfig: true,
       persistSession: false,
-      env: {
-        ...claudeEnvironment(this.#cli),
-        ...this.#environment(this.#onApiKey),
-        ...OPENBOT_CLAUDE_CLIENT,
-      },
+      env: withClaudeClientLabels({ ...claudeEnvironment(this.#cli), ...this.#environment(this.#onApiKey) }),
     };
   }
 
@@ -1163,12 +1172,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           ...(plugins.length ? { plugins } : {}),
           mcpServers,
           env: {
-            ...claudeEnvironment(this.#cli),
-            // The login shell's `PATH`, so the Bash tool and hooks find Homebrew and `~/.local/bin`
-            // tools when Finder starts OpenBot. An `env.PATH` in the Claude settings still wins.
-            ...(launchPath ? { PATH: launchPath } : {}),
-            ...this.#environment(this.#onApiKey),
-            ...OPENBOT_CLAUDE_CLIENT,
+            ...withClaudeClientLabels({
+              ...claudeEnvironment(this.#cli),
+              // The login shell's `PATH`, so the Bash tool and hooks find Homebrew and `~/.local/bin`
+              // tools when Finder starts OpenBot. An `env.PATH` in the Claude settings still wins.
+              ...(launchPath ? { PATH: launchPath } : {}),
+              ...this.#environment(this.#onApiKey),
+            }),
             // Without a terminal, the CLI gives the newer models no TodoWrite or task tools, so the
             // agent has no plan for OpenBot to show as a task list.
             CLAUDE_CODE_ENABLE_TODO_TOOLS: "1",
@@ -2389,8 +2399,16 @@ function removeClaudeQueryFile(file: string | null): Effect.Effect<void> {
  */
 const CLAUDE_SANDBOX_UNAVAILABLE = /Sandbox required but unavailable: (.+?)\.? Set sandbox\.failIfUnavailable=false/s;
 
+/**
+ * The CLI's report of an Anthropic API key with no API credit: "Credit balance is too low", from the
+ * API's "Your credit balance is too low to access the Anthropic API" (Claude Code 2.1.309). A Claude
+ * plan does not pay for API key requests, and a plan subscriber read it as a fault (#5550).
+ */
+const CLAUDE_API_CREDIT_EMPTY = /\bcredit balance (?:is )?too low\b/iu;
+
 function claudeTurnError(error: unknown): string {
   const text = String(error);
+  if (CLAUDE_API_CREDIT_EMPTY.test(text)) return sourceText("error.provider.claudeApiKeyNoCredit");
   const reason = CLAUDE_SANDBOX_UNAVAILABLE.exec(text)?.[1];
   return reason ? sourceText("error.agent.claudeSandboxUnavailable", { reason }) : text;
 }
