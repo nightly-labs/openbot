@@ -131,7 +131,11 @@ const report: {
   cli: Pick<ClaudeCliInfo, "executable" | "version" | "source">;
   model: string;
   runs: RunReport[];
-} = { cli: { executable: cli.executable, version: cli.version, source: cli.source }, model: MODEL, runs: [] };
+} = {
+  cli: { executable: cli.executable, version: cli.version, ...(cli.source ? { source: cli.source } : {}) },
+  model: MODEL,
+  runs: [],
+};
 
 function startedThreadId(value: unknown): string {
   const id = getString(getRecord(value, "thread"), "id");
