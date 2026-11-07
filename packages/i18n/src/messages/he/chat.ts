@@ -252,6 +252,7 @@ export const messages = {
   "chat.code.copy": "העתקת הקוד",
   "chat.visual.loadFailed": "לא ניתן לטעון את {title}",
   "chat.visual.fullScreen": "מסך מלא",
+  "chat.visual.openInSidePanel": "פתיחה בפאנל הצד",
   "chat.visual.exitFullScreen": "יציאה ממסך מלא",
   "chat.preview.switchLabel": "תצוגה מקדימה או קוד",
   "chat.preview.code": "קוד",

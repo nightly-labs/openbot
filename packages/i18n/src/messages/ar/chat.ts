@@ -379,6 +379,7 @@ export const messages = {
   "chat.code.copy": "نسخ التعليمات البرمجية",
   "chat.visual.loadFailed": "تعذّر تحميل {title}",
   "chat.visual.fullScreen": "ملء الشاشة",
+  "chat.visual.openInSidePanel": "فتح في اللوحة الجانبية",
   "chat.visual.exitFullScreen": "الخروج من ملء الشاشة",
   "chat.preview.switchLabel": "المعاينة أو التعليمات البرمجية",
   "chat.preview.code": "التعليمات البرمجية",

@@ -240,6 +240,7 @@ export const messages = defineMessages("chat", {
   "chat.code.copy": "Copy code",
   "chat.visual.loadFailed": "Cannot load {title}",
   "chat.visual.fullScreen": "Full screen",
+  "chat.visual.openInSidePanel": "Open in side panel",
   "chat.visual.exitFullScreen": "Exit full screen",
   "chat.preview.switchLabel": "Preview or code",
   "chat.preview.code": "Code",

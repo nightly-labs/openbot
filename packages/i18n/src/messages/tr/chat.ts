@@ -247,6 +247,7 @@ export const messages = {
   "chat.code.copy": "Kodu kopyala",
   "chat.visual.loadFailed": "{title} yüklenemiyor",
   "chat.visual.fullScreen": "Tam ekran",
+  "chat.visual.openInSidePanel": "Yan panelde aç",
   "chat.visual.exitFullScreen": "Tam ekrandan çık",
   "chat.preview.switchLabel": "Önizleme veya kod",
   "chat.preview.code": "Kod",

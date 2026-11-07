@@ -239,6 +239,7 @@ export const messages = {
   "chat.code.copy": "코드 복사",
   "chat.visual.loadFailed": "{title}을(를) 불러올 수 없어요",
   "chat.visual.fullScreen": "전체 화면",
+  "chat.visual.openInSidePanel": "사이드 패널에서 열기",
   "chat.visual.exitFullScreen": "전체 화면 종료",
   "chat.preview.switchLabel": "미리보기 또는 코드",
   "chat.preview.code": "코드",

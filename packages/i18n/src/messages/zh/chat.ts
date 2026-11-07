@@ -241,6 +241,7 @@ export const messages = {
   "chat.code.copy": "复制代码",
   "chat.visual.loadFailed": "无法加载 {title}",
   "chat.visual.fullScreen": "全屏",
+  "chat.visual.openInSidePanel": "在侧边面板中打开",
   "chat.visual.exitFullScreen": "退出全屏",
   "chat.preview.switchLabel": "预览或代码",
   "chat.preview.code": "代码",

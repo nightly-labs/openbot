@@ -1,3 +1,4 @@
+import { fileQuoteId } from "@openbot/contracts/chat-tag-references";
 import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import type { ConversationMessageSender, MessageReaction } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
@@ -40,7 +41,7 @@ import { createMemo, createSignal, For, Loading, lazy, onCleanup, Show, untrack 
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { planItems, planTitle } from "../../app-message-projection";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
-import { currentDevicePlatform } from "../../send-shortcut-preference";
+import { currentDevicePlatform, deviceQuoteShortcut } from "../../send-shortcut-preference";
 import { remoteRoutineRecovery } from "../servers/server-capabilities";
 import { speechModelReady } from "../speech/speech-model";
 import { recordingGone, speechReading, spokenReply } from "../speech/speech-playback";
@@ -195,6 +196,7 @@ export function ConversationTimeline() {
     replyToMessage,
     addPageText,
     setPageContext,
+    quoteSelection,
     retryPendingSend,
     scheduleUnreadDividerVisibilityUpdate,
     setChatSearchQuery,
@@ -1204,6 +1206,13 @@ export function ConversationTimeline() {
                   // A visual reply is the agent's page. It shows above the final reply, with no bubble.
                   const visual = () => chatVisualReply(message() ?? initialMessage) ?? initialVisual;
                   const pageUrl = () => chatVisualPageUrl(visual().attachment.previewUrl);
+                  // The page quotes as its file, as in the side panel, so the quote chip opens the page.
+                  const pageQuoteId = () =>
+                    fileQuoteId({
+                      source: "attachment",
+                      attachmentId: visual().attachment.id,
+                      name: visual().attachment.name,
+                    });
                   const [page, setPage] = createSignal<{ html?: string; failed?: boolean }>({});
                   if (loadPage && !pageUrl()) {
                     let mounted = true;
@@ -1264,6 +1273,9 @@ export function ConversationTimeline() {
                             onOpenLink={(url) => void openExternalMessageUrl(url)}
                             onMessage={addPageText}
                             onContext={(text) => setPageContext(message() ?? initialMessage, text)}
+                            onQuote={(text) => quoteSelection(pageQuoteId(), text)}
+                            quoteShortcut={deviceQuoteShortcut(props.platform)}
+                            onOpenInSidePanel={() => void previewAttachment(visual().attachment)}
                             isAppShortcut={isChatVisualAppShortcut}
                             macWindowControls={props.platform === "darwin"}
                           />
