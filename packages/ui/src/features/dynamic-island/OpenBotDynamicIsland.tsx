@@ -449,8 +449,9 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
   const [outgoingPresentation, setOutgoingPresentation] = createSignal<DynamicIslandPresentation>();
   const [modeTransitioning, setModeTransitioning] = createSignal(false);
   const [hovered, setHovered] = createSignal(false);
-  // The island is on screen all day, above every app. Work moves on it only while the user looks at it.
-  const ambientMotion = () => hovered() || props.state === "expanded";
+  // The island is on screen all day, above every app. Work moves on it only while the pointer is on it:
+  // an island that a click expanded stays open after the user goes back to another app.
+  const ambientMotion = hovered;
   let transitionRoot: HTMLDivElement | undefined;
   let modeAnimations: Animation[] = [];
   let modeTransitionVersion = 0;
