@@ -286,7 +286,12 @@ export function ConversationComposer() {
     const link = currentChatErrorLink();
     if (link)
       return (
-        <Button variant="outline" size="sm" type="button" onClick={() => void openExternalMessageUrl(link)}>
+        <Button
+          variant="outline"
+          size="sm"
+          type="button"
+          onClick={() => void openExternalMessageUrl(link, { ownBrowser: true })}
+        >
           {t("composer.verifyAccount.action")}
         </Button>
       );

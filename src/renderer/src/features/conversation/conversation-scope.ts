@@ -2076,7 +2076,11 @@ export function createConversationViewScope(props: ConversationProps) {
     }
   });
 
-  async function openExternalMessageUrl(url: string) {
+  /**
+   * `ownBrowser` skips the built-in browser: an account page, such as Google's verification page,
+   * must open where the user signed in to the provider (#2419).
+   */
+  async function openExternalMessageUrl(url: string, options: { ownBrowser?: boolean } = {}) {
     const target = currentTarget();
     const runtime = conversationRuntime(props);
     try {
@@ -2084,6 +2088,7 @@ export function createConversationViewScope(props: ConversationProps) {
       // A joined server's browser runs on its host, and the other members see its tabs.
       // When no tab opens, the link opens as it does with no setting.
       if (
+        !options.ownBrowser &&
         props.openLinksInBrowser &&
         props.server?.kind !== "remote" &&
         props.browserEnabled !== false &&
