@@ -286,6 +286,7 @@ import {
   startMcpOAuthRedirectServer,
 } from "./mcp-oauth-redirect-server";
 import { McpOAuthStore } from "./mcp-oauth-store";
+import { MCP_SERVER_OWNERS_FILE, McpServerOwnersStore } from "./mcp-server-owners-store";
 import { MemoryReviewPreferenceStore } from "./memory-review-preference-store";
 import { MessagingCredentialStore } from "./messaging-credential-store";
 import { ModelReleaseCatalog, ModelVisibility } from "./model-visibility";
@@ -1375,6 +1376,8 @@ export async function createApplicationServices({
         serverAuditNames(teamStore.configured ? teamStore.listMembers() : [], service.listAgents()),
       ),
   });
+  const mcpServerOwners = new McpServerOwnersStore(join(app.getPath("userData"), MCP_SERVER_OWNERS_FILE));
+  await runCauseEffect(mcpServerOwners.load());
   if (!(await runCauseEffect(agentAccess.load())))
     logger.warn("The roles file did not load. Members get no access to agents until an admin saves the roles.");
   const serverTimezone = new ServerTimezonePreferenceStore(
@@ -2760,11 +2763,15 @@ export async function createApplicationServices({
     browser,
     chat: teamChatStore,
     channels: service.channels,
-    // Present, so the host advertises `mcp-servers-v1`. The routes are admin-only.
+    // Present, so the host advertises `mcp-servers-v1`. The routes are admin-only without `mcpServerOwners`.
     mcpServers: service,
-    // Present, so the host advertises `mcp-sign-in-v1`. The routes are admin-only.
+    // Present, so the host advertises `mcp-member-access-v1`. A member then uses the MCP routes too,
+    // and changes only the servers that they added.
+    mcpServerOwners,
+    // Present, so the host advertises `mcp-sign-in-v1`. The routes are admin-only without `mcpServerOwners`.
     mcpSignIns: mcpHostSignIns,
-    // Present, so the host advertises `sign-in-relay-v1`. The routes are admin-only.
+    // Present, so the host advertises `sign-in-relay-v1`. The routes are admin-only, but for a member's
+    // MCP sign-in with `mcpServerOwners`.
     signInRelay: signInRelayHost,
     // Present, so the host advertises `connectors-v1`. GitHub answers `available: false` when this
     // build has no GitHub App. The routes are admin-only.

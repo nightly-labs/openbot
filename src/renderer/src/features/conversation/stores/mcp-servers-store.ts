@@ -1,6 +1,6 @@
-import { MCP_SERVERS_CAPABILITY, type McpServerConfig, mcpSignInEvent } from "@openbot/contracts/ipc";
+import { type McpServerConfig, mcpSignInEvent } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal } from "solid-js";
-import { serverCanAdminister } from "../../servers/server-capabilities";
+import { serverCanManageMcp } from "../../servers/server-capabilities";
 import { conversationRuntime } from "../conversation-runtime";
 import type { ConversationProps } from "../conversation-types";
 
@@ -45,9 +45,10 @@ export function createMcpServersStore(deps: McpServersStoreDeps) {
   });
   const source = createMemo(() => {
     const server = deps.props.server;
-    // A host that predates the capability answers 404, and a host refuses its list to a member with
-    // 403, because the list holds the servers' environment and header values. Neither is asked.
-    const supported = server?.kind !== "remote" || serverCanAdminister(server, MCP_SERVERS_CAPABILITY);
+    // A host that predates the capability answers 404, and a host without `mcp-member-access-v1`
+    // refuses its list to a member with 403, because the list holds the servers' environment and
+    // header values. Neither is asked.
+    const supported = server?.kind !== "remote" || serverCanManageMcp(server);
     return `${server?.id ?? ""}\0${server?.connectionSequence ?? 0}\0${supported ? "supported" : "unsupported"}\0${deps.props.mcpSettingsOpen === true}\0${signInCards()}`;
   });
   createEffect(source, (key) => {

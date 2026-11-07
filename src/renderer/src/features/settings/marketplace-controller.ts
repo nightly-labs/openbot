@@ -1048,7 +1048,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     }
   }
 
-  /** Opens the relayed sign-in page in this computer's browser, after the user checked its host name. */
+  /** Opens the relayed sign-in page in this computer's browser again. */
   async function openSignInRelay(): Promise<void> {
     const relay = signInRelay();
     const current = relayed();
@@ -1087,7 +1087,8 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
       const kind = app.server.auth?.[0]?.kind ?? "";
       return kind === "local" || (kind === "link" && !signInRelay());
     });
-    if (!props.hostServerId || !hostOnly) return true;
+    // `pluginHostName` names a joined server that this account connects apps on, a member's too.
+    if (!props.pluginHostName || !hostOnly) return true;
     const key =
       hostOnly.server.auth?.[0]?.kind === "local"
         ? "marketplace.error.installLocalOnHost"

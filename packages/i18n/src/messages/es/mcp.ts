@@ -147,11 +147,11 @@ export const messages = {
   "mcp.panel.appSaved": "App guardada. Inicia sesión para usarla.",
   "mcp.panel.appRemoved": "App eliminada.",
   "mcp.signIn.relayDescription":
-    "Comprueba que la página de inicio de sesión está en {page} y ábrela en tu navegador. Al terminar, OpenBot envía el inicio de sesión a {host}.",
+    "Inicia sesión en {page} en tu navegador. Al terminar, OpenBot envía el inicio de sesión a {host}.",
   "mcp.signIn.relayOpenDescription":
-    "Abre la página de inicio de sesión de {page} en tu navegador. Al terminar, pega aquí la dirección que muestra el navegador. Después, OpenBot envía el inicio de sesión a {host}.",
+    "Inicia sesión en {page} en tu navegador. Al terminar, pega aquí la dirección que muestra el navegador. Después, OpenBot envía el inicio de sesión a {host}.",
   "mcp.signIn.relayDeviceDescription":
-    "Comprueba que la página de inicio de sesión está en {page}, ábrela en tu navegador y termina allí. {host} detecta el inicio de sesión por sí mismo.",
+    "Inicia sesión en {page} en tu navegador y termina allí. {host} detecta el inicio de sesión por sí mismo.",
   "mcp.signIn.relayOpen": "Abrir inicio de sesión",
   "mcp.signIn.relayPasteHint": "Si el navegador no vuelve a OpenBot, copia la dirección que muestra y pégala aquí.",
   "mcp.signIn.relayPasteRequired":
