@@ -452,7 +452,7 @@ export function AgentEventBridge() {
   }
 
   onSettled(() => {
-    if (!platform.chatWindow) prepareCompletionSound();
+    if (soundLevel() === "all" && !platform.chatWindow) prepareCompletionSound();
     const unsubscribe = agentsPort().agent.onEvent((event) => {
       if (event.type === "channels-changed") {
         void channels.refresh();

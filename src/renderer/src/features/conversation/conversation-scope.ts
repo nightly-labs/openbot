@@ -17,7 +17,7 @@ import { toast } from "@openbot/ui";
 import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/QuestionPromptBubble";
 import type { QuoteRequest } from "@openbot/ui/features/conversation/ComposerEditor";
 import { currentText } from "@openbot/ui/text";
-import { usesTouchLayout } from "@openbot/ui/utils";
+import { prefersReducedMotion, usesTouchLayout } from "@openbot/ui/utils";
 import { errorReference } from "@openbot/user-errors";
 import {
   createContext,
@@ -443,7 +443,8 @@ export function createConversationViewScope(props: ConversationProps) {
       else if (send.state === "sending" && !send.queued) unanswered.push(send.text.trim());
     }
     if (unanswered.length === 0) return ids;
-    for (const delivery of props.queue?.deliveries ?? []) {
+    // The newest delivery is the send. An earlier queued message with the same text stays in the panel.
+    for (const delivery of [...(props.queue?.deliveries ?? [])].reverse()) {
       // The snapshot also keeps finished messages, and an earlier one can have the same text.
       const waiting = delivery.status === "queued" || delivery.status === "starting";
       if (!waiting || delivery.sender.kind !== "user" || ids.has(delivery.id)) continue;
@@ -1227,7 +1228,7 @@ export function createConversationViewScope(props: ConversationProps) {
       distance <= 1 ||
       distance > element.clientHeight ||
       performance.now() < chatGlideAfter ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      prefersReducedMotion()
     ) {
       followConversationBottom(element);
       return;
@@ -1264,7 +1265,7 @@ export function createConversationViewScope(props: ConversationProps) {
       distance <= 1 ||
       distance > element.clientHeight ||
       performance.now() < chatGlideAfter ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      prefersReducedMotion()
     )
       return false;
     stopChatGlides();
@@ -1299,6 +1300,7 @@ export function createConversationViewScope(props: ConversationProps) {
     stopChatGlides();
     chatGlideAfter = performance.now() + CHAT_GLIDE_OPEN_DELAY_MS;
   }
+  onCleanup(stopChatGlides);
   let lastPanelAgentId: string | undefined;
   const [quoteRequest, setQuoteRequest] = createSignal<QuoteRequest | undefined>(undefined);
   let lastRuntimeSettingsSignature: string | undefined;
@@ -2162,6 +2164,8 @@ export function createConversationViewScope(props: ConversationProps) {
     if (latestScrollSettleFrame !== undefined) cancelAnimationFrame(latestScrollSettleFrame);
     latestScrollFrame = undefined;
     latestScrollSettleFrame = undefined;
+    // A glide aims at the bottom of each frame, so it would pull the chat back from a jump target.
+    stopChatGlides();
   }
   /**
    * Tab or a screen reader can move the focus to a control above the view. The chat then scrolls up

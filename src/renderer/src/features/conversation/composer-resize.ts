@@ -20,14 +20,14 @@ type ComposerResizeInput = {
  * curve. A line added in the full layout changes the height at once, so typing never waits for it.
  */
 export function createComposerResize(input: ComposerResizeInput) {
-  /** The chat whose draft wrapped. A wrap belongs to one draft, so another chat starts on one line. */
-  const [wrappedIn, setWrappedIn] = createSignal<string>();
+  /** The chats whose draft wrapped. A wrap belongs to one draft, so a chat keeps its own layout. */
+  const [wrappedIn, setWrappedIn] = createSignal<ReadonlySet<string>>(new Set());
   let composer: HTMLElement | undefined;
   /** The border-box heights of the last frame. A change of layout starts from them. */
   let paintedHeight = 0;
   let paintedWrapHeight = 0;
 
-  const wrapped = () => wrappedIn() === input.conversationKey();
+  const wrapped = () => wrappedIn().has(input.conversationKey());
   const expanded = () => input.full() || wrapped();
 
   /** The frame that reads the end height of a resize. */
@@ -101,13 +101,22 @@ export function createComposerResize(input: ComposerResizeInput) {
     if (!composer || expanded() || input.empty()) return false;
     const surface = composer.querySelector(".composer-editor-surface");
     if (!surface || surface.scrollHeight < WRAPPED_SURFACE_HEIGHT_PX) return false;
-    setWrappedIn(input.conversationKey());
+    const key = input.conversationKey();
+    setWrappedIn((keys) => new Set(keys).add(key));
     return true;
   }
 
-  createEffect(input.empty, (empty) => {
-    if (empty) setWrappedIn(undefined);
-  });
+  createEffect(
+    () => ({ empty: input.empty(), conversation: input.conversationKey() }),
+    ({ empty, conversation }) => {
+      if (!empty || !wrappedIn().has(conversation)) return;
+      setWrappedIn((keys) => {
+        const next = new Set(keys);
+        next.delete(conversation);
+        return next;
+      });
+    },
+  );
 
   let shownConversation: string | undefined;
   let shownExpanded: boolean | undefined;
@@ -139,17 +148,19 @@ export function createComposerResize(input: ComposerResizeInput) {
     });
     observer.observe(element);
     if (wrap) observer.observe(wrap);
-    // A new resize ends the one before it, so a cancelled transition needs no event of its own.
+    // A transition that a hidden pane cancels also ends the resize, or the fixed height clips new lines.
     const transitionEnd = (event: TransitionEvent) => {
       if (event.target === element && event.propertyName === "height") finishResize();
     };
     element.addEventListener("transitionend", transitionEnd);
+    element.addEventListener("transitioncancel", transitionEnd);
     element.addEventListener("beforeinput", holdHeight, true);
     return () => {
       if (measureFrame !== undefined) cancelAnimationFrame(measureFrame);
       observer.disconnect();
       element.removeEventListener("beforeinput", holdHeight, true);
       element.removeEventListener("transitionend", transitionEnd);
+      element.removeEventListener("transitioncancel", transitionEnd);
     };
   });
 

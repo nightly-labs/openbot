@@ -396,7 +396,6 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   };
 }
 
-/** The ids Claude and the ACP agents give a turn's thinking, beside its narration, as `REASONING_ID` in the backend. */
 /** Agent text that the host still writes. A plan, the subagents, a card and an image show while they run. */
 function heldWhileWritten(message: AgentMessage): boolean {
   return (
@@ -404,6 +403,7 @@ function heldWhileWritten(message: AgentMessage): boolean {
   );
 }
 
+/** The ids Claude and the ACP agents give a turn's thinking, beside its narration, as `REASONING_ID` in the backend. */
 const THINKING_ITEM_ID = /:(?:reasoning|thought(?::\d+)?)$/u;
 
 /**
