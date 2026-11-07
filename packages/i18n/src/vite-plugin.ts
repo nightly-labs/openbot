@@ -4,7 +4,7 @@ const I18N_SOURCE = normalizePath(fileURLToPath(new URL("./", import.meta.url)))
 const EAGER_CATALOG_MODULES = new Set(["./app-catalogs", "./source-catalogs", "./format-catalogs", "./locale-loading"]);
 
 /** The part of a Vite plugin that this plugin uses, so that this package needs no Vite dependency. */
-export interface LazyLanguageCatalogsPlugin {
+interface LazyLanguageCatalogsPlugin {
   readonly name: string;
   readonly enforce: "pre";
   readonly applyToEnvironment?: (environment: { readonly name: string }) => boolean;

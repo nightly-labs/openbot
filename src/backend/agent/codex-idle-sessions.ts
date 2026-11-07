@@ -2,7 +2,7 @@ import { Effect, type Scope } from "effect";
 import type { AgentClient } from "../agent-client";
 
 /** What a release found. `held`: something still needs the session. `gone`: no client holds it to release. */
-export type IdleSessionRelease = "released" | "held" | "gone";
+type IdleSessionRelease = "released" | "held" | "gone";
 
 export interface CodexIdleSessionsOptions {
   /** How long a session with no turn stays loaded. */
