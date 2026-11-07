@@ -15,7 +15,10 @@ const NEXT_STEP_LIMIT = 2;
 const NEXT_STEP_ANSWER_MAX = 400;
 /** Verbs that mean "go on with the same work". "Proceed" and "go ahead" ask for approval, so they block. */
 const CONTINUE_VERB = "(?:continue|keep going|go on|carry on|move on)";
-const REST_OF_WORK = String.raw`(?:\s+(?:with|to|on)\s+(?:the\s+)?(?:next(?:\s+(?:steps?|ones?|parts?|phases?|items?))?|rest(?:\s+of\s+(?:it|them|the\s+[a-z]+))?|remaining(?:\s+[a-z]+)?|steps?\s+\d+))?`;
+/** Parts of the same work. A named action, such as "the rest of the deploy", is not in it, so it blocks. */
+const WORK_PARTS =
+  "(?:steps|work|items|parts|ones|tasks|files|tests|changes|fixes|edits|checks|pages|sections|list|plan)";
+const REST_OF_WORK = String.raw`(?:\s+(?:with|to|on)\s+(?:the\s+)?(?:next(?:\s+(?:steps?|ones?|parts?|phases?|items?))?|rest(?:\s+of\s+(?:it|them|the\s+${WORK_PARTS}))?|remaining(?:\s+${WORK_PARTS})?|steps?\s+\d+))?`;
 /**
  * A last line that only asks whether to go on with the work, such as "Shall I continue?" or "Step
  * one is done. Want me to continue with the remaining files?". Text in front of the question must end a
@@ -33,15 +36,20 @@ const ASKS_TO_CONTINUE = new RegExp(
 const NAMES_NEXT_STEP =
   /(?:\blet me now\b|\bnow let me\b|\bi['\u2019]ll now\b|\bi will now\b|\bnow i(?:['\u2019]ll| will)\b|\bnext,?\s+i(?:['\u2019]ll| will)\b)(?!\s+(?:wait|hold|pause|stop)\b)[^.!?\n]{0,100}[.:\u2026]?\s*$/i;
 
-/** Work verbs that a stopped turn names for its next step. Risky verbs, such as deploy or delete, are not in it. */
+/**
+ * Work verbs that a stopped turn names for its next step. Verbs such as deploy or delete are not in it.
+ * The continuation note does not approve a risky action in any case.
+ */
 const WORK_VERB = String.raw`(?:run|re-?run|check|test|fix|update|edit|write|create|add|build|install|open|read|look|search|inspect|review|verify|start|try|apply|implement|rename|move|refactor|debug|finish|continue|configure|set\s+up|generate|download|compile|patch)`;
 /**
  * A last sentence in which the agent says that it does the next work, such as "Let me run the tests."
  * or "I'm going to fix the parser.". It must name a work verb, so "Let me know …" and "I'll keep an eye
- * on it." do not match. An offer to the user ("… if you want") or a later time does not match either.
+ * on it." do not match. An offer to the user ("… if you want"), an approval, or a later time does not match either.
  */
+/** A character inside a sentence. A period inside a word, as in "parser.ts" or "v1.2", does not end it. */
+const SENTENCE_CHAR = String.raw`(?:[^.!?\n]|\.(?=\S))`;
 const ANNOUNCES_WORK = new RegExp(
-  String.raw`(?:^|[.!\u2026]\s+|\n\s*)(?:(?:ok(?:ay)?|now|next|first|then|so)[,:]?\s+)*(?:let\s+me|i['\u2019]ll|i\s+will|i['\u2019]m\s+going\s+to|i\s+am\s+going\s+to)\s+(?:(?:now|first|next|then|also|quickly)\s+)?${WORK_VERB}\b(?![^.!?\n]*\b(?:(?:if|when|once|after|unless|until)\s+you|later|tomorrow|back\s+in)\b)[^.!?\n]{0,120}[.:\u2026]?\s*$`,
+  String.raw`(?:^|[.!:\u2026\u2013\u2014]\s+|\s-\s+|\n\s*)(?:(?:ok(?:ay)?|now|next|first|then|so)[,:]?\s+)*(?:let\s+me|i['\u2019]ll|i\s+will|i['\u2019]m\s+going\s+to|i\s+am\s+going\s+to)\s+(?:(?:now|first|next|then|also|quickly)\s+)?${WORK_VERB}\b(?!${SENTENCE_CHAR}*\b(?:(?:if|when|once|after|unless|until|as\s+soon\s+as)\s+(?:you|your)|approv\w*|confirm\w*|permission|later|tomorrow|next\s+(?:week|month|time)|back\s+in)\b)${SENTENCE_CHAR}{0,120}[.:\u2026]?\s*$`,
   "i",
 );
 
@@ -73,7 +81,7 @@ function stoppedBeforeNextStep(answer: string | undefined): boolean {
   if (asksToContinue(answer)) return true;
   const text = answer?.trim() ?? "";
   if (text.length === 0 || text.length > NEXT_STEP_ANSWER_MAX) return false;
-  return NAMES_NEXT_STEP.test(text.slice(-160)) || ANNOUNCES_WORK.test(text.replace(/[*_`]/g, "").trimEnd());
+  return NAMES_NEXT_STEP.test(text.slice(-160)) || ANNOUNCES_WORK.test(text.replace(/[*_`>#]/g, "").trimEnd());
 }
 
 interface ContinuationCount {
