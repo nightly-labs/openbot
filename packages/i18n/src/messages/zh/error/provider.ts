@@ -253,6 +253,10 @@ export const messages = {
   "error.provider.hermesNotStarted": "无法启动 Hermes Agent。请在终端中运行 `hermes --version`。",
   "error.provider.hermesVersionUnreadable": "无法读取 Hermes Agent 的版本。",
   "error.provider.hermesSignIn": "要使用 Hermes，请使用 Nous Portal 登录，或在终端中运行 `hermes setup`。",
+  "error.provider.zcodeMissing": "未安装 ZCode。请先安装 ZCode Desktop 和 zcode-acp 适配器，然后重试。",
+  "error.provider.zcodeNotStarted": "无法启动 ZCode。请在终端中运行 `zcode-acp --version`。",
+  "error.provider.zcodeVersionUnreadable": "无法读取 ZCode 版本。",
+  "error.provider.zcodeSignIn": "请先登录 ZCode（`zcode login`），然后重试。",
   "error.provider.usageLimitReached": "该账号已达到用量上限。",
   "error.provider.claudeApiKeyNoCredit":
     "该 Anthropic API 密钥没有 API 额度。Claude 套餐不支付使用 API 密钥的请求。请在 Anthropic Console 中充值，或在设置中登录 Claude，并在智能体的模型菜单中选择 Claude 账号。",

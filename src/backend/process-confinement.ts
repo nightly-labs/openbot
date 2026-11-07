@@ -318,6 +318,23 @@ export function hermesStatePaths(env: NodeJS.ProcessEnv = process.env, home = ho
 }
 
 /**
+ * ZCode Desktop keeps its sign-in, sessions, skills and provider config in `~/.zcode` (`ZCODE_HOME`
+ * when the user moves it). The user's own ZCode reads that folder, so it stays writable; only the
+ * local certificate authority that the desktop app generated stays read-only.
+ */
+export function zcodeHome(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.ZCODE_HOME?.trim() || join(home, ".zcode");
+}
+
+export function zcodeStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const root = zcodeHome(env, home);
+  return {
+    writable: [root],
+    protected: [join(root, "v2", "certs")],
+  };
+}
+
+/**
  * The Kimi Code CLI keeps its sign-in, sessions, logs and caches in `KIMI_SHARE_DIR`, `~/.kimi` by
  * default, and writes its plans in `~/.kimi/plans`. Its settings and hooks (`config.toml`), MCP
  * servers, plugins, skills and downloaded tools are in that folder too, and every other Kimi process

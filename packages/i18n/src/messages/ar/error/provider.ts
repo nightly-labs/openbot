@@ -265,6 +265,10 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "تتعذّر قراءة إصدار Hermes Agent.",
   "error.provider.hermesSignIn":
     "سجّل الدخول باستخدام Nous Portal، أو شغّل `hermes setup` في نافذة طرفية، لاستخدام Hermes.",
+  "error.provider.zcodeMissing": "ZCode غير مثبّت. ثبّت ZCode Desktop ومحوّل zcode-acp ثم أعد المحاولة.",
+  "error.provider.zcodeNotStarted": "تعذّر تشغيل ZCode. شغّل `zcode-acp --version` في الطرفية.",
+  "error.provider.zcodeVersionUnreadable": "تعذّرت قراءة إصدار ZCode.",
+  "error.provider.zcodeSignIn": "سجّل الدخول إلى ZCode‏ (`zcode login`) ثم أعد المحاولة.",
   "error.provider.usageLimitReached": "بلغ الحساب حد الاستخدام.",
   "error.provider.claudeApiKeyNoCredit":
     "لا يوجد رصيد API في مفتاح Anthropic API. لا تدفع خطة Claude مقابل الطلبات التي تستخدم مفتاح API. أضف رصيدًا في Anthropic Console، أو سجّل الدخول إلى Claude في الإعدادات واختر حساب Claude في قائمة نموذج الوكيل.",

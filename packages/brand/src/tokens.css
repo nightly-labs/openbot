@@ -474,3 +474,7 @@
 [data-provider="acp"] {
   --openbot-provider-current: var(--openbot-text-primary);
 }
+
+[data-provider="zcode"] {
+  --openbot-provider-current: var(--openbot-text-primary);
+}

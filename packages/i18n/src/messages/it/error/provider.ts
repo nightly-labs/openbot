@@ -286,6 +286,11 @@ export const messages = {
   "error.provider.hermesNotStarted": "Impossibile avviare Hermes Agent. Esegui `hermes --version` in un terminale.",
   "error.provider.hermesVersionUnreadable": "Impossibile leggere la versione di Hermes Agent.",
   "error.provider.hermesSignIn": "Accedi con Nous Portal o esegui `hermes setup` in un terminale per usare Hermes.",
+  "error.provider.zcodeMissing":
+    "ZCode non è installato. Installa ZCode Desktop e l'adattatore zcode-acp, quindi riprova.",
+  "error.provider.zcodeNotStarted": "ZCode non si è avviato. Esegui `zcode-acp --version` in un terminale.",
+  "error.provider.zcodeVersionUnreadable": "Impossibile leggere la versione di ZCode.",
+  "error.provider.zcodeSignIn": "Accedi a ZCode (`zcode login`), quindi riprova.",
   "error.provider.usageLimitReached": "L'account ha raggiunto il limite di utilizzo.",
   "error.provider.claudeApiKeyNoCredit":
     "La chiave API di Anthropic non ha credito API. Un piano Claude non paga le richieste fatte con una chiave API. Aggiungi credito nella Anthropic Console, oppure accedi a Claude nelle Impostazioni e seleziona l'account Claude nel menu dei modelli dell'agente.",

@@ -280,6 +280,11 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "Hermes Agent 버전을 읽을 수 없습니다.",
   "error.provider.hermesSignIn":
     "Hermes를 사용하려면 Nous Portal로 로그인하거나 터미널에서 `hermes setup`을 실행하세요.",
+  "error.provider.zcodeMissing":
+    "ZCode가 설치되어 있지 않습니다. ZCode Desktop과 zcode-acp 어댑터를 설치한 후 다시 시도하세요.",
+  "error.provider.zcodeNotStarted": "ZCode를 시작할 수 없었습니다. 터미널에서 `zcode-acp --version`을 실행하세요.",
+  "error.provider.zcodeVersionUnreadable": "ZCode 버전을 읽을 수 없습니다.",
+  "error.provider.zcodeSignIn": "ZCode에 로그인한(`zcode login`) 후 다시 시도하세요.",
   "error.provider.usageLimitReached": "계정이 사용 한도에 도달했어요.",
   "error.provider.claudeApiKeyNoCredit":
     "Anthropic API 키에 API 크레딧이 없어요. Claude 플랜은 API 키로 보낸 요청에 사용되지 않아요. Anthropic Console에서 크레딧을 추가하거나, 설정에서 Claude에 로그인한 다음 에이전트의 모델 메뉴에서 Claude 계정을 선택하세요.",
