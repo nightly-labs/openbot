@@ -174,7 +174,8 @@ export const messages = {
   "marketplace.plugin.cobrain.description":
     "Cobrain은 OpenBot 바깥에 있는, 내가 소유하는 Markdown 메모리예요. 같은 노트를 Claude, ChatGPT, Codex 등 연결한 모든 AI에서 쓸 수 있어요. OpenBot 자체 메모리와 함께, 앱 하나보다 오래 남아야 하는 것에 쓰세요. “이 고객을 Cobrain에 저장해 줘”, “어제 프로젝트 X에 대해 뭘 결정했지?”라고 하면, 다음 날 Claude나 ChatGPT가 같은 노트를 읽어요. 사용자마다 자기 Cobrain 계정으로 로그인해요.",
   "marketplace.plugin.cobrain.app": "Cobrain 브레인의 노트를 MCP 서버 하나로 읽고, 검색하고, 작성해요.",
-  "marketplace.plugin.cobrain.prompt.firstNote": "내 일에 대해 질문 세 개를 하고, 내 답을 Cobrain에 저장해 줘.",
+  "marketplace.plugin.cobrain.prompt.firstNote":
+    "나와 내 일에 대해 이미 알고 있는 걸 폴더로 정리해서 Cobrain에 저장하고, 빠진 게 뭔지 물어봐 줘.",
   "marketplace.plugin.cobrain.prompt.whatYouKnow": "Cobrain에서 나에 대해 뭘 알고 있어?",
   "marketplace.plugin.cobrain.prompt.saveNote": "오늘 한 일과 남은 일을 Cobrain에 노트로 저장해 줘.",
   "marketplace.plugin.figma.tagline": "디자인 및 프로토타입",

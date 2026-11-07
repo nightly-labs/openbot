@@ -428,7 +428,10 @@ const COBRAIN: MarketplacePluginDetail = {
   iconUrl: "https://cobrain.space/apple-icon.png",
   version: "1.0.0",
   prompts: [
-    { id: "prompt-first-note", text: "Ask me three questions about my work, then save my answers in Cobrain." },
+    {
+      id: "prompt-first-note",
+      text: "Save what you already know about me and my work in Cobrain, organized in folders, then ask me what's missing.",
+    },
     { id: "prompt-what-you-know", text: "What do you know about me from Cobrain?" },
     { id: "prompt-save-note", text: "Save a note in Cobrain with what we did today and what is left." },
   ],

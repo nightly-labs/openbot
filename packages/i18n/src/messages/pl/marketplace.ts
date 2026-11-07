@@ -207,7 +207,7 @@ export const messages = {
   "marketplace.plugin.cobrain.app":
     "Czytanie, wyszukiwanie i zapisywanie notatek w twoim mózgu Cobrain przez jeden serwer MCP.",
   "marketplace.plugin.cobrain.prompt.firstNote":
-    "Zadaj mi trzy pytania o moją pracę, a potem zapisz moje odpowiedzi w Cobrain.",
+    "Zapisz w Cobrain to, co już wiesz o mnie i mojej pracy, uporządkowane w folderach, a potem zapytaj mnie, czego brakuje.",
   "marketplace.plugin.cobrain.prompt.whatYouKnow": "Co wiesz o mnie z Cobrain?",
   "marketplace.plugin.cobrain.prompt.saveNote": "Zapisz w Cobrain notatkę o tym, co dziś zrobiliśmy i co zostało.",
   "marketplace.plugin.figma.tagline": "Projekty i prototypy",

@@ -212,7 +212,8 @@ export const messages = {
   "marketplace.plugin.cobrain.description":
     "Cobrain ذاكرة بتنسيق Markdown تملكها أنت، خارج OpenBot: الملاحظات نفسها تعمل في Claude وChatGPT وCodex وأي ذكاء اصطناعي آخر تربطه. استخدمها إلى جانب ذاكرة OpenBot لما يجب أن يبقى أطول من تطبيق واحد. اطلب «احفظ هذا العميل في Cobrain» أو «ماذا قررنا أمس بشأن المشروع X؟»، وفي اليوم التالي يقرأ Claude أو ChatGPT الملاحظات نفسها. يسجّل كل مستخدم الدخول إلى حساب Cobrain الخاص به.",
   "marketplace.plugin.cobrain.app": "قراءة الملاحظات والبحث فيها وكتابتها في دماغ Cobrain عبر خادم MCP واحد.",
-  "marketplace.plugin.cobrain.prompt.firstNote": "اطرح عليّ ثلاثة أسئلة عن عملي، ثم احفظ إجاباتي في Cobrain.",
+  "marketplace.plugin.cobrain.prompt.firstNote":
+    "احفظ في Cobrain ما تعرفه عني وعن عملي، مرتّبًا في مجلدات، ثم اسألني عمّا ينقص.",
   "marketplace.plugin.cobrain.prompt.whatYouKnow": "ماذا تعرف عني من Cobrain؟",
   "marketplace.plugin.cobrain.prompt.saveNote": "احفظ ملاحظة في Cobrain بما أنجزناه اليوم وما تبقّى.",
   "marketplace.plugin.figma.tagline": "التصاميم والنماذج الأولية",

@@ -216,7 +216,7 @@ export const messages = defineMessages("marketplace", {
     "Cobrain is a Markdown memory you own, outside OpenBot: the same notes work in Claude, ChatGPT, Codex and every other AI you connect. Use it next to OpenBot’s own memory for what has to outlast one app. Ask “Save this client in Cobrain” or “What did we decide yesterday about project X?”, and tomorrow Claude or ChatGPT read the same notes. Each user signs in to their own Cobrain account.",
   "marketplace.plugin.cobrain.app": "Read, search and write notes in your Cobrain brain over one MCP server.",
   "marketplace.plugin.cobrain.prompt.firstNote":
-    "Ask me three questions about my work, then save my answers in Cobrain.",
+    "Save what you already know about me and my work in Cobrain, organized in folders, then ask me what's missing.",
   "marketplace.plugin.cobrain.prompt.whatYouKnow": "What do you know about me from Cobrain?",
   "marketplace.plugin.cobrain.prompt.saveNote": "Save a note in Cobrain with what we did today and what is left.",
   "marketplace.plugin.figma.tagline": "Designs and prototypes",

@@ -180,7 +180,7 @@ export const messages = {
     "Cobrain is een Markdown-geheugen dat van jou is en buiten OpenBot staat: dezelfde notities werken in Claude, ChatGPT, Codex en elke andere AI die je koppelt. Gebruik het naast het eigen geheugen van OpenBot voor wat langer moet blijven dan één app. Vraag „Sla deze klant op in Cobrain” of „Wat hebben we gisteren over project X besloten?”, en morgen lezen Claude of ChatGPT dezelfde notities. Elke gebruiker logt in met een eigen Cobrain-account.",
   "marketplace.plugin.cobrain.app": "Lees, zoek en schrijf notities in je Cobrain-brein via één MCP-server.",
   "marketplace.plugin.cobrain.prompt.firstNote":
-    "Stel me drie vragen over mijn werk en sla mijn antwoorden op in Cobrain.",
+    "Sla in Cobrain op wat je al over mij en mijn werk weet, geordend in mappen, en vraag me daarna wat er ontbreekt.",
   "marketplace.plugin.cobrain.prompt.whatYouKnow": "Wat weet je over mij uit Cobrain?",
   "marketplace.plugin.cobrain.prompt.saveNote":
     "Sla een notitie op in Cobrain met wat we vandaag hebben gedaan en wat er nog moet.",

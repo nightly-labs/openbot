@@ -184,7 +184,8 @@ export const messages = {
   "marketplace.plugin.cobrain.description":
     "Cobrain 是一份属于你自己的 Markdown 记忆，独立于 OpenBot 之外：同样的笔记可以在 Claude、ChatGPT、Codex 以及你连接的任何其他 AI 中使用。把它和 OpenBot 自带的记忆一起用，存放那些需要超越单个应用、长期保留的内容。说一句“把这个客户存到 Cobrain”或“我们昨天对项目 X 做了什么决定？”，第二天 Claude 或 ChatGPT 就能读到同样的笔记。每位用户都登录自己的 Cobrain 账户。",
   "marketplace.plugin.cobrain.app": "通过一个 MCP 服务器，在你的 Cobrain 中读取、搜索和写入笔记。",
-  "marketplace.plugin.cobrain.prompt.firstNote": "问我三个关于我工作的问题，然后把我的回答保存到 Cobrain。",
+  "marketplace.plugin.cobrain.prompt.firstNote":
+    "把你已经知道的关于我和我工作的内容按文件夹整理好存到 Cobrain，然后问我还缺什么。",
   "marketplace.plugin.cobrain.prompt.whatYouKnow": "你从 Cobrain 里知道我哪些事？",
   "marketplace.plugin.cobrain.prompt.saveNote": "在 Cobrain 中保存一条笔记，记下我们今天做了什么、还剩什么。",
   "marketplace.plugin.figma.tagline": "设计与原型",

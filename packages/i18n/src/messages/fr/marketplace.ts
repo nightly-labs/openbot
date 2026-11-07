@@ -193,7 +193,7 @@ export const messages = {
   "marketplace.plugin.cobrain.app":
     "Lecture, recherche et écriture de notes dans votre cerveau Cobrain, via un serveur MCP.",
   "marketplace.plugin.cobrain.prompt.firstNote":
-    "Posez-moi trois questions sur mon travail, puis enregistrez mes réponses dans Cobrain.",
+    "Enregistrez dans Cobrain ce que vous savez déjà de moi et de mon travail, rangé en dossiers, puis demandez-moi ce qui manque.",
   "marketplace.plugin.cobrain.prompt.whatYouKnow": "Que savez-vous de moi grâce à Cobrain ?",
   "marketplace.plugin.cobrain.prompt.saveNote":
     "Enregistrez dans Cobrain une note avec ce que nous avons fait aujourd’hui et ce qui reste.",
