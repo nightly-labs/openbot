@@ -1446,6 +1446,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         argv: HERMES_ARGV,
         profileGeneration: true,
         env: {},
+        extraEnv: () => hermesSettingsEnvironment(process.env, context.providerStateDirectory),
         signInMessage: sourceText("error.provider.hermesSignIn"),
         authenticate: requireHermesProvider,
         servesModel: context.servesModel,

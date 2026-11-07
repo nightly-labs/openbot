@@ -24,19 +24,29 @@
 // .openbot-build/hermes-prompt-settings-bench/report.json.
 
 import { Database } from "bun:sqlite";
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
-import { delimiter, join, resolve } from "node:path";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, delimiter, dirname, join, resolve } from "node:path";
 import { stringify as stringifyYaml } from "yaml";
 import { VISIBLE_DYNAMIC_TOOLS } from "../src/backend/agent/tool-catalog";
 import type { AgentClient } from "../src/backend/agent-client";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { HERMES_AGENT_SETTINGS, type HermesAgentSettings } from "../src/backend/hermes-settings";
+import { hermesHome } from "../src/backend/process-confinement";
 import { getRecord, getString, isRecord } from "../src/backend/protocol";
 import { NO_PROVIDER_CREDENTIALS, requireProviderDriver } from "../src/backend/provider-drivers";
+import { median } from "./dev-automation/bench-stats";
 import { runTurn, stopClients } from "./provider-fakes/host";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/hermes-prompt-settings-bench");
@@ -96,19 +106,10 @@ function option(name: string): string | undefined {
   return process.argv.find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
 }
 
-const median = (values: readonly number[]) => {
-  if (values.length === 0) return null;
-  const sorted = [...values].sort((left, right) => left - right);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? (sorted[middle] ?? null) : ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
-};
-
-/** The user's Hermes root: the default `HERMES_HOME`, or the folder above a profile. */
+/** The user's Hermes root: the folder of the Hermes home, or the folder above a profile. */
 function userHermesRoot(): string {
-  const configured = process.env.HERMES_HOME?.trim();
-  if (!configured) return join(homedir(), ".hermes");
-  const profiles = resolve(configured, "..");
-  return profiles.endsWith(join(".hermes", "profiles")) ? resolve(profiles, "..") : configured;
+  const home = hermesHome();
+  return basename(dirname(home)) === "profiles" ? dirname(dirname(home)) : home;
 }
 
 /** The `agent-browser` and Chromium variables of the user's Hermes `tools` folder. */
@@ -136,16 +137,16 @@ function browserEnvironment(root: string): Record<string, string> {
 }
 
 /** Runs the Hermes CLI with no terminal, without the lazy runtime install that can rewrite the launchers. */
-async function hermes(executable: string, args: readonly string[], home: string): Promise<void> {
-  const child = spawn(executable, args, {
+function hermes(executable: string, args: readonly string[], home: string): void {
+  const result = spawnSync(executable, args, {
     env: { ...process.env, HERMES_HOME: home, HERMES_DISABLE_LAZY_INSTALLS: "1" },
     stdio: ["ignore", "pipe", "pipe"],
+    encoding: "utf8",
   });
-  let output = "";
-  child.stdout.on("data", (chunk: Buffer) => (output += chunk));
-  child.stderr.on("data", (chunk: Buffer) => (output += chunk));
-  const code = await new Promise<number | null>((done) => child.once("exit", done));
-  if (code !== 0) throw new Error(`hermes ${args.join(" ")} exited with ${code}:\n${output.trim().slice(-2000)}`);
+  if (result.status !== 0) {
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`.trim().slice(-2000);
+    throw new Error(`hermes ${args.join(" ")} exited with ${result.status ?? result.signal}:\n${output}`);
+  }
 }
 
 /** The content of the shared launchers, which the bench must not change. */
@@ -254,16 +255,17 @@ async function measureTurn(
 }
 
 const only = option("variant");
-const runs = Number(option("runs") ?? 3);
+const runsOption = option("runs") ?? "3";
+const runs = Number(runsOption);
+if (!Number.isInteger(runs) || runs < 1) throw new Error(`--runs must be a positive integer, not ${runsOption}.`);
 const model = option("model") ?? DEFAULT_MODEL;
 const verbose = process.argv.includes("--verbose");
-const names = only?.split(",");
+const names = only ? [...new Set(only.split(","))] : undefined;
 const variants = names ? VARIANTS.filter((variant) => names.includes(variant.name)) : VARIANTS;
 if (variants.length !== (names?.length ?? VARIANTS.length))
   throw new Error(`Unknown variant ${only}. Variants: ${VARIANTS.map((v) => v.name).join(", ")}`);
 
 const root = userHermesRoot();
-const scratch = await mkdtemp(join(tmpdir(), "openbot-hermes-bench-"));
 const profiles = join(root, "profiles");
 const profilesExisted = existsSync(profiles);
 const profile = `openbot-bench-${randomBytes(4).toString("hex")}`;
@@ -272,14 +274,7 @@ const launchersBefore = launchers(root);
 
 const driver = requireProviderDriver("hermes");
 const cli = await runCauseEffect(driver.resolveCli());
-// Without `--clone`, the profile gets the bundled skills and none of the user's settings.
-await hermes(cli.executable, ["profile", "create", profile, "--no-alias"], root);
-Object.assign(process.env, browserEnvironment(root), {
-  HERMES_HOME: home,
-  HERMES_SHARED_AUTH_DIR: join(root, "shared"),
-  HERMES_DISABLE_LAZY_INSTALLS: "1",
-});
-const workspace = makeWorkspace(scratch);
+const scratch = mkdtempSync(join(tmpdir(), "openbot-hermes-bench-"));
 const [provider, ...modelName] = model.split(":");
 interface VariantReport {
   name: string;
@@ -297,9 +292,57 @@ const report = {
 };
 
 let failed = false;
+let profileCreated = false;
+let cleanedUp = false;
+/** Removes the scratch folder and the profile, and checks the launchers. */
+function cleanUp(): void {
+  if (cleanedUp) return;
+  cleanedUp = true;
+  rmSync(scratch, { recursive: true, force: true });
+  if (profileCreated) {
+    // Hermes 0.21.5 removes the profile and then fails to purge its identity from the removed
+    // profile's `state.db`: that error is not a failure when the profile folder is gone.
+    try {
+      hermes(cli.executable, ["profile", "delete", "-y", profile], root);
+    } catch (error) {
+      if (existsSync(home)) throw error;
+    }
+    // `profile delete` leaves a tombstone for the name. The name is random, so nothing reuses it.
+    rmSync(join(profiles, ".deleted", profile), { force: true });
+  }
+  if (!profilesExisted) {
+    removeEmptyFolder(join(profiles, ".deleted"));
+    removeEmptyFolder(profiles);
+  }
+  if (launchers(root) !== launchersBefore) {
+    process.stderr.write(
+      `The bench changed the Hermes launchers in ${join(root, "hermes-agent", ".hermes", "bin")}.\n`,
+    );
+    failed = true;
+  }
+}
+// Ctrl-C stops Bun without the `finally` below, and the profile would stay in the user's Hermes.
+process.once("SIGINT", () => {
+  try {
+    cleanUp();
+  } finally {
+    process.exit(130);
+  }
+});
+
 try {
+  // Without `--clone`, the profile gets the bundled skills and none of the user's settings. A failed
+  // create can leave a part of the profile, so the clean-up deletes it too.
+  profileCreated = true;
+  hermes(cli.executable, ["profile", "create", profile, "--no-alias"], root);
+  Object.assign(process.env, browserEnvironment(root), {
+    HERMES_HOME: home,
+    HERMES_SHARED_AUTH_DIR: join(root, "shared"),
+    HERMES_DISABLE_LAZY_INSTALLS: "1",
+  });
+  const workspace = makeWorkspace(scratch);
   // Without a terminal, `auth add` takes the sign-in from the shared Nous store.
-  await hermes(cli.executable, ["auth", "add", "nous", "--type", "oauth", "--no-browser"], home);
+  hermes(cli.executable, ["auth", "add", "nous", "--type", "oauth", "--no-browser"], home);
   for (const variant of variants) {
     writeFileSync(
       join(home, "config.yaml"),
@@ -340,15 +383,17 @@ try {
     } finally {
       await stopClients([client]);
     }
+    const measured = turns.flatMap((turn) => [turn.reply, turn.task]);
+    const systemPromptChars = turns.flatMap((turn) => turn.reply.systemPromptChars ?? []);
+    const kept = measured.flatMap((turn) => turn.toolSearch?.kept ?? []);
+    const deferred = measured.flatMap((turn) => turn.toolSearch?.deferred ?? []);
     const summary = {
       replyPromptTokens: median(turns.map((turn) => turn.reply.promptTokens)),
       taskPromptTokens: median(turns.map((turn) => turn.task.promptTokens)),
       taskRequests: median(turns.map((turn) => turn.task.requests.length)),
-      systemPromptChars: median(turns.flatMap((turn) => turn.reply.systemPromptChars ?? [])),
-      toolsKept: Math.max(...turns.flatMap((turn) => [turn.reply, turn.task].flatMap((t) => t.toolSearch?.kept ?? []))),
-      toolsDeferred: Math.max(
-        ...turns.flatMap((turn) => [turn.reply, turn.task].flatMap((t) => t.toolSearch?.deferred ?? [])),
-      ),
+      systemPromptChars: systemPromptChars.length > 0 ? median(systemPromptChars) : null,
+      toolsKept: kept.length > 0 ? Math.max(...kept) : null,
+      toolsDeferred: deferred.length > 0 ? Math.max(...deferred) : null,
     };
     variantReports.push({ name: variant.name, summary, turns });
     process.stdout.write(`${variant.name}: ${JSON.stringify(summary)}\n`);
@@ -357,23 +402,6 @@ try {
   mkdirSync(OUT, { recursive: true });
   writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   process.stdout.write(`Report: ${join(OUT, "report.json")}\n`);
-  await rm(scratch, { recursive: true, force: true });
-  // Hermes 0.21.5 removes the profile and then fails to purge its identity from the removed profile's
-  // `state.db`: that error is not a failure when the profile folder is gone.
-  await hermes(cli.executable, ["profile", "delete", "-y", profile], root).catch((error: unknown) => {
-    if (existsSync(home)) throw error;
-  });
-  // `profile delete` leaves a tombstone for the name. The name is random, so nothing reuses it.
-  rmSync(join(profiles, ".deleted", profile), { force: true });
-  if (!profilesExisted) {
-    removeEmptyFolder(join(profiles, ".deleted"));
-    removeEmptyFolder(profiles);
-  }
-  if (launchers(root) !== launchersBefore) {
-    process.stderr.write(
-      `The bench changed the Hermes launchers in ${join(root, "hermes-agent", ".hermes", "bin")}.\n`,
-    );
-    failed = true;
-  }
+  cleanUp();
 }
 if (failed) process.exit(1);
