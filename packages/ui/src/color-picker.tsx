@@ -227,7 +227,7 @@ export function ColorPicker(props: ColorPickerProps) {
         update={update}
         clear={clear}
       />
-      <span class="ui-sr-only" aria-live="polite">
+      <span class="sr-only" aria-live="polite">
         {cleared() ? (props.clearLabel ?? t("settings.chatColor.none")) : ""}
       </span>
     </fieldset>
