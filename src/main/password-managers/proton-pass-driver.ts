@@ -749,7 +749,9 @@ export class ProtonPassDriver implements PasswordManagerDriver, PasswordVault {
         const executable = yield* this.#cli(signal);
         const signIn = Effect.gen({ self: this }, function* () {
           const login = yield* this.#call(executable, ["login"], this.#sessionEnv(record, true), signal, COMMAND_MS);
-          if (login.code !== 0) {
+          // The CLI refuses `login` while the session of an earlier run is still there, for example after a
+          // restart. The CLI deletes that session when the server ends it, so it is safe to use it.
+          if (login.code !== 0 && !login.stderr.includes("Already authenticated")) {
             const error = cliFailure(login);
             if (error.cause instanceof ProtonPassFailure && error.cause.code) this.#setError(error.cause);
             return yield* error;
