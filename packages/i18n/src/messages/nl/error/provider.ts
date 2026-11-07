@@ -311,6 +311,8 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Alleen HTTPS-inloglinks kunnen in de browser worden geopend.",
   "error.provider.geminiKeyRefused":
     "Gemini heeft de opgeslagen API-sleutel geweigerd. Vervang of verwijder de sleutel in Instellingen en verbind opnieuw.",
+  "error.provider.geminiVerificationRequired":
+    "Google moet je account verifiëren voordat Gemini kan antwoorden. Verifieer je Google-account in een browser en stuur je bericht daarna opnieuw.",
   "error.provider.keyProviderRefused":
     "{provider} heeft de opgeslagen API-sleutel geweigerd. Vervang of verwijder de sleutel in Instellingen en probeer het opnieuw.",
   "error.provider.keyProviderNoBalance":

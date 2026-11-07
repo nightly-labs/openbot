@@ -292,6 +292,8 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "רק קישורי התחברות מסוג HTTPS יכולים להיפתח בדפדפן.",
   "error.provider.geminiKeyRefused":
     "Gemini דחה את מפתח ה-API השמור. יש להחליף או להסיר את המפתח בהגדרות, ואז להתחבר שוב.",
+  "error.provider.geminiVerificationRequired":
+    "נדרש אימות של החשבון שלך ב-Google לפני ש-Gemini יוכל לענות. יש לאמת את חשבון Google בדפדפן, ואז לשלוח את ההודעה שוב.",
   "error.provider.keyProviderRefused":
     "{provider} דחה את מפתח ה-API השמור. יש להחליף או להסיר את המפתח בהגדרות, ואז לנסות שוב.",
   "error.provider.keyProviderNoBalance":

@@ -314,6 +314,8 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Somente links de login HTTPS podem abrir no navegador.",
   "error.provider.geminiKeyRefused":
     "O Gemini recusou a chave de API salva. Substitua ou remova a chave nas Configurações e conecte novamente.",
+  "error.provider.geminiVerificationRequired":
+    "O Google precisa verificar sua conta antes que o Gemini possa responder. Verifique sua conta do Google em um navegador e envie sua mensagem novamente.",
   "error.provider.keyProviderRefused":
     "O {provider} recusou a chave de API salva. Substitua ou remova a chave nas Configurações e tente novamente.",
   "error.provider.keyProviderNoBalance":

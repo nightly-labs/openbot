@@ -1,5 +1,5 @@
 // The agents of `acp-instructions-once-e2e.ts`. Each prompt logs whether its first block carries the
-// OpenBot instructions. `FAKE_MODE` picks one: "context" reports its context size after each prompt,
+// OpenBot instructions, and which turn-context blocks (memories, section-mates) come with it. `FAKE_MODE` picks one: "context" reports its context size after each prompt,
 // as OpenCode does; "silent" reports none. A prompt that says "compact-now" shrinks the context,
 // "compaction-update" reports a completed compaction, and "fail-now" fails.
 import { randomUUID } from "node:crypto";
@@ -29,11 +29,10 @@ serveFakeAcpAgent({
     const blocks = request.params.prompt ?? [];
     const first = blocks[0]?.text ?? "";
     const instructions = first.startsWith(INSTRUCTIONS_TAG);
-    const text = blocks
-      .slice(instructions ? 1 : 0)
-      .map((block) => block.text ?? "")
-      .join("");
-    logEntry({ sessionId, instructions, instructionsText: instructions ? first : null, text });
+    const rest = blocks.slice(instructions ? 1 : 0).map((block) => block.text ?? "");
+    const context = rest.filter((block) => block.startsWith("<openbot_"));
+    const text = rest.filter((block) => !block.startsWith("<openbot_")).join("");
+    logEntry({ sessionId, instructions, instructionsText: instructions ? first : null, context, text });
     if (text.includes("fail-now")) {
       peer.fail(request, { code: -32603, message: "Internal error", data: "the model failed" });
       return;

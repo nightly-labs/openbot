@@ -546,5 +546,6 @@ function reportedCostBasis(provider: string) {
   if (provider === "grok") return "Grok CLI prompt cost report";
   if (provider === "pi" || KEY_ONLY_PROVIDERS.some((id) => id === provider))
     return "Pi session cost report; rates of Pi's model list, not subscription charges";
+  if (provider === "acp") return "Custom agent session cost report";
   return "Claude SDK list-price estimate; https://platform.claude.com/docs/en/about-claude/pricing; verified 2026-09-07";
 }

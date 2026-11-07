@@ -56,6 +56,33 @@ catalog, and the guidance in bytes, and fails when one of them grows. See
 later add context and can add model steps. Provider prompts, external plugins, caching, billing, and
 native model serialization are outside this measurement.
 
+Claude Code adds its own system prompt, tools, and skill listing to each Claude request.
+`claude-client.ts` turns off the bundled skills that cannot work in an OpenBot agent, lists the
+bundled coding skills by name only, and turns off Remote Control, commit attribution, and the tools and
+agent types made for a Claude Code host (`CLAUDE_HOST_TOOLS`). These flag settings come before the
+user, project and local settings, so the client leaves out a skill override for a user or project skill
+of the same name, and each key that a settings file that the query loads sets. Git instructions and the built-in
+`general-purpose`, `Explore`, `Plan` and `web-fetch` agents stay. `bun run bench:claude-prompt-settings`
+runs real Haiku turns and reports the prompt tokens, tools, and skills of each settings variant in
+`.openbot-build/claude-prompt-settings-bench/report.json`. `bun run smoke:claude-agent` runs one agent
+session through the core tools, a subagent, a skill, a deferred tool, and a commit, and writes
+`.openbot-build/claude-agent-smoke/report-setup-<on|off>.json`.
+
+Pi adds its own system prompt, tools, and skill listing to each request of the Pi-based providers
+(`pi`, `inception`, `deepseek`, `openrouter`). The MCP extension of `pi-mcp.ts` removes Pi's `<docs>`
+section, which gives the paths of Pi's own documentation, from the copy of the messages that each
+request gets (`context_with_system`). A prompt returned from `before_agent_start` would also drop the
+`<mcp_servers>` section that names the user's deferred servers. The OpenBot bridge hides
+`request_api_key` and `suggest_marketplace_app` from Pi (`PI_SEARCH_ONLY_OPENBOT_TOOLS`). The agent
+finds and runs these two tools through OpenBot's `tool_search` and `tool_call`. They are `hidden`, not
+`deferred`: a deferred tool adds Pi's own `tool_search` and an `<mcp_servers>` line. `ask_ui` stays
+declared for its confirm card. The user's Pi settings, extensions, and skills stay, and a user extension
+can still change the prompt. `bun run bench:pi-prompt-settings`
+runs real Mercury turns and reports the system prompt sections, tools, and prompt tokens of each
+variant in `.openbot-build/pi-prompt-settings-bench/report.json`. `bun run smoke:pi-agent` runs one
+agent session through the core tools, a commit, and a hidden tool, checks each request, and writes
+`.openbot-build/pi-agent-smoke/report.json`.
+
 ## History retrieval and replacement sessions
 
 A replacement provider session receives a handoff of at most 32,000 characters, including headers
@@ -406,6 +433,40 @@ configuration and model discovery. `src/backend/acp-client.ts` owns session star
 streamed messages, permissions, tool bridging, and cancellation. `grok-client.ts` supplies xAI
 login and billing hooks. The OpenCode driver starts `opencode acp` on the runtime OpenBot pins and
 downloads, or on a CLI the user installed. Profile clients deny tool permissions.
+
+OpenCode adds its own system prompt, tools, skill listing and Code Mode catalog to each request of an
+agent. `opencode-agent-defaults.ts` denies the parts that an OpenBot agent does not use: the
+`question` tool (OpenBot has `ask_user`), the `opencode_list_mcp_resources` and
+`opencode_read_mcp_resource` tools (OpenBot's MCP servers serve no resources), and the `report` and
+`opencode` skills. These rules go in an `OPENCODE_CONFIG` file in the provider state folder, not in
+`OPENCODE_CONFIG_CONTENT`, so a rule in the project's `opencode.json` comes after them and wins. The
+global config (the XDG folder and `OPENCODE_CONFIG_DIR`) comes before that file, so the driver leaves
+out each rule that a global name or pattern matches, also in an agent's rules. The global catch-all `"*"` only sets how OpenCode asks for tools and does not count.
+When the user sets `OPENCODE_CONFIG`, or a global config file cannot be decoded, OpenBot adds no rule.
+The `models` tool, the `explore` agent and all OpenBot tools stay; with two tools gone, the Code Mode
+catalog shows 14 of 16 OpenBot tools, not 13, and `search` still finds the others. On OpenCode 2.2.6
+a one-reply request goes from 5,987 to 5,288 o200k tokens (−11.7%), and a read-then-reply task from
+12,130 to 10,732. `bun run bench:opencode-prompt-settings` runs the real driver and CLI against a fake
+model on loopback in temporary XDG folders and reports the tokens, tools, skills and catalog of each
+variant in `.openbot-build/opencode-prompt-settings-bench/report.json`. `bun run smoke:opencode-agent`
+runs one agent turn with the core tools, a subagent and an OpenBot tool through `execute`, then checks
+that global and project rules of the user win, in `.openbot-build/opencode-agent-smoke/report.json`.
+
+Grok `agent stdio` ignores `--tools` and `--disallowed-tools`, so only environment and `config.toml`
+switches remove a Grok feature. At each spawn, `grok-client.ts` turns off four features that an
+OpenBot agent does not use: feedback (`GROK_FEEDBACK_ENABLED`), workflows (`GROK_WORKFLOWS`), the
+turn summary (`GROK_TURN_SUMMARY`) and the skills of `~/.claude/skills` (`GROK_CLAUDE_SKILLS_ENABLED`).
+An environment value wins over every Grok config layer, so OpenBot sets a switch only when the
+user's environment and the layers below it (`$GROK_HOME/managed_config.toml`, `$GROK_HOME/config.toml`,
+`GROK_CONFIG_PATH` and `GROK_CONFIG`) all leave its key unset. When a layer does not read or parse,
+OpenBot sets no switch. A user can turn each feature back on in `config.toml`. On Grok CLI 1.0.70
+and Grok Build Fast, feedback and workflows cost 1,707 prompt tokens in each request, the turn summary
+is one more request of about 1,600 after each turn, and one developer's Claude skills cost 2,811 in
+each request. The image, video, search, subagent and question tools stay: together they cost about
+6,100, but an agent can use each of them. The session title request (about 500) has no switch. `bun run bench:grok-prompt-settings` measures these features
+through a local proxy and a copy of the user's Grok login without its refresh token.
+`bun run smoke:grok-agent` checks that an agent can still use a skill, the file and terminal tools,
+a subagent and git, and that the user's `config.toml` value wins.
 
 The pinned runtime is OpenCode 2 (`@opencode/cli`). Its platform tarballs carry no licence file, so
 the stage step copies `LICENSE` from the `opencode-ai` tarball that `licensePackage` in
