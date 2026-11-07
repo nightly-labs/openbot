@@ -384,7 +384,6 @@ export const VOICE_KEY_PROVIDER_NAMES: Record<VoiceKeyProvider, string> = {
   xai: "xAI",
   groq: "Groq",
 };
-export const SPEECH_KEY_PROVIDER_NAMES: Record<SpeechKeyProvider, string> = VOICE_KEY_PROVIDER_NAMES;
 
 /**
  * The models that read replies aloud at a provider. The reply text goes to the provider with the
