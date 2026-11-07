@@ -171,7 +171,8 @@ export interface ComposerActionsDeps {
   clearConversationError: (target: ConversationTarget) => void;
   clearSubmittedDraft: (target: ConversationTarget, submitted: ComposerDraft) => void;
   setConversationError: (target: ConversationTarget, message: string) => void;
-  setStickToLatest: (value: boolean) => void;
+  /** The chat follows the latest message again and goes to the sent message at once. */
+  followSentMessage: () => void;
   pendingSends: PendingSendStore;
   attachmentPicker: () => HTMLInputElement | undefined;
   /** False in a chat window (#2964): the stored queue edit is one slot, and the main window owns it. */
@@ -857,7 +858,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       const activeTarget = deps.currentTarget();
       return activeTarget?.agentId === target.agentId && activeTarget.serverId === target.serverId;
     };
-    if (onScreen()) deps.setStickToLatest(true);
+    if (onScreen()) deps.followSentMessage();
     // A message to a working agent waits behind its turn or its queue. A channel has no such queue.
     // An earlier send that has not failed is about to start a turn, so this one waits behind it.
     const queued =

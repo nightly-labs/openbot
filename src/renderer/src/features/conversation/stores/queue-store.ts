@@ -41,7 +41,10 @@ export function createQueueStore(deps: QueueStoreDeps) {
     }).filter((row) => !(hidden.has(row.id) && (row.state === "replied" || row.state === "failed")));
   });
   const [renderedQueueDeliveries, setRenderedQueueDeliveries] = createSignal<QueueDelivery[]>([]);
+  /** The panel is in the DOM. It stays while it closes, so it can slide down behind the input. */
   const queuePanelVisible = createMemo(() => renderedQueueDeliveries().length > 0);
+  /** The panel has messages that wait. Its slot starts to close when the last one goes. */
+  const queueOpen = createMemo(() => presentedQueueDeliveries().length > 0);
   let queueExitTimer: number | undefined;
   let renderedOwner: string | undefined;
   createEffect(
@@ -50,12 +53,12 @@ export function createQueueStore(deps: QueueStoreDeps) {
       return { deliveries: presentedQueueDeliveries(), owner: target && `${target.serverId}:${target.agentId}` };
     },
     ({ deliveries, owner }) => {
-      if (queueExitTimer !== undefined) {
-        window.clearTimeout(queueExitTimer);
-        queueExitTimer = undefined;
-      }
       const switched = owner !== renderedOwner;
       renderedOwner = owner;
+      if (deliveries.length > 0 || switched) {
+        if (queueExitTimer !== undefined) window.clearTimeout(queueExitTimer);
+        queueExitTimer = undefined;
+      }
       if (deliveries.length > 0) {
         setRenderedQueueDeliveries(deliveries);
         return;
@@ -66,6 +69,9 @@ export function createQueueStore(deps: QueueStoreDeps) {
         setRenderedQueueDeliveries([]);
         return;
       }
+      // The empty queue is computed again for each change of the chat, such as each part of a reply
+      // that streams. The panel closes at the end of its first exit, not after the chat is quiet.
+      if (queueExitTimer !== undefined) return;
       queueExitTimer = window.setTimeout(() => {
         queueExitTimer = undefined;
         if (untrack(presentedQueueDeliveries).length === 0) setRenderedQueueDeliveries([]);
@@ -84,5 +90,6 @@ export function createQueueStore(deps: QueueStoreDeps) {
     renderedQueueDeliveries,
     setRenderedQueueDeliveries,
     queuePanelVisible,
+    queueOpen,
   };
 }

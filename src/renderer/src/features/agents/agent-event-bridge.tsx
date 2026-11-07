@@ -8,7 +8,7 @@ import { currentText } from "@openbot/ui/text";
 import { classifyUserError } from "@openbot/user-errors";
 import { flush, onSettled } from "solid-js";
 import { withoutAgent } from "../../app-message-projection";
-import { playCompletionSoundForAgentEvent } from "../../completion-sound";
+import { playCompletionSoundForAgentEvent, prepareCompletionSound } from "../../completion-sound";
 import { usePlatform } from "../../platform";
 import { useProviders } from "../../providers";
 import { queueAfterTurnCompleted } from "../../queue-reconciliation";
@@ -235,6 +235,7 @@ export function AgentEventBridge() {
           ...current,
           [event.agentId]: event.turnId,
         }));
+        if (soundLevel() === "all" && !platform.chatWindow) prepareCompletionSound();
         return;
       case "turn-completed":
         completedTurnByAgent.set(event.agentId, event.turnId);
@@ -451,6 +452,7 @@ export function AgentEventBridge() {
   }
 
   onSettled(() => {
+    if (!platform.chatWindow) prepareCompletionSound();
     const unsubscribe = agentsPort().agent.onEvent((event) => {
       if (event.type === "channels-changed") {
         void channels.refresh();

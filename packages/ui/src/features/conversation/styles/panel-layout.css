@@ -40,6 +40,30 @@
   }
 }
 
+/* A new chat bubble rises 8px and grows from 97% as Grok Bot's do. The timing curve passes 100% a
+   little and comes back, so the bubble settles with a small bounce. */
+@keyframes message-bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* The user's own message rises 12px, as Grok Bot's does when it is sent. A tall message that also
+   grew from 97% would move its top edge far, so it only rises. */
+@keyframes message-sent-in {
+  from {
+    transform: translateY(12px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
 @keyframes agent-activity-dot {
   0%,
   60%,
@@ -91,10 +115,12 @@
   .browser-panel,
   .remote-desktop-workspace,
   .message-entry,
+  .message-entry-animated,
   .chat-action-entry-animated,
   .agent-activity-entry,
   .agent-activity-content,
   .agent-activity-avatar,
+  .agent-activity-entry .agent-activity-avatar,
   .agent-row-thinking-dots i,
   .agent-row-agent-status-responded,
   .agent-row-agent-status-unread,

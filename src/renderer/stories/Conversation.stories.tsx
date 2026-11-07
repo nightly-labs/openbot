@@ -2363,3 +2363,128 @@ export const RoutineRunGroupInChat: Story = {
     ],
   },
 };
+
+/**
+ * A host that answers each message in the order the desktop host does: the receipt, then the
+ * message with the turn that starts it, a thinking step, the reply while the agent writes it, the
+ * finished reply, and the end of the turn. The chat starts with `historyRows` rows, so a send can
+ * also take the transcript over the 100 rows that the timeline draws in full.
+ */
+function NaturalSendLoopConversation(props: { args: Parameters<typeof Conversation>[0]; historyRows: number }) {
+  const [chat, setChat] = createSignal<RendererAgentMessage[]>(readingHistoryMessages(props.historyRows));
+  const [activeTurnId, setActiveTurnId] = createSignal<string | null>(null);
+  const [deliveries, setDeliveries] = createSignal<QueueSnapshot["deliveries"]>([]);
+  const timers = new Set<number>();
+  const later = (delay: number, step: () => void) => {
+    const timer = window.setTimeout(() => {
+      timers.delete(timer);
+      step();
+    }, delay);
+    timers.add(timer);
+  };
+  onCleanup(() => {
+    for (const timer of timers) window.clearTimeout(timer);
+  });
+  let sends = 0;
+  const sendMessage = async (body: string) => {
+    sends += 1;
+    const id = `natural-send-${sends}`;
+    const delivery = {
+      ...queuedDelivery,
+      id,
+      messageId: id,
+      text: body,
+      status: "queued" as const,
+      position: 0,
+      createdAt: new Date().toISOString(),
+    };
+    // As the host does: it reports the queued message first, answers the send, then starts the turn.
+    setDeliveries((current) => [...current, delivery]);
+    later(220, () => {
+      setDeliveries((current) =>
+        current.map((item) => (item.id === id ? { ...item, status: "running" as const, turnId: id } : item)),
+      );
+      setActiveTurnId(id);
+      setChat((current) => [
+        ...current,
+        { id, author: "you", body, time: "10:02", createdAt: new Date().toISOString(), kind: "text" },
+      ]);
+    });
+    later(500, () =>
+      setChat((current) => [
+        ...current,
+        {
+          id: `thinking:${id}`,
+          author: "agent",
+          body: "",
+          time: "10:02",
+          kind: "thinking",
+          items: ["Read the message", "Checked the release plan"],
+          streaming: true,
+        },
+      ]),
+    );
+    const reply = `I checked it. The owner, the date and the open risk for "${body}" are in the plan now.`;
+    later(1600, () =>
+      setChat((current) => [
+        ...current,
+        {
+          id: `${id}:assistant`,
+          author: "agent",
+          body: reply.slice(0, 20),
+          time: "10:02",
+          kind: "text",
+          streaming: true,
+        },
+      ]),
+    );
+    later(2200, () =>
+      setChat((current) =>
+        current.map((message) => {
+          if (message.id === `${id}:assistant`) return { ...message, body: reply, streaming: false };
+          if (message.id === `thinking:${id}`) return { ...message, streaming: false };
+          return message;
+        }),
+      ),
+    );
+    later(2260, () => {
+      setActiveTurnId((current) => (current === id ? null : current));
+      // The host keeps a finished message in the snapshot.
+      setDeliveries((current) =>
+        current.map((item) => (item.id === id ? { ...item, status: "completed" as const, position: null } : item)),
+      );
+    });
+    await new Promise<void>((resolve) => later(200, resolve));
+    return { messageId: id };
+  };
+  return (
+    <MockedConversation
+      args={{
+        ...props.args,
+        responseStyle: "natural",
+        activeTurnId: activeTurnId(),
+        queue: { agentId: queuedDelivery.recipientAgentId, deliveries: deliveries() },
+        onSendMessage: sendMessage,
+      }}
+      messages={chat()}
+    />
+  );
+}
+
+/** Send a message: it rises above the working face, and the reply comes as one bubble. */
+export const NaturalSendLoop: Story = {
+  args: { messages: [], activeTurnId: null, queue: undefined, unreadCount: 0, firstUnreadMessageId: null },
+  render: (storyArgs) => <NaturalSendLoopConversation args={storyArgs} historyRows={20} />,
+};
+
+/** 100 rows: the first send takes the transcript over the rows that the timeline draws in full. */
+export const NaturalSendLoopAtRowLimit: Story = {
+  args: NaturalSendLoop.args,
+  render: (storyArgs) => <NaturalSendLoopConversation args={storyArgs} historyRows={99} />,
+};
+
+/** A long transcript, which draws only the rows near the screen. */
+export const NaturalSendLoopLongHistory: Story = {
+  args: NaturalSendLoop.args,
+  render: (storyArgs) => <NaturalSendLoopConversation args={storyArgs} historyRows={300} />,
+};

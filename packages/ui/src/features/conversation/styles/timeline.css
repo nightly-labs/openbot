@@ -12,6 +12,11 @@
   width: 100%;
 }
 
+/* While the chat moves up under the working face, a new message comes up from behind the face line. */
+.virtual-chat-list[data-pushing] {
+  overflow-y: clip;
+}
+
 .virtual-chat-row {
   position: absolute;
   inset: 0 0 auto;

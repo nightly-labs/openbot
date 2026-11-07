@@ -99,6 +99,27 @@ function followConversationBottom(element: HTMLDivElement): void {
   element.scrollTop = element.scrollHeight - element.clientHeight;
 }
 
+/**
+ * How fast the chat glides to a new message: each 70ms covers about 63% of the distance that is left,
+ * so the move ends in about 280ms, as a new bubble enters in Grok Bot. It starts fast and slows down.
+ */
+const CHAT_GLIDE_TIME_CONSTANT_MS = 70;
+/**
+ * The most time one step of the glide counts. After a long frame the glide goes on in steps and does
+ * not jump the rest of the way, while the bubble that it follows still enters.
+ */
+const CHAT_GLIDE_MAX_STEP_MS = 34;
+/** A message that enters above the working face moves the chat up in the time of its own entrance. */
+const CHAT_PUSH_DURATION_MS = 280;
+const CHAT_PUSH_EASING = "cubic-bezier(0.2, 0.9, 0.3, 1)";
+/** After a chat opens or loads, its first follows jump: the reader did not see the earlier place. */
+const CHAT_GLIDE_OPEN_DELAY_MS = 600;
+/**
+ * After the user sends, the chat goes to the new message at once, as Grok Bot's does. A glide would
+ * move the chat up while the composer closes and moves it down, so the two would go against each other.
+ */
+const SENT_MESSAGE_PIN_MS = 400;
+
 export function createConversationViewScope(props: ConversationProps) {
   const controller = useConversationController();
   /** A view shows one agent or one channel for its whole life, so each branch below is fixed. */
@@ -412,16 +433,41 @@ export function createConversationViewScope(props: ConversationProps) {
   const currentPendingSends = createMemo(() => pendingSends.list(currentTarget()));
   // The host queues a message for a moment before it starts it. A send made while the agent was idle
   // stays in the chat for that moment, so it does not jump to the queue panel and back.
-  const startingDeliveryIds = createMemo(
-    () => new Set(currentPendingSends().flatMap((send) => (send.starting && send.messageId ? [send.messageId] : []))),
-  );
+  // The host can report the queue before it answers the send. The message has no id here yet, so its
+  // queued delivery is found by its text.
+  const startingDeliveryIds = createMemo(() => {
+    const ids = new Set<string>();
+    const unanswered: string[] = [];
+    for (const send of currentPendingSends()) {
+      if (send.starting && send.messageId) ids.add(send.messageId);
+      else if (send.state === "sending" && !send.queued) unanswered.push(send.text.trim());
+    }
+    if (unanswered.length === 0) return ids;
+    for (const delivery of props.queue?.deliveries ?? []) {
+      // The snapshot also keeps finished messages, and an earlier one can have the same text.
+      const waiting = delivery.status === "queued" || delivery.status === "starting";
+      if (!waiting || delivery.sender.kind !== "user" || ids.has(delivery.id)) continue;
+      const index = unanswered.indexOf(delivery.text.trim());
+      if (index < 0) continue;
+      ids.add(delivery.id);
+      unanswered.splice(index, 1);
+    }
+    return ids;
+  });
   // A message goes, or the host starts its turn: the agent has no turn yet, but it soon works. A send
   // that waits behind a failed one does not go until Retry or Dismiss, so it does not count.
   const sendStarting = createMemo(() =>
     currentPendingSends().some((send) => send.state === "sending" || send.starting),
   );
   const queue = createQueueStore({ props, hiddenAwaitingReplyIds, startingDeliveryIds });
-  const { activeDeliveries, orderedQueuedDeliveries, presentedQueueDeliveries, queuePanelVisible } = queue;
+  const {
+    activeDeliveries,
+    orderedQueuedDeliveries,
+    presentedQueueDeliveries,
+    queuePanelVisible,
+    queueOpen,
+    renderedQueueDeliveries,
+  } = queue;
   const awaitingReplies = channel
     ? createMemo(() => {
         const hidden = hiddenAwaitingReplyIds();
@@ -451,6 +497,14 @@ export function createConversationViewScope(props: ConversationProps) {
     providerSilentMinutes,
     providerOffline,
   } = activity;
+  // A sent message makes room for the working agent's line at once. The chat then moves one time,
+  // with the message, and not again when the line shows.
+  createEffect(
+    () => !channel && currentPendingSends().length > 0,
+    (sending) => {
+      if (sending) setAgentActivitySpaceReserved(true);
+    },
+  );
   /** The name of what the agent's turns wait for. OpenCode or Pi serves a custom endpoint, so it names the endpoint (#3234). */
   const agentProviderName = () => {
     const agent = props.agent;
@@ -720,6 +774,7 @@ export function createConversationViewScope(props: ConversationProps) {
       getStickToLatest: () => stickToLatest,
       setStickToLatest,
       getCurrentUnreadCount: () => currentUnreadCount,
+      followLatest: (element) => glideConversationBottom(element),
     },
   });
   const {
@@ -1030,7 +1085,7 @@ export function createConversationViewScope(props: ConversationProps) {
     clearConversationError,
     clearSubmittedDraft,
     setConversationError,
-    setStickToLatest,
+    followSentMessage,
     pendingSends,
     attachmentPicker: () => attachmentPicker,
     promptComposerAnswer,
@@ -1143,6 +1198,107 @@ export function createConversationViewScope(props: ConversationProps) {
   let browserVisibilityGeneration = 0;
   let stickToLatest = true;
   let lastConversationIdentity: string | undefined;
+  let lastLoaded: boolean | undefined;
+  let chatGlideFrame: number | undefined;
+  let chatGlideAfter = Number.POSITIVE_INFINITY;
+  let sentMessagePinUntil = 0;
+  /** The user's own message: follow the latest message, and go to it at once. */
+  function followSentMessage(): void {
+    setStickToLatest(true);
+    stopChatGlides();
+    sentMessagePinUntil = performance.now() + SENT_MESSAGE_PIN_MS;
+  }
+  /**
+   * Follows the bottom as `followConversationBottom` does, but scrolls over about 280ms
+   * instead of at once. Each frame covers a share of the distance that is left, by the time that the
+   * frame took, so a slow frame does not stop the glide and a write from elsewhere does not move the
+   * chat back. A follow during a glide keeps that glide: it aims at the bottom of each frame.
+   */
+  function glideConversationBottom(element: HTMLDivElement): void {
+    if (performance.now() < sentMessagePinUntil) {
+      stopChatGlides();
+      followConversationBottom(element);
+      return;
+    }
+    if (pushConversationBottom(element)) return;
+    if (chatGlideFrame !== undefined) return;
+    const distance = element.scrollHeight - element.clientHeight - element.scrollTop;
+    if (
+      distance <= 1 ||
+      distance > element.clientHeight ||
+      performance.now() < chatGlideAfter ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      followConversationBottom(element);
+      return;
+    }
+    let last = performance.now();
+    const step = (now: number) => {
+      const elapsed = Math.min(CHAT_GLIDE_MAX_STEP_MS, Math.max(0, now - last));
+      last = now;
+      const current = element.scrollTop;
+      const left = element.scrollHeight - element.clientHeight - current;
+      if (left <= 0.5) {
+        if (left > 0) followConversationBottom(element);
+        chatGlideFrame = undefined;
+        return;
+      }
+      element.scrollTop = current + left * (1 - Math.exp(-elapsed / CHAT_GLIDE_TIME_CONSTANT_MS));
+      chatGlideFrame = requestAnimationFrame(step);
+    };
+    chatGlideFrame = requestAnimationFrame(step);
+  }
+  let chatPush: Animation | undefined;
+  /**
+   * In the Natural style the working face stays in place while a message enters above it, as in Grok
+   * Bot. A glide would move the face down under the new message and then back up. The chat goes to the
+   * bottom at once, and the messages slide up from where they were painted. The list clips its rows
+   * during the move, so the new message comes up from behind the face line and does not cover it.
+   */
+  function pushConversationBottom(element: HTMLDivElement): boolean {
+    const list = virtualRoot;
+    if (channel || props.responseStyle !== "natural" || !list) return false;
+    if (!agentActivitySlot?.querySelector(".agent-activity-entry")) return false;
+    const distance = element.scrollHeight - element.clientHeight - element.scrollTop;
+    if (
+      distance <= 1 ||
+      distance > element.clientHeight ||
+      performance.now() < chatGlideAfter ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    )
+      return false;
+    stopChatGlides();
+    const before = element.scrollTop;
+    followConversationBottom(element);
+    const moved = element.scrollTop - before;
+    if (moved <= 0) return true;
+    list.dataset.pushing = "";
+    let push: Animation | undefined;
+    for (const row of list.children) {
+      push = row.animate([{ transform: `translateY(${moved}px)` }, { transform: "translateY(0)" }], {
+        duration: CHAT_PUSH_DURATION_MS,
+        easing: CHAT_PUSH_EASING,
+        composite: "add",
+      });
+    }
+    chatPush = push;
+    const finish = () => {
+      if (chatPush !== push) return;
+      chatPush = undefined;
+      delete list.dataset.pushing;
+    };
+    push?.finished.then(finish, finish);
+    if (!push) finish();
+    return true;
+  }
+  function stopChatGlides(): void {
+    if (chatGlideFrame !== undefined) cancelAnimationFrame(chatGlideFrame);
+    chatGlideFrame = undefined;
+  }
+  function holdChatGlides(): void {
+    stopChatGlides();
+    chatGlideAfter = performance.now() + CHAT_GLIDE_OPEN_DELAY_MS;
+  }
   let lastPanelAgentId: string | undefined;
   const [quoteRequest, setQuoteRequest] = createSignal<QuoteRequest | undefined>(undefined);
   let lastRuntimeSettingsSignature: string | undefined;
@@ -1361,11 +1517,18 @@ export function createConversationViewScope(props: ConversationProps) {
     keyboardTarget.addEventListener("keydown", readerKeyDown);
     keyboardWindow.addEventListener("pointerup", endReaderDrag);
     keyboardWindow.addEventListener("pointercancel", endReaderDrag);
+    let viewportHeight = scrollElement?.clientHeight ?? 0;
     scrollResizeObserver = new ResizeObserver(() => {
       updateVirtualScrollMargin();
+      // A taller composer makes the chat shorter. The chat keeps its distance from the bottom in the
+      // same frame, as in Grok Bot, so the last message moves with the composer and is never cut off.
+      // A glide that is running keeps the distance that it has left.
+      const viewportGrowth = scrollElement ? scrollElement.clientHeight - viewportHeight : 0;
+      viewportHeight = scrollElement?.clientHeight ?? 0;
+      if (scrollElement && stickToLatest && viewportGrowth < 0) scrollElement.scrollTop -= viewportGrowth;
       const readerAbove = scrollElement !== undefined && readerAboveShrinkingContent(scrollElement);
       if (scrollElement && stickToLatest) {
-        if (!readerAbove) followConversationBottom(scrollElement);
+        if (!readerAbove) glideConversationBottom(scrollElement);
       }
       // An image or a preview that lays out after the opening grows a row above the divider. The chat
       // has no browser scroll anchoring, so without this the divider moves down out of view.
@@ -1562,7 +1725,7 @@ export function createConversationViewScope(props: ConversationProps) {
         unreadCount: props.unreadCount,
       };
     },
-    ({ agentId, serverId, unreadCount }) => {
+    ({ agentId, serverId, unreadCount, loaded }) => {
       currentUnreadCount = unreadCount;
       const conversationIdentity = `${serverId}:${agentId ?? ""}`;
       if (conversationIdentity !== lastConversationIdentity) {
@@ -1570,6 +1733,11 @@ export function createConversationViewScope(props: ConversationProps) {
         lastConversationIdentity = conversationIdentity;
         setStickToLatest(true);
         setAgentActivitySpaceReserved(false);
+        holdChatGlides();
+      }
+      if (loaded !== lastLoaded) {
+        lastLoaded = loaded;
+        holdChatGlides();
       }
       if (latestScrollFrame !== undefined) cancelAnimationFrame(latestScrollFrame);
       if (latestScrollSettleFrame !== undefined) cancelAnimationFrame(latestScrollSettleFrame);
@@ -1578,7 +1746,7 @@ export function createConversationViewScope(props: ConversationProps) {
         latestScrollFrame = undefined;
         if (!scrollElement) return;
         updateVirtualScrollMargin();
-        if (followLatest) followConversationBottom(scrollElement);
+        if (followLatest) glideConversationBottom(scrollElement);
         updateScrollFade(scrollElement);
         updateUnreadDividerVisibility();
         latestScrollSettleFrame = requestAnimationFrame(() => {
@@ -1586,7 +1754,7 @@ export function createConversationViewScope(props: ConversationProps) {
           if (!scrollElement) return;
           // A later layout, such as the activity line, can leave the first follow short of the
           // bottom. Stay there only while this follow is still on; do not turn it back on.
-          if (followLatest && stickToLatest) followConversationBottom(scrollElement);
+          if (followLatest && stickToLatest) glideConversationBottom(scrollElement);
           updateScrollFade(scrollElement);
           updateUnreadDividerVisibility();
         });
@@ -2005,7 +2173,10 @@ export function createConversationViewScope(props: ConversationProps) {
    */
   function readerFocusIn() {
     if (readerDragging || !scrollElement) return;
-    if (scrollElement.scrollTop < lastScrollTop) stopFollowingLatest();
+    if (scrollElement.scrollTop < lastScrollTop) {
+      stopFollowingLatest();
+      updateScrollFade(scrollElement);
+    }
     // A focus that moved the chat down also leaves the unread divider; the hold must not move the focus out of view.
     else if (scrollElement.scrollTop > lastScrollTop) unreadOpening.holding = false;
   }
@@ -2050,6 +2221,8 @@ export function createConversationViewScope(props: ConversationProps) {
   };
   function noteReaderIntent(up: boolean) {
     readerIntent = { up, at: performance.now() };
+    // The reader takes the scroll: the content shows at its real place at once.
+    stopChatGlides();
   }
   function readerWheel(event: WheelEvent) {
     // Ctrl with the wheel zooms, and a sideways swipe can report a small vertical delta.
@@ -2083,7 +2256,10 @@ export function createConversationViewScope(props: ConversationProps) {
   }
   /* Only the main button drags. A context menu can take the release of another button. */
   function readerPointerDown(event: PointerEvent) {
-    if (event.button === 0) readerDragging = true;
+    if (event.button === 0) {
+      readerDragging = true;
+      stopChatGlides();
+    }
   }
   const setVirtualRootElement = (element: HTMLDivElement) => {
     virtualRoot = element;
@@ -2319,6 +2495,8 @@ export function createConversationViewScope(props: ConversationProps) {
     previewAttachment,
     props,
     queuePanelVisible,
+    queueOpen,
+    renderedQueueDeliveries,
     reactToMessage,
     navigateBrowserTab,
     reloadBrowserTab,

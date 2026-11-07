@@ -48,6 +48,8 @@ interface ScrollStickyState {
   getStickToLatest: () => boolean;
   setStickToLatest: (value: boolean) => void;
   getCurrentUnreadCount: () => number;
+  /** Moves a following reader to the newest message. */
+  followLatest: (element: HTMLDivElement) => void;
 }
 
 export interface ScrollStoreDeps {
@@ -107,8 +109,11 @@ export function createScrollStore(deps: ScrollStoreDeps) {
       if (message.kind === "memory-changes" && answeredTurns().has(message.turnId)) return [];
       return silentAgentAnswer(message) ? [] : [message];
     });
+    // Natural shows an agent's text once it is complete, as one bubble, while the activity line
+    // names the step. A bubble that grows as the text arrives moves the chat at each line.
+    const complete = progressUpdates ? shown.filter((message) => !heldWhileWritten(message)) : shown;
     const questionTurnId = deps.props.channel ? undefined : deps.props.prompt?.turnId;
-    return summarizeHostedSiteMessages(withQuestionContext(shown, deps.props.messages, questionTurnId));
+    return summarizeHostedSiteMessages(withQuestionContext(complete, deps.props.messages, questionTurnId));
   });
   const routineRunTurns = createMemo(() => routineRunTurnMessages(deps.props.messages, shownMessages()));
   /* The messages of a routine run follow its row and open and close with it. */
@@ -254,6 +259,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     },
     scrollMargin: virtualScrollMargin,
     stickToLatest: deps.sticky.getStickToLatest,
+    followLatest: deps.sticky.followLatest,
     onChange: (instance) => {
       const first = instance.getVirtualItems()[0];
       if (!first) return;
@@ -272,7 +278,9 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     scrollFades.measure();
     updateHistoryBoundary(element);
     const remaining = element.scrollHeight - element.scrollTop - element.clientHeight;
-    setShowScrollToLatest(remaining > 80);
+    // A chat that follows the latest message is on its way down: a new row is taller than 80px for
+    // the frames before the follow lands, and the button must not flash over it.
+    setShowScrollToLatest(remaining > 80 && !deps.sticky.getStickToLatest());
     if (remaining <= 80) clearNewMessages();
   }
 
@@ -389,6 +397,13 @@ export function createScrollStore(deps: ScrollStoreDeps) {
 }
 
 /** The ids Claude and the ACP agents give a turn's thinking, beside its narration, as `REASONING_ID` in the backend. */
+/** Agent text that the host still writes. A plan, the subagents, a card and an image show while they run. */
+function heldWhileWritten(message: AgentMessage): boolean {
+  return (
+    message.author === "agent" && message.streaming === true && message.kind === "text" && !message.imageGeneration
+  );
+}
+
 const THINKING_ITEM_ID = /:(?:reasoning|thought(?::\d+)?)$/u;
 
 /**
