@@ -10,7 +10,7 @@ import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
 class FixtureProcessTimeout extends Error {}
 
 /** The case count of `browser-fingerprint-electron.ts`. A case that stops running fails the check. */
-const FINGERPRINT_CASES = 12;
+const FINGERPRINT_CASES = 15;
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const buildRoot = await mkdtemp(join(tmpdir(), "openbot-fingerprint-"));

@@ -16,7 +16,9 @@ import { contextBridge } from "electron";
  * Each replaced function reads as native code through `Function.prototype.toString`.
  */
 function matchChromePageValues(): void {
-  const natives = new WeakMap<object, string>();
+  // A masked `toString` called on an object with this key puts its map of replaced functions in
+  // the object, so that the frames of one page share one map. A native `toString` throws instead.
+  const nativesRequest = "matchChromePageValues:natives";
   const onWindows = navigator.userAgent.includes("Windows");
   // The window frame and toolbar of a Chrome window with no bookmarks bar.
   const frameWidth = onWindows ? 16 : 0;
@@ -31,6 +33,49 @@ function matchChromePageValues(): void {
     }
   };
 
+  // A page can give the `toString` of one frame a function of another frame. Each frame runs its
+  // own copy of this function, so each frame uses the map of its highest same-origin ancestor.
+  const sharedNatives = (): WeakMap<object, string> => {
+    let shared: WeakMap<object, string> | undefined;
+    let frame: Window = window;
+    try {
+      while (frame.parent !== frame) {
+        frame = frame.parent;
+        if (!isGlobal(frame)) continue;
+        const request: { [nativesRequest]: WeakMap<object, string> | undefined } = { [nativesRequest]: undefined };
+        try {
+          frame.Function.prototype.toString.call(request);
+        } catch {
+          // The native `toString` of a frame with no map throws for an object.
+        }
+        shared = request[nativesRequest] ?? shared;
+      }
+    } catch {
+      // The frame left the page while this ran.
+    }
+    return shared ?? new WeakMap<object, string>();
+  };
+  const natives = sharedNatives();
+
+  // A native function that throws from a trap below has one more stack frame than in Chrome: the
+  // trap. It is removed before the error goes to the page.
+  const removeTrapFrame = (error: unknown): void => {
+    try {
+      if (typeof error === "object" && error !== null && "stack" in error && typeof error.stack === "string") {
+        const lines = error.stack.split("\n");
+        const trap = lines.findIndex(
+          (line, index) => index > 0 && /^\s+at Object\.apply \(<anonymous>:\d+:\d+\)$/.test(line),
+        );
+        if (trap > 0) {
+          lines.splice(trap, 1);
+          error.stack = lines.join("\n");
+        }
+      }
+    } catch {
+      // An error with a fixed stack keeps it.
+    }
+  };
+
   const wrapGetter = <Owner extends typeof globalThis | HTMLIFrameElement, Key extends keyof Owner & string>(
     owner: Owner,
     key: Key,
@@ -39,7 +84,18 @@ function matchChromePageValues(): void {
     const descriptor = Object.getOwnPropertyDescriptor(owner, key);
     const get = descriptor?.get;
     if (!descriptor || !get) return;
-    const wrapped = new Proxy(get, { apply: (method, self: unknown) => fix(method.call(self)) });
+    const wrapped = new Proxy(get, {
+      apply: (method, self: unknown) => {
+        let value: Owner[Key];
+        try {
+          value = method.call(self);
+        } catch (error) {
+          removeTrapFrame(error);
+          throw error;
+        }
+        return fix(value);
+      },
+    });
     natives.set(wrapped, `get ${key}`);
     Object.defineProperty(owner, key, { ...descriptor, get: wrapped });
   };
@@ -118,8 +174,18 @@ function matchChromePageValues(): void {
     const functionPrototype = target.Function.prototype;
     const maskedToString = new Proxy(functionPrototype.toString, {
       apply: (method, self: unknown) => {
+        if (typeof self === "object" && self !== null && nativesRequest in self) {
+          Object.defineProperty(self, nativesRequest, { value: natives });
+          return "";
+        }
         const name = typeof self === "function" ? natives.get(self) : undefined;
-        return name === undefined ? method.call(self) : `function ${name}() { [native code] }`;
+        if (name !== undefined) return `function ${name}() { [native code] }`;
+        try {
+          return method.call(self);
+        } catch (error) {
+          removeTrapFrame(error);
+          throw error;
+        }
       },
     });
     natives.set(maskedToString, "toString");

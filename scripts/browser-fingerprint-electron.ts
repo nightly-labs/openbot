@@ -55,6 +55,7 @@ const values: {
   hiddenTab?: z.infer<typeof sizeSchema>;
   chrome?: z.infer<typeof chromeSchema>;
   frames?: z.infer<typeof framesSchema>;
+  crossFrame?: string[];
   keys?: Array<Pick<z.infer<typeof pageEventSchema>, "key" | "code" | "keyCode" | "shift">>;
   hiddenClick?: ClickValues;
   shownClick?: ClickValues;
@@ -198,6 +199,21 @@ async function main(): Promise<void> {
       const maskedToString = await page(contents, "Function.prototype.toString.toString()", z.string());
       assert.equal(maskedToString, "function toString() { [native code] }");
       recordCase("replaced-functions-read-as-native");
+
+      // A lie check gives a replaced function a receiver that makes it throw, and reads the stack.
+      const stacks = await page(
+        contents,
+        `[
+          () => Function.prototype.toString.call({}),
+          () => Object.getOwnPropertyDescriptor(window, 'outerWidth').get.call({}),
+        ].map((call) => { try { call(); return 'no error'; } catch (error) { return error.stack; } })`,
+        z.array(z.string()),
+      );
+      assert(
+        stacks.every((stack) => stack !== "no error" && !/at Object\.apply \(<anonymous>:\d+/.test(stack)),
+        `A replaced function shows its trap in the stack: ${stacks.join(" | ")}`,
+      );
+      recordCase("replaced-function-errors-have-native-stacks");
     }
 
     {
@@ -231,6 +247,39 @@ async function main(): Promise<void> {
       recordCase("frame-window-chrome-matches-chrome");
       assert.equal(frames.openbot, "undefinedundefined", "The tab page can reach window.openbot or require.");
       recordCase("page-has-no-openbot-bridge");
+
+      // A lie check reads the functions of one frame with the toString of another frame. The frame
+      // is read after it loads, so its own preload ran first.
+      const crossFrame = await page(
+        contents,
+        `new Promise((resolve) => {
+          const frame = document.createElement('iframe');
+          frame.srcdoc = 'blank page';
+          frame.onload = () => {
+            const child = frame.contentWindow;
+            const outer = (target) => Object.getOwnPropertyDescriptor(target, 'outerWidth').get;
+            resolve([
+              child.Function.prototype.toString.call(chrome.loadTimes),
+              child.Function.prototype.toString.call(outer(window)),
+              Function.prototype.toString.call(child.chrome.loadTimes),
+              Function.prototype.toString.call(outer(child)),
+              Function.prototype.toString.call(child.Function.prototype.toString),
+            ]);
+            frame.remove();
+          };
+          document.body.appendChild(frame);
+        })`,
+        z.array(z.string()),
+      );
+      values.crossFrame = crossFrame;
+      assert.deepEqual(crossFrame, [
+        "function loadTimes() { [native code] }",
+        "function get outerWidth() { [native code] }",
+        "function loadTimes() { [native code] }",
+        "function get outerWidth() { [native code] }",
+        "function toString() { [native code] }",
+      ]);
+      recordCase("frames-read-each-others-functions-as-native");
     }
 
     {
@@ -264,10 +313,22 @@ async function main(): Promise<void> {
       );
       recordCase("long-text-is-inserted");
 
-      const mixed = "zażółć ok\nkoniec";
+      const mixed = "zażółć ok";
       await call("type", { tabId, target: { kind: "css", selector: "#other" }, text: mixed });
-      assert.equal(await page(contents, "document.getElementById('other').value", z.string()), "zażółć okkoniec");
+      assert.equal(await page(contents, "document.getElementById('other').value", z.string()), mixed);
       recordCase("text-with-no-us-key-is-inserted");
+
+      // A code editor adds a closing bracket for a typed opening bracket, so this text is inserted.
+      await takeEvents(contents);
+      const code = "if (x) {";
+      await call("type", { tabId, target: { kind: "css", selector: "#long" }, text: code });
+      assert.equal(await page(contents, "document.getElementById('long').value", z.string()), code);
+      assert.equal(
+        (await takeEvents(contents)).filter((event) => event.type === "keydown").length,
+        0,
+        "Text with an opening bracket was typed key by key.",
+      );
+      recordCase("text-that-editors-complete-is-inserted");
     }
 
     const click = async () => {

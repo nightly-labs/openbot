@@ -6,4 +6,5 @@
 - Agents now type short text one key at a time with real key codes, and move the pointer along a
   short path and hold the button when they click. Before, text arrived with no key events and the
   pointer jumped to the target with no hold. Clicks in a tab that is not shown take no longer than
-  before.
+  before. Text with a line break, a bracket or a quote is still entered in one piece, so code
+  editors do not add closing brackets to it.

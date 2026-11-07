@@ -333,7 +333,8 @@ const BROWSER_WEB_PREFERENCES = {
   allowRunningInsecureContent: false,
   // An agent works in tabs that the panel does not show. A throttled tab waits up to a few seconds
   // for each pointer move, because Chromium sends the move with the next frame, and it tells the
-  // page that it is hidden. A tab that is not in use goes to sleep, so this costs no idle work.
+  // page that it is hidden. The cost is that a hidden page keeps its full timer and frame rate
+  // until the idle sweep puts the tab to sleep (`IDLE_TAB_SLEEP_MS`, sooner when memory is low).
   backgroundThrottling: false,
 };
 

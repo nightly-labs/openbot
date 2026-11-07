@@ -262,12 +262,19 @@ const US_KEYS: ReadonlyMap<string, UsKey> = new Map<string, UsKey>([
  */
 const MAX_KEYED_TEXT = 128;
 
+/**
+ * Code editors such as CodeMirror and Monaco add a closing bracket, quote or tag, or an indent,
+ * when a person types one of these characters. Text that has one is inserted in one piece, so the
+ * field gets the exact text.
+ */
+const EDITOR_COMPLETED_TEXT = /[\n\r([{'"`<]/;
+
 export const dispatchText = Effect.fn("Browser.dispatchText")(function* (
   send: SendCommand,
   text: string,
   sessionId?: string,
 ) {
-  if (text.length === 0 || text.length > MAX_KEYED_TEXT) {
+  if (text.length === 0 || text.length > MAX_KEYED_TEXT || EDITOR_COMPLETED_TEXT.test(text)) {
     yield* send("Input.insertText", { text }, sessionId);
     return;
   }
