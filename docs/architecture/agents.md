@@ -477,6 +477,21 @@ at once and shows an Undo toast; when the toast ends, `AgentService.deleteTask` 
 messages and deletes the thread with its conversation, attachments, event history and provider
 session. It refuses a thread with a running turn. The main thread has no archive, rename or delete.
 
+An agent reads its other conversations with `openbot.history_search` and `openbot.history_read`
+(`src/backend/agent/history-tools.ts`). Memory keeps facts, not a log of work, so these tools answer
+"what did we do today?". `history_search` without `query` lists the own chat (`taskId` `main`) and the
+side threads, open and archived, with activity since `after` (`24h`, `7d`, a date or an ISO time),
+the newest first, each with its last request and reply as redacted excerpts. With `query` and no
+`taskId`, it searches the current conversation first, then the own chat and the 8 newest side
+threads, and gives each match from another conversation its `taskId` (`searchAll`). Its `nextCursor`
+continues only the current conversation. With `query` or with `history_read`, a `taskId` names one
+conversation; a `taskId` without `query` reads that conversation's newest messages. Models often skip the tool
+description, so the search of all conversations makes their first call work. Each conversation is
+readable only after its latest context reset. The router (`openbot-tool-router.ts`) allows a
+`taskId`, the list and the search of all conversations only from the own chat or a side thread of the
+same agent: a messaging chat, where other people write, searches only itself, and a channel gets no
+history.
+
 "Branch from here" (`AgentService.branchTask`, `AgentTasks.branch`, `AgentThreadStore.branch`) makes a
 new side thread of the same agent from the last agent message of a finished turn, in the main thread
 or in a side thread. The button and the message menu item are off while the source has a running

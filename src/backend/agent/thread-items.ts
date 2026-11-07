@@ -496,6 +496,15 @@ const TOOL_USAGE_ACTIVITIES: Readonly<Record<ToolUsageKind, AgentStepActivity>> 
   other: "working",
 };
 
+/** OpenBot tools that only read: memories, skills and chat history. */
+const READING_OPENBOT_TOOLS = new Set([
+  "search_memories",
+  "list_memories",
+  "read_local_skill",
+  "history_search",
+  "history_read",
+]);
+
 /**
  * What a tool step does, for the `activity` of its `turn-progress` event, or null for an item that is
  * not a tool step. An ended step is `reviewing`: the model now reads its result.
@@ -506,7 +515,7 @@ export function toolActivity(item: ThreadItem, completed: boolean): AgentStepAct
   if (browserTool(item) !== null) return "browsing";
   const openBot = openBotTool(item);
   if (openBot === "send_message") return "delegating";
-  if (openBot === "search_memories" || openBot === "list_memories" || openBot === "read_local_skill") return "reading";
+  if (READING_OPENBOT_TOOLS.has(openBot ?? "")) return "reading";
   return TOOL_USAGE_ACTIVITIES[toolUsage(item)?.kind ?? "other"];
 }
 
