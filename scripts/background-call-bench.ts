@@ -21,7 +21,13 @@ import { generateTextWithoutTools, startToolless, stopToolless } from "../src/ba
 import type { AgentClient } from "../src/backend/agent-client";
 import { CodexAppServerClient } from "../src/backend/app-server-client";
 import { ClaudeAgentClient } from "../src/backend/claude-client";
-import { cliPathEnvironment, resolveClaudeCli, resolveCodexCli } from "../src/backend/cli";
+import {
+  type ClaudeCliInfo,
+  type CodexCliInfo,
+  cliPathEnvironment,
+  resolveClaudeCli,
+  resolveCodexCli,
+} from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { type AppServerNotification, getArray, getRecord, getString, isRecord } from "../src/backend/protocol";
 import { observedQuery } from "./claude-agent-harness";
@@ -130,7 +136,7 @@ async function listedModel(client: AgentClient, provider: Provider): Promise<Age
 }
 
 async function claudeRun(
-  cli: Awaited<ReturnType<typeof runCli>>["claude"],
+  cli: ClaudeCliInfo,
   listed: AgentModelOption,
   testCase: (typeof CASES)[number],
   variant: Run["variant"],
@@ -183,7 +189,7 @@ async function claudeRun(
 }
 
 async function codexRun(
-  cli: Awaited<ReturnType<typeof runCli>>["codex"],
+  cli: CodexCliInfo,
   listed: AgentModelOption,
   testCase: (typeof CASES)[number],
   variant: Run["variant"],
@@ -218,31 +224,41 @@ async function codexRun(
   };
 }
 
-async function runCli() {
-  return { claude: await runCauseEffect(resolveClaudeCli()), codex: await runCauseEffect(resolveCodexCli()) };
-}
-
 const runs: Run[] = [];
 const failures: string[] = [];
-const clis = await runCli();
+const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+async function runCases(
+  provider: Provider,
+  run: (testCase: (typeof CASES)[number], variant: Run["variant"]) => Promise<Run>,
+) {
+  for (const testCase of CASES)
+    for (let index = 0; index < runCount; index += 1)
+      for (const variant of ["before", "after"] as const) {
+        try {
+          runs.push(await run(testCase, variant));
+        } catch (error) {
+          failures.push(`${provider} ${testCase.name} ${variant}: ${message(error)}`);
+        }
+      }
+}
+
 for (const provider of providers) {
   try {
-    const listed = await listedModel(
-      provider === "claude"
-        ? new ClaudeAgentClient(clis.claude, undefined, undefined, TIMEOUT_MS)
-        : new CodexAppServerClient(clis.codex.executable, TIMEOUT_MS, cliPathEnvironment(clis.codex)),
-      provider,
-    );
-    for (const testCase of CASES)
-      for (let index = 0; index < runCount; index += 1)
-        for (const variant of ["before", "after"] as const)
-          runs.push(
-            provider === "claude"
-              ? await claudeRun(clis.claude, listed, testCase, variant)
-              : await codexRun(clis.codex, listed, testCase, variant),
-          );
+    if (provider === "claude") {
+      const cli = await runCauseEffect(resolveClaudeCli());
+      const listed = await listedModel(new ClaudeAgentClient(cli, undefined, undefined, TIMEOUT_MS), provider);
+      await runCases(provider, (testCase, variant) => claudeRun(cli, listed, testCase, variant));
+    } else {
+      const cli = await runCauseEffect(resolveCodexCli());
+      const listed = await listedModel(
+        new CodexAppServerClient(cli.executable, TIMEOUT_MS, cliPathEnvironment(cli)),
+        provider,
+      );
+      await runCases(provider, (testCase, variant) => codexRun(cli, listed, testCase, variant));
+    }
   } catch (error) {
-    failures.push(`${provider}: ${error instanceof Error ? error.message : String(error)}`);
+    failures.push(`${provider}: ${message(error)}`);
   }
 }
 for (const run of runs)
