@@ -21,6 +21,19 @@ export const messages = {
   "channel.settings.isolatedDescription":
     "Gli agenti salvano ciò che imparano qui come memorie del canale. Le loro altre chat non le vedono.",
   "channel.settings.memoryCount": { one: "{count} salvata", other: "{count} salvate" },
+  "channel.settings.newConversation.title": "Nuova conversazione",
+  "channel.settings.newConversation.description":
+    "I membri dimenticano i messaggi precedenti. Le impostazioni del canale restano.",
+  "channel.settings.newConversation.button": "Avvia",
+  "channel.settings.newConversation.confirmTitle": "Avviare una nuova conversazione in {name}?",
+  "channel.settings.newConversation.confirmDescription":
+    "I membri dimenticano i messaggi precedenti di questo canale. I messaggi restano visibili sopra un divisore. Membri, istruzioni, ricordi e routine non cambiano.",
+  "channel.settings.newConversation.confirm": "Avvia nuova conversazione",
+  "channel.settings.newConversation.failed": "Impossibile avviare una nuova conversazione.",
+  "channel.settings.compact.title": "Compatta contesto",
+  "channel.settings.compact.description":
+    "I membri conservano un breve riepilogo della sessione del canale e usano meno token.",
+  "channel.settings.compact.failed": "Impossibile compattare il contesto del canale.",
   "channel.settings.routines": "Routine",
   "channel.settings.routineCount": { one: "{count} configurata", other: "{count} configurate" },
   "channel.create.close": "Chiudi il nuovo canale",

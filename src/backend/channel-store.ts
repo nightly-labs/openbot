@@ -10,6 +10,7 @@ import {
   type ChannelSummary,
   type ChannelTask,
   type ChannelThread,
+  CONTEXT_RESET_ITEM_TYPE,
   decodeChannel,
   isChannelMessage,
   isChannelTask,
@@ -656,6 +657,37 @@ export class ChannelStore {
         .prepare("SELECT thread_id FROM projection_channel_contexts WHERE channel_id = ? ORDER BY agent_id")
         .all(channelId),
     ).map((row) => requiredStringColumn(row, "thread_id"));
+  }
+
+  /** The agent and execution thread of each member context of one channel. */
+  contexts(channelId: string): Array<{ agentId: string; threadId: string }> {
+    return databaseRows(
+      this.database.connection
+        .prepare("SELECT agent_id, thread_id FROM projection_channel_contexts WHERE channel_id = ? ORDER BY agent_id")
+        .all(channelId),
+    ).map((row) => ({
+      agentId: requiredStringColumn(row, "agent_id"),
+      threadId: requiredStringColumn(row, "thread_id"),
+    }));
+  }
+
+  /**
+   * The sequence of the newest "New conversation" marker of a channel, or 0. A model reads no
+   * message at or before it. The marker is an ordinary message row, so a deleted marker ends the
+   * boundary and no event type or migration is needed.
+   */
+  contextResetSequence(channelId: string): number {
+    const row = databaseRow(
+      this.database.connection
+        .prepare(
+          `SELECT MAX(sequence) AS sequence FROM projection_channel_messages WHERE channel_id = ? AND ${SHOWN_MESSAGE_SQL}
+             AND json_extract(message_json, '$.message.itemType') = ?
+             AND json_extract(message_json, '$.message.author') = 'system'
+             AND json_extract(message_json, '$.message.source') = 'system'`,
+        )
+        .get(channelId, CONTEXT_RESET_ITEM_TYPE),
+    );
+    return row && typeof row.sequence === "number" ? row.sequence : 0;
   }
 
   /** The execution threads of one agent, one for each channel it works in. */

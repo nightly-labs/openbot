@@ -286,6 +286,11 @@ export const messages = {
   "provider.settings.promptCacheHour": "שעה",
   "provider.settings.promptCacheDefault": "ברירת המחדל של Claude Code",
   "provider.settings.promptCacheLoadFailed": "לא ניתן לטעון את זמן מטמון ההנחיות של השרת הזה.",
+  "provider.settings.claudeSetup": "Claude Code",
+  "provider.settings.claudeUserSetup": "שימוש בהגדרות Claude Code שלי",
+  "provider.settings.claudeUserSetupDescription":
+    "הסוכנים טוענים את CLAUDE.md, הכישורים, הסוכנים, ה-hooks והתוספים שלך מ-~/.claude. כשהאפשרות כבויה, כל תור שולח הנחיה קצרה יותר. קבצי סביבת העבודה עדיין נטענים.",
+  "provider.settings.claudeUserSetupLoadFailed": "לא ניתן לטעון את ההגדרה של Claude Code.",
   "provider.settings.models": "מודלים",
   "provider.settings.modelsDescription": {
     one: "{shown} מתוך מודל אחד מוצג בבורר המודלים.",

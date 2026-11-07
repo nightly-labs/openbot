@@ -19,6 +19,7 @@ import { ResizableTextarea } from "@openbot/ui/components/ResizableTextarea";
 import { SettingsField, SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/SettingsPanel";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { InstructionsLimit, instructionsTooLong } from "@openbot/ui/features/agents/InstructionsLimit";
+import { ChannelContextActions } from "@openbot/ui/features/channels/ChannelContextActions";
 import { ChannelMemberRow } from "@openbot/ui/features/channels/ChannelMemberRow";
 import { ChannelPictureEditor } from "@openbot/ui/features/channels/ChannelPictureEditor";
 import { ContentExitMotion } from "@openbot/ui/menu-motion";
@@ -397,6 +398,15 @@ export function ChannelEditor(props: ChannelEditorProps) {
           onClick={props.onOpenRoutines}
         />
       </SettingsLinkGroup>
+      <Show when={channels.contextActionsSupported() && channel()}>
+        {(current) => (
+          <ChannelContextActions
+            channelName={current().name}
+            startNewConversation={() => channels.clearContext(current().id)}
+            compact={() => channels.compactContext(current().id)}
+          />
+        )}
+      </Show>
       <section class="channel-members" aria-label={t("channel.members.title")}>
         <h3 class="channel-members-title">{t("channel.members.title")}</h3>
         <ItemGroup class="channel-member-list">

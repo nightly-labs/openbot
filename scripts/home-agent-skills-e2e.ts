@@ -92,6 +92,10 @@ try {
     undefined,
     state,
     () => ({}),
+    undefined,
+    undefined,
+    // The home skills plugin loads only with the user's Claude Code setup, which is off by default.
+    () => true,
   );
   client.start();
   await runCauseEffect(client.request("thread/start", { cwd: workspace, persistSession: false }, (value) => value));

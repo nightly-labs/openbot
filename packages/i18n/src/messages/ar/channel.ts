@@ -27,6 +27,17 @@ export const messages = {
     many: "{count} عنصرًا محفوظًا",
     other: "{count} عنصر محفوظ",
   },
+  "channel.settings.newConversation.title": "محادثة جديدة",
+  "channel.settings.newConversation.description": "ينسى الأعضاء الرسائل السابقة. تبقى إعدادات القناة.",
+  "channel.settings.newConversation.button": "ابدأ",
+  "channel.settings.newConversation.confirmTitle": "هل تريد بدء محادثة جديدة في {name}؟",
+  "channel.settings.newConversation.confirmDescription":
+    "ينسى الأعضاء الرسائل السابقة في هذه القناة. تبقى الرسائل ظاهرة فوق فاصل. لا يتغير الأعضاء والتعليمات والذكريات والمهام الروتينية.",
+  "channel.settings.newConversation.confirm": "ابدأ محادثة جديدة",
+  "channel.settings.newConversation.failed": "تعذر بدء محادثة جديدة.",
+  "channel.settings.compact.title": "ضغط السياق",
+  "channel.settings.compact.description": "يحتفظ الأعضاء بملخص قصير لجلسة القناة ويستخدمون رموزًا أقل.",
+  "channel.settings.compact.failed": "تعذر ضغط سياق القناة.",
   "channel.settings.routines": "المهام الدورية",
   "channel.settings.routineCount": {
     zero: "لا مهام مُعدّة",

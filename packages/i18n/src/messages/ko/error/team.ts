@@ -56,6 +56,7 @@ export const messages = {
   "error.team.providersUnsupported": "이 연결에서는 제공자 설정을 지원하지 않아요.",
   "error.team.providerNotManaged": "OpenBot은 이 제공자의 CLI를 관리하지 않아요.",
   "error.team.channelsUnsupported": "이 연결에서는 채널 채팅을 지원하지 않아요.",
+  "error.team.channelContextUnsupported": "이 연결은 채널의 새 대화나 압축을 지원하지 않습니다.",
   "error.team.channelPictureUnsupported": "이 연결에서는 채널 사진을 지원하지 않아요.",
   "error.team.channelDeleteUnsupported": "이 연결에서는 채널 삭제를 지원하지 않아요.",
   "error.team.channelTaskCancelUnsupported": "이 연결에서는 채널 작업 취소를 지원하지 않아요.",

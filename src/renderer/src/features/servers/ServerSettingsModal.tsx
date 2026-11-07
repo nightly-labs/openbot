@@ -225,6 +225,11 @@ export interface ServerSettingsModalProps {
    */
   hostPromptCacheTtl?: HostPromptCacheTtlOptions | undefined;
   /**
+   * The Claude provider page of the local server shows "Use my Claude Code setup" only when the
+   * desktop app sets this. A joined server and the web client have no route for it.
+   */
+  claudeUserSetup?: boolean | undefined;
+  /**
    * Each provider page shows its Models section only when a caller supplies this, and only for the
    * local server or a remote host with `model-visibility-v1` that this member administers.
    */
@@ -924,6 +929,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                   selectMount={modalElement()}
                   onDetailChange={setProviderDetail}
                   promptCache={promptCacheSource()}
+                  claudeUserSetup={props.claudeUserSetup === true && local()}
                   modelVisibility={modelVisibilitySource()}
                   hostDefaultProvider={hostDefaultProviderSource()}
                 />

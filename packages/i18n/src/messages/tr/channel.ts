@@ -21,6 +21,18 @@ export const messages = {
   "channel.settings.isolatedDescription":
     "Ajanlar burada öğrendiklerini kanal belleği olarak kaydeder. Diğer sohbetleri bunları görmez.",
   "channel.settings.memoryCount": { one: "{count} kayıtlı", other: "{count} kayıtlı" },
+  "channel.settings.newConversation.title": "Yeni konuşma",
+  "channel.settings.newConversation.description": "Üyeler önceki mesajları unutur. Kanal ayarları kalır.",
+  "channel.settings.newConversation.button": "Başlat",
+  "channel.settings.newConversation.confirmTitle": "{name} içinde yeni bir konuşma başlatılsın mı?",
+  "channel.settings.newConversation.confirmDescription":
+    "Üyeler bu kanalın önceki mesajlarını unutur. Mesajlar bir ayırıcının üstünde görünür kalır. Üyeler, talimatlar, anılar ve rutinler değişmez.",
+  "channel.settings.newConversation.confirm": "Yeni konuşma başlat",
+  "channel.settings.newConversation.failed": "Yeni konuşma başlatılamadı.",
+  "channel.settings.compact.title": "Bağlamı sıkıştır",
+  "channel.settings.compact.description":
+    "Üyeler kanal oturumlarının kısa bir özetini tutar ve daha az token kullanır.",
+  "channel.settings.compact.failed": "Kanal bağlamı sıkıştırılamadı.",
   "channel.settings.routines": "Rutinler",
   "channel.settings.routineCount": { one: "{count} yapılandırılmış", other: "{count} yapılandırılmış" },
   "channel.create.close": "Yeni kanalı kapat",

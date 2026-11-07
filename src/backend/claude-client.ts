@@ -371,6 +371,20 @@ const queryLogger = createOpenBotLogger("claude-query");
  */
 const lastAuthStatuses = new Map<string, DynamicRecord>();
 
+/**
+ * The settings files that a query loads. A profile generation loads none. Workspace only loads the
+ * user settings alone: see `claude-workspace-sandbox.ts`. Without the user setup the user settings
+ * go, and with them the user's CLAUDE.md, skills, agents, hooks and plugins; the project files stay.
+ */
+function claudeSettingSources(
+  config: Pick<ThreadConfig, "profileGeneration" | "workspaceOnly">,
+  userSetup: boolean,
+): NonNullable<Options["settingSources"]> {
+  if (config.profileGeneration) return [];
+  const user: NonNullable<Options["settingSources"]> = userSetup ? ["user"] : [];
+  return config.workspaceOnly ? user : [...user, "project", "local"];
+}
+
 export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly contextCompaction = "native";
   #queryRestarts = 0;
@@ -394,6 +408,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
    * account: the key then serves the agents that the user did not move to another account.
    */
   readonly #fallbackApiKey: (() => string | null) | undefined;
+  /** Off: the agents load no user settings, CLAUDE.md, skills, agents, hooks or plugins of `~/.claude`, and no `~/.agents/skills`. */
+  readonly #userSetup: () => boolean;
   /** Whether the last account read found no claude.ai account and signed in with the key. */
   #onApiKey = false;
   /** Whether this client read the account. A client for one generation without tools does not. */
@@ -447,6 +463,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     agentEnvironment?: (inherited?: NodeJS.ProcessEnv) => Readonly<Record<string, string>>,
     historyIndexDirectory?: string,
     fallbackApiKey?: () => string | null,
+    userSetup: () => boolean = () => false,
   ) {
     super();
     this.#cli = cli;
@@ -461,6 +478,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#stateDirectory = stateDirectory;
     this.#agentEnvironment = agentEnvironment;
     this.#fallbackApiKey = fallbackApiKey;
+    this.#userSetup = userSetup;
     const historyEnvironment = agentEnvironment?.();
     const resolvedHistoryIndexDirectory = historyIndexDirectory ?? stateDirectory;
     const historyOptions: ClaudeHistoryOptions = {
@@ -960,10 +978,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           ).pipe(toProviderClientOperationError),
         );
     const stateDirectory = this.#stateDirectory;
+    // Read once, so that the settings and the home skills of one query agree.
+    const userSetup = !config.profileGeneration && this.#userSetup();
     const skillPlugin =
       config.workspaceOnly && stateDirectory ? yield* claudeWorkspaceSkillPlugin(stateDirectory, config.cwd) : null;
     const homeSkillPlugin =
-      stateDirectory && !config.profileGeneration
+      stateDirectory && userSetup
         ? yield* claudeHomeSkillPlugin(
             stateDirectory,
             this.#agentEnvironment?.().CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"),
@@ -1029,11 +1049,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           ...(config.profileGeneration
             ? { tools: [] }
             : { disallowedTools: [...CLAUDE_NATIVE_SCHEDULING, ...CLAUDE_DUPLICATE_TOOLS] }),
-          settingSources: config.profileGeneration
-            ? []
-            : config.workspaceOnly
-              ? ["user"]
-              : ["user", "project", "local"],
+          settingSources: claudeSettingSources(config, userSetup),
           // The MCP panel is the only door. Without this, Claude merges project `.mcp.json`, user
           // settings, plugin and agent-frontmatter servers into the record above, so two computers
           // with the same OpenBot settings give their agents different tools and "which servers does

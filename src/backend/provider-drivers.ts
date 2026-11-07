@@ -527,6 +527,11 @@ export interface ProviderClientContext {
    * same reason as `reportMcpDrops`: without it the CLI uses its own cache time.
    */
   readonly promptCacheTtl?: () => PromptCacheTtl;
+  /**
+   * Whether Claude loads the user's own Claude Code setup, read at each spawn. Optional for the same
+   * reason as `reportMcpDrops`: without it Claude does not load the setup, as the default is.
+   */
+  readonly claudeUserSetup?: () => boolean;
 }
 
 /** The agent environment with the account's home folder after it, so the account folder wins. */
@@ -856,6 +861,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         claudeAgentEnvironment(context),
         undefined,
         claudeFallbackApiKey(context),
+        context.claudeUserSetup,
       ),
     authState: (account) => ({ kind: "claude", email: account?.email ?? null }),
     validateAccount: () => undefined,

@@ -21,6 +21,19 @@ export const messages = {
   "channel.settings.isolatedDescription":
     "Agenten bewaren wat ze hier leren als kanaalherinneringen. Hun andere chats zien ze niet.",
   "channel.settings.memoryCount": { one: "{count} opgeslagen", other: "{count} opgeslagen" },
+  "channel.settings.newConversation.title": "Nieuw gesprek",
+  "channel.settings.newConversation.description":
+    "De leden vergeten de eerdere berichten. De kanaalinstellingen blijven.",
+  "channel.settings.newConversation.button": "Starten",
+  "channel.settings.newConversation.confirmTitle": "Een nieuw gesprek starten in {name}?",
+  "channel.settings.newConversation.confirmDescription":
+    "De leden vergeten de eerdere berichten van dit kanaal. De berichten blijven zichtbaar boven een scheidingslijn. Leden, instructies, herinneringen en routines veranderen niet.",
+  "channel.settings.newConversation.confirm": "Nieuw gesprek starten",
+  "channel.settings.newConversation.failed": "Kan geen nieuw gesprek starten.",
+  "channel.settings.compact.title": "Context comprimeren",
+  "channel.settings.compact.description":
+    "De leden houden een korte samenvatting van hun kanaalsessie en gebruiken minder tokens.",
+  "channel.settings.compact.failed": "Kan de kanaalcontext niet comprimeren.",
   "channel.settings.routines": "Routines",
   "channel.settings.routineCount": { one: "{count} ingesteld", other: "{count} ingesteld" },
   "channel.create.close": "Nieuw kanaal sluiten",

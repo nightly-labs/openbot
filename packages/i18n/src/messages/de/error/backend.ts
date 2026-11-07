@@ -74,6 +74,11 @@ export const messages = {
     "Im Kanal gibt es einen unbestätigten Auftragsstart. Prüfe das Ergebnis, bevor du den Kanal löschst.",
   "error.backend.channelNotFound": "Kanal nicht gefunden.",
   "error.backend.channelMemberUnavailable": "Ein Kanalmitglied ist nicht verfügbar.",
+  "error.backend.channelWaitBeforeNewConversation":
+    "Warte, bis die Arbeit in diesem Kanal endet, und starte dann eine neue Unterhaltung.",
+  "error.backend.channelWaitBeforeCompact": "Warte, bis die Arbeit in diesem Kanal endet, und komprimiere ihn dann.",
+  "error.backend.channelCompactUnavailable":
+    "Kein Mitglied dieses Kanals kann seinen Kontext jetzt komprimieren. Ein Mitglied muss zuerst im Kanal antworten, und sein Anbieter muss das Komprimieren unterstützen.",
   "error.backend.channelArchived":
     "Stelle diesen Kanal wieder her, bevor du Nachrichten sendest oder Aufgaben änderst.",
   "error.backend.channelReferenceUnavailable": "Die referenzierte Kanalnachricht ist nicht verfügbar.",

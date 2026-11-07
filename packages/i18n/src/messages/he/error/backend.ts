@@ -68,6 +68,10 @@ export const messages = {
   "error.backend.channelUnconfirmedStart": "לערוץ יש התחלת הקצאה שלא אושרה. יש לבדוק את תוצאתה לפני המחיקה.",
   "error.backend.channelNotFound": "הערוץ לא נמצא.",
   "error.backend.channelMemberUnavailable": "חבר בערוץ אינו זמין.",
+  "error.backend.channelWaitBeforeNewConversation": "המתינו עד שהעבודה בערוץ הזה תיפסק, ואז התחילו שיחה חדשה.",
+  "error.backend.channelWaitBeforeCompact": "המתינו עד שהעבודה בערוץ הזה תיפסק, ואז דחסו אותו.",
+  "error.backend.channelCompactUnavailable":
+    "אף חבר בערוץ הזה לא יכול לדחוס את ההקשר שלו כעת. חבר צריך לענות בערוץ קודם, והספק שלו צריך לתמוך בדחיסה.",
   "error.backend.channelArchived": "יש לשחזר את הערוץ הזה לפני שליחת הודעות או שינוי משימות.",
   "error.backend.channelReferenceUnavailable": "הודעת הערוץ שאליה מפנים אינה זמינה.",
   "error.backend.channelTaskNotFound": "משימת הערוץ לא נמצאה.",

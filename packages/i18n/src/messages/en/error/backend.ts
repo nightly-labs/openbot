@@ -71,6 +71,11 @@ export const messages = defineMessages("error.backend", {
     "The channel has an unconfirmed assignment start. Check its outcome before deleting it.",
   "error.backend.channelNotFound": "Channel not found.",
   "error.backend.channelMemberUnavailable": "A channel member is unavailable.",
+  "error.backend.channelWaitBeforeNewConversation":
+    "Wait until the work in this channel stops, then start a new conversation.",
+  "error.backend.channelWaitBeforeCompact": "Wait until the work in this channel stops, then compact it.",
+  "error.backend.channelCompactUnavailable":
+    "No member of this channel can compact its context now. A member must answer in the channel first, and its provider must support compaction.",
   "error.backend.channelArchived": "Restore this channel before sending messages or changing tasks.",
   "error.backend.channelReferenceUnavailable": "The referenced channel message is unavailable.",
   "error.backend.channelTaskNotFound": "Channel task not found.",

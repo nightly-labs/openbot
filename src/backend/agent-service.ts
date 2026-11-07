@@ -3696,6 +3696,62 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }, Effect.uninterruptible).bind(this);
 
   /**
+   * "New conversation" in a channel: the members forget the earlier messages. The channel writes a
+   * marker, and the provider session of each member's channel thread ends, so the next turn starts
+   * a new session that reads only the messages after the marker. The members, the messages, and
+   * the agents' own chats do not change.
+   */
+  readonly clearChannelContext = Effect.fn("AgentService.clearChannelContext")(function* (
+    this: AgentService,
+    channelId: string,
+    person: { id: string; name: string },
+  ) {
+    const threads = yield* this.channels.clearContext(channelId, person);
+    yield* Effect.forEach(threads, (threadId) => this.#threads.endThreadContext(threadId), { discard: true });
+  }, Effect.uninterruptible).bind(this);
+
+  /**
+   * Compacts the channel session of each member now, as `compactAgentContext` does for an agent's
+   * own chat. A member with no session, or with a provider that OpenBot cannot ask to compact, is
+   * skipped; when no member can compact, the request fails.
+   */
+  readonly compactChannelContext = Effect.fn("AgentService.compactChannelContext")(function* (
+    this: AgentService,
+    channelId: string,
+  ) {
+    const contexts = yield* this.channels.compactTargets(channelId);
+    const sessions = yield* lifecycleStep("compact channel context", () => {
+      const agents = new Map(this.#store.list().map((agent) => [agent.id, agent]));
+      const candidates = contexts.flatMap(({ agentId, threadId }) => {
+        const agent = agents.get(agentId);
+        const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
+        return agent && session ? [{ agentId, threadId, externalSessionId: session.externalSessionId }] : [];
+      });
+      // A compaction that still runs, or a start that the provider refused, holds the session too.
+      if (
+        candidates.some(
+          ({ agentId, threadId, externalSessionId }) =>
+            this.#conversation.loadedExecutionSnapshot(threadId)?.activeTurnId ||
+            this.#store.database.readActiveTurnId(agentId, threadId) ||
+            this.#compaction.heldThreads(agentId).includes(externalSessionId),
+        )
+      )
+        throw new ContextCompactRefusedError(sourceText("error.backend.channelWaitBeforeCompact"));
+      const reserved = candidates.filter(({ agentId, externalSessionId }) =>
+        this.#compaction.reserve(agentId, externalSessionId, true),
+      );
+      if (!reserved.length) throw new ContextCompactRefusedError(sourceText("error.backend.channelCompactUnavailable"));
+      return reserved;
+    });
+    yield* Effect.forEach(
+      sessions,
+      ({ agentId, externalSessionId }) => this.#compaction.request(agentId, externalSessionId),
+      // Each session compacts on its own; one at a time, a large channel would wait minutes.
+      { discard: true, concurrency: "unbounded" },
+    );
+  }, Effect.uninterruptible).bind(this);
+
+  /**
    * The new chat that the agent asked for with `start_new_chat`. The drain calls it when the agent's
    * own chat has nothing to start. A turn of a task or a compaction can still run; the request then
    * waits for the next drain, unless a turn in the agent's own chat starts first. The user can turn

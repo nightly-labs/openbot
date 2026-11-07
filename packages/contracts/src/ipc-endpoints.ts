@@ -273,6 +273,7 @@ import type {
   DeleteChannelMessageInput,
   SetChannelImageInput,
 } from "./ipc-chat-channels";
+import type { ClaudeUserSetupSetting } from "./ipc-claude-user-setup";
 import type {
   CancelMessageLinkInput,
   ConversationFileSearchPage,
@@ -878,6 +879,12 @@ export const IPC_ENDPOINTS = {
     providerUsageResets: request<AgentProviderId, ProviderUsageResets[]>()("app:provider-usage-resets"),
     /** Spends one usage reset credit of an account. A reset ends the usage limit that holds its agents. */
     resetProviderUsage: request<ResetProviderUsageInput, ProviderUsageResetOutcome>()("app:reset-provider-usage"),
+    /**
+     * Whether the Claude agents of this computer load the user's own Claude Code setup. This computer
+     * only: a joined server has no route for it.
+     */
+    getClaudeUserSetup: request<undefined, ClaudeUserSetupSetting>()("app:get-claude-user-setup"),
+    setClaudeUserSetup: request<boolean, ClaudeUserSetupSetting>()("app:set-claude-user-setup"),
   },
   providerRuntimes: {
     getStatus: request<undefined, ProviderRuntimeSnapshot>()("provider-runtimes:get-status"),
@@ -1603,6 +1610,10 @@ export const IPC_ENDPOINTS = {
     deleteChannelMessage: scopedRequest<DeleteChannelMessageInput, void>()("agent:channels:delete-message"),
     // Only this computer keeps a channel image. A joined server has no route for it.
     setChannelImage: scopedRequest<SetChannelImageInput, Channel>()("agent:channels:set-image"),
+    /** "New conversation": the members of the channel forget its earlier messages. */
+    clearChannelContext: scopedRequest<string, void>()("agent:channels:clear-context"),
+    /** Compacts the channel session of each member now. */
+    compactChannelContext: scopedRequest<string, void>()("agent:channels:compact-context"),
     getSidebarLayout: scopedQuery<SidebarLayoutSnapshot>()("agent:get-sidebar-layout"),
     mutateSidebarLayout: scopedRequest<SidebarLayoutAction, SidebarLayoutSnapshot>()("agent:mutate-sidebar-layout"),
     // The user's own pinned chats. A joined server answers through `sidebar-pins-v1`.

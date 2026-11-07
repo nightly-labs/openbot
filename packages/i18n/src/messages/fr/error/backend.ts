@@ -74,6 +74,11 @@ export const messages = {
     "Le canal a un démarrage de tâche non confirmé. Vérifiez son résultat avant de le supprimer.",
   "error.backend.channelNotFound": "Canal introuvable.",
   "error.backend.channelMemberUnavailable": "Un membre du canal est indisponible.",
+  "error.backend.channelWaitBeforeNewConversation":
+    "Attendez la fin du travail dans ce canal, puis démarrez une nouvelle conversation.",
+  "error.backend.channelWaitBeforeCompact": "Attendez la fin du travail dans ce canal, puis compactez-le.",
+  "error.backend.channelCompactUnavailable":
+    "Aucun membre de ce canal ne peut compacter son contexte maintenant. Un membre doit d’abord répondre dans le canal, et son fournisseur doit prendre en charge la compaction.",
   "error.backend.channelArchived": "Restaurez ce canal avant d’envoyer des messages ou de modifier des tâches.",
   "error.backend.channelReferenceUnavailable": "Le message de canal référencé est indisponible.",
   "error.backend.channelTaskNotFound": "Tâche de canal introuvable.",

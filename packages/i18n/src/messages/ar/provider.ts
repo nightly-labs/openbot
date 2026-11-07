@@ -322,6 +322,11 @@ export const messages = {
   "provider.settings.promptCacheHour": "ساعة واحدة",
   "provider.settings.promptCacheDefault": "الافتراضي في Claude Code",
   "provider.settings.promptCacheLoadFailed": "تعذّر تحميل مدة ذاكرة التخزين المؤقت للموجّه لهذا الخادم.",
+  "provider.settings.claudeSetup": "Claude Code",
+  "provider.settings.claudeUserSetup": "استخدام إعداد Claude Code الخاص بي",
+  "provider.settings.claudeUserSetupDescription":
+    "يحمّل الوكلاء ملف CLAUDE.md والمهارات والوكلاء والخطافات والإضافات من ~/.claude. عند الإيقاف، يرسل كل دور موجّهًا أقصر. تظل ملفات مساحة العمل تُحمَّل.",
+  "provider.settings.claudeUserSetupLoadFailed": "تعذّر تحميل إعداد Claude Code.",
   "provider.settings.models": "النماذج",
   "provider.settings.modelsDescription": {
     zero: "لا تتوفر نماذج لعرضها في منتقي النماذج.",

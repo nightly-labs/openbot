@@ -73,6 +73,11 @@ export const messages = {
     "Kanał ma niepotwierdzone rozpoczęcie przydziału. Sprawdź jego wynik przed usunięciem.",
   "error.backend.channelNotFound": "Nie znaleziono kanału.",
   "error.backend.channelMemberUnavailable": "Członek kanału jest niedostępny.",
+  "error.backend.channelWaitBeforeNewConversation":
+    "Poczekaj, aż praca w tym kanale się zakończy, a potem rozpocznij nową rozmowę.",
+  "error.backend.channelWaitBeforeCompact": "Poczekaj, aż praca w tym kanale się zakończy, a potem go skompaktuj.",
+  "error.backend.channelCompactUnavailable":
+    "Żaden członek tego kanału nie może teraz skompaktować kontekstu. Członek musi najpierw odpowiedzieć w kanale, a jego dostawca musi obsługiwać kompaktowanie.",
   "error.backend.channelArchived": "Przywróć ten kanał, zanim wyślesz wiadomości lub zmienisz zadania.",
   "error.backend.channelReferenceUnavailable": "Wskazana wiadomość kanału jest niedostępna.",
   "error.backend.channelTaskNotFound": "Nie znaleziono zadania kanału.",

@@ -77,6 +77,11 @@ export const messages = {
     "O canal tem uma tarefa atribuída cujo início não foi confirmado. Verifique o resultado antes de excluí-lo.",
   "error.backend.channelNotFound": "Canal não encontrado.",
   "error.backend.channelMemberUnavailable": "Um membro do canal está indisponível.",
+  "error.backend.channelWaitBeforeNewConversation":
+    "Aguarde o trabalho neste canal terminar e depois inicie uma nova conversa.",
+  "error.backend.channelWaitBeforeCompact": "Aguarde o trabalho neste canal terminar e depois compacte-o.",
+  "error.backend.channelCompactUnavailable":
+    "Nenhum membro deste canal pode compactar o contexto agora. Um membro precisa responder no canal primeiro, e o provedor dele precisa suportar compactação.",
   "error.backend.channelArchived": "Restaure este canal antes de enviar mensagens ou alterar tarefas.",
   "error.backend.channelReferenceUnavailable": "A mensagem do canal usada como referência está indisponível.",
   "error.backend.channelTaskNotFound": "Tarefa do canal não encontrada.",
