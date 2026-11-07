@@ -60,7 +60,7 @@ export function ChatQuestionPrompt({
   const choice = choiceBlockOf(prompt, uiBlock);
   if (!prompt.resolution && !controller && onActivate) {
     return (
-      <View className="max-w-[92%] self-start gap-2 rounded-[20px] bg-control/60 px-4 py-3">
+      <View className="w-full max-w-[92%] self-start gap-2 rounded-[20px] bg-control/60 px-4 py-3">
         {confirm ? (
           <ConfirmBody spec={confirm} compact selectValue={answeredSelect(prompt, null, t)} />
         ) : (
@@ -77,7 +77,7 @@ export function ChatQuestionPrompt({
   if (resolution) {
     return (
       <View
-        className="max-w-[92%] self-start gap-2 rounded-[20px] bg-control/60 px-4 py-3"
+        className="w-full max-w-[92%] self-start gap-2 rounded-[20px] bg-control/60 px-4 py-3"
         style={{ borderCurve: "circular" }}
       >
         <View className="flex-row items-center gap-2">
