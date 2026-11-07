@@ -248,7 +248,7 @@ export const messages = {
   "settings.tab.notifications.description": "OpenBot'un sizi nasıl uyaracağını seçin.",
   "settings.tab.voice.title": "Ses",
   "settings.tab.voice.description":
-    "Mesaj kutusunda dikte. Yerel modeller bu bilgisayarda, ElevenLabs ise bulutta çalışır.",
+    "Mesaj kutusunda dikte. Yerel modeller bu bilgisayarda, ElevenLabs ve Groq ise bulutta çalışır.",
   "settings.tab.computerUse.title": "Bilgisayar Kullanımı",
   "settings.tab.computerUse.description":
     "Bu bilgisayardaki OpenBot ajanlarının buradaki uygulamaları görmesine ve kullanmasına izin verin. Başka bir sunucudaki ajanlar o sunucunun bilgisayarını kullanır.",

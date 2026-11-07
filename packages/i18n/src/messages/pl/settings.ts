@@ -254,7 +254,7 @@ export const messages = {
   "settings.tab.notifications.description": "Wybierz, jak OpenBot cię powiadamia.",
   "settings.tab.voice.title": "Głos",
   "settings.tab.voice.description":
-    "Dyktowanie w polu wiadomości. Modele lokalne działają na tym komputerze, a ElevenLabs w chmurze.",
+    "Dyktowanie w polu wiadomości. Modele lokalne działają na tym komputerze, a ElevenLabs i Groq w chmurze.",
   "settings.tab.computerUse.title": "Sterowanie PC",
   "settings.tab.computerUse.description":
     "Pozwól agentom OpenBot na tym komputerze widzieć jego aplikacje i ich używać. Agenci na innym serwerze używają komputera tego serwera.",

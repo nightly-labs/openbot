@@ -254,7 +254,7 @@ export const messages = defineMessages("settings", {
   "settings.tab.notifications.description": "Choose how OpenBot alerts you.",
   "settings.tab.voice.title": "Voice",
   "settings.tab.voice.description":
-    "Dictation in the message box. Local models run on this computer; ElevenLabs runs in the cloud.",
+    "Dictation in the message box. Local models run on this computer; ElevenLabs and Groq run in the cloud.",
   "settings.tab.computerUse.title": "Computer Use",
   "settings.tab.computerUse.description":
     "Let agents on this computer's OpenBot see and use its apps. Agents on another server use that server's computer.",

@@ -251,7 +251,7 @@ export const messages = {
   "settings.tab.notifications.description": "اختر كيف ينبّهك OpenBot.",
   "settings.tab.voice.title": "الصوت",
   "settings.tab.voice.description":
-    "الإملاء في مربع الرسالة. تعمل النماذج المحلية على هذا الحاسوب؛ ويعمل ElevenLabs في السحابة.",
+    "الإملاء في مربع الرسالة. تعمل النماذج المحلية على هذا الحاسوب؛ ويعمل ElevenLabs وGroq في السحابة.",
   "settings.tab.computerUse.title": "التحكم في الحاسوب",
   "settings.tab.computerUse.description":
     "السماح للوكلاء في OpenBot على هذا الحاسوب برؤية تطبيقاته واستخدامها. يستخدم الوكلاء على خادم آخر حاسوب ذلك الخادم.",

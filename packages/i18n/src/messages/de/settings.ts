@@ -255,7 +255,7 @@ export const messages = {
   "settings.tab.notifications.description": "Lege fest, wie OpenBot dich benachrichtigt.",
   "settings.tab.voice.title": "Diktat",
   "settings.tab.voice.description":
-    "Diktat im Nachrichtenfeld. Lokale Modelle laufen auf diesem Computer, ElevenLabs läuft in der Cloud.",
+    "Diktat im Nachrichtenfeld. Lokale Modelle laufen auf diesem Computer, ElevenLabs und Groq laufen in der Cloud.",
   "settings.tab.computerUse.title": "PC-Steuerung",
   "settings.tab.computerUse.description":
     "Agenten im OpenBot dieses Computers dürfen seine Apps sehen und bedienen. Agenten auf einem anderen Server nutzen dessen Computer.",

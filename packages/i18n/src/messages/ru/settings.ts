@@ -255,7 +255,7 @@ export const messages = {
   "settings.tab.notifications.description": "Выберите, как OpenBot сообщает вам о событиях.",
   "settings.tab.voice.title": "Голос",
   "settings.tab.voice.description":
-    "Диктовка в поле сообщения. Локальные модели работают на этом компьютере, ElevenLabs — в облаке.",
+    "Диктовка в поле сообщения. Локальные модели работают на этом компьютере, ElevenLabs и Groq — в облаке.",
   "settings.tab.computerUse.title": "Управление ПК",
   "settings.tab.computerUse.description":
     "Разрешите агентам OpenBot на этом компьютере видеть его приложения и работать с ними. Агенты на другом сервере используют компьютер этого сервера.",

@@ -241,7 +241,7 @@ export const messages = {
   "settings.tab.notifications.title": "התראות",
   "settings.tab.notifications.description": "בחירת האופן ש-OpenBot מתריע.",
   "settings.tab.voice.title": "קול",
-  "settings.tab.voice.description": "הכתבה בתיבת ההודעה. מודלים מקומיים רצים במחשב הזה; ElevenLabs רץ בענן.",
+  "settings.tab.voice.description": "הכתבה בתיבת ההודעה. מודלים מקומיים רצים במחשב הזה; ElevenLabs ו-Groq רצים בענן.",
   "settings.tab.computerUse.title": "שליטה במחשב",
   "settings.tab.computerUse.description":
     "מאפשר לסוכנים של OpenBot במחשב הזה לראות את האפליקציות שלו ולהשתמש בהן. סוכנים בשרת אחר משתמשים במחשב של אותו שרת.",

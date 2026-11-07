@@ -249,7 +249,7 @@ export const messages = {
   "settings.tab.notifications.description": "OpenBot からの知らせ方を選びます。",
   "settings.tab.voice.title": "音声",
   "settings.tab.voice.description":
-    "メッセージ欄での音声入力です。ローカルモデルはこのコンピューター上で、ElevenLabs はクラウドで動作します。",
+    "メッセージ欄での音声入力です。ローカルモデルはこのコンピューター上で、ElevenLabs と Groq はクラウドで動作します。",
   "settings.tab.computerUse.title": "Computer Use",
   "settings.tab.computerUse.description":
     "このコンピューターの OpenBot のエージェントが、このコンピューターのアプリを見て操作できるようにします。別のサーバーのエージェントは、そのサーバーのコンピューターを使います。",

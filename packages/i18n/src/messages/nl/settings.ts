@@ -252,7 +252,7 @@ export const messages = {
   "settings.tab.notifications.description": "Kies hoe OpenBot je waarschuwt.",
   "settings.tab.voice.title": "Spraak",
   "settings.tab.voice.description":
-    "Dicteren in het berichtvak. Lokale modellen draaien op deze computer; ElevenLabs draait in de cloud.",
+    "Dicteren in het berichtvak. Lokale modellen draaien op deze computer; ElevenLabs en Groq draaien in de cloud.",
   "settings.tab.computerUse.title": "PC-besturing",
   "settings.tab.computerUse.description":
     "Laat agents in de OpenBot van deze computer de apps ervan zien en gebruiken. Agents op een andere server gebruiken de computer van die server.",

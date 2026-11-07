@@ -243,7 +243,7 @@ export const messages = {
   "settings.tab.notifications.title": "通知",
   "settings.tab.notifications.description": "选择 OpenBot 提醒你的方式。",
   "settings.tab.voice.title": "语音",
-  "settings.tab.voice.description": "消息框中的听写。本地模型在本机运行，ElevenLabs 在云端运行。",
+  "settings.tab.voice.description": "消息框中的听写。本地模型在本机运行，ElevenLabs 和 Groq 在云端运行。",
   "settings.tab.computerUse.title": "Computer Use",
   "settings.tab.computerUse.description":
     "允许这台电脑上 OpenBot 的助手查看并操作这台电脑上的应用。其他服务器上的助手使用那台服务器的电脑。",

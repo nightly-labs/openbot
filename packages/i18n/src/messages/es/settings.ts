@@ -254,7 +254,7 @@ export const messages = {
   "settings.tab.notifications.description": "Elige cómo te avisa OpenBot.",
   "settings.tab.voice.title": "Voz",
   "settings.tab.voice.description":
-    "Dictado en el cuadro de mensaje. Los modelos locales se ejecutan en este equipo; ElevenLabs, en la nube.",
+    "Dictado en el cuadro de mensaje. Los modelos locales se ejecutan en este equipo; ElevenLabs y Groq, en la nube.",
   "settings.tab.computerUse.title": "Uso del equipo",
   "settings.tab.computerUse.description":
     "Permite que los agentes del OpenBot de este equipo vean y usen sus apps. Los agentes de otro servidor usan el equipo de ese servidor.",
