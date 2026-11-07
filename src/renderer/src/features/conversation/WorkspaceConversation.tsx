@@ -121,13 +121,15 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     else await connection.connect(provider, "composer");
   };
   const signInWithCode = (provider: AgentProviderId) => connection.alternative(provider, "composer");
-  // The server's response style decides whether progress updates show as messages.
-  createEffect(
-    () => activeServer()?.id,
-    (serverId) => {
-      if (serverId) loadServerPersonality(serverId, window.openbot.hostAdmin);
-    },
-  );
+  // The server's response style decides whether progress updates show as messages. Main answers
+  // "classic" for a joined server until the server says what it supports, so the read waits for that.
+  const personalityServerId = () => {
+    const server = activeServer();
+    return server && (server.kind === "local" || server.compatibility) ? server.id : undefined;
+  };
+  createEffect(personalityServerId, (serverId) => {
+    if (serverId) loadServerPersonality(serverId, window.openbot.hostAdmin);
+  });
   const responseStyle = () => {
     const serverId = activeServer()?.id;
     return serverId ? serverResponseStyle(serverId) : undefined;

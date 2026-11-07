@@ -852,16 +852,19 @@ export class MessagingThreads {
     const link = this.store.linkForThread(snapshot.threadId);
     const provider = link ? this.#hooks.progressUpdates(link.agentId) : null;
     if (!link || !provider) return;
-    const update = [...snapshot.messages]
-      .reverse()
-      .find(
-        (message) =>
-          message.turnId === turnId &&
-          message.itemType === "commentary" &&
-          message.status === "completed" &&
-          Boolean(message.text.trim()) &&
-          isNarrationItemId(message.id, provider),
-      );
+    // From the end, without a copy: this runs on each snapshot of the turn.
+    let update: (typeof snapshot.messages)[number] | undefined;
+    for (let index = snapshot.messages.length - 1; index >= 0 && !update; index -= 1) {
+      const message = snapshot.messages[index];
+      if (
+        message?.turnId === turnId &&
+        message.itemType === "commentary" &&
+        message.status === "completed" &&
+        message.text.trim() &&
+        isNarrationItemId(message.id, provider)
+      )
+        update = message;
+    }
     if (!update || this.#progress.get(turnId) === update.id) return;
     this.#progress.set(turnId, update.id);
     this.#publish({ type: "progress", link, turnId, origin, text: update.text.trim() });

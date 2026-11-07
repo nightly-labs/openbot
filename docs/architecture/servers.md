@@ -643,7 +643,7 @@ the agents to send short updates between their steps, and the chat shows them as
 `classic` keeps the earlier prompt, and the chat keeps those updates in the steps. Any member reads
 the style, so each client knows what to show; only an owner or admin changes it. A change unloads the
 agents' threads, so the next turn uses the new prompt. A host without the capability reads as
-`classic`. Other clients see a change on their next read.
+`classic`. Other clients see a change when they open the server again.
 
 `host-key-rotation-v1` lets the owner change the host's key from another device, with the same steps
 as Server settings → General → Server key on the host computer (`HostService.rotateIdentityKey`).

@@ -24,11 +24,12 @@ export function rememberServerPersonality(serverId: string, personality: HostPer
 }
 
 /**
- * Reads the style of a server once for the page. A failed read keeps the style unknown, so the chat
- * shows what it showed before this setting, and the next chat of that server reads again.
+ * Reads the style of a server again. The caller reads each time a server opens, so a change from
+ * another device shows then. The last known style stays until the host answers, and a
+ * failed read keeps it.
  */
 export function loadServerPersonality(serverId: string, calls: HostPersonalityCalls): void {
-  if (styles().has(serverId) || reading.has(serverId)) return;
+  if (reading.has(serverId)) return;
   reading.add(serverId);
   calls.getPersonality(serverId).then(
     (personality) => {

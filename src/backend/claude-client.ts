@@ -163,6 +163,8 @@ const CLAUDE_DUPLICATE_TOOLS = ["ListAgents", "Workflow", "Skill(workflow-author
 
 /** The longest tool description the activity line shows. The model writes about 5 to 10 words. */
 const TOOL_DESCRIPTION_LIMIT = 120;
+/** The tools whose `description` argument is the model's short label of the step. */
+const LABELLED_TOOLS: ReadonlySet<string> = new Set(["Bash", "Task", "Agent"]);
 
 /**
  * Names OpenBot to Claude. Without `CLAUDE_CODE_ENTRYPOINT` the SDK labels each request `sdk-ts`, and
@@ -1729,8 +1731,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             ? { skill: input.skill.slice(0, INPUT_LIMITS.identifier) }
             : {}),
           // The model's own short label of a running command or subagent, such as "Show folder sizes",
-          // for the turn's activity line.
-          ...(!completed && isRecord(input) && typeof input.description === "string"
+          // for the turn's activity line. Other tools, such as an MCP tool, can have a `description`
+          // argument that is content, not a label.
+          ...(!completed && LABELLED_TOOLS.has(name) && isRecord(input) && typeof input.description === "string"
             ? { description: input.description.slice(0, TOOL_DESCRIPTION_LIMIT) }
             : {}),
           // What a read, search or fetch works on, for a label such as "Reading main.ts…".
