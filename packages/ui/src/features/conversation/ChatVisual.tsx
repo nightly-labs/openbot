@@ -25,8 +25,10 @@ import {
   isQuoteShortcut,
   QuoteSelectionButton,
   type QuoteShortcutModifier,
+  releaseSelectionAction,
   type SelectionActionsPosition,
   selectionActionsPosition,
+  showSelectionAction,
 } from "./SelectionActions";
 
 /** The page variables and the app tokens that give their values. */
@@ -143,12 +145,6 @@ export function ChatVisual(props: ChatVisualProps) {
  * so the page does not load again and keeps its state. The app's own dialogs and menus cannot show
  * above the top layer, so the page goes back into the chat before the app shows one for it.
  */
-/**
- * Closes the page Quote action that shows. A press in a page reaches only that page, so a selection in
- * a second page, for example the same page in the side panel, closes the action of the first.
- */
-let closeShownPageAction: (() => void) | undefined;
-
 function VisualFrame(props: ChatVisualProps) {
   const { t } = useText();
   const [theme, setTheme] = createSignal<ChatVisualTheme>();
@@ -263,8 +259,7 @@ function VisualFrame(props: ChatVisualProps) {
         if (message.text === quoted) return;
         quoted = undefined;
         if (!props.onQuote || !message.text) return setSelection(null);
-        if (closeShownPageAction !== dismiss) closeShownPageAction?.();
-        closeShownPageAction = dismiss;
+        showSelectionAction(dismiss);
         setSelection({ text: message.text, rect: message.rect });
         return;
       case "key": {
@@ -317,7 +312,7 @@ function VisualFrame(props: ChatVisualProps) {
       window.removeEventListener("message", onMessage);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("pointerdown", onPointerDown);
-      if (closeShownPageAction === dismiss) closeShownPageAction = undefined;
+      releaseSelectionAction(dismiss);
       box?.removeEventListener("toggle", onToggle);
       box?.removeEventListener("click", onBoxClick);
     };

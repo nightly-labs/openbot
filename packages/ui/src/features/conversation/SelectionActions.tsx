@@ -90,6 +90,23 @@ export function selectionActionsPosition(
   return { top: clamp(idealTop, VIEWPORT_MARGIN, maximumTop), left, placement };
 }
 
+/**
+ * Closes the selection action that shows. A press in a page frame reaches only that page, so the
+ * window listeners of the other actions, in the app or in a different page, do not see it.
+ */
+let closeShownAction: (() => void) | undefined;
+
+/** Makes `close` the one selection action that shows, and closes the action that showed before. */
+export function showSelectionAction(close: () => void): void {
+  if (closeShownAction !== close) closeShownAction?.();
+  closeShownAction = close;
+}
+
+/** Forgets `close` when its action goes away. */
+export function releaseSelectionAction(close: () => void): void {
+  if (closeShownAction === close) closeShownAction = undefined;
+}
+
 export function MessageSelectionActions(props: {
   contextKey: string | undefined;
   disabled: boolean;
@@ -136,6 +153,7 @@ export function MessageSelectionActions(props: {
       clearSelection();
       return;
     }
+    showSelectionAction(clearSelection);
     setSelection(next);
   };
 
@@ -202,6 +220,7 @@ export function MessageSelectionActions(props: {
       window.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("keydown", onKeyDown);
+      releaseSelectionAction(clearSelection);
       if (selection()) clearPersistentHighlight();
     };
   });
