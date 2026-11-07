@@ -172,10 +172,11 @@ export const messages = {
   "marketplace.plugin.notion.prompt.updateDoc": "온보딩 문서를 새 릴리스 체크리스트로 업데이트해 줘.",
   "marketplace.plugin.cobrain.tagline": "AI 에이전트를 위한 공유 메모리",
   "marketplace.plugin.cobrain.description":
-    "Cobrain은 연결한 모든 AI가 읽고 쓸 수 있는 Markdown 메모리예요. 에이전트는 작업하기 전에 고객이나 프로젝트의 컨텍스트를 불러오고, 과거 노트와 결정을 검색하고, 배운 내용을 저장해서 다음 스레드가 이전 스레드가 끝난 곳에서 시작되도록 해요. 사용자는 각자 자신의 Cobrain 계정으로 로그인해요.",
+    "Cobrain은 OpenBot 바깥에 있는, 내가 소유하는 Markdown 메모리예요. 같은 노트를 Claude, ChatGPT, Codex 등 연결한 모든 AI에서 쓸 수 있어요. OpenBot 자체 메모리와 함께, 앱 하나보다 오래 남아야 하는 것에 쓰세요. “이 고객을 Cobrain에 저장해 줘”, “어제 프로젝트 X에 대해 뭘 결정했지?”라고 하면, 다음 날 Claude나 ChatGPT가 같은 노트를 읽어요. 사용자마다 자기 Cobrain 계정으로 로그인해요.",
   "marketplace.plugin.cobrain.app": "Cobrain 브레인의 노트를 MCP 서버 하나로 읽고, 검색하고, 작성해요.",
-  "marketplace.plugin.cobrain.prompt.startSession": "시작하기 전에 이 프로젝트의 Cobrain 컨텍스트를 불러와 줘.",
-  "marketplace.plugin.cobrain.prompt.searchDecision": "가격에 대해 우리가 뭘 결정했는지 Cobrain 노트에서 검색해 줘.",
+  "marketplace.plugin.cobrain.prompt.firstNote":
+    "이 프로젝트의 목표, 지금까지 정한 것, 다음 단계를 짧은 노트로 Cobrain에 저장해 줘.",
+  "marketplace.plugin.cobrain.prompt.whatYouKnow": "Cobrain에서 나에 대해 뭘 알고 있어?",
   "marketplace.plugin.cobrain.prompt.saveNote": "오늘 한 일과 남은 일을 Cobrain에 노트로 저장해 줘.",
   "marketplace.plugin.figma.tagline": "디자인 및 프로토타입",
   "marketplace.plugin.figma.description":

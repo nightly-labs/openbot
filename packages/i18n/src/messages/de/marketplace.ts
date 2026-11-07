@@ -192,13 +192,12 @@ export const messages = {
     "Aktualisiere das Onboarding-Dokument mit der neuen Release-Checkliste.",
   "marketplace.plugin.cobrain.tagline": "Gemeinsames Gedächtnis für deine KI-Agenten",
   "marketplace.plugin.cobrain.description":
-    "Cobrain ist ein Markdown-Gedächtnis, das jede verbundene KI lesen und beschreiben kann. Agenten laden vor der Arbeit den Kontext eines Kunden oder Projekts, durchsuchen frühere Notizen und Entscheidungen und speichern, was sie lernen, damit die nächste Unterhaltung dort beginnt, wo die letzte endete. Jeder Nutzer meldet sich bei seinem eigenen Cobrain-Konto an.",
+    "Cobrain ist ein Markdown-Gedächtnis, das dir gehört und außerhalb von OpenBot liegt: Dieselben Notizen funktionieren in Claude, ChatGPT, Codex und jeder anderen KI, die du verbindest. Nutze es neben dem Gedächtnis von OpenBot für alles, was länger halten muss als eine einzelne App. Frag „Speichere diesen Kunden in Cobrain“ oder „Was haben wir gestern zu Projekt X entschieden?“, und morgen lesen Claude oder ChatGPT dieselben Notizen. Jeder Nutzer meldet sich mit seinem eigenen Cobrain-Konto an.",
   "marketplace.plugin.cobrain.app":
     "Notizen in deinem Cobrain-Gehirn lesen, durchsuchen und schreiben, über einen MCP-Server.",
-  "marketplace.plugin.cobrain.prompt.startSession":
-    "Lade meinen Cobrain-Kontext für dieses Projekt, bevor wir anfangen.",
-  "marketplace.plugin.cobrain.prompt.searchDecision":
-    "Durchsuche meine Cobrain-Notizen danach, was wir zu den Preisen entschieden haben.",
+  "marketplace.plugin.cobrain.prompt.firstNote":
+    "Speichere in Cobrain eine kurze Notiz zu diesem Projekt: das Ziel, die bisherigen Entscheidungen und den nächsten Schritt.",
+  "marketplace.plugin.cobrain.prompt.whatYouKnow": "Was weißt du aus Cobrain über mich?",
   "marketplace.plugin.cobrain.prompt.saveNote":
     "Speichere in Cobrain eine Notiz mit dem, was wir heute erledigt haben und was noch offen ist.",
   "marketplace.plugin.figma.tagline": "Designs und Prototypen",

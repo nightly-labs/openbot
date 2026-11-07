@@ -76,8 +76,8 @@ const PLUGIN_TEXT = {
       "app-cobrain-mcp": "marketplace.plugin.cobrain.app",
     },
     prompts: {
-      "prompt-start-session": "marketplace.plugin.cobrain.prompt.startSession",
-      "prompt-search-decision": "marketplace.plugin.cobrain.prompt.searchDecision",
+      "prompt-first-note": "marketplace.plugin.cobrain.prompt.firstNote",
+      "prompt-what-you-know": "marketplace.plugin.cobrain.prompt.whatYouKnow",
       "prompt-save-note": "marketplace.plugin.cobrain.prompt.saveNote",
     },
   },

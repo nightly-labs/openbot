@@ -187,12 +187,12 @@ export const messages = {
     "Aggiorna il documento di onboarding con la nuova checklist di rilascio.",
   "marketplace.plugin.cobrain.tagline": "Memoria condivisa per i tuoi agenti IA",
   "marketplace.plugin.cobrain.description":
-    "Cobrain è una memoria in Markdown che ogni IA collegata può leggere e scrivere. Gli agenti caricano il contesto di un cliente o di un progetto prima di lavorare, cercano note e decisioni passate e salvano ciò che imparano, così la conversazione successiva riparte da dove si era fermata la precedente. Ogni utente accede al proprio account Cobrain.",
+    "Cobrain è una memoria in Markdown che resta tua, fuori da OpenBot: le stesse note funzionano in Claude, ChatGPT, Codex e in ogni altra IA che colleghi. Usala accanto alla memoria di OpenBot per ciò che deve durare oltre una sola app. Chiedi «Salva questo cliente in Cobrain» o «Cosa abbiamo deciso ieri sul progetto X?», e domani Claude o ChatGPT leggono le stesse note. Ogni utente accede al proprio account Cobrain.",
   "marketplace.plugin.cobrain.app":
     "Lettura, ricerca e scrittura di note nel tuo cervello Cobrain, tramite un server MCP.",
-  "marketplace.plugin.cobrain.prompt.startSession":
-    "Carica il mio contesto Cobrain per questo progetto prima di iniziare.",
-  "marketplace.plugin.cobrain.prompt.searchDecision": "Cerca nelle mie note Cobrain cosa abbiamo deciso sui prezzi.",
+  "marketplace.plugin.cobrain.prompt.firstNote":
+    "Salva su Cobrain una breve nota su questo progetto: l'obiettivo, le decisioni prese e il prossimo passo.",
+  "marketplace.plugin.cobrain.prompt.whatYouKnow": "Cosa sai di me da Cobrain?",
   "marketplace.plugin.cobrain.prompt.saveNote":
     "Salva una nota in Cobrain con quello che abbiamo fatto oggi e quello che resta.",
   "marketplace.plugin.figma.tagline": "Design e prototipi",

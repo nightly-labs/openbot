@@ -383,13 +383,16 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     name: "Cobrain",
     tagline: "Shared memory for your AI agents",
     description:
-      "Cobrain is a Markdown memory that every AI you connect can read and write. Agents load the context of a client or project before working, search past notes and decisions, and save what they learn so the next thread starts where the last one ended. Each user signs in to their own Cobrain account.",
+      "Cobrain is a Markdown memory you own, outside OpenBot: the same notes work in Claude, ChatGPT, Codex and every other AI you connect. Use it next to OpenBot's own memory for what has to outlast one app. Ask “Save this client in Cobrain” or “What did we decide yesterday about project X?”, and tomorrow Claude or ChatGPT read the same notes. Each user signs in to their own Cobrain account.",
     category: "productivity",
     creatorName: "Cobrain",
-    version: "1.0.0",
+    version: "1.1.0",
     prompts: [
-      { id: "prompt-start-session", text: "Load my Cobrain context for this project before we start." },
-      { id: "prompt-search-decision", text: "Search my Cobrain notes for what we decided about pricing." },
+      {
+        id: "prompt-first-note",
+        text: "Save a short note in Cobrain about this project: the goal, the decisions so far and the next step.",
+      },
+      { id: "prompt-what-you-know", text: "What do you know about me from Cobrain?" },
       { id: "prompt-save-note", text: "Save a note in Cobrain with what we did today and what is left." },
     ],
     websiteUrl: "https://cobrain.space",
