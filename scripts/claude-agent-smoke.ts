@@ -16,7 +16,7 @@ import { mkdtemp, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import { ClaudeAgentClient } from "../src/backend/claude-client";
+import { CLAUDE_HOST_TOOLS, CLAUDE_UNFIT_SKILLS, ClaudeAgentClient } from "../src/backend/claude-client";
 import { resolveClaudeCli } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { type AppServerNotification, getRecord, getString } from "../src/backend/protocol";
@@ -45,7 +45,7 @@ const TURNS: Array<{ step: string; prompt: string; expect: string[] }> = [
   {
     step: "name-only skill",
     prompt:
-      "Call the Skill tool once with skill `dataviz`. Do not do the review and do not change files. " +
+      "Call the Skill tool once with skill `dataviz`. Do not make a chart and do not change files. " +
       "Reply with the first heading of the skill text you got.",
     expect: ["Skill"],
   },
@@ -155,6 +155,9 @@ const failures: string[] = [];
 client.on("notification", (notification: AppServerNotification) => {
   if (notification.method === "error") failures.push(JSON.stringify(notification.params));
   if (notification.method !== "turn/completed") return;
+  // A turn can end as failed or interrupted with no error notification.
+  const status = getString(getRecord(notification.params, "turn"), "status");
+  if (status !== "completed") failures.push(`turn ended as ${status ?? "unknown"}`);
   const threadId = getString(notification.params, "threadId");
   if (threadId) completions.get(threadId)?.();
 });
@@ -213,22 +216,21 @@ const commitMessage = git("log", "-1", "--format=%B");
 const hello = await Bun.file(join(workspace, "hello.txt"))
   .text()
   .catch(() => "");
+// The init message lists agent types without the `Agent(...)` denies, so only the tools are checked.
 const hostTools = [
-  "ReportFindings",
-  "DesignSync",
-  "PushNotification",
+  ...CLAUDE_HOST_TOOLS.filter((tool) => !tool.startsWith("Agent(")),
   "RemoteTrigger",
   "CronCreate",
   "Workflow",
   "Artifact",
 ];
-const unfitSkills = ["schedule", "loop", "send-to-project", "keybindings-help", "update-config", "design"];
 const checks = {
+  initSeen: init !== null,
   helloFile: hello.trim() === "hello world",
   committed: commitMessage.startsWith("Add hello"),
   noCoAuthor: !/co-authored-by|generated with/i.test(commitMessage),
   hostToolsPresent: hostTools.filter((tool) => init?.tools.includes(tool)),
-  unfitSkillsPresent: unfitSkills.filter((skill) => init?.skills.includes(skill)),
+  unfitSkillsPresent: CLAUDE_UNFIT_SKILLS.filter((skill) => init?.skills.includes(skill)),
   everyExpectedToolUsed: turns.every((turn) => turn.expectMissing.length === 0),
   noToolErrors: turns.every((turn) => turn.toolErrors.length === 0),
 };
@@ -245,6 +247,7 @@ process.stdout.write(
   `\ncommit message:\n${commitMessage}\nchecks: ${JSON.stringify(checks)}\n${error ? `error: ${error}\n` : ""}`,
 );
 const passed =
+  checks.initSeen &&
   checks.helloFile &&
   checks.committed &&
   checks.noCoAuthor &&

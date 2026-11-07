@@ -17,7 +17,7 @@ import { mkdtemp, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { type Options, query, type Settings } from "@anthropic-ai/claude-agent-sdk";
-import { ClaudeAgentClient } from "../src/backend/claude-client";
+import { CLAUDE_UNFIT_SKILLS, ClaudeAgentClient } from "../src/backend/claude-client";
 import { type ClaudeCliInfo, resolveClaudeCli } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { type AppServerNotification, getRecord, getString } from "../src/backend/protocol";
@@ -48,22 +48,6 @@ const SINGLE_SETTINGS = [
   "disableClaudeAiConnectors",
 ] as const;
 
-/** The skills that `claude-client.ts` turns off, for a variant that keeps the others listed in full. */
-const UNFIT_SKILLS = [
-  "deep-research",
-  "design",
-  "design-sync",
-  "doctor",
-  "fewer-permission-prompts",
-  "keybindings-help",
-  "loop",
-  "plugin-authoring",
-  "schedule",
-  "send-to-project",
-  "update-config",
-  "workflow-authoring",
-];
-
 /**
  * Features that OpenBot agents keep, measured as references on top of `current`. On 2026-11-07:
  * `includeGitInstructions: false` saved 561 tokens, but takes away the commit and pull request rules.
@@ -89,7 +73,7 @@ const VARIANTS: Variant[] = [
   { name: "all-five", settings: Object.fromEntries(SINGLE_SETTINGS.map((setting) => [setting, true])) },
   {
     name: "unfit-skills-off-only",
-    settings: { skillOverrides: Object.fromEntries(UNFIT_SKILLS.map((skill) => [skill, "off"])) },
+    settings: { skillOverrides: Object.fromEntries(CLAUDE_UNFIT_SKILLS.map((skill) => [skill, "off"])) },
     remove: ["skillOverrides"],
   },
   ...REFERENCES,
@@ -254,6 +238,9 @@ for (const userSetup of setups) {
     client.on("notification", (notification: AppServerNotification) => {
       if (notification.method === "error") failures.push(JSON.stringify(notification.params));
       if (notification.method !== "turn/completed") return;
+      // A turn can end as failed or interrupted with no error notification.
+      const status = getString(getRecord(notification.params, "turn"), "status");
+      if (status !== "completed") failures.push(`turn ended as ${status ?? "unknown"}`);
       const threadId = getString(notification.params, "threadId");
       if (threadId) completions.get(threadId)?.();
     });

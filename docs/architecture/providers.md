@@ -59,10 +59,14 @@ native model serialization are outside this measurement.
 Claude Code adds its own system prompt, tools, and skill listing to each Claude request.
 `claude-client.ts` turns off the bundled skills that cannot work in an OpenBot agent, lists the
 bundled coding skills by name only, and turns off Remote Control, commit attribution, and the tools and
-agent types made for a Claude Code host (`CLAUDE_HOST_TOOLS`). Git instructions and the built-in
+agent types made for a Claude Code host (`CLAUDE_HOST_TOOLS`). These flag settings come before the
+user settings, so the client leaves out a skill override for a user or project skill of the same name,
+and, with the user setup, each key that the user's own settings set. Git instructions and the built-in
 `general-purpose`, `Explore`, `Plan` and `web-fetch` agents stay. `bun run bench:claude-prompt-settings`
 runs real Haiku turns and reports the prompt tokens, tools, and skills of each settings variant in
-`.openbot-build/claude-prompt-settings-bench/report.json`.
+`.openbot-build/claude-prompt-settings-bench/report.json`. `bun run smoke:claude-agent` runs one agent
+session through the core tools, a subagent, a skill, a deferred tool, and a commit, and writes
+`.openbot-build/claude-agent-smoke/report-setup-<on|off>.json`.
 
 ## History retrieval and replacement sessions
 
