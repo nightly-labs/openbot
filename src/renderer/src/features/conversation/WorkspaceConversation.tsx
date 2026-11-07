@@ -122,10 +122,13 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   };
   const signInWithCode = (provider: AgentProviderId) => connection.alternative(provider, "composer");
   // The server's response style decides whether progress updates show as messages. Main answers
-  // "classic" for a joined server until the server says what it supports, so the read waits for that.
+  // "classic" for a joined server until the server says what it supports, so the read waits for a
+  // negotiated protocol.
   const personalityServerId = () => {
     const server = activeServer();
-    return server && (server.kind === "local" || server.compatibility) ? server.id : undefined;
+    return server && (server.kind === "local" || server.compatibility?.negotiatedProtocol != null)
+      ? server.id
+      : undefined;
   };
   createEffect(personalityServerId, (serverId) => {
     if (serverId) loadServerPersonality(serverId, window.openbot.hostAdmin);
