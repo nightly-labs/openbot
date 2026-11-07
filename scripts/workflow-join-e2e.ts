@@ -1,7 +1,8 @@
 // Checks a workflow join on the real SQLite and the real workflow service, on a temporary profile
 // (#5553). Three branches go into a model step, an approval and an output: two prompts, and a model
 // step that fails once. Each join starts only when all three branches end. The model join keeps the
-// place of the failed branch with its error. The approval and the output get only the answers, and so
+// place of the failed branch with its error, redacted, and the place of the step after it that was
+// skipped. The approval and the output get only the answers, and so
 // does an output after the approval, because an approval hands its input on. A retry runs the failed
 // branch again and not the others, and the joins run again with all three answers. The run keeps its
 // steps over a restart. The model steps are a fake, so no model, agent, account or network is started.
@@ -25,7 +26,8 @@ import { createWorkflows, type WorkflowsHandle } from "../src/backend/workflows/
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/workflow-join-e2e");
 const WAIT_MS = 5_000;
-const BOARD_ERROR = "The job board did not answer.";
+const BOARD_ERROR = "The job board did not answer. Authorization: Bearer abcdefghijklmnop1234567890";
+const SAFE_ERROR = "The job board did not answer. Authorization: [redacted]";
 const ANSWERS = "Input 1:\n\nBoard A: 3 jobs\n\nInput 2:\n\nBoard C: 1 job";
 const ALL_ANSWERS = "Input 1:\n\nBoard A: 3 jobs\n\nInput 2:\n\nBoard B: 2 jobs\n\nInput 3:\n\nBoard C: 1 job";
 
@@ -49,6 +51,7 @@ const GRAPH: WorkflowGraph = {
     { id: "a", kind: "prompt", at: { x: 0, y: 0 }, fields: { text: "Board A: 3 jobs" } },
     { id: "b", kind: "llm", at: { x: 0, y: 200 }, fields: { prompt: "Search board B" } },
     { id: "c", kind: "prompt", at: { x: 0, y: 400 }, fields: { text: "Board C: 1 job" } },
+    { id: "parse", kind: "llm", at: { x: 150, y: 200 }, fields: { prompt: "Parse board B" } },
     { id: "count", kind: "llm", at: { x: 300, y: 0 }, fields: { prompt: "Count the jobs" } },
     { id: "join", kind: "approval", at: { x: 300, y: 200 }, fields: { question: "Screen these jobs?" } },
     { id: "post", kind: "output", at: { x: 300, y: 600 }, fields: { target: "notify" } },
@@ -59,6 +62,8 @@ const GRAPH: WorkflowGraph = {
       ["a", "b", "c"].map((from) => ({ id: `${from}>${to}`, from, to, type: "text" as const })),
     ),
     { id: "join>after", from: "join", to: "after", type: "text" },
+    { id: "b>parse", from: "b", to: "parse", type: "text" },
+    { id: "parse>count", from: "parse", to: "count", type: "text" },
   ],
   strokes: [],
 };
@@ -87,6 +92,7 @@ async function open() {
           report.joinPrompts.push(request.prompt);
           return Effect.succeed("Counted");
         }
+        if (request.prompt.includes("Parse board B")) return Effect.succeed("Parsed B");
         return ++generations === 1 ? Effect.fail({ message: BOARD_ERROR }) : Effect.succeed("Board B: 2 jobs");
       },
       notify: (notice) => {
@@ -169,12 +175,13 @@ try {
   const count = await settled(workflows, run.id, "count", 1);
   report.inputs.firstCount = inputOf(count);
   check(
-    "a model join keeps the place of the failed branch, with its error",
+    "a model join keeps the place of the failed branch and of the step after it, with the error redacted",
     count.status === "done" &&
       inputOf(count) ===
-        `Input 1:\n\nBoard A: 3 jobs\n\nInput 2:\n\nNo answer: this step failed. Error: ${BOARD_ERROR}\n\nInput 3:\n\nBoard C: 1 job` &&
+        `Input 1:\n\nBoard A: 3 jobs\n\nInput 2:\n\nNo answer: this step failed. Error: ${SAFE_ERROR}\n\nInput 3:\n\nBoard C: 1 job\n\nInput 4:\n\nNo answer: a step before this one failed. Error: ${SAFE_ERROR}` &&
       report.joinPrompts.length === 1 &&
-      report.joinPrompts[0]?.includes(`No answer: this step failed. Error: ${BOARD_ERROR}`) === true,
+      report.joinPrompts[0]?.includes(`No answer: this step failed. Error: ${SAFE_ERROR}`) === true &&
+      !report.joinPrompts[0]?.includes("abcdefghijklmnop"),
     { input: inputOf(count), prompts: report.joinPrompts },
   );
   check("an approval join gets only the answers", inputOf(step) === ANSWERS, inputOf(step));
@@ -203,16 +210,24 @@ try {
       step.attempt === 2 &&
       inputOf(step) === ALL_ANSWERS &&
       report.joinPrompts.length === 2 &&
-      report.joinPrompts[1]?.includes(ALL_ANSWERS) === true &&
+      report.joinPrompts[1]?.includes(`${ALL_ANSWERS}\n\nInput 4:\n\nParsed B`) === true &&
       !report.joinPrompts[1]?.includes("No answer"),
     { input: inputOf(step), prompts: report.joinPrompts },
   );
   const retried = await attempts(workflows, run.id);
   check(
     "a retry runs only the failed branch and the steps after it",
-    ["a:1:done", "c:1:done", "b:1:failed", "b:2:done", "count:2:done", "join:2:approval", "post:2:done"].every((each) =>
-      retried.includes(each),
-    ) && !retried.some((each) => each.startsWith("a:2") || each.startsWith("c:2")),
+    [
+      "a:1:done",
+      "c:1:done",
+      "b:1:failed",
+      "b:2:done",
+      "parse:2:done",
+      "count:2:done",
+      "join:2:approval",
+      "post:2:done",
+    ].every((each) => retried.includes(each)) &&
+      !retried.some((each) => each.startsWith("a:2") || each.startsWith("c:2")),
     retried,
   );
 

@@ -12,8 +12,10 @@
  * A join is a node with more than one edge from the nodes before it, apart from loop edges. When a
  * node before a join failed or was stopped, the join still runs on the other answers. At a model or
  * agent join, that node keeps its place in the inputs with the reason it has no answer, so the model
- * can see that a branch is missing. The other steps get only the answers: an output posts its input,
- * and a condition or an approval hands its input on to the nodes after it, outputs too.
+ * can see that a branch is missing. A node that was skipped because a node before it failed or was
+ * stopped gives that reason too; a node after the branch that a condition did not choose gives none.
+ * The other steps get only the answers: an output posts its input, and a condition or an approval
+ * hands its input on to the nodes after it, outputs too.
  *
  * A loop edge (`workflowLoopEdges`) goes back to an earlier node. It does not hold that node back.
  * When it is active and newer than the node's own step, the node is due again with the loop edge's
@@ -29,6 +31,7 @@ import {
   type WorkflowNode,
   workflowLoopEdges,
 } from "@openbot/contracts/ipc";
+import { redactText } from "@openbot/logging";
 import { isOpenStep, type StoredWorkflowStep } from "./workflow-run-store";
 
 /** Node kinds and settings that this version cannot run. The canvas does not offer them. */
@@ -104,6 +107,7 @@ export function nextActions(
   const forward = graph.edges.filter((edge) => !loops.has(edge.id));
   const before = incoming(graph.edges);
   const kinds = new Map(graph.nodes.map((node) => [node.id, node.kind]));
+  const reasons = { before, loops, latest };
   const due = new Set<string>();
   const actions: WalkAction[] = [];
   for (const nodeId of graphOrder(graph.nodes, forward, scope)) {
@@ -133,7 +137,8 @@ export function nextActions(
       actions.push({ nodeId, action: "skip" });
       continue;
     }
-    actions.push({ nodeId, action: "run", inputs: edgeInputs(kinds.get(nodeId), edges, loops, latest) });
+    const join = isJoin(kinds.get(nodeId), before.get(nodeId) ?? [], loops);
+    actions.push({ nodeId, action: "run", inputs: edgeInputs(join, edges, reasons) });
   }
   return actions;
 }
@@ -146,39 +151,74 @@ export function soloInputs(
 ): string[] {
   const kind = graph.nodes.find((node) => node.id === nodeId)?.kind;
   const loops = workflowLoopEdges(graph.nodes, graph.edges);
-  return edgeInputs(kind, incoming(graph.edges).get(nodeId) ?? [], loops, answered);
+  const before = incoming(graph.edges);
+  const edges = before.get(nodeId) ?? [];
+  return edgeInputs(isJoin(kind, edges, loops), edges, { before, loops, latest: answered });
 }
 
-/** The longest error that a missing answer quotes, so a long provider error costs few tokens. */
+/** The longest error that a missing answer quotes, in characters, so a long error costs few tokens. */
 const MISSING_ERROR_LIMIT = 300;
 
+/** What a missing answer reads to find its reason: the edges into each node and the newest steps. */
+interface Reasons {
+  before: ReadonlyMap<string, readonly WorkflowEdge[]>;
+  loops: ReadonlySet<string>;
+  latest: ReadonlyMap<string, StoredWorkflowStep>;
+}
+
 /**
- * The inputs of a node by its edges, in edge order: the answer of each active edge, and at a model
- * or agent join, the reason for each node before it that failed or was stopped.
+ * A model or agent node with more than one edge from the nodes before it, apart from loop edges. It
+ * counts every edge in the graph, so a run and a retry of the node agree.
  */
-function edgeInputs(
+function isJoin(
   kind: WorkflowNode["kind"] | undefined,
   edges: readonly WorkflowEdge[],
   loops: ReadonlySet<string>,
-  latest: ReadonlyMap<string, StoredWorkflowStep>,
-): string[] {
-  const join = (kind === "llm" || kind === "agent") && edges.filter((edge) => !loops.has(edge.id)).length > 1;
+): boolean {
+  return (kind === "llm" || kind === "agent") && edges.filter((edge) => !loops.has(edge.id)).length > 1;
+}
+
+/**
+ * The inputs of a node by its edges, in edge order: the answer of each active edge, and at a join,
+ * the reason for each node before it that has no answer.
+ */
+function edgeInputs(join: boolean, edges: readonly WorkflowEdge[], reasons: Reasons): string[] {
   return edges.flatMap((edge) => {
-    const source = latest.get(edge.from);
+    const source = reasons.latest.get(edge.from);
     if (!source) return [];
     if (edgeActive(edge, source)) return [source.output ?? ""];
-    return join && !loops.has(edge.id) ? missingAnswer(source) : [];
+    if (!join || reasons.loops.has(edge.id)) return [];
+    const reason = missingAnswer(source, reasons, new Set());
+    return reason ? [reason] : [];
   });
 }
 
-/** Why a node before a join has no answer. A provider reads it, so the words stay English. */
-function missingAnswer(source: StoredWorkflowStep): string[] {
-  if (source.status === "stopped") return ["No answer: this step was stopped."];
-  if (source.status !== "failed") return [];
-  const error = source.error?.trim();
-  if (!error) return ["No answer: this step failed."];
-  const quoted = error.length > MISSING_ERROR_LIMIT ? `${error.slice(0, MISSING_ERROR_LIMIT)}…` : error;
-  return [`No answer: this step failed. Error: ${quoted}`];
+/**
+ * Why a node before a join has no answer, or null when it chose to give none. A skipped node gives
+ * the reason of the first node before it that failed or was stopped. A provider reads it, so the
+ * words stay English, and the error is redacted.
+ */
+function missingAnswer(source: StoredWorkflowStep, reasons: Reasons, seen: Set<string>): string | null {
+  if (source.status === "failed") return withError("No answer: this step failed.", source.error);
+  if (source.status === "stopped") return withError("No answer: this step was stopped.", source.error);
+  if (source.status !== "skipped" || seen.has(source.nodeId)) return null;
+  seen.add(source.nodeId);
+  for (const edge of reasons.before.get(source.nodeId) ?? []) {
+    const earlier = reasons.latest.get(edge.from);
+    if (reasons.loops.has(edge.id) || !earlier || earlier.status === "done") continue;
+    const reason = missingAnswer(earlier, reasons, seen);
+    if (reason) return reason.replace("No answer: this step", "No answer: a step before this one");
+  }
+  return null;
+}
+
+function withError(text: string, error: string | null | undefined): string {
+  const clean = redactText(error?.trim() ?? "");
+  if (!clean) return text;
+  const characters = Array.from(clean);
+  const quoted =
+    characters.length > MISSING_ERROR_LIMIT ? `${characters.slice(0, MISSING_ERROR_LIMIT).join("")}…` : clean;
+  return `${text} Error: ${quoted}`;
 }
 
 function edgeActive(edge: WorkflowEdge, source: StoredWorkflowStep): boolean {
