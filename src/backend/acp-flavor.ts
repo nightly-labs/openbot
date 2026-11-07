@@ -88,6 +88,11 @@ export interface AcpFlavor {
     emptyOutputFailure?: RegExp;
     /** The message of a turn that failed in this way, from the failure text. */
     turnFailure(text: string): string;
+    /**
+     * The https link in the failure text that the user must open to fix their account, or `null`.
+     * The turn fails as a sign-in failure, and the error banner opens the link.
+     */
+    accountLink?(text: string): string | null;
     /** The message of an answer chunk that reports an exhausted quota, or `null`. */
     quota(text: string): string | null;
     /** The MCP server whose failed start ended the turn, from the failure text, or `null`. */

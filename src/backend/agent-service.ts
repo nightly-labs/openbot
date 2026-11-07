@@ -1572,7 +1572,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hooks: {
         emitFailure: (failure) => this.emit("failure", failure),
         emit: (event) => this.#emit(event),
-        emitError: (code, error, agentId, context) => this.#emitError(code, error, agentId, context),
+        emitError: (code, error, agentId, context, link) => this.#emitError(code, error, agentId, context, link),
         emitRuntimeSnapshot: () => this.#emitRuntimeSnapshot(),
         scheduleDrain: (agentId) => this.#drain.scheduleDrain(agentId),
         steerAgentMessage: (recipientAgentId, deliveryId) => this.#steerAgentMessage(recipientAgentId, deliveryId),
@@ -5764,7 +5764,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
-  #emitError(code: string, error: unknown, agentId?: string, context?: FailureContext): void {
+  /** `link` goes only to the renderer: the failure report and the log do not keep a page address. */
+  #emitError(code: string, error: unknown, agentId?: string, context?: FailureContext, link?: string): void {
     const causeCode = context?.causeCode ?? classifyFailure(error);
     this.emit("failure", {
       ...context,
@@ -5794,6 +5795,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       message,
       ...(context?.provider ? { provider: context.provider } : {}),
       ...(context?.model ? { model: context.model } : {}),
+      ...(link ? { link } : {}),
     });
   }
 

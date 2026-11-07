@@ -15,6 +15,7 @@ export const messages = {
   "composer.signIn.label": "Inloggen bij {provider}",
   "composer.signIn.action": "Inloggen",
   "composer.updateKey.action": "Sleutel bijwerken",
+  "composer.verifyAccount.action": "Account verifiëren",
   "composer.update.body": "Werk {provider} bij om door te gaan.",
   "composer.update.manual": "Werk {provider} bij op de computer waarop het draait om door te gaan.",
   "composer.update.pending": "Bijwerken…",

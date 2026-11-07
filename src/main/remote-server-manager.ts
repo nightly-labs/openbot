@@ -477,6 +477,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       : null;
     this.#webrtcTransport?.on("connected", (serverId) => {
       this.#events.clearReconnectBackoff(serverId);
+      this.#events.markSeenOnline(serverId);
       this.#hostRestartAway.delete(serverId);
       const hostedStartAt = this.#hostedStartAt.get(serverId);
       if (hostedStartAt !== undefined)
@@ -520,6 +521,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     });
     this.#webrtcTransport?.on("disconnected", (serverId) => {
       const wasOnline = this.#connections.statusFor(serverId).state === "online";
+      if (wasOnline) this.#events.markSeenOnline(serverId);
       // A host the app has stopped reconnecting to is not merely offline. The recorded failure is
       // the reason it will not come back, and this disconnect is that failure's own tail -- the one
       // `#suspendServer` asked for. Writing "offline" over an "incompatible" would leave the issue
