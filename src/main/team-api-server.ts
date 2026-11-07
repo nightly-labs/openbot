@@ -91,6 +91,7 @@ import {
   LOCAL_SERVERS_CAPABILITY,
   legacyTeamCapabilities,
   MCP_ACCOUNTS_CAPABILITY,
+  MCP_MEMBER_ACCESS_CAPABILITY,
   MCP_SERVERS_CAPABILITY,
   MCP_SIGN_IN_APP_CAPABILITY,
   MCP_SIGN_IN_CAPABILITY,
@@ -1020,15 +1021,26 @@ export class TeamApiServer {
       if ((await this.#routeBrowser(context)) === "handled") return;
       if ((await this.#routeFiles(context)) === "handled") return;
       if ((await routeChannels(context, this.#options.channels, this.#options.agents, hidden)) === "handled") return;
+      const { mcpServers, mcpServerOwners } = this.#options;
       if (
-        (await routeMcpServers(context, this.#options.mcpServers, this.#options.mcpToolRuntimePreparation)) ===
+        (await routeMcpServers(context, mcpServers, this.#options.mcpToolRuntimePreparation, mcpServerOwners)) ===
         "handled"
       )
         return;
-      if ((await routeMcpSignIn(context, this.#options.mcpServers && this.#options.mcpSignIns)) === "handled") return;
-      if ((await routeMcpSignInApp(context, this.#options.mcpServers && this.#options.mcpSignIns)) === "handled")
+      if (
+        (await routeMcpSignIn(context, mcpServers && this.#options.mcpSignIns, mcpServers, mcpServerOwners)) ===
+        "handled"
+      )
         return;
-      if ((await routeSignInRelay(context, this.#options.mcpServers && this.#options.signInRelay)) === "handled")
+      if (
+        (await routeMcpSignInApp(context, mcpServers && this.#options.mcpSignIns, mcpServers, mcpServerOwners)) ===
+        "handled"
+      )
+        return;
+      if (
+        (await routeSignInRelay(context, mcpServers && this.#options.signInRelay, mcpServers, mcpServerOwners)) ===
+        "handled"
+      )
         return;
       if ((await routeConnectors(context, this.#options.connectors)) === "handled") return;
       if ((await routeDiscordAccess(context, this.#options.connectors)) === "handled") return;
@@ -2274,6 +2286,9 @@ export class TeamApiServer {
             return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
           if (capability === MCP_SIGN_IN_CAPABILITY)
             return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
+          // A member changes only the servers that they added, so the host must know who added each.
+          if (capability === MCP_MEMBER_ACCESS_CAPABILITY)
+            return this.#options.mcpServers !== undefined && this.#options.mcpServerOwners !== undefined;
           if (capability === MCP_SIGN_IN_APP_CAPABILITY)
             return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
           if (capability === SIGN_IN_RELAY_CAPABILITY)

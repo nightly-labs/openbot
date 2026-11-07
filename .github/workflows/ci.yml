@@ -338,6 +338,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:sign-in-relay-replay
 
+      - name: Run the MCP member access E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:mcp-member-access
+
       - name: Run the server mute and unmute E2E test
         if: ${{ !cancelled() }}
         run: bun run test:server-mute
@@ -620,6 +624,7 @@ jobs:
             .openbot-build/team-session-revoke-e2e/
             .openbot-build/sign-in-relay-paste-e2e/
             .openbot-build/sign-in-relay-replay-e2e/
+            .openbot-build/mcp-member-access-e2e/
             .openbot-build/server-mute-e2e/
             .openbot-build/desktop-notifications-e2e/
             .openbot-build/push-notification-away-e2e/

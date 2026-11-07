@@ -147,6 +147,8 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Deze client ondersteunt geen beveiligde verificatie.",
   "error.team.agentSettingsUnsupported": "Deze verbinding ondersteunt geen instellingen van agents.",
   "error.team.adminRequired": "Beheerderstoegang is verplicht.",
+  "error.team.mcpServerNotYours":
+    "Alleen de persoon die deze MCP-server heeft toegevoegd, of een beheerder, kan hem wijzigen.",
   "error.team.ownerRequired": "Alleen de eigenaar van deze server kan dit doen.",
   "error.team.requestTooLarge": "De inhoud van het verzoek is te groot.",
   "error.team.signInRelayUnsupported": "Deze server kan geen inlogs doorgeven. Werk OpenBot bij op de host.",

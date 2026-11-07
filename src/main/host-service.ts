@@ -120,6 +120,7 @@ type ForwardedApiOptions = ConstructorParameters<typeof TeamApiServer>[0];
 interface HostServiceOptions {
   channels?: ChannelService;
   mcpServers?: ForwardedApiOptions["mcpServers"];
+  mcpServerOwners?: ForwardedApiOptions["mcpServerOwners"];
   mcpSignIns?: ForwardedApiOptions["mcpSignIns"];
   signInRelay?: ForwardedApiOptions["signInRelay"];
   connectors?: ForwardedApiOptions["connectors"];
@@ -476,6 +477,7 @@ export class HostService extends EventEmitter<HostEvents> {
       agentsReady: options.agentsReady,
       ...(options.channels === undefined ? {} : { channels: options.channels }),
       ...(options.mcpServers === undefined ? {} : { mcpServers: options.mcpServers }),
+      ...(options.mcpServerOwners === undefined ? {} : { mcpServerOwners: options.mcpServerOwners }),
       ...(options.mcpSignIns === undefined ? {} : { mcpSignIns: options.mcpSignIns }),
       ...(options.signInRelay === undefined ? {} : { signInRelay: options.signInRelay }),
       ...(options.connectors === undefined ? {} : { connectors: options.connectors }),
