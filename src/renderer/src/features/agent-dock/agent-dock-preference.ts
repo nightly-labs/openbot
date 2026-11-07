@@ -59,7 +59,7 @@ const preferenceSchema = z
       .catch(DEFAULT_PREFERENCE.offsets),
   })
   .catch(DEFAULT_PREFERENCE);
-const seatsSchema = z.array(z.string().trim().min(1).nullable().catch(null)).catch([]);
+const seatsSchema = z.array(z.string().trim().min(1).nullable().catch(null));
 
 /* The values that blocked or full storage did not save. They win over older saved values. */
 let unsavedPreference: AgentDockPreference | undefined;
