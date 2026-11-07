@@ -2659,6 +2659,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         ...(status === undefined ? {} : { status }),
         arguments: update.rawInput ?? turn.toolItems.get(update.toolCallId)?.arguments,
         result: update.rawOutput ?? turn.toolItems.get(update.toolCallId)?.result,
+        // Gemini and others put the error of a failed tool only in the content, not in rawOutput.
+        ...(update.status === "failed" && update.content ? { error: update.content } : {}),
       };
       turn.toolItems.set(update.toolCallId, item);
       this.#foldSubagentTool(thread, turn, update.toolCallId, update.content, item);

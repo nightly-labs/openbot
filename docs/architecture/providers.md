@@ -434,6 +434,40 @@ streamed messages, permissions, tool bridging, and cancellation. `grok-client.ts
 login and billing hooks. The OpenCode driver starts `opencode acp` on the runtime OpenBot pins and
 downloads, or on a CLI the user installed. Profile clients deny tool permissions.
 
+OpenCode adds its own system prompt, tools, skill listing and Code Mode catalog to each request of an
+agent. `opencode-agent-defaults.ts` denies the parts that an OpenBot agent does not use: the
+`question` tool (OpenBot has `ask_user`), the `opencode_list_mcp_resources` and
+`opencode_read_mcp_resource` tools (OpenBot's MCP servers serve no resources), and the `report` and
+`opencode` skills. These rules go in an `OPENCODE_CONFIG` file in the provider state folder, not in
+`OPENCODE_CONFIG_CONTENT`, so a rule in the project's `opencode.json` comes after them and wins. The
+global config (the XDG folder and `OPENCODE_CONFIG_DIR`) comes before that file, so the driver leaves
+out each rule that a global name or pattern matches, also in an agent's rules. The global catch-all `"*"` only sets how OpenCode asks for tools and does not count.
+When the user sets `OPENCODE_CONFIG`, or a global config file cannot be decoded, OpenBot adds no rule.
+The `models` tool, the `explore` agent and all OpenBot tools stay; with two tools gone, the Code Mode
+catalog shows 14 of 16 OpenBot tools, not 13, and `search` still finds the others. On OpenCode 2.2.6
+a one-reply request goes from 5,987 to 5,288 o200k tokens (−11.7%), and a read-then-reply task from
+12,130 to 10,732. `bun run bench:opencode-prompt-settings` runs the real driver and CLI against a fake
+model on loopback in temporary XDG folders and reports the tokens, tools, skills and catalog of each
+variant in `.openbot-build/opencode-prompt-settings-bench/report.json`. `bun run smoke:opencode-agent`
+runs one agent turn with the core tools, a subagent and an OpenBot tool through `execute`, then checks
+that global and project rules of the user win, in `.openbot-build/opencode-agent-smoke/report.json`.
+
+Grok `agent stdio` ignores `--tools` and `--disallowed-tools`, so only environment and `config.toml`
+switches remove a Grok feature. At each spawn, `grok-client.ts` turns off four features that an
+OpenBot agent does not use: feedback (`GROK_FEEDBACK_ENABLED`), workflows (`GROK_WORKFLOWS`), the
+turn summary (`GROK_TURN_SUMMARY`) and the skills of `~/.claude/skills` (`GROK_CLAUDE_SKILLS_ENABLED`).
+An environment value wins over every Grok config layer, so OpenBot sets a switch only when the
+user's environment and the layers below it (`$GROK_HOME/managed_config.toml`, `$GROK_HOME/config.toml`,
+`GROK_CONFIG_PATH` and `GROK_CONFIG`) all leave its key unset. When a layer does not read or parse,
+OpenBot sets no switch. A user can turn each feature back on in `config.toml`. On Grok CLI 1.0.70
+and Grok Build Fast, feedback and workflows cost 1,707 prompt tokens in each request, the turn summary
+is one more request of about 1,600 after each turn, and one developer's Claude skills cost 2,811 in
+each request. The image, video, search, subagent and question tools stay: together they cost about
+6,100, but an agent can use each of them. The session title request (about 500) has no switch. `bun run bench:grok-prompt-settings` measures these features
+through a local proxy and a copy of the user's Grok login without its refresh token.
+`bun run smoke:grok-agent` checks that an agent can still use a skill, the file and terminal tools,
+a subagent and git, and that the user's `config.toml` value wins.
+
 The pinned runtime is OpenCode 2 (`@opencode/cli`). Its platform tarballs carry no licence file, so
 the stage step copies `LICENSE` from the `opencode-ai` tarball that `licensePackage` in
 `native-runtime.lock.json` names. Every OpenCode install on the computer shares
@@ -1035,6 +1069,26 @@ Hermes reads only one project context file: `.hermes.md` or `HERMES.md` before `
 reads project skills only in a git root that `skills.trusted_project_dirs` names. A turn that fails
 with an exception in Hermes ends as answer text `Error: …`, not as a failed turn. Team API
 protocols below 8 hide Hermes; protocol 8 and newer carry it as any other provider id.
+
+OpenBot gives its Hermes agents two `agent` settings, `HERMES_AGENT_SETTINGS` in
+`src/backend/hermes-settings.ts`: `coding_context: focus` shows the skills of non-coding categories
+by name only, and `disabled_toolsets: [browser]` removes the Hermes browser tools, because each agent
+has `openbot_browser`. `hermesSettingsEnvironment` writes them to a `config.yaml` in
+`<provider state>/hermes-settings/<hash>/` and sets `HERMES_MANAGED_DIR` to that folder. Hermes
+merges a managed `config.yaml` over the user's, and a Hermes process that saves its settings removes
+the managed keys from the user's file. So OpenBot sets only the keys that the user's `config.yaml`
+does not have, and sets nothing when `HERMES_MANAGED_DIR` is set, when `/etc/hermes` exists, or when
+it cannot read the user's file. The chat client and the profile client both get the folder. This has
+two limits. Commands that the agent runs keep `HERMES_MANAGED_DIR`, so in them
+`hermes config set` refuses the two keys as "managed by your administrator". OpenBot reads the
+user's file when the Hermes process starts, so a key that the user adds while an agent runs applies
+only after the next start, and a settings save of that process can remove it from the user's file.
+`bun run bench:hermes-prompt-settings` measures each setting with real
+turns on a free Nous Portal model in a temporary Hermes profile, and writes
+`.openbot-build/hermes-prompt-settings-bench/report.json`. On Hermes 0.21.5 the two settings take a
+reply from 14,524 to 12,159 prompt tokens (−16%). A Hermes home outside `~/.hermes` installs its
+own runtime and rewrites the shared `hermes` launchers, so the bench uses a profile, which shares the
+user's runtime, and stops when the launchers change.
 
 ### Custom agents
 

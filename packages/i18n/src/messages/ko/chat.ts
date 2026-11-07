@@ -22,6 +22,8 @@ export const messages = {
   "chat.activity.current": "현재 활동",
   "chat.steps.show": "단계 보기",
   "chat.steps.hide": "단계 숨기기",
+  "chat.steps.showError": "오류 보기",
+  "chat.steps.hideError": "오류 숨기기",
   "chat.steps.list": "에이전트 단계",
   "chat.steps.count": { other: "{count}단계" },
   "chat.steps.failed": { other: "{count}개 실패" },
