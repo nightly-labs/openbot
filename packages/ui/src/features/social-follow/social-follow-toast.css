@@ -11,18 +11,11 @@
   align-items: start;
   column-gap: var(--openbot-space-3);
   padding: var(--openbot-space-4);
-  border-radius: var(--openbot-radius-lg);
+  border-radius: var(--openbot-radius-card);
   background: var(--openbot-bg-surface-raised);
   box-shadow: 0 0 0 1px var(--openbot-border);
   color: var(--openbot-text-primary);
   font-family: var(--openbot-font-sans);
-}
-
-.social-follow-toast-close {
-  position: absolute;
-  top: var(--openbot-space-2);
-  inset-inline-end: var(--openbot-space-2);
-  color: var(--openbot-text-muted);
 }
 
 /* The plush hops in after the card, leans toward a network under the pointer, and bounces on thanks. */
@@ -59,14 +52,15 @@
 .social-follow-toast-copy {
   display: grid;
   gap: var(--openbot-space-0-5);
-  /* The close button sits in the top corner. */
-  padding-inline-end: var(--openbot-space-6);
+  /* The close control sits on the corner, mostly outside the card, so the title keeps a small space. */
+  padding-inline-end: var(--openbot-space-1);
 }
 
 .social-follow-toast-copy strong {
   font-size: var(--openbot-text-md);
   line-height: var(--openbot-leading-md);
   font-weight: var(--openbot-weight-semibold);
+  text-wrap: balance;
 }
 
 .social-follow-toast-copy p {
@@ -123,10 +117,23 @@
   animation-delay: 340ms;
 }
 
-/* The follow request: one outline button with the network mark, below the thanks. */
+/* The follow request: one main button with the network mark, below the thanks. It has the size of the
+   toast buttons. */
 .social-follow-toast-follow {
   display: flex;
   animation: social-follow-rise var(--openbot-duration-overlay) var(--openbot-ease-out) 120ms both;
+}
+
+.social-follow-toast-follow .ui-button {
+  height: var(--openbot-control-sm);
+  border-radius: var(--openbot-radius-sm);
+  transition:
+    background-color var(--openbot-duration-hover) ease,
+    transform var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.social-follow-toast-follow .ui-button:active {
+  transform: scale(0.96);
 }
 
 .social-follow-toast .social-follow-network {

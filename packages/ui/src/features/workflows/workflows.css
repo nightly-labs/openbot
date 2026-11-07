@@ -1227,11 +1227,7 @@
   visibility: hidden;
 }
 
-/* The Undo toast of a workflow delete has the 1px ring and no shadow, as the other canvas surfaces. */
-.wfn-undo-toast-host .agent-delete-undo-toast {
-  box-shadow: 0 0 0 1px var(--openbot-border);
-}
-
+/* The workflow mark of the Undo toast, in the place of the agent avatar. */
 .wfn-undo-toast-tile {
   display: grid;
   place-items: center;
