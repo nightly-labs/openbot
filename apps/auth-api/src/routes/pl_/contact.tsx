@@ -4,13 +4,13 @@ import { contactPageText } from "../../components/contact/contact-page-text";
 import { CONTACT_ROUTE, CONTACT_SOCIAL_IMAGE_PATH } from "../../lib/contact";
 import { loadSitePage } from "../../lib/site-locale";
 import { sitePageHead } from "../../lib/site-page-head";
-import { POLISH_PAGE_PATHS } from "../../lib/site-paths";
+import { LOCALIZED_PAGE_PATHS } from "../../lib/site-paths";
 
 // The contact page in Polish, whatever the language of the request.
 export const Route = createFileRoute("/pl_/contact")({
   loader: () => loadSitePage("pl", contactPageText),
   head: ({ match, loaderData }) => {
-    const path = POLISH_PAGE_PATHS[CONTACT_ROUTE];
+    const path = LOCALIZED_PAGE_PATHS.pl[CONTACT_ROUTE];
     if (!loaderData) return { links: [{ rel: "canonical", href: new URL(path, match.context.siteUrl).toString() }] };
     return sitePageHead(match.context.siteUrl, {
       page: CONTACT_ROUTE,

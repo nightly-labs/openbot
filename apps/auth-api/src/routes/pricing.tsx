@@ -8,7 +8,8 @@ import { loadSiteChrome, siteLocale } from "../lib/site-locale";
 import { sitePageHead } from "../lib/site-page-head";
 
 // The order form has text in every app language, so the page shows the language of the request. The header and
-// the footer are in Polish for Polish and in English for all others. `/pl/pricing` always shows Polish.
+// the footer are in Polish for Polish, in Brazilian Portuguese for Portuguese, and in English for all others.
+// `/pl/pricing` always shows Polish, and `/pt/pricing` Portuguese.
 export const Route = createFileRoute("/pricing")({
   loader: async ({ context }) => {
     const [offer, page, site] = await Promise.all([

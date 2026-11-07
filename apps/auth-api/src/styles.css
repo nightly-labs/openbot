@@ -772,6 +772,7 @@ a {
 
 .site-language-name {
   flex: 1 1 auto;
+  white-space: nowrap;
 }
 
 .site-language-check {
@@ -840,6 +841,16 @@ a {
   .site-nav,
   .site-header-actions > .site-header-secondary {
     display: none;
+  }
+
+  /* The globe is not the last button here, and a list that ends at the globe goes past the left
+     edge of a phone screen. The list ends at the menu button. */
+  .site-header-actions {
+    position: relative;
+  }
+
+  .site-language-menu {
+    position: static;
   }
 
   .site-menu-button {

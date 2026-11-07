@@ -25,6 +25,7 @@ import { Route as PlRouteImport } from './routes/pl'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
+import { Route as PtRouteImport } from './routes/pt'
 import { Route as ReportSiteRouteImport } from './routes/report-site'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TeamsRouteImport } from './routes/teams'
@@ -62,6 +63,9 @@ import { Route as PluginsSlugRouteImport } from './routes/plugins/$slug'
 import { Route as ProvidersIndexRouteImport } from './routes/providers/index'
 import { Route as ProvidersSlugRouteImport } from './routes/providers/$slug'
 import { Route as ProvidersRssDotxmlRouteImport } from './routes/providers/rss[.]xml'
+import { Route as PtContactRouteImport } from './routes/pt_/contact'
+import { Route as PtPricingRouteImport } from './routes/pt_/pricing'
+import { Route as PtTeamsRouteImport } from './routes/pt_/teams'
 import { Route as SlackConnectRouteImport } from './routes/slack/connect'
 import { Route as V1ContactRouteImport } from './routes/v1/contact'
 import { Route as V1MeRouteImport } from './routes/v1/me'
@@ -284,6 +288,11 @@ const PrivacyPolicyRoute = PrivacyPolicyRouteImport.update({
   path: '/privacy-policy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PtRoute = PtRouteImport.update({
+  id: '/pt',
+  path: '/pt',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportSiteRoute = ReportSiteRouteImport.update({
   id: '/report-site',
   path: '/report-site',
@@ -468,6 +477,21 @@ const ProvidersSlugRoute = ProvidersSlugRouteImport.update({
 const ProvidersRssDotxmlRoute = ProvidersRssDotxmlRouteImport.update({
   id: '/providers/rss.xml',
   path: '/providers/rss.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PtContactRoute = PtContactRouteImport.update({
+  id: '/pt_/contact',
+  path: '/pt/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PtPricingRoute = PtPricingRouteImport.update({
+  id: '/pt_/pricing',
+  path: '/pt/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PtTeamsRoute = PtTeamsRouteImport.update({
+  id: '/pt_/teams',
+  path: '/pt/teams',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SlackConnectRoute = SlackConnectRouteImport.update({
@@ -1258,6 +1282,7 @@ export interface FileRoutesByFullPath {
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
+  '/pt': typeof PtRoute
   '/report-site': typeof ReportSiteRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/teams': typeof TeamsRoute
@@ -1287,6 +1312,9 @@ export interface FileRoutesByFullPath {
   '/plugins/$slug': typeof PluginsSlugRoute
   '/providers/$slug': typeof ProvidersSlugRoute
   '/providers/rss.xml': typeof ProvidersRssDotxmlRoute
+  '/pt/contact': typeof PtContactRoute
+  '/pt/pricing': typeof PtPricingRoute
+  '/pt/teams': typeof PtTeamsRoute
   '/slack/connect': typeof SlackConnectRoute
   '/v1/contact': typeof V1ContactRoute
   '/v1/me': typeof V1MeRouteWithChildren
@@ -1454,6 +1482,7 @@ export interface FileRoutesByTo {
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
+  '/pt': typeof PtRoute
   '/report-site': typeof ReportSiteRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/teams': typeof TeamsRoute
@@ -1483,6 +1512,9 @@ export interface FileRoutesByTo {
   '/plugins/$slug': typeof PluginsSlugRoute
   '/providers/$slug': typeof ProvidersSlugRoute
   '/providers/rss.xml': typeof ProvidersRssDotxmlRoute
+  '/pt/contact': typeof PtContactRoute
+  '/pt/pricing': typeof PtPricingRoute
+  '/pt/teams': typeof PtTeamsRoute
   '/slack/connect': typeof SlackConnectRoute
   '/v1/contact': typeof V1ContactRoute
   '/v1/me': typeof V1MeRouteWithChildren
@@ -1651,6 +1683,7 @@ export interface FileRoutesById {
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
+  '/pt': typeof PtRoute
   '/report-site': typeof ReportSiteRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/teams': typeof TeamsRoute
@@ -1680,6 +1713,9 @@ export interface FileRoutesById {
   '/plugins/$slug': typeof PluginsSlugRoute
   '/providers/$slug': typeof ProvidersSlugRoute
   '/providers/rss.xml': typeof ProvidersRssDotxmlRoute
+  '/pt_/contact': typeof PtContactRoute
+  '/pt_/pricing': typeof PtPricingRoute
+  '/pt_/teams': typeof PtTeamsRoute
   '/slack/connect': typeof SlackConnectRoute
   '/v1/contact': typeof V1ContactRoute
   '/v1/me': typeof V1MeRouteWithChildren
@@ -1849,6 +1885,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/privacy'
     | '/privacy-policy'
+    | '/pt'
     | '/report-site'
     | '/sitemap.xml'
     | '/teams'
@@ -1878,6 +1915,9 @@ export interface FileRouteTypes {
     | '/plugins/$slug'
     | '/providers/$slug'
     | '/providers/rss.xml'
+    | '/pt/contact'
+    | '/pt/pricing'
+    | '/pt/teams'
     | '/slack/connect'
     | '/v1/contact'
     | '/v1/me'
@@ -2045,6 +2085,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/privacy'
     | '/privacy-policy'
+    | '/pt'
     | '/report-site'
     | '/sitemap.xml'
     | '/teams'
@@ -2074,6 +2115,9 @@ export interface FileRouteTypes {
     | '/plugins/$slug'
     | '/providers/$slug'
     | '/providers/rss.xml'
+    | '/pt/contact'
+    | '/pt/pricing'
+    | '/pt/teams'
     | '/slack/connect'
     | '/v1/contact'
     | '/v1/me'
@@ -2241,6 +2285,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/privacy'
     | '/privacy-policy'
+    | '/pt'
     | '/report-site'
     | '/sitemap.xml'
     | '/teams'
@@ -2270,6 +2315,9 @@ export interface FileRouteTypes {
     | '/plugins/$slug'
     | '/providers/$slug'
     | '/providers/rss.xml'
+    | '/pt_/contact'
+    | '/pt_/pricing'
+    | '/pt_/teams'
     | '/slack/connect'
     | '/v1/contact'
     | '/v1/me'
@@ -2438,6 +2486,7 @@ export interface RootRouteChildren {
   PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
   PrivacyPolicyRoute: typeof PrivacyPolicyRoute
+  PtRoute: typeof PtRoute
   ReportSiteRoute: typeof ReportSiteRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TeamsRoute: typeof TeamsRoute
@@ -2467,6 +2516,9 @@ export interface RootRouteChildren {
   PluginsSlugRoute: typeof PluginsSlugRoute
   ProvidersSlugRoute: typeof ProvidersSlugRoute
   ProvidersRssDotxmlRoute: typeof ProvidersRssDotxmlRoute
+  PtContactRoute: typeof PtContactRoute
+  PtPricingRoute: typeof PtPricingRoute
+  PtTeamsRoute: typeof PtTeamsRoute
   SlackConnectRoute: typeof SlackConnectRoute
   V1ContactRoute: typeof V1ContactRoute
   V1MeRoute: typeof V1MeRouteWithChildren
@@ -2704,6 +2756,13 @@ declare module '@tanstack/solid-router' {
       path: '/privacy-policy'
       fullPath: '/privacy-policy'
       preLoaderRoute: typeof PrivacyPolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pt': {
+      id: '/pt'
+      path: '/pt'
+      fullPath: '/pt'
+      preLoaderRoute: typeof PtRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/report-site': {
@@ -2963,6 +3022,27 @@ declare module '@tanstack/solid-router' {
       path: '/providers/rss.xml'
       fullPath: '/providers/rss.xml'
       preLoaderRoute: typeof ProvidersRssDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pt_/contact': {
+      id: '/pt_/contact'
+      path: '/pt/contact'
+      fullPath: '/pt/contact'
+      preLoaderRoute: typeof PtContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pt_/pricing': {
+      id: '/pt_/pricing'
+      path: '/pt/pricing'
+      fullPath: '/pt/pricing'
+      preLoaderRoute: typeof PtPricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pt_/teams': {
+      id: '/pt_/teams'
+      path: '/pt/teams'
+      fullPath: '/pt/teams'
+      preLoaderRoute: typeof PtTeamsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/slack/connect': {
@@ -4119,6 +4199,7 @@ const rootRouteChildren: RootRouteChildren = {
   PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
   PrivacyPolicyRoute: PrivacyPolicyRoute,
+  PtRoute: PtRoute,
   ReportSiteRoute: ReportSiteRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TeamsRoute: TeamsRoute,
@@ -4149,6 +4230,9 @@ const rootRouteChildren: RootRouteChildren = {
   PluginsSlugRoute: PluginsSlugRoute,
   ProvidersSlugRoute: ProvidersSlugRoute,
   ProvidersRssDotxmlRoute: ProvidersRssDotxmlRoute,
+  PtContactRoute: PtContactRoute,
+  PtPricingRoute: PtPricingRoute,
+  PtTeamsRoute: PtTeamsRoute,
   SlackConnectRoute: SlackConnectRoute,
   V1ContactRoute: V1ContactRoute,
   V1MeRoute: V1MeRouteWithChildren,

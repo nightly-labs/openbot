@@ -246,10 +246,13 @@ const LINK_DESTINATIONS = new Map<string, LandingDestination>([
   [OPENBOT_LINKS.contact, "contact"],
   [TEAMS_ROUTE, "teams"],
   [PRICING_ROUTE, "pricing"],
-  // The Polish copies are the same destinations.
+  // The copies in other languages are the same destinations.
   [pagePaths("/contact").pl, "contact"],
   [pagePaths("/teams").pl, "teams"],
   [pagePaths("/pricing").pl, "pricing"],
+  [pagePaths("/contact").pt, "contact"],
+  [pagePaths("/teams").pt, "teams"],
+  [pagePaths("/pricing").pt, "pricing"],
   [OPENBOT_LINKS.x, "x"],
   [OPENBOT_LINKS.threads, "threads"],
   [OPENBOT_LINKS.linkedin, "linkedin"],

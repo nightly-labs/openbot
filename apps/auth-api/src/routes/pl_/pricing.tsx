@@ -5,7 +5,7 @@ import { readPricingOffer } from "../../lib/pricing-offer";
 import { PRICING_ROUTE, PRICING_SOCIAL_IMAGE_PATH } from "../../lib/pricing-page";
 import { loadSitePage } from "../../lib/site-locale";
 import { sitePageHead } from "../../lib/site-page-head";
-import { POLISH_PAGE_PATHS } from "../../lib/site-paths";
+import { LOCALIZED_PAGE_PATHS } from "../../lib/site-paths";
 
 // The pricing page in Polish, whatever the language of the request.
 export const Route = createFileRoute("/pl_/pricing")({
@@ -15,7 +15,7 @@ export const Route = createFileRoute("/pl_/pricing")({
     return { ...page, offer, textCatalog: page.locale };
   },
   head: ({ match, loaderData }) => {
-    const path = POLISH_PAGE_PATHS[PRICING_ROUTE];
+    const path = LOCALIZED_PAGE_PATHS.pl[PRICING_ROUTE];
     if (!loaderData) return { links: [{ rel: "canonical", href: new URL(path, match.context.siteUrl).toString() }] };
     return sitePageHead(match.context.siteUrl, {
       page: PRICING_ROUTE,
