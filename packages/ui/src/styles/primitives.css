@@ -2001,7 +2001,7 @@ html.ui-textarea-resizing {
   }
 
   .ui-toaster[data-sonner-toaster][data-sonner-theme] [data-sonner-toast][data-styled="true"] [data-cancel]:hover {
-    background: color-mix(in srgb, var(--openbot-text-primary) 6%, transparent);
+    background: var(--openbot-bg-control-hover);
     color: var(--openbot-text-primary);
   }
 
@@ -2081,12 +2081,16 @@ html.ui-textarea-resizing {
   margin-inline-end: calc(var(--openbot-space-2) - var(--openbot-space-4));
 }
 
+/* The Button transitions, with the press scale added. */
 .ui-toast-card-actions .ui-button {
   height: var(--openbot-control-sm);
   border-radius: var(--openbot-radius-sm);
   transition:
     background-color var(--openbot-duration-hover) ease,
+    border-color var(--openbot-duration-hover) ease,
     color var(--openbot-duration-hover) ease,
+    box-shadow var(--openbot-duration-hover) ease,
+    opacity var(--openbot-duration-hover) ease,
     transform var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
@@ -2116,7 +2120,7 @@ html.ui-textarea-resizing {
   }
 
   .ui-toast-card-actions .ui-button-variant-ghost:hover {
-    background: color-mix(in srgb, var(--openbot-text-primary) 6%, transparent);
+    background: var(--openbot-bg-control-hover);
     color: var(--openbot-text-primary);
   }
 }
