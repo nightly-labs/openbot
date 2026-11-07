@@ -30,6 +30,12 @@ export const messages = defineMessages("settings", {
   "settings.logoColor.beige": "Beige",
   "settings.logoColor.gray": "Gray",
   "settings.logoColor.white": "White",
+  "settings.chatBackground.title": "Chat background",
+  "settings.chatBackground.description":
+    "Each theme keeps its own color. A color that makes text hard to read becomes darker or lighter.",
+  "settings.chatBackground.light": "Chat background in Light",
+  "settings.chatBackground.dark": "Chat background in Dark",
+  "settings.chatBackground.default": "Default",
   "settings.chatColor.title": "Chat color",
   "settings.chatColor.description": "Tints the bubbles of your messages. People on your servers see it too.",
   "settings.chatColor.yours": "Your chat color",

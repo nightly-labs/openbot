@@ -29,6 +29,12 @@ export const messages = {
   "settings.logoColor.beige": "בז'",
   "settings.logoColor.gray": "אפור",
   "settings.logoColor.white": "לבן",
+  "settings.chatBackground.title": "רקע הצ'אט",
+  "settings.chatBackground.description":
+    "כל ערכת נושא שומרת על צבע משלה. צבע שמקשה על קריאת הטקסט נעשה כהה או בהיר יותר.",
+  "settings.chatBackground.light": "רקע הצ'אט בערכה בהירה",
+  "settings.chatBackground.dark": "רקע הצ'אט בערכה כהה",
+  "settings.chatBackground.default": "ברירת מחדל",
   "settings.chatColor.title": "צבע הצ'אט",
   "settings.chatColor.description": "צובע את הבועות של ההודעות שלך. גם אנשים בשרתים שלך רואים אותו.",
   "settings.chatColor.yours": "צבע הצ'אט שלך",

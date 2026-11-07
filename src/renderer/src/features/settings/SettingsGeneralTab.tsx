@@ -23,8 +23,10 @@ import {
   SwitchField,
   toast,
 } from "@openbot/ui";
+import { documentColorScheme } from "@openbot/ui/document-color-scheme";
 import { AppearanceSelect } from "@openbot/ui/features/settings/AppearanceSelect";
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
+import { ChatBackgroundSetting } from "@openbot/ui/features/settings/ChatBackgroundSetting";
 import { OwnChatColorTrigger } from "@openbot/ui/features/settings/ChatColorSetting";
 import { LanguageSelect } from "@openbot/ui/features/settings/LanguageSelect";
 import { LogoColorPicker } from "@openbot/ui/features/settings/LogoColorPicker";
@@ -155,6 +157,24 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
             </ItemContent>
             <ItemActions>
               <OwnChatColorTrigger value={props.chatColor} onChange={saveChatColor} />
+            </ItemActions>
+          </Item>
+          <Item data-settings-row="settings.chatBackground.title" class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{i18n.t("settings.chatBackground.title")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.chatBackground.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <ChatBackgroundSetting
+                scheme={documentColorScheme()}
+                light={appearance.chatBackgroundLight()}
+                dark={appearance.chatBackgroundDark()}
+                onChange={(scheme, value) =>
+                  scheme === "light"
+                    ? appearance.changeChatBackgroundLight(value)
+                    : appearance.changeChatBackgroundDark(value)
+                }
+              />
             </ItemActions>
           </Item>
         </ItemGroup>
