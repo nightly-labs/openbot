@@ -249,6 +249,7 @@ import {
   type LocalServerChildEnvironment,
   LocalServerMarketplace,
   LocalServerMembers,
+  reportLocalServerWorkingAgents,
   startLocalServerChild,
 } from "./local-server-child";
 import { LOCAL_SERVERS_FILE } from "./local-servers/local-server-registry";
@@ -3434,6 +3435,11 @@ export async function createApplicationServices({
         warn: (message, cause) => logger.warn(message, toLogValue(cause)),
       }),
     );
+    reportLocalServerWorkingAgents({
+      read: () => service.workingAgents(),
+      subscribe: (listener) => service.on("event", listener),
+      write: (line) => process.stdout.write(line),
+    });
   }
   configureAttachmentProtocol({ mailbox, agents: service, remoteServers });
   configureServerLogoProtocols({ teamStore, remoteServers });

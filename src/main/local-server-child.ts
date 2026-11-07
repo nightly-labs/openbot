@@ -19,12 +19,16 @@
  * The Marketplace also needs an account session. To add an agent from a listing, this process writes
  * each read to stdout, and the desktop app makes it with its own session and writes the answer to the
  * control pipe (`LocalServerMarketplace`).
+ *
+ * A quit of the desktop app stops this process. So that `Cmd + Q` asks for a hold while an agent here
+ * works, this process writes the agents that work to stdout each time the list changes.
  */
 
 import { randomUUID } from "node:crypto";
 import { Socket } from "node:net";
 import { isAbsolute } from "node:path";
 import type { Readable } from "node:stream";
+import type { AgentSummary } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit, Schema, Semaphore } from "effect";
 import { CentralAuthOperationError } from "./central-auth-effects";
@@ -39,6 +43,10 @@ export const LOCAL_SERVER_OWNER_USERNAME = "owner";
 export const LOCAL_SERVER_READY_PREFIX = "OPENBOT_LOCAL_SERVER_READY ";
 /** The stdout line that asks the parent for this server's account directory. It holds no data. */
 export const LOCAL_SERVER_MEMBERS_REQUEST = "OPENBOT_LOCAL_SERVER_REQUEST members";
+/** The prefix of the stdout line that lists the agents that work now, as JSON. */
+export const LOCAL_SERVER_WORKING_PREFIX = "OPENBOT_LOCAL_SERVER_WORKING ";
+/** A turn and its stream send many events. One read of the working agents follows each burst. */
+const LOCAL_SERVER_WORKING_DELAY_MS = 100;
 /** How long a read of the account directory waits for the parent's answer. */
 const LOCAL_SERVER_MEMBERS_TIMEOUT_MS = 30_000;
 /** The prefix of a stdout line that asks the parent for a Marketplace read. It holds no secret. */
@@ -328,6 +336,33 @@ export function takeLocalServerChildEnvironment(
   for (const name of Object.values(LOCAL_SERVER_ENVIRONMENT)) delete environment[name];
   if (flag !== "1" || !userDataDirectory || !isAbsolute(agentRoot) || !serverName || !ownerSecret) return null;
   return { agentRoot, serverName, ownerSecret, runtimeRoot: isAbsolute(runtimeRoot) ? runtimeRoot : null };
+}
+
+/**
+ * Writes the agents that work now to the parent after the agent events change them. The parent knows
+ * no agent of this server at the start, so the first line follows the first change.
+ */
+export function reportLocalServerWorkingAgents({
+  read,
+  subscribe,
+  write,
+}: {
+  read: () => AgentSummary[];
+  subscribe: (listener: () => void) => void;
+  write: (line: string) => void;
+}): void {
+  let last = "[]";
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  subscribe(() => {
+    if (timer) return;
+    timer = setTimeout(() => {
+      timer = null;
+      const agents = JSON.stringify(read());
+      if (agents === last) return;
+      last = agents;
+      write(`${LOCAL_SERVER_WORKING_PREFIX}${agents}\n`);
+    }, LOCAL_SERVER_WORKING_DELAY_MS);
+  });
 }
 
 /** The ready line holds no secret: the parent knows the password, and the session is made later. */

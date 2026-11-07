@@ -3,6 +3,7 @@ import { join, resolve } from "node:path";
 import { parseInviteUrl, selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import {
   type AgentEvent,
+  type AgentSummary,
   type AppLogoColor,
   type CentralAuthState,
   type HostStatus,
@@ -513,6 +514,15 @@ const {
 });
 
 // Resolved once, safely: every `app.setPath("userData", ...)` above has already run.
+/**
+ * The agents that a quit stops: the local agents, and the agents on the servers on this computer,
+ * whose processes end with this one. Before the services start, no agent can work.
+ */
+function workingAgents(): AgentSummary[] {
+  if (!services) return [];
+  return [...services.service.workingAgents(), ...(services.localServers?.workingAgents() ?? [])];
+}
+
 const windows = createMainWindowController({
   holder: windowHolder,
   statePath: join(app.getPath("userData"), MAIN_WINDOW_STATE_FILE),
@@ -540,6 +550,7 @@ const windows = createMainWindowController({
   },
   reportError: (message, error) => logger.error(message, toLogValue(error)),
   quitFromShortcut: () => quitFor("shortcut"),
+  workingAgents,
 });
 
 let appIconColorImage: NativeImage | undefined;
@@ -1575,6 +1586,7 @@ if (!hasSingleInstanceLock) {
         interfaceSize,
         language.translate,
         () => windowHolder.current,
+        workingAgents,
         quitFor,
       );
       // The way back to a window hidden in the background, and the sign that a member controls
@@ -1614,6 +1626,7 @@ if (!hasSingleInstanceLock) {
           interfaceSize,
           language.translate,
           () => windowHolder.current,
+          workingAgents,
           quitFor,
         );
         tray.relabel();
