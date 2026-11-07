@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { StringDecoder } from "node:string_decoder";
 import { promisify } from "node:util";
 import {
   type CanUseTool,
@@ -25,7 +26,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type AgentContextCategoryUsage, defaultProviderModel } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger } from "@openbot/logging";
+import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Option, Scope } from "effect";
 import { z } from "zod";
 import { advertisedZodShape } from "./agent/advertised-json-schema";
@@ -129,6 +130,7 @@ import {
   toProviderClientOperationError,
 } from "./provider-client-effects";
 import type { ReadProviderHistory } from "./provider-history";
+import { endProcessGroupOnExit, PROVIDER_PROCESS_GROUP } from "./provider-process-group";
 
 const execFileAsync = promisify(execFile);
 const CLAUDE_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
@@ -389,6 +391,8 @@ interface ThreadRuntime {
   subagents: SubagentState;
   /** Background subagents and commands that outlive their turn. Stopping the process ends them (#1870). */
   backgroundTasks: number;
+  /** When the process last sent a message. With no turn, only background work sends one. */
+  lastOutputAt: number;
   /**
    * The uuid of the message that the CLI's next turn of its own answers, such as a steer that came
    * after the turn's last request. Its history names the turn by that uuid (#3365).
@@ -400,6 +404,8 @@ interface ThreadRuntime {
   mcpConfigFile: string | null;
   /** The `--settings` file of this query until it closes. See `writeClaudeFlagSettings`. */
   settingsFile: string | null;
+  /** The end of the CLI's stderr when OpenBot starts the CLI. See `spawnClaudeProcessGroup`. */
+  stderr: ClaudeStderrTail;
 }
 
 /** The limit of `claude auth status` when the caller names none. */
@@ -410,13 +416,19 @@ const AUTH_STATUS_TIMEOUT_MS = 5_000;
  * its MCP servers, and the SDK resumes the same session from disk, so an idle thread costs only a
  * slower first message when the user comes back.
  */
-const CLAUDE_THREAD_IDLE_RELEASE_MS = 10 * 60_000;
+const CLAUDE_THREAD_IDLE_RELEASE_MS = 5 * 60_000;
 
 /**
  * How many idle threads keep their `claude` process before the timeout. A user who runs one turn on
- * each of five agents otherwise holds five processes of about 140 MB each for ten minutes.
+ * each of five agents otherwise holds five processes of about 140 MB each for five minutes.
  */
-const CLAUDE_IDLE_THREAD_LIMIT = 2;
+const CLAUDE_IDLE_THREAD_LIMIT = 1;
+
+/**
+ * How long background work that sends nothing keeps its thread's `claude` process while the machine
+ * is low on memory. With enough memory, background work holds the process until it ends (#1870).
+ */
+const CLAUDE_BACKGROUND_QUIET_RELEASE_MS = 30 * 60_000;
 
 interface ClaudeStreamMessage {
   type: string;
@@ -686,6 +698,28 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   releaseIdleThreads(): Effect.Effect<void, ProviderClientOperationError> {
     return this.#threads.releaseIdle();
   }
+
+  /**
+   * Closes each thread with no turn whose background work sent nothing for `quietForMs`. The memory
+   * guard calls it only while the machine is low on memory: the work then ends with the process.
+   * Its next turn resumes the session. With enough memory the work holds its process (#1870).
+   */
+  readonly releaseQuietBackgroundThreads = Effect.fn("ClaudeAgentClient.releaseQuietBackgroundThreads")(function* (
+    this: ClaudeAgentClient,
+    quietForMs = CLAUDE_BACKGROUND_QUIET_RELEASE_MS,
+  ): Effect.fn.Return<void, ProviderClientOperationError> {
+    const now = Date.now();
+    const closed = yield* this.#threads.releaseWhere(
+      (runtime) =>
+        runtime.config.persistSession && runtime.backgroundTasks > 0 && now - runtime.lastOutputAt >= quietForMs,
+    );
+    for (const runtime of closed)
+      queryLogger.warn("Closed a Claude thread with quiet background work, because memory is low.", {
+        threadId: runtime.id,
+        backgroundTasks: runtime.backgroundTasks,
+        quietForMinutes: Math.floor((now - runtime.lastOutputAt) / 60_000),
+      });
+  });
 
   /** Background subagents run in this process after their turn ends, so it stays while any runs. */
   canReleaseProcess(): boolean {
@@ -1214,12 +1248,16 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       // The CLI loads this file and the SDK's own `--mcp-config` value together.
       ...(mcpConfigFile ? { "mcp-config": mcpConfigFile } : {}),
     };
+    const stderr = new ClaudeStderrTail();
     const claudeQuery = yield* providerSync(() =>
       this.#createQuery({
         prompt: input,
         options: {
           cwd: config.cwd,
           ...this.#sdkLaunch,
+          ...(this.#sdkLaunch.spawnClaudeCodeProcess || !PROVIDER_PROCESS_GROUP
+            ? {}
+            : { spawnClaudeCodeProcess: (options: SpawnOptions) => spawnClaudeProcessGroup(options, stderr) }),
           ...(config.model ? { model: this.#sdkModel(config.model) } : {}),
           ...(appliedEffort ? { effort: appliedEffort } : {}),
           ...(resume ? { resume: threadId } : { sessionId: threadId, title: CLAUDE_SESSION_TITLE }),
@@ -1297,10 +1335,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       plan: newClaudePlanState(),
       subagents: newSubagentState(),
       backgroundTasks: 0,
+      lastOutputAt: Date.now(),
       nextTurnId: null,
       streamMessage: { id: null, thinkingBlocks: new Map<number, string>() },
       mcpConfigFile,
       settingsFile,
+      stderr,
     };
     runtime.consume = yield* Effect.forkIn(this.#consume(runtime), this.#scope, { startImmediately: true });
     // The CLI reads the file once at its start and keeps the servers in memory, also to reconnect one.
@@ -1486,8 +1526,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       if (this.#running && this.#threads.get(runtime.id) === runtime) {
         this.#fail(new Error("Claude session stream ended unexpectedly."));
       }
-    } catch (error) {
+    } catch (caught) {
       if (!this.#running || this.#threads.get(runtime.id) !== runtime) return;
+      const error = runtime.stderr.addTo(caught);
       const activeTurn = runtime.activeTurn;
       if (activeTurn) yield* this.#completeTurn(runtime, "failed", error);
       this.#fail(error instanceof Error ? error : new Error(String(error)));
@@ -1512,6 +1553,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     runtime: ThreadRuntime,
     message: ClaudeStreamMessage,
   ) {
+    runtime.lastOutputAt = Date.now();
     if (message.type === "assistant") {
       // Each content block repeats its request's message; the last copy has the final count.
       const id = getString(message.message, "id");
@@ -2556,6 +2598,61 @@ function spawnClaudeWrapper({ command, args, cwd, env, signal }: SpawnOptions): 
     });
     return true;
   };
+  const abort = () => child.kill();
+  const release = () => signal.removeEventListener("abort", abort);
+  signal.addEventListener("abort", abort, { once: true });
+  child.once("exit", release);
+  child.once("error", release);
+  if (signal.aborted) abort();
+  return child;
+}
+
+/** As many characters of stderr as the SDK adds to an exit error. */
+const CLAUDE_STDERR_TAIL_CHARS = 2_048;
+
+/** The SDK's exit error of a process that it did not start, which therefore has no stderr text. */
+const CLAUDE_PROCESS_EXIT = /^Claude Code process (?:exited with code|terminated by signal) [^.]*$/;
+
+/**
+ * The end of the CLI's stderr, which the SDK adds to its exit error only for a process that it
+ * started. A CLI that cannot start, such as with no sandbox (`CLAUDE_SANDBOX_UNAVAILABLE`), gives
+ * the reason there. Secrets are redacted before the text is cut, as the SDK does.
+ */
+class ClaudeStderrTail {
+  #text = "";
+  readonly #decoder = new StringDecoder("utf8");
+
+  push(chunk: Buffer): void {
+    this.#text += this.#decoder.write(chunk);
+    if (this.#text.length > 2 * CLAUDE_STDERR_TAIL_CHARS) this.#text = this.#text.slice(-CLAUDE_STDERR_TAIL_CHARS);
+  }
+
+  /** The SDK's error with the text the SDK adds when it starts the process itself. */
+  addTo(error: unknown): unknown {
+    if (!(error instanceof Error) || !CLAUDE_PROCESS_EXIT.test(error.message)) return error;
+    const text = redactText(this.#text).slice(-CLAUDE_STDERR_TAIL_CHARS).trim();
+    return text ? new Error(`${error.message}. stderr: ${text}`, { cause: error }) : error;
+  }
+}
+
+/**
+ * Outside Windows, the CLI of a thread starts as the leader of a process group of its own. The SDK
+ * starts it in OpenBot's group, where the child of an MCP server outlived the CLI with no owner
+ * (`provider-process-group.ts`). The SDK closes stdin first and sends SIGTERM to the CLI 2 seconds
+ * later, as before; when the CLI exits, what is left of its group ends. Shell commands and
+ * background tasks run in groups of their own, so they are not in it.
+ */
+function spawnClaudeProcessGroup(
+  { command, args, cwd, env, signal }: SpawnOptions,
+  stderr: ClaudeStderrTail,
+): SpawnedProcess {
+  const child = spawn(command, args, { cwd, env, stdio: ["pipe", "pipe", "pipe"], detached: true });
+  endProcessGroupOnExit(child);
+  // Read to its end: a full stderr pipe would block the CLI.
+  child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
+  child.stderr.on("error", () => {
+    // The CLI exited; the SDK reports the exit.
+  });
   const abort = () => child.kill();
   const release = () => signal.removeEventListener("abort", abort);
   signal.addEventListener("abort", abort, { once: true });

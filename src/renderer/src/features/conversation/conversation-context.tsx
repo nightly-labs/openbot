@@ -56,6 +56,8 @@ import { useDirectMessages } from "./direct-messages-context";
 import { noteAgentMessageSent } from "./github-star-prompt";
 import { noteSocialFollowMessageSent } from "./social-follow-prompt";
 
+type ConversationDeltaEvent = Extract<AgentEvent, { type: "conversation-delta" }>;
+
 const LATEST_PAGE_SIZE = 50;
 /**
  * How much of a snapshot an agent that is not open converts. Commentary of one turn becomes one
@@ -147,8 +149,17 @@ const Conversation = createSimpleContext({
       setTurnProgress,
     } = useTurns();
 
-    const [conversations, setConversations] = createStore<Record<string, ConversationState>>({});
+    const [conversations, writeConversations] = createStore<Record<string, ConversationState>>({});
     const rawAgentMessageBodies = new Map<string, string>();
+    /** The streamed text that arrived since the last frame, in arrival order. */
+    let queuedDeltas: ConversationDeltaEvent[] = [];
+    let deltaFrame: number | undefined;
+
+    /** Each change of the conversations applies the queued text first, so the changes keep their order. */
+    function setConversations(update: (current: Record<string, ConversationState>) => void): void {
+      flushConversationDeltas();
+      writeConversations(update);
+    }
 
     function updateConversation(agentId: string, update: (conversation: ConversationState) => void): void {
       setConversations((current) => {
@@ -358,6 +369,7 @@ const Conversation = createSimpleContext({
     }
 
     function scheduleConversation(snapshot: ConversationSnapshot) {
+      flushConversationDeltas();
       const agentId = snapshot.agentId;
       const appliedRevision = conversations[agentId]?.revision ?? -1;
       const pending = pendingConversationSnapshots.get(agentId);
@@ -372,6 +384,8 @@ const Conversation = createSimpleContext({
       if (conversationFrame !== undefined) return;
       conversationFrame = requestAnimationFrame(() => {
         conversationFrame = undefined;
+        // Text that came after a snapshot applies that snapshot first.
+        flushConversationDeltas();
         const snapshots = [...pendingConversationSnapshots.values()];
         pendingConversationSnapshots.clear();
         for (const pendingSnapshot of snapshots) {
@@ -415,6 +429,7 @@ const Conversation = createSimpleContext({
      * the open's page is still on the wire, which is a race, not a rare case.
      */
     function markLatestVisibleAgentMessageRead(agentId: string, serverId: string): void {
+      flushConversationDeltas();
       const latestMessageId = latestVisibleAgentMessageId(conversations[agentId]?.messages);
       if (!latestMessageId) return;
       if (autoReadAgentMessages.get(agentConversationKey(serverId, agentId))?.messageId === latestMessageId) return;
@@ -430,6 +445,7 @@ const Conversation = createSimpleContext({
       minimumRevision: number,
       fallbackState: ConversationReadState | null,
     ): void {
+      flushConversationDeltas();
       const trackingKey = agentConversationKey(serverId, agentId);
       const conversationAtStart = conversations[agentId];
       const applyFallback = () => {
@@ -458,6 +474,7 @@ const Conversation = createSimpleContext({
     }
 
     function autoMarkAgentMessageRead(agentId: string, messageId: string, optimisticallyClearUnread = false): void {
+      flushConversationDeltas();
       const serverId = activeServerId();
       const trackingKey = agentConversationKey(serverId, agentId);
       if (heldUnreadAgentChats.has(trackingKey)) return;
@@ -500,7 +517,50 @@ const Conversation = createSimpleContext({
       });
     }
 
-    function applyConversationDelta(event: Extract<AgentEvent, { type: "conversation-delta" }>) {
+    /**
+     * Queues streamed text. Each frame applies the queued text once per message, so a fast stream does
+     * not make a full message body and a new message object for each delta.
+     */
+    function applyConversationDelta(event: ConversationDeltaEvent) {
+      queuedDeltas.push(event);
+      deltaFrame ??= requestAnimationFrame(flushConversationDeltas);
+    }
+
+    /** Whether a delta changes the conversation now: an applied or waiting snapshot can already hold it. */
+    function deltaApplies(event: ConversationDeltaEvent): boolean {
+      if (event.revision <= (conversations[event.agentId]?.revision ?? -1)) return false;
+      const pendingSnapshot = pendingConversationSnapshots.get(event.agentId);
+      return !pendingSnapshot || event.revision > pendingSnapshot.revision;
+    }
+
+    /**
+     * Applies the queued text in arrival order. The next deltas of the same message join the first one
+     * that applies: each of them has a higher revision, so each would apply after it.
+     */
+    function flushConversationDeltas(): void {
+      if (deltaFrame !== undefined) cancelAnimationFrame(deltaFrame);
+      deltaFrame = undefined;
+      if (queuedDeltas.length === 0) return;
+      const events = queuedDeltas;
+      queuedDeltas = [];
+      let joined: ConversationDeltaEvent | undefined;
+      for (const event of events) {
+        if (
+          joined &&
+          joined.agentId === event.agentId &&
+          joined.messageId === event.messageId &&
+          event.revision > joined.revision
+        ) {
+          joined = { ...joined, revision: event.revision, delta: joined.delta + event.delta };
+          continue;
+        }
+        if (joined) applyDeltaNow(joined);
+        joined = deltaApplies(event) ? event : undefined;
+      }
+      if (joined) applyDeltaNow(joined);
+    }
+
+    function applyDeltaNow(event: ConversationDeltaEvent) {
       if (event.revision <= (conversations[event.agentId]?.revision ?? -1)) return;
       const pendingSnapshot = pendingConversationSnapshots.get(event.agentId);
       if (pendingSnapshot) {
@@ -672,6 +732,7 @@ const Conversation = createSimpleContext({
       merge: "replace" | "older" | "latest",
       windowMode?: "latest" | "around",
     ): boolean {
+      flushConversationDeltas();
       if (page.revision < (conversations[page.agentId]?.revision ?? -1)) return false;
       for (const message of page.messages) {
         const key = agentMessageKey(page.agentId, message.id);
@@ -783,6 +844,7 @@ const Conversation = createSimpleContext({
     }
 
     function pruneInactiveAgentHistory(agentId: string): void {
+      flushConversationDeltas();
       const messages = conversations[agentId]?.messages;
       if (!messages || messages.length <= LATEST_PAGE_SIZE) return;
       updateConversation(agentId, trimToLatestPage);
@@ -918,6 +980,7 @@ const Conversation = createSimpleContext({
       onSuccess?: (state: ConversationReadState) => void,
     ): Promise<void> {
       if (!agentId || !scopeIsCurrent()) return;
+      flushConversationDeltas();
       const requestKey = agentConversationKey(serverId, agentId);
       // Automatic reads stop before this for a chat marked unread, so this read is the user's.
       heldUnreadAgentChats.delete(requestKey);
@@ -943,6 +1006,7 @@ const Conversation = createSimpleContext({
             serverId,
           );
           agentChatsToRetryRead.delete(requestKey);
+          flushConversationDeltas();
           const nextState = isAgentChatReadable(agentId)
             ? state
             : preserveKnownAgentUnread(state, boundary, conversations[agentId]?.messages ?? []);
@@ -963,6 +1027,7 @@ const Conversation = createSimpleContext({
             latestMessageId !== visibleMessageIdAtStart
           ) {
             queueMicrotask(() => {
+              flushConversationDeltas();
               const latestVisibleMessageId = latestVisibleAgentMessageId(conversations[agentId]?.messages);
               if (
                 scopeIsCurrent() &&
@@ -1033,6 +1098,7 @@ const Conversation = createSimpleContext({
         serverId,
       );
       if (taskId !== undefined || !scopeIsCurrent() || !conversations[agentId]) return;
+      flushConversationDeltas();
       rawAgentMessageBodies.delete(agentMessageKey(agentId, messageId));
       updateConversation(agentId, (conversation) => {
         conversation.messages = conversation.messages.filter((message) => message.id !== messageId);
@@ -1083,6 +1149,7 @@ const Conversation = createSimpleContext({
       ) {
         return;
       }
+      flushConversationDeltas();
       const persisted = (conversations[agentId]?.messages ?? []).some(
         (message) => messagePromptRequestKey(message) === requestKey && message.questionPrompt?.resolution !== null,
       );
@@ -1099,6 +1166,7 @@ const Conversation = createSimpleContext({
     // provider owns cancelling it. Nothing else here needs teardown.
     onCleanup(() => {
       if (conversationFrame !== undefined) cancelAnimationFrame(conversationFrame);
+      if (deltaFrame !== undefined) cancelAnimationFrame(deltaFrame);
     });
 
     return {
@@ -1120,6 +1188,7 @@ const Conversation = createSimpleContext({
       isAgentChatReadable,
       autoMarkAgentMessageRead,
       applyConversationDelta,
+      flushConversationDeltas,
       applyConversationPage,
       loadOlderAgentMessages,
       loadLatestAgentMessages,

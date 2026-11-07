@@ -1,7 +1,9 @@
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import solidPlugin from "@solidjs/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, externalizeDepsPlugin } from "electron-vite";
+import { normalizePath, type Plugin } from "vite";
 
 const rendererPort = readRendererPort(process.env.OPENBOT_DEV_RENDERER_PORT);
 
@@ -60,7 +62,7 @@ export default defineConfig({
   renderer: {
     // The Solid Performance panel tracks record each effect run under `vite dev`, and make a send
     // in a chat drop frames that the built app does not drop. Set this to true for a trace.
-    plugins: [solidPlugin({ performanceTracks: false }), tailwindcss({ optimize: false })],
+    plugins: [solidPlugin({ performanceTracks: false }), tailwindcss({ optimize: false }), lazyLanguageCatalogs()],
     optimizeDeps: {
       // bloub finds its plush images with `new URL(..., import.meta.url)`. A pre-bundle moves the
       // code away from the images, so Vite serves the package as it is.
@@ -83,6 +85,26 @@ export default defineConfig({
     },
   },
 });
+
+const I18N_SOURCE = normalizePath(fileURLToPath(new URL("./packages/i18n/src/", import.meta.url)));
+const EAGER_CATALOG_MODULES = new Set(["./app-catalogs", "./source-catalogs", "./format-catalogs", "./locale-loading"]);
+
+/**
+ * Each window loads English and the language it shows, not all fifteen: all of them take about 36 MB
+ * of JavaScript heap in every window (main, team WebRTC and each helper). The public web build does
+ * the same (see `packages/i18n/src/lazy-catalogs.ts`). The main process keeps every language.
+ */
+function lazyLanguageCatalogs(): Plugin {
+  return {
+    name: "openbot-lazy-language-catalogs",
+    enforce: "pre",
+    resolveId(source, importer) {
+      if (!importer || !EAGER_CATALOG_MODULES.has(source)) return null;
+      if (!normalizePath(importer).startsWith(I18N_SOURCE)) return null;
+      return `${I18N_SOURCE}lazy-catalogs.ts`;
+    },
+  };
+}
 
 function readRendererPort(value: string | undefined): number | undefined {
   if (value === undefined) return undefined;

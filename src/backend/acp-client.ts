@@ -325,7 +325,7 @@ export interface AcpHistoryPersistence {
  * servers for each session and keeps them until the session closes, and the agent loads the same
  * session again from its own store, so an idle session costs only a slower first message.
  */
-const ACP_SESSION_IDLE_RELEASE_MS = 10 * 60_000;
+const ACP_SESSION_IDLE_RELEASE_MS = 5 * 60_000;
 
 /** An agent that reports no context size gets the instructions again after this many prompts. */
 const ACP_INSTRUCTIONS_REFRESH_PROMPTS = 10;
@@ -336,9 +336,9 @@ const ACP_COMPACTION_CONTEXT_RATIO = 0.6;
 /**
  * How many idle sessions stay open before the timeout. Grok gives each session its own set of the
  * user's MCP servers (`npx chrome-devtools-mcp` is about 300 MB), so one turn on each of five agents
- * otherwise holds five sets for ten minutes.
+ * otherwise holds five sets for five minutes.
  */
-const ACP_IDLE_SESSION_LIMIT = 2;
+const ACP_IDLE_SESSION_LIMIT = 1;
 
 interface AcpProviderAccount {
   email: string | null;

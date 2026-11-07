@@ -3150,6 +3150,7 @@ export async function createApplicationServices({
     trace,
     statementTimings,
     tabProcessIds: () => browser.tabProcessIds(),
+    appWindowContents: () => BrowserWindow.getAllWindows().map((window) => window.webContents),
     turnRunning: () => service.earliestRunningTurnStartedAt() !== null,
   });
   teardown.push(TEARDOWN_ORDER.resourceMonitor, "the resource monitor", () =>

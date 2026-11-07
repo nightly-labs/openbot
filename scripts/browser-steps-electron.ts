@@ -503,6 +503,49 @@ async function main(): Promise<void> {
     recordCases("crashed-script-stops");
     await close(crashing.tab.id);
 
+    // A new host with a short sweep: of the idle tabs, only the 3 most recently used stay loaded.
+    phase("tab-sleep");
+    await runCauseEffect(host.destroy());
+    const sleepy = new BrowserHost(window, join(fixtureRoot, "downloads"), join(fixtureRoot, "sleep-tabs.json"), {
+      tabSleep: { sweepMs: 50, awakeGraceMs: 0 },
+    });
+    browser = sleepy;
+    const unloaded = (contents: Electron.WebContents) =>
+      contents.isDestroyed()
+        ? Promise.resolve()
+        : new Promise<void>((resolve) => contents.once("destroyed", () => resolve()));
+    const loaded: Electron.WebContents[] = [];
+    let firstTabId: string | undefined;
+    for (const index of [1, 2, 3, 4, 5]) {
+      const url = `${origin}/form?tab=${index}`;
+      const tab = await runCauseEffect(sleepy.open(url, "fixture-thread", "fixture-agent"));
+      firstTabId ??= tab.id;
+      const contents = webContents.getAllWebContents().find((item) => !item.isDestroyed() && item.getURL() === url);
+      assert(contents, `Missing contents of sleep tab ${index}.`);
+      loaded.push(contents);
+    }
+    const [first, second, ...newest] = loaded;
+    assert(first && second, "Missing sleep tabs.");
+    // The fifth tab is the active one, so it is in use; the first of the four idle tabs is past the cap.
+    await unloaded(first);
+    assert(!second.isDestroyed() && newest.every((item) => !item.isDestroyed()), "A tab within the cap slept.");
+    recordCases("idle-tabs-past-cap-sleep");
+
+    assert(firstTabId, "Missing the first sleep tab.");
+    const woken = snapshotSchema.parse(
+      parseBrowserToolText(
+        text(await runCauseEffect(sleepy.handleDynamicTool(params("snapshot", { tabId: firstTabId, image: "never" })))),
+      ),
+    );
+    assert.equal(woken.url, `${origin}/form?tab=1`, "A slept tab did not load its page again.");
+    // The woken tab is now the most recently used one, so the second tab is past the cap.
+    await unloaded(second);
+    assert(
+      newest.every((item) => !item.isDestroyed()),
+      "A tab within the cap slept after another tab woke.",
+    );
+    recordCases("slept-tab-wakes-on-next-call");
+
     const report = {
       status: "passed",
       runId,

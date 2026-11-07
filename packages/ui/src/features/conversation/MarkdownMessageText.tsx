@@ -133,11 +133,16 @@ function headingLevel(depth: number): 1 | 2 | 3 | 4 | 5 | 6 {
 // virtualization re-renders settled messages often). Cap the size so a long
 // session cannot grow this without bound.
 const LEXER_CACHE_LIMIT = 200;
+/**
+ * A longer body is lexed again on each render. Its tokens hold copies of the text, so 200 large
+ * bodies, such as pasted logs, would keep many megabytes after their messages are gone.
+ */
+const LEXER_CACHE_MAX_BODY = 32 * 1024;
 const lexerCache = new Map<string, TokensList>();
 const inlineLexerCache = new Map<string, Token[]>();
 
 function lexBlockTokens(body: string, cache: boolean): TokensList {
-  if (!cache) return markdown.lexer(body);
+  if (!cache || body.length > LEXER_CACHE_MAX_BODY) return markdown.lexer(body);
   const cached = lexerCache.get(body);
   if (cached) return cached;
   const tokens = markdown.lexer(body);
@@ -188,6 +193,7 @@ function lexStreamingTokens(body: string, previous: StreamedTokens | undefined):
 }
 
 function lexInlineTokens(body: string): Token[] {
+  if (body.length > LEXER_CACHE_MAX_BODY) return markdown.Lexer.lexInline(body, markdown.defaults);
   const cached = inlineLexerCache.get(body);
   if (cached) return cached;
   const tokens = markdown.Lexer.lexInline(body, markdown.defaults);

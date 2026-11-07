@@ -16,6 +16,11 @@ export interface MemoryHoldHooks {
    * sample while a delivery is held, so a call with no idle thread must do nothing.
    */
   releaseIdleThreads(): Effect.Effect<void, ProviderClientOperationError>;
+  /**
+   * Closes the provider threads that only background work holds, when that work sent nothing for a
+   * long time. Called at each low sample, so a call with no such thread must do nothing.
+   */
+  releaseQuietBackgroundThreads(): Effect.Effect<void, ProviderClientOperationError>;
   emitError(code: string, error: unknown, agentId?: string): void;
 }
 
@@ -29,7 +34,8 @@ export interface MemoryHoldOptions {
  * Owns the memory clause of the queue drain. While the machine is low on memory no new turn starts,
  * and the delivery stays queued: a message to a busy machine waits, as it does for a busy agent. Each
  * held agent is told one time in each low period. At a critical level, and while a delivery is held,
- * the idle provider threads close.
+ * the idle provider threads close. At each low sample, the threads that only quiet background work
+ * holds close.
  * It never imports the service.
  */
 export class MemoryHold {
@@ -98,18 +104,26 @@ export class MemoryHold {
     // While a delivery waits, at each sample: an idle thread costs only a slower first message, and
     // its timer could hold the queue for minutes with no turn running (#4676).
     const critical = level === "critical" && previous !== "critical";
-    if (!this.#releasing && (critical || (level !== "ok" && this.#told.size > 0))) {
+    if (!this.#releasing && level !== "ok") {
       this.#releasing = true;
-      yield* this.#hooks.releaseIdleThreads().pipe(
-        Effect.catch((failure) =>
-          Effect.sync(() => {
-            if (this.#releaseFailed && !critical) return;
-            this.#releaseFailed = true;
-            this.#hooks.emitError("idle_thread_release_failed", failure.cause);
-          }),
-        ),
-        Effect.ensuring(Effect.sync(() => (this.#releasing = false))),
-      );
+      // Background work that sent nothing for a long time holds a whole process, also when no
+      // delivery waits.
+      const releases = [this.#hooks.releaseQuietBackgroundThreads()];
+      if (critical || this.#told.size > 0) releases.push(this.#hooks.releaseIdleThreads());
+      yield* Effect.forEach(
+        releases,
+        (release) =>
+          release.pipe(
+            Effect.catch((failure) =>
+              Effect.sync(() => {
+                if (this.#releaseFailed && !critical) return;
+                this.#releaseFailed = true;
+                this.#hooks.emitError("idle_thread_release_failed", failure.cause);
+              }),
+            ),
+          ),
+        { discard: true },
+      ).pipe(Effect.ensuring(Effect.sync(() => (this.#releasing = false))));
     }
     if (level === "ok") this.#releaseFailed = false;
     // By the held agents, not by the last level: a turn reservation can hold an agent between two

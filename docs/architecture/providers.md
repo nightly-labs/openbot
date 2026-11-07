@@ -168,6 +168,33 @@ and shows nothing. A usage limit is skipped silently and does not mark the model
 memory-changes line with its own `memory-review-` turn id, in the conversation that was reviewed.
 While a turn of that conversation runs, the line waits for the turn to end. Agent deletion and service stop end a running review.
 
+## Idle provider sessions
+
+A loaded provider session holds processes: the CLI, its MCP servers and its background terminals.
+OpenBot unloads a session that has no turn, keeps its identity, and resumes it at the next turn.
+
+- Claude closes the `claude` process of an idle thread, and each ACP client closes an idle session
+  (`IdleThreadPool` in `src/backend/idle-thread-pool.ts`). The client opens it again from the session.
+- One Codex app server holds every thread of its account, and stops the MCP servers of a thread only
+  when it unloads that thread. `CodexIdleSessions` (`src/backend/agent/codex-idle-sessions.ts`)
+  releases an agent session 5 minutes after its last turn ends. When a turn ends, it releases at once
+  each idle session of the same app server except the newest one. `ThreadLifecycle.releaseIdleSession`
+  keeps a session whose agent has a running, starting or compacting turn, a pending approval,
+  question or browser takeover, or whose thread has a background terminal (`thread/backgroundTerminals/list`). It drops
+  the routing before it sends `thread/unsubscribe`, so the next turn sends `thread/resume` after the
+  unsubscribe. Codex unloads a thread with no subscriber after `thread_unload_delay_secs` (60 s by
+  default) with no activity. That unload ends the thread's unified exec processes and its MCP servers.
+- When the memory of a server is critical, `MemoryHold` releases every idle session of each kind at once.
+- A routine session is ephemeral and is not released.
+- Outside Windows, each provider CLI starts as the leader of its own process group
+  (`src/backend/provider-process-group.ts`). When the CLI exits, OpenBot sends SIGTERM to what is
+  left of the group, then SIGKILL after 2 seconds. A child of an MCP server outlived the Claude CLI
+  without this. Shell commands run in groups of their own, so a server that the agent started keeps
+  running. Windows stops the tree with `taskkill /T`.
+
+`bun run test:codex-idle-thread-release` checks the Codex release with a fake app server.
+`scripts/provider-session-reuse-e2e.ts` checks that the group ends with the Claude, Codex and ACP CLIs.
+
 ## Compaction ownership
 
 Codex and Muse complete explicit compaction through turn events. Pi completes it through the request

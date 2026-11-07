@@ -922,7 +922,8 @@ server can change it.
   cleanly sends one product analytics event: the phase, the previous app version, a coarse uptime
   class, the dump count, whether the computer slept or started again, and whether it is a server.
 - `~/Library/Application Support/OpenBot/logs/resources.ndjson` holds one line a minute: the memory
-  and CPU use of each OpenBot process group and provider id, the main process delay and its phase, the number of
+  and CPU use of each OpenBot process group and provider id, the heap sizes and DOM node count of
+  the app windows, the main process delay and its phase, the number of
   agent database statements, active turns and browser tabs. It holds no process IDs, program names,
   command lines or paths. It is kept to two files of 1 MB each and is never sent.
   `~/Library/Application Support/OpenBot/openbot-resource-summary-v1.json` holds the totals of

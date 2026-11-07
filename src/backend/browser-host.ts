@@ -278,9 +278,16 @@ function viewContextMenu(
  * blank page, as a restored tab does. When memory is low, the tab unloads after
  * `LOW_MEMORY_TAB_SLEEP_MS`.
  */
-const IDLE_TAB_SLEEP_MS = 30 * 60_000;
+const IDLE_TAB_SLEEP_MS = 15 * 60_000;
 const LOW_MEMORY_TAB_SLEEP_MS = 5 * 60_000;
 const IDLE_TAB_SWEEP_MS = 60_000;
+/**
+ * Each loaded tab is its own renderer process, about 300 MB on a typical page. Of the tabs that can
+ * sleep and are not in use, only this many most recently used stay loaded; an older one sleeps after
+ * `AWAKE_TAB_GRACE_MS`, so an agent that moves between a few tabs in one task does not reload them.
+ */
+const MAX_IDLE_AWAKE_TABS = 3;
+const AWAKE_TAB_GRACE_MS = 2 * 60_000;
 /**
  * The page load errors that say the proxy of the tab did not answer or refused it, and why, with
  * their Chromium codes. A failed load can give only the code, with no name.
@@ -345,7 +352,8 @@ const BROWSER_WEB_PREFERENCES = {
   // An agent works in tabs that the panel does not show. A throttled tab waits up to a few seconds
   // for each pointer move, because Chromium sends the move with the next frame, and it tells the
   // page that it is hidden. The cost is that a hidden page keeps its full timer and frame rate
-  // until the idle sweep puts the tab to sleep (`IDLE_TAB_SLEEP_MS`, sooner when memory is low).
+  // until the idle sweep puts the tab to sleep (`IDLE_TAB_SLEEP_MS`, sooner past `MAX_IDLE_AWAKE_TABS`
+  // idle tabs or when memory is low).
   backgroundThrottling: false,
 };
 
@@ -563,6 +571,7 @@ export class BrowserHost {
   /** Whether the machine is too low on memory for one more tab. Only a server has a reading. */
   readonly #memoryLow: () => boolean;
   readonly #idleTabSweep: NodeJS.Timeout;
+  readonly #awakeTabGraceMs: number;
   readonly #webPreferences: ReturnType<typeof browserWebPreferences>;
 
   constructor(
@@ -594,6 +603,8 @@ export class BrowserHost {
       quitShortcut?: (input: Input) => boolean;
       /** The tab preload, which makes the page values that bot checks read agree with Chrome. */
       pagePreload?: string;
+      /** Shorter sleep timing for `scripts/browser-steps-e2e.ts`. */
+      tabSleep?: { sweepMs: number; awakeGraceMs: number };
     } = {},
   ) {
     this.#window = window;
@@ -608,6 +619,7 @@ export class BrowserHost {
       window.once("closed", () => this.#closeBackgroundWindow());
     }
     this.#memoryLow = options.memoryLow ?? (() => false);
+    this.#awakeTabGraceMs = options.tabSleep?.awakeGraceMs ?? AWAKE_TAB_GRACE_MS;
     this.#browserProfile = options.browserProfile ?? (() => ({ kind: "shared" }));
     this.#profileExists = options.profileExists ?? (() => false);
     this.#profileProxy = options.profileProxy ?? (() => null);
@@ -643,7 +655,7 @@ export class BrowserHost {
       void runCauseEffect(this.#sleepIdleTabs()).catch((error) =>
         logger.warn("Unable to sleep browser tabs", { error: toLogValue(error) }),
       );
-    }, IDLE_TAB_SWEEP_MS);
+    }, options.tabSleep?.sweepMs ?? IDLE_TAB_SWEEP_MS);
     this.#idleTabSweep.unref();
   }
 
@@ -718,10 +730,16 @@ export class BrowserHost {
   readonly #sleepIdleTabs = Effect.fn("BrowserHost.sleepIdleTabs")(function* (this: BrowserHost) {
     const now = Date.now();
     const idleMs = this.#memoryLow() ? LOW_MEMORY_TAB_SLEEP_MS : IDLE_TAB_SLEEP_MS;
+    const awake: BrowserHostTab[] = [];
     for (const tab of this.#tabs.values()) {
       if (tab.pendingRestore || !this.#maySleep(tab)) continue;
       if (this.#tabInUse(tab)) tab.lastUsedAt = now;
       else if (now - tab.lastUsedAt >= idleMs) yield* this.#sleep(tab);
+      else awake.push(tab);
+    }
+    awake.sort((left, right) => right.lastUsedAt - left.lastUsedAt);
+    for (const tab of awake.slice(MAX_IDLE_AWAKE_TABS)) {
+      if (now - tab.lastUsedAt >= this.#awakeTabGraceMs) yield* this.#sleep(tab);
     }
   });
 
@@ -1890,8 +1908,12 @@ export class BrowserHost {
   ): Effect.fn.Return<BrowserPreview, BrowserOperationError> {
     const tab = this.#tabs.get(tabId);
     if (!tab) return yield* browserFailure(new Error(`Unknown browser tab: ${tabId}`));
-    // A preview card on screen does not keep a sleeping tab loaded.
-    if (tab.sleeping?.preview) return tab.sleeping.preview;
+    // A preview card on screen does not keep a sleeping tab loaded, also when the tab has no saved
+    // frame: the card asks again every few seconds, and each wake would load the page again.
+    if (tab.sleeping) {
+      if (tab.sleeping.preview) return tab.sleeping.preview;
+      return yield* browserFailure(new Error("Browser preview is not saved for a sleeping tab."));
+    }
     yield* this.#wake(tab);
     if (tab.secret?.submitted)
       return yield* browserFailure(new Error("Browser inspection is protected during authentication. Use takeover."));

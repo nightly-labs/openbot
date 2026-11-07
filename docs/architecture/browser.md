@@ -459,7 +459,8 @@ refusal in `AgentService` stays beside it rather than being folded in: it also c
 | Cancelled, interrupted, or failed | Stay open. Completion clears the control session only. |
 | Retry | Same thread and agent, so the same tabs are still reachable. |
 | Restart | Restored from the browser's own state file. |
-| Idle 30 min (5 min when memory is low) | Stays open, but its page unloads and its renderer process ends. The next use loads the page again. |
+| Idle 15 min (5 min when memory is low) | Stays open, but its page unloads and its renderer process ends. The next use loads the page again. |
+| More than 3 idle tabs loaded | The least recently used ones beyond 3 sleep as above once they are idle for 2 min. A tab in use (shown, busy, held, recording, playing audio, or with a secret) does not count. |
 | Agent deleted | That agent's tabs are closed, including a legacy tab holding only its thread id. Its own browser session is cleared. |
 | Browser profile changed | That agent's tabs are closed. Its next tab opens in the profile it chose. Both profiles keep their data. |
 | Profile cleared or deleted | Every tab in that profile is closed, then its data is cleared. |

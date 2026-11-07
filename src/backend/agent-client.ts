@@ -58,6 +58,11 @@ export interface AgentClient {
    */
   releaseThread?(externalThreadId: string, resumes?: boolean): Effect.Effect<void, ProviderClientOperationError>;
   /**
+   * Whether the session runs work that its release would end, such as a background terminal.
+   * Optional, because a client without this check must keep its idle sessions loaded.
+   */
+  holdsBackgroundWork?(externalThreadId: string): Effect.Effect<boolean, ProviderClientOperationError>;
+  /**
    * Hides a thread that a replacement session took over from the provider's own thread list, and
    * keeps its history readable. Optional, because only a provider that shows its threads to the user
    * in another app has a list to keep clean.
@@ -69,6 +74,12 @@ export interface AgentClient {
    * threads in one process frees nothing this way.
    */
   releaseIdleThreads?(): Effect.Effect<void, ProviderClientOperationError>;
+  /**
+   * Closes each thread that has no turn and stays open only for background work that sent nothing
+   * for a long time. The memory guard calls it at each sample while the machine is low on memory.
+   * Optional, because only a client whose background work holds a thread's process has one.
+   */
+  releaseQuietBackgroundThreads?(): Effect.Effect<void, ProviderClientOperationError>;
   /** Effective provider options. Saved overrides belong to the agent store. */
   readSessionSettings?(
     externalThreadId: string,

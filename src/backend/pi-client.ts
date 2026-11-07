@@ -79,6 +79,16 @@ const logger = createOpenBotLogger("provider-runtime");
 const PI_TURN_STALL_MS = 10 * 60_000;
 
 /**
+ * How long a thread with no turn keeps its `pi` process, its MCP bridge session and its extension
+ * folder. Pi opens the same session file again, so an idle thread costs only a slower first message.
+ * Without it, every Pi thread kept its process until the whole provider was idle for 10 minutes.
+ */
+const PI_THREAD_IDLE_RELEASE_MS = 5 * 60_000;
+
+/** How many idle threads keep their `pi` process before the timeout. The longest idle goes first. */
+const PI_IDLE_THREAD_LIMIT = 1;
+
+/**
  * How long `pi update --models` may take before the model list is read without it. It took 0.7 s in
  * Pi 1.5.0, and the catalog waits 5 s for each `model/list` request.
  */
@@ -182,6 +192,10 @@ interface PiThread {
    * instructions and access. A thread that a history read opened after a restart has none of them.
    */
   configured: boolean;
+  /** Closes the thread when it stays with no turn. See `PI_THREAD_IDLE_RELEASE_MS`. */
+  idleRelease: ReturnType<typeof setTimeout> | null;
+  /** When its last turn ended, so the longest idle thread goes first. `0` before its first turn. */
+  idleSince: number;
 }
 interface ClientEvents {
   notification: [AppServerNotification];
@@ -272,6 +286,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
 
   readonly #close = Effect.fn("PiAgentClient.closeThread")(function* (this: PiAgentClient, thread: PiThread) {
     thread.closed = true;
+    this.#disarmIdle(thread);
     // The key extension folder is removed also when a step before it fails.
     yield* Effect.gen(function* () {
       yield* thread.rpc.stop();
@@ -295,17 +310,50 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
   });
 
   readonly releaseIdleThreads = Effect.fn("PiAgentClient.releaseIdleThreads")(function* (this: PiAgentClient) {
-    for (const [id, thread] of this.#threads) {
-      // A held gate is a turn that starts, before it sets `turn`, or a compaction. Out of the map
-      // before it closes, so a turn that starts during the close opens the thread again.
-      yield* Effect.gen({ self: this }, function* () {
-        if (thread.turn) return;
-        if (thread.configured) this.#released.set(id, thread.params);
-        this.#threads.delete(id);
-        yield* this.#close(thread);
-      }).pipe(thread.gate.withPermitsIfAvailable(1));
-    }
+    for (const thread of [...this.#threads.values()]) yield* this.#releaseIdle(thread);
   });
+
+  /**
+   * Closes a thread with no turn. Its next turn opens the session again with the saved settings.
+   * A thread whose gate is held tries again after the timeout.
+   */
+  readonly #releaseIdle = Effect.fn("PiAgentClient.releaseIdle")(function* (this: PiAgentClient, thread: PiThread) {
+    // A held gate is a turn that starts, before it sets `turn`, or a compaction. Out of the map
+    // before it closes, so a turn that starts during the close opens the thread again.
+    const done = yield* Effect.gen({ self: this }, function* () {
+      if (thread.turn || this.#threads.get(thread.id) !== thread) return;
+      if (thread.configured) this.#released.set(thread.id, thread.params);
+      this.#threads.delete(thread.id);
+      yield* this.#close(thread);
+    }).pipe(thread.gate.withPermitsIfAvailable(1));
+    if (Option.isNone(done) && !thread.turn && this.#threads.get(thread.id) === thread) this.#armIdle(thread);
+  });
+
+  /** Marks a thread whose turn ended as idle, and closes the longest idle threads over the limit. */
+  readonly #markIdle = Effect.fn("PiAgentClient.markIdle")(function* (this: PiAgentClient, thread: PiThread) {
+    if (thread.turn || this.#threads.get(thread.id) !== thread) return;
+    thread.idleSince = Date.now();
+    this.#armIdle(thread);
+    const idle = [...this.#threads.values()]
+      .filter((candidate) => candidate.turn === null && candidate.idleSince > 0)
+      .sort((left, right) => left.idleSince - right.idleSince);
+    for (const candidate of idle.slice(0, Math.max(0, idle.length - PI_IDLE_THREAD_LIMIT)))
+      yield* this.#releaseIdle(candidate);
+  });
+
+  #armIdle(thread: PiThread): void {
+    this.#disarmIdle(thread);
+    thread.idleRelease = setTimeout(() => {
+      thread.idleRelease = null;
+      this.#background(this.#releaseIdle(thread));
+    }, PI_THREAD_IDLE_RELEASE_MS);
+    thread.idleRelease.unref?.();
+  }
+
+  #disarmIdle(thread: PiThread): void {
+    if (thread.idleRelease) clearTimeout(thread.idleRelease);
+    thread.idleRelease = null;
+  }
 
   readonly request = Effect.fn("PiAgentClient.request")(function* <T>(
     this: PiAgentClient,
@@ -693,10 +741,14 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         closed: false,
         gate: Semaphore.makeUnsafe(1),
         configured,
+        idleRelease: null,
+        idleSince: 0,
       };
       yield* this.#configure(thread, params);
       this.#threads.set(id, thread);
       this.#released.delete(id);
+      // A thread that a read opened, or whose first turn never comes, closes after the timeout too.
+      this.#armIdle(thread);
       retained = true;
       return thread;
     }).pipe(
@@ -779,6 +831,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     };
     this.#addUserMessage(turn, prompt.message);
     thread.turn = turn;
+    this.#disarmIdle(thread);
     this.#notify("turn/started", thread, { turn: { id: turn.id, status: "inProgress" } });
     // Subscribe before sending: a completed event can precede the prompt acknowledgement.
     yield* Effect.forkIn(
@@ -1051,6 +1104,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     // Before the notice, so a session that closes when its turn ends is not busy.
     if (thread.turn === turn) thread.turn = null;
     this.#notify("turn/completed", thread, { turn: { id: turn.id, status } });
+    yield* this.#markIdle(thread);
   });
 
   readonly #ui = Effect.fn("PiAgentClient.userInput")(function* (
