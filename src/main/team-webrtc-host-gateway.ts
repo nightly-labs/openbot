@@ -1,3 +1,4 @@
+import { SIGNAL_NO_READY_CLOSE_CODE } from "@openbot/contracts/signal-protocol/messages";
 import { ticketNamesSignalHome } from "@openbot/contracts/signal-protocol/ticket";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -14,6 +15,8 @@ interface TeamWebRtcHostGatewayOptions extends TeamWebRtcHostPeerOptions {
   ) => Effect.Effect<{ signalUrl: string; ticket: string }, RemoteWorkflowError>;
   /** `reason` names the last Signal close or error code for the log, never its text. */
   onSignalRecoveryFailure?: (error: Error, reason: string) => void;
+  /** True when devices could not reach the host through Signal for a long time; false when they can again. */
+  onSignalLost?: (lost: boolean) => void;
   /** Whether devices may connect only over a private network, such as the Wi-Fi or Tailscale. */
   privateNetwork?: () => boolean;
 }
@@ -23,12 +26,10 @@ const logger = createOpenBotLogger("team-webrtc-host");
 // How long the host's Signal socket can stay closed before the host asks for another Signal machine.
 // The time starts at the first close and stops when Signal accepts the host again.
 const SIGNAL_MOVE_AFTER_MS = 20_000;
-// A host with no `ready` for this long reports the lost registration. The host leaves `online`, so
-// `openbot status` and the server list show it, and the start retry publishes it again with a new
-// ticket (#3749). It is longer than the reconnect backoff, so a Signal restart does not cause it.
+// A host with no `ready` for this long reports the lost registration, so `openbot status` and the
+// app show it (#3749). The host stays `online`: a restart would drop the devices that are connected
+// now. It is longer than the reconnect backoff, so a Signal restart does not cause it.
 const SIGNAL_LOST_REPORT_AFTER_MS = 3 * 60_000;
-// The `signal-closed` code of a host socket that did not answer in time (`team-webrtc.ts`).
-const SIGNAL_NO_READY_CODE = "no-ready";
 
 class HostSignal extends Context.Service<
   HostSignal,
@@ -119,6 +120,7 @@ export class TeamWebRtcHostGateway {
   #signalUrl: string | null = null;
   #signalMoveTimer: ReturnType<typeof setTimeout> | null = null;
   #signalLostTimer: ReturnType<typeof setTimeout> | null = null;
+  #signalLostReported = false;
   // Set when the hidden window ends the host peer for good during a move, as it does after
   // `authentication_required` or close code 4000.
   #signalEnded = false;
@@ -162,6 +164,7 @@ export class TeamWebRtcHostGateway {
     },
   ) {
     this.#hostId = input.hostId;
+    this.#signalLostReported = false;
     this.#lastSignalEnd = null;
     this.#signalUrl = input.signalUrl;
     this.#signalEnded = false;
@@ -197,6 +200,7 @@ export class TeamWebRtcHostGateway {
     return yield* Effect.gen({ self: this }, function* () {
       const hostId = this.#hostId;
       this.#hostId = null;
+      this.#signalLostReported = false;
       this.#localApiPort = null;
       this.#signalUrl = null;
       this.#cancelSignalMove();
@@ -316,7 +320,8 @@ export class TeamWebRtcHostGateway {
       this.#cancelSignalMove();
       this.#cancelSignalLostReport();
     } else {
-      if (code === SIGNAL_NO_READY_CODE) logger.warn("Host Signal socket did not answer in time; it connects again.");
+      if (code === SIGNAL_NO_READY_CLOSE_CODE)
+        logger.warn("Host Signal socket did not answer in time; it connects again.");
       else logger.info(`Host Signal socket closed with code ${code}; it connects again.`);
       this.#scheduleSignalMove();
       this.#scheduleSignalLostReport();
@@ -327,6 +332,11 @@ export class TeamWebRtcHostGateway {
     if (peerId !== this.#hostId) return;
     this.#cancelSignalMove();
     this.#cancelSignalLostReport();
+    if (this.#signalLostReported) {
+      this.#signalLostReported = false;
+      logger.info("Host Signal socket is ready again.");
+      this.#options.onSignalLost?.(false);
+    }
   };
 
   // One timer for each outage, as for the move.
@@ -348,10 +358,12 @@ export class TeamWebRtcHostGateway {
       this.#scheduleSignalLostReport();
       return;
     }
-    this.#options.onSignalRecoveryFailure?.(
-      new Error(sourceText("error.remote.signalRecoveryFailed")),
-      `not ready ${SIGNAL_LOST_REPORT_AFTER_MS / 60_000} minutes after ${this.#lastSignalEnd ?? "a close"}`,
+    if (this.#signalLostReported) return;
+    this.#signalLostReported = true;
+    logger.warn(
+      `Host Signal socket not ready ${SIGNAL_LOST_REPORT_AFTER_MS / 60_000} minutes after ${this.#lastSignalEnd ?? "a close"}.`,
     );
+    this.#options.onSignalLost?.(true);
   };
 
   // One timer for each outage: a later close does not start the time again.

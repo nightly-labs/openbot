@@ -1,6 +1,7 @@
 import { isString } from "@openbot/contracts/runtime-values";
 import { decodeSignalServerMessage } from "@openbot/contracts/signal-protocol/decode";
 import {
+  SIGNAL_NO_READY_CLOSE_CODE,
   SIGNAL_PROTOCOL_VERSION,
   SIGNAL_TURN_REFRESH_INTERVAL_MS,
   type SignalClientMessage,
@@ -123,11 +124,10 @@ const DISCONNECT_GRACE_MS = 15_000;
 // gets no close event, so it did not connect again, and devices got `host_unavailable` until a restart
 // (#3749). A host waits this long for each `ready`, and then opens a new socket.
 const SIGNAL_READY_DEADLINE_MS = 30_000;
-// A host asks a quiet socket for `ready` this often with a `turn-refresh`. Signal gives the same TURN
-// credentials again for 5 minutes, so the probe makes new ones about every 8 minutes, not each time.
+// A host asks a socket that received nothing for this long for `ready` with a `turn-refresh`. Signal
+// gives the same TURN credentials again for 5 minutes, so a probe makes new ones at most every 8
+// minutes. A socket with traffic is not probed and keeps the 45-minute refresh.
 const SIGNAL_PROBE_INTERVAL_MS = 4 * 60_000;
-// The `signal-closed` code of a host socket that did not answer in time. Main logs it as a warning.
-const SIGNAL_NO_READY_CODE = "no-ready";
 
 const peers = new Map<string, PeerState>();
 // Main can replace a peer after an initial connection error. Keep the rate wait across that replacement.
@@ -390,6 +390,8 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
   socket.addEventListener("message", (event) => {
     if (!isString(event.data)) return;
     refusal = signalErrorCode(event.data) ?? refusal;
+    // Any frame shows that the socket works, also while earlier frames wait in the chain.
+    if (state.socket === socket) probeSignalLater(state);
     state.signalChain = state.signalChain
       .then(async () => {
         if (state.closed || state.socket !== socket) return;
@@ -487,7 +489,6 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
   }
   if (message.type === "ready") {
     state.reconnectAttempt = 0;
-    probeSignalLater(state);
     // Null on the `ready` of the host's socket, and on the `ready` that answers a `turn-refresh`.
     const turnRefresh = message.connectionId === null;
     const client = state.role === "client" && state.connectionId ? state.peerConnection : null;
@@ -1042,7 +1043,7 @@ function awaitSignalReady(state: PeerState, socket: WebSocket): void {
     if (state.closed || state.socket !== socket) return;
     state.socket = null;
     socket.close(1000, "No ready");
-    post({ type: "signal-closed", peerId: state.id, code: SIGNAL_NO_READY_CODE, terminal: false });
+    post({ type: "signal-closed", peerId: state.id, code: SIGNAL_NO_READY_CLOSE_CODE, terminal: false });
     scheduleSignalReconnect(state);
   }, SIGNAL_READY_DEADLINE_MS);
 }
