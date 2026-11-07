@@ -23,7 +23,10 @@ const profileFields = {
     .string()
     .max(INPUT_LIMITS.agentDescription)
     .describe(`A short summary of the agent's work, at most ${INPUT_LIMITS.agentDescription} characters.`),
-  avatarSeed: z.string().regex(AVATAR_SEED_PATTERN, "Invalid avatar seed."),
+  avatarSeed: z
+    .string()
+    .regex(AVATAR_SEED_PATTERN, "Invalid avatar seed.")
+    .describe("1-128 lowercase letters, digits, colons or hyphens."),
   // A number schema, not z.literal: Gemini rejects a request whose tool schema has a non-string enum.
   avatarHue: z
     .number()

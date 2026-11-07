@@ -14,6 +14,9 @@ export const messages = {
   "queue.item.steerTooltip": "Направить сообщение",
   "queue.item.steering": "Направляется",
   "queue.item.steer": "Направить",
+  "queue.item.sendNowLabel": "Остановить агента и отправить сейчас сообщение {position} из очереди",
+  "queue.item.sendNowTooltip": "Остановить агента и отправить это сообщение сейчас",
+  "queue.item.sendNow": "Отправить сейчас",
   "queue.item.notSteered": "Не направлено",
   "queue.item.steerFallback.providerUnsupported":
     "Этот провайдер не умеет направлять выполняемый ход, поэтому сообщение ждёт в очереди.",

@@ -136,7 +136,7 @@ const SECTION_TEAMMATE_RULE =
   "For work you cannot finish alone, send it to a suitable section teammate first. Go outside the section only when no section teammate fits, more expertise is needed, or the user names another agent. Named recipients and replies take priority.";
 
 function sectionTeammateList(section: SectionTeammates): string {
-  return tagSafe(JSON.stringify({ section: section.name, agents: section.members }, null, 2));
+  return tagSafe(JSON.stringify({ section: section.name, agents: section.members }));
 }
 
 /**
@@ -300,17 +300,13 @@ export function developerInstructions(
   options: DeveloperInstructionOptions = {},
 ): string {
   const profile = tagSafe(
-    JSON.stringify(
-      {
-        id: agent.id,
-        name: agent.name,
-        // The saved values, as read_agent returns them, so that an agent never saves a placeholder as its title.
-        title: agent.title.trim(),
-        description: agent.description.trim(),
-      },
-      null,
-      2,
-    ),
+    JSON.stringify({
+      id: agent.id,
+      name: agent.name,
+      // The saved values, as read_agent returns them, so that an agent never saves a placeholder as its title.
+      title: agent.title.trim(),
+      description: agent.description.trim(),
+    }),
   );
   const folders = existingAgentFolders(agent);
   const excluded = workspaceExcludedFolders(agent);

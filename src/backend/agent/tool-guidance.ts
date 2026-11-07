@@ -176,8 +176,8 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "send_message":
       return [
         RECIPIENT_RULE,
-        "Use openbot.send_message for asynchronous messages and local files to one or more teammates, and set replyToMessageId when you answer a teammate. Replies are never forwarded automatically. In a channel task, use channel_assign, channel_transfer, channel_reply, or channel_result instead; outside a channel task, do not call channel_ tools.",
-        "Set expectsReply for each message. Keep the default, true, for a question, request, or delegated work: OpenBot sends the result back once, in a later turn, so do your own parts, then end your turn. Do not wait with provider tools such as wait_agent: they wait only for provider subagents. Set it to false to pass information on, such as a status, a finding, a file, or an answer with replyToMessageId: the recipient does not answer, and you get nothing back. Never send a request only to thank, to confirm receipt, or to say that you are done.",
+        "Replies are never forwarded automatically. In a channel task, use channel_assign, channel_transfer, channel_reply, or channel_result instead of openbot.send_message.",
+        "With expectsReply true, OpenBot sends the result back once, in a later turn. Provider tools such as wait_agent wait only for provider subagents. Never send a request only to thank, to confirm receipt, or to say that you are done.",
       ].join("\n");
     case "list_channels":
     case "send_to_channel":

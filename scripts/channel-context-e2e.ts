@@ -26,6 +26,8 @@
 //      it. The packet says when isolation is on and when it is off (#4332).
 //  11. A reply that quotes a member's message and only mentions another member gives the quote in
 //      the assignment. The quote continues its task, and the packet does not show it superseded (#4841).
+//  12. Saved channel memories go in a delta only when they changed. A delta with the same memories says
+//      that the session has them.
 // `bun scripts/channel-context-e2e.ts`. Writes .openbot-build/channel-context-e2e/report.json.
 // `CHANNEL_CONTEXT_MEASURE=<label> bun scripts/channel-context-e2e.ts` runs no checks. It sends
 // MEASURE_TURNS requests to three members in turn, with long replies, and writes the size of each
@@ -73,12 +75,16 @@ const PACKET_STARTS = [
 ];
 const CHANNEL_RULE = "Use channel_history for earlier history";
 const SUMMARY_REQUEST = "Summarize shared facts";
+const UNCHANGED_MEMORIES = "The saved channel memories are the same as in your earlier channel message";
 const SUMMARY_TEXT = "Summary: the team discussed the release.";
 // The complete packet budget is 120,000 characters, and its transcript part is a quarter of that.
 const TRANSCRIPT_CHARACTERS = 30_000;
 const MEASURE = process.env.CHANNEL_CONTEXT_MEASURE?.replace(/[^\w-]/g, "") || null;
 const MEASURE_TURNS = 30;
 // A reply and a summary of about the size that a real member writes.
+const MEASURE_MEMORIES = 8;
+const measureMemory = (index: number) =>
+  `Memory ${index}: ${"The release checklist needs a signed build and a tested database backup. ".repeat(6)}`;
 const MEASURE_REPLY = `Reply: ${"I checked this step and wrote down what is left to do. ".repeat(36)}`;
 const MEASURE_SUMMARY = `${SUMMARY_TEXT} ${"The members checked one more step of the plan. ".repeat(85)}`;
 
@@ -495,8 +501,11 @@ try {
   await save("Ship the release.", false);
 
   if (MEASURE) {
+    // Saved channel memories go in each packet that has a changed memory list.
+    for (let index = 0; index < MEASURE_MEMORIES; index++)
+      channels().memories.saveFromTool(channelId, measureMemory(index), randomUUID(), randomUUID());
     const members = [lead, tester, writer ?? lead];
-    const turns: { agent: string; threadId: string; characters: number; delta: boolean }[] = [];
+    const turns: { agent: string; threadId: string; characters: number; delta: boolean; memories: boolean }[] = [];
     for (let index = 0; index < MEASURE_TURNS; index++) {
       const member = members[index % members.length] ?? lead;
       const packet = await send(
@@ -510,6 +519,7 @@ try {
         threadId,
         characters: packet.length,
         delta: packet.includes("Shared messages after the ones you already have"),
+        memories: packet.includes("<channel_memories>"),
       });
     }
     const summaries = summaryInputs().map((entry) => entry.text.length);
@@ -529,6 +539,10 @@ try {
       label: MEASURE,
       turns: turns.length,
       replyCharacters: MEASURE_REPLY.length,
+      memoryCharacters: channels()
+        .memories.list(channelId)
+        .reduce((total, memory) => total + memory.text.length, 0),
+      packetsWithMemories: turns.filter((turn) => turn.memories).length,
       packetCharacters,
       largestPacket: Math.max(...turns.map((turn) => turn.characters)),
       deltaTurns: turns.filter((turn) => turn.delta).length,
@@ -537,7 +551,7 @@ try {
       // About four characters make one token.
       estimatedInputTokens: Math.round((packetCharacters + summaryCharacters) / 4),
       sessions,
-      perTurn: turns.map(({ agent, characters, delta }) => ({ agent, characters, delta })),
+      perTurn: turns.map(({ agent, characters, delta, memories }) => ({ agent, characters, delta, memories })),
     };
     mkdirSync(OUT, { recursive: true });
     writeFileSync(join(OUT, `measure-${MEASURE}.json`), `${JSON.stringify(measured, null, 2)}\n`);
@@ -607,6 +621,33 @@ try {
       facts(changed).channel?.instructions === "Ship the release on Friday.",
       JSON.stringify(facts(changed)),
     );
+
+    // 12. Saved channel memories go in a delta only when they changed. The delta says that the
+    // session has them, and a changed memory list goes again in full.
+    const remembered = "The release needs a signed build.";
+    channels().memories.saveFromTool(channelId, remembered, randomUUID(), randomUUID());
+    const withMemory = await send(channelId, lead.id, "Read the saved memory.");
+    pass(
+      "A delta after a new memory gives the memories",
+      withMemory.includes(`<channel_memories>\n${remembered}\n</channel_memories>`),
+      blocks(withMemory).find((entry) => entry.includes("channel memories")),
+    );
+    const sameMemory = await send(channelId, lead.id, "Check the build again.");
+    pass(
+      "A delta with the same memories does not give them again",
+      !sameMemory.includes("<channel_memories>") && sameMemory.includes(UNCHANGED_MEMORIES),
+      blocks(sameMemory).find((entry) => entry.includes("channel memories")),
+    );
+    const added = "The backup is tested on Thursday.";
+    channels().memories.saveFromTool(channelId, added, randomUUID(), randomUUID());
+    const changedMemory = await send(channelId, lead.id, "Read the new memory.");
+    pass(
+      "A delta after a memory change gives all memories again",
+      changedMemory.includes(remembered) && changedMemory.includes(added),
+      blocks(changedMemory).find((entry) => entry.includes("channel memories")),
+    );
+    channels().memories.deleteByText(channelId, remembered);
+    channels().memories.deleteByText(channelId, added);
 
     // 4. Grow the history over the start of the summary after a turn, but not over the packet
     // threshold. Only the summary after a turn summarizes it now: no packet is prepared.

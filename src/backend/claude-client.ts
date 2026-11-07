@@ -27,6 +27,8 @@ import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Option, Scope } from "effect";
+import { z } from "zod";
+import { advertisedZodShape } from "./agent/advertised-json-schema";
 import { isTurnContextBlock } from "./agent/developer-instructions";
 import {
   type ClaudePlanState,
@@ -699,9 +701,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly releaseThread = Effect.fn("ClaudeAgentClient.releaseThread")(function* (
     this: ClaudeAgentClient,
     threadId: string,
+    resumes = false,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     this.#threads.forget(threadId);
-    this.#turnContext.forget(threadId);
+    // `--resume` opens the same conversation, which holds the memories and section-mates that its
+    // turns were sent. They went again on each turn after a runtime reload.
+    if (!resumes) this.#turnContext.forget(threadId);
     const runtime = this.#threads.get(threadId);
     if (!runtime) return;
     yield* this.#threads.close(runtime).pipe(toProviderClientOperationError);
@@ -2304,12 +2309,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       openbot: createSdkMcpServer({
         name: "openbot",
         version: "0.1.0",
-        // Claude uses the SDK's AskUserQuestion permission flow.
-        tools: VISIBLE_TOOL_DEFINITIONS.filter((definition) => definition.name !== "ask_user").map((definition) =>
-          tool(definition.name, definition.description, definition.shape, (args) =>
-            call("openbot", definition.name, args),
-          ),
-        ),
+        tools: claudeOpenBotTools((name, args) => call("openbot", name, args)),
       }),
     };
   }
@@ -2458,6 +2458,18 @@ const writeClaudeFlagSettings = Effect.fn("ClaudeAgentClient.writeFlagSettings")
   yield* providerCall(() => writeFile(file, JSON.stringify(settings), { mode: 0o600 }));
   return file;
 });
+
+/**
+ * The tools of OpenBot's in-process MCP server for Claude. Claude uses the SDK's AskUserQuestion permission
+ * flow. The SDK lists the JSON Schema of each shape, so the shape is the advertised schema that Codex also
+ * gets, without validation-only keywords. The OpenBot tool router decodes each call with the full schema.
+ */
+export function claudeOpenBotTools(call: (name: string, args: unknown) => Promise<CallToolResult>) {
+  return VISIBLE_TOOL_DEFINITIONS.filter((definition) => definition.name !== "ask_user").map((definition) => {
+    const shape = advertisedZodShape(z.strictObject(definition.shape));
+    return tool(definition.name, definition.description, shape, (args) => call(definition.name, args));
+  });
+}
 
 /** A file that cannot be deleted must not stop the close. */
 function removeClaudeQueryFile(file: string | null): Effect.Effect<void> {

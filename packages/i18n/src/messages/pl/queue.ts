@@ -14,6 +14,9 @@ export const messages = {
   "queue.item.steerTooltip": "Pokieruj wiadomością",
   "queue.item.steering": "Kierowanie",
   "queue.item.steer": "Pokieruj",
+  "queue.item.sendNowLabel": "Zatrzymaj agenta i wyślij teraz wiadomość z kolejki {position}",
+  "queue.item.sendNowTooltip": "Zatrzymaj agenta i wyślij tę wiadomość teraz",
+  "queue.item.sendNow": "Wyślij teraz",
   "queue.item.notSteered": "Nie pokierowano",
   "queue.item.steerFallback.providerUnsupported":
     "Ten dostawca nie może pokierować trwającą turą, więc wiadomość czeka w kolejce.",

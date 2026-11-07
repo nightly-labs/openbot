@@ -35,8 +35,15 @@ const DIRECT_NAMES = new Set([
 
 const BROWSER_SCRIPT_TOOL = requireTool(`${OPENBOT_BROWSER_NAMESPACE}.run_script`);
 
-// Names keep the complete, stable catalog below 4,000 characters without schema duplication.
-const INITIAL_TOOL_CATALOG = BUILTIN_TOOL_CATALOG.map((tool) => tool.name).join(", ");
+/**
+ * The names of all catalog tools, grouped by namespace, such as `openbot.{list_tables, query_data}`. Names
+ * give a complete, stable list without schemas; the group form keeps each name qualified and does not
+ * repeat the namespace for each tool. Direct tools stay in it: a provider can hide some of them, such as
+ * Pi with `request_api_key`.
+ */
+const INITIAL_TOOL_CATALOG = [OPENBOT_DYNAMIC_TOOLS, ...BROWSER_DYNAMIC_TOOLS]
+  .map((namespace) => `${namespace.name}.{${namespace.tools.map((tool) => tool.name).join(", ")}}`)
+  .join("; ");
 const qualifiedName = z.string().trim().min(1).max(160);
 const searchQuery = z.string().trim().min(1).max(200);
 // Models often send one query string, so search accepts `query` as well as `queries`.

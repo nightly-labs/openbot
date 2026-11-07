@@ -21,8 +21,9 @@ export interface AgentClient {
    */
   readonly contextCompaction?: "events" | "request" | "native" | "handoff" | "unsupported";
   /**
-   * True when a streaming `final_answer` item can still become a step: the provider names no phase,
-   * and the client classifies the text only at the next tool call or at the end of the turn.
+   * True when a streaming answer item (`final_answer`, or `agentMessage` with no phase yet) can still
+   * become a step: the provider names no phase, and the client classifies the text only at the next
+   * tool call or at the end of the turn.
    */
   readonly provisionalAnswers?: boolean;
   /**
@@ -50,8 +51,12 @@ export interface AgentClient {
    * this call the previous session stays open inside the client, and the MCP servers it spawned stay
    * alive with it, so each further change adds another set of processes - including the servers the
    * user turned off. Optional, because a client that keeps no per-thread state has nothing to close.
+   *
+   * `resumes`: the next turn resumes this same provider session, which still holds the context that
+   * its turns were sent. A client keeps what it knows of that context, so the turn does not send it
+   * again. Otherwise the session ends, and the client forgets it.
    */
-  releaseThread?(externalThreadId: string): Effect.Effect<void, ProviderClientOperationError>;
+  releaseThread?(externalThreadId: string, resumes?: boolean): Effect.Effect<void, ProviderClientOperationError>;
   /**
    * Hides a thread that a replacement session took over from the provider's own thread list, and
    * keeps its history readable. Optional, because only a provider that shows its threads to the user

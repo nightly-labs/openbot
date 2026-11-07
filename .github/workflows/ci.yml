@@ -493,6 +493,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:claude-usage-resume
 
+      - name: Run the Claude turn context after a runtime refresh E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:claude-turn-context
+
       - name: Run the Claude late steer E2E test
         if: ${{ !cancelled() }}
         run: bun run test:claude-late-steer
@@ -668,6 +672,7 @@ jobs:
             .openbot-build/agent-profile-accounts-e2e/
             .openbot-build/browser-profile-agents-e2e/
             .openbot-build/claude-usage-resume-e2e/
+            .openbot-build/claude-turn-context-e2e/
             .openbot-build/claude-late-steer-e2e/
             .openbot-build/provider-session-reuse-e2e/
             .openbot-build/backup-model-failover-e2e/

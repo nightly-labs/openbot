@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
+import { join } from "node:path";
 import { agentProviderDescriptor, customAgentIdOfModel } from "@openbot/contracts/agent-providers";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { developmentStartingModel } from "@openbot/contracts/development-defaults";
@@ -181,6 +182,7 @@ import { type GitHubConnectorSource, McpGateway, type TestMcpServerOptions } fro
 import { type MarketplaceAppServer, mcpServersFromGateway } from "./agent/mcp-tools";
 import { MemoryHold } from "./agent/memory-hold";
 import { MEMORY_REVIEW_MESSAGES, MemoryReview } from "./agent/memory-review";
+import { MemoryReviewCursors } from "./agent/memory-review-cursors";
 import { MessageDeletion } from "./agent/message-deletion";
 import {
   creationModel,
@@ -695,6 +697,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       stopping: () => this.#stopping,
       ...(options.memoryReviewIdleMs === undefined ? {} : { idleMs: options.memoryReviewIdleMs }),
       ...(options.memoryReviewInterval ? { interval: options.memoryReviewInterval } : {}),
+      cursors: new MemoryReviewCursors(join(store.database.userDataPath, "memory-review-cursors.json")),
     });
     // One timer for every routine owner. The sources are read lazily because `channels` and its
     // scheduler are built further down, and because an owner's earliest routine changes constantly.
