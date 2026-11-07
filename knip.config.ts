@@ -54,6 +54,8 @@ const config: KnipConfig = {
     "vm_stat",
     // Starts a D-Bus session with a test keyring in the Linux secret storage E2E script.
     "dbus-run-session",
+    // Makes the MP4 with its index at the end in the attachment video seek E2E script.
+    "ffmpeg",
   ],
   workspaces: {
     ".": {
