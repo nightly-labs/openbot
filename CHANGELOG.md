@@ -179,6 +179,8 @@ All notable changes to OpenBot will be documented here. The project follows
 - An agent in a messaging chat, such as WhatsApp or Slack, can no longer read the owner's other
   chats. Other people can write in a messaging chat.
 - A change of language in the website menu no longer loads the page again. The page changes to the new language at once.
+- On macOS, the agent dock now shows the first 3 agents of the sidebar until you add or remove an
+  agent. Before, the dock was empty until you added agents one at a time.
 
 ### Fixed
 
