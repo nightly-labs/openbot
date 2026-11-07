@@ -110,15 +110,15 @@ export class AgentInterruptTool {
     // drain would start the next of these messages.
     const cancelledMessages = yield* toolStep(() => this.#cancelQueuedFrom(agentId, callerAgentId));
     if (!turnId) {
-      // A task that the agent started runs its own brief, so it is never the caller's to stop. Say so,
-      // or the caller reads "nothing ran" while `list_agents` shows the agent as working.
+      // A task turn never runs the caller's message, so it is never the caller's to stop. Say so, or the
+      // caller reads "nothing ran" while `list_agents` shows the agent as working.
       const runningTasks = this.#conversation.workingTaskSnapshots(agentId).length;
       if (runningTasks === 0) return openBotToolResult({ interruptedTurnId: null, cancelledMessages });
       return openBotToolResult({
         interruptedTurnId: null,
         cancelledMessages,
         runningTasks,
-        note: "This agent still runs tasks that it started itself. This tool cannot stop them. The user can stop a task with Stop in its tab in the agent's chat header.",
+        note: "This agent still runs tasks. This tool cannot stop them. The user can stop a task with Stop in its tab in the agent's chat header.",
       });
     }
 
