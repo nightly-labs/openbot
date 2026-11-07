@@ -1,4 +1,10 @@
-import { LOCAL_SERVER_ID, VOICE_AUDIO_LIMITS, VOICE_MODELS, VOICE_STREAM_LIMITS } from "@openbot/contracts/ipc";
+import {
+  type ConversationMessage,
+  LOCAL_SERVER_ID,
+  VOICE_AUDIO_LIMITS,
+  VOICE_MODELS,
+  VOICE_STREAM_LIMITS,
+} from "@openbot/contracts/ipc";
 import type { VoicePanelPhase } from "@openbot/ui/features/conversation/VoicePanel";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore, onCleanup } from "solid-js";
@@ -84,6 +90,8 @@ export interface VoiceConversationDeps {
   ) => Promise<boolean>;
   /** The server of the agent is connected. The local server always is. */
   serverOnline: () => boolean;
+  /** Whether a step of a reply is a progress update, which the conversation reads aloud before the answer. */
+  progressUpdate: (message: ConversationMessage) => boolean;
 }
 
 /**
@@ -546,7 +554,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       discardRecording(recordingId);
       return;
     }
-    noteDictatedMessage(target, text, { always: true });
+    noteDictatedMessage(target, text, { always: true, progressUpdate: deps.progressUpdate });
     // A send can fail after it is queued, so the wait for the reply ends there too.
     // A later failure, after a Retry, belongs to a turn that is over.
     const notSent = () => {

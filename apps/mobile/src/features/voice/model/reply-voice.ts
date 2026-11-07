@@ -44,8 +44,9 @@ export interface ReplyReading {
   /**
    * Gives a reading from `streamReply` the reply so far. The text only grows. Each sentence plays
    * once a sentence after it is written; `complete` plays the rest, and the reading ends after it.
+   * `settled` plays the rest too, but more text can follow: a progress update that is complete.
    */
-  update: (markdown: string, complete: boolean) => void;
+  update: (markdown: string, complete: boolean, settled?: boolean) => void;
 }
 
 type ReplyHandlers = {
@@ -134,6 +135,9 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
   let markdownSoFar = "";
   /** The parts that are fixed: the text after them is written. */
   const parts: string[] = [];
+  /** The text that `settled` fixed, and its parts. The text after it makes parts of its own. */
+  let settledLength = 0;
+  let settledParts: string[] = [];
   let lastDone = -1;
   let wake: (() => void) | null = null;
   const idOf = (index: number) => `${reading}:${index}`;
@@ -261,12 +265,16 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
     }
   }
 
-  const update = (markdown: string, isComplete: boolean) => {
+  const update = (markdown: string, isComplete: boolean, settled = false) => {
     if (ended || complete) return;
     markdownSoFar = markdown;
-    const all = liveSpeechParts(markdown, SPEECH_LIMITS.maximumTextLength);
+    const rest = liveSpeechParts(markdown.slice(settledLength), SPEECH_LIMITS.maximumTextLength);
     // The last part can still grow, so it waits until more text follows it or the reply is complete.
-    const fixed = isComplete ? all : all.slice(0, -1);
+    const fixed = [...settledParts, ...(isComplete || settled ? rest : rest.slice(0, -1))];
+    if (settled) {
+      settledLength = markdown.length;
+      settledParts = fixed;
+    }
     if (fixed.length > parts.length) parts.push(...fixed.slice(parts.length));
     complete = isComplete;
     if (complete && lastDone === parts.length - 1) {

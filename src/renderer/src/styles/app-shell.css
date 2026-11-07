@@ -1834,12 +1834,16 @@ textarea {
     to bottom,
     var(--openbot-text-primary) var(--agent-list-stuck-height),
     transparent var(--agent-list-stuck-height),
-    var(--openbot-text-primary) calc(var(--agent-list-stuck-height) + 18px)
+    var(--openbot-text-primary) calc(var(--agent-list-stuck-height) + var(--agent-list-fade-size, 18px))
   );
 }
 
 .sidebar .agent-list.scroll-fade-bottom {
-  --agent-list-fade-bottom: linear-gradient(to bottom, var(--openbot-text-primary) calc(100% - 18px), transparent 100%);
+  --agent-list-fade-bottom: linear-gradient(
+    to bottom,
+    var(--openbot-text-primary) calc(100% - var(--agent-list-fade-size, 18px)),
+    transparent 100%
+  );
 }
 
 /* The folder name starts in line with the avatars and the folder icon ends in line with the dates
@@ -3384,6 +3388,9 @@ textarea {
 }
 
 .sidebar-compact .agent-list {
+  /* An 18px fade is too short for a 64px row: a cut avatar looks like a hard edge. Half a row fades. */
+  --agent-list-fade-size: 32px;
+
   padding-inline: 12px;
 }
 

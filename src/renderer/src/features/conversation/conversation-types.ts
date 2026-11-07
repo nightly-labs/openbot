@@ -378,6 +378,11 @@ export interface ConversationProps {
   onCancelQueuedMessage: (deliveryId: string) => void;
   onCancelWait?: ((waitId: string) => void) | undefined;
   onSteerQueuedMessage: (deliveryId: string) => void;
+  /**
+   * Puts a queued message first and stops the turn, for an agent whose provider cannot steer.
+   * Absent where the host does not offer it.
+   */
+  onSendQueuedMessageNow?: ((deliveryId: string) => void) | undefined;
   onUpdateQueuedMessage: (
     deliveryId: string,
     text: string,

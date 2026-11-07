@@ -2714,14 +2714,15 @@ export class ChannelService {
         !message.questionPrompt
       )
         continue;
-      // OpenCode's text before a tool call streams as the answer and becomes a step only at that
-      // call. Copied while it streamed, each such note showed as the member's message and then
-      // folded (#4844). The agent's own chat still streams it; the channel gets it when it completes.
+      // OpenCode's text before a tool call streams as the answer, and Pi's streams with no phase. Each
+      // becomes a step only at that call. Copied while it streamed, each such note showed as the
+      // member's message and then folded (#4844). The agent's own chat still streams it; the channel
+      // gets it when it completes.
       if (
         !original &&
         message.author === "assistant" &&
         message.status === "streaming" &&
-        message.itemType === "final_answer" &&
+        (message.itemType === "final_answer" || message.itemType === "agentMessage") &&
         provisionalAnswers()
       )
         continue;
