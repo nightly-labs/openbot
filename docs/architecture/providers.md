@@ -407,6 +407,21 @@ streamed messages, permissions, tool bridging, and cancellation. `grok-client.ts
 login and billing hooks. The OpenCode driver starts `opencode acp` on the runtime OpenBot pins and
 downloads, or on a CLI the user installed. Profile clients deny tool permissions.
 
+Grok `agent stdio` ignores `--tools` and `--disallowed-tools`, so only environment and `config.toml`
+switches remove a Grok feature. At each spawn, `grok-client.ts` turns off four features that an
+OpenBot agent does not use: feedback (`GROK_FEEDBACK_ENABLED`), workflows (`GROK_WORKFLOWS`), the
+turn summary (`GROK_TURN_SUMMARY`) and the skills of `~/.claude/skills` (`GROK_CLAUDE_SKILLS_ENABLED`).
+An environment value wins over `config.toml`, so OpenBot sets a switch only when the user's
+environment and `$GROK_HOME/config.toml` both leave its key unset. A user can turn each feature back
+on in `config.toml`. On Grok CLI 1.0.70 and Grok Build Fast, feedback and workflows cost 1,707 prompt
+tokens in each request, the turn summary is one more request of about 1,600 after each turn, and one
+developer's Claude skills cost 2,811 in each request. The image, video, search, subagent and question
+tools stay: together they cost about 6,100, but an agent can use each of them. The session title
+request (about 500) has no switch. `bun run bench:grok-prompt-settings` measures these features
+through a local proxy and a copy of the user's Grok login without its refresh token.
+`bun run smoke:grok-agent` checks that an agent can still use a skill, the file and terminal tools,
+a subagent and git, and that the user's `config.toml` value wins.
+
 The pinned runtime is OpenCode 2 (`@opencode/cli`). Its platform tarballs carry no licence file, so
 the stage step copies `LICENSE` from the `opencode-ai` tarball that `licensePackage` in
 `native-runtime.lock.json` names. Every OpenCode install on the computer shares

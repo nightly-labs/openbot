@@ -236,6 +236,8 @@
     "test:pi-usage-cost": "bun scripts/pi-usage-cost-e2e.ts",
     "test:pi-mcp-deferred": "bun scripts/pi-mcp-deferred-e2e.ts",
     "test:grok-tool-trim": "bun scripts/grok-tool-trim-e2e.ts",
+    "bench:grok-prompt-settings": "bun scripts/grok-prompt-settings-bench.ts",
+    "smoke:grok-agent": "bun scripts/grok-agent-smoke.ts",
     "test:antigravity-tool-filter": "bun scripts/antigravity-tool-filter-e2e.ts",
     "test:codex-prompt-trim": "bun scripts/codex-prompt-trim-e2e.ts",
     "test:opencode-tool-trim": "bun scripts/opencode-tool-trim-e2e.ts",
