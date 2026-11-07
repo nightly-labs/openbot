@@ -654,6 +654,7 @@ export class BrowserCdpEngine {
   });
   #retainDebugger = false;
   #ownsDebugger = false;
+  #idleDetach: NodeJS.Immediate | undefined;
   #closing = false;
   #disposed = false;
   readonly #scope = Scope.makeUnsafe();
@@ -1969,8 +1970,18 @@ export class BrowserCdpEngine {
 
   /** The engine sees a dialog only while it stays attached: for each lease, watch, and open dialog. */
   #releaseIdleDebugger(): void {
-    if (this.#activeLeases === 0 && !this.#retainDebugger && !this.#dialog && this.#dialogWatches.size === 0)
-      this.#detachOwnedDebugger();
+    if (!this.#debuggerIdle() || this.#idleDetach) return;
+    // A lease can end inside a CDP message: a command fails while Chromium detaches the frame sessions
+    // of a committing navigation. A detach there frees the sessions that Chromium still uses, and the
+    // main process crashes (#5520). Detach on a later task, if the debugger is still idle then.
+    this.#idleDetach = setImmediate(() => {
+      this.#idleDetach = undefined;
+      if (this.#debuggerIdle()) this.#detachOwnedDebugger();
+    });
+  }
+
+  #debuggerIdle(): boolean {
+    return this.#activeLeases === 0 && !this.#retainDebugger && !this.#dialog && this.#dialogWatches.size === 0;
   }
 
   #signalDialogChange(): void {
@@ -2461,6 +2472,8 @@ export class BrowserCdpEngine {
     this.#disposed = true;
     yield* Scope.close(this.#scope, Exit.void);
     this.#retainDebugger = false;
+    clearImmediate(this.#idleDetach);
+    this.#idleDetach = undefined;
     this.#detachOwnedDebugger();
     // Electron keeps its box open after the page closes, a person's box too, and nobody can answer it
     // then. The box can also show after the close. The emit only runs JavaScript listeners.
