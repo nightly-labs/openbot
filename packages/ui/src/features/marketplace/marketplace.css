@@ -941,8 +941,14 @@ label.marketplace-skill-picker-row:hover {
   gap: var(--openbot-space-1);
 }
 
-.marketplace-skill-picker-agent > .marketplace-skill-picker-name {
-  flex: 0 1 auto;
+/* As in the sidebar, a long title gets smaller before the name does, to two characters. */
+.marketplace-skill-picker-agent:has(.agent-role-badge) {
+  --agent-role-badge-collapsed-width: calc(2ch + 9px);
+
+  display: grid;
+  grid-template-columns:
+    fit-content(calc(100% - var(--agent-role-badge-collapsed-width) - var(--openbot-space-1)))
+    minmax(var(--agent-role-badge-collapsed-width), 1fr);
 }
 
 .marketplace-skill-picker-none {
