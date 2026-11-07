@@ -30,7 +30,7 @@ import {
   ComposerUsageLimitNotice,
 } from "@openbot/ui/features/conversation/ComposerNotice";
 import { ComposerReplyPreview } from "@openbot/ui/features/conversation/ComposerReplyPreview";
-import { ComposerSendControl } from "@openbot/ui/features/conversation/ComposerSendControl";
+import { ComposerSendControl, type ComposerSendVoice } from "@openbot/ui/features/conversation/ComposerSendControl";
 import {
   ComposerCompactionNotice,
   ComposerNewChatButton,
@@ -124,7 +124,9 @@ export function ConversationComposer() {
     openSideQuestion,
     voiceConversationAvailable,
     openSidePanelPane,
+    closeSidePanelPane,
     activeRightPanel,
+    sendStarting,
     channel,
     providerSilentMinutes,
     providerOffline,
@@ -156,6 +158,21 @@ export function ConversationComposer() {
     };
   };
   const openVoiceConversation = () => (voiceConversationAvailable() ? () => openSidePanelPane("voice") : undefined);
+  /**
+   * With nothing to send, Send starts a voice conversation, as on mobile. While the Voice tab shows, the
+   * conversation runs, and the same button ends it.
+   */
+  const sendVoice = (): ComposerSendVoice | undefined => {
+    if (!props.agent || !voiceConversationAvailable()) return undefined;
+    if (composerHasContent() || editingDeliveryId() || attachmentBusy() || voicePhase() !== "idle") return undefined;
+    // Between a send and its turn, Send stays, so the voice icon does not show for a moment before Stop.
+    if (sendStarting()) return undefined;
+    return activeRightPanel() === "voice" ? "end" : "start";
+  };
+  const toggleVoiceConversation = () => {
+    if (activeRightPanel() === "voice") closeSidePanelPane("voice");
+    else openSidePanelPane("voice");
+  };
   // A pending Save keeps its exact request for retry. Block changes until retry or cancel.
   const savePending = () => Boolean(editingDeliveryId() && editingPendingSave());
   // One chip for each file of each import. Only a single-file import knows the bytes of its file.
@@ -369,6 +386,8 @@ export function ConversationComposer() {
         props.activeTurnId && !editingDeliveryId() && !composerHasContent() && voicePhase() !== "recording",
       )}
       onStop={props.onStop}
+      voice={sendVoice()}
+      onVoice={toggleVoiceConversation}
       label={sendLabel()}
       keyShortcuts={sendKeyShortcuts()}
       title={sendTitle()}
