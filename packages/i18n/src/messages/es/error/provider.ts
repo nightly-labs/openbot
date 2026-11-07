@@ -10,6 +10,8 @@ export const messages = {
   "error.provider.acpUnresponsive": "{provider} no respondió a tiempo, así que OpenBot terminó su proceso.",
   "error.provider.acpSignInLost":
     "{provider} perdió su inicio de sesión, así que OpenBot terminó su proceso. Envía tu mensaje de nuevo.",
+  "error.provider.acpPlanUsedUp":
+    "{provider} indica que tu plan está agotado. Elige otro modelo o mejora tu plan de {provider}.",
   "error.provider.acpMcpNotLoaded":
     "{provider} no cargó las herramientas de OpenBot, así que este agente no puede usarlas ni comunicarse con sus compañeros. Una política de equipo de {provider} puede bloquear los servidores MCP locales. Pide al administrador de tu equipo que los permita y vuelve a intentarlo.",
   "error.provider.endpointsReadOnly":

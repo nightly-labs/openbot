@@ -155,6 +155,11 @@ export interface AcpFlavor {
    * turn and ends the process, so the next turn starts a process that reads the sign-in again.
    */
   signInLostChunk?: RegExp;
+  /**
+   * A whole answer chunk that tells that the plan is used up, sent as answer text in a turn that
+   * then ends as a success. OpenBot fails the turn as a usage limit, so a backup model can take it.
+   */
+  planUsedUpChunk?: RegExp;
   /** The `_meta` of each `session/new`, `session/load` and `session/resume` request. */
   sessionMeta?: NewSessionRequest["_meta"];
   /**
@@ -215,6 +220,9 @@ export const CURSOR_ACP_FLAVOR: AcpFlavor = {
   // again (#4614).
   signInLostChunk:
     /^\n\n(?:Please sign in to continue|Error: \[unauthenticated\] Backend rejected authentication\.[^\n]*)$/u,
+  // Cursor sends a used-up plan as one chunk in the same form, and then ends the turn as a success
+  // (#5668). Only the full chunk matches, so an answer that quotes the text stays an answer.
+  planUsedUpChunk: /^\n\nUpgrade your plan to continue$/u,
   // Cursor 2026.10.22-27dcf5f asks its server for the model list on each model set, and reports a
   // failed request as "Invalid model value" (#3800). One set per change, not one per turn.
   processWideModel: true,
