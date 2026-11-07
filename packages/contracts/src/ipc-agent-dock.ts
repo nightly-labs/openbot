@@ -197,7 +197,7 @@ export function isAgentDockAction(value: unknown): value is AgentDockAction {
     case "send":
       return (
         isIdentifier(value.agentId) &&
-        isBoundedString(value.text, INPUT_LIMITS.directMessageText) &&
+        isBoundedString(value.text, INPUT_LIMITS.messageText) &&
         value.text.trim().length > 0 &&
         isIdentifier(value.clientMessageId)
       );
