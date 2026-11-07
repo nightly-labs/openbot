@@ -262,12 +262,13 @@ export function isTurnContextBlock(text: string): boolean {
 
 /**
  * The text a person wrote, without the turn context blocks at its start. A client that sends one
- * message string puts the blocks before the user's text, each followed by an empty line. The JSON in
- * a block has no raw line break, so the first closing tag on a line of its own ends the block.
+ * message string puts the blocks before the user's text, each followed by an empty line, and a
+ * provider can trim or join the parts again. The JSON in a block has no raw line break, so the first
+ * closing tag on a line of its own ends the block.
  */
 export function withoutTurnContext(text: string): string {
   return text.replace(
-    /^(?:<(openbot_saved_memories|openbot_saved_memories_update|openbot_section_teammates|openbot_turn_style)>\n[\s\S]*?\n<\/\1>\n\n)+/u,
+    /^(?:<(openbot_saved_memories|openbot_saved_memories_update|openbot_section_teammates|openbot_turn_style)>\n[\s\S]*?\n<\/\1>\n*)+/u,
     "",
   );
 }

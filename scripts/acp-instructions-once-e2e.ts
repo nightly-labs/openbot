@@ -197,6 +197,9 @@ try {
     );
     await turn("three", false);
     await turn("four", false);
+    // A slash command must start the prompt, and it can clear the context.
+    await turn("/review", false);
+    await turn("after-command", false);
     await turn("compact-now", false);
     await turn("five", true);
     await runCauseEffect(client.stop());
@@ -220,6 +223,11 @@ try {
       "memory: the update has only the change.",
     );
     assert.deepEqual(contextOf("four"), [], "memory: the update is sent once.");
+    assert.deepEqual(contextOf("/review"), [], "memory: a slash command gets no blocks.");
+    assert.ok(
+      contextOf("after-command")[0]?.startsWith("<openbot_saved_memories>"),
+      "memory: the prompt after a slash command has all memories.",
+    );
     const again = contextOf("five")[0] ?? "";
     assert.ok(
       again.startsWith("<openbot_saved_memories>") && again.includes("short answers") && again.includes("Kraków"),

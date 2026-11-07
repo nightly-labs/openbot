@@ -47,7 +47,7 @@ import {
   OPENCODE_CHILD_UPDATE_METHOD,
   type OpenCodeLaunches,
 } from "./agent/acp-subagent-updates";
-import { isTurnContextBlock } from "./agent/developer-instructions";
+import { isTurnContextBlock, withoutTurnContext } from "./agent/developer-instructions";
 import { acpPlanSteps, PLAN_UPDATED_METHOD } from "./agent/plan-updates";
 import { elicitationFieldQuestions, elicitationValue } from "./agent/prompts";
 import {
@@ -1129,7 +1129,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       case "thread/start":
       case "thread/resume": {
         const response = yield* this.#startThread(params, method === "thread/resume");
-        this.#turnContext.set(response.thread.id, params, method === "thread/resume");
+        // A resume with no thread id opens a new session, which holds no context.
+        const resumed = method === "thread/resume" && getString(params, "threadId") === response.thread.id;
+        this.#turnContext.set(response.thread.id, params, resumed);
         return yield* providerSync(() => decoder(response));
       }
       case "thread/read": {
@@ -1869,7 +1871,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   /** Converts ACP replay notifications into storage fragments, with no live turn side effects. */
   #historyUpdate(replay: HistoryReplay, notification: SessionNotification): void {
     replay.hasUpdates = true;
-    const update = notification.update;
+    let update = notification.update;
     const messageId = contentMessageId(update);
     const startsTurn =
       update.sessionUpdate === "user_message_chunk" &&
@@ -1903,13 +1905,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       replay.turnHasOutput = true;
     }
     if (replay.items === "none") return;
-    // OpenBot's memory and section-mate blocks are not text that the user wrote.
+    // OpenBot's memory and section-mate blocks are not text that the user wrote. An agent can replay
+    // them as chunks of their own or joined with the user's text.
     if (
       update.sessionUpdate === "user_message_chunk" &&
       update.content.type === "text" &&
       isTurnContextBlock(update.content.text)
-    )
-      return;
+    ) {
+      const text = withoutTurnContext(update.content.text);
+      if (!text) return;
+      update = { ...update, content: { ...update.content, text } };
+    }
     if (
       (update.sessionUpdate === "agent_message_chunk" || update.sessionUpdate === "user_message_chunk") &&
       update.content.type === "text" &&
@@ -2117,7 +2123,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         (thread.contextUsed === null && thread.promptsSinceInstructions > ACP_INSTRUCTIONS_REFRESH_PROMPTS));
     // With the instructions again, the memories and section-mates go in full too.
     if (sendInstructions) this.#turnContext.resend(thread.id);
-    blocks.unshift(...this.#turnContext.take(thread.id).map((text) => ({ type: "text" as const, text })));
+    // A slash command gets no blocks: the agent reads a command only at the start of the prompt.
+    const first = blocks[0];
+    const command = first?.type === "text" && first.text.startsWith("/");
+    blocks.unshift(...this.#turnContext.take(thread.id, command).map((text) => ({ type: "text" as const, text })));
     if (sendInstructions) {
       blocks.unshift({
         type: "text",

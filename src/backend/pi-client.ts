@@ -336,7 +336,9 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       case "thread/start":
       case "thread/resume": {
         const thread = yield* this.#opening.withPermit(this.#open(params, method === "thread/resume", true));
-        this.#turnContext.set(thread.id, params, method === "thread/resume");
+        // A resume with no thread id opens a new session, which holds no context.
+        const resumed = method === "thread/resume" && getString(params, "threadId") === thread.id;
+        this.#turnContext.set(thread.id, params, resumed);
         response = { thread: { id: thread.id } };
         break;
       }

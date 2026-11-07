@@ -635,7 +635,11 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     // instructions again, the memories and section-mates go in full too.
     const sendInstructions = !compact && thread.instructions && thread.instructionsSent !== thread.instructions;
     if (sendInstructions) this.#turnContext.resend(thread.id);
-    if (!compact) input.unshift(...this.#turnContext.take(thread.id).map((text) => ({ type: "text" as const, text })));
+    // A slash command gets no blocks: the agent reads a command only at the start of the input.
+    const first = input[0];
+    const command = first?.type === "text" && first.text?.startsWith("/") === true;
+    if (!compact)
+      input.unshift(...this.#turnContext.take(thread.id, command).map((text) => ({ type: "text" as const, text })));
     if (sendInstructions) {
       input.unshift({ type: "text", text: thread.instructions });
       thread.instructionsSent = thread.instructions;
