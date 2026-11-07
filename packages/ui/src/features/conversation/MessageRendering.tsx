@@ -38,7 +38,16 @@ import { AttachmentCards, type AttachmentDownloads, type AttachmentMediaSource }
 import { CodeBlock } from "./CodeBlock";
 import { CodePreview } from "./CodePreview";
 import { ComparisonTable } from "./ComparisonTable";
-import { BranchIcon, CheckIcon, CopyIcon, PlusIcon, ReactionIcon, ReplyIcon, StopIcon } from "./ConversationIcons";
+import {
+  BranchIcon,
+  CheckIcon,
+  CopyIcon,
+  MoreIcon,
+  PlusIcon,
+  ReactionIcon,
+  ReplyIcon,
+  StopIcon,
+} from "./ConversationIcons";
 import { createSmoothHeightResize } from "./createSmoothHeightResize";
 import { DataTable, type MessageContentBlock, messageContentBlocks, reuseUnchangedBlocks } from "./DataTable";
 import { messageFileReferences } from "./FileReference";
@@ -905,6 +914,11 @@ function imageGenerationStatus(
   return "completed";
 }
 
+/**
+ * The action row of a message. Each button shows when its action is given. The compact row gives
+ * React, Reply and `menu`: More opens the items of the right-click menu, so the row stays short and
+ * every action is still one click away. The full row gives Copy, Read aloud, React, Reply and Branch.
+ */
 export function MessageActions(props: {
   message: AgentMessage;
   /** Names the toolbar for a screen reader. A channel has more authors than "Agent". */
@@ -916,12 +930,13 @@ export function MessageActions(props: {
   reactions?: boolean;
   pickerOpen: boolean;
   expandedEmoji: boolean;
-  copied: boolean;
   onTogglePicker: () => void;
   onExpandEmoji: () => void;
   onReact: (emoji: MessageReaction | null) => void;
   onReply?: (() => void) | undefined;
-  onCopy: () => void;
+  /** Copies the message. True `copied` shows that the copy happened a moment ago. */
+  onCopy?: (() => void) | undefined;
+  copied?: boolean | undefined;
   /** Reads the message aloud, or stops it while it is read. Absent where replies cannot be read aloud. */
   readAloud?: { reading: boolean; onToggle: () => void } | undefined;
   /**
@@ -931,26 +946,33 @@ export function MessageActions(props: {
   onBranch?: (() => void) | undefined;
   /** A turn runs in the thread, so Branch shows but does nothing. */
   branchDisabled?: boolean | undefined;
+  /** The items of the More menu, a `MessageMenuItems`. Without it, the row has no More button. */
+  menu?: (() => JSX.Element) | undefined;
 }) {
   const { t } = useText();
+  const [menuOpen, setMenuOpen] = createSignal(false);
   const authorName = () => props.authorName ?? t("chat.message.agentFallback");
   return (
     <div
-      class={["message-actions", { "message-actions-open": props.pickerOpen }]}
+      class={["message-actions", { "message-actions-open": props.pickerOpen || menuOpen() }]}
       role="toolbar"
       aria-label={
         props.message.author === "you" ? t("chat.actions.userLabel") : t("chat.actions.label", { name: authorName() })
       }
     >
-      <Button
-        variant="ghost"
-        type="button"
-        class="message-action-button"
-        aria-label={props.copied ? t("common.copied") : t("common.copy")}
-        onClick={props.onCopy}
-      >
-        {props.copied ? <CheckIcon /> : <CopyIcon />}
-      </Button>
+      <Show when={props.onCopy}>
+        {(onCopy) => (
+          <Button
+            variant="ghost"
+            type="button"
+            class="message-action-button"
+            aria-label={props.copied ? t("common.copied") : t("common.copy")}
+            onClick={() => onCopy()()}
+          >
+            {props.copied ? <CheckIcon /> : <CopyIcon />}
+          </Button>
+        )}
+      </Show>
       <Show when={props.readAloud}>
         {(readAloud) => (
           <Button
@@ -1055,18 +1077,26 @@ export function MessageActions(props: {
           </Button>
         )}
       </Show>
+      <Show when={props.menu}>
+        {(menu) => (
+          <div class="message-action-popover-anchor">
+            <DropdownMenu.Root open={menuOpen()} onOpenChange={setMenuOpen} placement="bottom-start" gutter={6}>
+              <DropdownMenu.Trigger class="message-action-button" aria-label={t("chat.actions.more")}>
+                <MoreIcon />
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content aria-label={t("chat.actions.more")}>{menu()()}</DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+          </div>
+        )}
+      </Show>
     </div>
   );
 }
 
-/**
- * The right-click menu of a message, for `ChatMessageRow`'s `menu` slot. It holds the actions of
- * `MessageActions` with text labels; React opens a submenu with every reaction.
- */
-export function MessageMenu(props: {
+export interface MessageMenuItemsProps {
   message: AgentMessage;
-  /** Names the menu for a screen reader. A channel has more authors than "Agent". */
-  authorName?: string | undefined;
   /** Whether React stands in the menu. A channel message has no owner to hold a reaction yet. */
   reactions?: boolean;
   onReact: (emoji: MessageReaction | null) => void;
@@ -1083,17 +1113,18 @@ export function MessageMenu(props: {
   sendToChannel?: { channels: { id: string; name: string }[]; onSend: (channelId: string) => void } | undefined;
   /** Asks to delete this message. Without it, the menu has no such item. */
   onDelete?: (() => void) | undefined;
-}) {
+}
+
+/**
+ * The items of a message's menu. The right-click menu and the More button of the action row show
+ * the same items; React opens a submenu with every reaction.
+ */
+export function MessageMenuItems(props: MessageMenuItemsProps) {
   const { t } = useText();
-  const authorName = () => props.authorName ?? t("chat.message.agentFallback");
   const react = (emoji: MessageReaction) => props.onReact(props.message.reaction === emoji ? null : emoji);
   const sendToChannel = () => (props.sendToChannel?.channels.length ? props.sendToChannel : undefined);
   return (
-    <ContextMenu.Content
-      aria-label={
-        props.message.author === "you" ? t("chat.actions.userLabel") : t("chat.actions.label", { name: authorName() })
-      }
-    >
+    <>
       <Show when={props.onReply}>
         {(onReply) => (
           <ContextMenu.Item onSelectAfterClose={onReply()}>
@@ -1204,6 +1235,26 @@ export function MessageMenu(props: {
           </>
         )}
       </Show>
+    </>
+  );
+}
+
+/** The right-click menu of a message, for `ChatMessageRow`'s `menu` slot. */
+export function MessageMenu(
+  props: MessageMenuItemsProps & {
+    /** Names the menu for a screen reader. A channel has more authors than "Agent". */
+    authorName?: string | undefined;
+  },
+) {
+  const { t } = useText();
+  const authorName = () => props.authorName ?? t("chat.message.agentFallback");
+  return (
+    <ContextMenu.Content
+      aria-label={
+        props.message.author === "you" ? t("chat.actions.userLabel") : t("chat.actions.label", { name: authorName() })
+      }
+    >
+      <MessageMenuItems {...props} />
     </ContextMenu.Content>
   );
 }

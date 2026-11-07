@@ -758,4 +758,12 @@ export const messages = {
   "server.restartNotice.restartingTitle": "جارٍ إعادة تشغيل {name} لتثبيت تحديث",
   "server.restartNotice.restartingDescription": "يعيد OpenBot الاتصال تلقائيًا عند عودة {name}.",
   "server.restartNotice.backTitle": "عاد {name} متصلًا",
+  "server.settings.personalityTitle": "الشخصية",
+  "server.settings.personalityDescription": "اختر كيف يتحدث إليك الوكلاء على هذا الخادم.",
+  "server.settings.responseStyle": "أسلوب الرد",
+  "server.settings.responseStyleDescription":
+    "طبيعي: يرسل الوكلاء تحديثات قصيرة أثناء العمل وتعرضها الدردشة. كلاسيكي: يرد الوكلاء مرة واحدة عند الانتهاء.",
+  "server.settings.responseStyleNatural": "طبيعي",
+  "server.settings.responseStyleClassic": "كلاسيكي",
+  "server.settings.personalityLoadFailed": "تعذّر تحميل شخصية الخادم.",
 } as const satisfies PartialTranslation<typeof source>;

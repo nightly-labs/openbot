@@ -1,7 +1,7 @@
 import { BloubBot, type ExpressionId, POSES } from "@norbert_bodziony/bloub";
 import { PlushBot, type PlushState, type PlushTransition } from "@norbert_bodziony/bloub/plush";
 import { type AvatarMood, avatarMoodPresentation, type ShapeSafeStateId } from "@openbot/brand/bloub-avatar-motion";
-import type { AvatarColor, AvatarHue } from "@openbot/contracts/ipc";
+import type { AgentStepActivity, AvatarColor, AvatarHue } from "@openbot/contracts/ipc";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
 import {
@@ -72,6 +72,30 @@ const HOVER_FACES: readonly HoverFace[] = [
 const WORKING_FACE_MIN_MS = 700;
 const WORKING_FACE_MAX_MS = 3200;
 
+/**
+ * How a working plush with an `activity` shows what its step does, as Grok Bot's avatar does. Each
+ * one keeps the body: it looks round with interest for a search, opens its eyes wide at a page,
+ * looks hard at what it reads, is eager while a command runs, is proud of a change, winks as it hands
+ * work to another agent, and thinks with the felt dots while it reads a result. Faces that read as a
+ * mood, such as anger or fear, are not used.
+ */
+const ACTIVITY_MOODS: Readonly<Record<AgentStepActivity, PlushMood>> = {
+  searching: { state: "idle", expression: "curieux", busy: true },
+  browsing: { state: "wide", expression: null, busy: true },
+  reading: { state: "idle", expression: "attentif", busy: true },
+  running: { state: "idle", expression: "excite", busy: true },
+  editing: { state: "idle", expression: "fier", busy: true },
+  delegating: { state: "wink", expression: null, busy: true },
+  working: { state: "idle", expression: "attentif", busy: true },
+  reviewing: PLUSH_MOODS.working,
+};
+
+/**
+ * How long a step face stays at least. A fast step would change the face before the morph ends,
+ * so a face waits until the one before it has shown this long. It is Grok Bot's hold.
+ */
+const ACTIVITY_HOLD_MS = 1_400;
+
 /** A photo has no face to move, so a busy agent's photo breathes: a slow scale of the whole circle. */
 const PHOTO_BREATHE = "0.03";
 
@@ -124,6 +148,11 @@ interface AgentAvatarProps {
    */
   workingFaces?: boolean;
   /**
+   * What the running step of a working agent does. The plush then shows the face of
+   * `ACTIVITY_MOODS` for it, not only the felt dots. Use it on the one line that shows an agent at work.
+   */
+  activity?: AgentStepActivity | null | undefined;
+  /**
    * Makes the eyes and the space between them larger. A small avatar, 24-40px, shows its face better
    * with larger eyes. 1 is the default size. A photo avatar ignores it.
    */
@@ -172,6 +201,7 @@ export function AgentAvatar(props: AgentAvatarProps) {
           transition={props.transition ?? "pop"}
           followPointer={props.followPointer === true}
           workingFaces={props.workingFaces === true}
+          activity={props.activity ?? null}
           eyeScale={props.eyeScale}
           class={className()}
           style={props.style}
@@ -208,6 +238,7 @@ function GeneratedAvatar(props: {
   transition: PlushTransition;
   followPointer: boolean;
   workingFaces: boolean;
+  activity: AgentStepActivity | null;
   eyeScale?: number | undefined;
   class: string;
   style?: Record<string, string> | undefined;
@@ -220,12 +251,19 @@ function GeneratedAvatar(props: {
   const reducedMotion = () => prefersReduced() || documentSoftwareRendering();
   const cyclesFaces = () => props.workingFaces && props.mood === "working";
   const [workingFace, setWorkingFace] = createSignal<ExpressionId>(nextWorkingFace(null));
-  const plushMood = createMemo(
-    (): PlushMood =>
-      cyclesFaces()
-        ? { state: "idle", expression: reducedMotion() ? "attentif" : workingFace(), busy: true }
-        : PLUSH_MOODS[props.mood],
-  );
+  // The face cycle wins: the sidebar badge already shows the work there. Reduced motion keeps the
+  // felt dots: a frozen plush cannot morph between faces.
+  const requestedActivity = () =>
+    props.mood === "working" && !props.workingFaces && !reducedMotion() ? props.activity : null;
+  const shownActivity = createHeldActivity(requestedActivity, ACTIVITY_HOLD_MS);
+  const activityMood = () => {
+    const activity = shownActivity();
+    return activity ? ACTIVITY_MOODS[activity] : null;
+  };
+  const plushMood = createMemo((): PlushMood => {
+    if (cyclesFaces()) return { state: "idle", expression: reducedMotion() ? "attentif" : workingFace(), busy: true };
+    return activityMood() ?? PLUSH_MOODS[props.mood];
+  });
   const profile = createMemo(() => bloubAvatarProfile(props.seed, props.hue, props.color));
   const restingExpression = () => props.expression ?? profile().expression;
   // A preview of a chosen shape or eyes keeps the face it shows, so the choice stays visible on hover.
@@ -254,8 +292,11 @@ function GeneratedAvatar(props: {
   const flatAppearance = createMemo(() => {
     const presentation = avatarMoodPresentation(props.mood);
     const hover = hovered() ? hoverFace() : null;
-    const working = cyclesFaces() ? plushMood().expression : null;
-    const state: ShapeSafeStateId = hover?.state === "wink" ? "wink" : presentation.state;
+    // The flat Bloub takes the face of a step, and of its states only `wide` and `wink`, which keep the body.
+    const stepMood = activityMood();
+    const working = cyclesFaces() ? plushMood().expression : (stepMood?.expression ?? null);
+    const motionState = stepMood?.state === "wide" || stepMood?.state === "wink" ? stepMood.state : null;
+    const state: ShapeSafeStateId = hover?.state === "wink" ? "wink" : (motionState ?? presentation.state);
     return {
       shape: props.shape ?? profile().shape,
       color: profile().color,
@@ -463,6 +504,29 @@ function randomHoverFace(previous: HoverFace | null, resting: ExpressionId): Hov
 function nextWorkingFace(current: ExpressionId | null): ExpressionId {
   const choices = AVATAR_EXPRESSIONS.filter((face) => face !== current);
   return choices[Math.floor(Math.random() * choices.length)] ?? "attentif";
+}
+
+/**
+ * `value`, but a new activity waits until the one before it has shown for `holdMs`. Only the newest
+ * waiting activity shows, so a run of fast steps ends on the last one.
+ */
+function createHeldActivity(value: () => AgentStepActivity | null, holdMs: number): () => AgentStepActivity | null {
+  const [shown, setShown] = createSignal<AgentStepActivity | null>(null);
+  let shownAt = 0;
+  createEffect(value, (next) => {
+    const wait = shownAt + holdMs - Date.now();
+    const show = () => {
+      shownAt = Date.now();
+      setShown(next);
+    };
+    if (wait <= 0) {
+      show();
+      return;
+    }
+    const timer = window.setTimeout(show, wait);
+    return () => window.clearTimeout(timer);
+  });
+  return shown;
 }
 
 function avatarAnimationPhase(seed: string): number {

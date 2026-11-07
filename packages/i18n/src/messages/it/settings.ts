@@ -85,6 +85,9 @@ export const messages = {
   "settings.showAgentSteps.title": "Mostra i passaggi dell'agente",
   "settings.showAgentSteps.description":
     "Apre per impostazione predefinita il ragionamento, i passaggi degli strumenti e le modifiche alle memorie di ogni turno su questo dispositivo e browser.",
+  "settings.compactMessageActions.title": "Azioni dei messaggi compatte",
+  "settings.compactMessageActions.description":
+    "Mostra Reagisci, Rispondi e Altro accanto a un messaggio e l’ora tra i messaggi. Se disattivato, tutte le azioni e l’ora compaiono sotto ogni messaggio.",
   "settings.busyMessage.title": "Indirizza gli agenti mentre lavorano",
   "settings.busyMessage.description":
     "I nuovi messaggi si uniscono al lavoro in corso dell'agente, non alla coda. Funziona con ChatGPT e Claude.",

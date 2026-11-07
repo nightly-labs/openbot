@@ -627,4 +627,12 @@ export const messages = {
   "server.restartNotice.restartingTitle": "{name} перезапускается, чтобы установить обновление",
   "server.restartNotice.restartingDescription": "OpenBot подключится снова автоматически, когда {name} вернётся.",
   "server.restartNotice.backTitle": "{name} снова в сети",
+  "server.settings.personalityTitle": "Характер",
+  "server.settings.personalityDescription": "Выберите, как агенты на этом сервере общаются с вами.",
+  "server.settings.responseStyle": "Стиль ответов",
+  "server.settings.responseStyleDescription":
+    "Естественный: агенты присылают короткие обновления во время работы, и чат их показывает. Классический: агенты отвечают один раз, когда закончат.",
+  "server.settings.responseStyleNatural": "Естественный",
+  "server.settings.responseStyleClassic": "Классический",
+  "server.settings.personalityLoadFailed": "Не удалось загрузить характер сервера.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1245,8 +1245,9 @@ message. The answers go from the computer to the Slack Web API directly.
   which runs on its provider like any other agent and passes the work to a teammate with the facts
   it needs.
 - **Sent to Slack.** The agents' answers and the files they attach, short status posts ("Working on
-  it…"), reactions, and approval requests with the command, folder and
-  reason the provider gave, redacted. A failed request posts a fixed sentence, never the provider's
+  it…", or with the Natural response style the agent's latest progress line, redacted, never its
+  thinking), reactions, and approval requests with the command, folder and reason the provider gave,
+  redacted. A failed request posts a fixed sentence, never the provider's
   error. Any agent, also in the user's own chat or a routine run, can post text, redacted, and
   files from its workspace or the OpenBot shared directory to a channel that OpenBot is a member of,
   and list those channels' names. A new post can ping a user that it mentions, never a channel,
@@ -1351,7 +1352,7 @@ short-lived signed addresses, in transit only.
   agent, which runs on its provider like any other agent and passes the work to a teammate with the
   facts it needs.
 - **Sent to Telegram.** The agents' answers and the files they attach, short status posts ("Working on
-  it…"), reactions, and approval requests with the command, folder and reason the provider gave,
+  it…", or the redacted progress line, as for Slack), reactions, and approval requests with the command, folder and reason the provider gave,
   redacted. A failed request posts a fixed sentence, never the provider's error. As for Slack, any
   agent can post redacted text and files from its workspace or the OpenBot shared directory to a
   linked chat. An answer or a post can ping a person that it mentions.

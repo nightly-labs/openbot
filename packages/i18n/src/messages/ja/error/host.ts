@@ -32,4 +32,5 @@ export const messages = {
     "テナントの停止がタイムアウトしました。アプリケーションの置き換えは開始されていません。",
   "error.host.tenantHealthMissing":
     "再起動後のテナントの正常性レポートがないか、異常です。次の更新の前に、テナントのセッションを確認してください。",
+  "error.host.personalityInvalid": "この応答スタイルは不明です。",
 } as const satisfies PartialTranslation<typeof source>;

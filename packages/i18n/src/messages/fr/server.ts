@@ -607,4 +607,12 @@ export const messages = {
   "server.restartNotice.restartingTitle": "{name} redémarre pour installer une mise à jour",
   "server.restartNotice.restartingDescription": "OpenBot se reconnecte automatiquement quand {name} est de retour.",
   "server.restartNotice.backTitle": "{name} est de nouveau en ligne",
+  "server.settings.personalityTitle": "Personnalité",
+  "server.settings.personalityDescription": "Choisissez comment les agents de ce serveur vous parlent.",
+  "server.settings.responseStyle": "Style de réponse",
+  "server.settings.responseStyleDescription":
+    "Naturel : les agents envoient de courtes mises à jour pendant leur travail, et le chat les affiche. Classique : les agents répondent une seule fois, à la fin.",
+  "server.settings.responseStyleNatural": "Naturel",
+  "server.settings.responseStyleClassic": "Classique",
+  "server.settings.personalityLoadFailed": "Impossible de charger la personnalité du serveur.",
 } as const satisfies PartialTranslation<typeof source>;

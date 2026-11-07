@@ -84,6 +84,9 @@ export const messages = {
   "settings.showAgentSteps.title": "エージェントのステップを表示",
   "settings.showAgentSteps.description":
     "このデバイスとこのブラウザーで、各ターンの思考、ツールのステップ、メモリーの変更を既定で開きます。",
+  "settings.compactMessageActions.title": "コンパクトなメッセージ操作",
+  "settings.compactMessageActions.description":
+    "メッセージの横にリアクション、返信、その他を表示し、メッセージの間に時刻を表示します。オフにすると、すべての操作と時刻が各メッセージの下に表示されます。",
   "settings.busyMessage.title": "作業中のエージェントの方向を修正",
   "settings.busyMessage.description":
     "新しいメッセージはキューに入らず、エージェントの現在の作業に加わります。ChatGPT と Claude で使えます。",

@@ -1,6 +1,9 @@
+import type { AgentProviderRef } from "@openbot/contracts/agent-providers";
+import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
 import type {
   AgentEvent,
   ConversationMessage,
+  ConversationSnapshot,
   MessagingPlatform,
   RoutineResultConnectionOption,
 } from "@openbot/contracts/ipc";
@@ -49,7 +52,9 @@ export type MessagingActivity =
       answer: string | null;
       files: MessagingAnswerFile[];
     }
-  | { type: "cancelled"; link: MessagingLink; origin: MessagingOrigin };
+  | { type: "cancelled"; link: MessagingLink; origin: MessagingOrigin }
+  /** A new progress line that the agent wrote between its steps, with the Natural style. */
+  | { type: "progress"; link: MessagingLink; turnId: string; origin: MessagingOrigin; text: string };
 
 export interface MessagingReceiveInput {
   connectionId: string;
@@ -230,6 +235,11 @@ export interface MessagingThreadsHooks {
    * Null when a compaction could drop the guidance with no signal, so each prompt repeats it.
    */
   contextSession(agentId: string, threadId: string): string | null;
+  /**
+   * The provider of the agent when the server uses the Natural style, so the conversation sees the
+   * agent's progress lines. Null with the Classic style: the conversation sees only "Working".
+   */
+  progressUpdates(agentId: string): AgentProviderRef | null;
 }
 
 /**
@@ -267,12 +277,19 @@ export class MessagingThreads {
   readonly #listeners = new Set<(activity: MessagingActivity) => void>();
   readonly #admissions = new Map<string, Deferred.Deferred<void>>();
   /** The external message each running turn answers, by turn id. */
-  readonly #turnOrigins = new Map<string, { origin: MessagingOrigin | null; followUp: boolean }>();
+  readonly #turnOrigins = new Map<
+    string,
+    { deliveryIds: readonly string[]; origin: MessagingOrigin | null; followUp: boolean }
+  >();
+  /** The deliveries whose requester stopped them while they were starting, so their turn stops when it starts. */
+  readonly #stopsBeforeStart = new Set<string>();
   /**
    * The newest turns whose end the conversation was told of, so `deliverySettled` does not tell it a
    * second time. Past the cap, the oldest goes.
    */
   readonly #finishedTurns = new Set<string>();
+  /** The id of the last progress line that each running turn reported, by turn id. */
+  readonly #progress = new Map<string, string>();
   /**
    * The provider session that read the guidance and the saved facts of each conversation, by link
    * id. Kept in memory only: after a restart, the first prompt of each conversation repeats them.
@@ -778,20 +795,32 @@ export class MessagingThreads {
   event(event: AgentEvent, scope: Scope.Scope): boolean {
     switch (event.type) {
       case "conversation":
-        return event.snapshot.threadId !== null && this.#takes(event.snapshot.threadId);
+        if (event.snapshot.threadId === null) return false;
+        this.#reportProgress(event.snapshot);
+        return this.#takes(event.snapshot.threadId);
       case "conversation-delta":
       case "turn-progress":
         return this.#takes(event.threadId);
       case "turn-started": {
         const link = this.store.linkForThread(event.threadId);
         if (!link) return false;
-        const running = this.#mailbox
+        const active = this.#mailbox
           .unresolvedMessagingDeliveries(link.linkId)
-          .find((context) => context.delivery.status !== "queued");
+          .filter((context) => context.delivery.status !== "queued");
+        const running = active[0];
         const origin = running ? this.#mailbox.messagingOrigin(running.delivery.id) : null;
         const followUp = running?.delivery.sender.kind === "agent";
-        this.#turnOrigins.set(event.turnId, { origin, followUp });
+        const deliveryIds = active.map((context) => context.delivery.id);
+        this.#turnOrigins.set(event.turnId, { deliveryIds, origin, followUp });
         this.#publish({ type: "started", link, turnId: event.turnId, origin, followUp });
+        let stopped = false;
+        for (const deliveryId of deliveryIds) if (this.#stopsBeforeStart.delete(deliveryId)) stopped = true;
+        if (stopped)
+          Effect.runFork(
+            this.#hooks
+              .interrupt(link.agentId, event.turnId, link.threadId)
+              .pipe(Effect.uninterruptible, Effect.forkIn(scope, { startImmediately: true })),
+          );
         return !this.#hooks.ownChat(event.threadId);
       }
       case "turn-completed": {
@@ -799,6 +828,7 @@ export class MessagingThreads {
         if (!link) return false;
         const started = this.#turnOrigins.get(event.turnId) ?? { origin: null, followUp: false };
         this.#turnOrigins.delete(event.turnId);
+        this.#progress.delete(event.turnId);
         // A turn with no known requester tells no conversation, so `deliverySettled` still must.
         if (started.origin) {
           this.#finishedTurns.add(event.turnId);
@@ -826,6 +856,35 @@ export class MessagingThreads {
     return this.store.linkForThread(threadId) !== null && !this.#hooks.ownChat(threadId);
   }
 
+  /**
+   * Reports the newest completed progress line of the running turn once. Only narration counts: the
+   * agent's thinking never goes to the conversation.
+   */
+  #reportProgress(snapshot: ConversationSnapshot): void {
+    const turnId = snapshot.activeTurnId;
+    const origin = turnId ? this.#turnOrigins.get(turnId)?.origin : null;
+    if (!turnId || !origin || snapshot.threadId === null) return;
+    const link = this.store.linkForThread(snapshot.threadId);
+    const provider = link ? this.#hooks.progressUpdates(link.agentId) : null;
+    if (!link || !provider) return;
+    // From the end, without a copy: this runs on each snapshot of the turn.
+    let update: (typeof snapshot.messages)[number] | undefined;
+    for (let index = snapshot.messages.length - 1; index >= 0 && !update; index -= 1) {
+      const message = snapshot.messages[index];
+      if (
+        message?.turnId === turnId &&
+        message.itemType === "commentary" &&
+        message.status === "completed" &&
+        message.text.trim() &&
+        isNarrationItemId(message.id, provider)
+      )
+        update = message;
+    }
+    if (!update || this.#progress.get(turnId) === update.id) return;
+    this.#progress.set(turnId, update.id);
+    this.#publish({ type: "progress", link, turnId, origin, text: update.text.trim() });
+  }
+
   /** A messaging delivery that failed before its turn started ends like a failed turn. */
   deliveryFailed(deliveryId: string): void {
     this.deliverySettled(deliveryId, "failed");
@@ -839,13 +898,17 @@ export class MessagingThreads {
    */
   deliverySettled(deliveryId: string, status: "completed" | "failed" | "interrupted"): void {
     this.#prepared.delete(deliveryId);
+    this.#stopsBeforeStart.delete(deliveryId);
     const origin = this.#mailbox.messagingOrigin(deliveryId);
     const link = origin ? this.store.link(origin.linkId) : null;
     if (!origin || !link) return;
     const delivery = this.#mailbox.getDelivery(deliveryId)?.delivery;
     const turnId = delivery?.turnId ?? null;
     if (turnId && this.#finishedTurns.has(turnId)) return;
-    if (turnId) this.#turnOrigins.delete(turnId);
+    if (turnId) {
+      this.#turnOrigins.delete(turnId);
+      this.#progress.delete(turnId);
+    }
     const answer =
       status === "completed" && turnId
         ? ([...this.#turnMessages(link, turnId)].reverse().find(isAnswer)?.text ?? null)
@@ -897,6 +960,13 @@ export class MessagingThreads {
       } else if (context.delivery.status === "running" && context.delivery.turnId) {
         const turnId = context.delivery.turnId;
         yield* this.#hooks.interrupt(link.agentId, turnId, link.threadId).pipe(toMessagingThreadFailed);
+        stopped = true;
+      } else if (context.delivery.status === "starting") {
+        // The turn has no id yet. When it already started, stop it now; else stop it when it starts (#5516).
+        const deliveryId = context.delivery.id;
+        const started = [...this.#turnOrigins].find(([, turn]) => turn.deliveryIds.includes(deliveryId))?.[0];
+        if (started) yield* this.#hooks.interrupt(link.agentId, started, link.threadId).pipe(toMessagingThreadFailed);
+        else this.#stopsBeforeStart.add(deliveryId);
         stopped = true;
       }
     }

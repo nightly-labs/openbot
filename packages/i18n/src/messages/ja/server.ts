@@ -594,4 +594,12 @@ export const messages = {
   "server.restartNotice.restartingTitle": "{name} はアップデートをインストールするため再起動しています",
   "server.restartNotice.restartingDescription": "{name} が復帰すると、OpenBot が自動的に再接続します。",
   "server.restartNotice.backTitle": "{name} がオンラインに戻りました",
+  "server.settings.personalityTitle": "パーソナリティ",
+  "server.settings.personalityDescription": "このサーバーのエージェントの話し方を選びます。",
+  "server.settings.responseStyle": "応答スタイル",
+  "server.settings.responseStyleDescription":
+    "ナチュラル: エージェントは作業中に短い進捗を送り、チャットに表示されます。クラシック: エージェントは完了時に一度だけ答えます。",
+  "server.settings.responseStyleNatural": "ナチュラル",
+  "server.settings.responseStyleClassic": "クラシック",
+  "server.settings.personalityLoadFailed": "サーバーのパーソナリティを読み込めませんでした。",
 } as const satisfies PartialTranslation<typeof source>;

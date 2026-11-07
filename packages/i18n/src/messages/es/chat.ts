@@ -354,6 +354,7 @@ export const messages = {
   "chat.actions.branch": "Ramificar en un hilo nuevo",
   "chat.actions.readAloud": "Leer en voz alta",
   "chat.actions.stopReading": "Dejar de leer",
+  "chat.actions.more": "Más acciones",
   "chat.menu.reply": "Responder",
   "chat.menu.copy": "Copiar mensaje",
   "chat.menu.react": "Reaccionar",

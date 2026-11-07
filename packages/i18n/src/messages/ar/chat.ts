@@ -492,6 +492,7 @@ export const messages = {
   "chat.actions.branch": "التفرع في سلسلة جديدة",
   "chat.actions.readAloud": "القراءة بصوت عالٍ",
   "chat.actions.stopReading": "إيقاف القراءة",
+  "chat.actions.more": "إجراءات أخرى",
   "chat.menu.reply": "رد",
   "chat.menu.copy": "نسخ الرسالة",
   "chat.menu.react": "تفاعل",

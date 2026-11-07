@@ -88,6 +88,9 @@ export const messages = defineMessages("settings", {
   "settings.showAgentSteps.title": "Show agent steps",
   "settings.showAgentSteps.description":
     "Open the thinking, tool steps and memory changes of each turn by default on this device and browser.",
+  "settings.compactMessageActions.title": "Compact message actions",
+  "settings.compactMessageActions.description":
+    "Show React, Reply and More beside a message, and the time between messages. When this is off, every action and the time show under each message.",
   "settings.busyMessage.title": "Steer agents while they work",
   "settings.busyMessage.description":
     "New messages join the agent’s current work, not the queue. Works with ChatGPT and Claude.",

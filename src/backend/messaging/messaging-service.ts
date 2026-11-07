@@ -174,6 +174,8 @@ interface PendingApproval {
 
 const FATAL_STATES = new Set<MessagingConnectionState>(["invalid_token", "removed"]);
 const APPROVAL_TEXT_LIMIT = 2_500;
+/** A progress line is one or two sentences; a longer one is cut, so every platform takes the edit. */
+const PROGRESS_TEXT_LIMIT = 1_000;
 const CANCEL_TEXT = /^(cancel|stop)$/i;
 const LIVE_STATES = new Set<MessagingConnectionState>(["connecting", "connected", "reconnecting", "rate_limited"]);
 /** The states in which a connection can still get a transport that takes deliveries. */
@@ -1827,6 +1829,20 @@ export class MessagingService {
     const key = `${activity.link.linkId}:${origin.platformMessageId}`;
     const target = this.#targets.get(key) ?? linkTarget(activity.link);
     const post = this.#posts.get(key);
+    if (activity.type === "progress") {
+      // The agent's newest progress line takes the place of "Working"; the Stop button stays. A
+      // request that already ended, or whose status post failed, gets no edit.
+      if (!live || !post?.messageId || !post.stopToken || post.final) return;
+      // Only the host makes a platform mention, so the mention markers go.
+      const text = redactText(activity.text).replace(MENTION_MARKERS, "");
+      yield* live.adapter
+        .edit(target, post.messageId, {
+          text: text.length > PROGRESS_TEXT_LIMIT ? `${text.slice(0, PROGRESS_TEXT_LIMIT - 1)}…` : text,
+          buttons: [{ action: "stop" as const, label: sourceText("status.messaging.stop"), token: post.stopToken }],
+        })
+        .pipe(Effect.catch((failure) => Effect.sync(() => this.#warn(failure.cause))));
+      return;
+    }
     if (activity.type === "started") {
       if (!live) return;
       const stopToken = token();
@@ -2299,7 +2315,10 @@ function token(): string {
 }
 
 /** The last post of a request and the reaction on the person's message, from how its turn ended. */
-function finalPost(activity: Exclude<MessagingActivity, { type: "started" }>, awaitsTeammate: boolean): PendingFinal {
+function finalPost(
+  activity: Exclude<MessagingActivity, { type: "started" | "progress" }>,
+  awaitsTeammate: boolean,
+): PendingFinal {
   // A follow-up turn answers a teammate's reply: the person's message already shows how its own turn ended.
   const reacts = activity.type === "cancelled" || !activity.followUp;
   if (activity.type === "cancelled" || activity.status === "interrupted")

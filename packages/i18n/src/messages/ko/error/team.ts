@@ -153,4 +153,5 @@ export const messages = {
   "error.team.signInRelayUsed": "이 로그인은 이미 전송되었어요.",
   "error.team.signInRelayMismatch": "이 주소는 이 로그인에서 만든 주소가 아니에요.",
   "error.team.signInRelayLinkUnknown": "이 서버의 어떤 에이전트도 이 로그인 링크를 표시하지 않았어요.",
+  "error.team.hostPersonalityUnsupported": "이 연결은 서버 성격을 지원하지 않아요.",
 } as const satisfies PartialTranslation<typeof source>;

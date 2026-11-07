@@ -26,11 +26,14 @@ import {
   Globe2,
   HardDrive,
   History,
+  ItemGroup,
   KeyRound,
   Monitor,
   RefreshCw,
   Settings,
+  SettingsSection,
   ShieldCheck,
+  Smile,
   Sparkles,
   Tabs,
   Text,
@@ -68,6 +71,7 @@ import { type McpPanelDetail, type McpPanelSignIn, ServerMcpPanel } from "./Serv
 import { createServerMembersSection } from "./ServerMembersSection";
 import type { ServerMemoryLimitOptions } from "./ServerMemoryLimitSetting";
 import type { ServerMemoryReviewOptions } from "./ServerMemoryReviewSetting";
+import { type ServerPersonalityOptions, ServerPersonalitySetting } from "./ServerPersonalitySetting";
 import { createServerRolesSection, type ServerAgentAccessOptions } from "./ServerRolesSection";
 import { type ServerRoutineFeedOptions, ServerRoutineFeedPanel } from "./ServerRoutineFeedPanel";
 import type { ServerTimezoneOptions } from "./ServerTimezoneSetting";
@@ -200,6 +204,11 @@ export interface ServerSettingsModalProps {
    */
   hostTimezone?: ServerTimezoneOptions | undefined;
   /**
+   * The Personality section shows only when a caller supplies this, and only for the local server or
+   * a remote host with `host-personality-v1` that this member administers.
+   */
+  hostPersonality?: ServerPersonalityOptions | undefined;
+  /**
    * General shows how many memories each agent keeps only when a caller supplies this, and only for
    * the local server or a remote host with `agent-memory-limit-v1` that this member administers.
    */
@@ -266,6 +275,7 @@ export interface ServerHostedSitesOptions {
 
 export type ServerSettingsSection =
   | "general"
+  | "personality"
   | "vault"
   | "members"
   | "roles"
@@ -284,6 +294,7 @@ type Section = ServerSettingsSection;
 
 const sections = {
   general: { title: "server.settings.generalTitle", description: "server.settings.generalDescription" },
+  personality: { title: "server.settings.personalityTitle", description: "server.settings.personalityDescription" },
   vault: { title: "server.settings.vaultTitle", description: "server.settings.vaultDescription" },
   members: { title: "server.settings.membersTitle", description: "server.settings.membersDescription" },
   roles: { title: "server.settings.rolesTitle", description: "server.settings.rolesDescription" },
@@ -352,6 +363,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     if (!options || local() || !actionsAvailable() || !serverCanAdminister(props.server, "provider-default-v1"))
       return undefined;
     return { ...options, serverId: props.server.id };
+  }
+  function personalityOptions(): ServerPersonalityOptions | undefined {
+    const options = props.hostPersonality;
+    if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "host-personality-v1")) return undefined;
+    return options;
   }
   const availableInitialSection = (): Section | null =>
     props.initialSection === "updates" && !props.hostUpdate ? null : (props.initialSection ?? null);
@@ -531,6 +547,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     onChange(value: string) {
       if (
         value === "general" ||
+        value === "personality" ||
         value === "vault" ||
         value === "members" ||
         value === "roles" ||
@@ -683,6 +700,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               <Settings aria-hidden="true" />
               <span>{t(sections.general.title)}</span>
             </Tabs.Trigger>
+            <Show when={personalityOptions()}>
+              <Tabs.Trigger class="settings-modal-nav-item" value="personality">
+                <Smile aria-hidden="true" />
+                <span>{t(sections.personality.title)}</span>
+              </Tabs.Trigger>
+            </Show>
             <Show when={props.vault}>
               <Tabs.Trigger class="settings-modal-nav-item" value="vault">
                 <KeyRound aria-hidden="true" />
@@ -771,6 +794,27 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         <Tabs.Content value="general" class="settings-modal-tab-panel server-settings-panel" data-tab="general">
           <general.Panel />
         </Tabs.Content>
+        <Show when={personalityOptions()}>
+          {(options) => (
+            <Tabs.Content
+              value="personality"
+              class="settings-modal-tab-panel server-settings-panel"
+              data-tab="personality"
+            >
+              <SettingsSection title={t("server.settings.agents")}>
+                <ItemGroup class="settings-modal-card">
+                  <ServerPersonalitySetting
+                    {...options()}
+                    serverId={props.server.id}
+                    disabled={Boolean(busy())}
+                    menuMount={modalElement()}
+                    run={run}
+                  />
+                </ItemGroup>
+              </SettingsSection>
+            </Tabs.Content>
+          )}
+        </Show>
         <Show when={props.vault}>
           {(vault) => (
             <Tabs.Content value="vault" class="settings-modal-tab-panel server-settings-panel" data-tab="vault">

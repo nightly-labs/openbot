@@ -86,6 +86,9 @@ export const messages = {
   "settings.showAgentSteps.title": "Agentenschritte anzeigen",
   "settings.showAgentSteps.description":
     "Öffnet Denken, Werkzeugschritte und Erinnerungsänderungen jedes Durchlaufs standardmäßig auf diesem Gerät und in diesem Browser.",
+  "settings.compactMessageActions.title": "Kompakte Nachrichtenaktionen",
+  "settings.compactMessageActions.description":
+    "Zeigt Reagieren, Antworten und Mehr neben einer Nachricht und die Uhrzeit zwischen den Nachrichten. Ist es aus, stehen alle Aktionen und die Uhrzeit unter jeder Nachricht.",
   "settings.busyMessage.title": "Agenten während der Arbeit steuern",
   "settings.busyMessage.description":
     "Neue Nachrichten fließen in die aktuelle Arbeit des Agenten ein, nicht in die Warteschlange. Funktioniert mit ChatGPT und Claude.",

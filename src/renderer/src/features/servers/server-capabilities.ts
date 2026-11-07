@@ -84,6 +84,7 @@ export function serverSupportsCapability(
       capability === "model-visibility-v1" ||
       capability === "claude-api-key-v1" ||
       capability === "codex-api-key-v1" ||
+      capability === "host-personality-v1" ||
       capability === "agent-access-v1" ||
       capability === "sidebar-folders-v1" ||
       capability === "server-audit-v1" ||

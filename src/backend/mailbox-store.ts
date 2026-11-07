@@ -444,11 +444,31 @@ export class MailboxStore {
    * in the chats.
    */
   #answerReturn(input: EnqueueInput, recipients: readonly string[]): MessagingOrigin | undefined {
-    if (input.sender.kind !== "agent" || !input.replyToMessageId || recipients.length !== 1) return undefined;
-    const request = this.#state.messages.find((message) => message.id === input.replyToMessageId);
-    if (!request?.messagingReturn || request.sender.kind !== "agent" || request.sender.agentId !== recipients[0])
+    if (input.sender.kind !== "agent" || !input.replyToMessageId) return undefined;
+    return this.answerReturn([input.replyToMessageId], recipients);
+  }
+
+  /**
+   * The external conversation that an agent's answer to these requests goes back to, when they all
+   * came from that one conversation and the answer goes to the agent that sent them, and to no one else.
+   */
+  answerReturn(requestIds: readonly string[], recipients: readonly string[]): MessagingOrigin | undefined {
+    if (recipients.length !== 1) return undefined;
+    const origins = requestIds.map((requestId) => {
+      const request = this.#state.messages.find((message) => message.id === requestId);
+      return request?.sender.kind === "agent" && request.sender.agentId === recipients[0]
+        ? request.messagingReturn
+        : undefined;
+    });
+    const [origin] = origins;
+    if (
+      !origin ||
+      origins.some(
+        (candidate) => candidate?.linkId !== origin.linkId || candidate.platformMessageId !== origin.platformMessageId,
+      )
+    )
       return undefined;
-    return structuredClone(request.messagingReturn);
+    return structuredClone(origin);
   }
 
   /**
