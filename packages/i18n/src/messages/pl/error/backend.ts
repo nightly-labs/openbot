@@ -332,6 +332,8 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "Proxy {name} odrzuciło logowanie, więc strona się nie otworzyła.",
   "error.backend.browserProxyComputerUnreachable":
     "Komputer, którego używa ten profil, nie odpowiada, więc strona się nie otworzyła.",
+  "error.backend.browserCertificateUntrusted":
+    "Certyfikat bezpieczeństwa tej witryny nie jest zaufany, więc strona się nie otworzyła.",
   "error.backend.browserLowMemory":
     "Na tym serwerze brakuje pamięci, więc przeglądarka nie może otworzyć kolejnej karty. Zamknij kartę lub poczekaj, aż inni agenci skończą.",
   "error.backend.browserOpenFailed": "Nie można otworzyć {url}: {reason}",

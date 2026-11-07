@@ -321,6 +321,8 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "{name} proxy'si oturum açmayı reddetti, bu yüzden sayfa açılmadı.",
   "error.backend.browserProxyComputerUnreachable":
     "Bu profilin kullandığı bilgisayar yanıt vermiyor, bu yüzden sayfa açılmadı.",
+  "error.backend.browserCertificateUntrusted":
+    "Bu sitenin güvenlik sertifikasına güvenilmiyor, bu yüzden sayfa açılmadı.",
   "error.backend.browserLowMemory":
     "Bu sunucunun belleği azaldı, bu nedenle tarayıcı başka bir sekme açamıyor. Bir sekmeyi kapatın veya diğer ajanların bitmesini bekleyin.",
   "error.backend.browserOpenFailed": "{url} açılamadı: {reason}",

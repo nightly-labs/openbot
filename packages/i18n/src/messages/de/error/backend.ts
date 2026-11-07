@@ -355,6 +355,8 @@ export const messages = {
     "Der Proxy {name} hat die Anmeldung abgelehnt, daher wurde die Seite nicht geöffnet.",
   "error.backend.browserProxyComputerUnreachable":
     "Der Computer dieses Profils antwortet nicht, daher wurde die Seite nicht geöffnet.",
+  "error.backend.browserCertificateUntrusted":
+    "Das Sicherheitszertifikat dieser Website ist nicht vertrauenswürdig, daher wurde die Seite nicht geöffnet.",
   "error.backend.browserLowMemory":
     "Dieser Server hat wenig freien Arbeitsspeicher. Der Browser kann daher keinen weiteren Tab öffnen. Schließe einen Tab oder warte, bis andere Agenten fertig sind.",
   "error.backend.browserOpenFailed": "{url} konnte nicht geöffnet werden: {reason}",

@@ -298,12 +298,29 @@ const PROXY_ERROR_LIST: readonly (readonly [name: string, code: number, failure:
 const PROXY_ERRORS = new Map(PROXY_ERROR_LIST.map(([name, , failure]) => [name, failure]));
 const PROXY_ERROR_CODES = new Map(PROXY_ERROR_LIST.map(([, code, failure]) => [code, failure]));
 
+/** The Chromium error code in the text of a failed page load, written as `(<code>)`. */
+function chromiumErrorCode(text: string): number | undefined {
+  const code = /\((-\d+)\)/u.exec(text)?.[1];
+  return code === undefined ? undefined : Number(code);
+}
+
 /** The proxy failure in the text of a failed page load: a Chromium error name, or `(<code>)`. */
 function proxyErrorInText(text: string): BrowserProxyFailure | undefined {
   const name = /\bERR_[A-Z_]+/u.exec(text)?.[0];
   if (name !== undefined) return PROXY_ERRORS.get(`net::${name}`);
-  const code = /\((-\d+)\)/u.exec(text)?.[1];
-  return code === undefined ? undefined : PROXY_ERROR_CODES.get(Number(code));
+  const code = chromiumErrorCode(text);
+  return code === undefined ? undefined : PROXY_ERROR_CODES.get(code);
+}
+
+/**
+ * A page load that Chromium stopped for the certificate of the site gets a message in plain words.
+ * Chromium gives certificate errors the codes -200 to -299. Other failures stay as they are.
+ */
+function certificateLoadFailure(failure: BrowserOperationError): BrowserOperationError {
+  const code = chromiumErrorCode(String(failure.cause));
+  return code !== undefined && code <= -200 && code > -300
+    ? browserFailure(new Error(sourceText("error.backend.browserCertificateUntrusted")))
+    : failure;
 }
 
 /** How many times one document answers the sign-in of its proxy. More means the sign-in is wrong. */
@@ -941,7 +958,7 @@ export class BrowserHost {
     ownerAgentId: string | null = null,
     focus = false,
   ): Effect.fn.Return<BrowserTab, BrowserOperationError> {
-    return yield* this.#open(url, ownerThreadId, ownerAgentId, focus);
+    return yield* this.#open(url, ownerThreadId, ownerAgentId, focus, false);
   }).bind(this);
 
   /**
@@ -955,15 +972,22 @@ export class BrowserHost {
   ): Effect.fn.Return<BrowserTab, BrowserOperationError> {
     const privateSession = session.fromPartition(`openbot-private-${randomUUID()}`, { cache: false });
     this.#configureSession(privateSession);
-    return yield* this.#open(url, null, null, false, privateSession);
+    return yield* this.#open(url, null, null, false, true, privateSession);
   }).bind(this);
 
+  /**
+   * With `closeOnFailure` false, a tab whose first page does not load stays open on that address, as
+   * a tab does when a later page does not load, so the person sees where it failed and can try again.
+   * The open tool of an agent closes its tab, so that failed attempts do not fill the tab limit, and
+   * a private sign-in page closes its tab, as its callers expect.
+   */
   readonly #open = Effect.fn("BrowserHost.openTab")(function* (
     this: BrowserHost,
     url: string,
     ownerThreadId: string | null,
     ownerAgentId: string | null,
     focus: boolean,
+    closeOnFailure: boolean,
     privateSession?: Session,
   ): Effect.fn.Return<BrowserTab, BrowserOperationError> {
     if (!this.#hasTabCapacity(ownerThreadId, ownerAgentId)) {
@@ -1014,7 +1038,7 @@ export class BrowserHost {
             const error = operationFailure.cause;
             // The user entered an address before the first page loaded: that load is the tab's page now.
             if (this.#tabs.get(tab.id) === tab && tab.loadGeneration !== loadGeneration) return;
-            if (this.#tabs.get(tab.id) === tab) {
+            if (this.#tabs.get(tab.id) === tab && (closeOnFailure || tab.contents.isDestroyed())) {
               this.#unmountView(tab.view);
               this.#tabs.delete(tab.id);
               this.#userControlTabIds.delete(tab.id);
@@ -1030,6 +1054,9 @@ export class BrowserHost {
             yield* this.#persistState();
             const proxyFailure = this.#proxyLoadFailure(tab, operationFailure);
             if (proxyFailure !== operationFailure) return yield* proxyFailure;
+            // An agent keeps the Chromium reason, which tells it which certificate check failed.
+            const certificateFailure = closeOnFailure ? operationFailure : certificateLoadFailure(operationFailure);
+            if (certificateFailure !== operationFailure) return yield* certificateFailure;
             return yield* browserFailure(
               new Error(sourceText("error.backend.browserOpenFailed", { url: normalizedUrl, reason: String(error) })),
             );
@@ -1094,7 +1121,7 @@ export class BrowserHost {
             tab,
             navigateAndWait(tab.contents, () => tab.contents.loadURL(normalizedUrl, browserLoadOptions())),
           ).pipe(
-            Effect.mapError((failure) => this.#proxyLoadFailure(tab, failure)),
+            Effect.mapError((failure) => certificateLoadFailure(this.#proxyLoadFailure(tab, failure))),
             // A same-document load or a load that does not start leaves the flag for the next navigation.
             Effect.ensuring(
               Effect.sync(() => {
@@ -2095,7 +2122,7 @@ export class BrowserHost {
   readonly #toolHandlers: BrowserToolHandlers = {
     open: ({ args }, params) =>
       Effect.gen({ self: this }, function* () {
-        const tab = yield* this.open(args.url, params.threadId, params.ownerAgentId ?? null);
+        const tab = yield* this.#open(args.url, params.threadId, params.ownerAgentId ?? null, false, true);
         this.#controls.updateTab(params, tab.id);
         // The agent reads a page that it opens, so the first snapshot comes with the tab and saves a call.
         const read = yield* Effect.result(this.#finalStepsSnapshot(params, tab.id));
