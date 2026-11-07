@@ -164,7 +164,7 @@ export interface MainWindowContext {
   reportError: (message: string, error: unknown) => void;
   /** Quits after `Cmd + Q` was held or pressed twice in a window. See `createQuitShortcut`. */
   quitFromShortcut: () => void;
-  /** The local agents that a quit stops. See `createQuitShortcut`. */
+  /** The agents that a quit stops, here and on the servers on this computer. See `createQuitShortcut`. */
   workingAgents: () => AgentSummary[];
 }
 
@@ -1008,6 +1008,7 @@ export function configureApplicationMenu(
   interfaceSize: InterfaceSizeService,
   translate: AppTranslate,
   getMainWindow: () => BrowserWindow | null,
+  workingAgents: () => AgentSummary[],
   quit: (source: MenuQuitSource) => void,
 ): void {
   Menu.setApplicationMenu(
@@ -1053,7 +1054,7 @@ export function configureApplicationMenu(
           { role: "unhide" },
           { type: "separator" },
           process.platform === "darwin"
-            ? macQuitItem(translate, () => service.workingAgents().length > 0, quit)
+            ? macQuitItem(translate, () => workingAgents().length > 0, quit)
             : { role: "quit" },
         ],
       },

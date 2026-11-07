@@ -19,6 +19,9 @@
 // asks on stdout, and this process writes the list to its control pipe. After this app changes a
 // member of the server, it writes the new list without a request. In the same way, this process makes
 // the Marketplace reads that adding an agent needs, with its own session, and only those reads.
+//
+// Each child writes the agents that work on it when the list changes. A quit of the desktop app stops
+// the children, so `Cmd + Q` asks for a hold while one of them works, as it does for the local agents.
 
 import { type ChildProcess, type SpawnOptions, spawn as spawnProcess } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -26,7 +29,7 @@ import { mkdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { Readable, Writable } from "node:stream";
-import { LOCAL_SERVER_LIMIT, type ServerSummary } from "@openbot/contracts/ipc";
+import { type AgentSummary, isAgentSummary, LOCAL_SERVER_LIMIT, type ServerSummary } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
 import { Deferred, Duration, Effect, Exit, Schema, Scope, Semaphore } from "effect";
@@ -39,6 +42,7 @@ import {
   LOCAL_SERVER_MEMBERS_REQUEST,
   LOCAL_SERVER_OWNER_USERNAME,
   LOCAL_SERVER_READY_PREFIX,
+  LOCAL_SERVER_WORKING_PREFIX,
   type LocalServerCommand,
   type LocalServerMarketplaceRequest,
   type LocalServerReady,
@@ -108,6 +112,20 @@ function parseReadyLine(line: string): LocalServerReady | null {
   try {
     const ready = decodeReady(JSON.parse(line.slice(LOCAL_SERVER_READY_PREFIX.length)));
     return isLocalDevelopmentApi(ready.apiUrl) ? ready : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The agents in a working line. The avatar address points into the child's own data, which this
+ * process cannot read, so each agent shows its generated face.
+ */
+function parseWorkingLine(line: string): AgentSummary[] | null {
+  if (!line.startsWith(LOCAL_SERVER_WORKING_PREFIX)) return null;
+  try {
+    const value = JSON.parse(line.slice(LOCAL_SERVER_WORKING_PREFIX.length));
+    return Array.isArray(value) ? value.filter(isAgentSummary).map((agent) => ({ ...agent, avatarUrl: null })) : null;
   } catch {
     return null;
   }
@@ -246,6 +264,8 @@ export class LocalServers {
   readonly #running = new Map<string, RunningChild>();
   /** The times each server stopped on its own, in the last `RESTART_WINDOW_MS`. */
   readonly #exits = new Map<string, number[]>();
+  /** The agents that work on each running server, by registry id. */
+  readonly #working = new Map<string, AgentSummary[]>();
   /** The last ready line of each running server, by registry id. */
   readonly #ready = new Map<string, LocalServerReady>();
   /** The registry ids of the children that have a machine token, and the account it belongs to. */
@@ -264,6 +284,11 @@ export class LocalServers {
     this.#options = options;
     this.#registry = new LocalServerRegistry(options.registryPath);
     this.#spawn = options.spawn ?? spawnProcess;
+  }
+
+  /** The agents that work on the servers on this computer. A quit stops them. */
+  workingAgents(): AgentSummary[] {
+    return [...this.#working.values()].flat();
   }
 
   /** The process ids of the children, which the update install does not wait for. */
@@ -680,6 +705,11 @@ export class LocalServers {
           this.#readMarketplace(entry.id, running, marketplace);
           return;
         }
+        const working = parseWorkingLine(line);
+        if (working) {
+          if (this.#running.get(entry.id) === running) this.#working.set(entry.id, working);
+          return;
+        }
         const value = parseReadyLine(line);
         if (value) Deferred.doneUnsafe(ready, Exit.succeed(value));
       });
@@ -750,6 +780,7 @@ export class LocalServers {
   #exited(entry: StoredLocalServer, running: RunningChild, code: number | null, signal: NodeJS.Signals | null): void {
     if (this.#running.get(entry.id) === running) {
       this.#running.delete(entry.id);
+      this.#working.delete(entry.id);
       // The next child gets its machine token again when it starts.
       this.#published.delete(entry.id);
       this.#announcePublished();

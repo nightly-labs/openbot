@@ -19,7 +19,7 @@ export interface QuitShortcutOptions {
   /** Starts the quit. */
   quit: () => void;
   isQuitting: () => boolean;
-  /** The local agents that work now. A quit stops them. */
+  /** The agents that work now, here and on the servers on this computer. A quit stops them. */
   workingAgents: () => AgentSummary[];
   /** Shows the hint in the window, with the agents that work. An empty list removes it. */
   showHint: (window: BrowserWindow, agents: AgentSummary[]) => void;
