@@ -39,4 +39,23 @@ describe("provider runtime fetch", () => {
     expect(netFetch).toHaveBeenNthCalledWith(1, url, undefined);
     expect(netFetch).toHaveBeenNthCalledWith(2, request, undefined);
   });
+
+  it("rejects a non-https URL before it reaches net.fetch", async () => {
+    for (const url of [
+      "http://example.test/runtime.zip",
+      "file:///tmp/runtime.zip",
+      "openbot://runtime.zip",
+      "not a url",
+    ]) {
+      await expect(providerRuntimeFetch(url)).rejects.toThrow("https URL");
+    }
+
+    expect(netFetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects a Request with a non-https URL", async () => {
+    await expect(providerRuntimeFetch(new Request("http://example.test/runtime.zip"))).rejects.toThrow("https URL");
+
+    expect(netFetch).not.toHaveBeenCalled();
+  });
 });

@@ -18,6 +18,8 @@ import { parseAgentRuntimeLock } from "./agent-runtime-lock";
 const OUT = resolve(import.meta.dirname, "../.openbot-build/provider-runtime-download-resume-e2e");
 /** The provider whose pinned download the manager resumes. */
 const RUNTIME: ManagedProviderId = "opencode";
+// A CLI path override makes the manager refuse to download this runtime, so the script removes it.
+delete process.env.OPENBOT_OPENCODE_PATH;
 const PARTIAL_BYTES = 1024;
 const ETAG = '"resume-test"';
 
