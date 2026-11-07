@@ -101,7 +101,7 @@ export const messages = {
     "Toont Reageren, Beantwoorden en Meer naast een bericht, en de tijd tussen berichten. Als dit uit staat, staan alle acties en de tijd onder elk bericht.",
   "settings.busyMessage.title": "Stuur agents bij terwijl ze werken",
   "settings.busyMessage.description":
-    "Nieuwe berichten gaan naar het huidige werk van de agent, niet naar de wachtrij. Werkt met ChatGPT en Claude.",
+    "Nieuwe berichten gaan naar het huidige werk van de agent, niet naar de wachtrij. Bij agents die dit niet kunnen, wachten ze in de wachtrij.",
   "settings.agentDefaults.title": "Standaarden",
   "settings.agentDefaults.description": "Agents volgen deze standaarden, tenzij je ze voor een agent wijzigt.",
   "settings.agentDefaults.value": "Standaard: {value}",

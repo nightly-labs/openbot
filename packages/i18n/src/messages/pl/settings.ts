@@ -101,7 +101,7 @@ export const messages = {
     "Pokazuje Reaguj, Odpowiedz i Więcej obok wiadomości, a godzinę między wiadomościami. Gdy jest wyłączone, wszystkie akcje i godzina są pod każdą wiadomością.",
   "settings.busyMessage.title": "Kieruj agentami podczas pracy",
   "settings.busyMessage.description":
-    "Nowe wiadomości dołączają do bieżącej pracy agenta, a nie do kolejki. Działa z ChatGPT i Claude.",
+    "Nowe wiadomości dołączają do bieżącej pracy agenta, a nie do kolejki. W przypadku agentów, które tego nie obsługują, czekają w kolejce.",
   "settings.agentDefaults.title": "Domyślne",
   "settings.agentDefaults.description": "Agenci stosują te ustawienia, chyba że zmienisz je dla agenta.",
   "settings.agentDefaults.value": "Domyślnie: {value}",

@@ -1,5 +1,5 @@
-import type { HostPersonality, OpenBotDesktopApi, ResponseStyle } from "@openbot/contracts/ipc";
-import { createSignal } from "solid-js";
+import type { HostPersonality, OpenBotDesktopApi, ResponseStyle, ServerSummary } from "@openbot/contracts/ipc";
+import { createEffect, createSignal } from "solid-js";
 
 /** The personality calls of one server's host. The desktop reaches them through main. */
 export type HostPersonalityCalls = Pick<OpenBotDesktopApi["hostAdmin"], "getPersonality" | "setPersonality">;
@@ -40,4 +40,28 @@ export function loadServerPersonality(serverId: string, calls: HostPersonalityCa
       reading.delete(serverId);
     },
   );
+}
+
+/**
+ * The response style of the open server, which decides whether progress updates show as messages.
+ * It reads the style each time a server opens. Main answers "classic" for a joined server until the
+ * server says what it supports, so the read waits for a negotiated protocol.
+ */
+export function createServerResponseStyle(
+  server: () => ServerSummary | undefined,
+  calls: HostPersonalityCalls,
+): () => ResponseStyle | undefined {
+  const readableServerId = () => {
+    const current = server();
+    return current && (current.kind === "local" || current.compatibility?.negotiatedProtocol != null)
+      ? current.id
+      : undefined;
+  };
+  createEffect(readableServerId, (serverId) => {
+    if (serverId) loadServerPersonality(serverId, calls);
+  });
+  return () => {
+    const serverId = server()?.id;
+    return serverId ? serverResponseStyle(serverId) : undefined;
+  };
 }

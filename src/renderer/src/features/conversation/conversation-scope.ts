@@ -5,6 +5,7 @@ import {
   fileQuoteTarget,
   limitedQuoteText,
 } from "@openbot/contracts/chat-tag-references";
+import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
 import {
   customProviderOfModel,
   isCustomProviderHarness,
@@ -2336,6 +2337,7 @@ export function createConversationViewScope(props: ConversationProps) {
       submit: (draft, target, submittedSnapshot, voice) =>
         actions.submitMessage(draft, target, submittedSnapshot, voice),
       serverOnline: () => props.server?.kind !== "remote" || props.server.state === "online",
+      progressUpdate: (message) => isNarrationItemId(message.id, props.agent?.provider),
     });
 
   return {

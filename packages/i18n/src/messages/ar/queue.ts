@@ -14,6 +14,9 @@ export const messages = {
   "queue.item.steerTooltip": "توجيه الرسالة",
   "queue.item.steering": "جارٍ التوجيه",
   "queue.item.steer": "توجيه",
+  "queue.item.sendNowLabel": "أوقف الوكيل وأرسل الرسالة {position} من قائمة الانتظار الآن",
+  "queue.item.sendNowTooltip": "أوقف الوكيل وأرسل هذه الرسالة الآن",
+  "queue.item.sendNow": "أرسل الآن",
   "queue.item.notSteered": "لم يتم التوجيه",
   "queue.item.steerFallback.providerUnsupported":
     "لا يستطيع هذا المزوّد توجيه دور قيد التشغيل، لذا تنتظر الرسالة في قائمة الانتظار.",

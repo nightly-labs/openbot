@@ -103,7 +103,7 @@ export const messages = {
     "Mostra Reagir, Responder e Mais ao lado de uma mensagem, e a hora entre as mensagens. Desativado, todas as ações e a hora aparecem abaixo de cada mensagem.",
   "settings.busyMessage.title": "Orientar agentes enquanto trabalham",
   "settings.busyMessage.description":
-    "Novas mensagens entram no trabalho atual do agente, não na fila. Funciona com ChatGPT e Claude.",
+    "Novas mensagens entram no trabalho atual do agente, não na fila. Com agentes que não suportam isso, elas esperam na fila.",
   "settings.agentDefaults.title": "Padrões",
   "settings.agentDefaults.description": "Os agentes seguem estes padrões, a menos que você os altere para um agente.",
   "settings.agentDefaults.value": "Padrão: {value}",
