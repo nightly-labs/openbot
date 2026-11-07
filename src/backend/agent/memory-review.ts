@@ -10,7 +10,7 @@ import { Effect, Exit, Fiber, Schema, Scope } from "effect";
 import type { AgentClient } from "../agent-client";
 import { extractJsonObject } from "../structured-output";
 import type { AgentMemories } from "./agent-memories";
-import { backgroundModel } from "./background-model";
+import { backgroundModel, withBackgroundEffort } from "./background-model";
 import { memoryChangesMessage } from "./memory-changes-message";
 import { MemoryReviewResult, memoryReviewPrompt } from "./memory-review-prompt";
 import type { ProfileClients } from "./profile-clients";
@@ -310,7 +310,7 @@ export class MemoryReview {
       const answer = yield* options.profileClients.run(client, (cancelled) =>
         generateTextWithoutTools(
           client,
-          model.id === agent.model ? { ...model, defaultReasoningEffort: agent.reasoningEffort } : model,
+          withBackgroundEffort(model),
           prompt,
           cancelled,
           options.usageObserver(agent, model),
