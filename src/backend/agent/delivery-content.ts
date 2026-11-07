@@ -269,11 +269,22 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       displayText || "(The reply contains attachments only.)",
     ].join("\n");
   }
-  // Only `start_task` sends an agent's message to itself: it is the brief of a task.
-  if (delivery.sender.kind === "agent" && delivery.sender.agentId === delivery.recipientAgentId) {
+  if (
+    delivery.sender.kind === "agent" &&
+    delivery.sender.agentId === delivery.recipientAgentId &&
+    delivery.expectsReply === false
+  ) {
+    text = [
+      "A task that you started with openbot.start_task sent this to your own chat. Its first line names the task and the kind: result, blocker, question or end.",
+      "Tell the user what it means for them. For a blocker or a question, ask the user. Do not reply to the task, and do not call openbot.send_message for it.",
+      COLLABORATOR_SEPARATOR,
+      displayText,
+    ].join("\n");
+  } else if (delivery.sender.kind === "agent" && delivery.sender.agentId === delivery.recipientAgentId) {
     text = [
       "You started this task with openbot.start_task from your own chat. It is a separate conversation beside that chat, with this brief as its first message.",
       "Do the work in the brief here, and end with the result for the user: the user reads it in this task. Do not send it with openbot.send_message.",
+      "When the task is done, or when it cannot continue without the user, call openbot.report_to_agent once with the result, the blocker or the question for your own chat.",
       COLLABORATOR_SEPARATOR,
       displayText,
     ].join("\n");

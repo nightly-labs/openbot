@@ -299,6 +299,7 @@
     "test:usage-read-pacing": "bun scripts/usage-read-pacing-e2e.ts",
     "test:routine-fresh-session": "bun scripts/routine-fresh-session-e2e.ts",
     "test:routine-report-failure": "bun scripts/routine-report-failure-e2e.ts",
+    "test:task-report": "bun scripts/task-report-e2e.ts",
     "test:agent-webhook-routine": "bun scripts/agent-webhook-routine-e2e.ts",
     "test:webhook-analytics": "bun scripts/webhook-analytics-e2e.ts",
     "test:agent-channel-manage": "bun scripts/agent-channel-manage-e2e.ts",

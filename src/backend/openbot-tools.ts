@@ -34,7 +34,12 @@ import {
 } from "./agent/sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS } from "./agent/skill-tools";
 import { CREATE_WEBHOOK_ROUTINE_TOOL, UPDATE_WEBHOOK_ROUTINE_TOOL } from "./agent/webhook-routine-tool";
-import { START_TASK_TOOL, startTaskToolSchema } from "./agent-tasks/agent-tasks";
+import {
+  REPORT_TO_AGENT_TOOL,
+  reportToAgentToolSchema,
+  START_TASK_TOOL,
+  startTaskToolSchema,
+} from "./agent-tasks/agent-tasks";
 import {
   AWAIT_EVENT_TOOL,
   awaitEventToolSchema,
@@ -608,8 +613,14 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: START_TASK_TOOL,
     description:
-      "Start a task: a separate conversation of yours that runs beside this chat, with its own context, progress and stop. Use it only for long, independent work that the user asked for and that need not block this chat. The brief is the task's first message: write everything the task needs, because it does not see this chat. The task result stays in the task; you do not receive it. Only your own chat can start a task.",
+      "Start a task: a separate conversation of yours that runs beside this chat, with its own context, progress and stop. Use it only for long, independent work that the user asked for and that need not block this chat. The brief is the task's first message: write everything the task needs, because it does not see this chat. The task sends its result, a blocker or a question to this chat with report_to_agent. Set notify to true only when you need to know that the task ended without a report: OpenBot then sends a short notice, which starts a new turn here. Only your own chat can start a task.",
     shape: startTaskToolSchema.shape,
+  },
+  {
+    name: REPORT_TO_AGENT_TOOL,
+    description:
+      "Send a result, a blocker or a question from a task that you started with start_task to your own chat. OpenBot delivers it there as a new turn, marked with the task and the kind. Call it once when the task is done, or when it cannot continue without the user. Only a task that you started can call it.",
+    shape: reportToAgentToolSchema.shape,
   },
   ...MEMORY_RECALL_TOOL_DEFINITIONS,
   {

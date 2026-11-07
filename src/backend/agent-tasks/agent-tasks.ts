@@ -18,7 +18,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Deferred, Effect, Schema, Semaphore } from "effect";
+import { Deferred, Effect, Schema, type Scope, Semaphore } from "effect";
 import { z } from "zod";
 import type { ConversationRuntime } from "../agent/conversation-runtime";
 import type { TaskLanes } from "../agent/drain-scheduler";
@@ -52,6 +52,20 @@ export const START_TASK_TOOL = "start_task";
 export const startTaskToolSchema = z.strictObject({
   title: z.string().trim().min(1).max(INPUT_LIMITS.agentTaskTitle),
   brief: z.string().trim().min(1).max(INPUT_LIMITS.messageText),
+  notify: z.boolean().optional(),
+});
+
+export const REPORT_TO_AGENT_TOOL = "report_to_agent";
+
+const TASK_REPORT_HEADER_ROOM = 512;
+
+export const reportToAgentToolSchema = z.strictObject({
+  kind: z.enum(["result", "blocker", "question"]),
+  text: z
+    .string()
+    .trim()
+    .min(1)
+    .max(INPUT_LIMITS.messageText - TASK_REPORT_HEADER_ROOM),
 });
 
 export interface AgentTasksHooks {
@@ -73,6 +87,7 @@ export interface AgentTaskCaller {
   agentId: string;
   /** A channel, messaging or task turn: only the agent's own chat starts a task. */
   inExecutionThread: boolean;
+  taskId: string | null;
 }
 
 /** Why a branch was not made. The cause holds the localized message for the person. */
@@ -110,6 +125,8 @@ export class AgentTasks implements TaskLanes {
   readonly #progress = new Map<string, string>();
   /** The last turn of each task that the user stopped, by task id. */
   readonly #stoppedTurns = new Map<string, string>();
+  readonly #reported = new Set<string>();
+  readonly #notifyOnEnd = new Set<string>();
   /** Who waits for the running turn of a task to end, by task id. */
   readonly #turnEndWaiters = new Map<string, Set<Deferred.Deferred<void>>>();
   /** One branch is made at a time, so a retry that arrives during the first call finds its branch. */
@@ -371,6 +388,8 @@ export class AgentTasks implements TaskLanes {
   delete(task: AgentThreadRecord): void {
     this.#progress.delete(task.taskId);
     this.#stoppedTurns.delete(task.taskId);
+    this.#reported.delete(task.taskId);
+    this.#notifyOnEnd.delete(task.taskId);
     this.#turnEndWaiters.delete(task.taskId);
     this.#store.delete(task.taskId);
     this.changed(task.agentId);
@@ -391,6 +410,8 @@ export class AgentTasks implements TaskLanes {
     this.#store.close(task.taskId);
     this.#progress.delete(task.taskId);
     this.#stoppedTurns.delete(task.taskId);
+    this.#reported.delete(task.taskId);
+    this.#notifyOnEnd.delete(task.taskId);
   }
 
   reopen(task: AgentThreadRecord): void {
@@ -502,6 +523,8 @@ export class AgentTasks implements TaskLanes {
     for (const taskId of this.#store.taskIdsForAgent(agentId)) {
       this.#progress.delete(taskId);
       this.#stoppedTurns.delete(taskId);
+      this.#reported.delete(taskId);
+      this.#notifyOnEnd.delete(taskId);
     }
     this.#store.deleteForAgent(agentId);
   }
@@ -516,6 +539,7 @@ export class AgentTasks implements TaskLanes {
     params: DynamicToolCallParams,
     caller: AgentTaskCaller,
   ): Effect.fn.Return<OpenBotToolResponse | null> {
+    if (params.tool === REPORT_TO_AGENT_TOOL) return yield* this.#report(params, caller);
     if (params.tool !== START_TASK_TOOL) return null;
     const parsed = startTaskToolSchema.safeParse(params.arguments);
     if (!parsed.success) return openBotToolFailure(sourceText("error.backend.taskToolInvalid"));
@@ -539,7 +563,7 @@ export class AgentTasks implements TaskLanes {
     const started = this.#mailbox.deliveryForKey(idempotencyKey);
     const startedTaskId = started ? this.#mailbox.taskIdForDelivery(started.delivery.id) : null;
     const startedTask = startedTaskId ? this.#store.task(startedTaskId) : null;
-    if (startedTask) return startedTaskResult(startedTask);
+    if (startedTask) return startedTaskResult(startedTask, this.#notifyOnEnd.has(startedTask.taskId));
     const open = this.#store.openTaskIds(caller.agentId).flatMap((taskId) => this.#store.task(taskId) ?? []);
     const finished = open.filter((task) => this.#finished(task));
     // A routine thread is the routine's own: its runs do not count as tasks that the agent started.
@@ -561,6 +585,7 @@ export class AgentTasks implements TaskLanes {
     // All of them close before the first yield, so no turn starts between the check and the close.
     for (const task of archived) this.#closeQuietly(task);
     const task = this.create(caller.agentId, input.title, "agent");
+    if (input.notify) this.#notifyOnEnd.add(task.taskId);
     if (archived.length > 0) yield* this.#hooks.archived(caller.agentId, archived);
     const queued = yield* this.#mailbox
       .enqueue({
@@ -587,7 +612,63 @@ export class AgentTasks implements TaskLanes {
     }
     this.changed(caller.agentId);
     this.#hooks.queued(caller.agentId);
-    return startedTaskResult(task);
+    return startedTaskResult(task, input.notify === true);
+  });
+
+  readonly #report = Effect.fn("AgentTasks.report")(function* (
+    this: AgentTasks,
+    params: DynamicToolCallParams,
+    caller: AgentTaskCaller,
+  ): Effect.fn.Return<OpenBotToolResponse> {
+    const parsed = reportToAgentToolSchema.safeParse(params.arguments);
+    if (!parsed.success) return openBotToolFailure(sourceText("error.backend.taskReportInvalid"));
+    const task = caller.taskId ? this.#store.task(caller.taskId) : null;
+    if (!task || task.closedAt !== null || !startedByAgent(task))
+      return openBotToolFailure(sourceText("error.backend.taskReportTaskOnly"));
+    const idempotencyKey = `task-report:${createHash("sha256")
+      .update(JSON.stringify([caller.agentId, params.turnId, params.callId]))
+      .digest("hex")}`;
+    const text = `${taskMessageHeader(task, parsed.data.kind)}\n\n${parsed.data.text}`;
+    if (!(yield* this.#notify(task, text, idempotencyKey)))
+      return openBotToolFailure(sourceText("error.backend.taskReportFailed"));
+    this.#reported.add(task.taskId);
+    return openBotToolResult({
+      kind: parsed.data.kind,
+      note: "OpenBot delivers this report to your own chat as a new turn. Continue the task, or end your turn.",
+    });
+  });
+
+  readonly #notify = Effect.fn("AgentTasks.notify")(function* (
+    this: AgentTasks,
+    task: AgentThreadRecord,
+    text: string,
+    idempotencyKey: string,
+  ): Effect.fn.Return<boolean> {
+    const queued = yield* this.#mailbox
+      .enqueue({
+        sender: { kind: "agent", agentId: task.agentId },
+        senderTaskId: task.taskId,
+        recipientAgentIds: [task.agentId],
+        text,
+        replyToMessageId: null,
+        expectsReply: false,
+        idempotencyKey,
+      })
+      .pipe(
+        Effect.as(true),
+        Effect.catch((failure) =>
+          Effect.sync(() => {
+            logger.warn("Could not queue a task report.", {
+              agentId: task.agentId,
+              taskId: task.taskId,
+              error: failure.cause,
+            });
+            return false;
+          }),
+        ),
+      );
+    if (queued) this.#hooks.queued(task.agentId);
+    return queued;
   });
 
   changed(agentId: string): void {
@@ -599,7 +680,7 @@ export class AgentTasks implements TaskLanes {
    * True when the event was taken. A prompt or an approval of a task turn passes. Its `threadId` is the
    * task's thread, so the task's panel shows it and the agent's chat leaves it out.
    */
-  event(event: AgentEvent): boolean {
+  event(event: AgentEvent, scope: Scope.Scope): boolean {
     switch (event.type) {
       case "conversation": {
         const task = this.#taskOf(event.snapshot.threadId);
@@ -642,6 +723,15 @@ export class AgentTasks implements TaskLanes {
         const waiters = this.#turnEndWaiters.get(task.taskId);
         this.#turnEndWaiters.delete(task.taskId);
         for (const ended of waiters ?? []) Deferred.doneUnsafe(ended, Effect.void);
+        if (!event.continues && startedByAgent(task) && !this.#mailbox.taskBusy(task.agentId, task.taskId)) {
+          const reported = this.#reported.delete(task.taskId);
+          if (!reported && this.#notifyOnEnd.has(task.taskId))
+            Effect.runFork(
+              this.#notify(task, taskEndNotice(task, event.status), `task-end:${event.turnId}`).pipe(
+                Effect.forkIn(scope, { startImmediately: true }),
+              ),
+            );
+        }
         // A routine run in the agent's chat notified. In its own thread it notifies the same way, but
         // through its own event, so the agent's chat keeps its turn state.
         if (task.routineId !== null && !event.quiet && !event.continues)
@@ -751,12 +841,27 @@ function branchTitle(sourceTitle: string, titles: readonly string[]): string {
   return `${prefix}${last + 1}`;
 }
 
-function startedTaskResult(task: AgentThreadRecord): OpenBotToolResponse {
+function startedTaskResult(task: AgentThreadRecord, notify: boolean): OpenBotToolResponse {
+  const endNotice = notify ? " When it ends without a report, OpenBot sends a short notice here." : "";
   return openBotToolResult({
     taskId: task.taskId,
     title: task.title,
-    note: "The task runs in its own conversation beside this chat, and the user follows it in the task list. Its result stays in the task: you do not receive it here. Tell the user in one sentence that the task started, and continue with other work or end your turn.",
+    note: `The task runs in its own conversation beside this chat, and the user follows it in the task list. The task sends its result, a blocker or a question to this chat with openbot.report_to_agent.${endNotice} Tell the user in one sentence that the task started, and continue with other work or end your turn.`,
   });
+}
+
+function startedByAgent(task: AgentThreadRecord): boolean {
+  return task.origin === "agent" && task.routineId === null && task.branch === null;
+}
+
+function taskMessageHeader(task: AgentThreadRecord, kind: string): string {
+  return `Task ${kind} from "${task.title}" (task ${task.taskId}):`;
+}
+
+function taskEndNotice(task: AgentThreadRecord, status: string): string {
+  const ended = status === "completed" ? "ended" : status === "failed" ? "failed" : "was stopped";
+  const error = status === "failed" && task.error ? ` Error: ${task.error}` : "";
+  return `${taskMessageHeader(task, "end")}\n\nThe task ${ended} and sent no report.${error} The user can read the task in the task list.`;
 }
 
 /** The first line of the text, cut to the title limit. An attachment reference shows as its file name. */

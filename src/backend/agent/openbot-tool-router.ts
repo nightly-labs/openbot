@@ -1304,6 +1304,7 @@ export class OpenBotToolRouter {
       inExecutionThread:
         this.#conversation.isExecutionThread(callerThreadId) &&
         !(callerTaskId !== null && this.#tasks.isRoutineThread(callerTaskId)),
+      taskId: callerTaskId,
     };
     const waitResult = this.#waits.handleTool(params, caller);
     if (waitResult) return waitResult;
