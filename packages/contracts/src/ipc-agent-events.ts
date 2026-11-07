@@ -215,10 +215,19 @@ export type AgentEvent =
       tabs: { tabId: string; canGoBack: boolean; canGoForward: boolean }[];
     }
   /**
-   * `provider` and `model` name the run that failed, for the banner. Local only: the Team API event
-   * projection drops them.
+   * `provider` and `model` name the run that failed, for the banner. `link` is the Google page where
+   * the user fixes the account that failed the turn, which the banner opens. Local only: the Team API
+   * event projection drops them.
    */
-  | { type: "error"; agentId?: string; code: string; message: string; provider?: AgentProviderId; model?: string }
+  | {
+      type: "error";
+      agentId?: string;
+      code: string;
+      message: string;
+      provider?: AgentProviderId;
+      model?: string;
+      link?: string;
+    }
   /**
    * A provider plan refused a turn, once per limit. The queues of its agents wait for the reset.
    * Local only: the released Team API event adapters do not carry it. `resetsAt` is in epoch seconds.
@@ -422,7 +431,8 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         isString(value.code) &&
         isString(value.message) &&
         (value.provider === undefined || isAgentProvider(value.provider)) &&
-        (value.model === undefined || isString(value.model))
+        (value.model === undefined || isString(value.model)) &&
+        (value.link === undefined || isString(value.link))
       );
     case "subagent-failed":
       return (

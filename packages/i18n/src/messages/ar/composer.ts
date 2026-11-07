@@ -14,6 +14,7 @@ export const messages = {
   "composer.signIn.label": "تسجيل الدخول إلى {provider}",
   "composer.signIn.action": "تسجيل الدخول",
   "composer.updateKey.action": "تحديث المفتاح",
+  "composer.verifyAccount.action": "التحقق من الحساب",
   "composer.update.body": "حدّث {provider} للمتابعة.",
   "composer.update.manual": "حدّث {provider} على الحاسوب الذي يشغّله للمتابعة.",
   "composer.update.pending": "جارٍ التحديث…",

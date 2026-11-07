@@ -171,6 +171,10 @@ export function createStableConversationState(
   const [conversationErrorRuns, setConversationErrorRuns] = createSignal<
     Record<string, { message: string; run: string }>
   >({});
+  /** The page that fixes the account behind each conversation error (#2419), keyed like `conversationErrors`. */
+  const [conversationErrorLinks, setConversationErrorLinks] = createSignal<
+    Record<string, { message: string; link: string }>
+  >({});
   createEffect(
     () => {
       const agentId = editingAgentId();
@@ -395,6 +399,8 @@ export function createStableConversationState(
     setConversationErrors,
     conversationErrorRuns,
     setConversationErrorRuns,
+    conversationErrorLinks,
+    setConversationErrorLinks,
     composerErrors,
     setComposerErrors,
     composerErrorReferences,

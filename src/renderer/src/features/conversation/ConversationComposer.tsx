@@ -75,6 +75,7 @@ export function ConversationComposer() {
     currentChatError,
     currentChatErrorReference,
     currentChatErrorRun,
+    currentChatErrorLink,
     currentDraft,
     dismissCurrentChatErrors,
     installedSkills,
@@ -88,6 +89,7 @@ export function ConversationComposer() {
     pasteFiles,
     presentedQueueDeliveries,
     previewAttachment,
+    openExternalMessageUrl,
     props,
     quoteRequest,
     openQuote,
@@ -270,6 +272,25 @@ export function ConversationComposer() {
     if (props.agent?.provider !== "opencode") return undefined;
     const expired = localizeSourceText(sourceText("error.provider.opencodeKeyExpired"));
     return currentChatError() === expired ? props.onManageProviders : undefined;
+  };
+  /** The button of the error banner: the fix that the error names, or none. */
+  const errorBannerAction = () => {
+    const updateKey = updateOpenCodeKey();
+    if (updateKey)
+      return (
+        <Button variant="outline" size="sm" type="button" onClick={(event) => updateKey(event.currentTarget)}>
+          {t("composer.updateKey.action")}
+        </Button>
+      );
+    // Google refuses Gemini until the user verifies the account on this page (#2419).
+    const link = currentChatErrorLink();
+    if (link)
+      return (
+        <Button variant="outline" size="sm" type="button" onClick={() => void openExternalMessageUrl(link)}>
+          {t("composer.verifyAccount.action")}
+        </Button>
+      );
+    return undefined;
   };
   /** An ACP provider has no steer request, so its queued messages wait for the turn to end (#3689). */
   const steers = () => !props.agent || providerSteersTurns(props.agent.provider);
@@ -633,18 +654,7 @@ export function ConversationComposer() {
                   dismissCurrentChatErrors();
                   setComposerFocusRequest((current) => current + 1);
                 }}
-                action={
-                  updateOpenCodeKey() ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      type="button"
-                      onClick={(event) => updateOpenCodeKey()?.(event.currentTarget)}
-                    >
-                      {t("composer.updateKey.action")}
-                    </Button>
-                  ) : undefined
-                }
+                action={errorBannerAction()}
               />
             )}
           </Show>

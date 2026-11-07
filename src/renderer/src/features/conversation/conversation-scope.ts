@@ -168,6 +168,7 @@ export function createConversationViewScope(props: ConversationProps) {
     conversationErrors,
     setConversationErrors,
     conversationErrorRuns,
+    conversationErrorLinks,
     voicePhase,
     setVoicePhase,
     voiceModelProgress,
@@ -406,6 +407,14 @@ export function createConversationViewScope(props: ConversationProps) {
     if (!target || !message) return null;
     const entry = conversationErrorRuns()[composerDraftKey(target)];
     return entry?.message === message ? entry.run : null;
+  });
+  /** The page that fixes the account behind the shown error. A later error shows none. */
+  const currentChatErrorLink = createMemo(() => {
+    const target = currentTarget();
+    const message = currentChatError();
+    if (!target || !message) return null;
+    const entry = conversationErrorLinks()[composerDraftKey(target)];
+    return entry?.message === message ? entry.link : null;
   });
   /** True while a file import for the chat waits. An import for another chat does not stop this one. */
   const attachmentBusy = (target = currentTarget()) =>
@@ -2413,6 +2422,7 @@ export function createConversationViewScope(props: ConversationProps) {
     currentChatError,
     currentChatErrorReference,
     currentChatErrorRun,
+    currentChatErrorLink,
     currentChatConversationKey,
     dismissCurrentChatErrors,
     dismissAwaitingReplies,
