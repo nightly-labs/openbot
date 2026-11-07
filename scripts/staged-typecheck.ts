@@ -15,7 +15,7 @@
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, posix, relative, resolve } from "node:path";
+import { join, posix, relative, resolve, sep } from "node:path";
 import { MOBILE_CODEGEN_INPUTS } from "./mobile-codegen";
 
 const ROOT = resolve(import.meta.dirname, "..");
@@ -151,11 +151,22 @@ function selectTypechecks(paths: string[]): Map<string, string> {
 
 function stagedPaths(): string[] {
   // Without renames, a moved file lists its old path too: the files that imported it now fail.
+  const repositoryRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+    cwd: ROOT,
+    encoding: "utf8",
+  }).trim();
+  // Git names staged paths from the repository root, which is above the project when OpenBot is
+  // a subdirectory of a larger repository. Project selectors are relative to OpenBot.
+  const projectPath = relative(repositoryRoot, ROOT).split(sep).join("/");
+  const prefix = projectPath ? `${projectPath}/` : "";
   const output = execFileSync("git", ["diff", "--cached", "--name-only", "--no-renames", "-z"], {
     cwd: ROOT,
     encoding: "utf8",
   });
-  return output.split("\0").filter(Boolean);
+  return output
+    .split("\0")
+    .filter((path) => !prefix || path.startsWith(prefix))
+    .map((path) => (prefix ? path.slice(prefix.length) : path));
 }
 
 if (import.meta.main) {

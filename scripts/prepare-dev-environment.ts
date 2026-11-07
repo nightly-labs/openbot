@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { constants, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, join, normalize, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { developmentInstanceIdForWorktree } from "../src/main/development-profile";
 import { type DevelopmentStateOutcome, ensureDevelopmentState } from "./development-secrets";
@@ -207,7 +207,12 @@ function findMainCheckoutRoot(projectRoot: string): string | undefined {
       cwd: projectRoot,
       encoding: "utf8",
     }).trim();
-    return dirname(commonDir);
+    const worktreeRoot = execFileSync("git", ["rev-parse", "--path-format=absolute", "--show-toplevel"], {
+      cwd: projectRoot,
+      encoding: "utf8",
+    }).trim();
+    const projectPath = relative(worktreeRoot, resolve(projectRoot));
+    return isInsideCheckout(projectPath) ? resolve(dirname(commonDir), projectPath) : undefined;
   } catch {
     // A source archive has no git metadata, so there is nothing to copy from.
     return undefined;

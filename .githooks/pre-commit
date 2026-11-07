@@ -1,8 +1,31 @@
 #!/bin/sh
 set -eu
 
-repository_root=$(git rev-parse --show-toplevel)
-cd "$repository_root"
+# Git gives a hook GIT_DIR but not GIT_WORK_TREE. In a linked worktree GIT_DIR points at the
+# worktree's own git directory, so git takes the current directory as the top of the working tree.
+# After the hook changes into a project subdirectory, `git add -- <path>` would then stage the file
+# under a second path, relative to that subdirectory. Without both variables git finds the working
+# tree itself, as in a normal checkout. GIT_INDEX_FILE stays: the hook must use the same index.
+unset GIT_DIR GIT_WORK_TREE
+
+# The project is the directory that holds this hook's .githooks. It is the repository root in a
+# normal checkout, and a subdirectory when OpenBot is checked out inside a larger repository.
+repository_root=$(cd -- "$(git rev-parse --show-toplevel)" && pwd -P)
+project_root=$(cd -- "$(dirname -- "$0")/.." && pwd -P)
+project_path=""
+case "$project_root" in
+  "$repository_root"/*) project_path=${project_root#"$repository_root"/} ;;
+  *) project_root="$repository_root" ;;
+esac
+cd "$project_root"
+
+git_diff() {
+  if [ -n "$project_path" ]; then
+    git -C "$repository_root" -c core.quotePath=false diff "$@" --relative="$project_path" -- "$project_path"
+  else
+    git -c core.quotePath=false diff "$@"
+  fi
+}
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
@@ -10,8 +33,8 @@ trap 'rm -rf "$work"' EXIT
 # Biome fixes the working-tree copy, and staging that copy again would also stage the edits the
 # author left unstaged. Only fully staged files are staged again; a partly staged file that Biome
 # changes stops the commit so the author can choose which fixes to stage.
-git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR >"$work/staged"
-git -c core.quotePath=false diff --name-only >"$work/unstaged"
+git_diff --cached --name-only --diff-filter=ACMR >"$work/staged"
+git_diff --name-only >"$work/unstaged"
 grep -Fx -f "$work/unstaged" "$work/staged" >"$work/partly-staged" || true
 grep -Fxv -f "$work/partly-staged" "$work/staged" >"$work/fully-staged" || true
 
@@ -37,7 +60,7 @@ if ! cmp -s "$work/before" "$work/after"; then
   exit 1
 fi
 
-staged_paths=$(git diff --cached --name-only --diff-filter=ACMRD)
+staged_paths=$(git_diff --cached --name-only --diff-filter=ACMRD)
 
 # A version bump is a release: its CHANGELOG.md section is the /changelog page. It runs first
 # because it takes less time than the type checks.
@@ -53,8 +76,14 @@ if printf '%s\n' "$staged_paths" | grep -Fxq apps/mobile/app.json; then
 fi
 
 # The release copies each fragment into its changelog, so a malformed one stops it later.
-git diff --cached --name-only -z --diff-filter=ACMR -- 'changelog.d/*.md' 'apps/mobile/changelog.d/*.md' \
-  ':(exclude)changelog.d/README.md' ':(exclude)apps/mobile/changelog.d/README.md' |
+if [ -n "$project_path" ]; then
+  git -C "$repository_root" -c core.quotePath=false diff --cached --name-only -z --diff-filter=ACMR \
+    --relative="$project_path" -- "$project_path/changelog.d/*.md" "$project_path/apps/mobile/changelog.d/*.md" \
+    ":(exclude)$project_path/changelog.d/README.md" ":(exclude)$project_path/apps/mobile/changelog.d/README.md"
+else
+  git diff --cached --name-only -z --diff-filter=ACMR -- 'changelog.d/*.md' 'apps/mobile/changelog.d/*.md' \
+    ':(exclude)changelog.d/README.md' ':(exclude)apps/mobile/changelog.d/README.md'
+fi |
   xargs -0 -r bun scripts/check-release-notes.ts --staged --fragments
 
 # Text-only commits, such as docs and AGENTS.md, cannot change a type or a UI rule. Data JSON is
