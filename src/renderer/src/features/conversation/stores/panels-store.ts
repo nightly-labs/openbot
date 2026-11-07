@@ -23,6 +23,7 @@ import type {
   SidePanelPane,
 } from "../conversation-types";
 import { agentSkillsMode } from "../installed-skills-source";
+import { SHARED_FOLDER_PATH } from "../message-image-files";
 import { filePreviewQuoteId } from "../quoted-text";
 import { conversationOwnerId } from "./composer-store";
 
@@ -410,6 +411,9 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   ) {
     const ownerAgentId = conversationOwnerId(deps.props);
     if (!agentId || !ownerAgentId) return;
+    // Agents also write a shared file as `Shared/…`, as the host reads it. It opens from the shared
+    // folder when the workspace has nothing at that path (#5657).
+    const next = SHARED_FOLDER_PATH.test(path) ? () => openSharedFile(path, place, fallback) : fallback;
     const serverId = deps.props.server?.id ?? "local";
     const target = { agentId: ownerAgentId, serverId };
     const generation = deps.nextFilePreviewGeneration();
@@ -436,8 +440,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
           () => {
             if (!scopeActive() || generation !== deps.currentFilePreviewGeneration()) return;
             if (!attachment || !canPreviewAttachment(attachment)) {
-              if (fallback) {
-                if (current()) fallback();
+              if (next) {
+                if (current()) next();
               } else deps.setComposerError(filePreviewError(error, path), target);
               return;
             }
