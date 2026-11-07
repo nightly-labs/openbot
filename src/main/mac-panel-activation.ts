@@ -77,9 +77,17 @@ export function hidePanelFromWindowSwitchers(window: BrowserWindow): void {
   try {
     const objc = objcRuntime();
     const nsWindow = objc.sendPointer(objc.pointerOf(window.getNativeWindowHandle()), objc.sel("window"));
+    const setSubrole = objc.sel("setAccessibilitySubrole:");
+    if (!nsWindow || !objc.sendRespondsTo(nsWindow, objc.sel("respondsToSelector:"), setSubrole)) {
+      logger.warn("The panel window has no setAccessibilitySubrole: method.");
+      return;
+    }
     const subrole = objc.sendCString(objc.getClass("NSString"), objc.sel("stringWithUTF8String:"), "AXFloatingWindow");
-    if (!nsWindow || !subrole) return;
-    objc.sendSetPointer(nsWindow, objc.sel("setAccessibilitySubrole:"), subrole);
+    if (!subrole) {
+      logger.warn("Unable to make the floating window subrole.");
+      return;
+    }
+    objc.sendSetPointer(nsWindow, setSubrole, subrole);
   } catch (error) {
     logger.warn("Unable to hide the panel from window switchers:", toLogValue(error));
   }
