@@ -298,12 +298,18 @@ const PROXY_ERROR_LIST: readonly (readonly [name: string, code: number, failure:
 const PROXY_ERRORS = new Map(PROXY_ERROR_LIST.map(([name, , failure]) => [name, failure]));
 const PROXY_ERROR_CODES = new Map(PROXY_ERROR_LIST.map(([, code, failure]) => [code, failure]));
 
+/** The Chromium error code in the text of a failed page load, written as `(<code>)`. */
+function chromiumErrorCode(text: string): number | undefined {
+  const code = /\((-\d+)\)/u.exec(text)?.[1];
+  return code === undefined ? undefined : Number(code);
+}
+
 /** The proxy failure in the text of a failed page load: a Chromium error name, or `(<code>)`. */
 function proxyErrorInText(text: string): BrowserProxyFailure | undefined {
   const name = /\bERR_[A-Z_]+/u.exec(text)?.[0];
   if (name !== undefined) return PROXY_ERRORS.get(`net::${name}`);
-  const code = /\((-\d+)\)/u.exec(text)?.[1];
-  return code === undefined ? undefined : PROXY_ERROR_CODES.get(Number(code));
+  const code = chromiumErrorCode(text);
+  return code === undefined ? undefined : PROXY_ERROR_CODES.get(code);
 }
 
 /**
@@ -311,8 +317,8 @@ function proxyErrorInText(text: string): BrowserProxyFailure | undefined {
  * Chromium gives certificate errors the codes -200 to -299. Other failures stay as they are.
  */
 function certificateLoadFailure(failure: BrowserOperationError): BrowserOperationError {
-  const code = Number(/\((-\d+)\)/u.exec(String(failure.cause))?.[1]);
-  return code <= -200 && code > -300
+  const code = chromiumErrorCode(String(failure.cause));
+  return code !== undefined && code <= -200 && code > -300
     ? browserFailure(new Error(sourceText("error.backend.browserCertificateUntrusted")))
     : failure;
 }
@@ -1048,7 +1054,8 @@ export class BrowserHost {
             yield* this.#persistState();
             const proxyFailure = this.#proxyLoadFailure(tab, operationFailure);
             if (proxyFailure !== operationFailure) return yield* proxyFailure;
-            const certificateFailure = certificateLoadFailure(operationFailure);
+            // An agent keeps the Chromium reason, which tells it which certificate check failed.
+            const certificateFailure = closeOnFailure ? operationFailure : certificateLoadFailure(operationFailure);
             if (certificateFailure !== operationFailure) return yield* certificateFailure;
             return yield* browserFailure(
               new Error(sourceText("error.backend.browserOpenFailed", { url: normalizedUrl, reason: String(error) })),
