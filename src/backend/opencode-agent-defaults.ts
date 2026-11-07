@@ -8,7 +8,7 @@
 // them. A rule in the user's global config comes before them, so a rule that a global name or pattern
 // matches is left out of the file. The global catch-all `"*"` only sets how OpenCode asks for tools.
 
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
@@ -61,6 +61,24 @@ function matches(pattern: string, name: string): boolean {
   return new RegExp(`^${source}$`, "u").test(name);
 }
 
+/** Copies `text` and gives each part outside a string to `outside`. Strings stay unchanged. */
+function mapOutsideStrings(text: string, outside: (part: string) => string): string {
+  let out = "";
+  let start = 0;
+  let index = 0;
+  while (index < text.length) {
+    if (text[index] !== '"') {
+      index += 1;
+      continue;
+    }
+    let end = index + 1;
+    while (end < text.length && text[end] !== '"') end += text[end] === "\\" ? 2 : 1;
+    out += outside(text.slice(start, index)) + text.slice(index, end + 1);
+    start = index = end + 1;
+  }
+  return out + outside(text.slice(start));
+}
+
 /**
  * Removes the comments and the trailing commas that OpenCode accepts in its config, so that
  * `JSON.parse` reads it. Text in strings stays unchanged.
@@ -85,14 +103,15 @@ function stripJsonc(text: string): string {
       index += 1;
     }
   }
-  return out.replace(/,(\s*[}\]])/g, "$1");
+  // With the comments gone, a quote starts or ends a string.
+  return mapOutsideStrings(out, (part) => part.replace(/,(\s*[}\]])/g, "$1"));
 }
 
 /**
  * The parts of a global config file that can name a rule. Other keys are ignored. A shape that OpenCode
  * itself refuses fails to decode, and then OpenBot adds no rule.
  */
-const UserConfig = Schema.Struct({
+const PermissionRules = Schema.Struct({
   permission: Schema.optional(
     Schema.Union([
       Schema.String,
@@ -106,12 +125,20 @@ const UserConfig = Schema.Struct({
   // The deprecated `tools` switches still turn a tool on or off.
   tools: Schema.optional(Schema.Record(Schema.String, Schema.Boolean)),
 });
-type UserConfig = typeof UserConfig.Type;
+type PermissionRules = typeof PermissionRules.Type;
+
+// A rule of an agent, in `agent` or `agents`, counts for every agent: OpenBot does not know which
+// agent the user starts.
+const UserConfig = Schema.Struct({
+  ...PermissionRules.fields,
+  agent: Schema.optional(Schema.Record(Schema.String, PermissionRules)),
+  agents: Schema.optional(Schema.Record(Schema.String, PermissionRules)),
+});
 
 const decodeUserConfig = Schema.decodeUnknownOption(Schema.fromJsonString(UserConfig));
 
-/** Adds the patterns that one global config file sets a rule for. */
-function collectRules(config: UserConfig, rules: { tools: string[]; skills: string[] }): void {
+/** Adds the patterns that one global config file, or one agent in it, sets a rule for. */
+function collectRules(config: PermissionRules, rules: { tools: string[]; skills: string[] }): void {
   const addTool = (pattern: string) => {
     if (pattern !== "*") rules.tools.push(pattern);
   };
@@ -132,28 +159,56 @@ function collectRules(config: UserConfig, rules: { tools: string[]; skills: stri
   for (const tool of Object.keys(config.tools ?? {})) addTool(tool);
 }
 
+/** The config files that a warning was logged for, so that each spawn does not log it again. */
+const warnedFiles = new Set<string>();
+
+/**
+ * The global config folders. `OPENCODE_CONFIG_DIR` takes the place of the XDG folder in OpenCode
+ * 2.2.6, and is also read as an extra folder; OpenBot reads both, so that it sees every user rule.
+ */
+function globalConfigFolders(env: NodeJS.ProcessEnv, home: string): string[] {
+  const folders = [join(env.XDG_CONFIG_HOME?.trim() || join(home, ".config"), "opencode")];
+  const configDirectory = env.OPENCODE_CONFIG_DIR?.trim();
+  if (configDirectory && !folders.includes(configDirectory)) folders.push(configDirectory);
+  return folders;
+}
+
 /**
  * The names that the user's global config sets a rule for, or null when a file cannot be decoded:
  * then OpenBot cannot know what the user set, and adds no rule.
  */
 function readUserRules(env: NodeJS.ProcessEnv, home: string): UserRules | null {
-  const folder = join(env.XDG_CONFIG_HOME?.trim() || join(home, ".config"), "opencode");
   const rules: { tools: string[]; skills: string[] } = { tools: [], skills: [] };
-  for (const name of GLOBAL_CONFIG_FILES) {
-    let text: string;
-    try {
-      text = readFileSync(join(folder, name), "utf8");
-    } catch {
-      continue;
+  for (const folder of globalConfigFolders(env, home)) {
+    for (const name of GLOBAL_CONFIG_FILES) {
+      const file = join(folder, name);
+      let text: string;
+      try {
+        text = readFileSync(file, "utf8");
+      } catch {
+        continue;
+      }
+      const config = decodeUserConfig(stripJsonc(text));
+      if (Option.isNone(config)) {
+        if (!warnedFiles.has(file))
+          logger.warn("OpenBot could not read an OpenCode config file, so it adds no prompt rules.", { file: name });
+        warnedFiles.add(file);
+        return null;
+      }
+      collectRules(config.value, rules);
+      for (const agent of [...Object.values(config.value.agent ?? {}), ...Object.values(config.value.agents ?? {})])
+        collectRules(agent, rules);
     }
-    const config = decodeUserConfig(stripJsonc(text));
-    if (Option.isNone(config)) {
-      logger.warn("OpenBot could not read an OpenCode config file, so it adds no prompt rules.", { file: name });
-      return null;
-    }
-    collectRules(config.value, rules);
   }
   return rules;
+}
+
+function readTextOrNull(file: string): string | null {
+  try {
+    return readFileSync(file, "utf8");
+  } catch {
+    return null;
+  }
 }
 
 /** One layer under OpenCode's `permission` key. */
@@ -194,9 +249,16 @@ export function openCodeAgentDefaultsEnv(
   if (!layer) return {};
   const folder = join(stateDirectory, "opencode");
   const file = join(folder, DEFAULTS_FILE);
+  const content = `${JSON.stringify(layer, null, 2)}\n`;
   try {
-    mkdirSync(folder, { recursive: true });
-    writeFileSync(file, `${JSON.stringify(layer, null, 2)}\n`);
+    if (readTextOrNull(file) !== content) {
+      mkdirSync(folder, { recursive: true });
+      // A process that starts while another spawn writes reads the old file or the new one, never a
+      // partial one.
+      const temporary = `${file}.${process.pid}.tmp`;
+      writeFileSync(temporary, content);
+      renameSync(temporary, file);
+    }
   } catch (cause) {
     logger.warn("OpenBot could not write its OpenCode prompt rules.", toLogValue(cause));
     return {};

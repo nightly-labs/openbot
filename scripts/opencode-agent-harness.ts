@@ -162,6 +162,9 @@ export async function startOpenCodeHarness(name: string): Promise<OpenCodeHarnes
     process.env[variable] = join(root, folder);
     await mkdir(join(root, folder), { recursive: true });
   }
+  // A config file or folder of the developer would add their rules, and the driver would add none.
+  delete process.env.OPENCODE_CONFIG;
+  delete process.env.OPENCODE_CONFIG_DIR;
   await mkdir(join(root, "config", "opencode"), { recursive: true });
   const workspace = join(root, "workspace");
   await mkdir(workspace, { recursive: true });

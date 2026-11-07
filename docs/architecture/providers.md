@@ -413,8 +413,8 @@ agent. `opencode-agent-defaults.ts` denies the parts that an OpenBot agent does 
 `opencode_read_mcp_resource` tools (OpenBot's MCP servers serve no resources), and the `report` and
 `opencode` skills. These rules go in an `OPENCODE_CONFIG` file in the provider state folder, not in
 `OPENCODE_CONFIG_CONTENT`, so a rule in the project's `opencode.json` comes after them and wins. The
-global config comes before that file, so the driver leaves out each rule that a global name or pattern
-matches. The global catch-all `"*"` only sets how OpenCode asks for tools and does not count.
+global config (the XDG folder and `OPENCODE_CONFIG_DIR`) comes before that file, so the driver leaves
+out each rule that a global name or pattern matches, also in an agent's rules. The global catch-all `"*"` only sets how OpenCode asks for tools and does not count.
 When the user sets `OPENCODE_CONFIG`, or a global config file cannot be decoded, OpenBot adds no rule.
 The `models` tool, the `explore` agent and all OpenBot tools stay; with two tools gone, the Code Mode
 catalog shows 14 of 16 OpenBot tools, not 13, and `search` still finds the others. On OpenCode 2.2.6
