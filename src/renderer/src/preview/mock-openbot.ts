@@ -2485,6 +2485,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
             preview: "",
             updatedAt: null,
           }),
+          // Only a named profile carries over, as in the agent store.
+          ...(source.browserProfileId === undefined
+            ? {}
+            : { ownBrowserSession: true, browserProfileId: source.browserProfileId }),
           threadId: null,
         };
         agents = [...agents, agent];
