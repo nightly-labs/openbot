@@ -4,6 +4,7 @@ import { type AvatarMood, avatarMoodPresentation, type ShapeSafeStateId } from "
 import type { AgentStepActivity, AvatarColor, AvatarHue } from "@openbot/contracts/ipc";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
+import { useAmbientMotion } from "../../ambient-motion";
 import {
   AVATAR_EXPRESSIONS,
   type AvatarMotion,
@@ -180,7 +181,8 @@ export function AgentAvatar(props: AgentAvatarProps) {
   // The custom property rides with the attribute rather than being set on every avatar: the
   // keyframe is an infinite animation, and a selector that matched all of them would start one
   // behind every resting row in the sidebar.
-  const breathe = () => (PLUSH_MOODS[mood()].busy ? PHOTO_BREATHE : undefined);
+  const ambientMotion = useAmbientMotion();
+  const breathe = () => (PLUSH_MOODS[mood()].busy && ambientMotion() ? PHOTO_BREATHE : undefined);
   const photoStyle = (): Record<string, string> => {
     const amount = breathe();
     return amount ? { ...props.style, "--agent-avatar-breathe": amount } : { ...props.style };
@@ -249,6 +251,7 @@ function GeneratedAvatar(props: {
   // On the CPU, six moving avatars took a third of a core. A window drawn there shows the still
   // avatars of reduced motion, which run no animation loop.
   const reducedMotion = () => prefersReduced() || documentSoftwareRendering();
+  const ambientMotion = useAmbientMotion();
   const cyclesFaces = () => props.workingFaces && props.mood === "working";
   const [workingFace, setWorkingFace] = createSignal<ExpressionId>(nextWorkingFace(null));
   // The face cycle wins: the sidebar badge already shows the work there. Reduced motion keeps the
@@ -305,7 +308,7 @@ function GeneratedAvatar(props: {
     };
   });
   const flatBreathe = () => {
-    const amount = flat() && !cyclesFaces() ? avatarMoodPresentation(props.mood).breathe : 0;
+    const amount = flat() && !cyclesFaces() && ambientMotion() ? avatarMoodPresentation(props.mood).breathe : 0;
     return amount > 0 ? String(amount) : undefined;
   };
   const spanStyle = () => {
@@ -315,16 +318,17 @@ function GeneratedAvatar(props: {
   // A mood that carries its own motion has to be seen without being pointed at, and so do eyes that
   // follow the pointer; the resting moods keep the hover gating that the perf note above is about.
   // An avatar that moves only as decoration rests while another app has the focus: the empty chat
-  // kept the loop running for as long as the window stayed open.
+  // kept the loop running for as long as the window stayed open. A surface above the other apps keeps
+  // a busy mood still until the user looks at it: see `AmbientMotion`.
   const animated = () =>
     props.followPointer ||
-    plushMood().busy ||
+    (plushMood().busy && ambientMotion()) ||
     (!STATIC_MOTIONS.has(props.motion) && documentFocused()) ||
     interacting();
 
   // Reduced motion keeps one face: it is a frozen plush, and a frozen plush cannot morph between faces.
   createEffect(
-    () => cyclesFaces() && !reducedMotion(),
+    () => cyclesFaces() && !reducedMotion() && ambientMotion(),
     (cycling) => {
       if (!cycling) return;
       let timer = 0;
