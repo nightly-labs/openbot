@@ -3791,7 +3791,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         return contexts.some(({ agentId, threadId }) => this.#channelSessionBusy(agents.get(agentId), threadId));
       },
       end: (threadIds) =>
-        Effect.forEach(threadIds, (threadId) => this.#threads.endThreadContext(threadId), { discard: true }),
+        Effect.forEach(
+          threadIds,
+          (threadId) => {
+            // The messages are gone, so the files that their turns used open from no other link.
+            this.#turn.fileHistory.forgetThread(threadId);
+            return this.#threads.endThreadContext(threadId);
+          },
+          { discard: true },
+        ),
     });
   }, Effect.uninterruptible).bind(this);
 
@@ -5817,6 +5825,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       this.#compaction.endThread(session.externalSessionId);
     }
     this.#conversation.forgetExecutionThread(threadId);
+    this.#turn.fileHistory.forgetThread(threadId);
   }, Effect.uninterruptible);
 }
 

@@ -79,19 +79,36 @@ export class ThreadFileHistory {
   record(agentId: string, threadId: string, paths: unknown): void {
     if (!Array.isArray(paths)) return;
     const history = this.#threads.get(threadId) ?? { agentId, paths: [] };
+    let recorded = false;
     for (const path of paths) {
       if (typeof path !== "string" || !isAbsolute(path)) continue;
       const previous = history.paths.indexOf(path);
       if (previous !== -1) history.paths.splice(previous, 1);
       history.paths.push(path);
       if (history.paths.length > 200) history.paths.shift();
+      recorded = true;
     }
-    if (history.paths.length > 0) this.#threads.set(threadId, history);
+    if (!recorded) return;
+    // The thread that recorded last goes to the end, so the threads stay in the order of their work.
+    this.#threads.delete(threadId);
+    this.#threads.set(threadId, history);
   }
 
+  /**
+   * The paths of all threads of the agent, oldest first. A chip does not name its thread, and a channel
+   * runs the agent in a thread of its own. The paths of `threadId` come last, so its files win.
+   */
   paths(agentId: string, threadId: string | null): readonly string[] {
-    const history = threadId ? this.#threads.get(threadId) : undefined;
-    return history?.agentId === agentId ? history.paths : [];
+    const preferred = threadId ? this.#threads.get(threadId) : undefined;
+    const others = [...this.#threads]
+      .filter(([id, history]) => id !== threadId && history.agentId === agentId)
+      .flatMap(([, history]) => history.paths);
+    return preferred?.agentId === agentId ? [...others, ...preferred.paths] : others;
+  }
+
+  /** A deleted thread, such as a deleted channel, gives no file to a link in another thread. */
+  forgetThread(threadId: string): void {
+    this.#threads.delete(threadId);
   }
 
   forgetAgent(agentId: string): void {
