@@ -348,8 +348,8 @@ const BASE_STYLE = [
  * It also gives the page `window.openbotPage`, which posts the MCP Apps requests: a message for the
  * user's message box, the page state for the agent, and full screen. It sends a click on an image,
  * so the app can show it large, and a key chord that the page did not use, so app shortcuts still
- * work while the page has focus. It reports the text that the user selects and its place, so the
- * app can offer to quote it. The app checks each message again. The key listener adds a second
+ * work while the page has focus. It reports the text that the user selects and its place when one of
+ * them changes, so the app can offer to quote it. The app checks each message again. The key listener adds a second
  * listener that runs last, and the image click waits a task, so each sees whether the page used
  * the key or the click first.
  *
@@ -441,7 +441,7 @@ if(url.protocol!=="http:"&&url.protocol!=="https:")return;
 event.preventDefault();
 send({id:nextId++,method:"${CHAT_VISUAL_OPEN_LINK}",params:{url:url.href}});
 },true);
-let selected="",selectionFrame=0;
+let selected="",reported="",selectionFrame=0;
 const reportSelection=()=>{
 selectionFrame=0;
 const selection=getSelection();
@@ -451,7 +451,9 @@ value=selection.toString().replace(/\u00a0/g," ").trim().slice(0,${CHAT_VISUAL_C
 const rect=selection.getRangeAt(0).getBoundingClientRect();
 if(value)box={top:rect.top,left:rect.left,bottom:rect.bottom,right:rect.right};
 }
-if(!value&&!selected)return;
+const report=value&&[value,box.top,box.left,box.bottom,box.right].join("|");
+if(report===reported)return;
+reported=report;
 selected=value;
 send({method:"${CHAT_VISUAL_SELECTION_CHANGED}",params:Object.assign({text:value},box)});
 };

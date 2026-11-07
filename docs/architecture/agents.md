@@ -840,8 +840,8 @@ context, the selected text, an image and an app shortcut. The frame script gives
 methods `ui/message`, `ui/update-model-context` and `ui/request-display-mode`. A link, a message, the
 context, an image, full screen and a shortcut need the frame to have the focus and the user's
 activation, so a page acts only after a click or a key in it. A message goes at the end of the draft,
-and the user sends it. The context is a quote tag of the page file
-at the start of the draft, so it shows as a quote chip and is saved and sent with the draft; the
+and the user sends it. The context is a quote tag of the visual message (in the side panel, of the
+message that holds the page) at the start of the draft, so it shows as a quote chip and is saved and sent with the draft; the
 page's next context replaces it. The frame script reports the text that the user selects in the
 page, and the chat or the panel shows the Quote action of a chat selection over it. Quote, or the
 quote shortcut in the page, adds the text as a quote of the page file, so the chip opens the page in

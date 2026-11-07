@@ -50,7 +50,7 @@ export function createMessageActions(deps: MessageActionsDeps) {
   }
 
   /**
-   * Puts the text that an HTML page wrote at the end of the draft. The user reads it and
+   * Puts the text that a visual reply's page wrote at the end of the draft. The user reads it and
    * sends it, so a page never sends a message itself.
    */
   function addPageText(text: string) {
@@ -59,28 +59,17 @@ export function createMessageActions(deps: MessageActionsDeps) {
     deps.setComposerFocusRequest((value) => value + 1);
   }
 
-  /** The last context that each page wrote, by the page's quote id. */
-  const pageContexts = new Map<string, string>();
-
   /**
-   * Keeps the state that an HTML page gave as a quote of the page at the start of the draft, so the
-   * user sees it and the next message sends it. `quoteId` is the file quote id of the page. The page's
-   * latest state replaces the one before it, and empty text removes it. A quote that the user made
-   * from the same page has the same id, so only the quote with the page's last context text changes.
+   * Keeps the state that a visual reply's page gave as a quote of the page at the start of the draft,
+   * so the user sees it and the next message sends it. The page's latest state replaces the one before
+   * it, and empty text removes it.
    */
-  function setPageContext(quoteId: string, text: string) {
+  function setPageContext(message: AgentMessage, text: string) {
     const draft = deps.currentDraft().text;
-    const quoted = text.trim() ? limitedQuoteText(text) : "";
-    const quote = quoted ? serializeChatTagReference("quote", quoted, quoteId) : "";
-    const previous = pageContexts.get(quoteId);
-    const shown =
-      previous === undefined
-        ? undefined
-        : chatTagReferences(draft).find(
-            (reference) => reference.kind === "quote" && reference.id === quoteId && reference.name === previous,
-          );
-    if (quoted) pageContexts.set(quoteId, quoted);
-    else pageContexts.delete(quoteId);
+    const quote = text.trim() ? serializeChatTagReference("quote", limitedQuoteText(text), message.id) : "";
+    const shown = chatTagReferences(draft).find(
+      (reference) => reference.kind === "quote" && reference.id === message.id,
+    );
     // A removed quote takes the space that the editor put after it.
     const end = shown && !quote && draft[shown.end] === " " ? shown.end + 1 : shown?.end;
     const next = shown ? `${draft.slice(0, shown.start)}${quote}${draft.slice(end)}` : quote && `${quote} ${draft}`;

@@ -513,23 +513,7 @@ export function SelectionActionsBar(props: {
                 </Show>
                 <Show when={props.onQuote}>
                   {(onQuote) => (
-                    <Button
-                      variant="ghost"
-                      type="button"
-                      class="selection-actions-control"
-                      aria-label={t("chat.selection.quote")}
-                      aria-keyshortcuts={props.quoteShortcut === "meta" ? "Meta+Shift+Period" : "Control+Shift+Period"}
-                      title={t(
-                        props.quoteShortcut === "meta"
-                          ? "chat.selection.quoteShortcutMac"
-                          : "chat.selection.quoteShortcutOther",
-                      )}
-                      onPointerDown={(event) => event.preventDefault()}
-                      onClick={() => onQuote()()}
-                    >
-                      <TextQuote class="selection-actions-icon" aria-hidden="true" />
-                      <span class="selection-actions-label">{t("chat.selection.quote")}</span>
-                    </Button>
+                    <QuoteSelectionButton quoteShortcut={props.quoteShortcut} onQuote={() => onQuote()()} />
                   )}
                 </Show>
                 <PresetButton
@@ -612,6 +596,28 @@ function PresetButton(props: { label: string; icon: SolidElement; onSelect: () =
     >
       {props.icon}
       <span class="selection-actions-label">{props.label}</span>
+    </Button>
+  );
+}
+
+/** The Quote action of a selection toolbar. A press keeps the selection, so the click can quote it. */
+export function QuoteSelectionButton(props: { quoteShortcut: QuoteShortcutModifier | undefined; onQuote: () => void }) {
+  const { t } = useText();
+  return (
+    <Button
+      variant="ghost"
+      type="button"
+      class="selection-actions-control"
+      aria-label={t("chat.selection.quote")}
+      aria-keyshortcuts={props.quoteShortcut === "meta" ? "Meta+Shift+Period" : "Control+Shift+Period"}
+      title={t(
+        props.quoteShortcut === "meta" ? "chat.selection.quoteShortcutMac" : "chat.selection.quoteShortcutOther",
+      )}
+      onPointerDown={(event) => event.preventDefault()}
+      onClick={() => props.onQuote()}
+    >
+      <TextQuote class="selection-actions-icon" aria-hidden="true" />
+      <span class="selection-actions-label">{t("chat.selection.quote")}</span>
     </Button>
   );
 }

@@ -13,7 +13,7 @@ import {
   parseChatVisualMessage,
 } from "@openbot/contracts/chat-visual";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
-import { Button, Maximize2, PanelRight, TextQuote } from "@openbot/ui";
+import { Button, Maximize2, PanelRight } from "@openbot/ui";
 import { Portal } from "@solidjs/web";
 import { createEffect, createSignal, onSettled, Show, untrack } from "solid-js";
 import { documentColorScheme } from "../../document-color-scheme";
@@ -23,6 +23,7 @@ import { ImageLightbox, type ImageLightboxOpening } from "./ImageLightbox";
 import { safeBrowserUrl } from "./RichMessageText";
 import {
   isQuoteShortcut,
+  QuoteSelectionButton,
   type QuoteShortcutModifier,
   type SelectionActionsPosition,
   selectionActionsPosition,
@@ -186,11 +187,17 @@ function VisualFrame(props: ChatVisualProps) {
   };
 
   /**
-   * The text that the user quoted. The page keeps its selection and reports it again when its frame
-   * changes size, for example when the side panel opens, so the action stays closed for this text
-   * until the selection changes.
+   * The text that the user quoted or closed the action for. The page keeps its selection and reports
+   * it again when its frame changes size or scrolls, for example when the side panel opens, so the
+   * action stays closed for this text until the selection changes.
    */
   let quoted: string | undefined;
+  /** Closes the action until the page selection changes. */
+  const dismiss = () => {
+    const selected = selection();
+    if (selected) quoted = selected.text;
+    setSelection(null);
+  };
   /** Quotes the page selection. The next selection shows the action again. */
   const quote = () => {
     const selected = selection();
@@ -256,7 +263,8 @@ function VisualFrame(props: ChatVisualProps) {
         if (key.key === "Escape" && !key.metaKey && !key.ctrlKey) return exitFullscreen();
         if (!frame || !userActed()) return;
         if (selection() && isQuoteShortcut(key, props.quoteShortcut ?? "ctrl")) {
-          // The quote goes to the message box, which takes the focus.
+          // The quote goes to the message box, which takes the focus and shows under full screen.
+          exitFullscreen();
           frame.blur();
           return quote();
         }
@@ -271,7 +279,7 @@ function VisualFrame(props: ChatVisualProps) {
     }
   };
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key === "Escape") setSelection(null);
+    if (event.key === "Escape") dismiss();
     if (event.key === "Escape" && shown() && !event.defaultPrevented) {
       event.preventDefault();
       exitFullscreen();
@@ -286,7 +294,7 @@ function VisualFrame(props: ChatVisualProps) {
   // page only, and the page reports its new selection.
   let quoteLayer: HTMLDivElement | undefined;
   const onPointerDown = (event: PointerEvent) => {
-    if (!(event.target instanceof Node && quoteLayer?.contains(event.target))) setSelection(null);
+    if (!(event.target instanceof Node && quoteLayer?.contains(event.target))) dismiss();
   };
 
   onSettled(() => {
@@ -440,14 +448,15 @@ function PageQuoteAction(props: {
     const style = getComputedStyle(frame);
     const top = box.top + frame.clientTop + Number.parseFloat(style.paddingTop);
     const left = box.left + frame.clientLeft + Number.parseFloat(style.paddingLeft);
+    // The page gives the box, so it is kept inside the frame. A selection that the page scrolled out
+    // of its frame has no action.
     const selected = {
-      top: top + props.rect.top,
-      left: left + props.rect.left,
-      bottom: top + props.rect.bottom,
-      right: left + props.rect.right,
+      top: Math.max(box.top, top + props.rect.top),
+      left: Math.max(box.left, left + props.rect.left),
+      bottom: Math.min(box.bottom, top + props.rect.bottom),
+      right: Math.min(box.right, left + props.rect.right),
     };
-    // A selection that the page scrolled out of its frame has no action.
-    if (selected.bottom < box.top || selected.top > box.bottom) {
+    if (selected.bottom < selected.top || selected.right < selected.left) {
       setPosition(null);
       return;
     }
@@ -465,8 +474,13 @@ function PageQuoteAction(props: {
     () => place(),
   );
   onSettled(() => {
+    // The chat or the side panel scrolls the frame, so the action moves with it.
     window.addEventListener("resize", place);
-    return () => window.removeEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
   });
 
   return (
@@ -485,23 +499,7 @@ function PageQuoteAction(props: {
           aria-label={t("chat.selection.label")}
         >
           <div class="selection-actions-content">
-            <Button
-              variant="ghost"
-              type="button"
-              class="selection-actions-control"
-              aria-label={t("chat.selection.quote")}
-              aria-keyshortcuts={props.quoteShortcut === "meta" ? "Meta+Shift+Period" : "Control+Shift+Period"}
-              title={t(
-                props.quoteShortcut === "meta"
-                  ? "chat.selection.quoteShortcutMac"
-                  : "chat.selection.quoteShortcutOther",
-              )}
-              onPointerDown={(event) => event.preventDefault()}
-              onClick={() => props.onQuote()}
-            >
-              <TextQuote class="selection-actions-icon" aria-hidden="true" />
-              <span class="selection-actions-label">{t("chat.selection.quote")}</span>
-            </Button>
+            <QuoteSelectionButton quoteShortcut={props.quoteShortcut} onQuote={props.onQuote} />
           </div>
         </div>
       </div>

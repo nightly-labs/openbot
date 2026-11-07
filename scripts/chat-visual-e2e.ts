@@ -6,8 +6,8 @@
 //
 // Through the desktop bridge it makes a channel and asks the agent to publish a page with a counter,
 // an image, a "Pick B" button, a context button and a note. Then, on the desktop, it checks that:
-// 1. the chat shows the live page, Quote in it quotes the page file, and its side panel button opens
-//    the page as a side panel tab;
+// 1. the chat shows the live page, full screen and back keeps its state, Quote in it quotes the page
+//    file, and its side panel button opens the page as a side panel tab;
 // 2. in the side panel, a click on the image opens the image viewer;
 // 3. "Pick B" puts its text in the composer, with no reply block, and sends nothing;
 // 4. the context shows as a quote chip in the composer, and the sent message starts with it;
@@ -64,6 +64,7 @@ interface Report {
   agent?: { id: string; provider: string; model: string };
   channelId?: string;
   inline?: { framesInChat: number; count: string; quoteId: string; openedInPanel: boolean };
+  fullScreen?: { countBefore: string; countAfter: string; closedWithEscape: boolean };
   imageViewer?: boolean;
   pick?: { composerText: string; replyingToPage: boolean; messagesBefore: number; messagesAfter: number };
   context?: { chip: boolean; sentText: string };
@@ -138,6 +139,10 @@ async function selectInNote(page: FrameLocator, text: string): Promise<void> {
 /** The quote id that a chip in the composer keeps. */
 const chipQuoteId = (chip: Locator) => chip.evaluate((element) => element.getAttribute("data-quote-message-id") ?? "");
 
+/** Whether the page's box is in the top layer, as full screen puts it. */
+const inFullScreen = (frame: Locator) =>
+  frame.evaluate((element) => element.closest("[popover]")?.matches(":popover-open") === true);
+
 /** Sends one request to the agent and waits until its task ends. */
 async function ask(channelId: string, agentId: string, text: string, label: string) {
   const before = (await client.read(channelId)).tasks.length;
@@ -191,6 +196,38 @@ try {
   const inlineCount = await inlineCounter.innerText();
   assert.equal(inlineCount, "Count: 1", "The page in the chat does not run its script.");
   await shot("inline", conversation(desktop));
+
+  // Full screen and back keeps the page state, so the page does not load again.
+  await inlineFrame.hover();
+  await conversation(desktop)
+    .getByRole("button", { name: english("chat.visual.fullScreen"), exact: true })
+    .click();
+  await waitFor(desktop, "the page goes full screen", () => inFullScreen(inlineFrame), Boolean, UI_WAIT_MS);
+  // The page hears of full screen after the app, and then has the size of the full frame.
+  await waitFor(
+    desktop,
+    "the page has the full-screen size",
+    () => inlineCounter.evaluate(() => window.openbotPage?.displayMode === "fullscreen" && window.innerWidth > 720),
+    Boolean,
+    UI_WAIT_MS,
+  );
+  // The browser sends a click to the frame from the last drawn frame, so the moved page must be drawn.
+  await desktop.evaluate(
+    () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => done(undefined)))),
+  );
+  await clickInPage(inlineFrame, inlineCounter);
+  await shot("full-screen", desktop.locator("body"));
+  await desktop.keyboard.press("Escape");
+  const closedWithEscape = await waitFor(
+    desktop,
+    "the page leaves full screen",
+    async () => !(await inFullScreen(inlineFrame)),
+    Boolean,
+    UI_WAIT_MS,
+  );
+  const countAfter = await inlineCounter.innerText();
+  report.fullScreen = { countBefore: inlineCount, countAfter, closedWithEscape };
+  assert.equal(countAfter, "Count: 2", "The page loaded again in full screen.");
 
   await selectInNote(inlinePage, INLINE_QUOTE_TEXT);
   const actions = desktop.getByRole("toolbar", { name: english("chat.selection.label"), exact: true });

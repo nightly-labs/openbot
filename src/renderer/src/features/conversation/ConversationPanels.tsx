@@ -484,9 +484,11 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                   const quoteId = previewQuoteId();
                   if (quoteId) quoteSelection(quoteId, text);
                 }}
+                // The page state goes with the message that holds the page, as in the chat.
                 onPageContext={(text) => {
-                  const quoteId = previewQuoteId();
-                  if (quoteId) setPageContext(quoteId, text);
+                  const id = attached()?.id;
+                  const message = id && props.messages.find((item) => item.attachments?.some((file) => file.id === id));
+                  if (message) setPageContext(message, text);
                 }}
                 onPageMessage={addPageText}
                 isPageAppShortcut={isChatVisualAppShortcut}

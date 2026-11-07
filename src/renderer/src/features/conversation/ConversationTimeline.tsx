@@ -1272,7 +1272,7 @@ export function ConversationTimeline() {
                             height={visual().height}
                             onOpenLink={(url) => void openExternalMessageUrl(url)}
                             onMessage={addPageText}
-                            onContext={(text) => setPageContext(pageQuoteId(), text)}
+                            onContext={(text) => setPageContext(message() ?? initialMessage, text)}
                             onQuote={(text) => quoteSelection(pageQuoteId(), text)}
                             quoteShortcut={deviceQuoteShortcut(props.platform)}
                             onOpenInSidePanel={() => void previewAttachment(visual().attachment)}
