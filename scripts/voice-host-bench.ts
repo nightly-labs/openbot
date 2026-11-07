@@ -320,7 +320,7 @@ function exitAfterReply(exit: Promise<void>): Promise<number> {
 /** The bench saves no key. */
 const NO_CIPHER = { canPersist: () => false, encrypt: () => Buffer.alloc(0), decrypt: () => "" };
 
-/** The cloud speech keys, with none saved: the bench reads with Supertonic only. */
+/** The cloud dictation keys, with none saved: the bench transcribes with local models only. */
 function noDictationKeys(temporary: string) {
   return {
     elevenlabs: new VoiceApiKeyStore({ path: join(temporary, "voice-api-key.json"), cipher: NO_CIPHER }),
@@ -328,6 +328,7 @@ function noDictationKeys(temporary: string) {
   };
 }
 
+/** The cloud speech keys, with none saved: the bench reads with Supertonic only. */
 function noSpeechKeys(temporary: string) {
   return {
     elevenlabs: new VoiceApiKeyStore({ path: join(temporary, "speech-elevenlabs-key.json"), cipher: NO_CIPHER }),

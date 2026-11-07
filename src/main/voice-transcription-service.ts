@@ -439,6 +439,7 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
       GROQ_MODELS[modelId],
       audio,
       language,
+      { label: "Groq", refused: groqRefusal },
     ).pipe(
       Effect.flatMap((result) =>
         result.text.length > INPUT_LIMITS.messageText
@@ -579,6 +580,14 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
     this.#hostModelId = null;
     host?.kill();
   }
+}
+
+/** The text for a Groq answer that is not about the recording: a refused key or a rate limit. */
+function groqRefusal(status: number): string | null {
+  const provider = VOICE_KEY_PROVIDER_NAMES.groq;
+  if (status === 401 || status === 403) return sourceText("error.voice.cloud.keyRejected", { provider });
+  if (status === 429) return sourceText("error.voice.cloud.rateLimited", { provider });
+  return null;
 }
 
 function cloudProvider(modelId: CloudVoiceModelId): DictationKeyProvider {

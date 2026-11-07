@@ -229,7 +229,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       // The user's own server takes the whole recording once: it has no live preview or stream.
       ownServer = server?.routes.dictation === true;
       cloud = !ownServer && selected?.kind === "cloud";
-      streamed = cloud && selected?.kind === "cloud" && selected.provider === "elevenlabs";
+      // Only ElevenLabs streams. Groq takes the whole recording once, as the user's own server does.
+      streamed = selected?.kind === "cloud" && selected.provider === "elevenlabs" && !ownServer;
       livePreview = !ownServer && !streamed && (selected?.livePreview ?? true);
       ready = true;
       analytics.track("voice_conversation_action", {
@@ -601,7 +602,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         .catch(() => {});
   }
 
-  /** A cloud model hears through a stream: the whole recording is sent, then the stream ends. */
+  /** ElevenLabs hears through a stream: the whole recording is sent, then the stream ends. */
   async function transcribeStreamed(recording: Blob): Promise<{ text: string }> {
     const pcm = encodePcm16(await recordingToSamples(recording));
     const { streamId } = await deps.voice.startStream();

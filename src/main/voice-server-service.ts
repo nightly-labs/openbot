@@ -170,6 +170,7 @@ export class VoiceServerService extends EventEmitter<VoiceServerEvents> {
       model,
       wav,
       language,
+      { label: "Voice server" },
     );
   }).bind(this);
 
@@ -216,6 +217,17 @@ interface ServerTarget {
   apiKey: string | null;
 }
 
+/** How one caller of `transcribeRecording` names itself in logs and explains refused requests. */
+interface TranscriptionCaller {
+  /** The first words of the failure log line. It names no host. */
+  label: string;
+  /** The text for a status that the caller explains itself, or null for the shared text. */
+  refused?: StatusText;
+}
+
+/** Localized text for an answer status, or null to use the shared text. */
+type StatusText = (status: number) => string | null;
+
 /**
  * Sends a 16 kHz mono WAV recording to `POST {address}/audio/transcriptions` of an OpenAI-compatible
  * API. The user's own server and Groq dictation use it.
@@ -226,6 +238,7 @@ export function transcribeRecording(
   model: string,
   wav: Uint8Array,
   language: VoiceLanguage,
+  caller: TranscriptionCaller,
 ): Effect.Effect<VoiceTranscriptionResult, VoiceOperationError> {
   const form = new FormData();
   form.set("file", new Blob([new Uint8Array(wav)], { type: "audio/wav" }), "audio.wav");
@@ -240,6 +253,7 @@ export function transcribeRecording(
     { method: "POST", body: form },
     TRANSCRIPTION_TIMEOUT_MS,
     (response, host) => readJson(response, host, LIST_BODY_LIMIT),
+    caller.refused,
   ).pipe(
     Effect.flatMap((body) =>
       isDynamicRecord(body) && isString(body.text)
@@ -247,7 +261,7 @@ export function transcribeRecording(
         : Effect.fail(invalidAnswer(target.address)),
     ),
     Effect.mapError((failure) => {
-      logger.warn(`OpenAI-compatible transcription failed after ${Date.now() - startedAt}ms.`);
+      logger.warn(`${caller.label} transcription failed after ${Date.now() - startedAt}ms.`);
       return new VoiceOperationError({ cause: new Error(failure.message) });
     }),
   );
@@ -279,7 +293,8 @@ function invalidAudio(host: string) {
 
 /**
  * One request to `{address}/{path}`, with the status checks every route shares. `read` reads the body
- * while the request is still open, so the timeout and the abort cover it too.
+ * while the request is still open, so the timeout and the abort cover it too. `refused` explains a
+ * status before the shared checks do.
  */
 function exchange<A>(
   fetcher: typeof fetch,
@@ -288,6 +303,7 @@ function exchange<A>(
   init: RequestInit,
   timeoutMs: number,
   read: (response: Response, host: string) => Effect.Effect<A, VoiceServerFailure>,
+  refused?: StatusText,
 ): Effect.Effect<A, VoiceServerFailure> {
   const host = hostOf(target.address);
   const fail = (field: VoiceServerProbeField, message: string) => new VoiceServerFailure({ field, message });
@@ -310,12 +326,12 @@ function exchange<A>(
           try: () => fetcher(url, { ...init, headers, redirect: "manual", signal: controller.signal }),
           catch: () => fail("address", sourceText("error.provider.discoveryUnreachable", { host })),
         });
+        const explained = response.ok ? null : (refused?.(response.status) ?? null);
+        if (explained) return yield* fail("address", explained);
         if (response.status >= 300 && response.status < 400)
           return yield* fail("address", sourceText("error.provider.discoveryRedirect", { host }));
         if (response.status === 401 || response.status === 403)
           return yield* fail("apiKey", sourceText("error.voice.server.keyRefused", { host }));
-        if (response.status === 429)
-          return yield* fail("address", sourceText("error.voice.cloud.rateLimited", { provider: host }));
         if (!response.ok)
           return yield* fail(
             "address",
