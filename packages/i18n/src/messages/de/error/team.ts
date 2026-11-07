@@ -71,6 +71,7 @@ export const messages = {
   "error.team.agentHideUnsupported": "Diese Verbindung unterstützt das Ausblenden von Agenten nicht.",
   "error.team.agentColorsUnsupported": "Diese Verbindung unterstützt keine Agentenfarben.",
   "error.team.chatColorsUnsupported": "Diese Verbindung unterstützt keine Chatfarben.",
+  "error.team.routineRunPlaceUnsupported": "Diese Verbindung kann nicht ändern, wo eine Routine läuft.",
   "error.team.sidebarFoldersUnsupported": "Diese Verbindung unterstützt keine Ordner in Ordnern.",
   "error.team.agentNotificationLevelsUnsupported":
     "Dieser Server kann keine eigene Benachrichtigungsstufe pro Agent speichern. Aktualisiere OpenBot auf dem Computer, auf dem er läuft.",

@@ -73,7 +73,8 @@ export interface RoutinesPort {
   onceSchedule: boolean;
   /**
    * Whether the host keeps where an agent routine runs: the agent's chat or the routine's own thread.
-   * Only this computer's host does. The released Team API drops the field.
+   * This computer's host does, and a remote host with `routine-run-place-v1`. The released routine
+   * routes drop the field, so the remote adapters send it on that capability's routes.
    */
   runIn: boolean;
   list: () => Promise<RoutineEditorRecord[]>;
@@ -112,6 +113,7 @@ export function agentRoutinesPort(
   automation = false,
   localHost = false,
   api: AgentRoutinesApi = window.openbot.agent,
+  runPlace = localHost,
 ): RoutinesPort {
   return {
     ownerId: agentId,
@@ -119,17 +121,15 @@ export function agentRoutinesPort(
     limitPolicy: localHost,
     missedPolicy: localHost,
     onceSchedule: localHost,
-    runIn: localHost,
+    runIn: runPlace,
     list: () => api.listRoutines(agentId),
     listRuns: (routineId, limit) => api.listRoutineRuns({ agentId, routineId, limit }),
     save: ({ routineId, name, instruction, active, timezone, schedule, limitPolicy, missedPolicy, runIn }) => {
-      const policy = localHost
-        ? {
-            ...(limitPolicy ? { limitPolicy } : {}),
-            ...(missedPolicy ? { missedPolicy } : {}),
-            ...(runIn ? { runIn } : {}),
-          }
-        : {};
+      const policy = {
+        ...(localHost && limitPolicy ? { limitPolicy } : {}),
+        ...(localHost && missedPolicy ? { missedPolicy } : {}),
+        ...(runPlace && runIn ? { runIn } : {}),
+      };
       return (
         routineId
           ? api.updateRoutine({ agentId, routineId, name, instruction, active, schedule, ...policy })

@@ -67,6 +67,7 @@ export const messages = {
   "error.team.agentHideUnsupported": "当前连接不支持隐藏助手。",
   "error.team.agentColorsUnsupported": "当前连接不支持助手颜色。",
   "error.team.chatColorsUnsupported": "当前连接不支持聊天颜色。",
+  "error.team.routineRunPlaceUnsupported": "当前连接无法更改自动化任务的运行位置。",
   "error.team.sidebarFoldersUnsupported": "当前连接不支持文件夹嵌套。",
   "error.team.agentNotificationLevelsUnsupported":
     "此服务器无法为每个助手保存你自己的通知级别。请在运行它的电脑上更新 OpenBot。",

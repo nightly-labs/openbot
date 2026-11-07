@@ -531,9 +531,16 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         trigger: webhookTriggerOf(current) ?? { kind: "schedule", schedule: current.schedule },
         limitPolicy: current.limitPolicy,
         missedPolicy: current.missedPolicy,
-        ...(props.port.runIn ? { runIn: current.runIn } : {}),
+        // Only a changed place goes: a remote host sends it on a route of its own, after the save.
+        ...(props.port.runIn && current.runIn !== ((current.id ? draftBase?.runIn : undefined) ?? "chat")
+          ? { runIn: current.runIn }
+          : {}),
       });
-      const saved = result.routine;
+      // A remote answer leaves out the place that the host kept.
+      const saved =
+        props.port.runIn && result.routine.runIn === undefined
+          ? { ...result.routine, runIn: current.runIn }
+          : result.routine;
       setRoutines((items) => {
         const next = items.some((routine) => routine.id === saved.id)
           ? items.map((routine) => (routine.id === saved.id ? saved : routine))
@@ -544,7 +551,11 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       setDraft((latest) => (latest && latest.id === current.id ? { ...latest, id: saved.id } : latest));
       if (draft()?.id === current.id) draftBase = saved;
       const destinationSaved = await saveDestination(saved.id, current.destination);
-      if (draftRevision === savingRevision && destinationSaved) setDirty(false);
+      // A remote host can keep the new routine but not its place. The editor keeps the change, so Save
+      // tries again.
+      const placeSaved = !props.port.runIn || saved.runIn === current.runIn;
+      if (!placeSaved) setError(t("routine.settings.runInSaveFailed"));
+      if (draftRevision === savingRevision && destinationSaved && placeSaved) setDirty(false);
       if (!current.id) void loadRuns(saved.id);
       if (result.secret && draft()?.id === saved.id) {
         const secret = result.secret;

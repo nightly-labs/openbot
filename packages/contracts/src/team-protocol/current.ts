@@ -109,6 +109,7 @@ import { TEAM_REASONING_EFFORTS_CAPABILITY } from "./reasoning-efforts-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "./routine-flows-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "./routine-results-v1";
+import { ROUTINE_RUN_PLACE_CAPABILITY } from "./routine-run-place-v1";
 import { SERVER_AUDIT_CAPABILITY } from "./server-audit-v1";
 import { SHARED_TABLES_CAPABILITY } from "./shared-tables-v1";
 import { SIDE_QUESTION_CAPABILITY } from "./side-question-v1";
@@ -273,6 +274,7 @@ export {
   ROUTINE_FLOWS_CAPABILITY,
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RESULTS_CAPABILITY,
+  ROUTINE_RUN_PLACE_CAPABILITY,
   SERVER_AUDIT_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SIDE_QUESTION_CAPABILITY,
@@ -466,6 +468,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   CHANNEL_ISOLATION_CAPABILITY,
   AGENT_THREAD_PAGES_CAPABILITY,
   TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
+  ROUTINE_RUN_PLACE_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -637,7 +640,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== CODEX_API_KEY_CAPABILITY &&
     capability !== CHANNEL_ISOLATION_CAPABILITY &&
     capability !== AGENT_THREAD_PAGES_CAPABILITY &&
-    capability !== TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
+    capability !== TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY &&
+    capability !== ROUTINE_RUN_PLACE_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -685,6 +689,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   CHANNEL_ISOLATION_CAPABILITY,
   AGENT_THREAD_PAGES_CAPABILITY,
   TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
+  ROUTINE_RUN_PLACE_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -815,6 +820,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== CODEX_API_KEY_CAPABILITY &&
       capability !== CHANNEL_ISOLATION_CAPABILITY &&
       capability !== AGENT_THREAD_PAGES_CAPABILITY &&
-      capability !== TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
+      capability !== TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY &&
+      capability !== ROUTINE_RUN_PLACE_CAPABILITY,
   );
 }

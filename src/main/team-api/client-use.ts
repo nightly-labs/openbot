@@ -41,6 +41,7 @@ import { ANDROID_PUSH_NOTIFICATIONS_ROUTES } from "@openbot/contracts/team-proto
 import { PUSH_NOTIFICATIONS_ROUTES } from "@openbot/contracts/team-protocol/push-notifications-v1";
 import { ROUTINE_RECOVERY_ROUTES } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_ROUTES } from "@openbot/contracts/team-protocol/routine-results-v1";
+import { ROUTINE_RUN_PLACE_ROUTES } from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { SERVER_AUDIT_ROUTES } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SHARED_TABLES_ROUTES } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
@@ -66,6 +67,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   ROUTINE_RECOVERY_ROUTES.listRuns,
   ROUTINE_RESULTS_ROUTES.options,
   ROUTINE_RESULTS_ROUTES.destination,
+  ROUTINE_RUN_PLACE_ROUTES.list,
   HOST_UPDATE_ROUTES.status,
   HOST_RELEASE_ROUTES.status,
   HOST_MEMBER_UPDATE_ROUTES.status,

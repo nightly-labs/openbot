@@ -92,6 +92,7 @@ export function serverSupportsCapability(
       capability === "context-reset-v1" ||
       capability === "routine-flows-v1" ||
       capability === "routine-recovery-v1" ||
+      capability === "routine-run-place-v1" ||
       capability === "webhook-tests-v1" ||
       capability === "webhook-sender-secret-v1" ||
       capability === "agent-import-v1" ||

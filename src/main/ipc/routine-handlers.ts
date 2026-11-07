@@ -8,12 +8,22 @@ import {
   decodeChannelRoutineRuns,
   decodeChannelRoutines,
   decodeChannelSummaries,
+  type Routine,
   type RoutineCalendarOwner,
+  type RoutineRunPlace,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import {
+  decodeRoutineRunPlace,
+  decodeRoutineRunPlaces,
+  ROUTINE_RUN_PLACE_CAPABILITY,
+  ROUTINE_RUN_PLACE_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
+import { withRoutineRunPlaces } from "@openbot/team-client/team-api-requests";
 import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { localRoutineCalendarSource } from "../local-routine-calendar";
@@ -38,6 +48,8 @@ import {
 import type { IpcGroupHandlers } from "./define-ipc-group";
 import { scopedHandler } from "./scoped-handler";
 
+const runPlaceLogger = createOpenBotLogger("routine-run-place");
+
 interface RoutineIpcDependencies {
   service: AgentService;
   remoteServers: RemoteServerManager;
@@ -52,31 +64,46 @@ export function routineIpcHandlers({
       listRoutines: scopedHandler(parseAgentId, {
         local: (agentId) => service.listRoutines(agentId),
         remote: (agentId, serverId) =>
-          runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines)),
+          runCauseEffect(
+            Effect.gen(function* () {
+              const routines = remoteServers.request(serverId, TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines);
+              if (!remoteServers.supportsCapability(serverId, ROUTINE_RUN_PLACE_CAPABILITY)) return yield* routines;
+              const [list, places] = yield* Effect.all(
+                [
+                  routines,
+                  remoteServers.request(serverId, ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, {
+                    method: "POST",
+                    body: { agentId },
+                  }),
+                ],
+                { concurrency: "unbounded" },
+              );
+              return withRoutineRunPlaces(list, places);
+            }),
+          ),
       }),
       createRoutine: scopedHandler(parseCreateRoutine, {
         local: (parsed) => service.createRoutine(parsed),
-        remote: (parsed, serverId) =>
+        remote: ({ runIn, ...parsed }, serverId) =>
           runCauseEffect(
-            remoteServers.request(serverId, TEAM_API_ROUTES.agent.routines(parsed.agentId), decodeRoutine, {
-              method: "POST",
-              body: parsed,
-            }),
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agent.routines(parsed.agentId), decodeRoutine, {
+                method: "POST",
+                body: parsed,
+              })
+              .pipe(Effect.flatMap((routine) => withRemoteRunPlace(remoteServers, serverId, routine, runIn, true))),
           ),
       }),
       updateRoutine: scopedHandler(parseUpdateRoutine, {
         local: (parsed) => service.updateRoutine(parsed),
-        remote: (parsed, serverId) =>
+        remote: ({ runIn, ...parsed }, serverId) =>
           runCauseEffect(
-            remoteServers.request(
-              serverId,
-              TEAM_API_ROUTES.agent.routine(parsed.agentId, parsed.routineId),
-              decodeRoutine,
-              {
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agent.routine(parsed.agentId, parsed.routineId), decodeRoutine, {
                 method: "PATCH",
                 body: parsed,
-              },
-            ),
+              })
+              .pipe(Effect.flatMap((routine) => withRemoteRunPlace(remoteServers, serverId, routine, runIn))),
           ),
       }),
       deleteRoutine: scopedHandler(parseDeleteRoutine, {
@@ -128,6 +155,38 @@ export function routineIpcHandlers({
       }),
     },
   };
+}
+
+/**
+ * The released routine routes leave out where a routine runs, so a host with `routine-run-place-v1`
+ * gets the place on its own route after the save. A host without it keeps the saved place. The new
+ * routine exists, so a failed place does not fail the create: the routine runs in the chat, and a
+ * second save does not make a second routine.
+ */
+function withRemoteRunPlace(
+  remoteServers: RemoteServerManager,
+  serverId: string,
+  routine: Routine,
+  runIn: RoutineRunPlace | undefined,
+  created = false,
+) {
+  if (!runIn || !remoteServers.supportsCapability(serverId, ROUTINE_RUN_PLACE_CAPABILITY))
+    return Effect.succeed(routine);
+  const placed = remoteServers
+    .request(serverId, ROUTINE_RUN_PLACE_ROUTES.set, decodeRoutineRunPlace, {
+      method: "POST",
+      body: { agentId: routine.agentId, routineId: routine.id, runIn },
+    })
+    .pipe(Effect.map((place): Routine => ({ ...routine, runIn: place.runIn })));
+  if (!created) return placed;
+  return placed.pipe(
+    Effect.catch(() =>
+      Effect.sync((): Routine => {
+        runPlaceLogger.warn("The run place of a new remote routine was not set. The routine runs in the chat.");
+        return { ...routine, runIn: "chat" };
+      }),
+    ),
+  );
 }
 
 function calendar(input: { from: string; to: string }, source: RoutineCalendarSource<RemoteWorkflowError>) {

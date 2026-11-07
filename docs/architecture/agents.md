@@ -105,8 +105,15 @@ the marker it skips the turn's thinking too, so a later import does not bring a 
 
 An agent routine runs in the agent's own chat, unless its `runIn` is `thread` (migration 57; existing
 routines got `chat`, the place of runs before 0.61). Then it runs in its own side thread, the routine
-thread. The routine settings show a switch for it on this computer's host only: the Team API admin wire
-does not carry `runIn`, and a remote save without it keeps the saved place. The `create_routine`,
+thread. The routine settings show a switch for it on this computer's host, and on a joined host with
+the optional `routine-run-place-v1` capability (`packages/contracts/src/team-protocol/routine-run-place-v1.ts`,
+host route `routeRoutineRunPlace` in `src/main/team-api/route-routine-run-place.ts`). The released
+routine routes and the `events-v1` and `routine-recovery-v1` routes do not carry `runIn`, so the remote
+adapters (main IPC for desktop, `@openbot/team-client` for `/app`) read the places on their own list
+route and send a change to the set route after the save. Any member reads the places of an agent that
+they can see; a change needs manage access. The host saves the stored record again with only the new
+place, for schedule and webhook routines. A save without `runIn`, or to a host without the capability,
+keeps the saved place. The `create_routine`,
 `update_routine`, `create_webhook_routine` and `update_webhook_routine` tools take `runIn` too. A routine set back to `chat` keeps its thread, but new runs,
 the run marker's "Open thread" link, a test run and the routine's reply digest do not use it.
 `AgentTasks.routineThread` makes the thread on the first run in a thread, with the routine's name as its title and `routine_id` set

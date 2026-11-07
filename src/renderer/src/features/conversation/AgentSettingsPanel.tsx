@@ -88,6 +88,8 @@ interface AgentSettingsPanelProps
   eventRoutines?: EventRoutinesApi | undefined;
   /** The released schedule API of a client without the desktop port. Absent, preload sends it. */
   routines?: AgentRoutinesApi | undefined;
+  /** A joined host that advertises `routine-run-place-v1` keeps where each routine runs. */
+  routineRunPlace?: boolean | undefined;
   onCreateSkill?: (() => void) | undefined;
   onTrySkill?: ((skill: SkillDetail) => void) | undefined;
   /** Reads a file in the agent workspace, on the computer that runs the agent. */
@@ -218,6 +220,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       // Set only for the host on this computer, the one place the policy is kept.
       props.localHost === true,
       props.routines,
+      props.localHost === true || props.routineRunPlace === true,
     ),
   );
   const routinesPort = createMemo(() => {

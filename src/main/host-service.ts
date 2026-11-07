@@ -141,6 +141,7 @@ interface HostServiceOptions {
   routineFlows?: ForwardedApiOptions["routineFlows"];
   workflows?: ForwardedApiOptions["workflows"];
   hiddenAgents?: ForwardedApiOptions["hiddenAgents"];
+  routineRunPlaces?: ForwardedApiOptions["routineRunPlaces"];
   /** The level that each person chose for each agent (`agent-notification-levels-v1`). */
   agentNotificationLevels?: AgentNotificationLevelStore;
   /** The chats that each person pinned (`sidebar-pins-v1`). */
@@ -498,6 +499,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.routineFlows === undefined ? {} : { routineFlows: options.routineFlows }),
       ...(options.workflows === undefined ? {} : { workflows: options.workflows }),
       ...(options.hiddenAgents === undefined ? {} : { hiddenAgents: options.hiddenAgents }),
+      ...(options.routineRunPlaces === undefined ? {} : { routineRunPlaces: options.routineRunPlaces }),
       ...(options.agentNotificationLevels === undefined
         ? {}
         : { agentNotificationLevels: this.#agentNotificationLevels(options.agentNotificationLevels) }),

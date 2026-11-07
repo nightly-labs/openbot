@@ -8,6 +8,7 @@
 // Pass driver and the real Bitwarden adapter, the
 // host's Vault (`vault-v1`, its API keys through `vault-v2`, and the CSV import of `vault-import-v1`)
 // over the real service and store,
+// where each routine runs (`routine-run-place-v1`) over stand-in routine records,
 // a password that an admin saves from the secure card (`browser-secret-vault-v1`),
 // direct-message isolation, agents hidden from an older
 // protocol, the queue routes, message delete (`message-delete-v1`) under the agent roles, the attachment and file routes with their size limits, and the error
@@ -157,6 +158,10 @@ import {
   ROUTINE_RESULTS_CAPABILITY,
   ROUTINE_RESULTS_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-results-v1";
+import {
+  ROUTINE_RUN_PLACE_CAPABILITY,
+  ROUTINE_RUN_PLACE_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { SIDE_QUESTION_CAPABILITY, SIDE_QUESTION_ROUTES } from "@openbot/contracts/team-protocol/side-question-v1";
 import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
@@ -186,6 +191,7 @@ import { runCauseEffect } from "../src/backend/effect-boundary";
 import { MessageDeleteRefused } from "../src/backend/message-delete";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { RoutineResultError } from "../src/backend/routine-results/routine-results";
+import type { OwnedRoutineRecord } from "../src/backend/routine-store";
 import { TeamChatStore } from "../src/backend/team-chat-store";
 import type { AgentAccessState } from "../src/main/agent-access-store";
 import { createAgentFolders } from "../src/main/agent-folders";
@@ -208,6 +214,7 @@ import type {
   TeamApiBrowser,
   TeamApiConnectors,
   TeamApiMailbox,
+  TeamApiRoutineRunPlaces,
 } from "../src/main/team-api/dependencies";
 import { isPeerHiddenProvider } from "../src/main/team-api/provider-visibility";
 import { TeamApiServer } from "../src/main/team-api-server";
@@ -438,6 +445,81 @@ const agentAccess: TeamApiAgentAccess = {
   copyAgent: unused("agentAccess.copyAgent"),
 };
 
+// The routine records of `agent-ada` for `routine-run-place-v1`: a schedule routine, a webhook routine
+// and a `once` routine, all in the agent's chat. A save records its input and keeps the new place.
+const routineRecordTimes = { createdAt: "2026-11-01T08:00:00.000Z", updatedAt: "2026-11-01T08:00:00.000Z" };
+let routineRecords: OwnedRoutineRecord[] = [
+  {
+    id: "routine-ada",
+    ownerId: "agent-ada",
+    name: "Morning report",
+    instruction: "Report the overnight changes.",
+    active: true,
+    timezone: "Europe/Warsaw",
+    limitPolicy: "wait",
+    missedPolicy: "skip",
+    runIn: "chat",
+    trigger: {
+      kind: "schedule",
+      id: "trigger-ada",
+      routineId: "routine-ada",
+      schedule: { kind: "daily", time: "08:00" },
+      nextRunAt: "2026-11-08T07:00:00.000Z",
+      ...routineRecordTimes,
+    },
+    ...routineRecordTimes,
+  },
+  {
+    id: "routine-hook",
+    ownerId: "agent-ada",
+    name: "Deploy watch",
+    instruction: "Check each deploy.",
+    active: true,
+    timezone: "Europe/Warsaw",
+    runIn: "chat",
+    trigger: {
+      kind: "webhook",
+      routeId: "route-hook",
+      url: "https://hooks.example.test/route-hook",
+      eventType: "deploy",
+      filters: [],
+      ...routineRecordTimes,
+    },
+    ...routineRecordTimes,
+  },
+  {
+    id: "routine-once",
+    ownerId: "agent-ada",
+    name: "Launch day check",
+    instruction: "Check the launch.",
+    active: true,
+    timezone: "Europe/Warsaw",
+    runIn: "chat",
+    trigger: {
+      kind: "schedule",
+      id: "trigger-once",
+      routineId: "routine-once",
+      schedule: { kind: "once", date: "2026-12-01", time: "09:00" },
+      nextRunAt: "2026-12-01T08:00:00.000Z",
+      ...routineRecordTimes,
+    },
+    ...routineRecordTimes,
+  },
+];
+const fakeRoutineRunPlaces: TeamApiRoutineRunPlaces = {
+  list: (owner) => routineRecords.filter((routine) => routine.ownerId === owner.id),
+  get: (owner, routineId) =>
+    routineRecords.find((routine) => routine.ownerId === owner.id && routine.id === routineId) ?? null,
+  save: (owner, routineId, input) => {
+    record("saveRoutineRecord", owner, routineId, input);
+    const current = routineRecords.find((routine) => routine.id === routineId);
+    if (!current) throw new Error("No routine record to save.");
+    const saved = { ...current, ...(input.runIn ? { runIn: input.runIn } : {}) };
+    routineRecords = routineRecords.map((routine) => (routine.id === routineId ? saved : routine));
+    return saved;
+  },
+};
+
 const fakeAgents: TeamApiAgents = {
   on: (_event, listener) => {
     agentEventListeners.add(listener);
@@ -569,7 +651,17 @@ const fakeAgents: TeamApiAgents = {
   clearMemories: unused("clearMemories"),
   listRoutines: unused("listRoutines"),
   createRoutine: unused("createRoutine"),
-  updateRoutine: unused("updateRoutine"),
+  // Only a run place change of a schedule routine (`routine-run-place-v1`) updates a routine here.
+  updateRoutine: (input, options) => {
+    record("updateRoutine", input, options);
+    const current = routineRecords.find((routine) => routine.id === input.routineId);
+    if (current?.trigger.kind !== "schedule") throw new Error("No schedule routine to update.");
+    const { kind: _kind, ...trigger } = current.trigger;
+    const saved = { ...current, ...(input.runIn ? { runIn: input.runIn } : {}) };
+    routineRecords = routineRecords.map((routine) => (routine.id === input.routineId ? saved : routine));
+    const { ownerId: _ownerId, trigger: _record, ...fields } = saved;
+    return { ...fields, agentId: input.agentId, trigger };
+  },
   deleteRoutine: unused("deleteRoutine"),
   testRoutine: unused("testRoutine"),
   listRoutineRuns: unused("listRoutineRuns"),
@@ -1424,6 +1516,7 @@ try {
       setServer: (memberId, level) => agentLevels.setServer(memberId, level),
       subscribe: (listener) => agentLevels.subscribe(listener),
     },
+    routineRunPlaces: fakeRoutineRunPlaces,
     hiddenAgents: {
       listHiddenAgents: () => hidden,
       setAgentHidden: (input) =>
@@ -5905,6 +5998,172 @@ try {
       "a file that is not a password export gets the Vault's own sentence",
       errorIs(notCsv, 400, sourceText("error.vault.csvInvalid")),
       summary(notCsv),
+    );
+  }
+
+  // ---- Where each routine runs (routine-run-place-v1) ----
+  {
+    const capabilities = [AGENT_HIDDEN_CAPABILITY, ROUTINE_RUN_PLACE_CAPABILITY];
+    const saves = () => [...callsOf("updateRoutine"), ...callsOf("saveRoutineRecord")];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises routine-run-place-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(ROUTINE_RUN_PLACE_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(ROUTINE_RUN_PLACE_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", ROUTINE_RUN_PLACE_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", routineId: "routine-ada", runIn: "thread" },
+    });
+    check(
+      "the set route without the capability gets 400 routineRunPlaceUnsupported, and saves nothing",
+      errorIs(unsupported, 400, sourceText("error.team.routineRunPlaceUnsupported")) && saves().length === 0,
+      summary(unsupported),
+    );
+    const before = await call("POST", ROUTINE_RUN_PLACE_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    const adminBefore = await call("POST", ROUTINE_RUN_PLACE_ROUTES.list, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    check(
+      "a member reads the places of the schedule routines that the released routes show; an admin also reads the webhook routines; nobody reads a `once` routine",
+      before.status === 200 &&
+        isDeepStrictEqual(before.body, { routines: [{ routineId: "routine-ada", runIn: "chat" }] }) &&
+        isDeepStrictEqual(adminBefore.body, {
+          routines: [
+            { routineId: "routine-ada", runIn: "chat" },
+            { routineId: "routine-hook", runIn: "chat" },
+          ],
+        }),
+      [summary(before), summary(adminBefore)],
+    );
+    const memberHook = await call("POST", ROUTINE_RUN_PLACE_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", routineId: "routine-hook", runIn: "thread" },
+      capabilities,
+    });
+    const onceSet = await call("POST", ROUTINE_RUN_PLACE_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-ada", routineId: "routine-once", runIn: "thread" },
+      capabilities,
+    });
+    check(
+      "a member who changes a webhook routine, and anybody who changes a `once` routine, gets 404 routineGone, and the host saves nothing",
+      errorIs(memberHook, 404, sourceText("error.backend.routineGone")) &&
+        errorIs(onceSet, 404, sourceText("error.backend.routineGone")) &&
+        saves().length === 0,
+      [summary(memberHook), summary(onceSet)],
+    );
+    const schedule = await call("POST", ROUTINE_RUN_PLACE_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", routineId: "routine-ada", runIn: "thread" },
+      capabilities,
+    });
+    const webhook = await call("POST", ROUTINE_RUN_PLACE_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-ada", routineId: "routine-hook", runIn: "thread" },
+      capabilities,
+    });
+    check(
+      "a member with manage access moves a schedule routine, and an admin a webhook routine, to their own threads; the host changes only the place, with no routine card in the chat",
+      schedule.status === 200 &&
+        isDeepStrictEqual(schedule.body, { routineId: "routine-ada", runIn: "thread" }) &&
+        webhook.status === 200 &&
+        isDeepStrictEqual(webhook.body, { routineId: "routine-hook", runIn: "thread" }) &&
+        isDeepStrictEqual(saves(), [
+          [{ agentId: "agent-ada", routineId: "routine-ada", runIn: "thread" }, { recordConversationEvent: false }],
+          [
+            { kind: "agent", id: "agent-ada" },
+            "routine-hook",
+            {
+              name: "Deploy watch",
+              instruction: "Check each deploy.",
+              active: true,
+              timezone: "Europe/Warsaw",
+              runIn: "thread",
+              trigger: { kind: "webhook", eventType: "deploy", filters: [], secretCiphertext: null },
+            },
+          ],
+        ]),
+      [summary(schedule), summary(webhook), saves()],
+    );
+    const same = await call("POST", ROUTINE_RUN_PLACE_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", routineId: "routine-ada", runIn: "thread" },
+      capabilities,
+    });
+    const after = await call("POST", ROUTINE_RUN_PLACE_ROUTES.list, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    check(
+      "the place that is already saved saves nothing, and the list shows the new places",
+      isDeepStrictEqual(same.body, { routineId: "routine-ada", runIn: "thread" }) &&
+        saves().length === 2 &&
+        isDeepStrictEqual(after.body, {
+          routines: [
+            { routineId: "routine-ada", runIn: "thread" },
+            { routineId: "routine-hook", runIn: "thread" },
+          ],
+        }),
+      [summary(same), summary(after)],
+    );
+    accessLevels = { revision: 10, everyone: { "agent-ada": "view" }, roles: [] };
+    const viewerList = await call("POST", ROUTINE_RUN_PLACE_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    const viewerSet = await call("POST", ROUTINE_RUN_PLACE_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", routineId: "routine-ada", runIn: "chat" },
+      capabilities,
+    });
+    accessLevels = { revision: 11, everyone: {}, roles: [] };
+    check(
+      "a member who can only view the agent reads the places, gets 403 agentManageDenied on a change, and the host saves nothing",
+      viewerList.status === 200 &&
+        errorIs(viewerSet, 403, sourceText("error.team.agentManageDenied")) &&
+        saves().length === 2,
+      [summary(viewerList), summary(viewerSet)],
+    );
+    const gone = await call("POST", ROUTINE_RUN_PLACE_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", routineId: "routine-none", runIn: "chat" },
+      capabilities,
+    });
+    const badPlace = await call("POST", ROUTINE_RUN_PLACE_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", routineId: "routine-ada", runIn: "side" },
+      capabilities,
+    });
+    const missing = await call("POST", ROUTINE_RUN_PLACE_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-none" },
+      capabilities,
+    });
+    const hiddenAgent = await call("POST", ROUTINE_RUN_PLACE_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-pi" },
+      capabilities,
+      protocol: 6,
+    });
+    check(
+      "a routine that the agent does not have gets 404 routineGone, a place that the codec does not know gets 400, and an unknown or hidden agent gets 404; the host saves nothing",
+      errorIs(gone, 404, sourceText("error.backend.routineGone")) &&
+        badPlace.status === 400 &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
+        saves().length === 2,
+      [summary(gone), summary(badPlace), summary(missing), summary(hiddenAgent)],
     );
   }
 
