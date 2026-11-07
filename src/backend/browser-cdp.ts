@@ -355,8 +355,9 @@ export class BrowserCdpEngine {
       clear: (secret: string) => Effect.Effect<boolean, BrowserOperationError>;
       /**
        * Which secret the fields are built for, so a fill that no user approves goes only there: every
-       * field is a password field, or every field asks for a one-time code. The fingerprint check of
-       * `enter` keeps this true until the fill.
+       * field is a password field, or every field asks for a one-time code. A text field that the page
+       * masks with `-webkit-text-security` is a password field. The fingerprint check of `enter` keeps
+       * this true until the fill; the mask is read here only, because a page can change it as it fills.
        */
       fields: { password: boolean; oneTimeCode: boolean };
       /**
@@ -436,7 +437,7 @@ export class BrowserCdpEngine {
             send,
             node.backendNodeId,
             `function() {
-              return { password: this.type === 'password', oneTimeCode: (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code'), network: ${LOADED_FROM_NETWORK} };
+              return { password: this.type === 'password' || (this.type === 'text' && !['', 'none'].includes(getComputedStyle(this).getPropertyValue('-webkit-text-security'))), oneTimeCode: (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code'), network: ${LOADED_FROM_NETWORK} };
             }`,
             [],
           );
