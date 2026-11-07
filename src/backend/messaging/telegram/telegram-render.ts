@@ -55,6 +55,11 @@ export function telegramChunks(markdown: string): string[] {
   return slackChunks(markdown, TELEGRAM_CHUNK_CHARACTERS);
 }
 
+/** An answer as plain text, for a post that Telegram refused as HTML. It mentions nobody. */
+export function telegramPlainText(markdown: string): string {
+  return inertMentions(markdown);
+}
+
 /** If an answer notifies a person: `@username` or `@<user id>` outside code and link labels. */
 export function hasTelegramMention(markdown: string): boolean {
   let fence = false;
@@ -104,7 +109,7 @@ function inlineHtml(line: string, mentionName: ((userId: string) => string) | un
       });
       // A user id becomes a link like the others, so the escape and the markup below leave it whole.
       const mentioned = mentionName
-        ? text.replace(/(?<![\w@])@([0-9]+)\b/gu, (_match, userId: string) => {
+        ? text.replace(/(?<![\w@])@([0-9]{5,20})\b/gu, (_match, userId: string) => {
             links.push(`<a href="tg://user?id=${userId}">${escapeHtml(mentionName(userId))}</a>`);
             return `\uE002${links.length - 1}\uE002`;
           })
@@ -122,8 +127,8 @@ function inlineHtml(line: string, mentionName: ((userId: string) => string) | un
     .join("");
 }
 
-/** `@username` (5 to 32 characters) or `@<user id>`, not in an email address. */
-const TELEGRAM_MENTION = /(?<![\w@])@(?:[0-9]+\b|[A-Za-z][A-Za-z0-9_]{4,31}\b)/u;
+/** `@username` (5 to 32 characters) or `@<user id>` (5 to 20 digits), not in an email address. */
+const TELEGRAM_MENTION = /(?<![\w@])@(?:[0-9]{5,20}\b|[A-Za-z][A-Za-z0-9_]{4,31}\b)/u;
 
 /** `@name` with a word joiner after `@`: Telegram then sees no mention. */
 function inertMentions(text: string): string {

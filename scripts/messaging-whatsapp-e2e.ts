@@ -847,7 +847,9 @@ try {
       const sentFrom = phone.sent.length;
       // Without a mention, the answer replaces the status post in place.
       const quiet = await runCauseEffect(adapter.post(target, { text: "Working on it…" }));
-      assert.equal(await runCauseEffect(adapter.postAnswer(target, "Done.", quiet)), quiet);
+      // An email address and a number in code mention nobody.
+      const quietText = `Done. Mail support@${FRIEND}.example, run \`ping @${FRIEND}\`.`;
+      assert.equal(await runCauseEffect(adapter.postAnswer(target, quietText, quiet)), quiet);
       assert.ok(
         phone.sent.some((sent) => "edit" in sent.content && sent.content.edit?.id === quiet),
         "An answer without a mention did not edit the status post.",
@@ -861,11 +863,11 @@ try {
         !sent.some((entry) => "edit" in entry.content && entry.content.edit?.id === status),
         "An answer with a mention was an edit, which notifies nobody.",
       );
-      assert.ok(
-        sent.some((entry) => "delete" in entry.content && entry.content.delete?.id === status),
-        "The status post stayed above the answer.",
-      );
-      const answer = sent.find((entry) => entry.id === answerId);
+      const deleted = sent.findIndex((entry) => "delete" in entry.content && entry.content.delete?.id === status);
+      assert.ok(deleted >= 0, "The status post stayed above the answer.");
+      const answerAt = sent.findIndex((entry) => entry.id === answerId);
+      assert.ok(answerAt < deleted, "The status post was deleted before the answer was posted.");
+      const answer = sent[answerAt];
       assert.ok(answer && "mentions" in answer.content, "The answer was not sent.");
       assert.deepEqual(answer.content.mentions, [`${FRIEND}@s.whatsapp.net`], "The answer did not list the person.");
       return { mentions: answer.content.mentions };

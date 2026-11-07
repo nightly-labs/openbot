@@ -1,8 +1,8 @@
 // Checks that a Telegram answer notifies the people it mentions. Runs the real Telegram driver and
 // adapter; only Signal's relay of the Bot API calls is a stand-in, so no bot, account or network is
 // used. An answer with `@username` or `@<user id>` is a new post with live mentions, because an edit
-// notifies nobody; an answer without one still edits the status post; the plain-text fallback keeps
-// `@username`; a status post still cannot mention anyone.
+// notifies nobody, and the status post goes only after that post; an answer without one still edits
+// the status post; the plain-text fallback and a status post still mention nobody.
 //
 // Run: bun scripts/messaging-telegram-mentions-e2e.ts
 // Writes .openbot-build/messaging-telegram-mentions-e2e/report.json and exits non-zero on a failure.
@@ -27,6 +27,7 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/messaging-telegram-m
 const BOT = "7000000001";
 const CHAT = "-1001234567890";
 const WORD_JOINER = "⁠";
+const USER_ID = "424242424";
 
 interface Call {
   method: TelegramCallMethod;
@@ -43,6 +44,8 @@ const calls: Call[] = [];
 let nextMessageId = 500;
 /** While set, Telegram refuses the next HTML post as it refuses HTML that it cannot parse. */
 let refuseHtml = false;
+/** While set, Telegram refuses the next post, as for a chat that the bot left. */
+let refusePost = false;
 
 const unused = (): never => {
   throw new Error("The Telegram adapter used a relay call that this check does not give.");
@@ -71,6 +74,12 @@ const ingress: MessagingIngress = {
           new MessagingAdapterError({
             cause: new TelegramCallError(400, "Bad Request: can't parse entities", null),
           }),
+        );
+      }
+      if (refusePost && method === "sendMessage") {
+        refusePost = false;
+        return Effect.fail(
+          new MessagingAdapterError({ cause: new TelegramCallError(400, "Bad Request: chat not found", null) }),
         );
       }
       nextMessageId += 1;
@@ -133,20 +142,36 @@ try {
   await step("an answer with a mention is a new post that mentions the people", async () => {
     let answerId = "";
     const made = await callsOf(async () => {
-      answerId = await runCauseEffect(adapter.postAnswer(target, "Done @42, and @alice_bob please check.", "101"));
+      answerId = await runCauseEffect(
+        adapter.postAnswer(target, `Done @${USER_ID}, and @alice_bob please check.`, "101"),
+      );
     });
     assert.deepEqual(
       made.map((call) => call.method),
-      ["deleteMessage", "sendMessage"],
+      ["sendMessage", "deleteMessage"],
       "An answer with a mention edited the status post, which notifies nobody.",
     );
-    assert.equal(messageIdOf(made[0]), 101, "The status post was not deleted.");
+    assert.equal(messageIdOf(made[1]), 101, "The status post was not deleted.");
     assert.notEqual(answerId, "101");
-    const html = textOf(made[1]);
-    assert.equal(parseModeOf(made[1]), "HTML");
-    assert.match(html, /<a href="tg:\/\/user\?id=42">42<\/a>/u, "The user id is not a mention link.");
+    const html = textOf(made[0]);
+    assert.equal(parseModeOf(made[0]), "HTML");
+    assert.ok(html.includes(`<a href="tg://user?id=${USER_ID}">${USER_ID}</a>`), "The user id is not a mention link.");
     assert.ok(html.includes("@alice_bob") && !html.includes(WORD_JOINER), "The @username is not a live mention.");
     return { html };
+  });
+
+  await step("when the new post fails, the status post stays for the next attempt", async () => {
+    refusePost = true;
+    const made = await callsOf(async () => {
+      const result = await Effect.runPromise(Effect.result(adapter.postAnswer(target, "Done @alice_bob", "103")));
+      assert.equal(result._tag, "Failure", "A refused post did not fail the answer.");
+    });
+    assert.deepEqual(
+      made.map((call) => call.method),
+      ["sendMessage"],
+      "The status post was deleted before the answer was posted.",
+    );
+    return { methods: made.map((call) => call.method) };
   });
 
   await step("a post to another place mentions the people", async () => {
@@ -159,7 +184,7 @@ try {
     return { text: textOf(made[0]) };
   });
 
-  await step("the plain-text fallback keeps the @username", async () => {
+  await step("the plain-text fallback mentions nobody", async () => {
     refuseHtml = true;
     const made = await callsOf(() => runCauseEffect(adapter.postAnswer(target, "Thanks @alice_bob <3", null)));
     assert.deepEqual(
@@ -167,14 +192,13 @@ try {
       ["sendMessage", "sendMessage"],
     );
     assert.equal(parseModeOf(made[1]), undefined, "The fallback was not plain text.");
-    assert.equal(textOf(made[1]), "Thanks @alice_bob <3");
+    assert.equal(textOf(made[1]), `Thanks @${WORD_JOINER}alice_bob <3`);
     return { text: textOf(made[1]) };
   });
 
-  await step("mentions in code, a link label and an email address stay inert", async () => {
-    const made = await callsOf(() =>
-      runCauseEffect(adapter.postAnswer(target, "Run `ping @42`, mail a@example.com, [@42 doc](https://e.x)", "102")),
-    );
+  await step("mentions in code, a link label, an email address and a short number stay inert", async () => {
+    const text = `Run \`ping @${USER_ID}\`, mail a@example.com, rated @4.5, [@${USER_ID} doc](https://e.x)`;
+    const made = await callsOf(() => runCauseEffect(adapter.postAnswer(target, text, "102")));
     assert.deepEqual(
       made.map((call) => call.method),
       ["editMessageText"],
