@@ -1,10 +1,10 @@
 {
-  "version": "0.63.0",
+  "version": "0.64.0",
   "highlights": [
-    "Claude stays signed in after a restart or an update, and Claude agents use less of the 5-hour usage window.",
-    "Choose when the plan card starts a long task by itself, or let it start only when you press Start.",
-    "Choose the provider account when you create an agent.",
-    "The Usage page shows how often your agents load each skill and what it costs.",
-    "Connect Higgsfield in the Marketplace to make images, videos and audio."
+    "If your Claude agents use your own CLAUDE.md, skills or hooks, turn on Use my Claude Code setup in Settings → Providers → Claude.",
+    "Put your agents on the new agent dock at the edge of your Mac screen, and chat with them from there.",
+    "Agents now write short updates while they work. Choose Classic in Server settings to keep the old style.",
+    "Members of a joined server can add their own MCP servers and connect apps such as Trello.",
+    "Attach a file of any type to a chat, and send files of up to 100 MB from the web app."
   ]
 }

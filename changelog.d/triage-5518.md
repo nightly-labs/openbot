@@ -1,5 +1,0 @@
-### Fixed
-
-- When an agent tries to stop a teammate's work and a task of the teammate still runs, the agent now
-  learns that the task continues and that you can stop it from the task tab. Before, the agent was
-  told that nothing ran.

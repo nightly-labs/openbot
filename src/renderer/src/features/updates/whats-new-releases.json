@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.64.0",
+    "date": "2026-11-07",
+    "notices": [
+      "If your Claude agents use your own CLAUDE.md, skills or hooks, turn on Settings → Providers → Claude → Use my Claude Code setup."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Put your agents on the new agent dock at the edge of the screen on macOS. Turn it off in Settings → Agent dock.",
+          "Agents now write short updates while they work. To get the old style, choose Classic in Server settings → Personality.",
+          "Start a new conversation or compact the context of a channel from its settings.",
+          "Members of a joined server can add their own MCP servers and connect apps such as Trello.",
+          "Choose who can control this computer with remote desktop in Server settings → Remote desktop.",
+          "Use OpenBot in Hebrew, and connect GitLab, Omnisend and ElevenLabs in the Marketplace."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Attach a file of any type to a chat, such as a certificate or a VPN profile.",
+          "The web app opens and sends files of up to 100 MB.",
+          "A message shows React, Reply and More when you hover it. Turn off Settings → General → Compact message actions to get the full row.",
+          "On a Mac, ⌘Q asks you to hold it only while an agent works."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Mentions in Slack, Discord, Telegram and WhatsApp posts now notify the person.",
+          "When a provider quota runs out, the agent continues the work on its first ready backup model.",
+          "A chat that compacted again after each turn now stops automatic compactions after 2 in a row.",
+          "OpenBot no longer closes when an agent's browser action waits on a page that navigates.",
+          "Proton Pass logins work after OpenBot restarts."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.63.0",
     "date": "2026-11-06",
     "notices": [],
